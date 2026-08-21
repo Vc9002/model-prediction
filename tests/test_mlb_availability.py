@@ -22,8 +22,9 @@ class _Response:
 
 
 class _FakeClient:
-    def __init__(self, roster_payload: dict[str, Any] | None = None,
-                 transactions_payload: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self, roster_payload: dict[str, Any] | None = None, transactions_payload: dict[str, Any] | None = None
+    ) -> None:
         self._roster_payload = roster_payload or {"roster": []}
         self._transactions_payload = transactions_payload or {"transactions": []}
         self.requested: list[tuple[str, dict[str, Any]]] = []
@@ -94,8 +95,9 @@ def _roster_entry(
     }
 
 
-def _entry(team_id: int, player_name: str, reported_date: str, type_desc: str,
-           effective_date: str | None = None) -> dict[str, Any]:
+def _entry(
+    team_id: int, player_name: str, reported_date: str, type_desc: str, effective_date: str | None = None
+) -> dict[str, Any]:
     return {
         "team_id": team_id,
         "player_id": 1,
@@ -147,18 +149,22 @@ def test_capture_roster_snapshot_writes_raw_and_normalized_files(tmp_path) -> No
     )
     observed = datetime(2026, 8, 1, 12, tzinfo=UTC)
 
-    payload = mlb_injuries.capture_roster_snapshot(
-        tmp_path, [147], observed_at=observed, client=client
-    )
+    payload = mlb_injuries.capture_roster_snapshot(tmp_path, [147], observed_at=observed, client=client)
 
     assert payload["entries"] == [
         {
-            "team_id": 147, "player_id": 1, "player_name": "Gerrit Cole",
-            "current_status": "Active", "position_type": "Pitcher",
+            "team_id": 147,
+            "player_id": 1,
+            "player_name": "Gerrit Cole",
+            "current_status": "Active",
+            "position_type": "Pitcher",
         },
         {
-            "team_id": 147, "player_id": 2, "player_name": "Some Reliever",
-            "current_status": "Injured 15-Day", "position_type": "Pitcher",
+            "team_id": 147,
+            "player_id": 2,
+            "player_name": "Some Reliever",
+            "current_status": "Injured 15-Day",
+            "position_type": "Pitcher",
         },
     ]
     written = list((tmp_path / "availability" / "mlb" / "snapshots" / "2026-08-01").glob("roster-*.json"))
@@ -505,9 +511,14 @@ def test_rehab_assignment_flags_starter_unavailable_even_without_an_in_window_il
         team_ids=[147, 119],
         entries=[
             _entry(
-                147, "Gerrit Cole", "2026-07-29",
+                147,
+                "Gerrit Cole",
+                "2026-07-29",
                 "Status Change",
-            ) | {"description": "New York Yankees sent RHP Gerrit Cole on a rehab assignment to Somerset Patriots."},
+            )
+            | {
+                "description": "New York Yankees sent RHP Gerrit Cole on a rehab assignment to Somerset Patriots."
+            },
         ],
         observed_at_utc="2026-08-01T12:00:00Z",
     )
@@ -532,7 +543,9 @@ def test_activation_after_rehab_assignment_still_clears_the_flag(tmp_path, monke
         team_ids=[147, 119],
         entries=[
             _entry(147, "Gerrit Cole", "2026-07-20", "Status Change")
-            | {"description": "New York Yankees sent RHP Gerrit Cole on a rehab assignment to Somerset Patriots."},
+            | {
+                "description": "New York Yankees sent RHP Gerrit Cole on a rehab assignment to Somerset Patriots."
+            },
             _entry(147, "Gerrit Cole", "2026-07-30", "Activated")
             | {"description": "New York Yankees activated RHP Gerrit Cole from the 15-day injured list."},
         ],
@@ -571,7 +584,7 @@ def test_retroactively_backdated_effective_date_never_leaks_future_knowledge(tmp
             _entry(
                 147,
                 "Gerrit Cole",
-                reported_date="2026-08-05",   # reported AFTER the decision date
+                reported_date="2026-08-05",  # reported AFTER the decision date
                 effective_date="2026-07-20",  # but claims to be effective BEFORE it
                 type_desc="Injured List (15-Day)",
             ),
@@ -907,7 +920,12 @@ def test_position_players_excludes_missing_position_type(tmp_path) -> None:
         team_ids=[147],
         entries=[
             _roster_entry(147, "Active Outfielder", "Active", position_type="Outfielder"),
-            {"team_id": 147, "player_id": 2, "player_name": "Legacy Entry", "current_status": "Injured 10-Day"},
+            {
+                "team_id": 147,
+                "player_id": 2,
+                "player_name": "Legacy Entry",
+                "current_status": "Injured 10-Day",
+            },
         ],
         observed_at_utc="2026-08-01T12:00:00Z",
     )

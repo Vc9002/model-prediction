@@ -26,10 +26,16 @@ class _FakeESPN:
                         {
                             "status": {"type": {"completed": True, "state": "post"}},
                             "competitors": [
-                                {"homeAway": "away", "score": "3",
-                                 "team": {"id": "1", "displayName": "Aways"}},
-                                {"homeAway": "home", "score": "5",
-                                 "team": {"id": "2", "displayName": "Homes"}},
+                                {
+                                    "homeAway": "away",
+                                    "score": "3",
+                                    "team": {"id": "1", "displayName": "Aways"},
+                                },
+                                {
+                                    "homeAway": "home",
+                                    "score": "5",
+                                    "team": {"id": "2", "displayName": "Homes"},
+                                },
                             ],
                         }
                     ],
@@ -55,13 +61,9 @@ def test_ingest_rows_carry_raw_provenance(tmp_path) -> None:
     import hashlib
 
     cached = json.loads(
-        (tmp_path / "raw" / "mlb" / "2020-01-01" / "scores_mlb.json").read_text(
-            encoding="utf-8"
-        )
+        (tmp_path / "raw" / "mlb" / "2020-01-01" / "scores_mlb.json").read_text(encoding="utf-8")
     )
-    expected = hashlib.sha256(
-        json.dumps(cached, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
+    expected = hashlib.sha256(json.dumps(cached, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     assert row["raw_hash"] == expected
 
 
@@ -76,9 +78,7 @@ def test_freeze_writes_rows_and_manifest(tmp_path) -> None:
     if not (Path("data") / "historical" / "mlb_games_all.jsonl").is_file():
         pytest.skip("machine-local MLB history not present (data/ untracked since K)")
     out = tmp_path / "features" / "pit_mlb.jsonl"
-    manifest = freeze_features(
-        sport="mlb", out_path=out, data_root=Path("data")
-    )
+    manifest = freeze_features(sport="mlb", out_path=out, data_root=Path("data"))
 
     assert out.is_file()
     assert manifest["rows"] > 0

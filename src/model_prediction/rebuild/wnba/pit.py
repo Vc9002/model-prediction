@@ -28,7 +28,11 @@ def eligible_prior_team_games(
         "pit_eligible",
     }
     required_box = {
-        "event_id", "team_id", "observed_at_utc", "raw_snapshot_hash", "pit_eligible",
+        "event_id",
+        "team_id",
+        "observed_at_utc",
+        "raw_snapshot_hash",
+        "pit_eligible",
     }
     if not required_games.issubset(games.columns) or not required_box.issubset(team_box.columns):
         raise ValueError("WNBA PIT input is missing required provenance columns")
@@ -44,11 +48,7 @@ def eligible_prior_team_games(
         # Latest-as-of state must be selected before checking completed or
         # PIT eligibility. Otherwise an older FINAL survives a later
         # correction to postponed/not-completed.
-        .filter(
-            pl.col("completed")
-            & pl.col("pit_eligible")
-            & (pl.col("_event_start") < event_cutoff)
-        )
+        .filter(pl.col("completed") & pl.col("pit_eligible") & (pl.col("_event_start") < event_cutoff))
         .select(
             "event_id",
             "event_start_utc",
@@ -67,8 +67,6 @@ def eligible_prior_team_games(
         .filter((pl.col("team_id") == team_id) & pl.col("pit_eligible"))
         .drop("_observed")
     )
-    return (
-        eligible_boxes
-        .join(prior_games, on="event_id", how="inner", suffix="_game")
-        .sort("event_start_utc")
+    return eligible_boxes.join(prior_games, on="event_id", how="inner", suffix="_game").sort(
+        "event_start_utc"
     )

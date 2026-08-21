@@ -30,9 +30,13 @@ class SoccerPrediction:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "event_id": self.event_id, "home_xg": self.home_xg, "away_xg": self.away_xg,
-            "home_win_prob": self.home_win_prob, "draw_prob": self.draw_prob,
-            "away_win_prob": self.away_win_prob, "total_mean": self.total_mean,
+            "event_id": self.event_id,
+            "home_xg": self.home_xg,
+            "away_xg": self.away_xg,
+            "home_win_prob": self.home_win_prob,
+            "draw_prob": self.draw_prob,
+            "away_win_prob": self.away_win_prob,
+            "total_mean": self.total_mean,
             "btts_prob": self.btts_prob,
         }
 
@@ -61,16 +65,22 @@ class DynamicDixonColes:
 
     def poisson_pmf(self, rate: float, k: int) -> float:
         rate = max(0.01, rate)
-        return rate ** k * math.exp(-rate) / math.factorial(k)
+        return rate**k * math.exp(-rate) / math.factorial(k)
 
     def dc_adjustment(self, h: int, a: int, home_rate: float, away_rate: float) -> float:
-        if h == 0 and a == 0: return 1 - home_rate * away_rate * self.rho
-        if h == 0 and a == 1: return 1 + home_rate * self.rho
-        if h == 1 and a == 0: return 1 + away_rate * self.rho
-        if h == 1 and a == 1: return 1 - self.rho
+        if h == 0 and a == 0:
+            return 1 - home_rate * away_rate * self.rho
+        if h == 0 and a == 1:
+            return 1 + home_rate * self.rho
+        if h == 1 and a == 0:
+            return 1 + away_rate * self.rho
+        if h == 1 and a == 1:
+            return 1 - self.rho
         return 1.0
 
-    def score_probability(self, home_rate: float, away_rate: float, home_goals: int, away_goals: int) -> float:
+    def score_probability(
+        self, home_rate: float, away_rate: float, home_goals: int, away_goals: int
+    ) -> float:
         hp = self.poisson_pmf(home_rate, home_goals)
         ap = self.poisson_pmf(away_rate, away_goals)
         return hp * ap * self.dc_adjustment(home_goals, away_goals, home_rate, away_rate)
@@ -94,10 +104,10 @@ class DynamicDixonColes:
                 away_rate = self.expected_goals(at, ht, is_home=False)
 
                 # Update attack/defense strengths
-                self.attack[ht] *= (1 + lr * (hg / max(0.5, home_rate) - 1))
-                self.defense[ht] *= (1 + lr * (away_rate / max(0.5, ag + 1) - 1))
-                self.attack[at] *= (1 + lr * (ag / max(0.5, away_rate) - 1))
-                self.defense[at] *= (1 + lr * (home_rate / max(0.5, hg + 1) - 1))
+                self.attack[ht] *= 1 + lr * (hg / max(0.5, home_rate) - 1)
+                self.defense[ht] *= 1 + lr * (away_rate / max(0.5, ag + 1) - 1)
+                self.attack[at] *= 1 + lr * (ag / max(0.5, away_rate) - 1)
+                self.defense[at] *= 1 + lr * (home_rate / max(0.5, hg + 1) - 1)
 
             # Renormalize attack strengths
             mean_att = np.mean(list(self.attack.values()))
@@ -119,7 +129,9 @@ class DynamicDixonColes:
             obs_00 = sum(1 for m in matches if m["home_goals"] == 0 and m["away_goals"] == 0) / low_score
             obs_11 = sum(1 for m in matches if m["home_goals"] == 1 and m["away_goals"] == 1) / low_score
             # rho estimate from 0-0 and 1-1 cell discrepancies
-            avg_home_rate = self.home_boost * np.mean([self.attack[m["home"]] * self.defense[m["away"]] for m in matches])
+            avg_home_rate = self.home_boost * np.mean(
+                [self.attack[m["home"]] * self.defense[m["away"]] for m in matches]
+            )
             avg_away_rate = np.mean([self.attack[m["away"]] * self.defense[m["home"]] for m in matches])
             poisson_00 = self.poisson_pmf(avg_home_rate, 0) * self.poisson_pmf(avg_away_rate, 0)
             poisson_11 = self.poisson_pmf(avg_home_rate, 1) * self.poisson_pmf(avg_away_rate, 1)
@@ -143,13 +155,22 @@ class DynamicDixonColes:
         for h in range(max_g):
             for a in range(max_g):
                 p = self.score_probability(home_rate, away_rate, h, a)
-                if h > a: home_win += p
-                elif h == a: draw += p
-                elif a > h: away_win += p
-                if h > 0 and a > 0: btts += p
+                if h > a:
+                    home_win += p
+                elif h == a:
+                    draw += p
+                elif a > h:
+                    away_win += p
+                if h > 0 and a > 0:
+                    btts += p
 
         return SoccerPrediction(
-            event_id=event_id, home_xg=float(home_rate), away_xg=float(away_rate),
-            home_win_prob=float(home_win), draw_prob=float(draw), away_win_prob=float(away_win),
-            total_mean=float(home_rate + away_rate), btts_prob=float(btts),
+            event_id=event_id,
+            home_xg=float(home_rate),
+            away_xg=float(away_rate),
+            home_win_prob=float(home_win),
+            draw_prob=float(draw),
+            away_win_prob=float(away_win),
+            total_mean=float(home_rate + away_rate),
+            btts_prob=float(btts),
         )

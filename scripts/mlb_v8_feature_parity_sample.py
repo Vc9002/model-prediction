@@ -23,11 +23,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from mlb_research_common import pinned_cohort  # noqa: E402
-from model_prediction import learned_forward  # noqa: E402
-from model_prediction.config import PROJECT_ROOT  # noqa: E402
-from model_prediction.features.elo_ratings import build_elo  # noqa: E402
-from model_prediction.features.trends import TrendEngine  # noqa: E402
+from mlb_research_common import pinned_cohort
+
+from model_prediction import learned_forward
+from model_prediction.config import PROJECT_ROOT
+from model_prediction.features.elo_ratings import build_elo
+from model_prediction.features.trends import TrendEngine
 
 SAMPLE = 40
 
@@ -40,8 +41,7 @@ def _history_before(store, event_id: str, game_date: str):
 
     games = store.load_games("mlb")
     return [
-        g for g in games
-        if g.start.astimezone(ZoneInfo("America/New_York")).date().isoformat() < game_date
+        g for g in games if g.start.astimezone(ZoneInfo("America/New_York")).date().isoformat() < game_date
     ]
 
 
@@ -86,9 +86,7 @@ def main() -> int:
                 )
             except Exception as error:  # noqa: BLE001 — availability differs per row by design; count it
                 serve["weather_factor"] = None
-                mismatches.setdefault("weather_factor", []).append(
-                    f"{row.event_id}: {type(error).__name__}"
-                )
+                mismatches.setdefault("weather_factor", []).append(f"{row.event_id}: {type(error).__name__}")
 
         for feature, value in serve.items():
             if value is None:
@@ -108,8 +106,10 @@ def main() -> int:
             "mean_abs_delta": round(sum(values) / len(values), 9),
             "exact_matches": sum(1 for v in values if v < 1e-9),
         }
-        print(f"{feature:16s} n={len(values):3d} max|d|={max(values):.2e} "
-              f"exact={sum(1 for v in values if v < 1e-9)}/{len(values)}")
+        print(
+            f"{feature:16s} n={len(values):3d} max|d|={max(values):.2e} "
+            f"exact={sum(1 for v in values if v < 1e-9)}/{len(values)}"
+        )
 
     # starter_era_gap: training map vs serving live function (same snapshots)
     from model_prediction.features.starter_history import starter_era_gap_live
@@ -129,9 +129,9 @@ def main() -> int:
                 g = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            crosswalk[
-                (str(g.get("event_start_utc") or "")[:16], g.get("home_team"), g.get("away_team"))
-            ] = g.get("event_id")
+            crosswalk[(str(g.get("event_start_utc") or "")[:16], g.get("home_team"), g.get("away_team"))] = (
+                g.get("event_id")
+            )
     snap_path = PROJECT_ROOT / "data/mlb_statsapi/game_snapshots.jsonl"
     if snap_path.is_file():
         for line in snap_path.read_text(encoding="utf-8").splitlines():
@@ -164,9 +164,7 @@ def main() -> int:
         if not pair or pair[0] is None or pair[1] is None:
             continue
         try:
-            serve_gap = starter_era_gap_live(
-                pair[0], pair[1], games[row.event_id].start
-            )
+            serve_gap = starter_era_gap_live(pair[0], pair[1], games[row.event_id].start)
         except ValueError:
             continue
         compared += 1
@@ -174,9 +172,7 @@ def main() -> int:
         if delta < 1e-9:
             exact += 1
         else:
-            starter_mismatches.append(
-                f"{row.event_id} train={train_gap:.6f} serve={serve_gap:.6f}"
-            )
+            starter_mismatches.append(f"{row.event_id} train={train_gap:.6f} serve={serve_gap:.6f}")
     report["features"]["starter_era_gap"] = {
         "rows_compared": compared,
         "exact_matches": exact,

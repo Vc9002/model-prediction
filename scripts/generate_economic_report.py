@@ -39,7 +39,9 @@ def main() -> None:
     total_decisions = conn.execute("SELECT COUNT(*) AS n FROM trade_decisions").fetchone()["n"]
     action_counts = {
         row["action"]: row["n"]
-        for row in conn.execute("SELECT action, COUNT(*) AS n FROM trade_decisions GROUP BY action").fetchall()
+        for row in conn.execute(
+            "SELECT action, COUNT(*) AS n FROM trade_decisions GROUP BY action"
+        ).fetchall()
     }
     reason_counts = {
         row["reason_code"] or "none": row["n"]
@@ -112,7 +114,9 @@ def main() -> None:
     lines.append(f"- runs recorded: {n_runs}")
     lines.append("")
     if n_settlements > 0:
-        lines.append("### Settlement outcomes (real WIN/LOSS/PUSH for every evaluated side, BET and NO_BET alike)")
+        lines.append(
+            "### Settlement outcomes (real WIN/LOSS/PUSH for every evaluated side, BET and NO_BET alike)"
+        )
         lines.append("")
         for outcome, n in sorted(settlement_outcome_counts.items(), key=lambda kv: -kv[1]):
             lines.append(f"- {outcome}: {n}")
@@ -148,8 +152,7 @@ def main() -> None:
         )
     elif n_settlements == 0:
         lines.append(
-            "Zero settlements/closing_prices means CLV and PnL cannot be computed from anything "
-            "real yet."
+            "Zero settlements/closing_prices means CLV and PnL cannot be computed from anything real yet."
         )
     else:
         lines.append(
@@ -192,8 +195,10 @@ def main() -> None:
     out_path = Path("outputs/rebuild/economic_report.md")
     out_path.write_text("\n".join(lines))
     print(f"Wrote {out_path}")
-    print(f"\nSummary: {total_decisions} real trade_decisions, {bet_count} BET / {no_bet_count} NO_BET, "
-          f"{n_paper_orders} paper_orders, {n_settlements} settlements, {n_closing_prices} closing_prices")
+    print(
+        f"\nSummary: {total_decisions} real trade_decisions, {bet_count} BET / {no_bet_count} NO_BET, "
+        f"{n_paper_orders} paper_orders, {n_settlements} settlements, {n_closing_prices} closing_prices"
+    )
 
 
 if __name__ == "__main__":

@@ -60,10 +60,7 @@ def surface_profile(matches: list[dict[str, Any]], player: str) -> dict[str, Any
 def tennis_surface_snapshot(context: FeatureContext) -> dict[str, Any]:
     matches = load_matches(context.data_root, context.as_of_date)
     player_names = {
-        name
-        for match in matches
-        for name in (match.get("winner"), match.get("loser"))
-        if name is not None
+        name for match in matches for name in (match.get("winner"), match.get("loser")) if name is not None
     }
     players = sorted(player_names)
     return {

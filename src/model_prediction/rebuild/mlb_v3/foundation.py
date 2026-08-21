@@ -85,7 +85,11 @@ class MLBV3Foundation:
                 season_by_game = dict(games.select("game_pk", "season").iter_rows())
                 for game_pk in games["game_pk"].unique().to_list():
                     result = self.mlb_stats.game_feed(int(game_pk), force=force)
-                    if result.status is not ProviderStatus.AVAILABLE or result.frame is None or result.metadata is None:
+                    if (
+                        result.status is not ProviderStatus.AVAILABLE
+                        or result.frame is None
+                        or result.metadata is None
+                    ):
                         report["errors"][f"game_feed:{game_pk}"] = result.reason or result.status.value
                         continue
                     outputs = normalize_game_feed(result.frame, result.metadata)
@@ -97,7 +101,11 @@ class MLBV3Foundation:
 
         if "transactions" in requested:
             result = self.mlb_stats.transactions(start, end, force=force)
-            if result.status is ProviderStatus.AVAILABLE and result.frame is not None and result.metadata is not None:
+            if (
+                result.status is ProviderStatus.AVAILABLE
+                and result.frame is not None
+                and result.metadata is not None
+            ):
                 transactions = normalize_transactions(result.frame, result.metadata)
                 if not transactions.is_empty():
                     # MLB transaction endpoints do not provide a reliable season
@@ -139,7 +147,11 @@ class MLBV3Foundation:
                 "status": result.status.value,
                 "reason": result.reason,
             }
-            if result.status is not ProviderStatus.AVAILABLE or result.frame is None or result.metadata is None:
+            if (
+                result.status is not ProviderStatus.AVAILABLE
+                or result.frame is None
+                or result.metadata is None
+            ):
                 errors[key] = result.reason or result.status.value
             elif not result.frame.is_empty():
                 normalized = normalize_statcast(result.frame, result.metadata)

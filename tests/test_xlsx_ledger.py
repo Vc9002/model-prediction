@@ -59,7 +59,8 @@ def test_round_trip_preserves_every_field_type(tmp_path) -> None:
 def test_empty_string_fields_round_trip_as_empty_not_zero(tmp_path) -> None:
     path = tmp_path / "picks.xlsx"
     write_xlsx_rows_atomic(
-        path, FIELDNAMES,
+        path,
+        FIELDNAMES,
         [_row(units="", pnl_units="", line="", rationale="")],
     )
     _, read_back = read_xlsx_rows(path)
@@ -123,7 +124,8 @@ def test_read_missing_sheet_raises_value_error(tmp_path) -> None:
 def test_negative_and_zero_values_round_trip_correctly(tmp_path) -> None:
     path = tmp_path / "picks.xlsx"
     write_xlsx_rows_atomic(
-        path, FIELDNAMES,
+        path,
+        FIELDNAMES,
         [_row(american_odds="150", model_probability="0.0", units="0.00", pnl_units="-1.5000", line="0")],
     )
     _, read_back = read_xlsx_rows(path)

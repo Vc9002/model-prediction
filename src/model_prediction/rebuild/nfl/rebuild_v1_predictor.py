@@ -64,15 +64,12 @@ def raw_probability(artifact: dict[str, Any], row: WalkForwardRow) -> float:
     coefficients: list[float] = market["coefficients"]
     intercept: float = market["intercept"]
     z = intercept + sum(
-        coef * _FEATURE_VALUES[name](row)
-        for coef, name in zip(coefficients, feature_names, strict=True)
+        coef * _FEATURE_VALUES[name](row) for coef, name in zip(coefficients, feature_names, strict=True)
     )
     return 1.0 / (1.0 + math.exp(-z))
 
 
-def predict_row(
-    artifact: dict[str, Any], calibrator: Calibrator, row: WalkForwardRow
-) -> dict[str, Any]:
+def predict_row(artifact: dict[str, Any], calibrator: Calibrator, row: WalkForwardRow) -> dict[str, Any]:
     raw = raw_probability(artifact, row)
     calibrated = calibrator.transform(raw)
     return {

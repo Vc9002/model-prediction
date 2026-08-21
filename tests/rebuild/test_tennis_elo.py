@@ -21,6 +21,7 @@ from model_prediction.rebuild.tennis.elo import (
 
 # ── helpers ──────────────────────────────────────────────────────────────
 
+
 def _match(
     match_id: str,
     date: str,
@@ -44,6 +45,7 @@ def _match(
 
 
 # ── SurfaceEloBook — core Elo mechanics ──────────────────────────────────
+
 
 class TestSurfaceEloBookCore:
     """Elo update, expected_win, and rating math."""
@@ -167,6 +169,7 @@ class TestSurfaceEloBookCore:
 
 # ── Surface weight & blended rating ──────────────────────────────────────
 
+
 class TestSurfaceWeight:
     def test_fixed_blend_with_no_surface_history(self):
         """Fixed 0.6 blend: blended = 0.6 * surface_default + 0.4 * overall."""
@@ -210,6 +213,7 @@ class TestSurfaceWeight:
 
 # ── _clean_surface ───────────────────────────────────────────────────────
 
+
 class TestCleanSurface:
     def test_known_surfaces_pass_through(self):
         for s in KNOWN_SURFACES:
@@ -240,6 +244,7 @@ class TestCleanSurface:
 
 
 # ── walk-forward PIT invariant ───────────────────────────────────────────
+
 
 class TestWalkForwardPIT:
     """Day-bucketed walk-forward: predictions never see same-day results."""
@@ -375,6 +380,7 @@ class TestWalkForwardPIT:
 
 # ── irregular result handling ────────────────────────────────────────────
 
+
 class TestIrregularResults:
     def test_retirement_not_included_in_walk_forward_rows(self):
         matches = [
@@ -452,6 +458,7 @@ class TestIrregularResults:
 
 # ── WalkForwardResult dataclass ──────────────────────────────────────────
 
+
 class TestWalkForwardResult:
     def test_result_counts_are_consistent(self):
         matches = [
@@ -487,6 +494,7 @@ class TestWalkForwardResult:
 
 
 # ── ATP + WTA mixed ──────────────────────────────────────────────────────
+
 
 class TestMixedTours:
     def test_atp_and_wta_players_share_elo_book(self):

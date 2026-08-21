@@ -103,9 +103,7 @@ def _market_capture(repo_root: Path) -> dict[str, Any]:
         return markets
     for sport_dir in sorted(p for p in odds_root.iterdir() if p.is_dir()):
         dates = sorted(
-            d.name
-            for d in sport_dir.iterdir()
-            if d.is_dir() and d.name[:4].isdigit() and "-" in d.name
+            d.name for d in sport_dir.iterdir() if d.is_dir() and d.name[:4].isdigit() and "-" in d.name
         )
         latest = dates[-1] if dates else None
         markets[sport_dir.name] = {
@@ -198,18 +196,13 @@ def system_health(
     registry_check: dict[str, Any] = {
         "primary": registry.primary.model_id,
         "models": {
-            entry.model_id: (
-                "ok" if entry.available else f"failed: {entry.load_error}"
-            )
+            entry.model_id: ("ok" if entry.available else f"failed: {entry.load_error}")
             for entry in registry.entries.values()
         },
     }
     report["checks"]["registry"] = registry_check
     if registry.problem_entries():
-        degrade(
-            f"{len(registry.problem_entries())} production model(s) "
-            "failed contract validation"
-        )
+        degrade(f"{len(registry.problem_entries())} production model(s) failed contract validation")
 
     # 2. Supervisor run rows (A-2): latest run per worker.
     supervisor = RunSupervisor(db_path=paths.runs_db, paths=paths)
@@ -244,9 +237,7 @@ def system_health(
     last_prediction = read_latest_prediction_utc(paths)
     report["checks"]["predictions"] = {
         "latest_prediction_utc": last_prediction,
-        "age_minutes": (
-            round(_age_minutes(last_prediction), 1) if last_prediction else None
-        ),
+        "age_minutes": (round(_age_minutes(last_prediction), 1) if last_prediction else None),
     }
     max_age_minutes = float(registry.health.get("max_data_age_minutes", 120))
     if last_prediction is None:
@@ -260,10 +251,7 @@ def system_health(
     if registry.health.get("require_probability_normalization", True):
         for pair in read_recent_probabilities(paths, limit=20):
             values = [v for v in pair.values() if isinstance(v, (int, float))]
-            if values and (
-                any(not 0.0 <= v <= 1.0 for v in values)
-                or abs(sum(values) - 1.0) > 1e-6
-            ):
+            if values and (any(not 0.0 <= v <= 1.0 for v in values) or abs(sum(values) - 1.0) > 1e-6):
                 down(f"stored prediction probabilities not normalized: {pair}")
 
     # 4. Source capture: historical games + Polymarket snapshots.

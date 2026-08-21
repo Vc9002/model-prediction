@@ -152,9 +152,9 @@ def test_market_baseline_origin_requires_a_recognized_identifier() -> None:
 
 def test_market_baseline_origin_rejects_an_unrecognized_identifier() -> None:
     with pytest.raises(ValueError, match="market baseline requires"):
-        _request(
-            model_origin=ModelOrigin.MARKET_BASELINE, baseline_identifier="MADE_UP_BASELINE"
-        ).validate(now=NOW)
+        _request(model_origin=ModelOrigin.MARKET_BASELINE, baseline_identifier="MADE_UP_BASELINE").validate(
+            now=NOW
+        )
 
 
 @pytest.mark.parametrize("identifier", sorted(BASELINE_IDENTIFIERS))
@@ -179,9 +179,7 @@ def test_observed_at_exactly_now_is_accepted() -> None:
     _request(observed_at_utc="2026-07-13T12:00:00Z").validate(now=NOW)
 
 
-@pytest.mark.parametrize(
-    "field", ["decision_no_vig_probability", "decision_consensus_probability"]
-)
+@pytest.mark.parametrize("field", ["decision_no_vig_probability", "decision_consensus_probability"])
 @pytest.mark.parametrize("probability", [0.0, 1.0, -0.1, 1.1])
 def test_decision_probabilities_out_of_range_are_rejected(field, probability) -> None:
     with pytest.raises(ValueError, match=field):

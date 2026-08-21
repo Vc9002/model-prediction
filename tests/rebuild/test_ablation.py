@@ -24,17 +24,28 @@ from model_prediction.rebuild.ablation import FEATURE_GROUPS_MLB, FeatureAblatio
 # a genuine schema change to mlb_features.build_game_feature_row() should
 # update this list too.
 REAL_MLB_FEATURE_COLUMNS = {
-    "home_sp_avg_velocity", "away_sp_avg_velocity",
-    "home_sp_csw_pct", "away_sp_csw_pct",
-    "home_bp_bullpen_pitches", "away_bp_bullpen_pitches",
-    "park_factor", "temp_f_first_pitch",
-    "home_sp_k_pct", "away_sp_k_pct",
-    "home_sp_bb_pct", "away_sp_bb_pct",
-    "home_sp_days_rest", "away_sp_days_rest",
-    "home_bp_bullpen_avg_velocity", "away_bp_bullpen_avg_velocity",
-    "home_sp_clean_first_inning_clean_rate", "away_sp_clean_first_inning_clean_rate",
-    "home_sp_clean_scoreless_inning_rate", "away_sp_clean_scoreless_inning_rate",
-    "home_sp_clean_clean_appearance_rate", "away_sp_clean_clean_appearance_rate",
+    "home_sp_avg_velocity",
+    "away_sp_avg_velocity",
+    "home_sp_csw_pct",
+    "away_sp_csw_pct",
+    "home_bp_bullpen_pitches",
+    "away_bp_bullpen_pitches",
+    "park_factor",
+    "temp_f_first_pitch",
+    "home_sp_k_pct",
+    "away_sp_k_pct",
+    "home_sp_bb_pct",
+    "away_sp_bb_pct",
+    "home_sp_days_rest",
+    "away_sp_days_rest",
+    "home_bp_bullpen_avg_velocity",
+    "away_bp_bullpen_avg_velocity",
+    "home_sp_clean_first_inning_clean_rate",
+    "away_sp_clean_first_inning_clean_rate",
+    "home_sp_clean_scoreless_inning_rate",
+    "away_sp_clean_scoreless_inning_rate",
+    "home_sp_clean_clean_appearance_rate",
+    "away_sp_clean_clean_appearance_rate",
 }
 
 
@@ -54,6 +65,7 @@ class TestFeatureGroupsMlbMatchesRealSchema:
 
 def _train_fn(X, y):
     from sklearn.linear_model import LogisticRegression
+
     model = LogisticRegression()
     model.fit(X, y)
     return model
@@ -69,12 +81,14 @@ def _synthetic_ablation_data(n: int = 90, seed: int = 0) -> pl.DataFrame:
     noise = rng.normal(0, 1, n)
     y = (informative + rng.normal(0, 0.2, n) > 0).astype(int)
     dates = [f"2026-01-{(i % 28) + 1:02d}" for i in range(n)]
-    return pl.DataFrame({
-        "game_date": sorted(dates),
-        "informative_feature": informative,
-        "noise_feature": noise,
-        "home_win": y,
-    })
+    return pl.DataFrame(
+        {
+            "game_date": sorted(dates),
+            "informative_feature": informative,
+            "noise_feature": noise,
+            "home_win": y,
+        }
+    )
 
 
 class TestFeatureAblationRunner:
@@ -86,7 +100,10 @@ class TestFeatureAblationRunner:
         ]
         runner = FeatureAblationRunner(groups)
         results = runner.run_isolated(
-            data, target_col="home_win", train_fn=_train_fn, predict_fn=_predict_fn,
+            data,
+            target_col="home_win",
+            train_fn=_train_fn,
+            predict_fn=_predict_fn,
         )
 
         by_group = {r.group: r for r in results}
@@ -95,11 +112,13 @@ class TestFeatureAblationRunner:
         assert by_group["informative"].delta_log_loss > by_group["noise"].delta_log_loss
 
     def test_coverage_impact_reflects_real_null_fraction(self):
-        data = pl.DataFrame({
-            "game_date": ["2026-01-01"] * 10,
-            "f1": [1.0, None, 1.0, None, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-            "home_win": [1, 0] * 5,
-        })
+        data = pl.DataFrame(
+            {
+                "game_date": ["2026-01-01"] * 10,
+                "f1": [1.0, None, 1.0, None, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+                "home_win": [1, 0] * 5,
+            }
+        )
         runner = FeatureAblationRunner([FeatureGroup("g1", ["f1"])])
         coverage = runner._coverage(data, ["f1"])
         assert coverage == 0.8
@@ -117,7 +136,11 @@ class TestFeatureAblationRunner:
         ]
         runner = FeatureAblationRunner(groups)
         cumulative = runner.run_cumulative(
-            data, target_col="home_win", train_fn=_train_fn, predict_fn=_predict_fn, top_n=2,
+            data,
+            target_col="home_win",
+            train_fn=_train_fn,
+            predict_fn=_predict_fn,
+            top_n=2,
         )
         assert len(cumulative) == 2
         assert cumulative[0].group == "cumulative_informative"
@@ -145,7 +168,10 @@ class TestFeatureAblationRunner:
         ]
         runner = FeatureAblationRunner(groups)
         results = runner.run_isolated(
-            data, target_col="home_win", train_fn=_train_fn, predict_fn=_predict_fn,
+            data,
+            target_col="home_win",
+            train_fn=_train_fn,
+            predict_fn=_predict_fn,
             all_features=["informative_feature"],  # deliberately excludes noise_feature
         )
         assert {r.group for r in results} == {"informative"}

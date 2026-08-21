@@ -27,38 +27,57 @@ def _dt(s: str) -> datetime:
 
 class TestBasicBackwardSemantics:
     def test_future_observation_is_excluded(self):
-        decisions = pl.DataFrame({
-            "entity": ["A"], "decision_time_utc": [_dt("2026-01-10")],
-        })
-        observations = pl.DataFrame({
-            "entity": ["A"], "observed_at_utc": [_dt("2026-01-15")], "value": [999],
-        })
+        decisions = pl.DataFrame(
+            {
+                "entity": ["A"],
+                "decision_time_utc": [_dt("2026-01-10")],
+            }
+        )
+        observations = pl.DataFrame(
+            {
+                "entity": ["A"],
+                "observed_at_utc": [_dt("2026-01-15")],
+                "value": [999],
+            }
+        )
 
         result = point_in_time_join(decisions, observations, entity_keys=["entity"])
 
         assert result["obs_value"][0] is None, "a future-only observation must not be selected"
 
     def test_newest_prior_observation_is_selected(self):
-        decisions = pl.DataFrame({
-            "entity": ["A"], "decision_time_utc": [_dt("2026-01-20")],
-        })
-        observations = pl.DataFrame({
-            "entity": ["A", "A", "A"],
-            "observed_at_utc": [_dt("2026-01-05"), _dt("2026-01-15"), _dt("2026-01-25")],
-            "value": [1, 2, 3],
-        })
+        decisions = pl.DataFrame(
+            {
+                "entity": ["A"],
+                "decision_time_utc": [_dt("2026-01-20")],
+            }
+        )
+        observations = pl.DataFrame(
+            {
+                "entity": ["A", "A", "A"],
+                "observed_at_utc": [_dt("2026-01-05"), _dt("2026-01-15"), _dt("2026-01-25")],
+                "value": [1, 2, 3],
+            }
+        )
 
         result = point_in_time_join(decisions, observations, entity_keys=["entity"])
 
         assert result["obs_value"][0] == 2, "must pick the newest observation strictly before the decision"
 
     def test_no_prior_observation_returns_null_not_a_future_leak(self):
-        decisions = pl.DataFrame({
-            "entity": ["A"], "decision_time_utc": [_dt("2026-01-01")],
-        })
-        observations = pl.DataFrame({
-            "entity": ["A"], "observed_at_utc": [_dt("2026-01-15")], "value": [999],
-        })
+        decisions = pl.DataFrame(
+            {
+                "entity": ["A"],
+                "decision_time_utc": [_dt("2026-01-01")],
+            }
+        )
+        observations = pl.DataFrame(
+            {
+                "entity": ["A"],
+                "observed_at_utc": [_dt("2026-01-15")],
+                "value": [999],
+            }
+        )
 
         result = point_in_time_join(decisions, observations, entity_keys=["entity"])
 
@@ -70,15 +89,19 @@ class TestEntityKeyIsolation:
     def test_observations_do_not_leak_across_entities(self):
         # Same-day-doubleheader-style case: two entities, decisions and
         # observations must never cross entity boundaries.
-        decisions = pl.DataFrame({
-            "entity": ["A", "B"],
-            "decision_time_utc": [_dt("2026-01-10"), _dt("2026-01-10")],
-        })
-        observations = pl.DataFrame({
-            "entity": ["A", "B"],
-            "observed_at_utc": [_dt("2026-01-05"), _dt("2026-01-09")],
-            "value": [111, 222],
-        })
+        decisions = pl.DataFrame(
+            {
+                "entity": ["A", "B"],
+                "decision_time_utc": [_dt("2026-01-10"), _dt("2026-01-10")],
+            }
+        )
+        observations = pl.DataFrame(
+            {
+                "entity": ["A", "B"],
+                "observed_at_utc": [_dt("2026-01-05"), _dt("2026-01-09")],
+                "value": [111, 222],
+            }
+        )
 
         result = point_in_time_join(decisions, observations, entity_keys=["entity"]).sort("entity")
 
@@ -86,18 +109,26 @@ class TestEntityKeyIsolation:
 
     def test_multi_column_entity_keys_work(self):
         # e.g. (team, season) or (game_pk, side) style composite keys.
-        decisions = pl.DataFrame({
-            "team": ["A", "A"], "season": [2025, 2026],
-            "decision_time_utc": [_dt("2026-01-10"), _dt("2026-01-10")],
-        })
-        observations = pl.DataFrame({
-            "team": ["A", "A"], "season": [2025, 2026],
-            "observed_at_utc": [_dt("2026-01-01"), _dt("2026-01-01")],
-            "value": [2025, 2026],
-        })
+        decisions = pl.DataFrame(
+            {
+                "team": ["A", "A"],
+                "season": [2025, 2026],
+                "decision_time_utc": [_dt("2026-01-10"), _dt("2026-01-10")],
+            }
+        )
+        observations = pl.DataFrame(
+            {
+                "team": ["A", "A"],
+                "season": [2025, 2026],
+                "observed_at_utc": [_dt("2026-01-01"), _dt("2026-01-01")],
+                "value": [2025, 2026],
+            }
+        )
 
         result = point_in_time_join(
-            decisions, observations, entity_keys=["team", "season"],
+            decisions,
+            observations,
+            entity_keys=["team", "season"],
         ).sort("season")
 
         assert result["obs_value"].to_list() == [2025, 2026], (
@@ -107,29 +138,49 @@ class TestEntityKeyIsolation:
 
 class TestMaxAge:
     def test_stale_observation_beyond_max_age_becomes_unavailable(self):
-        decisions = pl.DataFrame({
-            "entity": ["A"], "decision_time_utc": [_dt("2026-01-20")],
-        })
-        observations = pl.DataFrame({
-            "entity": ["A"], "observed_at_utc": [_dt("2026-01-01")], "value": [1],
-        })
+        decisions = pl.DataFrame(
+            {
+                "entity": ["A"],
+                "decision_time_utc": [_dt("2026-01-20")],
+            }
+        )
+        observations = pl.DataFrame(
+            {
+                "entity": ["A"],
+                "observed_at_utc": [_dt("2026-01-01")],
+                "value": [1],
+            }
+        )
 
         result = point_in_time_join(
-            decisions, observations, entity_keys=["entity"], max_age=timedelta(days=5),
+            decisions,
+            observations,
+            entity_keys=["entity"],
+            max_age=timedelta(days=5),
         )
 
         assert result["obs_value"][0] is None, "a 19-day-old observation must fail a 5-day max_age"
 
     def test_fresh_observation_within_max_age_is_kept(self):
-        decisions = pl.DataFrame({
-            "entity": ["A"], "decision_time_utc": [_dt("2026-01-20")],
-        })
-        observations = pl.DataFrame({
-            "entity": ["A"], "observed_at_utc": [_dt("2026-01-18")], "value": [1],
-        })
+        decisions = pl.DataFrame(
+            {
+                "entity": ["A"],
+                "decision_time_utc": [_dt("2026-01-20")],
+            }
+        )
+        observations = pl.DataFrame(
+            {
+                "entity": ["A"],
+                "observed_at_utc": [_dt("2026-01-18")],
+                "value": [1],
+            }
+        )
 
         result = point_in_time_join(
-            decisions, observations, entity_keys=["entity"], max_age=timedelta(days=5),
+            decisions,
+            observations,
+            entity_keys=["entity"],
+            max_age=timedelta(days=5),
         )
 
         assert result["obs_value"][0] == 1
@@ -137,17 +188,27 @@ class TestMaxAge:
 
 class TestEmptyInputs:
     def test_empty_decisions_returns_empty(self):
-        decisions = pl.DataFrame({"entity": [], "decision_time_utc": []}, schema={"entity": pl.Utf8, "decision_time_utc": pl.Datetime})
-        observations = pl.DataFrame({
-            "entity": ["A"], "observed_at_utc": [_dt("2026-01-01")], "value": [1],
-        })
+        decisions = pl.DataFrame(
+            {"entity": [], "decision_time_utc": []},
+            schema={"entity": pl.Utf8, "decision_time_utc": pl.Datetime},
+        )
+        observations = pl.DataFrame(
+            {
+                "entity": ["A"],
+                "observed_at_utc": [_dt("2026-01-01")],
+                "value": [1],
+            }
+        )
         result = point_in_time_join(decisions, observations, entity_keys=["entity"])
         assert result.height == 0
 
     def test_empty_observations_returns_decisions_unmatched(self):
-        decisions = pl.DataFrame({
-            "entity": ["A"], "decision_time_utc": [_dt("2026-01-10")],
-        })
+        decisions = pl.DataFrame(
+            {
+                "entity": ["A"],
+                "decision_time_utc": [_dt("2026-01-10")],
+            }
+        )
         observations = pl.DataFrame(
             {"entity": [], "observed_at_utc": [], "value": []},
             schema={"entity": pl.Utf8, "observed_at_utc": pl.Datetime, "value": pl.Int64},
@@ -162,13 +223,17 @@ class TestHardInvariant:
         # before the fix -- the function had never completed a single real
         # call. No assertion beyond "does not raise" is needed for that
         # specific regression; correctness is covered by the tests above.
-        decisions = pl.DataFrame({
-            "entity": ["A", "B"],
-            "decision_time_utc": [_dt("2026-01-10"), _dt("2026-01-12")],
-        })
-        observations = pl.DataFrame({
-            "entity": ["A", "A", "B"],
-            "observed_at_utc": [_dt("2026-01-01"), _dt("2026-01-09"), _dt("2026-01-11")],
-            "value": [1, 2, 3],
-        })
+        decisions = pl.DataFrame(
+            {
+                "entity": ["A", "B"],
+                "decision_time_utc": [_dt("2026-01-10"), _dt("2026-01-12")],
+            }
+        )
+        observations = pl.DataFrame(
+            {
+                "entity": ["A", "A", "B"],
+                "observed_at_utc": [_dt("2026-01-01"), _dt("2026-01-09"), _dt("2026-01-11")],
+                "value": [1, 2, 3],
+            }
+        )
         point_in_time_join(decisions, observations, entity_keys=["entity"])

@@ -95,11 +95,13 @@ class ProviderRawCache:
         body_path = self.store_blob(metadata, body)
 
         observation_id = hashlib.sha256(
-            canonical_json({
-                "retrieved_at_utc": metadata.retrieved_at_utc,
-                "request_time_utc": metadata.request_time_utc,
-                "content_hash": metadata.content_hash,
-            })
+            canonical_json(
+                {
+                    "retrieved_at_utc": metadata.retrieved_at_utc,
+                    "request_time_utc": metadata.request_time_utc,
+                    "content_hash": metadata.content_hash,
+                }
+            )
         ).hexdigest()
         manifest_path = root / "observations" / f"{observation_id}.json"
         manifest = {

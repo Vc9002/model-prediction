@@ -121,7 +121,7 @@ def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
     # Ledger/Flat/Research/Gated Research share one row/header renderer
     # (ledgerHeaderRow/ledgerRowHtml) so their columns and styling can never
     # drift apart again.
-    assert '<th>Order</th><th>Matchup</th>' in html
+    assert "<th>Order</th><th>Matchup</th>" in html
     assert "function ledgerHeaderRow" in html
     assert "function ledgerRowHtml" in html
     assert "model picks are not shown here" in html
@@ -211,7 +211,7 @@ def test_dashboard_operational_views_are_null_safe_filterable_and_accessible() -
     assert "const hasSettled=wins+losses>0" in html
     assert "const winRate=hasSettled?wins/(wins+losses):null" in html
     assert "const totalPnl=hasSettled?" in html
-    assert 'const rowPnl=isSettled?' in html
+    assert "const rowPnl=isSettled?" in html
     assert 'rowPnl==null?"—":fmt(rowPnl)' in html
 
     # Purchase controls fail closed in the row instead of inviting a rejected click.
@@ -236,7 +236,7 @@ def test_dashboard_operational_views_are_null_safe_filterable_and_accessible() -
         "folioPageSize",
     ):
         assert f'id="{element_id}"' in html
-    assert 'api/live' in html
+    assert "api/live" in html
     assert "quoteStateBadge" in html
     assert "timeToStart" in html
     assert "setUrlState" in html

@@ -269,9 +269,7 @@ def refresh_if_due(
     project_root = Path(project_root)
     games_path = Path(data_root) / "historical" / "mlb_games_all.jsonl"
     snapshot_path = Path(data_root) / "mlb_statsapi" / "game_snapshots.jsonl"
-    factors, sample_sizes, park_start, park_end, league_runs_per_team_game = compute_park_factors(
-        games_path
-    )
+    factors, sample_sizes, park_start, park_end, league_runs_per_team_game = compute_park_factors(games_path)
     rates, n_games, rate_start, rate_end = compute_league_rates(snapshot_path)
     if league_runs_per_team_game is not None:
         rates = {**rates, "league_runs_per_team_game": league_runs_per_team_game}

@@ -69,10 +69,12 @@ class TestVenuesForDate:
         norm = NormalizedStore(tmp_path / "data" / "normalized")
         # Real schema has no venue_id column — only venue. See collectors.py's
         # collect_espn_scoreboard for the actual row shape.
-        df = pl.DataFrame({
-            "event_start_utc": ["2026-08-06T01:40Z"],
-            "venue": ["T-Mobile Park"],
-        })
+        df = pl.DataFrame(
+            {
+                "event_start_utc": ["2026-08-06T01:40Z"],
+                "venue": ["T-Mobile Park"],
+            }
+        )
         norm.write("mlb", "scoreboard", df)
 
         collector = MLBCollector(tmp_path / "data", meta)
@@ -185,21 +187,39 @@ class FakePolymarketClientWithRealShape:
     (null price, empty event_id/market_id) every field except line."""
 
     def slate(self, league, game_date):
-        return [{
-            "event_id": "70535",
-            "event_start_utc": "2026-08-06T23:00:00+00:00",
-            "markets": [{
-                "market_id": "350520",
-                "market_type": "moneyline",
-                "line": None,
-                "sides": [
-                    {"side_id": "1", "selection": "away", "team": "Los Angeles Angels",
-                     "line": None, "price_probability": 0.395, "decimal_odds": 2.53, "american_odds": 153},
-                    {"side_id": "2", "selection": "home", "team": "Baltimore Orioles",
-                     "line": None, "price_probability": 0.61, "decimal_odds": 1.64, "american_odds": -156},
+        return [
+            {
+                "event_id": "70535",
+                "event_start_utc": "2026-08-06T23:00:00+00:00",
+                "markets": [
+                    {
+                        "market_id": "350520",
+                        "market_type": "moneyline",
+                        "line": None,
+                        "sides": [
+                            {
+                                "side_id": "1",
+                                "selection": "away",
+                                "team": "Los Angeles Angels",
+                                "line": None,
+                                "price_probability": 0.395,
+                                "decimal_odds": 2.53,
+                                "american_odds": 153,
+                            },
+                            {
+                                "side_id": "2",
+                                "selection": "home",
+                                "team": "Baltimore Orioles",
+                                "line": None,
+                                "price_probability": 0.61,
+                                "decimal_odds": 1.64,
+                                "american_odds": -156,
+                            },
+                        ],
+                    }
                 ],
-            }],
-        }]
+            }
+        ]
 
 
 class TestPolymarketRealDataShape:
@@ -238,17 +258,32 @@ class TestPolymarketRealDataShape:
 
 class FakeESPNClient:
     def scoreboard(self, game_date):
-        return {"events": [{
-            "id": "401816384", "date": "2026-07-20T22:35Z",
-            "competitions": [{
-                "status": {"type": {"name": "STATUS_FINAL"}},
-                "venue": {"fullName": "Oriole Park at Camden Yards"},
-                "competitors": [
-                    {"homeAway": "home", "team": {"displayName": "Baltimore Orioles"}, "score": "3"},
-                    {"homeAway": "away", "team": {"displayName": "Los Angeles Angels"}, "score": "1"},
-                ],
-            }],
-        }]}
+        return {
+            "events": [
+                {
+                    "id": "401816384",
+                    "date": "2026-07-20T22:35Z",
+                    "competitions": [
+                        {
+                            "status": {"type": {"name": "STATUS_FINAL"}},
+                            "venue": {"fullName": "Oriole Park at Camden Yards"},
+                            "competitors": [
+                                {
+                                    "homeAway": "home",
+                                    "team": {"displayName": "Baltimore Orioles"},
+                                    "score": "3",
+                                },
+                                {
+                                    "homeAway": "away",
+                                    "team": {"displayName": "Los Angeles Angels"},
+                                    "score": "1",
+                                },
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
 
 
 class TestESPNScoreboardSnapshotHash:
@@ -284,17 +319,32 @@ class FakeESPNClientWithTeamIds:
     unlike FakeESPNClient above which predates identity wiring."""
 
     def scoreboard(self, game_date):
-        return {"events": [{
-            "id": "401816384", "date": "2026-07-20T22:35Z",
-            "competitions": [{
-                "status": {"type": {"name": "STATUS_FINAL"}},
-                "venue": {"fullName": "Oriole Park at Camden Yards"},
-                "competitors": [
-                    {"homeAway": "home", "team": {"id": "1", "displayName": "Baltimore Orioles"}, "score": "3"},
-                    {"homeAway": "away", "team": {"id": "3", "displayName": "Los Angeles Angels"}, "score": "1"},
-                ],
-            }],
-        }]}
+        return {
+            "events": [
+                {
+                    "id": "401816384",
+                    "date": "2026-07-20T22:35Z",
+                    "competitions": [
+                        {
+                            "status": {"type": {"name": "STATUS_FINAL"}},
+                            "venue": {"fullName": "Oriole Park at Camden Yards"},
+                            "competitors": [
+                                {
+                                    "homeAway": "home",
+                                    "team": {"id": "1", "displayName": "Baltimore Orioles"},
+                                    "score": "3",
+                                },
+                                {
+                                    "homeAway": "away",
+                                    "team": {"id": "3", "displayName": "Los Angeles Angels"},
+                                    "score": "1",
+                                },
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
 
 
 class FakeESPNClientWithVenueId:
@@ -304,21 +354,37 @@ class FakeESPNClientWithVenueId:
     shape for venue-identity tests."""
 
     def scoreboard(self, game_date):
-        return {"events": [{
-            "id": "401816384", "date": "2026-07-20T22:35Z",
-            "competitions": [{
-                "status": {"type": {"name": "STATUS_FINAL"}},
-                "venue": {
-                    "id": "84", "fullName": "Citizens Bank Park",
-                    "address": {"city": "Philadelphia", "state": "Pennsylvania"},
-                    "indoor": False,
-                },
-                "competitors": [
-                    {"homeAway": "home", "team": {"id": "1", "displayName": "Baltimore Orioles"}, "score": "3"},
-                    {"homeAway": "away", "team": {"id": "3", "displayName": "Los Angeles Angels"}, "score": "1"},
-                ],
-            }],
-        }]}
+        return {
+            "events": [
+                {
+                    "id": "401816384",
+                    "date": "2026-07-20T22:35Z",
+                    "competitions": [
+                        {
+                            "status": {"type": {"name": "STATUS_FINAL"}},
+                            "venue": {
+                                "id": "84",
+                                "fullName": "Citizens Bank Park",
+                                "address": {"city": "Philadelphia", "state": "Pennsylvania"},
+                                "indoor": False,
+                            },
+                            "competitors": [
+                                {
+                                    "homeAway": "home",
+                                    "team": {"id": "1", "displayName": "Baltimore Orioles"},
+                                    "score": "3",
+                                },
+                                {
+                                    "homeAway": "away",
+                                    "team": {"id": "3", "displayName": "Los Angeles Angels"},
+                                    "score": "1",
+                                },
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
 
 
 class TestScoreboardCanonicalIdentity:
@@ -376,19 +442,31 @@ class FakeESPNClientDoubleheader:
 
     def scoreboard(self, game_date):
         common = {
-            "competitions": [{
-                "status": {"type": {"name": "STATUS_FINAL"}},
-                "venue": {"fullName": "Oriole Park at Camden Yards"},
-                "competitors": [
-                    {"homeAway": "home", "team": {"id": "1", "displayName": "Baltimore Orioles"}, "score": "3"},
-                    {"homeAway": "away", "team": {"id": "3", "displayName": "Los Angeles Angels"}, "score": "1"},
-                ],
-            }],
+            "competitions": [
+                {
+                    "status": {"type": {"name": "STATUS_FINAL"}},
+                    "venue": {"fullName": "Oriole Park at Camden Yards"},
+                    "competitors": [
+                        {
+                            "homeAway": "home",
+                            "team": {"id": "1", "displayName": "Baltimore Orioles"},
+                            "score": "3",
+                        },
+                        {
+                            "homeAway": "away",
+                            "team": {"id": "3", "displayName": "Los Angeles Angels"},
+                            "score": "1",
+                        },
+                    ],
+                }
+            ],
         }
-        return {"events": [
-            {"id": "401816384", "date": "2026-07-20T18:05Z", **common},
-            {"id": "401816385", "date": "2026-07-20T22:35Z", **common},
-        ]}
+        return {
+            "events": [
+                {"id": "401816384", "date": "2026-07-20T18:05Z", **common},
+                {"id": "401816385", "date": "2026-07-20T22:35Z", **common},
+            ]
+        }
 
 
 class TestScoreboardEventIdentity:

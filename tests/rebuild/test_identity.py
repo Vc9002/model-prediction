@@ -66,9 +66,12 @@ class TestIdentityRegistryRegisterAndResolve:
         registry = _registry(tmp_path)
 
         identity = registry.register(
-            entity_type="team", canonical_name="Seattle Mariners", sport="mlb",
+            entity_type="team",
+            canonical_name="Seattle Mariners",
+            sport="mlb",
             effective_from_utc="2026-01-01",
-            source_id="espn_public", source_entity_id="12",
+            source_id="espn_public",
+            source_entity_id="12",
         )
 
         resolved = registry.resolve("espn_public", "12")
@@ -82,8 +85,11 @@ class TestIdentityRegistryRegisterAndResolve:
     def test_bad_entity_type_fails_closed(self, tmp_path):
         try:
             CanonicalIdentity(
-                entity_id="x", entity_type="not_a_real_type", canonical_name="X",
-                sport="mlb", effective_from_utc="2026-01-01",
+                entity_id="x",
+                entity_type="not_a_real_type",
+                canonical_name="X",
+                sport="mlb",
+                effective_from_utc="2026-01-01",
             )
             raised = False
         except ValueError:
@@ -95,12 +101,16 @@ class TestProposeMatchFailsClosed:
     def test_confident_match_is_returned(self, tmp_path):
         registry = _registry(tmp_path)
         registry.register(
-            entity_type="team", canonical_name="Seattle Mariners", sport="mlb",
+            entity_type="team",
+            canonical_name="Seattle Mariners",
+            sport="mlb",
             effective_from_utc="2026-01-01",
         )
 
         proposed, confidence = registry.propose_match(
-            entity_type="team", sport="mlb", name="Seattle Mariners",
+            entity_type="team",
+            sport="mlb",
+            name="Seattle Mariners",
         )
         assert proposed is not None
         assert confidence == 1.0
@@ -108,7 +118,9 @@ class TestProposeMatchFailsClosed:
     def test_low_confidence_match_fails_closed_to_none(self, tmp_path):
         registry = _registry(tmp_path)
         registry.register(
-            entity_type="team", canonical_name="Seattle Mariners", sport="mlb",
+            entity_type="team",
+            canonical_name="Seattle Mariners",
+            sport="mlb",
             effective_from_utc="2026-01-01",
         )
 
@@ -116,7 +128,10 @@ class TestProposeMatchFailsClosed:
         # real ambiguity (could be Seattle Kraken, Seattle Sounders in a
         # differently-scoped registry), must not silently auto-match.
         proposed, confidence = registry.propose_match(
-            entity_type="team", sport="mlb", name="Seattle", min_confidence=0.90,
+            entity_type="team",
+            sport="mlb",
+            name="Seattle",
+            min_confidence=0.90,
         )
         assert proposed is None
         assert confidence < 0.90
@@ -124,41 +139,61 @@ class TestProposeMatchFailsClosed:
     def test_wrong_sport_is_never_matched(self, tmp_path):
         registry = _registry(tmp_path)
         registry.register(
-            entity_type="team", canonical_name="Seattle Mariners", sport="mlb",
+            entity_type="team",
+            canonical_name="Seattle Mariners",
+            sport="mlb",
             effective_from_utc="2026-01-01",
         )
 
         proposed, _ = registry.propose_match(
-            entity_type="team", sport="nba", name="Seattle Mariners",
+            entity_type="team",
+            sport="nba",
+            name="Seattle Mariners",
         )
         assert proposed is None
 
 
 def _register_team(registry, source_id, source_entity_id, name, effective_from_utc, sport="mlb"):
     return resolve_or_register_team(
-        registry, sport=sport, source_id=source_id, source_team_id=source_entity_id,
-        team_name=name, effective_from_utc=effective_from_utc,
+        registry,
+        sport=sport,
+        source_id=source_id,
+        source_team_id=source_entity_id,
+        team_name=name,
+        effective_from_utc=effective_from_utc,
     )
 
 
 def _register_venue(registry, source_id, source_entity_id, name, effective_from_utc, sport="mlb"):
     return resolve_or_register_venue(
-        registry, sport=sport, source_id=source_id, source_venue_id=source_entity_id,
-        venue_name=name, effective_from_utc=effective_from_utc,
+        registry,
+        sport=sport,
+        source_id=source_id,
+        source_venue_id=source_entity_id,
+        venue_name=name,
+        effective_from_utc=effective_from_utc,
     )
 
 
 def _register_event(registry, source_id, source_entity_id, name, effective_from_utc, sport="mlb"):
     return resolve_or_register_event(
-        registry, sport=sport, source_id=source_id, source_event_id=source_entity_id,
-        canonical_name=name, effective_from_utc=effective_from_utc,
+        registry,
+        sport=sport,
+        source_id=source_id,
+        source_event_id=source_entity_id,
+        canonical_name=name,
+        effective_from_utc=effective_from_utc,
     )
 
 
 def _register_player(registry, source_id, source_entity_id, name, effective_from_utc, sport="nba"):
     return resolve_or_register_player(
-        registry, sport=sport, source_id=source_id, source_player_id=source_entity_id,
-        player_name=name, effective_from_utc=effective_from_utc,
+        registry,
+        sport=sport,
+        source_id=source_id,
+        source_player_id=source_entity_id,
+        player_name=name,
+        effective_from_utc=effective_from_utc,
     )
 
 
@@ -223,7 +258,9 @@ class TestResolveOrRegisterFuzzyCrossSourceMatch:
     _NAME: ClassVar = {"team": "Seattle Mariners", "venue": "Citizens Bank Park"}
 
     @pytest.mark.parametrize("entity_type", sorted(_REGISTER))
-    def test_a_second_source_observing_the_same_real_entity_maps_to_the_same_identity(self, tmp_path, entity_type):
+    def test_a_second_source_observing_the_same_real_entity_maps_to_the_same_identity(
+        self, tmp_path, entity_type
+    ):
         register, name = self._REGISTER[entity_type], self._NAME[entity_type]
         registry = _registry(tmp_path)
 
@@ -249,13 +286,17 @@ class TestResolveEspnScoreboardTeamIdsCrossSportCollision:
     def test_same_espn_team_id_in_two_sports_resolves_to_two_different_teams(self, tmp_path):
         registry = _registry(tmp_path)
         mlb_home, mlb_away = resolve_espn_scoreboard_team_ids(
-            registry, "mlb", "espn_public",
+            registry,
+            "mlb",
+            "espn_public",
             {"id": "20", "displayName": "Washington Nationals"},
             {"id": "15", "displayName": "Atlanta Braves"},
             "2026-08-07T00:00:00+00:00",
         )
         wnba_home, wnba_away = resolve_espn_scoreboard_team_ids(
-            registry, "wnba", "espn_public",
+            registry,
+            "wnba",
+            "espn_public",
             {"id": "20", "displayName": "Atlanta Dream"},
             {"id": "15", "displayName": "Washington Mystics"},
             "2026-08-07T00:00:00+00:00",
@@ -284,9 +325,16 @@ class TestResolveEspnScoreboardEventId:
     def test_missing_espn_event_id_returns_none(self, tmp_path):
         registry = _registry(tmp_path)
         result = resolve_espn_scoreboard_event_id(
-            registry, "mlb", "espn_public", "",
-            self._home, self._away, "mlb:team:home", "mlb:team:away",
-            "2026-07-20T22:35Z", "2026-07-20T20:00:00+00:00",
+            registry,
+            "mlb",
+            "espn_public",
+            "",
+            self._home,
+            self._away,
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20T22:35Z",
+            "2026-07-20T20:00:00+00:00",
         )
         assert result is None
 
@@ -297,15 +345,29 @@ class TestResolveEspnScoreboardEventId:
         # one collapsed identity.
         registry = _registry(tmp_path)
         game_1 = resolve_espn_scoreboard_event_id(
-            registry, "mlb", "espn_public", "401816384",
-            self._home, self._away, "mlb:team:home", "mlb:team:away",
-            "2026-07-20T18:05Z", "2026-07-20T17:00:00+00:00",
+            registry,
+            "mlb",
+            "espn_public",
+            "401816384",
+            self._home,
+            self._away,
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20T18:05Z",
+            "2026-07-20T17:00:00+00:00",
             venue_name="Oriole Park at Camden Yards",
         )
         game_2 = resolve_espn_scoreboard_event_id(
-            registry, "mlb", "espn_public", "401816385",
-            self._home, self._away, "mlb:team:home", "mlb:team:away",
-            "2026-07-20T22:35Z", "2026-07-20T21:30:00+00:00",
+            registry,
+            "mlb",
+            "espn_public",
+            "401816385",
+            self._home,
+            self._away,
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20T22:35Z",
+            "2026-07-20T21:30:00+00:00",
             venue_name="Oriole Park at Camden Yards",
         )
         assert game_1 is not None
@@ -317,9 +379,16 @@ class TestResolveEspnScoreboardEventId:
         # must not depend on venue matching a "home" team's usual park.
         registry = _registry(tmp_path)
         event_id = resolve_espn_scoreboard_event_id(
-            registry, "mlb", "espn_public", "401900001",
-            self._home, self._away, "mlb:team:home", "mlb:team:away",
-            "2026-06-13T17:05Z", "2026-06-13T16:00:00+00:00",
+            registry,
+            "mlb",
+            "espn_public",
+            "401900001",
+            self._home,
+            self._away,
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-06-13T17:05Z",
+            "2026-06-13T16:00:00+00:00",
             venue_name="London Stadium",
         )
         assert event_id is not None
@@ -330,14 +399,28 @@ class TestResolveEspnScoreboardEventId:
     def test_rerunning_collection_reuses_the_same_canonical_event(self, tmp_path):
         registry = _registry(tmp_path)
         first = resolve_espn_scoreboard_event_id(
-            registry, "mlb", "espn_public", "401816384",
-            self._home, self._away, "mlb:team:home", "mlb:team:away",
-            "2026-07-20T22:35Z", "2026-07-20T20:00:00+00:00",
+            registry,
+            "mlb",
+            "espn_public",
+            "401816384",
+            self._home,
+            self._away,
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20T22:35Z",
+            "2026-07-20T20:00:00+00:00",
         )
         second = resolve_espn_scoreboard_event_id(
-            registry, "mlb", "espn_public", "401816384",
-            self._home, self._away, "mlb:team:home", "mlb:team:away",
-            "2026-07-20T22:35Z", "2026-07-20T21:00:00+00:00",
+            registry,
+            "mlb",
+            "espn_public",
+            "401816384",
+            self._home,
+            self._away,
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20T22:35Z",
+            "2026-07-20T21:00:00+00:00",
         )
         assert first == second
 
@@ -348,15 +431,28 @@ class TestResolveEspnScoreboardEventId:
         # verified collision-free either.
         registry = _registry(tmp_path)
         mlb_event = resolve_espn_scoreboard_event_id(
-            registry, "mlb", "espn_public", "500",
-            self._home, self._away, "mlb:team:home", "mlb:team:away",
-            "2026-07-20T22:35Z", "2026-07-20T20:00:00+00:00",
+            registry,
+            "mlb",
+            "espn_public",
+            "500",
+            self._home,
+            self._away,
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20T22:35Z",
+            "2026-07-20T20:00:00+00:00",
         )
         wnba_event = resolve_espn_scoreboard_event_id(
-            registry, "wnba", "espn_public", "500",
-            {"id": "20", "displayName": "Atlanta Dream"}, {"id": "15", "displayName": "Washington Mystics"},
-            "wnba:team:home", "wnba:team:away",
-            "2026-07-20T22:35Z", "2026-07-20T20:00:00+00:00",
+            registry,
+            "wnba",
+            "espn_public",
+            "500",
+            {"id": "20", "displayName": "Atlanta Dream"},
+            {"id": "15", "displayName": "Washington Mystics"},
+            "wnba:team:home",
+            "wnba:team:away",
+            "2026-07-20T22:35Z",
+            "2026-07-20T20:00:00+00:00",
         )
         assert mlb_event != wnba_event
 
@@ -371,38 +467,79 @@ class TestResolveEventByTeamPair:
     def test_finds_the_single_matching_event(self, tmp_path):
         registry = _registry(tmp_path)
         event_id = resolve_espn_scoreboard_event_id(
-            registry, "mlb", "espn_public", "401816384",
-            {"id": "1", "displayName": "Baltimore Orioles"}, {"id": "3", "displayName": "Los Angeles Angels"},
-            "mlb:team:home", "mlb:team:away",
-            "2026-07-20T22:35Z", "2026-07-20T20:00:00+00:00",
+            registry,
+            "mlb",
+            "espn_public",
+            "401816384",
+            {"id": "1", "displayName": "Baltimore Orioles"},
+            {"id": "3", "displayName": "Los Angeles Angels"},
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20T22:35Z",
+            "2026-07-20T20:00:00+00:00",
         )
         found = resolve_event_by_team_pair(
-            registry, "mlb", "mlb:team:home", "mlb:team:away", "2026-07-20",
+            registry,
+            "mlb",
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20",
         )
         assert found == event_id
 
     def test_doubleheader_ambiguity_fails_closed(self, tmp_path):
         registry = _registry(tmp_path)
-        home, away = {"id": "1", "displayName": "Baltimore Orioles"}, {"id": "3", "displayName": "Los Angeles Angels"}
-        resolve_espn_scoreboard_event_id(
-            registry, "mlb", "espn_public", "401816384",
-            home, away, "mlb:team:home", "mlb:team:away",
-            "2026-07-20T18:05Z", "2026-07-20T17:00:00+00:00",
+        home, away = (
+            {"id": "1", "displayName": "Baltimore Orioles"},
+            {"id": "3", "displayName": "Los Angeles Angels"},
         )
         resolve_espn_scoreboard_event_id(
-            registry, "mlb", "espn_public", "401816385",
-            home, away, "mlb:team:home", "mlb:team:away",
-            "2026-07-20T22:35Z", "2026-07-20T21:30:00+00:00",
+            registry,
+            "mlb",
+            "espn_public",
+            "401816384",
+            home,
+            away,
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20T18:05Z",
+            "2026-07-20T17:00:00+00:00",
         )
-        assert resolve_event_by_team_pair(
-            registry, "mlb", "mlb:team:home", "mlb:team:away", "2026-07-20",
-        ) is None
+        resolve_espn_scoreboard_event_id(
+            registry,
+            "mlb",
+            "espn_public",
+            "401816385",
+            home,
+            away,
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20T22:35Z",
+            "2026-07-20T21:30:00+00:00",
+        )
+        assert (
+            resolve_event_by_team_pair(
+                registry,
+                "mlb",
+                "mlb:team:home",
+                "mlb:team:away",
+                "2026-07-20",
+            )
+            is None
+        )
 
     def test_no_match_returns_none(self, tmp_path):
         registry = _registry(tmp_path)
-        assert resolve_event_by_team_pair(
-            registry, "mlb", "mlb:team:home", "mlb:team:away", "2026-07-20",
-        ) is None
+        assert (
+            resolve_event_by_team_pair(
+                registry,
+                "mlb",
+                "mlb:team:home",
+                "mlb:team:away",
+                "2026-07-20",
+            )
+            is None
+        )
 
     def test_missing_canonical_team_id_returns_none(self, tmp_path):
         registry = _registry(tmp_path)
@@ -421,9 +558,16 @@ class TestResolveOrLinkPolymarketEventId:
     def _seeded_registry(self, tmp_path):
         registry = _registry(tmp_path)
         event_id = resolve_espn_scoreboard_event_id(
-            registry, "mlb", "espn_public", "401816384",
-            self.home, self.away, "mlb:team:home", "mlb:team:away",
-            "2026-07-20T22:35Z", "2026-07-20T20:00:00+00:00",
+            registry,
+            "mlb",
+            "espn_public",
+            "401816384",
+            self.home,
+            self.away,
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20T22:35Z",
+            "2026-07-20T20:00:00+00:00",
         )
         return registry, event_id
 
@@ -431,8 +575,13 @@ class TestResolveOrLinkPolymarketEventId:
         registry, espn_event_id = self._seeded_registry(tmp_path)
 
         linked = resolve_or_link_polymarket_event_id(
-            registry, "mlb", "70543", "mlb:team:home", "mlb:team:away",
-            "2026-07-20", known_canonical_event_id=espn_event_id,
+            registry,
+            "mlb",
+            "70543",
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20",
+            known_canonical_event_id=espn_event_id,
         )
 
         assert linked == espn_event_id
@@ -442,12 +591,22 @@ class TestResolveOrLinkPolymarketEventId:
         registry, espn_event_id = self._seeded_registry(tmp_path)
 
         first = resolve_or_link_polymarket_event_id(
-            registry, "mlb", "70543", "mlb:team:home", "mlb:team:away",
-            "2026-07-20", known_canonical_event_id=espn_event_id,
+            registry,
+            "mlb",
+            "70543",
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20",
+            known_canonical_event_id=espn_event_id,
         )
         second = resolve_or_link_polymarket_event_id(
-            registry, "mlb", "70543", "mlb:team:home", "mlb:team:away",
-            "2026-07-20", known_canonical_event_id=espn_event_id,
+            registry,
+            "mlb",
+            "70543",
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20",
+            known_canonical_event_id=espn_event_id,
         )
         assert first == second == espn_event_id
 
@@ -455,7 +614,12 @@ class TestResolveOrLinkPolymarketEventId:
         registry, espn_event_id = self._seeded_registry(tmp_path)
 
         linked = resolve_or_link_polymarket_event_id(
-            registry, "mlb", "70543", "mlb:team:home", "mlb:team:away", "2026-07-20",
+            registry,
+            "mlb",
+            "70543",
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20",
         )
         assert linked == espn_event_id
 
@@ -465,26 +629,53 @@ class TestResolveOrLinkPolymarketEventId:
         # disambiguate a doubleheader -- must fail closed, not guess.
         registry = _registry(tmp_path)
         resolve_espn_scoreboard_event_id(
-            registry, "mlb", "espn_public", "401816384",
-            self.home, self.away, "mlb:team:home", "mlb:team:away",
-            "2026-07-20T18:05Z", "2026-07-20T17:00:00+00:00",
+            registry,
+            "mlb",
+            "espn_public",
+            "401816384",
+            self.home,
+            self.away,
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20T18:05Z",
+            "2026-07-20T17:00:00+00:00",
         )
         resolve_espn_scoreboard_event_id(
-            registry, "mlb", "espn_public", "401816385",
-            self.home, self.away, "mlb:team:home", "mlb:team:away",
-            "2026-07-20T22:35Z", "2026-07-20T21:30:00+00:00",
+            registry,
+            "mlb",
+            "espn_public",
+            "401816385",
+            self.home,
+            self.away,
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20T22:35Z",
+            "2026-07-20T21:30:00+00:00",
         )
 
         linked = resolve_or_link_polymarket_event_id(
-            registry, "mlb", "70543", "mlb:team:home", "mlb:team:away", "2026-07-20",
+            registry,
+            "mlb",
+            "70543",
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20",
         )
         assert linked is None
 
     def test_missing_polymarket_event_id_returns_none(self, tmp_path):
         registry, _ = self._seeded_registry(tmp_path)
-        assert resolve_or_link_polymarket_event_id(
-            registry, "mlb", None, "mlb:team:home", "mlb:team:away", "2026-07-20",
-        ) is None
+        assert (
+            resolve_or_link_polymarket_event_id(
+                registry,
+                "mlb",
+                None,
+                "mlb:team:home",
+                "mlb:team:away",
+                "2026-07-20",
+            )
+            is None
+        )
 
 
 class TestResolveOrLinkStatcastGamePk:
@@ -500,9 +691,16 @@ class TestResolveOrLinkStatcastGamePk:
     def _seeded_registry(self, tmp_path):
         registry = _registry(tmp_path)
         event_id = resolve_espn_scoreboard_event_id(
-            registry, "mlb", "espn_public", "401816384",
-            self.home, self.away, "mlb:team:home", "mlb:team:away",
-            "2026-07-20T22:35Z", "2026-07-20T20:00:00+00:00",
+            registry,
+            "mlb",
+            "espn_public",
+            "401816384",
+            self.home,
+            self.away,
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20T22:35Z",
+            "2026-07-20T20:00:00+00:00",
         )
         return registry, event_id
 
@@ -510,8 +708,13 @@ class TestResolveOrLinkStatcastGamePk:
         registry, espn_event_id = self._seeded_registry(tmp_path)
 
         linked = resolve_or_link_statcast_game_pk(
-            registry, "mlb", 824490, "mlb:team:home", "mlb:team:away",
-            "2026-07-20", known_canonical_event_id=espn_event_id,
+            registry,
+            "mlb",
+            824490,
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20",
+            known_canonical_event_id=espn_event_id,
         )
 
         assert linked == espn_event_id
@@ -521,12 +724,22 @@ class TestResolveOrLinkStatcastGamePk:
         registry, espn_event_id = self._seeded_registry(tmp_path)
 
         first = resolve_or_link_statcast_game_pk(
-            registry, "mlb", 824490, "mlb:team:home", "mlb:team:away",
-            "2026-07-20", known_canonical_event_id=espn_event_id,
+            registry,
+            "mlb",
+            824490,
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20",
+            known_canonical_event_id=espn_event_id,
         )
         second = resolve_or_link_statcast_game_pk(
-            registry, "mlb", 824490, "mlb:team:home", "mlb:team:away",
-            "2026-07-20", known_canonical_event_id=espn_event_id,
+            registry,
+            "mlb",
+            824490,
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20",
+            known_canonical_event_id=espn_event_id,
         )
         assert first == second == espn_event_id
 
@@ -534,7 +747,12 @@ class TestResolveOrLinkStatcastGamePk:
         registry, espn_event_id = self._seeded_registry(tmp_path)
 
         linked = resolve_or_link_statcast_game_pk(
-            registry, "mlb", 824490, "mlb:team:home", "mlb:team:away", "2026-07-20",
+            registry,
+            "mlb",
+            824490,
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20",
         )
         assert linked == espn_event_id
 
@@ -544,26 +762,53 @@ class TestResolveOrLinkStatcastGamePk:
         # disambiguate a doubleheader -- must fail closed, not guess.
         registry = _registry(tmp_path)
         resolve_espn_scoreboard_event_id(
-            registry, "mlb", "espn_public", "401816384",
-            self.home, self.away, "mlb:team:home", "mlb:team:away",
-            "2026-07-20T18:05Z", "2026-07-20T17:00:00+00:00",
+            registry,
+            "mlb",
+            "espn_public",
+            "401816384",
+            self.home,
+            self.away,
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20T18:05Z",
+            "2026-07-20T17:00:00+00:00",
         )
         resolve_espn_scoreboard_event_id(
-            registry, "mlb", "espn_public", "401816385",
-            self.home, self.away, "mlb:team:home", "mlb:team:away",
-            "2026-07-20T22:35Z", "2026-07-20T21:30:00+00:00",
+            registry,
+            "mlb",
+            "espn_public",
+            "401816385",
+            self.home,
+            self.away,
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20T22:35Z",
+            "2026-07-20T21:30:00+00:00",
         )
 
         linked = resolve_or_link_statcast_game_pk(
-            registry, "mlb", 824490, "mlb:team:home", "mlb:team:away", "2026-07-20",
+            registry,
+            "mlb",
+            824490,
+            "mlb:team:home",
+            "mlb:team:away",
+            "2026-07-20",
         )
         assert linked is None
 
     def test_missing_game_pk_returns_none(self, tmp_path):
         registry, _ = self._seeded_registry(tmp_path)
-        assert resolve_or_link_statcast_game_pk(
-            registry, "mlb", None, "mlb:team:home", "mlb:team:away", "2026-07-20",
-        ) is None
+        assert (
+            resolve_or_link_statcast_game_pk(
+                registry,
+                "mlb",
+                None,
+                "mlb:team:home",
+                "mlb:team:away",
+                "2026-07-20",
+            )
+            is None
+        )
 
 
 class TestResolveEspnScoreboardVenueId:
@@ -577,7 +822,10 @@ class TestResolveEspnScoreboardVenueId:
     def test_missing_id_returns_none(self, tmp_path):
         registry = _registry(tmp_path)
         result = resolve_espn_scoreboard_venue_id(
-            registry, "mlb", "espn_public", {"fullName": "Citizens Bank Park"},
+            registry,
+            "mlb",
+            "espn_public",
+            {"fullName": "Citizens Bank Park"},
             "2026-07-20T20:00:00+00:00",
         )
         assert result is None
@@ -585,7 +833,10 @@ class TestResolveEspnScoreboardVenueId:
     def test_missing_name_returns_none(self, tmp_path):
         registry = _registry(tmp_path)
         result = resolve_espn_scoreboard_venue_id(
-            registry, "mlb", "espn_public", {"id": "84"},
+            registry,
+            "mlb",
+            "espn_public",
+            {"id": "84"},
             "2026-07-20T20:00:00+00:00",
         )
         assert result is None
@@ -593,12 +844,17 @@ class TestResolveEspnScoreboardVenueId:
     def test_real_venue_shape_resolves_with_available_real_fields_only(self, tmp_path):
         registry = _registry(tmp_path)
         venue_obj = {
-            "id": "84", "fullName": "Citizens Bank Park",
+            "id": "84",
+            "fullName": "Citizens Bank Park",
             "address": {"city": "Philadelphia", "state": "Pennsylvania"},
             "indoor": False,
         }
         venue_id = resolve_espn_scoreboard_venue_id(
-            registry, "mlb", "espn_public", venue_obj, "2026-07-20T20:00:00+00:00",
+            registry,
+            "mlb",
+            "espn_public",
+            venue_obj,
+            "2026-07-20T20:00:00+00:00",
         )
         assert venue_id is not None
         resolved = registry.resolve("espn_public:mlb", "84")
@@ -615,10 +871,18 @@ class TestResolveEspnScoreboardVenueId:
         registry = _registry(tmp_path)
         venue_obj = {"id": "84", "fullName": "Citizens Bank Park"}
         first = resolve_espn_scoreboard_venue_id(
-            registry, "mlb", "espn_public", venue_obj, "2026-07-20T20:00:00+00:00",
+            registry,
+            "mlb",
+            "espn_public",
+            venue_obj,
+            "2026-07-20T20:00:00+00:00",
         )
         second = resolve_espn_scoreboard_venue_id(
-            registry, "mlb", "espn_public", venue_obj, "2026-07-21T20:00:00+00:00",
+            registry,
+            "mlb",
+            "espn_public",
+            venue_obj,
+            "2026-07-21T20:00:00+00:00",
         )
         assert first == second
 
@@ -641,12 +905,20 @@ class TestResolveOrRegisterPlayer:
         # docstring for why fuzzy matching is deliberately not used here).
         registry = _registry(tmp_path)
         first = resolve_or_register_player(
-            registry, sport="nba", source_id="espn_public:nba", source_player_id="111",
-            player_name="Chris Johnson", effective_from_utc="2026-01-01",
+            registry,
+            sport="nba",
+            source_id="espn_public:nba",
+            source_player_id="111",
+            player_name="Chris Johnson",
+            effective_from_utc="2026-01-01",
         )
         second = resolve_or_register_player(
-            registry, sport="nba", source_id="espn_public:nba", source_player_id="222",
-            player_name="Chris Johnson", effective_from_utc="2026-01-01",
+            registry,
+            sport="nba",
+            source_id="espn_public:nba",
+            source_player_id="222",
+            player_name="Chris Johnson",
+            effective_from_utc="2026-01-01",
         )
         assert first.entity_id != second.entity_id
         assert registry.resolve("espn_public:nba", "111").entity_id == first.entity_id
@@ -663,19 +935,29 @@ class TestResolveEspnRosterPlayerId:
     def test_missing_id_returns_none(self, tmp_path):
         registry = _registry(tmp_path)
         result = resolve_espn_roster_player_id(
-            registry, "wnba", "espn_public", {"displayName": "Maya Caldwell"},
-            None, "2026-07-20T20:00:00+00:00",
+            registry,
+            "wnba",
+            "espn_public",
+            {"displayName": "Maya Caldwell"},
+            None,
+            "2026-07-20T20:00:00+00:00",
         )
         assert result is None
 
     def test_real_athlete_shape_resolves_with_available_real_fields(self, tmp_path):
         registry = _registry(tmp_path)
         athlete = {
-            "id": 4280850, "displayName": "Maya Caldwell",
-            "position": {"abbreviation": "G"}, "jersey": "12",
+            "id": 4280850,
+            "displayName": "Maya Caldwell",
+            "position": {"abbreviation": "G"},
+            "jersey": "12",
         }
         player_id = resolve_espn_roster_player_id(
-            registry, "wnba", "espn_public", athlete, "wnba:team:atl",
+            registry,
+            "wnba",
+            "espn_public",
+            athlete,
+            "wnba:team:atl",
             "2026-07-20T20:00:00+00:00",
         )
         assert player_id is not None
@@ -690,11 +972,19 @@ class TestResolveEspnRosterPlayerId:
         # here.
         registry = _registry(tmp_path)
         nba_player = resolve_espn_roster_player_id(
-            registry, "nba", "espn_public", {"id": 500, "displayName": "Player A"},
-            None, "2026-07-20T20:00:00+00:00",
+            registry,
+            "nba",
+            "espn_public",
+            {"id": 500, "displayName": "Player A"},
+            None,
+            "2026-07-20T20:00:00+00:00",
         )
         wnba_player = resolve_espn_roster_player_id(
-            registry, "wnba", "espn_public", {"id": 500, "displayName": "Player B"},
-            None, "2026-07-20T20:00:00+00:00",
+            registry,
+            "wnba",
+            "espn_public",
+            {"id": 500, "displayName": "Player B"},
+            None,
+            "2026-07-20T20:00:00+00:00",
         )
         assert nba_player != wnba_player

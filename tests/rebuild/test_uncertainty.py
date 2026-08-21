@@ -100,28 +100,44 @@ class TestCalibrationUncertainty:
 class TestComposeConservativeProbability:
     def test_no_uncertainty_at_all_equals_bootstrap_lower(self):
         result = compose_conservative_probability(
-            calibrated_probability=0.6, bootstrap_lower=0.55, bootstrap_upper=0.65,
-            model_disagreement=0.0, calibration_uncertainty=0.0, missingness_penalty=0.0,
+            calibrated_probability=0.6,
+            bootstrap_lower=0.55,
+            bootstrap_upper=0.65,
+            model_disagreement=0.0,
+            calibration_uncertainty=0.0,
+            missingness_penalty=0.0,
         )
         assert result.conservative_probability == pytest.approx(0.55)
         assert result.probability_lower == pytest.approx(0.55)
 
     def test_real_disagreement_widens_the_bound(self):
         base = compose_conservative_probability(
-            calibrated_probability=0.6, bootstrap_lower=0.55, bootstrap_upper=0.65,
-            model_disagreement=0.0, calibration_uncertainty=0.0, missingness_penalty=0.0,
+            calibrated_probability=0.6,
+            bootstrap_lower=0.55,
+            bootstrap_upper=0.65,
+            model_disagreement=0.0,
+            calibration_uncertainty=0.0,
+            missingness_penalty=0.0,
         )
         widened = compose_conservative_probability(
-            calibrated_probability=0.6, bootstrap_lower=0.55, bootstrap_upper=0.65,
-            model_disagreement=0.10, calibration_uncertainty=0.0, missingness_penalty=0.0,
+            calibrated_probability=0.6,
+            bootstrap_lower=0.55,
+            bootstrap_upper=0.65,
+            model_disagreement=0.10,
+            calibration_uncertainty=0.0,
+            missingness_penalty=0.0,
         )
         assert widened.conservative_probability < base.conservative_probability
         assert widened.probability_upper > base.probability_upper
 
     def test_missingness_penalty_lowers_the_conservative_probability(self):
         result = compose_conservative_probability(
-            calibrated_probability=0.6, bootstrap_lower=0.55, bootstrap_upper=0.65,
-            model_disagreement=0.0, calibration_uncertainty=0.0, missingness_penalty=0.04,
+            calibrated_probability=0.6,
+            bootstrap_lower=0.55,
+            bootstrap_upper=0.65,
+            model_disagreement=0.0,
+            calibration_uncertainty=0.0,
+            missingness_penalty=0.04,
             missing_flags=["weather_availability", "home_sp_availability"],
         )
         assert result.conservative_probability == pytest.approx(0.51)
@@ -129,21 +145,33 @@ class TestComposeConservativeProbability:
 
     def test_result_is_always_clipped_to_a_real_probability(self):
         result = compose_conservative_probability(
-            calibrated_probability=0.6, bootstrap_lower=0.1, bootstrap_upper=0.2,
-            model_disagreement=0.5, calibration_uncertainty=0.3, missingness_penalty=MAX_MISSINGNESS_PENALTY,
+            calibrated_probability=0.6,
+            bootstrap_lower=0.1,
+            bootstrap_upper=0.2,
+            model_disagreement=0.5,
+            calibration_uncertainty=0.3,
+            missingness_penalty=MAX_MISSINGNESS_PENALTY,
         )
         assert 0.0 <= result.conservative_probability <= 1.0
         assert 0.0 <= result.probability_upper <= 1.0
 
     def test_unavailable_lineup_uncertainty_contributes_nothing_not_fabricated(self):
         with_none = compose_conservative_probability(
-            calibrated_probability=0.6, bootstrap_lower=0.55, bootstrap_upper=0.65,
-            model_disagreement=0.0, calibration_uncertainty=0.0, missingness_penalty=0.0,
+            calibrated_probability=0.6,
+            bootstrap_lower=0.55,
+            bootstrap_upper=0.65,
+            model_disagreement=0.0,
+            calibration_uncertainty=0.0,
+            missingness_penalty=0.0,
             lineup_uncertainty=None,
         )
         with_zero = compose_conservative_probability(
-            calibrated_probability=0.6, bootstrap_lower=0.55, bootstrap_upper=0.65,
-            model_disagreement=0.0, calibration_uncertainty=0.0, missingness_penalty=0.0,
+            calibrated_probability=0.6,
+            bootstrap_lower=0.55,
+            bootstrap_upper=0.65,
+            model_disagreement=0.0,
+            calibration_uncertainty=0.0,
+            missingness_penalty=0.0,
             lineup_uncertainty=0.0,
         )
         assert with_none.conservative_probability == with_zero.conservative_probability
@@ -151,15 +179,23 @@ class TestComposeConservativeProbability:
 
     def test_real_lineup_uncertainty_when_present_widens_further(self):
         result = compose_conservative_probability(
-            calibrated_probability=0.6, bootstrap_lower=0.55, bootstrap_upper=0.65,
-            model_disagreement=0.0, calibration_uncertainty=0.0, missingness_penalty=0.0,
+            calibrated_probability=0.6,
+            bootstrap_lower=0.55,
+            bootstrap_upper=0.65,
+            model_disagreement=0.0,
+            calibration_uncertainty=0.0,
+            missingness_penalty=0.0,
             lineup_uncertainty=0.05,
         )
         assert result.conservative_probability == pytest.approx(0.50)
 
     def test_raw_probability_defaults_to_calibrated_when_not_given(self):
         result = compose_conservative_probability(
-            calibrated_probability=0.6, bootstrap_lower=0.55, bootstrap_upper=0.65,
-            model_disagreement=0.0, calibration_uncertainty=0.0, missingness_penalty=0.0,
+            calibrated_probability=0.6,
+            bootstrap_lower=0.55,
+            bootstrap_upper=0.65,
+            model_disagreement=0.0,
+            calibration_uncertainty=0.0,
+            missingness_penalty=0.0,
         )
         assert result.raw_probability == pytest.approx(0.6)

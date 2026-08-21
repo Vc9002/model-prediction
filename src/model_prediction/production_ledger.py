@@ -168,7 +168,8 @@ class ProductionLedger:
         # A NULL resolved_outcome/settled_at_utc passes the CHECK, so this
         # is safe for existing rows.
         self._ensure_column(
-            "predictions", "resolved_outcome",
+            "predictions",
+            "resolved_outcome",
             "resolved_outcome TEXT CHECK(resolved_outcome IN ('won', 'lost', 'void'))",
         )
         self._ensure_column("predictions", "settled_at_utc", "settled_at_utc TEXT")
@@ -187,8 +188,7 @@ class ProductionLedger:
         already carry the corrected predicate.
         """
         row = self.conn.execute(
-            "SELECT sql FROM sqlite_master "
-            "WHERE type='index' AND name='idx_predictions_idempotent'"
+            "SELECT sql FROM sqlite_master WHERE type='index' AND name='idx_predictions_idempotent'"
         ).fetchone()
         if row is not None and "status = 'predicted'" not in (row[0] or ""):
             self.conn.execute("DROP INDEX idx_predictions_idempotent")
@@ -206,8 +206,7 @@ class ProductionLedger:
 
     # ── runs ────────────────────────────────────────────────────────────
 
-    def start_run(self, run_id: str | None = None,
-                  git_sha: str = "unknown") -> str:
+    def start_run(self, run_id: str | None = None, git_sha: str = "unknown") -> str:
         """Create a new run row and return the run_id."""
         if run_id is None:
             run_id = uuid.uuid4().hex[:12]
@@ -221,8 +220,7 @@ class ProductionLedger:
         self.conn.commit()
         return run_id
 
-    def complete_run(self, run_id: str, status: str = "completed",
-                     note: str | None = None) -> None:
+    def complete_run(self, run_id: str, status: str = "completed", note: str | None = None) -> None:
         """Transition a run to its terminal state (``completed`` or ``failed``).
 
         Explicit run-lifecycle transition — the only UPDATE the runs table
@@ -236,10 +234,7 @@ class ProductionLedger:
         invalid status value.
         """
         if status not in RUN_TERMINAL_STATUSES:
-            raise ValueError(
-                f"run status must be one of {sorted(RUN_TERMINAL_STATUSES)}; "
-                f"got {status!r}"
-            )
+            raise ValueError(f"run status must be one of {sorted(RUN_TERMINAL_STATUSES)}; got {status!r}")
         cursor = self.conn.execute(
             """UPDATE runs SET status=?, completed_at_utc=?, note=?
                WHERE run_id=? AND status='running'""",
@@ -247,9 +242,7 @@ class ProductionLedger:
         )
         self.conn.commit()
         if cursor.rowcount == 0:
-            row = self.conn.execute(
-                "SELECT status FROM runs WHERE run_id=?", (run_id,)
-            ).fetchone()
+            row = self.conn.execute("SELECT status FROM runs WHERE run_id=?", (run_id,)).fetchone()
             if row is None:
                 raise ValueError(f"no run with run_id={run_id!r}")
             # Already terminal: idempotent no-op, see docstring. A
@@ -305,15 +298,24 @@ class ProductionLedger:
                 DO UPDATE SET id=id
                 RETURNING id""",
                 (
-                    now, run_id, SCHEMA_VERSION,
+                    now,
+                    run_id,
+                    SCHEMA_VERSION,
                     supersedes_id,
-                    prediction_id, event_id, sport, market,
+                    prediction_id,
+                    event_id,
+                    sport,
+                    market,
                     event_start_utc,
-                    prediction_time_utc or now, model_id,
+                    prediction_time_utc or now,
+                    model_id,
                     model_artifact_hash,
-                    feature_schema_hash, predicted_side,
+                    feature_schema_hash,
+                    predicted_side,
                     probabilities_json,
-                    rationale, data_timestamp, data_age_seconds,
+                    rationale,
+                    data_timestamp,
+                    data_age_seconds,
                     git_sha,
                 ),
             )
@@ -325,8 +327,11 @@ class ProductionLedger:
             raise
 
     def get_predictions(
-        self, run_id: str | None = None, sport: str | None = None,
-        market: str | None = None, model_id: str | None = None,
+        self,
+        run_id: str | None = None,
+        sport: str | None = None,
+        market: str | None = None,
+        model_id: str | None = None,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
         """Query the *current* predictions view, optionally filtered.
@@ -353,17 +358,14 @@ class ProductionLedger:
             params.append(model_id)
         where = " AND ".join(conditions)
         rows = self.conn.execute(
-            f"SELECT * FROM predictions WHERE {where} "
-            f"ORDER BY created_at DESC LIMIT ?",
+            f"SELECT * FROM predictions WHERE {where} ORDER BY created_at DESC LIMIT ?",
             params + [limit],
         ).fetchall()
         return [_prediction_row(r) for r in rows]
 
     def get_prediction(self, row_id: int) -> dict[str, Any] | None:
         """Return a single prediction row by its integer id (or None)."""
-        row = self.conn.execute(
-            "SELECT * FROM predictions WHERE id=?", (row_id,)
-        ).fetchone()
+        row = self.conn.execute("SELECT * FROM predictions WHERE id=?", (row_id,)).fetchone()
         return _prediction_row(row) if row is not None else None
 
     # ── lifecycle transitions ───────────────────────────────────────────
@@ -405,17 +407,11 @@ class ProductionLedger:
             )
         if to_status == "settled":
             if outcome not in RESOLVED_OUTCOMES:
-                raise ValueError(
-                    f"settling requires outcome in {sorted(RESOLVED_OUTCOMES)}; "
-                    f"got {outcome!r}"
-                )
+                raise ValueError(f"settling requires outcome in {sorted(RESOLVED_OUTCOMES)}; got {outcome!r}")
             terminal_status = "voided" if outcome == "void" else "settled"
         else:
             if outcome is not None:
-                raise ValueError(
-                    f"outcome is only valid when settling; got {outcome!r} "
-                    f"for {to_status!r}"
-                )
+                raise ValueError(f"outcome is only valid when settling; got {outcome!r} for {to_status!r}")
             terminal_status = to_status
         now = at_utc or utc_now()
         cursor = self.conn.execute(
@@ -437,28 +433,34 @@ class ProductionLedger:
         return self.get_prediction(row_id)
 
     def settle_prediction(
-        self, row_id: int, outcome: str, *, note: str | None = None,
+        self,
+        row_id: int,
+        outcome: str,
+        *,
+        note: str | None = None,
         at_utc: str | None = None,
     ) -> dict[str, Any]:
         """Resolve a prediction with outcome ``won``/``lost``/``void``.
 
         The ``void`` outcome produces the terminal status ``voided``.
         """
-        return self.transition_prediction(
-            row_id, "settled", outcome=outcome, note=note, at_utc=at_utc
-        )
+        return self.transition_prediction(row_id, "settled", outcome=outcome, note=note, at_utc=at_utc)
 
     def void_prediction(
-        self, row_id: int, *, note: str | None = None,
+        self,
+        row_id: int,
+        *,
+        note: str | None = None,
         at_utc: str | None = None,
     ) -> dict[str, Any]:
         """Void an open prediction (no-action result)."""
-        return self.transition_prediction(
-            row_id, "settled", outcome="void", note=note, at_utc=at_utc
-        )
+        return self.transition_prediction(row_id, "settled", outcome="void", note=note, at_utc=at_utc)
 
     def supersede_prediction(
-        self, row_id: int, *, note: str | None = None,
+        self,
+        row_id: int,
+        *,
+        note: str | None = None,
         at_utc: str | None = None,
     ) -> dict[str, Any]:
         """Mark a prediction superseded; append its replacement separately.
@@ -469,12 +471,13 @@ class ProductionLedger:
         idempotency index and always appends, and ``get_predictions``
         returns only the replacement.
         """
-        return self.transition_prediction(
-            row_id, "superseded", note=note, at_utc=at_utc
-        )
+        return self.transition_prediction(row_id, "superseded", note=note, at_utc=at_utc)
 
     def mark_prediction_error(
-        self, row_id: int, *, note: str | None = None,
+        self,
+        row_id: int,
+        *,
+        note: str | None = None,
         at_utc: str | None = None,
     ) -> dict[str, Any]:
         """Flag an open prediction as errored (e.g. bad data surfaced late).
@@ -482,9 +485,7 @@ class ProductionLedger:
         *note* should say what went wrong — it is the only record of why
         the row was invalidated.
         """
-        return self.transition_prediction(
-            row_id, "error", note=note, at_utc=at_utc
-        )
+        return self.transition_prediction(row_id, "error", note=note, at_utc=at_utc)
 
     # ── health checks ───────────────────────────────────────────────────
 
@@ -510,8 +511,14 @@ class ProductionLedger:
             ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING id""",
             (
-                now, run_id, SCHEMA_VERSION,
-                sport, market, model_id, status, reason,
+                now,
+                run_id,
+                SCHEMA_VERSION,
+                sport,
+                market,
+                model_id,
+                status,
+                reason,
                 json.dumps(details, sort_keys=True) if details else None,
                 checked_at_utc or now,
             ),
@@ -520,9 +527,7 @@ class ProductionLedger:
         self.conn.commit()
         return row["id"]
 
-    def latest_health(
-        self, sport: str | None = None
-    ) -> list[dict[str, Any]]:
+    def latest_health(self, sport: str | None = None) -> list[dict[str, Any]]:
         """Return the most recent health check for each sport/market.
 
         Optionally filtered to a single sport.

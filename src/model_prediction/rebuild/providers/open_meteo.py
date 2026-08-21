@@ -94,7 +94,9 @@ class OpenMeteoForecastProvider:
         except (KeyError, TypeError, IndexError, json.JSONDecodeError) as exc:
             return ProviderResult(ProviderStatus.DEGRADED, metadata, None, f"Open-Meteo schema drift: {exc}")
         enriched = replace(metadata, schema_hash=dataframe_schema_hash(frame))
-        return ProviderResult(ProviderStatus.AVAILABLE, enriched, frame, "NO_FORECAST_HOURS" if frame.is_empty() else None)
+        return ProviderResult(
+            ProviderStatus.AVAILABLE, enriched, frame, "NO_FORECAST_HOURS" if frame.is_empty() else None
+        )
 
     def forecast(
         self,
@@ -173,7 +175,9 @@ class OpenMeteoForecastProvider:
                 )
                 return result
             except Exception as exc:  # noqa: BLE001
-                return ProviderResult(ProviderStatus.DEGRADED, cached.metadata, None, f"cached parse failed: {exc}")
+                return ProviderResult(
+                    ProviderStatus.DEGRADED, cached.metadata, None, f"cached parse failed: {exc}"
+                )
         try:
             fetched = self.http.get(url, params=request_params)
         except Exception as exc:  # noqa: BLE001

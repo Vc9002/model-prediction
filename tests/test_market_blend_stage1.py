@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from model_prediction.data_sources.mlb_market_odds import canonical_mlb_market_snapshot_hash
 from model_prediction.experiment_registry import list_experiments, show, void
 from model_prediction.market_blend import (
     MarketBlendBlockedError,
@@ -39,6 +40,9 @@ def _make_db(
     config_file: Path | None = None,
 ) -> None:
     paths = RuntimePaths(repo_root=ROOT, runtime_root=path.parents[1])
+    archive_dir = path.parents[1] / "odds"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    archive_file = archive_dir / "snapshots.jsonl"
     model_hash = "a" * 64
     if model_file is not None:
         model_raw = json.loads(model_file.read_text())
@@ -49,20 +53,50 @@ def _make_db(
     )
     n_rows = 65 if include_invalid_eligible else 60
     base = datetime(2026, 5, 1, 19, tzinfo=UTC)
+    archive_lines = []
     with RuntimeLedgerStore(paths) as store:
         for index in range(n_rows):
             event_start = base + timedelta(days=index // 2)
             variant = index - 60
-            market_snapshot_hash = hashlib.sha256(f"market-snapshot-{index}".encode()).hexdigest()
+            quote_obs = (event_start - timedelta(hours=1)).isoformat()
+            snap_payload = {
+                "event_id": f"event-{index}",
+                "event_start_utc": event_start.isoformat(),
+                "away_team": "BOS",
+                "home_team": "NYY",
+                "provider": "polymarket_us",
+                "observed_at_utc": quote_obs,
+                "markets": {
+                    "total": {
+                        "over": {
+                            "selection": "over",
+                            "line": None,
+                            "american_odds": -110,
+                        }
+                    }
+                },
+                "raw_response": {},
+            }
+            snap_hash = canonical_mlb_market_snapshot_hash(snap_payload)
+            archive_record = {
+                **snap_payload,
+                "snapshot_record_id": snap_hash,
+                "snapshot_hash": snap_hash,
+                "snapshot_archive_path": str(archive_file.resolve()),
+            }
+            archive_lines.append(json.dumps(archive_record, separators=(",", ":")))
             payload: dict | str = {
                 "model_artifact_hash": model_hash,
                 "config_hash": config_hash,
-                "market_quote_observed_at_utc": (event_start - timedelta(hours=1)).isoformat(),
+                "market_quote_observed_at_utc": quote_obs,
                 "market_quote_timestamp_valid": True,
                 "market_quote_source": "polymarket_us",
                 "market_quote_provenance": "decision_time_executable_quote",
                 "market_quote_reconstructed": False,
-                "market_snapshot_hash": market_snapshot_hash,
+                "market_snapshot_hash": snap_hash,
+                "market_snapshot_archive_path": str(archive_file.resolve()),
+                "market_snapshot_record_id": snap_hash,
+                "american_odds": -110,
                 "observed_at_utc": (event_start - timedelta(minutes=30)).isoformat(),
                 "record_source": "live_forecast",
                 "record_type": "QUALIFIED_SHADOW_CALL",
@@ -98,7 +132,7 @@ def _make_db(
                     model_id="measured-edge-totals-v3",
                     model_artifact_hash=model_hash,
                     model_probability=(None if variant == 4 else 0.6 if index % 2 else 0.4),
-                    market_snapshot_hash=market_snapshot_hash,
+                    market_snapshot_hash=snap_hash,
                     market_probability=0.8 if index % 2 else 0.2,
                     decision="CALL",
                     reason_code="QUALIFIED",
@@ -108,6 +142,7 @@ def _make_db(
                     decision_payload=payload,  # type: ignore[arg-type]
                 )
             )
+    archive_file.write_text("\n".join(archive_lines) + "\n", encoding="utf-8")
 
 
 def _runtime(
@@ -699,7 +734,8 @@ def test_implementation_manifest_covers_every_production_path_and_spec() -> None
         "src/model_prediction/data_sources/mlb_market_odds.py",
         "src/model_prediction/runtime_ledger_store.py",
         "src/model_prediction/models/mlb.py",
-        "src/model_prediction/cli.py",
+        "src/model_prediction/cli/forecast.py",
+        "src/model_prediction/cli/parser.py",
         "src/model_prediction/experiment_registry.py",
         "src/model_prediction/runtime_paths.py",
         "src/model_prediction/eligibility.py",

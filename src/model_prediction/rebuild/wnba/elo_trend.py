@@ -373,13 +373,19 @@ def build_walk_forward_rows(
 
         for g in day_games:
             book.update(g.home_team_id, g.away_team_id, g.home_score, g.away_score)
-            last_update[g.home_team_id] = max(last_update.get(g.home_team_id, g.event_start_utc), g.event_start_utc)
-            last_update[g.away_team_id] = max(last_update.get(g.away_team_id, g.event_start_utc), g.event_start_utc)
+            last_update[g.home_team_id] = max(
+                last_update.get(g.home_team_id, g.event_start_utc), g.event_start_utc
+            )
+            last_update[g.away_team_id] = max(
+                last_update.get(g.away_team_id, g.event_start_utc), g.event_start_utc
+            )
 
         history.extend(day_games)
         last_processed_date = day_date
 
-    return WalkForwardResult(rows=rows, skipped_bootstrap=skipped_bootstrap, skipped_cold_start_team=skipped_cold_start_team)
+    return WalkForwardResult(
+        rows=rows, skipped_bootstrap=skipped_bootstrap, skipped_cold_start_team=skipped_cold_start_team
+    )
 
 
 def build_dataset(data_root: str, seasons: list[int], **kwargs: Any) -> WalkForwardResult:

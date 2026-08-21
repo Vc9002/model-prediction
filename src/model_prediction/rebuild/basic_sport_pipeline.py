@@ -70,11 +70,7 @@ def dedupe_scoreboard(sb: pl.DataFrame) -> pl.DataFrame:
     FINAL) -- keep only the most-recently-observed row per event. Same
     real fix as mlb_features.dedupe_scoreboard, generalized here since
     every sport's scoreboard shares the identical schema."""
-    return (
-        sb.sort("observed_at_utc")
-        .group_by("event_id", maintain_order=False)
-        .agg(pl.all().last())
-    )
+    return sb.sort("observed_at_utc").group_by("event_id", maintain_order=False).agg(pl.all().last())
 
 
 def _model_artifact_hash(model: EloModel) -> str:
@@ -87,6 +83,7 @@ class BasicRunState:
     """Cross-stage state for one real basic-adapter run, held by the
     adapter between predict()/match_markets()/decide() calls within one
     CLI invocation -- same real shape as MLBRunState (mlb_shadow_pipeline.py)."""
+
     sport: str
     target_date: str
     horizon: str
@@ -113,8 +110,7 @@ def load_state(data_root: str, sport: str, target_date: str, horizon: str = "lat
         return None
     sb = dedupe_scoreboard(sb)
     tonight = sb.filter(
-        (pl.col("event_start_utc").str.slice(0, 10) == target_date)
-        & (pl.col("status") == "STATUS_SCHEDULED")
+        (pl.col("event_start_utc").str.slice(0, 10) == target_date) & (pl.col("status") == "STATUS_SCHEDULED")
     )
     if tonight.height == 0:
         return None
@@ -124,11 +120,17 @@ def load_state(data_root: str, sport: str, target_date: str, horizon: str = "lat
         for g in tonight.iter_rows(named=True)
     }
     return BasicRunState(
-        sport=sport, target_date=target_date, horizon=horizon, tonight=tonight, decision_times=decision_times,
+        sport=sport,
+        target_date=target_date,
+        horizon=horizon,
+        tonight=tonight,
+        decision_times=decision_times,
     )
 
 
-def predict_stage(state: BasicRunState, data_root: str, *, ledger: Any | None = None, run_id: str | None = None) -> dict:
+def predict_stage(
+    state: BasicRunState, data_root: str, *, ledger: Any | None = None, run_id: str | None = None
+) -> dict:
     """Real walk-forward Elo fit (strictly before target_date) + a
     market-blind moneyline forecast per real scheduled game -- predicted_winner
     is genuinely frozen here, before match_markets_stage ever inspects a
@@ -150,8 +152,12 @@ def predict_stage(state: BasicRunState, data_root: str, *, ledger: Any | None = 
 
     if ledger is not None and run_id is not None:
         ledger.record_model_artifact(
-            run_id=run_id, sport=state.sport, model_name=f"{state.sport}-elo-v1",
-            model_version="elo-v1", artifact_hash=artifact_hash, horizon=state.horizon,
+            run_id=run_id,
+            sport=state.sport,
+            model_name=f"{state.sport}-elo-v1",
+            model_version="elo-v1",
+            artifact_hash=artifact_hash,
+            horizon=state.horizon,
             training_end=state.target_date,
         )
 
@@ -167,29 +173,39 @@ def predict_stage(state: BasicRunState, data_root: str, *, ledger: Any | None = 
         }
         upper = {side: min(1.0, p + UNCERTAINTY_HAIRCUT) for side, p in calibrated.items()}
         state.forecasts[event_id] = SportsForecast(
-            event_id=event_id, predicted_winner=winner,
-            raw_probabilities=calibrated, calibrated_probabilities=calibrated,
-            probability_lower=lower, probability_upper=upper,
+            event_id=event_id,
+            predicted_winner=winner,
+            raw_probabilities=calibrated,
+            calibrated_probabilities=calibrated,
+            probability_lower=lower,
+            probability_upper=upper,
             # Real gap, disclosed: Elo has no principled expected-score
             # output (only a win-probability), so these are honestly left
             # at 0.0 rather than reverse-engineered from probability --
             # totals_probabilities stays empty for the same reason, so no
             # caller can accidentally treat this as a real score estimate.
-            expected_home_score=0.0, expected_away_score=0.0,
+            expected_home_score=0.0,
+            expected_away_score=0.0,
             model_artifact_hash=artifact_hash,
             calibration_artifact_hash="elo_fixed_haircut_v1",
         )
         n_predicted += 1
 
     return {
-        "status": "ok", "train_games": state.train_n,
-        "games_predicted": n_predicted, "games_total": state.tonight.height,
+        "status": "ok",
+        "train_games": state.train_n,
+        "games_predicted": n_predicted,
+        "games_total": state.tonight.height,
     }
 
 
 def match_markets_stage(
-    state: BasicRunState, data_root: str, collect_fn: Callable[[str], dict],
-    *, ledger: Any | None = None, run_id: str | None = None,
+    state: BasicRunState,
+    data_root: str,
+    collect_fn: Callable[[str], dict],
+    *,
+    ledger: Any | None = None,
+    run_id: str | None = None,
 ) -> dict:
     """Real fresh market collection (via the sport's own real collector,
     injected by the adapter -- collect_fn signature varies too much across
@@ -219,8 +235,11 @@ def match_markets_stage(
         # -- real_market_candidates() falls back to word-boundary name
         # matching honestly when they aren't.
         candidates = real_market_candidates(
-            state.market_rows, g["home_team"], g["away_team"],
-            home_canonical_id=g.get("home_team_canonical_id"), away_canonical_id=g.get("away_team_canonical_id"),
+            state.market_rows,
+            g["home_team"],
+            g["away_team"],
+            home_canonical_id=g.get("home_team_canonical_id"),
+            away_canonical_id=g.get("away_team_canonical_id"),
         )
         state.candidates_by_event[event_id] = [c for c in candidates if c.market_type == "moneyline"]
         n_matched += 1
@@ -234,7 +253,11 @@ def match_markets_stage(
 
 
 def decide_stage(
-    state: BasicRunState, *, ledger: Any | None = None, run_id: str | None = None, limits: SizeLimits | None = None,
+    state: BasicRunState,
+    *,
+    ledger: Any | None = None,
+    run_id: str | None = None,
+    limits: SizeLimits | None = None,
 ) -> dict:
     """Real winner-first decision + persistence over the frozen moneyline
     forecasts from predict_stage() -- unlike MLB's decide_stage, there is
@@ -250,7 +273,9 @@ def decide_stage(
     n_predictions_recorded = 0
     n_decisions_recorded = 0
     n_decisions_deduped = 0
-    team_names = {r["event_id"]: (r["home_team"], r["away_team"]) for r in state.tonight.iter_rows(named=True)}
+    team_names = {
+        r["event_id"]: (r["home_team"], r["away_team"]) for r in state.tonight.iter_rows(named=True)
+    }
 
     for event_id, forecast in state.forecasts.items():
         candidates = state.candidates_by_event.get(event_id, [])
@@ -262,53 +287,86 @@ def decide_stage(
 
         if ledger is not None and run_id is not None:
             _, pred_created = ledger.record_prediction(
-                run_id=run_id, sport=state.sport, event_id=event_id, horizon=state.horizon,
-                decision_time_utc=decision_time_utc, forecast=forecast,
+                run_id=run_id,
+                sport=state.sport,
+                event_id=event_id,
+                horizon=state.horizon,
+                decision_time_utc=decision_time_utc,
+                forecast=forecast,
             )
             n_predictions_recorded += 1 if pred_created else 0
 
             market_eval_ids: dict[tuple, int] = {}
             for c in candidates:
                 eval_row_id = ledger.record_market_evaluation(
-                    run_id=run_id, sport=state.sport, event_id=event_id,
-                    evaluation=c, decision_time_utc=decision_time_utc,
+                    run_id=run_id,
+                    sport=state.sport,
+                    event_id=event_id,
+                    evaluation=c,
+                    decision_time_utc=decision_time_utc,
                 )
                 market_eval_ids[(c.market_id, c.market_type, c.team_or_side, c.line)] = eval_row_id
 
             market_snapshot_hash = real_market_snapshot_hash(event_id, candidates)
             for d in decisions:
-                selected_id = market_eval_ids.get(
-                    (d.selected_market.market_id, d.selected_market.market_type,
-                     d.selected_market.team_or_side, d.selected_market.line)
-                ) if d.selected_market else None
-                evaluated_id = market_eval_ids.get(
-                    (d.evaluated_market.market_id, d.evaluated_market.market_type,
-                     d.evaluated_market.team_or_side, d.evaluated_market.line)
-                ) if d.evaluated_market else None
+                selected_id = (
+                    market_eval_ids.get(
+                        (
+                            d.selected_market.market_id,
+                            d.selected_market.market_type,
+                            d.selected_market.team_or_side,
+                            d.selected_market.line,
+                        )
+                    )
+                    if d.selected_market
+                    else None
+                )
+                evaluated_id = (
+                    market_eval_ids.get(
+                        (
+                            d.evaluated_market.market_id,
+                            d.evaluated_market.market_type,
+                            d.evaluated_market.team_or_side,
+                            d.evaluated_market.line,
+                        )
+                    )
+                    if d.evaluated_market
+                    else None
+                )
                 _, decision_created = ledger.record_trade_decision(
-                    run_id=run_id, sport=state.sport, event_id=event_id, horizon=state.horizon,
+                    run_id=run_id,
+                    sport=state.sport,
+                    event_id=event_id,
+                    horizon=state.horizon,
                     decision_time_utc=decision_time_utc,
                     model_artifact_hash=forecast.model_artifact_hash,
                     market_snapshot_hash=market_snapshot_hash,
                     decision_policy_version=DECISION_POLICY_VERSION,
-                    decision=d, selected_market_evaluation_id=selected_id,
+                    decision=d,
+                    selected_market_evaluation_id=selected_id,
                     evaluated_market_evaluation_id=evaluated_id,
                 )
                 n_decisions_recorded += 1 if decision_created else 0
                 n_decisions_deduped += 0 if decision_created else 1
 
         home_team, away_team = team_names.get(event_id, ("", ""))
-        games_report.append({
-            "event_id": event_id, "home_team": home_team, "away_team": away_team,
-            "predicted_winner": forecast.predicted_winner,
-            "home_win_prob": forecast.calibrated_probabilities["home"],
-            "away_win_prob": forecast.calibrated_probabilities["away"],
-            "candidate_markets_evaluated": len(candidates),
-            "bets": len(bet_decisions),
-        })
+        games_report.append(
+            {
+                "event_id": event_id,
+                "home_team": home_team,
+                "away_team": away_team,
+                "predicted_winner": forecast.predicted_winner,
+                "home_win_prob": forecast.calibrated_probabilities["home"],
+                "away_win_prob": forecast.calibrated_probabilities["away"],
+                "candidate_markets_evaluated": len(candidates),
+                "bets": len(bet_decisions),
+            }
+        )
 
     return {
-        "status": "ok", "games": games_report, "total_bets": n_bets,
+        "status": "ok",
+        "games": games_report,
+        "total_bets": n_bets,
         "predictions_recorded": n_predictions_recorded,
         "trade_decisions_recorded": n_decisions_recorded,
         "trade_decisions_deduped": n_decisions_deduped,

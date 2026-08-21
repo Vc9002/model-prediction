@@ -57,14 +57,26 @@ class TestFrozenCalibratorFailsClosed:
         assert loaded.calibrator_hash
 
 
-def _write_scoreboard(data_root, event_id: str, event_start_utc: str, home: str, away: str, status: str) -> None:
+def _write_scoreboard(
+    data_root, event_id: str, event_start_utc: str, home: str, away: str, status: str
+) -> None:
     norm = NormalizedStore(f"{data_root}/normalized")
     row = {
-        **provenance_row(source="espn_public", source_record_id=event_id, source_version="v1",
-                          observed_at_utc=utc_now().isoformat(), effective_at_utc=event_start_utc,
-                          event_start_utc=event_start_utc),
-        "event_id": event_id, "home_team": home, "away_team": away,
-        "home_score": 0, "away_score": 0, "status": status, "venue": "",
+        **provenance_row(
+            source="espn_public",
+            source_record_id=event_id,
+            source_version="v1",
+            observed_at_utc=utc_now().isoformat(),
+            effective_at_utc=event_start_utc,
+            event_start_utc=event_start_utc,
+        ),
+        "event_id": event_id,
+        "home_team": home,
+        "away_team": away,
+        "home_score": 0,
+        "away_score": 0,
+        "status": status,
+        "venue": "",
     }
     norm.write("mlb", "scoreboard", pl.DataFrame([row]), primary_key=["event_id"])
 
@@ -105,7 +117,14 @@ class TestLoadState:
         assert pipeline.load_state(str(tmp_path), "2026-08-06") is None
 
     def test_real_scheduled_game_produces_real_state(self, tmp_path):
-        _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers", "STATUS_SCHEDULED")
+        _write_scoreboard(
+            tmp_path,
+            "401",
+            "2026-08-06T22:10:00+00:00",
+            "Seattle Mariners",
+            "Detroit Tigers",
+            "STATUS_SCHEDULED",
+        )
         state = pipeline.load_state(str(tmp_path), "2026-08-06")
         assert state is not None
         assert state.tonight.height == 1
@@ -127,30 +146,46 @@ class TestBuildForecastCalledExactlyOncePerGame:
     happens in decide_stage()."""
 
     def test_predict_stage_does_not_call_build_forecast(self, tmp_path):
-        _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers", "STATUS_SCHEDULED")
+        _write_scoreboard(
+            tmp_path,
+            "401",
+            "2026-08-06T22:10:00+00:00",
+            "Seattle Mariners",
+            "Detroit Tigers",
+            "STATUS_SCHEDULED",
+        )
         # 30 real completed-game rows so predict_stage's real
         # features.height < 30 gate passes naturally.
         for i in range(30):
-            _write_scoreboard(tmp_path, f"hist{i}", f"2026-07-{(i % 28) + 1:02d}T22:10:00+00:00",
-                               "A", "B", "STATUS_FINAL")
+            _write_scoreboard(
+                tmp_path, f"hist{i}", f"2026-07-{(i % 28) + 1:02d}T22:10:00+00:00", "A", "B", "STATUS_FINAL"
+            )
         state = pipeline.load_state(str(tmp_path), "2026-08-06")
         assert state is not None
 
         frozen = _fake_bundle(tmp_path)
-        with patch(
-            "model_prediction.rebuild.mlb_shadow_pipeline.load_frozen_mlb_v2_bundle",
-            return_value=frozen,
-        ), patch(
-            "model_prediction.rebuild.mlb_shadow_pipeline.point_in_time_probable_starters",
-            return_value={"401": {"home_starter": "A", "away_starter": "B"}},
-        ), patch(
-            "model_prediction.rebuild.mlb_shadow_pipeline.build_live_game_feature_row",
-            return_value={"event_id": "401"},
-        ), patch(
-            "model_prediction.rebuild.mlb_shadow_pipeline.build_forecast",
-            side_effect=AssertionError("build_forecast must not be called from predict_stage"),
-        ), patch.object(
-            pipeline, "_utc_now_dt", return_value=datetime(2026, 8, 6, 21, 0, tzinfo=UTC),
+        with (
+            patch(
+                "model_prediction.rebuild.mlb_shadow_pipeline.load_frozen_mlb_v2_bundle",
+                return_value=frozen,
+            ),
+            patch(
+                "model_prediction.rebuild.mlb_shadow_pipeline.point_in_time_probable_starters",
+                return_value={"401": {"home_starter": "A", "away_starter": "B"}},
+            ),
+            patch(
+                "model_prediction.rebuild.mlb_shadow_pipeline.build_live_game_feature_row",
+                return_value={"event_id": "401"},
+            ),
+            patch(
+                "model_prediction.rebuild.mlb_shadow_pipeline.build_forecast",
+                side_effect=AssertionError("build_forecast must not be called from predict_stage"),
+            ),
+            patch.object(
+                pipeline,
+                "_utc_now_dt",
+                return_value=datetime(2026, 8, 6, 21, 0, tzinfo=UTC),
+            ),
         ):
             result = pipeline.predict_stage(state, str(tmp_path))
 
@@ -159,7 +194,14 @@ class TestBuildForecastCalledExactlyOncePerGame:
         assert "401" in state.rows_by_event
 
     def test_decide_stage_calls_build_forecast_exactly_once_per_game(self, tmp_path):
-        _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers", "STATUS_SCHEDULED")
+        _write_scoreboard(
+            tmp_path,
+            "401",
+            "2026-08-06T22:10:00+00:00",
+            "Seattle Mariners",
+            "Detroit Tigers",
+            "STATUS_SCHEDULED",
+        )
         state = pipeline.load_state(str(tmp_path), "2026-08-06")
         assert state is not None
         pipeline._apply_frozen_bundle(state, _fake_bundle(tmp_path))
@@ -169,21 +211,38 @@ class TestBuildForecastCalledExactlyOncePerGame:
         fake_forecast = MagicMock()
         fake_forecast.model_artifact_hash = "hash1"
 
-        with patch(
-            "model_prediction.rebuild.mlb_shadow_pipeline.build_forecast", return_value=fake_forecast,
-        ) as mock_build_forecast, patch(
-            "model_prediction.rebuild.mlb_shadow_pipeline.evaluate_game", return_value=[],
-        ), patch(
-            "model_prediction.rebuild.mlb_shadow_pipeline.real_market_snapshot_hash", return_value="mkthash",
-        ), patch.object(
-            pipeline, "_utc_now_dt", return_value=datetime(2026, 8, 6, 21, 1, tzinfo=UTC),
+        with (
+            patch(
+                "model_prediction.rebuild.mlb_shadow_pipeline.build_forecast",
+                return_value=fake_forecast,
+            ) as mock_build_forecast,
+            patch(
+                "model_prediction.rebuild.mlb_shadow_pipeline.evaluate_game",
+                return_value=[],
+            ),
+            patch(
+                "model_prediction.rebuild.mlb_shadow_pipeline.real_market_snapshot_hash",
+                return_value="mkthash",
+            ),
+            patch.object(
+                pipeline,
+                "_utc_now_dt",
+                return_value=datetime(2026, 8, 6, 21, 1, tzinfo=UTC),
+            ),
         ):
             pipeline.decide_stage(state)
 
         assert mock_build_forecast.call_count == 1
 
     def test_decide_stage_without_predict_first_raises(self, tmp_path):
-        _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers", "STATUS_SCHEDULED")
+        _write_scoreboard(
+            tmp_path,
+            "401",
+            "2026-08-06T22:10:00+00:00",
+            "Seattle Mariners",
+            "Detroit Tigers",
+            "STATUS_SCHEDULED",
+        )
         state = pipeline.load_state(str(tmp_path), "2026-08-06")
         assert state is not None
         with pytest.raises(ValueError, match="predict_stage"):
@@ -199,10 +258,18 @@ class TestModelArtifactLineage:
     def test_predict_stage_records_a_real_model_artifact_when_given_a_ledger(self, tmp_path):
         from model_prediction.rebuild.shadow_ledger import ShadowLedger
 
-        _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers", "STATUS_SCHEDULED")
+        _write_scoreboard(
+            tmp_path,
+            "401",
+            "2026-08-06T22:10:00+00:00",
+            "Seattle Mariners",
+            "Detroit Tigers",
+            "STATUS_SCHEDULED",
+        )
         for i in range(30):
-            _write_scoreboard(tmp_path, f"hist{i}", f"2026-07-{(i % 28) + 1:02d}T22:10:00+00:00",
-                               "A", "B", "STATUS_FINAL")
+            _write_scoreboard(
+                tmp_path, f"hist{i}", f"2026-07-{(i % 28) + 1:02d}T22:10:00+00:00", "A", "B", "STATUS_FINAL"
+            )
         state = pipeline.load_state(str(tmp_path), "2026-08-06")
         assert state is not None
 
@@ -212,13 +279,20 @@ class TestModelArtifactLineage:
         ledger = ShadowLedger(f"{tmp_path}/shadow.db")
         run_id = ledger.record_run("mlb", run_type="test")
 
-        with patch(
-            "model_prediction.rebuild.mlb_shadow_pipeline.load_frozen_mlb_v2_bundle",
-            return_value=frozen,
-        ), patch(
-            "model_prediction.rebuild.mlb_shadow_pipeline.point_in_time_probable_starters", return_value={},
-        ), patch.object(
-            pipeline, "_utc_now_dt", return_value=datetime(2026, 8, 6, 21, 0, tzinfo=UTC),
+        with (
+            patch(
+                "model_prediction.rebuild.mlb_shadow_pipeline.load_frozen_mlb_v2_bundle",
+                return_value=frozen,
+            ),
+            patch(
+                "model_prediction.rebuild.mlb_shadow_pipeline.point_in_time_probable_starters",
+                return_value={},
+            ),
+            patch.object(
+                pipeline,
+                "_utc_now_dt",
+                return_value=datetime(2026, 8, 6, 21, 0, tzinfo=UTC),
+            ),
         ):
             pipeline.predict_stage(state, str(tmp_path), ledger=ledger, run_id=run_id)
 
@@ -242,35 +316,63 @@ class TestPlayerIdentityLineage:
         from model_prediction.rebuild.identity import IdentityRegistry
         from model_prediction.rebuild.metadata import MetadataDB
 
-        _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers", "STATUS_SCHEDULED")
+        _write_scoreboard(
+            tmp_path,
+            "401",
+            "2026-08-06T22:10:00+00:00",
+            "Seattle Mariners",
+            "Detroit Tigers",
+            "STATUS_SCHEDULED",
+        )
         for i in range(30):
-            _write_scoreboard(tmp_path, f"hist{i}", f"2026-07-{(i % 28) + 1:02d}T22:10:00+00:00",
-                               "A", "B", "STATUS_FINAL")
+            _write_scoreboard(
+                tmp_path, f"hist{i}", f"2026-07-{(i % 28) + 1:02d}T22:10:00+00:00", "A", "B", "STATUS_FINAL"
+            )
         state = pipeline.load_state(str(tmp_path), "2026-08-06")
         assert state is not None
 
         registries_seen = []
 
-        def fake_build_live_row(espn_game, home_name, away_name, pitches, starters, data_root,
-                                 identity_registry=None, decision_time_utc=None):
+        def fake_build_live_row(
+            espn_game,
+            home_name,
+            away_name,
+            pitches,
+            starters,
+            data_root,
+            identity_registry=None,
+            decision_time_utc=None,
+        ):
             registries_seen.append(identity_registry)
             if identity_registry is not None:
                 from model_prediction.rebuild.identity import resolve_mlbam_player_id
-                resolve_mlbam_player_id(identity_registry, "mlb", home_name, 665742, "2026-08-06T21:10:00+00:00")
-                resolve_mlbam_player_id(identity_registry, "mlb", away_name, 592450, "2026-08-06T21:10:00+00:00")
+
+                resolve_mlbam_player_id(
+                    identity_registry, "mlb", home_name, 665742, "2026-08-06T21:10:00+00:00"
+                )
+                resolve_mlbam_player_id(
+                    identity_registry, "mlb", away_name, 592450, "2026-08-06T21:10:00+00:00"
+                )
             return {"event_id": "401"}
 
-        with patch(
-            "model_prediction.rebuild.mlb_shadow_pipeline.load_frozen_mlb_v2_bundle",
-            return_value=_fake_bundle(tmp_path),
-        ), patch(
-            "model_prediction.rebuild.mlb_shadow_pipeline.point_in_time_probable_starters",
-            return_value={"401": {"home_starter": "Juan Soto", "away_starter": "Aaron Judge"}},
-        ), patch(
-            "model_prediction.rebuild.mlb_shadow_pipeline.build_live_game_feature_row",
-            side_effect=fake_build_live_row,
-        ), patch.object(
-            pipeline, "_utc_now_dt", return_value=datetime(2026, 8, 6, 21, 0, tzinfo=UTC),
+        with (
+            patch(
+                "model_prediction.rebuild.mlb_shadow_pipeline.load_frozen_mlb_v2_bundle",
+                return_value=_fake_bundle(tmp_path),
+            ),
+            patch(
+                "model_prediction.rebuild.mlb_shadow_pipeline.point_in_time_probable_starters",
+                return_value={"401": {"home_starter": "Juan Soto", "away_starter": "Aaron Judge"}},
+            ),
+            patch(
+                "model_prediction.rebuild.mlb_shadow_pipeline.build_live_game_feature_row",
+                side_effect=fake_build_live_row,
+            ),
+            patch.object(
+                pipeline,
+                "_utc_now_dt",
+                return_value=datetime(2026, 8, 6, 21, 0, tzinfo=UTC),
+            ),
         ):
             pipeline.predict_stage(state, str(tmp_path))
 
@@ -293,8 +395,12 @@ class TestResumeState:
 
     def _frozen_state(self, tmp_path, target_date="2026-08-06"):
         _write_scoreboard(
-            tmp_path, "401", f"{target_date}T22:10:00+00:00",
-            "Seattle Mariners", "Detroit Tigers", "STATUS_SCHEDULED",
+            tmp_path,
+            "401",
+            f"{target_date}T22:10:00+00:00",
+            "Seattle Mariners",
+            "Detroit Tigers",
+            "STATUS_SCHEDULED",
         )
         state = pipeline.load_state(str(tmp_path), target_date)
         assert state is not None
@@ -306,8 +412,13 @@ class TestResumeState:
         return state, frozen
 
     def _load(self, tmp_path, state, frozen):
-        with patch.object(pipeline, "load_frozen_mlb_v2_bundle", return_value=frozen), patch.object(
-            pipeline, "_utc_now_dt", return_value=datetime(2026, 8, 6, 21, 1, tzinfo=UTC),
+        with (
+            patch.object(pipeline, "load_frozen_mlb_v2_bundle", return_value=frozen),
+            patch.object(
+                pipeline,
+                "_utc_now_dt",
+                return_value=datetime(2026, 8, 6, 21, 1, tzinfo=UTC),
+            ),
         ):
             return pipeline.load_resume_state(str(tmp_path), "run123", state.target_date)
 
@@ -342,7 +453,14 @@ class TestResumeState:
         assert loaded.calibrator_bundle is frozen.calibrator
 
     def test_no_saved_resume_state_returns_none(self, tmp_path):
-        _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers", "STATUS_SCHEDULED")
+        _write_scoreboard(
+            tmp_path,
+            "401",
+            "2026-08-06T22:10:00+00:00",
+            "Seattle Mariners",
+            "Detroit Tigers",
+            "STATUS_SCHEDULED",
+        )
         assert pipeline.load_resume_state(str(tmp_path), "nonexistent_run", "2026-08-06") is None
 
     def test_mismatched_date_returns_none_not_stale_state(self, tmp_path):
@@ -393,22 +511,34 @@ class TestUncertaintyWiring:
         n = 60
         data = {f: rng.uniform(1, 5, n) for f in INTENSITY_FEATURES}
         data.update({f: rng.uniform(-2, 2, n) for f in DIFFERENTIAL_FEATURES})
-        data["total_runs"] = sum(data[f] for f in INTENSITY_FEATURES) / len(INTENSITY_FEATURES) + rng.normal(0, 0.3, n)
+        data["total_runs"] = sum(data[f] for f in INTENSITY_FEATURES) / len(INTENSITY_FEATURES) + rng.normal(
+            0, 0.3, n
+        )
         data["home_margin"] = sum(data[f] for f in DIFFERENTIAL_FEATURES) / len(DIFFERENTIAL_FEATURES)
         data["game_date"] = [f"2026-06-{(i % 28) + 1:02d}" for i in range(n)]
         # Real, non-availability-flag columns get overwritten to real 1.0
         # so missingness_penalty has a real, known clean baseline to test
         # against, while still exercising the real XGB_DIRECT_FEATURES set.
-        for flag in ("home_sp_availability", "away_sp_availability", "home_bp_availability",
-                     "away_bp_availability", "weather_availability"):
+        for flag in (
+            "home_sp_availability",
+            "away_sp_availability",
+            "home_bp_availability",
+            "away_bp_availability",
+            "weather_availability",
+        ):
             data[flag] = np.ones(n)
         features = pl.DataFrame(data)
 
         trained = train_through(features, "2026-08-06")
         row = {f: float(rng.uniform(1, 5)) for f in INTENSITY_FEATURES}
         row.update({f: float(rng.uniform(-2, 2)) for f in DIFFERENTIAL_FEATURES})
-        for flag in ("home_sp_availability", "away_sp_availability", "home_bp_availability",
-                     "away_bp_availability", "weather_availability"):
+        for flag in (
+            "home_sp_availability",
+            "away_sp_availability",
+            "home_bp_availability",
+            "away_bp_availability",
+            "weather_availability",
+        ):
             row[flag] = 1.0
         row["event_id"] = "401"
         return trained, row, XGB_DIRECT_FEATURES
@@ -423,8 +553,11 @@ class TestUncertaintyWiring:
         assert trained.sklearn_baseline is not None
         assert trained.xgb_direct is not None
         forecast = pipeline.build_forecast(
-            trained.model, row, bootstrap=trained.bootstrap,
-            sklearn_baseline=trained.sklearn_baseline, xgb_direct=trained.xgb_direct,
+            trained.model,
+            row,
+            bootstrap=trained.bootstrap,
+            sklearn_baseline=trained.sklearn_baseline,
+            xgb_direct=trained.xgb_direct,
         )
         assert forecast.model_disagreement >= 0.0
         # Real, not fabricated: matches a direct real computation from the
@@ -436,12 +569,16 @@ class TestUncertaintyWiring:
         import numpy as np
 
         from model_prediction.rebuild.mlb_shadow_pipeline import XGB_DIRECT_FEATURES
+
         x_direct = np.array([[row.get(f, float("nan")) for f in XGB_DIRECT_FEATURES]])
         xgb_direct_prob = float(trained.xgb_direct.predict(x_direct)[0])
-        expected = real_model_disagreement({
-            "xgb_two_head_nb": pred.home_win_prob, "sklearn_coherent": sklearn_pred.home_win_prob,
-            "xgb_direct": xgb_direct_prob,
-        })
+        expected = real_model_disagreement(
+            {
+                "xgb_two_head_nb": pred.home_win_prob,
+                "sklearn_coherent": sklearn_pred.home_win_prob,
+                "xgb_direct": xgb_direct_prob,
+            }
+        )
         # Loose tolerance, not exact equality: JointScoreDistribution holds
         # one stateful RNG (see TestBuildForecastCalledExactlyOncePerGame's
         # docstring above) -- calling predict_row() a second time here (for
@@ -479,9 +616,12 @@ class TestUncertaintyWiring:
         oof_probs = rng.uniform(0.2, 0.8, 120).tolist()
         oof_labels = (rng.uniform(0, 1, 120) < np.array(oof_probs)).astype(int).tolist()
         forecast = pipeline.build_forecast(
-            trained.model, row, bootstrap=trained.bootstrap,
+            trained.model,
+            row,
+            bootstrap=trained.bootstrap,
             calibrator=TemperatureScaling(temperature=2.0),
-            calibration_oof_probs=oof_probs, calibration_oof_labels=oof_labels,
+            calibration_oof_probs=oof_probs,
+            calibration_oof_labels=oof_labels,
         )
         assert forecast.calibration_uncertainty >= 0.0
 
@@ -493,8 +633,11 @@ class TestUncertaintyWiring:
     def test_conservative_probabilities_are_real_valid_probabilities(self):
         trained, row, _ = self._real_row_and_models()
         forecast = pipeline.build_forecast(
-            trained.model, row, bootstrap=trained.bootstrap,
-            sklearn_baseline=trained.sklearn_baseline, xgb_direct=trained.xgb_direct,
+            trained.model,
+            row,
+            bootstrap=trained.bootstrap,
+            sklearn_baseline=trained.sklearn_baseline,
+            xgb_direct=trained.xgb_direct,
         )
         assert set(forecast.conservative_probabilities) == {"home", "away"}
         for p in forecast.conservative_probabilities.values():
@@ -506,8 +649,11 @@ class TestUncertaintyWiring:
         # value above the model's own real bootstrap upper bound.
         trained, row, _ = self._real_row_and_models()
         forecast = pipeline.build_forecast(
-            trained.model, row, bootstrap=trained.bootstrap,
-            sklearn_baseline=trained.sklearn_baseline, xgb_direct=trained.xgb_direct,
+            trained.model,
+            row,
+            bootstrap=trained.bootstrap,
+            sklearn_baseline=trained.sklearn_baseline,
+            xgb_direct=trained.xgb_direct,
         )
         for side in ("home", "away"):
             assert forecast.conservative_probabilities[side] <= forecast.probability_upper[side] + 1e-9
@@ -521,8 +667,11 @@ class TestUncertaintyWiring:
 
         trained, row, _ = self._real_row_and_models()
         forecast = pipeline.build_forecast(
-            trained.model, row, bootstrap=trained.bootstrap,
-            sklearn_baseline=trained.sklearn_baseline, xgb_direct=trained.xgb_direct,
+            trained.model,
+            row,
+            bootstrap=trained.bootstrap,
+            sklearn_baseline=trained.sklearn_baseline,
+            xgb_direct=trained.xgb_direct,
         )
         # Real, deliberately mismatched probability_lower vs
         # conservative_probabilities to prove which one the gate actually
@@ -530,15 +679,21 @@ class TestUncertaintyWiring:
         # positive; if it (correctly) uses conservative_probabilities the
         # edge must reflect that value instead.
         import dataclasses
+
         forecast = dataclasses.replace(
             forecast,
             probability_lower={"home": 0.95, "away": 0.05},
             conservative_probabilities={"home": 0.10, "away": 0.90},
         )
         candidate = MarketEvaluation(
-            market_id="m1", market_type="moneyline", team_or_side=forecast.predicted_winner,
-            line=None, executable_ask=0.50, depth_adjusted_price=0.50,
-            quote_age_seconds=1.0, available_depth=100.0,
+            market_id="m1",
+            market_type="moneyline",
+            team_or_side=forecast.predicted_winner,
+            line=None,
+            executable_ask=0.50,
+            depth_adjusted_price=0.50,
+            quote_age_seconds=1.0,
+            available_depth=100.0,
         )
         decision = decide_team_market(forecast, candidate, SizeLimits())
         if forecast.predicted_winner == "home":

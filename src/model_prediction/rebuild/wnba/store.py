@@ -68,9 +68,7 @@ class WNBANormalizedStore:
             comparable_incoming = set(incoming.columns) - {"ingested_at_utc"}
             if comparable_existing != comparable_incoming:
                 raise ValueError(f"conflicting WNBA {table} schema for normalized partition")
-            compare_columns = sorted(
-                comparable_existing
-            )
+            compare_columns = sorted(comparable_existing)
             existing_compare = existing.select(compare_columns)
             incoming_compare = incoming.select(compare_columns)
             joined = incoming_compare.join(

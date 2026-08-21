@@ -638,8 +638,14 @@ the independent sports model; it is a predictive benchmark.
 theory says they ought to work:** the Negative Binomial distribution
 challenger (the 203-game OOF win excluded gamma_poisson; the 3,513-game
 head-to-head shows NB losing 0.68844 vs 0.68813, P=0.175), plus the
-`rest_disparity`, `probable_starter_era_gap`, `starter_fip`, `starter_kbb`
+`rest_disparity`, `probable_starter_era_gap`, `starter_fip`, and `starter_kbb`
 branches.
+
+**Sabermetric K-BB% Rerun & Frozen Cohort (2026-08-20):**
+- `starter_kbb` was audited and repaired to use true sabermetric $\text{K-BB}\% = (\text{SO} - \text{BB})/\text{battersFaced}$ (previous implementation incorrectly divided by innings pitched and had a schema mismatch on Statcast `hitByPitch`).
+- A clean rerun via `scripts/mlb_evaluator.py` against the frozen cohort (`data/point_in_time/mlb_v9_cohort_v1/manifest.json`, 3,814 train / 1,082 val / 1,389 holdout) confirmed `starter_kbb: REJECT` with $\Delta\text{LL} = +0.00006$, $\Delta\text{Brier} = +0.00004$, and $P(\text{challenger better}) = 0.42$. The rejection is now empirically valid and grounded in correct sabermetric formulas.
+- The v8 holdout is formally designated as a research model-selection cohort (not an untouched locked test).
+- `scripts/mlb_v9_ablation.py` is deprecated and superseded by `scripts/mlb_evaluator.py`.
 
 MLB is the clearest case where the current team-score proxy is too lossy.
 Starting pitcher, lineup, bullpen, park, roof, and weather are not optional

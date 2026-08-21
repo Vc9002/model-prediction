@@ -52,10 +52,16 @@ def _synthetic_training_data(n: int = 40, seed: int = 0) -> pl.DataFrame:
     g2 = rng.uniform(-1, 1, n)
     total_runs = f1 + f2 + rng.normal(0, 0.5, n)
     home_margin = g1 + g2 + rng.normal(0, 0.5, n)
-    return pl.DataFrame({
-        "f1": f1, "f2": f2, "g1": g1, "g2": g2,
-        "total_runs": total_runs, "home_margin": home_margin,
-    })
+    return pl.DataFrame(
+        {
+            "f1": f1,
+            "f2": f2,
+            "g1": g1,
+            "g2": g2,
+            "total_runs": total_runs,
+            "home_margin": home_margin,
+        }
+    )
 
 
 class TestSeedIsIntrospectable:
@@ -92,7 +98,9 @@ class TestNegativeBinomialMethodConsistency:
                 self._real = real_rng
 
             def poisson(self, *args, **kwargs):
-                raise AssertionError("probability_for_market() called rng.poisson() despite method='negative_binomial'")
+                raise AssertionError(
+                    "probability_for_market() called rng.poisson() despite method='negative_binomial'"
+                )
 
             def negative_binomial(self, *args, **kwargs):
                 return self._real.negative_binomial(*args, **kwargs)
@@ -133,7 +141,9 @@ class TestSkellamMethod:
         mc_home_prob = ((home_mc > away_mc).sum() + 0.5 * (home_mc == away_mc).sum()) / n
 
         dist = JointScoreDistribution(method="skellam", seed=1)
-        pred = dist.predict_game("g1", total_intensity=home_exp + away_exp, home_advantage=home_exp - away_exp)
+        pred = dist.predict_game(
+            "g1", total_intensity=home_exp + away_exp, home_advantage=home_exp - away_exp
+        )
 
         assert abs(pred.home_win_prob - mc_home_prob) < 0.002
 
@@ -148,7 +158,9 @@ class TestSkellamMethod:
         mc_home_cover = ((margin > 0).sum() + 0.5 * (margin == 0).sum()) / n
 
         dist = JointScoreDistribution(method="skellam", seed=1)
-        pred = dist.predict_game("g1", total_intensity=home_exp + away_exp, home_advantage=home_exp - away_exp)
+        pred = dist.predict_game(
+            "g1", total_intensity=home_exp + away_exp, home_advantage=home_exp - away_exp
+        )
         cover_prob = dist.probability_for_market(pred, "spread", "home", line=line)
 
         assert abs(cover_prob - mc_home_cover) < 0.002
@@ -473,10 +485,16 @@ def _training_data_with_an_always_missing_column(n: int = 40, seed: int = 0) -> 
     g1 = rng.uniform(-2, 2, n)
     total_runs = f1 + rng.normal(0, 0.5, n)
     home_margin = g1 + rng.normal(0, 0.5, n)
-    return pl.DataFrame({
-        "f1": f1, "f2": [float("nan")] * n, "g1": g1, "g2": [float("nan")] * n,
-        "total_runs": total_runs, "home_margin": home_margin,
-    })
+    return pl.DataFrame(
+        {
+            "f1": f1,
+            "f2": [float("nan")] * n,
+            "g1": g1,
+            "g2": [float("nan")] * n,
+            "total_runs": total_runs,
+            "home_margin": home_margin,
+        }
+    )
 
 
 class TestAlwaysMissingColumnNeutralization:
@@ -563,10 +581,12 @@ class TestLowVarianceColumnNeutralization:
         from model_prediction.rebuild.models import RunIntensityHead
 
         n = 40
-        X = np.column_stack([
-            np.full(n, 100.0),  # constant column -- zero real variance, no NaN at all
-            np.linspace(3.0, 6.0, n),
-        ])
+        X = np.column_stack(
+            [
+                np.full(n, 100.0),  # constant column -- zero real variance, no NaN at all
+                np.linspace(3.0, 6.0, n),
+            ]
+        )
         y = np.linspace(7.0, 10.0, n)
 
         head = RunIntensityHead().fit(X, y, ["park_factor", "f2"])
@@ -588,11 +608,16 @@ class TestLowVarianceColumnNeutralization:
         f2 = rng.uniform(3, 6, n)
         g1 = rng.uniform(-2, 2, n)
         g2 = rng.uniform(-1, 1, n)
-        data = pl.DataFrame({
-            "park_factor": park_factors, "f2": f2, "g1": g1, "g2": g2,
-            "total_runs": park_factors / 20 + f2 + rng.normal(0, 0.5, n),
-            "home_margin": g1 + g2 + rng.normal(0, 0.5, n),
-        })
+        data = pl.DataFrame(
+            {
+                "park_factor": park_factors,
+                "f2": f2,
+                "g1": g1,
+                "g2": g2,
+                "total_runs": park_factors / 20 + f2 + rng.normal(0, 0.5, n),
+                "home_margin": g1 + g2 + rng.normal(0, 0.5, n),
+            }
+        )
 
         bootstrap = BootstrapMLBEnsemble(n_bootstrap=30, seed=1)
         bootstrap.fit(data, ["park_factor", "f2"], ["g1", "g2"])

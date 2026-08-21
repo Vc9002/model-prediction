@@ -87,8 +87,7 @@ def test_pit_differs_from_static_early_season():
         # Team A: hitter's park — first game high-scoring
         _FakeGame("Team A", 8, 4, "2025-04-01T19:00:00Z"),
         # Many neutral games
-        *[_FakeGame("Team X", 4, 4, f"2025-04-{day:02d}T19:00:00Z")
-          for day in range(1, 15)],
+        *[_FakeGame("Team X", 4, 4, f"2025-04-{day:02d}T19:00:00Z") for day in range(1, 15)],
     ]
     static = park_factor("Team A")
     pit = park_factor_at("Team A", "2025-04-02", games_data=games)
@@ -108,10 +107,8 @@ def test_pit_converges_toward_static_with_accumulated_games():
     hitter's parks)."""
     # Build a team that is consistently a hitter's park across many games
     games = [
-        *[_FakeGame("Rockies", 7, 5, f"2025-04-{day:02d}T19:00:00Z")
-          for day in range(1, 30)],
-        *[_FakeGame("Team X", 4, 4, f"2025-04-{day:02d}T19:00:00Z")
-          for day in range(1, 30)],
+        *[_FakeGame("Rockies", 7, 5, f"2025-04-{day:02d}T19:00:00Z") for day in range(1, 30)],
+        *[_FakeGame("Team X", 4, 4, f"2025-04-{day:02d}T19:00:00Z") for day in range(1, 30)],
     ]
     # With only 1 prior game, the factor is heavily shrunk (near 1.0)
     pit_early = park_factor_at("Rockies", "2025-04-03", games_data=games)
@@ -208,9 +205,7 @@ def test_undated_game_is_excluded_not_treated_as_prior():
         _FakeGame("Team X", 4, 4, "2025-04-01T19:00:00Z"),
     ]
     result = park_factor_at("Team A", "2025-05-01", games_data=games)
-    expected = park_factor_at(
-        "Team A", "2025-05-01", games_data=[games[0], games[2]]
-    )
+    expected = park_factor_at("Team A", "2025-05-01", games_data=[games[0], games[2]])
     assert result == expected
 
 
@@ -219,7 +214,4 @@ def test_undated_game_is_excluded_not_treated_as_prior():
 
 def _mk_games(home_team: str, home_score: int, away_score: int, n: int):
     """Generate n identical _FakeGame instances for a team."""
-    return [
-        _FakeGame(home_team, home_score, away_score, "2025-04-01T19:00:00Z")
-        for _ in range(n)
-    ]
+    return [_FakeGame(home_team, home_score, away_score, "2025-04-01T19:00:00Z") for _ in range(n)]

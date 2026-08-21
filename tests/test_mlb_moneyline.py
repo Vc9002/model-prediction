@@ -17,8 +17,10 @@ from model_prediction.models.learned_market import build_artifact
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
-def _write_history(root, *, home_team="Home Team", away_team="Away Team",
-                   game_count=60, start_month=5, extra_rows=None) -> None:
+
+def _write_history(
+    root, *, home_team="Home Team", away_team="Away Team", game_count=60, start_month=5, extra_rows=None
+) -> None:
     path = root / "processed/mlb/games.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
     rows = [
@@ -38,8 +40,9 @@ def _write_history(root, *, home_team="Home Team", away_team="Away Team",
     path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
 
 
-def _write_artifact(path, *, qualified=True, feature_names=None,
-                    coefficients=None, intercept=3.0, threshold=0.55):
+def _write_artifact(
+    path, *, qualified=True, feature_names=None, coefficients=None, intercept=3.0, threshold=0.55
+):
     if feature_names is None:
         feature_names = ["elo_probability", "trend_gap", "park_factor", "pitcher_era_gap"]
     if coefficients is None:
@@ -67,27 +70,48 @@ def _write_artifact(path, *, qualified=True, feature_names=None,
 
 class _FakeESPN:
     """Returns one MLB game for 2026-07-17."""
-    def __init__(self, events=None, home="Home Team", away="Away Team",
-                 event_id="future-1", game_date="2026-07-17",
-                 event_time="2026-07-17T23:00:00Z"):
-        self.events = events or [{
-            "id": event_id,
-            "date": event_time,
-            "competitions": [{
-                "competitors": [
+
+    def __init__(
+        self,
+        events=None,
+        home="Home Team",
+        away="Away Team",
+        event_id="future-1",
+        game_date="2026-07-17",
+        event_time="2026-07-17T23:00:00Z",
+    ):
+        self.events = events or [
+            {
+                "id": event_id,
+                "date": event_time,
+                "competitions": [
                     {
-                        "homeAway": "away",
-                        "team": {"displayName": away},
-                        "probables": [{"name": "probableStartingPitcher", "athlete": {"displayName": "Away Pitcher"}}],
-                    },
-                    {
-                        "homeAway": "home",
-                        "team": {"displayName": home},
-                        "probables": [{"name": "probableStartingPitcher", "athlete": {"displayName": "Home Pitcher"}}],
-                    },
-                ]
-            }],
-        }]
+                        "competitors": [
+                            {
+                                "homeAway": "away",
+                                "team": {"displayName": away},
+                                "probables": [
+                                    {
+                                        "name": "probableStartingPitcher",
+                                        "athlete": {"displayName": "Away Pitcher"},
+                                    }
+                                ],
+                            },
+                            {
+                                "homeAway": "home",
+                                "team": {"displayName": home},
+                                "probables": [
+                                    {
+                                        "name": "probableStartingPitcher",
+                                        "athlete": {"displayName": "Home Pitcher"},
+                                    }
+                                ],
+                            },
+                        ]
+                    }
+                ],
+            }
+        ]
         self._game_date = game_date
 
     def scoreboard(self, league: str, game_date: str) -> dict:
@@ -97,6 +121,7 @@ class _FakeESPN:
 
 
 # ── Core pipeline tests ────────────────────────────────────────────────────
+
 
 def test_full_mlb_forward_slate_produces_home_call(tmp_path):
     """Build a full MLB slate with production-like features and verify call."""
@@ -173,6 +198,7 @@ def test_feature_basis_includes_all_required_features(tmp_path):
 
 # ── Edge case tests ────────────────────────────────────────────────────────
 
+
 def test_already_started_event_is_skipped(tmp_path):
     """Events where start <= observed_at must be skipped."""
     _write_history(tmp_path)
@@ -220,15 +246,17 @@ def test_insufficient_team_history_skips_event(tmp_path):
     rows = []
     for i in range(60):
         away = "Rare Team" if i < 5 else "Other Team"
-        rows.append({
-            "event_id": f"history-{i}",
-            "event_start_utc": f"2026-05-{i % 28 + 1:02d}T12:00:00Z",
-            "league": "MLB",
-            "away_team": away,
-            "home_team": "Home Team",
-            "away_score": 2,
-            "home_score": 5,
-        })
+        rows.append(
+            {
+                "event_id": f"history-{i}",
+                "event_start_utc": f"2026-05-{i % 28 + 1:02d}T12:00:00Z",
+                "league": "MLB",
+                "away_team": away,
+                "home_team": "Home Team",
+                "away_score": 2,
+                "home_score": 5,
+            }
+        )
     path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
 
     artifact_path = tmp_path / "artifact.json"
@@ -263,16 +291,18 @@ def test_unresolved_probable_starter_skips_the_event(tmp_path):
     event_no_probables = {
         "id": "future-1",
         "date": "2026-07-17T23:00:00Z",
-        "competitions": [{
-            "competitors": [
-                {"homeAway": "away", "team": {"displayName": "Away Team"}},
-                {
-                    "homeAway": "home",
-                    "team": {"displayName": "Home Team"},
-                    "probables": [{"name": "probableStartingPitcher"}],
-                },
-            ]
-        }],
+        "competitions": [
+            {
+                "competitors": [
+                    {"homeAway": "away", "team": {"displayName": "Away Team"}},
+                    {
+                        "homeAway": "home",
+                        "team": {"displayName": "Home Team"},
+                        "probables": [{"name": "probableStartingPitcher"}],
+                    },
+                ]
+            }
+        ],
     }
 
     candidates, skipped, scheduled = build_learned_moneyline_slate(
@@ -325,8 +355,9 @@ def test_below_threshold_still_produces_a_real_call(tmp_path):
     artifact_path = tmp_path / "artifact.json"
     # Intercept=0 + all-zero coefs → 50/50 probability. Threshold 0.95 means
     # this would have failed the old gate -- it must not fail the new one.
-    _write_artifact(artifact_path, threshold=0.95, intercept=0.0,
-                    coefficients=[0.0], feature_names=["elo_probability"])
+    _write_artifact(
+        artifact_path, threshold=0.95, intercept=0.0, coefficients=[0.0], feature_names=["elo_probability"]
+    )
 
     candidates, _, _ = build_learned_moneyline_slate(
         sport="mlb",
@@ -365,6 +396,7 @@ def test_unqualified_artifact_still_produces_candidates(tmp_path):
 
 # ── Multi-game slate ───────────────────────────────────────────────────────
 
+
 def test_multi_game_slate_returns_all_candidates(tmp_path):
     """A slate with 3 games (same teams, different IDs) returns 3 candidates."""
     _write_history(tmp_path)
@@ -372,19 +404,26 @@ def test_multi_game_slate_returns_all_candidates(tmp_path):
     _write_artifact(artifact_path)
 
     events = [
-        {"id": f"game-{i}", "date": f"2026-07-17T{20+i:02d}:00:00Z",
-         "competitions": [{"competitors": [
-             {
-                 "homeAway": "away",
-                 "team": {"displayName": "Away Team"},
-                 "probables": [{"name": "probableStartingPitcher"}],
-             },
-             {
-                 "homeAway": "home",
-                 "team": {"displayName": "Home Team"},
-                 "probables": [{"name": "probableStartingPitcher"}],
-             },
-         ]}]}
+        {
+            "id": f"game-{i}",
+            "date": f"2026-07-17T{20 + i:02d}:00:00Z",
+            "competitions": [
+                {
+                    "competitors": [
+                        {
+                            "homeAway": "away",
+                            "team": {"displayName": "Away Team"},
+                            "probables": [{"name": "probableStartingPitcher"}],
+                        },
+                        {
+                            "homeAway": "home",
+                            "team": {"displayName": "Home Team"},
+                            "probables": [{"name": "probableStartingPitcher"}],
+                        },
+                    ]
+                }
+            ],
+        }
         for i in range(3)
     ]
 
@@ -403,6 +442,7 @@ def test_multi_game_slate_returns_all_candidates(tmp_path):
 
 
 # ── WNBA gate does NOT affect MLB ──────────────────────────────────────────
+
 
 def test_wnba_availability_gate_does_not_activate_for_mlb(tmp_path):
     """The 5pp availability gate is WNBA-only; MLB must pass through unchanged."""

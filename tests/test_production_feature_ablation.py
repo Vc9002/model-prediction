@@ -99,9 +99,7 @@ def test_reproduction_gate_requires_exact_calls_and_tight_coefficients() -> None
     assert result["passed"] is True
 
 
-def test_current_cs2_artifact_fails_closed_on_source_data_drift(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_current_cs2_artifact_fails_closed_on_source_data_drift(monkeypatch, tmp_path: Path) -> None:
     """The current CS2 artifact fails closed when its source data drifts.
 
     K split (2026-08-15): the live matches.jsonl tracks the ROLLING
@@ -141,9 +139,7 @@ def test_current_cs2_artifact_fails_closed_on_source_data_drift(
         _esports_model(test_config, "cs2")
 
 
-def test_esports_artifact_resolution_prefers_rolling_when_present(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_esports_artifact_resolution_prefers_rolling_when_present(monkeypatch, tmp_path: Path) -> None:
     """K split: the ablation resolves the rolling runtime artifact when
     one exists and falls back to the configured frozen copy otherwise."""
     from model_prediction.production_feature_ablation import _resolve_esports_artifact

@@ -209,9 +209,7 @@ def test_refresh_if_due_throttles_on_recent_state(tmp_path):
     (data_root / "historical" / "mlb_games_all.jsonl").write_text("", encoding="utf-8")
     (data_root / "mlb_statsapi" / "game_snapshots.jsonl").write_text("", encoding="utf-8")
     state_path = data_root / "mlb_baseline_refresh_state.json"
-    state_path.write_text(
-        json.dumps({"last_refreshed_utc": utc_now().isoformat()}), encoding="utf-8"
-    )
+    state_path.write_text(json.dumps({"last_refreshed_utc": utc_now().isoformat()}), encoding="utf-8")
     result = refresh_if_due(data_root, project_root, min_days=7.0)
     assert result["status"] == "skipped_recent"
 

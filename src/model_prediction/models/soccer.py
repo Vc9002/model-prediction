@@ -105,9 +105,7 @@ class SoccerModel:
             }
         return strengths, baseline
 
-    def score_matrix(
-        self, home_rate: float, away_rate: float
-    ) -> list[list[float]]:
+    def score_matrix(self, home_rate: float, away_rate: float) -> list[list[float]]:
         matrix = []
         for h in range(MAX_GOALS + 1):
             row = []
@@ -139,14 +137,9 @@ class SoccerModel:
             away_win = sum(matrix[h][a] for a in range(MAX_GOALS + 1) for h in range(a))
             draw = 1 - home_win - away_win
             over25 = sum(
-                matrix[h][a]
-                for h in range(MAX_GOALS + 1)
-                for a in range(MAX_GOALS + 1)
-                if h + a > 2.5
+                matrix[h][a] for h in range(MAX_GOALS + 1) for a in range(MAX_GOALS + 1) if h + a > 2.5
             )
-            raw_btts = sum(
-                matrix[h][a] for h in range(1, MAX_GOALS + 1) for a in range(1, MAX_GOALS + 1)
-            )
+            raw_btts = sum(matrix[h][a] for h in range(1, MAX_GOALS + 1) for a in range(1, MAX_GOALS + 1))
             btts = _apply_btts_calibration(raw_btts)
             sample = min(home["games"], away["games"])
             uncertainty = max(0.04, min(0.20, 0.20 - 0.01 * sample))

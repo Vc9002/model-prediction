@@ -77,14 +77,20 @@ def _primary_content_hash(model: XGBoostTwoHeadModel) -> str:
         digest.update(b"\0")
         digest.update(bytes(fitted.get_booster().save_raw(raw_format="json")))
         digest.update(b"\0")
-    digest.update(json.dumps({
-        "seed": model.seed,
-        "distribution_method": model.distribution.method,
-        "distribution_n_sim": model.distribution.n_sim,
-        "distribution_seed": model.distribution.seed,
-        "intensity_features": model._intensity_features,
-        "differential_features": model._differential_features,
-    }, sort_keys=True, separators=(",", ":")).encode())
+    digest.update(
+        json.dumps(
+            {
+                "seed": model.seed,
+                "distribution_method": model.distribution.method,
+                "distribution_n_sim": model.distribution.n_sim,
+                "distribution_seed": model.distribution.seed,
+                "intensity_features": model._intensity_features,
+                "differential_features": model._differential_features,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    )
     return digest.hexdigest()
 
 
@@ -109,11 +115,16 @@ def verified_source_tree_hash(repo_root: str | Path | None = None) -> str:
     try:
         dirty = subprocess.run(
             ["git", "status", "--porcelain=v1", "--untracked-files=all", "--", *SOURCE_FINGERPRINT_PATHS],
-            cwd=root, check=True, capture_output=True, text=True,
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
         ).stdout.strip()
         tracked_raw: bytes = subprocess.run(
             ["git", "ls-files", "-z", "--", *SOURCE_FINGERPRINT_PATHS],
-            cwd=root, check=True, capture_output=True,
+            cwd=root,
+            check=True,
+            capture_output=True,
         ).stdout
     except (OSError, subprocess.CalledProcessError) as exc:
         raise ValueError("cannot verify frozen MLB v2 source tree") from exc
@@ -164,12 +175,19 @@ def parse_frozen_mlb_v2_anchor(raw: dict[str, Any]) -> FrozenMLBV2Anchor:
         raise ValueError(f"MLB v2 frozen artifact anchor is not sealed (status={status!r})")
     return FrozenMLBV2Anchor(
         status=status,
-        bundle_manifest_sha256=_require_sha256(anchor.get("bundle_manifest_sha256"), "bundle_manifest_sha256"),
+        bundle_manifest_sha256=_require_sha256(
+            anchor.get("bundle_manifest_sha256"), "bundle_manifest_sha256"
+        ),
         bundle_hash=_require_sha256(anchor.get("bundle_hash"), "bundle_hash"),
-        primary_content_sha256=_require_sha256(anchor.get("primary_content_sha256"), "primary_content_sha256"),
-        primary_artifact_sha256=_require_sha256(anchor.get("primary_artifact_sha256"), "primary_artifact_sha256"),
+        primary_content_sha256=_require_sha256(
+            anchor.get("primary_content_sha256"), "primary_content_sha256"
+        ),
+        primary_artifact_sha256=_require_sha256(
+            anchor.get("primary_artifact_sha256"), "primary_artifact_sha256"
+        ),
         calibrator_artifact_sha256=_require_sha256(
-            anchor.get("calibrator_artifact_sha256"), "calibrator_artifact_sha256",
+            anchor.get("calibrator_artifact_sha256"),
+            "calibrator_artifact_sha256",
         ),
         calibrator_hash=_require_sha256(anchor.get("calibrator_hash"), "calibrator_hash"),
         source_tree_sha256=_require_sha256(anchor.get("source_tree_sha256"), "source_tree_sha256"),
@@ -222,10 +240,14 @@ def load_frozen_calibrator(
     challenger_root: str | Path | None = None,
 ) -> FrozenCalibratorBundle:
     """Load and self-verify the persisted calibrator without fitting."""
-    root = Path(challenger_root).resolve() if challenger_root is not None else (
-        default_repo_root() / "config" / "models" / "challengers"
-    ).resolve()
-    path = Path(artifact_path).resolve() if artifact_path is not None else root / FROZEN_CALIBRATOR_ARTIFACT_NAME
+    root = (
+        Path(challenger_root).resolve()
+        if challenger_root is not None
+        else (default_repo_root() / "config" / "models" / "challengers").resolve()
+    )
+    path = (
+        Path(artifact_path).resolve() if artifact_path is not None else root / FROZEN_CALIBRATOR_ARTIFACT_NAME
+    )
     path = assert_challenger_artifact_path(path, root)
     artifact = json.loads(path.read_text())
     required = {"method", "parameters", "base_model_hash", "dataset_hash", "calibrator_hash"}
@@ -233,7 +255,8 @@ def load_frozen_calibrator(
     if missing:
         raise ValueError(f"calibrator artifact missing fields: {', '.join(missing)}")
     identity_payload = {
-        key: value for key, value in artifact.items()
+        key: value
+        for key, value in artifact.items()
         if key not in {"calibrator_hash", "oof_probs", "oof_labels"}
     }
     actual_hash = hashlib.sha256(
@@ -246,14 +269,20 @@ def load_frozen_calibrator(
     if artifact["method"] != FROZEN_CALIBRATION_METHOD:
         raise ValueError("frozen MLB v2 requires temperature calibration")
     temperature = artifact.get("parameters", {}).get("temperature")
-    if not isinstance(temperature, (int, float)) or isinstance(temperature, bool) \
-            or not math.isfinite(float(temperature)) or float(temperature) <= 0:
+    if (
+        not isinstance(temperature, (int, float))
+        or isinstance(temperature, bool)
+        or not math.isfinite(float(temperature))
+        or float(temperature) <= 0
+    ):
         raise ValueError("frozen MLB v2 temperature must be finite and positive")
     oof_probs = artifact.get("oof_probs", [])
     oof_labels = artifact.get("oof_labels", [])
     if any(
-        not isinstance(value, (int, float)) or isinstance(value, bool)
-        or not math.isfinite(float(value)) or not 0.0 <= float(value) <= 1.0
+        not isinstance(value, (int, float))
+        or isinstance(value, bool)
+        or not math.isfinite(float(value))
+        or not 0.0 <= float(value) <= 1.0
         for value in oof_probs
     ):
         raise ValueError("calibrator OOF probabilities must be finite values in [0,1]")
@@ -329,7 +358,8 @@ def write_frozen_mlb_v2_bundle(
     if len(code_revision) != 40:
         raise ValueError("code_revision must be an exact 40-character Git SHA")
     source_hash = _require_sha256(
-        source_tree_sha256 or verified_source_tree_hash(), "source_tree_sha256",
+        source_tree_sha256 or verified_source_tree_hash(),
+        "source_tree_sha256",
     )
 
     out.mkdir(parents=True)
@@ -425,9 +455,11 @@ def load_frozen_mlb_v2_bundle(
 ) -> FrozenMLBV2Bundle:
     """Load the exact sealed candidate and reject every provenance mismatch."""
     anchor = expected_anchor or load_frozen_mlb_v2_anchor(registry_path)
-    challenger = Path(challenger_root).resolve() if challenger_root is not None else (
-        default_repo_root() / "config" / "models" / "challengers"
-    ).resolve()
+    challenger = (
+        Path(challenger_root).resolve()
+        if challenger_root is not None
+        else (default_repo_root() / "config" / "models" / "challengers").resolve()
+    )
     root = assert_challenger_artifact_path(challenger / MLB_V2_BUNDLE_DIRNAME, challenger)
     manifest_path = assert_challenger_artifact_path(root / MLB_V2_MANIFEST, challenger)
     manifest_sha256 = _sha256_file(manifest_path)
@@ -442,7 +474,10 @@ def load_frozen_mlb_v2_bundle(
         raise ValueError("frozen MLB v2 bundle hash is not externally anchored")
     if manifest.get("schema_version") != MLB_V2_SCHEMA_VERSION:
         raise ValueError("unsupported frozen MLB v2 manifest schema")
-    if manifest.get("test_id") != MLB_V2_TEST_ID or manifest.get("candidate_version") != MLB_V2_CANDIDATE_VERSION:
+    if (
+        manifest.get("test_id") != MLB_V2_TEST_ID
+        or manifest.get("candidate_version") != MLB_V2_CANDIDATE_VERSION
+    ):
         raise ValueError("frozen MLB v2 cohort identity mismatch")
     if manifest.get("head_family") != FROZEN_HEAD_FAMILY:
         raise ValueError("frozen MLB v2 head family mismatch")

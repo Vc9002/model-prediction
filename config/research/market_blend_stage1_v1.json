@@ -97,6 +97,7 @@
     "require_empty_corrective_action": true,
     "require_explicit_not_backfill": true,
     "require_market_snapshot_hash": true,
+    "require_archived_market_snapshot": true,
     "accepted_ledger_decisions": [
       "CALL"
     ],

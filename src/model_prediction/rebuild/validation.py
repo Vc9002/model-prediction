@@ -30,23 +30,24 @@ class ChronologicalFold:
     where training data actually started, so a persisted split manifest
     couldn't show either even though both were real, already-correct
     behavior."""
+
     fold_index: int
-    train_end: str          # ISO date — everything before this is train
-    val_start: str          # ISO date
-    val_end: str            # ISO date
-    train_start: str | None = None      # first date included in this fold's training window
-    embargo_start: str | None = None    # first date excluded as publication embargo (day after train_end)
-    embargo_end: str | None = None      # last date excluded as publication embargo (day before val_start)
-    test_start: str | None = None   # separate economic test, not used in Part 2
+    train_end: str  # ISO date — everything before this is train
+    val_start: str  # ISO date
+    val_end: str  # ISO date
+    train_start: str | None = None  # first date included in this fold's training window
+    embargo_start: str | None = None  # first date excluded as publication embargo (day after train_end)
+    embargo_end: str | None = None  # last date excluded as publication embargo (day before val_start)
+    test_start: str | None = None  # separate economic test, not used in Part 2
     test_end: str | None = None
 
 
 def expanding_folds(
     dates: Sequence[str],
     n_splits: int = 5,
-    val_size: int = 30,     # days
-    gap: int = 1,           # publication embargo
-    test_size: int = 60,    # untouched final test
+    val_size: int = 30,  # days
+    gap: int = 1,  # publication embargo
+    test_size: int = 60,  # untouched final test
 ) -> list[ChronologicalFold]:
     """Expanding window: train grows, validation slides forward.
     Last `test_size` days are the untouched final test.
@@ -64,17 +65,19 @@ def expanding_folds(
         if val_end_idx <= val_start_idx:
             break
         has_embargo = val_start_idx > train_end_idx
-        folds.append(ChronologicalFold(
-            fold_index=i,
-            train_end=train_dates[train_end_idx - 1],
-            val_start=sorted_dates[val_start_idx],
-            val_end=sorted_dates[val_end_idx - 1],
-            train_start=train_dates[0],  # expanding: every fold's window starts at the same earliest date
-            embargo_start=sorted_dates[train_end_idx] if has_embargo else None,
-            embargo_end=sorted_dates[val_start_idx - 1] if has_embargo else None,
-            test_start=sorted_dates[-test_size] if test_size > 0 else None,
-            test_end=sorted_dates[-1] if test_size > 0 else None,
-        ))
+        folds.append(
+            ChronologicalFold(
+                fold_index=i,
+                train_end=train_dates[train_end_idx - 1],
+                val_start=sorted_dates[val_start_idx],
+                val_end=sorted_dates[val_end_idx - 1],
+                train_start=train_dates[0],  # expanding: every fold's window starts at the same earliest date
+                embargo_start=sorted_dates[train_end_idx] if has_embargo else None,
+                embargo_end=sorted_dates[val_start_idx - 1] if has_embargo else None,
+                test_start=sorted_dates[-test_size] if test_size > 0 else None,
+                test_end=sorted_dates[-1] if test_size > 0 else None,
+            )
+        )
     return folds
 
 
@@ -98,22 +101,26 @@ def rolling_folds(
         if val_end_idx >= len(sorted_dates) - test_size:
             break
         has_embargo = val_start_idx > train_end_idx
-        folds.append(ChronologicalFold(
-            fold_index=i,
-            train_end=sorted_dates[train_end_idx - 1],
-            val_start=sorted_dates[val_start_idx],
-            val_end=sorted_dates[val_end_idx - 1],
-            train_start=sorted_dates[offset],  # rolling: fixed-size window slides forward with i
-            embargo_start=sorted_dates[train_end_idx] if has_embargo else None,
-            embargo_end=sorted_dates[val_start_idx - 1] if has_embargo else None,
-            test_start=sorted_dates[-test_size] if test_size > 0 else None,
-            test_end=sorted_dates[-1] if test_size > 0 else None,
-        ))
+        folds.append(
+            ChronologicalFold(
+                fold_index=i,
+                train_end=sorted_dates[train_end_idx - 1],
+                val_start=sorted_dates[val_start_idx],
+                val_end=sorted_dates[val_end_idx - 1],
+                train_start=sorted_dates[offset],  # rolling: fixed-size window slides forward with i
+                embargo_start=sorted_dates[train_end_idx] if has_embargo else None,
+                embargo_end=sorted_dates[val_start_idx - 1] if has_embargo else None,
+                test_start=sorted_dates[-test_size] if test_size > 0 else None,
+                test_end=sorted_dates[-1] if test_size > 0 else None,
+            )
+        )
     return folds
 
 
 def date_cluster_split(
-    dates: Sequence[str], test_size: int, calib_size: int = 0,
+    dates: Sequence[str],
+    test_size: int,
+    calib_size: int = 0,
 ) -> tuple[list[str], list[str], list[str]]:
     """Split real calendar dates into (train_dates, calib_dates, test_dates)
     -- never splits a single date's games across buckets.
@@ -293,7 +300,9 @@ def ece(y_true: Sequence[int], y_prob: Sequence[float], n_bins: int = 10) -> flo
 
 
 def calibration_curve(
-    y_true: Sequence[int], y_prob: Sequence[float], n_bins: int = 10,
+    y_true: Sequence[int],
+    y_prob: Sequence[float],
+    n_bins: int = 10,
 ) -> dict[str, list[float]]:
     """Reliability curve: bin centers, actual fraction of positives."""
     yt = np.array(y_true)
@@ -382,7 +391,5 @@ class ChronologicalEvaluator:
             "log_loss": log_loss(outcomes, probs),
             "brier": brier_score(outcomes, probs),
             "ece": ece(outcomes, probs),
-            "bootstrap_ci": date_cluster_bootstrap(
-                [p - o for p, o in zip(probs, outcomes)], dates
-            ),
+            "bootstrap_ci": date_cluster_bootstrap([p - o for p, o in zip(probs, outcomes)], dates),
         }

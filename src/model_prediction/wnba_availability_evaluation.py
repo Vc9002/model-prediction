@@ -48,13 +48,9 @@ def _target_teams(event: Mapping[str, Any]) -> dict[str, str]:
     return {str(item["team"]["displayName"]): str(item["team"]["id"]) for item in competitors}
 
 
-def _team_games_before(
-    games: list[GameRecord], team: str, event_start: datetime
-) -> list[GameRecord]:
+def _team_games_before(games: list[GameRecord], team: str, event_start: datetime) -> list[GameRecord]:
     eligible = [
-        game
-        for game in games
-        if game.start < event_start and team in {game.home_team, game.away_team}
+        game for game in games if game.start < event_start and team in {game.home_team, game.away_team}
     ]
     return eligible[-LOOKBACK_TEAM_GAMES:]
 
@@ -88,9 +84,7 @@ def _cached_summary(client: Any, cache_root: Path, event_id: str) -> dict[str, A
     return payload
 
 
-def _cached_roster(
-    client: Any, cache_root: Path, team_id: str, season: int
-) -> dict[str, Any]:
+def _cached_roster(client: Any, cache_root: Path, team_id: str, season: int) -> dict[str, Any]:
     path = cache_root.parent / "espn_rosters" / f"{season}-{team_id}.json"
     if path.exists():
         return json.loads(path.read_text(encoding="utf-8"))["payload"]
@@ -194,9 +188,7 @@ def build_research_priors(
                 projected = 0.0
             total_minutes = sum(item[1] for item in samples)
             total_plus_minus = sum(item[2] for item in samples)
-            raw_per_100 = (
-                total_plus_minus / total_minutes * 40.0 * 1.25 if total_minutes > 0 else 0.0
-            )
+            raw_per_100 = total_plus_minus / total_minutes * 40.0 * 1.25 if total_minutes > 0 else 0.0
             shrinkage = total_minutes / (total_minutes + PLUS_MINUS_PRIOR_MINUTES)
             impact = max(-8.0, min(8.0, raw_per_100 * shrinkage))
             provisional.append(
@@ -214,9 +206,7 @@ def build_research_priors(
             raise ValueError(f"no pregame player-minute history for {team}")
         scale = 200.0 / raw_total
         active_impacts = sorted(
-            row["impact_points_per_100"]
-            for row in provisional
-            if row["projected_minutes"] > 0
+            row["impact_points_per_100"] for row in provisional if row["projected_minutes"] > 0
         )
         replacement = active_impacts[max(0, int(0.25 * (len(active_impacts) - 1)))]
         for row in provisional:

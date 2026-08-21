@@ -73,16 +73,22 @@ def main() -> None:
     # mlb_shadow_pipeline.py's walk-forward retraining).
     dataset = build_mlb_historical_horizon_dataset("data/rebuild", start_date, end_date, HORIZON)
     features = dataset.features.sort("game_date") if dataset.features.height else dataset.features
-    print(f"2. Dataset builder: {dataset.matched_games} matched games in [{start_date}, {end_date}] "
-          f"({dataset.unmatched_games} team-unresolved, not fabricated); dataset_hash={dataset.dataset_hash[:12]}")
-    print(f"3. Feature rows: {dataset.matched_games} matched; "
-          f"{dataset.starters_known_games}/{dataset.matched_games} have a point-in-time-valid probable "
-          f"starter for both teams at horizon={HORIZON} "
-          f"({dataset.matched_games - dataset.starters_known_games} flagged starters_known=0, "
-          f"not silently filled with the actual starter)")
+    print(
+        f"2. Dataset builder: {dataset.matched_games} matched games in [{start_date}, {end_date}] "
+        f"({dataset.unmatched_games} team-unresolved, not fabricated); dataset_hash={dataset.dataset_hash[:12]}"
+    )
+    print(
+        f"3. Feature rows: {dataset.matched_games} matched; "
+        f"{dataset.starters_known_games}/{dataset.matched_games} have a point-in-time-valid probable "
+        f"starter for both teams at horizon={HORIZON} "
+        f"({dataset.matched_games - dataset.starters_known_games} flagged starters_known=0, "
+        f"not silently filled with the actual starter)"
+    )
 
     if features.height < 30:
-        print("Not enough matched games to train meaningfully (need >=30). Stopping honestly, not faking a result.")
+        print(
+            "Not enough matched games to train meaningfully (need >=30). Stopping honestly, not faking a result."
+        )
         sys.exit(0)
 
     # Task 8 fix (see outputs/rebuild/takeover_status.md): this used to pass
@@ -106,8 +112,10 @@ def main() -> None:
     val_size_days = max(1, n_unique_dates // 6)
     test_size_days = max(1, n_unique_dates // 6)
     folds = expanding_folds(game_dates, n_splits=3, val_size=val_size_days, test_size=test_size_days, gap=1)
-    print(f"4. Chronological folds: {len(folds)} ({n_unique_dates} real distinct dates, "
-          f"val_size={val_size_days}d test_size={test_size_days}d gap=1d)")
+    print(
+        f"4. Chronological folds: {len(folds)} ({n_unique_dates} real distinct dates, "
+        f"val_size={val_size_days}d test_size={test_size_days}d gap=1d)"
+    )
 
     fold_metrics = []
     for fold in folds:
@@ -127,14 +135,20 @@ def main() -> None:
             y_true.append(1 if row["home_score"] > row["away_score"] else 0)
             y_prob.append(pred.home_win_prob)
 
-        fold_metrics.append({
-            "fold": fold.fold_index, "train_n": train_df.height, "val_n": val_df.height,
-            "log_loss": log_loss(y_true, y_prob),
-            "brier": brier_score(y_true, y_prob),
-            "ece": ece(y_true, y_prob),
-        })
-        print(f"  Fold {fold.fold_index}: train={train_df.height} val={val_df.height} "
-              f"ll={fold_metrics[-1]['log_loss']:.3f} brier={fold_metrics[-1]['brier']:.3f}")
+        fold_metrics.append(
+            {
+                "fold": fold.fold_index,
+                "train_n": train_df.height,
+                "val_n": val_df.height,
+                "log_loss": log_loss(y_true, y_prob),
+                "brier": brier_score(y_true, y_prob),
+                "ece": ece(y_true, y_prob),
+            }
+        )
+        print(
+            f"  Fold {fold.fold_index}: train={train_df.height} val={val_df.height} "
+            f"ll={fold_metrics[-1]['log_loss']:.3f} brier={fold_metrics[-1]['brier']:.3f}"
+        )
 
     print(f"5. Validation complete: {len(fold_metrics)} folds evaluated")
 
@@ -157,14 +171,18 @@ def main() -> None:
     test_size_dates = max(1, n_unique_dates // 6)
     calib_size_dates = max(1, n_unique_dates // 6)
     train_dates, calib_dates, test_dates = date_cluster_split(
-        game_dates, test_size=test_size_dates, calib_size=calib_size_dates,
+        game_dates,
+        test_size=test_size_dates,
+        calib_size=calib_size_dates,
     )
     train_final = features.filter(pl.col("game_date").is_in(train_dates))
     calib_final = features.filter(pl.col("game_date").is_in(calib_dates))
     test_final = features.filter(pl.col("game_date").is_in(test_dates))
-    print(f"5b. Split: train={train_final.height} ({len(train_dates)} dates), "
-          f"calibration={calib_final.height} ({len(calib_dates)} dates, fits Platt only), "
-          f"test={test_final.height} ({len(test_dates)} dates, untouched until final evaluation)")
+    print(
+        f"5b. Split: train={train_final.height} ({len(train_dates)} dates), "
+        f"calibration={calib_final.height} ({len(calib_dates)} dates, fits Platt only), "
+        f"test={test_final.height} ({len(test_dates)} dates, untouched until final evaluation)"
+    )
 
     final_model = MLBTwoHeadModel(seed=42)
     final_model.fit(train_final, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
@@ -190,10 +208,12 @@ def main() -> None:
         "raw_brier": brier_score(labels, raw_probs),
         "accuracy": sum(1 for p, y in zip(calibrated, labels) if (p >= 0.5) == (y == 1)) / len(labels),
     }
-    print(f"6. Held-out test ({len(labels)} games): "
-          f"brier={final_metrics['brier']:.4f} (raw {final_metrics['raw_brier']:.4f}) "
-          f"ll={final_metrics['log_loss']:.4f} ece={final_metrics['ece']:.4f} "
-          f"acc={final_metrics['accuracy']:.3f}")
+    print(
+        f"6. Held-out test ({len(labels)} games): "
+        f"brier={final_metrics['brier']:.4f} (raw {final_metrics['raw_brier']:.4f}) "
+        f"ll={final_metrics['log_loss']:.4f} ece={final_metrics['ece']:.4f} "
+        f"acc={final_metrics['accuracy']:.3f}"
+    )
 
     # ── Diagnostic: cold-start missingness composition, train vs test ────────
     # A short real backfill window (10 days) means many early rows have zero
@@ -203,11 +223,15 @@ def main() -> None:
     # shape, not from anything the model "learned" wrong. Reporting this
     # explicitly rather than only the headline metric above, per this
     # project's own "missingness is data" principle (CLAUDE.md Part 1 S11).
-    train_avail = (train_final["home_sp_availability"].mean() + train_final["away_sp_availability"].mean()) / 2
+    train_avail = (
+        train_final["home_sp_availability"].mean() + train_final["away_sp_availability"].mean()
+    ) / 2
     test_avail = (test_final["home_sp_availability"].mean() + test_final["away_sp_availability"].mean()) / 2
-    print(f"7. Cold-start composition: train mean starter-availability={train_avail:.3f}, "
-          f"test mean starter-availability={test_avail:.3f} "
-          f"({'MISMATCHED — interpret the headline metric with caution' if abs(train_avail - test_avail) > 0.2 else 'comparable'})")
+    print(
+        f"7. Cold-start composition: train mean starter-availability={train_avail:.3f}, "
+        f"test mean starter-availability={test_avail:.3f} "
+        f"({'MISMATCHED — interpret the headline metric with caution' if abs(train_avail - test_avail) > 0.2 else 'comparable'})"
+    )
 
     # ── Quality-filtered comparison: both starters have real prior history ──
     both_avail_test = test_final.filter(
@@ -227,30 +251,39 @@ def main() -> None:
             "log_loss": log_loss(q_labels, q_cal),
             "accuracy": sum(1 for p, y in zip(q_cal, q_labels) if (p >= 0.5) == (y == 1)) / len(q_labels),
         }
-        print(f"8. Quality-filtered test (both starters have real history, "
-              f"n={quality_metrics['n']}): brier={quality_metrics['brier']:.4f} "
-              f"ll={quality_metrics['log_loss']:.4f} acc={quality_metrics['accuracy']:.3f}")
+        print(
+            f"8. Quality-filtered test (both starters have real history, "
+            f"n={quality_metrics['n']}): brier={quality_metrics['brier']:.4f} "
+            f"ll={quality_metrics['log_loss']:.4f} acc={quality_metrics['accuracy']:.3f}"
+        )
     else:
-        print(f"8. Quality-filtered test: only {both_avail_test.height} rows have both starters "
-              f"with real history — too few to report separately")
+        print(
+            f"8. Quality-filtered test: only {both_avail_test.height} rows have both starters "
+            f"with real history — too few to report separately"
+        )
 
     artifact = final_model.to_artifact()
-    artifact.update({
-        "feature_set": "real_statcast_v1",
-        "intensity_features": INTENSITY_FEATURES,
-        "differential_features": DIFFERENTIAL_FEATURES,
-        "calibration": {"intercept": cal.intercept, "slope": cal.slope},
-        "fold_metrics": fold_metrics,
-        "final_metrics": final_metrics,
-        "quality_filtered_metrics": quality_metrics,
-        "cold_start_composition": {"train_mean_availability": train_avail, "test_mean_availability": test_avail},
-        "train_games": train_final.height,
-        "calibration_games": calib_final.height,
-        "test_games": test_final.height,
-        "total_completed_games": completed.height,
-        "matched_games": features.height,
-        "unmatched_games": dataset.unmatched_games,
-    })
+    artifact.update(
+        {
+            "feature_set": "real_statcast_v1",
+            "intensity_features": INTENSITY_FEATURES,
+            "differential_features": DIFFERENTIAL_FEATURES,
+            "calibration": {"intercept": cal.intercept, "slope": cal.slope},
+            "fold_metrics": fold_metrics,
+            "final_metrics": final_metrics,
+            "quality_filtered_metrics": quality_metrics,
+            "cold_start_composition": {
+                "train_mean_availability": train_avail,
+                "test_mean_availability": test_avail,
+            },
+            "train_games": train_final.height,
+            "calibration_games": calib_final.height,
+            "test_games": test_final.height,
+            "total_completed_games": completed.height,
+            "matched_games": features.height,
+            "unmatched_games": dataset.unmatched_games,
+        }
+    )
 
     artifact_dir = Path("config/models/challengers")
     artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -259,14 +292,25 @@ def main() -> None:
     print(f"\n9. Artifact saved to {artifact_path}")
 
     results_path = Path("outputs/rebuild/mlb_training_results_real_features.json")
-    results_path.write_text(json.dumps({
-        "model_version": artifact["model_id"], "feature_set": "real_statcast_v1",
-        "matched_games": features.height, "unmatched_games": dataset.unmatched_games,
-        "fold_metrics": fold_metrics, "final_metrics": final_metrics,
-        "quality_filtered_metrics": quality_metrics,
-        "cold_start_composition": {"train_mean_availability": train_avail, "test_mean_availability": test_avail},
-        "artifact_hash": artifact.get("artifact_hash", ""),
-    }, indent=2))
+    results_path.write_text(
+        json.dumps(
+            {
+                "model_version": artifact["model_id"],
+                "feature_set": "real_statcast_v1",
+                "matched_games": features.height,
+                "unmatched_games": dataset.unmatched_games,
+                "fold_metrics": fold_metrics,
+                "final_metrics": final_metrics,
+                "quality_filtered_metrics": quality_metrics,
+                "cold_start_composition": {
+                    "train_mean_availability": train_avail,
+                    "test_mean_availability": test_avail,
+                },
+                "artifact_hash": artifact.get("artifact_hash", ""),
+            },
+            indent=2,
+        )
+    )
     print(f"10. Results saved to {results_path}")
 
     # Real, persisted split manifest (CLAUDE.md Part 2 SS2 "Persist a split
@@ -281,13 +325,19 @@ def main() -> None:
     # predictive scores), not a replacement for it. See
     # build_split_manifest()'s own docstring for the real gap this closes.
     claude_fold_ranges = build_split_manifest(
-        sport="mlb", horizon="late", dataset_hash=artifact.get("artifact_hash", ""),
-        folds=folds, final_test_start=str(test_final["event_start_utc"].min()),
-        final_test_end=str(test_final["event_start_utc"].max()), final_test_consumed=True,
+        sport="mlb",
+        horizon="late",
+        dataset_hash=artifact.get("artifact_hash", ""),
+        folds=folds,
+        final_test_start=str(test_final["event_start_utc"].min()),
+        final_test_end=str(test_final["event_start_utc"].max()),
+        final_test_consumed=True,
     )["folds"]
 
     split_manifest = {
-        "sport": "mlb", "horizon": "late", "dataset_hash": artifact.get("artifact_hash", ""),
+        "sport": "mlb",
+        "horizon": "late",
+        "dataset_hash": artifact.get("artifact_hash", ""),
         "folds": claude_fold_ranges,
         "fold_metrics": fold_metrics,
         "train_start": str(train_final["event_start_utc"].min()),

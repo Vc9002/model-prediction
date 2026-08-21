@@ -21,17 +21,24 @@ from model_prediction.rebuild.collectors import NFLCollector
 
 class FakeESPNClient:
     def scoreboard(self, league, game_date):
-        return {"events": [{
-            "id": "1", "date": "2026-08-06T20:00Z",
-            "competitions": [{
-                "status": {"type": {"name": "STATUS_SCHEDULED"}},
-                "venue": {"fullName": "Test Stadium"},
-                "competitors": [
-                    {"homeAway": "home", "team": {"displayName": "Home Team"}, "score": "0"},
-                    {"homeAway": "away", "team": {"displayName": "Away Team"}, "score": "0"},
-                ],
-            }],
-        }]}
+        return {
+            "events": [
+                {
+                    "id": "1",
+                    "date": "2026-08-06T20:00Z",
+                    "competitions": [
+                        {
+                            "status": {"type": {"name": "STATUS_SCHEDULED"}},
+                            "venue": {"fullName": "Test Stadium"},
+                            "competitors": [
+                                {"homeAway": "home", "team": {"displayName": "Home Team"}, "score": "0"},
+                                {"homeAway": "away", "team": {"displayName": "Away Team"}, "score": "0"},
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
 
 
 class TestNFLCollectorNotSilentlyBroken:
@@ -39,12 +46,15 @@ class TestNFLCollectorNotSilentlyBroken:
         meta = MetadataDB(tmp_path / "metadata.db")
         collector = NFLCollector(tmp_path / "data", meta)
 
-        with patch(
-            "model_prediction.data_sources.espn.ESPNClient",
-            return_value=FakeESPNClient(),
-        ), patch(
-            "model_prediction.data_sources.polymarket_us.PolymarketUSClient",
-            side_effect=ImportError,
+        with (
+            patch(
+                "model_prediction.data_sources.espn.ESPNClient",
+                return_value=FakeESPNClient(),
+            ),
+            patch(
+                "model_prediction.data_sources.polymarket_us.PolymarketUSClient",
+                side_effect=ImportError,
+            ),
         ):
             result = collector.collect_date("2026-08-06")
 

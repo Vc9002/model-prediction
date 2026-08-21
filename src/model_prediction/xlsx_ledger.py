@@ -117,9 +117,7 @@ def write_xlsx_rows_atomic(
     destination.parent.mkdir(parents=True, exist_ok=True)
     materialized = list(rows)
     workbook = _build_workbook(fieldnames, materialized)
-    descriptor, temporary = tempfile.mkstemp(
-        prefix="picks-", suffix=".xlsx", dir=destination.parent
-    )
+    descriptor, temporary = tempfile.mkstemp(prefix="picks-", suffix=".xlsx", dir=destination.parent)
     os.close(descriptor)
     try:
         workbook.save(temporary)
@@ -167,7 +165,11 @@ def _build_workbook(fieldnames: list[str], rows: list[dict[str, str]]) -> Workbo
                 cell.data_type = "s"
             cell.font = body_font
             cell.alignment = Alignment(
-                horizontal="left" if field in _NARRATIVE_FIELDS else "right" if _is_numeric(field) else "left",
+                horizontal="left"
+                if field in _NARRATIVE_FIELDS
+                else "right"
+                if _is_numeric(field)
+                else "left",
                 vertical="top",
                 wrap_text=field in _NARRATIVE_FIELDS,
             )
@@ -252,7 +254,7 @@ def _build_summary(sheet, fieldnames: list[str], row_count: int) -> None:
             "Research accuracy",
             f'=IFERROR(COUNTIFS({research_units},">0",{result},"win")/(COUNTIFS({research_units},">0",{result},"win")+COUNTIFS({research_units},">0",{result},"loss")),0)',
         ),
-        "G6": ("Research ROI", f'=IFERROR(SUM({research_pnl})/SUM({research_units}),0)'),
+        "G6": ("Research ROI", f"=IFERROR(SUM({research_pnl})/SUM({research_units}),0)"),
         "A9": ("Research P&L", f"=SUM({research_pnl})"),
         "C9": ("Mean raw-probability CLV", f'=IFERROR(AVERAGEIF({clv},"<>",{clv}),0)'),
         "E9": (
@@ -329,7 +331,9 @@ def _build_summary(sheet, fieldnames: list[str], row_count: int) -> None:
         sheet.cell(row=row_index, column=7).number_format = "0.00%"
 
     sheet.merge_cells("A18:L19")
-    sheet["A18"] = "Descriptive only—not evidence of profitability. Calibration needs 30 settled binary picks."
+    sheet["A18"] = (
+        "Descriptive only—not evidence of profitability. Calibration needs 30 settled binary picks."
+    )
     sheet["A18"].fill = PatternFill("solid", fgColor="FFF4CE")
     sheet["A18"].font = Font(name="Aptos", size=10, italic=True, color="7A4E00")
     sheet["A18"].alignment = Alignment(wrap_text=True, vertical="center")

@@ -117,13 +117,17 @@ def test_prior_matches_for_player_only_within_same_provider_id_space():
     matches = normalize_tennismylife_matches(_mylife_fixture(), _metadata("tennis_mylife"), tour="atp")
     decision = datetime(2026, 8, 10, tzinfo=UTC)
     djokovic_matches = eligible_prior_matches_for_player(
-        matches, tennis_player_id="tennis_mylife:104925", decision_time_utc=decision,
+        matches,
+        tennis_player_id="tennis_mylife:104925",
+        decision_time_utc=decision,
     )
     assert djokovic_matches.height == 1
     assert djokovic_matches["winner_player_name"][0] == "Novak Djokovic"
     # Retirement/walkover matches are excluded by completed_only in eligible_matches_as_of.
     zverev_matches = eligible_prior_matches_for_player(
-        matches, tennis_player_id="tennis_mylife:126094", decision_time_utc=decision,
+        matches,
+        tennis_player_id="tennis_mylife:126094",
+        decision_time_utc=decision,
     )
     assert zverev_matches.is_empty()
 
@@ -139,7 +143,9 @@ def test_store_is_content_idempotent_and_partitions_by_tour_and_year(tmp_path):
 
 
 def test_current_events_partition_by_capture_date(tmp_path):
-    events = normalize_espn_scoreboard(_espn_fixture(), _metadata("tennis_espn", observed="2026-08-09T12:00:00+00:00"))
+    events = normalize_espn_scoreboard(
+        _espn_fixture(), _metadata("tennis_espn", observed="2026-08-09T12:00:00+00:00")
+    )
     store = TennisNormalizedStore(tmp_path)
     store.write_current_events(events)
     assert (tmp_path / "tennis" / "current_events" / "tour=wta" / "date=2026-08-09").exists()
@@ -167,7 +173,9 @@ def test_audit_against_empty_store_is_honest_unavailable(tmp_path):
 
 def test_foundation_backfill_writes_manifest_and_is_idempotent(tmp_path):
     class FixtureTennisMyLifeProvider:
-        def year_matches(self, tour: str, year: int, *, kind: str = "main", force: bool = False) -> ProviderResult:
+        def year_matches(
+            self, tour: str, year: int, *, kind: str = "main", force: bool = False
+        ) -> ProviderResult:
             assert tour == "atp"
             assert year == 2024
             return ProviderResult(ProviderStatus.AVAILABLE, _metadata("tennis_mylife"), _mylife_fixture())

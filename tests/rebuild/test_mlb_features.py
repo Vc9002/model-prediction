@@ -36,23 +36,46 @@ from model_prediction.rebuild.mlb_features import (
 
 
 def _pitch_row(
-    game_pk: int, game_date: str, pitcher: int, at_bat_number: int, pitch_number: int,
-    *, inning_topbot: str = "Top", home_team: str = "HOME", away_team: str = "AWAY",
-    description: str = "called_strike", events: str | None = None,
-    release_speed: float = 93.0, pitcher_days_since_prev_game: int = 4,
-    inning: int = 1, bat_score: int = 0, post_bat_score: int = 0,
+    game_pk: int,
+    game_date: str,
+    pitcher: int,
+    at_bat_number: int,
+    pitch_number: int,
+    *,
+    inning_topbot: str = "Top",
+    home_team: str = "HOME",
+    away_team: str = "AWAY",
+    description: str = "called_strike",
+    events: str | None = None,
+    release_speed: float = 93.0,
+    pitcher_days_since_prev_game: int = 4,
+    inning: int = 1,
+    bat_score: int = 0,
+    post_bat_score: int = 0,
 ) -> dict:
     return {
-        "game_pk": game_pk, "game_date": game_date, "pitcher": pitcher,
-        "batter": 1, "home_team": home_team, "away_team": away_team,
-        "inning": inning, "inning_topbot": inning_topbot,
-        "at_bat_number": at_bat_number, "pitch_number": pitch_number,
-        "pitch_type": "FF", "release_speed": release_speed, "release_spin_rate": 2200,
-        "description": description, "events": events, "zone": 5,
-        "p_throws": "R", "stand": "R",
+        "game_pk": game_pk,
+        "game_date": game_date,
+        "pitcher": pitcher,
+        "batter": 1,
+        "home_team": home_team,
+        "away_team": away_team,
+        "inning": inning,
+        "inning_topbot": inning_topbot,
+        "at_bat_number": at_bat_number,
+        "pitch_number": pitch_number,
+        "pitch_type": "FF",
+        "release_speed": release_speed,
+        "release_spin_rate": 2200,
+        "description": description,
+        "events": events,
+        "zone": 5,
+        "p_throws": "R",
+        "stand": "R",
         "pitcher_days_since_prev_game": pitcher_days_since_prev_game,
         "n_thruorder_pitcher": 1,
-        "bat_score": bat_score, "post_bat_score": post_bat_score,
+        "bat_score": bat_score,
+        "post_bat_score": post_bat_score,
     }
 
 
@@ -120,7 +143,7 @@ class TestPitcherRollingFeaturesPointInTime:
 
         feats = pitcher_rolling_features(pitches, 100, before_game_date="2026-08-01")
 
-        assert feats["k_pct"] == 0.5   # 1 strikeout / 2 batters faced
+        assert feats["k_pct"] == 0.5  # 1 strikeout / 2 batters faced
         assert feats["bb_pct"] == 0.5  # 1 walk / 2 batters faced
 
 
@@ -202,10 +225,19 @@ class TestPitcherCleanRateFeatures:
         # when the source data actually has them -- an older or synthetic
         # dataset missing them must fail closed to availability=0, not
         # raise on a missing column.
-        pitches = pl.DataFrame([
-            {"game_pk": 1, "game_date": "2026-07-20", "pitcher": 100, "inning": 1,
-             "inning_topbot": "Top", "home_team": "HOME", "away_team": "AWAY"},
-        ]).with_columns(pl.col("game_date").str.slice(0, 10).alias("game_date_str"))
+        pitches = pl.DataFrame(
+            [
+                {
+                    "game_pk": 1,
+                    "game_date": "2026-07-20",
+                    "pitcher": 100,
+                    "inning": 1,
+                    "inning_topbot": "Top",
+                    "home_team": "HOME",
+                    "away_team": "AWAY",
+                },
+            ]
+        ).with_columns(pl.col("game_date").str.slice(0, 10).alias("game_date_str"))
         feats = pitcher_clean_rate_features(pitches, 100, before_game_date="2026-08-01")
         assert feats["availability"] == 0.0
 
@@ -247,19 +279,28 @@ class TestLookupPitcherId:
     """
 
     def test_ambiguous_name_resolved_by_recency(self):
-        fake_result = pd.DataFrame({
-            "name_first": ["drew", "drew"], "name_last": ["anderson", "anderson"],
-            "key_mlbam": [449776, 623454],
-            "mlb_played_first": [2006.0, 2017.0], "mlb_played_last": [2006.0, 2026.0],
-        })
+        fake_result = pd.DataFrame(
+            {
+                "name_first": ["drew", "drew"],
+                "name_last": ["anderson", "anderson"],
+                "key_mlbam": [449776, 623454],
+                "mlb_played_first": [2006.0, 2017.0],
+                "mlb_played_last": [2006.0, 2026.0],
+            }
+        )
         with patch("pybaseball.playerid_lookup", return_value=fake_result):
             assert lookup_pitcher_id("Drew Anderson") == 623454
 
     def test_unambiguous_name_still_works(self):
-        fake_result = pd.DataFrame({
-            "name_first": ["bryan"], "name_last": ["woo"], "key_mlbam": [693433],
-            "mlb_played_first": [2023.0], "mlb_played_last": [2026.0],
-        })
+        fake_result = pd.DataFrame(
+            {
+                "name_first": ["bryan"],
+                "name_last": ["woo"],
+                "key_mlbam": [693433],
+                "mlb_played_first": [2023.0],
+                "mlb_played_last": [2026.0],
+            }
+        )
         with patch("pybaseball.playerid_lookup", return_value=fake_result):
             assert lookup_pitcher_id("Bryan Woo") == 693433
 
@@ -270,11 +311,15 @@ class TestLookupPitcherId:
     def test_true_tie_in_recency_returns_none(self):
         # Two different real players who both last played the same year --
         # recency can't break this tie, so it must still fail closed.
-        fake_result = pd.DataFrame({
-            "name_first": ["j", "j"], "name_last": ["smith", "smith"],
-            "key_mlbam": [111, 222],
-            "mlb_played_first": [2020.0, 2021.0], "mlb_played_last": [2026.0, 2026.0],
-        })
+        fake_result = pd.DataFrame(
+            {
+                "name_first": ["j", "j"],
+                "name_last": ["smith", "smith"],
+                "key_mlbam": [111, 222],
+                "mlb_played_first": [2020.0, 2021.0],
+                "mlb_played_last": [2026.0, 2026.0],
+            }
+        )
         with patch("pybaseball.playerid_lookup", return_value=fake_result):
             assert lookup_pitcher_id("J Smith") is None
 
@@ -290,14 +335,18 @@ class TestDedupeScoreboard:
     """
 
     def test_duplicate_event_id_collapses_to_one_row(self):
-        df = pl.DataFrame({
-            "event_id": ["401816384", "401816384", "401816385"],
-            "observed_at_utc": [
-                "2026-08-05T10:33:04+00:00", "2026-08-05T10:42:34+00:00", "2026-08-05T10:33:04+00:00",
-            ],
-            "home_score": [3, 3, 5],
-            "status": ["STATUS_FINAL", "STATUS_FINAL", "STATUS_FINAL"],
-        })
+        df = pl.DataFrame(
+            {
+                "event_id": ["401816384", "401816384", "401816385"],
+                "observed_at_utc": [
+                    "2026-08-05T10:33:04+00:00",
+                    "2026-08-05T10:42:34+00:00",
+                    "2026-08-05T10:33:04+00:00",
+                ],
+                "home_score": [3, 3, 5],
+                "status": ["STATUS_FINAL", "STATUS_FINAL", "STATUS_FINAL"],
+            }
+        )
 
         deduped = dedupe_scoreboard(df)
 
@@ -305,11 +354,13 @@ class TestDedupeScoreboard:
         assert sorted(deduped["event_id"].to_list()) == ["401816384", "401816385"]
 
     def test_keeps_the_most_recently_observed_row(self):
-        df = pl.DataFrame({
-            "event_id": ["1", "1"],
-            "observed_at_utc": ["2026-08-05T10:00:00+00:00", "2026-08-05T12:00:00+00:00"],
-            "home_score": [0, 5],  # later observation has the real final score
-        })
+        df = pl.DataFrame(
+            {
+                "event_id": ["1", "1"],
+                "observed_at_utc": ["2026-08-05T10:00:00+00:00", "2026-08-05T12:00:00+00:00"],
+                "home_score": [0, 5],  # later observation has the real final score
+            }
+        )
 
         deduped = dedupe_scoreboard(df)
 
@@ -323,8 +374,10 @@ class TestDedupeScoreboard:
 
 def _probable_record(event_id: str, observed_at_utc: str, home_starter: str, away_starter: str) -> dict:
     return {
-        "event_id": event_id, "observed_at_utc": observed_at_utc,
-        "home_starter": home_starter, "away_starter": away_starter,
+        "event_id": event_id,
+        "observed_at_utc": observed_at_utc,
+        "home_starter": home_starter,
+        "away_starter": away_starter,
     }
 
 
@@ -382,25 +435,40 @@ class TestPointInTimeProbableStarters:
         assert set(result.keys()) == {"401"}
 
     def test_empty_inputs_return_empty(self):
-        assert point_in_time_probable_starters({}, [_probable_record("401", "2026-08-05T10:00:00+00:00", "A", "X")]) == {}
-        assert point_in_time_probable_starters(
-            {"401": datetime.fromisoformat("2026-08-06T22:10:00+00:00")}, [],
-        ) == {}
+        assert (
+            point_in_time_probable_starters(
+                {}, [_probable_record("401", "2026-08-05T10:00:00+00:00", "A", "X")]
+            )
+            == {}
+        )
+        assert (
+            point_in_time_probable_starters(
+                {"401": datetime.fromisoformat("2026-08-06T22:10:00+00:00")},
+                [],
+            )
+            == {}
+        )
 
 
 def _pit_probable(event_id, observed_at_utc, home_starter, away_starter, *, pit_eligible=True):
     return {
-        "event_id": event_id, "observed_at_utc": observed_at_utc,
-        "home_starter": home_starter, "away_starter": away_starter,
+        "event_id": event_id,
+        "observed_at_utc": observed_at_utc,
+        "home_starter": home_starter,
+        "away_starter": away_starter,
         "pit_eligible": pit_eligible,
     }
 
 
 def _espn_game(event_id="401", event_start_utc="2026-08-06T22:10:00+00:00"):
     return {
-        "event_id": event_id, "event_start_utc": event_start_utc,
-        "home_team": "Seattle Mariners", "away_team": "Detroit Tigers",
-        "home_score": 4, "away_score": 2, "venue": "T-Mobile Park",
+        "event_id": event_id,
+        "event_start_utc": event_start_utc,
+        "home_team": "Seattle Mariners",
+        "away_team": "Detroit Tigers",
+        "home_score": 4,
+        "away_score": 2,
+        "venue": "T-Mobile Park",
     }
 
 
@@ -448,7 +516,9 @@ class TestResolveHorizonStarterNames:
         # timestamp alone would satisfy the point-in-time filter.
         game = _espn_game()
         records = [
-            _pit_probable("401", "2026-08-06T16:00:00+00:00", "Pitcher A", "Away Pitcher", pit_eligible=False),
+            _pit_probable(
+                "401", "2026-08-06T16:00:00+00:00", "Pitcher A", "Away Pitcher", pit_eligible=False
+            ),
         ]
 
         home, away, missing_reason = resolve_horizon_starter_names(game, "late", records)
@@ -480,17 +550,41 @@ class TestBuildGameFeatureRowStarterParity:
         # This completed game (game_pk=100): pitcher 2 actually threw
         # SEA's first pitch -- the real, actual starter of record.
         this_game = [
-            _pitch_row(100, "2026-08-06", pitcher=2, at_bat_number=1, pitch_number=1,
-                       home_team="SEA", away_team="DET", release_speed=80.0),
+            _pitch_row(
+                100,
+                "2026-08-06",
+                pitcher=2,
+                at_bat_number=1,
+                pitch_number=1,
+                home_team="SEA",
+                away_team="DET",
+                release_speed=80.0,
+            ),
         ]
         # Real prior starts (before 2026-08-06) for each pitcher, with
         # deliberately distinct velocities so the test can tell which
         # pitcher's history actually fed the row.
         prior = [
-            _pitch_row(50, "2026-08-01", pitcher=1, at_bat_number=1, pitch_number=1,
-                       home_team="SEA", away_team="DET", release_speed=99.0),  # Pitcher A
-            _pitch_row(51, "2026-07-31", pitcher=2, at_bat_number=1, pitch_number=1,
-                       home_team="SEA", away_team="DET", release_speed=80.0),  # Pitcher B (actual starter)
+            _pitch_row(
+                50,
+                "2026-08-01",
+                pitcher=1,
+                at_bat_number=1,
+                pitch_number=1,
+                home_team="SEA",
+                away_team="DET",
+                release_speed=99.0,
+            ),  # Pitcher A
+            _pitch_row(
+                51,
+                "2026-07-31",
+                pitcher=2,
+                at_bat_number=1,
+                pitch_number=1,
+                home_team="SEA",
+                away_team="DET",
+                release_speed=80.0,
+            ),  # Pitcher B (actual starter)
         ]
         pitches = normalize_statcast_pitches(pl.DataFrame(this_game + prior))
         return pitches, identify_starters(pitches)
@@ -552,7 +646,8 @@ class TestBuildGameFeatureRowStarterParity:
 
 def _statsapi_game(game_pk: int, game_date_utc: str, home: str, away: str) -> dict:
     return {
-        "gamePk": game_pk, "gameDate": game_date_utc,
+        "gamePk": game_pk,
+        "gameDate": game_date_utc,
         "teams": {"home": {"team": {"name": home}}, "away": {"team": {"name": away}}},
     }
 
@@ -570,15 +665,25 @@ class TestResolveStatcastGamePk:
     gamePks 824490 at 17:40Z and 824489 at 23:10Z)."""
 
     def test_single_game(self):
-        espn_game = {"event_id": "1", "event_start_utc": "2026-07-26T16:15:00+00:00",
-                      "home_team": "Tampa Bay Rays", "away_team": "Cleveland Guardians"}
-        statsapi_games = [_statsapi_game(822950, "2026-07-26T16:15:00Z", "Tampa Bay Rays", "Cleveland Guardians")]
+        espn_game = {
+            "event_id": "1",
+            "event_start_utc": "2026-07-26T16:15:00+00:00",
+            "home_team": "Tampa Bay Rays",
+            "away_team": "Cleveland Guardians",
+        }
+        statsapi_games = [
+            _statsapi_game(822950, "2026-07-26T16:15:00Z", "Tampa Bay Rays", "Cleveland Guardians")
+        ]
 
         assert resolve_statcast_game_pk(espn_game, statsapi_games) == 822950
 
     def test_doubleheader_game_1_resolves_to_the_earlier_real_game(self):
-        espn_game = {"event_id": "g1", "event_start_utc": "2026-07-28T17:40:00+00:00",
-                      "home_team": "Cincinnati Reds", "away_team": "Cleveland Guardians"}
+        espn_game = {
+            "event_id": "g1",
+            "event_start_utc": "2026-07-28T17:40:00+00:00",
+            "home_team": "Cincinnati Reds",
+            "away_team": "Cleveland Guardians",
+        }
         statsapi_games = [
             _statsapi_game(824490, "2026-07-28T17:40:00Z", "Cincinnati Reds", "Cleveland Guardians"),
             _statsapi_game(824489, "2026-07-28T23:10:00Z", "Cincinnati Reds", "Cleveland Guardians"),
@@ -587,8 +692,12 @@ class TestResolveStatcastGamePk:
         assert resolve_statcast_game_pk(espn_game, statsapi_games) == 824490
 
     def test_doubleheader_game_2_resolves_to_the_later_real_game(self):
-        espn_game = {"event_id": "g2", "event_start_utc": "2026-07-28T23:05:00+00:00",
-                      "home_team": "Cincinnati Reds", "away_team": "Cleveland Guardians"}
+        espn_game = {
+            "event_id": "g2",
+            "event_start_utc": "2026-07-28T23:05:00+00:00",
+            "home_team": "Cincinnati Reds",
+            "away_team": "Cleveland Guardians",
+        }
         statsapi_games = [
             _statsapi_game(824490, "2026-07-28T17:40:00Z", "Cincinnati Reds", "Cleveland Guardians"),
             _statsapi_game(824489, "2026-07-28T23:10:00Z", "Cincinnati Reds", "Cleveland Guardians"),
@@ -601,8 +710,12 @@ class TestResolveStatcastGamePk:
         # schedule for that date has no matching team pair at all (e.g.
         # the real game was postponed to a later date) -- must not guess
         # at an unrelated real game sharing the same team names elsewhere.
-        espn_game = {"event_id": "1", "event_start_utc": "2026-07-26T16:15:00+00:00",
-                      "home_team": "Tampa Bay Rays", "away_team": "Cleveland Guardians"}
+        espn_game = {
+            "event_id": "1",
+            "event_start_utc": "2026-07-26T16:15:00+00:00",
+            "home_team": "Tampa Bay Rays",
+            "away_team": "Cleveland Guardians",
+        }
         statsapi_games = [
             _statsapi_game(822950, "2026-07-28T16:15:00Z", "Tampa Bay Rays", "Cleveland Guardians"),
         ]
@@ -614,8 +727,12 @@ class TestResolveStatcastGamePk:
         # play on both 2026-07-26 and 2026-07-27. Must resolve to the real
         # game on the SAME calendar date as the ESPN event, not the
         # nearest one by team pair alone.
-        espn_game = {"event_id": "2", "event_start_utc": "2026-07-27T16:15:00+00:00",
-                      "home_team": "Tampa Bay Rays", "away_team": "Cleveland Guardians"}
+        espn_game = {
+            "event_id": "2",
+            "event_start_utc": "2026-07-27T16:15:00+00:00",
+            "home_team": "Tampa Bay Rays",
+            "away_team": "Cleveland Guardians",
+        }
         statsapi_games = [
             _statsapi_game(822950, "2026-07-26T16:15:00Z", "Tampa Bay Rays", "Cleveland Guardians"),
             _statsapi_game(822951, "2026-07-27T16:15:00Z", "Tampa Bay Rays", "Cleveland Guardians"),
@@ -627,8 +744,12 @@ class TestResolveStatcastGamePk:
         # A synthetic but real-shaped edge case: two real candidates
         # equally close in time -- must not be silently broken by list
         # order.
-        espn_game = {"event_id": "1", "event_start_utc": "2026-07-26T18:00:00+00:00",
-                      "home_team": "Tampa Bay Rays", "away_team": "Cleveland Guardians"}
+        espn_game = {
+            "event_id": "1",
+            "event_start_utc": "2026-07-26T18:00:00+00:00",
+            "home_team": "Tampa Bay Rays",
+            "away_team": "Cleveland Guardians",
+        }
         statsapi_games = [
             _statsapi_game(1, "2026-07-26T17:00:00Z", "Tampa Bay Rays", "Cleveland Guardians"),
             _statsapi_game(2, "2026-07-26T19:00:00Z", "Tampa Bay Rays", "Cleveland Guardians"),
@@ -637,15 +758,23 @@ class TestResolveStatcastGamePk:
         assert resolve_statcast_game_pk(espn_game, statsapi_games) is None
 
     def test_no_matching_team_pair_returns_none(self):
-        espn_game = {"event_id": "1", "event_start_utc": "2026-07-26T16:15:00+00:00",
-                      "home_team": "Tampa Bay Rays", "away_team": "Cleveland Guardians"}
+        espn_game = {
+            "event_id": "1",
+            "event_start_utc": "2026-07-26T16:15:00+00:00",
+            "home_team": "Tampa Bay Rays",
+            "away_team": "Cleveland Guardians",
+        }
         statsapi_games = [_statsapi_game(1, "2026-07-26T16:15:00Z", "Boston Red Sox", "New York Yankees")]
 
         assert resolve_statcast_game_pk(espn_game, statsapi_games) is None
 
     def test_empty_statsapi_games_returns_none(self):
-        espn_game = {"event_id": "1", "event_start_utc": "2026-07-26T16:15:00+00:00",
-                      "home_team": "Tampa Bay Rays", "away_team": "Cleveland Guardians"}
+        espn_game = {
+            "event_id": "1",
+            "event_start_utc": "2026-07-26T16:15:00+00:00",
+            "home_team": "Tampa Bay Rays",
+            "away_team": "Cleveland Guardians",
+        }
         assert resolve_statcast_game_pk(espn_game, []) is None
 
 
@@ -656,15 +785,24 @@ def _write_weather_snapshot(raw_root: Path, venue_id: str, game_date: str, name:
         f.write(json.dumps(payload).encode("utf-8"))
 
 
-def _weather_envelope(observed_at_utc: str, times: list[str], temps_c: list[float],
-                       wind_kmh: list[float], wind_dir: list[float], precip_mm: list[float]) -> dict:
+def _weather_envelope(
+    observed_at_utc: str,
+    times: list[str],
+    temps_c: list[float],
+    wind_kmh: list[float],
+    wind_dir: list[float],
+    precip_mm: list[float],
+) -> dict:
     return {
         "observed_at_utc": observed_at_utc,
         "endpoint": "historical_forecast_stitched",
         "forecast_data": {
             "hourly": {
-                "time": times, "temperature_2m": temps_c, "wind_speed_10m": wind_kmh,
-                "wind_direction_10m": wind_dir, "precipitation": precip_mm,
+                "time": times,
+                "temperature_2m": temps_c,
+                "wind_speed_10m": wind_kmh,
+                "wind_direction_10m": wind_dir,
+                "precipitation": precip_mm,
             },
         },
     }
@@ -682,18 +820,30 @@ class TestLoadWeatherAtDecisionTime:
         # -- the later one must never be used for this decision.
         early = _weather_envelope(
             "2026-08-06T10:00:00+00:00",
-            ["2026-08-06T22:00"], [30.0], [10.0], [180.0], [0.0],
+            ["2026-08-06T22:00"],
+            [30.0],
+            [10.0],
+            [180.0],
+            [0.0],
         )
         late = _weather_envelope(
             "2026-08-06T21:30:00+00:00",  # after the late decision time
-            ["2026-08-06T22:00"], [99.0], [99.0], [99.0], [99.0],
+            ["2026-08-06T22:00"],
+            [99.0],
+            [99.0],
+            [99.0],
+            [99.0],
         )
         _write_weather_snapshot(tmp_path, "chase_field", "2026-08-06", "a_early", early)
         _write_weather_snapshot(tmp_path, "chase_field", "2026-08-06", "b_late", late)
         decision_time = datetime.fromisoformat("2026-08-06T21:10:00+00:00")
 
         result = load_weather_at_decision_time(
-            tmp_path, "chase_field", "2026-08-06", decision_time, "2026-08-06T22:10:00+00:00",
+            tmp_path,
+            "chase_field",
+            "2026-08-06",
+            decision_time,
+            "2026-08-06T22:10:00+00:00",
         )
 
         assert result["availability"] == 1.0
@@ -702,13 +852,21 @@ class TestLoadWeatherAtDecisionTime:
     def test_no_snapshot_before_decision_time_is_honestly_unavailable(self, tmp_path):
         only_late = _weather_envelope(
             "2026-08-06T21:30:00+00:00",
-            ["2026-08-06T22:00"], [30.0], [10.0], [180.0], [0.0],
+            ["2026-08-06T22:00"],
+            [30.0],
+            [10.0],
+            [180.0],
+            [0.0],
         )
         _write_weather_snapshot(tmp_path, "chase_field", "2026-08-06", "only_late", only_late)
         decision_time = datetime.fromisoformat("2026-08-06T21:10:00+00:00")
 
         result = load_weather_at_decision_time(
-            tmp_path, "chase_field", "2026-08-06", decision_time, "2026-08-06T22:10:00+00:00",
+            tmp_path,
+            "chase_field",
+            "2026-08-06",
+            decision_time,
+            "2026-08-06T22:10:00+00:00",
         )
 
         assert result["availability"] == 0.0
@@ -730,7 +888,11 @@ class TestLoadWeatherAtDecisionTime:
         decision_time = datetime.fromisoformat("2026-08-06T21:10:00+00:00")
 
         result = load_weather_at_decision_time(
-            tmp_path, "chase_field", "2026-08-06", decision_time, "2026-08-06T22:10:00+00:00",
+            tmp_path,
+            "chase_field",
+            "2026-08-06",
+            decision_time,
+            "2026-08-06T22:10:00+00:00",
         )
 
         assert result["temp_f_first_pitch"] == pytest.approx(60.0 * 9 / 5 + 32)
@@ -742,15 +904,22 @@ class TestLoadWeatherAtDecisionTime:
         # as a last resort.
         legacy_payload = {
             "hourly": {
-                "time": ["2026-08-06T22:00"], "temperature_2m": [30.0],
-                "wind_speed_10m": [10.0], "wind_direction_10m": [180.0], "precipitation": [0.0],
+                "time": ["2026-08-06T22:00"],
+                "temperature_2m": [30.0],
+                "wind_speed_10m": [10.0],
+                "wind_direction_10m": [180.0],
+                "precipitation": [0.0],
             },
         }
         _write_weather_snapshot(tmp_path, "chase_field", "2026-08-06", "legacy", legacy_payload)
         decision_time = datetime.fromisoformat("2026-08-06T21:10:00+00:00")
 
         result = load_weather_at_decision_time(
-            tmp_path, "chase_field", "2026-08-06", decision_time, "2026-08-06T22:10:00+00:00",
+            tmp_path,
+            "chase_field",
+            "2026-08-06",
+            decision_time,
+            "2026-08-06T22:10:00+00:00",
         )
 
         assert result["availability"] == 0.0
@@ -758,20 +927,32 @@ class TestLoadWeatherAtDecisionTime:
     def test_no_snapshot_directory_at_all_is_unavailable(self, tmp_path):
         decision_time = datetime.fromisoformat("2026-08-06T21:10:00+00:00")
         result = load_weather_at_decision_time(
-            tmp_path, "nowhere", "2026-08-06", decision_time, "2026-08-06T22:10:00+00:00",
+            tmp_path,
+            "nowhere",
+            "2026-08-06",
+            decision_time,
+            "2026-08-06T22:10:00+00:00",
         )
         assert result["availability"] == 0.0
 
     def test_forecast_age_hours_reflects_the_real_gap(self, tmp_path):
         snap = _weather_envelope(
             "2026-08-06T10:00:00+00:00",
-            ["2026-08-06T22:00"], [30.0], [10.0], [180.0], [0.0],
+            ["2026-08-06T22:00"],
+            [30.0],
+            [10.0],
+            [180.0],
+            [0.0],
         )
         _write_weather_snapshot(tmp_path, "chase_field", "2026-08-06", "snap", snap)
         decision_time = datetime.fromisoformat("2026-08-06T21:10:00+00:00")
 
         result = load_weather_at_decision_time(
-            tmp_path, "chase_field", "2026-08-06", decision_time, "2026-08-06T22:10:00+00:00",
+            tmp_path,
+            "chase_field",
+            "2026-08-06",
+            decision_time,
+            "2026-08-06T22:10:00+00:00",
         )
 
         # observed at 10:00Z, decision at 21:10Z -> 11h10m old
@@ -789,9 +970,15 @@ class TestTrainServingMissingnessParity:
     construction; this test proves it rather than assuming it."""
 
     SHARED_PREFIXES = ("home_sp_", "away_sp_", "home_sp_clean_", "away_sp_clean_", "home_bp_", "away_bp_")
-    SHARED_EXACT = ("park_factor", "weather_availability", "temp_f_first_pitch",
-                     "wind_mph_first_pitch", "wind_direction_deg_first_pitch",
-                     "precip_mm_first_pitch", "weather_forecast_age_hours")
+    SHARED_EXACT = (
+        "park_factor",
+        "weather_availability",
+        "temp_f_first_pitch",
+        "wind_mph_first_pitch",
+        "wind_direction_deg_first_pitch",
+        "precip_mm_first_pitch",
+        "weather_forecast_age_hours",
+    )
 
     def _same_value(self, a, b) -> bool:
         if isinstance(a, float) and isinstance(b, float) and math.isnan(a) and math.isnan(b):
@@ -804,8 +991,15 @@ class TestTrainServingMissingnessParity:
         # real prior Statcast pitches before this game's date -- every
         # continuous stat must come back NaN in both paths identically.
         this_game = [
-            _pitch_row(100, "2026-08-06", pitcher=1, at_bat_number=1, pitch_number=1,
-                       home_team="SEA", away_team="DET"),
+            _pitch_row(
+                100,
+                "2026-08-06",
+                pitcher=1,
+                at_bat_number=1,
+                pitch_number=1,
+                home_team="SEA",
+                away_team="DET",
+            ),
         ]
         pitches = normalize_statcast_pitches(pl.DataFrame(this_game))
         starters = identify_starters(pitches)
@@ -819,7 +1013,12 @@ class TestTrainServingMissingnessParity:
             historical_row = build_game_feature_row(game, pitches, starters, "data/rebuild", "late", records)
             decision_time = datetime.fromisoformat(game["event_start_utc"]) - timedelta(hours=1)
             live_row = build_live_game_feature_row(
-                game, "Pitcher A", "Pitcher B", pitches, starters, "data/rebuild",
+                game,
+                "Pitcher A",
+                "Pitcher B",
+                pitches,
+                starters,
+                "data/rebuild",
                 decision_time_utc=decision_time,
             )
 

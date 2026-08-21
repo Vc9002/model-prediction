@@ -43,7 +43,9 @@ class MLBV3DataFoundation:
 
     def _foundation(self, provider_name: str) -> MLBV3Foundation:
         if provider_name not in SUPPORTED_PROVIDERS:
-            raise ValueError(f"unsupported MLB v3 provider: {provider_name}; choose one of {SUPPORTED_PROVIDERS}")
+            raise ValueError(
+                f"unsupported MLB v3 provider: {provider_name}; choose one of {SUPPORTED_PROVIDERS}"
+            )
         sources = load_rebuild_sources_config()
         policy = sources.mlb_stats if provider_name == "mlb_stats" else sources.statcast
         self._http = HttpProviderClient(
@@ -75,7 +77,9 @@ class MLBV3DataFoundation:
         start_date, end_date = date.fromisoformat(start), date.fromisoformat(end)
         foundation = self._foundation(provider)
         if provider == "mlb_stats":
-            return foundation.backfill_mlb_stats(start_date, end_date, tables=tables or ("schedule",), force=force)
+            return foundation.backfill_mlb_stats(
+                start_date, end_date, tables=tables or ("schedule",), force=force
+            )
         if tables:
             raise ValueError("Statcast backfill does not accept --table")
         return foundation.backfill_statcast(start_date, end_date, force=force)

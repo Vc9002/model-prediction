@@ -150,7 +150,11 @@ def run_checklist(
             "final_test_unused_for_selection",
             "pass" if count <= 1 else "fail",
             f"{count} trial(s) logged for {sport or 'all sports'} -- "
-            + ("single trial, holdout still clean" if count <= 1 else "holdout has been viewed multiple times"),
+            + (
+                "single trial, holdout still clean"
+                if count <= 1
+                else "holdout has been viewed multiple times"
+            ),
         )
 
     if ablation_variant_names is not None:
@@ -158,28 +162,32 @@ def run_checklist(
             name.lower() in {"incumbent", "baseline", "elo_only"} for name in ablation_variant_names
         )
         results["ablations_include_baseline"] = ChecklistResult(
-            "ablations_include_baseline", "pass" if has_baseline else "fail",
+            "ablations_include_baseline",
+            "pass" if has_baseline else "fail",
             "" if has_baseline else "no incumbent/baseline variant found in ablation set",
         )
 
     if predictive_metrics is not None:
         ok = predictive_metrics.get("status") == "ok" and "brier_score" in predictive_metrics
         results["proper_scores_reported"] = ChecklistResult(
-            "proper_scores_reported", "pass" if ok else "fail",
+            "proper_scores_reported",
+            "pass" if ok else "fail",
             "" if ok else f"predictive_metrics status={predictive_metrics.get('status')!r}",
         )
 
     if artifact_hashes is not None:
         ok = all(isinstance(h, str) and len(h) == 64 for h in artifact_hashes) and bool(artifact_hashes)
         results["artifacts_reproducible"] = ChecklistResult(
-            "artifacts_reproducible", "pass" if ok else "fail",
+            "artifacts_reproducible",
+            "pass" if ok else "fail",
             "" if ok else "one or more artifact hashes missing or not a sha256 hex digest",
         )
 
     if research_units is not None:
         ok = all(unit == 0 for unit in research_units)
         results["zero_unit_until_promotion"] = ChecklistResult(
-            "zero_unit_until_promotion", "pass" if ok else "fail",
+            "zero_unit_until_promotion",
+            "pass" if ok else "fail",
             "" if ok else "one or more research rows carry non-zero units before promotion",
         )
 

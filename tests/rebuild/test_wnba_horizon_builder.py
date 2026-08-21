@@ -32,16 +32,20 @@ from model_prediction.rebuild.wnba.time import sports_event_date
 
 
 def _source_frame() -> pl.DataFrame:
-    return pl.DataFrame([{
-        "event_id": "late-et",
-        "event_start_utc": "2026-05-02T02:00:00+00:00",
-        "sports_event_date": "2026-05-01",
-        "observed_at_utc": "2026-05-01T20:00:00+00:00",
-        "raw_snapshot_hash": "raw-1",
-        "availability_basis": "capture_time_only",
-        "commercial_use_status": "unresolved",
-        "production_allowed": False,
-    }])
+    return pl.DataFrame(
+        [
+            {
+                "event_id": "late-et",
+                "event_start_utc": "2026-05-02T02:00:00+00:00",
+                "sports_event_date": "2026-05-01",
+                "observed_at_utc": "2026-05-01T20:00:00+00:00",
+                "raw_snapshot_hash": "raw-1",
+                "availability_basis": "capture_time_only",
+                "commercial_use_status": "unresolved",
+                "production_allowed": False,
+            }
+        ]
+    )
 
 
 class TestLatestTargetsHonorsWnbaSportsDate:
@@ -74,7 +78,8 @@ class TestResearchProvenanceGateFailsClosed:
     def test_missing_source_provenance_column_fails_closed(self):
         with pytest.raises(ValueError, match="missing provenance"):
             _assert_research_source_provenance(
-                _source_frame().drop("commercial_use_status"), "games",
+                _source_frame().drop("commercial_use_status"),
+                "games",
             )
 
 
@@ -86,15 +91,17 @@ class TestPostponementCutoffStabilization:
     def _games(self, starts: list[tuple[str, str]]) -> pl.DataFrame:
         # starts: list of (observed_at_utc, event_start_utc) revisions, in
         # the order they were captured.
-        return pl.DataFrame([
-            {
-                "event_id": "postponed-1",
-                "event_start_utc": start,
-                "observed_at_utc": observed,
-                "pit_eligible": True,
-            }
-            for observed, start in starts
-        ])
+        return pl.DataFrame(
+            [
+                {
+                    "event_id": "postponed-1",
+                    "event_start_utc": start,
+                    "observed_at_utc": observed,
+                    "pit_eligible": True,
+                }
+                for observed, start in starts
+            ]
+        )
 
     def test_two_revisions_converge_to_the_final_known_start(self):
         # First capture: game scheduled for 2026-05-10T20:00Z. Second
@@ -103,10 +110,12 @@ class TestPostponementCutoffStabilization:
         # the *first* start and miss that the game moved; the stabilization
         # loop must re-resolve against the schedule state knowable as of
         # each successive cutoff estimate until it stops moving.
-        games = self._games([
-            ("2026-05-01T00:00:00+00:00", "2026-05-10T20:00:00+00:00"),
-            ("2026-05-09T00:00:00+00:00", "2026-05-12T20:00:00+00:00"),
-        ])
+        games = self._games(
+            [
+                ("2026-05-01T00:00:00+00:00", "2026-05-10T20:00:00+00:00"),
+                ("2026-05-09T00:00:00+00:00", "2026-05-12T20:00:00+00:00"),
+            ]
+        )
         resolved = _target_as_of_cutoff(
             games,
             event_id="postponed-1",
@@ -121,11 +130,13 @@ class TestPostponementCutoffStabilization:
     def test_three_revisions_still_converge(self):
         # A double-postponement: moved twice before settling. The loop caps
         # at 5 attempts, so 3 revisions must still resolve.
-        games = self._games([
-            ("2026-05-01T00:00:00+00:00", "2026-05-10T20:00:00+00:00"),
-            ("2026-05-08T00:00:00+00:00", "2026-05-13T20:00:00+00:00"),
-            ("2026-05-12T00:00:00+00:00", "2026-05-15T20:00:00+00:00"),
-        ])
+        games = self._games(
+            [
+                ("2026-05-01T00:00:00+00:00", "2026-05-10T20:00:00+00:00"),
+                ("2026-05-08T00:00:00+00:00", "2026-05-13T20:00:00+00:00"),
+                ("2026-05-12T00:00:00+00:00", "2026-05-15T20:00:00+00:00"),
+            ]
+        )
         resolved = _target_as_of_cutoff(
             games,
             event_id="postponed-1",
@@ -141,10 +152,7 @@ class TestPostponementCutoffStabilization:
         # Pathological: each successive cutoff estimate reveals yet another
         # revision, indefinitely (simulated for 6+ steps, more than the
         # 5-attempt cap). Must raise, not silently use a stale cutoff.
-        starts = [
-            (f"2026-0{i}-01T00:00:00+00:00", f"2026-0{i + 1}-10T20:00:00+00:00")
-            for i in range(1, 7)
-        ]
+        starts = [(f"2026-0{i}-01T00:00:00+00:00", f"2026-0{i + 1}-10T20:00:00+00:00") for i in range(1, 7)]
         games = self._games(starts)
         with pytest.raises(ValueError, match="did not stabilize"):
             _target_as_of_cutoff(
@@ -182,7 +190,11 @@ def _base_row(**overrides: object) -> dict[str, object]:
 
 
 def _prior_game_and_boxes(
-    *, event_id: str, team_id: str, opponent_id: str, event_start_utc: str,
+    *,
+    event_id: str,
+    team_id: str,
+    opponent_id: str,
+    event_start_utc: str,
 ) -> tuple[dict, list[dict]]:
     game = _base_row(
         event_id=event_id,
@@ -198,20 +210,38 @@ def _prior_game_and_boxes(
     )
     boxes = [
         _base_row(
-            event_id=event_id, team_id=team_id, opponent_team_id=opponent_id,
-            observed_at_utc="2024-04-01T00:00:00+00:00", raw_snapshot_hash=f"box-{event_id}-{team_id}",
-            points=80, field_goals_made=30, field_goals_attempted=70,
-            three_points_made=8, three_points_attempted=24,
-            free_throws_made=12, free_throws_attempted=16,
-            offensive_rebounds=10, defensive_rebounds=25, turnovers=12,
+            event_id=event_id,
+            team_id=team_id,
+            opponent_team_id=opponent_id,
+            observed_at_utc="2024-04-01T00:00:00+00:00",
+            raw_snapshot_hash=f"box-{event_id}-{team_id}",
+            points=80,
+            field_goals_made=30,
+            field_goals_attempted=70,
+            three_points_made=8,
+            three_points_attempted=24,
+            free_throws_made=12,
+            free_throws_attempted=16,
+            offensive_rebounds=10,
+            defensive_rebounds=25,
+            turnovers=12,
         ),
         _base_row(
-            event_id=event_id, team_id=opponent_id, opponent_team_id=team_id,
-            observed_at_utc="2024-04-01T00:00:00+00:00", raw_snapshot_hash=f"box-{event_id}-{opponent_id}",
-            points=70, field_goals_made=27, field_goals_attempted=68,
-            three_points_made=7, three_points_attempted=22,
-            free_throws_made=9, free_throws_attempted=12,
-            offensive_rebounds=8, defensive_rebounds=24, turnovers=14,
+            event_id=event_id,
+            team_id=opponent_id,
+            opponent_team_id=team_id,
+            observed_at_utc="2024-04-01T00:00:00+00:00",
+            raw_snapshot_hash=f"box-{event_id}-{opponent_id}",
+            points=70,
+            field_goals_made=27,
+            field_goals_attempted=68,
+            three_points_made=7,
+            three_points_attempted=22,
+            free_throws_made=9,
+            free_throws_attempted=12,
+            offensive_rebounds=8,
+            defensive_rebounds=24,
+            turnovers=14,
         ),
     ]
     return game, boxes
@@ -223,10 +253,16 @@ def _write_ready_season(tmp_path, *, target_start_utc: str) -> WNBANormalizedSto
     for build_team_form_snapshot to return AVAILABLE for both sides."""
     store = WNBANormalizedStore(Path(tmp_path) / "normalized")
     game_a, boxes_a = _prior_game_and_boxes(
-        event_id="g-a", team_id="A", opponent_id="C", event_start_utc="2024-05-01T00:00:00+00:00",
+        event_id="g-a",
+        team_id="A",
+        opponent_id="C",
+        event_start_utc="2024-05-01T00:00:00+00:00",
     )
     game_b, boxes_b = _prior_game_and_boxes(
-        event_id="g-b", team_id="B", opponent_id="D", event_start_utc="2024-05-01T00:00:00+00:00",
+        event_id="g-b",
+        team_id="B",
+        opponent_id="D",
+        event_start_utc="2024-05-01T00:00:00+00:00",
     )
     target = _base_row(
         event_id="g-target",
@@ -335,7 +371,10 @@ class TestLiveModeRespectsItsOwnCutoff:
         # live mode "as of" well before that must decline, not guess.
         knowledge_time = datetime(2024, 5, 1, tzinfo=UTC)
         result = build_wnba_live_features(
-            str(tmp_path), "2024-05-10", "early", knowledge_time_utc=knowledge_time,
+            str(tmp_path),
+            "2024-05-10",
+            "early",
+            knowledge_time_utc=knowledge_time,
         )
         assert result.rows == []
         assert result.missing_reasons.get("decision_cutoff_not_reached") == 1
@@ -344,7 +383,10 @@ class TestLiveModeRespectsItsOwnCutoff:
         _write_ready_season(tmp_path, target_start_utc="2024-05-10T20:00:00+00:00")
         knowledge_time = datetime(2024, 5, 10, 19, 30, tzinfo=UTC)  # after "late" cutoff (19:00Z)
         result = build_wnba_live_features(
-            str(tmp_path), "2024-05-10", "late", knowledge_time_utc=knowledge_time,
+            str(tmp_path),
+            "2024-05-10",
+            "late",
+            knowledge_time_utc=knowledge_time,
         )
         assert len(result.rows) == 1
         assert result.mode == "live"
@@ -353,7 +395,9 @@ class TestLiveModeRespectsItsOwnCutoff:
         _write_ready_season(tmp_path, target_start_utc="2024-05-10T20:00:00+00:00")
         with pytest.raises(ValueError, match="timezone-aware"):
             build_wnba_live_features(
-                str(tmp_path), "2024-05-10", "late",
+                str(tmp_path),
+                "2024-05-10",
+                "late",
                 knowledge_time_utc=datetime(2024, 5, 10, 19, 30, tzinfo=UTC).replace(tzinfo=None),
             )
 

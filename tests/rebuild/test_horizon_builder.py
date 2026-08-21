@@ -21,12 +21,20 @@ def _write_scoreboard(data_root, event_id: str, event_start_utc: str, home: str,
     norm = NormalizedStore(f"{data_root}/normalized")
     row = {
         **provenance_row(
-            source="espn_public", source_record_id=event_id, source_version="v1",
-            observed_at_utc=utc_now().isoformat(), effective_at_utc=event_start_utc,
+            source="espn_public",
+            source_record_id=event_id,
+            source_version="v1",
+            observed_at_utc=utc_now().isoformat(),
+            effective_at_utc=event_start_utc,
             event_start_utc=event_start_utc,
         ),
-        "event_id": event_id, "home_team": home, "away_team": away,
-        "home_score": 0, "away_score": 0, "status": "STATUS_SCHEDULED", "venue": "",
+        "event_id": event_id,
+        "home_team": home,
+        "away_team": away,
+        "home_score": 0,
+        "away_score": 0,
+        "status": "STATUS_SCHEDULED",
+        "venue": "",
     }
     norm.write("mlb", "scoreboard", pl.DataFrame([row]), primary_key=["event_id"])
 
@@ -95,10 +103,14 @@ class TestMissingnessIsHonest:
         # "late" but must not leak into "early" -- exactly the point-in-time
         # guarantee point_in_time_probable_starters exists to provide.
         _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers")
-        records = [{
-            "event_id": "401", "observed_at_utc": "2026-08-06T21:00:00+00:00",  # ~70min before start
-            "home_starter": "Some Pitcher", "away_starter": "Other Pitcher",
-        }]
+        records = [
+            {
+                "event_id": "401",
+                "observed_at_utc": "2026-08-06T21:00:00+00:00",  # ~70min before start
+                "home_starter": "Some Pitcher",
+                "away_starter": "Other Pitcher",
+            }
+        ]
 
         early = build_mlb_horizon_dataset(str(tmp_path), "2026-08-06", "early", records)
         late = build_mlb_horizon_dataset(str(tmp_path), "2026-08-06", "late", records)
@@ -128,10 +140,14 @@ class TestSnapshotHashReflectsRealContent:
 
     def test_same_event_ids_but_different_feature_content_yields_different_hashes(self, tmp_path):
         _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers")
-        records = [{
-            "event_id": "401", "observed_at_utc": "2026-08-06T21:00:00+00:00",
-            "home_starter": "Pitcher A", "away_starter": "Pitcher B",
-        }]
+        records = [
+            {
+                "event_id": "401",
+                "observed_at_utc": "2026-08-06T21:00:00+00:00",
+                "home_starter": "Pitcher A",
+                "away_starter": "Pitcher B",
+            }
+        ]
 
         first_row = {"event_id": "401", "home_sp_avg_velocity": 93.0}
         second_row = {"event_id": "401", "home_sp_avg_velocity": 97.5}  # a real corrected value
@@ -163,10 +179,14 @@ class TestSnapshotHashReflectsRealContent:
 
     def test_identical_content_yields_the_same_hash(self, tmp_path):
         _write_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Seattle Mariners", "Detroit Tigers")
-        records = [{
-            "event_id": "401", "observed_at_utc": "2026-08-06T21:00:00+00:00",
-            "home_starter": "Pitcher A", "away_starter": "Pitcher B",
-        }]
+        records = [
+            {
+                "event_id": "401",
+                "observed_at_utc": "2026-08-06T21:00:00+00:00",
+                "home_starter": "Pitcher A",
+                "away_starter": "Pitcher B",
+            }
+        ]
         row = {"event_id": "401", "home_sp_avg_velocity": 93.0}
 
         with patch("model_prediction.rebuild.mlb_features.build_live_game_feature_row", return_value=row):
@@ -176,17 +196,32 @@ class TestSnapshotHashReflectsRealContent:
         assert first.snapshot_hash == second.snapshot_hash
 
 
-def _write_final_game(data_root, event_id: str, event_start_utc: str, home: str, away: str,
-                       home_score: int = 4, away_score: int = 2) -> None:
+def _write_final_game(
+    data_root,
+    event_id: str,
+    event_start_utc: str,
+    home: str,
+    away: str,
+    home_score: int = 4,
+    away_score: int = 2,
+) -> None:
     norm = NormalizedStore(f"{data_root}/normalized")
     row = {
         **provenance_row(
-            source="espn_public", source_record_id=event_id, source_version="v1",
-            observed_at_utc=utc_now().isoformat(), effective_at_utc=event_start_utc,
+            source="espn_public",
+            source_record_id=event_id,
+            source_version="v1",
+            observed_at_utc=utc_now().isoformat(),
+            effective_at_utc=event_start_utc,
             event_start_utc=event_start_utc,
         ),
-        "event_id": event_id, "home_team": home, "away_team": away,
-        "home_score": home_score, "away_score": away_score, "status": "STATUS_FINAL", "venue": "",
+        "event_id": event_id,
+        "home_team": home,
+        "away_team": away,
+        "home_score": home_score,
+        "away_score": away_score,
+        "status": "STATUS_FINAL",
+        "venue": "",
     }
     norm.write("mlb", "scoreboard", pl.DataFrame([row]), primary_key=["event_id"])
 
@@ -215,12 +250,20 @@ class TestBuildMlbHistoricalHorizonDataset:
         norm = NormalizedStore(f"{tmp_path}/normalized")
         row = {
             **provenance_row(
-                source="espn_public", source_record_id="1", source_version="v1",
-                observed_at_utc=utc_now().isoformat(), effective_at_utc="2026-08-06T22:10:00+00:00",
+                source="espn_public",
+                source_record_id="1",
+                source_version="v1",
+                observed_at_utc=utc_now().isoformat(),
+                effective_at_utc="2026-08-06T22:10:00+00:00",
                 event_start_utc="2026-08-06T22:10:00+00:00",
             ),
-            "event_id": "1", "home_team": "Seattle Mariners", "away_team": "Detroit Tigers",
-            "home_score": 0, "away_score": 0, "status": "STATUS_SCHEDULED", "venue": "",
+            "event_id": "1",
+            "home_team": "Seattle Mariners",
+            "away_team": "Detroit Tigers",
+            "home_score": 0,
+            "away_score": 0,
+            "status": "STATUS_SCHEDULED",
+            "venue": "",
         }
         norm.write("mlb", "scoreboard", pl.DataFrame([row]), primary_key=["event_id"])
 

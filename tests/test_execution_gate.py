@@ -182,9 +182,7 @@ def test_missing_execute_flag_is_a_dry_run(tmp_path) -> None:
 
 def test_missing_api_credentials_refuses(tmp_path) -> None:
     with pytest.raises(ExecutionGateError, match="POLYMARKET_KEY_ID"):
-        executor(tmp_path, env={}).execute(
-            ticket(), qualified_row(), execute_flag=True, user_command=True
-        )
+        executor(tmp_path, env={}).execute(ticket(), qualified_row(), execute_flag=True, user_command=True)
 
 
 def test_research_observation_can_submit_without_manual_override(tmp_path, monkeypatch) -> None:
@@ -193,7 +191,9 @@ def test_research_observation_can_submit_without_manual_override(tmp_path, monke
     row (no manual_research_order flag) must be submittable through every
     other still-enforced gate, not refused purely for its classification."""
     client = executor(tmp_path, env=US_CREDS)
-    monkeypatch.setattr(client, "_request", lambda method, path, payload: {"id": "order-1", "state": "ORDER_STATE_NEW"})
+    monkeypatch.setattr(
+        client, "_request", lambda method, path, payload: {"id": "order-1", "state": "ORDER_STATE_NEW"}
+    )
     row = {**moneyline_row(), "record_type": "RESEARCH_OBSERVATION"}
 
     result = client.execute(ticket(), row, execute_flag=True, user_command=True)
@@ -268,7 +268,9 @@ def test_single_order_policy_refuses_a_second_buy_on_the_same_pick(tmp_path, mon
     the audit chain (not orders.json, dashboard-only) so this protects the
     raw CLI `execute` path too, not just the dashboard's own nonce/expiry."""
     client = executor(tmp_path, env=US_CREDS)
-    orders = iter([{"id": "order-1", "state": "ORDER_STATE_NEW"}, {"id": "order-2", "state": "ORDER_STATE_NEW"}])
+    orders = iter(
+        [{"id": "order-1", "state": "ORDER_STATE_NEW"}, {"id": "order-2", "state": "ORDER_STATE_NEW"}]
+    )
     monkeypatch.setattr(client, "_request", lambda method, path, payload: next(orders))
 
     first = client.execute(ticket(), qualified_row(), execute_flag=True, user_command=True)
@@ -280,7 +282,9 @@ def test_single_order_policy_refuses_a_second_buy_on_the_same_pick(tmp_path, mon
 
 def test_single_order_policy_does_not_block_a_sell_closing_the_position(tmp_path, monkeypatch) -> None:
     client = executor(tmp_path, env=US_CREDS)
-    orders = iter([{"id": "order-1", "state": "ORDER_STATE_NEW"}, {"id": "order-2", "state": "ORDER_STATE_NEW"}])
+    orders = iter(
+        [{"id": "order-1", "state": "ORDER_STATE_NEW"}, {"id": "order-2", "state": "ORDER_STATE_NEW"}]
+    )
     monkeypatch.setattr(client, "_request", lambda method, path, payload: next(orders))
 
     bought = client.execute(ticket(), qualified_row(), execute_flag=True, user_command=True)
@@ -293,7 +297,9 @@ def test_single_order_policy_does_not_block_a_sell_closing_the_position(tmp_path
 
 def test_single_order_policy_is_scoped_to_one_pick_id(tmp_path, monkeypatch) -> None:
     client = executor(tmp_path, env=US_CREDS)
-    orders = iter([{"id": "order-1", "state": "ORDER_STATE_NEW"}, {"id": "order-2", "state": "ORDER_STATE_NEW"}])
+    orders = iter(
+        [{"id": "order-1", "state": "ORDER_STATE_NEW"}, {"id": "order-2", "state": "ORDER_STATE_NEW"}]
+    )
     monkeypatch.setattr(client, "_request", lambda method, path, payload: next(orders))
 
     first = client.execute(ticket(), qualified_row(), execute_flag=True, user_command=True)
@@ -314,7 +320,9 @@ def test_live_side_check_accepts_a_ticket_matching_the_row_selection(tmp_path, m
     the one chokepoint both paths share. This verifies the matching case
     still submits normally once the live-quote check is wired in."""
     client = executor(tmp_path, env=US_CREDS, live_quote=lambda slug: fresh_quote())
-    monkeypatch.setattr(client, "_request", lambda method, path, payload: {"id": "order-1", "state": "ORDER_STATE_NEW"})
+    monkeypatch.setattr(
+        client, "_request", lambda method, path, payload: {"id": "order-1", "state": "ORDER_STATE_NEW"}
+    )
 
     result = client.execute(ticket(), moneyline_row(), execute_flag=True, user_command=True)
 
@@ -334,9 +342,7 @@ def test_live_side_check_refuses_a_ticket_on_the_wrong_side(tmp_path) -> None:
 
 
 def test_live_side_check_refuses_a_stale_quote(tmp_path) -> None:
-    stale_quote = fresh_quote(
-        observed_at_utc=(datetime.now(UTC) - timedelta(minutes=10)).isoformat()
-    )
+    stale_quote = fresh_quote(observed_at_utc=(datetime.now(UTC) - timedelta(minutes=10)).isoformat())
     client = executor(tmp_path, env=US_CREDS, live_quote=lambda slug: stale_quote)
     with pytest.raises(ExecutionGateError, match="live quote is stale"):
         client.execute(ticket(), moneyline_row(), execute_flag=True, user_command=True)
@@ -350,9 +356,7 @@ def test_live_side_check_refuses_a_closed_market(tmp_path) -> None:
 
 
 def test_live_side_check_refuses_after_event_start(tmp_path) -> None:
-    started_row = moneyline_row(
-        event_start_utc=(datetime.now(UTC) - timedelta(minutes=5)).isoformat()
-    )
+    started_row = moneyline_row(event_start_utc=(datetime.now(UTC) - timedelta(minutes=5)).isoformat())
     client = executor(tmp_path, env=US_CREDS, live_quote=lambda slug: fresh_quote())
     with pytest.raises(ExecutionGateError, match="event has already started"):
         client.execute(ticket(), started_row, execute_flag=True, user_command=True)
@@ -379,7 +383,9 @@ def test_live_side_check_accepts_a_spread_ticket_matching_the_row_selection(tmp_
     the row here picks the away team (Yankees) at -1.5, matching the live
     quote's long side exactly."""
     client = executor(tmp_path, env=US_CREDS, live_quote=lambda slug: spread_quote())
-    monkeypatch.setattr(client, "_request", lambda method, path, payload: {"id": "order-1", "state": "ORDER_STATE_NEW"})
+    monkeypatch.setattr(
+        client, "_request", lambda method, path, payload: {"id": "order-1", "state": "ORDER_STATE_NEW"}
+    )
     row = spread_row(selection="away", line="-1.5")
 
     result = client.execute(ticket(), row, execute_flag=True, user_command=True)
@@ -410,7 +416,9 @@ def test_live_side_check_refuses_a_spread_ticket_on_a_stale_line(tmp_path) -> No
 
 def test_live_side_check_accepts_a_total_ticket_matching_the_row_selection(tmp_path, monkeypatch) -> None:
     client = executor(tmp_path, env=US_CREDS, live_quote=lambda slug: total_quote())
-    monkeypatch.setattr(client, "_request", lambda method, path, payload: {"id": "order-1", "state": "ORDER_STATE_NEW"})
+    monkeypatch.setattr(
+        client, "_request", lambda method, path, payload: {"id": "order-1", "state": "ORDER_STATE_NEW"}
+    )
     row = total_row(selection="over", line="8.5")
 
     result = client.execute(ticket(), row, execute_flag=True, user_command=True)
@@ -434,7 +442,9 @@ def test_live_side_check_refuses_a_total_ticket_on_a_stale_line(tmp_path) -> Non
 
 def test_live_side_check_accepts_a_btts_ticket_matching_the_row_selection(tmp_path, monkeypatch) -> None:
     client = executor(tmp_path, env=US_CREDS, live_quote=lambda slug: btts_quote())
-    monkeypatch.setattr(client, "_request", lambda method, path, payload: {"id": "order-1", "state": "ORDER_STATE_NEW"})
+    monkeypatch.setattr(
+        client, "_request", lambda method, path, payload: {"id": "order-1", "state": "ORDER_STATE_NEW"}
+    )
     row = btts_row(selection="yes")
 
     result = client.execute(ticket(), row, execute_flag=True, user_command=True)
@@ -455,7 +465,9 @@ def test_config_override_qualified_call_can_submit_without_manual_order(tmp_path
     genuinely qualified) is no longer refused for that reason -- execution
     restrictions based on record_type/artifact qualification are removed."""
     client = executor(tmp_path, env=US_CREDS)
-    monkeypatch.setattr(client, "_request", lambda method, path, payload: {"id": "order-1", "state": "ORDER_STATE_NEW"})
+    monkeypatch.setattr(
+        client, "_request", lambda method, path, payload: {"id": "order-1", "state": "ORDER_STATE_NEW"}
+    )
 
     result = client.execute(
         ticket(), qualified_row(), execute_flag=True, user_command=True, artifact_qualified=False
@@ -467,7 +479,9 @@ def test_config_override_qualified_call_can_submit_without_manual_order(tmp_path
 def test_config_override_qualified_call_can_submit_via_manual_order(tmp_path, monkeypatch) -> None:
     client = executor(tmp_path, answer="y", env=US_CREDS)
     monkeypatch.setattr(
-        client, "_request", lambda method, path, payload: {"id": "override-order-1", "state": "ORDER_STATE_NEW"}
+        client,
+        "_request",
+        lambda method, path, payload: {"id": "override-order-1", "state": "ORDER_STATE_NEW"},
     )
 
     result = client.execute(
@@ -610,9 +624,7 @@ def test_marketable_limit_uses_ioc_and_can_take_liquidity(tmp_path, monkeypatch)
     assert payloads[-1]["synchronousExecution"] is True
 
 
-def test_portfolio_snapshot_uses_exchange_positions_and_activity_endpoints(
-    tmp_path, monkeypatch
-) -> None:
+def test_portfolio_snapshot_uses_exchange_positions_and_activity_endpoints(tmp_path, monkeypatch) -> None:
     client = executor(tmp_path, env=US_CREDS)
     responses = {
         "/v1/portfolio/positions": {"positions": {"market-1": {"netPositionDecimal": "2"}}},

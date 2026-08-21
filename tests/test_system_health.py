@@ -123,8 +123,7 @@ def _seed_game(repo: Path, sport: str, days_ago: float) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(
-            json.dumps({"event_id": f"{sport}-1", "event_start_utc": _iso_days_ago(days_ago)})
-            + "\n"
+            json.dumps({"event_id": f"{sport}-1", "event_start_utc": _iso_days_ago(days_ago)}) + "\n"
         )
 
 

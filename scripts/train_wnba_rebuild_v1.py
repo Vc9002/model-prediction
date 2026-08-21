@@ -100,9 +100,16 @@ def _calibration_diagnostics(labels: list[int], probs: list[float], n_bins: int 
     intercept, slope = calibration_intercept_slope(probs, labels)
     curve = calibration_curve(labels, probs, n_bins=n_bins)
     buckets = [
-        {"lower": round(i / n_bins, 3), "upper": round((i + 1) / n_bins, 3), "mean_p": round(center, 4),
-         "hit_rate": (None if math.isnan(actual) else round(actual, 4)), "count": count}
-        for i, (center, actual, count) in enumerate(zip(curve["bin_centers"], curve["actual_fraction"], curve["counts"], strict=True))
+        {
+            "lower": round(i / n_bins, 3),
+            "upper": round((i + 1) / n_bins, 3),
+            "mean_p": round(center, 4),
+            "hit_rate": (None if math.isnan(actual) else round(actual, 4)),
+            "count": count,
+        }
+        for i, (center, actual, count) in enumerate(
+            zip(curve["bin_centers"], curve["actual_fraction"], curve["counts"], strict=True)
+        )
         if count > 0
     ]
     return {"calibration_intercept": intercept, "calibration_slope": slope, "reliability_buckets": buckets}
@@ -111,12 +118,16 @@ def _calibration_diagnostics(labels: list[int], probs: list[float], n_bins: int 
 def main() -> None:
     print(f"1. Loading real backfilled WNBA games for seasons {SEASONS} ...")
     result = build_dataset(
-        "data/rebuild", SEASONS,
-        minimum_history_games=MINIMUM_HISTORY_GAMES, minimum_team_games=MINIMUM_TEAM_GAMES,
+        "data/rebuild",
+        SEASONS,
+        minimum_history_games=MINIMUM_HISTORY_GAMES,
+        minimum_team_games=MINIMUM_TEAM_GAMES,
     )
     frame = rows_to_frame(result.rows).sort("event_start_utc")
-    print(f"   {frame.height} real walk-forward rows "
-          f"(skipped_bootstrap={result.skipped_bootstrap}, skipped_cold_start_team={result.skipped_cold_start_team})")
+    print(
+        f"   {frame.height} real walk-forward rows "
+        f"(skipped_bootstrap={result.skipped_bootstrap}, skipped_cold_start_team={result.skipped_cold_start_team})"
+    )
     if frame.height < 200:
         print("Not enough real rows to train meaningfully. Stopping honestly, not faking a result.")
         sys.exit(0)
@@ -125,22 +136,32 @@ def main() -> None:
     n_unique_dates = len(set(dates))
     test_size_dates = max(1, round(n_unique_dates * 0.20))
     calib_size_dates = max(1, round(n_unique_dates * 0.20))
-    train_dates, val_dates, holdout_dates = date_cluster_split(dates, test_size=test_size_dates, calib_size=calib_size_dates)
+    train_dates, val_dates, holdout_dates = date_cluster_split(
+        dates, test_size=test_size_dates, calib_size=calib_size_dates
+    )
 
     train_df = frame.filter(pl.col("sports_event_date").is_in(train_dates))
     val_df = frame.filter(pl.col("sports_event_date").is_in(val_dates))
     holdout_df = frame.filter(pl.col("sports_event_date").is_in(holdout_dates))
     print(f"2. Chronological 60/20/20 date-cluster split ({n_unique_dates} real distinct WNBA slate dates):")
-    print(f"   train:   {train_df.height} rows, {len(train_dates)} dates, "
-          f"[{train_df['sports_event_date'].min()}, {train_df['sports_event_date'].max()}]")
-    print(f"   valid:   {val_df.height} rows, {len(val_dates)} dates, "
-          f"[{val_df['sports_event_date'].min()}, {val_df['sports_event_date'].max()}]")
-    print(f"   holdout: {holdout_df.height} rows, {len(holdout_dates)} dates, "
-          f"[{holdout_df['sports_event_date'].min()}, {holdout_df['sports_event_date'].max()}] "
-          f"(LOCKED -- touched exactly once, below)")
+    print(
+        f"   train:   {train_df.height} rows, {len(train_dates)} dates, "
+        f"[{train_df['sports_event_date'].min()}, {train_df['sports_event_date'].max()}]"
+    )
+    print(
+        f"   valid:   {val_df.height} rows, {len(val_dates)} dates, "
+        f"[{val_df['sports_event_date'].min()}, {val_df['sports_event_date'].max()}]"
+    )
+    print(
+        f"   holdout: {holdout_df.height} rows, {len(holdout_dates)} dates, "
+        f"[{holdout_df['sports_event_date'].min()}, {holdout_df['sports_event_date'].max()}] "
+        f"(LOCKED -- touched exactly once, below)"
+    )
 
     # ── Feature-set decision: on validation only, never holdout ──────────
-    print("3. Feature-set comparison (defensive_trend_gap in vs. out), fit on train, scored on validation only:")
+    print(
+        "3. Feature-set comparison (defensive_trend_gap in vs. out), fit on train, scored on validation only:"
+    )
     val_labels = val_df["home_win"].to_list()
     feature_set_results: dict[str, dict[str, float]] = {}
     fitted_models: dict[str, LogisticRegression] = {}
@@ -152,8 +173,10 @@ def main() -> None:
         feature_set_results[name] = metrics
         coefs = dict(zip(features, model.coef_[0].tolist(), strict=True))
         print(f"   {name}: coef={coefs} intercept={model.intercept_[0]:.6f}")
-        print(f"   {name}: validation brier={metrics['brier']:.5f} log_loss={metrics['log_loss']:.5f} "
-              f"acc={metrics['accuracy']:.4f} ece={metrics['ece']:.4f}")
+        print(
+            f"   {name}: validation brier={metrics['brier']:.5f} log_loss={metrics['log_loss']:.5f} "
+            f"acc={metrics['accuracy']:.4f} ece={metrics['ece']:.4f}"
+        )
 
     full_brier = feature_set_results["full_3_feature"]["brier"]
     reduced_brier = feature_set_results["reduced_2_feature"]["brier"]
@@ -194,10 +217,14 @@ def main() -> None:
     train_metrics = _metrics(train_labels, train_probs)
     val_metrics = _metrics(val_labels, val_probs_final)
     print(f"5. Raw (uncalibrated) metrics for the FINAL {winning_name} model:")
-    print(f"   train (in-sample, n={train_metrics['n']}): brier={train_metrics['brier']:.5f} "
-          f"log_loss={train_metrics['log_loss']:.5f} acc={train_metrics['accuracy']:.4f}")
-    print(f"   validation (OOS, n={val_metrics['n']}): brier={val_metrics['brier']:.5f} "
-          f"log_loss={val_metrics['log_loss']:.5f} acc={val_metrics['accuracy']:.4f}")
+    print(
+        f"   train (in-sample, n={train_metrics['n']}): brier={train_metrics['brier']:.5f} "
+        f"log_loss={train_metrics['log_loss']:.5f} acc={train_metrics['accuracy']:.4f}"
+    )
+    print(
+        f"   validation (OOS, n={val_metrics['n']}): brier={val_metrics['brier']:.5f} "
+        f"log_loss={val_metrics['log_loss']:.5f} acc={val_metrics['accuracy']:.4f}"
+    )
 
     # ── Calibration method selection: chronological cross-fit on
     # validation only (never holdout), per rebuild/calibration.py. ───────
@@ -206,8 +233,12 @@ def main() -> None:
     for method in ("identity", "platt", "temperature", "isotonic"):
         cf = cross_fit_calibration_eval(val_probs_final, val_labels, method, n_blocks=4)
         calibration_comparison[method] = {
-            "n_eval_total": cf.n_eval_total, "log_loss": cf.log_loss, "brier": cf.brier,
-            "ece": cf.ece, "calibration_intercept": cf.calibration_intercept, "calibration_slope": cf.calibration_slope,
+            "n_eval_total": cf.n_eval_total,
+            "log_loss": cf.log_loss,
+            "brier": cf.brier,
+            "ece": cf.ece,
+            "calibration_intercept": cf.calibration_intercept,
+            "calibration_slope": cf.calibration_slope,
         }
         print(f"   {method}: n={cf.n_eval_total} brier={cf.brier} log_loss={cf.log_loss} ece={cf.ece}")
 
@@ -228,17 +259,23 @@ def main() -> None:
     holdout_calibration_diag_raw = _calibration_diagnostics(holdout_labels, holdout_probs_raw)
     holdout_calibration_diag_calibrated = _calibration_diagnostics(holdout_labels, holdout_probs_calibrated)
     print(f"7. LOCKED HOLDOUT (touched once, n={holdout_metrics_raw['n']}):")
-    print(f"   raw:        brier={holdout_metrics_raw['brier']:.5f} log_loss={holdout_metrics_raw['log_loss']:.5f} "
-          f"acc={holdout_metrics_raw['accuracy']:.4f} ece={holdout_metrics_raw['ece']:.4f} "
-          f"cal_slope={holdout_calibration_diag_raw['calibration_slope']:.4f} "
-          f"cal_intercept={holdout_calibration_diag_raw['calibration_intercept']:.4f}")
-    print(f"   calibrated: brier={holdout_metrics_calibrated['brier']:.5f} log_loss={holdout_metrics_calibrated['log_loss']:.5f} "
-          f"acc={holdout_metrics_calibrated['accuracy']:.4f} ece={holdout_metrics_calibrated['ece']:.4f} "
-          f"cal_slope={holdout_calibration_diag_calibrated['calibration_slope']:.4f} "
-          f"cal_intercept={holdout_calibration_diag_calibrated['calibration_intercept']:.4f}")
+    print(
+        f"   raw:        brier={holdout_metrics_raw['brier']:.5f} log_loss={holdout_metrics_raw['log_loss']:.5f} "
+        f"acc={holdout_metrics_raw['accuracy']:.4f} ece={holdout_metrics_raw['ece']:.4f} "
+        f"cal_slope={holdout_calibration_diag_raw['calibration_slope']:.4f} "
+        f"cal_intercept={holdout_calibration_diag_raw['calibration_intercept']:.4f}"
+    )
+    print(
+        f"   calibrated: brier={holdout_metrics_calibrated['brier']:.5f} log_loss={holdout_metrics_calibrated['log_loss']:.5f} "
+        f"acc={holdout_metrics_calibrated['accuracy']:.4f} ece={holdout_metrics_calibrated['ece']:.4f} "
+        f"cal_slope={holdout_calibration_diag_calibrated['calibration_slope']:.4f} "
+        f"cal_intercept={holdout_calibration_diag_calibrated['calibration_intercept']:.4f}"
+    )
 
     home_win_rate_overall = float(np.mean(frame["home_win"].to_numpy()))
-    print(f"8. Context: overall real home-win rate across all {frame.height} rows = {home_win_rate_overall:.4f}")
+    print(
+        f"8. Context: overall real home-win rate across all {frame.height} rows = {home_win_rate_overall:.4f}"
+    )
 
     # ── Persist artifacts under config/models/challengers/ ONLY. ─────────
     model_artifact_raw = {
@@ -316,14 +353,16 @@ def main() -> None:
                 "clearance. See docs/model_audit/models/WNBA_ELO_TREND_LR_REBUILD_V1.md."
             ),
             "sibling_of_incumbent": "wnba-elo-trend-lr-v4 (config/models/wnba-elo-trend-lr-v4.json) -- "
-                                    "same family, never loaded as candidate, referenced only as a design guide",
+            "same family, never loaded as candidate, referenced only as a design guide",
             "data_root": "data/rebuild/normalized/wnba",
             "seasons": SEASONS,
             "dropped_incomplete_games": "see docs/model_audit/models/WNBA_ELO_TREND_LR_REBUILD_V1.md",
         },
         "generated_at_utc": datetime.now(UTC).isoformat(),
     }
-    artifact_hash = hashlib.sha256(json.dumps(model_artifact_raw, sort_keys=True, default=str).encode()).hexdigest()
+    artifact_hash = hashlib.sha256(
+        json.dumps(model_artifact_raw, sort_keys=True, default=str).encode()
+    ).hexdigest()
     model_artifact_raw["artifact_hash"] = artifact_hash
 
     calibrator_artifact_raw = {
@@ -342,11 +381,13 @@ def main() -> None:
             "commercial_use_status": "unresolved",
             "production_allowed": False,
             "note": "Fitted on the validation split only (disjoint from both train and the locked holdout). "
-                    "Same capture-time-only / unresolved-commercial-rights caveats as the base model artifact apply.",
+            "Same capture-time-only / unresolved-commercial-rights caveats as the base model artifact apply.",
         },
         "generated_at_utc": datetime.now(UTC).isoformat(),
     }
-    calibrator_hash = hashlib.sha256(json.dumps(calibrator_artifact_raw, sort_keys=True, default=str).encode()).hexdigest()
+    calibrator_hash = hashlib.sha256(
+        json.dumps(calibrator_artifact_raw, sort_keys=True, default=str).encode()
+    ).hexdigest()
     calibrator_artifact_raw["calibrator_hash"] = calibrator_hash
 
     challenger_dir = Path("config/models/challengers")
@@ -360,27 +401,33 @@ def main() -> None:
 
     results_path = Path("outputs/rebuild/wnba/wnba_rebuild_v1_training_results.json")
     results_path.parent.mkdir(parents=True, exist_ok=True)
-    results_path.write_text(json.dumps({
-        "feature_set_results": feature_set_results,
-        "feature_set_decision": decision,
-        "final_feature_set": winning_name,
-        "final_features": final_features,
-        "coefficients": coefficients,
-        "intercept": intercept,
-        "train_metrics": train_metrics,
-        "validation_metrics": val_metrics,
-        "holdout_metrics_raw": holdout_metrics_raw,
-        "holdout_metrics_calibrated": holdout_metrics_calibrated,
-        "holdout_calibration_diagnostics_raw": holdout_calibration_diag_raw,
-        "holdout_calibration_diagnostics_calibrated": holdout_calibration_diag_calibrated,
-        "calibration_comparison": calibration_comparison,
-        "winning_calibration_method": winning_method,
-        "artifact_hash": artifact_hash,
-        "calibrator_hash": calibrator_hash,
-        "n_rows_total": frame.height,
-        "skipped_bootstrap": result.skipped_bootstrap,
-        "skipped_cold_start_team": result.skipped_cold_start_team,
-    }, indent=2, default=str))
+    results_path.write_text(
+        json.dumps(
+            {
+                "feature_set_results": feature_set_results,
+                "feature_set_decision": decision,
+                "final_feature_set": winning_name,
+                "final_features": final_features,
+                "coefficients": coefficients,
+                "intercept": intercept,
+                "train_metrics": train_metrics,
+                "validation_metrics": val_metrics,
+                "holdout_metrics_raw": holdout_metrics_raw,
+                "holdout_metrics_calibrated": holdout_metrics_calibrated,
+                "holdout_calibration_diagnostics_raw": holdout_calibration_diag_raw,
+                "holdout_calibration_diagnostics_calibrated": holdout_calibration_diag_calibrated,
+                "calibration_comparison": calibration_comparison,
+                "winning_calibration_method": winning_method,
+                "artifact_hash": artifact_hash,
+                "calibrator_hash": calibrator_hash,
+                "n_rows_total": frame.height,
+                "skipped_bootstrap": result.skipped_bootstrap,
+                "skipped_cold_start_team": result.skipped_cold_start_team,
+            },
+            indent=2,
+            default=str,
+        )
+    )
     print(f"10. Results saved to {results_path}")
 
 

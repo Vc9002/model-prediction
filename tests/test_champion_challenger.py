@@ -25,6 +25,7 @@ from model_prediction.champion_challenger import (
 def _write_yaml(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     import yaml
+
     path.write_text(yaml.dump(data), encoding="utf-8")
 
 
@@ -120,6 +121,7 @@ def _many_rows(
 ) -> list[dict]:
     """Generate *n* rows with reasonable spread across dates."""
     import random as _rnd
+
     rng = _rnd.Random(seed)
     rows = []
     for i in range(n):
@@ -565,9 +567,7 @@ class TestPromotionEligible:
             # Both predict identically, but challenger calls only half the games
             prob = 0.60 if true_outcome == 1 else 0.40
             champion_rows.append(_pred_row(f"e{i:04d}", date, prob, true_outcome, called=True))
-            challenger_rows.append(
-                _pred_row(f"e{i:04d}", date, prob, true_outcome, called=(i % 2 == 0))
-            )
+            challenger_rows.append(_pred_row(f"e{i:04d}", date, prob, true_outcome, called=(i % 2 == 0)))
 
         pc = PairedComparison(champion_rows, challenger_rows)
         results = pc.compute()
@@ -648,9 +648,7 @@ class TestLoadSettledPredictions:
                         "line": "-110",
                     }
                 )
-                ledger.settle(
-                    row["prediction_id"], result="win" if i % 2 == 0 else "loss"
-                )
+                ledger.settle(row["prediction_id"], result="win" if i % 2 == 0 else "loss")
 
         all_rows = load_settled_predictions("mlb", "moneyline", repo_root=tmp_path)
         assert len(all_rows) == 5
@@ -675,7 +673,8 @@ class TestBootstrapCiOnDeltas:
         champion = [_pred_row("e1", "2026-06-01", 0.60, 1)]
         challenger = [_pred_row("e1", "2026-06-01", 0.60, 1)]
         result = _bootstrap_ci_on_deltas(
-            champion, challenger,
+            champion,
+            challenger,
             date_key="date",
             metric_fn=lambda rows: sum(float(r["probability"]) for r in rows) / len(rows),
         )
@@ -686,7 +685,8 @@ class TestBootstrapCiOnDeltas:
         champion = _many_rows(60, seed=1, base_prob=0.55)
         challenger = _many_rows(60, seed=2, base_prob=0.55)
         result = _bootstrap_ci_on_deltas(
-            champion, challenger,
+            champion,
+            challenger,
             date_key="date",
             metric_fn=lambda rows: sum(float(r["probability"]) for r in rows) / len(rows),
         )

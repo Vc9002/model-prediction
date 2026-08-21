@@ -17,60 +17,64 @@ from model_prediction.rebuild.wnba.store import WNBANormalizedStore
 
 
 def _games() -> pl.DataFrame:
-    return pl.DataFrame({
-        "event_id": ["g1", "g2"],
-        "event_start_utc": ["2024-05-01T00:00:00+00:00", "2024-05-03T00:00:00+00:00"],
-        "sports_event_date": ["2024-04-30", "2024-05-02"],
-        "observed_at_utc": ["2026-08-09T00:00:00+00:00", "2026-08-09T00:00:00+00:00"],
-        "raw_snapshot_hash": ["game-g1", "game-g2"],
-        "completed": [True, True],
-        "pit_eligible": [True, True],
-    })
+    return pl.DataFrame(
+        {
+            "event_id": ["g1", "g2"],
+            "event_start_utc": ["2024-05-01T00:00:00+00:00", "2024-05-03T00:00:00+00:00"],
+            "sports_event_date": ["2024-04-30", "2024-05-02"],
+            "observed_at_utc": ["2026-08-09T00:00:00+00:00", "2026-08-09T00:00:00+00:00"],
+            "raw_snapshot_hash": ["game-g1", "game-g2"],
+            "completed": [True, True],
+            "pit_eligible": [True, True],
+        }
+    )
 
 
 def _boxes() -> pl.DataFrame:
     rows = []
     for event_id, team_points, opponent_points in [("g1", 80, 70), ("g2", 90, 85)]:
-        rows.extend([
-            {
-                "event_id": event_id,
-                "event_start_utc": "2024-05-01T00:00:00+00:00",
-                "observed_at_utc": "2026-08-09T00:00:00+00:00",
-                "raw_snapshot_hash": f"box-{event_id}-a",
-                "pit_eligible": True,
-                "team_id": "A",
-                "opponent_team_id": "B",
-                "points": team_points,
-                "field_goals_made": 30,
-                "field_goals_attempted": 70,
-                "three_points_made": 8,
-                "three_points_attempted": 24,
-                "free_throws_made": 12,
-                "free_throws_attempted": 16,
-                "offensive_rebounds": 10,
-                "defensive_rebounds": 25,
-                "turnovers": 12,
-            },
-            {
-                "event_id": event_id,
-                "event_start_utc": "2024-05-01T00:00:00+00:00",
-                "observed_at_utc": "2026-08-09T00:00:00+00:00",
-                "raw_snapshot_hash": f"box-{event_id}-b",
-                "pit_eligible": True,
-                "team_id": "B",
-                "opponent_team_id": "A",
-                "points": opponent_points,
-                "field_goals_made": 27,
-                "field_goals_attempted": 68,
-                "three_points_made": 7,
-                "three_points_attempted": 22,
-                "free_throws_made": 9,
-                "free_throws_attempted": 12,
-                "offensive_rebounds": 8,
-                "defensive_rebounds": 24,
-                "turnovers": 14,
-            },
-        ])
+        rows.extend(
+            [
+                {
+                    "event_id": event_id,
+                    "event_start_utc": "2024-05-01T00:00:00+00:00",
+                    "observed_at_utc": "2026-08-09T00:00:00+00:00",
+                    "raw_snapshot_hash": f"box-{event_id}-a",
+                    "pit_eligible": True,
+                    "team_id": "A",
+                    "opponent_team_id": "B",
+                    "points": team_points,
+                    "field_goals_made": 30,
+                    "field_goals_attempted": 70,
+                    "three_points_made": 8,
+                    "three_points_attempted": 24,
+                    "free_throws_made": 12,
+                    "free_throws_attempted": 16,
+                    "offensive_rebounds": 10,
+                    "defensive_rebounds": 25,
+                    "turnovers": 12,
+                },
+                {
+                    "event_id": event_id,
+                    "event_start_utc": "2024-05-01T00:00:00+00:00",
+                    "observed_at_utc": "2026-08-09T00:00:00+00:00",
+                    "raw_snapshot_hash": f"box-{event_id}-b",
+                    "pit_eligible": True,
+                    "team_id": "B",
+                    "opponent_team_id": "A",
+                    "points": opponent_points,
+                    "field_goals_made": 27,
+                    "field_goals_attempted": 68,
+                    "three_points_made": 7,
+                    "three_points_attempted": 22,
+                    "free_throws_made": 9,
+                    "free_throws_attempted": 12,
+                    "offensive_rebounds": 8,
+                    "defensive_rebounds": 24,
+                    "turnovers": 14,
+                },
+            ]
+        )
     return pl.DataFrame(rows)
 
 
@@ -121,16 +125,22 @@ def test_persisted_and_in_memory_paths_use_same_transform(tmp_path):
 
 
 def test_latest_asof_game_state_is_selected_before_completed_filter():
-    games = pl.concat([
-        _games().head(1).with_columns(
-            pl.lit("2026-08-09T00:00:00+00:00").alias("observed_at_utc"),
-            pl.lit(True).alias("completed"),
-        ),
-        _games().head(1).with_columns(
-            pl.lit("2026-08-09T01:00:00+00:00").alias("observed_at_utc"),
-            pl.lit(False).alias("completed"),
-        ),
-    ])
+    games = pl.concat(
+        [
+            _games()
+            .head(1)
+            .with_columns(
+                pl.lit("2026-08-09T00:00:00+00:00").alias("observed_at_utc"),
+                pl.lit(True).alias("completed"),
+            ),
+            _games()
+            .head(1)
+            .with_columns(
+                pl.lit("2026-08-09T01:00:00+00:00").alias("observed_at_utc"),
+                pl.lit(False).alias("completed"),
+            ),
+        ]
+    )
     result = build_team_form_snapshot(
         games,
         _boxes().filter(pl.col("event_id") == "g1"),
@@ -181,7 +191,10 @@ def test_real_backfilled_2024_data_produces_a_real_available_snapshot():
     any_team_id = str(team_box["team_id"][0])
     decision = datetime.now(UTC)
     result = build_team_form_snapshot(
-        games, team_box, team_id=any_team_id, decision_time_utc=decision,
+        games,
+        team_box,
+        team_id=any_team_id,
+        decision_time_utc=decision,
     )
     assert result["status"] == "AVAILABLE"
     assert result["sample_size"] > 0

@@ -61,9 +61,7 @@ def test_artifact_control_uses_pinned_coefficients() -> None:
             training={},
         )
     )
-    probabilities = _artifact_predict(
-        artifact, [_row("2026-01-01", 1)], ("elo_probability",)
-    )
+    probabilities = _artifact_predict(artifact, [_row("2026-01-01", 1)], ("elo_probability",))
     assert probabilities == [0.5]
 
 
@@ -79,13 +77,5 @@ def test_independent_effect_rejects_degenerate_and_zero_variance() -> None:
         "raw_p_value": 0.01,
         "adjusted_p_value": 0.02,
     }
-    assert (
-        _independent_effect_label(
-            "schedule_missingness", unique_values=2, **common
-        )
-        == "REJECT_DEGENERATE"
-    )
-    assert (
-        _independent_effect_label("back_to_back", unique_values=1, **common)
-        == "NO_VARIANCE"
-    )
+    assert _independent_effect_label("schedule_missingness", unique_values=2, **common) == "REJECT_DEGENERATE"
+    assert _independent_effect_label("back_to_back", unique_values=1, **common) == "NO_VARIANCE"

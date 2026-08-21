@@ -147,17 +147,35 @@ class TestCollectionOnlyAdapterFailsClosedNotCrashed:
         assert "simulated real collector failure" in result.detail["error"]
 
 
-def _write_nba_scoreboard(data_root, event_id: str, event_start_utc: str, home: str, away: str,
-                           status: str, home_score: int = 0, away_score: int = 0) -> None:
+def _write_nba_scoreboard(
+    data_root,
+    event_id: str,
+    event_start_utc: str,
+    home: str,
+    away: str,
+    status: str,
+    home_score: int = 0,
+    away_score: int = 0,
+) -> None:
     from model_prediction.rebuild.storage import NormalizedStore, provenance_row, utc_now
 
     norm = NormalizedStore(f"{data_root}/normalized")
     row = {
-        **provenance_row(source="espn_public", source_record_id=event_id, source_version="v1",
-                          observed_at_utc=utc_now().isoformat(), effective_at_utc=event_start_utc,
-                          event_start_utc=event_start_utc),
-        "event_id": event_id, "home_team": home, "away_team": away,
-        "home_score": home_score, "away_score": away_score, "status": status, "venue": "",
+        **provenance_row(
+            source="espn_public",
+            source_record_id=event_id,
+            source_version="v1",
+            observed_at_utc=utc_now().isoformat(),
+            effective_at_utc=event_start_utc,
+            event_start_utc=event_start_utc,
+        ),
+        "event_id": event_id,
+        "home_team": home,
+        "away_team": away,
+        "home_score": home_score,
+        "away_score": away_score,
+        "status": status,
+        "venue": "",
     }
     norm.write("nba", "scoreboard", __import__("polars").DataFrame([row]), primary_key=["event_id"])
 
@@ -183,7 +201,9 @@ class TestBasicEloAdapter:
         # stays a fast, deterministic unit test -- live network
         # verification is done separately (matching the pattern used
         # elsewhere in this file).
-        adapter.collector.collect_date = lambda d, sport="nba": (calls.append(sport), {"status": "no_games"})[1]
+        adapter.collector.collect_date = lambda d, sport="nba": (calls.append(sport), {"status": "no_games"})[
+            1
+        ]
         adapter.collect("2026-08-06")
         assert calls == ["wnba"]
 
@@ -218,10 +238,18 @@ class TestBasicEloAdapter:
         # inspected yet) before match_markets/decide ever run.
         for i in range(12):
             _write_nba_scoreboard(
-                tmp_path, f"hist{i}", f"2026-07-{i + 1:02d}T22:10:00+00:00",
-                "Alpha", "Beta", "STATUS_FINAL", home_score=110, away_score=90,
+                tmp_path,
+                f"hist{i}",
+                f"2026-07-{i + 1:02d}T22:10:00+00:00",
+                "Alpha",
+                "Beta",
+                "STATUS_FINAL",
+                home_score=110,
+                away_score=90,
             )
-        _write_nba_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED")
+        _write_nba_scoreboard(
+            tmp_path, "401", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED"
+        )
 
         adapter = build_adapter("nba", str(tmp_path))
         result = adapter.predict("2026-08-06", "late")
@@ -240,12 +268,22 @@ class TestBasicEloAdapter:
 
         for i in range(12):
             _write_nba_scoreboard(
-                tmp_path, f"hist{i}", f"2026-07-{i + 1:02d}T22:10:00+00:00",
-                "Alpha", "Beta", "STATUS_FINAL", home_score=110, away_score=90,
+                tmp_path,
+                f"hist{i}",
+                f"2026-07-{i + 1:02d}T22:10:00+00:00",
+                "Alpha",
+                "Beta",
+                "STATUS_FINAL",
+                home_score=110,
+                away_score=90,
             )
-        _write_nba_scoreboard(tmp_path, "401", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED")
+        _write_nba_scoreboard(
+            tmp_path, "401", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED"
+        )
 
-        adapter = _BasicEloAdapter("nba", str(tmp_path), collector=None, collect_fn=lambda d: {"status": "no_markets"})
+        adapter = _BasicEloAdapter(
+            "nba", str(tmp_path), collector=None, collect_fn=lambda d: {"status": "no_markets"}
+        )
         adapter.predict("2026-08-06", "late")
         # No real Polymarket data at all in this cold data_root -- match_markets
         # must still succeed honestly with zero real candidates, not crash.
@@ -275,23 +313,36 @@ class TestMLBRealCollectAndFeatures:
 
         from model_prediction.rebuild.shadow_ledger import ShadowLedger
 
-        with patch(
-            "model_prediction.rebuild.mlb_features.build_live_game_feature_row",
-            return_value={"event_id": "401", "home_sp_avg_velocity": 93.0},
-        ), patch(
-            "model_prediction.rebuild.horizon_builder.point_in_time_probable_starters",
-            return_value={"401": {"home_starter": "A", "away_starter": "B"}},
+        with (
+            patch(
+                "model_prediction.rebuild.mlb_features.build_live_game_feature_row",
+                return_value={"event_id": "401", "home_sp_avg_velocity": 93.0},
+            ),
+            patch(
+                "model_prediction.rebuild.horizon_builder.point_in_time_probable_starters",
+                return_value={"401": {"home_starter": "A", "away_starter": "B"}},
+            ),
         ):
             adapter = build_adapter("mlb", str(tmp_path))
             from model_prediction.rebuild.storage import NormalizedStore, provenance_row, utc_now
+
             norm = NormalizedStore(f"{tmp_path}/normalized")
             row = {
-                **provenance_row(source="espn_public", source_record_id="401", source_version="v1",
-                                  observed_at_utc=utc_now().isoformat(),
-                                  effective_at_utc="2026-08-06T22:10:00+00:00",
-                                  event_start_utc="2026-08-06T22:10:00+00:00"),
-                "event_id": "401", "home_team": "Seattle Mariners", "away_team": "Detroit Tigers",
-                "home_score": 0, "away_score": 0, "status": "STATUS_SCHEDULED", "venue": "",
+                **provenance_row(
+                    source="espn_public",
+                    source_record_id="401",
+                    source_version="v1",
+                    observed_at_utc=utc_now().isoformat(),
+                    effective_at_utc="2026-08-06T22:10:00+00:00",
+                    event_start_utc="2026-08-06T22:10:00+00:00",
+                ),
+                "event_id": "401",
+                "home_team": "Seattle Mariners",
+                "away_team": "Detroit Tigers",
+                "home_score": 0,
+                "away_score": 0,
+                "status": "STATUS_SCHEDULED",
+                "venue": "",
             }
             norm.write("mlb", "scoreboard", __import__("polars").DataFrame([row]), primary_key=["event_id"])
 

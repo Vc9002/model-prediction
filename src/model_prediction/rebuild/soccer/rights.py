@@ -56,13 +56,7 @@ def _assert_explicit_rights(frame: pl.DataFrame) -> None:
         raise ValueError("soccer source rows contain unknown use scope")
     missing_attribution = frame.filter(
         pl.col("attribution_required")
-        & (
-            pl.col("attribution_text")
-            .cast(pl.String, strict=False)
-            .fill_null("")
-            .str.strip_chars()
-            == ""
-        )
+        & (pl.col("attribution_text").cast(pl.String, strict=False).fill_null("").str.strip_chars() == "")
     ).height
     if missing_attribution:
         raise ValueError("soccer source rows require missing attribution text")

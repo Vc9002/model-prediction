@@ -93,7 +93,10 @@ def main() -> None:
     best_methods: dict[str, str] = {}
     for name in MODEL_NAMES:
         probs, labels = raw_oof[name]["probs"], raw_oof[name]["labels"]
-        results = {m: cross_fit_calibration_eval(probs, labels, m, n_blocks=N_CALIBRATION_BLOCKS) for m in CALIBRATION_METHODS}
+        results = {
+            m: cross_fit_calibration_eval(probs, labels, m, n_blocks=N_CALIBRATION_BLOCKS)
+            for m in CALIBRATION_METHODS
+        }
         valid = {m: r for m, r in results.items() if r.log_loss is not None}
         best_methods[name] = min(valid, key=lambda m: valid[m].log_loss) if valid else "identity"
     print(f"3. Best calibration method per model: {best_methods}")
@@ -119,54 +122,77 @@ def main() -> None:
     for row in val_df.iter_rows(named=True):
         pred_two_head = two_head.predict_row(row["event_id"], row)
         pred_xgb_two_head = xgb_two_head.predict_row(row["event_id"], row)
-        probs_by_model = {"two_head": pred_two_head.home_win_prob, "xgb_two_head": pred_xgb_two_head.home_win_prob}
+        probs_by_model = {
+            "two_head": pred_two_head.home_win_prob,
+            "xgb_two_head": pred_xgb_two_head.home_win_prob,
+        }
         disagreement = model_disagreement(probs_by_model)
 
         penalty, missing_flags = missingness_penalty(row)
 
         cal_uncertainty = calibration_uncertainty(
             pred_two_head.home_win_prob,
-            raw_oof["two_head"]["probs"], raw_oof["two_head"]["labels"],
-            best_methods["two_head"], n_bootstrap=50,
+            raw_oof["two_head"]["probs"],
+            raw_oof["two_head"]["labels"],
+            best_methods["two_head"],
+            n_bootstrap=50,
         )
 
         bootstrap_lower, bootstrap_upper = bootstrap.market_probability_bounds(
-            row, two_head.distribution, "moneyline", "home",
+            row,
+            two_head.distribution,
+            "moneyline",
+            "home",
         )
 
         result = compose_conservative_probability(
             calibrated_probability=pred_two_head.home_win_prob,
-            bootstrap_lower=bootstrap_lower, bootstrap_upper=bootstrap_upper,
-            model_disagreement=disagreement, calibration_uncertainty=cal_uncertainty,
-            missingness_penalty=penalty, missing_flags=missing_flags,
+            bootstrap_lower=bootstrap_lower,
+            bootstrap_upper=bootstrap_upper,
+            model_disagreement=disagreement,
+            calibration_uncertainty=cal_uncertainty,
+            missingness_penalty=penalty,
+            missing_flags=missing_flags,
             raw_probability=pred_two_head.home_win_prob,
             lineup_uncertainty=None,  # no real timestamp-valid lineup source -- never fabricated
         )
-        demo_rows.append({
-            "event_id": row["event_id"], "game_date": row["game_date"],
-            "two_head_prob": pred_two_head.home_win_prob, "xgb_two_head_prob": pred_xgb_two_head.home_win_prob,
-            "model_disagreement": disagreement, "missingness_penalty": penalty, "missing_flags": missing_flags,
-            "calibration_uncertainty": cal_uncertainty,
-            "bootstrap_lower": bootstrap_lower, "bootstrap_upper": bootstrap_upper,
-            "conservative_probability": result.conservative_probability,
-            "probability_lower": result.probability_lower, "probability_upper": result.probability_upper,
-        })
+        demo_rows.append(
+            {
+                "event_id": row["event_id"],
+                "game_date": row["game_date"],
+                "two_head_prob": pred_two_head.home_win_prob,
+                "xgb_two_head_prob": pred_xgb_two_head.home_win_prob,
+                "model_disagreement": disagreement,
+                "missingness_penalty": penalty,
+                "missing_flags": missing_flags,
+                "calibration_uncertainty": cal_uncertainty,
+                "bootstrap_lower": bootstrap_lower,
+                "bootstrap_upper": bootstrap_upper,
+                "conservative_probability": result.conservative_probability,
+                "probability_lower": result.probability_lower,
+                "probability_upper": result.probability_upper,
+            }
+        )
 
     print("\n5. Real per-game uncertainty decomposition (first 5 real games):")
     for r in demo_rows[:5]:
-        print(f"   {r['event_id']}: two_head={r['two_head_prob']:.3f} xgb={r['xgb_two_head_prob']:.3f} "
-              f"disagreement={r['model_disagreement']:.3f} cal_unc={r['calibration_uncertainty']:.3f} "
-              f"missingness_penalty={r['missingness_penalty']:.3f} ({len(r['missing_flags'])} flags) "
-              f"-> conservative={r['conservative_probability']:.3f} "
-              f"[{r['probability_lower']:.3f}, {r['probability_upper']:.3f}]")
+        print(
+            f"   {r['event_id']}: two_head={r['two_head_prob']:.3f} xgb={r['xgb_two_head_prob']:.3f} "
+            f"disagreement={r['model_disagreement']:.3f} cal_unc={r['calibration_uncertainty']:.3f} "
+            f"missingness_penalty={r['missingness_penalty']:.3f} ({len(r['missing_flags'])} flags) "
+            f"-> conservative={r['conservative_probability']:.3f} "
+            f"[{r['probability_lower']:.3f}, {r['probability_upper']:.3f}]"
+        )
 
     mean_disagreement = sum(r["model_disagreement"] for r in demo_rows) / len(demo_rows)
     mean_penalty = sum(r["missingness_penalty"] for r in demo_rows) / len(demo_rows)
     mean_cal_unc = sum(r["calibration_uncertainty"] for r in demo_rows) / len(demo_rows)
     mean_haircut = sum(r["two_head_prob"] - r["conservative_probability"] for r in demo_rows) / len(demo_rows)
-    print(f"\n6. Real summary over {len(demo_rows)} games: mean_disagreement={mean_disagreement:.4f} "
-          f"mean_calibration_uncertainty={mean_cal_unc:.4f} mean_missingness_penalty={mean_penalty:.4f} "
-          f"mean_total_haircut_from_raw={mean_haircut:.4f}")
+    print(
+        f"\n6. Real summary over {len(demo_rows)} games: mean_disagreement={mean_disagreement:.4f} "
+        f"mean_calibration_uncertainty={mean_cal_unc:.4f} mean_missingness_penalty={mean_penalty:.4f} "
+        f"mean_total_haircut_from_raw={mean_haircut:.4f}"
+    )
     print(
         "\n7. Real, disclosed scope: registry-safe (does not touch\n"
         "   test_consumption_registry.json). Not yet wired into the live shadow\n"
@@ -177,16 +203,22 @@ def main() -> None:
     )
 
     results_path = Path("outputs/rebuild/mlb_uncertainty_demo.json")
-    results_path.write_text(json.dumps({
-        "dataset_hash": dataset.dataset_hash,
-        "best_calibration_method_per_model": best_methods,
-        "n_games": len(demo_rows),
-        "mean_model_disagreement": mean_disagreement,
-        "mean_calibration_uncertainty": mean_cal_unc,
-        "mean_missingness_penalty": mean_penalty,
-        "mean_total_haircut_from_raw": mean_haircut,
-        "games": demo_rows,
-    }, indent=2, default=str))
+    results_path.write_text(
+        json.dumps(
+            {
+                "dataset_hash": dataset.dataset_hash,
+                "best_calibration_method_per_model": best_methods,
+                "n_games": len(demo_rows),
+                "mean_model_disagreement": mean_disagreement,
+                "mean_calibration_uncertainty": mean_cal_unc,
+                "mean_missingness_penalty": mean_penalty,
+                "mean_total_haircut_from_raw": mean_haircut,
+                "games": demo_rows,
+            },
+            indent=2,
+            default=str,
+        )
+    )
     print(f"8. Results saved to {results_path}")
 
 

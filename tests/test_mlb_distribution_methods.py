@@ -96,24 +96,39 @@ def _spec(tmp_path):
 
 def _pitcher() -> PitcherForm:
     return PitcherForm(
-        player_id="p", name="p", throwing_hand="R", starts_before_game=20,
-        season_innings=100.0, season_earned_runs=40, season_strikeouts=90,
-        season_walks=30, season_batters_faced=420,
-        last_five_innings=28.0, last_five_earned_runs=12,
-        last_five_strikeouts=25, last_five_walks=8, last_five_batters_faced=120,
+        player_id="p",
+        name="p",
+        throwing_hand="R",
+        starts_before_game=20,
+        season_innings=100.0,
+        season_earned_runs=40,
+        season_strikeouts=90,
+        season_walks=30,
+        season_batters_faced=420,
+        last_five_innings=28.0,
+        last_five_earned_runs=12,
+        last_five_strikeouts=25,
+        last_five_walks=8,
+        last_five_batters_faced=120,
     )
 
 
 def _features() -> _Features:
     form = TeamForm(runs_scored=(4, 5, 3, 6, 4), runs_allowed=(3, 4, 5, 3, 4), wins=3, losses=2)
     return _Features(
-        event_id="e1", event_start_utc="2026-07-01T20:00:00Z",
+        event_id="e1",
+        event_start_utc="2026-07-01T20:00:00Z",
         decision_timestamp_utc="2026-07-01T18:00:00Z",
-        away_team="Away", home_team="Home",
-        away_form=form, home_form=form,
-        away_starter=_pitcher(), home_starter=_pitcher(),
-        away_bullpen_weakness=1.0, home_bullpen_weakness=1.0,
-        park_factor=1.0, weather_factor=1.0,
+        away_team="Away",
+        home_team="Home",
+        away_form=form,
+        home_form=form,
+        away_starter=_pitcher(),
+        home_starter=_pitcher(),
+        away_bullpen_weakness=1.0,
+        home_bullpen_weakness=1.0,
+        park_factor=1.0,
+        weather_factor=1.0,
     )
 
 

@@ -40,7 +40,9 @@ class TennisNormalizedStore:
         for (tour, tourney_date), part in frame.with_columns(
             pl.col("tourney_date").str.slice(0, 4).cast(pl.Int64).alias("_year")
         ).group_by(["tour", "_year"], maintain_order=True):
-            written.append(self._write_part(self._matches_partition(str(tour), int(tourney_date)), part.drop("_year")))
+            written.append(
+                self._write_part(self._matches_partition(str(tour), int(tourney_date)), part.drop("_year"))
+            )
         return written
 
     def write_current_events(self, frame: pl.DataFrame) -> list[Path]:
@@ -51,7 +53,9 @@ class TennisNormalizedStore:
             pl.col("observed_at_utc").str.slice(0, 10).alias("_date")
         ).group_by(["tour", "_date"], maintain_order=True):
             written.append(
-                self._write_part(self._current_events_partition(str(tour), str(capture_date)), part.drop("_date"))
+                self._write_part(
+                    self._current_events_partition(str(tour), str(capture_date)), part.drop("_date")
+                )
             )
         return written
 

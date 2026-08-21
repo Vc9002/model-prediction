@@ -25,10 +25,23 @@ class FakeESPNRosterClient:
     and `jersey`."""
 
     def roster(self, league, team_id, season):
-        return {"team": {"id": team_id}, "athletes": [
-            {"id": 4280850, "displayName": "Maya Caldwell", "position": {"abbreviation": "G"}, "jersey": "12"},
-            {"id": 4433403, "displayName": "Other Player", "position": {"abbreviation": "F"}, "jersey": "34"},
-        ]}
+        return {
+            "team": {"id": team_id},
+            "athletes": [
+                {
+                    "id": 4280850,
+                    "displayName": "Maya Caldwell",
+                    "position": {"abbreviation": "G"},
+                    "jersey": "12",
+                },
+                {
+                    "id": 4433403,
+                    "displayName": "Other Player",
+                    "position": {"abbreviation": "F"},
+                    "jersey": "34",
+                },
+            ],
+        }
 
 
 class TestNBACollectorRoster:
@@ -91,9 +104,14 @@ class TestNBACollectorRoster:
         meta = MetadataDB(tmp_path / "metadata.db")
         collector = NBACollector(tmp_path / "data", meta)
         from model_prediction.rebuild.identity import resolve_or_register_team
+
         team = resolve_or_register_team(
-            collector.identity, sport="wnba", source_id="espn_public:wnba", source_team_id="8",
-            team_name="Atlanta Dream", effective_from_utc="2026-01-01",
+            collector.identity,
+            sport="wnba",
+            source_id="espn_public:wnba",
+            source_team_id="8",
+            team_name="Atlanta Dream",
+            effective_from_utc="2026-01-01",
         )
 
         with patch(

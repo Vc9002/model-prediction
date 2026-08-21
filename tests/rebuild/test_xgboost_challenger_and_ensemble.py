@@ -228,8 +228,12 @@ class TestNestedXgboostFold:
 
         with patch.object(xgboost.XGBClassifier, "fit", spy_fit):
             nested_xgboost_fold(
-                X_outer_train, y_outer_train, X_outer_val, y_outer_val,
-                fold_index=0, param_grid=_TINY_GRID,
+                X_outer_train,
+                y_outer_train,
+                X_outer_val,
+                y_outer_val,
+                fold_index=0,
+                param_grid=_TINY_GRID,
             )
 
         # Every real y-array passed to any real XGBoost .fit()/eval_set
@@ -245,7 +249,12 @@ class TestNestedXgboostFold:
     def test_persists_required_fields_per_claude_md(self):
         X, y = self._data(n=120)
         result = nested_xgboost_fold(
-            X[:80], y[:80], X[80:], y[80:], fold_index=2, param_grid=_TINY_GRID,
+            X[:80],
+            y[:80],
+            X[80:],
+            y[80:],
+            fold_index=2,
+            param_grid=_TINY_GRID,
         )
 
         assert result.fold_index == 2
@@ -264,7 +273,12 @@ class TestNestedXgboostFold:
     def test_selected_params_come_from_the_declared_grid(self):
         X, y = self._data(n=120)
         result = nested_xgboost_fold(
-            X[:80], y[:80], X[80:], y[80:], fold_index=0, param_grid=_TINY_GRID,
+            X[:80],
+            y[:80],
+            X[80:],
+            y[80:],
+            fold_index=0,
+            param_grid=_TINY_GRID,
         )
         assert result.best_params["max_depth"] in _TINY_GRID["max_depth"]
         assert result.best_params["learning_rate"] in _TINY_GRID["learning_rate"]
@@ -275,7 +289,12 @@ class TestNestedXgboostFold:
         # "doesn't crash."
         X, y = self._data(n=250)
         result = nested_xgboost_fold(
-            X[:180], y[:180], X[180:], y[180:], fold_index=0, param_grid=_TINY_GRID,
+            X[:180],
+            y[:180],
+            X[180:],
+            y[180:],
+            fold_index=0,
+            param_grid=_TINY_GRID,
         )
         assert result.outer_log_loss < 0.5
 
@@ -290,12 +309,19 @@ def _synthetic_score_data(n: int = 80, seed: int = 0) -> pl.DataFrame:
     home_margin = g1 + g2 + rng.normal(0, 0.5, n)
     home_score = np.round(np.clip((total_runs + home_margin) / 2, 0, None))
     away_score = np.round(np.clip((total_runs - home_margin) / 2, 0, None))
-    return pl.DataFrame({
-        "event_id": [f"e{i}" for i in range(n)],
-        "f1": f1, "f2": f2, "g1": g1, "g2": g2,
-        "total_runs": total_runs, "home_margin": home_margin,
-        "home_score": home_score, "away_score": away_score,
-    })
+    return pl.DataFrame(
+        {
+            "event_id": [f"e{i}" for i in range(n)],
+            "f1": f1,
+            "f2": f2,
+            "g1": g1,
+            "g2": g2,
+            "total_runs": total_runs,
+            "home_margin": home_margin,
+            "home_score": home_score,
+            "away_score": away_score,
+        }
+    )
 
 
 class TestXGBoostTwoHeadModel:
@@ -344,7 +370,9 @@ class TestXGBoostTwoHeadModel:
         # RunDifferentialHead's ElasticNet (which needs the real imputer
         # fix in models/__init__.py).
         data = _synthetic_score_data(n=60)
-        data = data.with_columns(pl.when(pl.arange(0, pl.len()) < 10).then(None).otherwise(pl.col("f2")).alias("f2"))
+        data = data.with_columns(
+            pl.when(pl.arange(0, pl.len()) < 10).then(None).otherwise(pl.col("f2")).alias("f2")
+        )
         model = XGBoostTwoHeadModel(seed=42)
         model.fit(data, ["f1", "f2"], ["g1", "g2"])
 
@@ -402,7 +430,7 @@ class TestMetaCrossFitEnsemble:
         block_size = n // 3
         blocks = [(0, block_size), (block_size, 2 * block_size), (2 * block_size, n)]
         for call_idx, fit_labels in enumerate(fit_calls):
-            expected = labels[blocks[0][0]:blocks[call_idx][1]]
+            expected = labels[blocks[0][0] : blocks[call_idx][1]]
             assert fit_labels == expected
 
     def test_single_model_baseline_uses_its_own_oof_with_no_fitting(self):

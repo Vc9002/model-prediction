@@ -234,17 +234,21 @@ def _write_synthetic_history(tmp_path, league: str = "kbo") -> None:
     games_path = directory / "games.jsonl"
     games_path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
     games_hash = hashlib.sha256(games_path.read_bytes()).hexdigest()
-    (directory / "manifest.json").write_text(
-        json.dumps({"games_sha256": games_hash}), encoding="utf-8"
-    )
+    (directory / "manifest.json").write_text(json.dumps({"games_sha256": games_hash}), encoding="utf-8")
 
 
 def test_validation_is_locked_chronological_and_never_promotes(tmp_path) -> None:
     _write_synthetic_history(tmp_path)
     report = validate_international_baseball_baseline(tmp_path, "kbo", tmp_path / "models")
     assert report["status"] == "ok"
-    assert report["chronological_split"]["train"]["through_date"] < report["chronological_split"]["validation"]["from_date"]
-    assert report["chronological_split"]["validation"]["through_date"] < report["chronological_split"]["locked_test"]["from_date"]
+    assert (
+        report["chronological_split"]["train"]["through_date"]
+        < report["chronological_split"]["validation"]["from_date"]
+    )
+    assert (
+        report["chronological_split"]["validation"]["through_date"]
+        < report["chronological_split"]["locked_test"]["from_date"]
+    )
     assert report["promotion_eligible"] is False
     assert report["units"] == 0
     artifact = json.loads((tmp_path / "models/kbo-tie-aware-elo-v2.json").read_text())
@@ -253,8 +257,13 @@ def test_validation_is_locked_chronological_and_never_promotes(tmp_path) -> None
     # Production-model audit gap #2 (2026-08-15): champion evidence must
     # live INSIDE the artifact — the v8-style structured blocks.
     assert set(artifact["training"]) == {"coefficient_fit", "threshold_selection", "locked_holdout"}
-    assert artifact["training"]["coefficient_fit"]["observations"] == report["chronological_split"]["train"]["n"]
-    assert artifact["training"]["locked_holdout"]["observations"] == report["chronological_split"]["locked_test"]["n"]
+    assert (
+        artifact["training"]["coefficient_fit"]["observations"] == report["chronological_split"]["train"]["n"]
+    )
+    assert (
+        artifact["training"]["locked_holdout"]["observations"]
+        == report["chronological_split"]["locked_test"]["n"]
+    )
     assert "locked_test" in artifact["qualification"]
     assert artifact["qualification"]["qualified"] is False
 
@@ -349,9 +358,13 @@ def test_forecast_refuses_when_training_prefix_hash_no_longer_matches(tmp_path) 
         encoding="utf-8",
     )
     game_row = {
-        "game_id": "kbo:1", "game_date": "2099-07-18",
-        "home_team_id": "LG", "away_team_id": "KIA",
-        "home_score": 4, "away_score": 2, "tie": False,
+        "game_id": "kbo:1",
+        "game_date": "2099-07-18",
+        "home_team_id": "LG",
+        "away_team_id": "KIA",
+        "home_score": 4,
+        "away_score": 2,
+        "tie": False,
     }
     (directory / "games.jsonl").write_text(json.dumps(game_row) + "\n", encoding="utf-8")
     real_prefix_hash = _training_prefix_sha256([game_row], "2099-07-18")
@@ -372,13 +385,9 @@ def test_forecast_refuses_when_training_prefix_hash_no_longer_matches(tmp_path) 
         }
 
     # Wrong hash (as if the history was altered after this artifact trained) -> refused.
-    (models / "kbo-tie-aware-elo-v2.json").write_text(
-        json.dumps(_artifact("0" * 64)), encoding="utf-8"
-    )
+    (models / "kbo-tie-aware-elo-v2.json").write_text(json.dumps(_artifact("0" * 64)), encoding="utf-8")
     with pytest.raises(ValueError, match="training history has changed"):
-        forecast_international_baseball_slate(
-            tmp_path, models, "kbo", "2099-07-20", client=_MarketClient()
-        )
+        forecast_international_baseball_slate(tmp_path, models, "kbo", "2099-07-20", client=_MarketClient())
 
     # Real matching hash -> forecast proceeds normally.
     (models / "kbo-tie-aware-elo-v2.json").write_text(
@@ -527,7 +536,13 @@ def test_chronological_split_does_not_crash_with_one_unique_date() -> None:
 def test_home_elo_update_does_not_recompute_on_explicit_zero_probability() -> None:
     """A frozen probability of exactly 0.0 must be used as-is, not treated as unset."""
     book = HomeElo(k=20.0, home_advantage=50.0, ratings={"A": 1500.0, "B": 1500.0})
-    row = {"home_team_id": "A", "away_team_id": "B", "home_score": 5, "away_score": 3, "game_date": "2025-06-01"}
+    row = {
+        "home_team_id": "A",
+        "away_team_id": "B",
+        "home_score": 5,
+        "away_score": 3,
+        "game_date": "2025-06-01",
+    }
     book.update(row, probability=0.0)
     # outcome=1.0 (home won), probability=0.0 forced -> delta = k * (1.0 - 0.0) = k
     assert book.ratings["A"] == pytest.approx(1500.0 + 20.0)
@@ -544,13 +559,10 @@ def _write_completed_games(tmp_path, league: str, rows: list[dict]) -> None:
     """
     directory = tmp_path / "international_baseball" / league
     directory.mkdir(parents=True)
-    (directory / "games.jsonl").write_text(
-        "".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8"
-    )
+    (directory / "games.jsonl").write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
     team_ids = {row["home_team_id"] for row in rows} | {row["away_team_id"] for row in rows}
     teams = {
-        team_id: {"team_id": team_id, "name": team_id.title(), "aliases": [team_id]}
-        for team_id in team_ids
+        team_id: {"team_id": team_id, "name": team_id.title(), "aliases": [team_id]} for team_id in team_ids
     }
     (directory / "teams.json").write_text(json.dumps(teams), encoding="utf-8")
 
@@ -572,9 +584,7 @@ def test_find_international_baseball_result_matches_by_date_and_team_alias(tmp_p
             }
         ],
     )
-    result = find_international_baseball_result(
-        tmp_path, "kbo", "2026-05-01", "Doosan", "Hanwha"
-    )
+    result = find_international_baseball_result(tmp_path, "kbo", "2026-05-01", "Doosan", "Hanwha")
     assert result == (4, 6)  # (away_score, home_score)
 
 

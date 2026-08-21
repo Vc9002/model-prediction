@@ -114,32 +114,61 @@ class TestRealContracts:
     """The real contracts real collectors actually write against."""
 
     def test_scoreboard_contract_accepts_a_real_shaped_row(self):
-        df = pl.DataFrame({
-            "event_id": ["401816384"], "home_team": ["Baltimore Orioles"],
-            "away_team": ["Los Angeles Angels"], "home_score": [3.0], "away_score": [1.0],
-            "status": ["STATUS_FINAL"], "venue": ["Camden Yards"],
-            "home_team_canonical_id": ["mlb:team:abc"], "away_team_canonical_id": ["mlb:team:def"],
-            "observed_at_utc": ["2026-08-06T10:00:00"], "event_start_utc": ["2026-08-06T22:35:00"],
-            "source": ["espn_public"],
-        })
+        df = pl.DataFrame(
+            {
+                "event_id": ["401816384"],
+                "home_team": ["Baltimore Orioles"],
+                "away_team": ["Los Angeles Angels"],
+                "home_score": [3.0],
+                "away_score": [1.0],
+                "status": ["STATUS_FINAL"],
+                "venue": ["Camden Yards"],
+                "home_team_canonical_id": ["mlb:team:abc"],
+                "away_team_canonical_id": ["mlb:team:def"],
+                "observed_at_utc": ["2026-08-06T10:00:00"],
+                "event_start_utc": ["2026-08-06T22:35:00"],
+                "source": ["espn_public"],
+            }
+        )
         assert validate_against_contract(df, SCOREBOARD_CONTRACT) == []
 
     def test_scoreboard_contract_rejects_missing_event_id(self):
-        df = pl.DataFrame({
-            "home_team": ["Baltimore Orioles"], "away_team": ["Los Angeles Angels"],
-            "home_score": [3.0], "away_score": [1.0], "status": ["STATUS_FINAL"],
-            "observed_at_utc": ["2026-08-06T10:00:00"], "event_start_utc": ["2026-08-06T22:35:00"],
-            "source": ["espn_public"],
-        })
+        df = pl.DataFrame(
+            {
+                "home_team": ["Baltimore Orioles"],
+                "away_team": ["Los Angeles Angels"],
+                "home_score": [3.0],
+                "away_score": [1.0],
+                "status": ["STATUS_FINAL"],
+                "observed_at_utc": ["2026-08-06T10:00:00"],
+                "event_start_utc": ["2026-08-06T22:35:00"],
+                "source": ["espn_public"],
+            }
+        )
         errors = validate_against_contract(df, SCOREBOARD_CONTRACT)
         assert any("event_id" in e for e in errors)
 
     def test_market_snapshot_contract_accepts_a_real_shaped_row(self):
-        df = pl.DataFrame({
-            "event_id": ["70543"], "market_id": ["m1"], "market_type": ["moneyline"],
-            "team_or_side": ["home"], "line": [None], "executable_price": [0.55],
-            "observed_at_utc": ["2026-08-06T10:00:00"], "source": ["polymarket_us"],
-        }, schema={"event_id": pl.Utf8, "market_id": pl.Utf8, "market_type": pl.Utf8,
-                   "team_or_side": pl.Utf8, "line": pl.Float64, "executable_price": pl.Float64,
-                   "observed_at_utc": pl.Utf8, "source": pl.Utf8})
+        df = pl.DataFrame(
+            {
+                "event_id": ["70543"],
+                "market_id": ["m1"],
+                "market_type": ["moneyline"],
+                "team_or_side": ["home"],
+                "line": [None],
+                "executable_price": [0.55],
+                "observed_at_utc": ["2026-08-06T10:00:00"],
+                "source": ["polymarket_us"],
+            },
+            schema={
+                "event_id": pl.Utf8,
+                "market_id": pl.Utf8,
+                "market_type": pl.Utf8,
+                "team_or_side": pl.Utf8,
+                "line": pl.Float64,
+                "executable_price": pl.Float64,
+                "observed_at_utc": pl.Utf8,
+                "source": pl.Utf8,
+            },
+        )
         assert validate_against_contract(df, MARKET_SNAPSHOT_CONTRACT) == []

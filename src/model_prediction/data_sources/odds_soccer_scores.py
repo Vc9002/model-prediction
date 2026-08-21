@@ -1,6 +1,7 @@
 """Collect soccer scores from The Odds API (free tier, last 3 days).
 Appends to the existing historical soccer JSONL file.
 """
+
 from __future__ import annotations
 
 import hashlib

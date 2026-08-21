@@ -124,14 +124,10 @@ def test_record_parse_result_is_separate_immutable_evidence(tmp_path):
     body = b"parseable"
     metadata = _metadata(body, datetime(2026, 1, 1, tzinfo=UTC))
     cache.store(metadata, body)
-    path = cache.record_parse_result(
-        metadata, parser_version="v1", status="AVAILABLE", schema_hash="abc"
-    )
+    path = cache.record_parse_result(metadata, parser_version="v1", status="AVAILABLE", schema_hash="abc")
     assert path.exists()
     # Same inputs -> same content-addressed path, not a second file.
-    again = cache.record_parse_result(
-        metadata, parser_version="v1", status="AVAILABLE", schema_hash="abc"
-    )
+    again = cache.record_parse_result(metadata, parser_version="v1", status="AVAILABLE", schema_hash="abc")
     assert again == path
     # A different parser version is new, distinguishable evidence.
     drifted = cache.record_parse_result(

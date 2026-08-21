@@ -31,7 +31,9 @@ HORIZON_HOURS_BEFORE = {"early": 36, "mid": 6, "late": 1.0}
 
 
 def compute_decision_times(
-    scoreboard: pl.DataFrame, game_date: str, horizon: str,
+    scoreboard: pl.DataFrame,
+    game_date: str,
+    horizon: str,
 ) -> dict[str, datetime]:
     """Real, sport-agnostic decision_time_utc computation for every
     scheduled event on `game_date`: `event_start_utc - HORIZON_HOURS_BEFORE[horizon]`.
@@ -61,6 +63,7 @@ def compute_decision_times(
 @dataclass
 class HorizonSpec:
     """What's available at each decision horizon."""
+
     name: str
     hours_before_start: float
     # Which feature groups are available at this horizon
@@ -101,7 +104,9 @@ def horizon_specs_for_sport(sport: str) -> dict[str, HorizonSpec]:
         }
     elif sport in ("soccer",):
         return {
-            "early": HorizonSpec("early", 36, common_early + ["xg_form", "attack_strength", "defense_strength"]),
+            "early": HorizonSpec(
+                "early", 36, common_early + ["xg_form", "attack_strength", "defense_strength"]
+            ),
             "mid": HorizonSpec("mid", 6, common_mid + ["starting_xi", "goalkeeper_confirmed"]),
             "late": HorizonSpec("late", 1.0, common_late + ["final_lineup", "market_depth"]),
         }
@@ -144,8 +149,14 @@ def validate_horizon_separation(
 
     # Check that predictions have timestamp metadata and that
     # late-only features don't appear in early/mid predictions
-    late_only_features = {"confirmed_batting_order", "wind_vector", "final_lineups",
-                          "inactive_list", "game_time_weather", "withdrawal_risk"}
+    late_only_features = {
+        "confirmed_batting_order",
+        "wind_vector",
+        "final_lineups",
+        "inactive_list",
+        "game_time_weather",
+        "withdrawal_risk",
+    }
 
     for p in early_predictions:
         features = set(p.get("features_used", []))

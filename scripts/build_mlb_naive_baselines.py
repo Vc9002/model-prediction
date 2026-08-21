@@ -112,7 +112,9 @@ def main() -> None:
             inc_probs: list[float] = []
             inc_labels: list[int] = []
             for r in ml.iter_rows(named=True):
-                home_prob = r["model_probability"] if r["selection"] == "home" else 1.0 - r["model_probability"]
+                home_prob = (
+                    r["model_probability"] if r["selection"] == "home" else 1.0 - r["model_probability"]
+                )
                 selection_won = r["result"] == "win"
                 home_won = selection_won if r["selection"] == "home" else not selection_won
                 inc_probs.append(home_prob)
@@ -120,10 +122,14 @@ def main() -> None:
             incumbent_n = len(inc_probs)
             incumbent_ll = log_loss(inc_labels, inc_probs)
             incumbent_brier = brier_score(inc_labels, inc_probs)
-            print(f"   incumbent_elo_trend_lr_v8     : n={incumbent_n} log_loss={incumbent_ll:.4f} "
-                  f"brier={incumbent_brier:.4f} (real, DIFFERENT sample/date range than the n={n} OOF above)")
+            print(
+                f"   incumbent_elo_trend_lr_v8     : n={incumbent_n} log_loss={incumbent_ll:.4f} "
+                f"brier={incumbent_brier:.4f} (real, DIFFERENT sample/date range than the n={n} OOF above)"
+            )
         else:
-            print("   incumbent_elo_trend_lr_v8     : no real moneyline rows in current_model_baselines.parquet")
+            print(
+                "   incumbent_elo_trend_lr_v8     : no real moneyline rows in current_model_baselines.parquet"
+            )
     else:
         print(f"   incumbent_elo_trend_lr_v8     : {baselines_path} not found")
 
@@ -134,25 +140,58 @@ def main() -> None:
     # its schema here -- one real row per naive/incumbent baseline.
     benchmark_path = Path("outputs/rebuild/model_benchmark.parquet")
     new_rows = [
-        {"sport": "mlb", "model": "constant_0.5", "market_type": "moneyline", "selection": None,
-         "line": None, "calibrated": False, "calibration_method": None,
-         "n": n, "log_loss": constant_ll, "brier": constant_brier, "ece": None,
-         "status": "RESEARCH_ONLY", "dataset_hash": dataset.dataset_hash,
-         "source_file": "build_mlb_naive_baselines.py"},
-        {"sport": "mlb", "model": "expanding_historical_home_win_base_rate", "market_type": "moneyline",
-         "selection": None, "line": None, "calibrated": False, "calibration_method": None,
-         "n": n, "log_loss": expanding_ll, "brier": expanding_brier, "ece": None,
-         "status": "RESEARCH_ONLY", "dataset_hash": dataset.dataset_hash,
-         "source_file": "build_mlb_naive_baselines.py"},
+        {
+            "sport": "mlb",
+            "model": "constant_0.5",
+            "market_type": "moneyline",
+            "selection": None,
+            "line": None,
+            "calibrated": False,
+            "calibration_method": None,
+            "n": n,
+            "log_loss": constant_ll,
+            "brier": constant_brier,
+            "ece": None,
+            "status": "RESEARCH_ONLY",
+            "dataset_hash": dataset.dataset_hash,
+            "source_file": "build_mlb_naive_baselines.py",
+        },
+        {
+            "sport": "mlb",
+            "model": "expanding_historical_home_win_base_rate",
+            "market_type": "moneyline",
+            "selection": None,
+            "line": None,
+            "calibrated": False,
+            "calibration_method": None,
+            "n": n,
+            "log_loss": expanding_ll,
+            "brier": expanding_brier,
+            "ece": None,
+            "status": "RESEARCH_ONLY",
+            "dataset_hash": dataset.dataset_hash,
+            "source_file": "build_mlb_naive_baselines.py",
+        },
     ]
     if incumbent_ll is not None:
-        new_rows.append({
-            "sport": "mlb", "model": "incumbent_elo_trend_lr_v8", "market_type": "moneyline",
-            "selection": None, "line": None, "calibrated": False, "calibration_method": None,
-            "n": incumbent_n, "log_loss": incumbent_ll, "brier": incumbent_brier, "ece": None,
-            "status": "RESEARCH_ONLY", "dataset_hash": "n/a (real, different sample -- see current_model_baselines.parquet)",
-            "source_file": "build_mlb_naive_baselines.py",
-        })
+        new_rows.append(
+            {
+                "sport": "mlb",
+                "model": "incumbent_elo_trend_lr_v8",
+                "market_type": "moneyline",
+                "selection": None,
+                "line": None,
+                "calibrated": False,
+                "calibration_method": None,
+                "n": incumbent_n,
+                "log_loss": incumbent_ll,
+                "brier": incumbent_brier,
+                "ece": None,
+                "status": "RESEARCH_ONLY",
+                "dataset_hash": "n/a (real, different sample -- see current_model_baselines.parquet)",
+                "source_file": "build_mlb_naive_baselines.py",
+            }
+        )
 
     new_df = pl.DataFrame(new_rows)
     if benchmark_path.exists():
@@ -162,7 +201,9 @@ def main() -> None:
     else:
         combined = new_df
     combined.write_parquet(benchmark_path)
-    print(f"\n5. {new_df.height} real baseline rows written to {benchmark_path} ({combined.height} total rows)")
+    print(
+        f"\n5. {new_df.height} real baseline rows written to {benchmark_path} ({combined.height} total rows)"
+    )
 
 
 if __name__ == "__main__":

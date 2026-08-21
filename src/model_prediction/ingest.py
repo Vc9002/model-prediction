@@ -125,15 +125,16 @@ class Ingestor:
             completed_events = (
                 ESPNClient.completed_tennis_singles_matches(cached_payload)
                 if sport_key == "tennis" and cached_payload is not None
-                else ESPNClient.completed_games(cached_payload) if cached_payload is not None else []
+                else ESPNClient.completed_games(cached_payload)
+                if cached_payload is not None
+                else []
             )
             cache_is_stale = (
                 cached_payload is not None
                 and is_past_date
                 and bool(cached_payload.get("events"))
                 and (
-                    not completed_events
-                    or (sport_key != "tennis" and _has_unfinished_events(cached_payload))
+                    not completed_events or (sport_key != "tennis" and _has_unfinished_events(cached_payload))
                 )
             )
             if cached_payload is not None and not cache_is_stale:

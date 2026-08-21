@@ -39,7 +39,9 @@ from model_prediction.rebuild.providers.statcast import StatcastProvider
 FIXTURES = Path(__file__).parent / "fixtures" / "mlb_v3"
 
 
-def _metadata(body: bytes, observed: datetime, *, endpoint: str, event: str | None = None) -> SourceResponseMetadata:
+def _metadata(
+    body: bytes, observed: datetime, *, endpoint: str, event: str | None = None
+) -> SourceResponseMetadata:
     timestamp = observed.astimezone(UTC).isoformat()
     return SourceResponseMetadata(
         provider="fixture",
@@ -95,7 +97,9 @@ def test_schedule_keeps_game_pk_doubleheader_and_reschedule_identity(tmp_path):
 def test_probable_pitcher_corrections_use_latest_observation_as_of(tmp_path):
     body = (FIXTURES / "game_feed.json").read_bytes()
     first_time = datetime(2026, 8, 9, 10, tzinfo=UTC)
-    first = MLBStatsProvider._feed_rows(body, _metadata(body, first_time, endpoint="game_feed", event="900001"))
+    first = MLBStatsProvider._feed_rows(
+        body, _metadata(body, first_time, endpoint="game_feed", event="900001")
+    )
     assert first.frame is not None and first.metadata is not None
     first_rows = normalize_game_feed(first.frame, first.metadata)["probable_pitchers"]
 
@@ -158,8 +162,7 @@ def test_statcast_range_is_bounded_and_normalizes_capture_time(tmp_path):
 def test_weather_is_forecast_observation_not_realized_weather(tmp_path):
     payload = json.loads((FIXTURES / "weather.json").read_text())
     payload["hourly"] = {
-        (key if key == "time" else f"{key}_previous_day1"): value
-        for key, value in payload["hourly"].items()
+        (key if key == "time" else f"{key}_previous_day1"): value for key, value in payload["hourly"].items()
     }
     body = json.dumps(payload).encode()
     provider = OpenMeteoForecastProvider(_client(body), ProviderRawCache(tmp_path / "raw"))
@@ -275,7 +278,9 @@ def test_unresolved_public_provider_cannot_be_used_for_production(tmp_path):
 def test_latest_as_of_rejects_timezone_naive_cutoff():
     with pytest.raises(ValueError, match="timezone-aware"):
         latest_as_of(
-            pl.DataFrame({"game_pk": [1], "observed_at_utc": ["2026-01-01T00:00:00+00:00"], "pit_eligible": [True]}),
+            pl.DataFrame(
+                {"game_pk": [1], "observed_at_utc": ["2026-01-01T00:00:00+00:00"], "pit_eligible": [True]}
+            ),
             entity_keys=["game_pk"],
             decision_time_utc=datetime(2026, 1, 1, tzinfo=None),  # noqa: DTZ001 - deliberate rejection case
         )
@@ -443,12 +448,14 @@ def test_delayed_is_not_postponed_and_suspended_resume_is_explicit():
 
 
 def test_latest_as_of_parses_offsets_and_rejects_post_start_rows():
-    frame = pl.DataFrame({
-        "game_pk": [1],
-        "observed_at_utc": ["2026-01-01T01:00:00+01:00"],
-        "event_start_utc": ["2026-01-01T00:20:00+00:00"],
-        "pit_eligible": [True],
-    })
+    frame = pl.DataFrame(
+        {
+            "game_pk": [1],
+            "observed_at_utc": ["2026-01-01T01:00:00+01:00"],
+            "event_start_utc": ["2026-01-01T00:20:00+00:00"],
+            "pit_eligible": [True],
+        }
+    )
     before = latest_as_of(
         frame,
         entity_keys=["game_pk"],
@@ -513,7 +520,9 @@ def test_statcast_resume_uses_success_manifest_and_in_season_empty_degrades(tmp_
             "pitch_number": pl.Int64,
         }
     )
-    empty_provider = CountingProvider(ProviderResult(ProviderStatus.AVAILABLE, metadata, empty_frame, "NO_PITCHES"))
+    empty_provider = CountingProvider(
+        ProviderResult(ProviderStatus.AVAILABLE, metadata, empty_frame, "NO_PITCHES")
+    )
     empty_foundation = MLBV3Foundation(
         tmp_path / "empty" / "data" / "rebuild" / "normalized",
         repo_root=tmp_path / "empty",

@@ -73,7 +73,5 @@ def backup_before_overwrite(path: Path) -> Path | None:
 
 def identity_key(value: str) -> str:
     return "".join(
-        character
-        for character in unicodedata.normalize("NFKD", value).casefold()
-        if character.isalnum()
+        character for character in unicodedata.normalize("NFKD", value).casefold() if character.isalnum()
     )

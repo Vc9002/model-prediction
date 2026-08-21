@@ -26,13 +26,7 @@ def test_soccer_forward_prices_draw_aware_full_game_total_from_exact_bbo(tmp_pat
         "".join(json.dumps(row) + "\n" for row in history),
         encoding="utf-8",
     )
-    snapshot_path = (
-        tmp_path
-        / "odds"
-        / "soccer"
-        / "2026-07-27"
-        / "polymarket_snapshots.jsonl"
-    )
+    snapshot_path = tmp_path / "odds" / "soccer" / "2026-07-27" / "polymarket_snapshots.jsonl"
     snapshot_path.parent.mkdir(parents=True)
     snapshot_path.write_text(
         json.dumps(
@@ -183,13 +177,7 @@ def test_soccer_forward_prices_moneyline_matching_side_by_team_name(tmp_path) ->
         "".join(json.dumps(row) + "\n" for row in history),
         encoding="utf-8",
     )
-    snapshot_path = (
-        tmp_path
-        / "odds"
-        / "soccer"
-        / "2026-07-27"
-        / "polymarket_snapshots.jsonl"
-    )
+    snapshot_path = tmp_path / "odds" / "soccer" / "2026-07-27" / "polymarket_snapshots.jsonl"
     snapshot_path.parent.mkdir(parents=True)
     rows = [
         {
@@ -271,9 +259,7 @@ def test_soccer_forward_prices_moneyline_matching_side_by_team_name(tmp_path) ->
         observed_at=datetime(2026, 7, 27, 13, tzinfo=UTC),
     )
 
-    moneyline_contracts = [
-        c for c in result["priced_contracts"] if c["market_type"] == "moneyline"
-    ]
+    moneyline_contracts = [c for c in result["priced_contracts"] if c["market_type"] == "moneyline"]
     assert len(moneyline_contracts) == 1
     contract = moneyline_contracts[0]
     assert contract["line"] is None
@@ -285,13 +271,7 @@ def test_soccer_forward_prices_moneyline_matching_side_by_team_name(tmp_path) ->
 
 
 def test_soccer_forward_rejects_partial_or_timestamp_invalid_totals(tmp_path) -> None:
-    snapshot_path = (
-        tmp_path
-        / "odds"
-        / "soccer"
-        / "2026-07-27"
-        / "polymarket_snapshots.jsonl"
-    )
+    snapshot_path = tmp_path / "odds" / "soccer" / "2026-07-27" / "polymarket_snapshots.jsonl"
     snapshot_path.parent.mkdir(parents=True)
     rows = [
         {
@@ -347,13 +327,7 @@ def test_soccer_forward_prices_btts_from_a_matched_bbo(tmp_path) -> None:
         "".join(json.dumps(row) + "\n" for row in history),
         encoding="utf-8",
     )
-    snapshot_path = (
-        tmp_path
-        / "odds"
-        / "soccer"
-        / "2026-07-27"
-        / "polymarket_snapshots.jsonl"
-    )
+    snapshot_path = tmp_path / "odds" / "soccer" / "2026-07-27" / "polymarket_snapshots.jsonl"
     snapshot_path.parent.mkdir(parents=True)
     snapshot_path.write_text(
         json.dumps(
@@ -543,5 +517,6 @@ def test_moneyline_refuses_ambiguous_derby_match_against_opponent_snapshot(tmp_p
         if contract["selection"] == "home":
             assert contract["home_team"] == "AC Milan"
         assert not (
-            contract["home_team"] == "AC Milan" and contract["market_slug"] == "tw-serie-a-inter-milan-2026-07-27"
+            contract["home_team"] == "AC Milan"
+            and contract["market_slug"] == "tw-serie-a-inter-milan-2026-07-27"
         )

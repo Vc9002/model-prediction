@@ -71,9 +71,7 @@ def fetch_season(
     try:
         fetched = http.get(url, params={"dates": str(season), "limit": 1000})
     except Exception as exc:  # noqa: BLE001 -- external transport boundary
-        return ProviderResult.unavailable(
-            f"ESPN soccer transport failed ({type(exc).__name__})"
-        )
+        return ProviderResult.unavailable(f"ESPN soccer transport failed ({type(exc).__name__})")
 
     metadata = SourceResponseMetadata(
         provider=provider_id,
@@ -94,9 +92,7 @@ def fetch_season(
 
     cache.store(metadata, fetched.body)
     if fetched.status_code != 200:
-        return ProviderResult.unavailable(
-            f"ESPN soccer returned HTTP {fetched.status_code}", metadata
-        )
+        return ProviderResult.unavailable(f"ESPN soccer returned HTTP {fetched.status_code}", metadata)
 
     try:
         payload = json.loads(fetched.body)
@@ -106,9 +102,7 @@ def fetch_season(
     return _parse_scoreboard(payload, metadata)
 
 
-def _parse_scoreboard(
-    payload: dict[str, Any], metadata: SourceResponseMetadata
-) -> ProviderResult:
+def _parse_scoreboard(payload: dict[str, Any], metadata: SourceResponseMetadata) -> ProviderResult:
     """Parse ESPN scoreboard JSON into provider rows (same logic as ESPNSoccerProvider._parse)."""
     try:
         events = payload.get("events")
@@ -126,12 +120,8 @@ def _parse_scoreboard(
             rows.append(
                 {
                     "source_match_id": str(event["id"]),
-                    "competition_id": str(
-                        league.get("slug") or metadata.requested_parameters["league"]
-                    ),
-                    "competition_name": str(
-                        league.get("name") or metadata.requested_parameters["league"]
-                    ),
+                    "competition_id": str(league.get("slug") or metadata.requested_parameters["league"]),
+                    "competition_name": str(league.get("name") or metadata.requested_parameters["league"]),
                     "season_id": str(season_info.get("year") or "unknown"),
                     "event_start": str(event["date"]),
                     "status": str(status.get("name") or "UNKNOWN"),
@@ -140,16 +130,8 @@ def _parse_scoreboard(
                     "home_team_name": str(home["team"].get("displayName") or ""),
                     "away_team_id": str(away["team"]["id"]),
                     "away_team_name": str(away["team"].get("displayName") or ""),
-                    "home_score": (
-                        int(home["score"])
-                        if home.get("score") not in (None, "")
-                        else None
-                    ),
-                    "away_score": (
-                        int(away["score"])
-                        if away.get("score") not in (None, "")
-                        else None
-                    ),
+                    "home_score": (int(home["score"]) if home.get("score") not in (None, "") else None),
+                    "away_score": (int(away["score"]) if away.get("score") not in (None, "") else None),
                     "venue_id": str(venue.get("id") or "") or None,
                     "venue_name": venue.get("fullName"),
                     "provider_updated_at": None,
@@ -168,9 +150,7 @@ def _parse_scoreboard(
             )
         )
     except (KeyError, TypeError, ValueError) as exc:
-        return ProviderResult(
-            ProviderStatus.DEGRADED, metadata, None, f"ESPN soccer schema drift: {exc}"
-        )
+        return ProviderResult(ProviderStatus.DEGRADED, metadata, None, f"ESPN soccer schema drift: {exc}")
 
     from model_prediction.rebuild.providers.base import dataframe_schema_hash
 
@@ -186,19 +166,29 @@ def _parse_scoreboard(
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Backfill ESPN soccer by season")
     parser.add_argument(
-        "--league", action="append", dest="leagues", required=True,
+        "--league",
+        action="append",
+        dest="leagues",
+        required=True,
         help="ESPN league code (repeatable, e.g. eng.1)",
     )
     parser.add_argument(
-        "--season", type=int, action="append", dest="seasons", required=True,
+        "--season",
+        type=int,
+        action="append",
+        dest="seasons",
+        required=True,
         help="Season year (repeatable, e.g. 2023)",
     )
     parser.add_argument(
-        "--data-root", default="data/rebuild",
+        "--data-root",
+        default="data/rebuild",
         help="Rebuild data root (default: data/rebuild)",
     )
     parser.add_argument(
-        "--force", action="store_true", help="Re-fetch even if cached",
+        "--force",
+        action="store_true",
+        help="Re-fetch even if cached",
     )
     args = parser.parse_args(argv)
 

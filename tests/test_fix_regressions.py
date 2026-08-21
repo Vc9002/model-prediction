@@ -171,17 +171,11 @@ class _ResolvedClient:
         ("away", "Team Home", "loss"),
     ],
 )
-def test_esports_settlement_maps_winner_to_correct_side(
-    tmp_path, monkeypatch, selection, winner, expected
-):
+def test_esports_settlement_maps_winner_to_correct_side(tmp_path, monkeypatch, selection, winner, expected):
     ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
-    row = ledger.append_call(
-        _future_request(selection=selection, event_id=f"e-{selection}-{winner}"), 0, 10
-    )
+    row = ledger.append_call(_future_request(selection=selection, event_id=f"e-{selection}-{winner}"), 0, 10)
     loser = "Team Away" if winner == "Team Home" else "Team Home"
-    monkeypatch.setattr(
-        polymarket_us, "PolymarketUSClient", lambda: _ResolvedClient(winner, loser)
-    )
+    monkeypatch.setattr(polymarket_us, "PolymarketUSClient", lambda: _ResolvedClient(winner, loser))
     result = _settle_esports_pick(row, ledger)
     assert result is not None and result.get("settled") is True
     assert result["result"] == expected
@@ -255,9 +249,7 @@ def test_esports_settlement_stays_pending_until_terminal_state(tmp_path, monkeyp
         def book(self, slug):
             return {"state": "MARKET_STATE_OPEN"}
 
-    monkeypatch.setattr(
-        polymarket_us, "PolymarketUSClient", lambda: _OpenClient("Team Home", "Team Away")
-    )
+    monkeypatch.setattr(polymarket_us, "PolymarketUSClient", lambda: _OpenClient("Team Home", "Team Away"))
     assert _settle_esports_pick(row, ledger) is None
 
 
@@ -265,9 +257,7 @@ def test_esports_settlement_stays_pending_until_terminal_state(tmp_path, monkeyp
 
 
 def test_esports_eligibility_qualifies_only_with_full_provenance():
-    result = evaluate_esports_eligibility(
-        _future_request(model_probability=0.58), Exposure(), UnitPolicy()
-    )
+    result = evaluate_esports_eligibility(_future_request(model_probability=0.58), Exposure(), UnitPolicy())
     assert result.record_type.value == "QUALIFIED_SHADOW_CALL"
     assert result.units > 0
 
@@ -280,9 +270,7 @@ def test_esports_eligibility_qualifies_only_with_full_provenance():
 
 
 def test_esports_eligibility_fails_closed_on_stale_data():
-    stale = _future_request(
-        observed_at_utc=(datetime.now(UTC) - timedelta(hours=13)).isoformat()
-    )
+    stale = _future_request(observed_at_utc=(datetime.now(UTC) - timedelta(hours=13)).isoformat())
     result = evaluate_esports_eligibility(stale, Exposure(), UnitPolicy())
     assert result.reason_code == "NO_CALL_STALE_DATA"
     # Still gets a real paper size (operator directive, 2026-07-31); it just
@@ -295,9 +283,7 @@ def test_esports_eligibility_fails_closed_on_future_data():
     outright -- only the "too old" direction was ever guarded. Mirrors
     test_esports_eligibility_fails_closed_on_stale_data but for the other
     side of the clock."""
-    future = _future_request(
-        observed_at_utc=(datetime.now(UTC) + timedelta(hours=1)).isoformat()
-    )
+    future = _future_request(observed_at_utc=(datetime.now(UTC) + timedelta(hours=1)).isoformat())
     result = evaluate_esports_eligibility(future, Exposure(), UnitPolicy())
     assert result.reason_code == "NO_CALL_STALE_DATA"
     assert result.units > 0

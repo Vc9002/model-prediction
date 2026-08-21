@@ -70,21 +70,46 @@ DEFAULT_PARK_FACTOR = 100
 # Statcast pitches (which have the real starter/bullpen signal) — there's no
 # shared game ID between the two sources.
 ESPN_TO_STATCAST_ABBREV: dict[str, str] = {
-    "Arizona Diamondbacks": "AZ", "Atlanta Braves": "ATL", "Athletics": "ATH",
-    "Baltimore Orioles": "BAL", "Boston Red Sox": "BOS", "Chicago Cubs": "CHC",
-    "Chicago White Sox": "CWS", "Cincinnati Reds": "CIN", "Cleveland Guardians": "CLE",
-    "Colorado Rockies": "COL", "Detroit Tigers": "DET", "Houston Astros": "HOU",
-    "Kansas City Royals": "KC", "Los Angeles Angels": "LAA", "Los Angeles Dodgers": "LAD",
-    "Miami Marlins": "MIA", "Milwaukee Brewers": "MIL", "Minnesota Twins": "MIN",
-    "New York Mets": "NYM", "New York Yankees": "NYY", "Philadelphia Phillies": "PHI",
-    "Pittsburgh Pirates": "PIT", "San Diego Padres": "SD", "San Francisco Giants": "SF",
-    "Seattle Mariners": "SEA", "St. Louis Cardinals": "STL", "Tampa Bay Rays": "TB",
-    "Texas Rangers": "TEX", "Toronto Blue Jays": "TOR", "Washington Nationals": "WSH",
+    "Arizona Diamondbacks": "AZ",
+    "Atlanta Braves": "ATL",
+    "Athletics": "ATH",
+    "Baltimore Orioles": "BAL",
+    "Boston Red Sox": "BOS",
+    "Chicago Cubs": "CHC",
+    "Chicago White Sox": "CWS",
+    "Cincinnati Reds": "CIN",
+    "Cleveland Guardians": "CLE",
+    "Colorado Rockies": "COL",
+    "Detroit Tigers": "DET",
+    "Houston Astros": "HOU",
+    "Kansas City Royals": "KC",
+    "Los Angeles Angels": "LAA",
+    "Los Angeles Dodgers": "LAD",
+    "Miami Marlins": "MIA",
+    "Milwaukee Brewers": "MIL",
+    "Minnesota Twins": "MIN",
+    "New York Mets": "NYM",
+    "New York Yankees": "NYY",
+    "Philadelphia Phillies": "PHI",
+    "Pittsburgh Pirates": "PIT",
+    "San Diego Padres": "SD",
+    "San Francisco Giants": "SF",
+    "Seattle Mariners": "SEA",
+    "St. Louis Cardinals": "STL",
+    "Tampa Bay Rays": "TB",
+    "Texas Rangers": "TEX",
+    "Toronto Blue Jays": "TOR",
+    "Washington Nationals": "WSH",
 }
 
 SWING_DESCRIPTIONS = {
-    "foul", "foul_tip", "hit_into_play", "swinging_strike",
-    "swinging_strike_blocked", "missed_bunt", "foul_bunt",
+    "foul",
+    "foul_tip",
+    "hit_into_play",
+    "swinging_strike",
+    "swinging_strike_blocked",
+    "missed_bunt",
+    "foul_bunt",
 }
 WHIFF_DESCRIPTIONS = {"swinging_strike", "swinging_strike_blocked", "missed_bunt"}
 CSW_DESCRIPTIONS = WHIFF_DESCRIPTIONS | {"called_strike"}
@@ -103,11 +128,7 @@ def dedupe_scoreboard(sb: pl.DataFrame) -> pl.DataFrame:
     """
     if sb.is_empty():
         return sb
-    return (
-        sb.sort("observed_at_utc")
-        .group_by("event_id", maintain_order=True)
-        .last()
-    )
+    return sb.sort("observed_at_utc").group_by("event_id", maintain_order=True).last()
 
 
 def load_probable_starter_records(
@@ -158,14 +179,30 @@ def load_raw_statcast_dates(raw_root: str | Path, dates: list[str]) -> pl.DataFr
 
 
 _NORMALIZED_PITCH_SCHEMA: dict[str, pl.PolarsDataType] = {
-    "game_pk": pl.Int64, "game_date": pl.Utf8, "pitcher": pl.Int64, "batter": pl.Int64,
-    "home_team": pl.Utf8, "away_team": pl.Utf8, "inning": pl.Int64, "inning_topbot": pl.Utf8,
-    "at_bat_number": pl.Int64, "pitch_number": pl.Int64, "pitch_type": pl.Utf8,
-    "release_speed": pl.Float64, "release_spin_rate": pl.Float64, "description": pl.Utf8,
-    "events": pl.Utf8, "zone": pl.Int64, "p_throws": pl.Utf8, "stand": pl.Utf8,
-    "pitcher_days_since_prev_game": pl.Int64, "n_thruorder_pitcher": pl.Int64,
-    "bat_score": pl.Int64, "post_bat_score": pl.Int64,
-    "pitching_team": pl.Utf8, "game_date_str": pl.Utf8,
+    "game_pk": pl.Int64,
+    "game_date": pl.Utf8,
+    "pitcher": pl.Int64,
+    "batter": pl.Int64,
+    "home_team": pl.Utf8,
+    "away_team": pl.Utf8,
+    "inning": pl.Int64,
+    "inning_topbot": pl.Utf8,
+    "at_bat_number": pl.Int64,
+    "pitch_number": pl.Int64,
+    "pitch_type": pl.Utf8,
+    "release_speed": pl.Float64,
+    "release_spin_rate": pl.Float64,
+    "description": pl.Utf8,
+    "events": pl.Utf8,
+    "zone": pl.Int64,
+    "p_throws": pl.Utf8,
+    "stand": pl.Utf8,
+    "pitcher_days_since_prev_game": pl.Int64,
+    "n_thruorder_pitcher": pl.Int64,
+    "bat_score": pl.Int64,
+    "post_bat_score": pl.Int64,
+    "pitching_team": pl.Utf8,
+    "game_date_str": pl.Utf8,
 }
 
 
@@ -188,18 +225,34 @@ def normalize_statcast_pitches(pitches: pl.DataFrame) -> pl.DataFrame:
         # to "no rows match" instead of "no such column".
         return pl.DataFrame(schema=_NORMALIZED_PITCH_SCHEMA)
     keep = [
-        "game_pk", "game_date", "pitcher", "batter", "home_team", "away_team",
-        "inning", "inning_topbot", "at_bat_number", "pitch_number",
-        "pitch_type", "release_speed", "release_spin_rate", "description",
-        "events", "zone", "p_throws", "stand",
-        "pitcher_days_since_prev_game", "n_thruorder_pitcher",
+        "game_pk",
+        "game_date",
+        "pitcher",
+        "batter",
+        "home_team",
+        "away_team",
+        "inning",
+        "inning_topbot",
+        "at_bat_number",
+        "pitch_number",
+        "pitch_type",
+        "release_speed",
+        "release_spin_rate",
+        "description",
+        "events",
+        "zone",
+        "p_throws",
+        "stand",
+        "pitcher_days_since_prev_game",
+        "n_thruorder_pitcher",
         # bat_score/post_bat_score: the batting team's real score
         # immediately before/after this pitch. Added for
         # pitcher_clean_rate_features() -- runs allowed by the pitcher on
         # the mound is exactly the batting (opposing) team's score delta
         # while that pitcher's pitches are being thrown, real Statcast
         # data, not derived/estimated.
-        "bat_score", "post_bat_score",
+        "bat_score",
+        "post_bat_score",
     ]
     present = [c for c in keep if c in pitches.columns]
     df = pitches.select(present)
@@ -246,9 +299,15 @@ _NAN = float("nan")
 # build_game_feature_row()'s "starter identity itself unknown" fallback
 # (Task 1) share, so the two can never silently drift apart.
 _NO_STARTER_ROLLING = {
-    "availability": 0.0, "starts_seen": 0.0, "avg_velocity": _NAN,
-    "k_pct": _NAN, "bb_pct": _NAN, "csw_pct": _NAN, "whiff_pct": _NAN,
-    "days_rest": _NAN, "pitches_last_start": _NAN,
+    "availability": 0.0,
+    "starts_seen": 0.0,
+    "avg_velocity": _NAN,
+    "k_pct": _NAN,
+    "bb_pct": _NAN,
+    "csw_pct": _NAN,
+    "whiff_pct": _NAN,
+    "days_rest": _NAN,
+    "pitches_last_start": _NAN,
 }
 # Clean-rate fields are the one exception to the NaN rule above: their
 # beta-binomial shrinkage estimator (missingness.pitcher_clean_rate_shrink)
@@ -262,14 +321,20 @@ _NO_STARTER_ROLLING = {
 _CLEAN_RATE_PRIOR_MEAN = 5.0 / (5.0 + 5.0)
 _NO_STARTER_CLEAN = {
     "availability": 0.0,
-    "first_inning_clean_rate": _CLEAN_RATE_PRIOR_MEAN, "first_inning_clean_n": 0.0,
-    "scoreless_inning_rate": _CLEAN_RATE_PRIOR_MEAN, "scoreless_inning_n": 0.0,
-    "clean_appearance_rate": _CLEAN_RATE_PRIOR_MEAN, "clean_appearance_n": 0.0,
+    "first_inning_clean_rate": _CLEAN_RATE_PRIOR_MEAN,
+    "first_inning_clean_n": 0.0,
+    "scoreless_inning_rate": _CLEAN_RATE_PRIOR_MEAN,
+    "scoreless_inning_n": 0.0,
+    "clean_appearance_rate": _CLEAN_RATE_PRIOR_MEAN,
+    "clean_appearance_n": 0.0,
 }
 
 
 def pitcher_rolling_features(
-    pitches: pl.DataFrame, pitcher_id: int, before_game_date: str, lookback_starts: int = 3,
+    pitches: pl.DataFrame,
+    pitcher_id: int,
+    before_game_date: str,
+    lookback_starts: int = 3,
 ) -> dict[str, float]:
     """Real, point-in-time-safe rolling features for one pitcher, computed
     only from that pitcher's own pitches in games strictly before
@@ -289,15 +354,16 @@ def pitcher_rolling_features(
     `availability` indicator, not silently receive an apparently-measured
     zero.
     """
-    prior = pitches.filter(
-        (pl.col("pitcher") == pitcher_id) & (pl.col("game_date_str") < before_game_date)
-    )
+    prior = pitches.filter((pl.col("pitcher") == pitcher_id) & (pl.col("game_date_str") < before_game_date))
     if prior.is_empty():
         return dict(_NO_STARTER_ROLLING)
 
     recent_game_dates = (
-        prior.select("game_date_str").unique().sort("game_date_str", descending=True)
-        .head(lookback_starts)["game_date_str"].to_list()
+        prior.select("game_date_str")
+        .unique()
+        .sort("game_date_str", descending=True)
+        .head(lookback_starts)["game_date_str"]
+        .to_list()
     )
     recent = prior.filter(pl.col("game_date_str").is_in(recent_game_dates))
 
@@ -341,7 +407,9 @@ def pitcher_rolling_features(
 
 
 def pitcher_clean_rate_features(
-    pitches: pl.DataFrame, pitcher_id: int, before_game_date: str,
+    pitches: pl.DataFrame,
+    pitcher_id: int,
+    before_game_date: str,
 ) -> dict[str, float]:
     """Real beta-binomial-shrunk pitcher clean-rate features (CLAUDE.md Part
     1 SS10's "Pitcher clean-rate group"), computed strictly from this
@@ -396,22 +464,21 @@ def pitcher_clean_rate_features(
         zero = pitcher_clean_rate_shrink(str(pitcher_id), "clean_appearance", 0.0, 0.0)
         return {
             "availability": 0.0,
-            "first_inning_clean_rate": zero.posterior_mean, "first_inning_clean_n": 0.0,
-            "scoreless_inning_rate": zero.posterior_mean, "scoreless_inning_n": 0.0,
-            "clean_appearance_rate": zero.posterior_mean, "clean_appearance_n": 0.0,
+            "first_inning_clean_rate": zero.posterior_mean,
+            "first_inning_clean_n": 0.0,
+            "scoreless_inning_rate": zero.posterior_mean,
+            "scoreless_inning_n": 0.0,
+            "clean_appearance_rate": zero.posterior_mean,
+            "clean_appearance_n": 0.0,
         }
 
-    prior = pitches.filter(
-        (pl.col("pitcher") == pitcher_id) & (pl.col("game_date_str") < before_game_date)
-    )
+    prior = pitches.filter((pl.col("pitcher") == pitcher_id) & (pl.col("game_date_str") < before_game_date))
     if prior.is_empty() or "bat_score" not in prior.columns or "post_bat_score" not in prior.columns:
         return _no_history()
 
     prior = prior.filter(
         pl.col("bat_score").is_not_null() & pl.col("post_bat_score").is_not_null()
-    ).with_columns(
-        (pl.col("post_bat_score") - pl.col("bat_score")).alias("runs_this_pitch")
-    )
+    ).with_columns((pl.col("post_bat_score") - pl.col("bat_score")).alias("runs_this_pitch"))
     if prior.is_empty():
         return _no_history()
 
@@ -439,13 +506,22 @@ def pitcher_clean_rate_features(
     total_innings = float(per_game_inning.height)
 
     first_inning_shrunk = pitcher_clean_rate_shrink(
-        str(pitcher_id), "first_inning_clean", first_inning_clean, first_inning_n,
+        str(pitcher_id),
+        "first_inning_clean",
+        first_inning_clean,
+        first_inning_n,
     )
     scoreless_shrunk = pitcher_clean_rate_shrink(
-        str(pitcher_id), "scoreless_inning", scoreless_innings, total_innings,
+        str(pitcher_id),
+        "scoreless_inning",
+        scoreless_innings,
+        total_innings,
     )
     clean_appearance_shrunk = pitcher_clean_rate_shrink(
-        str(pitcher_id), "clean_appearance", clean_starts, total_starts,
+        str(pitcher_id),
+        "clean_appearance",
+        clean_starts,
+        total_starts,
     )
 
     return {
@@ -460,7 +536,11 @@ def pitcher_clean_rate_features(
 
 
 def bullpen_rolling_features(
-    pitches: pl.DataFrame, team: str, before_game_date: str, starters: pl.DataFrame, lookback_days: int = 3,
+    pitches: pl.DataFrame,
+    team: str,
+    before_game_date: str,
+    starters: pl.DataFrame,
+    lookback_days: int = 3,
 ) -> dict[str, float]:
     """Team-level relief-pitching workload/quality over the prior N calendar
     days, excluding each game's own starter (identified via identify_starters,
@@ -473,7 +553,12 @@ def bullpen_rolling_features(
     # mathematically undefined at zero real pitches, so it's NaN rather
     # than an apparently-real 0 mph (see pitcher_rolling_features' own
     # avg_velocity for the identical reasoning).
-    no_bullpen = {"availability": 0.0, "bullpen_pitches": 0.0, "bullpen_avg_velocity": _NAN, "bullpen_appearances": 0.0}
+    no_bullpen = {
+        "availability": 0.0,
+        "bullpen_pitches": 0.0,
+        "bullpen_avg_velocity": _NAN,
+        "bullpen_appearances": 0.0,
+    }
 
     cutoff = (date.fromisoformat(before_game_date) - timedelta(days=lookback_days)).isoformat()
     team_pitches = pitches.filter(
@@ -484,10 +569,10 @@ def bullpen_rolling_features(
     if team_pitches.is_empty():
         return dict(no_bullpen)
 
-    team_starters = set(
-        starters.filter(pl.col("pitching_team") == team)["pitcher"].to_list()
+    team_starters = set(starters.filter(pl.col("pitching_team") == team)["pitcher"].to_list())
+    relief = team_pitches.filter(
+        ~pl.col("pitcher").is_in(list(team_starters)) if team_starters else pl.lit(True)
     )
-    relief = team_pitches.filter(~pl.col("pitcher").is_in(list(team_starters)) if team_starters else pl.lit(True))
     if relief.is_empty():
         return dict(no_bullpen)
 
@@ -548,7 +633,8 @@ def lookup_pitcher_id(full_name: str) -> int | None:
 
 
 def point_in_time_probable_starters(
-    decision_times: dict[str, datetime], probable_records: list[dict],
+    decision_times: dict[str, datetime],
+    probable_records: list[dict],
 ) -> dict[str, dict[str, str]]:
     """The real, point-in-time-correct probable starters for each game in
     `decision_times` ({event_id: decision_time_utc}), selected from
@@ -586,10 +672,12 @@ def point_in_time_probable_starters(
     if not records:
         return {}
     observations = pl.DataFrame(records)
-    decisions = pl.DataFrame({
-        "event_id": list(decision_times.keys()),
-        "decision_time_utc": list(decision_times.values()),
-    })
+    decisions = pl.DataFrame(
+        {
+            "event_id": list(decision_times.keys()),
+            "decision_time_utc": list(decision_times.values()),
+        }
+    )
     joined = point_in_time_join(decisions, observations, entity_keys=["event_id"])
     result: dict[str, dict[str, str]] = {}
     for row in joined.iter_rows(named=True):
@@ -608,8 +696,11 @@ def point_in_time_probable_starters(
 # and -- worst of all -- forecast_age_hours=0.0 looked exactly like "just
 # observed," the opposite of "never observed").
 _NO_WEATHER = {
-    "availability": 0.0, "temp_f_first_pitch": _NAN, "wind_mph_first_pitch": _NAN,
-    "wind_direction_deg_first_pitch": _NAN, "precip_mm_first_pitch": _NAN,
+    "availability": 0.0,
+    "temp_f_first_pitch": _NAN,
+    "wind_mph_first_pitch": _NAN,
+    "wind_direction_deg_first_pitch": _NAN,
+    "precip_mm_first_pitch": _NAN,
     "forecast_age_hours": _NAN,
 }
 
@@ -671,7 +762,11 @@ def load_weather_at_decision_time(
     for snap_path in snapshots:
         with gzip.open(snap_path) as f:
             payload = json.loads(f.read())
-        if not isinstance(payload, dict) or "observed_at_utc" not in payload or "forecast_data" not in payload:
+        if (
+            not isinstance(payload, dict)
+            or "observed_at_utc" not in payload
+            or "forecast_data" not in payload
+        ):
             continue  # legacy/unenveloped snapshot -- real observed_at_utc unknown, not PIT-usable
         try:
             observed_at = datetime.fromisoformat(payload["observed_at_utc"])
@@ -803,7 +898,9 @@ def resolve_statcast_game_pk(
 
 
 def resolve_horizon_starter_names(
-    espn_game: dict, horizon: str, probable_records: list[dict],
+    espn_game: dict,
+    horizon: str,
+    probable_records: list[dict],
 ) -> tuple[str | None, str | None, str | None]:
     """Real, point-in-time-safe probable starter names for one game at the
     given horizon's decision time: (home_starter_name, away_starter_name,
@@ -856,21 +953,33 @@ def resolve_horizon_starter_names(
 # and useful signal even for RunIntensityHead's HistGradientBoostingRegressor,
 # which handles the NaN natively but still benefits from an explicit flag.
 MLB_INTENSITY_FEATURES = [
-    "home_sp_avg_velocity", "away_sp_avg_velocity",
-    "home_sp_csw_pct", "away_sp_csw_pct",
-    "home_bp_bullpen_pitches", "away_bp_bullpen_pitches",
-    "park_factor", "temp_f_first_pitch",
-    "home_sp_availability", "away_sp_availability",
-    "home_bp_availability", "away_bp_availability",
+    "home_sp_avg_velocity",
+    "away_sp_avg_velocity",
+    "home_sp_csw_pct",
+    "away_sp_csw_pct",
+    "home_bp_bullpen_pitches",
+    "away_bp_bullpen_pitches",
+    "park_factor",
+    "temp_f_first_pitch",
+    "home_sp_availability",
+    "away_sp_availability",
+    "home_bp_availability",
+    "away_bp_availability",
     "weather_availability",
 ]
 MLB_DIFFERENTIAL_FEATURES = [
-    "home_sp_k_pct", "away_sp_k_pct",
-    "home_sp_bb_pct", "away_sp_bb_pct",
-    "home_sp_days_rest", "away_sp_days_rest",
-    "home_bp_bullpen_avg_velocity", "away_bp_bullpen_avg_velocity",
-    "home_sp_availability", "away_sp_availability",
-    "home_bp_availability", "away_bp_availability",
+    "home_sp_k_pct",
+    "away_sp_k_pct",
+    "home_sp_bb_pct",
+    "away_sp_bb_pct",
+    "home_sp_days_rest",
+    "away_sp_days_rest",
+    "home_bp_bullpen_avg_velocity",
+    "away_bp_bullpen_avg_velocity",
+    "home_sp_availability",
+    "away_sp_availability",
+    "home_bp_availability",
+    "away_bp_availability",
 ]
 
 
@@ -916,7 +1025,9 @@ def build_game_feature_row(
         return None
 
     home_starter_name, away_starter_name, missing_reason = resolve_horizon_starter_names(
-        espn_game, horizon, probable_records,
+        espn_game,
+        horizon,
+        probable_records,
     )
 
     home_starter_id = lookup_pitcher_id(home_starter_name) if home_starter_name else None
@@ -944,7 +1055,11 @@ def build_game_feature_row(
         hours=HORIZON_HOURS_BEFORE[horizon]
     )
     weather = load_weather_at_decision_time(
-        raw_root, espn_game.get("venue", ""), game_date, decision_time_utc, espn_game["event_start_utc"],
+        raw_root,
+        espn_game.get("venue", ""),
+        game_date,
+        decision_time_utc,
+        espn_game["event_start_utc"],
     )
 
     # Targets attached last, after every feature above is frozen from
@@ -956,7 +1071,8 @@ def build_game_feature_row(
         "game_date": game_date,
         "event_start_utc": espn_game["event_start_utc"],
         "horizon": horizon,
-        "home_team": home_name, "away_team": away_name,
+        "home_team": home_name,
+        "away_team": away_name,
         "starters_known": 1.0 if starter_known else 0.0,
         "starter_missing_reason": missing_reason or "",
         # Starter features (prefixed by side)
@@ -977,7 +1093,8 @@ def build_game_feature_row(
         "weather_forecast_age_hours": weather["forecast_age_hours"],
         "total_runs": float(home_score + away_score),
         "home_margin": float(home_score - away_score),
-        "home_score": float(home_score), "away_score": float(away_score),
+        "home_score": float(home_score),
+        "away_score": float(away_score),
     }
 
 
@@ -1051,15 +1168,21 @@ def build_live_game_feature_row(
     away_bp = bullpen_rolling_features(pitches, away_abbrev, game_date, starters)
     park = park_factor(espn_game.get("venue", ""))
     weather = load_weather_at_decision_time(
-        raw_root, espn_game.get("venue", ""), game_date, decision_time_utc, espn_game["event_start_utc"],
+        raw_root,
+        espn_game.get("venue", ""),
+        game_date,
+        decision_time_utc,
+        espn_game["event_start_utc"],
     )
 
     return {
         "event_id": espn_game["event_id"],
         "game_date": game_date,
         "event_start_utc": espn_game["event_start_utc"],
-        "home_team": home_name, "away_team": away_name,
-        "home_starter_name": home_starter_name, "away_starter_name": away_starter_name,
+        "home_team": home_name,
+        "away_team": away_name,
+        "home_starter_name": home_starter_name,
+        "away_starter_name": away_starter_name,
         **{f"home_sp_{k}": v for k, v in home_p.items()},
         **{f"away_sp_{k}": v for k, v in away_p.items()},
         **{f"home_sp_clean_{k}": v for k, v in home_clean.items()},

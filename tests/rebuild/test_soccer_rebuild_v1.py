@@ -127,9 +127,7 @@ class TestDixonColesParams:
 class TestDixonColesModel:
     """Model fitting and prediction tests."""
 
-    def _synthetic_data(
-        self, n_matches: int = 200, seed: int = 42
-    ) -> pl.DataFrame:
+    def _synthetic_data(self, n_matches: int = 200, seed: int = 42) -> pl.DataFrame:
         """Generate synthetic completed matches.
 
         Teams A,B,C,D with A being strongest, D weakest.
@@ -154,13 +152,15 @@ class TestDixonColesModel:
             lambda_a = np.exp(league_base + attack[at] + defense[ht])
             hg = rng.poisson(lambda_h)
             ag = rng.poisson(lambda_a)
-            rows.append({
-                "home_team_name": ht,
-                "away_team_name": at,
-                "home_score": hg,
-                "away_score": ag,
-                "competition_id": "test.1",
-            })
+            rows.append(
+                {
+                    "home_team_name": ht,
+                    "away_team_name": at,
+                    "home_score": hg,
+                    "away_score": ag,
+                    "competition_id": "test.1",
+                }
+            )
         return pl.DataFrame(rows)
 
     def test_fit_synthetic_data(self) -> None:
@@ -216,11 +216,13 @@ class TestDixonColesModel:
         df = self._synthetic_data(200)
         model = DixonColesModel()
         model.fit(df, verbose=False)
-        test_df = pl.DataFrame({
-            "home_team_name": ["TeamA", "TeamC"],
-            "away_team_name": ["TeamD", "TeamB"],
-            "competition_id": ["test.1", "test.1"],
-        })
+        test_df = pl.DataFrame(
+            {
+                "home_team_name": ["TeamA", "TeamC"],
+                "away_team_name": ["TeamD", "TeamB"],
+                "competition_id": ["test.1", "test.1"],
+            }
+        )
         result = model.predict_batch(test_df)
         assert "p_home" in result.columns
         assert "p_draw" in result.columns

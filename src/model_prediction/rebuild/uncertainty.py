@@ -119,8 +119,10 @@ MAX_MISSINGNESS_PENALTY = 0.08
 # The real availability flags mlb_features.py already computes per row
 # (Task 5) -- checked directly, not re-derived.
 CRITICAL_AVAILABILITY_FLAGS = (
-    "home_sp_availability", "away_sp_availability",
-    "home_bp_availability", "away_bp_availability",
+    "home_sp_availability",
+    "away_sp_availability",
+    "home_bp_availability",
+    "away_bp_availability",
     "weather_availability",
 )
 
@@ -142,6 +144,7 @@ def missingness_penalty(row: dict[str, Any]) -> tuple[float, list[str]]:
 class ConservativeProbabilityResult:
     """Every real component CLAUDE.md's "Final output" spec names,
     exposed separately -- not silently averaged away."""
+
     raw_probability: float
     calibrated_probability: float
     bootstrap_lower: float

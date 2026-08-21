@@ -108,7 +108,9 @@ def build_mlb_horizon_dataset(
     completed = scoreboard.filter(
         (pl.col("status") == "STATUS_FINAL") & (pl.col("event_start_utc") <= f"{game_date}T23:59:59")
     )
-    backfill_dates = sorted({row["event_start_utc"][:10] for row in completed.iter_rows(named=True)} | {game_date})
+    backfill_dates = sorted(
+        {row["event_start_utc"][:10] for row in completed.iter_rows(named=True)} | {game_date}
+    )
     raw = load_raw_statcast_dates(data_root, backfill_dates)
     pitches = normalize_statcast_pitches(raw)
     starters_table = identify_starters(pitches)
@@ -129,8 +131,12 @@ def build_mlb_horizon_dataset(
             continue
 
         row = build_live_game_feature_row(
-            g, probable["home_starter"], probable["away_starter"],
-            pitches, starters_table, data_root,
+            g,
+            probable["home_starter"],
+            probable["away_starter"],
+            pitches,
+            starters_table,
+            data_root,
             decision_time_utc=decision_times[event_id],
         )
         if row is None:
@@ -165,9 +171,13 @@ def build_mlb_horizon_dataset(
     }
 
     result = HorizonBuildResult(
-        sport="mlb", horizon=horizon, game_date=game_date,
-        decision_times=decision_times_out, rows=rows,
-        coverage=coverage, missingness=missingness,
+        sport="mlb",
+        horizon=horizon,
+        game_date=game_date,
+        decision_times=decision_times_out,
+        rows=rows,
+        coverage=coverage,
+        missingness=missingness,
         available_information=available_features,
     )
 
@@ -190,7 +200,8 @@ def build_mlb_horizon_dataset(
         canonical_rows = sorted(rows, key=lambda r: r["event_id"])
         payload_hash_input = json.dumps(
             {"game_date": game_date, "horizon": horizon, "rows": canonical_rows},
-            sort_keys=True, default=str,
+            sort_keys=True,
+            default=str,
         ).encode("utf-8")
         snapshot_hash = hashlib.sha256(payload_hash_input).hexdigest()
         store = FeatureStore(f"{data_root}/features")
@@ -199,7 +210,10 @@ def build_mlb_horizon_dataset(
 
         if ledger is not None and run_id is not None:
             ledger.record_feature_snapshot(
-                run_id=run_id, sport="mlb", horizon=horizon, dataset_hash=snapshot_hash,
+                run_id=run_id,
+                sport="mlb",
+                horizon=horizon,
+                dataset_hash=snapshot_hash,
                 row_count=df.height,
             )
 
@@ -216,6 +230,7 @@ class MLBHistoricalDatasetResult:
     before this, three real training scripts plus mlb_shadow_pipeline.py's
     own walk-forward retraining step each had their own copy of it, which
     could silently drift from each other."""
+
     horizon: str
     start_date: str
     end_date: str
@@ -233,7 +248,10 @@ class MLBHistoricalDatasetResult:
 
 
 def build_mlb_historical_horizon_dataset(
-    data_root: str, start_date: str, end_date: str, horizon: str,
+    data_root: str,
+    start_date: str,
+    end_date: str,
+    horizon: str,
 ) -> MLBHistoricalDatasetResult:
     """The one authoritative historical MLB feature dataset builder.
 
@@ -296,11 +314,16 @@ def build_mlb_historical_horizon_dataset(
     dataset_hash = hashlib.sha256(
         json.dumps(
             {"start_date": start_date, "end_date": end_date, "horizon": horizon, "rows": canonical_rows},
-            sort_keys=True, default=str,
+            sort_keys=True,
+            default=str,
         ).encode("utf-8")
     ).hexdigest()
 
     return MLBHistoricalDatasetResult(
-        horizon=horizon, start_date=start_date, end_date=end_date,
-        features=features, unmatched_games=unmatched, dataset_hash=dataset_hash,
+        horizon=horizon,
+        start_date=start_date,
+        end_date=end_date,
+        features=features,
+        unmatched_games=unmatched,
+        dataset_hash=dataset_hash,
     )

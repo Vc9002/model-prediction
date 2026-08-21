@@ -411,6 +411,7 @@ def test_learned_forward_artifact_consumes_availability_feature(
 def test_gate_fires_when_delta_exceeds_threshold() -> None:
     """The 5pp probit gate should fire for a large points gap."""
     from model_prediction.wnba_availability_evaluation import adjust_home_probability
+
     # A -7 point gap on a 50% base → large delta
     base = 0.50
     adjusted = adjust_home_probability(base, -7.0, 12.0)
@@ -421,6 +422,7 @@ def test_gate_fires_when_delta_exceeds_threshold() -> None:
 def test_gate_passes_through_when_delta_below_threshold() -> None:
     """The 5pp gate should NOT fire for a small points gap."""
     from model_prediction.wnba_availability_evaluation import adjust_home_probability
+
     base = 0.50
     adjusted = adjust_home_probability(base, -1.0, 12.0)
     delta = abs(adjusted - base)
@@ -430,6 +432,7 @@ def test_gate_passes_through_when_delta_below_threshold() -> None:
 def test_adjust_home_probability_bounds_clamped() -> None:
     """adjust_home_probability returns values strictly inside (0, 1)."""
     from model_prediction.wnba_availability_evaluation import adjust_home_probability
+
     # Extreme inputs
     assert 0 < adjust_home_probability(0.999, -20.0, 5.0) < 1
     assert 0 < adjust_home_probability(0.001, 20.0, 5.0) < 1
@@ -441,11 +444,15 @@ def test_gate_logs_on_skip(caplog) -> None:
     import logging
 
     from model_prediction.learned_forward import logger as gate_logger
+
     gate_logger.setLevel(logging.DEBUG)
     # Trigger a debug log manually to verify the logging path exists
     gate_logger.debug(
         "WNBA availability gate skipped for %s @ %s on %s: %s",
-        "Away", "Home", "2026-07-20", "test error",
+        "Away",
+        "Home",
+        "2026-07-20",
+        "test error",
     )
     assert "WNBA availability gate skipped" in caplog.text
 

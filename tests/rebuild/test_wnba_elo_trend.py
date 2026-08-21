@@ -92,7 +92,13 @@ def test_regress_to_mean_is_a_no_op_for_zero_fraction() -> None:
 
 
 def _game(
-    event_id: str, day: str, home: str, away: str, home_score: int, away_score: int, season: int = 2024,
+    event_id: str,
+    day: str,
+    home: str,
+    away: str,
+    home_score: int,
+    away_score: int,
+    season: int = 2024,
 ) -> WNBAGameRow:
     return WNBAGameRow(
         event_id=event_id,
@@ -214,32 +220,34 @@ def test_load_completed_games_drops_incomplete_and_ties(tmp_path) -> None:
     import polars as pl
 
     store = WNBANormalizedStore(tmp_path)
-    frame = pl.DataFrame({
-        "event_id": ["a", "b", "c"],
-        "season": [2024, 2024, 2024],
-        "event_start_utc": [
-            "2024-05-01T00:00:00+00:00",
-            "2024-05-02T00:00:00+00:00",
-            "2024-05-03T00:00:00+00:00",
-        ],
-        "sports_event_date": ["2024-04-30", "2024-05-01", "2024-05-02"],
-        "home_team_id": ["T0", "T1", "T2"],
-        "away_team_id": ["T1", "T2", "T3"],
-        "home_score": [80, 70, None],
-        "away_score": [75, 70, 60],  # b is a tie, c has a null score
-        "completed": [True, True, True],
-        "observed_at_utc": ["2026-08-11T00:00:00+00:00"] * 3,
-        "raw_snapshot_hash": ["h1", "h2", "h3"],
-        "retrieved_at_utc": ["2026-08-11T00:00:00+00:00"] * 3,
-        "availability_basis": ["capture_time_only"] * 3,
-        "commercial_use_status": ["unresolved"] * 3,
-        "production_allowed": [False] * 3,
-        "pit_eligible": [True] * 3,
-        "home_team_canonical_id": ["c0", "c1", "c2"],
-        "away_team_canonical_id": ["c1", "c2", "c3"],
-        "event_canonical_id": ["e1", "e2", "e3"],
-        "status": ["STATUS_FINAL"] * 3,
-    })
+    frame = pl.DataFrame(
+        {
+            "event_id": ["a", "b", "c"],
+            "season": [2024, 2024, 2024],
+            "event_start_utc": [
+                "2024-05-01T00:00:00+00:00",
+                "2024-05-02T00:00:00+00:00",
+                "2024-05-03T00:00:00+00:00",
+            ],
+            "sports_event_date": ["2024-04-30", "2024-05-01", "2024-05-02"],
+            "home_team_id": ["T0", "T1", "T2"],
+            "away_team_id": ["T1", "T2", "T3"],
+            "home_score": [80, 70, None],
+            "away_score": [75, 70, 60],  # b is a tie, c has a null score
+            "completed": [True, True, True],
+            "observed_at_utc": ["2026-08-11T00:00:00+00:00"] * 3,
+            "raw_snapshot_hash": ["h1", "h2", "h3"],
+            "retrieved_at_utc": ["2026-08-11T00:00:00+00:00"] * 3,
+            "availability_basis": ["capture_time_only"] * 3,
+            "commercial_use_status": ["unresolved"] * 3,
+            "production_allowed": [False] * 3,
+            "pit_eligible": [True] * 3,
+            "home_team_canonical_id": ["c0", "c1", "c2"],
+            "away_team_canonical_id": ["c1", "c2", "c3"],
+            "event_canonical_id": ["e1", "e2", "e3"],
+            "status": ["STATUS_FINAL"] * 3,
+        }
+    )
     store.write("games", 2024, frame)
 
     rows = load_completed_games(store, [2024])

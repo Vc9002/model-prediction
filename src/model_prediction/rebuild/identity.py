@@ -29,6 +29,7 @@ ENTITY_TYPES = (
 @dataclass(frozen=True)
 class CanonicalIdentity:
     """A stable, sport-scoped identity with effective dates."""
+
     entity_id: str
     entity_type: str  # one of ENTITY_TYPES
     canonical_name: str
@@ -45,6 +46,7 @@ class CanonicalIdentity:
 @dataclass(frozen=True)
 class SourceMapping:
     """Links a canonical entity to a source-specific identifier."""
+
     entity_id: str
     source_id: str
     source_entity_id: str
@@ -143,8 +145,12 @@ class IdentityRegistry:
             attributes=attributes or {},
         )
         self.metadata.register_entity(
-            entity_id, entity_type, canonical_name, sport,
-            effective_from_utc, attributes,
+            entity_id,
+            entity_type,
+            canonical_name,
+            sport,
+            effective_from_utc,
+            attributes,
         )
         if source_id and source_entity_id:
             self.map(entity_id, source_id, source_entity_id, confidence)
@@ -152,11 +158,14 @@ class IdentityRegistry:
         self.metadata.audit_event(
             "entity_registered",
             {"entity_id": entity_id, "entity_type": entity_type, "name": canonical_name, "sport": sport},
-            entity_type=entity_type, entity_id=entity_id,
+            entity_type=entity_type,
+            entity_id=entity_id,
         )
         return identity
 
-    def map(self, entity_id: str, source_id: str, source_entity_id: str, confidence: float = 1.0) -> SourceMapping:
+    def map(
+        self, entity_id: str, source_id: str, source_entity_id: str, confidence: float = 1.0
+    ) -> SourceMapping:
         # entity_mappings.source_id carries a real, enforced foreign key
         # against sources(source_id) (PRAGMA foreign_keys=ON). Real
         # collectors always call meta.update_source_health() before doing
@@ -255,17 +264,23 @@ def resolve_or_register_team(
         return existing
 
     proposed, _confidence = registry.propose_match(
-        entity_type="team", sport=sport, name=team_name,
-        source_id=source_id, min_confidence=min_confidence,
+        entity_type="team",
+        sport=sport,
+        name=team_name,
+        source_id=source_id,
+        min_confidence=min_confidence,
     )
     if proposed is not None:
         registry.map(proposed.entity_id, source_id, source_team_id)
         return proposed
 
     return registry.register(
-        entity_type="team", canonical_name=team_name, sport=sport,
+        entity_type="team",
+        canonical_name=team_name,
+        sport=sport,
         effective_from_utc=effective_from_utc,
-        source_id=source_id, source_entity_id=source_team_id,
+        source_id=source_id,
+        source_entity_id=source_team_id,
     )
 
 
@@ -300,14 +315,20 @@ def resolve_espn_scoreboard_team_ids(
     home_id = away_id = None
     if home_team_obj.get("id") and home_team_obj.get("displayName"):
         home_id = resolve_or_register_team(
-            registry, sport=sport, source_id=namespaced_source_id,
-            source_team_id=str(home_team_obj["id"]), team_name=home_team_obj["displayName"],
+            registry,
+            sport=sport,
+            source_id=namespaced_source_id,
+            source_team_id=str(home_team_obj["id"]),
+            team_name=home_team_obj["displayName"],
             effective_from_utc=observed_at,
         ).entity_id
     if away_team_obj.get("id") and away_team_obj.get("displayName"):
         away_id = resolve_or_register_team(
-            registry, sport=sport, source_id=namespaced_source_id,
-            source_team_id=str(away_team_obj["id"]), team_name=away_team_obj["displayName"],
+            registry,
+            sport=sport,
+            source_id=namespaced_source_id,
+            source_team_id=str(away_team_obj["id"]),
+            team_name=away_team_obj["displayName"],
             effective_from_utc=observed_at,
         ).entity_id
     return home_id, away_id
@@ -347,9 +368,12 @@ def resolve_or_register_event(
     if existing is not None:
         return existing
     return registry.register(
-        entity_type="event", canonical_name=canonical_name, sport=sport,
+        entity_type="event",
+        canonical_name=canonical_name,
+        sport=sport,
         effective_from_utc=effective_from_utc,
-        source_id=source_id, source_entity_id=source_event_id,
+        source_id=source_id,
+        source_entity_id=source_event_id,
         attributes=attributes,
     )
 
@@ -386,8 +410,11 @@ def resolve_espn_scoreboard_event_id(
     away_name = away_team_obj.get("displayName", "")
     canonical_name = f"{away_name} @ {home_name}".strip()
     identity = resolve_or_register_event(
-        registry, sport=sport, source_id=namespaced_source_id,
-        source_event_id=espn_event_id, canonical_name=canonical_name,
+        registry,
+        sport=sport,
+        source_id=namespaced_source_id,
+        source_event_id=espn_event_id,
+        canonical_name=canonical_name,
         effective_from_utc=event_start_utc or observed_at,
         attributes={
             "home_team_canonical_id": home_canonical_id,
@@ -424,8 +451,10 @@ def resolve_event_by_team_pair(
     if not home_canonical_id or not away_canonical_id:
         return None
     matches = [
-        ident for ident in registry._cache.values()
-        if ident.entity_type == "event" and ident.sport == sport
+        ident
+        for ident in registry._cache.values()
+        if ident.entity_type == "event"
+        and ident.sport == sport
         and ident.attributes.get("home_team_canonical_id") == home_canonical_id
         and ident.attributes.get("away_team_canonical_id") == away_canonical_id
         and str(ident.attributes.get("event_start_utc") or "").startswith(game_date)
@@ -456,17 +485,23 @@ def resolve_or_register_venue(
         return existing
 
     proposed, _confidence = registry.propose_match(
-        entity_type="venue", sport=sport, name=venue_name,
-        source_id=source_id, min_confidence=min_confidence,
+        entity_type="venue",
+        sport=sport,
+        name=venue_name,
+        source_id=source_id,
+        min_confidence=min_confidence,
     )
     if proposed is not None:
         registry.map(proposed.entity_id, source_id, source_venue_id)
         return proposed
 
     return registry.register(
-        entity_type="venue", canonical_name=venue_name, sport=sport,
+        entity_type="venue",
+        canonical_name=venue_name,
+        sport=sport,
         effective_from_utc=effective_from_utc,
-        source_id=source_id, source_entity_id=source_venue_id,
+        source_id=source_id,
+        source_entity_id=source_venue_id,
         attributes=attributes,
     )
 
@@ -503,8 +538,11 @@ def resolve_espn_scoreboard_venue_id(
     namespaced_source_id = f"{source_id}:{sport}"
     address = venue_obj.get("address") or {}
     identity = resolve_or_register_venue(
-        registry, sport=sport, source_id=namespaced_source_id,
-        source_venue_id=str(venue_id), venue_name=venue_name,
+        registry,
+        sport=sport,
+        source_id=namespaced_source_id,
+        source_venue_id=str(venue_id),
+        venue_name=venue_name,
         effective_from_utc=observed_at,
         attributes={
             "city": address.get("city"),
@@ -534,7 +572,9 @@ def word_boundary_name_match(a: str, b: str) -> bool:
 
 
 def resolve_polymarket_team_id(
-    registry: IdentityRegistry, sport: str, team_name: str | None,
+    registry: IdentityRegistry,
+    sport: str,
+    team_name: str | None,
 ) -> str | None:
     """Resolve a Polymarket-reported team name to the same canonical team
     entity ESPN scoreboard collection already registered for this sport.
@@ -562,8 +602,10 @@ def resolve_polymarket_team_id(
     if existing is not None:
         return existing.entity_id
     matches = [
-        ident for ident in registry._cache.values()
-        if ident.entity_type == "team" and ident.sport == sport
+        ident
+        for ident in registry._cache.values()
+        if ident.entity_type == "team"
+        and ident.sport == sport
         and word_boundary_name_match(team_name, ident.canonical_name)
     ]
     if len(matches) != 1:
@@ -614,7 +656,11 @@ def resolve_or_link_polymarket_event_id(
     if existing is not None:
         return existing.entity_id
     canonical_event_id = known_canonical_event_id or resolve_event_by_team_pair(
-        registry, sport, home_canonical_id, away_canonical_id, game_date,
+        registry,
+        sport,
+        home_canonical_id,
+        away_canonical_id,
+        game_date,
     )
     if canonical_event_id is None:
         return None
@@ -665,7 +711,11 @@ def resolve_or_link_statcast_game_pk(
     if existing is not None:
         return existing.entity_id
     canonical_event_id = known_canonical_event_id or resolve_event_by_team_pair(
-        registry, sport, home_canonical_id, away_canonical_id, game_date,
+        registry,
+        sport,
+        home_canonical_id,
+        away_canonical_id,
+        game_date,
     )
     if canonical_event_id is None:
         return None
@@ -704,9 +754,12 @@ def resolve_or_register_player(
     if existing is not None:
         return existing
     return registry.register(
-        entity_type="player", canonical_name=player_name, sport=sport,
+        entity_type="player",
+        canonical_name=player_name,
+        sport=sport,
         effective_from_utc=effective_from_utc,
-        source_id=source_id, source_entity_id=source_player_id,
+        source_id=source_id,
+        source_entity_id=source_player_id,
         attributes=attributes,
     )
 
@@ -734,8 +787,11 @@ def resolve_espn_roster_player_id(
     namespaced_source_id = f"{source_id}:{sport}"
     position = (athlete_obj.get("position") or {}).get("abbreviation")
     identity = resolve_or_register_player(
-        registry, sport=sport, source_id=namespaced_source_id,
-        source_player_id=str(player_id), player_name=player_name,
+        registry,
+        sport=sport,
+        source_id=namespaced_source_id,
+        source_player_id=str(player_id),
+        player_name=player_name,
         effective_from_utc=effective_from_utc,
         attributes={
             "team_canonical_id": team_canonical_id,
@@ -747,7 +803,11 @@ def resolve_espn_roster_player_id(
 
 
 def resolve_mlbam_player_id(
-    registry: IdentityRegistry, sport: str, player_name: str, mlbam_id: int, effective_from_utc: str,
+    registry: IdentityRegistry,
+    sport: str,
+    player_name: str,
+    mlbam_id: int,
+    effective_from_utc: str,
 ) -> str:
     """Register/resolve a canonical player identity for a real MLBAM
     (Statcast/pybaseball) pitcher ID -- see mlb_features.lookup_pitcher_id(),
@@ -764,14 +824,18 @@ def resolve_mlbam_player_id(
     if existing is not None:
         return existing.entity_id
     return registry.register(
-        entity_type="player", canonical_name=player_name, sport=sport,
+        entity_type="player",
+        canonical_name=player_name,
+        sport=sport,
         effective_from_utc=effective_from_utc,
-        source_id=source_id, source_entity_id=source_entity_id,
+        source_id=source_id,
+        source_entity_id=source_entity_id,
     ).entity_id
 
 
 def json_loads_safe(value: str | None) -> dict[str, Any]:
     import json
+
     if value is None:
         return {}
     try:

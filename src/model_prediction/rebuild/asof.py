@@ -41,10 +41,9 @@ def point_in_time_join(
 
     # Rename observation columns to avoid clashes, prefix with "obs_"
     obs_time_renamed = f"obs_{observation_time_col}"
-    obs_renamed = observations.rename({
-        col: f"obs_{col}" for col in observations.columns
-        if col not in entity_keys
-    })
+    obs_renamed = observations.rename(
+        {col: f"obs_{col}" for col in observations.columns if col not in entity_keys}
+    )
 
     # join_asof requires both frames sorted by their respective `on` column
     # (within each `by` group). entity_keys go in `by` (exact match, like a
@@ -81,8 +80,7 @@ def point_in_time_join(
         violations = (obs_time > dec_time).sum()
         if violations and violations > 0:
             raise AssertionError(
-                f"PIT violation: {violations} rows have observation time "
-                f"after decision time"
+                f"PIT violation: {violations} rows have observation time after decision time"
             )
 
     # Max age filter
@@ -94,8 +92,6 @@ def point_in_time_join(
         # Null out observations that are too old
         obs_cols = [c for c in result.columns if c.startswith("obs_")]
         for col in obs_cols:
-            result = result.with_columns(
-                pl.when(mask).then(result[col]).otherwise(None).alias(col)
-            )
+            result = result.with_columns(pl.when(mask).then(result[col]).otherwise(None).alias(col))
 
     return result

@@ -160,10 +160,9 @@ def economic_gate(
         and drawdown is not None
         and drawdown.max_drawdown_units > maximum_drawdown_units
     ):
-            reasons.append(
-                f"max drawdown {drawdown.max_drawdown_units:.2f}U exceeds the "
-                f"{maximum_drawdown_units:.2f}U limit"
-            )
+        reasons.append(
+            f"max drawdown {drawdown.max_drawdown_units:.2f}U exceeds the {maximum_drawdown_units:.2f}U limit"
+        )
     roi_ci = None
     if daily_pnl_for_bootstrap:
         roi_ci = bootstrap_ci(list(daily_pnl_for_bootstrap))

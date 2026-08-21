@@ -86,9 +86,7 @@ class TheOddsAPIClient:
             )
         ]
 
-    def tennis_odds(
-        self, sport_key: str, markets: str = "h2h,spreads,totals"
-    ) -> list[dict[str, Any]]:
+    def tennis_odds(self, sport_key: str, markets: str = "h2h,spreads,totals") -> list[dict[str, Any]]:
         if not sport_key.startswith("tennis_"):
             raise ValueError("tennis sport key must start with 'tennis_'")
         return self._odds_for_sport(sport_key, markets)

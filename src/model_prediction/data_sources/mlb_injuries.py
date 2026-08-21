@@ -146,7 +146,9 @@ def _team_identity(value: str) -> str:
     return " ".join(value.replace("-", " ").casefold().split())
 
 
-_TEAM_ID_BY_IDENTITY: dict[str, int] = {_team_identity(name): team_id for name, team_id in MLB_TEAM_IDS.items()}
+_TEAM_ID_BY_IDENTITY: dict[str, int] = {
+    _team_identity(name): team_id for name, team_id in MLB_TEAM_IDS.items()
+}
 
 
 def team_id_for_name(team_name: str) -> int:
@@ -161,14 +163,13 @@ def team_id_for_name(team_name: str) -> int:
 def _stamp_and_digest(observed: datetime, entries: list[dict[str, Any]]) -> tuple[str, str, str]:
     day = observed.astimezone(EASTERN).date().isoformat()
     stamp = observed.astimezone(EASTERN).strftime("%Y%m%dT%H%M%S%z")
-    digest = hashlib.sha256(
-        json.dumps(entries, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
+    digest = hashlib.sha256(json.dumps(entries, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     return day, stamp, digest
 
 
-def _write_snapshot(data_root: str | Path, name_prefix: str, day: str, stamp: str, digest: str,
-                     payload: dict[str, Any]) -> tuple[Path, Path]:
+def _write_snapshot(
+    data_root: str | Path, name_prefix: str, day: str, stamp: str, digest: str, payload: dict[str, Any]
+) -> tuple[Path, Path]:
     root = Path(data_root) / "availability" / "mlb"
     raw_path = root / "raw" / day / f"{name_prefix}-{stamp}-{digest[:12]}.json"
     snapshot_path = root / "snapshots" / day / f"{name_prefix}-{stamp}-{digest[:12]}.json"
@@ -196,9 +197,7 @@ def capture_roster_snapshot(
     http = client or httpx.Client(timeout=15)
 
     def _fetch_team(team_id: int) -> list[dict[str, Any]]:
-        response = http.get(
-            ROSTER_URL_TEMPLATE.format(team_id=team_id), params={"rosterType": "40Man"}
-        )
+        response = http.get(ROSTER_URL_TEMPLATE.format(team_id=team_id), params={"rosterType": "40Man"})
         response.raise_for_status()
         payload = response.json()
         team_entries: list[dict[str, Any]] = []

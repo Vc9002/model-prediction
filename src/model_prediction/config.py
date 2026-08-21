@@ -97,11 +97,7 @@ def validate_config(config: dict[str, Any]) -> None:
     for key, value in (("min_pick_units", min_units), ("max_pick_units", max_units)):
         if value is not None and (not isinstance(value, (int, float)) or value < 0):
             errors.append(f"bankroll.{key} must be a non-negative number when set")
-    if (
-        isinstance(min_units, (int, float))
-        and isinstance(max_units, (int, float))
-        and min_units > max_units
-    ):
+    if isinstance(min_units, (int, float)) and isinstance(max_units, (int, float)) and min_units > max_units:
         errors.append("bankroll.min_pick_units must not exceed bankroll.max_pick_units")
 
     require_section("execution")
@@ -189,10 +185,7 @@ def unit_policy(config: dict[str, Any]) -> UnitPolicy:
     values = config["bankroll"]
     defaults = UnitPolicy()
     return UnitPolicy(
-        **{
-            field: values.get(field, getattr(defaults, field))
-            for field in UnitPolicy.__dataclass_fields__
-        }
+        **{field: values.get(field, getattr(defaults, field)) for field in UnitPolicy.__dataclass_fields__}
     )
 
 

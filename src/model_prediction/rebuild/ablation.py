@@ -23,6 +23,7 @@ from .validation import brier_score, ece, log_loss
 @dataclass
 class FeatureGroup:
     """A named group of features to ablate together."""
+
     name: str
     features: list[str]
     description: str = ""
@@ -35,6 +36,7 @@ class FeatureGroup:
 @dataclass
 class AblationResult:
     """Result of one feature group ablation."""
+
     group: str
     baseline_log_loss: float
     ablated_log_loss: float
@@ -45,14 +47,17 @@ class AblationResult:
     baseline_ece: float
     ablated_ece: float
     coverage_impact: float  # change in coverage when this group is removed
-    fold_stability: float   # std of delta across folds
-    verdict: str = "PASS"   # PASS, REJECT, WARN
+    fold_stability: float  # std of delta across folds
+    verdict: str = "PASS"  # PASS, REJECT, WARN
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "group": self.group, "delta_log_loss": self.delta_log_loss,
-            "delta_brier": self.delta_brier, "coverage_impact": self.coverage_impact,
-            "fold_stability": self.fold_stability, "verdict": self.verdict,
+            "group": self.group,
+            "delta_log_loss": self.delta_log_loss,
+            "delta_brier": self.delta_brier,
+            "coverage_impact": self.coverage_impact,
+            "fold_stability": self.fold_stability,
+            "verdict": self.verdict,
         }
 
 
@@ -75,22 +80,40 @@ class AblationResult:
 FEATURE_GROUPS_MLB: list[FeatureGroup] = [
     FeatureGroup(
         "starter_pitching",
-        ["home_sp_avg_velocity", "away_sp_avg_velocity", "home_sp_csw_pct", "away_sp_csw_pct",
-         "home_sp_k_pct", "away_sp_k_pct", "home_sp_bb_pct", "away_sp_bb_pct",
-         "home_sp_days_rest", "away_sp_days_rest"],
+        [
+            "home_sp_avg_velocity",
+            "away_sp_avg_velocity",
+            "home_sp_csw_pct",
+            "away_sp_csw_pct",
+            "home_sp_k_pct",
+            "away_sp_k_pct",
+            "home_sp_bb_pct",
+            "away_sp_bb_pct",
+            "home_sp_days_rest",
+            "away_sp_days_rest",
+        ],
         "Starting pitcher velocity, CSW%, K%/BB%, and rest, real Statcast-derived",
     ),
     FeatureGroup(
         "bullpen",
-        ["home_bp_bullpen_pitches", "away_bp_bullpen_pitches",
-         "home_bp_bullpen_avg_velocity", "away_bp_bullpen_avg_velocity"],
+        [
+            "home_bp_bullpen_pitches",
+            "away_bp_bullpen_pitches",
+            "home_bp_bullpen_avg_velocity",
+            "away_bp_bullpen_avg_velocity",
+        ],
         "Bullpen recent workload and velocity, real Statcast-derived",
     ),
     FeatureGroup(
         "clean_rates",
-        ["home_sp_clean_first_inning_clean_rate", "away_sp_clean_first_inning_clean_rate",
-         "home_sp_clean_scoreless_inning_rate", "away_sp_clean_scoreless_inning_rate",
-         "home_sp_clean_clean_appearance_rate", "away_sp_clean_clean_appearance_rate"],
+        [
+            "home_sp_clean_first_inning_clean_rate",
+            "away_sp_clean_first_inning_clean_rate",
+            "home_sp_clean_scoreless_inning_rate",
+            "away_sp_clean_scoreless_inning_rate",
+            "home_sp_clean_clean_appearance_rate",
+            "away_sp_clean_clean_appearance_rate",
+        ],
         "Beta-binomial shrunk pitcher clean rates (first-inning/scoreless-inning/"
         "clean-appearance), real Statcast run-scoring-derived",
     ),
@@ -190,25 +213,34 @@ class FeatureAblationRunner:
             group = next(g for g in self.groups if g.name == ar.group)
             features.extend(group.features)
             result = self._evaluate(data, target_col, features, train_fn, predict_fn, date_col)
-            cumulative.append(AblationResult(
-                group=f"cumulative_{group.name}",
-                baseline_log_loss=baseline["log_loss"],
-                ablated_log_loss=result["log_loss"],
-                delta_log_loss=result["log_loss"] - baseline["log_loss"],
-                baseline_brier=baseline["brier"],
-                ablated_brier=result["brier"],
-                delta_brier=result["brier"] - baseline["brier"],
-                baseline_ece=baseline["ece"],
-                ablated_ece=result["ece"],
-                coverage_impact=0.0, fold_stability=0.0, verdict="PASS",
-            ))
+            cumulative.append(
+                AblationResult(
+                    group=f"cumulative_{group.name}",
+                    baseline_log_loss=baseline["log_loss"],
+                    ablated_log_loss=result["log_loss"],
+                    delta_log_loss=result["log_loss"] - baseline["log_loss"],
+                    baseline_brier=baseline["brier"],
+                    ablated_brier=result["brier"],
+                    delta_brier=result["brier"] - baseline["brier"],
+                    baseline_ece=baseline["ece"],
+                    ablated_ece=result["ece"],
+                    coverage_impact=0.0,
+                    fold_stability=0.0,
+                    verdict="PASS",
+                )
+            )
 
         self.results.extend(cumulative)
         return cumulative
 
     def _evaluate(
-        self, data: pl.DataFrame, target_col: str, features: list[str],
-        train_fn: Callable, predict_fn: Callable, date_col: str = "game_date",
+        self,
+        data: pl.DataFrame,
+        target_col: str,
+        features: list[str],
+        train_fn: Callable,
+        predict_fn: Callable,
+        date_col: str = "game_date",
     ) -> dict[str, float]:
         """Train on chronological first half, evaluate on second half.
 
@@ -217,15 +249,20 @@ class FeatureAblationRunner:
         if not features:
             y_true = data[target_col].to_list()
             y_prob = [0.5] * len(y_true)
-            return {"log_loss": log_loss(y_true, y_prob), "brier": brier_score(y_true, y_prob),
-                    "ece": ece(y_true, y_prob)}
+            return {
+                "log_loss": log_loss(y_true, y_prob),
+                "brier": brier_score(y_true, y_prob),
+                "ece": ece(y_true, y_prob),
+            }
 
         available_features = [f for f in features if f in data.columns]
         if not available_features:
             y_true = data[target_col].to_list()
-            return {"log_loss": log_loss(y_true, [0.5]*len(y_true)),
-                    "brier": brier_score(y_true, [0.5]*len(y_true)),
-                    "ece": ece(y_true, [0.5]*len(y_true))}
+            return {
+                "log_loss": log_loss(y_true, [0.5] * len(y_true)),
+                "brier": brier_score(y_true, [0.5] * len(y_true)),
+                "ece": ece(y_true, [0.5] * len(y_true)),
+            }
 
         # Chronological split: sort by date, train on first 2/3 of dates
         if date_col in data.columns:
@@ -237,9 +274,11 @@ class FeatureAblationRunner:
 
         if train_df.height < 10 or test_df.height < 5:
             y_true = data[target_col].to_list()
-            return {"log_loss": log_loss(y_true, [0.5]*len(y_true)),
-                    "brier": brier_score(y_true, [0.5]*len(y_true)),
-                    "ece": ece(y_true, [0.5]*len(y_true))}
+            return {
+                "log_loss": log_loss(y_true, [0.5] * len(y_true)),
+                "brier": brier_score(y_true, [0.5] * len(y_true)),
+                "ece": ece(y_true, [0.5] * len(y_true)),
+            }
 
         try:
             X_train = train_df.select(available_features).to_numpy()
@@ -248,14 +287,18 @@ class FeatureAblationRunner:
             y_test = test_df[target_col].to_numpy()
             model = train_fn(X_train, y_train)
             probs = predict_fn(model, X_test)
-            return {"log_loss": log_loss(y_test.tolist(), probs),
-                    "brier": brier_score(y_test.tolist(), probs),
-                    "ece": ece(y_test.tolist(), probs)}
+            return {
+                "log_loss": log_loss(y_test.tolist(), probs),
+                "brier": brier_score(y_test.tolist(), probs),
+                "ece": ece(y_test.tolist(), probs),
+            }
         except Exception:  # noqa: BLE001 -- train_fn/predict_fn are caller-supplied callables that can raise anything; falls back to a disclosed coin-flip result, not silently swallowed
             y_test = test_df[target_col].to_list()
-            return {"log_loss": log_loss(y_test, [0.5]*len(y_test)),
-                    "brier": brier_score(y_test, [0.5]*len(y_test)),
-                    "ece": ece(y_test, [0.5]*len(y_test))}
+            return {
+                "log_loss": log_loss(y_test, [0.5] * len(y_test)),
+                "brier": brier_score(y_test, [0.5] * len(y_test)),
+                "ece": ece(y_test, [0.5] * len(y_test)),
+            }
 
     @staticmethod
     def _coverage(data: pl.DataFrame, features: list[str]) -> float:

@@ -42,9 +42,7 @@ def load_completed_matches(store: SoccerNormalizedStore) -> pl.DataFrame:
 
     # Parse event_start_utc for chronological split
     matches = matches.with_columns(
-        pl.col("event_start_utc")
-        .str.to_datetime(time_zone="UTC", strict=False)
-        .alias("_event_dt")
+        pl.col("event_start_utc").str.to_datetime(time_zone="UTC", strict=False).alias("_event_dt")
     ).filter(pl.col("_event_dt").is_not_null())
 
     return matches.sort("_event_dt")
@@ -104,11 +102,7 @@ def evaluate(
     p_draw = np.clip(scored["p_draw"].to_numpy(), 1e-15, 1.0)
     p_away = np.clip(scored["p_away"].to_numpy(), 1e-15, 1.0)
 
-    log_loss = -np.mean(
-        a_home * np.log(p_home)
-        + a_draw * np.log(p_draw)
-        + a_away * np.log(p_away)
-    )
+    log_loss = -np.mean(a_home * np.log(p_home) + a_draw * np.log(p_draw) + a_away * np.log(p_away))
 
     # Per-outcome Brier scores
     brier_home = float(np.mean((p_home - a_home) ** 2))
@@ -119,7 +113,7 @@ def evaluate(
     # Accuracy: highest probability outcome
     preds_stacked = np.column_stack([p_home, p_draw, p_away])
     actual_stacked = np.column_stack([a_home, a_draw, a_away])
-    correct = (np.argmax(preds_stacked, axis=1) == np.argmax(actual_stacked, axis=1))
+    correct = np.argmax(preds_stacked, axis=1) == np.argmax(actual_stacked, axis=1)
     accuracy = float(np.mean(correct))
 
     # Outcome distribution
@@ -271,16 +265,22 @@ def main() -> None:
     test_metrics = evaluate(model, test, "test")
 
     for m in [train_metrics, cal_metrics, test_metrics]:
-        print(f"  {m['label']:>12s}: n={m['n']:>5d}  "
-              f"LogLoss={m['log_loss']:.4f}  "
-              f"Brier={m['brier_mean']:.4f}  "
-              f"Acc={m['accuracy']:.3f}  "
-              f"H%={m['actual_home_pct']:.2f} D%={m['actual_draw_pct']:.2f} A%={m['actual_away_pct']:.2f}")
+        print(
+            f"  {m['label']:>12s}: n={m['n']:>5d}  "
+            f"LogLoss={m['log_loss']:.4f}  "
+            f"Brier={m['brier_mean']:.4f}  "
+            f"Acc={m['accuracy']:.3f}  "
+            f"H%={m['actual_home_pct']:.2f} D%={m['actual_draw_pct']:.2f} A%={m['actual_away_pct']:.2f}"
+        )
 
     # 5. Save artifact
     print("\n[5/5] Saving challenger artifact ...")
     artifact_hash = save_challenger_artifact(
-        model, train_metrics, cal_metrics, test_metrics, output_dir,
+        model,
+        train_metrics,
+        cal_metrics,
+        test_metrics,
+        output_dir,
     )
     print(f"  Artifact hash: {artifact_hash}")
     print(f"  Written to: {output_dir / 'soccer-poisson-dc-rebuild-v1.json'}")

@@ -25,9 +25,14 @@ def test_run_checklist_source_keys_fail_for_excluded_source() -> None:
 
 def test_run_checklist_observation_metadata_pass() -> None:
     obs = FeatureObservation(
-        event_id="1", entity_id="e", feature_name="f", value=1.0,
-        effective_at_utc="2026-07-18T19:00:00Z", observed_at_utc="2026-07-18T18:00:00Z",
-        source="espn", source_version="v1",
+        event_id="1",
+        entity_id="e",
+        feature_name="f",
+        value=1.0,
+        effective_at_utc="2026-07-18T19:00:00Z",
+        observed_at_utc="2026-07-18T18:00:00Z",
+        source="espn",
+        source_version="v1",
     )
     results = {r.item_id: r for r in run_checklist(observations=[obs])}
     assert results["observation_metadata"].status == "pass"
@@ -49,7 +54,9 @@ def test_run_checklist_ablation_baseline_presence() -> None:
     with_baseline = {r.item_id: r for r in run_checklist(ablation_variant_names=["incumbent", "+ feature A"])}
     assert with_baseline["ablations_include_baseline"].status == "pass"
 
-    without_baseline = {r.item_id: r for r in run_checklist(ablation_variant_names=["+ feature A", "+ feature B"])}
+    without_baseline = {
+        r.item_id: r for r in run_checklist(ablation_variant_names=["+ feature A", "+ feature B"])
+    }
     assert without_baseline["ablations_include_baseline"].status == "fail"
 
 

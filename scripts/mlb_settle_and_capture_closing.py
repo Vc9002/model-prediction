@@ -75,7 +75,9 @@ DATA_ROOT = "data/rebuild"
 SPORT = "mlb"
 
 
-def determine_outcome(market_type: str, team_or_side: str, line: float | None, home_score: int, away_score: int) -> str:
+def determine_outcome(
+    market_type: str, team_or_side: str, line: float | None, home_score: int, away_score: int
+) -> str:
     """Real outcome (WIN/LOSS/PUSH) of one evaluated market/side/line, from
     the real final score. `line` is that side's own signed line (real
     market convention -- 'home' with line=-2.5 means home favored by 2.5;
@@ -115,8 +117,14 @@ def real_event_market_date(event_start_utc: str | None, decision_time_utc: str) 
 
 
 def real_closing_quote(
-    market_store: MarketStore, sport: str, game_date: str, market_id: str, team_or_side: str,
-    line: float | None, decision_time_utc: str, event_start_utc: str,
+    market_store: MarketStore,
+    sport: str,
+    game_date: str,
+    market_id: str,
+    team_or_side: str,
+    line: float | None,
+    decision_time_utc: str,
+    event_start_utc: str,
 ) -> tuple[float, str] | None:
     """The real most-recent quote for one exact market_id/side/line on
     `game_date`, read from the actual store the collector writes to
@@ -196,7 +204,11 @@ def _run_settlement(ledger: ShadowLedger, run_id: str) -> dict[str, Any]:
         home_score, away_score = final_scores[event_id]
 
         outcome = determine_outcome(
-            row["market_type"], row["evaluated_team_or_side"], row["evaluated_line"], home_score, away_score,
+            row["market_type"],
+            row["evaluated_team_or_side"],
+            row["evaluated_line"],
+            home_score,
+            away_score,
         )
         outcome_counts[outcome] = outcome_counts.get(outcome, 0) + 1
 
@@ -225,8 +237,14 @@ def _run_settlement(ledger: ShadowLedger, run_id: str) -> dict[str, Any]:
         closing_price: float | None = None
         if event_start_utc is not None:
             quote = real_closing_quote(
-                market_store, SPORT, game_date, row["evaluated_market_id"], row["evaluated_team_or_side"],
-                row["evaluated_line"], row["decision_time_utc"], event_start_utc,
+                market_store,
+                SPORT,
+                game_date,
+                row["evaluated_market_id"],
+                row["evaluated_team_or_side"],
+                row["evaluated_line"],
+                row["decision_time_utc"],
+                event_start_utc,
             )
             if quote is not None:
                 closing_price, quote_observed_at = quote
@@ -238,10 +256,16 @@ def _run_settlement(ledger: ShadowLedger, run_id: str) -> dict[str, Any]:
                     datetime.fromisoformat(event_start_utc) - datetime.fromisoformat(quote_observed_at)
                 ).total_seconds()
                 ledger.record_closing_price(
-                    run_id=run_id, sport=SPORT, event_id=event_id,
-                    market_id=row["evaluated_market_id"], side_id=row["evaluated_team_or_side"],
-                    line=row["evaluated_line"], closing_price=closing_price, observed_at_utc=quote_observed_at,
-                    quote_type="last_pregame_quote", seconds_to_start=seconds_to_start,
+                    run_id=run_id,
+                    sport=SPORT,
+                    event_id=event_id,
+                    market_id=row["evaluated_market_id"],
+                    side_id=row["evaluated_team_or_side"],
+                    line=row["evaluated_line"],
+                    closing_price=closing_price,
+                    observed_at_utc=quote_observed_at,
+                    quote_type="last_pregame_quote",
+                    seconds_to_start=seconds_to_start,
                 )
                 closing_found += 1
 
@@ -273,15 +297,25 @@ def _run_settlement(ledger: ShadowLedger, run_id: str) -> dict[str, Any]:
             f"closing_price={'captured' if closing_price is not None else 'unavailable (Polymarket public API serves only open markets, not resolved historical books)'}"
         )
         ledger.record_settlement(
-            run_id=run_id, sport=SPORT, event_id=event_id, outcome=outcome,
-            trade_decision_id=row["id"], settled_price=closing_price, pnl=pnl,
-            settled_at_utc=utc_now(), notes=notes,
+            run_id=run_id,
+            sport=SPORT,
+            event_id=event_id,
+            outcome=outcome,
+            trade_decision_id=row["id"],
+            settled_price=closing_price,
+            pnl=pnl,
+            settled_at_utc=utc_now(),
+            notes=notes,
         )
         n_settled += 1
 
-    print(f"3. Real closing-price fetch attempted for {closing_attempted} distinct real dates; "
-          f"real quotes found and recorded for {closing_found} of {n_settled} settled decisions.")
-    print(f"4. Real settlements recorded: {n_settled} (skipped {n_skipped_not_final} -- event not yet STATUS_FINAL)")
+    print(
+        f"3. Real closing-price fetch attempted for {closing_attempted} distinct real dates; "
+        f"real quotes found and recorded for {closing_found} of {n_settled} settled decisions."
+    )
+    print(
+        f"4. Real settlements recorded: {n_settled} (skipped {n_skipped_not_final} -- event not yet STATUS_FINAL)"
+    )
     print(f"   Real outcome breakdown across all evaluated sides (BET + NO_BET): {outcome_counts}")
     print(
         "\n5. Real, disclosed scope: registry-safe (does not touch\n"
@@ -312,8 +346,13 @@ def main() -> None:
         duration = perf_counter() - run_started
         error = str(exc)[:500]
         ledger.record_stage_result(
-            run_id, "settle", "ERROR", {"error": error}, duration_seconds=duration,
-            error=error, mode="fresh",
+            run_id,
+            "settle",
+            "ERROR",
+            {"error": error},
+            duration_seconds=duration,
+            error=error,
+            mode="fresh",
         )
         ledger.finish_run(run_id, "ERROR", duration_seconds=duration, error=error, mode="fresh")
         raise
@@ -321,8 +360,13 @@ def main() -> None:
         duration = perf_counter() - run_started
         rows = result["settlements_recorded"]
         ledger.record_stage_result(
-            run_id, "settle", "SUCCESS", result, duration_seconds=duration,
-            mode="fresh", row_count=rows,
+            run_id,
+            "settle",
+            "SUCCESS",
+            result,
+            duration_seconds=duration,
+            mode="fresh",
+            row_count=rows,
         )
         ledger.finish_run(run_id, "SUCCESS", duration_seconds=duration, mode="fresh")
     finally:

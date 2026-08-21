@@ -79,17 +79,27 @@ def test_raw_probability_matches_a_hand_computed_logistic_forward_pass() -> None
     from model_prediction.rebuild.wnba.elo_trend import WalkForwardRow
 
     row = WalkForwardRow(
-        event_id="synthetic", event_start_utc="2024-05-01T00:00:00+00:00",
-        sports_event_date="2024-05-01", season=2024,
-        home_team_id="A", away_team_id="B", home_win=1,
-        elo_probability=0.65, trend_gap=1.5, defensive_trend_gap=-0.5,
-        home_elo_rating=1550.0, away_elo_rating=1480.0,
-        home_games_played=20, away_games_played=20,
-        last_home_update_utc=None, last_away_update_utc=None,
+        event_id="synthetic",
+        event_start_utc="2024-05-01T00:00:00+00:00",
+        sports_event_date="2024-05-01",
+        season=2024,
+        home_team_id="A",
+        away_team_id="B",
+        home_win=1,
+        elo_probability=0.65,
+        trend_gap=1.5,
+        defensive_trend_gap=-0.5,
+        home_elo_rating=1550.0,
+        away_elo_rating=1480.0,
+        home_games_played=20,
+        away_games_played=20,
+        last_home_update_utc=None,
+        last_away_update_utc=None,
     )
     values = {"elo_probability": 0.65, "trend_gap": 1.5, "defensive_trend_gap": -0.5}
     expected_z = market["intercept"] + sum(
-        coef * values[name] for coef, name in zip(market["coefficients"], market["feature_names"], strict=True)
+        coef * values[name]
+        for coef, name in zip(market["coefficients"], market["feature_names"], strict=True)
     )
     expected_p = 1.0 / (1.0 + math.exp(-expected_z))
 

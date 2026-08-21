@@ -28,14 +28,15 @@ def expected_win_probability(rating_a: float, rating_b: float, advantage: float 
     """
     return 1.0 / (1.0 + 10.0 ** (-(rating_a + advantage - rating_b) / 400.0))
 
+
 # Per-sport tuning; falls back to the generic row.
 ELO_CONFIG: dict[str, dict[str, float]] = {
-    "mlb":     {"k": 4.0,  "home_advantage": 24.0, "offseason_regression": 0.00},
-    "nba":     {"k": 20.0, "home_advantage": 70.0, "offseason_regression": 0.35},
-    "wnba":    {"k": 20.0, "home_advantage": 60.0, "offseason_regression": 0.40},
-    "nfl":     {"k": 20.0, "home_advantage": 55.0, "offseason_regression": 0.50},
-    "soccer":  {"k": 20.0, "home_advantage": 60.0, "offseason_regression": 0.50},
-    "tennis":  {"k": 32.0, "home_advantage": 0.0,  "offseason_regression": 0.50},
+    "mlb": {"k": 4.0, "home_advantage": 24.0, "offseason_regression": 0.00},
+    "nba": {"k": 20.0, "home_advantage": 70.0, "offseason_regression": 0.35},
+    "wnba": {"k": 20.0, "home_advantage": 60.0, "offseason_regression": 0.40},
+    "nfl": {"k": 20.0, "home_advantage": 55.0, "offseason_regression": 0.50},
+    "soccer": {"k": 20.0, "home_advantage": 60.0, "offseason_regression": 0.50},
+    "tennis": {"k": 32.0, "home_advantage": 0.0, "offseason_regression": 0.50},
     "generic": {"k": 20.0, "home_advantage": 50.0, "offseason_regression": 0.50},
 }
 
@@ -71,9 +72,12 @@ class EloBook:
         self.ratings[game.away_team] = self.rating(game.away_team) - delta
 
 
-def build_elo(games: Iterable[GameRecord], sport: str,
-              offseason_regression: float | None = None,
-              offseason_gap_days: int = 90) -> EloBook:
+def build_elo(
+    games: Iterable[GameRecord],
+    sport: str,
+    offseason_regression: float | None = None,
+    offseason_gap_days: int = 90,
+) -> EloBook:
     """Build chronological Elo ratings with offseason regression.
 
     When more than ``offseason_gap_days`` pass between consecutive games for

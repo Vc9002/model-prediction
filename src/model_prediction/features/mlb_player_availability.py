@@ -53,9 +53,7 @@ def _identity(value: str) -> str:
     return " ".join(ascii_value.replace("-", " ").casefold().split())
 
 
-def _latest_transactions_snapshot(
-    root: Path, team_id: int, cutoff_date: str
-) -> dict[str, Any]:
+def _latest_transactions_snapshot(root: Path, team_id: int, cutoff_date: str) -> dict[str, Any]:
     """Most recent captured transactions snapshot covering ``team_id``
     through ``cutoff_date``.
 
@@ -82,9 +80,7 @@ def _latest_transactions_snapshot(
     return max(eligible, key=lambda item: (item[0], str(item[1])))[2]
 
 
-def _starter_status(
-    payload: dict[str, Any], team_id: int, starter_name: str, observed: datetime
-) -> str:
+def _starter_status(payload: dict[str, Any], team_id: int, starter_name: str, observed: datetime) -> str:
     """Status of ``starter_name`` as of ``observed``, from the latest
     IL-relevant transaction reported strictly before ``observed``'s own
     calendar day.
@@ -337,7 +333,9 @@ def _team_roster_group_availability(
     ]
     group = [entry for entry in matching if str(entry.get("current_status") or "") != "Reassigned to Minors"]
     if not group:
-        raise ValueError(f"NO_CALL_MLB_{group_label}_UNAVAILABLE: no matching players found on roster for {team}")
+        raise ValueError(
+            f"NO_CALL_MLB_{group_label}_UNAVAILABLE: no matching players found on roster for {team}"
+        )
     unknown = [
         entry for entry in group if str(entry.get("current_status") or "") not in STATUS_ACTIVE_PROBABILITIES
     ]

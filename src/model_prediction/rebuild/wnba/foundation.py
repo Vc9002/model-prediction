@@ -73,7 +73,11 @@ class WNBAFoundation:
                     errors[source_table] = "unsupported table"
                     continue
                 result = self.provider.season_table(source_table, season, force=force)
-                if result.status is not ProviderStatus.AVAILABLE or result.frame is None or result.metadata is None:
+                if (
+                    result.status is not ProviderStatus.AVAILABLE
+                    or result.frame is None
+                    or result.metadata is None
+                ):
                     errors[source_table] = result.reason or result.status.value
                     continue
                 try:

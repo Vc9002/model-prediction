@@ -110,8 +110,10 @@ def main() -> None:
         calibrated_oof[name] = results[best].calibrated_probs
         if calibrated_labels is None:
             calibrated_labels = results[best].eval_labels
-        print(f"3. {name}: calibrated with `{best}` (Task 14's own winner), "
-              f"{len(calibrated_oof[name])} real calibrated OOF rows")
+        print(
+            f"3. {name}: calibrated with `{best}` (Task 14's own winner), "
+            f"{len(calibrated_oof[name])} real calibrated OOF rows"
+        )
 
     assert calibrated_labels is not None
     n = len(calibrated_labels)
@@ -126,16 +128,19 @@ def main() -> None:
     from model_prediction.rebuild.validation import log_loss as _log_loss
 
     coherent_scores = {
-        name: _log_loss(calibrated_labels, calibrated_oof[name])
-        for name in ("two_head", "xgb_two_head")
+        name: _log_loss(calibrated_labels, calibrated_oof[name]) for name in ("two_head", "xgb_two_head")
     }
     best_coherent = min(coherent_scores, key=lambda n_: coherent_scores[n_])
-    print(f"\n4. Best calibrated coherent score model: {best_coherent} "
-          f"(two_head={coherent_scores['two_head']:.4f}, xgb_two_head={coherent_scores['xgb_two_head']:.4f})")
+    print(
+        f"\n4. Best calibrated coherent score model: {best_coherent} "
+        f"(two_head={coherent_scores['two_head']:.4f}, xgb_two_head={coherent_scores['xgb_two_head']:.4f})"
+    )
 
     candidates = [best_coherent, "xgb_direct", *ENSEMBLE_METHODS]
-    print(f"\n5. Real chronological meta-cross-fit comparison ({n} real calibrated OOF rows, "
-          f"{N_META_BLOCKS} meta-blocks, first block fit-only):")
+    print(
+        f"\n5. Real chronological meta-cross-fit comparison ({n} real calibrated OOF rows, "
+        f"{N_META_BLOCKS} meta-blocks, first block fit-only):"
+    )
     results_summary = {}
     for method in candidates:
         result = meta_cross_fit_ensemble(calibrated_oof, calibrated_labels, method, n_blocks=N_META_BLOCKS)
@@ -165,8 +170,10 @@ def main() -> None:
         max_weight = max(ens.weights.values()) if ens.weights else 0.0
         if max_weight > 0.9:
             dominant = max(ens.weights, key=lambda k: ens.weights[k])
-            print(f"      -> collapses to ~{dominant} (weight={max_weight:.3f}): "
-                  f"this ensemble method adds no real value over using {dominant} directly.")
+            print(
+                f"      -> collapses to ~{dominant} (weight={max_weight:.3f}): "
+                f"this ensemble method adds no real value over using {dominant} directly."
+            )
 
     print(
         "\n7. Real, disclosed scope: registry-safe (does not touch\n"
@@ -176,17 +183,23 @@ def main() -> None:
     )
 
     results_path = Path("outputs/rebuild/mlb_calibrated_ensemble_comparison.json")
-    results_path.write_text(json.dumps({
-        "dataset_hash": dataset.dataset_hash,
-        "matched_games": dataset.matched_games,
-        "n_calibrated_oof": n,
-        "best_calibration_method_per_model": best_methods,
-        "best_calibrated_coherent_score_model": best_coherent,
-        "coherent_score_model_log_loss": coherent_scores,
-        "meta_cross_fit_results": results_summary,
-        "best_method_by_meta_log_loss": winner,
-        "full_history_ensemble_weights": ensemble_weights,
-    }, indent=2, default=str))
+    results_path.write_text(
+        json.dumps(
+            {
+                "dataset_hash": dataset.dataset_hash,
+                "matched_games": dataset.matched_games,
+                "n_calibrated_oof": n,
+                "best_calibration_method_per_model": best_methods,
+                "best_calibrated_coherent_score_model": best_coherent,
+                "coherent_score_model_log_loss": coherent_scores,
+                "meta_cross_fit_results": results_summary,
+                "best_method_by_meta_log_loss": winner,
+                "full_history_ensemble_weights": ensemble_weights,
+            },
+            indent=2,
+            default=str,
+        )
+    )
     print(f"8. Results saved to {results_path}")
 
 

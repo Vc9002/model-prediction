@@ -30,21 +30,28 @@ def _sigmoid(x: float) -> float:
 @dataclass
 class MarketResidualFeatures:
     """Features for the market residual model — market-side only, no sport probability mutation."""
-    logit_model: float          # logit(calibrated sport probability)
-    logit_market: float         # logit(market no-vig probability)
-    spread: float               # bid-ask spread in probability units
-    depth_ask: float             # available size on the ask
-    quote_age_seconds: float     # seconds since quote was observed
-    time_to_start_hours: float   # hours until event starts
-    model_uncertainty: float     # model's own uncertainty estimate
-    horizon: str = "mid"         # early/mid/late
+
+    logit_model: float  # logit(calibrated sport probability)
+    logit_market: float  # logit(market no-vig probability)
+    spread: float  # bid-ask spread in probability units
+    depth_ask: float  # available size on the ask
+    quote_age_seconds: float  # seconds since quote was observed
+    time_to_start_hours: float  # hours until event starts
+    model_uncertainty: float  # model's own uncertainty estimate
+    horizon: str = "mid"  # early/mid/late
 
     def to_array(self) -> np.ndarray:
-        return np.array([
-            self.logit_model, self.logit_market, self.spread,
-            min(self.depth_ask, 10000), min(self.quote_age_seconds, 3600),
-            self.time_to_start_hours, self.model_uncertainty,
-        ])
+        return np.array(
+            [
+                self.logit_model,
+                self.logit_market,
+                self.spread,
+                min(self.depth_ask, 10000),
+                min(self.quote_age_seconds, 3600),
+                self.time_to_start_hours,
+                self.model_uncertainty,
+            ]
+        )
 
 
 class MarketResidualModel:

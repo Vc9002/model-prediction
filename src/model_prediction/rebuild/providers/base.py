@@ -120,9 +120,7 @@ class SourceResponseMetadata:
             or self.upstream_rights_status != "cleared"
             or self.use_scope != "production_economic"
         ):
-            raise ValueError(
-                "production_allowed requires cleared commercial and upstream rights"
-            )
+            raise ValueError("production_allowed requires cleared commercial and upstream rights")
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)

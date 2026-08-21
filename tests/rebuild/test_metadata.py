@@ -60,9 +60,12 @@ class TestIdentityRegistryRealSourceMapping:
         registry = IdentityRegistry(meta)
 
         identity = registry.register(
-            entity_type="team", canonical_name="Seattle Mariners", sport="mlb",
+            entity_type="team",
+            canonical_name="Seattle Mariners",
+            sport="mlb",
             effective_from_utc="2026-01-01",
-            source_id="espn_public", source_entity_id="12",
+            source_id="espn_public",
+            source_entity_id="12",
         )
 
         resolved = registry.resolve("espn_public", "12")

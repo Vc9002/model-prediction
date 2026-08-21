@@ -48,9 +48,7 @@ def _repo_root() -> Path:
 # ── config loading ─────────────────────────────────────────────────────────
 
 
-def load_production_config(
-    *, repo_root: Path | str | None = None
-) -> dict[str, Any]:
+def load_production_config(*, repo_root: Path | str | None = None) -> dict[str, Any]:
     """Load and return the production canary configuration.
 
     Reads ``config/production.yaml`` relative to *repo_root* (defaults to
@@ -68,9 +66,7 @@ def load_production_config(
 # ── validation ──────────────────────────────────────────────────────────────
 
 
-def validate_production_config(
-    config: dict[str, Any], *, repo_root: Path | str | None = None
-) -> None:
+def validate_production_config(config: dict[str, Any], *, repo_root: Path | str | None = None) -> None:
     """Validate the production config via the single production registry.
 
     Rules (fail-closed — any failure raises ``ValueError``):
@@ -177,9 +173,7 @@ def health_check(
     except Exception as exc:  # noqa: BLE001
         return {
             "status": "DOWN",
-            "model_id": (
-                config.get("prediction_service", {}).get("primary", {}).get("model_id")
-            ),
+            "model_id": (config.get("prediction_service", {}).get("primary", {}).get("model_id")),
             "reason": f"config validation failed: {exc}",
             "checked_at_utc": now_utc,
         }
@@ -192,23 +186,16 @@ def health_check(
     # Per-model registry contract status — every entry, not just the
     # primary. A broken secondary model degrades the overall status.
     details["models"] = {
-        entry.model_id: (
-            "ok" if entry.available else f"failed: {entry.load_error}"
-        )
+        entry.model_id: ("ok" if entry.available else f"failed: {entry.load_error}")
         for entry in registry.entries.values()
     }
     if registry.problem_entries():
-        details["failed_models"] = [
-            entry.model_id for entry in registry.problem_entries()
-        ]
+        details["failed_models"] = [entry.model_id for entry in registry.problem_entries()]
         return {
             "status": "DEGRADED",
             "model_id": model_id,
             "artifact_hash": primary.artifact_hash,
-            "reason": (
-                f"{len(registry.problem_entries())} production model(s) "
-                "failed contract validation"
-            ),
+            "reason": (f"{len(registry.problem_entries())} production model(s) failed contract validation"),
             "checked_at_utc": now_utc,
             "details": details,
         }
@@ -312,9 +299,7 @@ def _check_finite_probabilities(artifact: dict[str, Any]) -> None:
             _check(mm_val.get("confidence_threshold"), f"market_models.{mm_key}.confidence_threshold")
 
 
-def _check_data_freshness(
-    repo_root: Path, runtime_root: Path, max_age_minutes: int
-) -> str | None:
+def _check_data_freshness(repo_root: Path, runtime_root: Path, max_age_minutes: int) -> str | None:
     """Return a human-readable staleness description, or *None* if fresh.
 
     Freshness is judged on the canonical production database
@@ -330,8 +315,7 @@ def _check_data_freshness(
     last_prediction = read_latest_prediction_utc(paths)
     if last_prediction is None:
         return (
-            f"no production predictions recorded in {paths.production_db} "
-            "(never recorded a prediction run)"
+            f"no production predictions recorded in {paths.production_db} (never recorded a prediction run)"
         )
     try:
         last_dt = datetime.fromisoformat(last_prediction)
@@ -341,10 +325,7 @@ def _check_data_freshness(
         last_dt = last_dt.replace(tzinfo=UTC)
     age_minutes = (datetime.now(UTC) - last_dt).total_seconds() / 60
     if age_minutes > max_age_minutes:
-        return (
-            f"last prediction {age_minutes:.0f} minutes ago "
-            f"(max_data_age_minutes={max_age_minutes})"
-        )
+        return f"last prediction {age_minutes:.0f} minutes ago (max_data_age_minutes={max_age_minutes})"
     return None
 
 
@@ -356,9 +337,7 @@ _BINARY_PROBABILITY_PAIRS = (
 )
 
 
-def _check_probability_normalization(
-    artifact: dict[str, Any], repo_root: Path, runtime_root: Path
-) -> None:
+def _check_probability_normalization(artifact: dict[str, Any], repo_root: Path, runtime_root: Path) -> None:
     """Enforce the normalization contract on every binary probability
     pair the system stores or emits.
 
@@ -380,14 +359,10 @@ def _check_probability_normalization(
             if home is None and away is None:
                 continue
             if home is None or away is None:
-                raise ValueError(
-                    f"market_models.{market} has {home_key} without {away_key}"
-                )
+                raise ValueError(f"market_models.{market} has {home_key} without {away_key}")
             for label, value in ((home_key, home), (away_key, away)):
                 if not isinstance(value, (int, float)) or not 0.0 <= float(value) <= 1.0:
-                    raise ValueError(
-                        f"market_models.{market}.{label} out of [0,1]: {value!r}"
-                    )
+                    raise ValueError(f"market_models.{market}.{label} out of [0,1]: {value!r}")
             if abs(float(home) + float(away) - 1.0) > _NORMALIZATION_TOLERANCE:
                 raise ValueError(
                     f"market_models.{market} probabilities not normalized: "
@@ -405,9 +380,7 @@ def _check_probability_normalization(
             continue
         total = sum(values)
         if any(not 0.0 <= v <= 1.0 for v in values):
-            raise ValueError(
-                f"stored prediction probabilities out of [0,1]: {pair}"
-            )
+            raise ValueError(f"stored prediction probabilities out of [0,1]: {pair}")
         if abs(total - 1.0) > _NORMALIZATION_TOLERANCE:
             raise ValueError(
                 f"stored prediction probabilities not normalized: {pair} "

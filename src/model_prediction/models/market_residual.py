@@ -69,11 +69,7 @@ class MarketResidualModel:
     def train(cls, rows: Sequence[ResidualTrainingRow], now=None) -> MarketResidualModel:
         current = now or utc_now()
         cutoff = current - timedelta(days=ROLLING_WINDOW_DAYS)
-        usable = [
-            row
-            for row in rows
-            if row.outcome in (0, 1) and parse_utc(row.settled_at_utc) >= cutoff
-        ]
+        usable = [row for row in rows if row.outcome in (0, 1) and parse_utc(row.settled_at_utc) >= cutoff]
         if len(usable) < MINIMUM_SAMPLE:
             return cls(None, len(usable))
         xs = [(1.0, _logit(row.model_probability), _logit(row.market_probability)) for row in usable]

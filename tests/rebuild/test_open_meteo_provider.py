@@ -61,7 +61,9 @@ def test_forecast_is_sport_neutral_raw_first_and_rights_gated(tmp_path):
 
 
 def test_naive_datetimes_are_rejected():
-    provider = OpenMeteoForecastProvider(_http(lambda r: httpx.Response(200)), ProviderRawCache("/tmp/unused"))
+    provider = OpenMeteoForecastProvider(
+        _http(lambda r: httpx.Response(200)), ProviderRawCache("/tmp/unused")
+    )
     result = provider.forecast(
         sport="mlb",
         latitude=0.0,

@@ -62,11 +62,7 @@ def test_scale_outside_positive_range_is_rejected(tmp_path, spec):
 
 
 def test_production_margin_and_totals_artifacts_load_cleanly(spec):
-    margin = MeasuredEdgeMarginModel(
-        PROJECT_ROOT / "config/models/measured-edge-margin-v3.json", spec
-    )
-    totals = MeasuredEdgeTotalsModel(
-        PROJECT_ROOT / "config/models/measured-edge-totals-v3.json", spec
-    )
+    margin = MeasuredEdgeMarginModel(PROJECT_ROOT / "config/models/measured-edge-margin-v3.json", spec)
+    totals = MeasuredEdgeTotalsModel(PROJECT_ROOT / "config/models/measured-edge-totals-v3.json", spec)
     assert 0.45 < margin.calibrate_selected_side(0.5) < 0.55
     assert 0.45 < totals.calibrate_selected_side(0.5) < 0.55

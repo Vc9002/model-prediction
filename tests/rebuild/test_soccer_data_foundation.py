@@ -181,9 +181,9 @@ def test_foundation_persists_espn_and_reports_statsbomb_policy_block(tmp_path):
     ],
 )
 def test_normalized_rights_reject_null_unknown_or_production_claim(column, value, error):
-    frame = normalize_soccer_matches(
-        _source_frame(), _metadata("2026-08-10T00:00:00+00:00")
-    ).with_columns(pl.lit(value).alias(column))
+    frame = normalize_soccer_matches(_source_frame(), _metadata("2026-08-10T00:00:00+00:00")).with_columns(
+        pl.lit(value).alias(column)
+    )
     with pytest.raises(error):
         eligible_matches_as_of(frame, datetime(2026, 8, 10, 12, tzinfo=UTC))
 

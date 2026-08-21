@@ -99,8 +99,10 @@ def main() -> None:
         assert combo_oof["labels"] == labels_direct, (
             f"{model_key} real OOF labels must match xgb_direct's -- same folds/games, different model only"
         )
-        print(f"3. {model_key}: real OOF built with head_family={head_family} distribution={method} "
-              f"({len(combo_oof['probs'])} rows)")
+        print(
+            f"3. {model_key}: real OOF built with head_family={head_family} distribution={method} "
+            f"({len(combo_oof['probs'])} rows)"
+        )
 
     calibrated_oof: dict[str, list[float]] = {}
     calibrated_labels: list[int] | None = None
@@ -129,13 +131,17 @@ def main() -> None:
         name: log_loss(calibrated_labels, calibrated_oof[name]) for name in ("two_head", "xgb_two_head")
     }
     best_coherent = min(coherent_scores, key=lambda n_: coherent_scores[n_])
-    print(f"\n5. Best calibrated coherent score model (each using its OWN real best distribution): "
-          f"{best_coherent} (two_head={coherent_scores['two_head']:.4f}, "
-          f"xgb_two_head={coherent_scores['xgb_two_head']:.4f})")
+    print(
+        f"\n5. Best calibrated coherent score model (each using its OWN real best distribution): "
+        f"{best_coherent} (two_head={coherent_scores['two_head']:.4f}, "
+        f"xgb_two_head={coherent_scores['xgb_two_head']:.4f})"
+    )
 
     candidates = [best_coherent, "xgb_direct", *ENSEMBLE_METHODS]
-    print(f"\n6. Real chronological meta-cross-fit comparison ({n} real calibrated OOF rows, "
-          f"{N_META_BLOCKS} meta-blocks, first block fit-only):")
+    print(
+        f"\n6. Real chronological meta-cross-fit comparison ({n} real calibrated OOF rows, "
+        f"{N_META_BLOCKS} meta-blocks, first block fit-only):"
+    )
     results_summary = {}
     for method in candidates:
         result = meta_cross_fit_ensemble(calibrated_oof, calibrated_labels, method, n_blocks=N_META_BLOCKS)
@@ -158,8 +164,10 @@ def main() -> None:
         max_weight = max(ens.weights.values()) if ens.weights else 0.0
         if max_weight > 0.9:
             dominant = max(ens.weights, key=lambda k: ens.weights[k])
-            print(f"      -> collapses to ~{dominant} (weight={max_weight:.3f}): "
-                  f"this ensemble method adds no real value over using {dominant} directly.")
+            print(
+                f"      -> collapses to ~{dominant} (weight={max_weight:.3f}): "
+                f"this ensemble method adds no real value over using {dominant} directly."
+            )
 
     print(
         "\n8. Real, disclosed scope: registry-safe (does not touch\n"
@@ -170,18 +178,24 @@ def main() -> None:
     )
 
     results_path = Path("outputs/rebuild/mlb_corrected_ensemble_comparison.json")
-    results_path.write_text(json.dumps({
-        "dataset_hash": dataset.dataset_hash,
-        "matched_games": dataset.matched_games,
-        "n_calibrated_oof": n,
-        "distribution_by_head_family": BEST_DISTRIBUTION_BY_HEAD_FAMILY,
-        "best_calibration_method_per_model": best_methods,
-        "best_calibrated_coherent_score_model": best_coherent,
-        "coherent_score_model_log_loss": coherent_scores,
-        "meta_cross_fit_results": results_summary,
-        "best_method_by_meta_log_loss": winner,
-        "full_history_ensemble_weights": ensemble_weights,
-    }, indent=2, default=str))
+    results_path.write_text(
+        json.dumps(
+            {
+                "dataset_hash": dataset.dataset_hash,
+                "matched_games": dataset.matched_games,
+                "n_calibrated_oof": n,
+                "distribution_by_head_family": BEST_DISTRIBUTION_BY_HEAD_FAMILY,
+                "best_calibration_method_per_model": best_methods,
+                "best_calibrated_coherent_score_model": best_coherent,
+                "coherent_score_model_log_loss": coherent_scores,
+                "meta_cross_fit_results": results_summary,
+                "best_method_by_meta_log_loss": winner,
+                "full_history_ensemble_weights": ensemble_weights,
+            },
+            indent=2,
+            default=str,
+        )
+    )
     print(f"9. Results saved to {results_path}")
 
 

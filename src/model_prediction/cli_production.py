@@ -163,8 +163,11 @@ def _git_sha() -> str:
     """Best-effort HEAD SHA for ledger run rows; ``"unknown"`` when unavailable."""
     try:
         out = subprocess.run(
-            ["git", "rev-parse", "HEAD"], capture_output=True, text=True,
-            check=True, cwd=PROJECT_ROOT,
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=PROJECT_ROOT,
         )
         return out.stdout.strip() or "unknown"
     except (OSError, subprocess.CalledProcessError):
@@ -182,17 +185,14 @@ def _open_ledger(runtime_root: Path) -> ProductionPredictionStore | None:
         return ProductionPredictionStore(_paths())
     except Exception:  # store must not fail the prediction cycle
         _logger.warning(
-            "production store unavailable at %s; this cycle's predictions "
-            "will not be recorded",
+            "production store unavailable at %s; this cycle's predictions will not be recorded",
             _paths().production_db,
             exc_info=True,
         )
         return None
 
 
-def _soft_ledger_write(
-    ledger: ProductionLedger | None, name: str, *args: Any, **kwargs: Any
-) -> None:
+def _soft_ledger_write(ledger: ProductionLedger | None, name: str, *args: Any, **kwargs: Any) -> None:
     """Call a ledger method fail-soft: log, never raise.
 
     The prediction command must succeed even when the ledger is down —
@@ -264,9 +264,7 @@ def _cmd_predict() -> int:
     model_id = entry.model_id
     artifact_rel = entry.artifact
     if not artifact_rel:
-        print(
-            f"CONFIG ERROR: primary {model_id} has no artifact path", file=sys.stderr
-        )
+        print(f"CONFIG ERROR: primary {model_id} has no artifact path", file=sys.stderr)
         return 1
     artifact_path = repo_root / artifact_rel
 
@@ -302,15 +300,13 @@ def _cmd_predict() -> int:
         events = scoreboard.get("events", [])
     except Exception as exc:  # noqa: BLE001
         print(f"ESPN ERROR: {exc}", file=sys.stderr)
-        _soft_ledger_write(ledger, "finish_run", run_id, "failed",
-                           note=f"ESPN error: {exc}")
+        _soft_ledger_write(ledger, "finish_run", run_id, "failed", note=f"ESPN error: {exc}")
         return 1
 
     if not events:
         print(f"NO_EVENTS: no {entry.sport} games scheduled for {today}")
         _record_prediction_run(model_id, artifact_hash, 0, 0)
-        _soft_ledger_write(ledger, "finish_run", run_id, "completed",
-                           note="NO_EVENTS")
+        _soft_ledger_write(ledger, "finish_run", run_id, "completed", note="NO_EVENTS")
         return 0
 
     # 5. Run predictions
@@ -332,17 +328,14 @@ def _cmd_predict() -> int:
         if "requires" in msg and "cached games before" in msg:
             print(f"NO_EVENTS: insufficient history for {today} — {msg}")
             _record_prediction_run(model_id, artifact_hash, len(events), 0)
-            _soft_ledger_write(ledger, "finish_run", run_id, "completed",
-                               note=f"insufficient history: {msg}")
+            _soft_ledger_write(ledger, "finish_run", run_id, "completed", note=f"insufficient history: {msg}")
             return 0
         print(f"PREDICTION ERROR: {exc}", file=sys.stderr)
-        _soft_ledger_write(ledger, "finish_run", run_id, "failed",
-                           note=f"ValueError: {exc}")
+        _soft_ledger_write(ledger, "finish_run", run_id, "failed", note=f"ValueError: {exc}")
         return 1
     except Exception as exc:  # noqa: BLE001
         print(f"PREDICTION ERROR: {exc}", file=sys.stderr)
-        _soft_ledger_write(ledger, "finish_run", run_id, "failed",
-                           note=f"{type(exc).__name__}: {exc}")
+        _soft_ledger_write(ledger, "finish_run", run_id, "failed", note=f"{type(exc).__name__}: {exc}")
         return 1
 
     # 6. Report results
@@ -357,8 +350,7 @@ def _cmd_predict() -> int:
     if not candidates:
         print("NO_PREDICTIONS: all events skipped or filtered")
         _record_prediction_run(model_id, artifact_hash, scheduled, 0)
-        _soft_ledger_write(ledger, "finish_run", run_id, "completed",
-                           note="NO_PREDICTIONS")
+        _soft_ledger_write(ledger, "finish_run", run_id, "completed", note="NO_PREDICTIONS")
         return 0
 
     for c in candidates:
@@ -377,7 +369,9 @@ def _cmd_predict() -> int:
         # horizon, decision_time_utc) makes a re-fired cycle with
         # identical inputs a no-op — append returns None on duplicate.
         _soft_ledger_write(
-            ledger, "append_prediction", run_id=run_id,
+            ledger,
+            "append_prediction",
+            run_id=run_id,
             prediction_id=f"{run_id}:{d['event_id']}",
             event_id=d["event_id"],
             sport=entry.sport,
@@ -402,8 +396,7 @@ def _cmd_predict() -> int:
         print(f"  SKIPPED: {s['event_id']} — {s['reason']}")
 
     _record_prediction_run(model_id, artifact_hash, scheduled, len(candidates))
-    _soft_ledger_write(ledger, "finish_run", run_id, "completed",
-                       note=f"{len(candidates)} predictions")
+    _soft_ledger_write(ledger, "finish_run", run_id, "completed", note=f"{len(candidates)} predictions")
     return 0
 
 
@@ -451,8 +444,7 @@ def _cmd_status() -> int:
     for entry in registry.entries.values():
         mark = "ok" if entry.available else f"FAILED: {entry.load_error}"
         print(
-            f"  {entry.model_id:<28} {entry.sport:<12} {entry.market:<10} "
-            f"{entry.implementation:<16} {mark}"
+            f"  {entry.model_id:<28} {entry.sport:<12} {entry.market:<10} {entry.implementation:<16} {mark}"
         )
     print()
     print(f"Last prediction:  {state.get('last_prediction_utc', 'never')}")
@@ -497,9 +489,7 @@ def _cmd_settle(args: list[str]) -> int:
     try:
         rest, note = _split_note(args)
         if len(rest) != 2 or not rest[0].isdigit():
-            raise ValueError(
-                "usage: settle <row_id> <won|lost|void> [--note TEXT]"
-            )
+            raise ValueError("usage: settle <row_id> <won|lost|void> [--note TEXT]")
         row_id = int(rest[0])
         ledger = _open_ledger_checked(_resolve_data_root())
         try:

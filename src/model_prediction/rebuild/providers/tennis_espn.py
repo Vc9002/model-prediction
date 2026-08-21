@@ -49,16 +49,24 @@ TENNIS_ESPN_RIGHTS = SourceRightsProfile(
     use_scope="research_shadow_only",
     production_allowed=False,
     policy_note=(
-        "Public, undocumented endpoint. Reachability does not grant "
-        "commercial rights to ESPN-derived data."
+        "Public, undocumented endpoint. Reachability does not grant commercial rights to ESPN-derived data."
     ),
 )
 
-REQUIRED_MATCH_COLUMNS: Final[frozenset[str]] = frozenset({
-    "espn_event_id", "espn_competition_id", "tour", "start_date",
-    "status_name", "status_completed",
-    "competitor_1_id", "competitor_1_name", "competitor_2_id", "competitor_2_name",
-})
+REQUIRED_MATCH_COLUMNS: Final[frozenset[str]] = frozenset(
+    {
+        "espn_event_id",
+        "espn_competition_id",
+        "tour",
+        "start_date",
+        "status_name",
+        "status_completed",
+        "competitor_1_id",
+        "competitor_1_name",
+        "competitor_2_id",
+        "competitor_2_name",
+    }
+)
 
 
 class ESPNTennisProvider:
@@ -135,49 +143,63 @@ class ESPNTennisProvider:
                             }
 
                         p1, p2 = _athlete(first), _athlete(second)
-                        rows.append({
-                            "espn_event_id": event_id,
-                            "espn_competition_id": str(competition.get("id") or ""),
-                            "tour": tour,
-                            "tournament_name": str(event_name),
-                            "grouping_slug": grouping_info.get("slug"),
-                            "season_year": season.get("year"),
-                            "start_date": str(competition.get("date") or competition.get("startDate") or ""),
-                            "status_name": status.get("name") or "UNKNOWN",
-                            "status_state": status.get("state"),
-                            "status_completed": bool(status.get("completed", False)),
-                            "venue_name": venue.get("fullName"),
-                            "court": venue.get("court"),
-                            "competitor_1_id": p1["id"],
-                            "competitor_1_name": p1["name"],
-                            "competitor_1_country": p1["country"],
-                            "competitor_1_winner": p1["winner"],
-                            "competitor_1_espn_home_away": p1["espn_home_away"],
-                            "competitor_2_id": p2["id"],
-                            "competitor_2_name": p2["name"],
-                            "competitor_2_country": p2["country"],
-                            "competitor_2_winner": p2["winner"],
-                            "competitor_2_espn_home_away": p2["espn_home_away"],
-                        })
+                        rows.append(
+                            {
+                                "espn_event_id": event_id,
+                                "espn_competition_id": str(competition.get("id") or ""),
+                                "tour": tour,
+                                "tournament_name": str(event_name),
+                                "grouping_slug": grouping_info.get("slug"),
+                                "season_year": season.get("year"),
+                                "start_date": str(
+                                    competition.get("date") or competition.get("startDate") or ""
+                                ),
+                                "status_name": status.get("name") or "UNKNOWN",
+                                "status_state": status.get("state"),
+                                "status_completed": bool(status.get("completed", False)),
+                                "venue_name": venue.get("fullName"),
+                                "court": venue.get("court"),
+                                "competitor_1_id": p1["id"],
+                                "competitor_1_name": p1["name"],
+                                "competitor_1_country": p1["country"],
+                                "competitor_1_winner": p1["winner"],
+                                "competitor_1_espn_home_away": p1["espn_home_away"],
+                                "competitor_2_id": p2["id"],
+                                "competitor_2_name": p2["name"],
+                                "competitor_2_country": p2["country"],
+                                "competitor_2_winner": p2["winner"],
+                                "competitor_2_espn_home_away": p2["espn_home_away"],
+                            }
+                        )
             frame = (
                 pl.DataFrame(rows)
                 if rows
-                else pl.DataFrame(schema={
-                    "espn_event_id": pl.String, "espn_competition_id": pl.String,
-                    "tour": pl.String, "start_date": pl.String,
-                })
+                else pl.DataFrame(
+                    schema={
+                        "espn_event_id": pl.String,
+                        "espn_competition_id": pl.String,
+                        "tour": pl.String,
+                        "start_date": pl.String,
+                    }
+                )
             )
         except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
             return ProviderResult(ProviderStatus.DEGRADED, metadata, None, f"ESPN tennis schema drift: {exc}")
         if not frame.is_empty():
             missing = sorted(REQUIRED_MATCH_COLUMNS - set(frame.columns))
             if missing:
-                return ProviderResult(ProviderStatus.DEGRADED, metadata, None, f"ESPN tennis schema drift: missing {missing}")
+                return ProviderResult(
+                    ProviderStatus.DEGRADED, metadata, None, f"ESPN tennis schema drift: missing {missing}"
+                )
         updated = replace(metadata, schema_hash=dataframe_schema_hash(frame))
-        return ProviderResult(ProviderStatus.AVAILABLE, updated, frame, "NO_EVENTS" if frame.is_empty() else None)
+        return ProviderResult(
+            ProviderStatus.AVAILABLE, updated, frame, "NO_EVENTS" if frame.is_empty() else None
+        )
 
     def events(self, *, sport: str, **kwargs: Any) -> ProviderResult:
         tour = str(kwargs.get("tour", "atp"))
         if sport != "tennis" or tour not in ("atp", "wta"):
-            return ProviderResult.unavailable("ESPN tennis events require sport=tennis and tour in {atp, wta}")
+            return ProviderResult.unavailable(
+                "ESPN tennis events require sport=tennis and tour in {atp, wta}"
+            )
         return self.scoreboard(tour, force=bool(kwargs.get("force")))  # type: ignore[arg-type]

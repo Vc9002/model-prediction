@@ -136,9 +136,14 @@ print(json.dumps({
     env["PYTHONPATH"] = str(REPO_ROOT / "src")
     result = subprocess.run(
         [
-            sys.executable, "-c", code, str(root), str(REPO_ROOT),
+            sys.executable,
+            "-c",
+            code,
+            str(root),
+            str(REPO_ROOT),
             json.dumps(anchor_for_test_bundle(root / "challengers" / MLB_V2_CANDIDATE_VERSION).__dict__),
-            TEST_SOURCE_TREE_HASH, json.dumps(row),
+            TEST_SOURCE_TREE_HASH,
+            json.dumps(row),
         ],
         cwd=REPO_ROOT,
         env=env,
@@ -181,7 +186,8 @@ def test_calibrator_must_be_semantically_bound_to_primary_model(sealed_bundle):
         calibrator = json.loads(original_calibrator)
         calibrator["base_model_hash"] = "wrong-primary-schema-hash"
         identity = {
-            key: value for key, value in calibrator.items()
+            key: value
+            for key, value in calibrator.items()
             if key not in {"calibrator_hash", "oof_probs", "oof_labels"}
         }
         calibrator["calibrator_hash"] = hashlib.sha256(
@@ -247,7 +253,9 @@ def test_source_tree_fingerprint_survives_commit_sha_change_but_rejects_dirty_so
     ):
         subprocess.run(args, cwd=tmp_path, check=True)
     first = verified_source_tree_hash(tmp_path)
-    subprocess.run(["git", "commit", "--allow-empty", "-qm", "merge-like sha change"], cwd=tmp_path, check=True)
+    subprocess.run(
+        ["git", "commit", "--allow-empty", "-qm", "merge-like sha change"], cwd=tmp_path, check=True
+    )
     assert verified_source_tree_hash(tmp_path) == first
     (tmp_path / "src/model_prediction/rebuild/module.py").write_text("VALUE = 2\n")
     with pytest.raises(ValueError, match="source tree is dirty"):
@@ -257,26 +265,31 @@ def test_source_tree_fingerprint_survives_commit_sha_change_but_rejects_dirty_so
 def test_runtime_predict_never_retrains_and_rejects_late_rows(sealed_bundle, tmp_path):
     root, _, _ = sealed_bundle
     frozen = _load(root)
-    tonight = pl.DataFrame({
-        "event_id": ["401"],
-        "event_start_utc": ["2099-01-02T22:10:00+00:00"],
-        "home_team": ["Seattle Mariners"],
-        "away_team": ["Detroit Tigers"],
-    })
+    tonight = pl.DataFrame(
+        {
+            "event_id": ["401"],
+            "event_start_utc": ["2099-01-02T22:10:00+00:00"],
+            "home_team": ["Seattle Mariners"],
+            "away_team": ["Detroit Tigers"],
+        }
+    )
     state = pipeline.MLBRunState(
         target_date="2099-01-02",
         tonight=tonight,
         decision_times={"401": datetime(2099, 1, 2, 21, 10, tzinfo=UTC)},
     )
-    with patch.object(pipeline, "load_frozen_mlb_v2_bundle", return_value=frozen), patch.object(
-        pipeline, "train_through", side_effect=AssertionError("runtime retraining is forbidden")
-    ), patch.object(
-        pipeline, "point_in_time_probable_starters",
-        return_value={"401": {"home_starter": "A", "away_starter": "B"}},
-    ), patch.object(
-        pipeline, "build_live_game_feature_row", return_value={"event_id": "401"}
-    ), patch.object(
-        pipeline, "_utc_now_dt", return_value=datetime(2099, 1, 2, 21, 0, tzinfo=UTC)
+    with (
+        patch.object(pipeline, "load_frozen_mlb_v2_bundle", return_value=frozen),
+        patch.object(
+            pipeline, "train_through", side_effect=AssertionError("runtime retraining is forbidden")
+        ),
+        patch.object(
+            pipeline,
+            "point_in_time_probable_starters",
+            return_value={"401": {"home_starter": "A", "away_starter": "B"}},
+        ),
+        patch.object(pipeline, "build_live_game_feature_row", return_value={"event_id": "401"}),
+        patch.object(pipeline, "_utc_now_dt", return_value=datetime(2099, 1, 2, 21, 0, tzinfo=UTC)),
     ):
         on_time = pipeline.predict_stage(state, str(tmp_path))
     assert on_time["games_predicted"] == 1
@@ -287,10 +300,12 @@ def test_runtime_predict_never_retrains_and_rejects_late_rows(sealed_bundle, tmp
         tonight=tonight,
         decision_times={"401": datetime(2099, 1, 2, 21, 10, tzinfo=UTC)},
     )
-    with patch.object(pipeline, "load_frozen_mlb_v2_bundle", return_value=frozen), patch.object(
-        pipeline, "train_through", side_effect=AssertionError("runtime retraining is forbidden")
-    ), patch.object(
-        pipeline, "_utc_now_dt", return_value=datetime(2099, 1, 2, 21, 11, tzinfo=UTC)
+    with (
+        patch.object(pipeline, "load_frozen_mlb_v2_bundle", return_value=frozen),
+        patch.object(
+            pipeline, "train_through", side_effect=AssertionError("runtime retraining is forbidden")
+        ),
+        patch.object(pipeline, "_utc_now_dt", return_value=datetime(2099, 1, 2, 21, 11, tzinfo=UTC)),
     ):
         late = pipeline.predict_stage(late_state, str(tmp_path))
     assert late["games_predicted"] == 0
@@ -303,12 +318,14 @@ def test_resume_reloads_identical_full_uncertainty_bundle(sealed_bundle, tmp_pat
     event_id = row["event_id"]
     state = pipeline.MLBRunState(
         target_date="2099-01-02",
-        tonight=pl.DataFrame({
-            "event_id": [event_id],
-            "event_start_utc": ["2099-01-02T22:10:00+00:00"],
-            "home_team": ["Seattle Mariners"],
-            "away_team": ["Detroit Tigers"],
-        }),
+        tonight=pl.DataFrame(
+            {
+                "event_id": [event_id],
+                "event_start_utc": ["2099-01-02T22:10:00+00:00"],
+                "home_team": ["Seattle Mariners"],
+                "away_team": ["Detroit Tigers"],
+            }
+        ),
         decision_times={event_id: datetime(2099, 1, 2, 21, 10, tzinfo=UTC)},
         rows_by_event={event_id: row},
         prediction_observed_at_by_event={event_id: "2099-01-02T21:00:00+00:00"},

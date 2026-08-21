@@ -150,7 +150,9 @@ def _provenance(metadata: SourceResponseMetadata, record_id: str) -> dict[str, A
 
 
 def _schedule(
-    frame: pl.DataFrame, metadata: SourceResponseMetadata, registry: IdentityRegistry,
+    frame: pl.DataFrame,
+    metadata: SourceResponseMetadata,
+    registry: IdentityRegistry,
 ) -> pl.DataFrame:
     rows: list[dict[str, Any]] = []
     for row in frame.iter_rows(named=True):
@@ -176,33 +178,37 @@ def _schedule(
         )
         if event_canonical_id is None:
             raise ValueError(f"unresolved canonical WNBA event: {event_id}")
-        rows.append({
-            **_provenance(metadata, event_id),
-            "event_id": event_id,
-            "season": int(row["season"]),
-            "season_type": _as_int(row.get("season_type")),
-            "event_start_utc": event_start,
-            "sports_event_date": sports_event_date(event_start),
-            "status": str(row.get("status_type_name") or row.get("status_type_description") or "UNKNOWN"),
-            "completed": completed,
-            "home_team_id": str(row["home_id"]),
-            "away_team_id": str(row["away_id"]),
-            "home_team_canonical_id": home_canonical_id,
-            "away_team_canonical_id": away_canonical_id,
-            "event_canonical_id": event_canonical_id,
-            "home_team_name": home_name,
-            "away_team_name": away_name,
-            "home_score": _as_int(row.get("home_score")),
-            "away_score": _as_int(row.get("away_score")),
-            "venue_id": str(row.get("venue_id") or "") or None,
-            "venue_name": row.get("venue_full_name"),
-            "pit_eligible": True,
-        })
+        rows.append(
+            {
+                **_provenance(metadata, event_id),
+                "event_id": event_id,
+                "season": int(row["season"]),
+                "season_type": _as_int(row.get("season_type")),
+                "event_start_utc": event_start,
+                "sports_event_date": sports_event_date(event_start),
+                "status": str(row.get("status_type_name") or row.get("status_type_description") or "UNKNOWN"),
+                "completed": completed,
+                "home_team_id": str(row["home_id"]),
+                "away_team_id": str(row["away_id"]),
+                "home_team_canonical_id": home_canonical_id,
+                "away_team_canonical_id": away_canonical_id,
+                "event_canonical_id": event_canonical_id,
+                "home_team_name": home_name,
+                "away_team_name": away_name,
+                "home_score": _as_int(row.get("home_score")),
+                "away_score": _as_int(row.get("away_score")),
+                "venue_id": str(row.get("venue_id") or "") or None,
+                "venue_name": row.get("venue_full_name"),
+                "pit_eligible": True,
+            }
+        )
     return pl.DataFrame(rows)
 
 
 def _team_box(
-    frame: pl.DataFrame, metadata: SourceResponseMetadata, registry: IdentityRegistry,
+    frame: pl.DataFrame,
+    metadata: SourceResponseMetadata,
+    registry: IdentityRegistry,
 ) -> pl.DataFrame:
     rows: list[dict[str, Any]] = []
     for row in frame.iter_rows(named=True):
@@ -214,36 +220,40 @@ def _team_box(
         opponent_canonical_id = _existing_identity(registry, opponent_id, "team")
         if opponent_canonical_id is None:
             raise ValueError(f"missing WNBA opponent ID for {event_id}:{team_id}")
-        rows.append({
-            **_provenance(metadata, f"{event_id}:{team_id}"),
-            "event_id": event_id,
-            "season": int(row["season"]),
-            "event_start_utc": event_start,
-            "sports_event_date": sports_event_date(event_start),
-            "team_id": team_id,
-            "team_canonical_id": team_canonical_id,
-            "opponent_team_id": opponent_id,
-            "opponent_team_canonical_id": opponent_canonical_id,
-            "team_name": team_name,
-            "home_away": str(row["team_home_away"]),
-            "points": _as_int(row.get("team_score")),
-            "field_goals_made": _as_int(row.get("field_goals_made")),
-            "field_goals_attempted": _as_int(row.get("field_goals_attempted")),
-            "three_points_made": _as_int(row.get("three_point_field_goals_made")),
-            "three_points_attempted": _as_int(row.get("three_point_field_goals_attempted")),
-            "free_throws_made": _as_int(row.get("free_throws_made")),
-            "free_throws_attempted": _as_int(row.get("free_throws_attempted")),
-            "offensive_rebounds": _as_int(row.get("offensive_rebounds")),
-            "defensive_rebounds": _as_int(row.get("defensive_rebounds")),
-            "assists": _as_int(row.get("assists")),
-            "turnovers": _as_int(row.get("turnovers") or row.get("team_turnovers")),
-            "pit_eligible": True,
-        })
+        rows.append(
+            {
+                **_provenance(metadata, f"{event_id}:{team_id}"),
+                "event_id": event_id,
+                "season": int(row["season"]),
+                "event_start_utc": event_start,
+                "sports_event_date": sports_event_date(event_start),
+                "team_id": team_id,
+                "team_canonical_id": team_canonical_id,
+                "opponent_team_id": opponent_id,
+                "opponent_team_canonical_id": opponent_canonical_id,
+                "team_name": team_name,
+                "home_away": str(row["team_home_away"]),
+                "points": _as_int(row.get("team_score")),
+                "field_goals_made": _as_int(row.get("field_goals_made")),
+                "field_goals_attempted": _as_int(row.get("field_goals_attempted")),
+                "three_points_made": _as_int(row.get("three_point_field_goals_made")),
+                "three_points_attempted": _as_int(row.get("three_point_field_goals_attempted")),
+                "free_throws_made": _as_int(row.get("free_throws_made")),
+                "free_throws_attempted": _as_int(row.get("free_throws_attempted")),
+                "offensive_rebounds": _as_int(row.get("offensive_rebounds")),
+                "defensive_rebounds": _as_int(row.get("defensive_rebounds")),
+                "assists": _as_int(row.get("assists")),
+                "turnovers": _as_int(row.get("turnovers") or row.get("team_turnovers")),
+                "pit_eligible": True,
+            }
+        )
     return pl.DataFrame(rows)
 
 
 def _player_box(
-    frame: pl.DataFrame, metadata: SourceResponseMetadata, registry: IdentityRegistry,
+    frame: pl.DataFrame,
+    metadata: SourceResponseMetadata,
+    registry: IdentityRegistry,
 ) -> pl.DataFrame:
     rows: list[dict[str, Any]] = []
     for row in frame.iter_rows(named=True):
@@ -253,34 +263,41 @@ def _player_box(
         team_canonical_id = _existing_identity(registry, team_id, "team")
         if team_canonical_id is None:
             raise ValueError(f"missing WNBA team ID for player {player_id}")
-        rows.append({
-            **_provenance(metadata, f"{event_id}:{team_id}:{player_id}"),
-            "event_id": event_id,
-            "season": int(row["season"]),
-            "event_start_utc": event_start,
-            "sports_event_date": sports_event_date(event_start),
-            "team_id": team_id,
-            "player_id": player_id,
-            "team_canonical_id": team_canonical_id,
-            "player_canonical_id": _player_canonical_id(
-                registry, player_id, player_name, event_start,
-            ),
-            "player_name": player_name,
-            "starter": _as_bool(row.get("starter", False)),
-            "active": _as_bool(row.get("active", False)),
-            "did_not_play": _as_bool(row.get("did_not_play", False)),
-            "minutes_text": str(row.get("min") or "") or None,
-            "points": _as_int(row.get("pts")),
-            "rebounds": _as_int(row.get("reb")),
-            "assists": _as_int(row.get("ast")),
-            "plus_minus": _as_float(row.get("plus_minus")),
-            "pit_eligible": True,
-        })
+        rows.append(
+            {
+                **_provenance(metadata, f"{event_id}:{team_id}:{player_id}"),
+                "event_id": event_id,
+                "season": int(row["season"]),
+                "event_start_utc": event_start,
+                "sports_event_date": sports_event_date(event_start),
+                "team_id": team_id,
+                "player_id": player_id,
+                "team_canonical_id": team_canonical_id,
+                "player_canonical_id": _player_canonical_id(
+                    registry,
+                    player_id,
+                    player_name,
+                    event_start,
+                ),
+                "player_name": player_name,
+                "starter": _as_bool(row.get("starter", False)),
+                "active": _as_bool(row.get("active", False)),
+                "did_not_play": _as_bool(row.get("did_not_play", False)),
+                "minutes_text": str(row.get("min") or "") or None,
+                "points": _as_int(row.get("pts")),
+                "rebounds": _as_int(row.get("reb")),
+                "assists": _as_int(row.get("ast")),
+                "plus_minus": _as_float(row.get("plus_minus")),
+                "pit_eligible": True,
+            }
+        )
     return pl.DataFrame(rows)
 
 
 def _rosters(
-    frame: pl.DataFrame, metadata: SourceResponseMetadata, registry: IdentityRegistry,
+    frame: pl.DataFrame,
+    metadata: SourceResponseMetadata,
+    registry: IdentityRegistry,
 ) -> pl.DataFrame:
     rows: list[dict[str, Any]] = []
     for row in frame.iter_rows(named=True):
@@ -288,55 +305,69 @@ def _rosters(
         team_name = str(row["team_display_name"])
         player_name = str(row["display_name"])
         team_canonical_id = _team_canonical_id(
-            registry, team_id, team_name, metadata.observed_at_utc,
+            registry,
+            team_id,
+            team_name,
+            metadata.observed_at_utc,
         )
-        rows.append({
-            **_provenance(metadata, f"{season}:{team_id}:{player_id}"),
-            "season": season,
-            "team_id": team_id,
-            "team_canonical_id": team_canonical_id,
-            "team_name": team_name,
-            "player_id": player_id,
-            "player_canonical_id": _player_canonical_id(
-                registry, player_id, player_name, metadata.observed_at_utc,
-            ),
-            "player_name": player_name,
-            "position": row.get("position_abbreviation"),
-            "jersey": row.get("jersey"),
-            "roster_status": row.get("status_name") or row.get("status_type"),
-            "pit_eligible": True,
-        })
+        rows.append(
+            {
+                **_provenance(metadata, f"{season}:{team_id}:{player_id}"),
+                "season": season,
+                "team_id": team_id,
+                "team_canonical_id": team_canonical_id,
+                "team_name": team_name,
+                "player_id": player_id,
+                "player_canonical_id": _player_canonical_id(
+                    registry,
+                    player_id,
+                    player_name,
+                    metadata.observed_at_utc,
+                ),
+                "player_name": player_name,
+                "position": row.get("position_abbreviation"),
+                "jersey": row.get("jersey"),
+                "roster_status": row.get("status_name") or row.get("status_type"),
+                "pit_eligible": True,
+            }
+        )
     return pl.DataFrame(rows)
 
 
 def _pbp(
-    frame: pl.DataFrame, metadata: SourceResponseMetadata, registry: IdentityRegistry,
+    frame: pl.DataFrame,
+    metadata: SourceResponseMetadata,
+    registry: IdentityRegistry,
 ) -> pl.DataFrame:
     rows: list[dict[str, Any]] = []
     for row in frame.iter_rows(named=True):
         event_id, play_id = str(row["game_id"]), str(row["id"])
         event_start = _utc_iso(row["game_date_time"])
-        rows.append({
-            **_provenance(metadata, f"{event_id}:{play_id}"),
-            "event_id": event_id,
-            "play_id": play_id,
-            "season": int(row["season"]),
-            "event_start_utc": event_start,
-            "sports_event_date": sports_event_date(event_start),
-            "period": int(row["period_number"]),
-            "clock": str(row.get("clock_display_value") or row.get("time") or ""),
-            "text": str(row.get("text") or ""),
-            "team_id": str(row.get("team_id") or "") or None,
-            "team_canonical_id": _existing_identity(registry, row.get("team_id"), "team"),
-            "player_1_id": str(row.get("athlete_id_1") or "") or None,
-            "player_1_canonical_id": _existing_identity(
-                registry, row.get("athlete_id_1"), "player",
-            ),
-            "home_score": _as_int(row.get("home_score")),
-            "away_score": _as_int(row.get("away_score")),
-            "scoring_play": _as_bool(row.get("scoring_play", False)),
-            "pit_eligible": True,
-        })
+        rows.append(
+            {
+                **_provenance(metadata, f"{event_id}:{play_id}"),
+                "event_id": event_id,
+                "play_id": play_id,
+                "season": int(row["season"]),
+                "event_start_utc": event_start,
+                "sports_event_date": sports_event_date(event_start),
+                "period": int(row["period_number"]),
+                "clock": str(row.get("clock_display_value") or row.get("time") or ""),
+                "text": str(row.get("text") or ""),
+                "team_id": str(row.get("team_id") or "") or None,
+                "team_canonical_id": _existing_identity(registry, row.get("team_id"), "team"),
+                "player_1_id": str(row.get("athlete_id_1") or "") or None,
+                "player_1_canonical_id": _existing_identity(
+                    registry,
+                    row.get("athlete_id_1"),
+                    "player",
+                ),
+                "home_score": _as_int(row.get("home_score")),
+                "away_score": _as_int(row.get("away_score")),
+                "scoring_play": _as_bool(row.get("scoring_play", False)),
+                "pit_eligible": True,
+            }
+        )
     return pl.DataFrame(rows)
 
 

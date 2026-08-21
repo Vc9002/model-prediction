@@ -30,11 +30,7 @@ def team_schedule_load(
 ) -> TeamScheduleLoad:
     """Return schedule load known immediately before ``event_start``."""
     prior = sorted(
-        (
-            game
-            for game in games
-            if team in (game.home_team, game.away_team) and game.start < event_start
-        ),
+        (game for game in games if team in (game.home_team, game.away_team) and game.start < event_start),
         key=lambda game: game.start,
     )
     if not prior:

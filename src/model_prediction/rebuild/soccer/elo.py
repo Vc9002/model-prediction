@@ -72,9 +72,7 @@ def _tau(h: int, a: int, lambda_h: float, lambda_a: float, rho: float) -> float:
     return 1.0
 
 
-def _bivariate_poisson_logpmf(
-    h: int, a: int, lambda_h: float, lambda_a: float, rho: float
-) -> float:
+def _bivariate_poisson_logpmf(h: int, a: int, lambda_h: float, lambda_a: float, rho: float) -> float:
     """Log-probability of (h, a) goals under Dixon-Coles bivariate Poisson."""
     tau_val = _tau(h, a, lambda_h, lambda_a, rho)
     if tau_val <= 0:
@@ -183,9 +181,9 @@ class DixonColesModel:
         away_goals = np.array(matches["away_score"].to_list(), dtype=np.int64)
 
         if "competition_id" in matches.columns:
-            league_idx = np.array([
-                league_to_idx.get(m["competition_id"], 0) for m in matches.iter_rows(named=True)
-            ])
+            league_idx = np.array(
+                [league_to_idx.get(m["competition_id"], 0) for m in matches.iter_rows(named=True)]
+            )
         else:
             league_idx = np.zeros(len(home_idx), dtype=np.int64)
 
@@ -219,8 +217,10 @@ class DixonColesModel:
         _gammaln_lookup = np.array([gammaln(k + 1) for k in range(21)])
 
         def _vec_logpmf(
-            h: np.ndarray, a: np.ndarray,
-            lambda_h: np.ndarray, lambda_a: np.ndarray,
+            h: np.ndarray,
+            a: np.ndarray,
+            lambda_h: np.ndarray,
+            lambda_a: np.ndarray,
             rho: float,
         ) -> np.ndarray:
             """Vectorized bivariate Poisson log-PMF with Dixon-Coles tau."""
@@ -230,8 +230,10 @@ class DixonColesModel:
 
             # Base Poisson log-prob
             log_p = (
-                h * np.log(lh) + a * np.log(la)
-                - lh - la
+                h * np.log(lh)
+                + a * np.log(la)
+                - lh
+                - la
                 - _gammaln_lookup[h.clip(0, 20)]
                 - _gammaln_lookup[a.clip(0, 20)]
             )
@@ -254,18 +256,16 @@ class DixonColesModel:
 
         def neg_log_likelihood(x: np.ndarray) -> float:
             attack, defense, league_base, home_adv, rho = unpack(x)
-            lambda_h = np.exp(
-                league_base[league_idx] + attack[home_idx] + defense[away_idx] + home_adv
-            )
-            lambda_a = np.exp(
-                league_base[league_idx] + attack[away_idx] + defense[home_idx]
-            )
+            lambda_h = np.exp(league_base[league_idx] + attack[home_idx] + defense[away_idx] + home_adv)
+            lambda_a = np.exp(league_base[league_idx] + attack[away_idx] + defense[home_idx])
             ll = _vec_logpmf(home_goals, away_goals, lambda_h, lambda_a, rho)
             return float(-ll.sum())
 
         if verbose:
-            print(f"Fitting Dixon-Coles: {n_teams} teams, {n_leagues} leagues, "
-                  f"{n_matches} matches, {n_params} parameters")
+            print(
+                f"Fitting Dixon-Coles: {n_teams} teams, {n_leagues} leagues, "
+                f"{n_matches} matches, {n_params} parameters"
+            )
 
         result = minimize(
             neg_log_likelihood,
@@ -314,9 +314,7 @@ class DixonColesModel:
 
         league_base = self.params.league_baseline.get(
             league or "default",
-            np.mean(list(self.params.league_baseline.values()))
-            if self.params.league_baseline
-            else 0.3,
+            np.mean(list(self.params.league_baseline.values())) if self.params.league_baseline else 0.3,
         )
 
         lambda_h = np.exp(league_base + attack_h + defense_a + self.params.home_advantage)
@@ -324,9 +322,7 @@ class DixonColesModel:
 
         return _score_matrix_probability(lambda_h, lambda_a, self.params.rho)
 
-    def predict_batch(
-        self, matches: pl.DataFrame
-    ) -> pl.DataFrame:
+    def predict_batch(self, matches: pl.DataFrame) -> pl.DataFrame:
         """Predict probabilities for a batch of matches.
 
         Args:

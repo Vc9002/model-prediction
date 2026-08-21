@@ -72,9 +72,7 @@ def test_mutation_and_audit_event_commit_in_one_transaction(tmp_path) -> None:
         store.apply(m1)
         store.apply(m2)
 
-        events = store._conn.execute(
-            "SELECT * FROM ledger_events ORDER BY sequence"
-        ).fetchall()
+        events = store._conn.execute("SELECT * FROM ledger_events ORDER BY sequence").fetchall()
         assert len(events) == 2
         assert events[0]["previous_hash"] is None
         assert events[1]["previous_hash"] == events[0]["event_hash"]
@@ -89,9 +87,7 @@ def test_tampering_breaks_the_integrity_check(tmp_path) -> None:
     with RuntimeLedgerStore(paths) as store:
         store.apply(_mutation())
         store.apply(_mutation(event_id="401690002"))
-        store._conn.execute(
-            "UPDATE ledger_events SET event_hash = 'deadbeef' WHERE sequence = 1"
-        )
+        store._conn.execute("UPDATE ledger_events SET event_hash = 'deadbeef' WHERE sequence = 1")
         store._conn.commit()
         ok, problems = store.verify_integrity()
         assert not ok
@@ -156,9 +152,7 @@ def test_main_ledger_dual_writes_append_and_settle_to_the_mirror(tmp_path) -> No
         assert record["model_id"] == "mlb-test-v1"
 
         # Append + settle = two hash-linked audit events, chain intact.
-        events = store._conn.execute(
-            "SELECT COUNT(*) AS n FROM ledger_events"
-        ).fetchone()
+        events = store._conn.execute("SELECT COUNT(*) AS n FROM ledger_events").fetchone()
         assert events["n"] == 2
         ok, problems = store.verify_integrity()
         assert ok, problems
@@ -216,13 +210,34 @@ def test_spread_total_and_soccer_shapes_map_canonical_fields(tmp_path) -> None:
     """G6: market shapes populate different fields — the canonical mapping
     must carry market_type/selection/line/status correctly for each."""
     from model_prediction.ledger import PickLedger
+
     ledger = PickLedger(tmp_path / "p.xlsx", tier="flat", mirror=None)
     cases = [
         # (row, market_type, selection, line)
-        ({"market_type": "spread", "selection": "home", "line": "3.5", "decision_line": ""}, "spread", "home", 3.5),
-        ({"market_type": "total", "selection": "over", "line": "8.5", "decision_line": "8.5"}, "total", "over", 8.5),
-        ({"market_type": "moneyline", "selection": "draw", "line": "", "decision_line": ""}, "moneyline", "draw", None),
-        ({"market_type": "moneyline", "selection": "", "line": "", "decision_line": "-1.5"}, "moneyline", None, -1.5),
+        (
+            {"market_type": "spread", "selection": "home", "line": "3.5", "decision_line": ""},
+            "spread",
+            "home",
+            3.5,
+        ),
+        (
+            {"market_type": "total", "selection": "over", "line": "8.5", "decision_line": "8.5"},
+            "total",
+            "over",
+            8.5,
+        ),
+        (
+            {"market_type": "moneyline", "selection": "draw", "line": "", "decision_line": ""},
+            "moneyline",
+            "draw",
+            None,
+        ),
+        (
+            {"market_type": "moneyline", "selection": "", "line": "", "decision_line": "-1.5"},
+            "moneyline",
+            None,
+            -1.5,
+        ),
     ]
     for row, market, selection, line in cases:
         mutation = ledger._row_mutation(
@@ -314,9 +329,7 @@ def test_archive_and_remove_leave_exempt_tombstones_in_the_mirror(tmp_path) -> N
     ledger = PickLedger(tmp_path / "picks.xlsx", tier="flat", mirror=store)
     logged = ledger.append_call(make_request(), 0.25, 70)
     ledger.settle(logged["pick_id"], away_score=2, home_score=3)
-    removed = ledger.archive_settled_rows(
-        [logged["pick_id"]], "retired model", "archive/test.xlsx"
-    )
+    removed = ledger.archive_settled_rows([logged["pick_id"]], "retired model", "archive/test.xlsx")
     assert len(removed) == 1
 
     records = store.records(tier="flat")

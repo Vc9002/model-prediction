@@ -58,11 +58,15 @@ class StatcastProvider:
         try:
             frame = pl.read_csv(io.BytesIO(body), infer_schema_length=10000, null_values=["null", ""])
         except Exception as exc:  # noqa: BLE001 - parser boundary
-            return ProviderResult(ProviderStatus.DEGRADED, metadata, None, f"Statcast CSV parse failed: {exc}")
+            return ProviderResult(
+                ProviderStatus.DEGRADED, metadata, None, f"Statcast CSV parse failed: {exc}"
+            )
         required = {"game_pk", "game_date", "at_bat_number", "pitch_number"}
         missing = sorted(required - set(frame.columns))
         if missing:
-            return ProviderResult(ProviderStatus.DEGRADED, metadata, None, f"Statcast schema drift: missing {missing}")
+            return ProviderResult(
+                ProviderStatus.DEGRADED, metadata, None, f"Statcast schema drift: missing {missing}"
+            )
         return ProviderResult(
             ProviderStatus.AVAILABLE,
             replace(metadata, schema_hash=dataframe_schema_hash(frame)),
@@ -99,7 +103,9 @@ class StatcastProvider:
                 )
                 return result
             except Exception as exc:  # noqa: BLE001 - cache boundary
-                return ProviderResult(ProviderStatus.DEGRADED, cached.metadata, None, f"cached parse failed: {exc}")
+                return ProviderResult(
+                    ProviderStatus.DEGRADED, cached.metadata, None, f"cached parse failed: {exc}"
+                )
         try:
             fetched = self.http.get(STATCAST_CSV_URL, params=params)
         except Exception as exc:  # noqa: BLE001 - network boundary

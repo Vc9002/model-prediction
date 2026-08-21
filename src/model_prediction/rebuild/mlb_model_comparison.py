@@ -49,7 +49,9 @@ def build_mlb_moneyline_oof(features: pl.DataFrame, folds) -> dict[str, dict[str
     {model_name: {"probs": [...], "labels": [...], "cohorts": [...]}}
     with every list in real chronological order -- required by any
     downstream chronological cross-fitting (calibration or ensemble)."""
-    oof: dict[str, dict[str, list]] = {name: {"probs": [], "labels": [], "cohorts": []} for name in MODEL_NAMES}
+    oof: dict[str, dict[str, list]] = {
+        name: {"probs": [], "labels": [], "cohorts": []} for name in MODEL_NAMES
+    }
 
     for fold in folds:
         train_df = features.filter(pl.col("game_date") <= fold.train_end)
@@ -72,11 +74,15 @@ def build_mlb_moneyline_oof(features: pl.DataFrame, folds) -> dict[str, dict[str
         xgb_two_head_probs = [xgb_two_head.predict_row(r["event_id"], r).home_win_prob for r in val_rows]
 
         X_train = train_df.select(XGB_DIRECT_FEATURES).to_numpy()
-        y_train_arr = train_df.select(
-            (pl.col("home_score") > pl.col("away_score")).cast(pl.Int8).alias("y")
-        ).to_numpy().ravel()
+        y_train_arr = (
+            train_df.select((pl.col("home_score") > pl.col("away_score")).cast(pl.Int8).alias("y"))
+            .to_numpy()
+            .ravel()
+        )
         X_val = val_df.select(XGB_DIRECT_FEATURES).to_numpy()
-        nested_result = nested_xgboost_fold(X_train, y_train_arr, X_val, y_val_fold, fold_index=fold.fold_index)
+        nested_result = nested_xgboost_fold(
+            X_train, y_train_arr, X_val, y_val_fold, fold_index=fold.fold_index
+        )
 
         oof["two_head"]["probs"].extend(two_head_probs)
         oof["xgb_two_head"]["probs"].extend(xgb_two_head_probs)
@@ -95,8 +101,12 @@ HEAD_FACTORIES: dict[str, Callable[..., Any]] = {
 
 
 def build_mlb_coherent_oof_for_combo(
-    features: pl.DataFrame, folds, head_family: str, method: str,
-    intensity_features: list[str] | None = None, differential_features: list[str] | None = None,
+    features: pl.DataFrame,
+    folds,
+    head_family: str,
+    method: str,
+    intensity_features: list[str] | None = None,
+    differential_features: list[str] | None = None,
 ) -> dict[str, list]:
     """Real chronological OOF moneyline predictions for one exact
     (head_family, distribution method) combination -- e.g.
@@ -113,7 +123,9 @@ def build_mlb_coherent_oof_for_combo(
     dataset in tests. Returns {"probs": [...], "labels": [...]} in real
     chronological order."""
     intensity_features = intensity_features if intensity_features is not None else INTENSITY_FEATURES
-    differential_features = differential_features if differential_features is not None else DIFFERENTIAL_FEATURES
+    differential_features = (
+        differential_features if differential_features is not None else DIFFERENTIAL_FEATURES
+    )
     factory = HEAD_FACTORIES[head_family]
     result: dict[str, list] = {"probs": [], "labels": []}
     for fold in folds:

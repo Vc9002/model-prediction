@@ -201,8 +201,12 @@ class MetadataDB:
         self.conn.commit()
 
     def register_source_sport(
-        self, source_id: str, sport: str, data_type: str,
-        coverage_start: str | None = None, coverage_end: str | None = None,
+        self,
+        source_id: str,
+        sport: str,
+        data_type: str,
+        coverage_start: str | None = None,
+        coverage_end: str | None = None,
     ) -> None:
         self.conn.execute(
             """INSERT OR REPLACE INTO source_sports(source_id, sport, data_type, coverage_start, coverage_end)
@@ -214,8 +218,12 @@ class MetadataDB:
     # ── schema registration ────────────────────────────────────────────
 
     def register_schema(
-        self, schema_id: str, source_id: str, table_name: str,
-        columns: list[dict[str, str]], schema_version: str = "1",
+        self,
+        schema_id: str,
+        source_id: str,
+        table_name: str,
+        columns: list[dict[str, str]],
+        schema_version: str = "1",
     ) -> None:
         self.conn.execute(
             """INSERT OR REPLACE INTO schemas(schema_id, source_id, table_name, schema_version, columns_json, created_utc)
@@ -227,35 +235,67 @@ class MetadataDB:
     # ── model registry ─────────────────────────────────────────────────
 
     def register_model(
-        self, model_id: str, sport: str, market_type: str, family: str,
-        version: str, artifact_hash: str, artifact_path: str | None = None,
-        qualified: bool = False, status: str = "research", notes: str | None = None,
+        self,
+        model_id: str,
+        sport: str,
+        market_type: str,
+        family: str,
+        version: str,
+        artifact_hash: str,
+        artifact_path: str | None = None,
+        qualified: bool = False,
+        status: str = "research",
+        notes: str | None = None,
     ) -> None:
         self.conn.execute(
             """INSERT OR REPLACE INTO models(model_id, sport, market_type, family, version,
                artifact_hash, artifact_path, qualified, status, created_utc, notes)
                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (model_id, sport, market_type, family, version, artifact_hash,
-             artifact_path, int(qualified), status, utc_now(), notes),
+            (
+                model_id,
+                sport,
+                market_type,
+                family,
+                version,
+                artifact_hash,
+                artifact_path,
+                int(qualified),
+                status,
+                utc_now(),
+                notes,
+            ),
         )
         self.conn.commit()
 
     # ── entity registry ────────────────────────────────────────────────
 
     def register_entity(
-        self, entity_id: str, entity_type: str, canonical_name: str,
-        sport: str, effective_from_utc: str, attributes: dict | None = None,
+        self,
+        entity_id: str,
+        entity_type: str,
+        canonical_name: str,
+        sport: str,
+        effective_from_utc: str,
+        attributes: dict | None = None,
     ) -> None:
         self.conn.execute(
             """INSERT OR REPLACE INTO entities(entity_id, entity_type, canonical_name, sport,
                effective_from_utc, attributes_json)
                VALUES(?, ?, ?, ?, ?, ?)""",
-            (entity_id, entity_type, canonical_name, sport, effective_from_utc,
-             json.dumps(attributes) if attributes else None),
+            (
+                entity_id,
+                entity_type,
+                canonical_name,
+                sport,
+                effective_from_utc,
+                json.dumps(attributes) if attributes else None,
+            ),
         )
         self.conn.commit()
 
-    def map_entity(self, entity_id: str, source_id: str, source_entity_id: str, confidence: float = 1.0) -> None:
+    def map_entity(
+        self, entity_id: str, source_id: str, source_entity_id: str, confidence: float = 1.0
+    ) -> None:
         self.conn.execute(
             """INSERT OR REPLACE INTO entity_mappings(entity_id, source_id, source_entity_id, confidence)
                VALUES(?, ?, ?, ?)""",
@@ -265,25 +305,45 @@ class MetadataDB:
 
     # ── audit ──────────────────────────────────────────────────────────
 
-    def audit_event(self, event_type: str, details: dict | None = None,
-                    entity_type: str | None = None, entity_id: str | None = None) -> str:
+    def audit_event(
+        self,
+        event_type: str,
+        details: dict | None = None,
+        entity_type: str | None = None,
+        entity_id: str | None = None,
+    ) -> str:
         import hashlib
         import uuid
+
         event_id = uuid.uuid4().hex
         now = utc_now()
-        prev = self.conn.execute(
-            "SELECT event_hash FROM audit ORDER BY created_utc DESC LIMIT 1"
-        ).fetchone()
+        prev = self.conn.execute("SELECT event_hash FROM audit ORDER BY created_utc DESC LIMIT 1").fetchone()
         previous_hash = prev["event_hash"] if prev else ""
-        raw = json.dumps({
-            "event_id": event_id, "event_type": event_type,
-            "entity_type": entity_type, "entity_id": entity_id,
-            "details": details, "previous_hash": previous_hash, "created_utc": now,
-        }, sort_keys=True)
+        raw = json.dumps(
+            {
+                "event_id": event_id,
+                "event_type": event_type,
+                "entity_type": entity_type,
+                "entity_id": entity_id,
+                "details": details,
+                "previous_hash": previous_hash,
+                "created_utc": now,
+            },
+            sort_keys=True,
+        )
         event_hash = hashlib.sha256(raw.encode()).hexdigest()
         self.conn.execute(
             "INSERT INTO audit(event_id, event_type, entity_type, entity_id, details_json, previous_hash, event_hash, created_utc) VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
-            (event_id, event_type, entity_type, entity_id, json.dumps(details) if details else None, previous_hash, event_hash, now),
+            (
+                event_id,
+                event_type,
+                entity_type,
+                entity_id,
+                json.dumps(details) if details else None,
+                previous_hash,
+                event_hash,
+                now,
+            ),
         )
         self.conn.commit()
         return event_id
@@ -294,9 +354,12 @@ class MetadataDB:
         return [dict(r) for r in self.conn.execute("SELECT * FROM sources ORDER BY source_id").fetchall()]
 
     def models_by_sport(self, sport: str) -> list[dict[str, Any]]:
-        return [dict(r) for r in self.conn.execute(
-            "SELECT * FROM models WHERE sport=? ORDER BY version", (sport,)
-        ).fetchall()]
+        return [
+            dict(r)
+            for r in self.conn.execute(
+                "SELECT * FROM models WHERE sport=? ORDER BY version", (sport,)
+            ).fetchall()
+        ]
 
     def entity_by_source(self, source_id: str, source_entity_id: str) -> dict[str, Any] | None:
         row = self.conn.execute(

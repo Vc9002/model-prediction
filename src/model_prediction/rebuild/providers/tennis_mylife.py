@@ -50,11 +50,21 @@ DATA_FILES_INDEX_URL = "https://stats.tennismylife.org/api/data-files"
 DATA_FILE_BASE_URL = "https://stats.tennismylife.org/data/"
 PARSER_VERSION = "tennis-mylife-csv-v1"
 
-REQUIRED_MATCH_COLUMNS: Final[frozenset[str]] = frozenset({
-    "tourney_id", "tourney_name", "surface", "tourney_date",
-    "winner_id", "winner_name", "loser_id", "loser_name",
-    "score", "best_of", "round",
-})
+REQUIRED_MATCH_COLUMNS: Final[frozenset[str]] = frozenset(
+    {
+        "tourney_id",
+        "tourney_name",
+        "surface",
+        "tourney_date",
+        "winner_id",
+        "winner_name",
+        "loser_id",
+        "loser_name",
+        "score",
+        "best_of",
+        "round",
+    }
+)
 
 Tour = Literal["atp", "wta"]
 MatchKind = Literal["main", "challenger", "qualifying"]
@@ -120,7 +130,9 @@ class TennisMyLifeProvider:
         )
         self.cache.store(metadata, fetched.body)
         if fetched.status_code != 200:
-            return ProviderResult.unavailable(f"TennisMyLife index returned HTTP {fetched.status_code}", metadata)
+            return ProviderResult.unavailable(
+                f"TennisMyLife index returned HTTP {fetched.status_code}", metadata
+            )
         return self._parse_index(fetched.body, metadata)
 
     @staticmethod
@@ -130,7 +142,9 @@ class TennisMyLifeProvider:
             files = payload["files"]
             if not isinstance(files, list):
                 raise TypeError("data-files payload lacks a files list")
-            frame = pl.DataFrame(files) if files else pl.DataFrame(schema={"name": pl.String, "url": pl.String})
+            frame = (
+                pl.DataFrame(files) if files else pl.DataFrame(schema={"name": pl.String, "url": pl.String})
+            )
         except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
             return ProviderResult(ProviderStatus.DEGRADED, metadata, None, f"index schema drift: {exc}")
         enriched = replace(metadata, schema_hash=dataframe_schema_hash(frame))
@@ -167,7 +181,9 @@ class TennisMyLifeProvider:
             return ProviderResult.unavailable(str(exc))
         return self._fetch_matches_csv(filename, sport_scope=f"{tour}_{kind}_{year}", force=force)
 
-    def ongoing_matches(self, tour: Literal["atp", "wta", "challenger"], *, force: bool = False) -> ProviderResult:
+    def ongoing_matches(
+        self, tour: Literal["atp", "wta", "challenger"], *, force: bool = False
+    ) -> ProviderResult:
         filename = {
             "atp": "ongoing_tourneys.csv",
             "wta": "wta_ongoing_tourneys.csv",
@@ -191,7 +207,9 @@ class TennisMyLifeProvider:
                 )
                 return result
             except Exception as exc:  # noqa: BLE001 -- cache boundary
-                return ProviderResult(ProviderStatus.DEGRADED, cached.metadata, None, f"cached parse failed: {exc}")
+                return ProviderResult(
+                    ProviderStatus.DEGRADED, cached.metadata, None, f"cached parse failed: {exc}"
+                )
 
         resolved = self._resolve_file_url(filename, force=force)
         if isinstance(resolved, ProviderResult):
@@ -219,7 +237,9 @@ class TennisMyLifeProvider:
         )
         self.cache.store(metadata, fetched.body)
         if fetched.status_code != 200:
-            return ProviderResult.unavailable(f"TennisMyLife returned HTTP {fetched.status_code} for {filename}", metadata)
+            return ProviderResult.unavailable(
+                f"TennisMyLife returned HTTP {fetched.status_code} for {filename}", metadata
+            )
         result = self._parse_matches(fetched.body, metadata)
         self.cache.record_parse_result(
             result.metadata or metadata,
@@ -235,9 +255,15 @@ class TennisMyLifeProvider:
         try:
             frame = pl.read_csv(io.BytesIO(body), infer_schema_length=10000, null_values=["", "NA"])
         except Exception as exc:  # noqa: BLE001 -- parser boundary
-            return ProviderResult(ProviderStatus.DEGRADED, metadata, None, f"TennisMyLife CSV parse failed: {exc}")
+            return ProviderResult(
+                ProviderStatus.DEGRADED, metadata, None, f"TennisMyLife CSV parse failed: {exc}"
+            )
         missing = sorted(REQUIRED_MATCH_COLUMNS - set(frame.columns))
         if missing:
-            return ProviderResult(ProviderStatus.DEGRADED, metadata, None, f"TennisMyLife schema drift: missing {missing}")
+            return ProviderResult(
+                ProviderStatus.DEGRADED, metadata, None, f"TennisMyLife schema drift: missing {missing}"
+            )
         enriched = replace(metadata, schema_hash=dataframe_schema_hash(frame))
-        return ProviderResult(ProviderStatus.AVAILABLE, enriched, frame, "NO_MATCHES" if frame.is_empty() else None)
+        return ProviderResult(
+            ProviderStatus.AVAILABLE, enriched, frame, "NO_MATCHES" if frame.is_empty() else None
+        )

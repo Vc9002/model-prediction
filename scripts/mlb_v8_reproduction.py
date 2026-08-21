@@ -66,9 +66,7 @@ def main() -> int:
     train_end_date = training["coefficient_fit"]["end"]
     validation_end_date = training["threshold_selection"]["end"]
     locked_holdout_end = training["locked_holdout"]["end"]
-    confidence_threshold = float(
-        artifact["market_models"]["moneyline"]["confidence_threshold"]
-    )
+    confidence_threshold = float(artifact["market_models"]["moneyline"]["confidence_threshold"])
     v8_qualification = artifact["qualification"]
     print(f"      model_version: {artifact['model_version']}")
     print(f"      train (coefficient_fit):      <= {train_end_date}")
@@ -78,13 +76,10 @@ def main() -> int:
 
     # Exclusive cutoff for build_walk_forward_rows: one day past the
     # inclusive locked_holdout end date it's meant to cap at.
-    rows_end_date = (
-        date.fromisoformat(locked_holdout_end) + timedelta(days=1)
-    ).isoformat()
+    rows_end_date = (date.fromisoformat(locked_holdout_end) + timedelta(days=1)).isoformat()
 
     # 2. Build walk-forward rows capped at v8's own locked_holdout end date.
-    print("\n[2/5] Building walk-forward rows (capped at "
-          f"{locked_holdout_end}) ...")
+    print(f"\n[2/5] Building walk-forward rows (capped at {locked_holdout_end}) ...")
     data_root = PROJECT_ROOT / "data"
     store = FeatureStore(data_root)
     rows = build_walk_forward_rows(store, SPORT, end_date=rows_end_date)
@@ -98,18 +93,24 @@ def main() -> int:
         validation_end_date=validation_end_date,
     )
     print(f"      train: {len(train)} rows ({split_meta['train']['start']}..{split_meta['train']['end']})")
-    print(f"      validation: {len(validation)} rows "
-          f"({split_meta['validation']['start']}..{split_meta['validation']['end']})")
-    print(f"      locked_holdout: {len(holdout)} rows "
-          f"({split_meta['locked_holdout']['start']}..{split_meta['locked_holdout']['end']})")
+    print(
+        f"      validation: {len(validation)} rows "
+        f"({split_meta['validation']['start']}..{split_meta['validation']['end']})"
+    )
+    print(
+        f"      locked_holdout: {len(holdout)} rows "
+        f"({split_meta['locked_holdout']['start']}..{split_meta['locked_holdout']['end']})"
+    )
 
     # 4. Evaluate v8's exact shipped feature set with the pinned threshold
     #    (no relearning from today's validation cohort).
-    print(f"\n[4/5] Evaluating {V8_VARIANT_NAME!r} with pinned threshold "
-          f"{confidence_threshold} ...")
+    print(f"\n[4/5] Evaluating {V8_VARIANT_NAME!r} with pinned threshold {confidence_threshold} ...")
     feature_names = FEATURE_VARIANTS[V8_VARIANT_NAME]
     result = evaluate_variant(
-        train, validation, holdout, feature_names,
+        train,
+        validation,
+        holdout,
+        feature_names,
         fixed_threshold=confidence_threshold,
     )
     primary = result["primary_65"]
@@ -145,8 +146,10 @@ def main() -> int:
     print(f"  hit_delta: {hit_delta}")
     print(f"  reproduced_closely: {reproduced_closely}")
 
-    print("\nNo promotion decision is made by this script. Report the raw "
-          "numbers above; interpretation is a separate, explicit step.")
+    print(
+        "\nNo promotion decision is made by this script. Report the raw "
+        "numbers above; interpretation is a separate, explicit step."
+    )
     return 0
 
 

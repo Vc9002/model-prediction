@@ -8,6 +8,7 @@ sub-subparsers, so every command name and help text is unchanged.
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 from ..domain import LOSS_CLASSIFICATIONS, League, MarketType, ModelOrigin, ModelState, eastern_today
 from ..esports import TITLE_SPECS
@@ -125,6 +126,16 @@ def parser() -> argparse.ArgumentParser:
     flat_forecast.add_argument("--log", action="store_true", help="log all calls to flat ledger")
     flat_forecast.add_argument(
         "--force", action="store_true", help="bypass event_started guard (for historical backfill)"
+    )
+    flat_forecast.add_argument(
+        "--market-blend-policy-artifact",
+        type=Path,
+        help="opt in to a completed Stage 1 MLB-totals policy artifact",
+    )
+    flat_forecast.add_argument(
+        "--market-blend-policy-report",
+        type=Path,
+        help="immutable completed gate report bound to the policy artifact",
     )
 
     log_cmd = commands.add_parser("log", help="alias for forecast --log")

@@ -25,6 +25,7 @@ CALIBRATOR_PATH = CHALLENGER_DIR / "tennis-surface-elo-rebuild-v1-calibrator.jso
 
 # ── helpers ──────────────────────────────────────────────────────────────
 
+
 def _make_row(
     match_id: str = "test_match_001",
     elo_prob: float = 0.65,
@@ -89,6 +90,7 @@ def _minimal_calibrator(method: str = "identity", params: dict | None = None) ->
 
 # ── artifact loading ─────────────────────────────────────────────────────
 
+
 class TestArtifactLoading:
     def test_from_default_artifact_loads_successfully(self):
         """The real challenger artifact must load without error."""
@@ -138,6 +140,7 @@ class TestArtifactLoading:
 
 
 # ── prediction determinism ───────────────────────────────────────────────
+
 
 class TestPredictionDeterminism:
     def test_same_row_produces_same_prediction(self, tmp_path: Path):
@@ -225,6 +228,7 @@ class TestPredictionDeterminism:
 
 # ── calibration ──────────────────────────────────────────────────────────
 
+
 class TestCalibration:
     def test_identity_calibrator_passes_through(self, tmp_path: Path):
         art_path = tmp_path / "model.json"
@@ -267,6 +271,7 @@ class TestCalibration:
 
 
 # ── caveat checks ────────────────────────────────────────────────────────
+
 
 class TestCaveats:
     def test_production_not_allowed_caveat_emitted(self, tmp_path: Path):
@@ -316,6 +321,7 @@ class TestCaveats:
 
 
 # ── real artifact integration ────────────────────────────────────────────
+
 
 class TestRealArtifactIntegration:
     @pytest.mark.skipif(

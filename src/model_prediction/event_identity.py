@@ -66,8 +66,7 @@ def canonicalize(
     conn = _conn(repo_root)
     try:
         row = conn.execute(
-            "SELECT canonical_event_id FROM canonical_events "
-            "WHERE provider = ? AND provider_event_id = ?",
+            "SELECT canonical_event_id FROM canonical_events WHERE provider = ? AND provider_event_id = ?",
             (provider.lower(), str(provider_event_id)),
         ).fetchone()
         if row is not None:
@@ -133,8 +132,7 @@ def mappings_for(canonical_event_id: str, *, repo_root: Path | str | None = None
     conn = _conn(repo_root)
     try:
         rows = conn.execute(
-            "SELECT provider, provider_event_id, sport FROM canonical_events "
-            "WHERE canonical_event_id = ?",
+            "SELECT provider, provider_event_id, sport FROM canonical_events WHERE canonical_event_id = ?",
             (canonical_event_id,),
         ).fetchall()
         return [dict(r) for r in rows]

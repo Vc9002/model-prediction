@@ -75,10 +75,7 @@ def _predictions(query: dict[str, list[str]]) -> dict[str, Any]:
             clauses.append("id < ?")
             params.append(int(cursor))
         where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
-        sql = (
-            f"SELECT {_PREDICTION_COLUMNS} FROM predictions{where} "
-            "ORDER BY id DESC LIMIT ?"
-        )
+        sql = f"SELECT {_PREDICTION_COLUMNS} FROM predictions{where} ORDER BY id DESC LIMIT ?"
         params.append(limit + 1)
         rows = conn.execute(sql, params).fetchall()
         has_more = len(rows) > limit
@@ -110,9 +107,7 @@ def _counts(query: dict[str, list[str]]) -> dict[str, Any]:
     if conn is None:
         return {"counts": {}, "note": "no production database yet"}
     try:
-        rows = conn.execute(
-            "SELECT status, COUNT(*) AS n FROM predictions GROUP BY status"
-        ).fetchall()
+        rows = conn.execute("SELECT status, COUNT(*) AS n FROM predictions GROUP BY status").fetchall()
         return {"counts": {str(r["status"]): int(r["n"]) for r in rows}}
     finally:
         conn.close()
@@ -135,9 +130,10 @@ def _runs(query: dict[str, list[str]]) -> dict[str, Any]:
 
 
 def _has_table(conn: sqlite3.Connection, table: str) -> bool:
-    return conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?", (table,)
-    ).fetchone() is not None
+    return (
+        conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?", (table,)).fetchone()
+        is not None
+    )
 
 
 def _promotions(query: dict[str, list[str]]) -> dict[str, Any]:
@@ -147,8 +143,10 @@ def _promotions(query: dict[str, list[str]]) -> dict[str, Any]:
     try:
         if not _has_table(conn, "promotions"):
             return {"promotions": [], "note": "no promotions recorded yet"}
-        cols = "promotion_id, sport, market, old_model_id, new_model_id, " \
-               "approved_by, evidence_id, git_sha, promoted_at_utc, status, note"
+        cols = (
+            "promotion_id, sport, market, old_model_id, new_model_id, "
+            "approved_by, evidence_id, git_sha, promoted_at_utc, status, note"
+        )
         rows = conn.execute(
             f"SELECT {cols} FROM promotions ORDER BY promoted_at_utc DESC LIMIT 100"
         ).fetchall()
@@ -173,9 +171,7 @@ def _versions(query: dict[str, list[str]]) -> dict[str, Any]:
     conn = _ro_conn(_paths().runs_db)
     if conn is not None:
         try:
-            row = conn.execute(
-                "SELECT MAX(started_at_utc) AS latest_run FROM runs"
-            ).fetchone()
+            row = conn.execute("SELECT MAX(started_at_utc) AS latest_run FROM runs").fetchone()
             fingerprint["parts"]["runs"] = dict(row)
             # The promotions/experiments tables are created lazily by
             # their writers — a read-only fingerprint must tolerate their
@@ -280,12 +276,7 @@ def _ledger_counts(query: dict[str, list[str]]) -> dict[str, Any]:
             f"FROM ledger_records{where} GROUP BY status",
             params,
         ).fetchall()
-        return {
-            "counts": {
-                str(r["status"]): {"n": int(r["n"]), "pnl_units": float(r["pnl"])}
-                for r in rows
-            }
-        }
+        return {"counts": {str(r["status"]): {"n": int(r["n"]), "pnl_units": float(r["pnl"])} for r in rows}}
     finally:
         conn.close()
 
@@ -295,9 +286,7 @@ _HANDLERS = {
     "predictions/counts": _counts,
     "runs": _runs,
     "promotions": _promotions,
-    "health": lambda query: system_health(
-        repo_root=_paths().repo_root, runtime_root=_paths().runtime_root
-    ),
+    "health": lambda query: system_health(repo_root=_paths().repo_root, runtime_root=_paths().runtime_root),
     "versions": _versions,
     "ledger": _ledger,
     "ledger/counts": _ledger_counts,
@@ -310,4 +299,3 @@ def handle(route: str, query: dict[str, list[str]]) -> dict[str, Any]:
     if handler is None:
         raise KeyError(f"unknown data route: {route}")
     return handler(query)
-

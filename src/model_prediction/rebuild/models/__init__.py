@@ -107,9 +107,13 @@ class RunIntensityHead:
         X = _neutralize_always_missing_columns(X, self._always_missing_mask)
         X_scaled = self.scaler.fit_transform(X)
         self.model = HistGradientBoostingRegressor(
-            max_iter=200, max_depth=4, learning_rate=0.05,
-            min_samples_leaf=50, l2_regularization=1.0,
-            early_stopping=True, validation_fraction=0.2,
+            max_iter=200,
+            max_depth=4,
+            learning_rate=0.05,
+            min_samples_leaf=50,
+            l2_regularization=1.0,
+            early_stopping=True,
+            validation_fraction=0.2,
             random_state=42,
         )
         self.model.fit(X_scaled, y)
@@ -154,7 +158,9 @@ class RunDifferentialHead:
         self._feature_names: list[str] = []
         self._always_missing_mask: np.ndarray | None = None
 
-    def fit(self, X: np.ndarray, y: np.ndarray, feature_names: list[str] | None = None) -> RunDifferentialHead:
+    def fit(
+        self, X: np.ndarray, y: np.ndarray, feature_names: list[str] | None = None
+    ) -> RunDifferentialHead:
         self._feature_names = feature_names or [f"f{i}" for i in range(X.shape[1])]
         X = np.asarray(X, dtype=float)
         # SimpleImputer(strategy="mean") silently *drops* an all-NaN
@@ -183,6 +189,7 @@ class RunDifferentialHead:
 @dataclass
 class GamePrediction:
     """Coherent prediction for one MLB game derived from the joint distribution."""
+
     event_id: str
     home_expected_runs: float
     away_expected_runs: float
@@ -191,9 +198,9 @@ class GamePrediction:
     total_mean: float
     total_std: float
     # Derived markets
-    moneyline: dict[str, float] = field(default_factory=dict)   # {home, away}
+    moneyline: dict[str, float] = field(default_factory=dict)  # {home, away}
     spreads: dict[float, dict[str, float]] = field(default_factory=dict)  # {line: {home, away}}
-    totals: dict[float, dict[str, float]] = field(default_factory=dict)   # {line: {over, under}}
+    totals: dict[float, dict[str, float]] = field(default_factory=dict)  # {line: {over, under}}
     push_prob: float = 0.0
     uncertainty: float = 0.05
     model_version: str = "mlb-two-head-v1"
@@ -244,6 +251,7 @@ class JointScoreDistribution:
         with the same underlying rate model, not a disconnected
         assumption."""
         from scipy.stats import skellam
+
         dist = skellam(home_exp, away_exp)
         win_prob = float(dist.sf(threshold))
         push_prob = float(dist.pmf(threshold))
@@ -328,7 +336,11 @@ class JointScoreDistribution:
         )
 
     def probability_for_market(
-        self, pred: GamePrediction, market_type: str, selection: str, line: float | None = None,
+        self,
+        pred: GamePrediction,
+        market_type: str,
+        selection: str,
+        line: float | None = None,
     ) -> float:
         """Derive probability for any market from the joint distribution.
 
@@ -509,11 +521,14 @@ class MLBTwoHeadModel:
         margin = float(self.differential_head.predict(X_diff)[0])
         return self.distribution.predict_game(event_id, max(1.0, total), margin)
 
-    def probability(self, pred: GamePrediction, market_type: str, selection: str, line: float | None = None) -> float:
+    def probability(
+        self, pred: GamePrediction, market_type: str, selection: str, line: float | None = None
+    ) -> float:
         return self.distribution.probability_for_market(pred, market_type, selection, line)
 
     def to_artifact(self) -> dict[str, Any]:
         import json
+
         raw = {
             "model_id": self.MODEL_VERSION,
             "method": self.distribution.method,
@@ -544,20 +559,23 @@ class MLBTwoHeadModel:
             raise RuntimeError("cannot save an unfitted model")
         out = Path(path)
         out.mkdir(parents=True, exist_ok=True)
-        joblib.dump({
-            "intensity_model": self.intensity_head.model,
-            "intensity_scaler": self.intensity_head.scaler,
-            "intensity_feature_names": self.intensity_head._feature_names,
-            "intensity_always_missing_mask": self.intensity_head._always_missing_mask,
-            "differential_model": self.differential_head.model,
-            "differential_scaler": self.differential_head.scaler,
-            "differential_imputer": self.differential_head.imputer,
-            "differential_feature_names": self.differential_head._feature_names,
-            "differential_always_missing_mask": self.differential_head._always_missing_mask,
-            "distribution_method": self.distribution.method,
-            "distribution_n_sim": self.distribution.n_sim,
-            "distribution_seed": self.distribution.seed,
-        }, out / "model.joblib")
+        joblib.dump(
+            {
+                "intensity_model": self.intensity_head.model,
+                "intensity_scaler": self.intensity_head.scaler,
+                "intensity_feature_names": self.intensity_head._feature_names,
+                "intensity_always_missing_mask": self.intensity_head._always_missing_mask,
+                "differential_model": self.differential_head.model,
+                "differential_scaler": self.differential_head.scaler,
+                "differential_imputer": self.differential_head.imputer,
+                "differential_feature_names": self.differential_head._feature_names,
+                "differential_always_missing_mask": self.differential_head._always_missing_mask,
+                "distribution_method": self.distribution.method,
+                "distribution_n_sim": self.distribution.n_sim,
+                "distribution_seed": self.distribution.seed,
+            },
+            out / "model.joblib",
+        )
         metadata = self.to_artifact()
         metadata["bundle_sha256"] = hashlib.sha256((out / "model.joblib").read_bytes()).hexdigest()
         (out / "metadata.json").write_text(json.dumps(metadata, indent=2, default=str))
@@ -639,16 +657,25 @@ class XGBoostRunHead:
         self.model: Any = None
         self._feature_names: list[str] = []
 
-    def fit(self, X: np.ndarray, y: np.ndarray, feature_names: list[str] | None = None, seed: int = 42) -> XGBoostRunHead:
+    def fit(
+        self, X: np.ndarray, y: np.ndarray, feature_names: list[str] | None = None, seed: int = 42
+    ) -> XGBoostRunHead:
         import xgboost as xgb
 
         self._feature_names = feature_names or [f"f{i}" for i in range(X.shape[1])]
         self.model = xgb.XGBRegressor(
             objective="reg:squarederror",
-            max_depth=3, learning_rate=0.05, n_estimators=200,
-            min_child_weight=5, subsample=0.85, colsample_bytree=0.8,
-            reg_alpha=1.0, reg_lambda=2.0,
-            random_state=seed, n_jobs=2, verbosity=0,
+            max_depth=3,
+            learning_rate=0.05,
+            n_estimators=200,
+            min_child_weight=5,
+            subsample=0.85,
+            colsample_bytree=0.8,
+            reg_alpha=1.0,
+            reg_lambda=2.0,
+            random_state=seed,
+            n_jobs=2,
+            verbosity=0,
         )
         self.model.fit(np.asarray(X, dtype=float), y)
         return self
@@ -718,7 +745,9 @@ class XGBoostTwoHeadModel:
         # expected-run rate.
         return self.distribution.predict_game(event_id, max(1.0, total), margin)
 
-    def probability(self, pred: GamePrediction, market_type: str, selection: str, line: float | None = None) -> float:
+    def probability(
+        self, pred: GamePrediction, market_type: str, selection: str, line: float | None = None
+    ) -> float:
         return self.distribution.probability_for_market(pred, market_type, selection, line)
 
     def to_artifact(self) -> dict[str, Any]:
@@ -728,6 +757,7 @@ class XGBoostTwoHeadModel:
         swap model families without a second, differently-shaped artifact
         schema."""
         import json
+
         raw = {
             "model_id": self.MODEL_VERSION,
             "method": self.distribution.method,
@@ -755,16 +785,19 @@ class XGBoostTwoHeadModel:
             raise RuntimeError("cannot save an unfitted model")
         out = Path(path)
         out.mkdir(parents=True, exist_ok=True)
-        joblib.dump({
-            "intensity_model": self.intensity_head.model,
-            "intensity_feature_names": self.intensity_head._feature_names,
-            "differential_model": self.differential_head.model,
-            "differential_feature_names": self.differential_head._feature_names,
-            "distribution_method": self.distribution.method,
-            "distribution_n_sim": self.distribution.n_sim,
-            "distribution_seed": self.distribution.seed,
-            "seed": self.seed,
-        }, out / "model.joblib")
+        joblib.dump(
+            {
+                "intensity_model": self.intensity_head.model,
+                "intensity_feature_names": self.intensity_head._feature_names,
+                "differential_model": self.differential_head.model,
+                "differential_feature_names": self.differential_head._feature_names,
+                "distribution_method": self.distribution.method,
+                "distribution_n_sim": self.distribution.n_sim,
+                "distribution_seed": self.distribution.seed,
+                "seed": self.seed,
+            },
+            out / "model.joblib",
+        )
         metadata = self.to_artifact()
         metadata["bundle_sha256"] = hashlib.sha256((out / "model.joblib").read_bytes()).hexdigest()
         (out / "metadata.json").write_text(json.dumps(metadata, indent=2, default=str))

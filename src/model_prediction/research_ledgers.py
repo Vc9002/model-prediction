@@ -62,6 +62,7 @@ def ledger_mirror(data_root: str | Path) -> RuntimeLedgerStore | None:
     except Exception:  # noqa: BLE001 — mirror must never break ledger construction
         return None
 
+
 def research_ledger(
     data_root: str | Path,
     sport: str,

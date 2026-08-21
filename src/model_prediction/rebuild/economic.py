@@ -19,15 +19,16 @@ import numpy as np
 @dataclass
 class SizeLimits:
     """Per-event and portfolio-level size caps."""
-    min_units: float = 0.0         # zero is valid default — no forced minimum
+
+    min_units: float = 0.0  # zero is valid default — no forced minimum
     max_units: float = 2.0
     max_event_units: float = 2.0
     max_team_daily: float = 3.0
     max_sport_daily: float = 5.0
     max_daily_total: float = 10.0
     max_correlation_group: float = 3.0
-    unit_rounding: float = 0.25     # round to nearest increment
-    min_depth_units: float = 1.0    # must have at least this much depth available
+    unit_rounding: float = 0.25  # round to nearest increment
+    min_depth_units: float = 1.0  # must have at least this much depth available
     max_quote_age_seconds: float = 300
 
 
@@ -94,6 +95,7 @@ def edge_scaled_units(
 @dataclass
 class Exposure:
     """Tracks current exposure across dimensions for correlation-aware limits."""
+
     daily_total: float = 0.0
     sport_daily: dict[str, float] = field(default_factory=dict)
     team_daily: dict[str, float] = field(default_factory=dict)
@@ -138,6 +140,7 @@ class Exposure:
 @dataclass
 class EconomicResult:
     """Result of one paper trade for economic evaluation."""
+
     event_id: str
     sport: str
     market_type: str
@@ -148,7 +151,7 @@ class EconomicResult:
     units: float
     outcome: int | None = None  # 1=win, 0=loss, 0.5=push, None=pending
     pnl: float | None = None
-    clv: float | None = None    # closing line value
+    clv: float | None = None  # closing line value
 
 
 def evaluate_portfolio(
@@ -215,6 +218,7 @@ HEALTH_STATES = [
 @dataclass
 class MonitorState:
     """Current health state of the rebuild pipeline."""
+
     state: str = "HEALTHY_SHADOW"
     last_checked_utc: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     source_health: dict[str, str] = field(default_factory=dict)

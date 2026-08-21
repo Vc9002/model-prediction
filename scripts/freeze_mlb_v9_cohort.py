@@ -28,10 +28,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from mlb_research_common import _identify_backfill_event_ids  # noqa: E402
-from mlb_research_common import pinned_cohort  # noqa: E402
+from mlb_research_common import (
+    _identify_backfill_event_ids,
+    pinned_cohort,
+)
 
-from model_prediction.config import PROJECT_ROOT  # noqa: E402
+from model_prediction.config import PROJECT_ROOT
 
 COHORT_DIR = PROJECT_ROOT / "data" / "point_in_time" / "mlb_v9_cohort_v1"
 

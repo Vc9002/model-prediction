@@ -65,9 +65,7 @@ def test_real_config_has_main_ledger_enabled() -> None:
 def test_multisport_pick_ledger_retired_never_creates_the_main_directory(tmp_path) -> None:
     ledger = MultiSportPickLedger(tmp_path, retired=True)
     for sport in MAIN_LEDGER_SPORTS:
-        row = ledger.append_evaluated(
-            _request(f"event-{sport}"), _qualified_call(), now=datetime.now(UTC)
-        )
+        row = ledger.append_evaluated(_request(f"event-{sport}"), _qualified_call(), now=datetime.now(UTC))
         assert row["pick_id"]
     assert ledger.rows() == []
     assert not (tmp_path / "main").exists()

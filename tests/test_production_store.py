@@ -94,9 +94,7 @@ def test_decisions_and_market_snapshots(tmp_path) -> None:
     with _store(tmp_path) as store:
         row_id = _append(store, "e1")
         store.record_decision("pred-e1", "operator", "approve", note="looks good")
-        store.record_market_snapshot(
-            "e1", "WNBA", "moneyline", {"best_ask": 0.62, "line": 2.5}
-        )
+        store.record_market_snapshot("e1", "WNBA", "moneyline", {"best_ask": 0.62, "line": 2.5})
         assert row_id is not None
 
 
@@ -180,17 +178,20 @@ def test_store_migrates_a_legacy_schema_database(tmp_path) -> None:
 
     # ...and new appends work against the migrated schema.
     run2 = store.start_run()
-    assert store.append_prediction(
-        run_id=run2,
-        prediction_id="r2:e2",
-        event_id="e2",
-        sport="WNBA",
-        market="moneyline",
-        market_type="moneyline",
-        model_id="wnba-elo-trend-lr-v4",
-        probabilities={"home": 0.5, "away": 0.5},
-        decision_time_utc="2026-08-14T12:00:00+00:00",
-    ) is not None
+    assert (
+        store.append_prediction(
+            run_id=run2,
+            prediction_id="r2:e2",
+            event_id="e2",
+            sport="WNBA",
+            market="moneyline",
+            market_type="moneyline",
+            model_id="wnba-elo-trend-lr-v4",
+            probabilities={"home": 0.5, "away": 0.5},
+            decision_time_utc="2026-08-14T12:00:00+00:00",
+        )
+        is not None
+    )
     store.close()
 
 

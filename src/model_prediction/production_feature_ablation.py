@@ -44,8 +44,16 @@ def _probability_metrics(probabilities: Sequence[float], outcomes: Sequence[int]
     return {
         "observations": len(outcomes),
         "accuracy": round(correct / len(outcomes), 6),
-        "brier_score": round(mean((value - outcome) ** 2 for value, outcome in zip(clipped, outcomes, strict=True)), 6),
-        "log_loss": round(-mean(outcome * math.log(value) + (1 - outcome) * math.log(1 - value) for value, outcome in zip(clipped, outcomes, strict=True)), 6),
+        "brier_score": round(
+            mean((value - outcome) ** 2 for value, outcome in zip(clipped, outcomes, strict=True)), 6
+        ),
+        "log_loss": round(
+            -mean(
+                outcome * math.log(value) + (1 - outcome) * math.log(1 - value)
+                for value, outcome in zip(clipped, outcomes, strict=True)
+            ),
+            6,
+        ),
     }
 
 
@@ -70,12 +78,21 @@ def _call_metrics(
         "hits": hits,
         "hit_rate": round(hits / calls, 6) if calls else None,
         "brier_score": (
-            round(mean((value - outcome) ** 2 for value, outcome in zip(confidences, correctness, strict=True)), 6)
+            round(
+                mean((value - outcome) ** 2 for value, outcome in zip(confidences, correctness, strict=True)),
+                6,
+            )
             if calls
             else None
         ),
         "log_loss": (
-            round(-mean(outcome * math.log(value) + (1 - outcome) * math.log(1 - value) for value, outcome in zip(confidences, correctness, strict=True)), 6)
+            round(
+                -mean(
+                    outcome * math.log(value) + (1 - outcome) * math.log(1 - value)
+                    for value, outcome in zip(confidences, correctness, strict=True)
+                ),
+                6,
+            )
             if calls
             else None
         ),
@@ -103,8 +120,7 @@ def _fit_binary(rows: Sequence[ValidationRow], features: Sequence[str]) -> tuple
         "features": list(features),
         "intercept": round(float(model.intercept_[0]), 10),
         "coefficients": {
-            feature: round(float(value), 10)
-            for feature, value in zip(features, model.coef_[0], strict=True)
+            feature: round(float(value), 10) for feature, value in zip(features, model.coef_[0], strict=True)
         },
     }
 
@@ -127,7 +143,11 @@ def _paired_uncertainty(
         clusters[day].append((brier, log_loss))
     days = sorted(clusters)
     summaries = {
-        day: (sum(value[0] for value in clusters[day]), sum(value[1] for value in clusters[day]), len(clusters[day]))
+        day: (
+            sum(value[0] for value in clusters[day]),
+            sum(value[1] for value in clusters[day]),
+            len(clusters[day]),
+        )
         for day in days
     }
     observed_brier = sum(value[0] for value in summaries.values()) / len(outcomes)
@@ -178,9 +198,15 @@ def _holm(values: Mapping[str, float]) -> dict[str, float]:
 
 def _provenance(feature: str) -> dict[str, Any]:
     if feature == "park_factor":
-        return {"status": "blocked", "reason": "2025-three-year static table is applied retroactively across seasons"}
+        return {
+            "status": "blocked",
+            "reason": "2025-three-year static table is applied retroactively across seasons",
+        }
     if feature == "weather_factor":
-        return {"status": "blocked", "reason": "historical weather cache has no forecast issue or observed_at timestamp"}
+        return {
+            "status": "blocked",
+            "reason": "historical weather cache has no forecast issue or observed_at timestamp",
+        }
     return {
         "status": "development_only",
         "reason": "constructed from completed events strictly before the prediction date; legacy source rows lack observed_at_utc",
@@ -288,9 +314,7 @@ def _score_sport(config: Mapping[str, Any], sport: str, store: FeatureStore) -> 
         "walk_forward_rows": len(rows),
     }
     try:
-        train, validation, holdout, split = _frozen_score_split(
-            rows, artifact.raw["training"]
-        )
+        train, validation, holdout, split = _frozen_score_split(rows, artifact.raw["training"])
     except ValueError as error:
         return {
             "status": "UNTESTABLE_SOURCE_SNAPSHOT_UNIDENTIFIED",
@@ -305,14 +329,18 @@ def _score_sport(config: Mapping[str, Any], sport: str, store: FeatureStore) -> 
     outcomes_validation = [row.outcome for row in validation]
     outcomes_holdout = [row.outcome for row in holdout]
     threshold = float(active["confidence_threshold"])
-    active_validation = [artifact.probability("moneyline", {feature: float(getattr(row, feature)) for feature in features}) for row in validation]
-    active_holdout = [artifact.probability("moneyline", {feature: float(getattr(row, feature)) for feature in features}) for row in holdout]
+    active_validation = [
+        artifact.probability("moneyline", {feature: float(getattr(row, feature)) for feature in features})
+        for row in validation
+    ]
+    active_holdout = [
+        artifact.probability("moneyline", {feature: float(getattr(row, feature)) for feature in features})
+        for row in holdout
+    ]
     baseline_predict, baseline_fit = _fit_binary(train, features)
     baseline_validation = baseline_predict(validation)
     baseline_holdout = baseline_predict(holdout)
-    baseline_call_metrics = _call_metrics(
-        baseline_holdout, outcomes_holdout, confidence_threshold=threshold
-    )
+    baseline_call_metrics = _call_metrics(baseline_holdout, outcomes_holdout, confidence_threshold=threshold)
     reproduction = _reproduction_gate(artifact, baseline_fit, baseline_call_metrics)
     if not reproduction["passed"]:
         return {
@@ -347,13 +375,21 @@ def _score_sport(config: Mapping[str, Any], sport: str, store: FeatureStore) -> 
             "fit": fit,
             "validation": {
                 "all_predictions": _probability_metrics(validation_probabilities, outcomes_validation),
-                "at_frozen_production_threshold": _call_metrics(validation_probabilities, outcomes_validation, confidence_threshold=threshold),
+                "at_frozen_production_threshold": _call_metrics(
+                    validation_probabilities, outcomes_validation, confidence_threshold=threshold
+                ),
             },
             "locked_holdout": {
                 "all_predictions": _probability_metrics(holdout_probabilities, outcomes_holdout),
-                "at_frozen_production_threshold": _call_metrics(holdout_probabilities, outcomes_holdout, confidence_threshold=threshold),
+                "at_frozen_production_threshold": _call_metrics(
+                    holdout_probabilities, outcomes_holdout, confidence_threshold=threshold
+                ),
             },
-            "validation_brier_delta": round(_probability_metrics(validation_probabilities, outcomes_validation)["brier_score"] - _probability_metrics(baseline_validation, outcomes_validation)["brier_score"], 6),
+            "validation_brier_delta": round(
+                _probability_metrics(validation_probabilities, outcomes_validation)["brier_score"]
+                - _probability_metrics(baseline_validation, outcomes_validation)["brier_score"],
+                6,
+            ),
             "paired_uncertainty": uncertainty,
             "raw_p_value": uncertainty["paired_date_sign_flip_p_value"],
             "provenance": _provenance(feature),
@@ -374,7 +410,9 @@ def _score_sport(config: Mapping[str, Any], sport: str, store: FeatureStore) -> 
             "validation": _probability_metrics(active_validation, outcomes_validation),
             "locked_holdout": {
                 "all_predictions": _probability_metrics(active_holdout, outcomes_holdout),
-                "at_frozen_production_threshold": _call_metrics(active_holdout, outcomes_holdout, confidence_threshold=threshold),
+                "at_frozen_production_threshold": _call_metrics(
+                    active_holdout, outcomes_holdout, confidence_threshold=threshold
+                ),
             },
         },
         "matched_refit_baseline": {
@@ -382,7 +420,9 @@ def _score_sport(config: Mapping[str, Any], sport: str, store: FeatureStore) -> 
             "validation": _probability_metrics(baseline_validation, outcomes_validation),
             "locked_holdout": {
                 "all_predictions": _probability_metrics(baseline_holdout, outcomes_holdout),
-                "at_frozen_production_threshold": _call_metrics(baseline_holdout, outcomes_holdout, confidence_threshold=threshold),
+                "at_frozen_production_threshold": _call_metrics(
+                    baseline_holdout, outcomes_holdout, confidence_threshold=threshold
+                ),
             },
         },
         "leave_one_out": leave_one_out,
@@ -545,24 +585,44 @@ def _esports_model(config: Mapping[str, Any], title: str) -> dict[str, Any]:
     split = {
         "method": "existing_row_order_60_20_20",
         "train": {"start": train[0]["start_utc"], "end": train[-1]["start_utc"], "observations": len(train)},
-        "validation": {"start": validation[0]["start_utc"], "end": validation[-1]["start_utc"], "observations": len(validation)},
-        "locked_holdout": {"start": holdout[0]["start_utc"], "end": holdout[-1]["start_utc"], "observations": len(holdout)},
+        "validation": {
+            "start": validation[0]["start_utc"],
+            "end": validation[-1]["start_utc"],
+            "observations": len(validation),
+        },
+        "locked_holdout": {
+            "start": holdout[0]["start_utc"],
+            "end": holdout[-1]["start_utc"],
+            "observations": len(holdout),
+        },
     }
     leave_one_out = {
         feature: {
             "comparison_key": key,
             "omitted_feature": feature,
             "remaining_features": [],
-            "fit": {"method": "train_cohort_intercept_only", "validation_probability": round(validation_intercept, 10), "holdout_probability": round(holdout_intercept, 10)},
+            "fit": {
+                "method": "train_cohort_intercept_only",
+                "validation_probability": round(validation_intercept, 10),
+                "holdout_probability": round(holdout_intercept, 10),
+            },
             "validation": {
                 "all_predictions": _probability_metrics(candidate_validation, validation_outcomes),
-                "at_frozen_production_threshold": _call_metrics(candidate_validation, validation_outcomes, confidence_threshold=threshold),
+                "at_frozen_production_threshold": _call_metrics(
+                    candidate_validation, validation_outcomes, confidence_threshold=threshold
+                ),
             },
             "locked_holdout": {
                 "all_predictions": _probability_metrics(candidate_holdout, holdout_outcomes),
-                "at_frozen_production_threshold": _call_metrics(candidate_holdout, holdout_outcomes, confidence_threshold=threshold),
+                "at_frozen_production_threshold": _call_metrics(
+                    candidate_holdout, holdout_outcomes, confidence_threshold=threshold
+                ),
             },
-            "validation_brier_delta": round(_probability_metrics(candidate_validation, validation_outcomes)["brier_score"] - _probability_metrics(baseline_validation, validation_outcomes)["brier_score"], 6),
+            "validation_brier_delta": round(
+                _probability_metrics(candidate_validation, validation_outcomes)["brier_score"]
+                - _probability_metrics(baseline_validation, validation_outcomes)["brier_score"],
+                6,
+            ),
             "paired_uncertainty": uncertainty,
             "raw_p_value": uncertainty["paired_date_sign_flip_p_value"],
             "provenance": _provenance(feature),
@@ -579,13 +639,21 @@ def _esports_model(config: Mapping[str, Any], title: str) -> dict[str, Any]:
         "split": split,
         "source_evidence": source_evidence,
         "frozen_threshold": threshold,
-        "exact_active_artifact": {"note": "historical predictions reconstructed point-in-time with frozen artifact K; terminal ratings were not backcast"},
+        "exact_active_artifact": {
+            "note": "historical predictions reconstructed point-in-time with frozen artifact K; terminal ratings were not backcast"
+        },
         "matched_refit_baseline": {
-            "fit": {"k": k, "initial_rating": artifact["initial_rating"], "home_or_order_advantage": artifact["home_or_order_advantage"]},
+            "fit": {
+                "k": k,
+                "initial_rating": artifact["initial_rating"],
+                "home_or_order_advantage": artifact["home_or_order_advantage"],
+            },
             "validation": _probability_metrics(baseline_validation, validation_outcomes),
             "locked_holdout": {
                 "all_predictions": _probability_metrics(baseline_holdout, holdout_outcomes),
-                "at_frozen_production_threshold": _call_metrics(baseline_holdout, holdout_outcomes, confidence_threshold=threshold),
+                "at_frozen_production_threshold": _call_metrics(
+                    baseline_holdout, holdout_outcomes, confidence_threshold=threshold
+                ),
             },
         },
         "leave_one_out": leave_one_out,
@@ -599,10 +667,28 @@ def _decision(result: Mapping[str, Any], adjusted_p_value: float) -> tuple[str, 
     delta = result["paired_uncertainty"]["candidate_minus_baseline"]
     low, high = delta["brier_ci_95"]
     validation_delta = float(result["validation_brier_delta"])
-    if validation_delta > 0 and delta["brier_score"] >= MINIMUM_MEANINGFUL_BRIER_DELTA and delta["log_loss"] > 0 and low > 0 and adjusted_p_value <= 0.05:
-        return "KEEP", "removal worsened validation and holdout proper scores with multiplicity-adjusted paired evidence"
-    if validation_delta < 0 and delta["brier_score"] <= -MINIMUM_MEANINGFUL_BRIER_DELTA and delta["log_loss"] < 0 and high < 0 and adjusted_p_value <= 0.05:
-        return "REMOVE CANDIDATE", "removal improved validation and holdout proper scores with multiplicity-adjusted paired evidence"
+    if (
+        validation_delta > 0
+        and delta["brier_score"] >= MINIMUM_MEANINGFUL_BRIER_DELTA
+        and delta["log_loss"] > 0
+        and low > 0
+        and adjusted_p_value <= 0.05
+    ):
+        return (
+            "KEEP",
+            "removal worsened validation and holdout proper scores with multiplicity-adjusted paired evidence",
+        )
+    if (
+        validation_delta < 0
+        and delta["brier_score"] <= -MINIMUM_MEANINGFUL_BRIER_DELTA
+        and delta["log_loss"] < 0
+        and high < 0
+        and adjusted_p_value <= 0.05
+    ):
+        return (
+            "REMOVE CANDIDATE",
+            "removal improved validation and holdout proper scores with multiplicity-adjusted paired evidence",
+        )
     return "INCONCLUSIVE", "predeclared removal or retention gate not cleared"
 
 
@@ -657,7 +743,10 @@ def build_markdown(report: Mapping[str, Any]) -> str:
         if model["status"] == "evaluated"
         for feature, result in model["leave_one_out"].items()
     ]
-    counts = {name: sum(result["decision"] == name for _, _, _, result in decisions) for name in ("KEEP", "REMOVE CANDIDATE", "INCONCLUSIVE")}
+    counts = {
+        name: sum(result["decision"] == name for _, _, _, result in decisions)
+        for name in ("KEEP", "REMOVE CANDIDATE", "INCONCLUSIVE")
+    }
     evaluated_models = sum(model["status"] == "evaluated" for model in report["models"].values())
     lines = [
         "# Production feature ablation — 2026-07-22",
@@ -673,28 +762,36 @@ def build_markdown(report: Mapping[str, Any]) -> str:
         "The primary comparison is leave-one-out minus the matched refit on all locked-holdout predictions. KEEP requires removal to worsen validation Brier, worsen holdout Brier by at least 0.001, worsen holdout log loss, produce a date-cluster 95% Brier interval above zero, and survive Holm adjustment at 0.05. REMOVE CANDIDATE is symmetric, or follows directly from a point-in-time provenance blocker. Everything else is INCONCLUSIVE.",
         "",
     ]
-    untestable = [(sport, model) for sport, model in report["models"].items() if model["status"] != "evaluated"]
+    untestable = [
+        (sport, model) for sport, model in report["models"].items() if model["status"] != "evaluated"
+    ]
     if untestable:
-        lines.extend([
-            "## Untestable production models",
-            "",
-            "These models were excluded from inference and multiplicity adjustment because the source or required reproduction evidence was not uniquely established.",
-            "A model is excluded when the full-feature refit does not reproduce the artifact or the artifact does not pin the holdout evidence required to test reproduction.",
-            "",
-            "| Model | Status | Explicit source | SHA-256 | Raw / loaded / walk-forward rows | Reason |",
-            "|---|---|---|---|---:|---|",
-        ])
+        lines.extend(
+            [
+                "## Untestable production models",
+                "",
+                "These models were excluded from inference and multiplicity adjustment because the source or required reproduction evidence was not uniquely established.",
+                "A model is excluded when the full-feature refit does not reproduce the artifact or the artifact does not pin the holdout evidence required to test reproduction.",
+                "",
+                "| Model | Status | Explicit source | SHA-256 | Raw / loaded / walk-forward rows | Reason |",
+                "|---|---|---|---|---:|---|",
+            ]
+        )
         for sport, model in untestable:
             source = model["source_evidence"]
             counts_text = f"{source.get('raw_nonempty_rows', '—')} / {source.get('loaded_modeling_games', '—')} / {source.get('walk_forward_rows', '—')}"
-            lines.append(f"| {sport.upper()} | `{model['status']}` | `{source['path']}` | `{source.get('sha256', '—')}` | {counts_text} | {model['reason']} |")
+            lines.append(
+                f"| {sport.upper()} | `{model['status']}` | `{source['path']}` | `{source.get('sha256', '—')}` | {counts_text} | {model['reason']} |"
+            )
         lines.append("")
-    lines.extend([
-        "## Feature decisions",
-        "",
-        "| Model | Active feature omitted | Decision | Val Δ Brier | Holdout Δ Brier | Δ log loss | 95% CI Δ Brier | Raw p | Holm p |",
-        "|---|---|---|---:|---:|---:|---:|---:|---:|",
-    ])
+    lines.extend(
+        [
+            "## Feature decisions",
+            "",
+            "| Model | Active feature omitted | Decision | Val Δ Brier | Holdout Δ Brier | Δ log loss | 95% CI Δ Brier | Raw p | Holm p |",
+            "|---|---|---|---:|---:|---:|---:|---:|---:|",
+        ]
+    )
     for sport, _, feature, result in decisions:
         delta = result["paired_uncertainty"]["candidate_minus_baseline"]
         ci = delta["brier_ci_95"]
@@ -711,34 +808,40 @@ def build_markdown(report: Mapping[str, Any]) -> str:
         coefficient_deltas = reproduction["coefficient_deltas_matched_refit_minus_artifact"]
         max_coefficient_delta = max(abs(value) for value in coefficient_deltas.values())
         metric_deltas = reproduction["holdout_metric_deltas_matched_refit_minus_artifact"]
-        lines.extend([
-            "",
-            f"## {sport.upper()} — `{model['artifact_version']}`",
-            "",
-            f"Split: {model['split']['train']['observations']} train / {model['split']['validation']['observations']} validation / {model['split']['locked_holdout']['observations']} locked holdout. Active features: " + ", ".join(f"`{item}`" for item in model["production_features"]) + ".",
-            f"Source: `{model['source_evidence']['path']}`; SHA-256 `{model['source_evidence']['sha256']}`; raw / loaded / walk-forward rows: {model['source_evidence']['raw_nonempty_rows']} / {model['source_evidence']['loaded_modeling_games']} / {model['source_evidence']['walk_forward_rows']}.",
-            f"Reproduction gate: **PASS**. Maximum absolute coefficient delta `{max_coefficient_delta:.12g}`; intercept delta `{reproduction['intercept_delta_matched_refit_minus_artifact']:+.12g}`; calls / hits deltas `{metric_deltas['calls']}` / `{metric_deltas['hits']}`; Brier / log-loss deltas `{metric_deltas['brier_score']:+.12g}` / `{metric_deltas['log_loss']:+.12g}`. Tolerances: coefficients/intercept `{reproduction['coefficient_tolerance']}`, metrics `{reproduction['metric_tolerance']}`.",
-            "",
-            "| Baseline | Observations | Accuracy | Brier | Log loss | Calls | Hit rate | -110 units |",
-            "|---|---:|---:|---:|---:|---:|---:|---:|",
-            f"| Matched refit | {holdout['all_predictions']['observations']} | {holdout['all_predictions']['accuracy']:.4f} | {holdout['all_predictions']['brier_score']:.6f} | {holdout['all_predictions']['log_loss']:.6f} | {calls['calls']} | {calls['hit_rate'] if calls['hit_rate'] is not None else '—'} | {calls['diagnostic_units_at_minus_110']:.2f} |",
-            "",
-        ])
+        lines.extend(
+            [
+                "",
+                f"## {sport.upper()} — `{model['artifact_version']}`",
+                "",
+                f"Split: {model['split']['train']['observations']} train / {model['split']['validation']['observations']} validation / {model['split']['locked_holdout']['observations']} locked holdout. Active features: "
+                + ", ".join(f"`{item}`" for item in model["production_features"])
+                + ".",
+                f"Source: `{model['source_evidence']['path']}`; SHA-256 `{model['source_evidence']['sha256']}`; raw / loaded / walk-forward rows: {model['source_evidence']['raw_nonempty_rows']} / {model['source_evidence']['loaded_modeling_games']} / {model['source_evidence']['walk_forward_rows']}.",
+                f"Reproduction gate: **PASS**. Maximum absolute coefficient delta `{max_coefficient_delta:.12g}`; intercept delta `{reproduction['intercept_delta_matched_refit_minus_artifact']:+.12g}`; calls / hits deltas `{metric_deltas['calls']}` / `{metric_deltas['hits']}`; Brier / log-loss deltas `{metric_deltas['brier_score']:+.12g}` / `{metric_deltas['log_loss']:+.12g}`. Tolerances: coefficients/intercept `{reproduction['coefficient_tolerance']}`, metrics `{reproduction['metric_tolerance']}`.",
+                "",
+                "| Baseline | Observations | Accuracy | Brier | Log loss | Calls | Hit rate | -110 units |",
+                "|---|---:|---:|---:|---:|---:|---:|---:|",
+                f"| Matched refit | {holdout['all_predictions']['observations']} | {holdout['all_predictions']['accuracy']:.4f} | {holdout['all_predictions']['brier_score']:.6f} | {holdout['all_predictions']['log_loss']:.6f} | {calls['calls']} | {calls['hit_rate'] if calls['hit_rate'] is not None else '—'} | {calls['diagnostic_units_at_minus_110']:.2f} |",
+                "",
+            ]
+        )
         for feature, result in model["leave_one_out"].items():
             metric = result["locked_holdout"]["all_predictions"]
             called = result["locked_holdout"]["at_frozen_production_threshold"]
             lines.append(
                 f"- Omit `{feature}`: {metric['observations']} observations, {metric['accuracy']:.2%} accuracy, Brier {metric['brier_score']:.6f}, log loss {metric['log_loss']:.6f}; {called['calls']} calls, {called['hit_rate'] if called['hit_rate'] is not None else '—'} hit rate, {called['diagnostic_units_at_minus_110']:+.2f} diagnostic units. **{result['decision']}** — {result['decision_reason']}"
             )
-    lines.extend([
-        "",
-        "## Multiplicity and economic boundary",
-        "",
-        f"Holm correction covers all {len(decisions)} feature omissions. These reused holdouts can rank removal hypotheses, but they cannot certify a promoted model. No ROI, EV, profitability, or tradability claim is made; that requires point-in-time executable asks on both sides, fees/friction, and CLV on a fresh prospective cohort.",
-        "",
-        f"Reproducibility hash: `{report['artifact_hash']}`.",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Multiplicity and economic boundary",
+            "",
+            f"Holm correction covers all {len(decisions)} feature omissions. These reused holdouts can rank removal hypotheses, but they cannot certify a promoted model. No ROI, EV, profitability, or tradability claim is made; that requires point-in-time executable asks on both sides, fees/friction, and CLV on a fresh prospective cohort.",
+            "",
+            f"Reproducibility hash: `{report['artifact_hash']}`.",
+            "",
+        ]
+    )
     return "\n".join(lines)
 
 

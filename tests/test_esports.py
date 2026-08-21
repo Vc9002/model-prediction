@@ -41,7 +41,8 @@ def test_raw_probability_never_applies_decay_or_shrink() -> None:
     are prediction-time-only adjustments applied by probability(), never
     fed back into how ratings actually move."""
     book = NeutralElo(
-        k=20, ratings={"a": 1600, "b": 1400},
+        k=20,
+        ratings={"a": 1600, "b": 1400},
         last_match_utc={"a": "2020-01-01T00:00:00Z", "b": "2026-08-04T00:00:00Z"},
         games_played={"a": 1, "b": 500},
     )
@@ -197,8 +198,20 @@ def test_refresh_recent_matches_merges_instead_of_overwriting(tmp_path) -> None:
     }
     (directory / "matches.jsonl").write_text(json.dumps(old_match) + "\n", encoding="utf-8")
     old_teams = {
-        "bo3:3:10": {"team_id": "bo3:3:10", "source_team_id": 10, "name": "Old Team A", "slug": "a", "acronym": "A"},
-        "bo3:3:20": {"team_id": "bo3:3:20", "source_team_id": 20, "name": "Old Team B", "slug": "b", "acronym": "B"},
+        "bo3:3:10": {
+            "team_id": "bo3:3:10",
+            "source_team_id": 10,
+            "name": "Old Team A",
+            "slug": "a",
+            "acronym": "A",
+        },
+        "bo3:3:20": {
+            "team_id": "bo3:3:20",
+            "source_team_id": 20,
+            "name": "Old Team B",
+            "slug": "b",
+            "acronym": "B",
+        },
     }
     (directory / "teams.json").write_text(json.dumps(old_teams), encoding="utf-8")
 
@@ -269,7 +282,9 @@ def test_refresh_recent_matches_merges_instead_of_overwriting(tmp_path) -> None:
     assert manifest["match_count"] == 2
     import hashlib
 
-    assert manifest["matches_sha256"] == hashlib.sha256((directory / "matches.jsonl").read_bytes()).hexdigest()
+    assert (
+        manifest["matches_sha256"] == hashlib.sha256((directory / "matches.jsonl").read_bytes()).hexdigest()
+    )
 
 
 def test_validation_is_chronological_versioned_and_never_promotes_baseline(tmp_path) -> None:
@@ -292,9 +307,7 @@ def test_validation_is_chronological_versioned_and_never_promotes_baseline(tmp_p
     matches_path = directory / "matches.jsonl"
     matches_path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
     digest = hashlib.sha256(matches_path.read_bytes()).hexdigest()
-    (directory / "manifest.json").write_text(
-        json.dumps({"matches_sha256": digest}), encoding="utf-8"
-    )
+    (directory / "manifest.json").write_text(json.dumps({"matches_sha256": digest}), encoding="utf-8")
 
     result = validate_esports_baseline(tmp_path, "lol", tmp_path / "artifacts")
 
@@ -371,9 +384,7 @@ def test_forecast_requires_exact_identity_and_remains_zero_unit(tmp_path) -> Non
                 "short": {"description": "Beta Gaming", "ask": 0.31},
             }
 
-    result = forecast_esports_slate(
-        tmp_path / "data", artifacts, "lol", "2099-01-01", client=FakeClient()
-    )
+    result = forecast_esports_slate(tmp_path / "data", artifacts, "lol", "2099-01-01", client=FakeClient())
 
     assert result["priced_count"] == 1
     assert result["priced_contracts"][0]["qualification"] == "NO_CALL_MODEL_UNVALIDATED"
@@ -381,4 +392,3 @@ def test_forecast_requires_exact_identity_and_remains_zero_unit(tmp_path) -> Non
     assert result["priced_contracts"][0]["source_teams_resolved"] is True
     assert result["priced_contracts"][0]["source_teams_trained"] is True
     assert result["priced_contracts"][0]["gated_research_eligible"] is True
-

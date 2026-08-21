@@ -79,12 +79,16 @@ def main() -> None:
 
     dataset = build_mlb_historical_horizon_dataset("data/rebuild", start_date, end_date, HORIZON)
     features = dataset.features.sort("event_start_utc") if dataset.features.height else dataset.features
-    print(f"1. Feature rows: {dataset.matched_games} matched "
-          f"({dataset.starters_known_games} with a point-in-time-valid probable starter); "
-          f"dataset_hash={dataset.dataset_hash[:12]}")
+    print(
+        f"1. Feature rows: {dataset.matched_games} matched "
+        f"({dataset.starters_known_games} with a point-in-time-valid probable starter); "
+        f"dataset_hash={dataset.dataset_hash[:12]}"
+    )
 
     if features.height < 30:
-        print("Not enough matched games to compare distribution methods meaningfully (need >=30). Stopping honestly.")
+        print(
+            "Not enough matched games to compare distribution methods meaningfully (need >=30). Stopping honestly."
+        )
         sys.exit(0)
 
     # Task 8: real date-cluster-safe folds, identical construction to
@@ -94,8 +98,10 @@ def main() -> None:
     val_size_days = max(1, n_unique_dates // 6)
     test_size_days = max(1, n_unique_dates // 6)
     folds = expanding_folds(game_dates, n_splits=3, val_size=val_size_days, test_size=test_size_days, gap=1)
-    print(f"2. Chronological folds: {len(folds)} ({n_unique_dates} real distinct dates, "
-          f"val_size={val_size_days}d test_size={test_size_days}d gap=1d)")
+    print(
+        f"2. Chronological folds: {len(folds)} ({n_unique_dates} real distinct dates, "
+        f"val_size={val_size_days}d test_size={test_size_days}d gap=1d)"
+    )
 
     oof: dict[str, list[float]] = {m: [] for m in METHODS}
     y_true: list[int] = []
@@ -112,7 +118,12 @@ def main() -> None:
         y_val_fold = _home_win_labels(val_df)
         val_rows = list(val_df.iter_rows(named=True))
 
-        fold_report = {"fold": fold.fold_index, "train_n": train_df.height, "val_n": val_df.height, "methods": {}}
+        fold_report = {
+            "fold": fold.fold_index,
+            "train_n": train_df.height,
+            "val_n": val_df.height,
+            "methods": {},
+        }
         for method in METHODS:
             # One real fit per method -- MLBTwoHeadModel.fit() re-fits both
             # heads from scratch each time (no artifact-reload shortcut
@@ -131,16 +142,16 @@ def main() -> None:
 
         y_true.extend(y_val_fold)
         per_fold_report.append(fold_report)
-        summary_line = " ".join(
-            f"{m}_ll={fold_report['methods'][m]['log_loss']:.3f}" for m in METHODS
-        )
+        summary_line = " ".join(f"{m}_ll={fold_report['methods'][m]['log_loss']:.3f}" for m in METHODS)
         print(f"  Fold {fold.fold_index}: train={train_df.height} val={val_df.height} {summary_line}")
 
     if len(y_true) < 10:
         print("Too few real OOF predictions across folds for a meaningful comparison. Stopping honestly.")
         sys.exit(0)
 
-    print(f"\n3. OOF comparison ({len(y_true)} real out-of-fold predictions across {len(per_fold_report)} folds):")
+    print(
+        f"\n3. OOF comparison ({len(y_true)} real out-of-fold predictions across {len(per_fold_report)} folds):"
+    )
     method_summary = {}
     for method in METHODS:
         probs = oof[method]
@@ -151,8 +162,10 @@ def main() -> None:
             "ece": ece(y_true, probs),
             "calibration_curve": curve,
         }
-        print(f"   {method:22s}: log_loss={method_summary[method]['log_loss']:.4f} "
-              f"brier={method_summary[method]['brier']:.4f} ece={method_summary[method]['ece']:.4f}")
+        print(
+            f"   {method:22s}: log_loss={method_summary[method]['log_loss']:.4f} "
+            f"brier={method_summary[method]['brier']:.4f} ece={method_summary[method]['ece']:.4f}"
+        )
 
     best_method = min(METHODS, key=lambda m: method_summary[m]["log_loss"])
     print(f"\n4. Best OOF log loss: {best_method}")
@@ -166,16 +179,22 @@ def main() -> None:
     )
 
     results_path = Path("outputs/rebuild/mlb_distribution_comparison.json")
-    results_path.write_text(json.dumps({
-        "dataset_hash": dataset.dataset_hash,
-        "matched_games": dataset.matched_games,
-        "starters_known_games": dataset.starters_known_games,
-        "n_oof": len(y_true),
-        "methods_compared": METHODS,
-        "per_fold": per_fold_report,
-        "oof_summary": method_summary,
-        "best_method_by_oof_log_loss": best_method,
-    }, indent=2, default=str))
+    results_path.write_text(
+        json.dumps(
+            {
+                "dataset_hash": dataset.dataset_hash,
+                "matched_games": dataset.matched_games,
+                "starters_known_games": dataset.starters_known_games,
+                "n_oof": len(y_true),
+                "methods_compared": METHODS,
+                "per_fold": per_fold_report,
+                "oof_summary": method_summary,
+                "best_method_by_oof_log_loss": best_method,
+            },
+            indent=2,
+            default=str,
+        )
+    )
     print(f"5. Results saved to {results_path}")
 
 

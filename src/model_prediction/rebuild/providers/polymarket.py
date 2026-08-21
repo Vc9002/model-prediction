@@ -114,7 +114,9 @@ class PolymarketProvider:
         status = ProviderStatus.DEGRADED if errors and frame.is_empty() else ProviderStatus.AVAILABLE
         return ProviderResult(status, enriched, frame, reason)
 
-    def snapshot(self, slug: str, *, sport: str, observed_at: datetime | None = None, force: bool = False) -> ProviderResult:
+    def snapshot(
+        self, slug: str, *, sport: str, observed_at: datetime | None = None, force: bool = False
+    ) -> ProviderResult:
         """One market's real executable book (best bid/ask, depth) at capture time.
 
         Never cached across calls with `force=False` skipped -- a book is a

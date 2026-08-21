@@ -151,8 +151,7 @@ class ProductionPredictionStore:
             self._ensure_column(table, column, ddl)
         with self._conn:
             self._conn.execute(
-                "UPDATE predictions SET decision_time_utc = prediction_time_utc "
-                "WHERE decision_time_utc = ''"
+                "UPDATE predictions SET decision_time_utc = prediction_time_utc WHERE decision_time_utc = ''"
             )
         # The query/identity indexes reference the migrated columns, so
         # they can only be created after _ensure_column above (a legacy
@@ -163,17 +162,14 @@ class ProductionPredictionStore:
             "ON predictions (sport, market_type, status, event_start_utc)"
         )
         self._conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_predictions_model "
-            "ON predictions (model_id, event_start_utc)"
+            "CREATE INDEX IF NOT EXISTS idx_predictions_model ON predictions (model_id, event_start_utc)"
         )
 
     def _ensure_column(self, table: str, column: str, ddl: str) -> None:
         columns = {row[1] for row in self._conn.execute(f"PRAGMA table_info({table})")}
         if column not in columns:
             with self._conn:
-                self._conn.execute(
-                    f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"
-                )
+                self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
     def close(self) -> None:
         self._conn.close()
@@ -213,8 +209,7 @@ class ProductionPredictionStore:
             raise ValueError(f"status must be one of {_RUN_STATUSES}")
         with self._conn:
             self._conn.execute(
-                "UPDATE runs SET status = ?, completed_at_utc = ?, note = ?, "
-                "counters = ? WHERE run_id = ?",
+                "UPDATE runs SET status = ?, completed_at_utc = ?, note = ?, counters = ? WHERE run_id = ?",
                 (
                     status,
                     datetime.now(UTC).isoformat(),
@@ -257,9 +252,7 @@ class ProductionPredictionStore:
         # The run must exist — absent runs are a caller bug, not a state
         # to normalize (an empty-string run_id would silently orphan the
         # row from its run lineage).
-        if self._conn.execute(
-            "SELECT 1 FROM runs WHERE run_id = ?", (run_id,)
-        ).fetchone() is None:
+        if self._conn.execute("SELECT 1 FROM runs WHERE run_id = ?", (run_id,)).fetchone() is None:
             raise ValueError(f"run_id {run_id!r} does not exist in runs")
         prediction_time = prediction_time_utc or decision_time_utc
         with self._conn:
@@ -308,8 +301,7 @@ class ProductionPredictionStore:
             raise ValueError(f"status must be one of {_PREDICTION_STATUSES}")
         with self._conn:
             cursor = self._conn.execute(
-                "UPDATE predictions SET status = ?, note = ? WHERE id = ? "
-                "AND status = 'predicted'",
+                "UPDATE predictions SET status = ?, note = ? WHERE id = ? AND status = 'predicted'",
                 (status, note, row_id),
             )
             if cursor.rowcount == 0:
@@ -319,9 +311,7 @@ class ProductionPredictionStore:
                 )
             return self.get_prediction(row_id)  # type: ignore[return-value]
 
-    def settle_prediction(
-        self, row_id: int, outcome: str, *, note: str | None = None
-    ) -> dict[str, Any]:
+    def settle_prediction(self, row_id: int, outcome: str, *, note: str | None = None) -> dict[str, Any]:
         if outcome not in ("won", "lost", "void"):
             raise ValueError("outcome must be won, lost, or void")
         # ONE transaction: a crash between "outcome recorded" and "status
@@ -344,14 +334,10 @@ class ProductionPredictionStore:
     def void_prediction(self, row_id: int, *, note: str | None = None) -> dict[str, Any]:
         return self._transition(row_id, "voided", note)
 
-    def supersede_prediction(
-        self, row_id: int, *, note: str | None = None
-    ) -> dict[str, Any]:
+    def supersede_prediction(self, row_id: int, *, note: str | None = None) -> dict[str, Any]:
         return self._transition(row_id, "superseded", note)
 
-    def mark_prediction_error(
-        self, row_id: int, *, note: str | None = None
-    ) -> dict[str, Any]:
+    def mark_prediction_error(self, row_id: int, *, note: str | None = None) -> dict[str, Any]:
         return self._transition(row_id, "error", note)
 
     # ── decisions & snapshots ──────────────────────────────────────────────
@@ -371,9 +357,7 @@ class ProductionPredictionStore:
                 (prediction_id, datetime.now(UTC).isoformat(), operator, action, note),
             )
 
-    def record_market_snapshot(
-        self, event_id: str, sport: str, market: str, payload: dict[str, Any]
-    ) -> None:
+    def record_market_snapshot(self, event_id: str, sport: str, market: str, payload: dict[str, Any]) -> None:
         with self._conn:
             self._conn.execute(
                 "INSERT INTO market_snapshots (event_id, sport, market, "
@@ -390,9 +374,7 @@ class ProductionPredictionStore:
     # ── reads ──────────────────────────────────────────────────────────────
 
     def get_prediction(self, row_id: int) -> dict[str, Any] | None:
-        row = self._conn.execute(
-            "SELECT * FROM predictions WHERE id = ?", (row_id,)
-        ).fetchone()
+        row = self._conn.execute("SELECT * FROM predictions WHERE id = ?", (row_id,)).fetchone()
         return _decode(row)
 
     def get_predictions(
@@ -444,15 +426,10 @@ class ProductionPredictionStore:
         if clauses:
             query += " WHERE " + " AND ".join(clauses)
         query += " GROUP BY status"
-        return {
-            str(row["status"]): int(row["n"])
-            for row in self._conn.execute(query, params).fetchall()
-        }
+        return {str(row["status"]): int(row["n"]) for row in self._conn.execute(query, params).fetchall()}
 
     def latest_prediction_utc(self) -> str | None:
-        row = self._conn.execute(
-            "SELECT MAX(prediction_time_utc) AS latest FROM predictions"
-        ).fetchone()
+        row = self._conn.execute("SELECT MAX(prediction_time_utc) AS latest FROM predictions").fetchone()
         return str(row["latest"]) if row and row["latest"] else None
 
     # ── export (xlsx is an explicit operation, not the database) ───────────
@@ -465,15 +442,23 @@ class ProductionPredictionStore:
         ws = wb.active
         ws.title = "predictions"
         columns = [
-            "id", "prediction_id", "event_id", "sport", "market_type",
-            "model_id", "horizon", "decision_time_utc", "probabilities",
-            "predicted_side", "status", "resolved_outcome", "settled_at_utc",
+            "id",
+            "prediction_id",
+            "event_id",
+            "sport",
+            "market_type",
+            "model_id",
+            "horizon",
+            "decision_time_utc",
+            "probabilities",
+            "predicted_side",
+            "status",
+            "resolved_outcome",
+            "settled_at_utc",
         ]
         ws.append(columns)
         count = 0
-        for row in self._conn.execute(
-            "SELECT * FROM predictions ORDER BY id"
-        ).fetchall():
+        for row in self._conn.execute("SELECT * FROM predictions ORDER BY id").fetchall():
             decoded = _decode(row)
             ws.append([_cell_value(decoded.get(c)) for c in columns])
             count += 1
@@ -528,13 +513,12 @@ def read_latest_prediction_utc(paths: RuntimePaths) -> str | None:
     if conn is None:
         return None
     try:
-        if conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='predictions'"
-        ).fetchone() is None:
+        if (
+            conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='predictions'").fetchone()
+            is None
+        ):
             return None
-        row = conn.execute(
-            "SELECT MAX(prediction_time_utc) AS latest FROM predictions"
-        ).fetchone()
+        row = conn.execute("SELECT MAX(prediction_time_utc) AS latest FROM predictions").fetchone()
         return str(row[0]) if row and row[0] else None
     finally:
         conn.close()
@@ -546,9 +530,10 @@ def read_recent_probabilities(paths: RuntimePaths, limit: int = 20) -> list[dict
     if conn is None:
         return []
     try:
-        if conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='predictions'"
-        ).fetchone() is None:
+        if (
+            conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='predictions'").fetchone()
+            is None
+        ):
             return []
         out: list[dict[str, float]] = []
         for row in conn.execute(

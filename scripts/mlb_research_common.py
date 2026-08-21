@@ -16,11 +16,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-import numpy as np  # noqa: E402
+import numpy as np
 
-from model_prediction.config import PROJECT_ROOT  # noqa: E402
-from model_prediction.features.base import FeatureStore  # noqa: E402
-from model_prediction.validation import (  # noqa: E402
+from model_prediction.config import PROJECT_ROOT
+from model_prediction.features.base import FeatureStore
+from model_prediction.validation import (
     build_walk_forward_rows,
     chronological_split,
 )

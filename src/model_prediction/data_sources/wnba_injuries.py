@@ -134,7 +134,14 @@ def _pdf_tokens(pdf_bytes: bytes) -> tuple[list[_Token], str]:
     for page_number, page in enumerate(reader.pages):
         raw_text.append(page.extract_text() or "")
 
-        def visit(text: str, _cm: list[float], tm: list[float], _font: Any, _size: float, page_number: int = page_number) -> None:
+        def visit(
+            text: str,
+            _cm: list[float],
+            tm: list[float],
+            _font: Any,
+            _size: float,
+            page_number: int = page_number,
+        ) -> None:
             cleaned = " ".join(text.split())
             if cleaned:
                 tokens.append(_Token(page_number, float(tm[4]), float(tm[5]), cleaned))
@@ -152,11 +159,7 @@ def _join(tokens: Iterable[_Token]) -> str:
 def _group_lines(tokens: Iterable[_Token], tolerance: float = 1.0) -> list[list[_Token]]:
     lines: list[list[_Token]] = []
     for token in sorted(tokens, key=lambda item: (item.page, item.y, item.x)):
-        if (
-            not lines
-            or token.page != lines[-1][0].page
-            or abs(token.y - lines[-1][0].y) > tolerance
-        ):
+        if not lines or token.page != lines[-1][0].page or abs(token.y - lines[-1][0].y) > tolerance:
             lines.append([token])
         else:
             lines[-1].append(token)
@@ -196,9 +199,7 @@ def _parse_coordinate_table(
                 continue
             header_y = title_candidates[0]
         data_lines = [
-            line
-            for line in _group_lines(page_tokens)
-            if line[0].y > header_y + 8 and line[0].y < 500
+            line for line in _group_lines(page_tokens) if line[0].y > header_y + 8 and line[0].y < 500
         ]
         player_lines: list[tuple[float, list[_Token]]] = []
         for line in data_lines:
@@ -300,11 +301,7 @@ def _parse_coordinate_table(
                 for token in page_tokens
                 if token.x >= 666 and abs(token.y - row_y) <= radius and token.y > header_y + 8
             ]
-            reason = " ".join(
-                _join(group)
-                for group in _group_lines(reason_tokens)
-                if _join(group)
-            )
+            reason = " ".join(_join(group) for group in _group_lines(reason_tokens) if _join(group))
             entries.append(
                 InjuryEntry(
                     game_date=current_date,

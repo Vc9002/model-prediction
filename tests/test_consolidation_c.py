@@ -128,12 +128,8 @@ def test_data_service_predictions_are_paginated_and_readonly(tmp_path: Path, mon
         page1 = data_service.handle("predictions", {"limit": ["2"]})
         assert len(page1["predictions"]) == 2
         assert page1["next_cursor"] is not None
-        page2 = data_service.handle(
-            "predictions", {"limit": ["2"], "cursor": [str(page1["next_cursor"])]}
-        )
-        page3 = data_service.handle(
-            "predictions", {"limit": ["2"], "cursor": [str(page2["next_cursor"])]}
-        )
+        page2 = data_service.handle("predictions", {"limit": ["2"], "cursor": [str(page1["next_cursor"])]})
+        page3 = data_service.handle("predictions", {"limit": ["2"], "cursor": [str(page2["next_cursor"])]})
         assert len(page2["predictions"]) == 2 and len(page3["predictions"]) == 1
         assert page3["next_cursor"] is None
 
@@ -202,19 +198,18 @@ def test_ledger_endpoint_is_paginated_and_readonly(tmp_path: Path, monkeypatch) 
     with RuntimeLedgerStore(paths) as store:
         for i in range(5):
             _seed_ledger_record(
-                store, pick_id=f"pick-{i}", operation_id=f"op-{i}",
-                event_id=f"e{i}", created_at_utc=f"2026-08-14T12:00:0{i}+00:00",
+                store,
+                pick_id=f"pick-{i}",
+                operation_id=f"op-{i}",
+                event_id=f"e{i}",
+                created_at_utc=f"2026-08-14T12:00:0{i}+00:00",
             )
 
         page1 = data_service.handle("ledger", {"limit": ["2"]})
         assert len(page1["records"]) == 2
         assert page1["next_cursor"] is not None
-        page2 = data_service.handle(
-            "ledger", {"limit": ["2"], "cursor": [page1["next_cursor"]]}
-        )
-        page3 = data_service.handle(
-            "ledger", {"limit": ["2"], "cursor": [page2["next_cursor"]]}
-        )
+        page2 = data_service.handle("ledger", {"limit": ["2"], "cursor": [page1["next_cursor"]]})
+        page3 = data_service.handle("ledger", {"limit": ["2"], "cursor": [page2["next_cursor"]]})
         assert len(page2["records"]) == 2 and len(page3["records"]) == 1
         assert page3["next_cursor"] is None
 
@@ -242,9 +237,7 @@ def test_ledger_endpoint_missing_db_is_empty_not_an_error(tmp_path: Path, monkey
     assert counts["counts"] == {}
 
 
-def test_dashboard_equivalence_sql_matches_xlsx_for_the_same_tier(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_dashboard_equivalence_sql_matches_xlsx_for_the_same_tier(tmp_path: Path, monkeypatch) -> None:
     """I: the SQL read path must show the SAME picks, status, and P&L as
     the XLSX ledger it mirrors — the dashboard-equivalence gate."""
     from model_prediction.dashboard import data_service

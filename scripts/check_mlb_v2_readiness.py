@@ -128,10 +128,12 @@ def count_committed_predictions(db_path: str | Path, contract: ReadinessContract
             contract.test_start,
         ]
         if contract.test_end is not None:
-            where.extend([
-                "julianday(p.prediction_observed_at_utc) <= julianday(?)",
-                "julianday(p.created_at) <= julianday(?)",
-            ])
+            where.extend(
+                [
+                    "julianday(p.prediction_observed_at_utc) <= julianday(?)",
+                    "julianday(p.created_at) <= julianday(?)",
+                ]
+            )
             params.extend([contract.test_end, contract.test_end])
         row = conn.execute(
             f"""WITH current_predictions AS (
@@ -149,7 +151,7 @@ def count_committed_predictions(db_path: str | Path, contract: ReadinessContract
                   ON ca.sport = p.sport
                  AND ca.model_artifact_hash = p.model_artifact_hash
                  AND ca.calibration_hash = p.calibration_artifact_hash
-                WHERE {' AND '.join(where)}""",
+                WHERE {" AND ".join(where)}""",
             params,
         ).fetchone()
     except sqlite3.Error as exc:
@@ -193,8 +195,11 @@ def count_completed_cohort_events(db_path: str | Path, contract: ReadinessContra
                         )
                   )""",
             (
-                contract.horizon, MLB_V2_TEST_ID, contract.candidate_version,
-                contract.anchor.bundle_hash, contract.anchor.calibrator_hash,
+                contract.horizon,
+                MLB_V2_TEST_ID,
+                contract.candidate_version,
+                contract.anchor.bundle_hash,
+                contract.anchor.calibrator_hash,
             ),
         ).fetchone()
     except sqlite3.Error as exc:

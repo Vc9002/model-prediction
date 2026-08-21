@@ -97,15 +97,11 @@ def _load_priors(
                 continue  # Prior too old
             eligible.append((as_of, path, payload))
     if not eligible:
-        raise ValueError(
-            "NO_CALL_AVAILABILITY_PRIORS_UNAVAILABLE: no pregame WNBA minutes/impact priors"
-        )
+        raise ValueError("NO_CALL_AVAILABILITY_PRIORS_UNAVAILABLE: no pregame WNBA minutes/impact priors")
     return max(eligible, key=lambda item: (item[0], str(item[1])))[2]
 
 
-def _latest_espn_snapshot(
-    data_root: Path, event_id: str, observed_at: datetime
-) -> dict[str, Any]:
+def _latest_espn_snapshot(data_root: Path, event_id: str, observed_at: datetime) -> dict[str, Any]:
     root = data_root / "availability/wnba/espn_event_snapshots"
     eligible: list[tuple[datetime, Path, dict[str, Any]]] = []
     for path in root.glob(f"*/{event_id}-*.json"):
@@ -117,14 +113,14 @@ def _latest_espn_snapshot(
         if observed <= observed_at:
             eligible.append((observed, path, payload))
     if not eligible:
-        raise ValueError(
-            "NO_CALL_AVAILABILITY_ESPN_UNAVAILABLE: no point-in-time ESPN event status snapshot"
-        )
+        raise ValueError("NO_CALL_AVAILABILITY_ESPN_UNAVAILABLE: no point-in-time ESPN event status snapshot")
     return max(eligible, key=lambda item: (item[0], str(item[1])))[2]
 
 
 def _team_rows(priors: Mapping[str, Any], team: str) -> list[Mapping[str, Any]]:
-    rows = [row for row in priors.get("players", []) if _identity(str(row.get("team", ""))) == _identity(team)]
+    rows = [
+        row for row in priors.get("players", []) if _identity(str(row.get("team", ""))) == _identity(team)
+    ]
     total_minutes = sum(float(row.get("projected_minutes", 0)) for row in rows)
     if not MINIMUM_TEAM_MINUTES <= total_minutes <= MAXIMUM_TEAM_MINUTES:
         raise ValueError(
@@ -354,8 +350,7 @@ def matchup_player_availability_from_payloads(
             "NO_CALL_AVAILABILITY_REPORT_INCOMPLETE: teams absent from report: " + ", ".join(absent)
         )
     submission_status = {
-        _identity(str(team)): str(status)
-        for team, status in snapshot.get("team_report_status", {}).items()
+        _identity(str(team)): str(status) for team, status in snapshot.get("team_report_status", {}).items()
     }
     incomplete = [
         team
@@ -364,22 +359,15 @@ def matchup_player_availability_from_payloads(
     ]
     if incomplete:
         raise ValueError(
-            "NO_CALL_AVAILABILITY_REPORT_INCOMPLETE: reports not submitted for "
-            + ", ".join(incomplete)
+            "NO_CALL_AVAILABILITY_REPORT_INCOMPLETE: reports not submitted for " + ", ".join(incomplete)
         )
     home_rows = _team_rows(priors, home_team)
     away_rows = _team_rows(priors, away_team)
-    home = _team_availability(
-        home_team, home_rows, _status_by_player(snapshot, home_team, game_date)
-    )
-    away = _team_availability(
-        away_team, away_rows, _status_by_player(snapshot, away_team, game_date)
-    )
+    home = _team_availability(home_team, home_rows, _status_by_player(snapshot, home_team, game_date))
+    away = _team_availability(away_team, away_rows, _status_by_player(snapshot, away_team, game_date))
     return {
         # Positive means the away team loses more value, favoring the home team.
-        "availability_points_gap": round(
-            away["expected_loss_points"] - home["expected_loss_points"], 10
-        ),
+        "availability_points_gap": round(away["expected_loss_points"] - home["expected_loss_points"], 10),
         "home_available_minutes_share": round(home["available_minutes_share"], 10),
         "away_available_minutes_share": round(away["available_minutes_share"], 10),
         "availability_uncertainty": round(

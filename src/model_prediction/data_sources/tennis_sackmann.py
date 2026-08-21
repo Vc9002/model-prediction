@@ -64,9 +64,7 @@ def player_form_from_matches(
     observations = [item for item in observations if item is not None]
     recent = observations[-recent_matches:]
     serve_won, serve_points, return_won, return_points = _sum_observations(observations)
-    recent_serve_won, recent_serve_points, recent_return_won, recent_return_points = (
-        _sum_observations(recent)
-    )
+    recent_serve_won, recent_serve_points, recent_return_won, recent_return_points = _sum_observations(recent)
     return TennisPlayerForm(
         player_id=player_key,
         name=player_name,
@@ -137,9 +135,7 @@ def _point_observation(row, player_key):
     serve_won = int(values["first_won"] + values["second_won"])
     return_points = int(values["opponent_serve_points"])
     return_won = int(
-        values["opponent_serve_points"]
-        - values["opponent_first_won"]
-        - values["opponent_second_won"]
+        values["opponent_serve_points"] - values["opponent_first_won"] - values["opponent_second_won"]
     )
     if min(serve_points, return_points, serve_won, return_won) < 0:
         return None

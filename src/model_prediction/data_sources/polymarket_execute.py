@@ -85,8 +85,7 @@ def _resolve_moneyline_side(pick_row: dict[str, str], snapshot: dict[str, Any]) 
     selected_team = _row_selected_team(pick_row)
     if not selected_team:
         raise ExecutionGateError(
-            f"REFUSED: unrecognized selection {pick_row.get('selection')!r} "
-            "for live side verification."
+            f"REFUSED: unrecognized selection {pick_row.get('selection')!r} for live side verification."
         )
     matches_long = _team_name_matches(selected_team, str(snapshot["long"]["description"]))
     matches_short = _team_name_matches(selected_team, str(snapshot["short"]["description"]))
@@ -115,16 +114,13 @@ def _resolve_spread_side(pick_row: dict[str, str], snapshot: dict[str, Any]) -> 
     selected_team = _row_selected_team(pick_row)
     if not selected_team:
         raise ExecutionGateError(
-            f"REFUSED: unrecognized selection {pick_row.get('selection')!r} "
-            "for live side verification."
+            f"REFUSED: unrecognized selection {pick_row.get('selection')!r} for live side verification."
         )
     row_line = _row_line(pick_row)
     market_team = snapshot.get("team")
     market_line = snapshot.get("line")
     if market_team is None or market_line is None:
-        raise ExecutionGateError(
-            "REFUSED: live spread market has no team/line to verify against."
-        )
+        raise ExecutionGateError("REFUSED: live spread market has no team/line to verify against.")
     is_market_team = _team_name_matches(selected_team, str(market_team))
     if is_market_team and _lines_match(row_line, float(market_line)):
         return "long"
@@ -146,8 +142,7 @@ def _resolve_total_side(pick_row: dict[str, str], snapshot: dict[str, Any]) -> s
     market_line = snapshot.get("line")
     if market_line is None or not _lines_match(row_line, float(market_line)):
         raise ExecutionGateError(
-            f"REFUSED: pick row line {row_line} does not match the live market's total line "
-            f"({market_line})."
+            f"REFUSED: pick row line {row_line} does not match the live market's total line ({market_line})."
         )
     return _resolve_exact_description_side(selection, snapshot)
 
@@ -172,6 +167,7 @@ def _resolve_exact_description_side(selection: str, snapshot: dict[str, Any]) ->
             f"(long={long_desc!r}, short={short_desc!r})."
         )
     return "long" if matches_long else "short"
+
 
 KEY_ID_ENV = "POLYMARKET_KEY_ID"
 SECRET_KEY_ENV = "POLYMARKET_SECRET_KEY"
@@ -351,13 +347,9 @@ class PolymarketExecutor:
         # never silently rounded — rounding changes the user-confirmed price.
         if abs(ticket.price * 100 - round(ticket.price * 100)) > 1e-9:
             raise ExecutionGateError(
-                f"REFUSED: limit price {ticket.price} is not a whole-cent tick; "
-                "resubmit at a 0.01 increment."
+                f"REFUSED: limit price {ticket.price} is not a whole-cent tick; resubmit at a 0.01 increment."
             )
-        if (
-            ticket.maximum_cost_usd is not None
-            and recomputed_cost > ticket.maximum_cost_usd + 0.005
-        ):
+        if ticket.maximum_cost_usd is not None and recomputed_cost > ticket.maximum_cost_usd + 0.005:
             raise ExecutionGateError(
                 f"REFUSED: ${recomputed_cost:.2f} exceeds the authorized "
                 f"unit cap of ${ticket.maximum_cost_usd:.2f}."
@@ -437,9 +429,7 @@ class PolymarketExecutor:
             "btts": _resolve_btts_side,
         }.get(str(market_type))
         if resolver is None:
-            raise ExecutionGateError(
-                f"REFUSED: no live side resolver for market_type {market_type!r}."
-            )
+            raise ExecutionGateError(f"REFUSED: no live side resolver for market_type {market_type!r}.")
         try:
             event_start = parse_utc(str(pick_row.get("event_start_utc", "")))
         except ValueError as error:
@@ -468,9 +458,7 @@ class PolymarketExecutor:
                 f"{_LIVE_QUOTE_MAXIMUM_AGE_SECONDS}s); refresh and resubmit."
             )
         if snapshot.get("market_state") not in (None, "MARKET_STATE_OPEN"):
-            raise ExecutionGateError(
-                f"REFUSED: market is not open (state={snapshot.get('market_state')})."
-            )
+            raise ExecutionGateError(f"REFUSED: market is not open (state={snapshot.get('market_state')}).")
         expected_side = resolver(pick_row, snapshot)
         if ticket.token_side != expected_side:
             raise ExecutionGateError(
@@ -543,9 +531,7 @@ class PolymarketExecutor:
         }.get((ticket.action, ticket.token_side))
         if intent is None:
             raise ExecutionGateError("REFUSED: unsupported order action/side.")
-        exchange_price = (
-            ticket.price if ticket.token_side == "long" else 1.0 - ticket.price
-        )
+        exchange_price = ticket.price if ticket.token_side == "long" else 1.0 - ticket.price
         marketable = ticket.order_type == "limit_ioc"
         response = self._request(
             "POST",
@@ -557,9 +543,7 @@ class PolymarketExecutor:
                 "price": {"value": f"{exchange_price:.2f}", "currency": "USD"},
                 "quantity": ticket.size_shares,
                 "tif": (
-                    "TIME_IN_FORCE_IMMEDIATE_OR_CANCEL"
-                    if marketable
-                    else "TIME_IN_FORCE_GOOD_TILL_CANCEL"
+                    "TIME_IN_FORCE_IMMEDIATE_OR_CANCEL" if marketable else "TIME_IN_FORCE_GOOD_TILL_CANCEL"
                 ),
                 "participateDontInitiate": not marketable,
                 "manualOrderIndicator": "MANUAL_ORDER_INDICATOR_MANUAL",

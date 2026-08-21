@@ -104,7 +104,9 @@ class MLBStatsProvider:
                 )
                 return result
             except Exception as exc:  # noqa: BLE001 - source parser boundary
-                return ProviderResult(ProviderStatus.DEGRADED, cached.metadata, None, f"cached parse failed: {exc}")
+                return ProviderResult(
+                    ProviderStatus.DEGRADED, cached.metadata, None, f"cached parse failed: {exc}"
+                )
         try:
             fetched = self.http.get(url, params=parameters)
         except Exception as exc:  # noqa: BLE001 - network boundary
@@ -165,28 +167,30 @@ class MLBStatsProvider:
                 away = teams.get("away", {})
                 status = game.get("status", {})
                 venue = game.get("venue") or {}
-                rows.append({
-                    "game_pk": int(game["gamePk"]),
-                    "game_date": game["gameDate"],
-                    "official_date": game.get("officialDate"),
-                    "season": int(game.get("season") or str(game.get("officialDate", "0000"))[:4]),
-                    "game_type": game.get("gameType"),
-                    "game_number": int(game.get("gameNumber") or 1),
-                    "double_header": str(game.get("doubleHeader") or "N"),
-                    "scheduled_innings": int(game.get("scheduledInnings") or 9),
-                    "status_abstract": status.get("abstractGameState"),
-                    "status_detailed": status.get("detailedState"),
-                    "status_code": status.get("statusCode"),
-                    "home_team_id": int(home["team"]["id"]),
-                    "away_team_id": int(away["team"]["id"]),
-                    "home_probable_pitcher_id": (home.get("probablePitcher") or {}).get("id"),
-                    "away_probable_pitcher_id": (away.get("probablePitcher") or {}).get("id"),
-                    "venue_id": venue.get("id"),
-                    "reschedule_date": game.get("rescheduleDate"),
-                    "rescheduled_from_date": game.get("rescheduledFromDate"),
-                    "resume_date": game.get("resumeDate"),
-                    "original_date": game.get("originalDate"),
-                })
+                rows.append(
+                    {
+                        "game_pk": int(game["gamePk"]),
+                        "game_date": game["gameDate"],
+                        "official_date": game.get("officialDate"),
+                        "season": int(game.get("season") or str(game.get("officialDate", "0000"))[:4]),
+                        "game_type": game.get("gameType"),
+                        "game_number": int(game.get("gameNumber") or 1),
+                        "double_header": str(game.get("doubleHeader") or "N"),
+                        "scheduled_innings": int(game.get("scheduledInnings") or 9),
+                        "status_abstract": status.get("abstractGameState"),
+                        "status_detailed": status.get("detailedState"),
+                        "status_code": status.get("statusCode"),
+                        "home_team_id": int(home["team"]["id"]),
+                        "away_team_id": int(away["team"]["id"]),
+                        "home_probable_pitcher_id": (home.get("probablePitcher") or {}).get("id"),
+                        "away_probable_pitcher_id": (away.get("probablePitcher") or {}).get("id"),
+                        "venue_id": venue.get("id"),
+                        "reschedule_date": game.get("rescheduleDate"),
+                        "rescheduled_from_date": game.get("rescheduledFromDate"),
+                        "resume_date": game.get("resumeDate"),
+                        "original_date": game.get("originalDate"),
+                    }
+                )
         # Explicit schema, not inference: reschedule_date/rescheduled_from_date/
         # resume_date are almost always null across a real season batch but
         # carry a real ISO datetime string for the rare suspended/postponed
@@ -197,7 +201,9 @@ class MLBStatsProvider:
         # instant a real string shows up later in the same request.
         frame = pl.DataFrame(rows, schema=_SCHEDULE_SCHEMA) if rows else pl.DataFrame(schema=_SCHEDULE_SCHEMA)
         enriched = replace(metadata, schema_hash=dataframe_schema_hash(frame))
-        return ProviderResult(ProviderStatus.AVAILABLE, enriched, frame, "NO_GAMES" if frame.is_empty() else None)
+        return ProviderResult(
+            ProviderStatus.AVAILABLE, enriched, frame, "NO_GAMES" if frame.is_empty() else None
+        )
 
     @staticmethod
     def _feed_rows(body: bytes, metadata: SourceResponseMetadata) -> ProviderResult:
@@ -223,16 +229,18 @@ class MLBStatsProvider:
             probable_pitcher = probable.get(side) or {}
             batting_order = [int(value) for value in (box.get("battingOrder") or [])]
             roster_ids = [int(str(value).removeprefix("ID")) for value in (box.get("players") or {})]
-            rows.append({
-                "game_pk": game_pk,
-                "team_side": side,
-                "team_id": int(team["id"]),
-                "probable_pitcher_id": probable_pitcher.get("id"),
-                "probable_pitcher_name": probable_pitcher.get("fullName"),
-                "batting_order_json": json.dumps(batting_order),
-                "roster_player_ids_json": json.dumps(roster_ids),
-                "players_json": json.dumps(players, sort_keys=True),
-            })
+            rows.append(
+                {
+                    "game_pk": game_pk,
+                    "team_side": side,
+                    "team_id": int(team["id"]),
+                    "probable_pitcher_id": probable_pitcher.get("id"),
+                    "probable_pitcher_name": probable_pitcher.get("fullName"),
+                    "batting_order_json": json.dumps(batting_order),
+                    "roster_player_ids_json": json.dumps(roster_ids),
+                    "players_json": json.dumps(players, sort_keys=True),
+                }
+            )
         frame = pl.DataFrame(rows)
         enriched = replace(metadata, schema_hash=dataframe_schema_hash(frame))
         return ProviderResult(ProviderStatus.AVAILABLE, enriched, frame)
@@ -245,7 +253,9 @@ class MLBStatsProvider:
             raise TypeError("transactions payload lacks transactions list")
         frame = pl.DataFrame(transactions) if transactions else pl.DataFrame(schema={"id": pl.Int64})
         enriched = replace(metadata, schema_hash=dataframe_schema_hash(frame))
-        return ProviderResult(ProviderStatus.AVAILABLE, enriched, frame, "NO_TRANSACTIONS" if frame.is_empty() else None)
+        return ProviderResult(
+            ProviderStatus.AVAILABLE, enriched, frame, "NO_TRANSACTIONS" if frame.is_empty() else None
+        )
 
     def schedule(self, start: date, end: date, *, force: bool = False) -> ProviderResult:
         if end < start:

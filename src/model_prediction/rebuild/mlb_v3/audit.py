@@ -75,7 +75,14 @@ def _coverage(name: str, expected: set[int], covered: set[int]) -> dict[str, Any
 def audit_mlb_v3(store: MLBV3NormalizedStore, season: int) -> dict[str, Any]:
     tables = {
         name: store.read_all(name, season)
-        for name in ("games", "probable_pitchers", "lineups", "rosters", "statcast_pitches", "weather_forecasts")
+        for name in (
+            "games",
+            "probable_pitchers",
+            "lineups",
+            "rosters",
+            "statcast_pitches",
+            "weather_forecasts",
+        )
     }
     games = tables["games"]
     if games.is_empty():
@@ -88,16 +95,12 @@ def audit_mlb_v3(store: MLBV3NormalizedStore, season: int) -> dict[str, Any]:
             "qualification_note": "No normalized MLB v3 game captures exist.",
         }
 
-    conflict_counts = {
-        name: store.conflict_count(name, season)
-        for name in tables
-    }
+    conflict_counts = {name: store.conflict_count(name, season) for name in tables}
     latest_games = games.sort("observed_at_utc").unique(["game_pk", "period"], keep="last")
     eligible_games = {
         int(row["game_pk"])
         for row in latest_games.iter_rows(named=True)
-        if not row["postponed"]
-        and "cancel" not in str(row["status"]).lower()
+        if not row["postponed"] and "cancel" not in str(row["status"]).lower()
     }
     completed_games = {
         int(row["game_pk"])
@@ -113,12 +116,16 @@ def audit_mlb_v3(store: MLBV3NormalizedStore, season: int) -> dict[str, Any]:
     )
     lineup_covered = _covered_two_sides(tables["lineups"], min_rows_per_side=9)
     roster_covered = _covered_two_sides(tables["rosters"])
-    statcast_covered = set() if tables["statcast_pitches"].is_empty() else {
-        int(value) for value in tables["statcast_pitches"]["game_pk"].unique().to_list()
-    }
-    weather_covered = set() if tables["weather_forecasts"].is_empty() else {
-        int(value) for value in tables["weather_forecasts"]["game_pk"].unique().to_list()
-    }
+    statcast_covered = (
+        set()
+        if tables["statcast_pitches"].is_empty()
+        else {int(value) for value in tables["statcast_pitches"]["game_pk"].unique().to_list()}
+    )
+    weather_covered = (
+        set()
+        if tables["weather_forecasts"].is_empty()
+        else {int(value) for value in tables["weather_forecasts"]["game_pk"].unique().to_list()}
+    )
     coverage = {
         "starters": _coverage("starters", eligible_games, starter_covered),
         "statcast": _coverage("statcast", completed_games, statcast_covered),
@@ -127,10 +134,7 @@ def audit_mlb_v3(store: MLBV3NormalizedStore, season: int) -> dict[str, Any]:
         "weather": _coverage("weather", eligible_games, weather_covered),
     }
     timestamp_violations = _timestamp_violations(list(tables.values()))
-    duplicate_observations = {
-        name: _duplicates(frame, PRIMARY_KEYS[name])
-        for name, frame in tables.items()
-    }
+    duplicate_observations = {name: _duplicates(frame, PRIMARY_KEYS[name]) for name, frame in tables.items()}
     hard_fail = timestamp_violations > 0 or any(conflict_counts.values())
     coverage_fail = any(not value["passes"] for value in coverage.values())
     report: dict[str, Any] = {

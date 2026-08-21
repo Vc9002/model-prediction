@@ -35,9 +35,7 @@ def test_integrity_report_detects_tampering(tmp_path) -> None:
     with RuntimeLedgerStore(paths) as store:
         store.apply(_mutation())
         store.apply(_mutation(event_id="401690002"))
-        store._conn.execute(
-            "UPDATE ledger_events SET event_hash = 'deadbeef' WHERE sequence = 1"
-        )
+        store._conn.execute("UPDATE ledger_events SET event_hash = 'deadbeef' WHERE sequence = 1")
         store._conn.commit()
     report = ledger_parity.integrity_report(paths)
     assert report["chain_ok"] is False
@@ -56,8 +54,6 @@ def test_verify_integrity_subcommand_exit_codes(tmp_path, monkeypatch) -> None:
     with RuntimeLedgerStore(paths) as store:
         store.apply(_mutation())
         store.apply(_mutation(event_id="401690002"))
-        store._conn.execute(
-            "UPDATE ledger_events SET event_hash = 'deadbeef' WHERE sequence = 1"
-        )
+        store._conn.execute("UPDATE ledger_events SET event_hash = 'deadbeef' WHERE sequence = 1")
         store._conn.commit()
     assert ledger_parity.main(["verify-integrity"]) == 1

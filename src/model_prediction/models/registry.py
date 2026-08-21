@@ -147,6 +147,7 @@ def _status_from_config(league: League) -> ModelState | None:
         if config_path.exists():
             try:
                 import yaml
+
                 raw = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
                 models = raw.get("models") or {}
             except Exception:  # noqa: BLE001 — config fallback must never crash status derivation

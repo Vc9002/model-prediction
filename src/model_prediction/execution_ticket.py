@@ -70,9 +70,7 @@ def verify_ticket(ticket: str) -> dict[str, Any]:
     body, _, signature = ticket.rpartition(".")
     if not body or not signature:
         raise ValueError("malformed ticket")
-    expected = hmac.new(
-        _load_or_create_secret(), body.encode(), hashlib.sha256
-    ).hexdigest()
+    expected = hmac.new(_load_or_create_secret(), body.encode(), hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, signature):
         raise ValueError("invalid ticket signature")
     payload = json.loads(body)

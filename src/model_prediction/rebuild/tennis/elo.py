@@ -39,6 +39,7 @@ DEFAULT_SURFACE = "Hard"
 @dataclass
 class TennisMatchRow:
     """One completed tennis match row from the normalized store."""
+
     canonical_match_id: str
     tour: str  # "ATP" | "WTA"
     tourney_date: str  # "YYYY-MM-DD"
@@ -60,6 +61,7 @@ class WalkForwardRow:
     independent of the match outcome. This means player_one_win is 0 or 1
     (not always 1), enabling proper calibration with both label classes.
     """
+
     match_id: str
     tourney_date: str
     tour: str
@@ -201,19 +203,21 @@ def load_matches(store_path: str, tours: list[str] | None = None) -> list[Tennis
 
     rows: list[TennisMatchRow] = []
     for row in frame.iter_rows(named=True):
-        rows.append(TennisMatchRow(
-            canonical_match_id=str(row["canonical_match_id"]),
-            tour=str(row["tour"]),
-            tourney_date=str(row["tourney_date"]),
-            surface=_clean_surface(row.get("surface")),
-            winner_id=str(row["winner_tennis_player_id"]),
-            loser_id=str(row["loser_tennis_player_id"]),
-            winner_name=str(row["winner_player_name"]),
-            loser_name=str(row["loser_player_name"]),
-            result_type=str(row["result_type"]),
-            winner_rank=row.get("winner_rank"),
-            loser_rank=row.get("loser_rank"),
-        ))
+        rows.append(
+            TennisMatchRow(
+                canonical_match_id=str(row["canonical_match_id"]),
+                tour=str(row["tour"]),
+                tourney_date=str(row["tourney_date"]),
+                surface=_clean_surface(row.get("surface")),
+                winner_id=str(row["winner_tennis_player_id"]),
+                loser_id=str(row["loser_tennis_player_id"]),
+                winner_name=str(row["winner_player_name"]),
+                loser_name=str(row["loser_player_name"]),
+                result_type=str(row["result_type"]),
+                winner_rank=row.get("winner_rank"),
+                loser_rank=row.get("loser_rank"),
+            )
+        )
     return rows
 
 
@@ -237,8 +241,9 @@ def build_walk_forward_rows(
     even if irregularly).
     """
     if not matches:
-        return WalkForwardResult(rows=[], skipped_bootstrap=0, skipped_cold_start=0,
-                                 skipped_irregular=0, n_total=0)
+        return WalkForwardResult(
+            rows=[], skipped_bootstrap=0, skipped_cold_start=0, skipped_irregular=0, n_total=0
+        )
 
     book = SurfaceEloBook()
     history: list[TennisMatchRow] = []
@@ -262,8 +267,9 @@ def build_walk_forward_rows(
                 skipped_bootstrap += 1
             elif m.result_type != "completed":
                 skipped_irregular += 1
-            elif not book.has_minimum_history(m.winner_id, minimum_player_matches) or \
-                 not book.has_minimum_history(m.loser_id, minimum_player_matches):
+            elif not book.has_minimum_history(
+                m.winner_id, minimum_player_matches
+            ) or not book.has_minimum_history(m.loser_id, minimum_player_matches):
                 skipped_cold_start += 1
             else:
                 surface = m.surface or DEFAULT_SURFACE
@@ -281,28 +287,30 @@ def build_walk_forward_rows(
 
                 prob_p1 = book.expected_win(p1_id, p2_id, surface)
 
-                rows.append(WalkForwardRow(
-                    match_id=m.canonical_match_id,
-                    tourney_date=m.tourney_date,
-                    tour=m.tour,
-                    surface=surface,
-                    player_one_id=p1_id,
-                    player_two_id=p2_id,
-                    player_one_name=p1_name,
-                    player_two_name=p2_name,
-                    player_one_win=p1_win,
-                    elo_probability_player_one=prob_p1,
-                    player_one_overall_elo=book.rating(p1_id),
-                    player_two_overall_elo=book.rating(p2_id),
-                    player_one_surface_elo=book.surface_rating(p1_id, surface),
-                    player_two_surface_elo=book.surface_rating(p2_id, surface),
-                    player_one_blended_elo=book.blended_rating(p1_id, surface),
-                    player_two_blended_elo=book.blended_rating(p2_id, surface),
-                    player_one_surface_matches=book.surface_matches(p1_id, surface),
-                    player_two_surface_matches=book.surface_matches(p2_id, surface),
-                    player_one_rank=p1_rank,
-                    player_two_rank=p2_rank,
-                ))
+                rows.append(
+                    WalkForwardRow(
+                        match_id=m.canonical_match_id,
+                        tourney_date=m.tourney_date,
+                        tour=m.tour,
+                        surface=surface,
+                        player_one_id=p1_id,
+                        player_two_id=p2_id,
+                        player_one_name=p1_name,
+                        player_two_name=p2_name,
+                        player_one_win=p1_win,
+                        elo_probability_player_one=prob_p1,
+                        player_one_overall_elo=book.rating(p1_id),
+                        player_two_overall_elo=book.rating(p2_id),
+                        player_one_surface_elo=book.surface_rating(p1_id, surface),
+                        player_two_surface_elo=book.surface_rating(p2_id, surface),
+                        player_one_blended_elo=book.blended_rating(p1_id, surface),
+                        player_two_blended_elo=book.blended_rating(p2_id, surface),
+                        player_one_surface_matches=book.surface_matches(p1_id, surface),
+                        player_two_surface_matches=book.surface_matches(p2_id, surface),
+                        player_one_rank=p1_rank,
+                        player_two_rank=p2_rank,
+                    )
+                )
 
         # Now update Elo with today's results
         # Completed matches: full update

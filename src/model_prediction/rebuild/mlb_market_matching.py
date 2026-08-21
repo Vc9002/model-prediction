@@ -103,8 +103,9 @@ def resolve_polymarket_event_id(
 
     team_rows = market_rows.filter(
         pl.col("team").map_elements(
-            lambda t: t is not None
-            and (_team_name_matches(t, home_name) or _team_name_matches(t, away_name)),
+            lambda t: (
+                t is not None and (_team_name_matches(t, home_name) or _team_name_matches(t, away_name))
+            ),
             return_dtype=pl.Boolean,
         )
     )

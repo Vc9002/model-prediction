@@ -35,9 +35,7 @@ logger = logging.getLogger(__name__)
 def _compute_artifact_hash(payload: dict[str, Any]) -> str:
     """SHA-256 of the canonical JSON form, excluding the embedded hash field."""
     canonical = {k: v for k, v in payload.items() if k != "artifact_hash"}
-    return hashlib.sha256(
-        json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
+    return hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
 def _repo_root() -> Path:
@@ -47,9 +45,7 @@ def _repo_root() -> Path:
     return PROJECT_ROOT
 
 
-def _load_production_config(
-    *, repo_root: Path | str | None = None
-) -> dict[str, Any]:
+def _load_production_config(*, repo_root: Path | str | None = None) -> dict[str, Any]:
     """Load production.yaml, matching production_canary.load_production_config."""
     root = Path(repo_root) if repo_root is not None else _repo_root()
     config_path = root / "config" / "production.yaml"
@@ -75,9 +71,7 @@ class ProductionFreezeViolation(Exception):
 # code-backed, which quietly dropped real artifact champions (kbo/npb v2
 # referenced files that were written under the wrong name) from both the
 # freeze and tamper protection (audit 2026-08-13).
-CODE_BACKED_MODEL_IDS: frozenset[str] = frozenset(
-    {"soccer-poisson-dc-v1", "tennis-surface-elo-v1"}
-)
+CODE_BACKED_MODEL_IDS: frozenset[str] = frozenset({"soccer-poisson-dc-v1", "tennis-surface-elo-v1"})
 
 
 # ── ChampionSnapshot ────────────────────────────────────────────────────────
@@ -147,13 +141,9 @@ class ProductionRegistry:
         from .domain import utc_now
 
         config = _load_production_config(repo_root=self._repo_root)
-        artifact_map: dict[str, str] = (
-            config.get("prediction_service", {}).get("artifact_map", {})
-        )
+        artifact_map: dict[str, str] = config.get("prediction_service", {}).get("artifact_map", {})
         if not artifact_map:
-            raise ValueError(
-                "production.yaml prediction_service.artifact_map is empty or missing"
-            )
+            raise ValueError("production.yaml prediction_service.artifact_map is empty or missing")
 
         snapshots: list[ChampionSnapshot] = []
         for model_id, artifact_rel in artifact_map.items():
@@ -172,9 +162,9 @@ class ProductionRegistry:
                         f"code-backed; generate the artifact before freezing"
                     )
                 logger.warning(
-                    "freeze: artifact file missing for %s (%s) — "
-                    "treating as code-backed champion",
-                    model_id, artifact_rel,
+                    "freeze: artifact file missing for %s (%s) — treating as code-backed champion",
+                    model_id,
+                    artifact_rel,
                 )
                 snapshot = ChampionSnapshot(
                     sport=sport,
@@ -200,9 +190,7 @@ class ProductionRegistry:
             snapshots.append(snapshot)
             self._snapshots[model_id] = snapshot
 
-        self._frozen_at_utc = (
-            utc_now().isoformat().replace("+00:00", "Z")
-        )
+        self._frozen_at_utc = utc_now().isoformat().replace("+00:00", "Z")
         return snapshots
 
     def champion(self, sport: str, market: str) -> ChampionSnapshot | None:
@@ -237,8 +225,7 @@ class ProductionRegistry:
                 # silently skipped.
                 if model_id not in CODE_BACKED_MODEL_IDS:
                     violations.append(
-                        f"{model_id}: frozen as CODE_BACKED but is "
-                        f"artifact-backed; re-run freeze-production"
+                        f"{model_id}: frozen as CODE_BACKED but is artifact-backed; re-run freeze-production"
                     )
                     continue
                 # Code-backed models (soccer, tennis) have no artifact file
@@ -246,9 +233,7 @@ class ProductionRegistry:
                 continue
             artifact_path = self._repo_root / snapshot.artifact_path
             if not artifact_path.is_file():
-                violations.append(
-                    f"{model_id}: artifact file missing at {snapshot.artifact_path}"
-                )
+                violations.append(f"{model_id}: artifact file missing at {snapshot.artifact_path}")
                 continue
             try:
                 payload = json.loads(artifact_path.read_text(encoding="utf-8"))
@@ -263,8 +248,7 @@ class ProductionRegistry:
 
         if violations:
             raise ProductionFreezeViolation(
-                f"production freeze violated for {len(violations)} artifact(s): "
-                + "; ".join(violations)
+                f"production freeze violated for {len(violations)} artifact(s): " + "; ".join(violations)
             )
         return violations
 
@@ -279,10 +263,7 @@ class ProductionRegistry:
     def to_dict(self) -> dict[str, Any]:
         return {
             "frozen_at_utc": self._frozen_at_utc,
-            "champions": {
-                model_id: snapshot.to_dict()
-                for model_id, snapshot in self._snapshots.items()
-            },
+            "champions": {model_id: snapshot.to_dict() for model_id, snapshot in self._snapshots.items()},
         }
 
     @classmethod
@@ -317,10 +298,7 @@ class FrozenProductionStore:
 
     @property
     def path(self) -> Path:
-        return (
-            RuntimePaths.resolve(repo_root=self._repo_root).production_root
-            / "frozen_champions.json"
-        )
+        return RuntimePaths.resolve(repo_root=self._repo_root).production_root / "frozen_champions.json"
 
     def write(self, registry: ProductionRegistry) -> None:
         """Write the frozen registry to disk."""
@@ -339,9 +317,7 @@ class FrozenProductionStore:
         modified since the freeze was written.
         """
         if not self.path.is_file():
-            raise FileNotFoundError(
-                f"no frozen champions file at {self.path}; run 'freeze-production' first"
-            )
+            raise FileNotFoundError(f"no frozen champions file at {self.path}; run 'freeze-production' first")
         data = json.loads(self.path.read_text(encoding="utf-8"))
         registry = ProductionRegistry.from_dict(data, repo_root=self._repo_root)
         registry.validate_no_tampering()
@@ -356,9 +332,7 @@ class FrozenProductionStore:
         whether validation matters.
         """
         if not self.path.is_file():
-            raise FileNotFoundError(
-                f"no frozen champions file at {self.path}; run 'freeze-production' first"
-            )
+            raise FileNotFoundError(f"no frozen champions file at {self.path}; run 'freeze-production' first")
         data = json.loads(self.path.read_text(encoding="utf-8"))
         return ProductionRegistry.from_dict(data, repo_root=self._repo_root)
 
@@ -420,12 +394,8 @@ def _bootstrap_ci_on_deltas(
         }
 
     # Champion and challenger metric per date
-    champion_daily = [
-        metric_fn(champion_by_date[day]) for day in common_dates
-    ]
-    challenger_daily = [
-        metric_fn(challenger_by_date[day]) for day in common_dates
-    ]
+    champion_daily = [metric_fn(champion_by_date[day]) for day in common_dates]
+    challenger_daily = [metric_fn(challenger_by_date[day]) for day in common_dates]
     deltas = [c - h for c, h in zip(challenger_daily, champion_daily)]
 
     n = len(deltas)
@@ -480,10 +450,7 @@ class PairedComparison:
                 msg_parts.append(f"{len(only_champ)} events only in champion")
             if only_chall:
                 msg_parts.append(f"{len(only_chall)} events only in challenger")
-            raise ValueError(
-                "champion and challenger must cover the same event IDs: "
-                + "; ".join(msg_parts)
-            )
+            raise ValueError("champion and challenger must cover the same event IDs: " + "; ".join(msg_parts))
 
         # Align both sequences by event_id for paired comparison
         champ_by_id = {str(row[event_id_key]): row for row in champion_predictions}
@@ -541,8 +508,7 @@ class PairedComparison:
         if not probabilities:
             return 0.0
         correct = sum(
-            1 for p, y in zip(probabilities, outcomes)
-            if (p >= 0.5 and y == 1) or (p < 0.5 and y == 0)
+            1 for p, y in zip(probabilities, outcomes) if (p >= 0.5 and y == 1) or (p < 0.5 and y == 0)
         )
         return correct / len(probabilities)
 
@@ -607,18 +573,27 @@ class PairedComparison:
         # Bootstrap CIs on the key deltas
         bootstrap_cis: dict[str, dict[str, Any]] = {}
         for metric_name, metric_fn in [
-            ("delta_log_loss", lambda rows: self._log_loss(
-                [float(r[self._probability_key]) for r in rows],
-                [int(r[self._outcome_key]) for r in rows],
-            )),
-            ("delta_brier", lambda rows: self._brier(
-                [float(r[self._probability_key]) for r in rows],
-                [int(r[self._outcome_key]) for r in rows],
-            )),
-            ("delta_ece", lambda rows: self._ece(
-                [float(r[self._probability_key]) for r in rows],
-                [int(r[self._outcome_key]) for r in rows],
-            )),
+            (
+                "delta_log_loss",
+                lambda rows: self._log_loss(
+                    [float(r[self._probability_key]) for r in rows],
+                    [int(r[self._outcome_key]) for r in rows],
+                ),
+            ),
+            (
+                "delta_brier",
+                lambda rows: self._brier(
+                    [float(r[self._probability_key]) for r in rows],
+                    [int(r[self._outcome_key]) for r in rows],
+                ),
+            ),
+            (
+                "delta_ece",
+                lambda rows: self._ece(
+                    [float(r[self._probability_key]) for r in rows],
+                    [int(r[self._outcome_key]) for r in rows],
+                ),
+            ),
         ]:
             bootstrap_cis[metric_name] = _bootstrap_ci_on_deltas(
                 self._champion_rows,
@@ -715,9 +690,7 @@ class PairedComparison:
         # Criterion 3: ΔECE not materially worse (threshold: 0.01)
         delta_ece = deltas["delta_ece"]
         if delta_ece > 0.01:
-            failures.append(
-                f"DeltaECE: challenger calibration materially worse ({delta_ece:+.6f} > 0.01)"
-            )
+            failures.append(f"DeltaECE: challenger calibration materially worse ({delta_ece:+.6f} > 0.01)")
 
         # Criterion 4: Coverage not reduced excessively (threshold: −0.05)
         delta_cov = deltas["delta_coverage"]
@@ -814,9 +787,7 @@ def compare_champion_vs_challenger(
         registry = frozen_store.load_no_validate()
         champion = registry.champion(sport, market)
         if champion is None:
-            raise ValueError(
-                f"no frozen champion for sport={sport!r}, market={market!r}"
-            )
+            raise ValueError(f"no frozen champion for sport={sport!r}, market={market!r}")
         champion_predictions = load_settled_predictions(
             sport,
             market,
@@ -863,9 +834,7 @@ def load_settled_predictions(
     root = Path(repo_root) if repo_root is not None else _repo_root()
     model_id = model_id_for(str(sport).upper(), str(market))
     if model_id is None:
-        raise ValueError(
-            f"no model ledger identity for sport={sport!r}, market={market!r}"
-        )
+        raise ValueError(f"no model ledger identity for sport={sport!r}, market={market!r}")
     ledger_path = root / "data" / "model_ledgers" / f"{model_id}.xlsx"
     if not ledger_path.is_file():
         raise FileNotFoundError(f"settled ledger not found: {ledger_path}")
@@ -884,12 +853,7 @@ def load_settled_predictions(
         prob = row.get("model_probability")
         if prob in (None, ""):
             continue
-        date = (
-            row.get("event_start_utc")
-            or row.get("observed_at_utc")
-            or row.get("settled_at_utc")
-            or ""
-        )
+        date = row.get("event_start_utc") or row.get("observed_at_utc") or row.get("settled_at_utc") or ""
         settled.append(
             {
                 "event_id": row.get("event_id", ""),
@@ -921,9 +885,7 @@ def settled_champion_calibration(
     registry = store.load_no_validate()
     champion = registry.champion(sport, market)
     if champion is None:
-        raise ValueError(
-            f"no frozen champion for sport={sport!r}, market={market!r}"
-        )
+        raise ValueError(f"no frozen champion for sport={sport!r}, market={market!r}")
     predictions = load_settled_predictions(
         sport, market, repo_root=repo_root, model_version=champion.model_id
     )

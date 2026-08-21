@@ -10,11 +10,7 @@ from .base import FeatureContext, GameRecord, register_feature
 
 def head_to_head(games: Iterable[GameRecord], team_a: str, team_b: str, limit: int = 20) -> dict[str, Any]:
     matchups = sorted(
-        (
-            game
-            for game in games
-            if {game.away_team, game.home_team} == {team_a, team_b}
-        ),
+        (game for game in games if {game.away_team, game.home_team} == {team_a, team_b}),
         key=lambda game: game.start,
     )[-limit:]
     a_wins = 0
@@ -53,9 +49,4 @@ def head_to_head_snapshot(context: FeatureContext) -> dict[str, Any]:
     pairs: set[tuple[str, str]] = set()
     for game in context.games:
         pairs.add(tuple(sorted((game.away_team, game.home_team))))  # type: ignore[arg-type]
-    return {
-        "pairs": {
-            f"{a} vs {b}": head_to_head(context.games, a, b)
-            for a, b in sorted(pairs)
-        }
-    }
+    return {"pairs": {f"{a} vs {b}": head_to_head(context.games, a, b) for a, b in sorted(pairs)}}

@@ -71,9 +71,11 @@ def main() -> None:
     dataset = build_mlb_historical_horizon_dataset("data/rebuild", start_date, end_date, HORIZON)
     features = dataset.features.sort("event_start_utc") if dataset.features.height else dataset.features
     starters_known = dataset.starters_known_games
-    print(f"1. Feature rows: {dataset.matched_games} matched ({starters_known} with a point-in-time-valid "
-          f"probable starter for both teams at horizon={HORIZON}, {dataset.matched_games - starters_known} "
-          f"flagged starters_known=0); dataset_hash={dataset.dataset_hash[:12]}")
+    print(
+        f"1. Feature rows: {dataset.matched_games} matched ({starters_known} with a point-in-time-valid "
+        f"probable starter for both teams at horizon={HORIZON}, {dataset.matched_games - starters_known} "
+        f"flagged starters_known=0); dataset_hash={dataset.dataset_hash[:12]}"
+    )
 
     if features.height < 30:
         print("Not enough matched games to run a meaningful ablation (need >=30). Stopping honestly.")
@@ -91,16 +93,24 @@ def main() -> None:
 
     runner = FeatureAblationRunner(FEATURE_GROUPS_MLB)
     isolated = runner.run_isolated(
-        ablation_input, target_col="home_win", train_fn=_train_fn, predict_fn=_predict_fn,
+        ablation_input,
+        target_col="home_win",
+        train_fn=_train_fn,
+        predict_fn=_predict_fn,
         date_col="event_start_utc",
     )
     print("\n3. Isolated ablation (remove one group at a time):")
     for r in isolated:
-        print(f"   {r.group:20s} delta_log_loss={r.delta_log_loss:+.4f} "
-              f"delta_brier={r.delta_brier:+.4f} coverage={r.coverage_impact:.2f} verdict={r.verdict}")
+        print(
+            f"   {r.group:20s} delta_log_loss={r.delta_log_loss:+.4f} "
+            f"delta_brier={r.delta_brier:+.4f} coverage={r.coverage_impact:.2f} verdict={r.verdict}"
+        )
 
     cumulative = runner.run_cumulative(
-        ablation_input, target_col="home_win", train_fn=_train_fn, predict_fn=_predict_fn,
+        ablation_input,
+        target_col="home_win",
+        train_fn=_train_fn,
+        predict_fn=_predict_fn,
         date_col="event_start_utc",
     )
     print("\n4. Cumulative ablation (add groups in order of isolated importance):")

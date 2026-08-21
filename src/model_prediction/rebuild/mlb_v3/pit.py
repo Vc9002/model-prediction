@@ -34,15 +34,11 @@ def latest_as_of(
         raise ValueError(f"MLB v3 PIT input is missing columns: {sorted(required - set(frame.columns))}")
 
     cutoff = decision_time_utc.astimezone(UTC)
-    observed = [
-        _aware_utc(value, field="observed_at_utc")
-        for value in frame["observed_at_utc"].to_list()
-    ]
+    observed = [_aware_utc(value, field="observed_at_utc") for value in frame["observed_at_utc"].to_list()]
     working = frame.with_columns(pl.Series("_observed_at_dt", observed, dtype=pl.Datetime("us", "UTC")))
     if event_start_column is not None:
         starts = [
-            _aware_utc(value, field=event_start_column)
-            for value in frame[event_start_column].to_list()
+            _aware_utc(value, field=event_start_column) for value in frame[event_start_column].to_list()
         ]
         working = working.with_columns(pl.Series("_event_start_dt", starts, dtype=pl.Datetime("us", "UTC")))
         working = working.filter(pl.lit(cutoff) < pl.col("_event_start_dt"))

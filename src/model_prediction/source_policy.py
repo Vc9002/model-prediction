@@ -37,62 +37,86 @@ class SourceSpec:
 # section 4's "Default source stack" and "League assignment" tables.
 DEFAULT_SOURCES: dict[str, SourceSpec] = {
     "espn": SourceSpec(
-        "ESPN public scoreboard/site API", SourceTier.OFFICIAL_PUBLIC_ENDPOINT, False,
+        "ESPN public scoreboard/site API",
+        SourceTier.OFFICIAL_PUBLIC_ENDPOINT,
+        False,
         ("mlb", "nba", "wnba", "nfl", "soccer", "tennis"),
         "Undocumented and unsupported; schemas can change.",
     ),
     "polymarket_us": SourceSpec(
-        "Polymarket US public gateway", SourceTier.OFFICIAL_PUBLIC_ENDPOINT, False,
+        "Polymarket US public gateway",
+        SourceTier.OFFICIAL_PUBLIC_ENDPOINT,
+        False,
         ("mlb", "nba", "wnba", "nfl", "soccer", "tennis", "esports", "kbo", "npb"),
         "Public read data only; trading/private-portfolio endpoints require authentication.",
     ),
     "open_meteo": SourceSpec(
-        "Open-Meteo historical/previous-runs forecast API", SourceTier.KEYLESS_OPEN_DATA_API, False,
+        "Open-Meteo historical/previous-runs forecast API",
+        SourceTier.KEYLESS_OPEN_DATA_API,
+        False,
         ("mlb", "nfl", "kbo", "npb"),
         "Free endpoint is non-commercial, rate-limited, no uptime guarantee.",
     ),
     "sportsdataverse": SourceSpec(
-        "SportsDataverse hoopR/wehoop GitHub releases", SourceTier.VERSIONED_RELEASE, False,
+        "SportsDataverse hoopR/wehoop GitHub releases",
+        SourceTier.VERSIONED_RELEASE,
+        False,
         ("nba", "wnba"),
         "Derived pipeline; release lag and upstream schema changes must be monitored.",
     ),
     "nflverse": SourceSpec(
-        "nflverse play-by-play GitHub releases", SourceTier.VERSIONED_RELEASE, False,
+        "nflverse play-by-play GitHub releases",
+        SourceTier.VERSIONED_RELEASE,
+        False,
         ("nfl",),
         "Dataset-specific licenses/attribution; in-season release lag.",
     ),
     "pybaseball": SourceSpec(
-        "Baseball Savant via pybaseball/direct CSV", SourceTier.THROTTLED_SCRAPER, False,
+        "Baseball Savant via pybaseball/direct CSV",
+        SourceTier.THROTTLED_SCRAPER,
+        False,
         ("mlb",),
         "Not a contractual API; cache and throttle.",
     ),
     "bo3": SourceSpec(
-        "BO3 public website data endpoint", SourceTier.THROTTLED_SCRAPER, False,
+        "BO3 public website data endpoint",
+        SourceTier.THROTTLED_SCRAPER,
+        False,
         ("esports",),
         "No published stable API contract; cache, hash, attribute, keep replaceable.",
     ),
     "oracles_elixir": SourceSpec(
-        "Oracle's Elixir public downloads", SourceTier.VERSIONED_RELEASE, False,
+        "Oracle's Elixir public downloads",
+        SourceTier.VERSIONED_RELEASE,
+        False,
         ("esports",),
         "Game-level rows; must prevent later-series games leaking into earlier predictions.",
     ),
     "kbo_official": SourceSpec(
-        "Official KBO schedule/results", SourceTier.OFFICIAL_PUBLIC_ENDPOINT, False,
+        "Official KBO schedule/results",
+        SourceTier.OFFICIAL_PUBLIC_ENDPOINT,
+        False,
         ("kbo",),
         "Not a promised bulk API; cache and hash extractions.",
     ),
     "npb_official": SourceSpec(
-        "Official NPB English calendar", SourceTier.OFFICIAL_PUBLIC_ENDPOINT, False,
+        "Official NPB English calendar",
+        SourceTier.OFFICIAL_PUBLIC_ENDPOINT,
+        False,
         ("npb",),
         "October excluded (mixes regular season and postseason).",
     ),
     "the_odds_api": SourceSpec(
-        "The Odds API", SourceTier.PAID_OR_KEYED_OPTIONAL, True,
+        "The Odds API",
+        SourceTier.PAID_OR_KEYED_OPTIONAL,
+        True,
         ("soccer",),
         "Keyed; used only for soccer score lookback, not as a default MLB/NBA/WNBA/NFL dependency.",
     ),
     "sportsdataio": SourceSpec(
-        "SportsDataIO", SourceTier.PAID_OR_KEYED_OPTIONAL, True,
+        "SportsDataIO",
+        SourceTier.PAID_OR_KEYED_OPTIONAL,
+        True,
         (),
         "Deliberately excluded from the default build.",
     ),
@@ -136,9 +160,7 @@ def assert_no_unapproved_paid_source(source_keys: list[str]) -> None:
         if spec is None:
             raise ValueError(f"source {key!r} is not registered in DEFAULT_SOURCES or EXCLUDED_SOURCES")
         if spec.requires_key and spec.tier is not SourceTier.PAID_OR_KEYED_OPTIONAL:
-            raise ValueError(
-                f"source {key!r} requires a key but is not marked PAID_OR_KEYED_OPTIONAL"
-            )
+            raise ValueError(f"source {key!r} requires a key but is not marked PAID_OR_KEYED_OPTIONAL")
 
 
 def sources_for_league(league: str) -> list[SourceSpec]:

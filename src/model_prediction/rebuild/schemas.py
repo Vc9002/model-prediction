@@ -29,6 +29,7 @@ class ColumnSpec:
 @dataclass(frozen=True)
 class TableContract:
     """A versioned schema and primary key for one real table."""
+
     name: str
     primary_key: list[str]
     columns: list[ColumnSpec]

@@ -78,11 +78,16 @@ def test_main_stamps_model_version_from_the_output_filename_not_a_hardcoded_lite
         "argv",
         [
             "mlb_measured_edge_calibrate.py",
-            "--formula", str(PROJECT_ROOT / "config/models/mlb-analyst-poisson-trend-v0.3.yaml"),
-            "--feature-cache", str(tmp_path / "no_such_cache.jsonl"),
-            "--odds-end", "2026-08-04",
-            "--output-margin", str(margin_out),
-            "--output-totals", str(totals_out),
+            "--formula",
+            str(PROJECT_ROOT / "config/models/mlb-analyst-poisson-trend-v0.3.yaml"),
+            "--feature-cache",
+            str(tmp_path / "no_such_cache.jsonl"),
+            "--odds-end",
+            "2026-08-04",
+            "--output-margin",
+            str(margin_out),
+            "--output-totals",
+            str(totals_out),
         ],
     )
     calibrate.main()

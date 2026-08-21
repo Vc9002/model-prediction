@@ -66,12 +66,7 @@ def _in_window_game_count() -> int:
         start = str(game.get("event_start_utc") or "")
         if not start:
             continue
-        day = (
-            datetime.fromisoformat(start)
-            .astimezone(ZoneInfo("America/New_York"))
-            .date()
-            .isoformat()
-        )
+        day = datetime.fromisoformat(start).astimezone(ZoneInfo("America/New_York")).date().isoformat()
         if c["validation_end"] < day <= c["holdout_end"]:
             count += 1
     return count
@@ -125,8 +120,10 @@ def _date_cluster_bootstrap_paired(
     p_better = float(np.mean(deltas_arr < 0))
     return {
         "observed_delta": round(observed, 6),
-        "ci_95": [round(float(np.percentile(deltas_arr, 2.5)), 6),
-                  round(float(np.percentile(deltas_arr, 97.5)), 6)],
+        "ci_95": [
+            round(float(np.percentile(deltas_arr, 2.5)), 6),
+            round(float(np.percentile(deltas_arr, 97.5)), 6),
+        ],
         "P_challenger_better": round(p_better, 4),
         "n_bootstrap": n_bootstrap,
         "seed": seed,
@@ -135,13 +132,20 @@ def _date_cluster_bootstrap_paired(
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--variants", nargs="+", required=True,
-                        help="feature-variant names (validation.FEATURE_VARIANTS keys)")
+    parser.add_argument(
+        "--variants",
+        nargs="+",
+        required=True,
+        help="feature-variant names (validation.FEATURE_VARIANTS keys)",
+    )
     parser.add_argument("--baseline", default=DEFAULT_BASELINE)
-    parser.add_argument("--bootstrap", type=int, default=N_BOOTSTRAP,
-                        help="bootstrap resamples per paired metric (smoke runs lower this)")
-    parser.add_argument("--out", default=str(
-        PROJECT_ROOT / "outputs/research/mlb_evaluator/report.json"))
+    parser.add_argument(
+        "--bootstrap",
+        type=int,
+        default=N_BOOTSTRAP,
+        help="bootstrap resamples per paired metric (smoke runs lower this)",
+    )
+    parser.add_argument("--out", default=str(PROJECT_ROOT / "outputs/research/mlb_evaluator/report.json"))
     args = parser.parse_args()
 
     cohort = pinned_cohort()
@@ -152,8 +156,9 @@ def main() -> int:
     # (the ablation harness's own convention — challengers must be
     # compared against the same-refit baseline, not against drifted
     # shipped coefficients; see docs/V8_REPRODUCTION.md).
-    base_probabilities = _predict(_fit(train, FEATURE_VARIANTS[args.baseline]),
-                                  exact_holdout, FEATURE_VARIANTS[args.baseline])
+    base_probabilities = _predict(
+        _fit(train, FEATURE_VARIANTS[args.baseline]), exact_holdout, FEATURE_VARIANTS[args.baseline]
+    )
     base_metrics = _scores(base_probabilities, [r.outcome for r in exact_holdout])
     base_cal = _all_rows_calibration(base_probabilities, exact_holdout)
 
@@ -184,13 +189,16 @@ def main() -> int:
         coverage = float(len(exact_holdout)) / max(1, _in_window_game_count())
         per_split = {
             "train": _all_rows_calibration(_predict(_fit(train, names), train, names), train),
-            "validation": _all_rows_calibration(
-                _predict(_fit(train, names), validation, names), validation),
+            "validation": _all_rows_calibration(_predict(_fit(train, names), validation, names), validation),
             "holdout": cal,
         }
         paired = {
-            "log_loss": _date_cluster_bootstrap_paired(dates, base_probabilities, probs, outcomes, "log_loss", n_bootstrap=args.bootstrap),
-            "brier": _date_cluster_bootstrap_paired(dates, base_probabilities, probs, outcomes, "brier", n_bootstrap=args.bootstrap),
+            "log_loss": _date_cluster_bootstrap_paired(
+                dates, base_probabilities, probs, outcomes, "log_loss", n_bootstrap=args.bootstrap
+            ),
+            "brier": _date_cluster_bootstrap_paired(
+                dates, base_probabilities, probs, outcomes, "brier", n_bootstrap=args.bootstrap
+            ),
         }
         report["variants"][variant] = {
             "features": names,
@@ -200,11 +208,13 @@ def main() -> int:
             "per_split": per_split,
             "paired_vs_baseline": paired,
         }
-        print(f"{variant}: LL={metrics['log_loss']:.4f} Brier={metrics['brier']:.4f} "
-              f"ECE={cal.get('expected_calibration_error')} acc={metrics['accuracy']:.4f} "
-              f"AUC={metrics['auc']} | dLL={paired['log_loss']['observed_delta']:+.5f} "
-              f"dBr={paired['brier']['observed_delta']:+.5f} "
-              f"P(better|LL)={paired['log_loss']['P_challenger_better']}")
+        print(
+            f"{variant}: LL={metrics['log_loss']:.4f} Brier={metrics['brier']:.4f} "
+            f"ECE={cal.get('expected_calibration_error')} acc={metrics['accuracy']:.4f} "
+            f"AUC={metrics['auc']} | dLL={paired['log_loss']['observed_delta']:+.5f} "
+            f"dBr={paired['brier']['observed_delta']:+.5f} "
+            f"P(better|LL)={paired['log_loss']['P_challenger_better']}"
+        )
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)

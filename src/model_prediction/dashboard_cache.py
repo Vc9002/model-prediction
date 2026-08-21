@@ -22,14 +22,37 @@ from zipfile import BadZipFile
 
 # Columns the dashboard actually uses from parsed pick rows
 DASHBOARD_COLUMNS = [
-    "pick_id", "created_at_utc", "event_start_utc", "event_id",
-    "league", "away_team", "home_team", "market_type", "selection",
-    "line", "american_odds", "market_implied_probability",
-    "model_probability", "model_uncertainty", "edge", "trade_candidate",
-    "confidence_score", "units", "model_version", "status", "result",
-    "away_score", "home_score", "probability_clv", "pnl_units",
-    "settled_at_utc", "record_type", "decision", "reason_code",
-    "research_score_units", "research_pnl_units",
+    "pick_id",
+    "created_at_utc",
+    "event_start_utc",
+    "event_id",
+    "league",
+    "away_team",
+    "home_team",
+    "market_type",
+    "selection",
+    "line",
+    "american_odds",
+    "market_implied_probability",
+    "model_probability",
+    "model_uncertainty",
+    "edge",
+    "trade_candidate",
+    "confidence_score",
+    "units",
+    "model_version",
+    "status",
+    "result",
+    "away_score",
+    "home_score",
+    "probability_clv",
+    "pnl_units",
+    "settled_at_utc",
+    "record_type",
+    "decision",
+    "reason_code",
+    "research_score_units",
+    "research_pnl_units",
 ]
 
 
@@ -93,8 +116,7 @@ class DashboardCache:
         conn.row_factory = sqlite3.Row
         try:
             rows = conn.execute(
-                "SELECT * FROM model_picks WHERE model_id = ? "
-                "ORDER BY row_index",
+                "SELECT * FROM model_picks WHERE model_id = ? ORDER BY row_index",
                 (model_id,),
             ).fetchall()
             return [_row_to_dict(r) for r in rows]
@@ -176,18 +198,12 @@ class DashboardCache:
 
     @staticmethod
     def _compute_mtime_key(paths: list[Path]) -> str:
-        existing = sorted(
-            (str(p), p.stat().st_mtime) for p in paths if p.exists()
-        )
+        existing = sorted((str(p), p.stat().st_mtime) for p in paths if p.exists())
         return json.dumps(existing, sort_keys=True)
 
     @staticmethod
-    def _is_fresh(
-        conn: sqlite3.Connection, tier: str, mtime_key: str
-    ) -> bool:
-        row = conn.execute(
-            "SELECT mtime_key FROM _meta WHERE tier = ?", (tier,)
-        ).fetchone()
+    def _is_fresh(conn: sqlite3.Connection, tier: str, mtime_key: str) -> bool:
+        row = conn.execute("SELECT mtime_key FROM _meta WHERE tier = ?", (tier,)).fetchone()
         return row is not None and row[0] == mtime_key
 
     def _replace_tier(
@@ -207,24 +223,19 @@ class DashboardCache:
 
         if tier.startswith("model:"):
             model_id = tier.split(":", 1)[1]
-            conn.execute(
-                "DELETE FROM model_picks WHERE model_id = ?", (model_id,)
-            )
+            conn.execute("DELETE FROM model_picks WHERE model_id = ?", (model_id,))
             conn.executemany(
-                "INSERT INTO model_picks(model_id, row_index, payload_json) "
-                "VALUES(?, ?, ?)",
+                "INSERT INTO model_picks(model_id, row_index, payload_json) VALUES(?, ?, ?)",
                 [(model_id, i, json.dumps(r)) for i, r in enumerate(rows)],
             )
         else:
             conn.executemany(
-                "INSERT INTO picks(tier, row_index, payload_json) "
-                "VALUES(?, ?, ?)",
+                "INSERT INTO picks(tier, row_index, payload_json) VALUES(?, ?, ?)",
                 [(tier, i, json.dumps(r)) for i, r in enumerate(rows)],
             )
 
         conn.execute(
-            "INSERT INTO _meta(tier, mtime_key, row_count, refreshed_at) "
-            "VALUES(?, ?, ?, ?)",
+            "INSERT INTO _meta(tier, mtime_key, row_count, refreshed_at) VALUES(?, ?, ?, ?)",
             (tier, mtime_key, len(rows), now),
         )
 
@@ -262,9 +273,7 @@ class DashboardCache:
                 wb.close()
                 return []
 
-            headers = [
-                str(h) if h is not None else "" for h in raw_headers
-            ]
+            headers = [str(h) if h is not None else "" for h in raw_headers]
             rows: list[dict[str, Any]] = []
             for values in row_iter:
                 if all(v is None for v in values):
@@ -297,16 +306,12 @@ _cache: DashboardCache | None = None
 _cache_lock = threading.Lock()
 
 
-def get_cache(
-    data_root: str | Path | None = None, *, db_path: Path | None = None
-) -> DashboardCache:
+def get_cache(data_root: str | Path | None = None, *, db_path: Path | None = None) -> DashboardCache:
     """Return the module-level DashboardCache singleton."""
     global _cache
     if _cache is None:
         with _cache_lock:
             if _cache is None:
-                root = Path(data_root) if data_root else (
-                    Path(__file__).resolve().parents[1] / "data"
-                )
+                root = Path(data_root) if data_root else (Path(__file__).resolve().parents[1] / "data")
                 _cache = DashboardCache(root, db_path=db_path)
     return _cache

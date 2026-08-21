@@ -95,10 +95,16 @@ def main() -> None:
             if n_oof < 20:
                 print(f"   {combo_name:35s}: too few real OOF predictions ({n_oof}), skipping calibration")
                 combo_results[combo_name] = {
-                    "head_family": head_family, "distribution": method, "n_oof": n_oof,
-                    "raw_log_loss": None, "raw_brier": None,
-                    "calibration_methods": {}, "best_calibration_method": None,
-                    "best_cross_fit_log_loss": None, "best_cross_fit_brier": None, "best_cross_fit_ece": None,
+                    "head_family": head_family,
+                    "distribution": method,
+                    "n_oof": n_oof,
+                    "raw_log_loss": None,
+                    "raw_brier": None,
+                    "calibration_methods": {},
+                    "best_calibration_method": None,
+                    "best_cross_fit_log_loss": None,
+                    "best_cross_fit_brier": None,
+                    "best_cross_fit_ece": None,
                 }
                 continue
 
@@ -114,10 +120,18 @@ def main() -> None:
             best = valid[best_method] if best_method else None
 
             combo_results[combo_name] = {
-                "head_family": head_family, "distribution": method, "n_oof": n_oof,
-                "raw_log_loss": raw_ll, "raw_brier": raw_brier,
+                "head_family": head_family,
+                "distribution": method,
+                "n_oof": n_oof,
+                "raw_log_loss": raw_ll,
+                "raw_brier": raw_brier,
                 "calibration_methods": {
-                    m: {"log_loss": r.log_loss, "brier": r.brier, "ece": r.ece, "n_eval_total": r.n_eval_total}
+                    m: {
+                        "log_loss": r.log_loss,
+                        "brier": r.brier,
+                        "ece": r.ece,
+                        "n_eval_total": r.n_eval_total,
+                    }
                     for m, r in cal_results.items()
                 },
                 "best_calibration_method": best_method,
@@ -127,8 +141,10 @@ def main() -> None:
                 "best_cross_fit_n": best.n_eval_total if best else None,
             }
             best_ll_str = f"{best.log_loss:.4f}" if best else "n/a"
-            print(f"   {combo_name:35s}: n_oof={n_oof:3d} raw_ll={raw_ll:.4f} "
-                  f"best_cal={best_method} best_cross_fit_ll={best_ll_str}")
+            print(
+                f"   {combo_name:35s}: n_oof={n_oof:3d} raw_ll={raw_ll:.4f} "
+                f"best_cal={best_method} best_cross_fit_ll={best_ll_str}"
+            )
 
     ranked = sorted(
         (c for c in combo_results.values() if c["best_cross_fit_log_loss"] is not None),
@@ -140,11 +156,13 @@ def main() -> None:
 
     winner = ranked[0]
     print(f"\n4. Real overall winner (min cross-fit log loss across all {len(ranked)} scored combinations):")
-    print(f"   head_family={winner['head_family']} distribution={winner['distribution']} "
-          f"calibration={winner['best_calibration_method']} "
-          f"cross_fit_log_loss={winner['best_cross_fit_log_loss']:.4f} "
-          f"cross_fit_brier={winner['best_cross_fit_brier']:.4f} "
-          f"cross_fit_ece={winner['best_cross_fit_ece']:.4f} (n={winner['best_cross_fit_n']})")
+    print(
+        f"   head_family={winner['head_family']} distribution={winner['distribution']} "
+        f"calibration={winner['best_calibration_method']} "
+        f"cross_fit_log_loss={winner['best_cross_fit_log_loss']:.4f} "
+        f"cross_fit_brier={winner['best_cross_fit_brier']:.4f} "
+        f"cross_fit_ece={winner['best_cross_fit_ece']:.4f} (n={winner['best_cross_fit_n']})"
+    )
 
     # Real, persisted calibrator for the exact winning combination -- refit
     # on its full real OOF history now that cross-fitting has already
@@ -156,12 +174,24 @@ def main() -> None:
     # its own (unvalidated-as-frozen) purpose, not overwritten here.
     winner_combo_name = f"{winner['head_family']}__{winner['distribution']}"
     winner_oof = combo_oof[winner_combo_name]
-    final_calibrator = fit_calibrator(winner["best_calibration_method"], winner_oof["probs"], winner_oof["labels"])
-    base_model_hash = hashlib.sha256(json.dumps(
-        {"head_family": winner["head_family"], "distribution": winner["distribution"], "dataset_hash": dataset.dataset_hash},
-        sort_keys=True,
-    ).encode()).hexdigest()
-    artifact_model_name = f"xgb_two_head_{winner['distribution']}" if winner["head_family"] == "xgboost" else f"two_head_{winner['distribution']}"
+    final_calibrator = fit_calibrator(
+        winner["best_calibration_method"], winner_oof["probs"], winner_oof["labels"]
+    )
+    base_model_hash = hashlib.sha256(
+        json.dumps(
+            {
+                "head_family": winner["head_family"],
+                "distribution": winner["distribution"],
+                "dataset_hash": dataset.dataset_hash,
+            },
+            sort_keys=True,
+        ).encode()
+    ).hexdigest()
+    artifact_model_name = (
+        f"xgb_two_head_{winner['distribution']}"
+        if winner["head_family"] == "xgboost"
+        else f"two_head_{winner['distribution']}"
+    )
     calibrator_artifact = {
         "model_name": artifact_model_name,
         "head_family": winner["head_family"],
@@ -196,22 +226,32 @@ def main() -> None:
     print("   exact validated combination is a separate, deliberate edit performed next.")
 
     results_path = Path("outputs/rebuild/mlb_head_distribution_cartesian.json")
-    results_path.write_text(json.dumps({
-        "dataset_hash": dataset.dataset_hash,
-        "matched_games": dataset.matched_games,
-        "n_calibration_blocks": N_CALIBRATION_BLOCKS,
-        "combinations": combo_results,
-        "ranked_by_cross_fit_log_loss": [
-            {"combo": f"{c['head_family']}__{c['distribution']}", "calibration": c["best_calibration_method"],
-             "cross_fit_log_loss": c["best_cross_fit_log_loss"]}
-            for c in ranked
-        ],
-        "winner": {
-            "head_family": winner["head_family"], "distribution": winner["distribution"],
-            "calibration_method": winner["best_calibration_method"],
-            "calibrator_artifact_path": str(artifact_path),
-        },
-    }, indent=2, default=str))
+    results_path.write_text(
+        json.dumps(
+            {
+                "dataset_hash": dataset.dataset_hash,
+                "matched_games": dataset.matched_games,
+                "n_calibration_blocks": N_CALIBRATION_BLOCKS,
+                "combinations": combo_results,
+                "ranked_by_cross_fit_log_loss": [
+                    {
+                        "combo": f"{c['head_family']}__{c['distribution']}",
+                        "calibration": c["best_calibration_method"],
+                        "cross_fit_log_loss": c["best_cross_fit_log_loss"],
+                    }
+                    for c in ranked
+                ],
+                "winner": {
+                    "head_family": winner["head_family"],
+                    "distribution": winner["distribution"],
+                    "calibration_method": winner["best_calibration_method"],
+                    "calibrator_artifact_path": str(artifact_path),
+                },
+            },
+            indent=2,
+            default=str,
+        )
+    )
     print(f"8. Results saved to {results_path}")
 
 

@@ -165,9 +165,7 @@ class TestAllowedModelConstraints:
         """validate rejects an empty allowed_models list (shipped constraint:
         the list must be non-empty — currently 13 production models)."""
         repo, _ = _setup_production_env(tmp_path)
-        bad = _make_production_config(
-            {"prediction_service": {"allowed_models": []}}
-        )
+        bad = _make_production_config({"prediction_service": {"allowed_models": []}})
         _write_yaml(repo / "config" / "production.yaml", bad)
         config = load_production_config(repo_root=repo)
         with pytest.raises(ValueError, match="non-empty"):
@@ -244,9 +242,7 @@ class TestHealthCheck:
         from model_prediction.production_store import ProductionPredictionStore
         from model_prediction.runtime_paths import RuntimePaths
 
-        store = ProductionPredictionStore(
-            RuntimePaths(repo_root=repo, runtime_root=runtime_root)
-        )
+        store = ProductionPredictionStore(RuntimePaths(repo_root=repo, runtime_root=runtime_root))
         run_id = store.start_run(git_sha="test")
         store.append_prediction(
             run_id=run_id,

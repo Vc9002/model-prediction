@@ -86,9 +86,7 @@ class SoccerFoundation:
             report[key] = metadata.get(key)
         return report
 
-    def _write_dataset_manifest(
-        self, game_date: date, reports: list[dict[str, Any]]
-    ) -> Path:
+    def _write_dataset_manifest(self, game_date: date, reports: list[dict[str, Any]]) -> Path:
         material = {
             "sport": "soccer",
             "date": game_date.isoformat(),
@@ -97,18 +95,12 @@ class SoccerFoundation:
             "economic_use_allowed": False,
             "production_allowed": False,
         }
-        dataset_hash = hashlib.sha256(
-            json.dumps(material, sort_keys=True).encode("utf-8")
-        ).hexdigest()
+        dataset_hash = hashlib.sha256(json.dumps(material, sort_keys=True).encode("utf-8")).hexdigest()
         payload = {
             **material,
             "dataset_hash": dataset_hash,
             "observed_through_utc": max(
-                (
-                    str(report["retrieved_at_utc"])
-                    for report in reports
-                    if report.get("retrieved_at_utc")
-                ),
+                (str(report["retrieved_at_utc"]) for report in reports if report.get("retrieved_at_utc")),
                 default=None,
             ),
         }

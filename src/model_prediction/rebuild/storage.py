@@ -122,8 +122,9 @@ def provenance_row(
 class RawSnapshotRef:
     """Immutable reference to a stored raw snapshot."""
 
-    def __init__(self, source: str, source_record_id: str,
-                 observed_at_utc: str, snapshot_hash: str, path: Path) -> None:
+    def __init__(
+        self, source: str, source_record_id: str, observed_at_utc: str, snapshot_hash: str, path: Path
+    ) -> None:
         self.source = source
         self.source_record_id = source_record_id
         self.observed_at_utc = observed_at_utc
@@ -131,8 +132,10 @@ class RawSnapshotRef:
         self.path = path
 
     def __repr__(self) -> str:
-        return (f"RawSnapshotRef(source={self.source}, record={self.source_record_id}, "
-                f"hash={self.snapshot_hash[:16]}...)")
+        return (
+            f"RawSnapshotRef(source={self.source}, record={self.source_record_id}, "
+            f"hash={self.snapshot_hash[:16]}...)"
+        )
 
 
 class RawStore:
@@ -147,13 +150,13 @@ class RawStore:
     def __init__(self, root: str | Path) -> None:
         self.root = Path(root)
 
-    def _content_path(self, source: str, date_str: str,
-                      record_id: str, payload_hash: str) -> Path:
+    def _content_path(self, source: str, date_str: str, record_id: str, payload_hash: str) -> Path:
         """data/rebuild/raw/{source}/{date}/{record_id}/{hash}.json.gz"""
         return self.root / source / date_str / record_id / f"{payload_hash}.json.gz"
 
-    def write(self, source: str, date_str: str, record_id: str, payload: Any, *,
-              observed_at: str | None = None) -> RawSnapshotRef:
+    def write(
+        self, source: str, date_str: str, record_id: str, payload: Any, *, observed_at: str | None = None
+    ) -> RawSnapshotRef:
         """Write an immutable content-addressed raw snapshot.
 
         Returns a RawSnapshotRef. If the exact same payload already exists
@@ -161,9 +164,9 @@ class RawStore:
         payloads always produce different files — no overwrites.
         """
         observed = observed_at or utc_now().isoformat()
-        raw_bytes = json.dumps(
-            payload, sort_keys=True, ensure_ascii=False, default=_json_default
-        ).encode("utf-8")
+        raw_bytes = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=_json_default).encode(
+            "utf-8"
+        )
         snapshot_hash = sha256_hex(raw_bytes)
         p = self._content_path(source, date_str, record_id, snapshot_hash)
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -203,8 +206,7 @@ class RawStore:
         with gzip.open(ref.path, "rb") as f:
             return sha256_hex(f.read()) == ref.snapshot_hash
 
-    def list_snapshots(self, source: str, date_str: str,
-                       record_id: str) -> list[RawSnapshotRef]:
+    def list_snapshots(self, source: str, date_str: str, record_id: str) -> list[RawSnapshotRef]:
         """List all snapshots for a given source/date/record."""
         parent = self.root / source / date_str / record_id
         if not parent.exists():
@@ -212,10 +214,15 @@ class RawStore:
         refs = []
         for f in sorted(parent.glob("*.json.gz")):
             h = f.stem
-            refs.append(RawSnapshotRef(
-                source=source, source_record_id=record_id,
-                observed_at_utc="", snapshot_hash=h, path=f,
-            ))
+            refs.append(
+                RawSnapshotRef(
+                    source=source,
+                    source_record_id=record_id,
+                    observed_at_utc="",
+                    snapshot_hash=h,
+                    path=f,
+                )
+            )
         return refs
 
 
@@ -233,7 +240,11 @@ class NormalizedStore:
         return self.root / sport / f"{table}.parquet"
 
     def write(
-        self, sport: str, table: str, df: pl.DataFrame, *,
+        self,
+        sport: str,
+        table: str,
+        df: pl.DataFrame,
+        *,
         mode: str = "append",
         primary_key: list[str] | None = None,
         conflict_policy: str = "keep_latest",
@@ -289,11 +300,18 @@ class NormalizedStore:
 
     @staticmethod
     def _dedupe_by_primary_key(
-        df: pl.DataFrame, primary_key: list[str], conflict_policy: str,
+        df: pl.DataFrame,
+        primary_key: list[str],
+        conflict_policy: str,
     ) -> pl.DataFrame:
         provenance_ish = {
-            "observed_at_utc", "effective_at_utc", "ingested_at_utc",
-            "raw_snapshot_hash", "source", "source_record_id", "source_version",
+            "observed_at_utc",
+            "effective_at_utc",
+            "ingested_at_utc",
+            "raw_snapshot_hash",
+            "source",
+            "source_record_id",
+            "source_version",
         }
         compare_cols = [c for c in df.columns if c not in provenance_ish and c not in primary_key]
 
@@ -446,8 +464,7 @@ class FeatureStore:
         if not self.root.joinpath(sport).exists():
             return []
         return sorted(
-            d.name for d in self.root.joinpath(sport).iterdir()
-            if d.is_dir() and (d / "latest.json").exists()
+            d.name for d in self.root.joinpath(sport).iterdir() if d.is_dir() and (d / "latest.json").exists()
         )
 
 

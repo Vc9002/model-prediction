@@ -77,19 +77,14 @@ def _game_metrics(row: dict[str, Any], opponent: dict[str, Any]) -> dict[str, fl
     )
     opp_possessions = (
         opp_fga + 0.44 * opp_fta - opp_oreb + opp_turnovers
-        if opp_fga is not None
-        and opp_fta is not None
-        and opp_oreb is not None
-        and opp_turnovers is not None
+        if opp_fga is not None and opp_fta is not None and opp_oreb is not None and opp_turnovers is not None
         else None
     )
     points = _number(row.get("points"))
     opponent_points = _number(opponent.get("points"))
     ortg = (100.0 * points / possessions) if possessions and points is not None else None
     drtg = (
-        100.0 * opponent_points / opp_possessions
-        if opp_possessions and opponent_points is not None
-        else None
+        100.0 * opponent_points / opp_possessions if opp_possessions and opponent_points is not None else None
     )
     efg_numerator = fgm + 0.5 * three_made if fgm is not None and three_made is not None else None
     opponent_dreb = _number(opponent.get("defensive_rebounds"))
@@ -150,8 +145,7 @@ def build_team_form_snapshot(
     )
     all_boxes = _latest_eligible_boxes(team_box, knowledge_time)
     by_event_team = {
-        (str(row["event_id"]), str(row["team_id"])): row
-        for row in all_boxes.iter_rows(named=True)
+        (str(row["event_id"]), str(row["team_id"])): row for row in all_boxes.iter_rows(named=True)
     }
     game_rows: list[dict[str, Any]] = []
     for row in eligible.iter_rows(named=True):
@@ -159,23 +153,23 @@ def build_team_form_snapshot(
         opponent = by_event_team.get((str(row["event_id"]), str(opponent_id)))
         if opponent is None:
             continue
-        game_rows.append({
-            "event_id": row["event_id"],
-            "event_start_utc": row["event_start_utc"],
-            "observed_at_utc": max(str(row["observed_at_utc"]), str(opponent["observed_at_utc"])),
-            "raw_snapshot_hashes": sorted({
-                str(row["raw_snapshot_hash"]),
-                str(opponent["raw_snapshot_hash"]),
-                str(row["game_raw_snapshot_hash"]),
-            }),
-            **_game_metrics(row, opponent),
-        })
+        game_rows.append(
+            {
+                "event_id": row["event_id"],
+                "event_start_utc": row["event_start_utc"],
+                "observed_at_utc": max(str(row["observed_at_utc"]), str(opponent["observed_at_utc"])),
+                "raw_snapshot_hashes": sorted(
+                    {
+                        str(row["raw_snapshot_hash"]),
+                        str(opponent["raw_snapshot_hash"]),
+                        str(row["game_raw_snapshot_hash"]),
+                    }
+                ),
+                **_game_metrics(row, opponent),
+            }
+        )
 
-    raw_snapshot_hashes = sorted({
-        digest
-        for row in game_rows
-        for digest in row["raw_snapshot_hashes"]
-    })
+    raw_snapshot_hashes = sorted({digest for row in game_rows for digest in row["raw_snapshot_hashes"]})
 
     result: dict[str, Any] = {
         "team_id": team_id,
@@ -185,10 +179,14 @@ def build_team_form_snapshot(
         "source_watermark_utc": max((row["observed_at_utc"] for row in game_rows), default=None),
         "source_raw_snapshot_hashes": raw_snapshot_hashes,
         "source_manifest_hash": (
-            hashlib.sha256(canonical_json({
-                "event_ids": [str(row["event_id"]) for row in game_rows],
-                "raw_snapshot_hashes": raw_snapshot_hashes,
-            })).hexdigest()
+            hashlib.sha256(
+                canonical_json(
+                    {
+                        "event_ids": [str(row["event_id"]) for row in game_rows],
+                        "raw_snapshot_hashes": raw_snapshot_hashes,
+                    }
+                )
+            ).hexdigest()
             if game_rows
             else None
         ),

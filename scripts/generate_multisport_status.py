@@ -187,7 +187,9 @@ def main() -> int:
     repo = args.repo_root.resolve()
     config_path = args.config if args.config.is_absolute() else repo / args.config
     json_output = args.json_output if args.json_output.is_absolute() else repo / args.json_output
-    markdown_output = args.markdown_output if args.markdown_output.is_absolute() else repo / args.markdown_output
+    markdown_output = (
+        args.markdown_output if args.markdown_output.is_absolute() else repo / args.markdown_output
+    )
     status = build_status(repo, config_path)
     json_output.parent.mkdir(parents=True, exist_ok=True)
     markdown_output.parent.mkdir(parents=True, exist_ok=True)

@@ -68,7 +68,9 @@ class PlattCalibrator:
     base_model_hash: str = ""
 
     def fit(
-        self, y_prob: Sequence[float], y_true: Sequence[int],
+        self,
+        y_prob: Sequence[float],
+        y_true: Sequence[int],
         base_model_hash: str = "",
     ) -> PlattCalibrator:
         """Fit Platt scaling on out-of-fold predictions (NOT training predictions)."""
@@ -104,8 +106,11 @@ class IsotonicCalibrator:
     _trained: bool = False
 
     def fit(
-        self, y_prob: Sequence[float], y_true: Sequence[int],
-        base_model_hash: str = "", min_sample: int = 100,
+        self,
+        y_prob: Sequence[float],
+        y_true: Sequence[int],
+        base_model_hash: str = "",
+        min_sample: int = 100,
     ) -> IsotonicCalibrator:
         if len(y_prob) < min_sample:
             return IsotonicCalibrator(None, "isotonic", base_model_hash)
@@ -128,6 +133,7 @@ class IsotonicCalibrator:
 
 class TemperatureScaling:
     """Single-parameter temperature scaling: p_cal = sigmoid(logit(p) / T)."""
+
     method = "temperature"
     base_model_hash = ""
 
@@ -135,8 +141,11 @@ class TemperatureScaling:
         self.temperature = temperature
 
     def fit(
-        self, y_prob: Sequence[float], y_true: Sequence[int],
-        base_model_hash: str = "", n_steps: int = 100,
+        self,
+        y_prob: Sequence[float],
+        y_true: Sequence[int],
+        base_model_hash: str = "",
+        n_steps: int = 100,
     ) -> TemperatureScaling:
         if len(y_prob) < 50:
             return TemperatureScaling(1.0)
@@ -144,8 +153,10 @@ class TemperatureScaling:
         best_t, best_loss = 1.0, float("inf")
         for t in temps:
             cal = np.array([_sigmoid(_logit(p) / t) for p in y_prob])
-            loss = -np.mean(np.array(y_true) * np.log(np.clip(cal, 1e-12, 1)) +
-                           (1 - np.array(y_true)) * np.log(np.clip(1 - cal, 1e-12, 1)))
+            loss = -np.mean(
+                np.array(y_true) * np.log(np.clip(cal, 1e-12, 1))
+                + (1 - np.array(y_true)) * np.log(np.clip(1 - cal, 1e-12, 1))
+            )
             if loss < best_loss:
                 best_loss, best_t = loss, t
         self.temperature = float(best_t)
@@ -261,6 +272,7 @@ class CrossFitCalibrationResult:
     calibration intercept/slope, plus per-block detail so a real audit can
     verify no evaluation block's labels ever reached the calibrator fit on
     it."""
+
     method: str
     n_blocks: int
     per_block: list[dict[str, Any]] = field(default_factory=list)
@@ -275,7 +287,10 @@ class CrossFitCalibrationResult:
 
 
 def cross_fit_calibration_eval(
-    probs: Sequence[float], labels: Sequence[int], method: str, n_blocks: int = 4,
+    probs: Sequence[float],
+    labels: Sequence[int],
+    method: str,
+    n_blocks: int = 4,
 ) -> CrossFitCalibrationResult:
     """Real chronological expanding-window calibration cross-fit: for each
     evaluation block i (i=1..n_blocks-1), fits `method`'s calibrator on
@@ -308,22 +323,30 @@ def cross_fit_calibration_eval(
 
         all_calibrated.extend(calibrated)
         all_labels.extend(eval_labels)
-        per_block.append({
-            "eval_block": i, "fit_n": len(fit_probs), "eval_n": len(eval_probs),
-            "log_loss": log_loss(eval_labels, calibrated),
-            "brier": brier_score(eval_labels, calibrated),
-        })
+        per_block.append(
+            {
+                "eval_block": i,
+                "fit_n": len(fit_probs),
+                "eval_n": len(eval_probs),
+                "log_loss": log_loss(eval_labels, calibrated),
+                "brier": brier_score(eval_labels, calibrated),
+            }
+        )
 
     if not all_labels:
         return CrossFitCalibrationResult(method=method, n_blocks=n_blocks, per_block=per_block)
 
     intercept, slope = calibration_intercept_slope(all_calibrated, all_labels)
     return CrossFitCalibrationResult(
-        method=method, n_blocks=n_blocks, per_block=per_block,
+        method=method,
+        n_blocks=n_blocks,
+        per_block=per_block,
         n_eval_total=len(all_labels),
         log_loss=log_loss(all_labels, all_calibrated),
         brier=brier_score(all_labels, all_calibrated),
         ece=ece(all_labels, all_calibrated),
-        calibration_intercept=intercept, calibration_slope=slope,
-        calibrated_probs=all_calibrated, eval_labels=all_labels,
+        calibration_intercept=intercept,
+        calibration_slope=slope,
+        calibrated_probs=all_calibrated,
+        eval_labels=all_labels,
     )

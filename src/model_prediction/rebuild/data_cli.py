@@ -25,7 +25,9 @@ FORBIDDEN_LIVE_FLAGS = frozenset({"--execute", "--live", "--real-order", "--prom
 SEASON_BASED_SPORTS = frozenset({"wnba", "nfl", "tennis"})
 
 
-def run(command: str, sport: str, data_root: str, *, status: str, repo_root: str, **kwargs: Any) -> dict[str, Any]:
+def run(
+    command: str, sport: str, data_root: str, *, status: str, repo_root: str, **kwargs: Any
+) -> dict[str, Any]:
     """Run one data operation. ``data_root``/``repo_root`` stay injectable
     for tests, same convention as `cli.py::run`."""
     assert_shadow_only()
@@ -45,37 +47,60 @@ def _parser() -> argparse.ArgumentParser:
     backfill = sub.add_parser("backfill", help="Backfill raw/normalized data for one sport")
     backfill.add_argument("--sport", required=True, choices=SUPPORTED_DATA_SPORTS)
     backfill.add_argument("--version", choices=("v3",), help="MLB-only: research lane version")
-    backfill.add_argument("--provider", choices=("mlb_stats", "statcast"), default="mlb_stats", help="MLB-only")
+    backfill.add_argument(
+        "--provider", choices=("mlb_stats", "statcast"), default="mlb_stats", help="MLB-only"
+    )
     backfill.add_argument("--start", help="MLB-only")
     backfill.add_argument("--end", help="MLB-only")
     backfill.add_argument(
-        "--season", type=int, action="append", help="WNBA/NFL-only, repeatable",
+        "--season",
+        type=int,
+        action="append",
+        help="WNBA/NFL-only, repeatable",
     )
     backfill.add_argument(
-        "--table", action="append", dest="tables",
+        "--table",
+        action="append",
+        dest="tables",
         choices=(
-            "schedule", "game_feed", "transactions",
-            "team_box", "player_box", "rosters", "pbp", "weekly_rosters",
+            "schedule",
+            "game_feed",
+            "transactions",
+            "team_box",
+            "player_box",
+            "rosters",
+            "pbp",
+            "weekly_rosters",
         ),
     )
     backfill.add_argument("--date", help="Soccer-only: one calendar date, YYYY-MM-DD")
     backfill.add_argument(
-        "--espn-league", action="append", dest="espn_leagues",
+        "--espn-league",
+        action="append",
+        dest="espn_leagues",
         help="Soccer-only, repeatable (e.g. eng.1); defaults to eng.1",
     )
     backfill.add_argument(
-        "--football-data-competition", action="append", dest="football_data_competitions",
+        "--football-data-competition",
+        action="append",
+        dest="football_data_competitions",
         help="Soccer-only, repeatable; requires FOOTBALL_DATA_TOKEN env var",
     )
     backfill.add_argument(
-        "--tour", choices=("atp", "wta", "challenger"), help="Tennis-only: required",
+        "--tour",
+        choices=("atp", "wta", "challenger"),
+        help="Tennis-only: required",
     )
     backfill.add_argument(
-        "--kind", dest="match_kind", choices=("main", "challenger", "qualifying"), default="main",
+        "--kind",
+        dest="match_kind",
+        choices=("main", "challenger", "qualifying"),
+        default="main",
         help="Tennis-only: TennisMyLife match kind",
     )
     backfill.add_argument(
-        "--current", action="store_true",
+        "--current",
+        action="store_true",
         help="Tennis-only: collect today's ESPN scoreboard instead of a TennisMyLife historical season",
     )
     backfill.add_argument("--resume", action=argparse.BooleanOptionalAction, default=True)
@@ -131,22 +156,35 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     if args.command == "backfill":
         report = run(
-            "backfill", args.sport, str(config.paths.data_root),
-            status=status, repo_root=str(config.repo_root),
-            provider=args.provider, start=args.start, end=args.end,
+            "backfill",
+            args.sport,
+            str(config.paths.data_root),
+            status=status,
+            repo_root=str(config.repo_root),
+            provider=args.provider,
+            start=args.start,
+            end=args.end,
             seasons=tuple(args.season) if args.season else None,
-            tables=tuple(args.tables) if args.tables else None, force=not args.resume,
+            tables=tuple(args.tables) if args.tables else None,
+            force=not args.resume,
             game_date=args.date,
             espn_leagues=tuple(args.espn_leagues) if args.espn_leagues else None,
             football_data_competitions=(
                 tuple(args.football_data_competitions) if args.football_data_competitions else None
             ),
-            tour=args.tour, match_kind=args.match_kind, current=args.current,
+            tour=args.tour,
+            match_kind=args.match_kind,
+            current=args.current,
         )
     else:
         report = run(
-            "audit", args.sport, str(config.paths.data_root),
-            status=status, repo_root=str(config.repo_root), season=args.season, tour=args.tour,
+            "audit",
+            args.sport,
+            str(config.paths.data_root),
+            status=status,
+            repo_root=str(config.repo_root),
+            season=args.season,
+            tour=args.tour,
         )
     print(json.dumps(report, indent=2, default=str))
 

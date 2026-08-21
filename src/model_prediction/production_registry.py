@@ -58,9 +58,7 @@ def compute_artifact_hash(payload: dict[str, Any]) -> str:
     ``artifact_hash`` key so the hash isn't self-referential.
     """
     canonical = {k: v for k, v in payload.items() if k != "artifact_hash"}
-    return hashlib.sha256(
-        json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
+    return hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -126,9 +124,7 @@ class ProductionModelRegistry:
         return cls.from_config(config, repo_root=root)
 
     @classmethod
-    def from_config(
-        cls, config: dict[str, Any], *, repo_root: Path | str
-    ) -> ProductionModelRegistry:
+    def from_config(cls, config: dict[str, Any], *, repo_root: Path | str) -> ProductionModelRegistry:
         """Build + validate a registry from an already-loaded config dict."""
         root = Path(repo_root)
         svc = config.get("prediction_service")
@@ -143,13 +139,9 @@ class ProductionModelRegistry:
 
         primary = entries.get(primary_id)
         if primary is None:
-            raise ValueError(
-                f"primary.model_id '{primary_id}' is not a registered production model"
-            )
+            raise ValueError(f"primary.model_id '{primary_id}' is not a registered production model")
         if primary.load_error is not None:
-            raise ValueError(
-                f"primary model '{primary_id}' failed validation: {primary.load_error}"
-            )
+            raise ValueError(f"primary model '{primary_id}' failed validation: {primary.load_error}")
 
         execution = config.get("execution") or {}
 
@@ -161,10 +153,7 @@ class ProductionModelRegistry:
                 raise ValueError(f"champions[{sport}] must be a mapping of market -> model_id")  # noqa: TRY004
             for model_id in markets.values():
                 if model_id not in entries:
-                    raise ValueError(
-                        f"champions references unknown model '{model_id}' "
-                        f"for {sport}"
-                    )
+                    raise ValueError(f"champions references unknown model '{model_id}' for {sport}")
 
         return cls(
             entries,
@@ -196,20 +185,15 @@ class ProductionModelRegistry:
                 raise ValueError("production model entry missing model_id")
             entries[model_id] = ProductionModelRegistry._resolve_entry(raw, root)
         if not entries:
-            raise ValueError(
-                "prediction_service.models must contain at least one model"
-            )
+            raise ValueError("prediction_service.models must contain at least one model")
         if primary_id not in entries:
             raise ValueError(
-                f"primary.model_id '{primary_id}' is not in "
-                f"prediction_service.models {sorted(entries)}"
+                f"primary.model_id '{primary_id}' is not in prediction_service.models {sorted(entries)}"
             )
         return entries, primary_id
 
     @staticmethod
-    def _entries_from_legacy(
-        svc: dict[str, Any], root: Path
-    ) -> tuple[dict[str, ProductionModelEntry], str]:
+    def _entries_from_legacy(svc: dict[str, Any], root: Path) -> tuple[dict[str, ProductionModelEntry], str]:
         """Derive entries from the v1/v2 ``allowed_models`` + ``artifact_map``.
 
         Legacy configs only declare sport/market for the primary; every
@@ -219,9 +203,7 @@ class ProductionModelRegistry:
         """
         allowed = svc.get("allowed_models")
         if not isinstance(allowed, list) or len(allowed) == 0:
-            raise ValueError(
-                "prediction_service.allowed_models must be a non-empty list"
-            )
+            raise ValueError("prediction_service.allowed_models must be a non-empty list")
 
         primary_spec = svc.get("primary")
         if not isinstance(primary_spec, dict):
@@ -230,10 +212,7 @@ class ProductionModelRegistry:
         if not isinstance(primary_id, str) or not primary_id.strip():
             raise ValueError("prediction_service.primary.model_id is missing or empty")
         if primary_id not in allowed:
-            raise ValueError(
-                f"primary.model_id '{primary_id}' is not in "
-                f"allowed_models {allowed}"
-            )
+            raise ValueError(f"primary.model_id '{primary_id}' is not in allowed_models {allowed}")
 
         artifact_map = svc.get("artifact_map") or {}
         primary_artifact = primary_spec.get("artifact")
@@ -277,8 +256,7 @@ class ProductionModelRegistry:
                 enabled=bool(raw.get("enabled", True)),
                 rollback_model=raw.get("rollback_model"),
                 load_error=(
-                    f"unknown implementation type {implementation!r}; "
-                    f"expected one of {IMPLEMENTATION_TYPES}"
+                    f"unknown implementation type {implementation!r}; expected one of {IMPLEMENTATION_TYPES}"
                 ),
             )
 
@@ -307,9 +285,7 @@ class ProductionModelRegistry:
                     load_error=f"artifact file not found at {artifact_path}",
                 )
             try:
-                payload: dict[str, Any] = json.loads(
-                    artifact_path.read_text(encoding="utf-8")
-                )
+                payload: dict[str, Any] = json.loads(artifact_path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError) as exc:
                 return ProductionModelEntry(
                     model_id=model_id,
@@ -333,8 +309,7 @@ class ProductionModelRegistry:
                     enabled=bool(raw.get("enabled", True)),
                     rollback_model=raw.get("rollback_model"),
                     load_error=(
-                        f"artifact_hash mismatch: embedded '{embedded_hash}' "
-                        f"!= computed '{computed_hash}'"
+                        f"artifact_hash mismatch: embedded '{embedded_hash}' != computed '{computed_hash}'"
                     ),
                 )
             artifact_model_id = payload.get("model_version")
@@ -348,8 +323,7 @@ class ProductionModelRegistry:
                     enabled=bool(raw.get("enabled", True)),
                     rollback_model=raw.get("rollback_model"),
                     load_error=(
-                        f"model_id mismatch: config says '{model_id}', "
-                        f"artifact says '{artifact_model_id}'"
+                        f"model_id mismatch: config says '{model_id}', artifact says '{artifact_model_id}'"
                     ),
                 )
             return ProductionModelEntry(

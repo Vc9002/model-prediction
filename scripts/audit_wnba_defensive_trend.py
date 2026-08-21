@@ -51,23 +51,23 @@ def _metrics(labels: np.ndarray, probs: np.ndarray) -> dict[str, Any]:
         "log_loss": float(log_loss(labels, probs)),
         "brier": float(brier_score(labels, probs)),
         "ece": float(ece(labels, probs, n_bins=10)),
-        "accuracy": float(directional_accuracy(
-            labels.astype(int).tolist(), preds.tolist()
-        )),
+        "accuracy": float(directional_accuracy(labels.astype(int).tolist(), preds.tolist())),
     }
 
 
 def main() -> None:
     print("Loading WNBA walk-forward data...")
-    result = build_dataset("data/rebuild", [2022, 2023, 2024, 2025],
-                           minimum_history_games=30, minimum_team_games=3)
+    result = build_dataset(
+        "data/rebuild", [2022, 2023, 2024, 2025], minimum_history_games=30, minimum_team_games=3
+    )
     frame = rows_to_frame(result.rows).sort("event_start_utc")
-    print(f"  {frame.height} rows, {result.skipped_bootstrap} bootstrap skipped, "
-          f"{result.skipped_cold_start_team} cold-start skipped")
+    print(
+        f"  {frame.height} rows, {result.skipped_bootstrap} bootstrap skipped, "
+        f"{result.skipped_cold_start_team} cold-start skipped"
+    )
 
     dates = frame["sports_event_date"].to_list()
-    folds = expanding_folds(dates, n_splits=N_FOLDS, val_size=VAL_DAYS,
-                            gap=GAP_DAYS, test_size=TEST_DAYS)
+    folds = expanding_folds(dates, n_splits=N_FOLDS, val_size=VAL_DAYS, gap=GAP_DAYS, test_size=TEST_DAYS)
     print(f"\n{len(folds)} expanding chronological folds:\n")
 
     fold_reports: list[dict[str, Any]] = []
@@ -77,8 +77,9 @@ def main() -> None:
 
     for fold in folds:
         train_mask = pl.col("sports_event_date") <= fold.train_end
-        val_mask = (pl.col("sports_event_date") >= fold.val_start) & \
-                   (pl.col("sports_event_date") <= fold.val_end)
+        val_mask = (pl.col("sports_event_date") >= fold.val_start) & (
+            pl.col("sports_event_date") <= fold.val_end
+        )
 
         train_df = frame.filter(train_mask)
         val_df = frame.filter(val_mask)
@@ -142,14 +143,16 @@ def main() -> None:
         fold_reports.append(report)
 
         marker = " <<< 3-feat better" if full_better else ""
-        print(f"  Fold {fold.fold_index}: train={train_df.height} val={val_df.height} "
-              f"[{fold.val_start}..{fold.val_end}]")
-        print(f"    3-feat: Brier={m3['brier']:.5f} LogLoss={m3['log_loss']:.5f} "
-              f"ECE={m3['ece']:.5f} dtg_coef={dtg_coef:+.6f}")
-        print(f"    2-feat: Brier={m2['brier']:.5f} LogLoss={m2['log_loss']:.5f} "
-              f"ECE={m2['ece']:.5f}")
-        print(f"    ΔBrier={brier_delta:+.6f} ΔLogLoss={logloss_delta:+.6f} "
-              f"ΔECE={ece_delta:+.6f}{marker}\n")
+        print(
+            f"  Fold {fold.fold_index}: train={train_df.height} val={val_df.height} "
+            f"[{fold.val_start}..{fold.val_end}]"
+        )
+        print(
+            f"    3-feat: Brier={m3['brier']:.5f} LogLoss={m3['log_loss']:.5f} "
+            f"ECE={m3['ece']:.5f} dtg_coef={dtg_coef:+.6f}"
+        )
+        print(f"    2-feat: Brier={m2['brier']:.5f} LogLoss={m2['log_loss']:.5f} ECE={m2['ece']:.5f}")
+        print(f"    ΔBrier={brier_delta:+.6f} ΔLogLoss={logloss_delta:+.6f} ΔECE={ece_delta:+.6f}{marker}\n")
 
     # ── Decision ──
     print("=" * 60)
@@ -163,7 +166,7 @@ def main() -> None:
 
     signs_consistent = len(set(sign_history)) <= 1
     improvement_repeatable = full_wins >= len(fold_reports) * 0.6  # wins on ≥60% of folds
-    improvement_meaningful = abs(np.mean([r['brier_delta'] for r in fold_reports])) >= 0.001
+    improvement_meaningful = abs(np.mean([r["brier_delta"] for r in fold_reports])) >= 0.001
 
     if signs_consistent and improvement_repeatable and improvement_meaningful:
         verdict = "KEEP"
@@ -185,7 +188,11 @@ def main() -> None:
                 f"mean Brier delta too small to be meaningful "
                 f"({np.mean([r['brier_delta'] for r in fold_reports]):+.6f})"
             )
-        reason = "defensive_trend_gap does not show repeatable, meaningful improvement: " + "; ".join(reasons) + "."
+        reason = (
+            "defensive_trend_gap does not show repeatable, meaningful improvement: "
+            + "; ".join(reasons)
+            + "."
+        )
 
     print(f"\n  VERDICT: {verdict}")
     print(f"  REASON: {reason}")
@@ -193,18 +200,24 @@ def main() -> None:
     # Persist report
     out_path = Path("outputs/rebuild/wnba/defensive_trend_audit.json")
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps({
-        "verdict": verdict,
-        "reason": reason,
-        "n_folds": len(fold_reports),
-        "full_wins": full_wins,
-        "reduced_wins": reduced_wins,
-        "sign_history": sign_history,
-        "mean_brier_delta": round(np.mean([r['brier_delta'] for r in fold_reports]), 6),
-        "mean_logloss_delta": round(np.mean([r['logloss_delta'] for r in fold_reports]), 6),
-        "mean_ece_delta": round(np.mean([r['ece_delta'] for r in fold_reports]), 6),
-        "per_fold": fold_reports,
-    }, indent=2, default=str))
+    out_path.write_text(
+        json.dumps(
+            {
+                "verdict": verdict,
+                "reason": reason,
+                "n_folds": len(fold_reports),
+                "full_wins": full_wins,
+                "reduced_wins": reduced_wins,
+                "sign_history": sign_history,
+                "mean_brier_delta": round(np.mean([r["brier_delta"] for r in fold_reports]), 6),
+                "mean_logloss_delta": round(np.mean([r["logloss_delta"] for r in fold_reports]), 6),
+                "mean_ece_delta": round(np.mean([r["ece_delta"] for r in fold_reports]), 6),
+                "per_fold": fold_reports,
+            },
+            indent=2,
+            default=str,
+        )
+    )
     print(f"\n  Report saved to {out_path}")
 
 

@@ -42,14 +42,27 @@ def test_row_count_delta_and_missing_ids() -> None:
 def test_field_mismatches_are_counted_by_bucket() -> None:
     report = compare(
         [_row("p1")],
-        [_row("p1", status="open", result="lost", units=1.6, pnl_units=1.31,
-              model_probability=0.62, line=1.5, selection="away",
-              model_id="mlb-elo-trend-lr-v7", model_artifact_hash="def456")],
+        [
+            _row(
+                "p1",
+                status="open",
+                result="lost",
+                units=1.6,
+                pnl_units=1.31,
+                model_probability=0.62,
+                line=1.5,
+                selection="away",
+                model_id="mlb-elo-trend-lr-v7",
+                model_artifact_hash="def456",
+            )
+        ],
     )
     assert report["settlement"] == {"status_mismatches": 1, "result_mismatches": 1}
     assert report["financial"] == {"units_mismatches": 1, "pnl_mismatches": 1}
     assert report["prediction"] == {
-        "prob_mismatches": 1, "line_mismatches": 1, "selection_mismatches": 1,
+        "prob_mismatches": 1,
+        "line_mismatches": 1,
+        "selection_mismatches": 1,
     }
     assert report["lineage"] == {"model_mismatches": 1, "artifact_mismatches": 1}
     assert report["clean"] is False

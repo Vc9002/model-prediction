@@ -83,6 +83,7 @@ def edge_scaled_units(
     units = round(units / policy.unit_increment) * policy.unit_increment
     return min(units, policy.max_pick_units)
 
+
 def recommend_units(
     model_probability: float,
     model_uncertainty: float,

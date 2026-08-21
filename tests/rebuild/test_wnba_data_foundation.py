@@ -56,7 +56,10 @@ def _identity(tmp_path) -> IdentityRegistry:
 def test_schedule_normalization_preserves_capture_time_not_fake_historical_time(tmp_path):
     identity = _identity(tmp_path)
     table, frame = normalize_wnba_table(
-        "schedule", _schedule_frame(), _metadata(), identity=identity,
+        "schedule",
+        _schedule_frame(),
+        _metadata(),
+        identity=identity,
     )
     assert table == "games"
     assert frame["observed_at_utc"][0] == "2026-08-09T00:00:00+00:00"
@@ -68,17 +71,22 @@ def test_schedule_normalization_preserves_capture_time_not_fake_historical_time(
 
 def test_historical_backfill_is_excluded_from_earlier_decision(tmp_path):
     _, games = normalize_wnba_table(
-        "schedule", _schedule_frame(), _metadata(), identity=_identity(tmp_path),
+        "schedule",
+        _schedule_frame(),
+        _metadata(),
+        identity=_identity(tmp_path),
     )
-    team_box = pl.DataFrame({
-        "event_id": ["401000001"],
-        "team_id": ["1"],
-        "observed_at_utc": ["2026-08-09T00:00:00+00:00"],
-        "raw_snapshot_hash": ["team-box-raw"],
-        "pit_eligible": [True],
-        "event_start_utc": ["2024-05-15T23:00:00+00:00"],
-        "points": [82],
-    })
+    team_box = pl.DataFrame(
+        {
+            "event_id": ["401000001"],
+            "team_id": ["1"],
+            "observed_at_utc": ["2026-08-09T00:00:00+00:00"],
+            "raw_snapshot_hash": ["team-box-raw"],
+            "pit_eligible": [True],
+            "event_start_utc": ["2024-05-15T23:00:00+00:00"],
+            "points": [82],
+        }
+    )
     result = eligible_prior_team_games(
         games,
         team_box,
@@ -90,17 +98,22 @@ def test_historical_backfill_is_excluded_from_earlier_decision(tmp_path):
 
 def test_same_feature_gate_allows_observation_for_later_decision(tmp_path):
     _, games = normalize_wnba_table(
-        "schedule", _schedule_frame(), _metadata(), identity=_identity(tmp_path),
+        "schedule",
+        _schedule_frame(),
+        _metadata(),
+        identity=_identity(tmp_path),
     )
-    team_box = pl.DataFrame({
-        "event_id": ["401000001"],
-        "team_id": ["1"],
-        "observed_at_utc": ["2026-08-09T00:00:00+00:00"],
-        "raw_snapshot_hash": ["team-box-raw"],
-        "pit_eligible": [True],
-        "event_start_utc": ["2024-05-15T23:00:00+00:00"],
-        "points": [82],
-    })
+    team_box = pl.DataFrame(
+        {
+            "event_id": ["401000001"],
+            "team_id": ["1"],
+            "observed_at_utc": ["2026-08-09T00:00:00+00:00"],
+            "raw_snapshot_hash": ["team-box-raw"],
+            "pit_eligible": [True],
+            "event_start_utc": ["2024-05-15T23:00:00+00:00"],
+            "points": [82],
+        }
+    )
     result = eligible_prior_team_games(
         games,
         team_box,
@@ -112,7 +125,10 @@ def test_same_feature_gate_allows_observation_for_later_decision(tmp_path):
 
 def test_partition_store_is_content_idempotent(tmp_path):
     _, games = normalize_wnba_table(
-        "schedule", _schedule_frame(), _metadata(), identity=_identity(tmp_path),
+        "schedule",
+        _schedule_frame(),
+        _metadata(),
+        identity=_identity(tmp_path),
     )
     store = WNBANormalizedStore(tmp_path)
     first = store.write("games", 2024, games)
@@ -123,7 +139,10 @@ def test_partition_store_is_content_idempotent(tmp_path):
 
 def test_partition_store_refuses_conflicting_same_observation(tmp_path):
     _, games = normalize_wnba_table(
-        "schedule", _schedule_frame(), _metadata(), identity=_identity(tmp_path),
+        "schedule",
+        _schedule_frame(),
+        _metadata(),
+        identity=_identity(tmp_path),
     )
     store = WNBANormalizedStore(tmp_path)
     store.write("games", 2024, games)
@@ -134,7 +153,10 @@ def test_partition_store_refuses_conflicting_same_observation(tmp_path):
 
 def test_partition_store_detects_corrupted_part_bytes(tmp_path):
     _, games = normalize_wnba_table(
-        "schedule", _schedule_frame(), _metadata(), identity=_identity(tmp_path),
+        "schedule",
+        _schedule_frame(),
+        _metadata(),
+        identity=_identity(tmp_path),
     )
     store = WNBANormalizedStore(tmp_path)
     part = store.write("games", 2024, games)
@@ -146,10 +168,16 @@ def test_partition_store_detects_corrupted_part_bytes(tmp_path):
 def test_latest_view_keeps_history_but_selects_newest_observation(tmp_path):
     identity = _identity(tmp_path)
     _, old = normalize_wnba_table(
-        "schedule", _schedule_frame(), _metadata("2026-08-09T00:00:00+00:00"), identity=identity,
+        "schedule",
+        _schedule_frame(),
+        _metadata("2026-08-09T00:00:00+00:00"),
+        identity=identity,
     )
     _, new = normalize_wnba_table(
-        "schedule", _schedule_frame(), _metadata("2026-08-10T00:00:00+00:00"), identity=identity,
+        "schedule",
+        _schedule_frame(),
+        _metadata("2026-08-10T00:00:00+00:00"),
+        identity=identity,
     )
     store = WNBANormalizedStore(tmp_path)
     store.write("games", 2024, old)
@@ -162,7 +190,10 @@ def test_latest_view_keeps_history_but_selects_newest_observation(tmp_path):
 
 def test_audit_reports_missing_boxes_as_degraded_not_system_failure(tmp_path):
     _, games = normalize_wnba_table(
-        "schedule", _schedule_frame(), _metadata(), identity=_identity(tmp_path),
+        "schedule",
+        _schedule_frame(),
+        _metadata(),
+        identity=_identity(tmp_path),
     )
     store = WNBANormalizedStore(tmp_path)
     store.write("games", 2024, games)
@@ -180,7 +211,10 @@ def test_audit_empty_season_is_unavailable_and_expectation_is_independent(tmp_pa
     assert empty["expected_games_basis"] == "UNAVAILABLE"
 
     _, games = normalize_wnba_table(
-        "schedule", _schedule_frame(), _metadata(), identity=_identity(tmp_path),
+        "schedule",
+        _schedule_frame(),
+        _metadata(),
+        identity=_identity(tmp_path),
     )
     store.write("games", 2024, games)
     report = audit_wnba_season(store, 2024, expected_event_ids={"401000001", "missing"})
@@ -191,7 +225,10 @@ def test_audit_empty_season_is_unavailable_and_expectation_is_independent(tmp_pa
 
 def test_audit_counts_duplicate_observations_before_any_latest_view(tmp_path):
     _, games = normalize_wnba_table(
-        "schedule", _schedule_frame(), _metadata(), identity=_identity(tmp_path),
+        "schedule",
+        _schedule_frame(),
+        _metadata(),
+        identity=_identity(tmp_path),
     )
     store = WNBANormalizedStore(tmp_path)
     store.write("games", 2024, games)
@@ -211,7 +248,10 @@ def test_audit_counts_duplicate_observations_before_any_latest_view(tmp_path):
 def test_foundation_and_live_collector_share_one_identity_registry_scheme(tmp_path):
     identity = _identity(tmp_path)
     _, games = normalize_wnba_table(
-        "schedule", _schedule_frame(), _metadata(), identity=identity,
+        "schedule",
+        _schedule_frame(),
+        _metadata(),
+        identity=identity,
     )
     live_home, live_away = resolve_espn_scoreboard_team_ids(
         identity,
@@ -248,18 +288,28 @@ def test_team_box_contract_requires_feature_metrics_and_rejects_bad_numbers(tmp_
         "turnovers": 11,
     }
     table, normalized = normalize_wnba_table(
-        "team_box", pl.DataFrame([row]), _metadata(), identity=identity,
+        "team_box",
+        pl.DataFrame([row]),
+        _metadata(),
+        identity=identity,
     )
     assert table == "team_box"
     assert normalized["field_goals_attempted"][0] == 70
-    assert normalized["opponent_team_canonical_id"][0] == identity.resolve(
-        "espn_public:wnba", "2",
-    ).entity_id
+    assert (
+        normalized["opponent_team_canonical_id"][0]
+        == identity.resolve(
+            "espn_public:wnba",
+            "2",
+        ).entity_id
+    )
 
     row["turnovers"] = "not-a-number"
     with pytest.raises(ValueError, match="invalid WNBA integer"):
         normalize_wnba_table(
-            "team_box", pl.DataFrame([row]), _metadata(), identity=identity,
+            "team_box",
+            pl.DataFrame([row]),
+            _metadata(),
+            identity=identity,
         )
 
 

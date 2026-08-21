@@ -16,6 +16,7 @@ cross-market consistency).
 
 ```python
 from model_prediction.data_sources.polymarket_us import capture_snapshots
+
 ...
 results[s] = capture_snapshots(s, _today())
 ```

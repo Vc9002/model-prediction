@@ -29,10 +29,16 @@ def _synthetic_training_data(n: int = 60, seed: int = 0) -> pl.DataFrame:
     g2 = rng.uniform(-1, 1, n)
     total_runs = f1 + f2 + rng.normal(0, 0.5, n)
     home_margin = g1 + g2 + rng.normal(0, 0.5, n)
-    return pl.DataFrame({
-        "f1": f1, "f2": f2, "g1": g1, "g2": g2,
-        "total_runs": total_runs, "home_margin": home_margin,
-    })
+    return pl.DataFrame(
+        {
+            "f1": f1,
+            "f2": f2,
+            "g1": g1,
+            "g2": g2,
+            "total_runs": total_runs,
+            "home_margin": home_margin,
+        }
+    )
 
 
 class TestFitting:
@@ -78,7 +84,9 @@ class TestMarketProbabilityBounds:
         row_extrapolated = {"f1": 50.0, "f2": 50.0, "g1": 20.0, "g2": 20.0, "event_id": "e2"}
 
         lower_a, upper_a = ensemble.market_probability_bounds(row_in_range, distribution, "moneyline", "home")
-        lower_b, upper_b = ensemble.market_probability_bounds(row_extrapolated, distribution, "moneyline", "home")
+        lower_b, upper_b = ensemble.market_probability_bounds(
+            row_extrapolated, distribution, "moneyline", "home"
+        )
 
         width_a = upper_a - lower_a
         width_b = upper_b - lower_b
@@ -94,11 +102,15 @@ class TestMarketProbabilityBounds:
 
         ensemble1 = BootstrapMLBEnsemble(n_bootstrap=10, seed=99)
         ensemble1.fit(data, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
-        bounds1 = ensemble1.market_probability_bounds(row, JointScoreDistribution(seed=1), "moneyline", "home")
+        bounds1 = ensemble1.market_probability_bounds(
+            row, JointScoreDistribution(seed=1), "moneyline", "home"
+        )
 
         ensemble2 = BootstrapMLBEnsemble(n_bootstrap=10, seed=99)
         ensemble2.fit(data, INTENSITY_FEATURES, DIFFERENTIAL_FEATURES)
-        bounds2 = ensemble2.market_probability_bounds(row, JointScoreDistribution(seed=1), "moneyline", "home")
+        bounds2 = ensemble2.market_probability_bounds(
+            row, JointScoreDistribution(seed=1), "moneyline", "home"
+        )
 
         assert bounds1 == bounds2, "identical seed and identical data must reproduce identical bounds"
 
@@ -113,10 +125,18 @@ class TestMarketProbabilityBounds:
         row = {"f1": 4.5, "f2": 4.2, "g1": 0.5, "g2": -0.2, "event_id": "e1"}
 
         spread_lower, spread_upper = ensemble.market_probability_bounds(
-            row, distribution, "spread", "home", line=-1.5,
+            row,
+            distribution,
+            "spread",
+            "home",
+            line=-1.5,
         )
         total_lower, total_upper = ensemble.market_probability_bounds(
-            row, distribution, "total", "over", line=8.5,
+            row,
+            distribution,
+            "total",
+            "over",
+            line=8.5,
         )
 
         assert 0.0 <= spread_lower <= spread_upper <= 1.0

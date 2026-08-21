@@ -18,9 +18,7 @@ def sports_event_date(event_start_utc: str | datetime) -> str:
     """Return the authoritative WNBA sports date for an event start."""
 
     parsed = (
-        event_start_utc
-        if isinstance(event_start_utc, datetime)
-        else datetime.fromisoformat(event_start_utc)
+        event_start_utc if isinstance(event_start_utc, datetime) else datetime.fromisoformat(event_start_utc)
     )
     if parsed.tzinfo is None:
         raise ValueError("WNBA event start must be timezone-aware")

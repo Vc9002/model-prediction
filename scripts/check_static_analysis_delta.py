@@ -8,9 +8,7 @@ import json
 import re
 from pathlib import Path
 
-MYPY_LINE = re.compile(
-    r"^(?P<path>.+?):\d+(?::\d+)?: error: (?P<message>.+?)\s+\[(?P<code>[^]]+)\]$"
-)
+MYPY_LINE = re.compile(r"^(?P<path>.+?):\d+(?::\d+)?: error: (?P<message>.+?)\s+\[(?P<code>[^]]+)\]$")
 
 
 def _relative(path: str, marker: str) -> str:
@@ -23,7 +21,8 @@ def _ruff(path: Path) -> collections.Counter[tuple[str, str, str]]:
     findings = json.loads(path.read_text(encoding="utf-8") or "[]")
     return collections.Counter(
         (
-            _relative(str(item["filename"]), "/src/") if "/src/" in str(item["filename"]).replace("\\", "/")
+            _relative(str(item["filename"]), "/src/")
+            if "/src/" in str(item["filename"]).replace("\\", "/")
             else _relative(str(item["filename"]), "/tests/"),
             str(item["code"]),
             str(item["message"]),

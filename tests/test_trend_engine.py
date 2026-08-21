@@ -55,10 +55,24 @@ def test_feature_store_point_in_time_cutoff(tmp_path) -> None:
     import json
 
     rows = [
-        {"event_id": "a", "event_start_utc": "2026-06-01T23:00:00Z", "league": "TEST",
-         "away_team": "A", "home_team": "B", "away_score": 1, "home_score": 2},
-        {"event_id": "b", "event_start_utc": "2026-06-10T23:00:00Z", "league": "TEST",
-         "away_team": "A", "home_team": "B", "away_score": 3, "home_score": 2},
+        {
+            "event_id": "a",
+            "event_start_utc": "2026-06-01T23:00:00Z",
+            "league": "TEST",
+            "away_team": "A",
+            "home_team": "B",
+            "away_score": 1,
+            "home_score": 2,
+        },
+        {
+            "event_id": "b",
+            "event_start_utc": "2026-06-10T23:00:00Z",
+            "league": "TEST",
+            "away_team": "A",
+            "home_team": "B",
+            "away_score": 3,
+            "home_score": 2,
+        },
         # Same-day game must be EXCLUDED from a 2026-06-10 snapshot.
     ]
     path.write_text("\n".join(json.dumps(row) for row in rows) + "\n")

@@ -120,7 +120,9 @@ class ExperimentLog:
                         payload = json.loads(line)
                         self._trials.append(ExperimentTrial(**payload))
 
-    def record(self, variant_name: str, sport: str, metrics: dict[str, Any], notes: str = "") -> ExperimentTrial:
+    def record(
+        self, variant_name: str, sport: str, metrics: dict[str, Any], notes: str = ""
+    ) -> ExperimentTrial:
         from .domain import utc_now
 
         trial = ExperimentTrial(

@@ -45,11 +45,13 @@ def _fetch_forecast_hourly(home_team: str) -> dict[str, Any] | None:
         return None
     lat, lon = coords
     try:
-        url = (f"https://api.open-meteo.com/v1/forecast?"
-               f"latitude={lat}&longitude={lon}"
-               f"&hourly=temperature_2m,wind_speed_10m,relative_humidity_2m"
-               f"&forecast_days=7&temperature_unit=fahrenheit&wind_speed_unit=mph"
-               f"&timezone=UTC")
+        url = (
+            f"https://api.open-meteo.com/v1/forecast?"
+            f"latitude={lat}&longitude={lon}"
+            f"&hourly=temperature_2m,wind_speed_10m,relative_humidity_2m"
+            f"&forecast_days=7&temperature_unit=fahrenheit&wind_speed_unit=mph"
+            f"&timezone=UTC"
+        )
         resp = httpx.get(url, timeout=10)
         hourly = resp.json().get("hourly", {}) if resp.status_code == 200 else None
     except (httpx.HTTPError, TypeError, ValueError):
@@ -73,6 +75,7 @@ def prefetch_live_weather(home_teams: Any) -> None:
         return
     with ThreadPoolExecutor(max_workers=min(16, len(pending))) as pool:
         list(pool.map(_fetch_forecast_hourly, pending))
+
 
 DOME_TEAMS = {
     "Tampa Bay Rays",
@@ -113,9 +116,7 @@ def weather_profile(home_team: str, espn_game_info: dict[str, Any] | None = None
         }
     payload = espn_game_info or {}
     weather = payload.get("weather") or {}
-    if not weather and any(
-        key in payload for key in ("temperature", "windSpeed", "gust", "humidity")
-    ):
+    if not weather and any(key in payload for key in ("temperature", "windSpeed", "gust", "humidity")):
         weather = payload
     temperature = weather.get("temperature")
     wind = weather.get("windSpeed") or weather.get("gust")
@@ -189,48 +190,65 @@ BALLPARK_COORDS: dict[str, tuple[float, float]] = {
 
 def live_weather(home_team: str, game_start_utc: str | None = None) -> dict[str, Any]:
     """Fetch current weather from Open-Meteo for a ballpark.
-    
+
     Uses free Open-Meteo API — no key required.
     Returns temperature (F), wind (mph), humidity, and run factor.
     Dome teams always return factor=1.0.
     """
     if home_team in DOME_TEAMS:
-        return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
-                "weather_run_factor": 1.0, "status": "dome", "source": "dome"}
+        return {
+            "temperature_f": None,
+            "wind_mph": None,
+            "humidity_pct": None,
+            "weather_run_factor": 1.0,
+            "status": "dome",
+            "source": "dome",
+        }
 
     coords = BALLPARK_COORDS.get(home_team)
     if not coords:
-        return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
-                "weather_run_factor": 1.0, "status": "unknown_park", "source": "none"}
+        return {
+            "temperature_f": None,
+            "wind_mph": None,
+            "humidity_pct": None,
+            "weather_run_factor": 1.0,
+            "status": "unknown_park",
+            "source": "none",
+        }
 
     try:
         hourly = _fetch_forecast_hourly(home_team)
         if hourly is None:
-            return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
-                    "weather_run_factor": 1.0, "status": "api_error", "source": "open-meteo"}
+            return {
+                "temperature_f": None,
+                "wind_mph": None,
+                "humidity_pct": None,
+                "weather_run_factor": 1.0,
+                "status": "api_error",
+                "source": "open-meteo",
+            }
         temps = hourly.get("temperature_2m", [])
         winds = hourly.get("wind_speed_10m", [])
         humids = hourly.get("relative_humidity_2m", [])
         times = hourly.get("time", [])
 
         if not temps:
-            return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
-                    "weather_run_factor": 1.0, "status": "no_data", "source": "open-meteo"}
-        
+            return {
+                "temperature_f": None,
+                "wind_mph": None,
+                "humidity_pct": None,
+                "weather_run_factor": 1.0,
+                "status": "no_data",
+                "source": "open-meteo",
+            }
+
         hour_index = 0
         if game_start_utc and times:
-            game_start = datetime.fromisoformat(
-                game_start_utc
-            ).astimezone(UTC)
-            parsed_hours = [
-                datetime.fromisoformat(str(value)).replace(tzinfo=UTC)
-                for value in times
-            ]
+            game_start = datetime.fromisoformat(game_start_utc).astimezone(UTC)
+            parsed_hours = [datetime.fromisoformat(str(value)).replace(tzinfo=UTC) for value in times]
             hour_index = min(
                 range(min(len(parsed_hours), len(temps))),
-                key=lambda index: abs(
-                    (parsed_hours[index] - game_start).total_seconds()
-                ),
+                key=lambda index: abs((parsed_hours[index] - game_start).total_seconds()),
             )
 
         temp = float(temps[hour_index])
@@ -246,8 +264,14 @@ def live_weather(home_team: str, game_start_utc: str | None = None) -> dict[str,
             "source": "open-meteo",
         }
     except (httpx.HTTPError, IndexError, KeyError, TypeError, ValueError):
-        return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
-                "weather_run_factor": 1.0, "status": "api_error", "source": "open-meteo"}
+        return {
+            "temperature_f": None,
+            "wind_mph": None,
+            "humidity_pct": None,
+            "weather_run_factor": 1.0,
+            "status": "api_error",
+            "source": "open-meteo",
+        }
 
 
 def historical_weather(home_team: str, game_start_utc: str) -> dict[str, Any]:
@@ -259,25 +283,45 @@ def historical_weather(home_team: str, game_start_utc: str) -> dict[str, Any]:
     stand-in for one of the two.
     """
     if home_team in DOME_TEAMS:
-        return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
-                "weather_run_factor": 1.0, "status": "dome", "source": "dome"}
+        return {
+            "temperature_f": None,
+            "wind_mph": None,
+            "humidity_pct": None,
+            "weather_run_factor": 1.0,
+            "status": "dome",
+            "source": "dome",
+        }
     coords = BALLPARK_COORDS.get(home_team)
     if not coords:
-        return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
-                "weather_run_factor": 1.0, "status": "unknown_park", "source": "none"}
+        return {
+            "temperature_f": None,
+            "wind_mph": None,
+            "humidity_pct": None,
+            "weather_run_factor": 1.0,
+            "status": "unknown_park",
+            "source": "none",
+        }
     lat, lon = coords
     try:
         game_start = datetime.fromisoformat(game_start_utc).astimezone(UTC)
         day = game_start.date().isoformat()
-        url = (f"https://archive-api.open-meteo.com/v1/archive?"
-               f"latitude={lat}&longitude={lon}"
-               f"&start_date={day}&end_date={day}"
-               f"&hourly=temperature_2m,wind_speed_10m,relative_humidity_2m"
-               f"&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=UTC")
+        url = (
+            f"https://archive-api.open-meteo.com/v1/archive?"
+            f"latitude={lat}&longitude={lon}"
+            f"&start_date={day}&end_date={day}"
+            f"&hourly=temperature_2m,wind_speed_10m,relative_humidity_2m"
+            f"&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=UTC"
+        )
         resp = httpx.get(url, timeout=10)
         if resp.status_code != 200:
-            return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
-                    "weather_run_factor": 1.0, "status": "api_error", "source": "open-meteo-archive"}
+            return {
+                "temperature_f": None,
+                "wind_mph": None,
+                "humidity_pct": None,
+                "weather_run_factor": 1.0,
+                "status": "api_error",
+                "source": "open-meteo-archive",
+            }
         data = resp.json()
         hourly = data.get("hourly", {})
         temps = hourly.get("temperature_2m", [])
@@ -285,11 +329,15 @@ def historical_weather(home_team: str, game_start_utc: str) -> dict[str, Any]:
         humids = hourly.get("relative_humidity_2m", [])
         times = hourly.get("time", [])
         if not temps:
-            return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
-                    "weather_run_factor": 1.0, "status": "no_data", "source": "open-meteo-archive"}
-        parsed_hours = [
-            datetime.fromisoformat(str(value)).replace(tzinfo=UTC) for value in times
-        ]
+            return {
+                "temperature_f": None,
+                "wind_mph": None,
+                "humidity_pct": None,
+                "weather_run_factor": 1.0,
+                "status": "no_data",
+                "source": "open-meteo-archive",
+            }
+        parsed_hours = [datetime.fromisoformat(str(value)).replace(tzinfo=UTC) for value in times]
         hour_index = min(
             range(min(len(parsed_hours), len(temps))),
             key=lambda index: abs((parsed_hours[index] - game_start).total_seconds()),
@@ -306,8 +354,14 @@ def historical_weather(home_team: str, game_start_utc: str) -> dict[str, Any]:
             "source": "open-meteo-archive",
         }
     except (httpx.HTTPError, IndexError, KeyError, TypeError, ValueError):
-        return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
-                "weather_run_factor": 1.0, "status": "api_error", "source": "open-meteo-archive"}
+        return {
+            "temperature_f": None,
+            "wind_mph": None,
+            "humidity_pct": None,
+            "weather_run_factor": 1.0,
+            "status": "api_error",
+            "source": "open-meteo-archive",
+        }
 
 
 def resolve_weather(home_team: str, game_start_utc: str | None) -> dict[str, Any]:
@@ -321,13 +375,25 @@ def resolve_weather(home_team: str, game_start_utc: str | None) -> dict[str, Any
     walk-forward backtest sees the same real conditions a live run would have.
     """
     if not game_start_utc:
-        return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
-                "weather_run_factor": 1.0, "status": "unavailable_from_source", "source": "none"}
+        return {
+            "temperature_f": None,
+            "wind_mph": None,
+            "humidity_pct": None,
+            "weather_run_factor": 1.0,
+            "status": "unavailable_from_source",
+            "source": "none",
+        }
     try:
         start = datetime.fromisoformat(str(game_start_utc)).astimezone(UTC)
     except ValueError:
-        return {"temperature_f": None, "wind_mph": None, "humidity_pct": None,
-                "weather_run_factor": 1.0, "status": "unavailable_from_source", "source": "none"}
+        return {
+            "temperature_f": None,
+            "wind_mph": None,
+            "humidity_pct": None,
+            "weather_run_factor": 1.0,
+            "status": "unavailable_from_source",
+            "source": "none",
+        }
     if start >= datetime.now(UTC) - timedelta(hours=6):
         return live_weather(home_team, game_start_utc)
     return historical_weather(home_team, game_start_utc)

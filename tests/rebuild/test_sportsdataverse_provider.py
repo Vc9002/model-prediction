@@ -30,25 +30,29 @@ def _parquet_bytes(*, remove: str | None = None) -> bytes:
 
 
 def _team_box_parquet_bytes(*, remove: str | None = None) -> bytes:
-    frame = pl.DataFrame([{
-        "game_id": "1",
-        "season": 2024,
-        "game_date_time": "2024-05-15T23:00:00+00:00",
-        "team_id": "1",
-        "team_display_name": "A",
-        "opponent_team_id": "2",
-        "team_home_away": "home",
-        "team_score": 80,
-        "field_goals_made": 30,
-        "field_goals_attempted": 70,
-        "three_point_field_goals_made": 7,
-        "three_point_field_goals_attempted": 20,
-        "free_throws_made": 13,
-        "free_throws_attempted": 18,
-        "offensive_rebounds": 8,
-        "defensive_rebounds": 28,
-        "turnovers": 10,
-    }])
+    frame = pl.DataFrame(
+        [
+            {
+                "game_id": "1",
+                "season": 2024,
+                "game_date_time": "2024-05-15T23:00:00+00:00",
+                "team_id": "1",
+                "team_display_name": "A",
+                "opponent_team_id": "2",
+                "team_home_away": "home",
+                "team_score": 80,
+                "field_goals_made": 30,
+                "field_goals_attempted": 70,
+                "three_point_field_goals_made": 7,
+                "three_point_field_goals_attempted": 20,
+                "free_throws_made": 13,
+                "free_throws_attempted": 18,
+                "offensive_rebounds": 8,
+                "defensive_rebounds": 28,
+                "turnovers": 10,
+            }
+        ]
+    )
     if remove:
         frame = frame.drop(remove)
     buffer = io.BytesIO()
@@ -62,7 +66,9 @@ def test_historical_asset_is_raw_first_and_cached(tmp_path):
     def handler(request: httpx.Request) -> httpx.Response:
         nonlocal calls
         calls += 1
-        return httpx.Response(200, content=_parquet_bytes(), headers={"content-type": "application/octet-stream"})
+        return httpx.Response(
+            200, content=_parquet_bytes(), headers={"content-type": "application/octet-stream"}
+        )
 
     http = HttpProviderClient(
         client=httpx.Client(transport=httpx.MockTransport(handler)),

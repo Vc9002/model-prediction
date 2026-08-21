@@ -78,24 +78,40 @@ class _NotImplementedStagesMixin:
     sport: str
 
     def predict(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
-        return StageResult("predict", STAGE_NOT_IMPLEMENTED, {
-            "reason": f"no real trained model wired into the shared adapter for {self.sport} yet",
-        })
+        return StageResult(
+            "predict",
+            STAGE_NOT_IMPLEMENTED,
+            {
+                "reason": f"no real trained model wired into the shared adapter for {self.sport} yet",
+            },
+        )
 
     def match_markets(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
-        return StageResult("match_markets", STAGE_NOT_IMPLEMENTED, {
-            "reason": f"no real market-matching logic wired into the shared adapter for {self.sport} yet",
-        })
+        return StageResult(
+            "match_markets",
+            STAGE_NOT_IMPLEMENTED,
+            {
+                "reason": f"no real market-matching logic wired into the shared adapter for {self.sport} yet",
+            },
+        )
 
     def decide(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
-        return StageResult("decide", STAGE_NOT_IMPLEMENTED, {
-            "reason": f"no real decision logic wired into the shared adapter for {self.sport} yet",
-        })
+        return StageResult(
+            "decide",
+            STAGE_NOT_IMPLEMENTED,
+            {
+                "reason": f"no real decision logic wired into the shared adapter for {self.sport} yet",
+            },
+        )
 
     def build_features(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
-        return StageResult("build_features", STAGE_NOT_IMPLEMENTED, {
-            "reason": f"no real horizon feature builder wired into the shared adapter for {self.sport} yet",
-        })
+        return StageResult(
+            "build_features",
+            STAGE_NOT_IMPLEMENTED,
+            {
+                "reason": f"no real horizon feature builder wired into the shared adapter for {self.sport} yet",
+            },
+        )
 
 
 class MLBAdapter(_NotImplementedStagesMixin):
@@ -128,7 +144,8 @@ class MLBAdapter(_NotImplementedStagesMixin):
         probables_path = Path(self.data_root) / "raw" / "mlb" / "probable_starters.jsonl"
         records = (
             [json.loads(line) for line in probables_path.read_text().splitlines() if line.strip()]
-            if probables_path.exists() else []
+            if probables_path.exists()
+            else []
         )
         # Real lineage wiring: when the shared CLI supplies a run_id, the
         # resulting feature snapshot is also recorded in the shadow ledger
@@ -138,19 +155,30 @@ class MLBAdapter(_NotImplementedStagesMixin):
         ledger = ShadowLedger(f"{self.data_root}/shadow.db") if run_id else None
         try:
             result = build_mlb_horizon_dataset(
-                self.data_root, date, horizon, records, ledger=ledger, run_id=run_id,
+                self.data_root,
+                date,
+                horizon,
+                records,
+                ledger=ledger,
+                run_id=run_id,
             )
         finally:
             if ledger is not None:
                 ledger.close()
         status = STAGE_SUCCESS if result.coverage["rows_built"] > 0 else STAGE_NO_DATA
-        return StageResult("build_features", status, {
-            "coverage": result.coverage, "missingness": result.missingness,
-            "snapshot_hash": result.snapshot_hash,
-        })
+        return StageResult(
+            "build_features",
+            status,
+            {
+                "coverage": result.coverage,
+                "missingness": result.missingness,
+                "snapshot_hash": result.snapshot_hash,
+            },
+        )
 
     def _ledger(self, run_id: str | None) -> Any:
         from .shadow_ledger import ShadowLedger
+
         return ShadowLedger(f"{self.data_root}/shadow.db") if run_id else None
 
     def predict(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
@@ -171,14 +199,22 @@ class MLBAdapter(_NotImplementedStagesMixin):
                     challenger_root=self.challenger_root,
                 )
             except Exception as exc:  # noqa: BLE001 -- corrupt external artifact is reported as a stage error
-                return StageResult("predict", STAGE_ERROR, {"reason": "invalid_resume_model", "error": str(exc)[:300]})
+                return StageResult(
+                    "predict", STAGE_ERROR, {"reason": "invalid_resume_model", "error": str(exc)[:300]}
+                )
             if resumed is not None:
                 self._state = resumed
-                return StageResult("predict", STAGE_SUCCESS, {
-                    "status": "resumed_from_disk", "train_games": resumed.train_n,
-                    "games_predicted": len(resumed.rows_by_event),
-                    "games_total": resumed.tonight.height, "skipped": dict(resumed.skipped),
-                })
+                return StageResult(
+                    "predict",
+                    STAGE_SUCCESS,
+                    {
+                        "status": "resumed_from_disk",
+                        "train_games": resumed.train_n,
+                        "games_predicted": len(resumed.rows_by_event),
+                        "games_total": resumed.tonight.height,
+                        "skipped": dict(resumed.skipped),
+                    },
+                )
 
         state = pipeline.load_state(self.data_root, date)
         if state is None:
@@ -205,14 +241,22 @@ class MLBAdapter(_NotImplementedStagesMixin):
         from . import mlb_shadow_pipeline as pipeline
 
         if self._state is None or self._state.target_date != date:
-            return StageResult("match_markets", STAGE_ERROR, {
-                "reason": "predict() must run first in the same invocation -- no real forecast state to match markets against",
-            })
+            return StageResult(
+                "match_markets",
+                STAGE_ERROR,
+                {
+                    "reason": "predict() must run first in the same invocation -- no real forecast state to match markets against",
+                },
+            )
 
         ledger = self._ledger(run_id)
         try:
             result = pipeline.match_markets_stage(
-                self._state, self.data_root, self.collector, ledger=ledger, run_id=run_id,
+                self._state,
+                self.data_root,
+                self.collector,
+                ledger=ledger,
+                run_id=run_id,
             )
         finally:
             if ledger is not None:
@@ -223,17 +267,26 @@ class MLBAdapter(_NotImplementedStagesMixin):
         from . import mlb_shadow_pipeline as pipeline
 
         if self._state is None or self._state.target_date != date:
-            return StageResult("decide", STAGE_ERROR, {
-                "reason": "predict()/match_markets() must run first in the same invocation -- no real state to decide against",
-            })
+            return StageResult(
+                "decide",
+                STAGE_ERROR,
+                {
+                    "reason": "predict()/match_markets() must run first in the same invocation -- no real state to decide against",
+                },
+            )
 
         ledger = self._ledger(run_id)
         try:
             result = pipeline.decide_stage(
-                self._state, ledger=ledger, run_id=run_id, challenger_root=self.challenger_root,
+                self._state,
+                ledger=ledger,
+                run_id=run_id,
+                challenger_root=self.challenger_root,
             )
         except Exception as exc:  # noqa: BLE001 -- corrupt external artifact is reported as a stage error
-            return StageResult("decide", STAGE_ERROR, {"reason": "invalid_challenger_artifact", "error": str(exc)[:300]})
+            return StageResult(
+                "decide", STAGE_ERROR, {"reason": "invalid_challenger_artifact", "error": str(exc)[:300]}
+            )
         finally:
             if ledger is not None:
                 ledger.close()
@@ -279,11 +332,15 @@ class _BasicEloAdapter(_CollectionOnlyAdapter):
     disclosed scope limits (moneyline only, no bootstrap ensemble, no
     derived feature store) versus MLB's pipeline."""
 
-    def __init__(self, sport: str, data_root: str, collector: Any, collect_fn: Callable[[str], dict[str, Any]]) -> None:
+    def __init__(
+        self, sport: str, data_root: str, collector: Any, collect_fn: Callable[[str], dict[str, Any]]
+    ) -> None:
         super().__init__(sport, collector)
         self.data_root = data_root
         self.collect_fn = collect_fn
-        self._state: Any = None  # basic_sport_pipeline.BasicRunState, held across predict/match_markets/decide
+        self._state: Any = (
+            None  # basic_sport_pipeline.BasicRunState, held across predict/match_markets/decide
+        )
 
     def collect(self, date: str, run_id: str | None = None) -> StageResult:
         # Real bug found live (2026-08-07): _CollectionOnlyAdapter.collect()
@@ -321,9 +378,15 @@ class _BasicEloAdapter(_CollectionOnlyAdapter):
         completed = sb.filter(pl.col("status") == "STATUS_FINAL").height
         scheduled = sb.filter(pl.col("status") == "STATUS_SCHEDULED").height
         status = STAGE_SUCCESS if sb.height > 0 else STAGE_NO_DATA
-        return StageResult("build_features", status, {
-            "real_scoreboard_rows": sb.height, "completed_games": completed, "scheduled_games": scheduled,
-        })
+        return StageResult(
+            "build_features",
+            status,
+            {
+                "real_scoreboard_rows": sb.height,
+                "completed_games": completed,
+                "scheduled_games": scheduled,
+            },
+        )
 
     def predict(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
         state = basic_pipeline.load_state(self.data_root, self.sport, date, horizon)
@@ -345,14 +408,22 @@ class _BasicEloAdapter(_CollectionOnlyAdapter):
 
     def match_markets(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
         if self._state is None or self._state.target_date != date:
-            return StageResult("match_markets", STAGE_ERROR, {
-                "reason": "predict() must run first in the same invocation -- no real forecast state to match markets against",
-            })
+            return StageResult(
+                "match_markets",
+                STAGE_ERROR,
+                {
+                    "reason": "predict() must run first in the same invocation -- no real forecast state to match markets against",
+                },
+            )
 
         ledger = self._ledger(run_id)
         try:
             result = basic_pipeline.match_markets_stage(
-                self._state, self.data_root, self.collect_fn, ledger=ledger, run_id=run_id,
+                self._state,
+                self.data_root,
+                self.collect_fn,
+                ledger=ledger,
+                run_id=run_id,
             )
         finally:
             if ledger is not None:
@@ -361,9 +432,13 @@ class _BasicEloAdapter(_CollectionOnlyAdapter):
 
     def decide(self, date: str, horizon: str, run_id: str | None = None) -> StageResult:
         if self._state is None or self._state.target_date != date:
-            return StageResult("decide", STAGE_ERROR, {
-                "reason": "predict()/match_markets() must run first in the same invocation -- no real state to decide against",
-            })
+            return StageResult(
+                "decide",
+                STAGE_ERROR,
+                {
+                    "reason": "predict()/match_markets() must run first in the same invocation -- no real state to decide against",
+                },
+            )
 
         ledger = self._ledger(run_id)
         try:
@@ -375,6 +450,7 @@ class _BasicEloAdapter(_CollectionOnlyAdapter):
 
     def _ledger(self, run_id: str | None) -> Any:
         from .shadow_ledger import ShadowLedger
+
         return ShadowLedger(f"{self.data_root}/shadow.db") if run_id else None
 
 
@@ -424,15 +500,22 @@ class _ResearchOnlyAdapter(_NotImplementedStagesMixin):
         self.sport = sport
 
     def collect(self, date: str, run_id: str | None = None) -> StageResult:
-        return StageResult("collect", STAGE_NOT_IMPLEMENTED, {
-            "reason": f"{self.sport} has no real collector or data source client in this codebase -- "
-                      f"explicitly research_only, not a wiring gap (see CLAUDE.md's KBO/NPB section)",
-            "qualification_status": "RESEARCH_ONLY",
-        })
+        return StageResult(
+            "collect",
+            STAGE_NOT_IMPLEMENTED,
+            {
+                "reason": f"{self.sport} has no real collector or data source client in this codebase -- "
+                f"explicitly research_only, not a wiring gap (see CLAUDE.md's KBO/NPB section)",
+                "qualification_status": "RESEARCH_ONLY",
+            },
+        )
 
 
 def build_adapter(
-    sport: str, data_root: str = "data/rebuild", *, challenger_root: str | None = None,
+    sport: str,
+    data_root: str = "data/rebuild",
+    *,
+    challenger_root: str | None = None,
 ) -> SportAdapter:
     """The one real registry every sport plugs into."""
     if sport == "mlb":
@@ -441,7 +524,9 @@ def build_adapter(
     meta = MetadataDB(f"{data_root}/metadata.db")
     if sport in ("nba", "wnba"):
         nba_collector = NBACollector(data_root, meta)
-        return _BasicEloAdapter(sport, data_root, nba_collector, lambda d: nba_collector.collect_date(d, sport=sport))
+        return _BasicEloAdapter(
+            sport, data_root, nba_collector, lambda d: nba_collector.collect_date(d, sport=sport)
+        )
     if sport == "nfl":
         nfl_collector = NFLCollector(data_root, meta)
         return _BasicEloAdapter(sport, data_root, nfl_collector, nfl_collector.collect_date)

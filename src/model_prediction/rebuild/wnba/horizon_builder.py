@@ -99,12 +99,8 @@ def _latest_targets(games: pl.DataFrame, game_date: str) -> pl.DataFrame:
         return pl.DataFrame()
     return (
         games.with_columns(
-            pl.col("observed_at_utc")
-            .str.to_datetime(time_zone="UTC", strict=True)
-            .alias("_observed"),
-            pl.col("event_start_utc")
-            .str.to_datetime(time_zone="UTC", strict=True)
-            .alias("_event_start"),
+            pl.col("observed_at_utc").str.to_datetime(time_zone="UTC", strict=True).alias("_observed"),
+            pl.col("event_start_utc").str.to_datetime(time_zone="UTC", strict=True).alias("_event_start"),
         )
         .sort("_observed")
         .group_by("event_id", maintain_order=True)
@@ -129,9 +125,7 @@ def _target_as_of_cutoff(
     """
 
     event_rows = games.filter(pl.col("event_id") == event_id).with_columns(
-        pl.col("observed_at_utc")
-        .str.to_datetime(time_zone="UTC", strict=True)
-        .alias("_observed")
+        pl.col("observed_at_utc").str.to_datetime(time_zone="UTC", strict=True).alias("_observed")
     )
     known_start = initial_start.astimezone(UTC)
     for _attempt in range(5):
@@ -173,9 +167,7 @@ def _feature_row(
 ) -> dict[str, Any]:
     row: dict[str, Any] = {
         "event_id": str(target["event_id"]),
-        "event_start_utc": datetime.fromisoformat(str(target["event_start_utc"]))
-        .astimezone(UTC)
-        .isoformat(),
+        "event_start_utc": datetime.fromisoformat(str(target["event_start_utc"])).astimezone(UTC).isoformat(),
         "decision_time_utc": decision_time.astimezone(UTC).isoformat(),
         "horizon": horizon,
         "sports_event_date": str(target["sports_event_date"]),
@@ -193,16 +185,22 @@ def _feature_row(
         for key, value in snapshot.items():
             if key not in {"team_id", "status", "as_of_utc"}:
                 row[f"{side}_{key}"] = value
-    source_hashes = sorted({
-        str(target["raw_snapshot_hash"]),
-        *(str(value) for value in home["source_raw_snapshot_hashes"]),
-        *(str(value) for value in away["source_raw_snapshot_hashes"]),
-    })
+    source_hashes = sorted(
+        {
+            str(target["raw_snapshot_hash"]),
+            *(str(value) for value in home["source_raw_snapshot_hashes"]),
+            *(str(value) for value in away["source_raw_snapshot_hashes"]),
+        }
+    )
     row["source_raw_snapshot_hashes"] = source_hashes
-    row["source_manifest_hash"] = hashlib.sha256(canonical_json({
-        "event_id": str(target["event_id"]),
-        "raw_snapshot_hashes": source_hashes,
-    })).hexdigest()
+    row["source_manifest_hash"] = hashlib.sha256(
+        canonical_json(
+            {
+                "event_id": str(target["event_id"]),
+                "raw_snapshot_hashes": source_hashes,
+            }
+        )
+    ).hexdigest()
     return row
 
 
@@ -261,9 +259,7 @@ def _build(
     if knowledge_time_utc is not None and knowledge_time_utc.tzinfo is None:
         raise ValueError("WNBA live knowledge time must be timezone-aware")
     live_knowledge_time = (
-        (knowledge_time_utc or datetime.now(UTC)).astimezone(UTC)
-        if mode == "live"
-        else None
+        (knowledge_time_utc or datetime.now(UTC)).astimezone(UTC) if mode == "live" else None
     )
 
     root = Path(data_root)
@@ -335,19 +331,29 @@ def _build(
 
     if not rows:
         return WNBAFeatureBuildResult(
-            mode, game_date, horizon, [], reasons, targets.height, None, None, None,
+            mode,
+            game_date,
+            horizon,
+            [],
+            reasons,
+            targets.height,
+            None,
+            None,
+            None,
         )
 
     rows.sort(key=lambda row: str(row["event_id"]))
     frame = pl.DataFrame(rows).select(sorted(pl.DataFrame(rows).columns)).sort("event_id")
     feature_schema_hash = dataframe_schema_hash(frame)
     snapshot_hash = hashlib.sha256(
-        canonical_json({
-            "game_date": game_date,
-            "horizon": horizon,
-            "feature_schema_hash": feature_schema_hash,
-            "rows": rows,
-        })
+        canonical_json(
+            {
+                "game_date": game_date,
+                "horizon": horizon,
+                "feature_schema_hash": feature_schema_hash,
+                "rows": rows,
+            }
+        )
     ).hexdigest()
     feature_store = FeatureStore(root / "features")
     feature_store.write_snapshot("wnba", horizon, frame, snapshot_hash)
@@ -367,9 +373,7 @@ def _build(
             sport="wnba",
             horizon=horizon,
             dataset_hash=snapshot_hash,
-            decision_time_utc=(
-                str(rows[0]["decision_time_utc"]) if len(rows) == 1 else None
-            ),
+            decision_time_utc=(str(rows[0]["decision_time_utc"]) if len(rows) == 1 else None),
             feature_schema_version=f"{FEATURE_SCHEMA_VERSION}:{feature_schema_hash}",
             row_count=frame.height,
             payload_path=str(payload_path),
@@ -396,7 +400,12 @@ def build_wnba_replay_features(
     run_id: str | None = None,
 ) -> WNBAFeatureBuildResult:
     return _build(
-        data_root, game_date, horizon, mode="replay", ledger=ledger, run_id=run_id,
+        data_root,
+        game_date,
+        horizon,
+        mode="replay",
+        ledger=ledger,
+        run_id=run_id,
     )
 
 

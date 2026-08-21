@@ -61,8 +61,12 @@ def test_mlb_v3_audit_against_empty_data_root_is_honest_no_data(tmp_path):
     # been captured under this data_root", not a stub -- matches
     # docs/rebuild/MLB_V3_DATA.md's documented audit contract.
     report = run(
-        "audit", "mlb", _mlb_v3_data_root(tmp_path), status="prospective_validation",
-        repo_root=str(tmp_path), season=2026,
+        "audit",
+        "mlb",
+        _mlb_v3_data_root(tmp_path),
+        status="prospective_validation",
+        repo_root=str(tmp_path),
+        season=2026,
     )
     assert report["status"] == "NO_DATA"
 
@@ -70,16 +74,28 @@ def test_mlb_v3_audit_against_empty_data_root_is_honest_no_data(tmp_path):
 def test_mlb_v3_backfill_requires_start_and_end(tmp_path):
     with pytest.raises(ValueError, match="requires --start and --end"):
         run(
-            "backfill", "mlb", _mlb_v3_data_root(tmp_path), status="prospective_validation",
-            repo_root=str(tmp_path), provider="mlb_stats", start=None, end=None, tables=None, force=False,
+            "backfill",
+            "mlb",
+            _mlb_v3_data_root(tmp_path),
+            status="prospective_validation",
+            repo_root=str(tmp_path),
+            provider="mlb_stats",
+            start=None,
+            end=None,
+            tables=None,
+            force=False,
         )
 
 
 def test_mlb_v3_audit_requires_season(tmp_path):
     with pytest.raises(ValueError, match="requires --season"):
         run(
-            "audit", "mlb", _mlb_v3_data_root(tmp_path), status="prospective_validation",
-            repo_root=str(tmp_path), season=None,
+            "audit",
+            "mlb",
+            _mlb_v3_data_root(tmp_path),
+            status="prospective_validation",
+            repo_root=str(tmp_path),
+            season=None,
         )
 
 
@@ -89,8 +105,12 @@ def _wnba_data_root(tmp_path: Path) -> str:
 
 def test_wnba_audit_against_empty_data_root_is_honest_unavailable(tmp_path):
     report = run(
-        "audit", "wnba", _wnba_data_root(tmp_path), status="data_foundation",
-        repo_root=str(tmp_path), season=2026,
+        "audit",
+        "wnba",
+        _wnba_data_root(tmp_path),
+        status="data_foundation",
+        repo_root=str(tmp_path),
+        season=2026,
     )
     assert report["status"] == "UNAVAILABLE"
 
@@ -98,16 +118,26 @@ def test_wnba_audit_against_empty_data_root_is_honest_unavailable(tmp_path):
 def test_wnba_backfill_requires_season(tmp_path):
     with pytest.raises(ValueError, match="requires --season"):
         run(
-            "backfill", "wnba", _wnba_data_root(tmp_path), status="data_foundation",
-            repo_root=str(tmp_path), seasons=None, tables=None, force=False,
+            "backfill",
+            "wnba",
+            _wnba_data_root(tmp_path),
+            status="data_foundation",
+            repo_root=str(tmp_path),
+            seasons=None,
+            tables=None,
+            force=False,
         )
 
 
 def test_wnba_audit_requires_season(tmp_path):
     with pytest.raises(ValueError, match="requires --season"):
         run(
-            "audit", "wnba", _wnba_data_root(tmp_path), status="data_foundation",
-            repo_root=str(tmp_path), season=None,
+            "audit",
+            "wnba",
+            _wnba_data_root(tmp_path),
+            status="data_foundation",
+            repo_root=str(tmp_path),
+            season=None,
         )
 
 
@@ -141,8 +171,12 @@ def test_nfl_audit_against_empty_data_root_is_honest_degraded(tmp_path):
     # timestamp violations) but zero games/roster rows still makes this
     # DEGRADED rather than a fabricated HEALTHY -- see nfl/audit.py.
     report = run(
-        "audit", "nfl", _nfl_data_root(tmp_path), status="data_foundation",
-        repo_root=str(tmp_path), season=2026,
+        "audit",
+        "nfl",
+        _nfl_data_root(tmp_path),
+        status="data_foundation",
+        repo_root=str(tmp_path),
+        season=2026,
     )
     assert report["status"] == "DEGRADED"
     assert report["games"] == 0
@@ -151,16 +185,26 @@ def test_nfl_audit_against_empty_data_root_is_honest_degraded(tmp_path):
 def test_nfl_backfill_requires_season(tmp_path):
     with pytest.raises(ValueError, match="requires --season"):
         run(
-            "backfill", "nfl", _nfl_data_root(tmp_path), status="data_foundation",
-            repo_root=str(tmp_path), seasons=None, tables=None, force=False,
+            "backfill",
+            "nfl",
+            _nfl_data_root(tmp_path),
+            status="data_foundation",
+            repo_root=str(tmp_path),
+            seasons=None,
+            tables=None,
+            force=False,
         )
 
 
 def test_nfl_audit_requires_season(tmp_path):
     with pytest.raises(ValueError, match="requires --season"):
         run(
-            "audit", "nfl", _nfl_data_root(tmp_path), status="data_foundation",
-            repo_root=str(tmp_path), season=None,
+            "audit",
+            "nfl",
+            _nfl_data_root(tmp_path),
+            status="data_foundation",
+            repo_root=str(tmp_path),
+            season=None,
         )
 
 
@@ -177,7 +221,10 @@ def _soccer_data_root(tmp_path: Path) -> str:
 
 def test_soccer_audit_against_empty_data_root_is_honest_unavailable(tmp_path):
     report = run(
-        "audit", "soccer", _soccer_data_root(tmp_path), status="data_foundation",
+        "audit",
+        "soccer",
+        _soccer_data_root(tmp_path),
+        status="data_foundation",
         repo_root=str(tmp_path),
     )
     assert report["status"] == "UNAVAILABLE"
@@ -186,9 +233,15 @@ def test_soccer_audit_against_empty_data_root_is_honest_unavailable(tmp_path):
 def test_soccer_backfill_requires_date(tmp_path):
     with pytest.raises(ValueError, match="requires --date"):
         run(
-            "backfill", "soccer", _soccer_data_root(tmp_path), status="data_foundation",
-            repo_root=str(tmp_path), game_date=None, espn_leagues=None,
-            football_data_competitions=None, force=False,
+            "backfill",
+            "soccer",
+            _soccer_data_root(tmp_path),
+            status="data_foundation",
+            repo_root=str(tmp_path),
+            game_date=None,
+            espn_leagues=None,
+            football_data_competitions=None,
+            force=False,
         )
 
 
@@ -226,8 +279,13 @@ def _tennis_data_root(tmp_path: Path) -> str:
 
 def test_tennis_audit_against_empty_data_root_is_honest_unavailable(tmp_path):
     report = run(
-        "audit", "tennis", _tennis_data_root(tmp_path), status="data_foundation",
-        repo_root=str(tmp_path), season=None, tour="atp",
+        "audit",
+        "tennis",
+        _tennis_data_root(tmp_path),
+        status="data_foundation",
+        repo_root=str(tmp_path),
+        season=None,
+        tour="atp",
     )
     assert report["status"] == "UNAVAILABLE"
 
@@ -235,18 +293,32 @@ def test_tennis_audit_against_empty_data_root_is_honest_unavailable(tmp_path):
 def test_tennis_backfill_requires_tour(tmp_path):
     with pytest.raises(ValueError, match="requires --tour"):
         run(
-            "backfill", "tennis", _tennis_data_root(tmp_path), status="data_foundation",
-            repo_root=str(tmp_path), tour=None, seasons=(2023,), match_kind="main",
-            current=False, force=False,
+            "backfill",
+            "tennis",
+            _tennis_data_root(tmp_path),
+            status="data_foundation",
+            repo_root=str(tmp_path),
+            tour=None,
+            seasons=(2023,),
+            match_kind="main",
+            current=False,
+            force=False,
         )
 
 
 def test_tennis_backfill_requires_season_unless_current(tmp_path):
     with pytest.raises(ValueError, match="requires --season"):
         run(
-            "backfill", "tennis", _tennis_data_root(tmp_path), status="data_foundation",
-            repo_root=str(tmp_path), tour="atp", seasons=None, match_kind="main",
-            current=False, force=False,
+            "backfill",
+            "tennis",
+            _tennis_data_root(tmp_path),
+            status="data_foundation",
+            repo_root=str(tmp_path),
+            tour="atp",
+            seasons=None,
+            match_kind="main",
+            current=False,
+            force=False,
         )
 
 

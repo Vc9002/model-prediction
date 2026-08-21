@@ -48,21 +48,57 @@ def _synthetic_row(event_id: str, game_date: str, away_score: int, home_score: i
         "home_team": "Home Team",
         "away_score": away_score,
         "home_score": home_score,
-        "away_form": {"runs_scored": [4, 5, 3], "runs_allowed": [3, 4, 2], "wins": 2, "losses": 1, "status": "available"},
-        "home_form": {"runs_scored": [5, 4, 6], "runs_allowed": [3, 3, 4], "wins": 2, "losses": 1, "status": "available"},
+        "away_form": {
+            "runs_scored": [4, 5, 3],
+            "runs_allowed": [3, 4, 2],
+            "wins": 2,
+            "losses": 1,
+            "status": "available",
+        },
+        "home_form": {
+            "runs_scored": [5, 4, 6],
+            "runs_allowed": [3, 3, 4],
+            "wins": 2,
+            "losses": 1,
+            "status": "available",
+        },
         "away_starter": {
-            "player_id": "1", "name": "Away Starter", "throwing_hand": "R", "starts_before_game": 12,
-            "season_innings": 90.0, "season_earned_runs": 30, "season_strikeouts": 80, "season_walks": 25,
-            "season_batters_faced": 380, "last_five_innings": 28.0, "last_five_earned_runs": 10,
-            "last_five_strikeouts": 26, "last_five_walks": 8, "last_five_batters_faced": 118,
-            "xfip": None, "xfip_status": "unavailable_from_source", "status": "available",
+            "player_id": "1",
+            "name": "Away Starter",
+            "throwing_hand": "R",
+            "starts_before_game": 12,
+            "season_innings": 90.0,
+            "season_earned_runs": 30,
+            "season_strikeouts": 80,
+            "season_walks": 25,
+            "season_batters_faced": 380,
+            "last_five_innings": 28.0,
+            "last_five_earned_runs": 10,
+            "last_five_strikeouts": 26,
+            "last_five_walks": 8,
+            "last_five_batters_faced": 118,
+            "xfip": None,
+            "xfip_status": "unavailable_from_source",
+            "status": "available",
         },
         "home_starter": {
-            "player_id": "2", "name": "Home Starter", "throwing_hand": "L", "starts_before_game": 15,
-            "season_innings": 95.0, "season_earned_runs": 28, "season_strikeouts": 90, "season_walks": 20,
-            "season_batters_faced": 390, "last_five_innings": 30.0, "last_five_earned_runs": 9,
-            "last_five_strikeouts": 30, "last_five_walks": 6, "last_five_batters_faced": 122,
-            "xfip": None, "xfip_status": "unavailable_from_source", "status": "available",
+            "player_id": "2",
+            "name": "Home Starter",
+            "throwing_hand": "L",
+            "starts_before_game": 15,
+            "season_innings": 95.0,
+            "season_earned_runs": 28,
+            "season_strikeouts": 90,
+            "season_walks": 20,
+            "season_batters_faced": 390,
+            "last_five_innings": 30.0,
+            "last_five_earned_runs": 9,
+            "last_five_strikeouts": 30,
+            "last_five_walks": 6,
+            "last_five_batters_faced": 122,
+            "xfip": None,
+            "xfip_status": "unavailable_from_source",
+            "status": "available",
         },
         "park_factor": 1.05,
         "weather_factor": 0.98,
@@ -127,8 +163,7 @@ def test_chronological_folds_are_strictly_expanding_and_non_overlapping(refit) -
 
 def test_run_cv_returns_one_result_per_fold_with_enough_data(refit, spec) -> None:
     rows = [
-        _synthetic_row(f"evt-{i}", f"2026-06-{(i % 28) + 1:02d}", 3 + (i % 4), 4 + (i % 3))
-        for i in range(60)
+        _synthetic_row(f"evt-{i}", f"2026-06-{(i % 28) + 1:02d}", 3 + (i % 4), 4 + (i % 3)) for i in range(60)
     ]
     design, target, game_dates = refit.build_design_matrix(rows, spec, include_bullpen=False)
 
@@ -137,7 +172,12 @@ def test_run_cv_returns_one_result_per_fold_with_enough_data(refit, spec) -> Non
     assert len(fold_results) >= 1
     for fold in fold_results:
         assert set(fold) == {
-            "fold", "train_games", "test_games", "held_out_correlation", "held_out_mae", "coefficients",
+            "fold",
+            "train_games",
+            "test_games",
+            "held_out_correlation",
+            "held_out_mae",
+            "coefficients",
         }
         assert len(fold["coefficients"]) == 4
 

@@ -87,7 +87,9 @@ class _NotImplementedFoundation:
         }
 
 
-def build_data_foundation(sport: str, data_root: str | Path, *, status: str, repo_root: str | Path) -> DataFoundation:
+def build_data_foundation(
+    sport: str, data_root: str | Path, *, status: str, repo_root: str | Path
+) -> DataFoundation:
     if sport not in SUPPORTED_DATA_SPORTS:
         raise DataFoundationError(f"unsupported sport: {sport}")
     if sport == "mlb":

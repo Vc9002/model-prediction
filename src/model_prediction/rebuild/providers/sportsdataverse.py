@@ -65,29 +65,56 @@ WNBA_RELEASE_ASSETS: Final[dict[str, tuple[str, str, frozenset[str]]]] = {
     "schedule": (
         "espn_wnba_schedules",
         "wnba_schedule_{season}.parquet",
-        frozenset({
-            "game_id", "season", "game_date_time", "home_id", "away_id",
-            "home_display_name", "away_display_name",
-        }),
+        frozenset(
+            {
+                "game_id",
+                "season",
+                "game_date_time",
+                "home_id",
+                "away_id",
+                "home_display_name",
+                "away_display_name",
+            }
+        ),
     ),
     "team_box": (
         "espn_wnba_team_boxscores",
         "team_box_{season}.parquet",
-        frozenset({
-            "game_id", "season", "game_date_time", "team_id", "team_display_name",
-            "opponent_team_id", "team_home_away", "team_score", "field_goals_made",
-            "field_goals_attempted", "three_point_field_goals_made",
-            "three_point_field_goals_attempted", "free_throws_made", "free_throws_attempted",
-            "offensive_rebounds", "defensive_rebounds", "turnovers",
-        }),
+        frozenset(
+            {
+                "game_id",
+                "season",
+                "game_date_time",
+                "team_id",
+                "team_display_name",
+                "opponent_team_id",
+                "team_home_away",
+                "team_score",
+                "field_goals_made",
+                "field_goals_attempted",
+                "three_point_field_goals_made",
+                "three_point_field_goals_attempted",
+                "free_throws_made",
+                "free_throws_attempted",
+                "offensive_rebounds",
+                "defensive_rebounds",
+                "turnovers",
+            }
+        ),
     ),
     "player_box": (
         "espn_wnba_player_boxscores",
         "player_box_{season}.parquet",
-        frozenset({
-            "game_id", "season", "game_date_time", "team_id", "athlete_id",
-            "athlete_display_name",
-        }),
+        frozenset(
+            {
+                "game_id",
+                "season",
+                "game_date_time",
+                "team_id",
+                "athlete_id",
+                "athlete_display_name",
+            }
+        ),
     ),
     "rosters": (
         "espn_wnba_rosters",
@@ -126,10 +153,7 @@ class SportsDataverseProvider:
     def _asset_url(table: str, season: int) -> str:
         tag, pattern, _required = WNBA_RELEASE_ASSETS[table]
         filename = pattern.format(season=season)
-        return (
-            "https://github.com/sportsdataverse/sportsdataverse-data/"
-            f"releases/download/{tag}/{filename}"
-        )
+        return f"https://github.com/sportsdataverse/sportsdataverse-data/releases/download/{tag}/{filename}"
 
     @staticmethod
     def _parse_parquet(body: bytes) -> pl.DataFrame:
@@ -238,7 +262,9 @@ class SportsDataverseProvider:
         self.cache.store_blob(metadata, fetched.body)
         if fetched.status_code != 200:
             self.cache.store(metadata, fetched.body)
-            return ProviderResult.unavailable(f"WNBA scoreboard returned HTTP {fetched.status_code}", metadata)
+            return ProviderResult.unavailable(
+                f"WNBA scoreboard returned HTTP {fetched.status_code}", metadata
+            )
         result = self._parse_scoreboard(fetched.body, metadata)
         stored_metadata = result.metadata or metadata
         self.cache.store(stored_metadata, fetched.body)
@@ -257,38 +283,46 @@ class SportsDataverseProvider:
                 home, away = competitors["home"], competitors["away"]
                 status = competition.get("status", {}).get("type", {})
                 venue = competition.get("venue") or {}
-                rows.append({
-                    "game_id": int(event["id"]),
-                    "season": int(event["season"]["year"]),
-                    "season_type": int(event["season"]["type"]),
-                    "game_date_time": event["date"],
-                    "status_type_name": status.get("name", "UNKNOWN"),
-                    "status_type_completed": bool(status.get("completed", False)),
-                    "home_id": int(home["team"]["id"]),
-                    "away_id": int(away["team"]["id"]),
-                    "home_display_name": home["team"].get("displayName", ""),
-                    "away_display_name": away["team"].get("displayName", ""),
-                    "home_score": int(home["score"]) if home.get("score") not in (None, "") else None,
-                    "away_score": int(away["score"]) if away.get("score") not in (None, "") else None,
-                    "venue_id": int(venue["id"]) if venue.get("id") else None,
-                    "venue_full_name": venue.get("fullName"),
-                })
-            frame = pl.DataFrame(rows) if rows else pl.DataFrame(schema={
-                "game_id": pl.Int64,
-                "season": pl.Int64,
-                "game_date_time": pl.String,
-                "home_id": pl.Int64,
-                "away_id": pl.Int64,
-            })
+                rows.append(
+                    {
+                        "game_id": int(event["id"]),
+                        "season": int(event["season"]["year"]),
+                        "season_type": int(event["season"]["type"]),
+                        "game_date_time": event["date"],
+                        "status_type_name": status.get("name", "UNKNOWN"),
+                        "status_type_completed": bool(status.get("completed", False)),
+                        "home_id": int(home["team"]["id"]),
+                        "away_id": int(away["team"]["id"]),
+                        "home_display_name": home["team"].get("displayName", ""),
+                        "away_display_name": away["team"].get("displayName", ""),
+                        "home_score": int(home["score"]) if home.get("score") not in (None, "") else None,
+                        "away_score": int(away["score"]) if away.get("score") not in (None, "") else None,
+                        "venue_id": int(venue["id"]) if venue.get("id") else None,
+                        "venue_full_name": venue.get("fullName"),
+                    }
+                )
+            frame = (
+                pl.DataFrame(rows)
+                if rows
+                else pl.DataFrame(
+                    schema={
+                        "game_id": pl.Int64,
+                        "season": pl.Int64,
+                        "game_date_time": pl.String,
+                        "home_id": pl.Int64,
+                        "away_id": pl.Int64,
+                    }
+                )
+            )
         except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
             return ProviderResult(ProviderStatus.DEGRADED, metadata, None, f"scoreboard schema drift: {exc}")
         metadata = replace(metadata, schema_hash=dataframe_schema_hash(frame))
-        return ProviderResult(ProviderStatus.AVAILABLE, metadata, frame, "NO_EVENTS" if frame.is_empty() else None)
+        return ProviderResult(
+            ProviderStatus.AVAILABLE, metadata, frame, "NO_EVENTS" if frame.is_empty() else None
+        )
 
     @staticmethod
-    def _validate_table(
-        table: str, frame: pl.DataFrame, metadata: SourceResponseMetadata
-    ) -> ProviderResult:
+    def _validate_table(table: str, frame: pl.DataFrame, metadata: SourceResponseMetadata) -> ProviderResult:
         required = WNBA_RELEASE_ASSETS[table][2]
         missing = sorted(required - set(frame.columns))
         if missing:
@@ -325,9 +359,7 @@ class SportsDataverseProvider:
             return ProviderResult.unavailable(f"rosters are not implemented for {sport}")
         return self.season_table("rosters", season)
 
-    def boxscores(
-        self, *, sport: str, season: int, level: str = "team", **_kwargs: Any
-    ) -> ProviderResult:
+    def boxscores(self, *, sport: str, season: int, level: str = "team", **_kwargs: Any) -> ProviderResult:
         if sport != "wnba":
             return ProviderResult.unavailable(f"boxscores are not implemented for {sport}")
         if level not in {"team", "player"}:

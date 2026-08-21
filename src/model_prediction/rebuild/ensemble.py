@@ -42,9 +42,7 @@ def inverse_log_loss_weights(
     losses = np.zeros(n_models)
     for i in range(n_models):
         probs = np.clip(arr[i], eps, 1 - eps)
-        losses[i] = -np.mean(
-            np.array(y_true) * np.log(probs) + (1 - np.array(y_true)) * np.log(1 - probs)
-        )
+        losses[i] = -np.mean(np.array(y_true) * np.log(probs) + (1 - np.array(y_true)) * np.log(1 - probs))
     weights = 1.0 / (losses + eps)
     weights /= weights.sum()
     weighted = np.dot(weights, arr)
@@ -108,7 +106,9 @@ class Ensemble:
         """Register a model's out-of-fold predictions. Not used during predict."""
 
     def fit(
-        self, oof_probs: dict[str, Sequence[float]], y_true: Sequence[int],
+        self,
+        oof_probs: dict[str, Sequence[float]],
+        y_true: Sequence[int],
     ) -> Ensemble:
         """Fit ensemble weights from out-of-fold predictions."""
         if len(oof_probs) < 1:
@@ -260,17 +260,29 @@ def meta_cross_fit_ensemble(
 
         all_probs.extend(eval_probs)
         all_labels.extend(eval_labels)
-        per_block.append({
-            "eval_block": i, "fit_n": fit_end - fit_start, "eval_n": len(eval_labels),
-            "log_loss": log_loss(eval_labels, eval_probs),
-            "brier": brier_score(eval_labels, eval_probs),
-        })
+        per_block.append(
+            {
+                "eval_block": i,
+                "fit_n": fit_end - fit_start,
+                "eval_n": len(eval_labels),
+                "log_loss": log_loss(eval_labels, eval_probs),
+                "brier": brier_score(eval_labels, eval_probs),
+            }
+        )
 
     if not all_labels:
-        return {"method": method, "n_blocks": n_blocks, "per_block": per_block, "n_eval_total": 0,
-                "log_loss": None, "brier": None}
+        return {
+            "method": method,
+            "n_blocks": n_blocks,
+            "per_block": per_block,
+            "n_eval_total": 0,
+            "log_loss": None,
+            "brier": None,
+        }
     return {
-        "method": method, "n_blocks": n_blocks, "per_block": per_block,
+        "method": method,
+        "n_blocks": n_blocks,
+        "per_block": per_block,
         "n_eval_total": len(all_labels),
         "log_loss": log_loss(all_labels, all_probs),
         "brier": brier_score(all_labels, all_probs),

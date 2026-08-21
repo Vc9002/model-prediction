@@ -45,6 +45,7 @@ def test_http_status_error_is_redacted_and_does_not_crash() -> None:
     that any raised error is httpx.HTTPError (what every real caller
     catches) with the API key redacted from its message, for the exact
     "401 Unauthorized" shape this failed with in production."""
+
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(401, text=f"Unauthorized: bad key secret-key-123 in {request.url}")
 

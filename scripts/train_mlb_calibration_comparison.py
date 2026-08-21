@@ -91,12 +91,16 @@ def main() -> None:
     val_size_days = max(1, n_unique_dates // 6)
     test_size_days = max(1, n_unique_dates // 6)
     folds = expanding_folds(game_dates, n_splits=3, val_size=val_size_days, test_size=test_size_days, gap=1)
-    fold_manifest_hash = hashlib.sha256(json.dumps(
-        [{"train_end": f.train_end, "val_start": f.val_start, "val_end": f.val_end} for f in folds],
-        sort_keys=True,
-    ).encode()).hexdigest()
-    print(f"2. Chronological folds: {len(folds)} ({n_unique_dates} real distinct dates); "
-          f"oof_split_manifest_hash={fold_manifest_hash[:12]}")
+    fold_manifest_hash = hashlib.sha256(
+        json.dumps(
+            [{"train_end": f.train_end, "val_start": f.val_start, "val_end": f.val_end} for f in folds],
+            sort_keys=True,
+        ).encode()
+    ).hexdigest()
+    print(
+        f"2. Chronological folds: {len(folds)} ({n_unique_dates} real distinct dates); "
+        f"oof_split_manifest_hash={fold_manifest_hash[:12]}"
+    )
 
     oof = build_mlb_moneyline_oof(features, folds)
     for name, data in oof.items():
@@ -104,13 +108,17 @@ def main() -> None:
 
     comparison: dict[str, dict] = {}
     md_lines: list[str] = ["# MLB Calibration Comparison\n"]
-    md_lines.append(f"dataset_hash: `{dataset.dataset_hash}`  \noof_split_manifest_hash: `{fold_manifest_hash}`\n")
+    md_lines.append(
+        f"dataset_hash: `{dataset.dataset_hash}`  \noof_split_manifest_hash: `{fold_manifest_hash}`\n"
+    )
 
     for model_name, data in oof.items():
         probs, labels, cohorts = data["probs"], data["labels"], data["cohorts"]
         n = len(labels)
-        print(f"\n4. {model_name} ({n} real OOF predictions), chronological cross-fit "
-              f"({N_CALIBRATION_BLOCKS} blocks, first block fit-only):")
+        print(
+            f"\n4. {model_name} ({n} real OOF predictions), chronological cross-fit "
+            f"({N_CALIBRATION_BLOCKS} blocks, first block fit-only):"
+        )
         md_lines.append(f"\n## {model_name} (n={n})\n")
         md_lines.append("| method | n_eval | log_loss | brier | ece | cal_intercept | cal_slope |")
         md_lines.append("|---|---|---|---|---|---|---|")
@@ -118,7 +126,9 @@ def main() -> None:
         method_results = {}
         for method in CALIBRATION_METHODS:
             if n < 2 * N_CALIBRATION_BLOCKS:
-                print(f"   {method:12s}: too few real OOF rows for {N_CALIBRATION_BLOCKS} cross-fit blocks, skipped")
+                print(
+                    f"   {method:12s}: too few real OOF rows for {N_CALIBRATION_BLOCKS} cross-fit blocks, skipped"
+                )
                 continue
             result = cross_fit_calibration_eval(probs, labels, method, n_blocks=N_CALIBRATION_BLOCKS)
             method_results[method] = result
@@ -127,18 +137,24 @@ def main() -> None:
             ec = f"{result.ece:.4f}" if result.ece is not None else "n/a"
             ci = f"{result.calibration_intercept:.3f}" if result.calibration_intercept is not None else "n/a"
             cs = f"{result.calibration_slope:.3f}" if result.calibration_slope is not None else "n/a"
-            print(f"   {method:12s}: n_eval={result.n_eval_total} log_loss={ll} brier={br} ece={ec} "
-                  f"intercept={ci} slope={cs}")
+            print(
+                f"   {method:12s}: n_eval={result.n_eval_total} log_loss={ll} brier={br} ece={ec} "
+                f"intercept={ci} slope={cs}"
+            )
             md_lines.append(f"| {method} | {result.n_eval_total} | {ll} | {br} | {ec} | {ci} | {cs} |")
 
         # Task 14's explicit rule: identity is a valid winner. Select
         # purely by real cross-fit log loss among methods that produced a
         # real result -- never force a non-identity method.
         valid_methods = {m: r for m, r in method_results.items() if r.log_loss is not None}
-        best_method = min(valid_methods, key=lambda m: valid_methods[m].log_loss) if valid_methods else "identity"
+        best_method = (
+            min(valid_methods, key=lambda m: valid_methods[m].log_loss) if valid_methods else "identity"
+        )
         print(f"   -> best by real cross-fit log loss: {best_method}")
-        md_lines.append(f"\n**Selected: `{best_method}`** (lowest real cross-fit log loss; "
-                         f"identity is always a valid winner, never forced out.)\n")
+        md_lines.append(
+            f"\n**Selected: `{best_method}`** (lowest real cross-fit log loss; "
+            f"identity is always a valid winner, never forced out.)\n"
+        )
 
         # Reliability buckets on the RAW (uncalibrated) predictions --
         # the real, honest starting point regardless of which method wins.
@@ -149,8 +165,10 @@ def main() -> None:
         for i in range(len(curve["bin_centers"])):
             if curve["counts"][i] == 0:
                 continue
-            md_lines.append(f"| {curve['bin_centers'][i]:.2f} | {curve['bin_centers'][i]:.3f} | "
-                             f"{curve['actual_fraction'][i]:.3f} | {curve['counts'][i]} |")
+            md_lines.append(
+                f"| {curve['bin_centers'][i]:.2f} | {curve['bin_centers'][i]:.3f} | "
+                f"{curve['actual_fraction'][i]:.3f} | {curve['counts'][i]} |"
+            )
 
         # Cohort calibration -- diagnostic only.
         md_lines.append("\n### Cohort calibration (diagnostic only, no calibrator selection)\n")
@@ -170,9 +188,12 @@ def main() -> None:
         # out-of-sample. Stored separately from the base model, per
         # CLAUDE.md's "persist calibrator separately, bound by hash."
         final_calibrator = fit_calibrator(best_method, probs, labels)
-        base_model_hash = hashlib.sha256(json.dumps(
-            {"model": model_name, "dataset_hash": dataset.dataset_hash}, sort_keys=True,
-        ).encode()).hexdigest()
+        base_model_hash = hashlib.sha256(
+            json.dumps(
+                {"model": model_name, "dataset_hash": dataset.dataset_hash},
+                sort_keys=True,
+            ).encode()
+        ).hexdigest()
         calibrator_artifact = {
             "model_name": model_name,
             "method": best_method,
@@ -196,8 +217,12 @@ def main() -> None:
             "n_oof": n,
             "cross_fit_results": {
                 m: {
-                    "n_eval_total": r.n_eval_total, "log_loss": r.log_loss, "brier": r.brier, "ece": r.ece,
-                    "calibration_intercept": r.calibration_intercept, "calibration_slope": r.calibration_slope,
+                    "n_eval_total": r.n_eval_total,
+                    "log_loss": r.log_loss,
+                    "brier": r.brier,
+                    "ece": r.ece,
+                    "calibration_intercept": r.calibration_intercept,
+                    "calibration_slope": r.calibration_slope,
                     "per_block": r.per_block,
                 }
                 for m, r in method_results.items()
@@ -219,14 +244,20 @@ def main() -> None:
     )
 
     results_path = Path("outputs/rebuild/mlb_calibration_comparison.json")
-    results_path.write_text(json.dumps({
-        "dataset_hash": dataset.dataset_hash,
-        "oof_split_manifest_hash": fold_manifest_hash,
-        "matched_games": dataset.matched_games,
-        "calibration_methods": CALIBRATION_METHODS,
-        "n_calibration_blocks": N_CALIBRATION_BLOCKS,
-        "models": comparison,
-    }, indent=2, default=str))
+    results_path.write_text(
+        json.dumps(
+            {
+                "dataset_hash": dataset.dataset_hash,
+                "oof_split_manifest_hash": fold_manifest_hash,
+                "matched_games": dataset.matched_games,
+                "calibration_methods": CALIBRATION_METHODS,
+                "n_calibration_blocks": N_CALIBRATION_BLOCKS,
+                "models": comparison,
+            },
+            indent=2,
+            default=str,
+        )
+    )
     print(f"6. Results saved to {results_path}")
 
     report_path = Path("outputs/rebuild/calibration_report.md")

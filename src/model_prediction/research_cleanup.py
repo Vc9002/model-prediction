@@ -36,30 +36,20 @@ class CleanupPlan:
 
     def report(self) -> dict[str, Any]:
         return {
-            "research_kept": {
-                sport: len(rows) for sport, rows in self.research_rows.items()
-            },
-            "gated_kept": {
-                sport: len(rows) for sport, rows in self.gated_rows.items()
-            },
+            "research_kept": {sport: len(rows) for sport, rows in self.research_rows.items()},
+            "gated_kept": {sport: len(rows) for sport, rows in self.gated_rows.items()},
             "research_rejected": len(self.rejected_research),
             "gated_rejected": len(self.rejected_gated),
             "research_rejection_reasons": dict(
                 sorted(
                     Counter(
-                        reason
-                        for reasons in self.rejected_research.values()
-                        for reason in reasons
+                        reason for reasons in self.rejected_research.values() for reason in reasons
                     ).items()
                 )
             ),
             "gated_rejection_reasons": dict(
                 sorted(
-                    Counter(
-                        reason
-                        for reasons in self.rejected_gated.values()
-                        for reason in reasons
-                    ).items()
+                    Counter(reason for reasons in self.rejected_gated.values() for reason in reasons).items()
                 )
             ),
             "research_duplicates_removed": len(self.duplicate_research),
@@ -110,9 +100,7 @@ def _esports_inputs_valid(
     if str(artifact.get("artifact_hash") or "") != row.get("model_artifact_hash"):
         return False, "model_artifact_hash_mismatch"
     try:
-        if parse_utc(str(artifact["trained_through_utc"])) >= parse_utc(
-            row["event_start_utc"]
-        ):
+        if parse_utc(str(artifact["trained_through_utc"])) >= parse_utc(row["event_start_utc"]):
             return False, "artifact_not_point_in_time"
     except (KeyError, ValueError):
         return False, "invalid_artifact_cutoff"
@@ -233,15 +221,10 @@ def _row_rejection_reasons(
     if decision == "CALL" or gated:
         model_config = config.get("models", {}).get(sport.upper(), {})
         minimum_edge = float(model_config.get("min_edge", 0.0))
-        minimum_confidence = float(
-            model_config.get("research_confidence_gate", 0.0)
-        )
+        minimum_confidence = float(model_config.get("research_confidence_gate", 0.0))
         if edge is None or edge < minimum_edge:
             reasons.append("below_configured_edge_gate")
-        if (
-            model_probability is None
-            or abs(model_probability - 0.5) < minimum_confidence
-        ):
+        if model_probability is None or abs(model_probability - 0.5) < minimum_confidence:
             reasons.append("below_configured_confidence_gate")
 
     return tuple(dict.fromkeys(reasons))
@@ -287,9 +270,7 @@ def build_cleanup_plan(
     research_rows = legacy_research.rows() if legacy_research.path.exists() else []
     gated_rows = legacy_gated.rows() if legacy_gated.path.exists() else []
 
-    valid_research: dict[str, list[dict[str, str]]] = {
-        sport: [] for sport in RESEARCH_LEDGER_SPORTS
-    }
+    valid_research: dict[str, list[dict[str, str]]] = {sport: [] for sport in RESEARCH_LEDGER_SPORTS}
     rejected_research: dict[str, tuple[str, ...]] = {}
     for row in research_rows:
         reasons = _row_rejection_reasons(
@@ -301,9 +282,7 @@ def build_cleanup_plan(
         )
         sport = _sport_for_row(row)
         if reasons or sport is None:
-            rejected_research[row["pick_id"]] = reasons or (
-                "unsupported_research_sport",
-            )
+            rejected_research[row["pick_id"]] = reasons or ("unsupported_research_sport",)
         else:
             valid_research[sport].append(row)
 
@@ -312,14 +291,8 @@ def build_cleanup_plan(
         valid_research[sport], duplicates = _deduplicate(rows)
         duplicate_research.update(duplicates)
 
-    valid_research_keys = {
-        _decision_key(row)
-        for rows in valid_research.values()
-        for row in rows
-    }
-    valid_gated: dict[str, list[dict[str, str]]] = {
-        sport: [] for sport in RESEARCH_LEDGER_SPORTS
-    }
+    valid_research_keys = {_decision_key(row) for rows in valid_research.values() for row in rows}
+    valid_gated: dict[str, list[dict[str, str]]] = {sport: [] for sport in RESEARCH_LEDGER_SPORTS}
     rejected_gated: dict[str, tuple[str, ...]] = {}
     for row in gated_rows:
         reasons = list(
@@ -335,9 +308,7 @@ def build_cleanup_plan(
             reasons.append("missing_valid_research_pair")
         sport = _sport_for_row(row)
         if reasons or sport is None:
-            rejected_gated[row["pick_id"]] = tuple(dict.fromkeys(reasons)) or (
-                "unsupported_research_sport",
-            )
+            rejected_gated[row["pick_id"]] = tuple(dict.fromkeys(reasons)) or ("unsupported_research_sport",)
         else:
             valid_gated[sport].append(row)
 

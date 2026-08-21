@@ -23,16 +23,12 @@ from model_prediction.rebuild.nfl.rebuild_v1_predictor import (
 )
 
 MODEL_PATH = Path("config/models/challengers/nfl-elo-trend-lr-rebuild-v1.json")
-CALIBRATOR_PATH = Path(
-    "config/models/challengers/nfl-elo-trend-lr-rebuild-v1-calibrator.json"
-)
+CALIBRATOR_PATH = Path("config/models/challengers/nfl-elo-trend-lr-rebuild-v1-calibrator.json")
 
 
 def _require_artifacts() -> None:
     if not MODEL_PATH.exists() or not CALIBRATOR_PATH.exists():
-        pytest.skip(
-            "nfl-elo-trend-lr-rebuild-v1 artifacts not present in this environment"
-        )
+        pytest.skip("nfl-elo-trend-lr-rebuild-v1 artifacts not present in this environment")
 
 
 def _synthetic_row(**overrides: object) -> WalkForwardRow:
@@ -164,9 +160,7 @@ class TestRawProbability:
         values = {"elo_probability": 0.65, "trend_gap": 0.15}
         expected_z = market["intercept"] + sum(
             coef * values[name]
-            for coef, name in zip(
-                market["coefficients"], market["feature_names"], strict=True
-            )
+            for coef, name in zip(market["coefficients"], market["feature_names"], strict=True)
         )
         expected_p = 1.0 / (1.0 + math.exp(-expected_z))
 

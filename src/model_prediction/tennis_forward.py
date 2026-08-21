@@ -215,9 +215,7 @@ def build_tennis_slate(
     # corrupt ratings (and risk a same-name collision across tours).
     predictions = []
     for tour in TENNIS_TOURS:
-        tour_history = [
-            game for game in all_history if str(game.get("league", "")).upper() == tour
-        ]
+        tour_history = [game for game in all_history if str(game.get("league", "")).upper() == tour]
         predictions.extend(model.predict_games(tour_history, upcoming_by_tour[tour]))
 
     snapshots_by_tour = {

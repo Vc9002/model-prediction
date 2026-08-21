@@ -39,6 +39,7 @@ NFL_ELO_CONFIG = {
 @dataclass
 class NFLGameRow:
     """One NFL game row from the normalized store."""
+
     event_id: str
     season: int
     season_type: str
@@ -55,6 +56,7 @@ class NFLGameRow:
 @dataclass
 class WalkForwardRow:
     """One walk-forward prediction row: Elo snapshot BEFORE game outcome."""
+
     event_id: str
     season: int
     season_type: str
@@ -121,23 +123,19 @@ class EloBook:
         return self.total_matches[team] >= min_matches
 
 
-def _trend_gap(
-    history: list[NFLGameRow], team: str, window: int = 10
-) -> float:
+def _trend_gap(history: list[NFLGameRow], team: str, window: int = 10) -> float:
     """Simple rolling win-rate trend: win pct over last N games minus season avg.
 
     Returns a momentum score in [-1, 1] range. Positive = team is playing
     above their season average recently."""
-    team_games = [
-        g for g in history
-        if g.home_team_id == team or g.away_team_id == team
-    ]
+    team_games = [g for g in history if g.home_team_id == team or g.away_team_id == team]
     if len(team_games) < window:
         return 0.0
 
     # Season average win rate
     season_wins = sum(
-        1 for g in team_games
+        1
+        for g in team_games
         if (g.home_team_id == team and g.home_score > g.away_score)
         or (g.away_team_id == team and g.away_score > g.home_score)
     )
@@ -146,7 +144,8 @@ def _trend_gap(
     # Recent win rate
     recent = team_games[-window:]
     recent_wins = sum(
-        1 for g in recent
+        1
+        for g in recent
         if (g.home_team_id == team and g.home_score > g.away_score)
         or (g.away_team_id == team and g.away_score > g.home_score)
     )
@@ -162,7 +161,7 @@ def load_games(data_root: str, seasons: list[int] | None = None) -> list[NFLGame
     store = NFLNormalizedStore(data_root)
     all_rows: list[NFLGameRow] = []
 
-    for season in (seasons or [2021, 2022, 2023, 2024, 2025]):
+    for season in seasons or [2021, 2022, 2023, 2024, 2025]:
         try:
             frame = store.read_season("games", season)
         except Exception as error:  # noqa: BLE001 — a missing/partial season file must skip, not abort the table build
@@ -176,19 +175,21 @@ def load_games(data_root: str, seasons: list[int] | None = None) -> list[NFLGame
         frame = frame.sort("event_start_utc")
 
         for row in frame.iter_rows(named=True):
-            all_rows.append(NFLGameRow(
-                event_id=str(row["event_id"]),
-                season=int(row["season"]),
-                season_type=str(row["season_type"]),
-                week=int(row["week"]),
-                event_start_utc=str(row["event_start_utc"]),
-                home_team_id=str(row["home_team_id"]),
-                away_team_id=str(row["away_team_id"]),
-                home_score=int(row["home_score"]),
-                away_score=int(row["away_score"]),
-                home_rest_days=row.get("home_rest_days"),
-                away_rest_days=row.get("away_rest_days"),
-            ))
+            all_rows.append(
+                NFLGameRow(
+                    event_id=str(row["event_id"]),
+                    season=int(row["season"]),
+                    season_type=str(row["season_type"]),
+                    week=int(row["week"]),
+                    event_start_utc=str(row["event_start_utc"]),
+                    home_team_id=str(row["home_team_id"]),
+                    away_team_id=str(row["away_team_id"]),
+                    home_score=int(row["home_score"]),
+                    away_score=int(row["away_score"]),
+                    home_rest_days=row.get("home_rest_days"),
+                    away_rest_days=row.get("away_rest_days"),
+                )
+            )
 
     return all_rows
 
@@ -209,8 +210,7 @@ def build_walk_forward_rows(
     see each other's results.
     """
     if not games:
-        return WalkForwardResult(rows=[], skipped_bootstrap=0,
-                                 skipped_cold_start=0, n_total=0)
+        return WalkForwardResult(rows=[], skipped_bootstrap=0, skipped_cold_start=0, n_total=0)
 
     book = EloBook()
     history: list[NFLGameRow] = []
@@ -229,17 +229,14 @@ def build_walk_forward_rows(
     # Track season boundaries for offseason regression
     last_season = -1
 
-    for (season, week) in sorted_keys:
+    for season, week in sorted_keys:
         week_games = by_season_week[(season, week)]
 
         # Offseason regression between seasons
         if season != last_season and last_season != -1:
             regress = NFL_ELO_CONFIG["offseason_regression"]
             for team in list(book.ratings.keys()):
-                book.ratings[team] = (
-                    book.ratings[team] * (1 - regress)
-                    + DEFAULT_ELO * regress
-                )
+                book.ratings[team] = book.ratings[team] * (1 - regress) + DEFAULT_ELO * regress
 
         last_season = season
 
@@ -247,32 +244,35 @@ def build_walk_forward_rows(
         for g in sorted(week_games, key=lambda x: x.event_start_utc):
             if len(history) < minimum_history_games:
                 skipped_bootstrap += 1
-            elif not book.has_minimum_history(g.home_team_id, minimum_team_games) or \
-                 not book.has_minimum_history(g.away_team_id, minimum_team_games):
+            elif not book.has_minimum_history(
+                g.home_team_id, minimum_team_games
+            ) or not book.has_minimum_history(g.away_team_id, minimum_team_games):
                 skipped_cold_start += 1
             else:
                 elo_prob = book.expected_home_win(g.home_team_id, g.away_team_id)
                 home_trend = _trend_gap(history, g.home_team_id)
                 away_trend = _trend_gap(history, g.away_team_id)
 
-                rows.append(WalkForwardRow(
-                    event_id=g.event_id,
-                    season=g.season,
-                    season_type=g.season_type,
-                    week=g.week,
-                    event_start_utc=g.event_start_utc,
-                    home_team_id=g.home_team_id,
-                    away_team_id=g.away_team_id,
-                    home_score=g.home_score,
-                    away_score=g.away_score,
-                    home_win=1 if g.home_score > g.away_score else 0,
-                    elo_probability=elo_prob,
-                    trend_gap=home_trend - away_trend,
-                    home_elo=book.rating(g.home_team_id),
-                    away_elo=book.rating(g.away_team_id),
-                    home_rest_days=g.home_rest_days,
-                    away_rest_days=g.away_rest_days,
-                ))
+                rows.append(
+                    WalkForwardRow(
+                        event_id=g.event_id,
+                        season=g.season,
+                        season_type=g.season_type,
+                        week=g.week,
+                        event_start_utc=g.event_start_utc,
+                        home_team_id=g.home_team_id,
+                        away_team_id=g.away_team_id,
+                        home_score=g.home_score,
+                        away_score=g.away_score,
+                        home_win=1 if g.home_score > g.away_score else 0,
+                        elo_probability=elo_prob,
+                        trend_gap=home_trend - away_trend,
+                        home_elo=book.rating(g.home_team_id),
+                        away_elo=book.rating(g.away_team_id),
+                        home_rest_days=g.home_rest_days,
+                        away_rest_days=g.away_rest_days,
+                    )
+                )
 
         # Now update Elo with this week's results
         for g in week_games:

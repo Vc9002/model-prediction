@@ -16,10 +16,10 @@ from model_prediction.models.learned_market import LearnedMarketArtifact
 from model_prediction.validation import ValidationRow, chronological_split
 
 ARTIFACTS = {
-    "mlb":  "config/models/mlb-elo-trend-lr-v3.json",
+    "mlb": "config/models/mlb-elo-trend-lr-v3.json",
     "wnba": "config/models/wnba-elo-trend-lr-v3.json",
-    "nba":  "config/models/nba-elo-trend-lr-v3.json",
-    "nfl":  "config/models/nfl-elo-trend-lr-v3.json",
+    "nba": "config/models/nba-elo-trend-lr-v3.json",
+    "nfl": "config/models/nfl-elo-trend-lr-v3.json",
 }
 
 FILTERS = [
@@ -30,6 +30,7 @@ FILTERS = [
 ]
 
 # ── helpers ─────────────────────────────────────────────────────────
+
 
 def _rest_days(team: str, game_start: datetime, team_dates: dict[str, list[datetime]]) -> int | None:
     dates = team_dates.get(team, [])
@@ -75,6 +76,7 @@ def build_holdout(store: FeatureStore, sport: str, artifact_path: str):
                     feat["defensive_trend_gap"] = ht.defensive_momentum - at.defensive_momentum
                 if "park_factor" in coeffs:
                     from model_prediction.features.park_factors import park_factor
+
                     feat["park_factor"] = float(park_factor(g.home_team).get("park_factor", 1.0))
                 if "weather_factor" in coeffs:
                     feat["weather_factor"] = 1.0
@@ -84,29 +86,34 @@ def build_holdout(store: FeatureStore, sport: str, artifact_path: str):
                 logodds = intercept + sum(coeffs.get(k, 0) * feat.get(k, 0) for k in coeffs)
                 prob = 1 / (1 + math.exp(-logodds))
 
-                all_rows.append(ValidationRow(
-                    date=day, event_id=g.event_id,
-                    outcome=int(g.home_score > g.away_score),
-                    elo_probability=feat.get("elo_probability", 0.5),
-                    trend_gap=feat.get("trend_gap", 0),
-                    defensive_trend_gap=feat.get("defensive_trend_gap", 0),
-                    park_factor=feat.get("park_factor", 1.0),
-                    weather_factor=feat.get("weather_factor", 1.0),
-                    park_available="park_factor" in coeffs,
-                    weather_available="weather_factor" in coeffs,
-                ))
+                all_rows.append(
+                    ValidationRow(
+                        date=day,
+                        event_id=g.event_id,
+                        outcome=int(g.home_score > g.away_score),
+                        elo_probability=feat.get("elo_probability", 0.5),
+                        trend_gap=feat.get("trend_gap", 0),
+                        defensive_trend_gap=feat.get("defensive_trend_gap", 0),
+                        park_factor=feat.get("park_factor", 1.0),
+                        weather_factor=feat.get("weather_factor", 1.0),
+                        park_available="park_factor" in coeffs,
+                        weather_available="weather_factor" in coeffs,
+                    )
+                )
 
                 hr = _rest_days(g.home_team, g.start, team_dates)
                 ar = _rest_days(g.away_team, g.start, team_dates)
-                all_extra.append({
-                    "home_rest": hr if hr is not None else -1,
-                    "away_rest": ar if ar is not None else -1,
-                    "rest_disparity": (hr - ar) if (hr is not None and ar is not None) else 0.0,
-                    "home_b2b": 1 if (hr is not None and hr <= 1) else 0,
-                    "frozen_prob": prob,
-                    "frozen_side": "home" if prob >= 0.5 else "away",
-                    "frozen_call": max(prob, 1 - prob) >= threshold,
-                })
+                all_extra.append(
+                    {
+                        "home_rest": hr if hr is not None else -1,
+                        "away_rest": ar if ar is not None else -1,
+                        "rest_disparity": (hr - ar) if (hr is not None and ar is not None) else 0.0,
+                        "home_b2b": 1 if (hr is not None and hr <= 1) else 0,
+                        "frozen_prob": prob,
+                        "frozen_side": "home" if prob >= 0.5 else "away",
+                        "frozen_call": max(prob, 1 - prob) >= threshold,
+                    }
+                )
         history.extend(day_games)
 
     _, _, holdout_rows, _ = chronological_split(all_rows)
@@ -133,18 +140,24 @@ def apply(extra, rows, threshold, fname):
                 keep = False
 
         elif "both sides" in fname and (side == "home" and disp <= -3 or side == "away" and disp >= 3):
-                keep = False
+            keep = False
         if keep:
             outcome = row.outcome if prob >= 0.5 else 1 - row.outcome
             selected.append((prob, outcome))
 
     c = len(selected)
     h = sum(o for _, o in selected)
-    return {"calls": c, "hits": h, "hit_rate": h / c if c else 0,
-            "units": round(h * 10/11 - (c - h), 2), "suppressed": 0}
+    return {
+        "calls": c,
+        "hits": h,
+        "hit_rate": h / c if c else 0,
+        "units": round(h * 10 / 11 - (c - h), 2),
+        "suppressed": 0,
+    }
 
 
 # ── run ─────────────────────────────────────────────────────────────
+
 
 def run():
     results = {}
@@ -167,17 +180,19 @@ def print_table(results):
         base = r["filters"][FILTERS[0]]
         print(f"\n── {sport.upper()} (frozen model, {r['baseline_calls']} baseline calls) ──")
         print(f"  {'Filter':<68} {'Calls':>6} {'Hit%':>7} {'Units':>8} {'ΔU':>8} {'Suppr':>6}")
-        print(f"  {'─'*105}")
+        print(f"  {'─' * 105}")
         for fn in FILTERS:
             f = r["filters"][fn]
             d = f["units"] - base["units"]
             mark = " ← baseline" if fn == FILTERS[0] else ""
-            print(f"  {fn:<68} {f['calls']:>6} {f['hit_rate']:>6.1%} {f['units']:>+8.2f} {d:>+8.2f} {f['suppressed']:>6}{mark}")
+            print(
+                f"  {fn:<68} {f['calls']:>6} {f['hit_rate']:>6.1%} {f['units']:>+8.2f} {d:>+8.2f} {f['suppressed']:>6}{mark}"
+            )
 
 
 if __name__ == "__main__":
     results = run()
     print_table(results)
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print("  Done. All four leagues tested against updated v3 models.")
-    print(f"{'='*80}")
+    print(f"{'=' * 80}")

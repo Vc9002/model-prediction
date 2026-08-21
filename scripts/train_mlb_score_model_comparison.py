@@ -150,11 +150,15 @@ def main() -> None:
         # Task 9's nested CV, reused as-is -- the direct classifier's own
         # early-stopping/hyperparameter selection must not see y_val_fold.
         X_train = train_df.select(XGB_DIRECT_FEATURES).to_numpy()
-        y_train_arr = train_df.select(
-            (pl.col("home_score") > pl.col("away_score")).cast(pl.Int8).alias("y")
-        ).to_numpy().ravel()
+        y_train_arr = (
+            train_df.select((pl.col("home_score") > pl.col("away_score")).cast(pl.Int8).alias("y"))
+            .to_numpy()
+            .ravel()
+        )
         X_val = val_df.select(XGB_DIRECT_FEATURES).to_numpy()
-        nested_result = nested_xgboost_fold(X_train, y_train_arr, X_val, y_val_fold, fold_index=fold.fold_index)
+        nested_result = nested_xgboost_fold(
+            X_train, y_train_arr, X_val, y_val_fold, fold_index=fold.fold_index
+        )
         xgb_direct_probs = nested_result.outer_probs
 
         oof["two_head"].extend(two_head_probs)
@@ -174,40 +178,70 @@ def main() -> None:
                 breakdown_th = two_head.distribution.total_market_breakdown(pred_th, line)
                 breakdown_xgb = xgb_two_head.distribution.total_market_breakdown(pred_xgb, line)
                 is_push = float(r["total_runs"]) == line
-                totals_records["two_head"][line].append({
-                    "over": breakdown_th["over"], "under": breakdown_th["under"], "push": breakdown_th["push"],
-                    "is_push": is_push, "label": None if is_push else (1 if r["total_runs"] > line else 0),
-                })
-                totals_records["xgb_two_head"][line].append({
-                    "over": breakdown_xgb["over"], "under": breakdown_xgb["under"], "push": breakdown_xgb["push"],
-                    "is_push": is_push, "label": None if is_push else (1 if r["total_runs"] > line else 0),
-                })
+                totals_records["two_head"][line].append(
+                    {
+                        "over": breakdown_th["over"],
+                        "under": breakdown_th["under"],
+                        "push": breakdown_th["push"],
+                        "is_push": is_push,
+                        "label": None if is_push else (1 if r["total_runs"] > line else 0),
+                    }
+                )
+                totals_records["xgb_two_head"][line].append(
+                    {
+                        "over": breakdown_xgb["over"],
+                        "under": breakdown_xgb["under"],
+                        "push": breakdown_xgb["push"],
+                        "is_push": is_push,
+                        "label": None if is_push else (1 if r["total_runs"] > line else 0),
+                    }
+                )
             home_margin = float(r["home_score"]) - float(r["away_score"])
             for line in SPREAD_LINE_GRID:
                 breakdown_th = two_head.distribution.spread_market_breakdown(pred_th, line)
                 breakdown_xgb = xgb_two_head.distribution.spread_market_breakdown(pred_xgb, line)
                 is_push = (home_margin + line) == 0.0
                 label = None if is_push else (1 if (home_margin + line) > 0 else 0)
-                spread_records["two_head"][line].append({
-                    "home": breakdown_th["home"], "away": breakdown_th["away"], "push": breakdown_th["push"],
-                    "is_push": is_push, "label": label,
-                })
-                spread_records["xgb_two_head"][line].append({
-                    "home": breakdown_xgb["home"], "away": breakdown_xgb["away"], "push": breakdown_xgb["push"],
-                    "is_push": is_push, "label": label,
-                })
+                spread_records["two_head"][line].append(
+                    {
+                        "home": breakdown_th["home"],
+                        "away": breakdown_th["away"],
+                        "push": breakdown_th["push"],
+                        "is_push": is_push,
+                        "label": label,
+                    }
+                )
+                spread_records["xgb_two_head"][line].append(
+                    {
+                        "home": breakdown_xgb["home"],
+                        "away": breakdown_xgb["away"],
+                        "push": breakdown_xgb["push"],
+                        "is_push": is_push,
+                        "label": label,
+                    }
+                )
 
         fold_report = {
-            "fold": fold.fold_index, "train_n": train_df.height, "val_n": val_df.height,
-            "two_head": {"log_loss": log_loss(y_val_fold, two_head_probs), "brier": brier_score(y_val_fold, two_head_probs)},
-            "xgb_two_head": {"log_loss": log_loss(y_val_fold, xgb_two_head_probs), "brier": brier_score(y_val_fold, xgb_two_head_probs)},
+            "fold": fold.fold_index,
+            "train_n": train_df.height,
+            "val_n": val_df.height,
+            "two_head": {
+                "log_loss": log_loss(y_val_fold, two_head_probs),
+                "brier": brier_score(y_val_fold, two_head_probs),
+            },
+            "xgb_two_head": {
+                "log_loss": log_loss(y_val_fold, xgb_two_head_probs),
+                "brier": brier_score(y_val_fold, xgb_two_head_probs),
+            },
             "xgb_direct": {"log_loss": nested_result.outer_log_loss, "brier": nested_result.outer_brier},
         }
         per_fold_report.append(fold_report)
-        print(f"  Fold {fold.fold_index}: train={train_df.height} val={val_df.height} "
-              f"two_head_ll={fold_report['two_head']['log_loss']:.3f} "
-              f"xgb_two_head_ll={fold_report['xgb_two_head']['log_loss']:.3f} "
-              f"xgb_direct_ll={fold_report['xgb_direct']['log_loss']:.3f}")
+        print(
+            f"  Fold {fold.fold_index}: train={train_df.height} val={val_df.height} "
+            f"two_head_ll={fold_report['two_head']['log_loss']:.3f} "
+            f"xgb_two_head_ll={fold_report['xgb_two_head']['log_loss']:.3f} "
+            f"xgb_direct_ll={fold_report['xgb_direct']['log_loss']:.3f}"
+        )
 
     if len(y_true) < 10:
         print("Too few real OOF predictions. Stopping honestly.")
@@ -217,11 +251,15 @@ def main() -> None:
     ml_summary = {}
     for model_name, probs in oof.items():
         ml_summary[model_name] = {"log_loss": log_loss(y_true, probs), "brier": brier_score(y_true, probs)}
-        print(f"   {model_name:15s}: log_loss={ml_summary[model_name]['log_loss']:.4f} "
-              f"brier={ml_summary[model_name]['brier']:.4f}")
+        print(
+            f"   {model_name:15s}: log_loss={ml_summary[model_name]['log_loss']:.4f} "
+            f"brier={ml_summary[model_name]['brier']:.4f}"
+        )
 
-    print(f"\n4. Totals OOF comparison, predeclared line grid {TOTALS_LINE_GRID} "
-          f"(coherent score models only -- xgb_direct has no totals probability):")
+    print(
+        f"\n4. Totals OOF comparison, predeclared line grid {TOTALS_LINE_GRID} "
+        f"(coherent score models only -- xgb_direct has no totals probability):"
+    )
     totals_summary: dict[str, dict[str, dict]] = {"two_head": {}, "xgb_two_head": {}}
     for model_name, by_line in totals_records.items():
         for line, records in by_line.items():
@@ -232,8 +270,11 @@ def main() -> None:
             mean_under = sum(rec["under"] for rec in records) / n_total if n_total else float("nan")
             mean_push = sum(rec["push"] for rec in records) / n_total if n_total else float("nan")
             entry = {
-                "line": line, "n": n_total, "n_push_real": n_push,
-                "mean_over_probability": mean_over, "mean_under_probability": mean_under,
+                "line": line,
+                "n": n_total,
+                "n_push_real": n_push,
+                "mean_over_probability": mean_over,
+                "mean_under_probability": mean_under,
                 "mean_push_probability": mean_push,
             }
             if len(non_push) >= 5:
@@ -245,12 +286,18 @@ def main() -> None:
                 entry["log_loss"] = None
                 entry["brier"] = None
             totals_summary[model_name][str(line)] = entry
-            ll_str = f"{entry['log_loss']:.4f}" if entry["log_loss"] is not None else "n/a (too few non-push obs)"
-            print(f"   {model_name:15s} line={line:4.1f}: n={n_total} push={n_push} "
-                  f"mean_over={mean_over:.3f} log_loss={ll_str}")
+            ll_str = (
+                f"{entry['log_loss']:.4f}" if entry["log_loss"] is not None else "n/a (too few non-push obs)"
+            )
+            print(
+                f"   {model_name:15s} line={line:4.1f}: n={n_total} push={n_push} "
+                f"mean_over={mean_over:.3f} log_loss={ll_str}"
+            )
 
-    print(f"\n5. Spread OOF comparison, predeclared signed home-line grid {SPREAD_LINE_GRID} "
-          f"(coherent score models only -- xgb_direct has no spread probability):")
+    print(
+        f"\n5. Spread OOF comparison, predeclared signed home-line grid {SPREAD_LINE_GRID} "
+        f"(coherent score models only -- xgb_direct has no spread probability):"
+    )
     spread_summary: dict[str, dict[str, dict]] = {"two_head": {}, "xgb_two_head": {}}
     for model_name, by_line in spread_records.items():
         for line, records in by_line.items():
@@ -261,8 +308,11 @@ def main() -> None:
             mean_away = sum(rec["away"] for rec in records) / n_total if n_total else float("nan")
             mean_push = sum(rec["push"] for rec in records) / n_total if n_total else float("nan")
             entry = {
-                "home_line": line, "n": n_total, "n_push_real": n_push,
-                "mean_home_probability": mean_home, "mean_away_probability": mean_away,
+                "home_line": line,
+                "n": n_total,
+                "n_push_real": n_push,
+                "mean_home_probability": mean_home,
+                "mean_away_probability": mean_away,
                 "mean_push_probability": mean_push,
             }
             if len(non_push) >= 5:
@@ -274,9 +324,13 @@ def main() -> None:
                 entry["log_loss"] = None
                 entry["brier"] = None
             spread_summary[model_name][str(line)] = entry
-            ll_str = f"{entry['log_loss']:.4f}" if entry["log_loss"] is not None else "n/a (too few non-push obs)"
-            print(f"   {model_name:15s} home_line={line:5.1f}: n={n_total} push={n_push} "
-                  f"mean_home={mean_home:.3f} log_loss={ll_str}")
+            ll_str = (
+                f"{entry['log_loss']:.4f}" if entry["log_loss"] is not None else "n/a (too few non-push obs)"
+            )
+            print(
+                f"   {model_name:15s} home_line={line:5.1f}: n={n_total} push={n_push} "
+                f"mean_home={mean_home:.3f} log_loss={ll_str}"
+            )
 
     print(
         "\n   Real, disclosed scope: registry-safe (does not touch\n"
@@ -290,17 +344,23 @@ def main() -> None:
     )
 
     results_path = Path("outputs/rebuild/mlb_score_model_comparison.json")
-    results_path.write_text(json.dumps({
-        "dataset_hash": dataset.dataset_hash,
-        "matched_games": dataset.matched_games,
-        "n_moneyline_oof": len(y_true),
-        "totals_line_grid": TOTALS_LINE_GRID,
-        "spread_line_grid": SPREAD_LINE_GRID,
-        "per_fold": per_fold_report,
-        "moneyline_oof_summary": ml_summary,
-        "totals_oof_summary": totals_summary,
-        "spread_oof_summary": spread_summary,
-    }, indent=2, default=str))
+    results_path.write_text(
+        json.dumps(
+            {
+                "dataset_hash": dataset.dataset_hash,
+                "matched_games": dataset.matched_games,
+                "n_moneyline_oof": len(y_true),
+                "totals_line_grid": TOTALS_LINE_GRID,
+                "spread_line_grid": SPREAD_LINE_GRID,
+                "per_fold": per_fold_report,
+                "moneyline_oof_summary": ml_summary,
+                "totals_oof_summary": totals_summary,
+                "spread_oof_summary": spread_summary,
+            },
+            indent=2,
+            default=str,
+        )
+    )
     print(f"6. Results saved to {results_path}")
 
 

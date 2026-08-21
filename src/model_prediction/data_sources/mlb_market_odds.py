@@ -497,7 +497,7 @@ def load_verified_mlb_market_snapshot(
             except json.JSONDecodeError as exc:
                 raise ValueError("market snapshot archive contains invalid JSON") from exc
             if not isinstance(item, dict):
-                raise ValueError("market snapshot archive record must be an object")
+                raise TypeError("market snapshot archive record must be an object")
             if item.get("snapshot_record_id") == record_id:
                 matches.append(item)
     if len(matches) != 1:
@@ -519,7 +519,7 @@ def load_verified_mlb_market_snapshot(
         raise ValueError("market snapshot event or quote identity mismatch")
     quote = item.get("markets", {}).get(market_type, {}).get(selection)
     if not isinstance(quote, dict):
-        raise ValueError("market snapshot selected quote is missing")
+        raise TypeError("market snapshot selected quote is missing or invalid type")
     archived_line = quote.get("line")
     if (
         quote.get("selection") != selection

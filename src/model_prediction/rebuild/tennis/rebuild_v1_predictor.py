@@ -28,6 +28,7 @@ CALIBRATOR_PATH = CHALLENGER_DIR / "tennis-surface-elo-rebuild-v1-calibrator.jso
 @dataclass
 class TennisSurfaceEloRebuildV1Prediction:
     """Structured prediction from the rebuild-native Surface Elo model."""
+
     winner_prob: float
     loser_prob: float
     predicted_player_one_id: str
@@ -114,13 +115,9 @@ class TennisSurfaceEloRebuildV1Predictor:
         expected_version = "tennis-surface-elo-rebuild-v1"
         actual_version = self._artifact.get("model_version")
         if actual_version != expected_version:
-            raise ValueError(
-                f"Artifact model_version is {actual_version!r}, expected {expected_version!r}"
-            )
+            raise ValueError(f"Artifact model_version is {actual_version!r}, expected {expected_version!r}")
         if self._artifact.get("sport") != "tennis":
-            raise ValueError(
-                f"Artifact sport is {self._artifact.get('sport')!r}, expected 'tennis'"
-            )
+            raise ValueError(f"Artifact sport is {self._artifact.get('sport')!r}, expected 'tennis'")
         moneyline = self._artifact.get("market_models", {}).get("moneyline", {})
         feature_names = moneyline.get("feature_names", [])
         if "elo_probability_player_one" not in feature_names:
@@ -176,7 +173,9 @@ class TennisSurfaceEloRebuildV1Predictor:
         if not self._artifact.get("provenance", {}).get("production_allowed", False):
             caveats.append("production_not_allowed: research only, per artifact provenance")
         if self._artifact.get("provenance", {}).get("pit_status") == "RETROSPECTIVE_RESEARCH":
-            caveats.append("retrospective_research: capture-time-only provenance, not prospective PIT evidence")
+            caveats.append(
+                "retrospective_research: capture-time-only provenance, not prospective PIT evidence"
+            )
 
         return TennisSurfaceEloRebuildV1Prediction(
             winner_prob=winner_prob,

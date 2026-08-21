@@ -68,12 +68,24 @@ class TennisFoundation:
         reports: list[dict[str, Any]] = []
         for year in years:
             result = self.tennis_mylife.year_matches(tour, year, kind=kind, force=force)
-            if result.status is not ProviderStatus.AVAILABLE or result.frame is None or result.metadata is None:
+            if (
+                result.status is not ProviderStatus.AVAILABLE
+                or result.frame is None
+                or result.metadata is None
+            ):
                 reports.append(
-                    {"tour": tour, "year": year, "kind": kind, "status": result.status.value, "reason": result.reason}
+                    {
+                        "tour": tour,
+                        "year": year,
+                        "kind": kind,
+                        "status": result.status.value,
+                        "reason": result.reason,
+                    }
                 )
                 continue
-            normalized = normalize_tennismylife_matches(result.frame, result.metadata, tour=tour, match_kind=kind)
+            normalized = normalize_tennismylife_matches(
+                result.frame, result.metadata, tour=tour, match_kind=kind
+            )
             self.store.write_matches(normalized)
             manifest = {
                 "sport": "tennis",
@@ -87,18 +99,27 @@ class TennisFoundation:
                 "availability_basis": "capture_time_only",
             }
             dataset_hash = hashlib.sha256(
-                json.dumps({k: v for k, v in manifest.items() if k != "generated_at"}, sort_keys=True).encode()
+                json.dumps(
+                    {k: v for k, v in manifest.items() if k != "generated_at"}, sort_keys=True
+                ).encode()
             ).hexdigest()
             manifest["dataset_hash"] = dataset_hash
             manifest_path = (
-                self.store.root / "tennis" / "_manifests" / f"tour={tour}" / f"kind={kind}"
-                / f"year={year}" / f"{dataset_hash}.json"
+                self.store.root
+                / "tennis"
+                / "_manifests"
+                / f"tour={tour}"
+                / f"kind={kind}"
+                / f"year={year}"
+                / f"{dataset_hash}.json"
             )
             manifest = self._atomic_json(manifest_path, manifest)
             reports.append({**manifest, "status": "AVAILABLE", "manifest": str(manifest_path)})
         return {"sport": "tennis", "tour": tour, "kind": kind, "seasons": reports}
 
-    def collect_current(self, tour: Literal["atp", "wta", "challenger"], *, force: bool = False) -> dict[str, Any]:
+    def collect_current(
+        self, tour: Literal["atp", "wta", "challenger"], *, force: bool = False
+    ) -> dict[str, Any]:
         if self.espn is None:
             raise RuntimeError("ESPN tennis provider is not configured")
         espn_tour: ESPNTour = "atp" if tour == "challenger" else tour

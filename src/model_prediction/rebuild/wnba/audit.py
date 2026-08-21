@@ -23,9 +23,7 @@ def _latest(frame: pl.DataFrame, keys: list[str]) -> pl.DataFrame:
         return pl.DataFrame()
     return (
         frame.with_columns(
-            pl.col("observed_at_utc")
-            .str.to_datetime(time_zone="UTC", strict=False)
-            .alias("_observed")
+            pl.col("observed_at_utc").str.to_datetime(time_zone="UTC", strict=False).alias("_observed")
         )
         .filter(pl.col("_observed").is_not_null())
         .sort("_observed")
@@ -43,9 +41,7 @@ def _timestamp_violations(frame: pl.DataFrame) -> int:
         return frame.height
     checked = frame.with_columns(
         pl.col("observed_at_utc").str.to_datetime(time_zone="UTC", strict=False).alias("_observed"),
-        pl.col("retrieved_at_utc")
-        .str.to_datetime(time_zone="UTC", strict=False)
-        .alias("_retrieved"),
+        pl.col("retrieved_at_utc").str.to_datetime(time_zone="UTC", strict=False).alias("_retrieved"),
     )
     return checked.filter(
         pl.col("_observed").is_null()
@@ -92,9 +88,7 @@ def audit_wnba_season(
             pl.col("home_score").is_null() | pl.col("away_score").is_null()
         ).height
     if not games.is_empty():
-        missing_teams = games.filter(
-            (pl.col("home_team_id") == "") | (pl.col("away_team_id") == "")
-        ).height
+        missing_teams = games.filter((pl.col("home_team_id") == "") | (pl.col("away_team_id") == "")).height
         canonical_columns = {"home_team_canonical_id", "away_team_canonical_id"}
         if not canonical_columns.issubset(games.columns):
             missing_canonical_team_ids += games.height
@@ -111,8 +105,7 @@ def audit_wnba_season(
                 missing_canonical_team_ids += frame.height
             else:
                 missing_canonical_team_ids += frame.filter(
-                    pl.col("team_canonical_id").is_null()
-                    | (pl.col("team_canonical_id") == "")
+                    pl.col("team_canonical_id").is_null() | (pl.col("team_canonical_id") == "")
                 ).height
     for frame in (player_box, rosters):
         if not frame.is_empty():
@@ -120,28 +113,20 @@ def audit_wnba_season(
                 missing_canonical_player_ids += frame.height
             else:
                 missing_canonical_player_ids += frame.filter(
-                    pl.col("player_canonical_id").is_null()
-                    | (pl.col("player_canonical_id") == "")
+                    pl.col("player_canonical_id").is_null() | (pl.col("player_canonical_id") == "")
                 ).height
 
     duplicate_observations = {
-        table: _duplicate_count(frame, store.observation_keys(table))
-        for table, frame in observations.items()
+        table: _duplicate_count(frame, store.observation_keys(table)) for table, frame in observations.items()
     }
     report: dict[str, Any] = {
         "sport": "wnba",
         "season": season,
         "games_expected": len(expected_ids) if expected_ids is not None else None,
-        "expected_games_basis": (
-            "independent_event_ids" if expected_ids is not None else "UNAVAILABLE"
-        ),
+        "expected_games_basis": ("independent_event_ids" if expected_ids is not None else "UNAVAILABLE"),
         "games_present": len(present_ids),
-        "expected_events_missing": (
-            len(expected_ids - present_ids) if expected_ids is not None else None
-        ),
-        "unexpected_events_present": (
-            len(present_ids - expected_ids) if expected_ids is not None else None
-        ),
+        "expected_events_missing": (len(expected_ids - present_ids) if expected_ids is not None else None),
+        "unexpected_events_present": (len(present_ids - expected_ids) if expected_ids is not None else None),
         "duplicate_events": duplicate_observations["games"],
         "duplicate_observations": duplicate_observations,
         "missing_final_scores": missing_final_scores,
@@ -154,9 +139,7 @@ def audit_wnba_season(
         "player_box_rows": player_box.height,
         "roster_rows": rosters.height,
         "missing_player_ids": (
-            player_box.filter(pl.col("player_id") == "").height
-            if not player_box.is_empty()
-            else 0
+            player_box.filter(pl.col("player_id") == "").height if not player_box.is_empty() else 0
         ),
         "timestamp_violations": sum(_timestamp_violations(frame) for frame in observations.values()),
         "timestamp_valid_rows": sum(

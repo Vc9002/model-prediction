@@ -27,9 +27,7 @@ SOCCER_SOURCE_RIGHTS = {
 
 def audit_soccer_data(store: SoccerNormalizedStore) -> dict[str, Any]:
     matches = store.read_matches()
-    configured = {
-        provider: profile.to_dict() for provider, profile in SOCCER_SOURCE_RIGHTS.items()
-    }
+    configured = {provider: profile.to_dict() for provider, profile in SOCCER_SOURCE_RIGHTS.items()}
     if matches.is_empty():
         return {
             "sport": "soccer",
@@ -73,20 +71,14 @@ def audit_soccer_data(store: SoccerNormalizedStore) -> dict[str, Any]:
             "availability_basis",
             *sorted(SOCCER_NORMALIZED_RIGHTS_COLUMNS - {"attribution_text"}),
         ]
-        null_provenance_rows = matches.filter(
-            pl.any_horizontal(pl.col(provenance_columns).is_null())
-        ).height
+        null_provenance_rows = matches.filter(pl.any_horizontal(pl.col(provenance_columns).is_null())).height
         malformed_hash_rows = matches.filter(
             (pl.col("raw_snapshot_hash").str.len_chars() != 64)
             | ~pl.col("raw_snapshot_hash").str.contains(r"^[0-9a-f]{64}$")
         ).height
         checked = matches.with_columns(
-            pl.col("observed_at_utc")
-            .str.to_datetime(time_zone="UTC", strict=False)
-            .alias("_observed"),
-            pl.col("available_at_utc")
-            .str.to_datetime(time_zone="UTC", strict=False)
-            .alias("_available"),
+            pl.col("observed_at_utc").str.to_datetime(time_zone="UTC", strict=False).alias("_observed"),
+            pl.col("available_at_utc").str.to_datetime(time_zone="UTC", strict=False).alias("_available"),
         )
         timestamp_violations = checked.filter(
             pl.col("_observed").is_null()

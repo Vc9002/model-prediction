@@ -11,15 +11,34 @@ from model_prediction.rebuild import basic_sport_pipeline as pipeline
 from model_prediction.rebuild.storage import NormalizedStore, provenance_row, utc_now
 
 
-def _write_scoreboard(data_root, sport: str, event_id: str, event_start_utc: str, home: str, away: str,
-                       status: str, home_score: int = 0, away_score: int = 0) -> None:
+def _write_scoreboard(
+    data_root,
+    sport: str,
+    event_id: str,
+    event_start_utc: str,
+    home: str,
+    away: str,
+    status: str,
+    home_score: int = 0,
+    away_score: int = 0,
+) -> None:
     norm = NormalizedStore(f"{data_root}/normalized")
     row = {
-        **provenance_row(source="espn_public", source_record_id=event_id, source_version="v1",
-                          observed_at_utc=utc_now().isoformat(), effective_at_utc=event_start_utc,
-                          event_start_utc=event_start_utc),
-        "event_id": event_id, "home_team": home, "away_team": away,
-        "home_score": home_score, "away_score": away_score, "status": status, "venue": "",
+        **provenance_row(
+            source="espn_public",
+            source_record_id=event_id,
+            source_version="v1",
+            observed_at_utc=utc_now().isoformat(),
+            effective_at_utc=event_start_utc,
+            event_start_utc=event_start_utc,
+        ),
+        "event_id": event_id,
+        "home_team": home,
+        "away_team": away,
+        "home_score": home_score,
+        "away_score": away_score,
+        "status": status,
+        "venue": "",
     }
     norm.write(sport, "scoreboard", pl.DataFrame([row]), primary_key=["event_id"])
 
@@ -33,7 +52,9 @@ class TestLoadState:
         assert pipeline.load_state(str(tmp_path), "nba", "2026-08-06") is None
 
     def test_real_scheduled_game_produces_real_state(self, tmp_path):
-        _write_scoreboard(tmp_path, "nba", "1", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED")
+        _write_scoreboard(
+            tmp_path, "nba", "1", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED"
+        )
         state = pipeline.load_state(str(tmp_path), "nba", "2026-08-06")
         assert state is not None
         assert state.tonight.height == 1
@@ -46,7 +67,9 @@ class TestLoadState:
         # silently ignored it -- every call used the same fixed
         # 60-minutes-before-start decision time regardless of
         # --horizon early/mid/late.
-        _write_scoreboard(tmp_path, "nba", "1", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED")
+        _write_scoreboard(
+            tmp_path, "nba", "1", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED"
+        )
         late = pipeline.load_state(str(tmp_path), "nba", "2026-08-06", horizon="late")
         mid = pipeline.load_state(str(tmp_path), "nba", "2026-08-06", horizon="mid")
         early = pipeline.load_state(str(tmp_path), "nba", "2026-08-06", horizon="early")
@@ -54,7 +77,9 @@ class TestLoadState:
         assert early.decision_times["1"] < mid.decision_times["1"] < late.decision_times["1"]
 
     def test_invalid_horizon_fails_closed_not_a_silent_default(self, tmp_path):
-        _write_scoreboard(tmp_path, "nba", "1", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED")
+        _write_scoreboard(
+            tmp_path, "nba", "1", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED"
+        )
         try:
             pipeline.load_state(str(tmp_path), "nba", "2026-08-06", horizon="not_a_real_horizon")
             raised = False
@@ -65,16 +90,29 @@ class TestLoadState:
 
 class TestPredictStage:
     def test_insufficient_history_stops_honestly(self, tmp_path):
-        _write_scoreboard(tmp_path, "nba", "1", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED")
+        _write_scoreboard(
+            tmp_path, "nba", "1", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED"
+        )
         state = pipeline.load_state(str(tmp_path), "nba", "2026-08-06")
         result = pipeline.predict_stage(state, str(tmp_path))
         assert result["status"] == "insufficient_history"
 
     def test_predicted_winner_is_frozen_before_any_market_is_inspected(self, tmp_path):
         for i in range(12):
-            _write_scoreboard(tmp_path, "nba", f"hist{i}", f"2026-07-{i + 1:02d}T22:10:00+00:00",
-                               "Alpha", "Beta", "STATUS_FINAL", home_score=110, away_score=90)
-        _write_scoreboard(tmp_path, "nba", "401", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED")
+            _write_scoreboard(
+                tmp_path,
+                "nba",
+                f"hist{i}",
+                f"2026-07-{i + 1:02d}T22:10:00+00:00",
+                "Alpha",
+                "Beta",
+                "STATUS_FINAL",
+                home_score=110,
+                away_score=90,
+            )
+        _write_scoreboard(
+            tmp_path, "nba", "401", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED"
+        )
         state = pipeline.load_state(str(tmp_path), "nba", "2026-08-06")
 
         result = pipeline.predict_stage(state, str(tmp_path))
@@ -88,16 +126,28 @@ class TestPredictStage:
         from model_prediction.rebuild.shadow_ledger import ShadowLedger
 
         for i in range(12):
-            _write_scoreboard(tmp_path, "nba", f"hist{i}", f"2026-07-{i + 1:02d}T22:10:00+00:00",
-                               "Alpha", "Beta", "STATUS_FINAL", home_score=110, away_score=90)
-        _write_scoreboard(tmp_path, "nba", "401", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED")
+            _write_scoreboard(
+                tmp_path,
+                "nba",
+                f"hist{i}",
+                f"2026-07-{i + 1:02d}T22:10:00+00:00",
+                "Alpha",
+                "Beta",
+                "STATUS_FINAL",
+                home_score=110,
+                away_score=90,
+            )
+        _write_scoreboard(
+            tmp_path, "nba", "401", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED"
+        )
         state = pipeline.load_state(str(tmp_path), "nba", "2026-08-06")
 
         ledger = ShadowLedger(f"{tmp_path}/shadow.db")
         run_id = ledger.record_run("nba", run_type="test")
         pipeline.predict_stage(state, str(tmp_path), ledger=ledger, run_id=run_id)
         row = ledger.conn.execute(
-            "SELECT run_id FROM model_artifacts WHERE artifact_hash = ?", (state.forecasts["401"].model_artifact_hash,)
+            "SELECT run_id FROM model_artifacts WHERE artifact_hash = ?",
+            (state.forecasts["401"].model_artifact_hash,),
         ).fetchone()
         ledger.close()
         assert row is not None
@@ -106,7 +156,9 @@ class TestPredictStage:
 
 class TestDecideStage:
     def test_decide_without_predict_first_raises(self, tmp_path):
-        _write_scoreboard(tmp_path, "nba", "401", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED")
+        _write_scoreboard(
+            tmp_path, "nba", "401", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED"
+        )
         state = pipeline.load_state(str(tmp_path), "nba", "2026-08-06")
         try:
             pipeline.decide_stage(state)
@@ -116,9 +168,20 @@ class TestDecideStage:
 
     def test_no_real_market_candidates_produces_a_real_no_bet_not_a_crash(self, tmp_path):
         for i in range(12):
-            _write_scoreboard(tmp_path, "nba", f"hist{i}", f"2026-07-{i + 1:02d}T22:10:00+00:00",
-                               "Alpha", "Beta", "STATUS_FINAL", home_score=110, away_score=90)
-        _write_scoreboard(tmp_path, "nba", "401", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED")
+            _write_scoreboard(
+                tmp_path,
+                "nba",
+                f"hist{i}",
+                f"2026-07-{i + 1:02d}T22:10:00+00:00",
+                "Alpha",
+                "Beta",
+                "STATUS_FINAL",
+                home_score=110,
+                away_score=90,
+            )
+        _write_scoreboard(
+            tmp_path, "nba", "401", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED"
+        )
         state = pipeline.load_state(str(tmp_path), "nba", "2026-08-06")
         pipeline.predict_stage(state, str(tmp_path))
 
@@ -133,23 +196,52 @@ class TestMatchMarketsStage:
         from model_prediction.rebuild.storage import MarketStore
 
         for i in range(12):
-            _write_scoreboard(tmp_path, "nba", f"hist{i}", f"2026-07-{i + 1:02d}T22:10:00+00:00",
-                               "Alpha", "Beta", "STATUS_FINAL", home_score=110, away_score=90)
-        _write_scoreboard(tmp_path, "nba", "401", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED")
+            _write_scoreboard(
+                tmp_path,
+                "nba",
+                f"hist{i}",
+                f"2026-07-{i + 1:02d}T22:10:00+00:00",
+                "Alpha",
+                "Beta",
+                "STATUS_FINAL",
+                home_score=110,
+                away_score=90,
+            )
+        _write_scoreboard(
+            tmp_path, "nba", "401", "2026-08-06T22:10:00+00:00", "Alpha", "Beta", "STATUS_SCHEDULED"
+        )
         state = pipeline.load_state(str(tmp_path), "nba", "2026-08-06")
         pipeline.predict_stage(state, str(tmp_path))
 
         markets = MarketStore(f"{tmp_path}/markets")
         rows = []
-        for market_type, team_or_side, line in [("moneyline", "home", None), ("spread", "home", -3.5), ("total", "over", 210.5)]:
-            rows.append({
-                **provenance_row("polymarket_us", f"401_{market_type}", "v1", utc_now().isoformat(),
-                                  utc_now().isoformat(), "2026-08-06T22:10:00+00:00"),
-                "event_id": "401", "market_id": f"m_{market_type}", "market_type": market_type,
-                "team_or_side": team_or_side, "team": "Alpha" if market_type != "total" else None,
-                "line": line, "executable_price": 0.55, "decimal_odds": None, "american_odds": None,
-                "available_depth": None,
-            })
+        for market_type, team_or_side, line in [
+            ("moneyline", "home", None),
+            ("spread", "home", -3.5),
+            ("total", "over", 210.5),
+        ]:
+            rows.append(
+                {
+                    **provenance_row(
+                        "polymarket_us",
+                        f"401_{market_type}",
+                        "v1",
+                        utc_now().isoformat(),
+                        utc_now().isoformat(),
+                        "2026-08-06T22:10:00+00:00",
+                    ),
+                    "event_id": "401",
+                    "market_id": f"m_{market_type}",
+                    "market_type": market_type,
+                    "team_or_side": team_or_side,
+                    "team": "Alpha" if market_type != "total" else None,
+                    "line": line,
+                    "executable_price": 0.55,
+                    "decimal_odds": None,
+                    "american_odds": None,
+                    "available_depth": None,
+                }
+            )
         markets.write_books("nba", "2026-08-06", pl.DataFrame(rows))
 
         result = pipeline.match_markets_stage(state, str(tmp_path), lambda d: {"status": "ok"})

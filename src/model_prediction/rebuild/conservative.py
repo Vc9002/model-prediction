@@ -22,6 +22,7 @@ import numpy as np
 @dataclass
 class ConservativeProbability:
     """Lower-bound probability estimate with uncertainty sources enumerated."""
+
     raw_probability: float
     conservative_probability: float
     uncertainty_components: dict[str, float] = field(default_factory=dict)
@@ -38,17 +39,20 @@ class ConservativeProbability:
     def __post_init__(self) -> None:
         if self.lower_bound == 0.0:
             total_uncertainty = (
-                self.model_bootstrap_uncertainty +
-                self.calibration_uncertainty +
-                self.player_lineup_uncertainty +
-                self.data_quality_uncertainty +
-                self.model_disagreement
+                self.model_bootstrap_uncertainty
+                + self.calibration_uncertainty
+                + self.player_lineup_uncertainty
+                + self.data_quality_uncertainty
+                + self.model_disagreement
             )
             self.lower_bound = max(0.01, self.raw_probability - total_uncertainty - self.safety_margin)
             self.conservative_probability = self.lower_bound
 
     def clears_ask(
-        self, best_ask: float, fee_rate: float = 0.0, slippage: float = 0.0,
+        self,
+        best_ask: float,
+        fee_rate: float = 0.0,
+        slippage: float = 0.0,
     ) -> tuple[bool, float]:
         """Check if conservative probability clears the executable ask after costs."""
         effective_ask = best_ask + slippage
@@ -92,6 +96,7 @@ def compute_conservative_probability(
 @dataclass
 class TradeThreshold:
     """A frozen threshold for trade eligibility on the economic validation set."""
+
     min_cost_adjusted_edge: float = 0.03
     min_expected_value: float = 0.0
     min_residual_score: float = 0.5
@@ -169,7 +174,9 @@ def apply_threshold(
             rejected[reason] = rejected.get(reason, 0) + 1
 
     return {
-        "total": len(candidates), "accepted": len(accepted), "rejected": len(candidates) - len(accepted),
+        "total": len(candidates),
+        "accepted": len(accepted),
+        "rejected": len(candidates) - len(accepted),
         "acceptance_rate": len(accepted) / max(1, len(candidates)),
         "rejection_reasons": rejected,
     }

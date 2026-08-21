@@ -87,56 +87,94 @@ def run(
                 detail = json.loads(prior["detail_json"]) if prior.get("detail_json") else {}
                 row_count = prior.get("row_count")
                 ledger.record_stage_result(
-                    run_id, stage, "SUCCESS", detail, artifact_hash=prior.get("artifact_hash"),
-                    duration_seconds=0.0, mode="resumed", row_count=row_count,
+                    run_id,
+                    stage,
+                    "SUCCESS",
+                    detail,
+                    artifact_hash=prior.get("artifact_hash"),
+                    duration_seconds=0.0,
+                    mode="resumed",
+                    row_count=row_count,
                 )
                 report["stages"][stage] = {
-                    "status": "SKIPPED_ALREADY_COMPLETE", "detail": detail,
-                    "duration_seconds": 0.0, "error": None, "mode": "resumed", "rows": row_count,
+                    "status": "SKIPPED_ALREADY_COMPLETE",
+                    "detail": detail,
+                    "duration_seconds": 0.0,
+                    "error": None,
+                    "mode": "resumed",
+                    "rows": row_count,
                 }
                 continue
             method = getattr(adapter, stage)
             stage_started = perf_counter()
             stage_mode = "resumed" if resume_run_id else ("partial" if only_stage else "fresh")
             try:
-                result = method(date, run_id=run_id) if stage == "collect" else method(
-                    date, horizon, run_id=run_id
+                result = (
+                    method(date, run_id=run_id)
+                    if stage == "collect"
+                    else method(date, horizon, run_id=run_id)
                 )
             except Exception as exc:
                 duration = perf_counter() - stage_started
                 exception_error = str(exc)[:500]
                 ledger.record_stage_result(
-                    run_id, stage, "ERROR", {"error": exception_error}, duration_seconds=duration,
-                    error=exception_error, mode=stage_mode,
+                    run_id,
+                    stage,
+                    "ERROR",
+                    {"error": exception_error},
+                    duration_seconds=duration,
+                    error=exception_error,
+                    mode=stage_mode,
                 )
                 ledger.finish_run(
-                    run_id, "ERROR", duration_seconds=perf_counter() - run_started,
-                    error=exception_error, mode=run_mode,
+                    run_id,
+                    "ERROR",
+                    duration_seconds=perf_counter() - run_started,
+                    error=exception_error,
+                    mode=run_mode,
                 )
                 raise
             duration = perf_counter() - stage_started
-            stage_error: str | None = str(result.detail.get("error") or result.detail.get("reason"))[:500] \
-                if result.status == "ERROR" else None
+            stage_error: str | None = (
+                str(result.detail.get("error") or result.detail.get("reason"))[:500]
+                if result.status == "ERROR"
+                else None
+            )
             row_count = _honest_row_count(stage, result.detail)
             report["stages"][stage] = {
-                "status": result.status, "detail": result.detail, "duration_seconds": duration,
-                "error": stage_error, "mode": stage_mode, "rows": row_count,
+                "status": result.status,
+                "detail": result.detail,
+                "duration_seconds": duration,
+                "error": stage_error,
+                "mode": stage_mode,
+                "rows": row_count,
             }
             ledger.record_stage_result(
-                run_id, stage, result.status, result.detail, duration_seconds=duration,
-                error=stage_error, mode=stage_mode, row_count=row_count,
+                run_id,
+                stage,
+                result.status,
+                result.detail,
+                duration_seconds=duration,
+                error=stage_error,
+                mode=stage_mode,
+                row_count=row_count,
             )
             if result.status != "SUCCESS" and only_stage is None:
                 break
-        terminal_status = next(reversed(report["stages"].values()))["status"] if report["stages"] else "SUCCESS"
+        terminal_status = (
+            next(reversed(report["stages"].values()))["status"] if report["stages"] else "SUCCESS"
+        )
         if terminal_status == "SKIPPED_ALREADY_COMPLETE":
             terminal_status = "SUCCESS"
         terminal_error = next(
             (item["error"] for item in reversed(list(report["stages"].values())) if item["error"]), None
         )
         ledger.finish_run(
-            run_id, terminal_status, duration_seconds=perf_counter() - run_started,
-            error=terminal_error, mode=run_mode,
+            run_id,
+            terminal_status,
+            duration_seconds=perf_counter() - run_started,
+            error=terminal_error,
+            mode=run_mode,
         )
         return report
     except Exception as exc:
@@ -144,8 +182,11 @@ def run(
             row = ledger.get_run(run_id)
             if row is not None and row.get("finished_at") is None:
                 ledger.finish_run(
-                    run_id, "ERROR", duration_seconds=perf_counter() - run_started,
-                    error=str(exc)[:500], mode=run_mode,
+                    run_id,
+                    "ERROR",
+                    duration_seconds=perf_counter() - run_started,
+                    error=str(exc)[:500],
+                    mode=run_mode,
                 )
         raise
     finally:

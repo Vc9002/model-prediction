@@ -76,16 +76,17 @@ def _metrics(labels: np.ndarray, probs: np.ndarray) -> dict[str, Any]:
 def main() -> None:
     # ── 1. Load data ──
     print("1. Loading TennisMyLife matches (ATP+WTA, 2021-2025)...")
-    result = build_dataset("data/rebuild", tours=TOURS,
-                           minimum_history_matches=100, minimum_player_matches=3)
+    result = build_dataset("data/rebuild", tours=TOURS, minimum_history_matches=100, minimum_player_matches=3)
     if not result.rows:
         print("ERROR: no walk-forward rows produced. Check data backfill.")
         sys.exit(1)
 
     frame = rows_to_frame(result.rows)
     print(f"   Loaded {result.n_total} matches (ATP+WTA)")
-    print(f"   Skipped: {result.skipped_bootstrap} bootstrap, "
-          f"{result.skipped_cold_start} cold-start, {result.skipped_irregular} irregular")
+    print(
+        f"   Skipped: {result.skipped_bootstrap} bootstrap, "
+        f"{result.skipped_cold_start} cold-start, {result.skipped_irregular} irregular"
+    )
     print(f"   Walk-forward rows: {frame.height}")
 
     labels = frame["player_one_win"].to_numpy().astype(np.float64)
@@ -99,7 +100,9 @@ def main() -> None:
     test_size = max(1, n_dates // 5)
     calib_size = max(1, n_dates // 5)
     train_dates, calib_dates, test_dates = date_cluster_split(dates_list, test_size, calib_size)
-    print(f"   {len(unique_dates)} unique dates → train={len(train_dates)} calib={len(calib_dates)} test={len(test_dates)}")
+    print(
+        f"   {len(unique_dates)} unique dates → train={len(train_dates)} calib={len(calib_dates)} test={len(test_dates)}"
+    )
     train_mask = pl.Series(dates_list).is_in(train_dates).to_numpy()
     val_mask = pl.Series(dates_list).is_in(calib_dates).to_numpy()
     holdout_mask = pl.Series(dates_list).is_in(test_dates).to_numpy()
@@ -109,12 +112,16 @@ def main() -> None:
 
     train_metrics = _metrics(train_labels, train_probs)
     val_metrics = _metrics(val_labels, val_probs)
-    print(f"   Train (n={train_metrics['n']}): LogLoss={train_metrics['log_loss']:.5f} "
-          f"Brier={train_metrics['brier']:.5f} ECE={train_metrics['ece']:.5f} "
-          f"Acc={train_metrics['accuracy']:.4f}")
-    print(f"   Validation (n={val_metrics['n']}): LogLoss={val_metrics['log_loss']:.5f} "
-          f"Brier={val_metrics['brier']:.5f} ECE={val_metrics['ece']:.5f} "
-          f"Acc={val_metrics['accuracy']:.4f}")
+    print(
+        f"   Train (n={train_metrics['n']}): LogLoss={train_metrics['log_loss']:.5f} "
+        f"Brier={train_metrics['brier']:.5f} ECE={train_metrics['ece']:.5f} "
+        f"Acc={train_metrics['accuracy']:.4f}"
+    )
+    print(
+        f"   Validation (n={val_metrics['n']}): LogLoss={val_metrics['log_loss']:.5f} "
+        f"Brier={val_metrics['brier']:.5f} ECE={val_metrics['ece']:.5f} "
+        f"Acc={val_metrics['accuracy']:.4f}"
+    )
 
     # ── 3. Surface breakdown ──
     print("\n3. Surface breakdown (validation fold)...")
@@ -125,8 +132,10 @@ def main() -> None:
             sl = sf["player_one_win"].to_numpy().astype(np.float64)
             sp = sf["elo_probability_player_one"].to_numpy().astype(np.float64)
             sm = _metrics(sl, sp)
-            print(f"   {surface} (n={sm['n']}): LogLoss={sm['log_loss']:.5f} "
-                  f"Brier={sm['brier']:.5f} Acc={sm['accuracy']:.4f}")
+            print(
+                f"   {surface} (n={sm['n']}): LogLoss={sm['log_loss']:.5f} "
+                f"Brier={sm['brier']:.5f} Acc={sm['accuracy']:.4f}"
+            )
 
     # ── 4. Calibration ──
     print("\n4. Calibration cross-fit comparison...")
@@ -161,8 +170,10 @@ def main() -> None:
             print(f"   {method}: SKIPPED ({m['error']})")
         else:
             marker = " <<<" if method == winning_method else ""
-            print(f"   {method}: LogLoss={m['log_loss']:.5f} Brier={m['brier']:.5f} "
-                  f"ECE={m['ece']:.5f} slope={m.get('calibration_slope','n/a')}{marker}")
+            print(
+                f"   {method}: LogLoss={m['log_loss']:.5f} Brier={m['brier']:.5f} "
+                f"ECE={m['ece']:.5f} slope={m.get('calibration_slope', 'n/a')}{marker}"
+            )
 
     if winning_method == "identity":
         calibrator: Calibrator = IdentityCalibrator()
@@ -181,9 +192,11 @@ def main() -> None:
         raw_score = holdout_metrics_raw["ece"] + holdout_metrics_raw["brier"]
         cal_score = holdout_metrics_cal["ece"] + holdout_metrics_cal["brier"]
         if cal_score > raw_score:
-            print(f"   WARNING: {winning_method} calibration worsens holdout "
-                  f"(ECE+Brier: {raw_score:.4f} → {cal_score:.4f}). "
-                  f"Falling back to identity.")
+            print(
+                f"   WARNING: {winning_method} calibration worsens holdout "
+                f"(ECE+Brier: {raw_score:.4f} → {cal_score:.4f}). "
+                f"Falling back to identity."
+            )
             calibrator = IdentityCalibrator()
             winning_method = "identity"
             holdout_metrics_cal = holdout_metrics_raw
@@ -197,15 +210,19 @@ def main() -> None:
     except ValueError:
         cal_diag_cal = {"calibration_intercept": None, "calibration_slope": None}
 
-    print(f"   Holdout raw (n={holdout_metrics_raw['n']}): "
-          f"LogLoss={holdout_metrics_raw['log_loss']:.5f} "
-          f"Brier={holdout_metrics_raw['brier']:.5f} "
-          f"ECE={holdout_metrics_raw['ece']:.5f} "
-          f"Acc={holdout_metrics_raw['accuracy']:.4f}")
-    print(f"   Holdout calibrated: "
-          f"LogLoss={holdout_metrics_cal['log_loss']:.5f} "
-          f"Brier={holdout_metrics_cal['brier']:.5f} "
-          f"ECE={holdout_metrics_cal['ece']:.5f}")
+    print(
+        f"   Holdout raw (n={holdout_metrics_raw['n']}): "
+        f"LogLoss={holdout_metrics_raw['log_loss']:.5f} "
+        f"Brier={holdout_metrics_raw['brier']:.5f} "
+        f"ECE={holdout_metrics_raw['ece']:.5f} "
+        f"Acc={holdout_metrics_raw['accuracy']:.4f}"
+    )
+    print(
+        f"   Holdout calibrated: "
+        f"LogLoss={holdout_metrics_cal['log_loss']:.5f} "
+        f"Brier={holdout_metrics_cal['brier']:.5f} "
+        f"ECE={holdout_metrics_cal['ece']:.5f}"
+    )
 
     # ── 6. Tour breakdown (holdout) ──
     print("\n6. Tour breakdown (holdout)...")
@@ -214,11 +231,17 @@ def main() -> None:
         tf = hf.filter(pl.col("tour") == tour)
         if tf.height > 0:
             tl = tf["player_one_win"].to_numpy().astype(np.float64)
-            tp = np.array([calibrator.transform(float(p))
-                          for p in tf["elo_probability_player_one"].to_numpy().astype(np.float64)])
+            tp = np.array(
+                [
+                    calibrator.transform(float(p))
+                    for p in tf["elo_probability_player_one"].to_numpy().astype(np.float64)
+                ]
+            )
             tm = _metrics(tl, tp)
-            print(f"   {tour} (n={tm['n']}): LogLoss={tm['log_loss']:.5f} "
-                  f"Brier={tm['brier']:.5f} Acc={tm['accuracy']:.4f}")
+            print(
+                f"   {tour} (n={tm['n']}): LogLoss={tm['log_loss']:.5f} "
+                f"Brier={tm['brier']:.5f} Acc={tm['accuracy']:.4f}"
+            )
 
     # ── 7. Persist artifacts ──
     print("\n7. Persisting challenger artifacts...")
@@ -323,23 +346,29 @@ def main() -> None:
     # Training results summary
     results_path = Path("outputs/rebuild/tennis/tennis_rebuild_v1_training_results.json")
     results_path.parent.mkdir(parents=True, exist_ok=True)
-    results_path.write_text(json.dumps({
-        "train_metrics": train_metrics,
-        "validation_metrics": val_metrics,
-        "holdout_metrics_raw": holdout_metrics_raw,
-        "holdout_metrics_calibrated": holdout_metrics_cal,
-        "holdout_calibration_diagnostics_raw": cal_diag_raw,
-        "holdout_calibration_diagnostics_calibrated": cal_diag_cal,
-        "calibration_results": calibration_results,
-        "winning_calibration_method": winning_method,
-        "artifact_hash": artifact_hash,
-        "calibrator_hash": calibrator_hash,
-        "n_rows_total": frame.height,
-        "n_total_matches": result.n_total,
-        "skipped_bootstrap": result.skipped_bootstrap,
-        "skipped_cold_start": result.skipped_cold_start,
-        "skipped_irregular": result.skipped_irregular,
-    }, indent=2, default=str))
+    results_path.write_text(
+        json.dumps(
+            {
+                "train_metrics": train_metrics,
+                "validation_metrics": val_metrics,
+                "holdout_metrics_raw": holdout_metrics_raw,
+                "holdout_metrics_calibrated": holdout_metrics_cal,
+                "holdout_calibration_diagnostics_raw": cal_diag_raw,
+                "holdout_calibration_diagnostics_calibrated": cal_diag_cal,
+                "calibration_results": calibration_results,
+                "winning_calibration_method": winning_method,
+                "artifact_hash": artifact_hash,
+                "calibrator_hash": calibrator_hash,
+                "n_rows_total": frame.height,
+                "n_total_matches": result.n_total,
+                "skipped_bootstrap": result.skipped_bootstrap,
+                "skipped_cold_start": result.skipped_cold_start,
+                "skipped_irregular": result.skipped_irregular,
+            },
+            indent=2,
+            default=str,
+        )
+    )
     print(f"   Results: {results_path}")
     print("\nDone. Tennis Surface Elo rebuild v1 trained.")
 

@@ -314,9 +314,7 @@ def backfill_international_baseball(
         team_id: {
             "team_id": team_id,
             "name": team["name"],
-            "aliases": sorted(
-                set(team.get("aliases", ())) | set(team.get("source_names", ())) | {team_id}
-            ),
+            "aliases": sorted(set(team.get("aliases", ())) | set(team.get("source_names", ())) | {team_id}),
         }
         for team_id, team in LEAGUE_SPECS[league]["teams"].items()
     }
@@ -453,9 +451,7 @@ def _merge_year_into_international_baseball_history(
         team_id: {
             "team_id": team_id,
             "name": team["name"],
-            "aliases": sorted(
-                set(team.get("aliases", ())) | set(team.get("source_names", ())) | {team_id}
-            ),
+            "aliases": sorted(set(team.get("aliases", ())) | set(team.get("source_names", ())) | {team_id}),
         }
         for team_id, team in LEAGUE_SPECS[league]["teams"].items()
     }
@@ -599,6 +595,7 @@ class HomeElo:
         if self.decay_rate <= 0 or self._last_active is None:
             return
         from datetime import date
+
         today = date.fromisoformat(game_date)
         for team_id in list(self.ratings):
             last = self._last_active.get(team_id)
@@ -632,6 +629,7 @@ class HomeElo:
         k_eff = self.k
         if self.margin_weight > 0 and margin > 1:
             import math
+
             k_eff = self.k * (1.0 + self.margin_weight * math.log(margin))
         delta = k_eff * (outcome - probability)
         self.ratings[row["home_team_id"]] = self.ratings.get(row["home_team_id"], 1500.0) + delta
@@ -699,9 +697,7 @@ def _training_prefix_sha256(rows: list[dict[str, Any]], through_date: str) -> st
         (row for row in rows if str(row["game_date"]) <= through_date),
         key=lambda row: (row["game_date"], row["game_id"]),
     )
-    return hashlib.sha256(
-        "".join(_canonical_json(row) + "\n" for row in prefix).encode("utf-8")
-    ).hexdigest()
+    return hashlib.sha256("".join(_canonical_json(row) + "\n" for row in prefix).encode("utf-8")).hexdigest()
 
 
 def _batched_predictions(
@@ -720,14 +716,22 @@ def _batched_predictions(
         for row in groups[game_date]:
             decisive_home = book.decisive_home_probability(row["away_team_id"], row["home_team_id"])
             game_tie_p = _game_tie_probability(
-                row["away_team_id"], row["home_team_id"], book, tie_method, base_tie_probability,
+                row["away_team_id"],
+                row["home_team_id"],
+                book,
+                tie_method,
+                base_tie_probability,
             )
             _, fair_home = tie_aware_fair_values(decisive_home, game_tie_p)
             outcome = 0.5 if row["tie"] else float(row["home_score"] > row["away_score"])
-            output.append({
-                "probability": fair_home, "outcome": outcome, "tie": bool(row["tie"]),
-                "game_date": game_date,
-            })
+            output.append(
+                {
+                    "probability": fair_home,
+                    "outcome": outcome,
+                    "tie": bool(row["tie"]),
+                    "game_date": game_date,
+                }
+            )
             pending.append((row, decisive_home, game_tie_p))
         for row, probability, _tie_p in pending:
             book.update(row, probability)
@@ -743,8 +747,14 @@ def _tie_rate(rows: Sequence[dict[str, Any]]) -> float:
 def _metrics(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
     if not rows:
         return {
-            "observations": 0, "brier_settlement": None, "mae_settlement": None, "accuracy_decisive": None,
-            "ties": 0, "calls": 0, "hits": 0, "units_at_minus_110": 0.0,
+            "observations": 0,
+            "brier_settlement": None,
+            "mae_settlement": None,
+            "accuracy_decisive": None,
+            "ties": 0,
+            "calls": 0,
+            "hits": 0,
+            "units_at_minus_110": 0.0,
         }
     brier = sum((float(row["probability"]) - float(row["outcome"])) ** 2 for row in rows) / len(rows)
     mae = sum(abs(float(row["probability"]) - float(row["outcome"])) for row in rows) / len(rows)
@@ -782,8 +792,11 @@ def _fit_and_score(
     tie_method: str = "flat",
 ) -> tuple[HomeElo, list[dict[str, Any]]]:
     book = HomeElo(
-        k=k, home_advantage=home_advantage, ratings={},
-        margin_weight=margin_weight, decay_rate=decay_rate,
+        k=k,
+        home_advantage=home_advantage,
+        ratings={},
+        margin_weight=margin_weight,
+        decay_rate=decay_rate,
     )
     tie_probability = _tie_rate(training)
     _batched_predictions(book, training, tie_probability, tie_method=tie_method)
@@ -828,15 +841,24 @@ def validate_international_baseball_baseline(
                 for decay_rate in DECAY_CANDIDATES:
                     for tie_method in TIE_MODEL_CANDIDATES:
                         _, predictions = _fit_and_score(
-                            train, validation, k, home_advantage,
-                            margin_weight=margin_weight, decay_rate=decay_rate,
+                            train,
+                            validation,
+                            k,
+                            home_advantage,
+                            margin_weight=margin_weight,
+                            decay_rate=decay_rate,
                             tie_method=tie_method,
                         )
-                        candidates.append({
-                            "k": k, "home_advantage": home_advantage,
-                            "margin_weight": margin_weight, "decay_rate": decay_rate,
-                            "tie_method": tie_method, **_metrics(predictions),
-                        })
+                        candidates.append(
+                            {
+                                "k": k,
+                                "home_advantage": home_advantage,
+                                "margin_weight": margin_weight,
+                                "decay_rate": decay_rate,
+                                "tie_method": tie_method,
+                                **_metrics(predictions),
+                            }
+                        )
     chosen = min(
         candidates,
         key=lambda row: (float(row["brier_settlement"]), float(row["mae_settlement"])),
@@ -847,8 +869,13 @@ def validate_international_baseball_baseline(
     chosen_decay = float(chosen.get("decay_rate", 0))
     chosen_tie = str(chosen.get("tie_method", "flat"))
     _, test_predictions = _fit_and_score(
-        [*train, *validation], test, chosen_k, chosen_home,
-        margin_weight=chosen_margin, decay_rate=chosen_decay, tie_method=chosen_tie,
+        [*train, *validation],
+        test,
+        chosen_k,
+        chosen_home,
+        margin_weight=chosen_margin,
+        decay_rate=chosen_decay,
+        tie_method=chosen_tie,
     )
     # Confidence-threshold selection: same methodology as
     # validation.qualify_soccer_total_model/qualify_tennis_elo_model --
@@ -860,23 +887,36 @@ def validate_international_baseball_baseline(
     # 0.50 regardless of the model's selected side, so it is neither a hit
     # nor a miss for a confidence-gated call.
     _, chosen_validation_predictions = _fit_and_score(
-        train, validation, chosen_k, chosen_home,
-        margin_weight=chosen_margin, decay_rate=chosen_decay, tie_method=chosen_tie,
+        train,
+        validation,
+        chosen_k,
+        chosen_home,
+        margin_weight=chosen_margin,
+        decay_rate=chosen_decay,
+        tie_method=chosen_tie,
     )
-    val_confidences = [abs(row["probability"] - 0.5) for row in chosen_validation_predictions if not row["tie"]]
+    val_confidences = [
+        abs(row["probability"] - 0.5) for row in chosen_validation_predictions if not row["tie"]
+    ]
     val_hits = [
         int((row["probability"] >= 0.5) == bool(row["outcome"]))
-        for row in chosen_validation_predictions if not row["tie"]
+        for row in chosen_validation_predictions
+        if not row["tie"]
     ]
     try:
         confidence_threshold, confidence_val_stats = _learn_threshold_from_confidence_hit(
-            val_confidences, val_hits,
+            val_confidences,
+            val_hits,
             target_hit_rate=PRIMARY_THRESHOLD_TARGET_HIT_RATE,
             minimum_calls=MINIMUM_CALLS,
         )
         test_decisive = [row for row in test_predictions if not row["tie"]]
         selected_for_grade = [
-            (abs(row["probability"] - 0.5), int((row["probability"] >= 0.5) == bool(row["outcome"])), row["game_date"])
+            (
+                abs(row["probability"] - 0.5),
+                int((row["probability"] >= 0.5) == bool(row["outcome"])),
+                row["game_date"],
+            )
             for row in test_decisive
             if abs(row["probability"] - 0.5) >= confidence_threshold
         ]
@@ -886,11 +926,14 @@ def validate_international_baseball_baseline(
         gate_units = gate_hits * (10 / 11) - (gate_calls - gate_hits) if gate_calls else 0.0
         gate_holdout_end = (
             max(date.fromisoformat(day) for _, _, day in selected_for_grade)
-            if selected_for_grade else date.today()  # noqa: DTZ011 — holdout boundary is an ET game date, timezone N/A
+            if selected_for_grade
+            else date.today()  # noqa: DTZ011 — holdout boundary is an ET game date, timezone N/A
         )
         gate_monthly = _monthly_grade(selected_for_grade, holdout_end=gate_holdout_end)
         gate_every_month_positive = all(
-            month["units_at_minus_110"] > 0 for month in gate_monthly if month["qualification_status"] == "qualifying"
+            month["units_at_minus_110"] > 0
+            for month in gate_monthly
+            if month["qualification_status"] == "qualifying"
         )
         confidence_gate_report: dict[str, Any] = {
             "status": "evaluated",
@@ -916,8 +959,11 @@ def validate_international_baseball_baseline(
     except ValueError as error:
         confidence_gate_report = {"status": "no_validation_threshold", "reason": str(error)}
     all_book = HomeElo(
-        k=chosen_k, home_advantage=chosen_home, ratings={},
-        margin_weight=chosen_margin, decay_rate=chosen_decay,
+        k=chosen_k,
+        home_advantage=chosen_home,
+        ratings={},
+        margin_weight=chosen_margin,
+        decay_rate=chosen_decay,
     )
     _batched_predictions(all_book, rows, _tie_rate(rows), tie_method=chosen_tie)
     source_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -995,8 +1041,16 @@ def validate_international_baseball_baseline(
         "tie_rate": round(_tie_rate(rows), 6),
         "chronological_split": {
             "train": {"n": len(train), "through_date": train[-1]["game_date"]},
-            "validation": {"n": len(validation), "from_date": validation[0]["game_date"], "through_date": validation[-1]["game_date"]},
-            "locked_test": {"n": len(test), "from_date": test[0]["game_date"], "through_date": test[-1]["game_date"]},
+            "validation": {
+                "n": len(validation),
+                "from_date": validation[0]["game_date"],
+                "through_date": validation[-1]["game_date"],
+            },
+            "locked_test": {
+                "n": len(test),
+                "from_date": test[0]["game_date"],
+                "through_date": test[-1]["game_date"],
+            },
         },
         "parameter_selection_on_validation": candidates,
         "chosen": {"k": chosen_k, "home_advantage": chosen_home},
@@ -1104,8 +1158,11 @@ def forecast_international_baseball_slate(
     decay_rate = float(artifact.get("decay_rate", 0))
     tie_method = str(artifact.get("tie_method", "flat"))
     book = HomeElo(
-        float(artifact["k"]), float(artifact["home_advantage"]), ratings,
-        margin_weight=margin_weight, decay_rate=decay_rate,
+        float(artifact["k"]),
+        float(artifact["home_advantage"]),
+        ratings,
+        margin_weight=margin_weight,
+        decay_rate=decay_rate,
     )
     tie_probability = float(artifact["tie_probability"])
     trained_through = date.fromisoformat(str(artifact["trained_through_date"]))
@@ -1140,7 +1197,13 @@ def forecast_international_baseball_slate(
                 no_calls.append({**base, "reason": "NO_CALL_POINT_IN_TIME_MODEL_ARTIFACT"})
                 continue
             if any(len(candidates) != 1 for candidates in matches):
-                no_calls.append({**base, "reason": "NO_CALL_ENTITY_UNRESOLVED", "candidate_counts": [len(value) for value in matches]})
+                no_calls.append(
+                    {
+                        **base,
+                        "reason": "NO_CALL_ENTITY_UNRESOLVED",
+                        "candidate_counts": [len(value) for value in matches],
+                    }
+                )
                 continue
             team_ids = [next(iter(candidates)) for candidates in matches]
             if team_ids[0] == team_ids[1]:

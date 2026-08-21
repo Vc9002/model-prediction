@@ -69,9 +69,7 @@ def capture_espn_event_injuries(
 ) -> dict[str, Any]:
     observed = parse_utc((observed_at or utc_now()).isoformat())
     summary = client.summary("WNBA", event_id)
-    payload = normalize_espn_event_injuries(
-        summary, event_id=event_id, observed_at=observed
-    )
+    payload = normalize_espn_event_injuries(summary, event_id=event_id, observed_at=observed)
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     payload["snapshot_sha256"] = hashlib.sha256(canonical).hexdigest()
     stamp = observed.strftime("%Y%m%dT%H%M%S%z")

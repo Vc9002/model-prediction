@@ -99,9 +99,7 @@ def test_require_external_runtime_fails_closed_when_env_unset(monkeypatch, tmp_p
 def test_require_external_runtime_honors_env(monkeypatch, tmp_path):
     runtime = tmp_path / "runtime"
     monkeypatch.setenv("MODEL_PREDICTION_RUNTIME_ROOT", str(runtime))
-    paths = RuntimePaths.resolve(
-        repo_root=tmp_path / "repo", require_external_runtime=True
-    )
+    paths = RuntimePaths.resolve(repo_root=tmp_path / "repo", require_external_runtime=True)
     assert paths.runtime_root == runtime.resolve()
 
 

@@ -11,6 +11,7 @@ HERE for the same BLE001-exemption reason as the other cli modules.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -19,9 +20,13 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from ..config import PROJECT_ROOT, ledger_path, market_odds_snapshot_path, unit_policy
+from ..config import PROJECT_ROOT, config_path, ledger_path, market_odds_snapshot_path, unit_policy
 from ..data_sources.espn import ESPNClient, ESPNMLBClient
-from ..data_sources.mlb_market_odds import MarketOddsSnapshotStore, MLBMarketOddsFeed
+from ..data_sources.mlb_market_odds import (
+    MarketOddsSnapshotStore,
+    MLBMarketOddsFeed,
+    load_verified_mlb_market_snapshot,
+)
 from ..data_sources.polymarket_us import probability_to_american
 from ..data_sources.the_odds_api import TheOddsAPIClient
 from ..domain import (
@@ -55,9 +60,12 @@ from ..international_baseball import (
 from ..learned_forward import build_learned_moneyline_slate, match_executable_quote
 from ..ledger import DuplicatePickError
 from ..main_ledgers import MAIN_LEDGER_SPORTS, MultiSportPickLedger
+from ..market_blend import MarketBlendBlockedError, MarketBlendPolicy, canonical_config_logical_hash
 from ..models.market_residual import MarketResidualModel
-from ..models.mlb import load_formula_spec
+from ..models.mlb import canonical_mlb_artifact_hash, load_formula_spec
+from ..pricing import implied_probability
 from ..research_ledgers import RESEARCH_LEDGER_SPORTS, research_ledger
+from ..runtime_paths import RuntimePaths
 from ..soccer_forward import build_soccer_total_slate
 from ..tennis_forward import build_tennis_slate
 from .commands import _clear_today_open, _research_models_dir
@@ -222,7 +230,19 @@ def _refresh_international_baseball_ratings(data_root) -> dict:
 
 
 def _forecast_mlb_totals_flat(
-    args_date: str, log: bool, config, registry, bans, flat_ledger, audit, main_ledger=None
+    args_date: str,
+    log: bool,
+    config,
+    registry,
+    bans,
+    flat_ledger,
+    audit,
+    main_ledger=None,
+    *,
+    blend_policy_artifact_path: str | Path | None = None,
+    blend_policy_report_path: str | Path | None = None,
+    runtime_paths: RuntimePaths | None = None,
+    preflight_only: bool = False,
 ) -> dict:
     """MLB total-runs and run-line picks (Measured Edge Monte-Carlo margin +
     totals models) into flat_picks.xlsx + main ledger. Flat logs every
@@ -237,6 +257,24 @@ def _forecast_mlb_totals_flat(
     against is already the main/most-balanced line, not an alternate (see
     mlb_market_odds._select_full_game_market's `_market_balance`).
     """
+    blend_policy: MarketBlendPolicy | None = None
+    if blend_policy_artifact_path is None:
+        if blend_policy_report_path is not None or runtime_paths is not None:
+            raise MarketBlendBlockedError(
+                "blend policy report/runtime paths require an explicit policy artifact"
+            )
+    else:
+        if blend_policy_report_path is None:
+            raise MarketBlendBlockedError("blend activation requires both policy artifact and gate report")
+        runtime_paths = runtime_paths or RuntimePaths.resolve(
+            repo_root=PROJECT_ROOT, require_external_runtime=True
+        )
+        blend_policy = MarketBlendPolicy.load(
+            blend_policy_artifact_path,
+            runtime_paths=runtime_paths,
+            report_path=blend_policy_report_path,
+        )
+
     spec = load_formula_spec(PROJECT_ROOT / "config/models/mlb-analyst-poisson-trend-v0.3.yaml")
     observed_at = utc_now()
     odds_api_key = os.getenv("THE_ODDS_API_KEY")
@@ -260,6 +298,17 @@ def _forecast_mlb_totals_flat(
         for candidate in candidates
         if candidate.market_type in (MarketType.TOTAL, MarketType.SPREAD)
     ]
+    stage1_config_path = config_path().resolve()
+    try:
+        stage1_config_bytes = stage1_config_path.read_bytes()
+    except OSError:
+        stage1_config_bytes = None
+    stage1_config_byte_sha256 = (
+        hashlib.sha256(stage1_config_bytes).hexdigest() if stage1_config_bytes is not None else None
+    )
+    stage1_config_hash = (
+        canonical_config_logical_hash(stage1_config_bytes) if stage1_config_bytes is not None else None
+    )
     logged, duplicates = [], []
     # DD-2 (deep debug audit, 2026-08-04): main_ledger's secondary write
     # below used to silently drop a duplicate with no trace at all --
@@ -267,8 +316,95 @@ def _forecast_mlb_totals_flat(
     # except DuplicatePickError catches flat_ledger.append_evaluated, since
     # that call sits outside the suppress block).
     main_duplicates = []
+    planned_rows: list[tuple[PickRequest, Any]] = []
     if log:
         for candidate in totals_candidates:
+            model_artifact_path = (
+                PROJECT_ROOT / "config/models/measured-edge-totals-v3.json"
+                if candidate.market_type is MarketType.TOTAL
+                else PROJECT_ROOT / "config/models/measured-edge-margin-v3.json"
+            ).resolve()
+            try:
+                model_artifact_bytes = model_artifact_path.read_bytes()
+            except OSError:
+                model_artifact_bytes = None
+            raw_model_probability = candidate.shrunk_probability
+            market_probability = implied_probability(candidate.american_odds)
+            if (
+                candidate.market_snapshot_archive_path is not None
+                and candidate.market_snapshot_record_id is not None
+            ):
+                try:
+                    load_verified_mlb_market_snapshot(
+                        archive_path=candidate.market_snapshot_archive_path,
+                        record_id=candidate.market_snapshot_record_id,
+                        approved_roots=(market_odds_snapshot_path(config).resolve().parent,),
+                        expected_snapshot_hash=candidate.market_snapshot_hash,
+                        event_id=candidate.event_id,
+                        observed_at_utc=candidate.observed_at_utc,
+                        provider=candidate.sportsbook,
+                        market_type=candidate.market_type.value,
+                        selection=candidate.selection,
+                        line=candidate.line,
+                        american_odds=candidate.american_odds,
+                    )
+                except ValueError as exc:
+                    if blend_policy is not None:
+                        raise MarketBlendBlockedError(
+                            f"archived market snapshot verification failed: {exc}"
+                        ) from exc
+            serving_probability = raw_model_probability
+            blend_weight = None
+            blend_policy_hash = None
+            blend_spec_hash = None
+            if blend_policy is not None and candidate.market_type is MarketType.TOTAL:
+                try:
+                    snapshot_hash_valid = (
+                        isinstance(candidate.market_snapshot_hash, str)
+                        and len(candidate.market_snapshot_hash) == 64
+                        and int(candidate.market_snapshot_hash, 16) >= 0
+                    )
+                except ValueError:
+                    snapshot_hash_valid = False
+                if not snapshot_hash_valid:
+                    raise MarketBlendBlockedError(
+                        "exact market snapshot SHA-256 is missing or invalid at the decision boundary"
+                    )
+                if (
+                    candidate.market_quote_timestamp_valid is not True
+                    or candidate.market_quote_source != "polymarket_us"
+                    or candidate.market_quote_provenance != "decision_time_executable_quote"
+                    or candidate.market_quote_reconstructed is not False
+                ):
+                    raise MarketBlendBlockedError(
+                        "decision-time market quote provenance is not serving-qualified"
+                    )
+                if model_artifact_bytes is None:
+                    raise MarketBlendBlockedError("measured-edge totals artifact bytes are unavailable")
+                try:
+                    model_artifact_raw = json.loads(model_artifact_bytes)
+                except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                    raise MarketBlendBlockedError("measured-edge totals artifact is not valid JSON") from exc
+                semantic_hash = canonical_mlb_artifact_hash(model_artifact_raw)
+                if (
+                    semantic_hash != candidate.model_artifact_hash
+                    or model_artifact_raw.get("artifact_hash") != semantic_hash
+                ):
+                    raise MarketBlendBlockedError(
+                        "candidate and measured-edge totals artifact identities differ"
+                    )
+                blend_audit = blend_policy.apply(
+                    sport="mlb",
+                    market="total",
+                    model_probability=raw_model_probability,
+                    market_probability=market_probability,
+                    model_artifact_hash=semantic_hash,
+                    config_hash=stage1_config_hash,
+                )
+                serving_probability = blend_audit.blended_probability
+                blend_weight = blend_audit.weight
+                blend_policy_hash = blend_audit.policy_artifact_hash
+                blend_spec_hash = blend_audit.experiment_spec_hash
             request = PickRequest(
                 event_start_utc=candidate.event_start_utc,
                 event_id=candidate.event_id,
@@ -280,7 +416,7 @@ def _forecast_mlb_totals_flat(
                 line=candidate.line,
                 sportsbook=candidate.sportsbook,
                 american_odds=candidate.american_odds,
-                model_probability=candidate.shrunk_probability,
+                model_probability=serving_probability,
                 model_uncertainty=candidate.uncertainty,
                 model_version=candidate.model_version,
                 rationale=candidate.rationale,
@@ -296,13 +432,38 @@ def _forecast_mlb_totals_flat(
                 entity_map_version=registry.version,
                 code_revision="measured-edge-paired-v1",
                 decision_no_vig_probability=candidate.no_vig_probability,
+                config_hash=stage1_config_hash,
+                config_byte_sha256=stage1_config_byte_sha256,
+                config_path=str(stage1_config_path),
+                model_artifact_byte_sha256=(
+                    hashlib.sha256(model_artifact_bytes).hexdigest()
+                    if model_artifact_bytes is not None
+                    else None
+                ),
+                model_artifact_path=str(model_artifact_path),
+                market_quote_observed_at_utc=candidate.observed_at_utc,
+                market_quote_timestamp_valid=candidate.market_quote_timestamp_valid,
+                market_quote_source=candidate.market_quote_source,
+                market_quote_provenance=candidate.market_quote_provenance,
+                market_quote_reconstructed=candidate.market_quote_reconstructed,
+                market_snapshot_hash=candidate.market_snapshot_hash,
+                market_snapshot_archive_path=candidate.market_snapshot_archive_path,
+                market_snapshot_record_id=candidate.market_snapshot_record_id,
+                record_source="live_forecast",
+                is_backfill=False,
+                model_probability_raw=raw_model_probability,
+                market_probability_at_decision=market_probability,
+                serving_probability=serving_probability,
+                blend_weight=blend_weight,
+                blend_policy_artifact_hash=blend_policy_hash,
+                blend_experiment_spec_hash=blend_spec_hash,
+                blend_config_hash=(stage1_config_hash if blend_policy is not None else None),
             )
             try:
                 request.validate(now=observed_at)
                 away = registry.resolve(request.league, request.away_team, request.event_start_utc)
                 home = registry.resolve(request.league, request.home_team, request.event_start_utc)
-                # Exposure check and append happen inside one held lock -- see
-                # the matching comment in _log_esports_forecast.
+                # Preflight computes every decision before any ledger mutation.
                 with _LEDGER_LOCK:
                     eligibility = evaluate_eligibility(
                         request,
@@ -316,19 +477,25 @@ def _forecast_mlb_totals_flat(
                         unit_policy(config),
                         now=observed_at,
                     )
-                    # Flat: every evaluated candidate is logged, no edge gate.
+                planned_rows.append((request, eligibility))
+            except (EntityResolutionError, ValueError) as error:
+                if preflight_only or blend_policy is not None:
+                    raise MarketBlendBlockedError(
+                        f"MLB totals preflight failed for {candidate.event_id}: {error}"
+                    ) from error
+                skipped.append({"event_id": candidate.event_id, "reason": str(error)[:200]})
+        if not preflight_only:
+            for request, eligibility in planned_rows:
+                try:
                     logged.append(flat_ledger.append_evaluated(request, eligibility, now=observed_at))
-                    # Main: only genuinely eligible (CALL) rows — operator directive 2026-08-03.
                     if main_ledger is not None and eligibility.decision == "CALL":
                         existing_pick_id = _append_secondary_ledger(
                             main_ledger, request, eligibility, observed_at, "mlb_totals:main_ledger"
                         )
                         if existing_pick_id is not None:
                             main_duplicates.append(existing_pick_id)
-            except DuplicatePickError as error:
-                duplicates.append(error.pick_id)
-            except (EntityResolutionError, ValueError) as error:
-                skipped.append({"event_id": candidate.event_id, "reason": str(error)[:200]})
+                except DuplicatePickError as error:
+                    duplicates.append(error.pick_id)
     return {
         "sport": "mlb_totals",
         "model_name": "Measured Edge Totals + Spread",

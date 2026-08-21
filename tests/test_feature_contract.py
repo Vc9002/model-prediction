@@ -81,9 +81,16 @@ def test_validate_observation_reports_missing_fields() -> None:
 
 def test_validate_observation_accepts_a_full_dict() -> None:
     payload = {
-        "event_id": "1", "entity_id": "e", "feature_name": "f", "value": 1.0,
-        "effective_at_utc": "2026-07-18T19:00:00Z", "observed_at_utc": "2026-07-18T18:00:00Z",
-        "source": "espn", "source_version": "v1", "available": True, "missing_reason": None,
+        "event_id": "1",
+        "entity_id": "e",
+        "feature_name": "f",
+        "value": 1.0,
+        "effective_at_utc": "2026-07-18T19:00:00Z",
+        "observed_at_utc": "2026-07-18T18:00:00Z",
+        "source": "espn",
+        "source_version": "v1",
+        "available": True,
+        "missing_reason": None,
     }
     assert validate_observation(payload) == []
 

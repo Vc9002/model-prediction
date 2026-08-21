@@ -444,9 +444,9 @@ def test_mlb_totals_flat_policy_uses_same_measured_edge_artifact_and_fails_close
     from model_prediction.models.mlb import canonical_mlb_artifact_hash
     from model_prediction.runtime_paths import RuntimePaths
 
-    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 20, tzinfo=UTC))
-    monkeypatch.setattr(cli, "load_formula_spec", lambda path: object())
-    monkeypatch.setattr(cli, "MLBMarketOddsFeed", lambda *args, **kwargs: object())
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 27, 20, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "load_formula_spec", lambda path: object())
+    monkeypatch.setattr(cli_forecast, "MLBMarketOddsFeed", lambda *args, **kwargs: object())
     model_path = PROJECT_ROOT / "config/models/measured-edge-totals-v3.json"
     model_raw = json.loads(model_path.read_text())
     model_hash = canonical_mlb_artifact_hash(model_raw)
@@ -459,7 +459,7 @@ def test_mlb_totals_flat_policy_uses_same_measured_edge_artifact_and_fails_close
         calibration_version="measured-edge-totals-v3",
         market_snapshot_hash=snapshot_hash,
     )
-    monkeypatch.setattr(cli, "build_mlb_slate", lambda *args, **kwargs: ([candidate], [], 1))
+    monkeypatch.setattr(cli_forecast, "build_mlb_slate", lambda *args, **kwargs: ([candidate], [], 1))
     runtime_paths = RuntimePaths(repo_root=PROJECT_ROOT, runtime_root=tmp_path / "runtime")
     config_hash = canonical_config_logical_hash(config_path().read_bytes())
     policy_raw = {
@@ -506,13 +506,15 @@ def test_mlb_totals_flat_policy_uses_same_measured_edge_artifact_and_fails_close
     config = {"project": {}, "bankroll": {}}
 
     incumbent_ledger = _CaptureLedger()
-    cli._forecast_mlb_totals_flat("2026-07-27", True, config, registry, ban_list, incumbent_ledger, None)
+    cli_forecast._forecast_mlb_totals_flat(
+        "2026-07-27", True, config, registry, ban_list, incumbent_ledger, None
+    )
     incumbent = incumbent_ledger.appended[0][0]
     assert incumbent.model_probability == candidate.shrunk_probability
     assert incumbent.blend_policy_artifact_hash is None
 
     blended_ledger = _CaptureLedger()
-    cli._forecast_mlb_totals_flat(
+    cli_forecast._forecast_mlb_totals_flat(
         "2026-07-27",
         True,
         config,
@@ -535,9 +537,9 @@ def test_mlb_totals_flat_policy_uses_same_measured_edge_artifact_and_fails_close
     assert blended.market_snapshot_hash == snapshot_hash
 
     mismatched = replace(candidate, model_artifact_hash="9" * 64)
-    monkeypatch.setattr(cli, "build_mlb_slate", lambda *args, **kwargs: ([mismatched], [], 1))
+    monkeypatch.setattr(cli_forecast, "build_mlb_slate", lambda *args, **kwargs: ([mismatched], [], 1))
     with pytest.raises(MarketBlendBlockedError, match="identities differ"):
-        cli._forecast_mlb_totals_flat(
+        cli_forecast._forecast_mlb_totals_flat(
             "2026-07-27",
             True,
             config,

@@ -18,10 +18,16 @@ class FakeESPN:
                         {
                             "status": {"type": {"completed": True}},
                             "competitors": [
-                                {"homeAway": "away", "score": "3",
-                                 "team": {"id": "1", "displayName": "Aways"}},
-                                {"homeAway": "home", "score": "5",
-                                 "team": {"id": "2", "displayName": "Homes"}},
+                                {
+                                    "homeAway": "away",
+                                    "score": "3",
+                                    "team": {"id": "1", "displayName": "Aways"},
+                                },
+                                {
+                                    "homeAway": "home",
+                                    "score": "5",
+                                    "team": {"id": "2", "displayName": "Homes"},
+                                },
                             ],
                         }
                     ],
@@ -80,7 +86,10 @@ def test_stale_pregame_cache_for_a_past_date_is_refetched_not_trusted_forever(tm
     assert result["fetched"] == 1
     assert result["new_games_appended"] == 1
     # The stale pregame snapshot was overwritten with the real final payload.
-    assert json.loads(raw_path.read_text())["events"][0]["competitions"][0]["status"]["type"]["completed"] is True
+    assert (
+        json.loads(raw_path.read_text())["events"][0]["competitions"][0]["status"]["type"]["completed"]
+        is True
+    )
 
 
 def test_partially_completed_past_date_cache_is_refetched_not_trusted_forever(tmp_path) -> None:
@@ -108,7 +117,9 @@ def test_partially_completed_past_date_cache_is_refetched_not_trusted_forever(tm
         return {
             "id": event_id,
             "date": f"{past_date}T23:00:00Z",
-            "competitions": [{"status": {"type": {"completed": completed, "state": state}}, "competitors": competitors}],
+            "competitions": [
+                {"status": {"type": {"completed": completed, "state": state}}, "competitors": competitors}
+            ],
         }
 
     raw_path.write_text(
@@ -154,8 +165,16 @@ def test_postponed_or_canceled_events_do_not_make_a_past_date_cache_stale(tmp_pa
                             {
                                 "status": {"type": {"completed": True, "state": "post"}},
                                 "competitors": [
-                                    {"homeAway": "away", "score": "1", "team": {"id": "1", "displayName": "Aways"}},
-                                    {"homeAway": "home", "score": "2", "team": {"id": "2", "displayName": "Homes"}},
+                                    {
+                                        "homeAway": "away",
+                                        "score": "1",
+                                        "team": {"id": "1", "displayName": "Aways"},
+                                    },
+                                    {
+                                        "homeAway": "home",
+                                        "score": "2",
+                                        "team": {"id": "2", "displayName": "Homes"},
+                                    },
                                 ],
                             }
                         ],
@@ -163,7 +182,9 @@ def test_postponed_or_canceled_events_do_not_make_a_past_date_cache_stale(tmp_pa
                     {
                         "id": "e_postponed",
                         "date": f"{past_date}T23:00:00Z",
-                        "competitions": [{"status": {"type": {"completed": False, "state": "post"}}, "competitors": []}],
+                        "competitions": [
+                            {"status": {"type": {"completed": False, "state": "post"}}, "competitors": []}
+                        ],
                     },
                 ]
             }

@@ -80,7 +80,9 @@ def _resolve(repo_root: Path, value: Any, key: str) -> Path:
 
 
 def load_rebuild_config(path: str | Path | None = None) -> RebuildConfig:
-    config_path = Path(path).resolve() if path is not None else default_repo_root() / "config" / "rebuild.yaml"
+    config_path = (
+        Path(path).resolve() if path is not None else default_repo_root() / "config" / "rebuild.yaml"
+    )
     repo_root = config_path.parent.parent.resolve()
     try:
         raw = yaml.safe_load(config_path.read_text())

@@ -23,7 +23,11 @@ SCHEDULE_PAYLOAD = {
                     "gameNumber": 1,
                     "doubleHeader": "N",
                     "scheduledInnings": 9,
-                    "status": {"abstractGameState": "Preview", "detailedState": "Scheduled", "statusCode": "S"},
+                    "status": {
+                        "abstractGameState": "Preview",
+                        "detailedState": "Scheduled",
+                        "statusCode": "S",
+                    },
                     "teams": {
                         "home": {"team": {"id": 111}, "probablePitcher": {"id": 55}},
                         "away": {"team": {"id": 121}, "probablePitcher": {"id": 66}},

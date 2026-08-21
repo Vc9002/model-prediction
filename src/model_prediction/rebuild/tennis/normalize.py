@@ -215,11 +215,15 @@ def normalize_espn_scoreboard(frame: pl.DataFrame, metadata: SourceResponseMetad
                 "competitor_1_tennis_player_id": f"{metadata.provider}:{competitor_1_id}",
                 "competitor_1_provider_player_id": competitor_1_id,
                 "competitor_1_player_name": _required(row.get("competitor_1_name"), "competitor_1_name"),
-                "competitor_1_winner": bool(row["competitor_1_winner"]) if row.get("competitor_1_winner") is not None else None,
+                "competitor_1_winner": bool(row["competitor_1_winner"])
+                if row.get("competitor_1_winner") is not None
+                else None,
                 "competitor_2_tennis_player_id": f"{metadata.provider}:{competitor_2_id}",
                 "competitor_2_provider_player_id": competitor_2_id,
                 "competitor_2_player_name": _required(row.get("competitor_2_name"), "competitor_2_name"),
-                "competitor_2_winner": bool(row["competitor_2_winner"]) if row.get("competitor_2_winner") is not None else None,
+                "competitor_2_winner": bool(row["competitor_2_winner"])
+                if row.get("competitor_2_winner") is not None
+                else None,
                 "result_type": result_type,
                 "completed": completed,
             }

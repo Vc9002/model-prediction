@@ -27,7 +27,8 @@ def generate_mlb_coverage(data_root: str, date: str, out_root: str) -> dict:
     probables_path = Path(data_root) / "raw" / "mlb" / "probable_starters.jsonl"
     records = (
         [json.loads(line) for line in probables_path.read_text().splitlines() if line.strip()]
-        if probables_path.exists() else []
+        if probables_path.exists()
+        else []
     )
 
     coverage_dir = Path(out_root) / "coverage"
@@ -39,12 +40,18 @@ def generate_mlb_coverage(data_root: str, date: str, out_root: str) -> dict:
     for horizon in HORIZONS:
         result = build_mlb_horizon_dataset(data_root, date, horizon, records)
         coverage_payload = {
-            "sport": "mlb", "horizon": horizon, "date": date,
-            "generated_from_code": True, **result.coverage,
+            "sport": "mlb",
+            "horizon": horizon,
+            "date": date,
+            "generated_from_code": True,
+            **result.coverage,
         }
         missingness_payload = {
-            "sport": "mlb", "horizon": horizon, "date": date,
-            "generated_from_code": True, **result.missingness,
+            "sport": "mlb",
+            "horizon": horizon,
+            "date": date,
+            "generated_from_code": True,
+            **result.missingness,
         }
         (coverage_dir / f"mlb_{horizon}.json").write_text(json.dumps(coverage_payload, indent=2))
         (missingness_dir / f"mlb_{horizon}.json").write_text(json.dumps(missingness_payload, indent=2))

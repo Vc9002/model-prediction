@@ -154,9 +154,7 @@ def collect_game_snapshots(
     skipped: list[dict[str, str]] = []
     written = 0
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
-        futures = {
-            pool.submit(client.snapshot, game, snapshot_type=snapshot_type): game for game in games
-        }
+        futures = {pool.submit(client.snapshot, game, snapshot_type=snapshot_type): game for game in games}
         for index, future in enumerate(as_completed(futures), start=1):
             game = futures[future]
             try:
@@ -223,9 +221,7 @@ def compact_game_snapshot(payload: dict[str, Any], *, snapshot_type: str) -> dic
     players = game_data.get("players", {})
     teams = game_data["teams"]
     probable = game_data.get("probablePitchers", {})
-    raw_hash = hashlib.sha256(
-        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
+    raw_hash = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
     sides: dict[str, Any] = {}
     for side in ("away", "home"):
@@ -240,7 +236,12 @@ def compact_game_snapshot(payload: dict[str, Any], *, snapshot_type: str) -> dic
             stats = player_box.get("stats", {})
             batting = _select_stats(stats.get("batting", {}), _BATTING_FIELDS)
             pitching = _select_stats(stats.get("pitching", {}), _PITCHING_FIELDS)
-            if not batting and not pitching and player_id not in batting_order and player_id not in pitcher_order:
+            if (
+                not batting
+                and not pitching
+                and player_id not in batting_order
+                and player_id not in pitcher_order
+            ):
                 continue
             compact_players.append(
                 {
@@ -248,8 +249,12 @@ def compact_game_snapshot(payload: dict[str, Any], *, snapshot_type: str) -> dic
                     "name": person.get("fullName") or person.get("displayName") or "Unknown",
                     "bat_side": _code(identity.get("batSide")),
                     "pitch_hand": _code(identity.get("pitchHand")),
-                    "batting_order": batting_order.index(player_id) + 1 if player_id in batting_order else None,
-                    "pitching_order": pitcher_order.index(player_id) + 1 if player_id in pitcher_order else None,
+                    "batting_order": batting_order.index(player_id) + 1
+                    if player_id in batting_order
+                    else None,
+                    "pitching_order": pitcher_order.index(player_id) + 1
+                    if player_id in pitcher_order
+                    else None,
                     "batting": batting,
                     "pitching": pitching,
                 }

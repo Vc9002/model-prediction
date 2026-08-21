@@ -22,14 +22,17 @@ def _make_ledger(tmp_path) -> ProductionLedger:
     return ProductionLedger(tmp_path / "production" / "predictions.db")
 
 
-def _record_sample(ledger: ProductionLedger, run_id: str = "run1",
-                   event_id: str = "evt1") -> int:
+def _record_sample(ledger: ProductionLedger, run_id: str = "run1", event_id: str = "evt1") -> int:
     # predictions.run_id is FK-constrained to runs(run_id), so a run row
     # must exist first — the CLI flow does the same via start_run.
     ledger.start_run(run_id=run_id, git_sha="test-sha")
     return ledger.record_prediction(
-        run_id, prediction_id=f"{run_id}:{event_id}", event_id=event_id,
-        sport="WNBA", market="moneyline", model_id="wnba-elo-trend-lr-v4",
+        run_id,
+        prediction_id=f"{run_id}:{event_id}",
+        event_id=event_id,
+        sport="WNBA",
+        market="moneyline",
+        model_id="wnba-elo-trend-lr-v4",
         probabilities={"home": 0.62, "away": 0.38},
         predicted_side="home",
     )
@@ -42,13 +45,20 @@ class _FakeCandidate:
         self._d = {
             "event_id": event_id,
             "event_start_utc": "2026-08-13T19:00:00Z",
-            "away_team": "Away", "home_team": "Home",
-            "selection": "home", "model_probability": 0.62,
-            "home_probability": 0.62, "confidence_threshold": 0.55,
-            "call": True, "action": "QUALIFIED_SHADOW_CALL",
-            "reason": "CALL_LEARNED_CONFIDENCE", "model_version": "v4",
-            "model_artifact_hash": "h", "model_qualified": True,
-            "feature_basis": {}, "feature_snapshot_hash": "snap1",
+            "away_team": "Away",
+            "home_team": "Home",
+            "selection": "home",
+            "model_probability": 0.62,
+            "home_probability": 0.62,
+            "confidence_threshold": 0.55,
+            "call": True,
+            "action": "QUALIFIED_SHADOW_CALL",
+            "reason": "CALL_LEARNED_CONFIDENCE",
+            "model_version": "v4",
+            "model_artifact_hash": "h",
+            "model_qualified": True,
+            "feature_basis": {},
+            "feature_snapshot_hash": "snap1",
             "unavailable_features": (),
         }
 
@@ -58,9 +68,7 @@ class _FakeCandidate:
 
 def _fake_scoreboard(events: tuple[str, ...] = ("401690001",)):
     def scoreboard(self, sport: str, date: str) -> dict[str, object]:
-        return {
-            "events": [{"id": eid, "date": "2026-08-13T19:00:00Z"} for eid in events]
-        }
+        return {"events": [{"id": eid, "date": "2026-08-13T19:00:00Z"} for eid in events]}
 
     return scoreboard
 
@@ -126,8 +134,12 @@ def test_supersede_bypasses_idempotency_and_replaces_view(tmp_path) -> None:
     old_id = _record_sample(ledger)
     ledger.supersede_prediction(old_id, note="line moved")
     new_id = ledger.record_prediction(
-        "run1", prediction_id="run1:evt1", event_id="evt1",
-        sport="WNBA", market="moneyline", model_id="wnba-elo-trend-lr-v4",
+        "run1",
+        prediction_id="run1:evt1",
+        event_id="evt1",
+        sport="WNBA",
+        market="moneyline",
+        model_id="wnba-elo-trend-lr-v4",
         probabilities={"home": 0.71, "away": 0.29},
         supersedes_id=old_id,  # correction flow: bypasses the idempotency index
     )
@@ -151,8 +163,12 @@ def test_rerun_after_supersede_returns_correction_not_stale_row(tmp_path) -> Non
     old_id = _record_sample(ledger)
     ledger.supersede_prediction(old_id, note="line moved")
     correction_id = ledger.record_prediction(
-        "run1", prediction_id="run1:evt1", event_id="evt1",
-        sport="WNBA", market="moneyline", model_id="wnba-elo-trend-lr-v4",
+        "run1",
+        prediction_id="run1:evt1",
+        event_id="evt1",
+        sport="WNBA",
+        market="moneyline",
+        model_id="wnba-elo-trend-lr-v4",
         probabilities={"home": 0.71, "away": 0.29},
         supersedes_id=old_id,
     )
@@ -329,9 +345,7 @@ def test_predict_succeeds_when_ledger_unavailable(tmp_path, monkeypatch) -> None
     def _boom_init(self, paths: object) -> None:
         raise RuntimeError("store down")
 
-    monkeypatch.setattr(
-        cli_production.ProductionPredictionStore, "__init__", _boom_init
-    )
+    monkeypatch.setattr(cli_production.ProductionPredictionStore, "__init__", _boom_init)
     assert _run_predict_with_fakes(tmp_path, monkeypatch) == 0
 
 
@@ -358,9 +372,7 @@ def test_predict_succeeds_when_ledger_writes_fail(tmp_path, monkeypatch) -> None
 def test_predict_records_to_ledger(tmp_path, monkeypatch) -> None:
     """Happy path: predict mirrors candidates and finishes the run row."""
     assert _run_predict_with_fakes(tmp_path, monkeypatch) == 0
-    store = ProductionPredictionStore(
-        RuntimePaths(repo_root=tmp_path, runtime_root=tmp_path / "data")
-    )
+    store = ProductionPredictionStore(RuntimePaths(repo_root=tmp_path, runtime_root=tmp_path / "data"))
     rows, _ = store.get_predictions()
     assert len(rows) == 1
     row = rows[0]
@@ -383,9 +395,7 @@ def test_predict_records_to_ledger(tmp_path, monkeypatch) -> None:
 
 def test_cli_settle_and_invalid_retransition(tmp_path, monkeypatch, capsys) -> None:
     assert _run_predict_with_fakes(tmp_path, monkeypatch) == 0
-    store = ProductionPredictionStore(
-        RuntimePaths(repo_root=tmp_path, runtime_root=tmp_path / "data")
-    )
+    store = ProductionPredictionStore(RuntimePaths(repo_root=tmp_path, runtime_root=tmp_path / "data"))
     row_id = store.get_predictions()[0][0]["id"]
     store.close()
 
@@ -404,9 +414,7 @@ def test_cli_settle_and_invalid_retransition(tmp_path, monkeypatch, capsys) -> N
 def test_cli_void_supersede_error_commands(tmp_path, monkeypatch, capsys) -> None:
     def _fresh_row_id() -> int:
         assert _run_predict_with_fakes(tmp_path, monkeypatch) == 0
-        store = ProductionPredictionStore(
-            RuntimePaths(repo_root=tmp_path, runtime_root=tmp_path / "data")
-        )
+        store = ProductionPredictionStore(RuntimePaths(repo_root=tmp_path, runtime_root=tmp_path / "data"))
         row_id = store.get_predictions()[0][0]["id"]
         store.close()
         return row_id
@@ -414,9 +422,7 @@ def test_cli_void_supersede_error_commands(tmp_path, monkeypatch, capsys) -> Non
     assert cli_production.main(["void", str(_fresh_row_id())]) == 0
     assert "voided" in capsys.readouterr().out
 
-    assert cli_production.main(
-        ["supersede", str(_fresh_row_id()), "--note", "line moved"]
-    ) == 0
+    assert cli_production.main(["supersede", str(_fresh_row_id()), "--note", "line moved"]) == 0
     assert "superseded" in capsys.readouterr().out
 
     assert cli_production.main(["error", str(_fresh_row_id()), "--note", "bad data"]) == 0

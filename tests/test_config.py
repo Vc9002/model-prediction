@@ -185,8 +185,6 @@ def test_mlb_v8_is_honestly_unqualified_despite_primary_holdout_metrics() -> Non
     assert qualification["hit_rate"] > 0.60
     assert qualification["validation_brier_score"] > qualification["brier_score"]
     assert len(qualification["failures"]) == 1
-    assert any(
-        "validation Brier regressed" in failure for failure in qualification["failures"]
-    )
+    assert any("validation Brier regressed" in failure for failure in qualification["failures"])
     assert "starter_era_gap" in raw["market_models"]["moneyline"]["feature_names"]
     assert "pitcher_era_gap" not in raw["market_models"]["moneyline"]["feature_names"]

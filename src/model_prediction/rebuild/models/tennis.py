@@ -27,7 +27,8 @@ class TennisPrediction:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "match_id": self.match_id, "player_a_win_prob": self.player_a_win_prob,
+            "match_id": self.match_id,
+            "player_a_win_prob": self.player_a_win_prob,
             "surface": self.surface,
         }
 
@@ -90,8 +91,9 @@ class ServeReturnModel:
         self.intercept: float = 0.0
         self._fitted = False
 
-    def win_probability(self, player_a_spw: float, player_a_rpw: float,
-                        player_b_spw: float, player_b_rpw: float) -> float:
+    def win_probability(
+        self, player_a_spw: float, player_a_rpw: float, player_b_spw: float, player_b_rpw: float
+    ) -> float:
         diff_spw = player_a_spw - player_b_spw
         diff_rpw = player_a_rpw - player_b_rpw
         score = self.intercept + self.coef_spw * diff_spw + self.coef_rpw * diff_rpw
@@ -144,14 +146,26 @@ class TennisModel:
         self.serve_return.fit(matches)
         return self
 
-    def predict(self, match_id: str, player_a: str, player_b: str, surface: str,
-                a_spw: float = 0.62, a_rpw: float = 0.38,
-                b_spw: float = 0.62, b_rpw: float = 0.38) -> TennisPrediction:
+    def predict(
+        self,
+        match_id: str,
+        player_a: str,
+        player_b: str,
+        surface: str,
+        a_spw: float = 0.62,
+        a_rpw: float = 0.38,
+        b_spw: float = 0.62,
+        b_rpw: float = 0.38,
+    ) -> TennisPrediction:
         elo_prob = self.elo.expected_win(player_a, player_b, surface)
         sr_prob = self.serve_return.win_probability(a_spw, a_rpw, b_spw, b_rpw)
         if self.serve_return._fitted and self.serve_return.coef_spw != 0.013:
             prob = 0.4 * elo_prob + 0.6 * sr_prob
         else:
             prob = elo_prob
-        return TennisPrediction(match_id=match_id, player_a_win_prob=float(prob),
-                                player_b_win_prob=float(1 - prob), surface=surface)
+        return TennisPrediction(
+            match_id=match_id,
+            player_a_win_prob=float(prob),
+            player_b_win_prob=float(1 - prob),
+            surface=surface,
+        )

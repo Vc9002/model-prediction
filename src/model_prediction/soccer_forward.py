@@ -55,11 +55,7 @@ def _team_matches_title(team: str, title: str) -> bool:
         return False
     if " ".join(team_words) in " ".join(_words(title)):
         return True
-    distinctive = [
-        word
-        for word in team_words
-        if len(word) >= 3 and word not in _GENERIC_TEAM_WORDS
-    ]
+    distinctive = [word for word in team_words if len(word) >= 3 and word not in _GENERIC_TEAM_WORDS]
     return bool(distinctive) and all(word in title_words for word in distinctive)
 
 
@@ -67,13 +63,7 @@ def _latest_total_snapshots(
     data_root: str | Path,
     game_date: str,
 ) -> list[dict[str, Any]]:
-    path = (
-        Path(data_root)
-        / "odds"
-        / "soccer"
-        / game_date
-        / "polymarket_snapshots.jsonl"
-    )
+    path = Path(data_root) / "odds" / "soccer" / game_date / "polymarket_snapshots.jsonl"
     if not path.exists():
         return []
     latest: dict[str, dict[str, Any]] = {}
@@ -127,13 +117,7 @@ def _latest_btts_snapshots(
     then this always returns [] (no BTTS rows in the snapshot file, since
     none can ever be classified as "btts" yet).
     """
-    path = (
-        Path(data_root)
-        / "odds"
-        / "soccer"
-        / game_date
-        / "polymarket_snapshots.jsonl"
-    )
+    path = Path(data_root) / "odds" / "soccer" / game_date / "polymarket_snapshots.jsonl"
     if not path.exists():
         return []
     latest: dict[str, dict[str, Any]] = {}
@@ -177,13 +161,7 @@ def _latest_moneyline_snapshots(
     `team` field naming which team (or None, for the draw market) that
     specific snapshot's Yes side concerns.
     """
-    path = (
-        Path(data_root)
-        / "odds"
-        / "soccer"
-        / game_date
-        / "polymarket_snapshots.jsonl"
-    )
+    path = Path(data_root) / "odds" / "soccer" / game_date / "polymarket_snapshots.jsonl"
     if not path.exists():
         return []
     latest: dict[str, dict[str, Any]] = {}
@@ -274,16 +252,8 @@ def build_soccer_total_slate(
         for prediction in all_predictions
         if str(prediction.market_type) == "total" and prediction.line == 2.5
     ]
-    moneylines = [
-        prediction
-        for prediction in all_predictions
-        if str(prediction.market_type) == "moneyline"
-    ]
-    btts_predictions = [
-        prediction
-        for prediction in all_predictions
-        if str(prediction.market_type) == "btts"
-    ]
+    moneylines = [prediction for prediction in all_predictions if str(prediction.market_type) == "moneyline"]
+    btts_predictions = [prediction for prediction in all_predictions if str(prediction.market_type) == "btts"]
     snapshots = _latest_total_snapshots(data_root, game_date)
     moneyline_snapshots = _latest_moneyline_snapshots(data_root, game_date)
     btts_snapshots = _latest_btts_snapshots(data_root, game_date)
@@ -315,9 +285,7 @@ def build_soccer_total_slate(
             unmatched.append(
                 {
                     "event_id": prediction.event_id,
-                    "reason": (
-                        "no unique timestamp-valid full-game 2.5 total matched"
-                    ),
+                    "reason": ("no unique timestamp-valid full-game 2.5 total matched"),
                 }
             )
             continue

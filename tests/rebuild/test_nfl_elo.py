@@ -22,6 +22,7 @@ from model_prediction.rebuild.nfl.elo import (
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
+
 def _game(
     event_id: str = "g1",
     season: int = 2024,
@@ -203,8 +204,7 @@ class TestTrendGap:
     def test_returns_zero_when_exactly_window_games_all_wins(self) -> None:
         """Recent avg == season avg → trend_gap = 0."""
         games = _games(
-            *[_game(f"g{i}", home="T", away=f"A{i}", home_score=28, away_score=17)
-              for i in range(10)]
+            *[_game(f"g{i}", home="T", away=f"A{i}", home_score=28, away_score=17) for i in range(10)]
         )
         assert _trend_gap(games, "T", window=10) == pytest.approx(0.0)
 
@@ -213,12 +213,10 @@ class TestTrendGap:
         games: list[NFLGameRow] = []
         # First 5: losses
         for i in range(5):
-            games.append(_game(f"g{i}", home="T", away=f"A{i}",
-                               home_score=10, away_score=28))
+            games.append(_game(f"g{i}", home="T", away=f"A{i}", home_score=10, away_score=28))
         # Last 5: wins
         for i in range(5, 10):
-            games.append(_game(f"g{i}", home="T", away=f"A{i}",
-                               home_score=28, away_score=17))
+            games.append(_game(f"g{i}", home="T", away=f"A{i}", home_score=28, away_score=17))
         gap = _trend_gap(games, "T", window=5)
         # Season: 5/10 = 0.5, Recent 5: 5/5 = 1.0 → gap = 0.5
         assert gap > 0.0
@@ -228,11 +226,9 @@ class TestTrendGap:
         """Team won first 5, lost last 5 → recent < season → negative gap."""
         games: list[NFLGameRow] = []
         for i in range(5):
-            games.append(_game(f"g{i}", home="T", away=f"A{i}",
-                               home_score=28, away_score=17))
+            games.append(_game(f"g{i}", home="T", away=f"A{i}", home_score=28, away_score=17))
         for i in range(5, 10):
-            games.append(_game(f"g{i}", home="T", away=f"A{i}",
-                               home_score=10, away_score=28))
+            games.append(_game(f"g{i}", home="T", away=f"A{i}", home_score=10, away_score=28))
         gap = _trend_gap(games, "T", window=5)
         assert gap < 0.0
         assert gap == pytest.approx(-0.5)
@@ -242,12 +238,10 @@ class TestTrendGap:
         games: list[NFLGameRow] = []
         # Home wins
         for i in range(5):
-            games.append(_game(f"h{i}", home="T", away=f"A{i}",
-                               home_score=28, away_score=17))
+            games.append(_game(f"h{i}", home="T", away=f"A{i}", home_score=28, away_score=17))
         # Away losses
         for i in range(5):
-            games.append(_game(f"a{i}", home=f"H{i}", away="T",
-                               home_score=35, away_score=10))
+            games.append(_game(f"a{i}", home=f"H{i}", away="T", home_score=35, away_score=10))
         gap = _trend_gap(games, "T", window=10)
         # Season: 5/10 = 0.5, Recent 10: 5/10 = 0.5 → gap = 0
         assert gap == pytest.approx(0.0)
@@ -277,12 +271,10 @@ class TestBuildWalkForwardRows:
         for i in range(4):
             # Use fixed teams for first 3 games, then introduce a new team
             if i < 3:
-                games.append(_game(f"g{i}", home="H", away="A",
-                                   week=i + 1))
+                games.append(_game(f"g{i}", home="H", away="A", week=i + 1))
             else:
                 games.append(_game("g3", home="NEW", away="A", week=4))
-        result = build_walk_forward_rows(games, minimum_history_games=2,
-                                         minimum_team_games=3)
+        result = build_walk_forward_rows(games, minimum_history_games=2, minimum_team_games=3)
         # The NEW team's first game should be cold-start skipped
         assert result.skipped_cold_start >= 1
 
@@ -290,10 +282,8 @@ class TestBuildWalkForwardRows:
         """After bootstrap, rows should have all expected fields."""
         games: list[NFLGameRow] = []
         for i in range(10):
-            games.append(_game(f"g{i}", home="H", away="A",
-                               week=i + 1, home_score=28, away_score=17))
-        result = build_walk_forward_rows(games, minimum_history_games=2,
-                                         minimum_team_games=2)
+            games.append(_game(f"g{i}", home="H", away="A", week=i + 1, home_score=28, away_score=17))
+        result = build_walk_forward_rows(games, minimum_history_games=2, minimum_team_games=2)
         assert len(result.rows) > 0
         row = result.rows[0]
         assert isinstance(row, WalkForwardRow)
@@ -310,27 +300,59 @@ class TestBuildWalkForwardRows:
         # minimum_team_games, and build enough league history.
         padded: list[NFLGameRow] = []
         for i in range(3):
-            padded.append(_game(f"bA{i}", home="H", away="A",
-                                week=i + 1, season=2023,
-                                home_score=28, away_score=17,
-                                event_start_utc=f"2023-09-{i+1:02d}T17:00:00+00:00"))
-            padded.append(_game(f"bB{i}", home="H", away="B",
-                                week=i + 1, season=2023,
-                                home_score=28, away_score=17,
-                                event_start_utc=f"2023-09-{i+1:02d}T20:00:00+00:00"))
+            padded.append(
+                _game(
+                    f"bA{i}",
+                    home="H",
+                    away="A",
+                    week=i + 1,
+                    season=2023,
+                    home_score=28,
+                    away_score=17,
+                    event_start_utc=f"2023-09-{i + 1:02d}T17:00:00+00:00",
+                )
+            )
+            padded.append(
+                _game(
+                    f"bB{i}",
+                    home="H",
+                    away="B",
+                    week=i + 1,
+                    season=2023,
+                    home_score=28,
+                    away_score=17,
+                    event_start_utc=f"2023-09-{i + 1:02d}T20:00:00+00:00",
+                )
+            )
         # Two games in the same week (season 2024, week 1)
-        padded.append(_game("g1", week=1, season=2024,
-                            home="H", away="A", home_score=28, away_score=17,
-                            event_start_utc="2024-09-08T17:00:00+00:00"))
-        padded.append(_game("g2", week=1, season=2024,
-                            home="H", away="B", home_score=21, away_score=14,
-                            event_start_utc="2024-09-08T20:00:00+00:00"))
+        padded.append(
+            _game(
+                "g1",
+                week=1,
+                season=2024,
+                home="H",
+                away="A",
+                home_score=28,
+                away_score=17,
+                event_start_utc="2024-09-08T17:00:00+00:00",
+            )
+        )
+        padded.append(
+            _game(
+                "g2",
+                week=1,
+                season=2024,
+                home="H",
+                away="B",
+                home_score=21,
+                away_score=14,
+                event_start_utc="2024-09-08T20:00:00+00:00",
+            )
+        )
 
-        result = build_walk_forward_rows(padded, minimum_history_games=2,
-                                         minimum_team_games=2)
+        result = build_walk_forward_rows(padded, minimum_history_games=2, minimum_team_games=2)
         # Both week=1, season=2024 games should exist
-        week1_rows = [r for r in result.rows
-                      if r.week == 1 and r.season == 2024]
+        week1_rows = [r for r in result.rows if r.week == 1 and r.season == 2024]
         assert len(week1_rows) >= 1
 
     def test_offseason_regression_pulls_ratings_toward_default(self) -> None:
@@ -338,15 +360,32 @@ class TestBuildWalkForwardRows:
         games: list[NFLGameRow] = []
         # Season 2023: build up some Elo divergence
         for i in range(10):
-            games.append(_game(f"s1g{i}", season=2023, week=i + 1,
-                               home="H", away="A", home_score=28, away_score=17,
-                               event_start_utc=f"2023-09-{i+1:02d}T17:00:00+00:00"))
+            games.append(
+                _game(
+                    f"s1g{i}",
+                    season=2023,
+                    week=i + 1,
+                    home="H",
+                    away="A",
+                    home_score=28,
+                    away_score=17,
+                    event_start_utc=f"2023-09-{i + 1:02d}T17:00:00+00:00",
+                )
+            )
         # Season 2024: one game
-        games.append(_game("s2g1", season=2024, week=1,
-                           home="H", away="A", home_score=28, away_score=17,
-                           event_start_utc="2024-09-08T17:00:00+00:00"))
-        result = build_walk_forward_rows(games, minimum_history_games=2,
-                                         minimum_team_games=2)
+        games.append(
+            _game(
+                "s2g1",
+                season=2024,
+                week=1,
+                home="H",
+                away="A",
+                home_score=28,
+                away_score=17,
+                event_start_utc="2024-09-08T17:00:00+00:00",
+            )
+        )
+        result = build_walk_forward_rows(games, minimum_history_games=2, minimum_team_games=2)
         # After 10 home wins in 2023, H's rating should be well above 1500.
         # After offseason regression (0.50), H should still be >1500 but
         # closer than it would be without regression.

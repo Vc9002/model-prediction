@@ -31,9 +31,7 @@ def _supervisor(tmp_path) -> RunSupervisor:
 
 def test_successful_run_records_completed_row(tmp_path) -> None:
     sup = _supervisor(tmp_path)
-    code = sup.run_worker(
-        "daily", command=[sys.executable, "-c", "print('hello from worker')"]
-    )
+    code = sup.run_worker("daily", command=[sys.executable, "-c", "print('hello from worker')"])
 
     assert code == 0
     rows = sup.latest_runs()
@@ -52,9 +50,7 @@ def test_successful_run_records_completed_row(tmp_path) -> None:
 
 def test_failed_run_records_failure_and_returns_worker_exit_code(tmp_path) -> None:
     sup = _supervisor(tmp_path)
-    code = sup.run_worker(
-        "production", command=[sys.executable, "-c", "import sys; sys.exit(3)"]
-    )
+    code = sup.run_worker("production", command=[sys.executable, "-c", "import sys; sys.exit(3)"])
 
     assert code == 3
     row = sup.latest_runs()[0]
@@ -85,9 +81,7 @@ def test_lease_contention_skips_and_records_the_skip(tmp_path) -> None:
 
 def test_heartbeat_advances_while_worker_runs(tmp_path) -> None:
     sup = _supervisor(tmp_path)
-    code = sup.run_worker(
-        "daily", command=[sys.executable, "-c", "import time; time.sleep(0.4)"]
-    )
+    code = sup.run_worker("daily", command=[sys.executable, "-c", "import time; time.sleep(0.4)"])
 
     assert code == 0
     row = sup.latest_runs()[0]

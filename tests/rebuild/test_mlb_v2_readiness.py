@@ -33,6 +33,8 @@ ANCHOR = FrozenMLBV2Anchor(
 
 def _anchor_dict() -> dict:
     return dict(ANCHOR.__dict__)
+
+
 SPEC = importlib.util.spec_from_file_location(
     "check_mlb_v2_readiness",
     REPO_ROOT / "scripts" / "check_mlb_v2_readiness.py",
@@ -146,8 +148,12 @@ def test_only_exact_on_time_v2_candidate_predictions_count(tmp_path):
 def test_late_manual_prospective_insert_fails_closed(tmp_path, observed, created, message):
     ledger = ShadowLedger(tmp_path / "shadow.db")
     run_id = ledger.record_run("mlb", run_type="manual")
-    with patch("model_prediction.rebuild.shadow_ledger.utc_now", return_value=created), pytest.raises(
-        ValueError, match=message,
+    with (
+        patch("model_prediction.rebuild.shadow_ledger.utc_now", return_value=created),
+        pytest.raises(
+            ValueError,
+            match=message,
+        ),
     ):
         ledger.record_prediction(
             run_id=run_id,
@@ -167,7 +173,13 @@ class _SealedTest(dict):
     """Explodes if readiness tries to inspect a sealed performance field."""
 
     _forbidden: ClassVar[set[str]] = {
-        "accuracy", "log_loss", "brier", "roi", "clv", "metrics", "outcomes",
+        "accuracy",
+        "log_loss",
+        "brier",
+        "roi",
+        "clv",
+        "metrics",
+        "outcomes",
     }
 
     def get(self, key, default=None):
@@ -177,18 +189,20 @@ class _SealedTest(dict):
 
 
 def test_readiness_contract_never_reads_sealed_metrics():
-    raw = _SealedTest({
-        "test_start": "2026-08-08T02:20:00+00:00",
-        "test_end": None,
-        "consumed": False,
-        "candidate_version": MLB_V2_CANDIDATE_VERSION,
-        "minimum_sample_before_evaluation": {
-            "n_prospective_predictions": 100,
-            "n_real_games": 100,
-        },
-        "frozen_artifact_anchor": _anchor_dict(),
-        "metrics": {"log_loss": 0.1},
-    })
+    raw = _SealedTest(
+        {
+            "test_start": "2026-08-08T02:20:00+00:00",
+            "test_end": None,
+            "consumed": False,
+            "candidate_version": MLB_V2_CANDIDATE_VERSION,
+            "minimum_sample_before_evaluation": {
+                "n_prospective_predictions": 100,
+                "n_real_games": 100,
+            },
+            "frozen_artifact_anchor": _anchor_dict(),
+            "metrics": {"log_loss": 0.1},
+        }
+    )
     contract = readiness.load_readiness_contract({"active_tests": {MLB_V2_TEST_ID: raw}})
     assert contract.minimum_predictions == 100
     assert contract.consumed is False
@@ -237,17 +251,25 @@ def test_superseded_original_is_not_counted_when_latest_correction_leaves_anchor
     _record_anchor_lineage(ledger, run_id)
     with patch("model_prediction.rebuild.shadow_ledger.utc_now", return_value="2026-08-09T21:01:00+00:00"):
         original_id, _ = ledger.record_prediction(
-            run_id=run_id, sport="mlb", event_id="401", horizon="late",
+            run_id=run_id,
+            sport="mlb",
+            event_id="401",
+            horizon="late",
             decision_time_utc="2026-08-09T21:10:00+00:00",
             prediction_observed_at_utc="2026-08-09T21:00:00+00:00",
-            test_id=MLB_V2_TEST_ID, candidate_version=MLB_V2_CANDIDATE_VERSION,
+            test_id=MLB_V2_TEST_ID,
+            candidate_version=MLB_V2_CANDIDATE_VERSION,
             forecast=_forecast("401"),
         )
         ledger.record_prediction(
-            run_id=run_id, sport="mlb", event_id="401", horizon="late",
+            run_id=run_id,
+            sport="mlb",
+            event_id="401",
+            horizon="late",
             decision_time_utc="2026-08-09T21:10:00+00:00",
             prediction_observed_at_utc="2026-08-09T21:00:00+00:00",
-            test_id=MLB_V2_TEST_ID, candidate_version=MLB_V2_CANDIDATE_VERSION,
+            test_id=MLB_V2_TEST_ID,
+            candidate_version=MLB_V2_CANDIDATE_VERSION,
             forecast={**_forecast("401"), "model_artifact_hash": "f" * 64},
             supersedes_id=original_id,
         )

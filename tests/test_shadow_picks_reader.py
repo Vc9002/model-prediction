@@ -39,7 +39,10 @@ def _seed_one_decision(ledger: ShadowLedger, *, action: str, side: str, reason_c
         },
     )
     ledger.record_prediction(
-        run_id=run_id, sport="tennis", event_id="181721", horizon="late",
+        run_id=run_id,
+        sport="tennis",
+        event_id="181721",
+        horizon="late",
         decision_time_utc="2026-08-10T22:30:00+00:00",
         forecast={
             "event_id": "181721",
@@ -57,14 +60,23 @@ def _seed_one_decision(ledger: ShadowLedger, *, action: str, side: str, reason_c
         },
     )
     decision_id, _ = ledger.record_trade_decision(
-        run_id=run_id, sport="tennis", event_id="181721", horizon="late",
+        run_id=run_id,
+        sport="tennis",
+        event_id="181721",
+        horizon="late",
         decision_time_utc="2026-08-10T22:30:00+00:00",
-        model_artifact_hash="elo-hash-1", market_snapshot_hash="mkt-hash-1",
+        model_artifact_hash="elo-hash-1",
+        market_snapshot_hash="mkt-hash-1",
         decision_policy_version="winner_first_v1",
         decision={
-            "event_id": "181721", "action": action, "predicted_winner": "home",
-            "market_type": "moneyline", "selected_market": None, "units": 1.5 if action == "BET" else 0.0,
-            "reason_code": reason_code, "cost_adjusted_edge": 0.055 if action == "BET" else None,
+            "event_id": "181721",
+            "action": action,
+            "predicted_winner": "home",
+            "market_type": "moneyline",
+            "selected_market": None,
+            "units": 1.5 if action == "BET" else 0.0,
+            "reason_code": reason_code,
+            "cost_adjusted_edge": 0.055 if action == "BET" else None,
             "evaluated_market": {"market_id": "390859", "team_or_side": side, "line": None},
         },
     )
@@ -129,8 +141,18 @@ def test_shadow_picks_reflects_real_settlement_when_present(tmp_path):
     ledger.conn.execute(
         "INSERT INTO settlements (created_at, run_id, sport, event_id, schema_version, trade_decision_id, "
         "outcome, settled_price, pnl, settled_at_utc) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        ("2026-08-11T00:00:00+00:00", run_id, "tennis", "181721", "1", decision_id,
-         "win", 0.62, 1.05, "2026-08-11T00:00:00+00:00"),
+        (
+            "2026-08-11T00:00:00+00:00",
+            run_id,
+            "tennis",
+            "181721",
+            "1",
+            decision_id,
+            "win",
+            0.62,
+            1.05,
+            "2026-08-11T00:00:00+00:00",
+        ),
     )
     ledger.conn.commit()
     ledger.close()

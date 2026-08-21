@@ -100,9 +100,7 @@ def _model_entry(config: dict[str, Any], model_id: str) -> dict[str, Any] | None
     return None
 
 
-def _active_record(
-    repo_root: Path, sport: str, market: str
-) -> dict[str, Any] | None:
+def _active_record(repo_root: Path, sport: str, market: str) -> dict[str, Any] | None:
     conn = _conn(repo_root)
     try:
         row = conn.execute(
@@ -112,9 +110,7 @@ def _active_record(
         ).fetchone()
         if row is None:
             return None
-        columns = [d[0] for d in conn.execute(
-            "SELECT * FROM promotions LIMIT 0"
-        ).description]
+        columns = [d[0] for d in conn.execute("SELECT * FROM promotions LIMIT 0").description]
         return dict(zip(columns, row))
     finally:
         conn.close()
@@ -137,18 +133,11 @@ def promote(
     if candidate is None:
         raise ValueError(f"unknown model '{new_model_id}' in production registry")
     if not candidate.available:
-        raise ValueError(
-            f"model '{new_model_id}' failed contract validation: "
-            f"{candidate.load_error}"
-        )
+        raise ValueError(f"model '{new_model_id}' failed contract validation: {candidate.load_error}")
     # The candidate must be registered for the sport/market it will serve.
-    if (
-        candidate.sport.lower() != sport.lower()
-        or candidate.market.lower() != market.lower()
-    ):
+    if candidate.sport.lower() != sport.lower() or candidate.market.lower() != market.lower():
         raise ValueError(
-            f"'{new_model_id}' is registered for {candidate.sport} "
-            f"{candidate.market}, not {sport} {market}"
+            f"'{new_model_id}' is registered for {candidate.sport} {candidate.market}, not {sport} {market}"
         )
 
     current = registry.champion(sport, market)
@@ -208,8 +197,7 @@ def promote(
         try:
             with conn:
                 conn.execute(
-                    "UPDATE promotions SET status = 'failed', note = ? "
-                    "WHERE promotion_id = ?",
+                    "UPDATE promotions SET status = 'failed', note = ? WHERE promotion_id = ?",
                     (f"write/validate failed: {exc}", promotion_id),
                 )
         finally:
@@ -228,9 +216,7 @@ def promote(
     return record
 
 
-def rollback(
-    *, sport: str, market: str, repo_root: Path | str | None = None
-) -> dict[str, Any]:
+def rollback(*, sport: str, market: str, repo_root: Path | str | None = None) -> dict[str, Any]:
     """Roll (sport, market) back to its previous champion in one command."""
     root = Path(repo_root) if repo_root is not None else PROJECT_ROOT
     registry = ProductionModelRegistry.load(root)
@@ -243,9 +229,7 @@ def rollback(
         raise ValueError(f"'{current.model_id}' has no rollback model recorded")
     target = registry.entries.get(target_id)
     if target is None or not target.available:
-        raise ValueError(
-            f"rollback target '{target_id}' is not a valid production model"
-        )
+        raise ValueError(f"rollback target '{target_id}' is not a valid production model")
 
     config = _load_yaml_dict(root)
     svc = config["prediction_service"]
@@ -294,9 +278,7 @@ def rollback(
     }
 
 
-def history(
-    repo_root: Path | str | None = None, limit: int = 20
-) -> list[dict[str, Any]]:
+def history(repo_root: Path | str | None = None, limit: int = 20) -> list[dict[str, Any]]:
     root = Path(repo_root) if repo_root is not None else PROJECT_ROOT
     conn = _conn(root)
     try:
@@ -304,9 +286,7 @@ def history(
             "SELECT * FROM promotions ORDER BY promoted_at_utc DESC LIMIT ?",
             (int(limit),),
         ).fetchall()
-        columns = [d[0] for d in conn.execute(
-            "SELECT * FROM promotions LIMIT 0"
-        ).description]
+        columns = [d[0] for d in conn.execute("SELECT * FROM promotions LIMIT 0").description]
         return [dict(zip(columns, row)) for row in rows]
     finally:
         conn.close()

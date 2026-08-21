@@ -33,14 +33,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from model_prediction.config import PROJECT_ROOT  # noqa: E402
-from model_prediction.ingest import PARSER_VERSION  # noqa: E402
+from model_prediction.config import PROJECT_ROOT
+from model_prediction.ingest import PARSER_VERSION
 
 GAMES_PATH = PROJECT_ROOT / "data" / "historical" / "mlb_games_all.jsonl"
 RAW_ROOT = PROJECT_ROOT / "data" / "raw" / "mlb"
-LOCK_PATH = Path(
-    os.environ.get("MODEL_PREDICTION_RUNTIME_ROOT", str(PROJECT_ROOT / "data"))
-) / "locks" / "daily.lock"
+LOCK_PATH = (
+    Path(os.environ.get("MODEL_PREDICTION_RUNTIME_ROOT", str(PROJECT_ROOT / "data"))) / "locks" / "daily.lock"
+)
 
 
 def _snapshot_index() -> dict[str, tuple[str, str]]:
@@ -98,12 +98,12 @@ def main() -> int:
                 row["raw_source"], row["raw_hash"] = provenance
                 row["parser_version"] = PARSER_VERSION
                 filled += 1
-        print(f"rows: {len(rows)} | filled: {filled} | already had provenance: {skipped} "
-              f"| still unmatched: {len(rows) - filled - skipped}")
-
-        handle, temp_name = tempfile.mkstemp(
-            prefix=".mlb_games_all.jsonl.", dir=GAMES_PATH.parent
+        print(
+            f"rows: {len(rows)} | filled: {filled} | already had provenance: {skipped} "
+            f"| still unmatched: {len(rows) - filled - skipped}"
         )
+
+        handle, temp_name = tempfile.mkstemp(prefix=".mlb_games_all.jsonl.", dir=GAMES_PATH.parent)
         try:
             with os.fdopen(handle, "w", encoding="utf-8") as fh:
                 for row in rows:

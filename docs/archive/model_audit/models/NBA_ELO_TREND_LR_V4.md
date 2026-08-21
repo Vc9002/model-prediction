@@ -48,10 +48,10 @@ direct source read at the time of this audit):
 for day in sorted(by_date):
     day_games = sorted(by_date[day], key=lambda item: (item.start, item.event_id))
     if len(history) >= minimum_history_games:
-        elo = build_elo(history, sport)        # history = games strictly before `day`
+        elo = build_elo(history, sport)  # history = games strictly before `day`
         trends = TrendEngine(history)
-        ...                                     # features for every game ON `day` use this snapshot
-    history.extend(day_games)                   # today's games appended AFTER the day's features are built
+        ...  # features for every game ON `day` use this snapshot
+    history.extend(day_games)  # today's games appended AFTER the day's features are built
 ```
 (`validation.py` lines ~237-358 as of this audit.)
 
@@ -103,14 +103,14 @@ snapshot-then-append.
 in the actual forward/live path). `learned_forward.py::build_learned_moneyline_slate`:
 
 ```python
-history = store.games_before(key, game_date)   # cutoff: midnight ET at the START of game_date
+history = store.games_before(key, game_date)  # cutoff: midnight ET at the START of game_date
 ...
 elo = build_elo(history, key)
 ...
 for event in events:
     start = parse_utc(str(event["date"]))
     if start <= observed_at:
-        raise ValueError("event_started")       # also refuses to predict an already-started game
+        raise ValueError("event_started")  # also refuses to predict an already-started game
 ```
 
 `FeatureStore.games_before` (`features/base.py:188`) is the single

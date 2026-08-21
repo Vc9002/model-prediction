@@ -32,28 +32,32 @@ MODEL_STATUSES = [
 @dataclass
 class PredictiveQualification:
     """Evidence for sports-only probability quality."""
+
     qualified: bool
     log_loss: float
     brier: float
     ece: float
     calibration_slope: float
     calibration_intercept: float
-    coverage: float                    # fraction of events with valid predictions
+    coverage: float  # fraction of events with valid predictions
     n_events: int
     n_calls: int
     n_unique_dates: int
     bootstrap_log_loss_ci: tuple[float, float] = (0.0, 0.0)
-    seasonal_stability: float = 1.0     # max log-loss difference across seasons
+    seasonal_stability: float = 1.0  # max log-loss difference across seasons
     pit_violations: int = 0
-    train_serve_parity: float = 1.0     # ratio of serve log-loss to train log-loss
+    train_serve_parity: float = 1.0  # ratio of serve log-loss to train log-loss
     failures: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "qualified": self.qualified, "log_loss": self.log_loss,
-            "brier": self.brier, "ece": self.ece,
+            "qualified": self.qualified,
+            "log_loss": self.log_loss,
+            "brier": self.brier,
+            "ece": self.ece,
             "calibration_slope": self.calibration_slope,
-            "n_events": self.n_events, "n_calls": self.n_calls,
+            "n_events": self.n_events,
+            "n_calls": self.n_calls,
             "pit_violations": self.pit_violations,
             "failures": self.failures,
         }
@@ -62,26 +66,30 @@ class PredictiveQualification:
 @dataclass
 class EconomicQualification:
     """Evidence for executable economic value."""
+
     qualified: bool
-    cost_adjusted_return: float        # return after spread, fees, slippage
-    clv_mean: float                    # mean closing line value
-    clv_positive_frac: float           # fraction with positive CLV
+    cost_adjusted_return: float  # return after spread, fees, slippage
+    clv_mean: float  # mean closing line value
+    clv_positive_frac: float  # fraction with positive CLV
     n_trades: int
     n_unique_dates: int
     bootstrap_return_ci: tuple[float, float] = (0.0, 0.0)
     bootstrap_clv_ci: tuple[float, float] = (0.0, 0.0)
     max_drawdown: float = 0.0
     sharpe: float = 0.0
-    concentration_ratio: float = 0.0   # fraction of PnL from top team
+    concentration_ratio: float = 0.0  # fraction of PnL from top team
     depth_sufficient: bool = True
     contract_match_success: float = 1.0
     failures: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "qualified": self.qualified, "cost_adjusted_return": self.cost_adjusted_return,
-            "clv_mean": self.clv_mean, "n_trades": self.n_trades,
-            "sharpe": self.sharpe, "max_drawdown": self.max_drawdown,
+            "qualified": self.qualified,
+            "cost_adjusted_return": self.cost_adjusted_return,
+            "clv_mean": self.clv_mean,
+            "n_trades": self.n_trades,
+            "sharpe": self.sharpe,
+            "max_drawdown": self.max_drawdown,
             "failures": self.failures,
         }
 
@@ -89,6 +97,7 @@ class EconomicQualification:
 @dataclass
 class ModelQualification:
     """Combined predictive + economic qualification for one model."""
+
     model_id: str
     sport: str
     market_type: str
@@ -121,16 +130,20 @@ class ModelQualification:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "model_id": self.model_id, "sport": self.sport,
-            "market_type": self.market_type, "status": self.status,
+            "model_id": self.model_id,
+            "sport": self.sport,
+            "market_type": self.market_type,
+            "status": self.status,
             "predictive": self.predictive.to_dict() if self.predictive else None,
             "economic": self.economic.to_dict() if self.economic else None,
         }
 
 
 def evaluate_predictive_qualification(
-    y_true: list[int], y_prob: list[float],
-    n_events: int, n_dates: int,
+    y_true: list[int],
+    y_prob: list[float],
+    n_events: int,
+    n_dates: int,
     calibration_slope: float = 1.0,
     calibration_intercept: float = 0.0,
     pit_violations: int = 0,
@@ -179,12 +192,18 @@ def evaluate_predictive_qualification(
     n_calls = len(y_true)
     return PredictiveQualification(
         qualified=len(failures) == 0,
-        log_loss=float(ll), brier=float(br), ece=float(ec),
+        log_loss=float(ll),
+        brier=float(br),
+        ece=float(ec),
         calibration_slope=calibration_slope,
         calibration_intercept=calibration_intercept,
-        coverage=1.0, n_events=n_events, n_calls=n_calls,
-        n_unique_dates=n_dates, pit_violations=pit_violations,
-        train_serve_parity=train_serve_parity, failures=failures,
+        coverage=1.0,
+        n_events=n_events,
+        n_calls=n_calls,
+        n_unique_dates=n_dates,
+        pit_violations=pit_violations,
+        train_serve_parity=train_serve_parity,
+        failures=failures,
     )
 
 
@@ -233,9 +252,11 @@ def evaluate_economic_qualification(
         cost_adjusted_return=ret,
         clv_mean=clv,
         clv_positive_frac=float(np.mean(np.array(clv_values) > 0)) if clv_values else 0.0,
-        n_trades=n_trades, n_unique_dates=n_dates,
+        n_trades=n_trades,
+        n_unique_dates=n_dates,
         bootstrap_return_ci=(boot_lower, float(np.percentile(boot_arr, 97.5))),
-        max_drawdown=max_drawdown, sharpe=float(ret / max(0.001, np.std(returns))),
+        max_drawdown=max_drawdown,
+        sharpe=float(ret / max(0.001, np.std(returns))),
         concentration_ratio=concentration_ratio,
         contract_match_success=contract_match_success,
         failures=failures,

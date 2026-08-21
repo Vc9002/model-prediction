@@ -29,11 +29,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-import polars as pl  # noqa: E402
+import polars as pl
 
-from model_prediction.config import PROJECT_ROOT  # noqa: E402
-from model_prediction.features.base import FeatureStore  # noqa: E402
-from model_prediction.validation import build_walk_forward_rows  # noqa: E402
+from model_prediction.config import PROJECT_ROOT
+from model_prediction.features.base import FeatureStore
+from model_prediction.validation import build_walk_forward_rows
 
 OUT_DIR = PROJECT_ROOT / "outputs" / "research" / "mlb_v9_feature_table"
 GAMES_PATH = PROJECT_ROOT / "data" / "historical" / "mlb_games_all.jsonl"
@@ -41,15 +41,36 @@ GAMES_PATH = PROJECT_ROOT / "data" / "historical" / "mlb_games_all.jsonl"
 # Every field ValidationRow exposes (the frozen column contract). New
 # features get appended here AND to ValidationRow together.
 COLUMNS = [
-    "date", "event_id", "outcome", "elo_probability", "trend_gap",
-    "park_factor", "weather_factor", "park_available", "weather_available",
-    "park_factor_pit", "elo_neutral_probability", "trailing_home_win_rate_30d",
-    "trailing_home_games_30d", "residual_trend_gap", "defensive_trend_gap",
-    "pitcher_era_gap", "starter_era_gap", "starter_fip_gap", "starter_kbb_gap",
-    "probable_starter_era_gap", "probable_starter_available",
-    "bullpen_weakness_gap", "bullpen_available", "bullpen_fatigue_gap",
-    "bullpen_fatigue_available", "consistency_gap", "hot_cold_gap",
-    "rest_disparity", "back_to_back_gap", "games_last_7_gap",
+    "date",
+    "event_id",
+    "outcome",
+    "elo_probability",
+    "trend_gap",
+    "park_factor",
+    "weather_factor",
+    "park_available",
+    "weather_available",
+    "park_factor_pit",
+    "elo_neutral_probability",
+    "trailing_home_win_rate_30d",
+    "trailing_home_games_30d",
+    "residual_trend_gap",
+    "defensive_trend_gap",
+    "pitcher_era_gap",
+    "starter_era_gap",
+    "starter_fip_gap",
+    "starter_kbb_gap",
+    "probable_starter_era_gap",
+    "probable_starter_available",
+    "bullpen_weakness_gap",
+    "bullpen_available",
+    "bullpen_fatigue_gap",
+    "bullpen_fatigue_available",
+    "consistency_gap",
+    "hot_cold_gap",
+    "rest_disparity",
+    "back_to_back_gap",
+    "games_last_7_gap",
     "schedule_available",
 ]
 
@@ -91,7 +112,11 @@ def main() -> int:
                 "home_team": meta.get("home_team"),
                 "away_team": meta.get("away_team"),
                 "outcome": row.outcome,
-                **{name: getattr(row, name) for name in COLUMNS if name not in ("date", "event_id", "outcome")},
+                **{
+                    name: getattr(row, name)
+                    for name in COLUMNS
+                    if name not in ("date", "event_id", "outcome")
+                },
             }
         )
         if not meta:
@@ -105,9 +130,11 @@ def main() -> int:
     print(f"[3/3] wrote {parquet_path} ({len(records)} rows, {frame.width} columns)")
 
     try:
-        git_sha = __import__("subprocess").run(
-            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
-        ).stdout.strip()
+        git_sha = (
+            __import__("subprocess")
+            .run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True)
+            .stdout.strip()
+        )
     except Exception:  # noqa: BLE001 — sha is informational
         git_sha = "unknown"
 
@@ -117,17 +144,19 @@ def main() -> int:
         "rows": len(records),
         "columns": sorted(frame.columns),
         "dataset_hash": sha256_file(parquet_path),
-        "feature_schema_hash": hashlib.sha256(
-            json.dumps(sorted(frame.columns)).encode()
-        ).hexdigest(),
+        "feature_schema_hash": hashlib.sha256(json.dumps(sorted(frame.columns)).encode()).hexdigest(),
         "source_hashes": {"mlb_games_all.jsonl": sha256_file(GAMES_PATH)},
         "git_sha": git_sha,
         "decision_horizon": "game-day walk-forward, ET dates; features computed from strictly prior completed games",
         "status": "PREP_ONLY — not to be used for model selection until burn-in passes (2026-08-18)",
         "missing_features_not_yet_built": [
-            "lineup_strength_projected", "lineup_strength_confirmed",
-            "bullpen_talent", "pit_weather_temperature", "pit_weather_humidity",
-            "pit_weather_wind", "pit_weather_roof",
+            "lineup_strength_projected",
+            "lineup_strength_confirmed",
+            "bullpen_talent",
+            "pit_weather_temperature",
+            "pit_weather_humidity",
+            "pit_weather_wind",
+            "pit_weather_roof",
         ],
     }
     manifest_path = OUT_DIR / "manifest.json"

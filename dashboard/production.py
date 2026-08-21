@@ -130,7 +130,9 @@ def get_production_status() -> dict[str, Any]:
     return {
         "model_id": model_id,
         "status": status,
-        "artifact_hash": artifact_hash[:12] + "..." if artifact_hash and len(artifact_hash) > 12 else artifact_hash,
+        "artifact_hash": artifact_hash[:12] + "..."
+        if artifact_hash and len(artifact_hash) > 12
+        else artifact_hash,
         "last_prediction_utc": last_prediction_utc,
         "last_scheduler_run_utc": last_scheduler_run_utc,
         "today_events": today_events,

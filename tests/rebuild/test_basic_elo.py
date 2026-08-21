@@ -11,10 +11,9 @@ from model_prediction.rebuild.basic_elo import EloModel
 
 
 def _games(pairs: list[tuple[str, str, int, int]]) -> pl.DataFrame:
-    return pl.DataFrame([
-        {"home_team": h, "away_team": a, "home_score": hs, "away_score": as_}
-        for h, a, hs, as_ in pairs
-    ])
+    return pl.DataFrame(
+        [{"home_team": h, "away_team": a, "home_score": hs, "away_score": as_} for h, a, hs, as_ in pairs]
+    )
 
 
 class TestEloModel:

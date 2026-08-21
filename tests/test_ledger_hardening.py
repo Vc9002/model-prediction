@@ -77,16 +77,16 @@ def test_research_is_zero_unit_excluded_from_exposure_roi_but_in_calibration(
     assert report["by_model_version"] == {"stat-v1": 2}
 
 
-def test_research_can_auto_score_one_hypothetical_unit_on_settlement(
-    registry, ban_list, tmp_path
-) -> None:
+def test_research_can_auto_score_one_hypothetical_unit_on_settlement(registry, ban_list, tmp_path) -> None:
     ledger = PickLedger(
         tmp_path / "picks.xlsx",
         tmp_path / "events.jsonl",
         research_score_units=1.0,
         research_scoring_note="one-unit hypothetical policy",
     )
-    req = request("research-one-unit", state=ModelState.SUSPENDED)  # see the note above on why SUSPENDED, not RESEARCH
+    req = request(
+        "research-one-unit", state=ModelState.SUSPENDED
+    )  # see the note above on why SUSPENDED, not RESEARCH
     gate = evaluate_eligibility(req, registry, ban_list, Exposure(), UnitPolicy(), NOW)
     row = ledger.append_evaluated(req, gate, NOW)
 
@@ -101,9 +101,7 @@ def test_research_can_auto_score_one_hypothetical_unit_on_settlement(
     assert settled["research_scoring_note"] == "one-unit hypothetical policy"
 
 
-def test_research_can_keep_model_recommended_units_on_settlement(
-    registry, ban_list, tmp_path
-) -> None:
+def test_research_can_keep_model_recommended_units_on_settlement(registry, ban_list, tmp_path) -> None:
     ledger = PickLedger(
         tmp_path / "picks.xlsx",
         tmp_path / "events.jsonl",
@@ -123,9 +121,7 @@ def test_research_can_keep_model_recommended_units_on_settlement(
     assert settled["research_scoring_note"] == "decision-time model size"
 
 
-def test_research_model_recommended_skips_scoring_without_uncertainty(
-    registry, ban_list, tmp_path
-) -> None:
+def test_research_model_recommended_skips_scoring_without_uncertainty(registry, ban_list, tmp_path) -> None:
     ledger = PickLedger(
         tmp_path / "picks.xlsx",
         tmp_path / "events.jsonl",
@@ -331,9 +327,7 @@ def test_audit_append_happens_while_the_ledger_lock_is_still_held(
     ledger.remove_open_rows(["lock-order-remove"], "test removal")
 
     assert audit_calls_while_locked, "expected at least one audit.append call to be observed"
-    assert all(audit_calls_while_locked), (
-        "every audit.append must fire while the ledger lock is still held"
-    )
+    assert all(audit_calls_while_locked), "every audit.append must fire while the ledger lock is still held"
 
 
 def test_ledger_write_crash_leaves_a_recoverable_audit_event_not_a_silent_gap(
@@ -376,9 +370,7 @@ def test_ledger_write_crash_leaves_a_recoverable_audit_event_not_a_silent_gap(
     # Audit event committed despite the ledger write never landing.
     events = ledger.audit.events()
     crash_events = [
-        event
-        for event in events
-        if event["event_type"] in ("pick_created", "research_observation_created")
+        event for event in events if event["event_type"] in ("pick_created", "research_observation_created")
     ]
     assert len(crash_events) == 1, "the crashed attempt's audit event must still exist"
     # The row genuinely isn't in the ledger -- confirms this is a detectable

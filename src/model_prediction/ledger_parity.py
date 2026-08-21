@@ -49,19 +49,13 @@ def _close(left: Any, right: Any, tolerance: float) -> bool:
         return left == right
 
 
-def compare(
-    xlsx_rows: list[dict[str, Any]], sqlite_rows: list[dict[str, Any]]
-) -> dict[str, Any]:
+def compare(xlsx_rows: list[dict[str, Any]], sqlite_rows: list[dict[str, Any]]) -> dict[str, Any]:
     """Compare two canonical row sets; returns the G5 report."""
     xlsx = {str(r["pick_id"]): r for r in xlsx_rows}
     # Archived/removed records stay in the mirror as tombstones (their
     # audit events reference them) but have left the XLSX — they are
     # exempt from the missing_xlsx count, not a parity failure.
-    sqlite = {
-        str(r["pick_id"]): r
-        for r in sqlite_rows
-        if r.get("status") not in ("archived", "removed")
-    }
+    sqlite = {str(r["pick_id"]): r for r in sqlite_rows if r.get("status") not in ("archived", "removed")}
     report: dict[str, Any] = {
         "rows": {
             "xlsx": len(xlsx),
@@ -89,8 +83,7 @@ def compare(
 
     def _note(kind: str, pick_id: str, field: str, xlsx_v: Any, sqlite_v: Any) -> None:
         report["details"].append(
-            {"kind": kind, "pick_id": pick_id, "field": field,
-             "xlsx": xlsx_v, "sqlite": sqlite_v}
+            {"kind": kind, "pick_id": pick_id, "field": field, "xlsx": xlsx_v, "sqlite": sqlite_v}
         )
 
     for pick_id, xrow in xlsx.items():
@@ -109,19 +102,21 @@ def compare(
         if not _close(xrow.get("pnl_units"), srow.get("pnl_units"), _MONEY_TOLERANCE):
             report["financial"]["pnl_mismatches"] += 1
             _note("pnl", pick_id, "pnl_units", xrow.get("pnl_units"), srow.get("pnl_units"))
-        if not _close(
-            xrow.get("model_probability"), srow.get("model_probability"), _PROB_TOLERANCE
-        ):
+        if not _close(xrow.get("model_probability"), srow.get("model_probability"), _PROB_TOLERANCE):
             report["prediction"]["prob_mismatches"] += 1
-            _note("prob", pick_id, "model_probability",
-                  xrow.get("model_probability"), srow.get("model_probability"))
+            _note(
+                "prob",
+                pick_id,
+                "model_probability",
+                xrow.get("model_probability"),
+                srow.get("model_probability"),
+            )
         if not _close(xrow.get("line"), srow.get("line"), _MONEY_TOLERANCE):
             report["prediction"]["line_mismatches"] += 1
             _note("line", pick_id, "line", xrow.get("line"), srow.get("line"))
         if _absent(xrow.get("selection")) != _absent(srow.get("selection")):
             report["prediction"]["selection_mismatches"] += 1
-            _note("selection", pick_id, "selection",
-                  xrow.get("selection"), srow.get("selection"))
+            _note("selection", pick_id, "selection", xrow.get("selection"), srow.get("selection"))
         # XLSX calls the field model_version; the mirror canonicalizes it
         # to model_id — compare on the same semantic field.
         x_model = _absent(xrow.get("model_id") or xrow.get("model_version"))
@@ -130,8 +125,13 @@ def compare(
             _note("model", pick_id, "model_id", x_model, srow.get("model_id"))
         if _absent(xrow.get("model_artifact_hash")) != _absent(srow.get("model_artifact_hash")):
             report["lineage"]["artifact_mismatches"] += 1
-            _note("artifact", pick_id, "model_artifact_hash",
-                  xrow.get("model_artifact_hash"), srow.get("model_artifact_hash"))
+            _note(
+                "artifact",
+                pick_id,
+                "model_artifact_hash",
+                xrow.get("model_artifact_hash"),
+                srow.get("model_artifact_hash"),
+            )
 
     report["details"] = report["details"][:20]
     report["clean"] = _is_clean(report)
@@ -215,8 +215,10 @@ def _print_report(report: dict[str, Any]) -> None:
         print()
         print("first divergences:")
         for detail in report["details"]:
-            print(f"  {detail['kind']}: {detail['pick_id']} {detail['field']} "
-                  f"xlsx={detail['xlsx']!r} sqlite={detail['sqlite']!r}")
+            print(
+                f"  {detail['kind']}: {detail['pick_id']} {detail['field']} "
+                f"xlsx={detail['xlsx']!r} sqlite={detail['sqlite']!r}"
+            )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -247,9 +249,7 @@ def main(argv: list[str] | None = None) -> int:
                     raise ValueError("backfill needs both --tier and --sport (or neither for --all)")
                 combos = [(tier, sport)]
             else:
-                combos = [
-                    (t, sp) for t, sports in _TIER_SPORTS.items() for sp in sports
-                ]
+                combos = [(t, sp) for t, sports in _TIER_SPORTS.items() for sp in sports]
             total = {"applied": 0, "already_present": 0, "skipped": 0}
             for t, sp in combos:
                 try:
@@ -260,18 +260,16 @@ def main(argv: list[str] | None = None) -> int:
                     continue
                 total["applied"] += result["applied"]
                 total["already_present"] += result["already_present"]
-                extra = (
-                    f" tombstoned={result.get('tombstoned')}"
-                    if "tombstoned" in result
-                    else ""
-                )
+                extra = f" tombstoned={result.get('tombstoned')}" if "tombstoned" in result else ""
                 if "synced" in result:
                     extra += f" synced={result['synced']}"
                 print(
                     f"{t:<15} {sp:<14} applied={result['applied']} "
                     f"already_present={result['already_present']}{extra}"
                 )
-            print(f"TOTAL applied={total['applied']} already_present={total['already_present']} skipped={total['skipped']}")
+            print(
+                f"TOTAL applied={total['applied']} already_present={total['already_present']} skipped={total['skipped']}"
+            )
             return 0
         tier = _arg("--tier", "main")
         sport = _arg("--sport", "mlb")
@@ -329,9 +327,7 @@ def reconcile(tier: str, sport: str) -> dict[str, int]:
                 # (e.g. settlements written through a pre-mirror path) is
                 # repaired deterministically — upsert overwrites fields.
                 xrow = xlsx_rows[record["pick_id"]]
-                mutation = ledger._row_mutation(
-                    xrow, "update", f"op-sync-{tier}-{record['pick_id']}"
-                )
+                mutation = ledger._row_mutation(xrow, "update", f"op-sync-{tier}-{record['pick_id']}")
                 if store.apply(mutation):
                     synced += 1
                 continue
@@ -371,9 +367,7 @@ def backfill(tier: str, sport: str) -> dict[str, int]:
             if row["pick_id"] in existing:
                 skipped += 1
                 continue
-            mutation = ledger._row_mutation(
-                row, "append", f"op-backfill-{tier}-{row['pick_id']}"
-            )
+            mutation = ledger._row_mutation(row, "append", f"op-backfill-{tier}-{row['pick_id']}")
             if store.apply(mutation):
                 applied += 1
             else:
@@ -400,5 +394,3 @@ def integrity_report(paths: RuntimePaths) -> dict[str, Any]:
 
 if __name__ == "__main__":
     sys.exit(main())
-
-

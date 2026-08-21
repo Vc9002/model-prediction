@@ -60,7 +60,9 @@ def main() -> None:
     for sport, count in main_counts.items():
         print(f"  {sport}: {count} rows")
     print("Flat (data/flat_picks.xlsx -> data/flat/<sport>.xlsx, MAIN_LEDGER_SPORTS only):")
-    flat_counts = _split(data_root / "flat_picks.xlsx", flat_ledger_path, data_root, restrict_to_main_sports=True)
+    flat_counts = _split(
+        data_root / "flat_picks.xlsx", flat_ledger_path, data_root, restrict_to_main_sports=True
+    )
     for sport, count in flat_counts.items():
         print(f"  {sport}: {count} rows")
     print("Done. Old data/picks.xlsx and data/flat_picks.xlsx were NOT modified or deleted.")

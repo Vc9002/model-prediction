@@ -77,12 +77,16 @@ def main() -> None:
     dataset = build_mlb_historical_horizon_dataset("data/rebuild", start_date, end_date, HORIZON)
     features = dataset.features.sort("event_start_utc") if dataset.features.height else dataset.features
     starters_known = dataset.starters_known_games
-    print(f"1. Feature rows: {dataset.matched_games} matched ({starters_known} with a point-in-time-valid "
-          f"probable starter for both teams at horizon={HORIZON}, {dataset.matched_games - starters_known} "
-          f"flagged starters_known=0); dataset_hash={dataset.dataset_hash[:12]}")
+    print(
+        f"1. Feature rows: {dataset.matched_games} matched ({starters_known} with a point-in-time-valid "
+        f"probable starter for both teams at horizon={HORIZON}, {dataset.matched_games - starters_known} "
+        f"flagged starters_known=0); dataset_hash={dataset.dataset_hash[:12]}"
+    )
 
     if features.height < 30:
-        print("Not enough matched games to compare model families meaningfully (need >=30). Stopping honestly.")
+        print(
+            "Not enough matched games to compare model families meaningfully (need >=30). Stopping honestly."
+        )
         sys.exit(0)
 
     # Task 8 fix: same real date-cluster-safe fold shape as
@@ -98,8 +102,10 @@ def main() -> None:
     val_size_days = max(1, n_unique_dates // 6)
     test_size_days = max(1, n_unique_dates // 6)
     folds = expanding_folds(game_dates, n_splits=3, val_size=val_size_days, test_size=test_size_days, gap=1)
-    print(f"2. Chronological folds: {len(folds)} ({n_unique_dates} real distinct dates, "
-          f"val_size={val_size_days}d test_size={test_size_days}d gap=1d)")
+    print(
+        f"2. Chronological folds: {len(folds)} ({n_unique_dates} real distinct dates, "
+        f"val_size={val_size_days}d test_size={test_size_days}d gap=1d)"
+    )
 
     two_head_oof: list[float] = []
     xgb_oof: list[float] = []
@@ -137,41 +143,51 @@ def main() -> None:
         # against -- a real leak CLAUDE.md's stop condition names
         # explicitly.
         X_train = train_df.select(XGB_FEATURES).to_numpy()
-        y_train_arr = train_df.select(
-            (pl.col("home_score") > pl.col("away_score")).cast(pl.Int8).alias("y")
-        ).to_numpy().ravel()
+        y_train_arr = (
+            train_df.select((pl.col("home_score") > pl.col("away_score")).cast(pl.Int8).alias("y"))
+            .to_numpy()
+            .ravel()
+        )
         X_val = val_df.select(XGB_FEATURES).to_numpy()
         y_val_fold = _home_win_labels(val_df)
 
-        nested_result = nested_xgboost_fold(X_train, y_train_arr, X_val, y_val_fold, fold_index=fold.fold_index)
+        nested_result = nested_xgboost_fold(
+            X_train, y_train_arr, X_val, y_val_fold, fold_index=fold.fold_index
+        )
         fold_xgb_probs = nested_result.outer_probs
 
         two_head_oof.extend(fold_two_head_probs)
         xgb_oof.extend(fold_xgb_probs)
         y_true.extend(y_val_fold)
 
-        per_fold_report.append({
-            "fold": fold.fold_index, "train_n": train_df.height, "val_n": val_df.height,
-            "two_head": {
-                "log_loss": log_loss(y_val_fold, fold_two_head_probs),
-                "brier": brier_score(y_val_fold, fold_two_head_probs),
-            },
-            "xgboost": {
-                "log_loss": nested_result.outer_log_loss,
-                "brier": nested_result.outer_brier,
-                # CLAUDE.md Task 9: persisted for every fold so a real
-                # audit can verify the outer score never influenced these.
-                "best_params": nested_result.best_params,
-                "best_iteration": nested_result.best_iteration,
-                "inner_log_loss": nested_result.inner_log_loss,
-                "inner_train_n": nested_result.inner_train_n,
-                "inner_val_n": nested_result.inner_val_n,
-            },
-        })
-        print(f"  Fold {fold.fold_index}: train={train_df.height} val={val_df.height} "
-              f"two_head_ll={per_fold_report[-1]['two_head']['log_loss']:.3f} "
-              f"xgb_ll={per_fold_report[-1]['xgboost']['log_loss']:.3f} "
-              f"(inner_ll={nested_result.inner_log_loss:.3f}, best_iter={nested_result.best_iteration})")
+        per_fold_report.append(
+            {
+                "fold": fold.fold_index,
+                "train_n": train_df.height,
+                "val_n": val_df.height,
+                "two_head": {
+                    "log_loss": log_loss(y_val_fold, fold_two_head_probs),
+                    "brier": brier_score(y_val_fold, fold_two_head_probs),
+                },
+                "xgboost": {
+                    "log_loss": nested_result.outer_log_loss,
+                    "brier": nested_result.outer_brier,
+                    # CLAUDE.md Task 9: persisted for every fold so a real
+                    # audit can verify the outer score never influenced these.
+                    "best_params": nested_result.best_params,
+                    "best_iteration": nested_result.best_iteration,
+                    "inner_log_loss": nested_result.inner_log_loss,
+                    "inner_train_n": nested_result.inner_train_n,
+                    "inner_val_n": nested_result.inner_val_n,
+                },
+            }
+        )
+        print(
+            f"  Fold {fold.fold_index}: train={train_df.height} val={val_df.height} "
+            f"two_head_ll={per_fold_report[-1]['two_head']['log_loss']:.3f} "
+            f"xgb_ll={per_fold_report[-1]['xgboost']['log_loss']:.3f} "
+            f"(inner_ll={nested_result.inner_log_loss:.3f}, best_iter={nested_result.best_iteration})"
+        )
 
     if len(y_true) < 10:
         print("Too few real OOF predictions across folds to fit a meaningful ensemble. Stopping honestly.")
@@ -185,22 +201,32 @@ def main() -> None:
     ensemble = Ensemble(method="logistic_stacking")
     ensemble.fit({"two_head": two_head_oof, "xgboost": xgb_oof}, y_true)
     ensemble_probs = [
-        ensemble.predict({"two_head": t, "xgboost": x})
-        for t, x in zip(two_head_oof, xgb_oof, strict=True)
+        ensemble.predict({"two_head": t, "xgboost": x}) for t, x in zip(two_head_oof, xgb_oof, strict=True)
     ]
 
     summary = {
         "n_oof": len(y_true),
-        "two_head": {"log_loss": log_loss(y_true, two_head_oof), "brier": brier_score(y_true, two_head_oof),
-                     "ece": ece(y_true, two_head_oof)},
-        "xgboost": {"log_loss": log_loss(y_true, xgb_oof), "brier": brier_score(y_true, xgb_oof),
-                    "ece": ece(y_true, xgb_oof)},
-        "ensemble": {"log_loss": log_loss(y_true, ensemble_probs), "brier": brier_score(y_true, ensemble_probs),
-                     "ece": ece(y_true, ensemble_probs)},
+        "two_head": {
+            "log_loss": log_loss(y_true, two_head_oof),
+            "brier": brier_score(y_true, two_head_oof),
+            "ece": ece(y_true, two_head_oof),
+        },
+        "xgboost": {
+            "log_loss": log_loss(y_true, xgb_oof),
+            "brier": brier_score(y_true, xgb_oof),
+            "ece": ece(y_true, xgb_oof),
+        },
+        "ensemble": {
+            "log_loss": log_loss(y_true, ensemble_probs),
+            "brier": brier_score(y_true, ensemble_probs),
+            "ece": ece(y_true, ensemble_probs),
+        },
         "ensemble_weights": ensemble.weights,
         "per_fold": per_fold_report,
     }
-    print(f"\n3. OOF comparison ({len(y_true)} real out-of-fold predictions across {len(per_fold_report)} folds):")
+    print(
+        f"\n3. OOF comparison ({len(y_true)} real out-of-fold predictions across {len(per_fold_report)} folds):"
+    )
     for name in ("two_head", "xgboost", "ensemble"):
         m = summary[name]
         print(f"   {name:10s}: log_loss={m['log_loss']:.4f} brier={m['brier']:.4f} ece={m['ece']:.4f}")

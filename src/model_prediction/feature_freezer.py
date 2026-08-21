@@ -50,9 +50,7 @@ def freeze_features(
     out_path.parent.mkdir(parents=True, exist_ok=True)
     lines: list[str] = []
     for row in rows:
-        lines.append(
-            json.dumps(dataclasses.asdict(row), sort_keys=True, separators=(",", ":"))
-        )
+        lines.append(json.dumps(dataclasses.asdict(row), sort_keys=True, separators=(",", ":")))
     table = "\n".join(lines) + ("\n" if lines else "")
     out_path.write_text(table, encoding="utf-8")
 
@@ -112,9 +110,7 @@ def main(argv: list[str] | None = None) -> int:
         out = _arg("--out")
         if not sport or not out:
             raise ValueError("--sport and --out are required")
-        manifest = freeze_features(
-            sport=sport, out_path=Path(out), end_date=_arg("--end-date")
-        )
+        manifest = freeze_features(sport=sport, out_path=Path(out), end_date=_arg("--end-date"))
         print(json.dumps(manifest, indent=2))
         return 0
     except Exception as exc:  # noqa: BLE001

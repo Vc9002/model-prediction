@@ -25,7 +25,6 @@ v8 was); the PIT-safe replacement is v9's ``park_factor_pit``.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import sys
 from datetime import date, timedelta
@@ -34,11 +33,11 @@ from statistics import mean
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-import numpy as np  # noqa: E402
+import numpy as np
 
-from model_prediction.config import PROJECT_ROOT  # noqa: E402
-from model_prediction.features.base import FeatureStore  # noqa: E402
-from model_prediction.validation import (  # noqa: E402
+from model_prediction.config import PROJECT_ROOT
+from model_prediction.features.base import FeatureStore
+from model_prediction.validation import (
     FEATURE_VARIANTS,
     build_walk_forward_rows,
     chronological_split,
@@ -107,11 +106,7 @@ def _identify_backfill_event_ids() -> set[str]:
     if descent is None:
         return set()
 
-    late_positions = {
-        i
-        for i, day, _ in days[descent + 1 :]
-        if day <= "2026-07-29"
-    }
+    late_positions = {i for i, day, _ in days[descent + 1 :] if day <= "2026-07-29"}
     first_position: dict[str, int] = {}
     for i, _, eid in days:
         first_position.setdefault(eid, i)
@@ -133,7 +128,7 @@ def main() -> int:
     rows_end = (date.fromisoformat(hold_end) + timedelta(days=1)).isoformat()
     store = FeatureStore(PROJECT_ROOT / "data")
     rows = build_walk_forward_rows(store, SPORT, end_date=rows_end)
-    train, validation, holdout, split_meta = chronological_split(
+    train, validation, holdout, _split_meta = chronological_split(
         rows, train_end_date=train_end, validation_end_date=val_end
     )
 
@@ -142,7 +137,10 @@ def main() -> int:
     # ── B: split boundaries ───────────────────────────────────────────────
     report["checks"]["B_boundaries"] = {
         "train": {"recorded": training["coefficient_fit"]["observations"], "actual": len(train)},
-        "validation": {"recorded": training["threshold_selection"].get("observations"), "actual": len(validation)},
+        "validation": {
+            "recorded": training["threshold_selection"].get("observations"),
+            "actual": len(validation),
+        },
         "holdout": {"recorded": training["locked_holdout"]["observations"], "actual": len(holdout)},
     }
 
@@ -174,7 +172,7 @@ def main() -> int:
     }
 
     # ── coefficient parity: refit on the pinned train, compare to shipped ──
-    from model_prediction.validation import _fit, _predict  # noqa: E402
+    from model_prediction.validation import _fit, _predict
 
     model = _fit(train, shipped_names)
     refit_coefs = [round(float(v), 10) for v in model.coef_[0]]
@@ -254,22 +252,31 @@ def main() -> int:
             fh.write(json.dumps(r) + "\n")
     report["_files"] = {"report": str(report_path), "rows": str(rows_path)}
 
-    print(json.dumps(
-        {
-            "B": report["checks"]["B_boundaries"],
-            "A": {k: v for k, v in report["checks"]["A_cohort"].items() if k != "excluded_event_ids"},
-            "C": report["checks"]["C_feature_order"]["match"],
-            "coefficients": {
-                "max_abs_delta": report["checks"]["coefficients"]["max_abs_delta"],
-                "parity_within_1e-6": report["checks"]["coefficients"]["parity_within_1e-6"],
+    print(
+        json.dumps(
+            {
+                "B": report["checks"]["B_boundaries"],
+                "A": {k: v for k, v in report["checks"]["A_cohort"].items() if k != "excluded_event_ids"},
+                "C": report["checks"]["C_feature_order"]["match"],
+                "coefficients": {
+                    "max_abs_delta": report["checks"]["coefficients"]["max_abs_delta"],
+                    "parity_within_1e-6": report["checks"]["coefficients"]["parity_within_1e-6"],
+                },
+                "row_probability": {
+                    k: report["checks"]["row_probability_parity"][k]
+                    for k in (
+                        "rows",
+                        "max_abs_delta",
+                        "rows_exact_within_1e-9",
+                        "calls_at_pinned_threshold_shipped_coefs",
+                        "recorded_calls",
+                    )
+                },
+                "J_missing": report["checks"]["J_missing_features"],
             },
-            "row_probability": {
-                k: report["checks"]["row_probability_parity"][k]
-                for k in ("rows", "max_abs_delta", "rows_exact_within_1e-9",
-                          "calls_at_pinned_threshold_shipped_coefs", "recorded_calls")
-            },
-            "J_missing": report["checks"]["J_missing_features"],
-        }, indent=2))
+            indent=2,
+        )
+    )
     return 0
 
 

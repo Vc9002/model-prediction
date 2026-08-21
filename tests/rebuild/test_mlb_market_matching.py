@@ -22,13 +22,25 @@ from model_prediction.rebuild.mlb_market_matching import (
 
 
 def _row(
-    event_id: str, market_type: str, team_or_side: str, line: float | None,
-    executable_price: float, *, team: str | None = None, is_f5: bool = False, market_id: str = "m1",
+    event_id: str,
+    market_type: str,
+    team_or_side: str,
+    line: float | None,
+    executable_price: float,
+    *,
+    team: str | None = None,
+    is_f5: bool = False,
+    market_id: str = "m1",
 ) -> dict:
     return {
-        "event_id": event_id, "market_id": market_id, "market_type": market_type,
-        "team_or_side": team_or_side, "team": team, "line": line,
-        "executable_price": executable_price, "is_first_five_innings": is_f5,
+        "event_id": event_id,
+        "market_id": market_id,
+        "market_type": market_type,
+        "team_or_side": team_or_side,
+        "team": team,
+        "line": line,
+        "executable_price": executable_price,
+        "is_first_five_innings": is_f5,
     }
 
 
@@ -37,10 +49,12 @@ class TestResolvePolymarketEventId:
         # Real bug: passing Statcast-style abbreviations ("SEA") here
         # silently matched zero rows, since Polymarket's `team` field is
         # the real full display name.
-        df = pl.DataFrame([
-            _row("70543", "moneyline", "home", None, 0.545, team="Seattle Mariners"),
-            _row("70543", "moneyline", "away", None, 0.46, team="Detroit Tigers"),
-        ])
+        df = pl.DataFrame(
+            [
+                _row("70543", "moneyline", "home", None, 0.545, team="Seattle Mariners"),
+                _row("70543", "moneyline", "away", None, 0.46, team="Detroit Tigers"),
+            ]
+        )
 
         assert resolve_polymarket_event_id(df, "Seattle Mariners", "Detroit Tigers") == "70543"
         assert resolve_polymarket_event_id(df, "SEA", "DET") is None, (
@@ -48,19 +62,23 @@ class TestResolvePolymarketEventId:
         )
 
     def test_ambiguous_match_returns_none(self):
-        df = pl.DataFrame([
-            _row("A", "moneyline", "home", None, 0.5, team="Seattle Mariners"),
-            _row("B", "moneyline", "home", None, 0.5, team="Seattle Mariners"),
-        ])
+        df = pl.DataFrame(
+            [
+                _row("A", "moneyline", "home", None, 0.5, team="Seattle Mariners"),
+                _row("B", "moneyline", "home", None, 0.5, team="Seattle Mariners"),
+            ]
+        )
         assert resolve_polymarket_event_id(df, "Seattle Mariners", "Detroit Tigers") is None
 
 
 class TestExcludeFirstFiveInnings:
     def test_f5_rows_are_dropped(self):
-        df = pl.DataFrame([
-            _row("70543", "total", "over", 6.5, 0.65, is_f5=False),
-            _row("70543", "total", "over", 6.5, 0.25, is_f5=True),
-        ])
+        df = pl.DataFrame(
+            [
+                _row("70543", "total", "over", 6.5, 0.65, is_f5=False),
+                _row("70543", "total", "over", 6.5, 0.25, is_f5=True),
+            ]
+        )
 
         result = exclude_first_five_innings(df)
 
@@ -74,12 +92,14 @@ class TestExcludeFirstFiveInnings:
 
 class TestRealTotalLines:
     def test_returns_distinct_real_lines_for_this_event_only(self):
-        df = pl.DataFrame([
-            _row("70543", "total", "over", 6.5, 0.65),
-            _row("70543", "total", "under", 6.5, 0.35),
-            _row("70543", "total", "over", 7.5, 0.5),
-            _row("99999", "total", "over", 2.5, 0.9),  # a different game entirely
-        ])
+        df = pl.DataFrame(
+            [
+                _row("70543", "total", "over", 6.5, 0.65),
+                _row("70543", "total", "under", 6.5, 0.35),
+                _row("70543", "total", "over", 7.5, 0.5),
+                _row("99999", "total", "over", 2.5, 0.9),  # a different game entirely
+            ]
+        )
 
         lines = real_total_lines(df, "70543")
 
@@ -91,12 +111,14 @@ class TestRealMarketCandidates:
         # Real bug: totals were previously filtered by market_type alone
         # with zero event isolation — every total market from the whole
         # date's collection (176 rows) got attached to every single game.
-        df = pl.DataFrame([
-            _row("70543", "moneyline", "home", None, 0.545, team="Seattle Mariners"),
-            _row("70543", "moneyline", "away", None, 0.46, team="Detroit Tigers"),
-            _row("70543", "total", "over", 6.5, 0.65),
-            _row("99999", "total", "over", 2.5, 0.9),  # unrelated game's total
-        ])
+        df = pl.DataFrame(
+            [
+                _row("70543", "moneyline", "home", None, 0.545, team="Seattle Mariners"),
+                _row("70543", "moneyline", "away", None, 0.46, team="Detroit Tigers"),
+                _row("70543", "total", "over", 6.5, 0.65),
+                _row("99999", "total", "over", 2.5, 0.9),  # unrelated game's total
+            ]
+        )
 
         candidates = real_market_candidates(df, "Seattle Mariners", "Detroit Tigers")
 
@@ -107,9 +129,11 @@ class TestRealMarketCandidates:
         assert totals[0].line == 6.5
 
     def test_unresolvable_event_returns_no_candidates_not_a_guess(self):
-        df = pl.DataFrame([
-            _row("70543", "moneyline", "home", None, 0.5, team="Some Other Team"),
-        ])
+        df = pl.DataFrame(
+            [
+                _row("70543", "moneyline", "home", None, 0.5, team="Some Other Team"),
+            ]
+        )
         assert real_market_candidates(df, "Seattle Mariners", "Detroit Tigers") == []
 
     def test_real_candidates_honestly_mark_depth_unavailable_not_fabricated(self):
@@ -119,10 +143,12 @@ class TestRealMarketCandidates:
         # "do not fabricate depth ... fail economic qualification"). The
         # underlying Polymarket source has no real depth endpoint, so every
         # real candidate must say so honestly via depth_available=False.
-        df = pl.DataFrame([
-            _row("70543", "moneyline", "home", None, 0.545, team="Seattle Mariners"),
-            _row("70543", "total", "over", 6.5, 0.65),
-        ])
+        df = pl.DataFrame(
+            [
+                _row("70543", "moneyline", "home", None, 0.545, team="Seattle Mariners"),
+                _row("70543", "total", "over", 6.5, 0.65),
+            ]
+        )
 
         candidates = real_market_candidates(df, "Seattle Mariners", "Detroit Tigers")
 
@@ -175,12 +201,24 @@ class TestRealMarketSnapshotHash:
 
     def test_hash_is_stable_across_different_quote_ages(self):
         m1 = MarketEvaluation(
-            market_id="70543", market_type="moneyline", team_or_side="home", line=None,
-            executable_ask=0.55, depth_adjusted_price=0.55, quote_age_seconds=5.0, available_depth=999.0,
+            market_id="70543",
+            market_type="moneyline",
+            team_or_side="home",
+            line=None,
+            executable_ask=0.55,
+            depth_adjusted_price=0.55,
+            quote_age_seconds=5.0,
+            available_depth=999.0,
         )
         m2 = MarketEvaluation(
-            market_id="70543", market_type="moneyline", team_or_side="home", line=None,
-            executable_ask=0.55, depth_adjusted_price=0.55, quote_age_seconds=4500.0, available_depth=999.0,
+            market_id="70543",
+            market_type="moneyline",
+            team_or_side="home",
+            line=None,
+            executable_ask=0.55,
+            depth_adjusted_price=0.55,
+            quote_age_seconds=4500.0,
+            available_depth=999.0,
         )
         assert real_market_snapshot_hash("70543", [m1]) == real_market_snapshot_hash("70543", [m2]), (
             "the same real quote observed at two different wall-clock moments "
@@ -189,12 +227,24 @@ class TestRealMarketSnapshotHash:
 
     def test_hash_changes_when_real_content_changes(self):
         m1 = MarketEvaluation(
-            market_id="70543", market_type="moneyline", team_or_side="home", line=None,
-            executable_ask=0.55, depth_adjusted_price=0.55, quote_age_seconds=5.0, available_depth=999.0,
+            market_id="70543",
+            market_type="moneyline",
+            team_or_side="home",
+            line=None,
+            executable_ask=0.55,
+            depth_adjusted_price=0.55,
+            quote_age_seconds=5.0,
+            available_depth=999.0,
         )
         m2 = MarketEvaluation(
-            market_id="70543", market_type="moneyline", team_or_side="home", line=None,
-            executable_ask=0.60, depth_adjusted_price=0.60, quote_age_seconds=5.0, available_depth=999.0,
+            market_id="70543",
+            market_type="moneyline",
+            team_or_side="home",
+            line=None,
+            executable_ask=0.60,
+            depth_adjusted_price=0.60,
+            quote_age_seconds=5.0,
+            available_depth=999.0,
         )
         assert real_market_snapshot_hash("70543", [m1]) != real_market_snapshot_hash("70543", [m2]), (
             "a real price move must still produce a different hash"

@@ -96,14 +96,12 @@ class TennisModel:
         surface: str,
         surface_weight: float = 0.6,
     ) -> float:
-        blend_one = (
-            surface_weight * by_surface.get((player_one, surface), DEFAULT_ELO)
-            + (1 - surface_weight) * overall.get(player_one, DEFAULT_ELO)
-        )
-        blend_two = (
-            surface_weight * by_surface.get((player_two, surface), DEFAULT_ELO)
-            + (1 - surface_weight) * overall.get(player_two, DEFAULT_ELO)
-        )
+        blend_one = surface_weight * by_surface.get((player_one, surface), DEFAULT_ELO) + (
+            1 - surface_weight
+        ) * overall.get(player_one, DEFAULT_ELO)
+        blend_two = surface_weight * by_surface.get((player_two, surface), DEFAULT_ELO) + (
+            1 - surface_weight
+        ) * overall.get(player_two, DEFAULT_ELO)
         return expected_win_probability(blend_one, blend_two)
 
     def predict_games(
@@ -145,12 +143,18 @@ class TennisModel:
                     model_version=self.version,
                     feature_basis={
                         "surface": match.surface,
-                        "elo_p1_surface": round(by_surface.get((match.player_one, match.surface), DEFAULT_ELO), 1),
-                        "elo_p2_surface": round(by_surface.get((match.player_two, match.surface), DEFAULT_ELO), 1),
+                        "elo_p1_surface": round(
+                            by_surface.get((match.player_one, match.surface), DEFAULT_ELO), 1
+                        ),
+                        "elo_p2_surface": round(
+                            by_surface.get((match.player_two, match.surface), DEFAULT_ELO), 1
+                        ),
                         "history_matches": len(matches),
                         # Real per-player match count -- "known" above only
                         # means at least one, which is a thin, noisy rating.
-                        "min_player_matches": min(counts.get(match.player_one, 0), counts.get(match.player_two, 0)),
+                        "min_player_matches": min(
+                            counts.get(match.player_one, 0), counts.get(match.player_two, 0)
+                        ),
                     },
                     rationale=(
                         f"Surface-blended Elo on {match.surface}: "

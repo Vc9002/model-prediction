@@ -81,8 +81,7 @@ ESPN_SOCCER_RIGHTS = SourceRightsProfile(
     use_scope="research_shadow_only",
     production_allowed=False,
     policy_note=(
-        "SportsDataverse code/package availability does not grant commercial "
-        "rights to ESPN-derived data."
+        "SportsDataverse code/package availability does not grant commercial rights to ESPN-derived data."
     ),
 )
 

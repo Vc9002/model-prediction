@@ -31,12 +31,20 @@ def _synthetic_dataset(n_days: int = 30, games_per_day: int = 4, seed: int = 0) 
             home_margin = g1 + g2 + rng.normal(0, 0.5)
             home_score = float(max(0, round((total_runs + home_margin) / 2)))
             away_score = float(max(0, round((total_runs - home_margin) / 2)))
-            rows.append({
-                "event_id": f"e{day}_{g}", "game_date": date,
-                "f1": f1, "f2": f2, "g1": g1, "g2": g2,
-                "total_runs": total_runs, "home_margin": home_margin,
-                "home_score": home_score, "away_score": away_score,
-            })
+            rows.append(
+                {
+                    "event_id": f"e{day}_{g}",
+                    "game_date": date,
+                    "f1": f1,
+                    "f2": f2,
+                    "g1": g1,
+                    "g2": g2,
+                    "total_runs": total_runs,
+                    "home_margin": home_margin,
+                    "home_score": home_score,
+                    "away_score": away_score,
+                }
+            )
     return pl.DataFrame(rows)
 
 
@@ -50,8 +58,12 @@ class TestBuildMlbCoherentOofForCombo:
         folds = self._folds(features)
         assert folds, "real synthetic dataset must produce at least one real fold"
         result = build_mlb_coherent_oof_for_combo(
-            features, folds, "sklearn", "negative_binomial",
-            intensity_features=["f1", "f2"], differential_features=["g1", "g2"],
+            features,
+            folds,
+            "sklearn",
+            "negative_binomial",
+            intensity_features=["f1", "f2"],
+            differential_features=["g1", "g2"],
         )
         assert len(result["probs"]) == len(result["labels"])
         assert len(result["probs"]) > 0
@@ -62,8 +74,12 @@ class TestBuildMlbCoherentOofForCombo:
         folds = self._folds(features)
         assert folds
         result = build_mlb_coherent_oof_for_combo(
-            features, folds, "xgboost", "negative_binomial",
-            intensity_features=["f1", "f2"], differential_features=["g1", "g2"],
+            features,
+            folds,
+            "xgboost",
+            "negative_binomial",
+            intensity_features=["f1", "f2"],
+            differential_features=["g1", "g2"],
         )
         assert len(result["probs"]) == len(result["labels"])
         assert len(result["probs"]) > 0
@@ -74,8 +90,12 @@ class TestBuildMlbCoherentOofForCombo:
         folds = self._folds(features)
         assert folds
         kwargs = {"intensity_features": ["f1", "f2"], "differential_features": ["g1", "g2"]}
-        poisson_result = build_mlb_coherent_oof_for_combo(features, folds, "xgboost", "independent_poisson", **kwargs)
-        nb_result = build_mlb_coherent_oof_for_combo(features, folds, "xgboost", "negative_binomial", **kwargs)
+        poisson_result = build_mlb_coherent_oof_for_combo(
+            features, folds, "xgboost", "independent_poisson", **kwargs
+        )
+        nb_result = build_mlb_coherent_oof_for_combo(
+            features, folds, "xgboost", "negative_binomial", **kwargs
+        )
         # Same real fitted heads (identical seed/features/folds), different
         # distribution reconciliation -- the real point of this combo
         # generator existing at all. Not required to differ by much, but

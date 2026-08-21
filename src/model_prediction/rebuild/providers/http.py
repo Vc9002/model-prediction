@@ -134,7 +134,9 @@ class HttpProviderClient:
             if retry_after_delay is not None:
                 self._sleep(retry_after_delay + self.retry.jitter_seconds * self._jitter())
             else:
-                delay = min(self.retry.base_delay_seconds * (2 ** (attempt - 1)), self.retry.max_delay_seconds)
+                delay = min(
+                    self.retry.base_delay_seconds * (2 ** (attempt - 1)), self.retry.max_delay_seconds
+                )
                 self._sleep(delay + self.retry.jitter_seconds * self._jitter())
         if last_error is not None:
             raise last_error

@@ -43,7 +43,9 @@ def _competitor_identity_obj(competitor: dict[str, Any]) -> dict[str, Any]:
     return {"id": None, "displayName": ""}
 
 
-def _collect_espn_roster(collector: Any, sport: str, league: str, team_id: str, season: int) -> dict[str, Any]:
+def _collect_espn_roster(
+    collector: Any, sport: str, league: str, team_id: str, season: int
+) -> dict[str, Any]:
     """Real ESPN roster collection + canonical player identity resolution
     (Task 3: player identity outside MLB), shared by every non-MLB
     collector -- MLB's player identity comes from pybaseball's player
@@ -83,34 +85,49 @@ def _collect_espn_roster(collector: Any, sport: str, league: str, team_id: str, 
     rows: list[dict[str, Any]] = []
     for athlete in payload.get("athletes", []):
         player_canonical_id = resolve_espn_roster_player_id(
-            collector.identity, sport, source, athlete, team_canonical_id, observed_at,
+            collector.identity,
+            sport,
+            source,
+            athlete,
+            team_canonical_id,
+            observed_at,
         )
         player_id = str(athlete.get("id", ""))
         if not player_id:
             continue
-        rows.append({
-            **provenance_row(
-                source=source, source_record_id=f"{team_id}_{player_id}",
-                source_version="espn_public_v1", observed_at_utc=observed_at,
-                effective_at_utc=observed_at, event_start_utc="",
-                raw_snapshot_hash=snapshot_hash,
-            ),
-            "team_id": str(team_id),
-            "player_id": player_id,
-            "player_name": athlete.get("displayName", ""),
-            "player_canonical_id": player_canonical_id,
-            "team_canonical_id": team_canonical_id,
-            "position": (athlete.get("position") or {}).get("abbreviation"),
-            "jersey": athlete.get("jersey"),
-            "season": season,
-        })
+        rows.append(
+            {
+                **provenance_row(
+                    source=source,
+                    source_record_id=f"{team_id}_{player_id}",
+                    source_version="espn_public_v1",
+                    observed_at_utc=observed_at,
+                    effective_at_utc=observed_at,
+                    event_start_utc="",
+                    raw_snapshot_hash=snapshot_hash,
+                ),
+                "team_id": str(team_id),
+                "player_id": player_id,
+                "player_name": athlete.get("displayName", ""),
+                "player_canonical_id": player_canonical_id,
+                "team_canonical_id": team_canonical_id,
+                "position": (athlete.get("position") or {}).get("abbreviation"),
+                "jersey": athlete.get("jersey"),
+                "season": season,
+            }
+        )
 
     if rows:
         collector.norm.write(
-            sport, "roster", pl.DataFrame(rows),
-            primary_key=["team_id", "player_id"], contract=ROSTER_CONTRACT,
+            sport,
+            "roster",
+            pl.DataFrame(rows),
+            primary_key=["team_id", "player_id"],
+            contract=ROSTER_CONTRACT,
         )
-        collector.meta.audit_event("collect_espn_roster", {"sport": sport, "team_id": team_id, "players": len(rows)})
+        collector.meta.audit_event(
+            "collect_espn_roster", {"sport": sport, "team_id": team_id, "players": len(rows)}
+        )
         return {"status": "ok", "sport": sport, "team_id": team_id, "players": len(rows)}
     return {"status": "no_players", "sport": sport, "team_id": team_id}
 
@@ -185,41 +202,60 @@ class MLBCollector:
             # ESPN_TO_STATCAST_ABBREV, mlb_market_matching.py's name
             # comparison) keep working exactly as before.
             home_canonical_id, away_canonical_id = resolve_espn_scoreboard_team_ids(
-                self.identity, "mlb", source, home_team_obj, away_team_obj, observed_at,
+                self.identity,
+                "mlb",
+                source,
+                home_team_obj,
+                away_team_obj,
+                observed_at,
             )
             venue_obj = comp.get("venue", {}) or {}
             venue_name = venue_obj.get("fullName", "")
             event_canonical_id = resolve_espn_scoreboard_event_id(
-                self.identity, "mlb", source, str(event.get("id", "")),
-                home_team_obj, away_team_obj, home_canonical_id, away_canonical_id,
-                event.get("date", ""), observed_at, venue_name,
+                self.identity,
+                "mlb",
+                source,
+                str(event.get("id", "")),
+                home_team_obj,
+                away_team_obj,
+                home_canonical_id,
+                away_canonical_id,
+                event.get("date", ""),
+                observed_at,
+                venue_name,
             )
             venue_canonical_id = resolve_espn_scoreboard_venue_id(
-                self.identity, "mlb", source, venue_obj, observed_at,
+                self.identity,
+                "mlb",
+                source,
+                venue_obj,
+                observed_at,
             )
 
-            games.append({
-                **provenance_row(
-                    source=source,
-                    source_record_id=str(event.get("id", "")),
-                    source_version="espn_public_v1",
-                    observed_at_utc=observed_at,
-                    effective_at_utc=event.get("date", ""),
-                    event_start_utc=event.get("date", ""),
-                    raw_snapshot_hash=snapshot_hash,
-                ),
-                "event_id": str(event.get("id", "")),
-                "away_team": away_team_obj.get("displayName", ""),
-                "home_team": home_team_obj.get("displayName", ""),
-                "away_team_canonical_id": away_canonical_id,
-                "home_team_canonical_id": home_canonical_id,
-                "event_canonical_id": event_canonical_id,
-                "venue_canonical_id": venue_canonical_id,
-                "away_score": int(away.get("score", 0) or 0),
-                "home_score": int(home.get("score", 0) or 0),
-                "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
-                "venue": venue_name,
-            })
+            games.append(
+                {
+                    **provenance_row(
+                        source=source,
+                        source_record_id=str(event.get("id", "")),
+                        source_version="espn_public_v1",
+                        observed_at_utc=observed_at,
+                        effective_at_utc=event.get("date", ""),
+                        event_start_utc=event.get("date", ""),
+                        raw_snapshot_hash=snapshot_hash,
+                    ),
+                    "event_id": str(event.get("id", "")),
+                    "away_team": away_team_obj.get("displayName", ""),
+                    "home_team": home_team_obj.get("displayName", ""),
+                    "away_team_canonical_id": away_canonical_id,
+                    "home_team_canonical_id": home_canonical_id,
+                    "event_canonical_id": event_canonical_id,
+                    "venue_canonical_id": venue_canonical_id,
+                    "away_score": int(away.get("score", 0) or 0),
+                    "home_score": int(home.get("score", 0) or 0),
+                    "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
+                    "venue": venue_name,
+                }
+            )
 
         if games:
             df = pl.DataFrame(games)
@@ -231,7 +267,9 @@ class MLBCollector:
 
     # ── pybaseball (Statcast, Savant, FanGraphs) ────────────────────────
 
-    def collect_pybaseball(self, game_date: str, *, statcast: bool = True, schedules: bool = True) -> dict[str, Any]:
+    def collect_pybaseball(
+        self, game_date: str, *, statcast: bool = True, schedules: bool = True
+    ) -> dict[str, Any]:
         """Collect from pybaseball for a date. Requires pybaseball installed."""
         source = "pybaseball"
         results: dict[str, Any] = {"date": game_date, "collected": []}
@@ -280,7 +318,11 @@ class MLBCollector:
     # ── Open-Meteo Archived Forecasts ───────────────────────────────────
 
     def collect_weather_forecast(
-        self, game_date: str, latitude: float, longitude: float, venue_id: str,
+        self,
+        game_date: str,
+        latitude: float,
+        longitude: float,
+        venue_id: str,
     ) -> dict[str, Any]:
         """Fetch weather for a venue on a game date, with correct point-in-time semantics.
 
@@ -312,6 +354,7 @@ class MLBCollector:
         self._throttle()
 
         import httpx
+
         is_future_or_today = date.fromisoformat(game_date) >= utc_now().date()
         url = (
             "https://api.open-meteo.com/v1/forecast"
@@ -323,9 +366,16 @@ class MLBCollector:
             "longitude": longitude,
             "start_date": game_date,
             "end_date": game_date,
-            "hourly": ["temperature_2m", "relative_humidity_2m", "dew_point_2m",
-                        "precipitation", "surface_pressure", "wind_speed_10m",
-                        "wind_direction_10m", "weather_code"],
+            "hourly": [
+                "temperature_2m",
+                "relative_humidity_2m",
+                "dew_point_2m",
+                "precipitation",
+                "surface_pressure",
+                "wind_speed_10m",
+                "wind_direction_10m",
+                "weather_code",
+            ],
             # Real bug fixed here (see outputs/rebuild/takeover_status.md
             # Task 3): this previously requested "America/New_York" for
             # every venue regardless of its real location, so
@@ -363,7 +413,9 @@ class MLBCollector:
                 "endpoint": endpoint,
                 "forecast_data": forecast_data,
             }
-            snapshot_hash = self.raw.write(source, game_date, record_id, payload, observed_at=observed_at).snapshot_hash
+            snapshot_hash = self.raw.write(
+                source, game_date, record_id, payload, observed_at=observed_at
+            ).snapshot_hash
             self.meta.update_source_health(source, "active")
             return {
                 "status": "ok",
@@ -416,49 +468,55 @@ class MLBCollector:
                         market_slug = market.get("market_slug", "")
                         line = market.get("line")
                         for side in market.get("sides", []):
-                            books.append({
-                                **provenance_row(
-                                    source=source,
-                                    source_record_id=f"{event_id}_{market_id}_{side.get('side_id', '')}",
-                                    source_version="polymarket_us_v1",
-                                    observed_at_utc=utc_now().isoformat(),
-                                    effective_at_utc=utc_now().isoformat(),
-                                    event_start_utc=event.get("event_start_utc", ""),
-                                ),
-                                "event_id": event_id,
-                                "market_id": market_id,
-                                "market_type": market_type,
-                                # market_slug carries the only reliable signal for
-                                # period ("-f5-" = first 5 innings vs full game) --
-                                # a real, distinct market can share the exact same
-                                # market_type/line as a full-game market (e.g. two
-                                # different real "total > 6.5" markets, one full
-                                # game at 65c, one F5 at 25c, confirmed live). A
-                                # caller comparing a full-game model probability
-                                # against an F5 price is comparing incompatible
-                                # bets -- see outputs/rebuild/takeover_status.md
-                                # Checkpoint 9.
-                                "market_slug": market_slug,
-                                "is_first_five_innings": "-f5-" in market_slug,
-                                "team_or_side": side.get("selection", ""),
-                                "team": side.get("team"),
-                                "team_canonical_id": resolve_polymarket_team_id(self.identity, "mlb", side.get("team")),
-                                "line": side.get("line", line),
-                                "executable_price": side.get("price_probability"),
-                                "decimal_odds": side.get("decimal_odds"),
-                                "american_odds": side.get("american_odds"),
-                                # PolymarketUSClient's _normalize_event doesn't
-                                # expose order-book depth/size, only an
-                                # indicative side price -- real, disclosed gap,
-                                # not fabricated. A caller must not treat this
-                                # as a depth-checked executable quote.
-                                "available_depth": None,
-                                # Missing provider state is not interpreted as open.
-                                "market_open": bool(market.get("active", event.get("active", False))),
-                            })
+                            books.append(
+                                {
+                                    **provenance_row(
+                                        source=source,
+                                        source_record_id=f"{event_id}_{market_id}_{side.get('side_id', '')}",
+                                        source_version="polymarket_us_v1",
+                                        observed_at_utc=utc_now().isoformat(),
+                                        effective_at_utc=utc_now().isoformat(),
+                                        event_start_utc=event.get("event_start_utc", ""),
+                                    ),
+                                    "event_id": event_id,
+                                    "market_id": market_id,
+                                    "market_type": market_type,
+                                    # market_slug carries the only reliable signal for
+                                    # period ("-f5-" = first 5 innings vs full game) --
+                                    # a real, distinct market can share the exact same
+                                    # market_type/line as a full-game market (e.g. two
+                                    # different real "total > 6.5" markets, one full
+                                    # game at 65c, one F5 at 25c, confirmed live). A
+                                    # caller comparing a full-game model probability
+                                    # against an F5 price is comparing incompatible
+                                    # bets -- see outputs/rebuild/takeover_status.md
+                                    # Checkpoint 9.
+                                    "market_slug": market_slug,
+                                    "is_first_five_innings": "-f5-" in market_slug,
+                                    "team_or_side": side.get("selection", ""),
+                                    "team": side.get("team"),
+                                    "team_canonical_id": resolve_polymarket_team_id(
+                                        self.identity, "mlb", side.get("team")
+                                    ),
+                                    "line": side.get("line", line),
+                                    "executable_price": side.get("price_probability"),
+                                    "decimal_odds": side.get("decimal_odds"),
+                                    "american_odds": side.get("american_odds"),
+                                    # PolymarketUSClient's _normalize_event doesn't
+                                    # expose order-book depth/size, only an
+                                    # indicative side price -- real, disclosed gap,
+                                    # not fabricated. A caller must not treat this
+                                    # as a depth-checked executable quote.
+                                    "available_depth": None,
+                                    # Missing provider state is not interpreted as open.
+                                    "market_open": bool(market.get("active", event.get("active", False))),
+                                }
+                            )
                 except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
                     skipped_events += 1
-                    self.meta.update_source_health(source, "active", f"skipped malformed event: {str(e)[:150]}")
+                    self.meta.update_source_health(
+                        source, "active", f"skipped malformed event: {str(e)[:150]}"
+                    )
                     continue
 
             if books:
@@ -471,7 +529,12 @@ class MLBCollector:
                     "collect_polymarket_books",
                     {"date": game_date, "books": len(books), "skipped_events": skipped_events},
                 )
-                return {"status": "ok", "date": game_date, "books": len(books), "skipped_events": skipped_events}
+                return {
+                    "status": "ok",
+                    "date": game_date,
+                    "books": len(books),
+                    "skipped_events": skipped_events,
+                }
 
             return {"status": "no_mlb_markets", "date": game_date}
 
@@ -495,9 +558,7 @@ class MLBCollector:
             venues = self._venues_for_date(game_date)
             weather_results: list[dict[str, Any]] = []
             for v in venues[:30]:  # safety cap
-                weather_results.append(
-                    self.collect_weather_forecast(game_date, v["lat"], v["lon"], v["id"])
-                )
+                weather_results.append(self.collect_weather_forecast(game_date, v["lat"], v["lon"], v["id"]))
             results["weather"] = {"count": len(weather_results), "results": weather_results}
 
         all_ok = all(
@@ -514,9 +575,7 @@ class MLBCollector:
             if not path.exists():
                 return []
             df = pl.read_parquet(str(path))
-            venue_df = df.filter(
-                pl.col("event_start_utc").str.contains(game_date)
-            ).select(["venue"]).unique()
+            venue_df = df.filter(pl.col("event_start_utc").str.contains(game_date)).select(["venue"]).unique()
             # Default coordinates for known ballparks
             KNOWN_PARKS: dict[str, tuple[float, float]] = {
                 "Yankee Stadium": (40.8296, -73.9262),
@@ -561,11 +620,14 @@ class MLBCollector:
             # selecting a nonexistent `venue_id` column) as a silent `[]` —
             # see outputs/rebuild/takeover_status.md Checkpoint 4. Surface
             # failures through source health instead of swallowing them.
-            self.meta.update_source_health("open_meteo", "degraded", f"_venues_for_date failed: {str(e)[:150]}")
+            self.meta.update_source_health(
+                "open_meteo", "degraded", f"_venues_for_date failed: {str(e)[:150]}"
+            )
             return []
 
 
 # ── NBA/WNBA Collector ──────────────────────────────────────────────────────
+
 
 class NBACollector:
     """NBA/WNBA data via ESPN + Polymarket.
@@ -623,49 +685,70 @@ class NBACollector:
                     away = c
                 else:
                     home = c
-            home_team_obj = (home.get("team", {}) or {})
-            away_team_obj = (away.get("team", {}) or {})
+            home_team_obj = home.get("team", {}) or {}
+            away_team_obj = away.get("team", {}) or {}
             observed_at = utc_now().isoformat()
             home_canonical_id, away_canonical_id = resolve_espn_scoreboard_team_ids(
-                self.identity, sport, source, home_team_obj, away_team_obj, observed_at,
+                self.identity,
+                sport,
+                source,
+                home_team_obj,
+                away_team_obj,
+                observed_at,
             )
             venue_obj = comp.get("venue", {}) or {}
             venue_name = venue_obj.get("fullName", "")
             event_canonical_id = resolve_espn_scoreboard_event_id(
-                self.identity, sport, source, str(event.get("id", "")),
-                home_team_obj, away_team_obj, home_canonical_id, away_canonical_id,
-                event.get("date", ""), observed_at, venue_name,
+                self.identity,
+                sport,
+                source,
+                str(event.get("id", "")),
+                home_team_obj,
+                away_team_obj,
+                home_canonical_id,
+                away_canonical_id,
+                event.get("date", ""),
+                observed_at,
+                venue_name,
             )
             venue_canonical_id = resolve_espn_scoreboard_venue_id(
-                self.identity, sport, source, venue_obj, observed_at,
+                self.identity,
+                sport,
+                source,
+                venue_obj,
+                observed_at,
             )
-            games.append({
-                **provenance_row(
-                    source=source,
-                    source_record_id=str(event.get("id", "")),
-                    source_version="espn_public_v1",
-                    observed_at_utc=observed_at,
-                    effective_at_utc=event.get("date", ""),
-                    event_start_utc=event.get("date", ""),
-                    raw_snapshot_hash=snapshot_hash,
-                ),
-                "event_id": str(event.get("id", "")),
-                "away_team": away_team_obj.get("displayName", ""),
-                "home_team": home_team_obj.get("displayName", ""),
-                "away_team_canonical_id": away_canonical_id,
-                "home_team_canonical_id": home_canonical_id,
-                "event_canonical_id": event_canonical_id,
-                "venue_canonical_id": venue_canonical_id,
-                "away_score": int(away.get("score", 0) or 0),
-                "home_score": int(home.get("score", 0) or 0),
-                "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
-                "venue": venue_name,
-            })
+            games.append(
+                {
+                    **provenance_row(
+                        source=source,
+                        source_record_id=str(event.get("id", "")),
+                        source_version="espn_public_v1",
+                        observed_at_utc=observed_at,
+                        effective_at_utc=event.get("date", ""),
+                        event_start_utc=event.get("date", ""),
+                        raw_snapshot_hash=snapshot_hash,
+                    ),
+                    "event_id": str(event.get("id", "")),
+                    "away_team": away_team_obj.get("displayName", ""),
+                    "home_team": home_team_obj.get("displayName", ""),
+                    "away_team_canonical_id": away_canonical_id,
+                    "home_team_canonical_id": home_canonical_id,
+                    "event_canonical_id": event_canonical_id,
+                    "venue_canonical_id": venue_canonical_id,
+                    "away_score": int(away.get("score", 0) or 0),
+                    "home_score": int(home.get("score", 0) or 0),
+                    "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
+                    "venue": venue_name,
+                }
+            )
 
         if games:
             df = pl.DataFrame(games)
             self.norm.write(sport, "scoreboard", df, primary_key=["event_id"], contract=SCOREBOARD_CONTRACT)
-            self.meta.audit_event("collect_espn_scoreboard", {"sport": sport, "date": game_date, "games": len(games)})
+            self.meta.audit_event(
+                "collect_espn_scoreboard", {"sport": sport, "date": game_date, "games": len(games)}
+            )
             return {"status": "ok", "sport": sport, "date": game_date, "games": len(games)}
 
         return {"status": "no_games", "sport": sport, "date": game_date}
@@ -686,6 +769,7 @@ class NBACollector:
         self._throttle()
         try:
             from model_prediction.data_sources.polymarket_us import PolymarketUSClient
+
             client = PolymarketUSClient()
             events = client.slate(sport.upper(), date.fromisoformat(game_date))
             books: list[dict[str, Any]] = []
@@ -703,21 +787,36 @@ class NBACollector:
                     market_type = market.get("market_type", "")
                     line = market.get("line")
                     for side in market.get("sides", []):
-                        books.append({
-                            **provenance_row(source, f"{event_id}_{market_id}_{side.get('side_id', '')}",
-                                              "polymarket_us_v1", utc_now().isoformat(),
-                                              utc_now().isoformat(), event.get("event_start_utc", "")),
-                            "event_id": event_id, "market_id": market_id, "market_type": market_type,
-                            "team_or_side": side.get("selection", ""), "team": side.get("team"),
-                            "team_canonical_id": resolve_polymarket_team_id(self.identity, sport, side.get("team")),
-                            "line": side.get("line", line),
-                            "executable_price": side.get("price_probability"),
-                            "decimal_odds": side.get("decimal_odds"), "american_odds": side.get("american_odds"),
-                            "available_depth": None,
-                            "market_open": bool(market.get("active", event.get("active", False))),
-                        })
+                        books.append(
+                            {
+                                **provenance_row(
+                                    source,
+                                    f"{event_id}_{market_id}_{side.get('side_id', '')}",
+                                    "polymarket_us_v1",
+                                    utc_now().isoformat(),
+                                    utc_now().isoformat(),
+                                    event.get("event_start_utc", ""),
+                                ),
+                                "event_id": event_id,
+                                "market_id": market_id,
+                                "market_type": market_type,
+                                "team_or_side": side.get("selection", ""),
+                                "team": side.get("team"),
+                                "team_canonical_id": resolve_polymarket_team_id(
+                                    self.identity, sport, side.get("team")
+                                ),
+                                "line": side.get("line", line),
+                                "executable_price": side.get("price_probability"),
+                                "decimal_odds": side.get("decimal_odds"),
+                                "american_odds": side.get("american_odds"),
+                                "available_depth": None,
+                                "market_open": bool(market.get("active", event.get("active", False))),
+                            }
+                        )
             if books:
-                self.markets.write_books(sport, game_date, pl.DataFrame(books), contract=MARKET_SNAPSHOT_CONTRACT)
+                self.markets.write_books(
+                    sport, game_date, pl.DataFrame(books), contract=MARKET_SNAPSHOT_CONTRACT
+                )
                 return {"status": "ok", "books": len(books)}
             return {"status": "no_markets"}
         except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
@@ -737,7 +836,9 @@ class NBACollector:
         results["status"] = "ok" if all_ok else "partial"
         return results
 
+
 # ── NFL Collector ───────────────────────────────────────────────────────────
+
 
 class NFLCollector:
     """NFL data via nflverse + ESPN + Polymarket."""
@@ -764,7 +865,8 @@ class NFLCollector:
         return _collect_espn_roster(self, "nfl", "NFL", team_id, season)
 
     def _collect_espn(self, game_date: str) -> dict[str, Any]:
-        sport = "nfl"; source = "espn_public"
+        sport = "nfl"
+        source = "espn_public"
         record_id = f"nfl_scoreboard_{game_date}"
         self._throttle()
         try:
@@ -782,50 +884,85 @@ class NFLCollector:
             competitors = comp.get("competitors", [])
             away = home = {}
             for c in competitors:
-                if c.get("homeAway") == "away": away = c
-                else: home = c
-            home_team_obj = (home.get("team", {}) or {})
-            away_team_obj = (away.get("team", {}) or {})
+                if c.get("homeAway") == "away":
+                    away = c
+                else:
+                    home = c
+            home_team_obj = home.get("team", {}) or {}
+            away_team_obj = away.get("team", {}) or {}
             observed_at = utc_now().isoformat()
             home_canonical_id, away_canonical_id = resolve_espn_scoreboard_team_ids(
-                self.identity, sport, source, home_team_obj, away_team_obj, observed_at,
+                self.identity,
+                sport,
+                source,
+                home_team_obj,
+                away_team_obj,
+                observed_at,
             )
             venue_obj = comp.get("venue", {}) or {}
             venue_name = venue_obj.get("fullName", "")
             event_canonical_id = resolve_espn_scoreboard_event_id(
-                self.identity, sport, source, str(event.get("id", "")),
-                home_team_obj, away_team_obj, home_canonical_id, away_canonical_id,
-                event.get("date", ""), observed_at, venue_name,
+                self.identity,
+                sport,
+                source,
+                str(event.get("id", "")),
+                home_team_obj,
+                away_team_obj,
+                home_canonical_id,
+                away_canonical_id,
+                event.get("date", ""),
+                observed_at,
+                venue_name,
             )
             venue_canonical_id = resolve_espn_scoreboard_venue_id(
-                self.identity, sport, source, venue_obj, observed_at,
+                self.identity,
+                sport,
+                source,
+                venue_obj,
+                observed_at,
             )
-            games.append({
-                **provenance_row(source, str(event.get("id", "")), "espn_public_v1",
-                                  observed_at, event.get("date", ""), event.get("date", ""),
-                                  raw_snapshot_hash=snapshot_hash),
-                "event_id": str(event.get("id", "")),
-                "away_team": away_team_obj.get("displayName", ""),
-                "home_team": home_team_obj.get("displayName", ""),
-                "away_team_canonical_id": away_canonical_id,
-                "home_team_canonical_id": home_canonical_id,
-                "event_canonical_id": event_canonical_id,
-                "venue_canonical_id": venue_canonical_id,
-                "away_score": int(away.get("score", 0) or 0),
-                "home_score": int(home.get("score", 0) or 0),
-                "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
-                "venue": venue_name,
-            })
+            games.append(
+                {
+                    **provenance_row(
+                        source,
+                        str(event.get("id", "")),
+                        "espn_public_v1",
+                        observed_at,
+                        event.get("date", ""),
+                        event.get("date", ""),
+                        raw_snapshot_hash=snapshot_hash,
+                    ),
+                    "event_id": str(event.get("id", "")),
+                    "away_team": away_team_obj.get("displayName", ""),
+                    "home_team": home_team_obj.get("displayName", ""),
+                    "away_team_canonical_id": away_canonical_id,
+                    "home_team_canonical_id": home_canonical_id,
+                    "event_canonical_id": event_canonical_id,
+                    "venue_canonical_id": venue_canonical_id,
+                    "away_score": int(away.get("score", 0) or 0),
+                    "home_score": int(home.get("score", 0) or 0),
+                    "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
+                    "venue": venue_name,
+                }
+            )
         if games:
-            self.norm.write(sport, "scoreboard", pl.DataFrame(games), primary_key=["event_id"], contract=SCOREBOARD_CONTRACT)
+            self.norm.write(
+                sport,
+                "scoreboard",
+                pl.DataFrame(games),
+                primary_key=["event_id"],
+                contract=SCOREBOARD_CONTRACT,
+            )
             return {"status": "ok", "sport": sport, "date": game_date, "games": len(games)}
         return {"status": "no_games", "sport": sport, "date": game_date}
 
     def _collect_markets(self, game_date: str) -> dict[str, Any]:
-        sport = "nfl"; source = "polymarket_us"
+        sport = "nfl"
+        source = "polymarket_us"
         self._throttle()
         try:
             from model_prediction.data_sources.polymarket_us import PolymarketUSClient
+
             client = PolymarketUSClient()
             events = client.slate("NFL", date.fromisoformat(game_date))
             books: list[dict[str, Any]] = []
@@ -840,19 +977,35 @@ class NFLCollector:
                     market_type = market.get("market_type", "")
                     line = market.get("line")
                     for side in market.get("sides", []):
-                        books.append({**provenance_row(
-                            source, f"{event_id}_{market_id}_{side.get('side_id', '')}",
-                            "polymarket_us_v1", utc_now().isoformat(), utc_now().isoformat(),
-                            event.get("event_start_utc", "")),
-                            "event_id": event_id, "market_id": market_id, "market_type": market_type,
-                            "team_or_side": side.get("selection", ""), "team": side.get("team"),
-                            "team_canonical_id": resolve_polymarket_team_id(self.identity, sport, side.get("team")),
-                            "line": side.get("line", line),
-                            "executable_price": side.get("price_probability"),
-                            "decimal_odds": side.get("decimal_odds"), "american_odds": side.get("american_odds"),
-                            "available_depth": None})
+                        books.append(
+                            {
+                                **provenance_row(
+                                    source,
+                                    f"{event_id}_{market_id}_{side.get('side_id', '')}",
+                                    "polymarket_us_v1",
+                                    utc_now().isoformat(),
+                                    utc_now().isoformat(),
+                                    event.get("event_start_utc", ""),
+                                ),
+                                "event_id": event_id,
+                                "market_id": market_id,
+                                "market_type": market_type,
+                                "team_or_side": side.get("selection", ""),
+                                "team": side.get("team"),
+                                "team_canonical_id": resolve_polymarket_team_id(
+                                    self.identity, sport, side.get("team")
+                                ),
+                                "line": side.get("line", line),
+                                "executable_price": side.get("price_probability"),
+                                "decimal_odds": side.get("decimal_odds"),
+                                "american_odds": side.get("american_odds"),
+                                "available_depth": None,
+                            }
+                        )
             if books:
-                self.markets.write_books(sport, game_date, pl.DataFrame(books), contract=MARKET_SNAPSHOT_CONTRACT)
+                self.markets.write_books(
+                    sport, game_date, pl.DataFrame(books), contract=MARKET_SNAPSHOT_CONTRACT
+                )
                 return {"status": "ok", "books": len(books)}
             return {"status": "no_markets"}
         except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
@@ -862,11 +1015,19 @@ class NFLCollector:
         results: dict[str, Any] = {"date": game_date, "sport": "nfl"}
         results["espn"] = self._collect_espn(game_date)
         results["polymarket"] = self._collect_markets(game_date)
-        results["status"] = "ok" if all(r.get("status") in ("ok", "no_games", "no_markets") for r in (results.get("espn", {}), results.get("polymarket", {}))) else "partial"
+        results["status"] = (
+            "ok"
+            if all(
+                r.get("status") in ("ok", "no_games", "no_markets")
+                for r in (results.get("espn", {}), results.get("polymarket", {}))
+            )
+            else "partial"
+        )
         return results
 
 
 # ── Soccer Collector ────────────────────────────────────────────────────────
+
 
 class SoccerCollector:
     """Soccer data via StatsBomb + ESPN + Polymarket."""
@@ -893,11 +1054,19 @@ class SoccerCollector:
         results: dict[str, Any] = {"date": game_date, "sport": sport}
         results["espn"] = self._collect_espn(game_date, sport, league)
         results["polymarket"] = self._collect_markets(game_date, sport, league)
-        results["status"] = "ok" if all(r.get("status") in ("ok", "no_games", "no_markets") for r in (results.get("espn", {}), results.get("polymarket", {}))) else "partial"
+        results["status"] = (
+            "ok"
+            if all(
+                r.get("status") in ("ok", "no_games", "no_markets")
+                for r in (results.get("espn", {}), results.get("polymarket", {}))
+            )
+            else "partial"
+        )
         return results
 
     def _collect_espn(self, game_date: str, sport: str, league: str) -> dict[str, Any]:
-        source = "espn_public"; record_id = f"{sport}_scoreboard_{game_date}"
+        source = "espn_public"
+        record_id = f"{sport}_scoreboard_{game_date}"
         self._throttle()
         try:
             from model_prediction.data_sources.espn import ESPNClient
@@ -914,47 +1083,84 @@ class SoccerCollector:
             competitors = comp.get("competitors", [])
             away = home = {}
             for c in competitors:
-                if c.get("homeAway") == "away": away = c
-                else: home = c
-            home_team_obj = (home.get("team", {}) or {})
-            away_team_obj = (away.get("team", {}) or {})
+                if c.get("homeAway") == "away":
+                    away = c
+                else:
+                    home = c
+            home_team_obj = home.get("team", {}) or {}
+            away_team_obj = away.get("team", {}) or {}
             observed_at = utc_now().isoformat()
             home_canonical_id, away_canonical_id = resolve_espn_scoreboard_team_ids(
-                self.identity, sport, source, home_team_obj, away_team_obj, observed_at,
+                self.identity,
+                sport,
+                source,
+                home_team_obj,
+                away_team_obj,
+                observed_at,
             )
             venue_obj = comp.get("venue", {}) or {}
             venue_name = venue_obj.get("fullName", "")
             event_canonical_id = resolve_espn_scoreboard_event_id(
-                self.identity, sport, source, str(event.get("id", "")),
-                home_team_obj, away_team_obj, home_canonical_id, away_canonical_id,
-                event.get("date", ""), observed_at, venue_name,
+                self.identity,
+                sport,
+                source,
+                str(event.get("id", "")),
+                home_team_obj,
+                away_team_obj,
+                home_canonical_id,
+                away_canonical_id,
+                event.get("date", ""),
+                observed_at,
+                venue_name,
             )
             venue_canonical_id = resolve_espn_scoreboard_venue_id(
-                self.identity, sport, source, venue_obj, observed_at,
+                self.identity,
+                sport,
+                source,
+                venue_obj,
+                observed_at,
             )
-            games.append({**provenance_row(source, str(event.get("id", "")), "espn_public_v1",
-                observed_at, event.get("date", ""), event.get("date", ""),
-                raw_snapshot_hash=snapshot_hash),
-                "event_id": str(event.get("id", "")),
-                "away_team": away_team_obj.get("displayName", ""),
-                "home_team": home_team_obj.get("displayName", ""),
-                "away_team_canonical_id": away_canonical_id,
-                "home_team_canonical_id": home_canonical_id,
-                "event_canonical_id": event_canonical_id,
-                "venue_canonical_id": venue_canonical_id,
-                "away_score": int(away.get("score", 0) or 0),
-                "home_score": int(home.get("score", 0) or 0),
-                "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
-                "venue": venue_name,})
+            games.append(
+                {
+                    **provenance_row(
+                        source,
+                        str(event.get("id", "")),
+                        "espn_public_v1",
+                        observed_at,
+                        event.get("date", ""),
+                        event.get("date", ""),
+                        raw_snapshot_hash=snapshot_hash,
+                    ),
+                    "event_id": str(event.get("id", "")),
+                    "away_team": away_team_obj.get("displayName", ""),
+                    "home_team": home_team_obj.get("displayName", ""),
+                    "away_team_canonical_id": away_canonical_id,
+                    "home_team_canonical_id": home_canonical_id,
+                    "event_canonical_id": event_canonical_id,
+                    "venue_canonical_id": venue_canonical_id,
+                    "away_score": int(away.get("score", 0) or 0),
+                    "home_score": int(home.get("score", 0) or 0),
+                    "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
+                    "venue": venue_name,
+                }
+            )
         if games:
-            self.norm.write(sport, "scoreboard", pl.DataFrame(games), primary_key=["event_id"], contract=SCOREBOARD_CONTRACT)
+            self.norm.write(
+                sport,
+                "scoreboard",
+                pl.DataFrame(games),
+                primary_key=["event_id"],
+                contract=SCOREBOARD_CONTRACT,
+            )
             return {"status": "ok", "sport": sport, "date": game_date, "games": len(games)}
         return {"status": "no_games", "sport": sport, "date": game_date}
 
     def _collect_markets(self, game_date: str, sport: str, league: str) -> dict[str, Any]:
-        source = "polymarket_us"; self._throttle()
+        source = "polymarket_us"
+        self._throttle()
         try:
             from model_prediction.data_sources.polymarket_us import PolymarketUSClient
+
             client = PolymarketUSClient()
             events = client.slate(league, date.fromisoformat(game_date))
             books: list[dict[str, Any]] = []
@@ -969,19 +1175,35 @@ class SoccerCollector:
                     market_type = market.get("market_type", "")
                     line = market.get("line")
                     for side in market.get("sides", []):
-                        books.append({**provenance_row(
-                            source, f"{event_id}_{market_id}_{side.get('side_id', '')}",
-                            "polymarket_us_v1", utc_now().isoformat(), utc_now().isoformat(),
-                            event.get("event_start_utc", "")),
-                            "event_id": event_id, "market_id": market_id, "market_type": market_type,
-                            "team_or_side": side.get("selection", ""), "team": side.get("team"),
-                            "team_canonical_id": resolve_polymarket_team_id(self.identity, sport, side.get("team")),
-                            "line": side.get("line", line),
-                            "executable_price": side.get("price_probability"),
-                            "decimal_odds": side.get("decimal_odds"), "american_odds": side.get("american_odds"),
-                            "available_depth": None})
+                        books.append(
+                            {
+                                **provenance_row(
+                                    source,
+                                    f"{event_id}_{market_id}_{side.get('side_id', '')}",
+                                    "polymarket_us_v1",
+                                    utc_now().isoformat(),
+                                    utc_now().isoformat(),
+                                    event.get("event_start_utc", ""),
+                                ),
+                                "event_id": event_id,
+                                "market_id": market_id,
+                                "market_type": market_type,
+                                "team_or_side": side.get("selection", ""),
+                                "team": side.get("team"),
+                                "team_canonical_id": resolve_polymarket_team_id(
+                                    self.identity, sport, side.get("team")
+                                ),
+                                "line": side.get("line", line),
+                                "executable_price": side.get("price_probability"),
+                                "decimal_odds": side.get("decimal_odds"),
+                                "american_odds": side.get("american_odds"),
+                                "available_depth": None,
+                            }
+                        )
             if books:
-                self.markets.write_books(sport, game_date, pl.DataFrame(books), contract=MARKET_SNAPSHOT_CONTRACT)
+                self.markets.write_books(
+                    sport, game_date, pl.DataFrame(books), contract=MARKET_SNAPSHOT_CONTRACT
+                )
                 return {"status": "ok", "books": len(books)}
             return {"status": "no_markets"}
         except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
@@ -1011,6 +1233,7 @@ class SoccerCollector:
 
 # ── Tennis Collector ────────────────────────────────────────────────────────
 
+
 class TennisCollector:
     """Tennis data via Sackmann + ESPN + Polymarket."""
 
@@ -1028,11 +1251,19 @@ class TennisCollector:
         results: dict[str, Any] = {"date": game_date, "sport": sport}
         results["espn"] = self._collect_espn(game_date, sport, league)
         results["polymarket"] = self._collect_markets(game_date, sport, league)
-        results["status"] = "ok" if all(r.get("status") in ("ok", "no_games", "no_markets") for r in (results.get("espn", {}), results.get("polymarket", {}))) else "partial"
+        results["status"] = (
+            "ok"
+            if all(
+                r.get("status") in ("ok", "no_games", "no_markets")
+                for r in (results.get("espn", {}), results.get("polymarket", {}))
+            )
+            else "partial"
+        )
         return results
 
     def _collect_espn(self, game_date: str, sport: str, league: str) -> dict[str, Any]:
-        source = "espn_public"; record_id = f"{sport}_scoreboard_{game_date}"
+        source = "espn_public"
+        record_id = f"{sport}_scoreboard_{game_date}"
         self._throttle()
         try:
             from model_prediction.data_sources.espn import ESPNClient
@@ -1056,55 +1287,93 @@ class TennisCollector:
             groupings = event.get("groupings")
             competitions = (
                 [c for g in groupings for c in (g.get("competitions", []) or [])]
-                if groupings else (event.get("competitions", []) or [])
+                if groupings
+                else (event.get("competitions", []) or [])
             )
             for comp in competitions:
                 competitors = comp.get("competitors", [])
                 away = home = {}
                 for c in competitors:
-                    if c.get("homeAway") == "away": away = c
-                    else: home = c
+                    if c.get("homeAway") == "away":
+                        away = c
+                    else:
+                        home = c
                 home_team_obj = _competitor_identity_obj(home)
                 away_team_obj = _competitor_identity_obj(away)
                 observed_at = utc_now().isoformat()
                 home_canonical_id, away_canonical_id = resolve_espn_scoreboard_team_ids(
-                    self.identity, sport, source, home_team_obj, away_team_obj, observed_at,
+                    self.identity,
+                    sport,
+                    source,
+                    home_team_obj,
+                    away_team_obj,
+                    observed_at,
                 )
                 comp_id = str(comp.get("id", "")) or str(event.get("id", ""))
                 comp_date = comp.get("date", event.get("date", ""))
                 venue_obj = comp.get("venue", {}) or {}
                 venue_name = venue_obj.get("fullName", "")
                 event_canonical_id = resolve_espn_scoreboard_event_id(
-                    self.identity, sport, source, comp_id,
-                    home_team_obj, away_team_obj, home_canonical_id, away_canonical_id,
-                    comp_date, observed_at, venue_name,
+                    self.identity,
+                    sport,
+                    source,
+                    comp_id,
+                    home_team_obj,
+                    away_team_obj,
+                    home_canonical_id,
+                    away_canonical_id,
+                    comp_date,
+                    observed_at,
+                    venue_name,
                 )
                 venue_canonical_id = resolve_espn_scoreboard_venue_id(
-                    self.identity, sport, source, venue_obj, observed_at,
+                    self.identity,
+                    sport,
+                    source,
+                    venue_obj,
+                    observed_at,
                 )
-                games.append({**provenance_row(source, comp_id, "espn_public_v1",
-                    observed_at, comp_date, comp_date,
-                    raw_snapshot_hash=snapshot_hash),
-                    "event_id": comp_id,
-                    "away_team": away_team_obj.get("displayName", ""),
-                    "home_team": home_team_obj.get("displayName", ""),
-                    "away_team_canonical_id": away_canonical_id,
-                    "home_team_canonical_id": home_canonical_id,
-                    "event_canonical_id": event_canonical_id,
-                "venue_canonical_id": venue_canonical_id,
-                    "away_score": int(away.get("score", 0) or 0),
-                    "home_score": int(home.get("score", 0) or 0),
-                    "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
-                    "venue": venue_name,})
+                games.append(
+                    {
+                        **provenance_row(
+                            source,
+                            comp_id,
+                            "espn_public_v1",
+                            observed_at,
+                            comp_date,
+                            comp_date,
+                            raw_snapshot_hash=snapshot_hash,
+                        ),
+                        "event_id": comp_id,
+                        "away_team": away_team_obj.get("displayName", ""),
+                        "home_team": home_team_obj.get("displayName", ""),
+                        "away_team_canonical_id": away_canonical_id,
+                        "home_team_canonical_id": home_canonical_id,
+                        "event_canonical_id": event_canonical_id,
+                        "venue_canonical_id": venue_canonical_id,
+                        "away_score": int(away.get("score", 0) or 0),
+                        "home_score": int(home.get("score", 0) or 0),
+                        "status": str(comp.get("status", {}).get("type", {}).get("name", "")),
+                        "venue": venue_name,
+                    }
+                )
         if games:
-            self.norm.write(sport, "scoreboard", pl.DataFrame(games), primary_key=["event_id"], contract=SCOREBOARD_CONTRACT)
+            self.norm.write(
+                sport,
+                "scoreboard",
+                pl.DataFrame(games),
+                primary_key=["event_id"],
+                contract=SCOREBOARD_CONTRACT,
+            )
             return {"status": "ok", "sport": sport, "date": game_date, "games": len(games)}
         return {"status": "no_games", "sport": sport, "date": game_date}
 
     def _collect_markets(self, game_date: str, sport: str, league: str) -> dict[str, Any]:
-        source = "polymarket_us"; self._throttle()
+        source = "polymarket_us"
+        self._throttle()
         try:
             from model_prediction.data_sources.polymarket_us import PolymarketUSClient
+
             client = PolymarketUSClient()
             events = client.slate(league, date.fromisoformat(game_date))
             books: list[dict[str, Any]] = []
@@ -1119,19 +1388,35 @@ class TennisCollector:
                     market_type = market.get("market_type", "")
                     line = market.get("line")
                     for side in market.get("sides", []):
-                        books.append({**provenance_row(
-                            source, f"{event_id}_{market_id}_{side.get('side_id', '')}",
-                            "polymarket_us_v1", utc_now().isoformat(), utc_now().isoformat(),
-                            event.get("event_start_utc", "")),
-                            "event_id": event_id, "market_id": market_id, "market_type": market_type,
-                            "team_or_side": side.get("selection", ""), "team": side.get("team"),
-                            "team_canonical_id": resolve_polymarket_team_id(self.identity, sport, side.get("team")),
-                            "line": side.get("line", line),
-                            "executable_price": side.get("price_probability"),
-                            "decimal_odds": side.get("decimal_odds"), "american_odds": side.get("american_odds"),
-                            "available_depth": None})
+                        books.append(
+                            {
+                                **provenance_row(
+                                    source,
+                                    f"{event_id}_{market_id}_{side.get('side_id', '')}",
+                                    "polymarket_us_v1",
+                                    utc_now().isoformat(),
+                                    utc_now().isoformat(),
+                                    event.get("event_start_utc", ""),
+                                ),
+                                "event_id": event_id,
+                                "market_id": market_id,
+                                "market_type": market_type,
+                                "team_or_side": side.get("selection", ""),
+                                "team": side.get("team"),
+                                "team_canonical_id": resolve_polymarket_team_id(
+                                    self.identity, sport, side.get("team")
+                                ),
+                                "line": side.get("line", line),
+                                "executable_price": side.get("price_probability"),
+                                "decimal_odds": side.get("decimal_odds"),
+                                "american_odds": side.get("american_odds"),
+                                "available_depth": None,
+                            }
+                        )
             if books:
-                self.markets.write_books(sport, game_date, pl.DataFrame(books), contract=MARKET_SNAPSHOT_CONTRACT)
+                self.markets.write_books(
+                    sport, game_date, pl.DataFrame(books), contract=MARKET_SNAPSHOT_CONTRACT
+                )
                 return {"status": "ok", "books": len(books)}
             return {"status": "no_markets"}
         except Exception as e:  # noqa: BLE001 -- external I/O (HTTP/parsing); error captured and reported via status/health, not swallowed
@@ -1160,6 +1445,7 @@ class TennisCollector:
 
 # ── Esports Collector ───────────────────────────────────────────────────────
 
+
 class EsportsCollector:
     """Esports data via BO3 + Valve VRS + OpenDota + Polymarket."""
 
@@ -1179,4 +1465,9 @@ class EsportsCollector:
         self._last_call = time.monotonic()
 
     def collect_date(self, game_date: str, title: str) -> dict[str, Any]:
-        return {"status": "stub", "date": game_date, "title": title, "note": "BO3/OpenDota integration pending"}
+        return {
+            "status": "stub",
+            "date": game_date,
+            "title": title,
+            "note": "BO3/OpenDota integration pending",
+        }

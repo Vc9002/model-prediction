@@ -9,9 +9,7 @@ import re
 import subprocess
 from pathlib import Path
 
-REBUILD_SOURCE_ROOTS = (
-    Path("src/model_prediction/rebuild"),
-)
+REBUILD_SOURCE_ROOTS = (Path("src/model_prediction/rebuild"),)
 REBUILD_SCRIPT_PATTERNS = (
     "rebuild_*.py",
     "mlb_shadow_*.py",
@@ -70,7 +68,9 @@ TRACKED_REBUILD_RUNTIME_PATTERNS = (
     re.compile(r"^outputs/rebuild/(?:verification\.json|main_integration_verification\.md)$"),
 )
 CHANGED_FORBIDDEN_PATTERNS = (
-    re.compile(r"^data/(?:main|flat|gated_research|research|availability|odds|logs|esports|international_baseball)/"),
+    re.compile(
+        r"^data/(?:main|flat|gated_research|research|availability|odds|logs|esports|international_baseball)/"
+    ),
     re.compile(r"^data/rebuild/(?:raw|normalized|features|markets|resume_state|logs)/"),
     re.compile(r"^data/rebuild/.*\.(?:db|sqlite)(?:-.+)?$"),
     re.compile(r"^outputs/rebuild/runtime/"),
@@ -79,9 +79,7 @@ CHANGED_FORBIDDEN_PATTERNS = (
 
 
 def _git(repo: Path, *args: str, check: bool = True) -> str:
-    result = subprocess.run(
-        ["git", *args], cwd=repo, check=check, capture_output=True, text=True
-    )
+    result = subprocess.run(["git", *args], cwd=repo, check=check, capture_output=True, text=True)
     return result.stdout
 
 
@@ -141,9 +139,7 @@ def _scan_python(repo: Path) -> list[str]:
                             and not alias.name.startswith("model_prediction.rebuild")
                         )
                     ):
-                        errors.append(
-                            f"{relative}:{node.lineno}: prohibited incumbent import {alias.name}"
-                        )
+                        errors.append(f"{relative}:{node.lineno}: prohibited incumbent import {alias.name}")
             elif isinstance(node, ast.ImportFrom):
                 imported = node.module
                 parts = set((imported or "").lower().replace("-", "_").split("."))
@@ -156,22 +152,18 @@ def _scan_python(repo: Path) -> list[str]:
                         and not imported.startswith("model_prediction.rebuild")
                     )
                 ):
-                    errors.append(
-                        f"{relative}:{node.lineno}: prohibited incumbent import {imported}"
-                    )
+                    errors.append(f"{relative}:{node.lineno}: prohibited incumbent import {imported}")
             elif isinstance(node, ast.Call):
                 function = node.func
-                name = function.attr if isinstance(function, ast.Attribute) else (
-                    function.id if isinstance(function, ast.Name) else None
+                name = (
+                    function.attr
+                    if isinstance(function, ast.Attribute)
+                    else (function.id if isinstance(function, ast.Name) else None)
                 )
                 if name in DENIED_ORDER_CALLS:
-                    errors.append(
-                        f"{relative}:{node.lineno}: prohibited real-order call {name}()"
-                    )
+                    errors.append(f"{relative}:{node.lineno}: prohibited real-order call {name}()")
             elif (
-                isinstance(node, ast.Constant)
-                and isinstance(node.value, str)
-                and id(node) not in docstrings
+                isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in docstrings
             ):
                 normalized = node.value.replace("\\", "/").lstrip("./")
                 for prefix in PROTECTED_DATA_PREFIXES:
@@ -207,9 +199,7 @@ def _scan_diff(repo: Path, base_ref: str | None) -> list[str]:
     errors: list[str] = []
     changed = _git(repo, "diff", "--name-only", f"{base_ref}...HEAD").splitlines()
     for path in changed:
-        if path.startswith("config/models/") and not path.startswith(
-            "config/models/challengers/"
-        ):
+        if path.startswith("config/models/") and not path.startswith("config/models/challengers/"):
             errors.append(f"incumbent model changed: {path}")
         if any(pattern.search(path) for pattern in CHANGED_FORBIDDEN_PATTERNS):
             errors.append(f"forbidden changed path: {path}")
