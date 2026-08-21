@@ -1477,61 +1477,107 @@ production dependency.
 - NFL Football Operations, [Personnel (Injury) Report
   Policy](https://operations.nfl.com/media/2683/2017-nfl-injury-report-policy.pdf):
   practice participation and game-status semantics.
-- nflverse, [play-by-play build and data releases](https://github.com/nflverse/nflverse-pbp):
-  reproducible public play-by-play infrastructure for EPA, success, pace, and
-  game-state features. Verify each release's field definitions and licensing.
+---
 
-Public Next Gen Stats pages do not imply that complete play-level tracking data
-is freely downloadable. Treat tracking-dependent features as licensed/P2 until
-the actual reproducible source is secured.
+## 9. Open-source research literature & architectural synthesis (2026-08-20)
 
-### Esports
+A systematic survey of public sports prediction and betting research repositories reinforces a core architectural principle: **steal ideas, representations, and validation discipline aggressively, but maintain strict code provenance and market separation.** A few repositories are MIT-licensed and provide reusable mathematical components; others serve as architecture and feature-engineering references.
 
-- [BO3 CS2 match history](https://bo3.gg/matches/finished) and its public
-  website data endpoints provide series IDs, timestamps, team IDs, scores,
-  best-of format, tier, tournament, and game-version fields without signup.
-  BO3 permits reproduction with attribution in its
-  [Use of Services](https://bo3.gg/wiki/use-of-services), but does not publish a
-  stable API guarantee; normalized snapshots therefore remain replaceable.
-- [Oracle's Elixir downloads](https://oracleselixir.com/tools/downloads) provide
-  yearly public LoL CSVs. They are richer than the series baseline but are
-  game-level, so a market-aligned series pipeline must prevent games later in a
-  series from entering an earlier prediction.
-- Polymarket US's live `/v2/sports` taxonomy currently exposes LoL, CS2, Call of
-  Duty, Valorant, Dota 2, Rocket League, Overwatch, and Rainbow Six. The public
-  [Sports API](https://docs.polymarket.us/api-reference/sports/overview) supports
-  league and sport event discovery without a trading credential.
-- Liquipedia's [API terms](https://liquipedia.net/api-terms-of-use) require
-  attribution and throttling, while its published free-plan policy rejects
-  betting-related projects. It is deliberately excluded rather than treated as
-  a convenient no-key loophole.
+### Comparative repository evaluation
 
-### KBO and NPB
+| Source | License / Access | Core concepts to adopt | Priority |
+|---|---|---|:---:|
+| **Volodymyr4K/market-efficiency-lab** | Reference / Inspiration | 63-feature MLB architecture, rich starter vector, bullpen talent × availability, monotonic XGBoost constraints, walk-forward holdout discipline | **S+** |
+| **Baseball Hydra** | MIT | Closed-form Empirical Bayes / Beta-Binomial shrinkage batter priors (outperforming neural ROS models across all PA thresholds) | **S+** |
+| **penaltyblog** | MIT | Unified Dixon-Coles score grid $(\lambda_H, \lambda_A, \rho)$ driving 1X2, BTTS, Over/Under totals, and Asian handicaps from a single joint distribution | **S+** |
+| **football-mle** | MIT | Learned Dixon-Coles parameters, optimal exponential time-decay parameter $\xi$ ($w_i = e^{-\xi \Delta t_i}$) selected via temporal CV, neutral-venue modeling | **S** |
+| **Forrest31/Baseball-Betting-Model** | MIT | Pregame Pythagorean expectation and Log5 matchup probabilities as permanent evaluator baselines | **A** |
+| **RyanPlanteNJ/mlb-pipeline** | Reference / Inspiration | Strict `shift(1).rolling(...)` leak-prevention pattern; batter-state × pitcher-state interaction modeling | **A-** |
+| **statcast-lab / baseballiq** | Reference / Inspiration | Pitch arsenal metrics, CSW%, chase rate, catcher framing, pitcher stuff metrics, SHAP attribution diagnostics | **A-** |
 
-- The official [KBO regular-season schedule](https://www.koreabaseball.com/Schedule/Schedule.aspx)
-  provides monthly final scores and stable game/team identifiers without a key.
-  The underlying website endpoint is not a promised bulk API, so extractions
-  are cached and hashed.
-- The official [NPB English calendar](https://npb.jp/bis/eng/2025/calendar/)
-  provides stable game links, team codes, canceled-game markers, scores, and
-  ties without signup. October is excluded in v1 because its calendar mixes
-  regular season and postseason without a safe competition field.
-- Official [NPB statistics](https://npb.jp/bis/eng/2025/stats/) and
-  [player register](https://npb.jp/bis/eng/players/) are the first enrichment
-  targets. Effective dates and decision-time availability must be retained.
-- Open-Meteo's no-key archived forecast sources can support park/weather
-  ablations only when forecast issue time and lead time are fixed.
-- Polymarket US public league discovery currently exposes `kbo` and `npb`; the
-  public Sports API provides event discovery and BBO access without a trading
-  credential. Current contract text specifies 50-cent settlement on a tie.
+---
 
-### Keyless weather and market data
+### Key Architectural & Feature Lessons
 
-- Open-Meteo states that its free non-commercial API requires [no API
-  key](https://open-meteo.com/en/about). Its free endpoint is rate-limited and
-  has no uptime guarantee, so retain raw forecast snapshots and a missing-source
-  path.
-- The [Polymarket US public API](https://docs.polymarket.us/api-reference/introduction)
-  exposes markets, events, order books, and BBO without an API key. Authenticated
-  trading and private portfolio endpoints remain outside this research-source
-  policy.
+#### 1. Rich Starter Representation (replacing single-scalar ERA/FIP/KBB)
+Instead of compressing a starting pitcher into a single scalar (e.g. `pitcher_era_gap`), construct a multidimensional PIT starter state:
+```text
+starter_quality:
+    xwoba_allowed (21d / season shrunk)
+    k_pct
+    bb_pct
+    csw_pct (Called Strike + Whiff %)
+    first_pitch_strike_pct
+    velocity (fastball avg & drift)
+    starter_depth (avg IP / pitch count)
+    recent_xwoba_delta (last 3 starts vs season)
+    recent_k_pct_delta
+    handedness & platoon splits
+```
+
+#### 2. Reliever State: Talent × Availability × Role Importance
+Instead of a crude innings-based fatigue scalar (`bullpen_fatigue = innings_last_3_days`), model dynamic bullpen capability:
+$$\text{reliever\_state} = \sum_{r \in \text{bullpen}} \text{talent}_r \times P(\text{available}_r \mid \text{workload}_{r, 1\text{d}, 2\text{d}, 3\text{d}}, \text{consecutive\_days}_r) \times \text{role\_leverage}_r$$
+Features: Bullpen xwOBA, K-BB%, high-leverage availability deficit, and pitch overuse penalties.
+
+#### 3. Batter Priors via Empirical Bayes Beta-Binomial Shrinkage (Baseball Hydra)
+Baseball Hydra demonstrated that closed-form Bayesian shrinkage beats complex neural networks across all sample-size checkpoints. For `projected_offense_pit`:
+$$\text{long-term prior} + \text{current-season evidence} \xrightarrow{\text{Bayesian shrinkage (PA-weighted)}} \text{current batter talent distribution}$$
+For each batter in the active pool, track shrunk priors for: $\text{xwOBA}$, $\text{K}\%$, $\text{BB}\%$, $\text{ISO}$, $\text{barrel}\%$, and $\text{hard-hit}\%$.
+
+#### 4. Prospective Lineup Weighting
+When lineups are posted (captured via `plan_lineup_wakes.py` and `data/point_in_time/mlb_lineups.jsonl`), aggregate batter priors with batting-order weights and platoon adjustments:
+```text
+lineup_vector:
+    home_lineup_xwoba / away_lineup_xwoba
+    lineup_vs_sp_hand_xwoba
+    lineup_k_pct / lineup_bb_pct / lineup_iso
+    lineup_barrel_pct / lineup_hard_hit_pct
+    lineup_xwoba_advantage (home - away)
+```
+
+#### 5. Monotonic XGBoost Constraints
+When transitioning from standardized Logistic Regression to XGBoost, enforce domain-structural monotonic constraints to prevent overfitting on thin interaction noise:
+- $\frac{\partial P(\text{Home Win})}{\partial (\text{Home SP xwOBA Allowed})} \le 0$
+- $\frac{\partial P(\text{Home Win})}{\partial (\text{Away SP xwOBA Allowed})} \ge 0$
+- $\frac{\partial P(\text{Home Win})}{\partial (\text{Home Lineup xwOBA})} \ge 0$
+- $\frac{\partial P(\text{Home Win})}{\partial (\text{Away Lineup xwOBA})} \le 0$
+
+#### 6. Soccer Joint Probability Grid (penaltyblog & football-mle)
+Replace independent contract heuristics with a single bivariate Dixon-Coles grid:
+$$\text{Feature Engine} \longrightarrow (\lambda_{\text{home}}, \lambda_{\text{away}}, \rho) \xrightarrow{\text{Dixon-Coles Grid}} \begin{cases} 1\text{X}2 \\ \text{BTTS} \\ \text{O/U } 1.5, 2.5, 3.5 \\ \text{Asian Handicap} \\ \text{Correct Score} \end{cases}$$
+Optimize exponential decay $\xi$ ($w_i = e^{-\xi \Delta t_i}$) chronologically over rolling CV windows.
+
+#### 7. Permanent Evaluator Baselines
+Maintain a standardized baseline ladder on every model report:
+1. Constant Home Rate
+2. Elo Only
+3. Pregame Pythagorean Expectation
+4. Log5 Matchup Probability
+5. Elo + Log5
+6. Shipped Production Champion (v8)
+7. Research Challenger (v9)
+8. Timestamp-valid Market No-Vig Probability (benchmark only)
+
+---
+
+### Strict Non-Adoptions (What NOT to Steal)
+
+- **Market Odds as Training Features or Soft Labels**: Repositories that feed closing market lines into totals models or use market probabilities as soft training labels violate the core separation principle. Independent sports modeling must remain strictly decoupled from market odds. Market prices belong exclusively in the benchmark, residual, and execution layers.
+- **Retrospective Lineup Boxscores in History**: Using post-game boxscore batting orders as historical "lineup features" is retrospective leakage. Historical player weights must use pre-game historical averages; confirmed lineups must use the prospective archive only.
+- **Fabricated Rolling Defaults**: Hardcoded fallback values that masquerade as real rolling features violate the system's fail-closed `available / missing_reason` contract.
+
+---
+
+## 10. Data sources and access rules
+
+- NFL Football Operations, [Personnel (Injury) Report Policy](https://operations.nfl.com/media/2683/2017-nfl-injury-report-policy.pdf): practice participation and game-status semantics.
+- nflverse, [play-by-play build and data releases](https://github.com/nflverse/nflverse-pbp): reproducible public play-by-play infrastructure for EPA, success, pace, and game-state features.
+- [BO3 CS2 match history](https://bo3.gg/matches/finished): series IDs, timestamps, team IDs, scores, best-of format, tier, tournament.
+- [Oracle's Elixir downloads](https://oracleselixir.com/tools/downloads): yearly public LoL CSVs for game and player stats.
+- [Polymarket US public API](https://docs.polymarket.us/api-reference/introduction): market discovery, order book snapshots, BBO odds without authentication.
+- [KBO regular-season schedule](https://www.koreabaseball.com/Schedule/Schedule.aspx) and [NPB calendar](https://npb.jp/bis/eng/2025/calendar/): official schedule, box scores, and results.
+- Open-Meteo [free weather API](https://open-meteo.com/en/about): historical and forecasted temperature, dew point, pressure, precipitation, and wind vectors.
+- [penaltyblog](https://github.com/martineastwood/penaltyblog) (MIT): Dixon-Coles models, score probability matrices, and betting analytics.
+- [football-mle](https://github.com/football-mle/football-mle) (MIT): Maximum likelihood estimation of football match prediction models with time decay.
+- [Baseball Hydra](https://github.com/BaseballHydra/BaseballHydra) (MIT): Empirical Bayes Beta-Binomial shrinkage models for baseball projection.

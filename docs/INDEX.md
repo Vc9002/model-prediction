@@ -36,7 +36,7 @@ Welcome to the unified documentation directory for the `model-prediction` platfo
 
 | Document | Purpose |
 | :--- | :--- |
-| [`MODEL_IMPROVEMENTS.md`](MODEL_IMPROVEMENTS.md) | Comprehensive modeling specifications, Empirical Bayes shrinkage, and multi-sport roadmaps. |
+| [`MODEL_IMPROVEMENTS.md`](MODEL_IMPROVEMENTS.md) | Comprehensive modeling specifications, Empirical Bayes shrinkage, multi-sport roadmaps, and open-source literature synthesis (Section 9). |
 | [`RESEARCH_LITERATURE_DIVE_4_2026-08-20.md`](RESEARCH_LITERATURE_DIVE_4_2026-08-20.md) | **Literature Dive #4**: Plate-Appearance Monte Carlo, Catcher Framing, and 15–30m Lineup Alpha Window. |
 | [`RESEARCH_DECISION_2026-08-18.md`](RESEARCH_DECISION_2026-08-18.md) | **Research Decision (2026-08-18)**: Strategy on building a more accurate MLB model beyond v8 baseline. |
 | [`V8_REPRODUCTION.md`](V8_REPRODUCTION.md) | Forensic reproduction report and holdout cohort definitions for MLB v8. |
