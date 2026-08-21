@@ -79,24 +79,48 @@ def _identify_backfill_event_ids() -> set[str]:
     return {eid for eid, pos in first_position.items() if pos in late_positions}
 
 
+COHORT_DIR = PROJECT_ROOT / "data" / "point_in_time" / "mlb_v9_cohort_v1"
+
+
 def pinned_cohort() -> dict:
     """Build the pinned split and return everything the research tools need.
 
-    ``exact_holdout`` = harness holdout minus the post-freeze backfill
-    (1,389 rows: the recorded 1,391 minus the 2 freeze-time rows lost
-    from today's file — see docs/V8_REPRODUCTION.md).
+    When ``data/point_in_time/mlb_v9_cohort_v1/manifest.json`` is present,
+    filters by the immutable frozen event-ID cohort. Otherwise derives
+    the split dynamically.
     """
     contract = v8_contract()
     rows_end = (date.fromisoformat(contract["holdout_end"]) + timedelta(days=1)).isoformat()
     store = FeatureStore(PROJECT_ROOT / "data")
     rows = build_walk_forward_rows(store, "mlb", end_date=rows_end)
-    train, validation, holdout, split_meta = chronological_split(
-        rows,
-        train_end_date=contract["train_end"],
-        validation_end_date=contract["validation_end"],
-    )
-    backfill_ids = _identify_backfill_event_ids()
-    exact_holdout = [r for r in holdout if r.event_id not in backfill_ids]
+
+    manifest_path = COHORT_DIR / "manifest.json"
+    if manifest_path.exists():
+        train_ids = set(json.loads((COHORT_DIR / "train_event_ids.json").read_text(encoding="utf-8")))
+        val_ids = set(json.loads((COHORT_DIR / "validation_event_ids.json").read_text(encoding="utf-8")))
+        holdout_ids = set(
+            json.loads((COHORT_DIR / "exact_holdout_event_ids.json").read_text(encoding="utf-8"))
+        )
+        backfill_ids = set(
+            json.loads(manifest_path.read_text(encoding="utf-8")).get("backfill_ids_excluded", [])
+        )
+
+        train = [r for r in rows if r.event_id in train_ids]
+        validation = [r for r in rows if r.event_id in val_ids]
+        exact_holdout = [r for r in rows if r.event_id in holdout_ids]
+        holdout = [
+            r for r in rows if r.date > contract["validation_end"] and r.date <= contract["holdout_end"]
+        ]
+        split_meta = {"train": len(train), "validation": len(validation), "holdout": len(holdout)}
+    else:
+        train, validation, holdout, split_meta = chronological_split(
+            rows,
+            train_end_date=contract["train_end"],
+            validation_end_date=contract["validation_end"],
+        )
+        backfill_ids = _identify_backfill_event_ids()
+        exact_holdout = [r for r in holdout if r.event_id not in backfill_ids]
+
     return {
         "contract": contract,
         "train": train,

@@ -57,9 +57,13 @@ CREATE INDEX IF NOT EXISTS idx_experiments_model
 _STATUSES = ("queued", "running", "completed", "void")
 
 
-def _conn(repo_root: Path | None = None) -> sqlite3.Connection:
+def _conn(repo_root: Path | None = None, runtime_root: Path | str | None = None) -> sqlite3.Connection:
     root = Path(repo_root) if repo_root is not None else PROJECT_ROOT
-    paths = RuntimePaths.resolve(repo_root=root)
+    paths = (
+        RuntimePaths(repo_root=root, runtime_root=Path(runtime_root))
+        if runtime_root is not None
+        else RuntimePaths.resolve(repo_root=root)
+    )
     migrate_legacy_state(paths)
     paths.runs_db.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(paths.runs_db, timeout=10.0)
@@ -94,6 +98,7 @@ def record(
     verdict: str | None = None,
     git_sha: str | None = None,
     repo_root: Path | str | None = None,
+    runtime_root: Path | str | None = None,
     status: str = "completed",
 ) -> dict[str, Any]:
     """Record one experiment run and return the row."""
@@ -101,7 +106,7 @@ def record(
         raise ValueError(f"status must be one of {_STATUSES}")
     experiment_id = f"exp-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:6]}"
     now = _now()
-    conn = _conn(repo_root)
+    conn = _conn(Path(repo_root) if repo_root is not None else None, runtime_root)
     try:
         with conn:
             conn.execute(
@@ -135,9 +140,14 @@ def record(
         conn.close()
 
 
-def void(experiment_id: str, reason: str, repo_root: Path | str | None = None) -> dict[str, Any]:
+def void(
+    experiment_id: str,
+    reason: str,
+    repo_root: Path | str | None = None,
+    runtime_root: Path | str | None = None,
+) -> dict[str, Any]:
     """Void a recorded experiment — kept in the registry with a reason."""
-    conn = _conn(repo_root)
+    conn = _conn(Path(repo_root) if repo_root is not None else None, runtime_root)
     try:
         with conn:
             cursor = conn.execute(
@@ -153,10 +163,36 @@ def void(experiment_id: str, reason: str, repo_root: Path | str | None = None) -
         conn.close()
 
 
+def complete(
+    experiment_id: str,
+    repo_root: Path | str | None = None,
+    runtime_root: Path | str | None = None,
+) -> dict[str, Any]:
+    """Mark a staged experiment complete only after immutable outputs exist."""
+    conn = _conn(Path(repo_root) if repo_root is not None else None, runtime_root)
+    try:
+        with conn:
+            cursor = conn.execute(
+                "UPDATE experiments SET status = 'completed', updated_at_utc = ? "
+                "WHERE experiment_id = ? AND status = 'running'",
+                (_now(), experiment_id),
+            )
+            if cursor.rowcount == 0:
+                raise ValueError(f"no running experiment with id {experiment_id}")
+        row = conn.execute("SELECT * FROM experiments WHERE experiment_id = ?", (experiment_id,)).fetchone()
+        return _decode(row)
+    finally:
+        conn.close()
+
+
 def list_experiments(
-    *, model_id: str | None = None, limit: int = 50, repo_root: Path | str | None = None
+    *,
+    model_id: str | None = None,
+    limit: int = 50,
+    repo_root: Path | str | None = None,
+    runtime_root: Path | str | None = None,
 ) -> list[dict[str, Any]]:
-    conn = _conn(repo_root)
+    conn = _conn(Path(repo_root) if repo_root is not None else None, runtime_root)
     try:
         query = "SELECT * FROM experiments"
         params: list[Any] = []
@@ -170,8 +206,12 @@ def list_experiments(
         conn.close()
 
 
-def show(experiment_id: str, repo_root: Path | str | None = None) -> dict[str, Any] | None:
-    conn = _conn(repo_root)
+def show(
+    experiment_id: str,
+    repo_root: Path | str | None = None,
+    runtime_root: Path | str | None = None,
+) -> dict[str, Any] | None:
+    conn = _conn(Path(repo_root) if repo_root is not None else None, runtime_root)
     try:
         row = conn.execute("SELECT * FROM experiments WHERE experiment_id = ?", (experiment_id,)).fetchone()
         return _decode(row)

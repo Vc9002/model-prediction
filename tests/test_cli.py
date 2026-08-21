@@ -10,7 +10,11 @@ session for both its date-matching and started-game guards).
 
 from __future__ import annotations
 
+import hashlib
+import json
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 
@@ -179,9 +183,7 @@ def test_esports_research_keeps_unvalidated_teams_and_gated_requires_positive_ed
         "bankroll": {},
     }
 
-    logged = cli._log_esports_forecast(
-        _esports_forecast(), config, research, gated_ledger=gated
-    )
+    logged = cli._log_esports_forecast(_esports_forecast(), config, research, gated_ledger=gated)
 
     # Every safely priced candidate reaches the research ledger, including
     # the unvalidated/new-team one (as a downgraded NO_CALL row) -- only the
@@ -263,9 +265,7 @@ def test_esports_exposure_check_happens_while_ledger_lock_is_held(monkeypatch) -
     cli._log_esports_forecast(_esports_forecast(), config, research, gated_ledger=gated)
 
     assert lock_held_when_exposure_checked, "expected exposure() to be called at least once"
-    assert all(lock_held_when_exposure_checked), (
-        "exposure() must be checked while _LEDGER_LOCK is held"
-    )
+    assert all(lock_held_when_exposure_checked), "exposure() must be checked while _LEDGER_LOCK is held"
 
 
 def test_esports_flat_mode_never_writes_research_or_gated(monkeypatch) -> None:
@@ -369,6 +369,11 @@ def _mlb_totals_candidate(market_type: MarketType, selection: str, line: float |
         model_artifact_hash="hash",
         calibration_version="measured-edge-totals-v1",
         feature_schema_version="mlb-analyst-poisson-trend-v0.2",
+        market_snapshot_hash="snapshot-hash",
+        market_quote_timestamp_valid=True,
+        market_quote_source="polymarket_us",
+        market_quote_provenance="decision_time_executable_quote",
+        market_quote_reconstructed=False,
     )
 
 
@@ -384,16 +389,12 @@ def test_mlb_totals_flat_keeps_total_and_spread_but_not_moneyline_and_never_touc
         _mlb_totals_candidate(MarketType.SPREAD, "away", -1.5),
         _mlb_totals_candidate(MarketType.TOTAL, "over", 8.5),
     ]
-    monkeypatch.setattr(
-        cli, "build_mlb_slate", lambda *args, **kwargs: (candidates, [], 1)
-    )
+    monkeypatch.setattr(cli, "build_mlb_slate", lambda *args, **kwargs: (candidates, [], 1))
 
     flat_ledger = _CaptureLedger()
     config = {"project": {}, "bankroll": {}}
 
-    result = cli._forecast_mlb_totals_flat(
-        "2026-07-27", True, config, registry, ban_list, flat_ledger, None
-    )
+    result = cli._forecast_mlb_totals_flat("2026-07-27", True, config, registry, ban_list, flat_ledger, None)
 
     assert result["market_candidates"] == 2
     assert result["total_candidates"] == 1
@@ -406,6 +407,182 @@ def test_mlb_totals_flat_keeps_total_and_spread_but_not_moneyline_and_never_touc
     )
     assert spread_request.line == -1.5
     assert spread_request.selection == "away"
+    total_request = next(
+        request for request, _e in flat_ledger.appended if request.market_type is MarketType.TOTAL
+    )
+    persisted = total_request.as_dict()
+    assert persisted["config_hash"]
+    assert persisted["config_byte_sha256"]
+    assert Path(persisted["config_path"]).is_file()
+    assert persisted["model_artifact_byte_sha256"]
+    assert Path(persisted["model_artifact_path"]).name == "measured-edge-totals-v3.json"
+    assert persisted["market_quote_observed_at_utc"] == "2026-07-27T19:00:00Z"
+    assert persisted["market_quote_timestamp_valid"] is True
+    assert persisted["market_quote_source"] == "polymarket_us"
+    assert persisted["market_quote_provenance"] == "decision_time_executable_quote"
+    assert persisted["market_quote_reconstructed"] is False
+    assert persisted["market_snapshot_hash"] == "snapshot-hash"
+    assert persisted["record_source"] == "live_forecast"
+    assert persisted["is_backfill"] is False
+    assert persisted["model_probability_raw"] == total_request.model_probability
+    assert persisted["serving_probability"] == total_request.model_probability
+    assert persisted["blend_policy_artifact_hash"] is None
+
+
+def test_mlb_totals_flat_policy_uses_same_measured_edge_artifact_and_fails_closed(
+    monkeypatch, registry, ban_list, tmp_path
+) -> None:
+    from model_prediction.config import PROJECT_ROOT, config_path
+    from model_prediction.experiment_registry import record, void
+    from model_prediction.market_blend import (
+        MarketBlendBlockedError,
+        canonical_config_logical_hash,
+        canonical_hash,
+    )
+    from model_prediction.models.mlb import canonical_mlb_artifact_hash
+    from model_prediction.runtime_paths import RuntimePaths
+
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 20, tzinfo=UTC))
+    monkeypatch.setattr(cli, "load_formula_spec", lambda path: object())
+    monkeypatch.setattr(cli, "MLBMarketOddsFeed", lambda *args, **kwargs: object())
+    model_path = PROJECT_ROOT / "config/models/measured-edge-totals-v3.json"
+    model_raw = json.loads(model_path.read_text())
+    model_hash = canonical_mlb_artifact_hash(model_raw)
+    assert model_hash == model_raw["artifact_hash"]
+    snapshot_hash = hashlib.sha256(b"exact-raw-quote-snapshot").hexdigest()
+    candidate = replace(
+        _mlb_totals_candidate(MarketType.TOTAL, "over", 8.5),
+        model_version="measured-edge-totals-v3",
+        model_artifact_hash=model_hash,
+        calibration_version="measured-edge-totals-v3",
+        market_snapshot_hash=snapshot_hash,
+    )
+    monkeypatch.setattr(cli, "build_mlb_slate", lambda *args, **kwargs: ([candidate], [], 1))
+    runtime_paths = RuntimePaths(repo_root=PROJECT_ROOT, runtime_root=tmp_path / "runtime")
+    config_hash = canonical_config_logical_hash(config_path().read_bytes())
+    policy_raw = {
+        "schema_version": "market_blend_policy_v1",
+        "policy_id": "measured-edge-total-cli-test",
+        "entries": [
+            {
+                "sport": "mlb",
+                "market": "total",
+                "weight": 0.0,
+                "model_artifact_hash": model_hash,
+                "config_hash": config_hash,
+                "evidence_dataset_hash": "d" * 64,
+                "experiment_spec_hash": "e" * 64,
+                "implementation_hash": "f" * 64,
+                "lineage_manifest_hash": "1" * 64,
+                "training_inputs": {"serving_integration": "flat_cli_measured_edge_totals_v3_only"},
+                "fold_definition": {"type": "expanding_date_oof"},
+                "oof_metrics": {"brier_delta": -0.01},
+                "gate_status": "passed",
+            }
+        ],
+    }
+    policy_raw["artifact_hash"] = canonical_hash(policy_raw)
+    policy_path = tmp_path / "policy.json"
+    policy_path.write_text(json.dumps(policy_raw))
+    experiment = record(
+        model_id="market-blend-mlb-total",
+        artifact_hashes={"candidate_policy": policy_raw["artifact_hash"]},
+        status="completed",
+        repo_root=PROJECT_ROOT,
+        runtime_root=runtime_paths.runtime_root,
+    )
+    report_path = tmp_path / "report.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "experiment_id": experiment["experiment_id"],
+                "candidate_policy_path": str(policy_path),
+                "candidate_policy_artifact_hash": policy_raw["artifact_hash"],
+            }
+        )
+    )
+    config = {"project": {}, "bankroll": {}}
+
+    incumbent_ledger = _CaptureLedger()
+    cli._forecast_mlb_totals_flat("2026-07-27", True, config, registry, ban_list, incumbent_ledger, None)
+    incumbent = incumbent_ledger.appended[0][0]
+    assert incumbent.model_probability == candidate.shrunk_probability
+    assert incumbent.blend_policy_artifact_hash is None
+
+    blended_ledger = _CaptureLedger()
+    cli._forecast_mlb_totals_flat(
+        "2026-07-27",
+        True,
+        config,
+        registry,
+        ban_list,
+        blended_ledger,
+        None,
+        blend_policy_artifact_path=policy_path,
+        blend_policy_report_path=report_path,
+        runtime_paths=runtime_paths,
+    )
+    blended = blended_ledger.appended[0][0]
+    assert blended.model_probability_raw == candidate.shrunk_probability
+    assert blended.market_probability_at_decision == pytest.approx(110 / 210)
+    assert blended.model_probability == pytest.approx(110 / 210)
+    assert blended.serving_probability == pytest.approx(110 / 210)
+    assert blended.blend_weight == 0.0
+    assert blended.blend_policy_artifact_hash == policy_raw["artifact_hash"]
+    assert blended.model_artifact_hash == model_hash
+    assert blended.market_snapshot_hash == snapshot_hash
+
+    mismatched = replace(candidate, model_artifact_hash="9" * 64)
+    monkeypatch.setattr(cli, "build_mlb_slate", lambda *args, **kwargs: ([mismatched], [], 1))
+    with pytest.raises(MarketBlendBlockedError, match="identities differ"):
+        cli._forecast_mlb_totals_flat(
+            "2026-07-27",
+            True,
+            config,
+            registry,
+            ban_list,
+            _CaptureLedger(),
+            None,
+            blend_policy_artifact_path=policy_path,
+            blend_policy_report_path=report_path,
+            runtime_paths=runtime_paths,
+        )
+
+    void(
+        experiment["experiment_id"],
+        "test invalidation",
+        repo_root=PROJECT_ROOT,
+        runtime_root=runtime_paths.runtime_root,
+    )
+    with pytest.raises(MarketBlendBlockedError, match="has not completed"):
+        cli._forecast_mlb_totals_flat(
+            "2026-07-27",
+            True,
+            config,
+            registry,
+            ban_list,
+            _CaptureLedger(),
+            None,
+            blend_policy_artifact_path=policy_path,
+            blend_policy_report_path=report_path,
+            runtime_paths=runtime_paths,
+        )
+
+
+def test_flat_forecast_parser_exposes_explicit_blend_opt_in_paths() -> None:
+    args = cli.parser().parse_args(
+        [
+            "flat-forecast",
+            "--sport",
+            "mlb",
+            "--market-blend-policy-artifact",
+            "/tmp/policy.json",
+            "--market-blend-policy-report",
+            "/tmp/report.json",
+        ]
+    )
+    assert args.market_blend_policy_artifact == Path("/tmp/policy.json")
+    assert args.market_blend_policy_report == Path("/tmp/report.json")
 
 
 def test_mlb_totals_main_ledger_duplicate_is_tracked_not_silently_dropped(
@@ -1253,7 +1430,13 @@ def test_below_min_edge_vs_market_still_gets_logged_not_skipped(monkeypatch, tmp
     }
 
     result = cli._forecast_learned_sport(
-        "mlb", "2026-07-26", True, config, Registry(), object(), ledger,
+        "mlb",
+        "2026-07-26",
+        True,
+        config,
+        Registry(),
+        object(),
+        ledger,
     )
 
     assert result["logged"] == 1  # not skipped, despite failing min_edge
@@ -1263,9 +1446,7 @@ def test_below_min_edge_vs_market_still_gets_logged_not_skipped(monkeypatch, tmp
     assert request.event_id == "mlb-2"
 
 
-def test_learned_sport_gated_ledger_duplicate_is_tracked_not_silently_dropped(
-    monkeypatch, tmp_path
-) -> None:
+def test_learned_sport_gated_ledger_duplicate_is_tracked_not_silently_dropped(monkeypatch, tmp_path) -> None:
     """DD-2 (deep debug audit, 2026-08-04): gated_ledger's secondary write
     used to be a bare `with suppress(DuplicatePickError):` -- a genuine
     duplicate was completely invisible. research_routed (the gate on this
@@ -1318,7 +1499,15 @@ def test_learned_sport_gated_ledger_duplicate_is_tracked_not_silently_dropped(
         cli,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
-            RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", 1.0, 60, 0.07, 0.02, AWAY, HOME,
+            RecordType.QUALIFIED_SHADOW_CALL,
+            "CALL",
+            "QUALIFIED",
+            1.0,
+            60,
+            0.07,
+            0.02,
+            AWAY,
+            HOME,
         ),
     )
     research_ledger = _CaptureLedger()
@@ -1340,8 +1529,15 @@ def test_learned_sport_gated_ledger_duplicate_is_tracked_not_silently_dropped(
     }
 
     result = cli._forecast_learned_sport(
-        "nba", "2026-07-26", True, config, Registry(), object(), research_ledger,
-        research_ledger=research_ledger, gated_ledger=gated_ledger,
+        "nba",
+        "2026-07-26",
+        True,
+        config,
+        Registry(),
+        object(),
+        research_ledger,
+        research_ledger=research_ledger,
+        gated_ledger=gated_ledger,
     )
 
     assert result["gated_ledger_duplicate_pick_ids"] == ["gated-existing-learned-1"]
@@ -1377,7 +1573,9 @@ def test_below_learned_confidence_threshold_downgraded_and_kept_off_main(monkeyp
     )
     monkeypatch.setattr(cli, "utc_now", lambda: observed)
     monkeypatch.setattr(
-        cli, "build_learned_moneyline_slate", lambda **kwargs: ([candidate], [], 1),
+        cli,
+        "build_learned_moneyline_slate",
+        lambda **kwargs: ([candidate], [], 1),
     )
     monkeypatch.setattr(
         cli,
@@ -1430,7 +1628,13 @@ def test_below_learned_confidence_threshold_downgraded_and_kept_off_main(monkeyp
     }
 
     result = cli._forecast_learned_sport(
-        "mlb", "2026-07-26", True, config, Registry(), object(), ledger,
+        "mlb",
+        "2026-07-26",
+        True,
+        config,
+        Registry(),
+        object(),
+        ledger,
     )
 
     # Kept off Main entirely (mirrors any other hard NO_CALL reason for a
@@ -1497,7 +1701,15 @@ def test_market_residual_probability_recorded_when_artifact_configured(monkeypat
         cli,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
-            RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", 1.0, 60, 0.07, 0.02, AWAY, HOME,
+            RecordType.QUALIFIED_SHADOW_CALL,
+            "CALL",
+            "QUALIFIED",
+            1.0,
+            60,
+            0.07,
+            0.02,
+            AWAY,
+            HOME,
         ),
     )
     ledger = _CaptureLedger()
@@ -1519,7 +1731,13 @@ def test_market_residual_probability_recorded_when_artifact_configured(monkeypat
     }
 
     result = cli._forecast_learned_sport(
-        "mlb", "2026-07-26", True, config, Registry(), object(), ledger,
+        "mlb",
+        "2026-07-26",
+        True,
+        config,
+        Registry(),
+        object(),
+        ledger,
     )
 
     assert result["logged"] == 1
@@ -1576,7 +1794,15 @@ def test_market_residual_probability_none_without_configured_artifact(monkeypatc
         cli,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
-            RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", 1.0, 60, 0.07, 0.02, AWAY, HOME,
+            RecordType.QUALIFIED_SHADOW_CALL,
+            "CALL",
+            "QUALIFIED",
+            1.0,
+            60,
+            0.07,
+            0.02,
+            AWAY,
+            HOME,
         ),
     )
     ledger = _CaptureLedger()
@@ -1598,7 +1824,13 @@ def test_market_residual_probability_none_without_configured_artifact(monkeypatc
     }
 
     result = cli._forecast_learned_sport(
-        "mlb", "2026-07-26", True, config, Registry(), object(), ledger,
+        "mlb",
+        "2026-07-26",
+        True,
+        config,
+        Registry(),
+        object(),
+        ledger,
     )
 
     assert result["logged"] == 1
@@ -1681,9 +1913,7 @@ def test_international_forecast_observed_now_is_captured_after_slate_building_no
     assert len(research.appended) == 1
 
 
-def test_international_forecast_logs_low_edge_to_research_but_not_gated(
-    monkeypatch, tmp_path
-) -> None:
+def test_international_forecast_logs_low_edge_to_research_but_not_gated(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
     monkeypatch.setattr(
         "model_prediction.international_baseball.forecast_international_baseball_slate",
@@ -1772,9 +2002,7 @@ def test_international_forecast_logging_failure_is_recorded_not_silently_discard
     ]
 
 
-def test_international_forecast_mirrors_only_strategy_qualified_calls(
-    monkeypatch, tmp_path
-) -> None:
+def test_international_forecast_mirrors_only_strategy_qualified_calls(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 26, 12, tzinfo=UTC))
     monkeypatch.setattr(
         "model_prediction.international_baseball.forecast_international_baseball_slate",
@@ -1827,9 +2055,7 @@ def test_international_forecast_gated_ledger_duplicate_is_tracked_not_silently_d
     assert result["duplicates"]["research_ledger"] == 0
 
 
-def test_international_forecast_gated_blocked_when_team_lacks_real_history(
-    monkeypatch, tmp_path
-) -> None:
+def test_international_forecast_gated_blocked_when_team_lacks_real_history(monkeypatch, tmp_path) -> None:
     """A contract whose min_team_games is below MINIMUM_TEAM_GAMES must not
     reach Gated Research even with a comfortably clearing edge -- same
     reasoning as soccer/tennis's equivalent test."""
@@ -1915,7 +2141,9 @@ def test_verify_chain_detects_a_tampered_event(tmp_path) -> None:
 
 def test_verify_chain_flags_a_ledger_row_with_no_creation_event(tmp_path) -> None:
     ledger = _ledger(tmp_path)
-    row = _log_pick(ledger, event_start_utc="2026-07-14T00:00:00Z", created_at=datetime(2026, 7, 13, tzinfo=UTC))
+    row = _log_pick(
+        ledger, event_start_utc="2026-07-14T00:00:00Z", created_at=datetime(2026, 7, 13, tzinfo=UTC)
+    )
     # Simulate a row that entered the ledger through a path that bypassed
     # the audited API entirely (the exact symptom that identified the
     # retroactively-rescored batch found and removed earlier this session).
@@ -2053,11 +2281,14 @@ def _wnba_spread_config() -> dict:
 
 
 def test_wnba_spread_flat_ledger_logs_every_contract_regardless_of_eligibility(
-    monkeypatch, registry, ban_list,
+    monkeypatch,
+    registry,
+    ban_list,
 ) -> None:
     monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 8, 13, 18, tzinfo=UTC))
     monkeypatch.setattr(
-        cli, "_forecast_wnba_spread_slate",
+        cli,
+        "_forecast_wnba_spread_slate",
         lambda *a, **k: _wnba_spread_forecast(selection="home", line=10.5),
     )
     flat_ledger = _CaptureLedger()
@@ -2084,7 +2315,8 @@ def test_wnba_spread_flat_ledger_logs_every_contract_regardless_of_eligibility(
 def test_wnba_spread_main_ledger_only_gets_call_rows(monkeypatch, registry, ban_list) -> None:
     monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 8, 13, 18, tzinfo=UTC))
     monkeypatch.setattr(
-        cli, "_forecast_wnba_spread_slate",
+        cli,
+        "_forecast_wnba_spread_slate",
         lambda *a, **k: _wnba_spread_forecast(selection="away", line=-10.5),
     )
     flat_ledger = _CaptureLedger()
@@ -2112,11 +2344,14 @@ def test_wnba_spread_main_ledger_only_gets_call_rows(monkeypatch, registry, ban_
 
 
 def test_wnba_spread_main_ledger_duplicate_is_tracked_not_silently_dropped(
-    monkeypatch, registry, ban_list,
+    monkeypatch,
+    registry,
+    ban_list,
 ) -> None:
     monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 8, 13, 18, tzinfo=UTC))
     monkeypatch.setattr(
-        cli, "_forecast_wnba_spread_slate",
+        cli,
+        "_forecast_wnba_spread_slate",
         lambda *a, **k: _wnba_spread_forecast(selection="away", line=-10.5),
     )
     flat_ledger = _CaptureLedger()

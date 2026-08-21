@@ -16,6 +16,7 @@ the only real-money path is the `execute` subcommand behind the hard gate in
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import os
@@ -57,7 +58,11 @@ from .data_sources.mlb_injuries import (
     capture_transactions_snapshot,
     team_id_for_name,
 )
-from .data_sources.mlb_market_odds import MarketOddsSnapshotStore, MLBMarketOddsFeed
+from .data_sources.mlb_market_odds import (
+    MarketOddsSnapshotStore,
+    MLBMarketOddsFeed,
+    load_verified_mlb_market_snapshot,
+)
 from .data_sources.polymarket_execute import (
     ExecutionGateError,
     OrderTicket,
@@ -116,17 +121,23 @@ from .international_baseball import (
 from .learned_forward import build_learned_moneyline_slate, match_executable_quote
 from .ledger import LEDGER_SCHEMA_VERSION, DuplicatePickError
 from .main_ledgers import MAIN_LEDGER_SPORTS, MultiSportPickLedger
+from .market_blend import (
+    MarketBlendBlockedError,
+    MarketBlendPolicy,
+    canonical_config_logical_hash,
+)
 from .mlb_baseline_refresh import refresh_if_due
 from .models import MODEL_SPECS
 from .models.market_residual import MarketResidualModel, ResidualTrainingRow
-from .models.mlb import load_formula_spec
+from .models.mlb import canonical_mlb_artifact_hash, load_formula_spec
 from .models.registry import model_spec
+from .pricing import implied_probability
 from .research_ledgers import (
     RESEARCH_LEDGER_SPORTS,
     existing_research_ledgers,
     research_ledger,
 )
-from .runtime_paths import rolling_models_root
+from .runtime_paths import RuntimePaths, rolling_models_root
 from .soccer_forward import build_soccer_total_slate
 from .tennis_forward import TENNIS_TOURS, build_tennis_slate
 from .total_score import validate_all_total_score_models
@@ -182,10 +193,9 @@ def _append_secondary_ledger(
         ledger.append_evaluated(request, eligibility, now=now)
         return None
     except DuplicatePickError as error:
-        logger.debug(
-            "%s: duplicate suppressed for existing pick %s", ledger_name, error.pick_id
-        )
+        logger.debug("%s: duplicate suppressed for existing pick %s", ledger_name, error.pick_id)
         return error.pick_id
+
 
 # League value on a ledger row -> ESPN league key(s) to search for results.
 # WORLD_CUP dropped 2026-07: tournament is over, no games left to forecast or settle.
@@ -195,10 +205,24 @@ _LEDGER_LEAGUE_TO_ESPN = {
     "WNBA": ("WNBA",),
     "NFL": ("NFL",),
     "SOCCER": (
-        "EPL", "LA_LIGA", "BUNDESLIGA", "SERIE_A", "MLS", "UCL",
-        "BRASILEIRAO", "BRAZIL_SERIE_B", "ARGENTINA", "ARGENTINA_2",
-        "COLOMBIA", "CHILE", "URUGUAY", "ECUADOR", "PERU", "SUDAMERICANA",
-        "FRIENDLIES", "CLUB_FRIENDLIES",
+        "EPL",
+        "LA_LIGA",
+        "BUNDESLIGA",
+        "SERIE_A",
+        "MLS",
+        "UCL",
+        "BRASILEIRAO",
+        "BRAZIL_SERIE_B",
+        "ARGENTINA",
+        "ARGENTINA_2",
+        "COLOMBIA",
+        "CHILE",
+        "URUGUAY",
+        "ECUADOR",
+        "PERU",
+        "SUDAMERICANA",
+        "FRIENDLIES",
+        "CLUB_FRIENDLIES",
     ),
 }
 
@@ -239,8 +263,9 @@ def parser() -> argparse.ArgumentParser:
     slate.add_argument("--sport", choices=SPORTS)
     slate.add_argument("--league", help="single gateway league key (e.g. MLB, EPL, WTA)")
     slate.add_argument("--all", action="store_true", help="every supported sport")
-    slate.add_argument("--date", default=eastern_today().isoformat(),
-        help="ISO date; defaults to today in US-Eastern time")
+    slate.add_argument(
+        "--date", default=eastern_today().isoformat(), help="ISO date; defaults to today in US-Eastern time"
+    )
     slate.add_argument("--timezone", default="America/New_York")
     slate.add_argument("--provider", default="polymarket", choices=["polymarket", "kalshi"])
     slate.add_argument(
@@ -259,8 +284,9 @@ def parser() -> argparse.ArgumentParser:
         "polymarket-ledger-prices",
         help="refresh BBOs only for exact contracts selected from the open ledger",
     )
-    ledger_prices.add_argument("--date", default=eastern_today().isoformat(),
-        help="ISO date; defaults to today in US-Eastern time")
+    ledger_prices.add_argument(
+        "--date", default=eastern_today().isoformat(), help="ISO date; defaults to today in US-Eastern time"
+    )
     ledger_prices.add_argument(
         "--contract",
         action="append",
@@ -274,16 +300,16 @@ def parser() -> argparse.ArgumentParser:
     clv.add_argument("--side", required=True, choices=["long", "short"])
     clv.add_argument("--decision-price", required=True, type=float)
     clv.add_argument("--sport")
-    clv.add_argument("--date", default=eastern_today().isoformat(),
-        help="ISO date; defaults to today in US-Eastern time")
-
-    forecast = commands.add_parser(
-        "forecast", help="pregame learned LR + confidence-gate moneyline slate"
+    clv.add_argument(
+        "--date", default=eastern_today().isoformat(), help="ISO date; defaults to today in US-Eastern time"
     )
+
+    forecast = commands.add_parser("forecast", help="pregame learned LR + confidence-gate moneyline slate")
     forecast.add_argument("--sport", choices=SPORTS + ESPORTS_TITLES)
     forecast.add_argument("--all", action="store_true")
-    forecast.add_argument("--date", default=eastern_today().isoformat(),
-        help="ISO date; defaults to today in US-Eastern time")
+    forecast.add_argument(
+        "--date", default=eastern_today().isoformat(), help="ISO date; defaults to today in US-Eastern time"
+    )
     forecast.add_argument("--log", action="store_true", help="log only rows with exact executable prices")
     forecast.add_argument(
         "--model",
@@ -296,25 +322,39 @@ def parser() -> argparse.ArgumentParser:
         action="store_true",
         help="clear existing open picks for today before re-forecasting (default on daily)",
     )
-    forecast.add_argument("--force", action="store_true", help="bypass event_started guard (for historical backfill)")
+    forecast.add_argument(
+        "--force", action="store_true", help="bypass event_started guard (for historical backfill)"
+    )
 
     flat_forecast = commands.add_parser(
         "flat-forecast", help="forecast every game with no edge gate → flat_picks.xlsx"
     )
     flat_forecast.add_argument("--sport", choices=SPORTS + ESPORTS_TITLES)
     flat_forecast.add_argument("--all", action="store_true")
-    flat_forecast.add_argument("--date", default=eastern_today().isoformat(),
-        help="ISO date; defaults to today in US-Eastern time")
+    flat_forecast.add_argument(
+        "--date", default=eastern_today().isoformat(), help="ISO date; defaults to today in US-Eastern time"
+    )
     flat_forecast.add_argument("--log", action="store_true", help="log all calls to flat ledger")
-    flat_forecast.add_argument("--force", action="store_true", help="bypass event_started guard (for historical backfill)")
+    flat_forecast.add_argument(
+        "--force", action="store_true", help="bypass event_started guard (for historical backfill)"
+    )
+    flat_forecast.add_argument(
+        "--market-blend-policy-artifact",
+        type=Path,
+        help="opt in to a completed Stage 1 MLB-totals policy artifact",
+    )
+    flat_forecast.add_argument(
+        "--market-blend-policy-report",
+        type=Path,
+        help="immutable completed gate report bound to the policy artifact",
+    )
 
     log_cmd = commands.add_parser("log", help="alias for forecast --log")
     log_cmd.add_argument("--sport", choices=SPORTS, default="mlb")
-    log_cmd.add_argument("--date", default=eastern_today().isoformat(),
-        help="ISO date; defaults to today in US-Eastern time")
     log_cmd.add_argument(
-        "--model", choices=("learned", "legacy-measured-edge"), default="learned"
+        "--date", default=eastern_today().isoformat(), help="ISO date; defaults to today in US-Eastern time"
     )
+    log_cmd.add_argument("--model", choices=("learned", "legacy-measured-edge"), default="learned")
 
     settle = commands.add_parser("settle")
     settle.add_argument("--pick-id")
@@ -331,8 +371,9 @@ def parser() -> argparse.ArgumentParser:
     settle.add_argument("--closing-consensus-line", type=float)
 
     daily = commands.add_parser("daily", help="slate + forecast + log + settle + summary in one run")
-    daily.add_argument("--date", default=eastern_today().isoformat(),
-        help="ISO date; defaults to today in US-Eastern time")
+    daily.add_argument(
+        "--date", default=eastern_today().isoformat(), help="ISO date; defaults to today in US-Eastern time"
+    )
     daily.add_argument(
         "--skip-settlement",
         action="store_true",
@@ -341,8 +382,9 @@ def parser() -> argparse.ArgumentParser:
 
     ingest = commands.add_parser("ingest", help="cache one date of ESPN scores locally")
     ingest.add_argument("--sport", required=True, choices=ESPN_SPORTS)
-    ingest.add_argument("--date", default=eastern_today().isoformat(),
-        help="ISO date; defaults to today in US-Eastern time")
+    ingest.add_argument(
+        "--date", default=eastern_today().isoformat(), help="ISO date; defaults to today in US-Eastern time"
+    )
 
     availability = commands.add_parser(
         "wnba-availability-capture",
@@ -381,9 +423,7 @@ def parser() -> argparse.ArgumentParser:
     esports_validate.add_argument(
         "--titles", nargs="+", choices=tuple(TITLE_SPECS), default=tuple(TITLE_SPECS)
     )
-    esports_validate.add_argument(
-        "--output", default="outputs/latest/esports-baseline-validation.json"
-    )
+    esports_validate.add_argument("--output", default="outputs/latest/esports-baseline-validation.json")
     esports_validate.add_argument("--write-artifacts", action="store_true")
 
     esports_forecast = commands.add_parser(
@@ -392,8 +432,9 @@ def parser() -> argparse.ArgumentParser:
     )
     esports_forecast.add_argument("--title", choices=tuple(TITLE_SPECS))
     esports_forecast.add_argument("--all", action="store_true", help="forecast all esports titles")
-    esports_forecast.add_argument("--date", default=eastern_today().isoformat(),
-        help="ISO date; defaults to today in US-Eastern time")
+    esports_forecast.add_argument(
+        "--date", default=eastern_today().isoformat(), help="ISO date; defaults to today in US-Eastern time"
+    )
     esports_forecast.add_argument("--timezone", default="America/New_York")
     esports_forecast.add_argument("--log", action="store_true", help="log forecast to research ledger")
 
@@ -401,9 +442,7 @@ def parser() -> argparse.ArgumentParser:
         "international-baseball-backfill",
         help="backfill official no-key KBO and NPB regular-season results",
     )
-    international_backfill.add_argument(
-        "--league", choices=tuple(INTERNATIONAL_BASEBALL_LEAGUE_SPECS)
-    )
+    international_backfill.add_argument("--league", choices=tuple(INTERNATIONAL_BASEBALL_LEAGUE_SPECS))
     international_backfill.add_argument("--all", action="store_true")
     international_backfill.add_argument("--from", dest="from_date", required=True)
     international_backfill.add_argument("--to", dest="to_date")
@@ -430,8 +469,9 @@ def parser() -> argparse.ArgumentParser:
     international_forecast.add_argument(
         "--league", required=True, choices=tuple(INTERNATIONAL_BASEBALL_LEAGUE_SPECS)
     )
-    international_forecast.add_argument("--date", default=eastern_today().isoformat(),
-        help="ISO date; defaults to today in US-Eastern time")
+    international_forecast.add_argument(
+        "--date", default=eastern_today().isoformat(), help="ISO date; defaults to today in US-Eastern time"
+    )
     international_forecast.add_argument("--timezone")
 
     entities = commands.add_parser("bootstrap-entities", help="merge ESPN team lists into the registry")
@@ -439,8 +479,9 @@ def parser() -> argparse.ArgumentParser:
 
     features = commands.add_parser("features", help="compute point-in-time feature snapshots")
     features.add_argument("--sport", required=True, choices=SPORTS)
-    features.add_argument("--date", default=eastern_today().isoformat(),
-        help="ISO date; defaults to today in US-Eastern time")
+    features.add_argument(
+        "--date", default=eastern_today().isoformat(), help="ISO date; defaults to today in US-Eastern time"
+    )
     features.add_argument("--refresh", action="store_true")
 
     backtest = commands.add_parser("backtest", help="walk-forward chronological backtest")
@@ -517,9 +558,7 @@ def parser() -> argparse.ArgumentParser:
         "refresh-mlb-baselines",
         help="regenerate real MLB park factors and league rates from historical data",
     )
-    mlb_baselines.add_argument(
-        "--force", action="store_true", help="refresh even if the last one was recent"
-    )
+    mlb_baselines.add_argument("--force", action="store_true", help="refresh even if the last one was recent")
     mlb_baselines.add_argument(
         "--min-days", type=float, default=7.0, help="minimum days between refreshes unless --force"
     )
@@ -630,7 +669,9 @@ def parser() -> argparse.ArgumentParser:
             child.add_argument("--review-after")
     ban_commands.add_parser("list")
 
-    collect = commands.add_parser("collect-scores", help="pull recent soccer scores from The Odds API (free tier, last 3 days)")
+    collect = commands.add_parser(
+        "collect-scores", help="pull recent soccer scores from The Odds API (free tier, last 3 days)"
+    )
     collect.add_argument("--days", type=int, default=3, help="days to look back (max 3 on free tier)")
 
     checklist = commands.add_parser(
@@ -669,9 +710,7 @@ def parser() -> argparse.ArgumentParser:
         help="path to JSON/JSONL file with champion predictions",
     )
     compare.add_argument("--sport", required=True, help="sport key (mlb, wnba, etc.)")
-    compare.add_argument(
-        "--market", default="moneyline", help="market type (default: moneyline)"
-    )
+    compare.add_argument("--market", default="moneyline", help="market type (default: moneyline)")
 
     return root
 
@@ -703,11 +742,7 @@ def _polymarket_slate(args, config) -> dict:
         # starts raising SSL EOF connection errors) at 24-32. One flat pool
         # capped at 16 keeps every fetch (30+ leagues) under that ceiling
         # instead of silently multiplying concurrency across nested pools.
-        all_leagues = [
-            (sport, league)
-            for sport in SPORTS
-            for league in POLYMARKET_SPORT_LEAGUES[sport]
-        ]
+        all_leagues = [(sport, league) for sport in SPORTS for league in POLYMARKET_SPORT_LEAGUES[sport]]
 
         def _fetch_league_slate(entry: tuple[str, str]) -> tuple[str, str, list[dict[str, Any]], str | None]:
             sport, league = entry
@@ -890,7 +925,9 @@ def _refresh_esports_ratings(data_root) -> dict:
     # (dashboard_server.production_evidence).
     report_path = PROJECT_ROOT / "outputs/latest/esports-baseline-validation.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(json.dumps(validation, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
+    report_path.write_text(
+        json.dumps(validation, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8"
+    )
     return {"backfill": backfill_results, "validation": validation}
 
 
@@ -903,16 +940,30 @@ def _refresh_international_baseball_ratings(data_root) -> dict:
     backfill_results = {
         league: refresh_recent_international_baseball_matches(data_root, league) for league in leagues
     }
-    validation = validate_all_international_baseball_baselines(
-        data_root, leagues, _research_models_dir()
-    )
+    validation = validate_all_international_baseball_baselines(data_root, leagues, _research_models_dir())
     report_path = PROJECT_ROOT / "outputs/latest/international-baseball-baseline-validation.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(json.dumps(validation, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
+    report_path.write_text(
+        json.dumps(validation, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8"
+    )
     return {"backfill": backfill_results, "validation": validation}
 
 
-def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans, flat_ledger, audit, main_ledger=None) -> dict:
+def _forecast_mlb_totals_flat(
+    args_date: str,
+    log: bool,
+    config,
+    registry,
+    bans,
+    flat_ledger,
+    audit,
+    main_ledger=None,
+    *,
+    blend_policy_artifact_path: str | Path | None = None,
+    blend_policy_report_path: str | Path | None = None,
+    runtime_paths: RuntimePaths | None = None,
+    preflight_only: bool = False,
+) -> dict:
     """MLB total-runs and run-line picks (Measured Edge Monte-Carlo margin +
     totals models) into flat_picks.xlsx + main ledger. Flat logs every
     candidate (no edge gate); Main logs every candidate too (operator
@@ -926,6 +977,24 @@ def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans,
     against is already the main/most-balanced line, not an alternate (see
     mlb_market_odds._select_full_game_market's `_market_balance`).
     """
+    blend_policy: MarketBlendPolicy | None = None
+    if blend_policy_artifact_path is None:
+        if blend_policy_report_path is not None or runtime_paths is not None:
+            raise MarketBlendBlockedError(
+                "blend policy report/runtime paths require an explicit policy artifact"
+            )
+    else:
+        if blend_policy_report_path is None:
+            raise MarketBlendBlockedError("blend activation requires both policy artifact and gate report")
+        runtime_paths = runtime_paths or RuntimePaths.resolve(
+            repo_root=PROJECT_ROOT, require_external_runtime=True
+        )
+        blend_policy = MarketBlendPolicy.load(
+            blend_policy_artifact_path,
+            runtime_paths=runtime_paths,
+            report_path=blend_policy_report_path,
+        )
+
     spec = load_formula_spec(PROJECT_ROOT / "config/models/mlb-analyst-poisson-trend-v0.3.yaml")
     observed_at = utc_now()
     odds_api_key = os.getenv("THE_ODDS_API_KEY")
@@ -949,6 +1018,17 @@ def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans,
         for candidate in candidates
         if candidate.market_type in (MarketType.TOTAL, MarketType.SPREAD)
     ]
+    stage1_config_path = config_path().resolve()
+    try:
+        stage1_config_bytes = stage1_config_path.read_bytes()
+    except OSError:
+        stage1_config_bytes = None
+    stage1_config_byte_sha256 = (
+        hashlib.sha256(stage1_config_bytes).hexdigest() if stage1_config_bytes is not None else None
+    )
+    stage1_config_hash = (
+        canonical_config_logical_hash(stage1_config_bytes) if stage1_config_bytes is not None else None
+    )
     logged, duplicates = [], []
     # DD-2 (deep debug audit, 2026-08-04): main_ledger's secondary write
     # below used to silently drop a duplicate with no trace at all --
@@ -956,8 +1036,95 @@ def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans,
     # except DuplicatePickError catches flat_ledger.append_evaluated, since
     # that call sits outside the suppress block).
     main_duplicates = []
+    planned_rows: list[tuple[PickRequest, Any]] = []
     if log:
         for candidate in totals_candidates:
+            model_artifact_path = (
+                PROJECT_ROOT / "config/models/measured-edge-totals-v3.json"
+                if candidate.market_type is MarketType.TOTAL
+                else PROJECT_ROOT / "config/models/measured-edge-margin-v3.json"
+            ).resolve()
+            try:
+                model_artifact_bytes = model_artifact_path.read_bytes()
+            except OSError:
+                model_artifact_bytes = None
+            raw_model_probability = candidate.shrunk_probability
+            market_probability = implied_probability(candidate.american_odds)
+            if (
+                candidate.market_snapshot_archive_path is not None
+                and candidate.market_snapshot_record_id is not None
+            ):
+                try:
+                    load_verified_mlb_market_snapshot(
+                        archive_path=candidate.market_snapshot_archive_path,
+                        record_id=candidate.market_snapshot_record_id,
+                        approved_roots=(market_odds_snapshot_path(config).resolve().parent,),
+                        expected_snapshot_hash=candidate.market_snapshot_hash,
+                        event_id=candidate.event_id,
+                        observed_at_utc=candidate.observed_at_utc,
+                        provider=candidate.sportsbook,
+                        market_type=candidate.market_type.value,
+                        selection=candidate.selection,
+                        line=candidate.line,
+                        american_odds=candidate.american_odds,
+                    )
+                except ValueError as exc:
+                    if blend_policy is not None:
+                        raise MarketBlendBlockedError(
+                            f"archived market snapshot verification failed: {exc}"
+                        ) from exc
+            serving_probability = raw_model_probability
+            blend_weight = None
+            blend_policy_hash = None
+            blend_spec_hash = None
+            if blend_policy is not None and candidate.market_type is MarketType.TOTAL:
+                try:
+                    snapshot_hash_valid = (
+                        isinstance(candidate.market_snapshot_hash, str)
+                        and len(candidate.market_snapshot_hash) == 64
+                        and int(candidate.market_snapshot_hash, 16) >= 0
+                    )
+                except ValueError:
+                    snapshot_hash_valid = False
+                if not snapshot_hash_valid:
+                    raise MarketBlendBlockedError(
+                        "exact market snapshot SHA-256 is missing or invalid at the decision boundary"
+                    )
+                if (
+                    candidate.market_quote_timestamp_valid is not True
+                    or candidate.market_quote_source != "polymarket_us"
+                    or candidate.market_quote_provenance != "decision_time_executable_quote"
+                    or candidate.market_quote_reconstructed is not False
+                ):
+                    raise MarketBlendBlockedError(
+                        "decision-time market quote provenance is not serving-qualified"
+                    )
+                if model_artifact_bytes is None:
+                    raise MarketBlendBlockedError("measured-edge totals artifact bytes are unavailable")
+                try:
+                    model_artifact_raw = json.loads(model_artifact_bytes)
+                except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                    raise MarketBlendBlockedError("measured-edge totals artifact is not valid JSON") from exc
+                semantic_hash = canonical_mlb_artifact_hash(model_artifact_raw)
+                if (
+                    semantic_hash != candidate.model_artifact_hash
+                    or model_artifact_raw.get("artifact_hash") != semantic_hash
+                ):
+                    raise MarketBlendBlockedError(
+                        "candidate and measured-edge totals artifact identities differ"
+                    )
+                blend_audit = blend_policy.apply(
+                    sport="mlb",
+                    market="total",
+                    model_probability=raw_model_probability,
+                    market_probability=market_probability,
+                    model_artifact_hash=semantic_hash,
+                    config_hash=stage1_config_hash,
+                )
+                serving_probability = blend_audit.blended_probability
+                blend_weight = blend_audit.weight
+                blend_policy_hash = blend_audit.policy_artifact_hash
+                blend_spec_hash = blend_audit.experiment_spec_hash
             request = PickRequest(
                 event_start_utc=candidate.event_start_utc,
                 event_id=candidate.event_id,
@@ -969,7 +1136,7 @@ def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans,
                 line=candidate.line,
                 sportsbook=candidate.sportsbook,
                 american_odds=candidate.american_odds,
-                model_probability=candidate.shrunk_probability,
+                model_probability=serving_probability,
                 model_uncertainty=candidate.uncertainty,
                 model_version=candidate.model_version,
                 rationale=candidate.rationale,
@@ -985,13 +1152,38 @@ def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans,
                 entity_map_version=registry.version,
                 code_revision="measured-edge-paired-v1",
                 decision_no_vig_probability=candidate.no_vig_probability,
+                config_hash=stage1_config_hash,
+                config_byte_sha256=stage1_config_byte_sha256,
+                config_path=str(stage1_config_path),
+                model_artifact_byte_sha256=(
+                    hashlib.sha256(model_artifact_bytes).hexdigest()
+                    if model_artifact_bytes is not None
+                    else None
+                ),
+                model_artifact_path=str(model_artifact_path),
+                market_quote_observed_at_utc=candidate.observed_at_utc,
+                market_quote_timestamp_valid=candidate.market_quote_timestamp_valid,
+                market_quote_source=candidate.market_quote_source,
+                market_quote_provenance=candidate.market_quote_provenance,
+                market_quote_reconstructed=candidate.market_quote_reconstructed,
+                market_snapshot_hash=candidate.market_snapshot_hash,
+                market_snapshot_archive_path=candidate.market_snapshot_archive_path,
+                market_snapshot_record_id=candidate.market_snapshot_record_id,
+                record_source="live_forecast",
+                is_backfill=False,
+                model_probability_raw=raw_model_probability,
+                market_probability_at_decision=market_probability,
+                serving_probability=serving_probability,
+                blend_weight=blend_weight,
+                blend_policy_artifact_hash=blend_policy_hash,
+                blend_experiment_spec_hash=blend_spec_hash,
+                blend_config_hash=(stage1_config_hash if blend_policy is not None else None),
             )
             try:
                 request.validate(now=observed_at)
                 away = registry.resolve(request.league, request.away_team, request.event_start_utc)
                 home = registry.resolve(request.league, request.home_team, request.event_start_utc)
-                # Exposure check and append happen inside one held lock -- see
-                # the matching comment in _log_esports_forecast.
+                # Preflight computes every decision before any ledger mutation.
                 with _LEDGER_LOCK:
                     eligibility = evaluate_eligibility(
                         request,
@@ -1005,20 +1197,26 @@ def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans,
                         unit_policy(config),
                         now=observed_at,
                     )
-                    # Flat: every evaluated candidate is logged, no edge gate.
+                planned_rows.append((request, eligibility))
+            except (EntityResolutionError, ValueError) as error:
+                if preflight_only or blend_policy is not None:
+                    raise MarketBlendBlockedError(
+                        f"MLB totals preflight failed for {candidate.event_id}: {error}"
+                    ) from error
+                skipped.append({"event_id": candidate.event_id, "reason": str(error)[:200]})
+        if not preflight_only:
+            for request, eligibility in planned_rows:
+                try:
                     logged.append(flat_ledger.append_evaluated(request, eligibility, now=observed_at))
-                    # Main: only genuinely eligible (CALL) rows — operator directive 2026-08-03.
                     if main_ledger is not None and eligibility.decision == "CALL":
                         existing_pick_id = _append_secondary_ledger(
                             main_ledger, request, eligibility, observed_at, "mlb_totals:main_ledger"
                         )
                         if existing_pick_id is not None:
                             main_duplicates.append(existing_pick_id)
-            except DuplicatePickError as error:
-                duplicates.append(error.pick_id)
-            except (EntityResolutionError, ValueError) as error:
-                skipped.append({"event_id": candidate.event_id, "reason": str(error)[:200]})
-    return {
+                except DuplicatePickError as error:
+                    duplicates.append(error.pick_id)
+    result = {
         "sport": "mlb_totals",
         "model_name": "Measured Edge Totals + Spread",
         "model_versions": ["measured-edge-totals-v3", "measured-edge-margin-v3"],
@@ -1038,6 +1236,44 @@ def _forecast_mlb_totals_flat(args_date: str, log: bool, config, registry, bans,
             "separately by the learned production path."
         ),
     }
+    if preflight_only:
+        result["_prepared_rows"] = planned_rows
+        result["_observed_at"] = observed_at
+    return result
+
+
+def _commit_preflighted_mlb_totals(
+    preflight: dict[str, Any], flat_ledger, main_ledger=None
+) -> dict[str, Any]:
+    """Persist a fully validated plan without rebuilding external inputs."""
+    planned_rows = preflight["_prepared_rows"]
+    observed_at = preflight["_observed_at"]
+    logged = []
+    duplicates = []
+    main_duplicates = []
+    for request, eligibility in planned_rows:
+        try:
+            logged.append(flat_ledger.append_evaluated(request, eligibility, now=observed_at))
+            if main_ledger is not None and eligibility.decision == "CALL":
+                duplicate = _append_secondary_ledger(
+                    main_ledger,
+                    request,
+                    eligibility,
+                    observed_at,
+                    "mlb_totals:main_ledger",
+                )
+                if duplicate is not None:
+                    main_duplicates.append(duplicate)
+        except DuplicatePickError as error:
+            duplicates.append(error.pick_id)
+    result = {key: value for key, value in preflight.items() if not key.startswith("_")}
+    result.update(
+        logged=len(logged),
+        logged_pick_ids=[row["pick_id"] for row in logged],
+        duplicate_pick_ids=duplicates,
+        main_ledger_duplicate_event_ids=main_duplicates,
+    )
+    return result
 
 
 def _select_wnba_spread_market(rows: list[dict]) -> dict | None:
@@ -1047,8 +1283,7 @@ def _select_wnba_spread_market(rows: list[dict]) -> dict | None:
     alternate lines, adapted to this snapshot format's embedded long/short
     asks instead of a two-sided quote list."""
     candidates = [
-        row for row in rows
-        if isinstance(row.get("long"), dict) and row["long"].get("ask") is not None
+        row for row in rows if isinstance(row.get("long"), dict) and row["long"].get("ask") is not None
     ]
     if not candidates:
         return None
@@ -1118,7 +1353,8 @@ def _forecast_wnba_spread_slate(data_root, args_date: str, client) -> dict:
         # happens the same way every other sport in this project matches a
         # Polymarket quote to an ESPN event).
         candidates = [
-            row for row in spread_rows
+            row
+            for row in spread_rows
             if _team_matches(away_team, str(row.get("team") or ""))
             and str(row.get("event_start_utc") or "")[:16] == str(event["date"])[:16]
         ]
@@ -1137,9 +1373,7 @@ def _forecast_wnba_spread_slate(data_root, args_date: str, client) -> dict:
         )
         market_by_event_id[event_id] = market
 
-    predictions = [
-        p for p in model.predict_games(history, upcoming) if p.market_type == "spread"
-    ]
+    predictions = [p for p in model.predict_games(history, upcoming) if p.market_type == "spread"]
 
     priced_contracts = []
     for prediction in predictions:
@@ -1191,7 +1425,14 @@ def _forecast_wnba_spread_slate(data_root, args_date: str, client) -> dict:
 
 
 def _forecast_wnba_spread_sport(
-    *, data_root, args_date: str, config: dict, registry, bans, main_ledger=None, flat_ledger=None,
+    *,
+    data_root,
+    args_date: str,
+    config: dict,
+    registry,
+    bans,
+    main_ledger=None,
+    flat_ledger=None,
 ) -> dict:
     """Log WNBA spread picks to Main (CALL only) + Flat (every candidate) --
     same routing MLB spread/total uses (operator directive, 2026-08-03: MLB
@@ -1233,10 +1474,7 @@ def _forecast_wnba_spread_sport(
             model_probability=contract["model_probability"],
             model_uncertainty=contract["model_uncertainty"],
             model_version=contract["model_version"],
-            rationale=(
-                f"{contract['rationale']} Executable ask {ask:.4f} "
-                f"({contract['market_slug']})."
-            ),
+            rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
             risks="Research-baseline margin-normal spread model; not yet locked-holdout qualified.",
             model_origin=ModelOrigin.STATISTICAL_MODEL,
             model_state=ModelState.RESEARCH,
@@ -1265,16 +1503,21 @@ def _forecast_wnba_spread_sport(
                     unit_policy(config),
                     now=observed_now,
                 )
-                if flat_ledger is not None and _append_secondary_ledger(
-                    flat_ledger, request, eligibility, observed_now, "wnba_spread:flat_ledger"
-                ) is not None:
+                if (
+                    flat_ledger is not None
+                    and _append_secondary_ledger(
+                        flat_ledger, request, eligibility, observed_now, "wnba_spread:flat_ledger"
+                    )
+                    is not None
+                ):
                     duplicates.append(contract["event_id"])
                 if (
                     main_ledger is not None
                     and eligibility.decision == "CALL"
                     and _append_secondary_ledger(
                         main_ledger, request, eligibility, observed_now, "wnba_spread:main_ledger"
-                    ) is not None
+                    )
+                    is not None
                 ):
                     main_duplicates.append(contract["event_id"])
             logged.append(contract["event_id"])
@@ -1340,9 +1583,7 @@ def _forecast_learned_sport(
     confusing, since main's rows are always a subset of flat's candidates.
     """
     decision_observed_at = observed_at or (
-        utc_now()
-        if not force
-        else datetime.strptime(args_date, "%Y-%m-%d").replace(tzinfo=UTC)
+        utc_now() if not force else datetime.strptime(args_date, "%Y-%m-%d").replace(tzinfo=UTC)
     )
     model_config = config["models"][sport.upper()]
     residual_model = _load_market_residual_model(config)
@@ -1373,7 +1614,7 @@ def _forecast_learned_sport(
             observed_at=decision_observed_at,
             leagues=tuple(configured_leagues) if configured_leagues else None,
         )
-    except ValueError as error:
+    except (OSError, ValueError) as error:
         return {
             "sport": sport,
             "status": "forecast_unavailable",
@@ -1451,8 +1692,10 @@ def _forecast_learned_sport(
                     )
                 else:
                     unmatched.append(
-                        {"event_id": candidate.event_id,
-                         "reason": "no stored executable moneyline BBO matched this matchup"}
+                        {
+                            "event_id": candidate.event_id,
+                            "reason": "no stored executable moneyline BBO matched this matchup",
+                        }
                     )
                     continue
             elif not bool(quote.get("timestamp_valid", False)):
@@ -1494,14 +1737,20 @@ def _forecast_learned_sport(
                 min_edge = float(model_config.get("min_edge", 0.02))
                 model_edge = candidate.model_probability - quote["executable_ask"]
                 if model_edge < min_edge:
-                    edge_pct = f"{min_edge*100:.0f}%"
+                    edge_pct = f"{min_edge * 100:.0f}%"
                     edge_blocked.append(
-                        {"event_id": candidate.event_id,
-                         "reason": f"model edge {model_edge:.4f} below {edge_pct} minimum over executable ask {quote['executable_ask']:.4f} — logged anyway, operator review"}
+                        {
+                            "event_id": candidate.event_id,
+                            "reason": f"model edge {model_edge:.4f} below {edge_pct} minimum over executable ask {quote['executable_ask']:.4f} — logged anyway, operator review",
+                        }
                     )
             # Convert UTC event time to Eastern for consistent ledger display
             try:
-                event_et = datetime.fromisoformat(candidate.event_start_utc).astimezone(EASTERN).strftime('%Y-%m-%dT%H:%M:%S%z')
+                event_et = (
+                    datetime.fromisoformat(candidate.event_start_utc)
+                    .astimezone(EASTERN)
+                    .strftime("%Y-%m-%dT%H:%M:%S%z")
+                )
             except (ValueError, TypeError):
                 event_et = candidate.event_start_utc
             if quote is not None:
@@ -1516,11 +1765,7 @@ def _forecast_learned_sport(
                 )
             else:
                 american_odds = -110
-                sportsbook = (
-                    "model_opinion_no_executable_quote"
-                    if quote_warning
-                    else "espn"
-                )
+                sportsbook = "model_opinion_no_executable_quote" if quote_warning else "espn"
                 observed_at_utc = iso_utc(effective_now) if quote_warning else None
                 decision_no_vig = None
                 rationale = (
@@ -1534,9 +1779,7 @@ def _forecast_learned_sport(
                     )
             row_unavailable_features = tuple(candidate.unavailable_features)
             if quote_warning:
-                row_unavailable_features = tuple(
-                    dict.fromkeys((*row_unavailable_features, quote_warning))
-                )
+                row_unavailable_features = tuple(dict.fromkeys((*row_unavailable_features, quote_warning)))
             if row_unavailable_features:
                 # Never a reason to drop the game — just a visible note that
                 # one input defaulted to neutral instead of using its real
@@ -1588,9 +1831,7 @@ def _forecast_learned_sport(
                 starter_era_gap=candidate.feature_basis.get("starter_era_gap"),
                 market_residual_probability=market_residual_probability,
                 unavailable_features=(
-                    ",".join(row_unavailable_features)
-                    if row_unavailable_features
-                    else None
+                    ",".join(row_unavailable_features) if row_unavailable_features else None
                 ),
             )
             try:
@@ -1606,12 +1847,16 @@ def _forecast_learned_sport(
                 # the matching comment in _log_esports_forecast.
                 with _LEDGER_LOCK:
                     eligibility = evaluate_eligibility(
-                        request, registry, bans,
+                        request,
+                        registry,
+                        bans,
                         (exposure_ledger or ledger).exposure(
-                            request, now=effective_now,
+                            request,
+                            now=effective_now,
                             canonical_team_ids=(away.canonical_team_id, home.canonical_team_id),
                         ),
-                        unit_policy(config), **eligibility_kwargs,
+                        unit_policy(config),
+                        **eligibility_kwargs,
                     )
                     if quote_warning and eligibility.decision == "CALL":
                         eligibility = replace(
@@ -1702,7 +1947,9 @@ def _forecast_learned_sport(
     return {
         "sport": sport,
         "status": "learned_forecast_complete",
-        "model_version": candidates[0].model_version if candidates else model_config.get("active_production_version", "unknown"),
+        "model_version": candidates[0].model_version
+        if candidates
+        else model_config.get("active_production_version", "unknown"),
         "artifact": str(artifact_path),
         "game_date": args_date,
         "scheduled_games": scheduled,
@@ -1741,6 +1988,7 @@ def _log_esports_forecast(
     count of logged rows.
     """
     from .data_sources.polymarket_us import probability_to_american
+
     logged = 0
     errors: list[dict] = []
     # DD-2 (deep debug audit, 2026-08-04): see _append_secondary_ledger's
@@ -1819,8 +2067,7 @@ def _log_esports_forecast(
             model_uncertainty=None,
             model_version=str(forecast["model_version"]),
             rationale=(
-                f"Neutral Elo baseline; executable ask {ask:.4f} "
-                f"(market_slug={contract['market_slug']})."
+                f"Neutral Elo baseline; executable ask {ask:.4f} (market_slug={contract['market_slug']})."
             ),
             risks="Config-promoted esports baseline; gates enforced at log time.",
             model_origin=ModelOrigin.STATISTICAL_MODEL,
@@ -1857,16 +2104,25 @@ def _log_esports_forecast(
                 genuinely_eligible = eligibility.decision == "CALL"
                 ledger.append_evaluated(request, eligibility, now=observed_now)
                 # Flat: every candidate, no edge gate (operator directive 2026-08-03).
-                if flat_ledger is not None and _append_secondary_ledger(
-                    flat_ledger, request, eligibility, observed_now, f"{title}:flat_ledger"
-                ) is not None:
+                if (
+                    flat_ledger is not None
+                    and _append_secondary_ledger(
+                        flat_ledger, request, eligibility, observed_now, f"{title}:flat_ledger"
+                    )
+                    is not None
+                ):
                     flat_duplicates += 1
                 # gated_ledger: curated subset of rows evaluate_esports_eligibility
                 # genuinely approved as a real call. Same relationship
                 # flat_picks.xlsx has to picks.xlsx, for research-only sports.
-                if gated_ledger is not None and genuinely_eligible and _append_secondary_ledger(
-                    gated_ledger, request, eligibility, observed_now, f"{title}:gated_ledger"
-                ) is not None:
+                if (
+                    gated_ledger is not None
+                    and genuinely_eligible
+                    and _append_secondary_ledger(
+                        gated_ledger, request, eligibility, observed_now, f"{title}:gated_ledger"
+                    )
+                    is not None
+                ):
                     gated_duplicates += 1
             logged += 1
         except DuplicatePickError as error:
@@ -1877,7 +2133,8 @@ def _log_esports_forecast(
             primary_duplicates += 1
             logger.debug(
                 "%s: duplicate suppressed for existing pick %s (primary ledger)",
-                title, error.pick_id,
+                title,
+                error.pick_id,
             )
             continue
         except (ValueError, KeyError) as error:
@@ -1886,13 +2143,17 @@ def _log_esports_forecast(
             # zero real predictions for a day with nothing surfaced anywhere
             # (see the KBO/NPB timestamp-ordering incident in DEBUG.md for
             # how bad a silent per-contract swallow can get).
-            errors.append({
-                "event_id": contract.get("event_id"),
-                "reason": f"{type(error).__name__}: {error}",
-            })
+            errors.append(
+                {
+                    "event_id": contract.get("event_id"),
+                    "reason": f"{type(error).__name__}: {error}",
+                }
+            )
             logger.warning(
                 "esports forecast logging failed for event %s (%s): %s",
-                contract.get("event_id"), title, error,
+                contract.get("event_id"),
+                title,
+                error,
             )
             continue
 
@@ -1939,7 +2200,10 @@ def _forecast_international_sport(
     MINIMUM_TEAM_GAMES = 10
     configured_state = str(model_config.get("status", "research"))
     forecast = forecast_international_baseball_slate(
-        data_root, artifact_dir, league, args_date,
+        data_root,
+        artifact_dir,
+        league,
+        args_date,
     )
     # Captured AFTER the slate builder, not before: forecast_international_
     # baseball_slate stamps each contract's own observed_at_utc with ITS OWN
@@ -2047,13 +2311,22 @@ def _forecast_international_sport(
                 genuinely_eligible = eligibility.decision == "CALL"
                 research_ledger.append_evaluated(request, eligibility, now=observed_now)
                 # Flat: every candidate, no edge gate (operator directive 2026-08-03).
-                if flat_ledger is not None and _append_secondary_ledger(
-                    flat_ledger, request, eligibility, observed_now, f"{league_upper}:flat_ledger"
-                ) is not None:
+                if (
+                    flat_ledger is not None
+                    and _append_secondary_ledger(
+                        flat_ledger, request, eligibility, observed_now, f"{league_upper}:flat_ledger"
+                    )
+                    is not None
+                ):
                     flat_duplicates += 1
-                if gated_ledger is not None and genuinely_eligible and _append_secondary_ledger(
-                    gated_ledger, request, eligibility, observed_now, f"{league_upper}:gated_ledger"
-                ) is not None:
+                if (
+                    gated_ledger is not None
+                    and genuinely_eligible
+                    and _append_secondary_ledger(
+                        gated_ledger, request, eligibility, observed_now, f"{league_upper}:gated_ledger"
+                    )
+                    is not None
+                ):
                     gated_duplicates += 1
             logged += 1
         except DuplicatePickError as error:
@@ -2064,19 +2337,24 @@ def _forecast_international_sport(
             research_duplicates += 1
             logger.debug(
                 "%s: duplicate suppressed for existing pick %s (research_ledger)",
-                league_upper, error.pick_id,
+                league_upper,
+                error.pick_id,
             )
             continue
         except (ValueError, KeyError) as error:
             # Record the failure instead of silently discarding it -- see
             # the matching comment in _log_esports_forecast.
-            errors.append({
-                "event_id": contract.get("event_id"),
-                "reason": f"{type(error).__name__}: {error}",
-            })
+            errors.append(
+                {
+                    "event_id": contract.get("event_id"),
+                    "reason": f"{type(error).__name__}: {error}",
+                }
+            )
             logger.warning(
                 "international baseball forecast logging failed for event %s (%s): %s",
-                contract.get("event_id"), league_upper, error,
+                contract.get("event_id"),
+                league_upper,
+                error,
             )
             continue
     forecast["logged"] = logged
@@ -2126,6 +2404,7 @@ def _forecast_soccer_sport(
     for any actual order on these rows.
     """
     from .data_sources.polymarket_us import probability_to_american
+
     model_config = config["models"].get("SOCCER", {})
     forecast = build_soccer_total_slate(
         data_root=data_root,
@@ -2181,9 +2460,7 @@ def _forecast_soccer_sport(
     errors: list[dict] = []
     for contract in forecast.get("priced_contracts", []):
         ask = float(contract["executable_ask"])
-        min_team_games = float(
-            (contract.get("feature_basis") or {}).get("min_team_games", 0.0)
-        )
+        min_team_games = float((contract.get("feature_basis") or {}).get("min_team_games", 0.0))
         model_inputs_valid = min_team_games >= MINIMUM_TEAM_GAMES
         request = PickRequest(
             event_start_utc=str(contract["event_start_utc"]),
@@ -2199,14 +2476,8 @@ def _forecast_soccer_sport(
             model_probability=float(contract["model_probability"]),
             model_uncertainty=float(contract["model_uncertainty"]),
             model_version=str(contract["model_version"]),
-            rationale=(
-                f"{contract['rationale']} Executable ask {ask:.4f} "
-                f"({contract['market_slug']})."
-            ),
-            risks=(
-                "Research-only soccer score model; draw-aware, but not yet "
-                "locked-holdout qualified."
-            ),
+            rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
+            risks=("Research-only soccer score model; draw-aware, but not yet locked-holdout qualified."),
             model_origin=ModelOrigin.STATISTICAL_MODEL,
             model_state=ModelState(configured_state),
             observed_at_utc=str(contract["observed_at_utc"]),
@@ -2230,9 +2501,7 @@ def _forecast_soccer_sport(
                     minimum_edge=min_edge,
                     minimum_confidence=research_confidence_gate,
                     now=observed_now,
-                    maximum_age_hours=float(
-                        config["project"].get("maximum_data_age_hours", 12)
-                    ),
+                    maximum_age_hours=float(config["project"].get("maximum_data_age_hours", 12)),
                     maximum_unreviewed_disagreement=float(
                         config["project"].get(
                             "maximum_unreviewed_market_disagreement",
@@ -2241,14 +2510,21 @@ def _forecast_soccer_sport(
                     ),
                 )
                 genuinely_eligible = eligibility.decision == "CALL"
-                if research_ledger is not None and _append_secondary_ledger(
-                    research_ledger, request, eligibility, observed_now, "soccer:research_ledger"
-                ) is not None:
+                if (
+                    research_ledger is not None
+                    and _append_secondary_ledger(
+                        research_ledger, request, eligibility, observed_now, "soccer:research_ledger"
+                    )
+                    is not None
+                ):
                     research_duplicates += 1
                 if gated_ledger is not None and genuinely_eligible:
-                    if _append_secondary_ledger(
-                        gated_ledger, request, eligibility, observed_now, "soccer:gated_ledger"
-                    ) is None:
+                    if (
+                        _append_secondary_ledger(
+                            gated_ledger, request, eligibility, observed_now, "soccer:gated_ledger"
+                        )
+                        is None
+                    ):
                         gated += 1
                     else:
                         gated_duplicates += 1
@@ -2256,9 +2532,12 @@ def _forecast_soccer_sport(
                     # Flat: log every priced contract regardless of
                     # eligibility, same "show everything" semantics flat
                     # mode uses for every other sport.
-                    if _append_secondary_ledger(
-                        flat_ledger, request, eligibility, observed_now, "soccer:flat_ledger"
-                    ) is None:
+                    if (
+                        _append_secondary_ledger(
+                            flat_ledger, request, eligibility, observed_now, "soccer:flat_ledger"
+                        )
+                        is None
+                    ):
                         flat_logged += 1
                     else:
                         flat_duplicates += 1
@@ -2267,9 +2546,12 @@ def _forecast_soccer_sport(
                     # result, same "only when genuinely eligible" gate. See
                     # this function's docstring: inert until soccer is
                     # promoted past status: research in config/model.yaml.
-                    if _append_secondary_ledger(
-                        main_ledger, request, eligibility, observed_now, "soccer:main_ledger"
-                    ) is None:
+                    if (
+                        _append_secondary_ledger(
+                            main_ledger, request, eligibility, observed_now, "soccer:main_ledger"
+                        )
+                        is None
+                    ):
                         main_logged += 1
                     else:
                         main_duplicates += 1
@@ -2279,13 +2561,16 @@ def _forecast_soccer_sport(
         except (KeyError, ValueError) as error:
             # Record the failure instead of silently discarding it -- see
             # the matching comment in _log_esports_forecast.
-            errors.append({
-                "event_id": contract.get("event_id"),
-                "reason": f"{type(error).__name__}: {error}",
-            })
+            errors.append(
+                {
+                    "event_id": contract.get("event_id"),
+                    "reason": f"{type(error).__name__}: {error}",
+                }
+            )
             logger.warning(
                 "soccer forecast logging failed for event %s: %s",
-                contract.get("event_id"), error,
+                contract.get("event_id"),
+                error,
             )
             continue
     forecast["logged"] = logged
@@ -2329,6 +2614,7 @@ def _forecast_tennis_sport(
     --manual-research-order for any actual order on these rows.
     """
     from .data_sources.polymarket_us import probability_to_american
+
     model_config = config["models"].get("TENNIS", {})
     forecast = build_tennis_slate(
         data_root=data_root,
@@ -2373,9 +2659,7 @@ def _forecast_tennis_sport(
     errors: list[dict] = []
     for contract in forecast.get("priced_contracts", []):
         ask = float(contract["executable_ask"])
-        min_player_matches = float(
-            (contract.get("feature_basis") or {}).get("min_player_matches", 0.0)
-        )
+        min_player_matches = float((contract.get("feature_basis") or {}).get("min_player_matches", 0.0))
         model_inputs_valid = min_player_matches >= MINIMUM_PLAYER_MATCHES
         request = PickRequest(
             event_start_utc=str(contract["event_start_utc"]),
@@ -2391,10 +2675,7 @@ def _forecast_tennis_sport(
             model_probability=float(contract["model_probability"]),
             model_uncertainty=float(contract["model_uncertainty"]),
             model_version=str(contract["model_version"]),
-            rationale=(
-                f"{contract['rationale']} Executable ask {ask:.4f} "
-                f"({contract['market_slug']})."
-            ),
+            rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
             risks=(
                 "Surface-blended Elo model; singles only, WTA+ATP market "
                 "coverage, not yet locked-holdout qualified -- promoted by "
@@ -2423,9 +2704,7 @@ def _forecast_tennis_sport(
                     minimum_edge=min_edge,
                     minimum_confidence=research_confidence_gate,
                     now=observed_now,
-                    maximum_age_hours=float(
-                        config["project"].get("maximum_data_age_hours", 12)
-                    ),
+                    maximum_age_hours=float(config["project"].get("maximum_data_age_hours", 12)),
                     maximum_unreviewed_disagreement=float(
                         config["project"].get(
                             "maximum_unreviewed_market_disagreement",
@@ -2434,14 +2713,21 @@ def _forecast_tennis_sport(
                     ),
                 )
                 genuinely_eligible = eligibility.decision == "CALL"
-                if research_ledger is not None and _append_secondary_ledger(
-                    research_ledger, request, eligibility, observed_now, "tennis:research_ledger"
-                ) is not None:
+                if (
+                    research_ledger is not None
+                    and _append_secondary_ledger(
+                        research_ledger, request, eligibility, observed_now, "tennis:research_ledger"
+                    )
+                    is not None
+                ):
                     research_duplicates += 1
                 if gated_ledger is not None and genuinely_eligible:
-                    if _append_secondary_ledger(
-                        gated_ledger, request, eligibility, observed_now, "tennis:gated_ledger"
-                    ) is None:
+                    if (
+                        _append_secondary_ledger(
+                            gated_ledger, request, eligibility, observed_now, "tennis:gated_ledger"
+                        )
+                        is None
+                    ):
                         gated += 1
                     else:
                         gated_duplicates += 1
@@ -2449,16 +2735,22 @@ def _forecast_tennis_sport(
                     # Flat: log every priced contract regardless of
                     # eligibility, same "show everything" semantics flat
                     # mode uses for every other sport.
-                    if _append_secondary_ledger(
-                        flat_ledger, request, eligibility, observed_now, "tennis:flat_ledger"
-                    ) is None:
+                    if (
+                        _append_secondary_ledger(
+                            flat_ledger, request, eligibility, observed_now, "tennis:flat_ledger"
+                        )
+                        is None
+                    ):
                         flat_logged += 1
                     else:
                         flat_duplicates += 1
                 if main_ledger is not None and genuinely_eligible:
-                    if _append_secondary_ledger(
-                        main_ledger, request, eligibility, observed_now, "tennis:main_ledger"
-                    ) is None:
+                    if (
+                        _append_secondary_ledger(
+                            main_ledger, request, eligibility, observed_now, "tennis:main_ledger"
+                        )
+                        is None
+                    ):
                         main_logged += 1
                     else:
                         main_duplicates += 1
@@ -2468,13 +2760,16 @@ def _forecast_tennis_sport(
         except (KeyError, ValueError) as error:
             # Record the failure instead of silently discarding it -- see
             # the matching comment in _log_esports_forecast.
-            errors.append({
-                "event_id": contract.get("event_id"),
-                "reason": f"{type(error).__name__}: {error}",
-            })
+            errors.append(
+                {
+                    "event_id": contract.get("event_id"),
+                    "reason": f"{type(error).__name__}: {error}",
+                }
+            )
             logger.warning(
                 "tennis forecast logging failed for event %s: %s",
-                contract.get("event_id"), error,
+                contract.get("event_id"),
+                error,
             )
             continue
     forecast["logged"] = logged
@@ -2658,7 +2953,12 @@ def _find_espn_result(espn: ESPNClient, leagues, game_day: str, row) -> dict | N
         try:
             scoreboard = espn.scoreboard(league, game_day)
         except Exception:
-            logger.warning("ESPN scoreboard fetch failed for %s on %s; settlement skipping this league", league, game_day, exc_info=True)
+            logger.warning(
+                "ESPN scoreboard fetch failed for %s on %s; settlement skipping this league",
+                league,
+                game_day,
+                exc_info=True,
+            )
             continue
         for event in scoreboard.get("events", []):
             competition = (event.get("competitions") or [{}])[0]
@@ -2778,7 +3078,12 @@ def _settle_esports_pick(row: dict, ledger, data_root=None) -> dict | None:
         market = client.market(slug)
         book = client.book(slug)
     except Exception:
-        logger.warning("Polymarket market/book fetch failed for slug %s; pick %s stays unsettled", slug, row.get("pick_id"), exc_info=True)
+        logger.warning(
+            "Polymarket market/book fetch failed for slug %s; pick %s stays unsettled",
+            slug,
+            row.get("pick_id"),
+            exc_info=True,
+        )
         return None
     if str(book.get("state") or "") not in _TERMINAL_MARKET_STATES:
         return None
@@ -2911,7 +3216,9 @@ def _find_tennis_result(espn: ESPNClient, game_day: str, row: dict) -> dict | No
         except Exception:
             logger.warning(
                 "ESPN %s scoreboard fetch failed for %s; tennis settlement skipping this tour",
-                tour, game_day, exc_info=True,
+                tour,
+                game_day,
+                exc_info=True,
             )
             continue
         for event in scoreboard.get("events", []):
@@ -3028,7 +3335,10 @@ def _find_soccer_result(
     away_names = {str(row.get("away_team", "")).casefold(), str(row.get("original_away_team", "")).casefold()}
     home_names = {str(row.get("home_team", "")).casefold(), str(row.get("original_home_team", "")).casefold()}
     for game in scores.values():
-        if str(game.get("away_team", "")).casefold() in away_names and str(game.get("home_team", "")).casefold() in home_names:
+        if (
+            str(game.get("away_team", "")).casefold() in away_names
+            and str(game.get("home_team", "")).casefold() in home_names
+        ):
             try:
                 return {
                     "status_name": "STATUS_FINAL",
@@ -3334,9 +3644,7 @@ def main(argv: list[str] | None = None) -> None:
                         "game_date": contract_day if day_separator else args.date,
                     }
                 )
-            output = refresh_contract_snapshots(
-                PolymarketUSClient(), contracts, data_root, args.date
-            )
+            output = refresh_contract_snapshots(PolymarketUSClient(), contracts, data_root, args.date)
         elif args.command == "polymarket-clv":
             if not 0 < args.decision_price < 1:
                 raise ValueError("decision price must be between 0 and 1")
@@ -3389,6 +3697,34 @@ def main(argv: list[str] | None = None) -> None:
             # too, with nothing in this run to regenerate them. See
             # _clear_today_open's docstring for the 2026-08-03 incident.
             main_ledger_sport_scope = {s.casefold() for s in sports} & set(MAIN_LEDGER_SPORTS)
+            blend_artifact_path = getattr(args, "market_blend_policy_artifact", None)
+            blend_report_path = getattr(args, "market_blend_policy_report", None)
+            if (blend_artifact_path is None) != (blend_report_path is None):
+                raise MarketBlendBlockedError(
+                    "blend activation requires both policy artifact and gate report"
+                )
+            if blend_artifact_path is not None and (
+                not is_flat or getattr(args, "all", False) or sports != ["mlb"]
+            ):
+                raise MarketBlendBlockedError(
+                    "Stage 1 blend flags are supported only by flat-forecast --sport mlb"
+                )
+            mlb_totals_preflight = None
+            flat_rows_before_mlb_replace = None
+            if is_flat and sports == ["mlb"]:
+                flat_rows_before_mlb_replace = flat_ledger.rows()
+                mlb_totals_preflight = _forecast_mlb_totals_flat(
+                    args.date,
+                    True,
+                    config,
+                    registry,
+                    bans,
+                    flat_ledger,
+                    audit,
+                    blend_policy_artifact_path=blend_artifact_path,
+                    blend_policy_report_path=blend_report_path,
+                    preflight_only=True,
+                )
             if is_flat:
                 if replace_today and log:
                     _clear_today_open(
@@ -3418,11 +3754,7 @@ def main(argv: list[str] | None = None) -> None:
                 selected_research_sports = (
                     RESEARCH_LEDGER_SPORTS
                     if getattr(args, "all", False)
-                    else tuple(
-                        sport
-                        for sport in sports
-                        if sport.casefold() in RESEARCH_LEDGER_SPORTS
-                    )
+                    else tuple(sport for sport in sports if sport.casefold() in RESEARCH_LEDGER_SPORTS)
                 )
                 for research_sport in selected_research_sports:
                     _clear_today_open(
@@ -3436,9 +3768,7 @@ def main(argv: list[str] | None = None) -> None:
                         by_event_date=True,
                     )
                 if dual_ledger_sports:
-                    _clear_today_open(
-                        flat_ledger, args.date, by_event_date=True, leagues=dual_ledger_sports
-                    )
+                    _clear_today_open(flat_ledger, args.date, by_event_date=True, leagues=dual_ledger_sports)
             elif replace_today and log and is_flat and dual_ledger_sports:
                 # NOTE: soccer/tennis's research/gated ledgers stopped being
                 # written to entirely as of the 2026-08-03 Main+Flat-only
@@ -3446,9 +3776,7 @@ def main(argv: list[str] | None = None) -> None:
                 # -- this used to also clear those files, but research_ledger()
                 # now raises ValueError for a sport outside RESEARCH_LEDGER_SPORTS,
                 # so clearing them here would crash rather than no-op. Removed.
-                _clear_today_open(
-                    ledger, args.date, by_event_date=True, leagues=dual_ledger_sports
-                )
+                _clear_today_open(ledger, args.date, by_event_date=True, leagues=dual_ledger_sports)
             results = {}
             for sport in sports:
                 if sport == "esports":
@@ -3489,9 +3817,7 @@ def main(argv: list[str] | None = None) -> None:
                         args_date=args.date,
                         config=config,
                         research_ledger=(
-                            research_ledger(data_directory, sport)
-                            if log and not is_flat
-                            else None
+                            research_ledger(data_directory, sport) if log and not is_flat else None
                         ),
                         gated_ledger=(
                             research_ledger(data_directory, sport, gated=True)
@@ -3520,7 +3846,13 @@ def main(argv: list[str] | None = None) -> None:
                 elif sport in LEARNED_PRODUCTION_SPORTS:
                     use_ledger = flat_ledger if is_flat else ledger
                     results[sport] = _forecast_learned_sport(
-                        sport, args.date, log, config, registry, bans, use_ledger,
+                        sport,
+                        args.date,
+                        log,
+                        config,
+                        registry,
+                        bans,
+                        use_ledger,
                         maximum_data_age_hours=float(config["project"].get("maximum_data_age_hours", 12)),
                         maximum_unreviewed_disagreement=float(
                             config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
@@ -3532,9 +3864,17 @@ def main(argv: list[str] | None = None) -> None:
                         exposure_ledger=ledger,
                     )
                     if is_flat and sport == "mlb":
-                        results["mlb_totals"] = _forecast_mlb_totals_flat(
-                            args.date, log, config, registry, bans, flat_ledger, audit
-                        )
+                        try:
+                            results["mlb_totals"] = _commit_preflighted_mlb_totals(
+                                mlb_totals_preflight, flat_ledger
+                            )
+                        except Exception:
+                            if flat_rows_before_mlb_replace is not None:
+                                flat_ledger.restore_rows_for_rollback(
+                                    flat_rows_before_mlb_replace,
+                                    "MLB flat replacement commit failed",
+                                )
+                            raise
                 else:
                     results[sport] = _forecast_research_sport(sport, args.date, config)
             output = results[sports[0]] if len(sports) == 1 else results
@@ -3617,34 +3957,43 @@ def main(argv: list[str] | None = None) -> None:
             # Run slate/BBO capture, WNBA availability, priors, soccer scores,
             # and MLB probables concurrently. These are independent I/O tasks.
             from .data_sources.odds_soccer_scores import collect_soccer_scores
+
             wnba_priors_result = {"status": "skipped"}
             mlb_probables_result: dict[str, Any] = {}
             soccer_collection = {}
+
             def _capture_wnba():
                 try:
                     from .data_sources.espn import ESPNClient
+
                     wnba_scoreboard = ESPNClient().scoreboard("WNBA", args.date)
-                    wnba_event_ids = [
-                        str(event["id"]) for event in wnba_scoreboard.get("events", [])
-                    ]
+                    wnba_event_ids = [str(event["id"]) for event in wnba_scoreboard.get("events", [])]
                     if wnba_event_ids:
                         capture_latest_report(data_root, observed_at=utc_now())
                         for event_id in wnba_event_ids:
                             try:
                                 capture_espn_event_injuries(
-                                    data_root, event_id=event_id,
-                                    client=ESPNClient(), observed_at=utc_now(),
+                                    data_root,
+                                    event_id=event_id,
+                                    client=ESPNClient(),
+                                    observed_at=utc_now(),
                                 )
                             except Exception:
-                                logger.warning("WNBA per-event injury capture failed for event %s", event_id, exc_info=True)
+                                logger.warning(
+                                    "WNBA per-event injury capture failed for event %s",
+                                    event_id,
+                                    exc_info=True,
+                                )
                 except Exception:
                     logger.warning("WNBA injury report capture failed for %s", args.date, exc_info=True)
+
             def _build_priors():
                 nonlocal wnba_priors_result
                 try:
                     from .data_sources.espn import ESPNClient
                     from .features.base import FeatureStore
                     from .wnba_availability_evaluation import build_and_save_priors
+
                     wnba_priors_result = build_and_save_priors(
                         store=FeatureStore(data_root),
                         client=ESPNClient(),
@@ -3653,12 +4002,14 @@ def main(argv: list[str] | None = None) -> None:
                     )
                 except Exception:
                     logger.warning("WNBA availability prior build failed for %s", args.date, exc_info=True)
+
             def _collect_soccer():
                 nonlocal soccer_collection
                 try:
                     soccer_collection = collect_soccer_scores(days_from=3)
                 except Exception:
                     logger.warning("Soccer score collection failed", exc_info=True)
+
             def _capture_mlb_probables():
                 nonlocal mlb_probables_result
                 try:
@@ -3671,7 +4022,9 @@ def main(argv: list[str] | None = None) -> None:
                         args.date,
                         exc_info=True,
                     )
+
             mlb_availability_result: dict[str, Any] = {"status": "skipped"}
+
             def _capture_mlb_availability():
                 # Shadow feature (features/mlb_player_availability.py) --
                 # only captures raw roster/transaction data here; per-matchup
@@ -3680,6 +4033,7 @@ def main(argv: list[str] | None = None) -> None:
                 nonlocal mlb_availability_result
                 try:
                     from .data_sources.espn import ESPNClient
+
                     mlb_scoreboard = ESPNClient().scoreboard("MLB", args.date)
                     team_ids: set[int] = set()
                     for event in mlb_scoreboard.get("events", []):
@@ -3715,11 +4069,11 @@ def main(argv: list[str] | None = None) -> None:
                         "transaction_entries": len(txn_snapshot.get("entries", [])),
                     }
                 except Exception:
-                    logger.warning(
-                        "MLB availability capture failed for %s", args.date, exc_info=True
-                    )
+                    logger.warning("MLB availability capture failed for %s", args.date, exc_info=True)
                     mlb_availability_result = {"status": "error"}
+
             mlb_starter_snapshot_result: dict[str, Any] = {"status": "skipped"}
+
             def _capture_mlb_starter_snapshots():
                 # Keeps data/mlb_statsapi/game_snapshots.jsonl current --
                 # features/starter_history.py's live starter_era_gap provider
@@ -3735,6 +4089,7 @@ def main(argv: list[str] | None = None) -> None:
                 nonlocal mlb_starter_snapshot_result
                 try:
                     from .data_sources.mlb_statsapi import MLBStatsAPIClient, collect_game_snapshots
+
                     lookback_start = (
                         datetime.fromisoformat(args.date).date() - timedelta(days=3)
                     ).isoformat()
@@ -3752,10 +4107,9 @@ def main(argv: list[str] | None = None) -> None:
                         "skipped": len(result.skipped),
                     }
                 except Exception:
-                    logger.warning(
-                        "MLB starter snapshot capture failed for %s", args.date, exc_info=True
-                    )
+                    logger.warning("MLB starter snapshot capture failed for %s", args.date, exc_info=True)
                     mlb_starter_snapshot_result = {"status": "error"}
+
             with ThreadPoolExecutor(max_workers=7) as io_pool:
                 f0 = io_pool.submit(_polymarket_slate, slate_args, config)
                 f1 = io_pool.submit(_capture_wnba)
@@ -3815,23 +4169,34 @@ def main(argv: list[str] | None = None) -> None:
             with ThreadPoolExecutor(max_workers=workers) as pool:
                 futures = {}
                 for sport in DAILY_LEARNED_SPORTS:
-                    futures[pool.submit(
-                        _forecast_learned_sport,
-                        sport, args.date, True, config, registry, bans, ledger,
-                        maximum_data_age_hours=max_data_age,
-                        maximum_unreviewed_disagreement=max_disagreement,
-                        research_ledger=None,
-                        gated_ledger=None,
-                        observed_at=forecast_observed_at,
-                    )] = sport
+                    futures[
+                        pool.submit(
+                            _forecast_learned_sport,
+                            sport,
+                            args.date,
+                            True,
+                            config,
+                            registry,
+                            bans,
+                            ledger,
+                            maximum_data_age_hours=max_data_age,
+                            maximum_unreviewed_disagreement=max_disagreement,
+                            research_ledger=None,
+                            gated_ledger=None,
+                            observed_at=forecast_observed_at,
+                        )
+                    ] = sport
                 for future in as_completed(futures):
                     sport = futures[future]
                     try:
                         forecast_result[sport] = future.result()
                     except Exception as exc:  # noqa: BLE001 — a failed sport must degrade to an error dict, never take down the whole forecast
                         forecast_result[sport] = {
-                            "sport": sport, "status": "error", "reason": str(exc),
-                            "logged": 0, "candidates": [],
+                            "sport": sport,
+                            "status": "error",
+                            "reason": str(exc),
+                            "logged": 0,
+                            "candidates": [],
                         }
             # Re-log computed candidates to flat ledger (flat mode, no edge gate)
             with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -3840,21 +4205,30 @@ def main(argv: list[str] | None = None) -> None:
                     result = forecast_result.get(sport, {})
                     candidates = result.get("candidates", [])
                     if candidates:
-                        flat_futures[pool.submit(
-                            _forecast_learned_sport,
-                            sport, args.date, True, config, registry, bans, flat_ledger,
-                            maximum_data_age_hours=max_data_age,
-                            maximum_unreviewed_disagreement=max_disagreement,
-                            flat_mode=True,
-                            exposure_ledger=ledger,
-                            observed_at=forecast_observed_at,
-                        )] = sport
+                        flat_futures[
+                            pool.submit(
+                                _forecast_learned_sport,
+                                sport,
+                                args.date,
+                                True,
+                                config,
+                                registry,
+                                bans,
+                                flat_ledger,
+                                maximum_data_age_hours=max_data_age,
+                                maximum_unreviewed_disagreement=max_disagreement,
+                                flat_mode=True,
+                                exposure_ledger=ledger,
+                                observed_at=forecast_observed_at,
+                            )
+                        ] = sport
                 for future in as_completed(flat_futures):
                     sport = flat_futures[future]
                     try:
                         forecast_result[f"_flat_{sport}"] = future.result()
                     except Exception:
                         logger.warning("Flat forecast failed for sport %s", sport, exc_info=True)
+
             # MLB totals, soccer, tennis, esports, and international baseball
             # are independent of each other and of the four learned sports
             # above (already logged by the pool before this point) -- they
@@ -3871,9 +4245,17 @@ def main(argv: list[str] | None = None) -> None:
             def _mlb_totals_task() -> None:
                 try:
                     forecast_result["mlb_totals"] = _forecast_mlb_totals_flat(
-                        args.date, True, config, registry, bans, flat_ledger, audit,
+                        args.date,
+                        True,
+                        config,
+                        registry,
+                        bans,
+                        flat_ledger,
+                        audit,
                         main_ledger=ledger,
                     )
+                except MarketBlendBlockedError:
+                    raise
                 except Exception:
                     logger.warning("MLB totals flat forecast failed", exc_info=True)
 
@@ -3968,7 +4350,8 @@ def main(argv: list[str] | None = None) -> None:
                 if _priced_esports and not _esports_logged:
                     logger.warning(
                         "zero rows logged for %s despite %d priced contracts",
-                        title, len(_priced_esports),
+                        title,
+                        len(_priced_esports),
                     )
 
             def _esports_block() -> None:
@@ -3980,8 +4363,7 @@ def main(argv: list[str] | None = None) -> None:
                 # refreshed above -- fan them out too instead of one at a time.
                 with ThreadPoolExecutor(max_workers=len(ESPORTS_TITLES)) as title_pool:
                     title_futures = {
-                        title_pool.submit(_esports_title_task, title): title
-                        for title in ESPORTS_TITLES
+                        title_pool.submit(_esports_title_task, title): title for title in ESPORTS_TITLES
                     }
                     for future in as_completed(title_futures):
                         title = title_futures[future]
@@ -4006,7 +4388,8 @@ def main(argv: list[str] | None = None) -> None:
                 if _priced_intl and not forecast_result[league].get("logged"):
                     logger.warning(
                         "zero rows logged for %s despite %d priced contracts",
-                        league, len(_priced_intl),
+                        league,
+                        len(_priced_intl),
                     )
 
             def _intl_baseball_block() -> None:
@@ -4017,9 +4400,7 @@ def main(argv: list[str] | None = None) -> None:
                 except Exception:
                     logger.warning("International baseball ratings refresh failed", exc_info=True)
                 # International baseball — logged to research/gated/flat ledgers
-                with ThreadPoolExecutor(
-                    max_workers=len(DAILY_INTERNATIONAL_BASEBALL_SPORTS)
-                ) as league_pool:
+                with ThreadPoolExecutor(max_workers=len(DAILY_INTERNATIONAL_BASEBALL_SPORTS)) as league_pool:
                     league_futures = {
                         league_pool.submit(_intl_baseball_league_task, league): league
                         for league in DAILY_INTERNATIONAL_BASEBALL_SPORTS
@@ -4031,7 +4412,8 @@ def main(argv: list[str] | None = None) -> None:
                         except Exception:
                             logger.warning(
                                 "International baseball forecast failed for league %s",
-                                league, exc_info=True,
+                                league,
+                                exc_info=True,
                             )
 
             with ThreadPoolExecutor(max_workers=6) as research_pool:
@@ -4050,9 +4432,7 @@ def main(argv: list[str] | None = None) -> None:
                 for future in as_completed(research_futures):
                     future.result()
             flat_result = {
-                sport: forecast_result.get(
-                    f"_flat_{sport}", forecast_result.get(sport, {})
-                )
+                sport: forecast_result.get(f"_flat_{sport}", forecast_result.get(sport, {}))
                 for sport in DAILY_LEARNED_SPORTS
             }
             for result in forecast_result.values():
@@ -4068,7 +4448,10 @@ def main(argv: list[str] | None = None) -> None:
                 odds_sport = "esports" if sport in ESPORTS_TITLES else sport
                 snap_path = (
                     Path(ledger_path(config)).parent
-                    / "odds" / odds_sport / args.date / "polymarket_snapshots.jsonl"
+                    / "odds"
+                    / odds_sport
+                    / args.date
+                    / "polymarket_snapshots.jsonl"
                 )
                 if snap_path.exists():
                     snaps = [
@@ -4078,17 +4461,12 @@ def main(argv: list[str] | None = None) -> None:
                     ]
                     odds_by_sport[sport] = {
                         "snapshots": len(snaps),
-                        "moneyline_snapshots": sum(
-                            1 for s in snaps if s.get("market_type") == "moneyline"
-                        ),
-                        "spread_snapshots": sum(
-                            1 for s in snaps if s.get("market_type") == "spread"
-                        ),
-                        "total_snapshots": sum(
-                            1 for s in snaps if s.get("market_type") == "total"
-                        ),
+                        "moneyline_snapshots": sum(1 for s in snaps if s.get("market_type") == "moneyline"),
+                        "spread_snapshots": sum(1 for s in snaps if s.get("market_type") == "spread"),
+                        "total_snapshots": sum(1 for s in snaps if s.get("market_type") == "total"),
                         "with_executable_bbo": sum(
-                            1 for s in snaps
+                            1
+                            for s in snaps
                             if s.get("long", {}).get("ask") is not None
                             and s.get("short", {}).get("ask") is not None
                         ),
@@ -4170,9 +4548,7 @@ def main(argv: list[str] | None = None) -> None:
         elif args.command == "ingest":
             output = Ingestor(data_root, audit=audit).ingest_scores(args.sport, args.date)
         elif args.command == "wnba-availability-capture":
-            availability_observed_at = (
-                parse_utc(args.observed_at) if args.observed_at else utc_now()
-            )
+            availability_observed_at = parse_utc(args.observed_at) if args.observed_at else utc_now()
             output = {
                 "official_report": capture_latest_report(
                     data_root,
@@ -4192,8 +4568,7 @@ def main(argv: list[str] | None = None) -> None:
             ingestor = Ingestor(data_root, audit=audit)
             if args.all:
                 output = {
-                    sport: ingestor.bootstrap(sport, args.from_date, args.to_date)
-                    for sport in ESPN_SPORTS
+                    sport: ingestor.bootstrap(sport, args.from_date, args.to_date) for sport in ESPN_SPORTS
                 }
             elif args.sport:
                 output = ingestor.bootstrap(args.sport, args.from_date, args.to_date)
@@ -4207,8 +4582,7 @@ def main(argv: list[str] | None = None) -> None:
             else:
                 raise ValueError("provide --title or --all")
             output = {
-                title: backfill_esports(data_root, title, args.from_date, args.to_date)
-                for title in titles
+                title: backfill_esports(data_root, title, args.from_date, args.to_date) for title in titles
             }
         elif args.command == "validate-esports":
             output = validate_all_esports_baselines(
@@ -4256,9 +4630,7 @@ def main(argv: list[str] | None = None) -> None:
             else:
                 raise ValueError("provide --league or --all")
             output = {
-                league: backfill_international_baseball(
-                    data_root, league, args.from_date, args.to_date
-                )
+                league: backfill_international_baseball(data_root, league, args.from_date, args.to_date)
                 for league in leagues
             }
         elif args.command == "validate-international-baseball":
@@ -4348,9 +4720,7 @@ def main(argv: list[str] | None = None) -> None:
                 PROJECT_ROOT / args.output,
             )
         elif args.command == "refresh-mlb-baselines":
-            output = refresh_if_due(
-                data_root, PROJECT_ROOT, min_days=args.min_days, force=args.force
-            )
+            output = refresh_if_due(data_root, PROJECT_ROOT, min_days=args.min_days, force=args.force)
         elif args.command == "train-residual":
             rows = [
                 ResidualTrainingRow(
@@ -4401,10 +4771,7 @@ def main(argv: list[str] | None = None) -> None:
                 model_probability = float(row.get("model_probability") or 0)
                 market_probability = float(row.get("market_implied_probability") or 0)
                 edge = model_probability - market_probability
-                if (
-                    execution_config.get("manual_research_require_positive_edge", True)
-                    and edge <= 0
-                ):
+                if execution_config.get("manual_research_require_positive_edge", True) and edge <= 0:
                     raise ExecutionGateError("REFUSED: manual research order has no positive edge.")
                 # The "limit below model probability" rule is a BUY guard (do not
                 # pay more than fair value). A SELL is an exit at a target price
@@ -4505,6 +4872,7 @@ def main(argv: list[str] | None = None) -> None:
             output = _handle_ban(args, bans)
         elif args.command == "collect-scores":
             from .data_sources.odds_soccer_scores import collect_soccer_scores
+
             output = collect_soccer_scores(days_from=args.days)
         elif args.command == "verify-checklist":
             from .source_policy import DEFAULT_SOURCES
@@ -4523,7 +4891,8 @@ def main(argv: list[str] | None = None) -> None:
             research_units = [
                 float(row["units"] or 0)
                 for row in ledger.rows()
-                if row["league"].lower() == sport and row["record_type"] == RecordType.RESEARCH_OBSERVATION.value
+                if row["league"].lower() == sport
+                and row["record_type"] == RecordType.RESEARCH_OBSERVATION.value
             ]
             results = run_checklist(
                 source_keys=source_keys or None,

@@ -79,6 +79,19 @@ own probability (auditable), the blend is a separate calibrated policy layer
 with its own experiment-registry entries. Gate: out-of-fold blend must beat
 the model-only path on settled picks before serving.
 
+Implementation scope for this Stage 1 tranche is deliberately narrower than
+the eventual multi-sport policy: **MLB totals only**, at the
+`_forecast_mlb_totals_flat` decision boundary backed by the exact
+`measured-edge-totals-v3` artifact. It does not apply to the frozen MLB-v2
+shadow pipeline. Activation is explicit through paired policy-artifact and
+gate-report CLI options; the default remains model-only. The exact-byte
+experiment spec rejects every other sport/market pair before ledger access.
+Training evidence and future calls must also bind the exact raw quote through
+`market_snapshot_hash`; missing or mismatched snapshot identity blocks the
+gate. Tennis, soccer, and other markets need their own prospective producer,
+decision integration, and gate run; this tranche must not be represented as
+generic all-sport serving.
+
 ### Stage 2 — MLB totals v2 (the accuracy-first rebuild, now evidence-shaped)
 - Replace flat bullpen weakness with the sharksnip structure: **starter
   expected-IP distribution × starter runs-allowed, bullpen expected-IP

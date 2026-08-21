@@ -61,8 +61,12 @@ def exclude_first_five_innings(market_rows: pl.DataFrame) -> pl.DataFrame:
 
 
 def resolve_polymarket_event_id(
-    market_rows: pl.DataFrame, home_name: str, away_name: str,
-    *, home_canonical_id: str | None = None, away_canonical_id: str | None = None,
+    market_rows: pl.DataFrame,
+    home_name: str,
+    away_name: str,
+    *,
+    home_canonical_id: str | None = None,
+    away_canonical_id: str | None = None,
 ) -> str | None:
     """Polymarket's own event_id (e.g. "70535") for this specific game,
     found via its moneyline/spread rows that carry real team names — total
@@ -81,7 +85,9 @@ def resolve_polymarket_event_id(
     None on no/ambiguous match rather than guessing which event a game
     belongs to."""
     if home_canonical_id and away_canonical_id and "team_canonical_id" in market_rows.columns:
-        id_rows = market_rows.filter(pl.col("team_canonical_id").is_in([home_canonical_id, away_canonical_id]))
+        id_rows = market_rows.filter(
+            pl.col("team_canonical_id").is_in([home_canonical_id, away_canonical_id])
+        )
         event_ids = id_rows["event_id"].unique().to_list()
         if len(event_ids) == 1:
             return event_ids[0]
@@ -97,7 +103,8 @@ def resolve_polymarket_event_id(
 
     team_rows = market_rows.filter(
         pl.col("team").map_elements(
-            lambda t: t is not None and (_team_name_matches(t, home_name) or _team_name_matches(t, away_name)),
+            lambda t: t is not None
+            and (_team_name_matches(t, home_name) or _team_name_matches(t, away_name)),
             return_dtype=pl.Boolean,
         )
     )
@@ -158,8 +165,12 @@ def real_quote_age_seconds(observed_at_utc: str | None, *, now: datetime | None 
 
 
 def real_market_candidates(
-    market_rows: pl.DataFrame, home_name: str, away_name: str,
-    *, home_canonical_id: str | None = None, away_canonical_id: str | None = None,
+    market_rows: pl.DataFrame,
+    home_name: str,
+    away_name: str,
+    *,
+    home_canonical_id: str | None = None,
+    away_canonical_id: str | None = None,
 ) -> list[MarketEvaluation]:
     """Real MarketEvaluation objects from the collected Polymarket rows for
     this specific game only — resolves the game's real Polymarket event_id
@@ -183,8 +194,11 @@ def real_market_candidates(
     correct behavior given real data scarcity, not a bug to work around
     with SizeLimits(min_depth_units=0.0)."""
     event_id = resolve_polymarket_event_id(
-        market_rows, home_name, away_name,
-        home_canonical_id=home_canonical_id, away_canonical_id=away_canonical_id,
+        market_rows,
+        home_name,
+        away_name,
+        home_canonical_id=home_canonical_id,
+        away_canonical_id=away_canonical_id,
     )
     if event_id is None:
         return []
@@ -210,25 +224,43 @@ def real_market_candidates(
             side = "home" if r["team_canonical_id"] == home_canonical_id else "away"
         else:
             side = "home" if _team_name_matches(r["team"], home_name) else "away"
-        candidates.append(MarketEvaluation(
-            market_id=r["market_id"], market_type=r["market_type"], team_or_side=side,
-            line=r["line"], executable_ask=r["executable_price"], depth_adjusted_price=r["executable_price"],
-            quote_age_seconds=real_quote_age_seconds(r.get("observed_at_utc")), available_depth=0.0,
-            depth_available=False,
-            market_open=bool(r.get("market_open", False)),
-            observed_at_utc=r.get("observed_at_utc"), event_start_utc=r.get("event_start_utc"),
-            contract_valid=bool(r.get("event_start_utc")) and r.get("executable_price") is not None,
-        ))
+        candidates.append(
+            MarketEvaluation(
+                market_id=r["market_id"],
+                market_type=r["market_type"],
+                team_or_side=side,
+                line=r["line"],
+                executable_ask=r["executable_price"],
+                depth_adjusted_price=r["executable_price"],
+                quote_age_seconds=real_quote_age_seconds(r.get("observed_at_utc")),
+                available_depth=0.0,
+                depth_available=False,
+                market_open=bool(r.get("market_open", False)),
+                observed_at_utc=r.get("observed_at_utc"),
+                event_start_utc=r.get("event_start_utc"),
+                contract_valid=bool(r.get("event_start_utc")) and r.get("executable_price") is not None,
+                market_probability=r.get("executable_price"),
+            )
+        )
     for r in total_rows.iter_rows(named=True):
-        candidates.append(MarketEvaluation(
-            market_id=r["market_id"], market_type="total", team_or_side=r["team_or_side"],
-            line=r["line"], executable_ask=r["executable_price"], depth_adjusted_price=r["executable_price"],
-            quote_age_seconds=real_quote_age_seconds(r.get("observed_at_utc")), available_depth=0.0,
-            depth_available=False,
-            market_open=bool(r.get("market_open", False)),
-            observed_at_utc=r.get("observed_at_utc"), event_start_utc=r.get("event_start_utc"),
-            contract_valid=bool(r.get("event_start_utc")) and r.get("executable_price") is not None,
-        ))
+        candidates.append(
+            MarketEvaluation(
+                market_id=r["market_id"],
+                market_type="total",
+                team_or_side=r["team_or_side"],
+                line=r["line"],
+                executable_ask=r["executable_price"],
+                depth_adjusted_price=r["executable_price"],
+                quote_age_seconds=real_quote_age_seconds(r.get("observed_at_utc")),
+                available_depth=0.0,
+                depth_available=False,
+                market_open=bool(r.get("market_open", False)),
+                observed_at_utc=r.get("observed_at_utc"),
+                event_start_utc=r.get("event_start_utc"),
+                contract_valid=bool(r.get("event_start_utc")) and r.get("executable_price") is not None,
+                market_probability=r.get("executable_price"),
+            )
+        )
     return candidates
 
 
@@ -245,9 +277,6 @@ def real_market_snapshot_hash(event_id: str, candidates: list[MarketEvaluation])
     rows instead of 0 before this fix."""
     payload = {
         "event_id": event_id,
-        "candidates": [
-            {k: v for k, v in asdict(c).items() if k != "quote_age_seconds"}
-            for c in candidates
-        ],
+        "candidates": [{k: v for k, v in asdict(c).items() if k != "quote_age_seconds"} for c in candidates],
     }
     return sha256_hex(json.dumps(payload, sort_keys=True, default=str).encode("utf-8"))

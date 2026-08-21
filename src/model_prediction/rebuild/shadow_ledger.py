@@ -287,6 +287,8 @@ class ShadowLedger:
                 calibration_artifact_hash TEXT NOT NULL,
                 totals_probabilities_json TEXT,
                 spread_probabilities_json TEXT,
+                totals_probabilities_lower_json TEXT,
+                spread_probabilities_lower_json TEXT,
                 model_disagreement REAL,
                 calibration_uncertainty REAL,
                 missingness_penalty REAL,
@@ -347,7 +349,8 @@ class ShadowLedger:
                 executable_ask REAL,
                 depth_adjusted_price REAL,
                 quote_age_seconds REAL,
-                available_depth REAL
+                available_depth REAL,
+                market_probability REAL
             );
 
             -- Fully implemented: record_trade_decision. Mirrors decision.py's
@@ -375,7 +378,22 @@ class ShadowLedger:
                 evaluated_market_evaluation_id INTEGER REFERENCES market_evaluations(id),
                 evaluated_market_id TEXT,
                 evaluated_team_or_side TEXT,
-                evaluated_line REAL
+                evaluated_line REAL,
+                model_probability REAL,
+                market_probability REAL,
+                serving_probability REAL,
+                model_conservative_probability REAL,
+                serving_conservative_probability REAL,
+                blend_weight REAL,
+                blend_policy_artifact_hash TEXT,
+                blend_experiment_spec_hash TEXT,
+                blend_config_hash TEXT,
+                serving_policy_block_reason TEXT
+                ,fee_rate REAL
+                ,safety_margin REAL
+                ,size_limits_version TEXT
+                ,size_limits_json TEXT
+                ,decision_economics_hash TEXT
             );
 
             -- The required idempotency key (sport, event_id, horizon,
@@ -407,14 +425,9 @@ class ShadowLedger:
             -- contract silently unenforced for exactly the most common
             -- market_type. -999999.0 is out of the real domain of a spread
             -- or total line.
-            CREATE UNIQUE INDEX IF NOT EXISTS ux_trade_decisions_idempotency
-            ON trade_decisions(
-                sport, event_id, horizon, decision_time_utc,
-                model_artifact_hash, market_snapshot_hash, decision_policy_version,
-                market_type, COALESCE(evaluated_market_id, ''),
-                COALESCE(evaluated_team_or_side, ''), COALESCE(evaluated_line, -999999.0)
-            )
-            WHERE supersedes_id IS NULL;
+            -- The versioned decision idempotency index is installed after
+            -- additive column migration so legacy databases that predate
+            -- the blend audit columns can still open safely.
 
             -- Fully implemented: record_paper_order.
             CREATE TABLE IF NOT EXISTS paper_orders (
@@ -515,6 +528,8 @@ class ShadowLedger:
         self._migrate_model_artifact_anchor_columns()
         self._migrate_closing_prices_taxonomy_columns()
         self._migrate_run_health_columns()
+        self._migrate_market_blend_audit_columns()
+        self._migrate_trade_decision_idempotency_index()
         self.conn.execute(
             "INSERT OR IGNORE INTO _meta(key, value) VALUES(?, ?)",
             ("schema_version", SCHEMA_VERSION),
@@ -537,29 +552,43 @@ class ShadowLedger:
         (multi-sport execution spec) added the uncertainty-decomposition
         columns (this repo's own `data/rebuild/shadow.db` has real
         predictions rows from before this change)."""
-        self._migrate_columns("predictions", {
-            "model_disagreement": "REAL", "calibration_uncertainty": "REAL",
-            "missingness_penalty": "REAL", "missing_flags_json": "TEXT",
-            "lineup_uncertainty": "REAL", "conservative_probabilities_json": "TEXT",
-        })
+        self._migrate_columns(
+            "predictions",
+            {
+                "model_disagreement": "REAL",
+                "calibration_uncertainty": "REAL",
+                "missingness_penalty": "REAL",
+                "missing_flags_json": "TEXT",
+                "lineup_uncertainty": "REAL",
+                "conservative_probabilities_json": "TEXT",
+                "totals_probabilities_lower_json": "TEXT",
+                "spread_probabilities_lower_json": "TEXT",
+            },
+        )
 
     def _migrate_predictions_prospective_columns(self) -> None:
         """Add stable experiment identity and actual observation time."""
-        self._migrate_columns("predictions", {
-            "prediction_observed_at_utc": "TEXT",
-            "test_id": "TEXT",
-            "candidate_version": "TEXT",
-        })
+        self._migrate_columns(
+            "predictions",
+            {
+                "prediction_observed_at_utc": "TEXT",
+                "test_id": "TEXT",
+                "candidate_version": "TEXT",
+            },
+        )
 
     def _migrate_model_artifact_anchor_columns(self) -> None:
         """Add externally anchored MLB v2 component identities."""
-        self._migrate_columns("model_artifacts", {
-            "manifest_sha256": "TEXT",
-            "primary_content_sha256": "TEXT",
-            "primary_artifact_sha256": "TEXT",
-            "calibrator_artifact_sha256": "TEXT",
-            "source_tree_sha256": "TEXT",
-        })
+        self._migrate_columns(
+            "model_artifacts",
+            {
+                "manifest_sha256": "TEXT",
+                "primary_content_sha256": "TEXT",
+                "primary_artifact_sha256": "TEXT",
+                "calibrator_artifact_sha256": "TEXT",
+                "source_tree_sha256": "TEXT",
+            },
+        )
 
     def _migrate_closing_prices_taxonomy_columns(self) -> None:
         """Real migration for `closing_prices` rows created before MLB-7
@@ -571,12 +600,112 @@ class ShadowLedger:
 
     def _migrate_run_health_columns(self) -> None:
         """Add terminal and stage health fields to pre-integration ledgers."""
-        self._migrate_columns("runs", {
-            "finished_at": "TEXT", "duration_seconds": "REAL", "error": "TEXT", "mode": "TEXT",
-        })
-        self._migrate_columns("run_stages", {
-            "duration_seconds": "REAL", "error": "TEXT", "mode": "TEXT", "row_count": "INTEGER",
-        })
+        self._migrate_columns(
+            "runs",
+            {
+                "finished_at": "TEXT",
+                "duration_seconds": "REAL",
+                "error": "TEXT",
+                "mode": "TEXT",
+            },
+        )
+        self._migrate_columns(
+            "run_stages",
+            {
+                "duration_seconds": "REAL",
+                "error": "TEXT",
+                "mode": "TEXT",
+                "row_count": "INTEGER",
+            },
+        )
+
+    def _migrate_market_blend_audit_columns(self) -> None:
+        """Persist raw model/market probabilities beside the serving blend."""
+        self._migrate_columns("market_evaluations", {"market_probability": "REAL"})
+        self._migrate_columns(
+            "trade_decisions",
+            {
+                "model_probability": "REAL",
+                "market_probability": "REAL",
+                "serving_probability": "REAL",
+                "model_conservative_probability": "REAL",
+                "serving_conservative_probability": "REAL",
+                "blend_weight": "REAL",
+                "blend_policy_artifact_hash": "TEXT",
+                "blend_experiment_spec_hash": "TEXT",
+                "blend_config_hash": "TEXT",
+                "serving_policy_block_reason": "TEXT",
+                "fee_rate": "REAL",
+                "safety_margin": "REAL",
+                "size_limits_version": "TEXT",
+                "size_limits_json": "TEXT",
+                "decision_economics_hash": "TEXT",
+            },
+        )
+
+    def _migrate_trade_decision_idempotency_index(self) -> None:
+        """Transactionally install and verify the blend/economics-bound v2 key."""
+        expected_sql = self._trade_decision_idempotency_index_sql()
+        existing = self.conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='index' AND name='ux_trade_decisions_idempotency_v2'"
+        ).fetchone()
+        legacy = self.conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='index' AND name='ux_trade_decisions_idempotency'"
+        ).fetchone()
+        if (
+            existing is not None
+            and self._normalize_index_sql(existing["sql"]) == self._normalize_index_sql(expected_sql)
+            and legacy is None
+        ):
+            return
+        self.conn.execute("SAVEPOINT trade_decision_index_v2")
+        try:
+            self.conn.execute("DROP INDEX IF EXISTS ux_trade_decisions_idempotency")
+            self.conn.execute("DROP INDEX IF EXISTS ux_trade_decisions_idempotency_v2")
+            self._create_trade_decision_idempotency_index(expected_sql)
+            installed = self.conn.execute(
+                "SELECT sql FROM sqlite_master WHERE type='index' "
+                "AND name='ux_trade_decisions_idempotency_v2'"
+            ).fetchone()
+            if installed is None or self._normalize_index_sql(installed["sql"]) != self._normalize_index_sql(
+                expected_sql
+            ):
+                raise RuntimeError("trade-decision idempotency v2 index verification failed")
+            self.conn.execute("RELEASE SAVEPOINT trade_decision_index_v2")
+        except Exception:
+            self.conn.execute("ROLLBACK TO SAVEPOINT trade_decision_index_v2")
+            self.conn.execute("RELEASE SAVEPOINT trade_decision_index_v2")
+            raise
+
+    @staticmethod
+    def _normalize_index_sql(sql: str) -> str:
+        return " ".join(sql.lower().split()).rstrip(";")
+
+    def _create_trade_decision_idempotency_index(self, sql: str) -> None:
+        self.conn.execute(sql)
+
+    @staticmethod
+    def _trade_decision_idempotency_index_sql() -> str:
+        return """CREATE UNIQUE INDEX ux_trade_decisions_idempotency_v2
+               ON trade_decisions(
+                   sport, event_id, horizon, decision_time_utc,
+                   model_artifact_hash, market_snapshot_hash, decision_policy_version,
+                   market_type, COALESCE(evaluated_market_id, ''),
+                   COALESCE(evaluated_team_or_side, ''),
+                   COALESCE(evaluated_line, -999999.0),
+                   COALESCE(blend_policy_artifact_hash, ''),
+                   COALESCE(blend_experiment_spec_hash, ''),
+                   COALESCE(blend_config_hash, ''),
+                   COALESCE(model_probability, -999999.0),
+                   COALESCE(market_probability, -999999.0),
+                   COALESCE(serving_probability, -999999.0),
+                   COALESCE(model_conservative_probability, -999999.0),
+                   COALESCE(serving_conservative_probability, -999999.0),
+                   COALESCE(blend_weight, -999999.0),
+                   COALESCE(decision_economics_hash, ''),
+                   COALESCE(serving_policy_block_reason, '')
+               )
+               WHERE supersedes_id IS NULL"""
 
     # ── runs ──────────────────────────────────────────────────────────
 
@@ -596,17 +725,24 @@ class ShadowLedger:
         same timestamped job must be idempotent" requirement at the run
         level."""
         run_id = run_id or f"{sport}_{run_type}_{uuid.uuid4().hex[:12]}"
-        existing = self.conn.execute(
-            "SELECT run_id FROM runs WHERE run_id=?", (run_id,)
-        ).fetchone()
+        existing = self.conn.execute("SELECT run_id FROM runs WHERE run_id=?", (run_id,)).fetchone()
         if existing is not None:
             return str(existing["run_id"])
         self.conn.execute(
             """INSERT INTO runs(
                    run_id, created_at, sport, run_type, horizon, status, mode, params_json, schema_version
                ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (run_id, utc_now(), sport, run_type, horizon, "started", mode,
-             json.dumps(params) if params else None, schema_version),
+            (
+                run_id,
+                utc_now(),
+                sport,
+                run_type,
+                horizon,
+                "started",
+                mode,
+                json.dumps(params) if params else None,
+                schema_version,
+            ),
         )
         self.conn.commit()
         return run_id
@@ -662,9 +798,18 @@ class ShadowLedger:
                    run_id, stage, status, completed_at, detail_json, artifact_hash,
                    duration_seconds, error, mode, row_count
                ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (run_id, stage, status, utc_now(),
-             json.dumps(detail, default=str) if detail is not None else None, artifact_hash,
-             duration_seconds, error, mode, row_count),
+            (
+                run_id,
+                stage,
+                status,
+                utc_now(),
+                json.dumps(detail, default=str) if detail is not None else None,
+                artifact_hash,
+                duration_seconds,
+                error,
+                mode,
+                row_count,
+            ),
         )
         self.conn.commit()
 
@@ -679,9 +824,7 @@ class ShadowLedger:
         `run_id` -- what a resumed invocation queries to decide which
         stages it can honestly skip. Empty dict for an unknown or
         brand-new run_id, not an error."""
-        rows = self.conn.execute(
-            "SELECT stage, status FROM run_stages WHERE run_id=?", (run_id,)
-        ).fetchall()
+        rows = self.conn.execute("SELECT stage, status FROM run_stages WHERE run_id=?", (run_id,)).fetchall()
         return {row["stage"]: row["status"] for row in rows}
 
     # ── predictions (append-only) ────────────────────────────────────
@@ -712,9 +855,7 @@ class ShadowLedger:
         created_at = utc_now()
         if test_id is not None:
             if prediction_observed_at_utc is None or not candidate_version:
-                raise ValueError(
-                    "prospective predictions require observation time and candidate version"
-                )
+                raise ValueError("prospective predictions require observation time and candidate version")
             try:
                 observed_dt = datetime.fromisoformat(observed_at)
                 created_dt = datetime.fromisoformat(created_at)
@@ -723,7 +864,10 @@ class ShadowLedger:
                 raise ValueError("prediction timestamps must be valid ISO-8601 values") from exc
             if observed_dt.tzinfo is None or created_dt.tzinfo is None or cutoff_dt.tzinfo is None:
                 raise ValueError("prospective prediction timestamps must include a UTC offset")
-            if any(value.utcoffset() != datetime.now(UTC).utcoffset() for value in (observed_dt, created_dt, cutoff_dt)):
+            if any(
+                value.utcoffset() != datetime.now(UTC).utcoffset()
+                for value in (observed_dt, created_dt, cutoff_dt)
+            ):
                 raise ValueError("prospective prediction timestamps must be UTC")
             if observed_dt > created_dt:
                 raise ValueError("prediction observation cannot be later than prediction creation")
@@ -747,9 +891,16 @@ class ShadowLedger:
             if prior is None:
                 raise ValueError("superseded prediction does not exist")
             logical_identity = (sport, event_id, horizon, test_id, candidate_version)
-            prior_identity = tuple(prior[key] for key in (
-                "sport", "event_id", "horizon", "test_id", "candidate_version",
-            ))
+            prior_identity = tuple(
+                prior[key]
+                for key in (
+                    "sport",
+                    "event_id",
+                    "horizon",
+                    "test_id",
+                    "candidate_version",
+                )
+            )
             if logical_identity != prior_identity:
                 raise ValueError("prediction correction cannot change sealed cohort identity")
 
@@ -759,23 +910,45 @@ class ShadowLedger:
                    WHERE sport=? AND event_id=? AND horizon=? AND decision_time_utc=?
                      AND model_artifact_hash=? AND calibration_artifact_hash=?
                      AND supersedes_id IS NULL""",
-                (sport, event_id, horizon, decision_time_utc,
-                 model_artifact_hash, calibration_artifact_hash),
+                (sport, event_id, horizon, decision_time_utc, model_artifact_hash, calibration_artifact_hash),
             ).fetchone()
             if existing is not None:
                 return int(existing["id"]), False
 
         cur = self._insert_prediction_row(
-            run_id, sport, event_id, horizon, schema_version, supersedes_id,
-            created_at, decision_time_utc, observed_at, test_id, candidate_version,
-            f, model_artifact_hash, calibration_artifact_hash,
+            run_id,
+            sport,
+            event_id,
+            horizon,
+            schema_version,
+            supersedes_id,
+            created_at,
+            decision_time_utc,
+            observed_at,
+            test_id,
+            candidate_version,
+            f,
+            model_artifact_hash,
+            calibration_artifact_hash,
         )
         return cur, True
 
     def _insert_prediction_row(
-        self, run_id, sport, event_id, horizon, schema_version, supersedes_id,
-        created_at, decision_time_utc, prediction_observed_at_utc, test_id, candidate_version,
-        f, model_artifact_hash, calibration_artifact_hash,
+        self,
+        run_id,
+        sport,
+        event_id,
+        horizon,
+        schema_version,
+        supersedes_id,
+        created_at,
+        decision_time_utc,
+        prediction_observed_at_utc,
+        test_id,
+        candidate_version,
+        f,
+        model_artifact_hash,
+        calibration_artifact_hash,
     ) -> int:
         try:
             cur = self.conn.execute(
@@ -786,24 +959,41 @@ class ShadowLedger:
                     calibrated_probabilities_json, probability_lower_json, probability_upper_json,
                     expected_home_score, expected_away_score, model_artifact_hash,
                     calibration_artifact_hash, totals_probabilities_json, spread_probabilities_json,
+                    totals_probabilities_lower_json, spread_probabilities_lower_json,
                     model_disagreement, calibration_uncertainty, missingness_penalty,
                     missing_flags_json, lineup_uncertainty, conservative_probabilities_json
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
-                    created_at, run_id, sport, event_id, horizon, schema_version, supersedes_id,
-                    decision_time_utc, prediction_observed_at_utc, test_id, candidate_version,
+                    created_at,
+                    run_id,
+                    sport,
+                    event_id,
+                    horizon,
+                    schema_version,
+                    supersedes_id,
+                    decision_time_utc,
+                    prediction_observed_at_utc,
+                    test_id,
+                    candidate_version,
                     f.get("predicted_winner"),
                     json.dumps(f.get("raw_probabilities", {})),
                     json.dumps(f.get("calibrated_probabilities", {})),
                     json.dumps(f.get("probability_lower", {})),
                     json.dumps(f.get("probability_upper", {})),
-                    f.get("expected_home_score"), f.get("expected_away_score"),
-                    model_artifact_hash, calibration_artifact_hash,
+                    f.get("expected_home_score"),
+                    f.get("expected_away_score"),
+                    model_artifact_hash,
+                    calibration_artifact_hash,
                     json.dumps(f.get("totals_probabilities", {})),
                     json.dumps(f.get("spread_probabilities", {})),
-                    f.get("model_disagreement"), f.get("calibration_uncertainty"),
-                    f.get("missingness_penalty"), json.dumps(f.get("missing_flags", [])),
-                    f.get("lineup_uncertainty"), json.dumps(f.get("conservative_probabilities", {})),
+                    json.dumps(f.get("totals_probabilities_lower", {})),
+                    json.dumps(f.get("spread_probabilities_lower", {})),
+                    f.get("model_disagreement"),
+                    f.get("calibration_uncertainty"),
+                    f.get("missingness_penalty"),
+                    json.dumps(f.get("missing_flags", [])),
+                    f.get("lineup_uncertainty"),
+                    json.dumps(f.get("conservative_probabilities", {})),
                 ),
             )
         except sqlite3.IntegrityError:
@@ -816,8 +1006,7 @@ class ShadowLedger:
                    WHERE sport=? AND event_id=? AND horizon=? AND decision_time_utc=?
                      AND model_artifact_hash=? AND calibration_artifact_hash=?
                      AND supersedes_id IS NULL""",
-                (sport, event_id, horizon, decision_time_utc,
-                 model_artifact_hash, calibration_artifact_hash),
+                (sport, event_id, horizon, decision_time_utc, model_artifact_hash, calibration_artifact_hash),
             ).fetchone()
             if existing is None:
                 raise
@@ -866,9 +1055,15 @@ class ShadowLedger:
         conflicting observations under what is supposed to be one immutable
         key (Phase 2: "conflicting rows ... must fail closed")."""
         content_key = json.dumps(
-            {"best_bid": best_bid, "best_ask": best_ask, "depth": depth,
-             "market_state": market_state, "order_book_hash": order_book_hash},
-            sort_keys=True, default=str,
+            {
+                "best_bid": best_bid,
+                "best_ask": best_ask,
+                "depth": depth,
+                "market_state": market_state,
+                "order_book_hash": order_book_hash,
+            },
+            sort_keys=True,
+            default=str,
         )
         content_hash = hashlib.sha256(content_key.encode()).hexdigest()
 
@@ -883,10 +1078,15 @@ class ShadowLedger:
             self.record_audit_event(
                 "market_snapshot_conflict",
                 details={
-                    "market_id": market_id, "side_id": side_id, "line": line,
-                    "period": period, "observed_at_utc": observed_at_utc,
+                    "market_id": market_id,
+                    "side_id": side_id,
+                    "line": line,
+                    "period": period,
+                    "observed_at_utc": observed_at_utc,
                 },
-                run_id=run_id, sport=sport, event_id=event_id,
+                run_id=run_id,
+                sport=sport,
+                event_id=event_id,
             )
             raise ValueError(
                 f"conflicting market_snapshot content for identical key "
@@ -902,10 +1102,24 @@ class ShadowLedger:
                 order_book_hash, content_hash
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
-                utc_now(), run_id, sport, event_id, schema_version, None,
-                market_id, side_id, line, period, observed_at_utc,
-                best_bid, best_ask, json.dumps(depth) if depth is not None else None,
-                market_state, quote_age_seconds, order_book_hash, content_hash,
+                utc_now(),
+                run_id,
+                sport,
+                event_id,
+                schema_version,
+                None,
+                market_id,
+                side_id,
+                line,
+                period,
+                observed_at_utc,
+                best_bid,
+                best_ask,
+                json.dumps(depth) if depth is not None else None,
+                market_state,
+                quote_age_seconds,
+                order_book_hash,
+                content_hash,
             ),
         )
         self.conn.commit()
@@ -938,13 +1152,26 @@ class ShadowLedger:
             """INSERT INTO market_evaluations(
                 created_at, run_id, sport, event_id, schema_version, supersedes_id,
                 decision_time_utc, market_id, market_type, team_or_side, line,
-                executable_ask, depth_adjusted_price, quote_age_seconds, available_depth
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                executable_ask, depth_adjusted_price, quote_age_seconds, available_depth,
+                market_probability
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
-                utc_now(), run_id, sport, event_id, schema_version, None,
-                decision_time_utc, e["market_id"], e["market_type"], e["team_or_side"],
-                e.get("line"), e.get("executable_ask"), e.get("depth_adjusted_price"),
-                e.get("quote_age_seconds"), e.get("available_depth"),
+                utc_now(),
+                run_id,
+                sport,
+                event_id,
+                schema_version,
+                None,
+                decision_time_utc,
+                e["market_id"],
+                e["market_type"],
+                e["team_or_side"],
+                e.get("line"),
+                e.get("executable_ask"),
+                e.get("depth_adjusted_price"),
+                e.get("quote_age_seconds"),
+                e.get("available_depth"),
+                e.get("market_probability"),
             ),
         )
         self.conn.commit()
@@ -999,9 +1226,28 @@ class ShadowLedger:
 
         if supersedes_id is None:
             existing = self._find_trade_decision(
-                sport, event_id, horizon, decision_time_utc,
-                model_artifact_hash, market_snapshot_hash, decision_policy_version,
-                d.get("market_type"), evaluated_market_id, evaluated_team_or_side, evaluated_line,
+                sport,
+                event_id,
+                horizon,
+                decision_time_utc,
+                model_artifact_hash,
+                market_snapshot_hash,
+                decision_policy_version,
+                d.get("market_type"),
+                evaluated_market_id,
+                evaluated_team_or_side,
+                evaluated_line,
+                d.get("blend_policy_artifact_hash"),
+                d.get("blend_experiment_spec_hash"),
+                d.get("blend_config_hash"),
+                d.get("model_probability"),
+                d.get("market_probability"),
+                d.get("serving_probability"),
+                d.get("model_conservative_probability"),
+                d.get("serving_conservative_probability"),
+                d.get("blend_weight"),
+                d.get("serving_policy_block_reason"),
+                d.get("decision_economics_hash"),
             )
             if existing is not None:
                 return existing, False
@@ -1014,23 +1260,77 @@ class ShadowLedger:
                     decision_policy_version, action, predicted_winner, market_type, units,
                     reason_code, cost_adjusted_edge, selected_market_evaluation_id,
                     evaluated_market_evaluation_id, evaluated_market_id, evaluated_team_or_side,
-                    evaluated_line
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    evaluated_line, model_probability, market_probability, serving_probability,
+                    model_conservative_probability, serving_conservative_probability,
+                    blend_weight, blend_policy_artifact_hash, blend_experiment_spec_hash,
+                    blend_config_hash,
+                    serving_policy_block_reason, fee_rate, safety_margin,
+                    size_limits_version, size_limits_json, decision_economics_hash
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
-                    utc_now(), run_id, sport, event_id, horizon, schema_version, supersedes_id,
-                    decision_time_utc, model_artifact_hash, market_snapshot_hash,
-                    decision_policy_version, d["action"], d.get("predicted_winner"),
-                    d.get("market_type"), d["units"], d.get("reason_code"),
-                    d.get("cost_adjusted_edge"), selected_market_evaluation_id,
-                    evaluated_market_evaluation_id, evaluated_market_id, evaluated_team_or_side,
+                    utc_now(),
+                    run_id,
+                    sport,
+                    event_id,
+                    horizon,
+                    schema_version,
+                    supersedes_id,
+                    decision_time_utc,
+                    model_artifact_hash,
+                    market_snapshot_hash,
+                    decision_policy_version,
+                    d["action"],
+                    d.get("predicted_winner"),
+                    d.get("market_type"),
+                    d["units"],
+                    d.get("reason_code"),
+                    d.get("cost_adjusted_edge"),
+                    selected_market_evaluation_id,
+                    evaluated_market_evaluation_id,
+                    evaluated_market_id,
+                    evaluated_team_or_side,
                     evaluated_line,
+                    d.get("model_probability"),
+                    d.get("market_probability"),
+                    d.get("serving_probability"),
+                    d.get("model_conservative_probability"),
+                    d.get("serving_conservative_probability"),
+                    d.get("blend_weight"),
+                    d.get("blend_policy_artifact_hash"),
+                    d.get("blend_experiment_spec_hash"),
+                    d.get("blend_config_hash"),
+                    d.get("serving_policy_block_reason"),
+                    d.get("fee_rate"),
+                    d.get("safety_margin"),
+                    d.get("size_limits_version"),
+                    d.get("size_limits_json"),
+                    d.get("decision_economics_hash"),
                 ),
             )
         except sqlite3.IntegrityError:
             existing = self._find_trade_decision(
-                sport, event_id, horizon, decision_time_utc,
-                model_artifact_hash, market_snapshot_hash, decision_policy_version,
-                d.get("market_type"), evaluated_market_id, evaluated_team_or_side, evaluated_line,
+                sport,
+                event_id,
+                horizon,
+                decision_time_utc,
+                model_artifact_hash,
+                market_snapshot_hash,
+                decision_policy_version,
+                d.get("market_type"),
+                evaluated_market_id,
+                evaluated_team_or_side,
+                evaluated_line,
+                d.get("blend_policy_artifact_hash"),
+                d.get("blend_experiment_spec_hash"),
+                d.get("blend_config_hash"),
+                d.get("model_probability"),
+                d.get("market_probability"),
+                d.get("serving_probability"),
+                d.get("model_conservative_probability"),
+                d.get("serving_conservative_probability"),
+                d.get("blend_weight"),
+                d.get("serving_policy_block_reason"),
+                d.get("decision_economics_hash"),
             )
             if existing is None:
                 raise
@@ -1039,9 +1339,29 @@ class ShadowLedger:
         return int(cur.lastrowid), True
 
     def _find_trade_decision(
-        self, sport, event_id, horizon, decision_time_utc,
-        model_artifact_hash, market_snapshot_hash, decision_policy_version,
-        market_type=None, evaluated_market_id=None, evaluated_team_or_side=None, evaluated_line=None,
+        self,
+        sport,
+        event_id,
+        horizon,
+        decision_time_utc,
+        model_artifact_hash,
+        market_snapshot_hash,
+        decision_policy_version,
+        market_type=None,
+        evaluated_market_id=None,
+        evaluated_team_or_side=None,
+        evaluated_line=None,
+        blend_policy_artifact_hash=None,
+        blend_experiment_spec_hash=None,
+        blend_config_hash=None,
+        model_probability=None,
+        market_probability=None,
+        serving_probability=None,
+        model_conservative_probability=None,
+        serving_conservative_probability=None,
+        blend_weight=None,
+        serving_policy_block_reason=None,
+        decision_economics_hash=None,
     ) -> int | None:
         # "IS ?" (not "=") for the nullable identity columns -- a moneyline
         # decision has a real, legitimate NULL evaluated_line, and SQL NULLs
@@ -1052,10 +1372,38 @@ class ShadowLedger:
                  AND model_artifact_hash=? AND market_snapshot_hash=? AND decision_policy_version=?
                  AND market_type IS ? AND evaluated_market_id IS ?
                  AND evaluated_team_or_side IS ? AND evaluated_line IS ?
+                 AND blend_policy_artifact_hash IS ? AND blend_experiment_spec_hash IS ?
+                 AND blend_config_hash IS ? AND model_probability IS ?
+                 AND market_probability IS ? AND serving_probability IS ?
+                 AND model_conservative_probability IS ?
+                 AND serving_conservative_probability IS ? AND blend_weight IS ?
+                 AND serving_policy_block_reason IS ?
+                 AND decision_economics_hash IS ?
                  AND supersedes_id IS NULL""",
-            (sport, event_id, horizon, decision_time_utc,
-             model_artifact_hash, market_snapshot_hash, decision_policy_version,
-             market_type, evaluated_market_id, evaluated_team_or_side, evaluated_line),
+            (
+                sport,
+                event_id,
+                horizon,
+                decision_time_utc,
+                model_artifact_hash,
+                market_snapshot_hash,
+                decision_policy_version,
+                market_type,
+                evaluated_market_id,
+                evaluated_team_or_side,
+                evaluated_line,
+                blend_policy_artifact_hash,
+                blend_experiment_spec_hash,
+                blend_config_hash,
+                model_probability,
+                market_probability,
+                serving_probability,
+                model_conservative_probability,
+                serving_conservative_probability,
+                blend_weight,
+                serving_policy_block_reason,
+                decision_economics_hash,
+            ),
         ).fetchone()
         return int(row["id"]) if row is not None else None
 
@@ -1098,9 +1446,23 @@ class ShadowLedger:
                 worst_fill_price, filled_units, unfilled_units, slippage, status, placed_at_utc
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
-                utc_now(), run_id, sport, event_id, schema_version, None,
-                trade_decision_id, market_id, side, requested_units, avg_fill_price,
-                worst_fill_price, filled_units, unfilled_units, slippage, status, placed_at_utc,
+                utc_now(),
+                run_id,
+                sport,
+                event_id,
+                schema_version,
+                None,
+                trade_decision_id,
+                market_id,
+                side,
+                requested_units,
+                avg_fill_price,
+                worst_fill_price,
+                filled_units,
+                unfilled_units,
+                slippage,
+                status,
+                placed_at_utc,
             ),
         )
         self.conn.commit()
@@ -1134,9 +1496,19 @@ class ShadowLedger:
                 settled_at_utc, notes
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
-                utc_now(), run_id, sport, event_id, schema_version, None,
-                paper_order_id, trade_decision_id, outcome, settled_price, pnl,
-                settled_at_utc, notes,
+                utc_now(),
+                run_id,
+                sport,
+                event_id,
+                schema_version,
+                None,
+                paper_order_id,
+                trade_decision_id,
+                outcome,
+                settled_price,
+                pnl,
+                settled_at_utc,
+                notes,
             ),
         )
         self.conn.commit()
@@ -1156,11 +1528,21 @@ class ShadowLedger:
     # same real bytes, recording it twice is a no-op, not a duplicate).
 
     def record_raw_snapshot(
-        self, *, run_id: str, sport: str, source: str, source_record_id: str,
-        observed_at_utc: str, snapshot_hash: str, event_id: str | None = None,
-        effective_at_utc: str | None = None, ingested_at_utc: str | None = None,
-        path: str | None = None, http_status: int | None = None,
-        request_params_hash: str | None = None, schema_version: str = SCHEMA_VERSION,
+        self,
+        *,
+        run_id: str,
+        sport: str,
+        source: str,
+        source_record_id: str,
+        observed_at_utc: str,
+        snapshot_hash: str,
+        event_id: str | None = None,
+        effective_at_utc: str | None = None,
+        ingested_at_utc: str | None = None,
+        path: str | None = None,
+        http_status: int | None = None,
+        request_params_hash: str | None = None,
+        schema_version: str = SCHEMA_VERSION,
     ) -> tuple[int, bool]:
         existing = self.conn.execute(
             "SELECT id FROM raw_snapshots WHERE snapshot_hash=? AND source=? AND source_record_id=?",
@@ -1174,16 +1556,31 @@ class ShadowLedger:
                 source, source_record_id, observed_at_utc, effective_at_utc,
                 ingested_at_utc, snapshot_hash, path, http_status, request_params_hash
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (utc_now(), run_id, sport, event_id, schema_version, None,
-             source, source_record_id, observed_at_utc, effective_at_utc,
-             ingested_at_utc, snapshot_hash, path, http_status, request_params_hash),
+            (
+                utc_now(),
+                run_id,
+                sport,
+                event_id,
+                schema_version,
+                None,
+                source,
+                source_record_id,
+                observed_at_utc,
+                effective_at_utc,
+                ingested_at_utc,
+                snapshot_hash,
+                path,
+                http_status,
+                request_params_hash,
+            ),
         )
         self.conn.commit()
         return int(cur.lastrowid), True
 
     def raw_snapshots_for_event(self, sport: str, event_id: str) -> list[dict[str, Any]]:
         rows = self.conn.execute(
-            "SELECT * FROM raw_snapshots WHERE sport=? AND event_id=? ORDER BY id", (sport, event_id),
+            "SELECT * FROM raw_snapshots WHERE sport=? AND event_id=? ORDER BY id",
+            (sport, event_id),
         ).fetchall()
         return [dict(r) for r in rows]
 
@@ -1193,10 +1590,18 @@ class ShadowLedger:
     # itself had before a4e03a1, not repeated here for the ledger copy.
 
     def record_normalized_observation(
-        self, *, run_id: str, sport: str, table_name: str, primary_key: dict[str, Any],
-        event_id: str | None = None, observed_at_utc: str | None = None,
-        source: str | None = None, raw_snapshot_hash: str | None = None,
-        payload: dict[str, Any] | None = None, schema_version: str = SCHEMA_VERSION,
+        self,
+        *,
+        run_id: str,
+        sport: str,
+        table_name: str,
+        primary_key: dict[str, Any],
+        event_id: str | None = None,
+        observed_at_utc: str | None = None,
+        source: str | None = None,
+        raw_snapshot_hash: str | None = None,
+        payload: dict[str, Any] | None = None,
+        schema_version: str = SCHEMA_VERSION,
     ) -> tuple[int, bool]:
         pk_json = json.dumps(primary_key, sort_keys=True, default=str)
         content_hash = hashlib.sha256(
@@ -1208,9 +1613,7 @@ class ShadowLedger:
             (table_name, pk_json, observed_at_utc),
         ).fetchone()
         if existing is not None:
-            existing_hash = hashlib.sha256(
-                (existing["payload_json"] or "{}").encode()
-            ).hexdigest()
+            existing_hash = hashlib.sha256((existing["payload_json"] or "{}").encode()).hexdigest()
             if existing_hash == content_hash:
                 return int(existing["id"]), False
         cur = self.conn.execute(
@@ -1219,9 +1622,20 @@ class ShadowLedger:
                 table_name, primary_key_json, observed_at_utc, source,
                 raw_snapshot_hash, payload_json
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (utc_now(), run_id, sport, event_id, schema_version, None,
-             table_name, pk_json, observed_at_utc, source, raw_snapshot_hash,
-             json.dumps(payload, default=str) if payload is not None else None),
+            (
+                utc_now(),
+                run_id,
+                sport,
+                event_id,
+                schema_version,
+                None,
+                table_name,
+                pk_json,
+                observed_at_utc,
+                source,
+                raw_snapshot_hash,
+                json.dumps(payload, default=str) if payload is not None else None,
+            ),
         )
         self.conn.commit()
         return int(cur.lastrowid), True
@@ -1232,10 +1646,18 @@ class ShadowLedger:
     # snapshot twice is a no-op here too.
 
     def record_feature_snapshot(
-        self, *, run_id: str, sport: str, horizon: str, dataset_hash: str,
-        event_id: str | None = None, decision_time_utc: str | None = None,
-        feature_schema_version: str | None = None, row_count: int | None = None,
-        payload_path: str | None = None, schema_version: str = SCHEMA_VERSION,
+        self,
+        *,
+        run_id: str,
+        sport: str,
+        horizon: str,
+        dataset_hash: str,
+        event_id: str | None = None,
+        decision_time_utc: str | None = None,
+        feature_schema_version: str | None = None,
+        row_count: int | None = None,
+        payload_path: str | None = None,
+        schema_version: str = SCHEMA_VERSION,
     ) -> tuple[int, bool]:
         existing = self.conn.execute(
             "SELECT id FROM feature_snapshots WHERE sport=? AND horizon=? AND dataset_hash=?",
@@ -1248,8 +1670,20 @@ class ShadowLedger:
                 created_at, run_id, sport, event_id, horizon, schema_version, supersedes_id,
                 decision_time_utc, feature_schema_version, dataset_hash, row_count, payload_path
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (utc_now(), run_id, sport, event_id, horizon, schema_version, None,
-             decision_time_utc, feature_schema_version, dataset_hash, row_count, payload_path),
+            (
+                utc_now(),
+                run_id,
+                sport,
+                event_id,
+                horizon,
+                schema_version,
+                None,
+                decision_time_utc,
+                feature_schema_version,
+                dataset_hash,
+                row_count,
+                payload_path,
+            ),
         )
         self.conn.commit()
         return int(cur.lastrowid), True
@@ -1267,10 +1701,17 @@ class ShadowLedger:
     # same real split out), so recomputing it isn't a new fact worth a new row.
 
     def record_dataset_manifest(
-        self, *, run_id: str, sport: str, dataset_hash: str,
-        horizon: str | None = None, split_manifest: dict[str, Any] | None = None,
-        final_test_start: str | None = None, final_test_end: str | None = None,
-        final_test_consumed: bool = False, schema_version: str = SCHEMA_VERSION,
+        self,
+        *,
+        run_id: str,
+        sport: str,
+        dataset_hash: str,
+        horizon: str | None = None,
+        split_manifest: dict[str, Any] | None = None,
+        final_test_start: str | None = None,
+        final_test_end: str | None = None,
+        final_test_consumed: bool = False,
+        schema_version: str = SCHEMA_VERSION,
     ) -> tuple[int, bool]:
         existing = self.conn.execute(
             "SELECT id FROM dataset_manifests WHERE sport=? AND dataset_hash=?",
@@ -1284,9 +1725,19 @@ class ShadowLedger:
                 dataset_hash, split_manifest_json, final_test_start, final_test_end,
                 final_test_consumed
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-            (utc_now(), run_id, sport, schema_version, None, horizon, dataset_hash,
-             json.dumps(split_manifest, default=str) if split_manifest is not None else None,
-             final_test_start, final_test_end, int(final_test_consumed)),
+            (
+                utc_now(),
+                run_id,
+                sport,
+                schema_version,
+                None,
+                horizon,
+                dataset_hash,
+                json.dumps(split_manifest, default=str) if split_manifest is not None else None,
+                final_test_start,
+                final_test_end,
+                int(final_test_consumed),
+            ),
         )
         self.conn.commit()
         return int(cur.lastrowid), True
@@ -1296,14 +1747,27 @@ class ShadowLedger:
     # convention already used across config/models/challengers/*.json.
 
     def record_model_artifact(
-        self, *, run_id: str, sport: str, model_name: str, model_version: str,
-        artifact_hash: str, market_family: str | None = None, horizon: str | None = None,
-        training_start: str | None = None, training_end: str | None = None,
-        dataset_hash: str | None = None, split_manifest_hash: str | None = None,
-        code_revision: str | None = None, dependency_lock_hash: str | None = None,
-        artifact_path: str | None = None, schema_version: str = SCHEMA_VERSION,
-        manifest_sha256: str | None = None, primary_content_sha256: str | None = None,
-        primary_artifact_sha256: str | None = None, calibrator_artifact_sha256: str | None = None,
+        self,
+        *,
+        run_id: str,
+        sport: str,
+        model_name: str,
+        model_version: str,
+        artifact_hash: str,
+        market_family: str | None = None,
+        horizon: str | None = None,
+        training_start: str | None = None,
+        training_end: str | None = None,
+        dataset_hash: str | None = None,
+        split_manifest_hash: str | None = None,
+        code_revision: str | None = None,
+        dependency_lock_hash: str | None = None,
+        artifact_path: str | None = None,
+        schema_version: str = SCHEMA_VERSION,
+        manifest_sha256: str | None = None,
+        primary_content_sha256: str | None = None,
+        primary_artifact_sha256: str | None = None,
+        calibrator_artifact_sha256: str | None = None,
         source_tree_sha256: str | None = None,
     ) -> tuple[int, bool]:
         existing = self.conn.execute(
@@ -1344,12 +1808,30 @@ class ShadowLedger:
                 manifest_sha256, primary_content_sha256, primary_artifact_sha256,
                 calibrator_artifact_sha256, source_tree_sha256
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (utc_now(), run_id, sport, schema_version, None,
-             model_name, model_version, market_family, horizon,
-             training_start, training_end, dataset_hash, split_manifest_hash,
-             code_revision, dependency_lock_hash, artifact_hash, artifact_path,
-             manifest_sha256, primary_content_sha256, primary_artifact_sha256,
-             calibrator_artifact_sha256, source_tree_sha256),
+            (
+                utc_now(),
+                run_id,
+                sport,
+                schema_version,
+                None,
+                model_name,
+                model_version,
+                market_family,
+                horizon,
+                training_start,
+                training_end,
+                dataset_hash,
+                split_manifest_hash,
+                code_revision,
+                dependency_lock_hash,
+                artifact_hash,
+                artifact_path,
+                manifest_sha256,
+                primary_content_sha256,
+                primary_artifact_sha256,
+                calibrator_artifact_sha256,
+                source_tree_sha256,
+            ),
         )
         self.conn.commit()
         return int(cur.lastrowid), True
@@ -1367,8 +1849,14 @@ class ShadowLedger:
     # separately hashed, mutually bound artifacts."
 
     def record_calibration_artifact(
-        self, *, run_id: str, sport: str, model_artifact_hash: str, calibration_hash: str,
-        method: str | None = None, fitted_on_hash: str | None = None,
+        self,
+        *,
+        run_id: str,
+        sport: str,
+        model_artifact_hash: str,
+        calibration_hash: str,
+        method: str | None = None,
+        fitted_on_hash: str | None = None,
         schema_version: str = SCHEMA_VERSION,
     ) -> tuple[int, bool]:
         existing = self.conn.execute(
@@ -1385,8 +1873,17 @@ class ShadowLedger:
                 created_at, run_id, sport, schema_version, supersedes_id,
                 model_artifact_hash, calibration_hash, method, fitted_on_hash
             ) VALUES (?,?,?,?,?,?,?,?,?)""",
-            (utc_now(), run_id, sport, schema_version, None,
-             model_artifact_hash, calibration_hash, method, fitted_on_hash),
+            (
+                utc_now(),
+                run_id,
+                sport,
+                schema_version,
+                None,
+                model_artifact_hash,
+                calibration_hash,
+                method,
+                fitted_on_hash,
+            ),
         )
         self.conn.commit()
         return int(cur.lastrowid), True
@@ -1397,10 +1894,18 @@ class ShadowLedger:
     # closed (a real closing price is a settled fact, not a moving quote).
 
     def record_closing_price(
-        self, *, run_id: str, sport: str, market_id: str, side_id: str,
-        event_id: str | None = None, line: float | None = None,
-        closing_price: float | None = None, observed_at_utc: str | None = None,
-        quote_type: str = "last_pregame_quote", seconds_to_start: float | None = None,
+        self,
+        *,
+        run_id: str,
+        sport: str,
+        market_id: str,
+        side_id: str,
+        event_id: str | None = None,
+        line: float | None = None,
+        closing_price: float | None = None,
+        observed_at_utc: str | None = None,
+        quote_type: str = "last_pregame_quote",
+        seconds_to_start: float | None = None,
         schema_version: str = SCHEMA_VERSION,
     ) -> tuple[int, bool]:
         """`quote_type` (MLB-7, multi-sport execution spec): every recorded
@@ -1433,9 +1938,21 @@ class ShadowLedger:
                 market_id, side_id, line, closing_price, observed_at_utc,
                 quote_type, seconds_to_start
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (utc_now(), run_id, sport, event_id, schema_version, None,
-             market_id, side_id, line, closing_price, observed_at_utc,
-             quote_type, seconds_to_start),
+            (
+                utc_now(),
+                run_id,
+                sport,
+                event_id,
+                schema_version,
+                None,
+                market_id,
+                side_id,
+                line,
+                closing_price,
+                observed_at_utc,
+                quote_type,
+                seconds_to_start,
+            ),
         )
         self.conn.commit()
         return int(cur.lastrowid), True
@@ -1443,17 +1960,37 @@ class ShadowLedger:
     # ── reviews (human/operator annotations -- always append) ──────────
 
     def record_review(
-        self, *, run_id: str, subject_table: str, subject_id: int, verdict: str,
-        sport: str | None = None, event_id: str | None = None, reviewer: str | None = None,
-        notes: str | None = None, schema_version: str = SCHEMA_VERSION,
+        self,
+        *,
+        run_id: str,
+        subject_table: str,
+        subject_id: int,
+        verdict: str,
+        sport: str | None = None,
+        event_id: str | None = None,
+        reviewer: str | None = None,
+        notes: str | None = None,
+        schema_version: str = SCHEMA_VERSION,
     ) -> int:
         cur = self.conn.execute(
             """INSERT INTO reviews(
                 created_at, run_id, sport, event_id, schema_version, supersedes_id,
                 subject_table, subject_id, reviewer, verdict, notes, reviewed_at_utc
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (utc_now(), run_id, sport, event_id, schema_version, None,
-             subject_table, subject_id, reviewer, verdict, notes, utc_now()),
+            (
+                utc_now(),
+                run_id,
+                sport,
+                event_id,
+                schema_version,
+                None,
+                subject_table,
+                subject_id,
+                reviewer,
+                verdict,
+                notes,
+                utc_now(),
+            ),
         )
         self.conn.commit()
         return int(cur.lastrowid)
@@ -1480,23 +2017,41 @@ class ShadowLedger:
         MetadataDB.audit_event. Returns the new entry's audit_uuid."""
         audit_uuid = uuid.uuid4().hex
         now = utc_now()
-        prev = self.conn.execute(
-            "SELECT event_hash FROM audit_events ORDER BY id DESC LIMIT 1"
-        ).fetchone()
+        prev = self.conn.execute("SELECT event_hash FROM audit_events ORDER BY id DESC LIMIT 1").fetchone()
         previous_hash = prev["event_hash"] if prev else ""
-        raw = json.dumps({
-            "audit_uuid": audit_uuid, "event_type": event_type, "run_id": run_id,
-            "sport": sport, "event_id": event_id, "details": details,
-            "previous_hash": previous_hash, "created_at": now,
-        }, sort_keys=True, default=str)
+        raw = json.dumps(
+            {
+                "audit_uuid": audit_uuid,
+                "event_type": event_type,
+                "run_id": run_id,
+                "sport": sport,
+                "event_id": event_id,
+                "details": details,
+                "previous_hash": previous_hash,
+                "created_at": now,
+            },
+            sort_keys=True,
+            default=str,
+        )
         event_hash = hashlib.sha256(raw.encode()).hexdigest()
         self.conn.execute(
             """INSERT INTO audit_events(
                 audit_uuid, created_at, run_id, sport, event_id, schema_version,
                 supersedes_id, event_type, details_json, previous_hash, event_hash
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-            (audit_uuid, now, run_id, sport, event_id, schema_version, None,
-             event_type, json.dumps(details) if details else None, previous_hash, event_hash),
+            (
+                audit_uuid,
+                now,
+                run_id,
+                sport,
+                event_id,
+                schema_version,
+                None,
+                event_type,
+                json.dumps(details) if details else None,
+                previous_hash,
+                event_hash,
+            ),
         )
         self.conn.commit()
         return audit_uuid

@@ -74,7 +74,7 @@ from .uncertainty import (
 from .xgboost_stress import XGBoostChallenger
 
 HORIZON_LATE = "late"
-DECISION_POLICY_VERSION = "winner_first_v1"
+DECISION_POLICY_VERSION = "winner_first_market_blend_v2"
 
 FROZEN_CALIBRATOR_ARTIFACT_PATH = (
     "config/models/challengers/mlb-xgb_two_head_negative_binomial-calibrator-v1.json"
@@ -105,6 +105,7 @@ class TrainedModels:
     spec) -- never for spread/total, per CLAUDE.md's architecture rule that
     a disconnected classifier may contribute disagreement evidence but must
     never generate spread/total on its own."""
+
     model: XGBoostTwoHeadModel
     bootstrap: BootstrapMLBEnsemble
     train_n: int
@@ -170,13 +171,17 @@ def train_through(features: pl.DataFrame, cutoff_date: str) -> TrainedModels:
             xgb_direct.fit(X_fit, y_fit, XGB_DIRECT_FEATURES, eval_set=(X_eval, y_eval))
 
     return TrainedModels(
-        model=model, bootstrap=bootstrap, train_n=train.height,
-        sklearn_baseline=sklearn_baseline, xgb_direct=xgb_direct,
+        model=model,
+        bootstrap=bootstrap,
+        train_n=train.height,
+        sklearn_baseline=sklearn_baseline,
+        xgb_direct=xgb_direct,
     )
 
 
 def build_forecast(
-    model: XGBoostTwoHeadModel, row: dict,
+    model: XGBoostTwoHeadModel,
+    row: dict,
     total_lines: list[float] | None = None,
     spread_line_side_pairs: list[tuple[float, str]] | None = None,
     bootstrap: BootstrapMLBEnsemble | None = None,
@@ -241,7 +246,10 @@ def build_forecast(
     real_calibration_uncertainty = 0.0
     if calibration_oof_probs and calibration_oof_labels:
         real_calibration_uncertainty = calibration_uncertainty(
-            pred.home_win_prob, calibration_oof_probs, calibration_oof_labels, calibrator.method,
+            pred.home_win_prob,
+            calibration_oof_probs,
+            calibration_oof_labels,
+            calibrator.method,
         )
 
     totals_probabilities: dict[float, dict[str, float]] = {}
@@ -268,10 +276,18 @@ def build_forecast(
         # preserved, and probability_lower/upper stay in the same
         # probability space as calibrated_probabilities.
         home_lower_raw, home_upper_raw = bootstrap.market_probability_bounds(
-            row, model.distribution, "moneyline", "home", lower_quantile=lower_quantile,
+            row,
+            model.distribution,
+            "moneyline",
+            "home",
+            lower_quantile=lower_quantile,
         )
         away_lower_raw, away_upper_raw = bootstrap.market_probability_bounds(
-            row, model.distribution, "moneyline", "away", lower_quantile=lower_quantile,
+            row,
+            model.distribution,
+            "moneyline",
+            "away",
+            lower_quantile=lower_quantile,
         )
         lower = {"home": calibrator.transform(home_lower_raw), "away": calibrator.transform(away_lower_raw)}
         upper = {"home": calibrator.transform(home_upper_raw), "away": calibrator.transform(away_upper_raw)}
@@ -299,14 +315,26 @@ def build_forecast(
         breakdown = model.distribution.total_market_breakdown(pred, line)
         totals_probabilities[line] = {"over": breakdown["over"], "under": breakdown["under"]}
         totals_outcomes[line] = {
-            "over_win": breakdown["over_win"], "under_win": breakdown["under_win"], "push": breakdown["push"],
+            "over_win": breakdown["over_win"],
+            "under_win": breakdown["under_win"],
+            "push": breakdown["push"],
         }
         if bootstrap is not None and bootstrap.fitted:
             over_lower, _ = bootstrap.market_probability_bounds(
-                row, model.distribution, "total", "over", line, lower_quantile=lower_quantile,
+                row,
+                model.distribution,
+                "total",
+                "over",
+                line,
+                lower_quantile=lower_quantile,
             )
             under_lower, _ = bootstrap.market_probability_bounds(
-                row, model.distribution, "total", "under", line, lower_quantile=lower_quantile,
+                row,
+                model.distribution,
+                "total",
+                "under",
+                line,
+                lower_quantile=lower_quantile,
             )
             totals_probabilities_lower[line] = {"over": over_lower, "under": under_lower}
 
@@ -323,13 +351,19 @@ def build_forecast(
         # Signed lines are stored per side. Outcome mass is explicit even
         # when the pricing probability splits a whole-line push.
         push_probe = model.distribution.spread_market_breakdown(
-            pred, line if side == "home" else -line,
+            pred,
+            line if side == "home" else -line,
         )
         spread_outcomes.setdefault(line, {})[f"{side}_win"] = push_probe[f"{side}_win"]
         spread_outcomes[line]["push"] = push_probe["push"]
         if bootstrap is not None and bootstrap.fitted:
             cover_lower, _ = bootstrap.market_probability_bounds(
-                row, model.distribution, "spread", side, line, lower_quantile=lower_quantile,
+                row,
+                model.distribution,
+                "spread",
+                side,
+                line,
+                lower_quantile=lower_quantile,
             )
             spread_probabilities_lower.setdefault(line, {})[side] = cover_lower
 
@@ -342,20 +376,26 @@ def build_forecast(
     for side in ("home", "away"):
         result = compose_conservative_probability(
             calibrated_probability=calibrated[side],
-            bootstrap_lower=lower[side], bootstrap_upper=upper[side],
+            bootstrap_lower=lower[side],
+            bootstrap_upper=upper[side],
             model_disagreement=real_model_disagreement,
             calibration_uncertainty=real_calibration_uncertainty,
             missingness_penalty=real_missingness_penalty,
-            raw_probability=raw[side], missing_flags=real_missing_flags,
+            raw_probability=raw[side],
+            missing_flags=real_missing_flags,
             lineup_uncertainty=None,
         )
         conservative_probabilities[side] = result.conservative_probability
 
     return SportsForecast(
-        event_id=row["event_id"], predicted_winner=predicted_winner,
-        raw_probabilities=raw, calibrated_probabilities=calibrated,
-        probability_lower=lower, probability_upper=upper,
-        expected_home_score=pred.home_expected_runs, expected_away_score=pred.away_expected_runs,
+        event_id=row["event_id"],
+        predicted_winner=predicted_winner,
+        raw_probabilities=raw,
+        calibrated_probabilities=calibrated,
+        probability_lower=lower,
+        probability_upper=upper,
+        expected_home_score=pred.home_expected_runs,
+        expected_away_score=pred.away_expected_runs,
         model_artifact_hash=model_artifact_hash or model.to_artifact().get("artifact_hash", ""),
         calibration_artifact_hash=calibrator_hash or f"uncalibrated_{calibrator.method}",
         totals_probabilities=totals_probabilities,
@@ -383,6 +423,7 @@ class MLBRunState:
     """Cross-stage state for one real MLB shadow run, held by MLBAdapter
     between predict()/match_markets()/decide() calls within one CLI
     invocation."""
+
     target_date: str
     tonight: pl.DataFrame
     pitches: pl.DataFrame = field(default_factory=pl.DataFrame)
@@ -411,12 +452,16 @@ class MLBRunState:
     decision_times: dict[str, datetime] = field(default_factory=dict)
     prediction_observed_at_by_event: dict[str, str] = field(default_factory=dict)
     rows_by_event: dict[str, dict] = field(default_factory=dict)  # real feature row per game
-    forecasts: dict[str, SportsForecast] = field(default_factory=dict)  # rebuilt in decide() with real market lines
+    forecasts: dict[str, SportsForecast] = field(
+        default_factory=dict
+    )  # rebuilt in decide() with real market lines
     market_rows: pl.DataFrame = field(default_factory=pl.DataFrame)
     candidates_by_event: dict[str, list] = field(default_factory=dict)
     total_lines_by_event: dict[str, list[float]] = field(default_factory=dict)
     spread_pairs_by_event: dict[str, list[tuple[float, str]]] = field(default_factory=dict)
-    event_canonical_id_by_event: dict[str, str | None] = field(default_factory=dict)  # linked Polymarket <-> ESPN canonical event
+    event_canonical_id_by_event: dict[str, str | None] = field(
+        default_factory=dict
+    )  # linked Polymarket <-> ESPN canonical event
     skipped: dict[str, str] = field(default_factory=dict)  # event_id -> real skip reason
 
 
@@ -470,6 +515,7 @@ def save_resume_state(state: MLBRunState, data_root: str, run_id: str) -> None:
         raise ValueError("cannot save resume state before the frozen candidate is loaded")
     out = _resume_state_dir(data_root, run_id)
     out.mkdir(parents=True, exist_ok=True)
+
     # rows_by_event's real feature values can be numpy scalars (e.g. from
     # pandas/numpy-backed feature computation upstream) -- plain
     # json.dumps(default=str) would silently stringify those into text
@@ -589,7 +635,11 @@ def load_resume_state(
     rows = saved.get("rows_by_event")
     observed_by_event = saved.get("prediction_observed_at_by_event")
     event_contracts = saved.get("event_contracts")
-    if not isinstance(rows, dict) or not isinstance(observed_by_event, dict) or not isinstance(event_contracts, dict):
+    if (
+        not isinstance(rows, dict)
+        or not isinstance(observed_by_event, dict)
+        or not isinstance(event_contracts, dict)
+    ):
         raise ValueError("resume state event payload is malformed")  # noqa: TRY004 -- untrusted JSON, see note above
     tonight_by_event = {str(row["event_id"]): row for row in state.tonight.iter_rows(named=True)}
     for event_id, row in rows.items():
@@ -641,8 +691,7 @@ def load_state(data_root: str, target_date: str) -> MLBRunState | None:
     except FileNotFoundError:
         return None
     tonight = sb.filter(
-        (pl.col("event_start_utc").str.slice(0, 10) == target_date)
-        & (pl.col("status") == "STATUS_SCHEDULED")
+        (pl.col("event_start_utc").str.slice(0, 10) == target_date) & (pl.col("status") == "STATUS_SCHEDULED")
     )
     if tonight.height == 0:
         return None
@@ -659,7 +708,10 @@ def load_state(data_root: str, target_date: str) -> MLBRunState | None:
     }
 
     return MLBRunState(
-        target_date=target_date, tonight=tonight, pitches=pitches, starters=starters,
+        target_date=target_date,
+        tonight=tonight,
+        pitches=pitches,
+        starters=starters,
         decision_times=decision_times,
     )
 
@@ -754,8 +806,14 @@ def predict_stage(
             continue
 
         row = build_live_game_feature_row(
-            g, probable["home_starter"], probable["away_starter"], state.pitches, state.starters, data_root,
-            identity_registry, decision_time_utc=state.decision_times[event_id],
+            g,
+            probable["home_starter"],
+            probable["away_starter"],
+            state.pitches,
+            state.starters,
+            data_root,
+            identity_registry,
+            decision_time_utc=state.decision_times[event_id],
         )
         if row is None:
             state.skipped[event_id] = "starter_name_not_resolved_to_real_statcast_id"
@@ -794,17 +852,24 @@ def predict_stage(
         save_resume_state(state, data_root, run_id)
 
     return {
-        "status": "ok", "train_games": state.train_n,
+        "status": "ok",
+        "train_games": state.train_n,
         "frozen_bundle_hash": state.frozen_bundle_hash,
         "test_id": state.test_id,
         "candidate_version": state.candidate_version,
-        "games_predicted": n_predicted, "games_total": state.tonight.height,
+        "games_predicted": n_predicted,
+        "games_total": state.tonight.height,
         "skipped": dict(state.skipped),
     }
 
 
 def match_markets_stage(
-    state: MLBRunState, data_root: str, collector: Any, *, ledger: Any | None = None, run_id: str | None = None,
+    state: MLBRunState,
+    data_root: str,
+    collector: Any,
+    *,
+    ledger: Any | None = None,
+    run_id: str | None = None,
 ) -> dict:
     """Real fresh Polymarket collection + per-game candidate/line
     resolution -- matches mlb_shadow_run.py's steps 4b-5 exactly (same
@@ -833,8 +898,11 @@ def match_markets_stage(
         home_canonical_id = g.get("home_team_canonical_id")
         away_canonical_id = g.get("away_team_canonical_id")
         resolved_event_id = resolve_polymarket_event_id(
-            state.market_rows, g["home_team"], g["away_team"],
-            home_canonical_id=home_canonical_id, away_canonical_id=away_canonical_id,
+            state.market_rows,
+            g["home_team"],
+            g["away_team"],
+            home_canonical_id=home_canonical_id,
+            away_canonical_id=away_canonical_id,
         )
         # Real event-identity linking (Task 1 follow-up): ties Polymarket's
         # own event_id to the same canonical event ESPN scoreboard
@@ -844,8 +912,12 @@ def match_markets_stage(
         # Fails closed to None (not an error) on any ambiguity or missing
         # canonical team ids, matching every other resolver here.
         state.event_canonical_id_by_event[event_id] = resolve_or_link_polymarket_event_id(
-            collector.identity, "mlb", resolved_event_id,
-            home_canonical_id, away_canonical_id, state.target_date,
+            collector.identity,
+            "mlb",
+            resolved_event_id,
+            home_canonical_id,
+            away_canonical_id,
+            state.target_date,
             known_canonical_event_id=g.get("event_canonical_id"),
         )
         state.total_lines_by_event[event_id] = (
@@ -855,8 +927,11 @@ def match_markets_stage(
             real_spread_line_side_pairs(state.market_rows, resolved_event_id) if resolved_event_id else []
         )
         state.candidates_by_event[event_id] = real_market_candidates(
-            state.market_rows, g["home_team"], g["away_team"],
-            home_canonical_id=home_canonical_id, away_canonical_id=away_canonical_id,
+            state.market_rows,
+            g["home_team"],
+            g["away_team"],
+            home_canonical_id=home_canonical_id,
+            away_canonical_id=away_canonical_id,
         )
         n_matched += 1
 
@@ -869,8 +944,12 @@ def match_markets_stage(
 
 
 def decide_stage(
-    state: MLBRunState, *, ledger: Any | None = None, run_id: str | None = None,
-    limits: SizeLimits | None = None, challenger_root: str | Path | None = None,
+    state: MLBRunState,
+    *,
+    ledger: Any | None = None,
+    run_id: str | None = None,
+    limits: SizeLimits | None = None,
+    challenger_root: str | Path | None = None,
 ) -> dict:
     """Real final forecast (now with real market-derived total/spread
     lines) + winner-first decision + persistence -- matches
@@ -894,7 +973,9 @@ def decide_stage(
     # state.rows_by_event only carries event_id, not the original scoreboard
     # row (needed so scripts/mlb_shadow_run.py's thin wrapper doesn't need
     # its own second pass over state.tonight just for display).
-    team_names = {r["event_id"]: (r["home_team"], r["away_team"]) for r in state.tonight.iter_rows(named=True)}
+    team_names = {
+        r["event_id"]: (r["home_team"], r["away_team"]) for r in state.tonight.iter_rows(named=True)
+    }
 
     for event_id, row in state.rows_by_event.items():
         prediction_created_at = _utc_now_dt()
@@ -909,10 +990,17 @@ def decide_stage(
         # itself was already frozen in predict_stage() and is unchanged here
         # (build_forecast recomputes deterministically from the same model/row).
         forecast = build_forecast(
-            state.model, row, total_lines, spread_pairs, bootstrap=state.bootstrap,
-            calibrator=calibrator_bundle.calibrator, calibrator_hash=calibrator_bundle.calibrator_hash,
-            sklearn_baseline=state.sklearn_baseline, xgb_direct=state.xgb_direct,
-            calibration_oof_probs=calibrator_bundle.oof_probs, calibration_oof_labels=calibrator_bundle.oof_labels,
+            state.model,
+            row,
+            total_lines,
+            spread_pairs,
+            bootstrap=state.bootstrap,
+            calibrator=calibrator_bundle.calibrator,
+            calibrator_hash=calibrator_bundle.calibrator_hash,
+            sklearn_baseline=state.sklearn_baseline,
+            xgb_direct=state.xgb_direct,
+            calibration_oof_probs=calibrator_bundle.oof_probs,
+            calibration_oof_labels=calibrator_bundle.oof_labels,
             model_artifact_hash=state.frozen_bundle_hash,
         )
         state.forecasts[event_id] = forecast
@@ -925,7 +1013,10 @@ def decide_stage(
 
         if ledger is not None and run_id is not None:
             _, pred_created = ledger.record_prediction(
-                run_id=run_id, sport="mlb", event_id=event_id, horizon=HORIZON_LATE,
+                run_id=run_id,
+                sport="mlb",
+                event_id=event_id,
+                horizon=HORIZON_LATE,
                 decision_time_utc=decision_time_utc,
                 prediction_observed_at_utc=state.prediction_observed_at_by_event[event_id],
                 test_id=state.test_id,
@@ -936,63 +1027,113 @@ def decide_stage(
             market_eval_ids: dict[tuple, int] = {}
             for c in candidates:
                 eval_row_id = ledger.record_market_evaluation(
-                    run_id=run_id, sport="mlb", event_id=event_id,
-                    evaluation=c, decision_time_utc=decision_time_utc,
+                    run_id=run_id,
+                    sport="mlb",
+                    event_id=event_id,
+                    evaluation=c,
+                    decision_time_utc=decision_time_utc,
                 )
                 market_eval_ids[(c.market_id, c.market_type, c.team_or_side, c.line)] = eval_row_id
 
             market_snapshot_hash = real_market_snapshot_hash(event_id, candidates)
             for d in decisions:
-                selected_id = market_eval_ids.get(
-                    (d.selected_market.market_id, d.selected_market.market_type,
-                     d.selected_market.team_or_side, d.selected_market.line)
-                ) if d.selected_market else None
-                evaluated_id = market_eval_ids.get(
-                    (d.evaluated_market.market_id, d.evaluated_market.market_type,
-                     d.evaluated_market.team_or_side, d.evaluated_market.line)
-                ) if d.evaluated_market else None
+                selected_id = (
+                    market_eval_ids.get(
+                        (
+                            d.selected_market.market_id,
+                            d.selected_market.market_type,
+                            d.selected_market.team_or_side,
+                            d.selected_market.line,
+                        )
+                    )
+                    if d.selected_market
+                    else None
+                )
+                evaluated_id = (
+                    market_eval_ids.get(
+                        (
+                            d.evaluated_market.market_id,
+                            d.evaluated_market.market_type,
+                            d.evaluated_market.team_or_side,
+                            d.evaluated_market.line,
+                        )
+                    )
+                    if d.evaluated_market
+                    else None
+                )
                 _, decision_created = ledger.record_trade_decision(
-                    run_id=run_id, sport="mlb", event_id=event_id, horizon=HORIZON_LATE,
+                    run_id=run_id,
+                    sport="mlb",
+                    event_id=event_id,
+                    horizon=HORIZON_LATE,
                     decision_time_utc=decision_time_utc,
                     model_artifact_hash=forecast.model_artifact_hash,
                     market_snapshot_hash=market_snapshot_hash,
                     decision_policy_version=DECISION_POLICY_VERSION,
-                    decision=d, selected_market_evaluation_id=selected_id,
+                    decision=d,
+                    selected_market_evaluation_id=selected_id,
                     evaluated_market_evaluation_id=evaluated_id,
                 )
                 n_decisions_recorded += 1 if decision_created else 0
                 n_decisions_deduped += 0 if decision_created else 1
 
         home_team, away_team = team_names.get(event_id, ("", ""))
-        games_report.append({
-            "event_id": event_id,
-            "home_team": home_team,
-            "away_team": away_team,
-            "predicted_winner": forecast.predicted_winner,
-            "home_win_prob": forecast.calibrated_probabilities["home"],
-            "away_win_prob": forecast.calibrated_probabilities["away"],
-            "expected_home_score": forecast.expected_home_score,
-            "expected_away_score": forecast.expected_away_score,
-            "candidate_markets_evaluated": len(candidates),
-            # evaluated_market (not selected_market) is used here so a
-            # NO_BET row still shows the exact market/side/line/ask that
-            # was rejected -- matches scripts/mlb_shadow_run.py's original
-            # per-game report shape exactly (see its own comment for the
-            # real audit-trail bug this fixed).
-            "decisions": [
-                {"market_type": d.market_type, "action": d.action, "units": d.units, "reason": d.reason_code,
-                 "market_id": d.evaluated_market.market_id if d.evaluated_market else None,
-                 "team_or_side": d.evaluated_market.team_or_side if d.evaluated_market else None,
-                 "line": d.evaluated_market.line if d.evaluated_market else None,
-                 "executable_ask": d.evaluated_market.executable_ask if d.evaluated_market else None,
-                 "cost_adjusted_edge": d.cost_adjusted_edge}
-                for d in decisions
-            ],
-            "bets": len(bet_decisions),
-        })
+        games_report.append(
+            {
+                "event_id": event_id,
+                "home_team": home_team,
+                "away_team": away_team,
+                "predicted_winner": forecast.predicted_winner,
+                "home_win_prob": forecast.calibrated_probabilities["home"],
+                "away_win_prob": forecast.calibrated_probabilities["away"],
+                "expected_home_score": forecast.expected_home_score,
+                "expected_away_score": forecast.expected_away_score,
+                "candidate_markets_evaluated": len(candidates),
+                # evaluated_market (not selected_market) is used here so a
+                # NO_BET row still shows the exact market/side/line/ask that
+                # was rejected -- matches scripts/mlb_shadow_run.py's original
+                # per-game report shape exactly (see its own comment for the
+                # real audit-trail bug this fixed).
+                "decisions": [
+                    {
+                        "market_type": d.market_type,
+                        "action": d.action,
+                        "units": d.units,
+                        "reason": d.reason_code,
+                        "market_id": d.evaluated_market.market_id if d.evaluated_market else None,
+                        "team_or_side": d.evaluated_market.team_or_side if d.evaluated_market else None,
+                        "line": d.evaluated_market.line if d.evaluated_market else None,
+                        "executable_ask": d.evaluated_market.executable_ask if d.evaluated_market else None,
+                        "cost_adjusted_edge": d.cost_adjusted_edge,
+                        "model_probability": d.model_probability,
+                        "market_probability": d.market_probability,
+                        "serving_probability": d.serving_probability,
+                        "model_conservative_probability": d.model_conservative_probability,
+                        "serving_conservative_probability": d.serving_conservative_probability,
+                        "blend_weight": d.blend_weight,
+                        "blend_policy_artifact_hash": d.blend_policy_artifact_hash,
+                        "blend_experiment_spec_hash": d.blend_experiment_spec_hash,
+                        "blend_config_hash": d.blend_config_hash,
+                        "serving_policy_block_reason": d.serving_policy_block_reason,
+                    }
+                    | {
+                        "fee_rate": d.fee_rate,
+                        "safety_margin": d.safety_margin,
+                        "size_limits_version": d.size_limits_version,
+                        "size_limits_json": d.size_limits_json,
+                        "decision_economics_hash": d.decision_economics_hash,
+                    }
+                    for d in decisions
+                ],
+                "bets": len(bet_decisions),
+            }
+        )
 
     return {
-        "status": "ok", "games": games_report, "total_bets": n_bets, "skipped": dict(state.skipped),
+        "status": "ok",
+        "games": games_report,
+        "total_bets": n_bets,
+        "skipped": dict(state.skipped),
         "predictions_recorded": n_predictions_recorded,
         "trade_decisions_recorded": n_decisions_recorded,
         "trade_decisions_deduped": n_decisions_deduped,

@@ -30,6 +30,7 @@ class League(StrEnum):
     KBO = "KBO"
     NPB = "NPB"
 
+
 # Canonical sport tuples — single source of truth for iteration and CLI choices.
 # When adding a sport, update League, these tuples, and config/model.yaml together.
 # WORLD_CUP retired 2026-07-27: the tournament is over, no games left to
@@ -40,7 +41,16 @@ class League(StrEnum):
 # not this enum, and still works for backfilling already-played tournaments.
 PRODUCTION_SPORTS: tuple[str, ...] = ("mlb", "wnba")
 LEARNED_PRODUCTION_SPORTS: tuple[str, ...] = (
-    "mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2", "dota2", "valorant", "rainbow_six",
+    "mlb",
+    "nba",
+    "wnba",
+    "nfl",
+    "soccer",
+    "lol",
+    "cs2",
+    "dota2",
+    "valorant",
+    "rainbow_six",
 )
 ALL_SPORTS: tuple[str, ...] = ("mlb", "nba", "wnba", "nfl", "soccer", "tennis")
 
@@ -215,6 +225,34 @@ class PickRequest:
     # specific game (e.g. ESPN hasn't posted both starters yet) — surfaced as
     # a visible dashboard badge, not just buried in the rationale text.
     unavailable_features: str | None = None
+    # Stage 1 prospective evidence lineage. These are audit-only fields and
+    # never change the forecast itself. Unknown provenance remains None.
+    config_hash: str | None = None
+    config_byte_sha256: str | None = None
+    config_path: str | None = None
+    model_artifact_byte_sha256: str | None = None
+    model_artifact_path: str | None = None
+    market_quote_observed_at_utc: str | None = None
+    market_quote_timestamp_valid: bool | None = None
+    market_quote_source: str | None = None
+    market_quote_provenance: str | None = None
+    market_quote_reconstructed: bool | None = None
+    market_snapshot_hash: str | None = None
+    market_snapshot_archive_path: str | None = None
+    market_snapshot_record_id: str | None = None
+    record_source: str | None = None
+    is_backfill: bool | None = None
+    # Stage 1 serving audit. ``model_probability`` is the effective value
+    # consumed by eligibility; the raw model and market inputs remain
+    # explicit so a settled decision can be reproduced exactly.
+    model_probability_raw: float | None = None
+    market_probability_at_decision: float | None = None
+    serving_probability: float | None = None
+    blend_weight: float | None = None
+    blend_policy_artifact_hash: str | None = None
+    blend_experiment_spec_hash: str | None = None
+    blend_config_hash: str | None = None
+    serving_policy_block_reason: str | None = None
 
     def validate(self, now: datetime | None = None) -> None:
         current = now or utc_now()
@@ -264,6 +302,9 @@ class PickRequest:
         for name, probability in (
             ("decision_no_vig_probability", self.decision_no_vig_probability),
             ("decision_consensus_probability", self.decision_consensus_probability),
+            ("model_probability_raw", self.model_probability_raw),
+            ("market_probability_at_decision", self.market_probability_at_decision),
+            ("serving_probability", self.serving_probability),
         ):
             if probability is not None and not 0 < probability < 1:
                 raise ValueError(f"{name} must be between 0 and 1")
@@ -311,4 +352,27 @@ class PickRequest:
             "starter_era_gap": self.starter_era_gap,
             "market_residual_probability": self.market_residual_probability,
             "unavailable_features": self.unavailable_features,
+            "config_hash": self.config_hash,
+            "config_byte_sha256": self.config_byte_sha256,
+            "config_path": self.config_path,
+            "model_artifact_byte_sha256": self.model_artifact_byte_sha256,
+            "model_artifact_path": self.model_artifact_path,
+            "market_quote_observed_at_utc": self.market_quote_observed_at_utc,
+            "market_quote_timestamp_valid": self.market_quote_timestamp_valid,
+            "market_quote_source": self.market_quote_source,
+            "market_quote_provenance": self.market_quote_provenance,
+            "market_quote_reconstructed": self.market_quote_reconstructed,
+            "market_snapshot_hash": self.market_snapshot_hash,
+            "market_snapshot_archive_path": self.market_snapshot_archive_path,
+            "market_snapshot_record_id": self.market_snapshot_record_id,
+            "record_source": self.record_source,
+            "is_backfill": self.is_backfill,
+            "model_probability_raw": self.model_probability_raw,
+            "market_probability_at_decision": self.market_probability_at_decision,
+            "serving_probability": self.serving_probability,
+            "blend_weight": self.blend_weight,
+            "blend_policy_artifact_hash": self.blend_policy_artifact_hash,
+            "blend_experiment_spec_hash": self.blend_experiment_spec_hash,
+            "blend_config_hash": self.blend_config_hash,
+            "serving_policy_block_reason": self.serving_policy_block_reason,
         }

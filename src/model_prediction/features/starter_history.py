@@ -37,9 +37,11 @@ DEFAULT_LOOKBACK_STARTS = 5
 MINIMUM_PRIOR_STARTS = 2
 FIP_CONSTANT = 3.10  # MLB league-average FIP constant; updated annually
 
-# (game_start, innings, earned_runs, strikeouts, walks, home_runs, hit_by_pitch)
-# -- widened for FIP (F-68); ERA-only callers just ignore the last four fields.
-_StarterRow = tuple[datetime, float, float, float, float, float, float]
+# (game_start, innings, earned_runs, strikeouts, walks, home_runs,
+# hit_by_pitch, batters_faced) -- widened for FIP (F-68), then again for real
+# K-BB% (needs batters_faced, not innings); ERA-only callers just ignore the
+# extra fields.
+_StarterRow = tuple[datetime, float, float, float, float, float, float, float]
 _STARTER_INDEX_CACHE: dict[Path, dict[str, list[_StarterRow]]] = {}
 
 
@@ -104,11 +106,14 @@ def load_starter_index(
                 so = float(starter["pitching"].get("strikeOuts") or 0)
                 bb = float(starter["pitching"].get("baseOnBalls") or 0)
                 hr = float(starter["pitching"].get("homeRuns") or 0)
-                hbp = float(starter["pitching"].get("hitBatsmen") or 0)
+                hbp = float(
+                    starter["pitching"].get("hitByPitch") or starter["pitching"].get("hitBatsmen") or 0
+                )
+                batters_faced = float(starter["pitching"].get("battersFaced") or 0)
                 name = starter.get("name")
                 if not name:
                     continue
-                row = (game_start, innings, earned_runs, so, bb, hr, hbp)
+                row = (game_start, innings, earned_runs, so, bb, hr, hbp, batters_faced)
                 index.setdefault(_normalize_name(name), []).append(row)
     for starts in index.values():
         starts.sort(key=lambda item: item[0])
@@ -236,13 +241,19 @@ def starter_fip_gap_live(
 
 
 def _rolling_kbb_pct(recent: list[tuple]) -> float:
-    """K-BB% = (K - BB) / IP from a rolling window of starts."""
-    innings = sum(item[1] for item in recent)
+    """K-BB% = (K - BB) / batters faced, from a rolling window of starts.
+
+    F-real (2026-08-20): this previously computed (K-BB)/IP -- K-BB *per
+    inning*, not the real sabermetric K-BB% -- because batters_faced wasn't
+    carried in the starter index. The prior REJECT verdict on this feature
+    was measured against that wrong statistic; see MODEL_IMPROVEMENTS.md.
+    """
+    batters_faced = sum(item[7] for item in recent)
     so = sum(item[3] for item in recent)
     bb = sum(item[4] for item in recent)
-    if innings <= 0:
+    if batters_faced <= 0:
         return 0.0
-    return (so - bb) / innings
+    return (so - bb) / batters_faced
 
 
 def starter_rolling_kbb(

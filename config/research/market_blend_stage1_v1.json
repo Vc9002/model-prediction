@@ -1,0 +1,122 @@
+{
+  "schema_version": "market_blend_stage1_experiment_spec_v1",
+  "spec_id": "market-blend-stage1-v1",
+  "scope": {
+    "allowed_sport_market_pairs": [
+      {
+        "sport": "mlb",
+        "market": "total"
+      }
+    ],
+    "serving_integration": "flat_cli_measured_edge_totals_v3_only"
+  },
+  "lineage_semantics": {
+    "model_logical_hash": "mlb_canonical_json_without_artifact_hash_sha256",
+    "config_logical_hash": "model_prediction_config_v1_nul_exact_bytes_sha256"
+  },
+  "weight_grid": [
+    0.0,
+    0.05,
+    0.1,
+    0.15,
+    0.2,
+    0.25,
+    0.3,
+    0.35,
+    0.4,
+    0.45,
+    0.5,
+    0.55,
+    0.6,
+    0.65,
+    0.7,
+    0.75,
+    0.8,
+    0.85,
+    0.9,
+    0.95,
+    1.0
+  ],
+  "folds": {
+    "type": "expanding_date_oof",
+    "initial_train_fraction": 0.6,
+    "n_splits": 5,
+    "min_rows": 50,
+    "min_dates": 10,
+    "min_oof_rows": 20
+  },
+  "bootstrap": {
+    "cluster": "event_date_utc",
+    "n_resamples": 2000,
+    "seed": 20260818
+  },
+  "acceptance": {
+    "brier_delta": {
+      "operator": "lt",
+      "threshold": 0.0
+    },
+    "log_loss_delta": {
+      "operator": "lt",
+      "threshold": 0.0
+    },
+    "bootstrap_p_better": {
+      "operator": "gte",
+      "threshold": 0.95
+    }
+  },
+  "evidence": {
+    "lineage_manifest_schema": "market_blend_lineage_manifest_v2",
+    "required_decision_payload_fields": [
+      "config_hash",
+      "config_byte_sha256",
+      "config_path",
+      "model_artifact_byte_sha256",
+      "model_artifact_path",
+      "market_quote_observed_at_utc",
+      "market_quote_timestamp_valid",
+      "market_quote_source",
+      "market_quote_provenance",
+      "market_quote_reconstructed",
+      "market_snapshot_hash",
+      "observed_at_utc",
+      "record_source",
+      "record_type",
+      "call_type",
+      "corrective_action",
+      "is_backfill"
+    ],
+    "require_config_hash": true,
+    "require_timestamp_valid": true,
+    "require_prestart_quote": true,
+    "reject_reconstructed": true,
+    "require_quote_at_or_before_decision": true,
+    "require_decision_at_or_before_created": true,
+    "require_created_prestart": true,
+    "require_cryptographic_model_lineage": true,
+    "require_cryptographic_config_lineage": true,
+    "require_empty_corrective_action": true,
+    "require_explicit_not_backfill": true,
+    "require_market_snapshot_hash": true,
+    "accepted_ledger_decisions": [
+      "CALL"
+    ],
+    "accepted_reason_codes": [
+      "QUALIFIED"
+    ],
+    "accepted_record_types": [
+      "QUALIFIED_SHADOW_CALL"
+    ],
+    "accepted_call_types": [
+      "model_qualified"
+    ],
+    "accepted_record_sources": [
+      "live_forecast"
+    ],
+    "accepted_market_sources": [
+      "polymarket_us"
+    ],
+    "accepted_market_provenance": [
+      "decision_time_executable_quote"
+    ]
+  }
+}
