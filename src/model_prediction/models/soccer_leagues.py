@@ -75,6 +75,7 @@ class LeagueDixonColesRegistry:
     def __init__(self) -> None:
         self._matches: dict[str, list[LeagueMatchRecord]] = {}
         self._engines: dict[str, DixonColesEngine] = {}
+        self._engine_as_of_dates: dict[str, str] = {}
 
     def record_match(self, match: LeagueMatchRecord) -> None:
         """Record a completed match into its league partition sequentially."""
@@ -101,6 +102,7 @@ class LeagueDixonColesRegistry:
         if not valid_matches:
             engine = DixonColesEngine(xi=xi)
             self._engines[league_key] = engine
+            self._engine_as_of_dates[league_key] = as_of_date
             return LeagueFittedArtifact(
                 league=league_key,
                 as_of_date=as_of_date,
@@ -127,6 +129,7 @@ class LeagueDixonColesRegistry:
         engine = DixonColesEngine(xi=optimal_xi)
         engine.fit(match_dicts, t_now=as_of_date)
         self._engines[league_key] = engine
+        self._engine_as_of_dates[league_key] = as_of_date
 
         unique_teams = set()
         for m in valid_matches:
@@ -154,7 +157,7 @@ class LeagueDixonColesRegistry:
     ) -> DixonColesMatchPrediction:
         """Generate multi-market Dixon-Coles forecast using the league-specific fitted engine."""
         league_key = league.value if isinstance(league, SoccerLeague) else str(league)
-        if league_key not in self._engines:
+        if league_key not in self._engines or self._engine_as_of_dates.get(league_key) != as_of_date:
             # Fit on demand strictly as-of as_of_date
             self.fit_league(league_key, as_of_date=as_of_date)
 
