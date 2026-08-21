@@ -134,8 +134,8 @@ config, reports, ledgers, and audit state disagree.
 
 ## P2 — High-Alpha MLB Features & PA Monte Carlo Simulator (from Research Literature Dive #4)
 
-- [ ] Ingest rolling Statcast Catcher Framing in the Shadow Zone (`features/catcher_framing.py`)
-  to capture the $1\text{--}2\text{pp}$ PA called-strike leverage on totals and NRFI.
+- [x] Ingest rolling Statcast Catcher Framing in the Shadow Zone (`features/catcher_framing.py`)
+  to capture the $1\text{--}2\text{pp}$ PA called-strike leverage on totals and NRFI. → DONE: `PointInTimeCatcherFramingEngine` & tests in `test_catcher_framing.py`.
 - [x] Implement Starting Pitcher Pitch-Type Arsenal vs. Lineup Vulnerability dot-product
   tensor (`features/pitch_arsenal.py`). → DONE: Repertoire metric tensor & tests in `test_pitch_arsenal.py`.
 - [x] Build Discrete-Event Plate-Appearance (PA) 8-Class Monte Carlo Simulation Engine
