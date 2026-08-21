@@ -1,0 +1,57 @@
+diff --git a/docs/PRODUCTION.md b/docs/PRODUCTION.md
+index ae742f7..194f209 100644
+--- a/docs/PRODUCTION.md
++++ b/docs/PRODUCTION.md
+@@ -127,25 +127,45 @@ human decision.
+ 
+ ## Scheduler
+ 
+-| Job                   | Label                               | Interval |
+-| --------------------- | ----------------------------------- | -------- |
+-| Production prediction | `com.modelprediction.production`    | 3 hours  |
+-| Rebuild shadow        | `com.modelprediction.rebuild-shadow`| 3 hours  |
++| Job                   | Label                               | Interval | Script |
++| --------------------- | ----------------------------------- | -------- | ------ |
++| Production prediction | `com.modelprediction.production`    | 3 hours  | `scripts/run_production.sh` |
++| Rebuild shadow        | `com.modelprediction.rebuild-shadow`| 3 hours  | `scripts/run_rebuild.sh` |
++
++Both jobs are managed by launchd with configs in `~/Library/LaunchAgents/`.
++Runtime output is logged to `$MODEL_PREDICTION_RUNTIME_ROOT/logs/`.
++
++## Test Suites
++
++| Suite | Tests | Purpose |
++|---|---|---|
++| `test_production_registry.py` | 49 | Registry validation, health checks, fail-closed, ledger integration |
++| `test_production_canary.py` | 13 | Legacy compat — old single-model canary interface |
++| `test_production_ci.py` | 11 | CI contract — real config validation, runtime paths, execution policy |
++| `test_rebuild_isolation.py` | 6 | Proves challenger models never leak into production |
++| **Total** | **79** | **All passing** |
+ 
+ ## Module Reference
+ 
+ - **`load_production_config()`** — loads `config/production.yaml`, returns dict.
+-- **`validate_production_config(config)`** — fail-closed validation of all model entries.
+-- **`get_production_models(config)`** — returns all 16 sport/market entries keyed by `"sport/market"`.
++- **`validate_production_config(config)`** — fail-closed validation of all 23 sport/market entries.
++- **`get_production_models(config)`** — returns all entries keyed by `"sport/market"`.
+ - **`get_production_model(config, sport, market=None)`** — returns a single model dict.
+ - **`get_supported_markets(config, sport)`** — returns list of market names for a sport.
+ - **`health_check_model(config, sport, market=None)`** — per-market or per-sport aggregate health.
+-- **`health_check_all(config)`** — six-sport aggregate health with nested market status.
++- **`health_check_all(config)`** — 13-sport aggregate health with nested market status.
+ - **`health_check(config)`** — legacy compatibility wrapper.
++- **`run_production_health_check(config, ledger=...)`** — health check + persist to SQLite.
+ 
+ All functions live in `src/model_prediction/production_service.py`.
+ The old `production_canary.py` is retained as a deprecated compatibility shim.
+ 
++See also:
++- `src/model_prediction/calibration.py` — 4 calibrators, cross-fit comparison
++- `src/model_prediction/production_ledger.py` — append-only SQLite predictions DB
++- `src/model_prediction/dashboard_cache.py` — SQLite mirror of Excel ledgers
++- `config/rebuild.yaml` — active/inactive research scope
++
+ ## Production vs Rebuild Isolation
+ 
+ Production models are the proven incumbent model lineage. Rebuild models are

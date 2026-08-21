@@ -10,7 +10,11 @@ session for both its date-matching and started-game guards).
 
 from __future__ import annotations
 
+import hashlib
+import json
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 
@@ -367,6 +371,11 @@ def _mlb_totals_candidate(market_type: MarketType, selection: str, line: float |
         model_artifact_hash="hash",
         calibration_version="measured-edge-totals-v1",
         feature_schema_version="mlb-analyst-poisson-trend-v0.2",
+        market_snapshot_hash="snapshot-hash",
+        market_quote_timestamp_valid=True,
+        market_quote_source="polymarket_us",
+        market_quote_provenance="decision_time_executable_quote",
+        market_quote_reconstructed=False,
     )
 
 
@@ -400,6 +409,182 @@ def test_mlb_totals_flat_keeps_total_and_spread_but_not_moneyline_and_never_touc
     )
     assert spread_request.line == -1.5
     assert spread_request.selection == "away"
+    total_request = next(
+        request for request, _e in flat_ledger.appended if request.market_type is MarketType.TOTAL
+    )
+    persisted = total_request.as_dict()
+    assert persisted["config_hash"]
+    assert persisted["config_byte_sha256"]
+    assert Path(persisted["config_path"]).is_file()
+    assert persisted["model_artifact_byte_sha256"]
+    assert Path(persisted["model_artifact_path"]).name == "measured-edge-totals-v3.json"
+    assert persisted["market_quote_observed_at_utc"] == "2026-07-27T19:00:00Z"
+    assert persisted["market_quote_timestamp_valid"] is True
+    assert persisted["market_quote_source"] == "polymarket_us"
+    assert persisted["market_quote_provenance"] == "decision_time_executable_quote"
+    assert persisted["market_quote_reconstructed"] is False
+    assert persisted["market_snapshot_hash"] == "snapshot-hash"
+    assert persisted["record_source"] == "live_forecast"
+    assert persisted["is_backfill"] is False
+    assert persisted["model_probability_raw"] == total_request.model_probability
+    assert persisted["serving_probability"] == total_request.model_probability
+    assert persisted["blend_policy_artifact_hash"] is None
+
+
+def test_mlb_totals_flat_policy_uses_same_measured_edge_artifact_and_fails_closed(
+    monkeypatch, registry, ban_list, tmp_path
+) -> None:
+    from model_prediction.config import PROJECT_ROOT, config_path
+    from model_prediction.experiment_registry import record, void
+    from model_prediction.market_blend import (
+        MarketBlendBlockedError,
+        canonical_config_logical_hash,
+        canonical_hash,
+    )
+    from model_prediction.models.mlb import canonical_mlb_artifact_hash
+    from model_prediction.runtime_paths import RuntimePaths
+
+    monkeypatch.setattr(cli, "utc_now", lambda: datetime(2026, 7, 27, 20, tzinfo=UTC))
+    monkeypatch.setattr(cli, "load_formula_spec", lambda path: object())
+    monkeypatch.setattr(cli, "MLBMarketOddsFeed", lambda *args, **kwargs: object())
+    model_path = PROJECT_ROOT / "config/models/measured-edge-totals-v3.json"
+    model_raw = json.loads(model_path.read_text())
+    model_hash = canonical_mlb_artifact_hash(model_raw)
+    assert model_hash == model_raw["artifact_hash"]
+    snapshot_hash = hashlib.sha256(b"exact-raw-quote-snapshot").hexdigest()
+    candidate = replace(
+        _mlb_totals_candidate(MarketType.TOTAL, "over", 8.5),
+        model_version="measured-edge-totals-v3",
+        model_artifact_hash=model_hash,
+        calibration_version="measured-edge-totals-v3",
+        market_snapshot_hash=snapshot_hash,
+    )
+    monkeypatch.setattr(cli, "build_mlb_slate", lambda *args, **kwargs: ([candidate], [], 1))
+    runtime_paths = RuntimePaths(repo_root=PROJECT_ROOT, runtime_root=tmp_path / "runtime")
+    config_hash = canonical_config_logical_hash(config_path().read_bytes())
+    policy_raw = {
+        "schema_version": "market_blend_policy_v1",
+        "policy_id": "measured-edge-total-cli-test",
+        "entries": [
+            {
+                "sport": "mlb",
+                "market": "total",
+                "weight": 0.0,
+                "model_artifact_hash": model_hash,
+                "config_hash": config_hash,
+                "evidence_dataset_hash": "d" * 64,
+                "experiment_spec_hash": "e" * 64,
+                "implementation_hash": "f" * 64,
+                "lineage_manifest_hash": "1" * 64,
+                "training_inputs": {"serving_integration": "flat_cli_measured_edge_totals_v3_only"},
+                "fold_definition": {"type": "expanding_date_oof"},
+                "oof_metrics": {"brier_delta": -0.01},
+                "gate_status": "passed",
+            }
+        ],
+    }
+    policy_raw["artifact_hash"] = canonical_hash(policy_raw)
+    policy_path = tmp_path / "policy.json"
+    policy_path.write_text(json.dumps(policy_raw))
+    experiment = record(
+        model_id="market-blend-mlb-total",
+        artifact_hashes={"candidate_policy": policy_raw["artifact_hash"]},
+        status="completed",
+        repo_root=PROJECT_ROOT,
+        runtime_root=runtime_paths.runtime_root,
+    )
+    report_path = tmp_path / "report.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "experiment_id": experiment["experiment_id"],
+                "candidate_policy_path": str(policy_path),
+                "candidate_policy_artifact_hash": policy_raw["artifact_hash"],
+            }
+        )
+    )
+    config = {"project": {}, "bankroll": {}}
+
+    incumbent_ledger = _CaptureLedger()
+    cli._forecast_mlb_totals_flat("2026-07-27", True, config, registry, ban_list, incumbent_ledger, None)
+    incumbent = incumbent_ledger.appended[0][0]
+    assert incumbent.model_probability == candidate.shrunk_probability
+    assert incumbent.blend_policy_artifact_hash is None
+
+    blended_ledger = _CaptureLedger()
+    cli._forecast_mlb_totals_flat(
+        "2026-07-27",
+        True,
+        config,
+        registry,
+        ban_list,
+        blended_ledger,
+        None,
+        blend_policy_artifact_path=policy_path,
+        blend_policy_report_path=report_path,
+        runtime_paths=runtime_paths,
+    )
+    blended = blended_ledger.appended[0][0]
+    assert blended.model_probability_raw == candidate.shrunk_probability
+    assert blended.market_probability_at_decision == pytest.approx(110 / 210)
+    assert blended.model_probability == pytest.approx(110 / 210)
+    assert blended.serving_probability == pytest.approx(110 / 210)
+    assert blended.blend_weight == 0.0
+    assert blended.blend_policy_artifact_hash == policy_raw["artifact_hash"]
+    assert blended.model_artifact_hash == model_hash
+    assert blended.market_snapshot_hash == snapshot_hash
+
+    mismatched = replace(candidate, model_artifact_hash="9" * 64)
+    monkeypatch.setattr(cli, "build_mlb_slate", lambda *args, **kwargs: ([mismatched], [], 1))
+    with pytest.raises(MarketBlendBlockedError, match="identities differ"):
+        cli._forecast_mlb_totals_flat(
+            "2026-07-27",
+            True,
+            config,
+            registry,
+            ban_list,
+            _CaptureLedger(),
+            None,
+            blend_policy_artifact_path=policy_path,
+            blend_policy_report_path=report_path,
+            runtime_paths=runtime_paths,
+        )
+
+    void(
+        experiment["experiment_id"],
+        "test invalidation",
+        repo_root=PROJECT_ROOT,
+        runtime_root=runtime_paths.runtime_root,
+    )
+    with pytest.raises(MarketBlendBlockedError, match="has not completed"):
+        cli._forecast_mlb_totals_flat(
+            "2026-07-27",
+            True,
+            config,
+            registry,
+            ban_list,
+            _CaptureLedger(),
+            None,
+            blend_policy_artifact_path=policy_path,
+            blend_policy_report_path=report_path,
+            runtime_paths=runtime_paths,
+        )
+
+
+def test_flat_forecast_parser_exposes_explicit_blend_opt_in_paths() -> None:
+    args = cli.parser().parse_args(
+        [
+            "flat-forecast",
+            "--sport",
+            "mlb",
+            "--market-blend-policy-artifact",
+            "/tmp/policy.json",
+            "--market-blend-policy-report",
+            "/tmp/report.json",
+        ]
+    )
+    assert args.market_blend_policy_artifact == Path("/tmp/policy.json")
+    assert args.market_blend_policy_report == Path("/tmp/report.json")
 
 
 def test_mlb_totals_main_ledger_duplicate_is_tracked_not_silently_dropped(

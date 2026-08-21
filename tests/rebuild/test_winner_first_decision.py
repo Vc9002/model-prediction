@@ -16,10 +16,17 @@
 
 from __future__ import annotations
 
+import json
+from dataclasses import asdict
+
+import pytest
+
+from model_prediction.market_blend import MarketBlendPolicy, canonical_hash
 from model_prediction.rebuild.decision import (
     AMBIGUOUS_EVENT,
     CLOSED_MARKET,
     INSUFFICIENT_DEPTH,
+    MARKET_BLEND_POLICY_BLOCKED,
     NO_EDGE_AFTER_COSTS,
     NOT_ALIGNED_WITH_FROZEN_TOTALS_SIDE,
     NOT_ALIGNED_WITH_PREDICTED_WINNER,
@@ -36,9 +43,14 @@ from model_prediction.rebuild.economic import SizeLimits
 
 
 def _forecast(
-    predicted_winner="home", home_prob=0.60, away_prob=0.40, lower_margin=0.05,
-    totals_probabilities=None, spread_probabilities=None,
-    totals_probabilities_lower=None, spread_probabilities_lower=None,
+    predicted_winner="home",
+    home_prob=0.60,
+    away_prob=0.40,
+    lower_margin=0.05,
+    totals_probabilities=None,
+    spread_probabilities=None,
+    totals_probabilities_lower=None,
+    spread_probabilities_lower=None,
 ):
     return SportsForecast(
         event_id="game-1",
@@ -47,8 +59,10 @@ def _forecast(
         calibrated_probabilities={"home": home_prob, "away": away_prob},
         probability_lower={"home": home_prob - lower_margin, "away": away_prob - lower_margin},
         probability_upper={"home": home_prob + lower_margin, "away": away_prob + lower_margin},
-        expected_home_score=4.5, expected_away_score=4.0,
-        model_artifact_hash="abc123", calibration_artifact_hash="def456",
+        expected_home_score=4.5,
+        expected_away_score=4.0,
+        model_artifact_hash="abc123",
+        calibration_artifact_hash="def456",
         totals_probabilities=totals_probabilities or {},
         spread_probabilities=spread_probabilities or {},
         totals_probabilities_lower=totals_probabilities_lower or {},
@@ -56,13 +70,53 @@ def _forecast(
     )
 
 
-def _market(team_or_side="home", ask=0.70, depth_price=None, market_type="moneyline",
-            line=None, quote_age=5.0, depth=5.0):
+def _market(
+    team_or_side="home",
+    ask=0.70,
+    depth_price=None,
+    market_type="moneyline",
+    line=None,
+    quote_age=5.0,
+    depth=5.0,
+    market_probability=None,
+):
     return MarketEvaluation(
-        market_id="mkt-1", market_type=market_type, team_or_side=team_or_side, line=line,
-        executable_ask=ask, depth_adjusted_price=depth_price if depth_price is not None else ask,
-        quote_age_seconds=quote_age, available_depth=depth,
+        market_id="mkt-1",
+        market_type=market_type,
+        team_or_side=team_or_side,
+        line=line,
+        executable_ask=ask,
+        depth_adjusted_price=depth_price if depth_price is not None else ask,
+        quote_age_seconds=quote_age,
+        available_depth=depth,
+        market_probability=market_probability,
     )
+
+
+def _blend_policy(weight=0.25):
+    raw = {
+        "schema_version": "market_blend_policy_v1",
+        "policy_id": "mlb-moneyline-blend-v1",
+        "entries": [
+            {
+                "sport": "mlb",
+                "market": "moneyline",
+                "weight": weight,
+                "model_artifact_hash": "a" * 64,
+                "config_hash": "b" * 64,
+                "evidence_dataset_hash": "c" * 64,
+                "experiment_spec_hash": "d" * 64,
+                "implementation_hash": "e" * 64,
+                "lineage_manifest_hash": "f" * 64,
+                "training_inputs": {"spec_id": "test-only"},
+                "fold_definition": {"type": "expanding_date_oof"},
+                "oof_metrics": {"brier_delta": -0.01},
+                "gate_status": "passed",
+            }
+        ],
+    }
+    raw["artifact_hash"] = canonical_hash(raw)
+    return MarketBlendPolicy.from_dict(raw)
 
 
 class TestMarketCannotChangePredictedWinner:
@@ -103,10 +157,113 @@ class TestQualifiedWinnerReturnsBet:
         # granularity policy.
         forecast = _forecast(predicted_winner="home", home_prob=0.60, lower_margin=0.03)
         market = _market(team_or_side="home", ask=0.52, depth_price=0.52)
-        decision = decide_team_market(forecast, market, limits=SizeLimits(min_depth_units=0.0, unit_rounding=0.0))
+        decision = decide_team_market(
+            forecast, market, limits=SizeLimits(min_depth_units=0.0, unit_rounding=0.0)
+        )
         assert decision.action == "BET"
         assert decision.units > 0.0
         assert decision.reason_code == QUALIFIED
+
+
+class TestMarketBlendDecisionBoundary:
+    def test_blend_changes_edge_but_preserves_all_raw_probabilities_and_identity(self):
+        forecast = _forecast(predicted_winner="home", home_prob=0.60, lower_margin=0.0)
+        # The real forecast hash must match the policy's exact serving binding.
+        forecast = forecast.__class__(**{**forecast.__dict__, "model_artifact_hash": "a" * 64})
+        market = _market(
+            team_or_side="home",
+            ask=0.49,
+            depth_price=0.49,
+            market_probability=0.40,
+        )
+
+        decision = decide_team_market(
+            forecast,
+            market,
+            limits=SizeLimits(min_depth_units=0.0, unit_rounding=0.0),
+            blend_policy=_blend_policy(weight=0.25),
+            sport="mlb",
+            serving_config_hash="b" * 64,
+        )
+
+        assert decision.model_probability == 0.60
+        assert decision.market_probability == 0.40
+        assert decision.serving_probability == pytest.approx(0.45)
+        assert decision.model_conservative_probability == pytest.approx(0.60)
+        assert decision.serving_conservative_probability == pytest.approx(0.45)
+        assert decision.blend_weight == 0.25
+        assert decision.blend_policy_artifact_hash is not None
+        assert decision.blend_experiment_spec_hash == "d" * 64
+        assert decision.blend_config_hash == "b" * 64
+        assert forecast.calibrated_probabilities["home"] == 0.60
+        assert decision.action == "NO_BET"
+        assert decision.reason_code == NO_EDGE_AFTER_COSTS
+
+    def test_active_policy_fails_closed_when_config_hash_is_missing(self):
+        forecast = _forecast(predicted_winner="home", home_prob=0.60, lower_margin=0.0)
+        forecast = forecast.__class__(**{**forecast.__dict__, "model_artifact_hash": "a" * 64})
+        market = _market(
+            team_or_side="home",
+            ask=0.40,
+            depth_price=0.40,
+            market_probability=0.40,
+        )
+
+        decision = decide_team_market(
+            forecast,
+            market,
+            limits=SizeLimits(min_depth_units=0.0, unit_rounding=0.0),
+            blend_policy=_blend_policy(),
+            sport="mlb",
+            serving_config_hash=None,
+        )
+
+        assert decision.action == "NO_BET"
+        assert decision.reason_code == MARKET_BLEND_POLICY_BLOCKED
+        assert decision.serving_probability is None
+        assert decision.model_probability == 0.60
+        assert decision.market_probability == 0.40
+        assert decision.model_conservative_probability == 0.60
+        assert decision.blend_experiment_spec_hash == "d" * 64
+        assert decision.serving_policy_block_reason == "serving config hash is missing"
+
+
+class TestDecisionEconomicsAudit:
+    def test_every_economic_input_is_persisted_and_hash_bound(self):
+        forecast = _forecast(predicted_winner="home", home_prob=0.60, lower_margin=0.03)
+        market = _market(team_or_side="home", ask=0.52, depth_price=0.52)
+        limits = SizeLimits(
+            min_units=0.01,
+            max_units=0.75,
+            max_event_units=1.5,
+            max_team_daily=2.5,
+            max_sport_daily=4.5,
+            max_daily_total=7.5,
+            max_correlation_group=2.25,
+            unit_rounding=0.0,
+            min_depth_units=0.0,
+            max_quote_age_seconds=120.0,
+        )
+
+        decision = decide_team_market(forecast, market, limits=limits, fee_rate=0.01, safety_margin=0.02)
+        exact_rerun = decide_team_market(forecast, market, limits=limits, fee_rate=0.01, safety_margin=0.02)
+        changed_fee = decide_team_market(forecast, market, limits=limits, fee_rate=0.015, safety_margin=0.02)
+        changed_limits = decide_team_market(
+            forecast,
+            market,
+            limits=SizeLimits(**{**asdict(limits), "max_units": 0.50}),
+            fee_rate=0.01,
+            safety_margin=0.02,
+        )
+
+        assert decision.fee_rate == 0.01
+        assert decision.safety_margin == 0.02
+        assert decision.size_limits_version == "size_limits_v1"
+        assert json.loads(decision.size_limits_json or "{}") == asdict(limits)
+        assert len(decision.decision_economics_hash or "") == 64
+        assert exact_rerun.decision_economics_hash == decision.decision_economics_hash
+        assert changed_fee.decision_economics_hash != decision.decision_economics_hash
+        assert changed_limits.decision_economics_hash != decision.decision_economics_hash
 
 
 class TestOpponentNeverSubstituted:
@@ -127,20 +284,32 @@ class TestWinnerAlignedSpreadMayQualify:
         # Real spread cover probability (0.55), not the moneyline win
         # probability (0.60) — this is the fixed, correct behavior.
         forecast = _forecast(
-            predicted_winner="home", home_prob=0.60, lower_margin=0.03,
+            predicted_winner="home",
+            home_prob=0.60,
+            lower_margin=0.03,
             spread_probabilities={-1.5: {"home": 0.55, "away": 0.45}},
         )
         spread_market = _market(
-            team_or_side="home", ask=0.50, depth_price=0.50, market_type="spread", line=-1.5,
+            team_or_side="home",
+            ask=0.50,
+            depth_price=0.50,
+            market_type="spread",
+            line=-1.5,
         )
-        decision = decide_team_market(forecast, spread_market, limits=SizeLimits(min_depth_units=0.0, unit_rounding=0.0))
+        decision = decide_team_market(
+            forecast, spread_market, limits=SizeLimits(min_depth_units=0.0, unit_rounding=0.0)
+        )
         assert decision.action == "BET"
         assert decision.market_type == "spread"
 
     def test_spread_for_the_opposing_team_is_rejected_even_if_priced_well(self):
         forecast = _forecast(predicted_winner="home", home_prob=0.60, away_prob=0.40)
         opposing_spread = _market(
-            team_or_side="away", ask=0.20, depth_price=0.20, market_type="spread", line=1.5,
+            team_or_side="away",
+            ask=0.20,
+            depth_price=0.20,
+            market_type="spread",
+            line=1.5,
         )
         decision = decide_team_market(forecast, opposing_spread)
         assert decision.action == "NO_BET"
@@ -156,11 +325,17 @@ class TestWinnerAlignedSpreadMayQualify:
         NO_BET with a negative edge, not a positive one derived from 70%.
         """
         forecast = _forecast(
-            predicted_winner="home", home_prob=0.70, lower_margin=0.0,
+            predicted_winner="home",
+            home_prob=0.70,
+            lower_margin=0.0,
             spread_probabilities={-2.5: {"home": 0.40, "away": 0.60}},
         )
         spread_market = _market(
-            team_or_side="home", ask=0.45, depth_price=0.45, market_type="spread", line=-2.5,
+            team_or_side="home",
+            ask=0.45,
+            depth_price=0.45,
+            market_type="spread",
+            line=-2.5,
         )
 
         decision = decide_team_market(forecast, spread_market)
@@ -176,7 +351,11 @@ class TestWinnerAlignedSpreadMayQualify:
     def test_spread_with_no_real_forecast_for_that_line_fails_closed(self):
         forecast = _forecast(predicted_winner="home", home_prob=0.60, spread_probabilities={})
         spread_market = _market(
-            team_or_side="home", ask=0.50, depth_price=0.50, market_type="spread", line=-1.5,
+            team_or_side="home",
+            ask=0.50,
+            depth_price=0.50,
+            market_type="spread",
+            line=-1.5,
         )
         decision = decide_team_market(forecast, spread_market)
         assert decision.action == "NO_BET"
@@ -194,12 +373,17 @@ class TestSpreadAndTotalUseConservativeBoundWhenAvailable:
 
     def test_spread_bet_that_only_qualifies_on_point_estimate_is_rejected_with_real_lower_bound(self):
         forecast = _forecast(
-            predicted_winner="home", home_prob=0.60,
+            predicted_winner="home",
+            home_prob=0.60,
             spread_probabilities={-1.5: {"home": 0.55, "away": 0.45}},
             spread_probabilities_lower={-1.5: {"home": 0.48, "away": 0.40}},
         )
         spread_market = _market(
-            team_or_side="home", ask=0.50, depth_price=0.50, market_type="spread", line=-1.5,
+            team_or_side="home",
+            ask=0.50,
+            depth_price=0.50,
+            market_type="spread",
+            line=-1.5,
         )
         decision = decide_team_market(forecast, spread_market, limits=SizeLimits(min_depth_units=0.0))
         assert decision.action == "NO_BET", (
@@ -214,25 +398,37 @@ class TestSpreadAndTotalUseConservativeBoundWhenAvailable:
         # that never populates spread_probabilities_lower still gets the
         # pre-existing point-estimate-based behavior, not a crash.
         forecast = _forecast(
-            predicted_winner="home", home_prob=0.60,
+            predicted_winner="home",
+            home_prob=0.60,
             spread_probabilities={-1.5: {"home": 0.55, "away": 0.45}},
         )
         spread_market = _market(
-            team_or_side="home", ask=0.50, depth_price=0.50, market_type="spread", line=-1.5,
+            team_or_side="home",
+            ask=0.50,
+            depth_price=0.50,
+            market_type="spread",
+            line=-1.5,
         )
         decision = decide_team_market(
-            forecast, spread_market, limits=SizeLimits(min_depth_units=0.0, unit_rounding=0.0),
+            forecast,
+            spread_market,
+            limits=SizeLimits(min_depth_units=0.0, unit_rounding=0.0),
         )
         assert decision.action == "BET"
 
     def test_total_bet_that_only_qualifies_on_point_estimate_is_rejected_with_real_lower_bound(self):
         forecast = _forecast(
-            predicted_winner="home", home_prob=0.60,
+            predicted_winner="home",
+            home_prob=0.60,
             totals_probabilities={8.5: {"over": 0.58, "under": 0.42}},
             totals_probabilities_lower={8.5: {"over": 0.48, "under": 0.35}},
         )
         total_market = _market(
-            team_or_side="over", ask=0.52, depth_price=0.52, market_type="total", line=8.5,
+            team_or_side="over",
+            ask=0.52,
+            depth_price=0.52,
+            market_type="total",
+            line=8.5,
         )
         decision = decide_total(forecast, total_market, limits=SizeLimits(min_depth_units=0.0))
         assert decision.action == "NO_BET", (
@@ -243,14 +439,21 @@ class TestSpreadAndTotalUseConservativeBoundWhenAvailable:
 
     def test_total_without_a_lower_bound_falls_back_to_point_estimate(self):
         forecast = _forecast(
-            predicted_winner="home", home_prob=0.60,
+            predicted_winner="home",
+            home_prob=0.60,
             totals_probabilities={8.5: {"over": 0.58, "under": 0.42}},
         )
         total_market = _market(
-            team_or_side="over", ask=0.52, depth_price=0.52, market_type="total", line=8.5,
+            team_or_side="over",
+            ask=0.52,
+            depth_price=0.52,
+            market_type="total",
+            line=8.5,
         )
         decision = decide_total(
-            forecast, total_market, limits=SizeLimits(min_depth_units=0.0, unit_rounding=0.0),
+            forecast,
+            total_market,
+            limits=SizeLimits(min_depth_units=0.0, unit_rounding=0.0),
         )
         assert decision.action == "BET"
 
@@ -265,9 +468,9 @@ class TestStaleQuoteFailsClosed:
 
 class TestMarketStateFailsClosed:
     def test_closed_market_is_no_bet(self):
-        decision = decide_team_market(_forecast(), _market(ask=0.50).__class__(
-            **{**_market(ask=0.50).__dict__, "market_open": False}
-        ))
+        decision = decide_team_market(
+            _forecast(), _market(ask=0.50).__class__(**{**_market(ask=0.50).__dict__, "market_open": False})
+        )
         assert decision.action == "NO_BET"
         assert decision.reason_code == CLOSED_MARKET
 
@@ -315,9 +518,15 @@ class TestInsufficientDepthFailsClosed:
         # happens to be zero.
         forecast = _forecast(predicted_winner="home", home_prob=0.60, lower_margin=0.03)
         unknown_depth_market = MarketEvaluation(
-            market_id="mkt-1", market_type="moneyline", team_or_side="home", line=None,
-            executable_ask=0.52, depth_adjusted_price=0.52, quote_age_seconds=5.0,
-            available_depth=0.0, depth_available=False,
+            market_id="mkt-1",
+            market_type="moneyline",
+            team_or_side="home",
+            line=None,
+            executable_ask=0.52,
+            depth_adjusted_price=0.52,
+            quote_age_seconds=5.0,
+            available_depth=0.0,
+            depth_available=False,
         )
         decision = decide_team_market(forecast, unknown_depth_market, limits=SizeLimits(min_depth_units=0.0))
         assert decision.action == "NO_BET"
@@ -344,7 +553,9 @@ class TestTotalsFreezeBeforeMarket:
 
     def test_under_side_market_rejected_when_over_is_frozen(self):
         forecast = _forecast(totals_probabilities={8.5: {"over": 0.58, "under": 0.42}})
-        under_market = _market(team_or_side="under", ask=0.40, depth_price=0.40, market_type="total", line=8.5)
+        under_market = _market(
+            team_or_side="under", ask=0.40, depth_price=0.40, market_type="total", line=8.5
+        )
         decision = decide_total(forecast, under_market)
         assert decision.action == "NO_BET"
         assert decision.reason_code == NOT_ALIGNED_WITH_FROZEN_TOTALS_SIDE
@@ -352,14 +563,20 @@ class TestTotalsFreezeBeforeMarket:
     def test_frozen_over_side_can_be_bet_when_qualified(self):
         forecast = _forecast(totals_probabilities={8.5: {"over": 0.58, "under": 0.42}})
         over_market = _market(team_or_side="over", ask=0.50, depth_price=0.50, market_type="total", line=8.5)
-        decision = decide_total(forecast, over_market, limits=SizeLimits(min_depth_units=0.0, unit_rounding=0.0))
+        decision = decide_total(
+            forecast, over_market, limits=SizeLimits(min_depth_units=0.0, unit_rounding=0.0)
+        )
         assert decision.action == "BET"
         assert decision.market_type == "total"
 
     def test_no_forecast_for_an_unlisted_line_fails_closed(self):
         forecast = _forecast(totals_probabilities={8.5: {"over": 0.58, "under": 0.42}})
         unlisted_line_market = _market(
-            team_or_side="over", ask=0.50, depth_price=0.50, market_type="total", line=9.5,
+            team_or_side="over",
+            ask=0.50,
+            depth_price=0.50,
+            market_type="total",
+            line=9.5,
         )
         decision = decide_total(forecast, unlisted_line_market)
         assert decision.action == "NO_BET"
@@ -369,8 +586,8 @@ class TestEveryCandidateGetsADecision:
     def test_no_bets_are_still_returned_not_dropped(self):
         forecast = _forecast(predicted_winner="home", home_prob=0.60, away_prob=0.40)
         candidates = [
-            _market(team_or_side="home", ask=0.70, depth_price=0.70),   # overpriced -> NO_BET
-            _market(team_or_side="away", ask=0.20, depth_price=0.20),   # wrong side -> NO_BET
+            _market(team_or_side="home", ask=0.70, depth_price=0.70),  # overpriced -> NO_BET
+            _market(team_or_side="away", ask=0.20, depth_price=0.20),  # wrong side -> NO_BET
         ]
         decisions = evaluate_game(forecast, candidates)
         assert len(decisions) == 2
@@ -398,7 +615,9 @@ class TestRejectedMarketIdentityIsPreserved:
         forecast = _forecast(predicted_winner="home", home_prob=0.60, lower_margin=0.03)
         market = _market(team_or_side="home", ask=0.52, depth_price=0.52, market_type="moneyline")
 
-        decision = decide_team_market(forecast, market, limits=SizeLimits(min_depth_units=0.0, unit_rounding=0.0))
+        decision = decide_team_market(
+            forecast, market, limits=SizeLimits(min_depth_units=0.0, unit_rounding=0.0)
+        )
 
         assert decision.action == "BET"
         assert decision.evaluated_market is market

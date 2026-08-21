@@ -100,7 +100,23 @@ class LearnedMarketArtifact:
         linear = float(model["intercept"]) + sum(
             coefficient * float(features[name]) for name, coefficient in zip(names, coefficients, strict=True)
         )
-        return min(0.999999, max(0.000001, _sigmoid(linear)))
+        probability = min(0.999999, max(0.000001, _sigmoid(linear)))
+        # Optional post-hoc calibration, applied only when the artifact's own
+        # moneyline block carries a "calibration" entry -- every existing
+        # artifact without one follows the exact legacy path above,
+        # bit-for-bit. Unknown methods fail closed: the artifact refuses to
+        # serve rather than silently serving uncalibrated probabilities.
+        calibration = model.get("calibration") or {}
+        method = calibration.get("method")
+        if method in (None, "identity"):
+            return probability
+        if method == "temperature":
+            temperature = float(calibration["temperature"])
+            if temperature <= 0:
+                raise ValueError(f"invalid {market_type} calibration temperature")
+            logit = math.log(probability / (1 - probability))
+            return min(0.999999, max(0.000001, _sigmoid(logit / temperature)))
+        raise ValueError(f"unsupported {market_type} calibration method: {method}")
 
     def threshold(self, market_type: str) -> float:
         model = self.raw["market_models"][market_type]
@@ -175,9 +191,7 @@ class LearnedMarketArtifact:
             decimal_odds = float(odds_raw) if odds_raw is not None else None
             edge = probability - market_probability if market_probability is not None else None
             expected_value = (
-                probability * (decimal_odds - 1.0) - (1.0 - probability)
-                if decimal_odds is not None
-                else None
+                probability * (decimal_odds - 1.0) - (1.0 - probability) if decimal_odds is not None else None
             )
             evaluated.append((probability, selection, market_probability, edge, expected_value))
         probability, selection, market_probability, edge, expected_value = max(evaluated)

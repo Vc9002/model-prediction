@@ -127,9 +127,7 @@ class TrainablePlattCalibrator:
 class IsotonicCalibrator:
     """Isotonic regression via pool-adjacent-violators, with linear interpolation."""
 
-    def __init__(
-        self, thresholds: list[float], values: list[float], metadata: CalibrationMetadata
-    ) -> None:
+    def __init__(self, thresholds: list[float], values: list[float], metadata: CalibrationMetadata) -> None:
         self.thresholds = thresholds
         self.values = values
         self.metadata = metadata
@@ -190,6 +188,69 @@ class IsotonicCalibrator:
         return self.values[-1]
 
 
+class TemperatureCalibrator:
+    """Temperature scaling: p_cal = sigmoid(logit(p) / T).
+
+    T < 1 SHARPENS (amplifies logits, fixes underconfidence, measured
+    slope > 1); T > 1 SOFTENS (shrinks logits, fixes overconfidence,
+    measured slope < 1). Fitted by grid search minimizing log-loss on the
+    provided (validation) predictions. Follows the same
+    fit/fail-closed-to-identity contract as the Platt and isotonic
+    calibrators. First validated use: WNBA v4 (2026-08-17 holdout test --
+    Brier 0.214138 -> 0.212096, the first challenger of the v9 cycle to
+    clear the -0.002 magnitude bar).
+    """
+
+    TEMPERATURE_GRID = (0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5, 1.7, 2.0, 2.5, 3.0)
+
+    def __init__(self, temperature: float, metadata: CalibrationMetadata) -> None:
+        self.temperature = temperature
+        self.metadata = metadata
+
+    @classmethod
+    def fit(
+        cls,
+        probabilities: Sequence[float],
+        outcomes: Sequence[int],
+        base_model_version: str,
+        version: str = "temperature-rolling-v1",
+        minimum_sample: int = 100,
+    ) -> TemperatureCalibrator | IdentityCalibrator:
+        if len(probabilities) != len(outcomes):
+            raise ValueError("probabilities and outcomes must have equal length")
+        if len(probabilities) < minimum_sample:
+            return IdentityCalibrator(base_model_version, f"{version}-identity-fallback")
+        clipped = [min(1 - 1e-9, max(1e-9, p)) for p in probabilities]
+        logits = [math.log(p / (1 - p)) for p in clipped]
+        best_t, best_loss = 1.0, float("inf")
+        for t in cls.TEMPERATURE_GRID:
+            loss = 0.0
+            for z, y in zip(logits, outcomes, strict=True):
+                p = min(1 - 1e-9, max(1e-9, 1.0 / (1.0 + math.exp(-z / t))))
+                loss += -(y * math.log(p) + (1 - y) * math.log(1 - p))
+            if loss < best_loss:
+                best_loss, best_t = loss, t
+        raw = {
+            "method": "temperature",
+            "version": version,
+            "base_model_version": base_model_version,
+            "temperature": best_t,
+            "sample_size": len(probabilities),
+        }
+        artifact_hash = hashlib.sha256(
+            json.dumps(raw, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        metadata = CalibrationMetadata(
+            "temperature", version, base_model_version, None, None, len(probabilities), artifact_hash
+        )
+        return cls(best_t, metadata)
+
+    def transform(self, probability: float) -> float:
+        clipped = min(1 - 1e-12, max(1e-12, probability))
+        logit = math.log(clipped / (1 - clipped))
+        return 1 / (1 + math.exp(-logit / self.temperature))
+
+
 def calibration_metrics(
     probabilities: Sequence[float], outcomes: Sequence[int], minimum_sample: int = 30
 ) -> dict[str, object]:
@@ -219,9 +280,34 @@ def calibration_metrics(
         mean_y = sum(y for _, y in members) / len(members)
         ece += len(members) / len(clipped) * abs(mean_p - mean_y)
         buckets.append(
-            {"lower": lower, "upper": upper, "count": len(members), "mean_p": mean_p, "hit_rate": mean_y}
+            {
+                "lower": lower,
+                "upper": upper,
+                "count": len(members),
+                "mean_p": mean_p,
+                "hit_rate": mean_y,
+            }
         )
     intercept, slope = _logistic_calibration(clipped, outcomes)
+    # Three-way Brier decomposition of the BINNED forecast (Murphy 1973):
+    # uncertainty - resolution + reliability. The three terms reconstruct
+    # the Brier score of the binned (discretized) forecast exactly; the raw
+    # Brier additionally carries within-bucket prediction spread and
+    # within-bucket p-y covariance, which the textbook decomposition
+    # deliberately excludes (it treats each bin as one forecast at mean_p).
+    # Resolution = how well the model separates easy from hard games;
+    # reliability = calibration error; uncertainty is irreducible (base-rate
+    # entropy). A model can improve resolution while degrading reliability —
+    # accuracy alone hides that; this decomposition is the diagnostic the
+    # LR-vs-XGB decision needs.
+    base_rate = sum(outcomes) / len(outcomes)
+    uncertainty = base_rate * (1.0 - base_rate)
+    reliability = 0.0
+    resolution = 0.0
+    for bucket in buckets:
+        weight = bucket["count"] / len(clipped)
+        reliability += weight * (bucket["mean_p"] - bucket["hit_rate"]) ** 2
+        resolution += weight * (bucket["hit_rate"] - base_rate) ** 2
     return {
         "status": "ok",
         "sample_size": len(clipped),
@@ -230,6 +316,9 @@ def calibration_metrics(
         "calibration_intercept": intercept,
         "calibration_slope": slope,
         "expected_calibration_error": ece,
+        "brier_reliability": reliability,
+        "brier_resolution": resolution,
+        "brier_uncertainty": uncertainty,
         "reliability_buckets": buckets,
     }
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,17 @@ def _within(path: Path, root: Path) -> bool:
     return True
 
 
+def _within_lexical(path: Path, root: Path) -> bool:
+    """Containment WITHOUT symlink resolution — used to judge the path the
+    caller supplied, before resolve() can follow a symlinked data/ tree
+    out of the repository."""
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
 @dataclass(frozen=True)
 class RebuildPathPolicy:
     repo_root: Path
@@ -35,7 +47,9 @@ class RebuildPathPolicy:
 
     @classmethod
     def from_config(cls, config: RebuildConfig) -> RebuildPathPolicy:
-        policy = cls(config.repo_root, config.paths.data_root, config.paths.output_root, config.paths.challenger_root)
+        policy = cls(
+            config.repo_root, config.paths.data_root, config.paths.output_root, config.paths.challenger_root
+        )
         policy.assert_isolated_roots()
         return policy
 
@@ -48,7 +62,9 @@ class RebuildPathPolicy:
         expected_output = self.repo_root / "outputs" / "rebuild"
         expected_challengers = self.repo_root / "config" / "models" / "challengers"
         if not _within(self.data_root, expected_data):
-            raise RebuildSafetyError("rebuild data_root must be inside the resolved runtime root's rebuild/ directory")
+            raise RebuildSafetyError(
+                "rebuild data_root must be inside the resolved runtime root's rebuild/ directory"
+            )
         if not _within(self.output_root, expected_output):
             raise RebuildSafetyError("rebuild output_root must be inside outputs/rebuild")
         if not _within(self.challenger_root, expected_challengers):
@@ -97,7 +113,23 @@ def assert_challenger_artifact_path(path: str | Path, challenger_root: str | Pat
 
 
 def assert_runtime_data_root(path: str | Path, repo_root: str | Path) -> Path:
-    """Allow external temporary roots, but constrain every repo-local run."""
+    """Allow external temporary roots, but constrain every repo-local run.
+
+    Containment is checked on the symlink-UNRESOLVED path first: a
+    repo-local path that resolves through a symlinked directory (a
+    research worktree sharing the canonical checkout's ``data/`` tree,
+    exactly this checkout's layout) escapes the resolved-path check and
+    would otherwise let a rebuild run open a ledger in the live
+    production tree. The lexical check rejects by the path the caller
+    actually supplied; the resolved check then guards the write-side
+    layer against symlink targets inside the repo from outside.
+    """
+    lexical = Path(os.path.abspath(str(path)))
+    repository_lexical = Path(os.path.abspath(str(repo_root)))
+    if _within_lexical(lexical, repository_lexical) and not _within_lexical(
+        lexical, repository_lexical / "data" / "rebuild"
+    ):
+        raise RebuildSafetyError(f"repo-local rebuild data must stay inside data/rebuild: {path}")
     resolved = Path(path).resolve()
     repository = Path(repo_root).resolve()
     if _within(resolved, repository) and not _within(resolved, repository / "data" / "rebuild"):

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -42,6 +42,8 @@ class MLBGameOdds:
     markets: dict[str, dict[str, MarketSideQuote]]
     raw_response: dict[str, Any]
     snapshot_hash: str
+    snapshot_archive_path: str | None = None
+    snapshot_record_id: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -56,12 +58,24 @@ class MarketOddsSnapshotStore:
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
 
-    def append(self, snapshot: MLBGameOdds | dict[str, Any]) -> None:
-        payload = snapshot.as_dict() if isinstance(snapshot, MLBGameOdds) else snapshot
+    def append(self, snapshot: MLBGameOdds | dict[str, Any]) -> MLBGameOdds | dict[str, Any]:
+        if isinstance(snapshot, MLBGameOdds):
+            bound = replace(
+                snapshot,
+                snapshot_archive_path=str(self.path.resolve()),
+                snapshot_record_id=snapshot.snapshot_hash,
+            )
+            payload = bound.as_dict()
+        else:
+            payload = dict(snapshot)
+            payload["snapshot_archive_path"] = str(self.path.resolve())
+            payload["snapshot_record_id"] = payload.get("snapshot_hash")
+            bound = payload
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
             handle.flush()
+        return bound
 
     def closing_quote(
         self,
@@ -152,8 +166,7 @@ class MLBMarketOddsFeed:
                     home_team,
                     polymarket_event,
                 )
-                self.snapshot_store.append(snapshot)
-                return snapshot
+                return self.snapshot_store.append(snapshot)  # type: ignore[return-value]
             except (httpx.HTTPError, KeyError, StopIteration, TypeError, ValueError) as error:
                 errors.append(f"polymarket_us_exact_bbo:{type(error).__name__}")
         draftkings_event = self._match_event(
@@ -171,8 +184,7 @@ class MLBMarketOddsFeed:
                     home_team,
                     draftkings_event,
                 )
-                self.snapshot_store.append(snapshot)
-                return snapshot
+                return self.snapshot_store.append(snapshot)  # type: ignore[return-value]
             except (KeyError, StopIteration, TypeError, ValueError) as error:
                 errors.append(f"draftkings_exact_market:{type(error).__name__}")
         detail = ",".join(errors) if errors else "no_matching_event"
@@ -393,10 +405,8 @@ def _validate_lines(market_type: str, sides: dict[str, MarketSideQuote]) -> None
             raise MarketUnavailableError("spread lines unavailable")
         if abs(sides["away"].line + sides["home"].line) > 1e-9:
             raise MarketUnavailableError("spread lines are not opposites")
-    if market_type == "total" and (
-        sides["over"].line is None or sides["under"].line != sides["over"].line
-    ):
-            raise MarketUnavailableError("total lines are unavailable or incoherent")
+    if market_type == "total" and (sides["over"].line is None or sides["under"].line != sides["over"].line):
+        raise MarketUnavailableError("total lines are unavailable or incoherent")
 
 
 def _snapshot(
@@ -434,3 +444,87 @@ def _snapshot(
         raw_response=raw_response,
         snapshot_hash=digest,
     )
+
+
+def canonical_mlb_market_snapshot_hash(raw: dict[str, Any]) -> str:
+    """Recompute the exact semantic digest written by :func:`_snapshot`."""
+    canonical = {
+        key: raw.get(key)
+        for key in (
+            "event_id",
+            "event_start_utc",
+            "away_team",
+            "home_team",
+            "provider",
+            "observed_at_utc",
+            "markets",
+            "raw_response",
+        )
+    }
+    return hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def load_verified_mlb_market_snapshot(
+    *,
+    archive_path: str | Path | None,
+    record_id: str | None,
+    approved_roots: tuple[Path, ...],
+    expected_snapshot_hash: str | None,
+    event_id: str,
+    observed_at_utc: str,
+    provider: str,
+    market_type: str,
+    selection: str,
+    line: float | None,
+    american_odds: int,
+) -> dict[str, Any]:
+    """Load and authenticate one archived decision-time market record."""
+    if not archive_path or not record_id or not expected_snapshot_hash:
+        raise ValueError("market snapshot archive locator and record identity are required")
+    path = Path(archive_path).resolve()
+    roots = tuple(root.resolve() for root in approved_roots)
+    if not any(path == root or root in path.parents for root in roots):
+        raise ValueError("market snapshot archive path is outside approved roots")
+    if not path.is_file():
+        raise ValueError("market snapshot archive is missing")
+    matches: list[dict[str, Any]] = []
+    with path.open(encoding="utf-8") as handle:
+        for raw_line in handle:
+            if not raw_line.strip():
+                continue
+            try:
+                item = json.loads(raw_line)
+            except json.JSONDecodeError as exc:
+                raise ValueError("market snapshot archive contains invalid JSON") from exc
+            if not isinstance(item, dict):
+                raise ValueError("market snapshot archive record must be an object")
+            if item.get("snapshot_record_id") == record_id:
+                matches.append(item)
+    if len(matches) != 1:
+        raise ValueError("market snapshot record identity is missing or ambiguous")
+    item = matches[0]
+    recomputed = canonical_mlb_market_snapshot_hash(item)
+    if not (
+        record_id == expected_snapshot_hash
+        and item.get("snapshot_hash") == expected_snapshot_hash
+        and recomputed == expected_snapshot_hash
+        and item.get("snapshot_archive_path") == str(path)
+    ):
+        raise ValueError("market snapshot archive hash binding mismatch")
+    if (
+        item.get("event_id") != event_id
+        or item.get("observed_at_utc") != observed_at_utc
+        or item.get("provider") != provider
+    ):
+        raise ValueError("market snapshot event or quote identity mismatch")
+    quote = item.get("markets", {}).get(market_type, {}).get(selection)
+    if not isinstance(quote, dict):
+        raise ValueError("market snapshot selected quote is missing")
+    archived_line = quote.get("line")
+    if (
+        quote.get("selection") != selection
+        or archived_line != line
+        or quote.get("american_odds") != american_odds
+    ):
+        raise ValueError("market snapshot selected quote identity mismatch")
+    return item

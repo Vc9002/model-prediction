@@ -20,8 +20,6 @@ from typing import Any
 
 from sklearn.linear_model import LogisticRegression
 
-logger = logging.getLogger(__name__)
-
 from .calibration import calibration_metrics
 from .config import PROJECT_ROOT
 from .data_sources.espn_probables import point_in_time_pitcher_era_gap
@@ -37,6 +35,8 @@ from .features.trends import TrendEngine
 from .lifecycle import evaluate_locked_holdout
 from .models.learned_market import build_artifact, learn_confidence_threshold
 from .pricing import american_to_decimal
+
+logger = logging.getLogger(__name__)
 
 PRIMARY_THRESHOLD_TARGET_HIT_RATE = 0.65
 DIAGNOSTIC_THRESHOLD_TARGET_HIT_RATE = 0.60
@@ -263,6 +263,71 @@ FEATURE_VARIANTS: dict[str, tuple[str, ...]] = {
         "weather_factor",
         "starter_era_gap",
         "bullpen_fatigue_gap",
+    ),
+    # ── v9 ISOLATING ladder: each entry changes EXACTLY ONE term against the
+    # v8 control (elo_trend_park_weather_starter_bullpen), so a delta is
+    # attributable to that term alone. The v9 variants above each move two
+    # things at once (e.g. PIT park AND the starter stat), which confounds
+    # the rung they were meant to test.
+    "v8_iso_park_pit": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor_pit",  # <- only change vs v8 control
+        "weather_factor",
+        "starter_era_gap",
+        "bullpen_weakness_gap",
+    ),
+    "v8_iso_residual_trend": (
+        "elo_probability",
+        "residual_trend_gap",  # <- only change
+        "park_factor",
+        "weather_factor",
+        "starter_era_gap",
+        "bullpen_weakness_gap",
+    ),
+    "v8_iso_starter_kbb": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_kbb_gap",  # <- only change
+        "bullpen_weakness_gap",
+    ),
+    "v8_iso_starter_fip": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_fip_gap",  # <- only change
+        "bullpen_weakness_gap",
+    ),
+    "v8_iso_bullpen_fatigue": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_era_gap",
+        "bullpen_fatigue_gap",  # <- only change
+    ),
+    "v8_iso_bullpen_both": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_era_gap",
+        "bullpen_weakness_gap",
+        "bullpen_fatigue_gap",  # <- only addition
+    ),
+    # weather_factor carries 26%/97%/52% availability by year and a standard
+    # deviation of 0.0084 (near-constant). It is in the v8 control, so every
+    # ladder comparison inherits it -- this drops it to measure what it is
+    # actually contributing.
+    "v8_iso_drop_weather": (
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "starter_era_gap",
+        "bullpen_weakness_gap",
     ),
     # ── v9 Phase 3: batter PIT priors (projected_offense_pit) isolating-
     # ladder control + single-variable candidate (docs/MODEL_IMPROVEMENTS.md
@@ -2489,7 +2554,7 @@ def _load_starter_fip_map() -> dict[str, float]:
             so = int(stats.get("strikeOuts", 0) or 0)
             bb = int(stats.get("baseOnBalls", 0) or 0)
             hr = int(stats.get("homeRuns", 0) or 0)
-            hbp = int(stats.get("hitBatsmen", 0) or 0)
+            hbp = int(stats.get("hitByPitch", 0) or stats.get("hitBatsmen", 0) or 0)
 
             prior = history.get(pid, [])
             if len(prior) >= 2:
@@ -2523,7 +2588,7 @@ def _starter_fip_gap(event_id: str) -> float:
     return _load_starter_fip_map().get(event_id, 0.0)
 
 
-# ── Starter K-BB% gap (same methodology, (K-BB)/IP instead of ERA/FIP) ───
+# ── Starter K-BB% gap (same methodology, (K-BB)/BF instead of ERA/FIP) ───
 
 _STARTER_KBB_MAP: dict[str, float] | None = None
 
@@ -2533,7 +2598,13 @@ def _load_starter_kbb_map() -> dict[str, float]:
 
     Mirrors ``_load_starter_fip_map`` exactly — same chronological point-in-time
     logic, same rolling 5-start window, same >=2 prior starts minimum, same
-    crosswalk — but computes (K-BB)/IP instead of FIP."""
+    crosswalk — but computes real K-BB% = (K-BB)/battersFaced instead of FIP.
+
+    F-real (2026-08-20): this previously computed (K-BB)/IP -- K-BB per
+    inning, not K-BB% -- because batters_faced wasn't carried in the
+    per-start history dict below. The closed ``starter_kbb: REJECT``
+    verdict was measured against that wrong statistic; see
+    MODEL_IMPROVEMENTS.md section 8 for the corrected rerun."""
     global _STARTER_KBB_MAP
     if _STARTER_KBB_MAP is not None:
         return _STARTER_KBB_MAP
@@ -2581,22 +2652,22 @@ def _load_starter_kbb_map() -> dict[str, float]:
             if not player or "inningsPitched" not in player.get("pitching", {}):
                 continue
             stats = player["pitching"]
-            ip = _ip_float(stats["inningsPitched"])
             so = int(stats.get("strikeOuts", 0) or 0)
             bb = int(stats.get("baseOnBalls", 0) or 0)
+            bf = int(stats.get("battersFaced", 0) or 0)
 
             prior = history.get(pid, [])
             if len(prior) >= 2:
                 recent = prior[-5:]
-                pip = sum(g["ip"] for g in recent)
-                if pip > 0:
-                    kbb = (sum(g["so"] for g in recent) - sum(g["bb"] for g in recent)) / pip
+                pbf = sum(g["bf"] for g in recent)
+                if pbf > 0:
+                    kbb = (sum(g["so"] for g in recent) - sum(g["bb"] for g in recent)) / pbf
                     if side_key == "home":
                         home_kbb = kbb
                     else:
                         away_kbb = kbb
 
-            history.setdefault(pid, []).append({"ip": ip, "so": so, "bb": bb})
+            history.setdefault(pid, []).append({"bf": bf, "so": so, "bb": bb})
 
         if home_kbb is not None and away_kbb is not None:
             result[eid] = round(home_kbb - away_kbb, 6)

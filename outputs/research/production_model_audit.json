@@ -1,0 +1,398 @@
+{
+  "generated_at_utc": "2026-08-15T07:25:55.276478+00:00",
+  "models": {
+    "cs2": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "cs2-tiered-elo-v6",
+      "is_champion": true,
+      "model_version": "cs2-tiered-elo-v6",
+      "hash_valid": true,
+      "qualified": null,
+      "feature_names": [],
+      "threshold": null,
+      "training_observations": {},
+      "ledger": {
+        "total": 465,
+        "by_status": {
+          "open": {
+            "n": 52,
+            "last_settled": null
+          },
+          "removed": {
+            "n": 123,
+            "last_settled": null
+          },
+          "settled": {
+            "n": 290,
+            "last_settled": "2026-08-15T02:11:57.738237Z"
+          }
+        }
+      },
+      "data_freshness": {},
+      "findings": []
+    },
+    "dota2": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "dota2-tiered-elo-v6",
+      "is_champion": true,
+      "model_version": "dota2-tiered-elo-v6",
+      "hash_valid": true,
+      "qualified": null,
+      "feature_names": [],
+      "threshold": null,
+      "training_observations": {},
+      "ledger": {
+        "total": 99,
+        "by_status": {
+          "open": {
+            "n": 8,
+            "last_settled": null
+          },
+          "removed": {
+            "n": 40,
+            "last_settled": null
+          },
+          "settled": {
+            "n": 51,
+            "last_settled": "2026-08-14T17:02:21.770579Z"
+          }
+        }
+      },
+      "data_freshness": {},
+      "findings": []
+    },
+    "kbo": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "kbo-tie-aware-elo-v2",
+      "is_champion": true,
+      "model_version": "kbo-tie-aware-elo-v2",
+      "hash_valid": true,
+      "qualified": null,
+      "feature_names": [],
+      "threshold": null,
+      "training_observations": {},
+      "ledger": {
+        "total": 34,
+        "by_status": {
+          "open": {
+            "n": 13,
+            "last_settled": null
+          },
+          "settled": {
+            "n": 21,
+            "last_settled": "2026-08-14T17:00:38.090862Z"
+          }
+        }
+      },
+      "data_freshness": {},
+      "findings": []
+    },
+    "lol": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "lol-tiered-elo-v6",
+      "is_champion": true,
+      "model_version": "lol-tiered-elo-v6",
+      "hash_valid": true,
+      "qualified": null,
+      "feature_names": [],
+      "threshold": null,
+      "training_observations": {},
+      "ledger": {
+        "total": 291,
+        "by_status": {
+          "open": {
+            "n": 23,
+            "last_settled": null
+          },
+          "removed": {
+            "n": 96,
+            "last_settled": null
+          },
+          "settled": {
+            "n": 172,
+            "last_settled": "2026-08-14T20:41:53.704284Z"
+          }
+        }
+      },
+      "data_freshness": {},
+      "findings": []
+    },
+    "mlb": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "mlb-elo-trend-lr-v8",
+      "is_champion": true,
+      "model_version": "mlb-elo-trend-lr-v8",
+      "hash_valid": true,
+      "qualified": false,
+      "override_note": "promoted by operator override despite qualified:false",
+      "feature_names": [
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_era_gap",
+        "bullpen_weakness_gap"
+      ],
+      "threshold": 0.61966524,
+      "training_observations": {
+        "coefficient_fit": 3814,
+        "locked_holdout": 1391,
+        "threshold_selection": 1082
+      },
+      "ledger": {
+        "total": 150,
+        "by_status": {
+          "removed": {
+            "n": 28,
+            "last_settled": null
+          },
+          "settled": {
+            "n": 122,
+            "last_settled": "2026-08-14T23:06:42.454764Z"
+          }
+        }
+      },
+      "data_freshness": {
+        "latest_event": "2026-08-15",
+        "days_ago": 0
+      },
+      "findings": []
+    },
+    "nba": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "nba-elo-trend-lr-v4",
+      "is_champion": true,
+      "model_version": "nba-elo-trend-lr-v4",
+      "hash_valid": true,
+      "qualified": true,
+      "feature_names": [
+        "elo_probability",
+        "trend_gap",
+        "defensive_trend_gap"
+      ],
+      "threshold": 0.54443676,
+      "training_observations": {
+        "coefficient_fit": 2171,
+        "locked_holdout": 654,
+        "threshold_selection": 753
+      },
+      "ledger": {
+        "total": 0,
+        "by_status": {}
+      },
+      "data_freshness": {
+        "latest_event": "2026-06-14",
+        "days_ago": 62
+      },
+      "findings": []
+    },
+    "nfl": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "nfl-elo-trend-lr-v4",
+      "is_champion": true,
+      "model_version": "nfl-elo-trend-lr-v4",
+      "hash_valid": true,
+      "qualified": true,
+      "feature_names": [
+        "elo_probability",
+        "trend_gap"
+      ],
+      "threshold": 0.54411292,
+      "training_observations": {
+        "coefficient_fit": 366,
+        "locked_holdout": 122,
+        "threshold_selection": 146
+      },
+      "ledger": {
+        "total": 0,
+        "by_status": {}
+      },
+      "data_freshness": {
+        "latest_event": "2026-08-14",
+        "days_ago": 1
+      },
+      "findings": []
+    },
+    "npb": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "npb-tie-aware-elo-v2",
+      "is_champion": true,
+      "model_version": "npb-tie-aware-elo-v2",
+      "hash_valid": true,
+      "qualified": null,
+      "feature_names": [],
+      "threshold": null,
+      "training_observations": {},
+      "ledger": {
+        "total": 55,
+        "by_status": {
+          "open": {
+            "n": 4,
+            "last_settled": null
+          },
+          "settled": {
+            "n": 51,
+            "last_settled": "2026-08-14T18:41:55.829935Z"
+          }
+        }
+      },
+      "data_freshness": {},
+      "findings": []
+    },
+    "rainbow_six": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "rainbow_six-tiered-elo-v6",
+      "is_champion": true,
+      "model_version": "rainbow_six-tiered-elo-v6",
+      "hash_valid": true,
+      "qualified": null,
+      "feature_names": [],
+      "threshold": null,
+      "training_observations": {},
+      "ledger": {
+        "total": 7,
+        "by_status": {
+          "removed": {
+            "n": 1,
+            "last_settled": null
+          },
+          "settled": {
+            "n": 6,
+            "last_settled": "2026-08-14T17:02:01.124892Z"
+          }
+        }
+      },
+      "data_freshness": {},
+      "findings": []
+    },
+    "soccer": {
+      "status": true,
+      "kind": "code_backed_model",
+      "champion": "soccer-poisson-dc-v1",
+      "is_champion": true,
+      "model_version": "soccer-poisson-dc-v1",
+      "ledger": {
+        "total": 161,
+        "by_status": {
+          "open": {
+            "n": 3,
+            "last_settled": null
+          },
+          "removed": {
+            "n": 11,
+            "last_settled": null
+          },
+          "settled": {
+            "n": 147,
+            "last_settled": "2026-08-14T20:40:47.602760Z"
+          }
+        }
+      },
+      "data_freshness": {},
+      "findings": []
+    },
+    "tennis": {
+      "status": true,
+      "kind": "code_backed_model",
+      "champion": "tennis-surface-elo-v1",
+      "is_champion": true,
+      "model_version": "tennis-surface-elo-v1",
+      "ledger": {
+        "total": 379,
+        "by_status": {
+          "removed": {
+            "n": 13,
+            "last_settled": null
+          },
+          "settled": {
+            "n": 366,
+            "last_settled": "2026-08-14T23:06:44.236839Z"
+          }
+        }
+      },
+      "data_freshness": {
+        "latest_event": "2026-08-15",
+        "days_ago": 0
+      },
+      "findings": []
+    },
+    "valorant": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "valorant-tiered-elo-v6",
+      "is_champion": true,
+      "model_version": "valorant-tiered-elo-v6",
+      "hash_valid": true,
+      "qualified": null,
+      "feature_names": [],
+      "threshold": null,
+      "training_observations": {},
+      "ledger": {
+        "total": 220,
+        "by_status": {
+          "open": {
+            "n": 16,
+            "last_settled": null
+          },
+          "removed": {
+            "n": 126,
+            "last_settled": null
+          },
+          "settled": {
+            "n": 78,
+            "last_settled": "2026-08-15T05:16:05.060243Z"
+          }
+        }
+      },
+      "data_freshness": {},
+      "findings": []
+    },
+    "wnba": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "wnba-elo-trend-lr-v4",
+      "is_champion": true,
+      "model_version": "wnba-elo-trend-lr-v4",
+      "hash_valid": true,
+      "qualified": true,
+      "feature_names": [
+        "elo_probability",
+        "trend_gap",
+        "defensive_trend_gap"
+      ],
+      "threshold": 0.50013272,
+      "training_observations": {
+        "coefficient_fit": 457,
+        "locked_holdout": 163,
+        "threshold_selection": 143
+      },
+      "ledger": {
+        "total": 89,
+        "by_status": {
+          "removed": {
+            "n": 8,
+            "last_settled": null
+          },
+          "settled": {
+            "n": 81,
+            "last_settled": "2026-08-14T04:07:59.125483Z"
+          }
+        }
+      },
+      "data_freshness": {
+        "latest_event": "2026-08-15",
+        "days_ago": 0
+      },
+      "findings": []
+    }
+  }
+}

@@ -51,6 +51,9 @@ CREATE TABLE IF NOT EXISTS ledger_records (
 
     model_id                TEXT,
     model_artifact_hash     TEXT,
+    market_snapshot_hash    TEXT,
+    market_snapshot_archive_path TEXT,
+    market_snapshot_record_id TEXT,
     feature_schema_version  TEXT,
 
     model_probability       REAL,
@@ -108,7 +111,8 @@ _EVENT_TYPES = ("append", "settle", "void", "update", "archive", "remove")
 # v2: the primary key became (pick_id, ledger_tier) — main and flat
 # legitimately share pick_ids (one decision, two tiers), so a single
 # pick_id key wrongly collapsed them (found live on flat/tennis).
-_SCHEMA_VERSION = 2
+_SCHEMA_VERSION = 3
+_EVENT_SCHEMA_VERSION = 3
 
 
 @dataclass(frozen=True)
@@ -132,6 +136,9 @@ class LedgerMutation:
     # model lineage
     model_id: str | None = None
     model_artifact_hash: str | None = None
+    market_snapshot_hash: str | None = None
+    market_snapshot_archive_path: str | None = None
+    market_snapshot_record_id: str | None = None
     feature_schema_version: str | None = None
     # numbers
     model_probability: float | None = None
@@ -162,9 +169,7 @@ def new_pick_ids() -> tuple[str, str]:
     return f"pick-{uuid.uuid4().hex}", f"op-{uuid.uuid4().hex}"
 
 
-def _hash_event(
-    event_type: str, pick_id: str, payload_json: str, previous_hash: str | None
-) -> str:
+def _hash_event(event_type: str, pick_id: str, payload_json: str, previous_hash: str | None) -> str:
     digest = hashlib.sha256()
     for part in (event_type, pick_id, payload_json, previous_hash or ""):
         digest.update(part.encode())
@@ -193,9 +198,8 @@ class RuntimeLedgerStore:
             schema_row = conn.execute(
                 "SELECT sql FROM sqlite_master WHERE name = 'ledger_records'"
             ).fetchone()
-            pk_matches = (
-                schema_row is not None
-                and "PRIMARY KEY (pick_id, ledger_tier)" in (schema_row[0] or "")
+            pk_matches = schema_row is not None and "PRIMARY KEY (pick_id, ledger_tier)" in (
+                schema_row[0] or ""
             )
             if schema_row is not None and not pk_matches:
                 # Schema change on a mirror: drop + rebuild. This is safe
@@ -205,11 +209,16 @@ class RuntimeLedgerStore:
                 # check is STRUCTURAL (the table's own declared key), not a
                 # version pragma — a pragma can be stamped by a half-run but
                 # the table can't lie about its shape.
-                conn.executescript(
-                    "DROP TABLE IF EXISTS ledger_records; "
-                    "DROP TABLE IF EXISTS ledger_events;"
-                )
+                conn.executescript("DROP TABLE IF EXISTS ledger_records; DROP TABLE IF EXISTS ledger_events;")
             conn.executescript(_SCHEMA)
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(ledger_records)")}
+            for column in (
+                "market_snapshot_hash",
+                "market_snapshot_archive_path",
+                "market_snapshot_record_id",
+            ):
+                if column not in columns:
+                    conn.execute(f"ALTER TABLE ledger_records ADD COLUMN {column} TEXT")
             conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
 
     @property
@@ -251,13 +260,10 @@ class RuntimeLedgerStore:
         """
         if mutation.event_type not in _EVENT_TYPES:
             raise ValueError(f"event_type must be one of {_EVENT_TYPES}")
-        payload = json.dumps(
-            _mutation_payload(mutation), sort_keys=True, separators=(",", ":")
-        )
+        payload = json.dumps(_mutation_payload(mutation), sort_keys=True, separators=(",", ":"))
         with self._conn:
             existing = self._conn.execute(
-                "SELECT operation_id FROM ledger_records "
-                "WHERE pick_id = ? AND ledger_tier = ?",
+                "SELECT operation_id FROM ledger_records WHERE pick_id = ? AND ledger_tier = ?",
                 (mutation.pick_id, mutation.ledger_tier),
             ).fetchone()
             if existing is not None and existing["operation_id"] == mutation.operation_id:
@@ -268,7 +274,9 @@ class RuntimeLedgerStore:
                     pick_id, operation_id, ledger_tier, sport,
                     event_id, canonical_event_id, event_start_utc,
                     market_type, selection, line,
-                    model_id, model_artifact_hash, feature_schema_version,
+                    model_id, model_artifact_hash, market_snapshot_hash,
+                    market_snapshot_archive_path, market_snapshot_record_id,
+                    feature_schema_version,
                     model_probability, market_probability, edge, confidence, units,
                     decision, reason_code, status, result, pnl_units,
                     created_at_utc, settled_at_utc,
@@ -276,7 +284,9 @@ class RuntimeLedgerStore:
                 VALUES (:pick_id, :operation_id, :ledger_tier, :sport,
                     :event_id, :canonical_event_id, :event_start_utc,
                     :market_type, :selection, :line,
-                    :model_id, :model_artifact_hash, :feature_schema_version,
+                    :model_id, :model_artifact_hash, :market_snapshot_hash,
+                    :market_snapshot_archive_path, :market_snapshot_record_id,
+                    :feature_schema_version,
                     :model_probability, :market_probability, :edge, :confidence, :units,
                     :decision, :reason_code, :status, :result, :pnl_units,
                     :created_at_utc, :settled_at_utc,
@@ -293,6 +303,9 @@ class RuntimeLedgerStore:
                     line = excluded.line,
                     model_id = excluded.model_id,
                     model_artifact_hash = excluded.model_artifact_hash,
+                    market_snapshot_hash = excluded.market_snapshot_hash,
+                    market_snapshot_archive_path = excluded.market_snapshot_archive_path,
+                    market_snapshot_record_id = excluded.market_snapshot_record_id,
                     feature_schema_version = excluded.feature_schema_version,
                     model_probability = excluded.model_probability,
                     market_probability = excluded.market_probability,
@@ -315,9 +328,7 @@ class RuntimeLedgerStore:
                 "SELECT event_hash FROM ledger_events ORDER BY sequence DESC LIMIT 1"
             ).fetchone()
             previous_hash = previous["event_hash"] if previous else None
-            event_hash = _hash_event(
-                mutation.event_type, mutation.pick_id, payload, previous_hash
-            )
+            event_hash = _hash_event(mutation.event_type, mutation.pick_id, payload, previous_hash)
             self._conn.execute(
                 "INSERT INTO ledger_events (event_id, pick_id, event_type, "
                 "event_time_utc, payload_json, previous_hash, event_hash) "
@@ -353,27 +364,207 @@ class RuntimeLedgerStore:
 
     def event_count(self) -> int:
         """Total hash-linked audit events (I2 overlap report)."""
-        row = self._conn.execute(
-            "SELECT COUNT(*) AS n FROM ledger_events"
-        ).fetchone()
+        row = self._conn.execute("SELECT COUNT(*) AS n FROM ledger_events").fetchone()
         return int(row["n"])
 
     def verify_integrity(self) -> tuple[bool, list[str]]:
         """Replay the hash chain; report the first break (I2 precursor)."""
-        rows = self._conn.execute(
-            "SELECT * FROM ledger_events ORDER BY sequence"
-        ).fetchall()
+        rows = self._conn.execute("SELECT * FROM ledger_events ORDER BY sequence").fetchall()
         problems: list[str] = []
         previous_hash: str | None = None
         for row in rows:
-            expected = _hash_event(
-                row["event_type"], row["pick_id"], row["payload_json"], previous_hash
-            )
+            expected = _hash_event(row["event_type"], row["pick_id"], row["payload_json"], previous_hash)
             if expected != row["event_hash"]:
                 problems.append(f"hash break at sequence {row['sequence']}")
                 break
             previous_hash = row["event_hash"]
         return (not problems), problems
+
+
+_REPLAY_FIELDS_V2 = (
+    "operation_id",
+    "ledger_tier",
+    "sport",
+    "event_id",
+    "market_type",
+    "selection",
+    "line",
+    "model_id",
+    "model_artifact_hash",
+    "feature_schema_version",
+    "model_probability",
+    "market_probability",
+    "edge",
+    "confidence",
+    "units",
+    "decision",
+    "reason_code",
+    "status",
+    "result",
+    "pnl_units",
+    "settled_at_utc",
+)
+_REPLAY_FIELDS_V3 = (
+    *_REPLAY_FIELDS_V2,
+    "canonical_event_id",
+    "event_start_utc",
+    "market_snapshot_hash",
+    "market_snapshot_archive_path",
+    "market_snapshot_record_id",
+)
+_PROJECTION_FIELDS = _REPLAY_FIELDS_V3
+
+
+def verify_runtime_ledger_connection(conn: sqlite3.Connection) -> dict[str, Any]:
+    """Verify one caller-owned read-transaction snapshot."""
+    conn.row_factory = sqlite3.Row
+    tables = {
+        row["name"]
+        for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' "
+            "AND name IN ('ledger_records', 'ledger_events')"
+        ).fetchall()
+    }
+    missing_tables = {"ledger_records", "ledger_events"} - tables
+    if missing_tables:
+        return {
+            "status": "failed",
+            "problems": [f"missing_table:{name}" for name in sorted(missing_tables)],
+        }
+    events = conn.execute("SELECT * FROM ledger_events ORDER BY sequence").fetchall()
+    records = conn.execute("SELECT * FROM ledger_records").fetchall()
+    if not events:
+        return {
+            "status": "failed",
+            "event_count": 0,
+            "record_count": len(records),
+            "problems": ["missing_ledger_event_chain"],
+        }
+
+    problems: list[str] = []
+    previous_hash: str | None = None
+    replay: dict[tuple[str, str], dict[str, Any]] = {}
+    for row in events:
+        if row["previous_hash"] != previous_hash:
+            problems.append(f"previous_hash_break_at_sequence:{row['sequence']}")
+            break
+        expected = _hash_event(row["event_type"], row["pick_id"], row["payload_json"], previous_hash)
+        if expected != row["event_hash"]:
+            problems.append(f"event_hash_break_at_sequence:{row['sequence']}")
+            break
+        try:
+            payload = json.loads(row["payload_json"])
+        except json.JSONDecodeError:
+            problems.append(f"invalid_event_payload_json_at_sequence:{row['sequence']}")
+            break
+        if not isinstance(payload, dict):
+            problems.append(f"invalid_event_payload_type_at_sequence:{row['sequence']}")
+            break
+        if payload.get("pick_id") != row["pick_id"]:
+            problems.append(f"event_pick_id_mismatch_at_sequence:{row['sequence']}")
+            break
+        if payload.get("event_type") != row["event_type"]:
+            problems.append(f"event_type_mismatch_at_sequence:{row['sequence']}")
+            break
+        event_schema_version = payload.get("event_schema_version", 2)
+        if event_schema_version not in {2, 3}:
+            problems.append(f"unsupported_event_schema_at_sequence:{row['sequence']}:{event_schema_version}")
+            break
+        replay_fields = _REPLAY_FIELDS_V3 if event_schema_version == 3 else _REPLAY_FIELDS_V2
+        missing = [field for field in replay_fields if field not in payload]
+        if event_schema_version == 3 and "created_at_utc" not in payload:
+            missing.append("created_at_utc")
+        if missing:
+            problems.append(
+                f"event_payload_missing_replay_fields_at_sequence:{row['sequence']}:" + ",".join(missing)
+            )
+            break
+        tier = payload.get("ledger_tier")
+        if not isinstance(tier, str) or not tier:
+            problems.append(f"event_missing_ledger_tier_at_sequence:{row['sequence']}")
+            break
+        key = (row["pick_id"], tier)
+        prior = replay.get(key)
+        decision_payload = payload.get("decision_payload")
+        decision_payload = decision_payload if isinstance(decision_payload, dict) else {}
+        projected = {field: payload.get(field) for field in _PROJECTION_FIELDS}
+        if event_schema_version == 2:
+            projected["canonical_event_id"] = decision_payload.get("canonical_event_id") or None
+            projected["event_start_utc"] = decision_payload.get("event_start_utc") or None
+            projected["market_snapshot_hash"] = None
+            projected["market_snapshot_archive_path"] = None
+            projected["market_snapshot_record_id"] = None
+        projected["pick_id"] = row["pick_id"]
+        projected["created_at_utc"] = (
+            prior["created_at_utc"]
+            if prior is not None
+            else payload.get("created_at_utc") or decision_payload.get("created_at_utc")
+        )
+        projected["decision_payload"] = payload.get("decision_payload")
+        projected["feature_payload"] = payload.get("feature_payload")
+        replay[key] = projected
+        previous_hash = row["event_hash"]
+
+    if not problems:
+        projected_rows = {(row["pick_id"], row["ledger_tier"]): row for row in records}
+        if set(projected_rows) != set(replay):
+            missing_events = sorted(set(projected_rows) - set(replay))
+            missing_records = sorted(set(replay) - set(projected_rows))
+            if missing_events:
+                problems.append(f"projection_rows_without_events:{missing_events[0]}")
+            if missing_records:
+                problems.append(f"events_without_projection_rows:{missing_records[0]}")
+        for key in sorted(set(projected_rows) & set(replay)):
+            record = projected_rows[key]
+            expected_row = replay[key]
+            record_fields = set(record.keys())
+            for field in ("pick_id", "created_at_utc", *_PROJECTION_FIELDS):
+                actual = record[field] if field in record_fields else None
+                if actual != expected_row[field]:
+                    problems.append(f"projection_mismatch:{key}:{field}")
+                    break
+            for column, field in (
+                ("decision_payload_json", "decision_payload"),
+                ("feature_payload_json", "feature_payload"),
+            ):
+                try:
+                    actual = json.loads(record[column]) if record[column] is not None else None
+                except json.JSONDecodeError:
+                    problems.append(f"projection_invalid_json:{key}:{column}")
+                    break
+                if actual != expected_row[field]:
+                    problems.append(f"projection_mismatch:{key}:{column}")
+                    break
+            if problems:
+                break
+    return {
+        "status": "verified" if not problems else "failed",
+        "event_count": len(events),
+        "record_count": len(records),
+        "chain_tip": previous_hash,
+        "problems": problems,
+    }
+
+
+def verify_runtime_ledger_read_only(paths: RuntimePaths) -> dict[str, Any]:
+    """Verify the canonical event chain and replay it against its projection.
+
+    This verifier deliberately opens a read-only transaction snapshot. It does not
+    instantiate :class:`RuntimeLedgerStore`, because that writer bootstraps
+    schema/WAL state and is therefore inappropriate at a research gate.
+    """
+    db_path = paths.ledgers_db.resolve()
+    if db_path.parent != paths.ledgers_root.resolve() or not db_path.is_file():
+        return {"status": "failed", "problems": ["canonical_ledger_db_missing"]}
+    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    try:
+        conn.execute("PRAGMA query_only=ON")
+        conn.execute("BEGIN")
+        return verify_runtime_ledger_connection(conn)
+    finally:
+        if conn.in_transaction:
+            conn.rollback()
+        conn.close()
 
 
 def _mutation_row(m: LedgerMutation) -> dict[str, Any]:
@@ -390,6 +581,9 @@ def _mutation_row(m: LedgerMutation) -> dict[str, Any]:
         "line": m.line,
         "model_id": m.model_id,
         "model_artifact_hash": m.model_artifact_hash,
+        "market_snapshot_hash": m.market_snapshot_hash,
+        "market_snapshot_archive_path": m.market_snapshot_archive_path,
+        "market_snapshot_record_id": m.market_snapshot_record_id,
         "feature_schema_version": m.feature_schema_version,
         "model_probability": m.model_probability,
         "market_probability": m.market_probability,
@@ -403,33 +597,32 @@ def _mutation_row(m: LedgerMutation) -> dict[str, Any]:
         "pnl_units": m.pnl_units,
         "created_at_utc": m.created_at_utc,
         "settled_at_utc": m.settled_at_utc,
-        "decision_payload": (
-            json.dumps(m.decision_payload, sort_keys=True)
-            if m.decision_payload
-            else None
-        ),
-        "feature_payload": (
-            json.dumps(m.feature_payload, sort_keys=True)
-            if m.feature_payload
-            else None
-        ),
+        "decision_payload": (json.dumps(m.decision_payload, sort_keys=True) if m.decision_payload else None),
+        "feature_payload": (json.dumps(m.feature_payload, sort_keys=True) if m.feature_payload else None),
     }
 
 
 def _mutation_payload(m: LedgerMutation) -> dict[str, Any]:
     """The event payload: every field the audit chain hashes."""
     return {
+        "event_schema_version": _EVENT_SCHEMA_VERSION,
         "pick_id": m.pick_id,
         "operation_id": m.operation_id,
         "ledger_tier": m.ledger_tier,
         "sport": m.sport,
         "event_type": m.event_type,
+        "created_at_utc": m.created_at_utc,
         "event_id": m.event_id,
+        "canonical_event_id": m.canonical_event_id,
+        "event_start_utc": m.event_start_utc,
         "market_type": m.market_type,
         "selection": m.selection,
         "line": m.line,
         "model_id": m.model_id,
         "model_artifact_hash": m.model_artifact_hash,
+        "market_snapshot_hash": m.market_snapshot_hash,
+        "market_snapshot_archive_path": m.market_snapshot_archive_path,
+        "market_snapshot_record_id": m.market_snapshot_record_id,
         "feature_schema_version": m.feature_schema_version,
         "model_probability": m.model_probability,
         "market_probability": m.market_probability,

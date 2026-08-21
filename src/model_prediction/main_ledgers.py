@@ -67,6 +67,7 @@ def ledger_mirror(data_root: str | Path) -> RuntimeLedgerStore | None:
     except Exception:  # noqa: BLE001 — mirror must never break ledger construction
         return None
 
+
 def main_ledger_path(data_root: str | Path, sport: str) -> Path:
     normalized = normalize_main_sport(sport)
     return Path(data_root) / "main" / f"{normalized}.xlsx"
@@ -219,9 +220,7 @@ class MultiSportPickLedger:
         now: datetime | None = None,
         canonical_team_ids: tuple[str, str] | None = None,
     ):
-        return self._ledger_for_league(request.league).exposure(
-            request, now, canonical_team_ids
-        )
+        return self._ledger_for_league(request.league).exposure(request, now, canonical_team_ids)
 
     def append_evaluated(
         self, request: PickRequest, eligibility: EligibilityResult, now: datetime | None = None
@@ -267,6 +266,12 @@ class MultiSportPickLedger:
         for ledger, ids in by_ledger.values():
             removed.extend(ledger.remove_open_rows(ids, reason, allow_staked_removal))
         return removed
+
+    def restore_rows_for_rollback(self, rows: list[dict[str, str]], reason: str) -> None:
+        """Restore every per-sport ledger to a captured combined snapshot."""
+        for sport, ledger in self._ledgers.items():
+            sport_rows = [row for row in rows if str(row.get("league", "")).casefold() == sport]
+            ledger.restore_rows_for_rollback(sport_rows, reason)
 
     def archive_settled_rows(
         self, pick_ids: list[str], reason: str, archive_reference: str

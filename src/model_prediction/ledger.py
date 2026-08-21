@@ -91,7 +91,8 @@ def _acquire_exclusive_lock(fileno: int, path: Path, timeout: float = LOCK_TIMEO
                 ) from None
             time.sleep(LOCK_POLL_INTERVAL_SECONDS)
 
-LEDGER_SCHEMA_VERSION = "3"
+
+LEDGER_SCHEMA_VERSION = "4"
 LEGACY_FIELDNAMES = [
     "pick_id",
     "created_at_utc",
@@ -131,7 +132,8 @@ LEGACY_FIELDNAMES = [
     "corrective_action",
     "call_type",
 ]
-FIELDNAMES = [*LEGACY_FIELDNAMES,
+FIELDNAMES = [
+    *LEGACY_FIELDNAMES,
     "ledger_schema_version",
     "record_type",
     "decision",
@@ -215,6 +217,29 @@ FIELDNAMES = [*LEGACY_FIELDNAMES,
     # genuinely positive expected value against the executable price" stay
     # visibly distinct instead of both hiding behind one QUALIFIED label.
     "trade_candidate",
+    "config_hash",
+    "config_byte_sha256",
+    "config_path",
+    "model_artifact_byte_sha256",
+    "model_artifact_path",
+    "market_quote_observed_at_utc",
+    "market_quote_timestamp_valid",
+    "market_quote_source",
+    "market_quote_provenance",
+    "market_quote_reconstructed",
+    "market_snapshot_hash",
+    "market_snapshot_archive_path",
+    "market_snapshot_record_id",
+    "record_source",
+    "is_backfill",
+    "model_probability_raw",
+    "market_probability_at_decision",
+    "serving_probability",
+    "blend_weight",
+    "blend_policy_artifact_hash",
+    "blend_experiment_spec_hash",
+    "blend_config_hash",
+    "serving_policy_block_reason",
 ]
 DECISION_FIELDS = {
     "pick_id",
@@ -265,6 +290,29 @@ DECISION_FIELDS = {
     "decision_consensus_probability",
     "decision_consensus_line",
     "legacy_units",
+    "config_hash",
+    "config_byte_sha256",
+    "config_path",
+    "model_artifact_byte_sha256",
+    "model_artifact_path",
+    "market_quote_observed_at_utc",
+    "market_quote_timestamp_valid",
+    "market_quote_source",
+    "market_quote_provenance",
+    "market_quote_reconstructed",
+    "market_snapshot_hash",
+    "market_snapshot_archive_path",
+    "market_snapshot_record_id",
+    "record_source",
+    "is_backfill",
+    "model_probability_raw",
+    "market_probability_at_decision",
+    "serving_probability",
+    "blend_weight",
+    "blend_policy_artifact_hash",
+    "blend_experiment_spec_hash",
+    "blend_config_hash",
+    "serving_policy_block_reason",
 }
 
 
@@ -332,9 +380,7 @@ def _parity_alarm(mirror: RuntimeLedgerStore, message: str) -> None:
                 + "\n"
             )
     except Exception:
-        logging.getLogger(__name__).debug(
-            "parity alarm write failed", exc_info=True
-        )
+        logging.getLogger(__name__).debug("parity alarm write failed", exc_info=True)
 
 
 class PickLedger:
@@ -359,8 +405,7 @@ class PickLedger:
         # per-model ledger — the dedupe key already assumes Main/Flat/Research/
         # Gated collapse into a single row for one real decision.
         self.model_ledgers_dir = (
-            Path(model_ledgers_dir) if model_ledgers_dir is not None
-            else self.path.parent / "model_ledgers"
+            Path(model_ledgers_dir) if model_ledgers_dir is not None else self.path.parent / "model_ledgers"
         )
         # Dual-write (G4): when a tier + mirror are supplied, every
         # mutation is mirrored into the runtime ledger store. The XLSX
@@ -768,9 +813,7 @@ class PickLedger:
         self._write_rows(rows_to_write)
         self._mirror_row(mirror_row, event_type, operation_id)
 
-    def _mirror_row(
-        self, row: dict[str, str], event_type: str, operation_id: str
-    ) -> None:
+    def _mirror_row(self, row: dict[str, str], event_type: str, operation_id: str) -> None:
         """Mirror write with the authority-aware failure contract.
 
         xlsx authority (dual-write phase): the mirror is fail-soft — a
@@ -795,9 +838,7 @@ class PickLedger:
             )
             _parity_alarm(self.mirror, f"{event_type} {row['pick_id']}")
 
-    def _row_mutation(
-        self, row: dict[str, str], event_type: str, operation_id: str
-    ) -> LedgerMutation:
+    def _row_mutation(self, row: dict[str, str], event_type: str, operation_id: str) -> LedgerMutation:
         """Map a canonical XLSX row to the mirror mutation (G3/G4).
 
         The full row rides along in decision_payload so reconciliation can
@@ -819,9 +860,14 @@ class PickLedger:
             line=_num(line),
             model_id=row.get("model_version") or None,
             model_artifact_hash=row.get("model_artifact_hash") or None,
+            market_snapshot_hash=row.get("market_snapshot_hash") or None,
+            market_snapshot_archive_path=(row.get("market_snapshot_archive_path") or None),
+            market_snapshot_record_id=row.get("market_snapshot_record_id") or None,
             feature_schema_version=row.get("feature_schema_version") or None,
-            model_probability=_num(row.get("model_probability")),
-            market_probability=_num(row.get("market_implied_probability")),
+            model_probability=_num(row.get("model_probability_raw") or row.get("model_probability")),
+            market_probability=_num(
+                row.get("market_probability_at_decision") or row.get("market_implied_probability")
+            ),
             edge=_num(row.get("edge")),
             confidence=_num(row.get("confidence_score")),
             units=_num(row.get("units")),
@@ -894,9 +940,7 @@ class PickLedger:
                 if MarketType(row["market_type"]) is not MarketType.MONEYLINE:
                     raise ValueError("binary contract settlement value is moneyline-only")
                 if result is not PickResult.PUSH:
-                    raise ValueError(
-                        "partial binary contract settlement is only valid for a tied outcome"
-                    )
+                    raise ValueError("partial binary contract settlement is only valid for a tied outcome")
             closing_decimal = (
                 american_to_decimal(closing_american_odds) if closing_american_odds is not None else None
             )
@@ -913,8 +957,7 @@ class PickLedger:
             # the ledger itself (main only), not something settle() decides.
             units = float(row["units"] or 0)
             entry_probability = float(
-                row["decision_raw_implied_probability"]
-                or row["market_implied_probability"]
+                row["decision_raw_implied_probability"] or row["market_implied_probability"]
             )
             pnl = (
                 units * (binary_contract_settlement_value / entry_probability - 1)
@@ -947,9 +990,7 @@ class PickLedger:
             if research_units is None:
                 research_pnl = None
             elif binary_contract_settlement_value is not None:
-                research_pnl = research_units * (
-                    binary_contract_settlement_value / entry_probability - 1
-                )
+                research_pnl = research_units * (binary_contract_settlement_value / entry_probability - 1)
             else:
                 research_pnl = profit_units(
                     result,
@@ -1187,6 +1228,18 @@ class PickLedger:
             )
         return [row["pick_id"] for row in removed]
 
+    def restore_rows_for_rollback(self, rows: list[dict[str, str]], reason: str) -> None:
+        """Restore an exact pre-batch workbook snapshot after commit failure."""
+        if not reason.strip():
+            raise ValueError("a rollback reason is required")
+        with self._lock():
+            self._write_rows_unchecked(rows)
+        self.audit.append(
+            "ledger_batch_rollback_restored",
+            str(self.path),
+            {"reason": reason, "restored_rows": len(rows)},
+        )
+
     def archive_settled_rows(
         self,
         pick_ids: list[str],
@@ -1278,10 +1331,7 @@ class PickLedger:
         """
         if not source.strip() or not reason.strip():
             raise ValueError("source and reason are required")
-        normalized_rows = [
-            {field: str(row.get(field, "")) for field in FIELDNAMES}
-            for row in rows
-        ]
+        normalized_rows = [{field: str(row.get(field, "")) for field in FIELDNAMES} for row in rows]
         requested_ids = [row["pick_id"] for row in normalized_rows]
         if any(not pick_id for pick_id in requested_ids):
             raise ValueError("every imported row must have a pick_id")
@@ -1300,9 +1350,7 @@ class PickLedger:
                 prior = existing_by_id.get(row["pick_id"])
                 if prior is not None:
                     if prior != row:
-                        raise ValueError(
-                            f"import conflicts with existing pick {row['pick_id']}"
-                        )
+                        raise ValueError(f"import conflicts with existing pick {row['pick_id']}")
                     continue
                 existing.append(row)
                 existing_by_id[row["pick_id"]] = row

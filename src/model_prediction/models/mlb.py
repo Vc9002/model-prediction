@@ -159,10 +159,17 @@ def load_formula_spec(path: str | Path) -> FormulaSpec:
     if raw["formula_version"] != ENGINE_VERSION:
         raise ValueError("formula file version does not match the Trend Engine code")
     required = {
-        "seed_method", "factor_bounds", "uncertainty", "simulation",
-        "league_runs_per_team_game", "league_starter_era",
-        "offense_elasticity", "starter_weakness_elasticity", "bullpen_elasticity",
-        "park_elasticity", "weather_elasticity",
+        "seed_method",
+        "factor_bounds",
+        "uncertainty",
+        "simulation",
+        "league_runs_per_team_game",
+        "league_starter_era",
+        "offense_elasticity",
+        "starter_weakness_elasticity",
+        "bullpen_elasticity",
+        "park_elasticity",
+        "weather_elasticity",
     }
     missing = sorted(required - set(raw))
     engine_sim_fields = {"simulations", "shared_environment_variance", "team_specific_variance"}
@@ -223,20 +230,20 @@ def estimate_runs(features: MLBGameFeatures, spec: FormulaSpec) -> RunEstimate:
     # full rebuild rationale, including why bullpen_elasticity is 0.0.
     away_expected = (
         spec.league_runs_per_team_game
-        * away_offense ** spec.offense_elasticity
-        * home_starter_weakness ** spec.starter_weakness_elasticity
-        * home_bullpen ** spec.bullpen_elasticity
-        * park ** spec.park_elasticity
-        * weather ** spec.weather_elasticity
+        * away_offense**spec.offense_elasticity
+        * home_starter_weakness**spec.starter_weakness_elasticity
+        * home_bullpen**spec.bullpen_elasticity
+        * park**spec.park_elasticity
+        * weather**spec.weather_elasticity
         * spec.away_field_run_factor
     )
     home_expected = (
         spec.league_runs_per_team_game
-        * home_offense ** spec.offense_elasticity
-        * away_starter_weakness ** spec.starter_weakness_elasticity
-        * away_bullpen ** spec.bullpen_elasticity
-        * park ** spec.park_elasticity
-        * weather ** spec.weather_elasticity
+        * home_offense**spec.offense_elasticity
+        * away_starter_weakness**spec.starter_weakness_elasticity
+        * away_bullpen**spec.bullpen_elasticity
+        * park**spec.park_elasticity
+        * weather**spec.weather_elasticity
         * spec.home_field_run_factor
     )
     components = _uncertainty_components(features, spec)
@@ -408,7 +415,12 @@ def compare_distribution_methods(
     result: dict[str, dict[str, MarketDistribution]] = {}
     for method in methods:
         simulation = simulate_game(
-            features, estimate, spec, simulations=simulations, seed_namespace="distribution_compare", method=method
+            features,
+            estimate,
+            spec,
+            simulations=simulations,
+            seed_namespace="distribution_compare",
+            method=method,
         )
         markets = {
             "moneyline": derive_market_distribution(simulation, MarketType.MONEYLINE),
@@ -459,7 +471,9 @@ def _starter_weakness(pitcher: PitcherForm, spec: FormulaSpec) -> float:
     season_credibility = pitcher.season_innings / (pitcher.season_innings + spec.starter_season_prior_innings)
     season_era = season_credibility * raw_season_era + (1 - season_credibility) * spec.league_starter_era
     raw_recent_era = _era(pitcher.last_five_earned_runs, pitcher.last_five_innings, season_era)
-    recent_credibility = pitcher.last_five_innings / (pitcher.last_five_innings + spec.starter_recent_prior_innings)
+    recent_credibility = pitcher.last_five_innings / (
+        pitcher.last_five_innings + spec.starter_recent_prior_innings
+    )
     recent_era = recent_credibility * raw_recent_era + (1 - recent_credibility) * season_era
     blended_era = spec.starter_season_weight * season_era + spec.starter_recent_weight * recent_era
     # Same small-sample problem as ERA above: last_five_batters_faced is
@@ -559,9 +573,7 @@ class MeasuredEdgeMarginModel:
             raise ValueError("margin calibration scale outside governance bounds")
         calibrated_at_half = scale * 0.5 + offset
         if not 0.35 <= calibrated_at_half <= 0.65:
-            raise ValueError(
-                "margin calibration offset implies too much bias at raw probability 0.5"
-            )
+            raise ValueError("margin calibration offset implies too much bias at raw probability 0.5")
         self.formula_spec = formula_spec
 
     def predict(
@@ -594,7 +606,9 @@ class MeasuredEdgeMarginModel:
     def calibrate_selected_side(self, raw_probability: float) -> float:
         if not 0 < raw_probability < 1:
             raise ValueError("raw probability must be between 0 and 1")
-        calibrated = _artifact_float(self.raw, "scale") * raw_probability + _artifact_float(self.raw, "offset")
+        calibrated = _artifact_float(self.raw, "scale") * raw_probability + _artifact_float(
+            self.raw, "offset"
+        )
         if not 0 < calibrated < 1:
             # __init__'s governance check only validates scale/offset at
             # raw_probability=0.5 (the real invariant it guards: "no large
@@ -647,9 +661,7 @@ class MeasuredEdgeTotalsModel:
             raise ValueError("totals calibration scale outside governance bounds")
         calibrated_at_half = scale * 0.5 + offset
         if not 0.35 <= calibrated_at_half <= 0.65:
-            raise ValueError(
-                "totals calibration offset implies too much bias at raw probability 0.5"
-            )
+            raise ValueError("totals calibration offset implies too much bias at raw probability 0.5")
         self.formula_spec = formula_spec
 
     def predict(
@@ -681,7 +693,9 @@ class MeasuredEdgeTotalsModel:
     def calibrate_selected_side(self, raw_probability: float) -> float:
         if not 0 < raw_probability < 1:
             raise ValueError("raw probability must be between 0 and 1")
-        calibrated = _artifact_float(self.raw, "scale") * raw_probability + _artifact_float(self.raw, "offset")
+        calibrated = _artifact_float(self.raw, "scale") * raw_probability + _artifact_float(
+            self.raw, "offset"
+        )
         if not 0 < calibrated < 1:
             raise ValueError(
                 f"totals calibration produced an out-of-range probability ({calibrated}) "
@@ -714,16 +728,21 @@ def _artifact_str(raw: dict[str, object], key: str) -> str:
 
 def _artifact_float(raw: dict[str, object], key: str) -> float:
     value = raw[key]
-    assert isinstance(value, (int, float)), f"artifact field {key!r} must be numeric, got {type(value).__name__}"
+    assert isinstance(value, (int, float)), (
+        f"artifact field {key!r} must be numeric, got {type(value).__name__}"
+    )
     return float(value)
+
+
+def canonical_mlb_artifact_hash(raw: dict[str, object]) -> str:
+    """Return the canonical logical identity used by MLB artifact loaders."""
+    canonical = {key: value for key, value in raw.items() if key != "artifact_hash"}
+    return hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
 def _load_artifact(path: str | Path, expected_version: str) -> dict[str, object]:
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
-    canonical = {key: value for key, value in raw.items() if key != "artifact_hash"}
-    actual_hash = hashlib.sha256(
-        json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
+    actual_hash = canonical_mlb_artifact_hash(raw)
     if actual_hash != raw.get("artifact_hash"):
         raise ValueError("Measured Edge artifact hash mismatch")
     if raw.get("model_version") != expected_version:

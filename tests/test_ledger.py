@@ -64,6 +64,47 @@ def test_duplicate_call_is_rejected(tmp_path) -> None:
         raise AssertionError("duplicate call was accepted")
 
 
+def test_stage1_provenance_fields_round_trip_without_synthesis(tmp_path) -> None:
+    ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
+    enriched = replace(
+        request(),
+        config_hash="a" * 64,
+        config_byte_sha256="b" * 64,
+        config_path="/runtime/config/model.yaml",
+        model_artifact_byte_sha256="c" * 64,
+        model_artifact_path="/runtime/models/mlb.json",
+        market_quote_observed_at_utc="2026-08-18T18:00:00Z",
+        market_quote_timestamp_valid=True,
+        market_quote_source="polymarket_us",
+        market_quote_provenance="decision_time_executable_quote",
+        market_quote_reconstructed=None,
+        market_snapshot_hash="d" * 64,
+        record_source="live_forecast",
+        is_backfill=False,
+        model_probability_raw=0.61,
+        market_probability_at_decision=0.52,
+        serving_probability=0.57,
+        blend_weight=0.55,
+        blend_policy_artifact_hash="e" * 64,
+        blend_experiment_spec_hash="f" * 64,
+        blend_config_hash="a" * 64,
+    )
+    row = ledger.append_evaluated(enriched, _qualified_call(0.5))
+
+    assert row["config_hash"] == "a" * 64
+    assert row["config_byte_sha256"] == "b" * 64
+    assert row["market_quote_timestamp_valid"] == "True"
+    assert row["market_quote_reconstructed"] == ""
+    assert row["market_snapshot_hash"] == "d" * 64
+    assert row["record_source"] == "live_forecast"
+    assert row["is_backfill"] == "False"
+    assert row["model_probability_raw"] == "0.61"
+    assert row["market_probability_at_decision"] == "0.52"
+    assert row["serving_probability"] == "0.57"
+    assert row["blend_weight"] == "0.55"
+    assert row["blend_policy_artifact_hash"] == "e" * 64
+
+
 def test_verified_closing_can_be_added_after_result_without_mutating_decision(tmp_path) -> None:
     ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
     logged = ledger.append_call(request(), 0.25, 70)
@@ -122,9 +163,7 @@ def test_trade_candidate_reflects_positive_edge_not_record_type(tmp_path) -> Non
     positive_row = ledger.append_evaluated(request(), positive_edge_call)
     assert positive_row["trade_candidate"] == "True"
 
-    negative_row = ledger.append_evaluated(
-        replace(request(), event_id="event-2"), negative_edge_call
-    )
+    negative_row = ledger.append_evaluated(replace(request(), event_id="event-2"), negative_edge_call)
     assert negative_row["record_type"] == RecordType.QUALIFIED_SHADOW_CALL.value
     assert negative_row["trade_candidate"] == "False"  # QUALIFIED but not actually positive EV
 
@@ -151,9 +190,7 @@ def test_append_evaluated_also_writes_the_new_per_model_ledger(tmp_path) -> None
     assert float(rows[0]["model_market_difference"]) == pytest.approx(float(row["edge"]))
 
 
-def test_a_model_ledger_write_failure_never_breaks_the_primary_ledger_write(
-    tmp_path, monkeypatch
-) -> None:
+def test_a_model_ledger_write_failure_never_breaks_the_primary_ledger_write(tmp_path, monkeypatch) -> None:
     """The primary PickLedger write is real, working, and already succeeded
     by the time the new-schema write happens -- a bug or lock timeout in the
     additive path must never turn into a lost/failed real pick."""
@@ -192,9 +229,7 @@ def test_settle_also_settles_the_new_per_model_ledger(tmp_path) -> None:
     assert float(rows[0]["pnl_units"]) > 0
 
 
-def test_a_model_ledger_settle_failure_never_breaks_the_primary_ledger_settle(
-    tmp_path, monkeypatch
-) -> None:
+def test_a_model_ledger_settle_failure_never_breaks_the_primary_ledger_settle(tmp_path, monkeypatch) -> None:
     import model_prediction.ledger as ledger_module
 
     def _boom(*args, **kwargs):

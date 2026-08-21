@@ -133,9 +133,7 @@ def test_slate_skips_market_with_boundary_probability_instead_of_aborting() -> N
     http_client = httpx.Client(
         transport=httpx.MockTransport(lambda request: httpx.Response(200, json={"events": [event]}))
     )
-    slate = PolymarketUSClient("https://example.test", http_client).slate(
-        "WNBA", date(2026, 7, 17)
-    )
+    slate = PolymarketUSClient("https://example.test", http_client).slate("WNBA", date(2026, 7, 17))
 
     assert [market["market_slug"] for market in slate[0]["markets"]] == ["good-market"]
 
@@ -189,6 +187,8 @@ def test_snapshot_uses_executable_asks_for_both_sides() -> None:
     assert snapshot["short"]["price"] == 0.57
     assert snapshot["long"]["midpoint"] == 0.445
     assert snapshot["short"]["midpoint"] == 0.555
+    assert snapshot["reconstructed"] is False
+    assert snapshot["reconstruction_status_source"] == "live_gateway_market_and_book_response"
     assert json.dumps(snapshot)
 
 
@@ -213,9 +213,7 @@ def test_slate_capture_stores_prospective_bbo_by_sport_and_date(tmp_path) -> Non
             "MLB": [
                 {
                     "event_id": "event-1",
-                    "markets": [
-                        {"market_slug": "market-1", "market_type": "moneyline", "line": None}
-                    ],
+                    "markets": [{"market_slug": "market-1", "market_type": "moneyline", "line": None}],
                 }
             ]
         },
@@ -224,10 +222,10 @@ def test_slate_capture_stores_prospective_bbo_by_sport_and_date(tmp_path) -> Non
     )
 
     assert result["captured"] == 1
-    stored = json.loads(
-        (tmp_path / "odds/mlb/2026-07-18/polymarket_snapshots.jsonl").read_text()
-    )
+    stored = json.loads((tmp_path / "odds/mlb/2026-07-18/polymarket_snapshots.jsonl").read_text())
     assert stored["timestamp_valid"] is True
+    assert stored["reconstructed"] is None
+    assert stored["reconstruction_status_source"] is None
     assert stored["usage"] == "prospective_executable_bbo"
 
 
@@ -237,9 +235,7 @@ def test_sport_slate_surfaces_a_failed_league_distinctly_from_an_empty_one() -> 
             return httpx.Response(500, json={"error": "gateway down"})
         return httpx.Response(200, json={"events": []})
 
-    client = PolymarketUSClient(
-        "https://example.test", httpx.Client(transport=httpx.MockTransport(handler))
-    )
+    client = PolymarketUSClient("https://example.test", httpx.Client(transport=httpx.MockTransport(handler)))
 
     result = client.sport_slate("esports", date(2026, 7, 27))
 
@@ -308,8 +304,22 @@ def test_slate_capture_skips_sports_outside_qualification_scope(tmp_path) -> Non
                 "market_slug": slug,
                 "event_start_utc": "2026-07-18T19:00:00Z",
                 "observed_at_utc": "2026-07-18T18:00:00Z",
-                "long": {"description": "home", "ask": 0.52, "bid": 0.50, "bid_size": 100, "ask_size": 100, "midpoint": 0.51},
-                "short": {"description": "away", "ask": 0.50, "bid": 0.48, "bid_size": 100, "ask_size": 100, "midpoint": 0.49},
+                "long": {
+                    "description": "home",
+                    "ask": 0.52,
+                    "bid": 0.50,
+                    "bid_size": 100,
+                    "ask_size": 100,
+                    "midpoint": 0.51,
+                },
+                "short": {
+                    "description": "away",
+                    "ask": 0.50,
+                    "bid": 0.48,
+                    "bid_size": 100,
+                    "ask_size": 100,
+                    "midpoint": 0.49,
+                },
             }
 
     result = capture_slate_snapshots(
@@ -354,9 +364,7 @@ def test_ledger_price_refresh_deduplicates_and_never_discovers_a_broad_slate(tmp
             "short": {"ask": 0.48},
         }
     )
-    next_day_store = PolymarketSnapshotStore.for_sport_date(
-        tmp_path, "mlb", "2026-07-19"
-    )
+    next_day_store = PolymarketSnapshotStore.for_sport_date(tmp_path, "mlb", "2026-07-19")
     next_day_store.append(
         {
             "market_slug": "mlb-next-day",

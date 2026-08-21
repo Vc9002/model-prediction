@@ -1,0 +1,115 @@
+{
+  "artifact_hash": "3b345499bd6bad9bcf65367a07fe0c668fb5817d4f016a0a865c01d9212fdeb8",
+  "checks": {
+    "B_boundaries": {
+      "train": {
+        "recorded": 3814,
+        "actual": 3814
+      },
+      "validation": {
+        "recorded": 1082,
+        "actual": 1082
+      },
+      "holdout": {
+        "recorded": 1391,
+        "actual": 1420
+      }
+    },
+    "A_cohort": {
+      "backfill_rows_excluded": 31,
+      "exact_holdout_rows": 1389,
+      "recorded": 1391,
+      "match": false,
+      "excluded_event_ids": [
+        "401816171",
+        "401816172",
+        "401816173",
+        "401816174",
+        "401816175",
+        "401816176",
+        "401816177",
+        "401816178",
+        "401816179",
+        "401816180"
+      ],
+      "note": "31 net-new post-freeze rows identified (the 08-14 reconciliation batch). After exclusion the cohort is 2 rows SHORT of the recorded 1,391: two freeze-time rows are missing from today's file, and v8's build never snapshotted the holdout event-id list, so they cannot be identified. Net cohort growth = +31 added, -2 lost = +29 (matches the 1,391 -> 1,420 delta)."
+    },
+    "C_feature_order": {
+      "artifact": [
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_era_gap",
+        "bullpen_weakness_gap"
+      ],
+      "harness": [
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_era_gap",
+        "bullpen_weakness_gap"
+      ],
+      "match": true
+    },
+    "coefficients": {
+      "feature": [
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_era_gap",
+        "bullpen_weakness_gap"
+      ],
+      "shipped": [
+        3.0404972651,
+        -0.0248808023,
+        -0.9016764146,
+        -0.2981045997,
+        -0.0190272663,
+        0.1519919276
+      ],
+      "refit": [
+        3.0426086374,
+        -0.0250136146,
+        -0.8910204259,
+        -0.3057451733,
+        -0.0190757972,
+        0.1510849411
+      ],
+      "abs_delta": [
+        0.00211137,
+        0.00013281,
+        0.01065599,
+        0.00764057,
+        4.853e-05,
+        0.00090699
+      ],
+      "intercept_shipped": -0.2831037846,
+      "intercept_refit": -0.2869314205,
+      "max_abs_delta": 0.01065599,
+      "parity_within_1e-6": false,
+      "note": "Coefficients do NOT reproduce within 1e-6 (max delta 0.010656). Root cause: Elo/trend/park/weather features for train-window rows are computed from the FULL history, and post-freeze backfills changed that history \u2014 v8's coefficients were fit on freeze-time feature values that no longer exist anywhere. Row-level probability drift is bounded (see row_probability_parity); exact coefficient reproduction requires the freeze-time dataset, which v8 never snapshotted. The frozen v9 feature table exists to prevent this class of drift for future models."
+    },
+    "row_probability_parity": {
+      "rows": 1389,
+      "max_abs_delta": 0.0006148,
+      "mean_abs_delta": 0.0001391284,
+      "rows_exact_within_1e-9": 0,
+      "calls_at_pinned_threshold_shipped_coefs": 148,
+      "recorded_calls": 148
+    },
+    "L_orientation": {
+      "positive_class": "home",
+      "note": "p_shipped applies the artifact's positive_class; verify it matches the serving orientation in learned_forward."
+    },
+    "K_threshold": {
+      "pinned": 0.61966524
+    },
+    "J_missing_features": {
+      "rows_with_nan_feature": 0,
+      "note": "v8 artifact carries no missingness policy field; the harness build_walk_forward_rows drops rows with unavailable features."
+    }
+  }
+}

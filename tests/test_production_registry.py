@@ -30,9 +30,7 @@ def _write_json(path: Path, data: dict[str, Any]) -> None:
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
-def _make_artifact(
-    model_id: str, sport: str = "wnba", *, include_hash: bool = True
-) -> dict[str, Any]:
+def _make_artifact(model_id: str, sport: str = "wnba", *, include_hash: bool = True) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "model_version": model_id,
         "sport": sport,
@@ -101,8 +99,8 @@ def test_real_production_yaml_resolves_every_model() -> None:
     registry = ProductionModelRegistry.load(REPO)
 
     assert registry.schema_version == "3"
-    assert len(registry.entries) == 13
-    assert len(registry.available_entries()) == 13
+    assert len(registry.entries) == 14  # 13 + measured-edge-totals-v3 (MLB total promotion, 2026-08-18)
+    assert len(registry.available_entries()) == 14
     assert registry.problem_entries() == []
     assert registry.primary.model_id == "wnba-elo-trend-lr-v4"
     assert registry.primary.artifact_hash
@@ -110,6 +108,11 @@ def test_real_production_yaml_resolves_every_model() -> None:
     mlb = registry.entries["mlb-elo-trend-lr-v8"]
     assert mlb.rollback_model == "mlb-elo-trend-lr-v7"
     assert mlb.feature_schema_version == "1"
+
+    totals = registry.entries["measured-edge-totals-v3"]
+    assert totals.sport == "MLB"
+    assert totals.market == "total"
+    assert registry.champion("MLB", "total").model_id == "measured-edge-totals-v3"  # type: ignore[union-attr]
 
     soccer = registry.entries["soccer-poisson-dc-v1"]
     assert soccer.implementation == IMPLEMENTATION_CODE_BACKED

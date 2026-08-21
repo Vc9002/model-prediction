@@ -358,7 +358,7 @@ def test_starter_fip_and_kbb_gaps_home_minus_away_sign_convention(tmp_path) -> N
         starter_kbb_gap_live,
     )
 
-    def snapshot(day, side, pitcher_id, name, innings, so, bb, hr, hbp):
+    def snapshot(day, side, pitcher_id, name, innings, so, bb, hr, hbp, bf=24):
         return {
             "game_start_utc": f"2026-07-{day:02d}T00:00:00Z",
             side: {
@@ -373,6 +373,7 @@ def test_starter_fip_and_kbb_gaps_home_minus_away_sign_convention(tmp_path) -> N
                             "baseOnBalls": bb,
                             "homeRuns": hr,
                             "hitBatsmen": hbp,
+                            "battersFaced": bf,
                         },
                     }
                 ],
@@ -380,12 +381,12 @@ def test_starter_fip_and_kbb_gaps_home_minus_away_sign_convention(tmp_path) -> N
         }
 
     snapshots = [
-        # Home starter: 6 IP, 9 K, 1 BB, 0 HR, 0 HBP per start (elite FIP)
-        snapshot(1, "home", "h1", "Home Ace", "6.0", 9, 1, 0, 0),
-        snapshot(5, "home", "h1", "Home Ace", "6.0", 9, 1, 0, 0),
-        # Away starter: 5 IP, 3 K, 4 BB, 2 HR, 1 HBP per start (poor FIP)
-        snapshot(2, "away", "a1", "Away Arms", "5.0", 3, 4, 2, 1),
-        snapshot(6, "away", "a1", "Away Arms", "5.0", 3, 4, 2, 1),
+        # Home starter: 6 IP, 24 BF, 9 K, 1 BB, 0 HR, 0 HBP per start (elite FIP & K-BB%)
+        snapshot(1, "home", "h1", "Home Ace", "6.0", 9, 1, 0, 0, bf=24),
+        snapshot(5, "home", "h1", "Home Ace", "6.0", 9, 1, 0, 0, bf=24),
+        # Away starter: 5 IP, 25 BF, 3 K, 4 BB, 2 HR, 1 HBP per start (poor FIP & K-BB%)
+        snapshot(2, "away", "a1", "Away Arms", "5.0", 3, 4, 2, 1, bf=25),
+        snapshot(6, "away", "a1", "Away Arms", "5.0", 3, 4, 2, 1, bf=25),
     ]
     snap_path = tmp_path / "game_snapshots.jsonl"
     snap_path.write_text("\n".join(json.dumps(s) for s in snapshots) + "\n", encoding="utf-8")
@@ -398,5 +399,5 @@ def test_starter_fip_and_kbb_gaps_home_minus_away_sign_convention(tmp_path) -> N
     assert fip_gap == pytest.approx(-9.5, abs=0.01)
 
     kbb_gap = starter_kbb_gap_live("Home Ace", "Away Arms", decision, snapshot_path=snap_path)
-    # home K-BB% = (9-1)/6 = 1.333; away = (3-4)/5 = -0.2; gap = 1.533
-    assert kbb_gap == pytest.approx(1.533, abs=0.01)
+    # home K-BB% = (9-1)/24 = 0.3333; away = (3-4)/25 = -0.0400; gap = 0.3733
+    assert kbb_gap == pytest.approx(0.3733, abs=0.01)

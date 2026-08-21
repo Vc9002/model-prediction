@@ -21,11 +21,16 @@ before market inspection, then only that side may be bet.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import hashlib
+import json
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import Literal
 
+from ..market_blend import MarketBlendBlockedError, MarketBlendPolicy
 from .economic import SizeLimits, edge_scaled_units
+
+SIZE_LIMITS_VERSION = "size_limits_v1"
 
 
 @dataclass(frozen=True)
@@ -33,11 +38,12 @@ class SportsForecast:
     """Market-blind sports-only prediction for one event. Constructed once,
     from the model alone — nothing in the market layer may rewrite any field
     on this object."""
+
     event_id: str
     predicted_winner: Literal["home", "away"]
-    raw_probabilities: dict[str, float]          # {"home": .., "away": ..}
+    raw_probabilities: dict[str, float]  # {"home": .., "away": ..}
     calibrated_probabilities: dict[str, float]
-    probability_lower: dict[str, float]           # conservative/lower-bound
+    probability_lower: dict[str, float]  # conservative/lower-bound
     probability_upper: dict[str, float]
     expected_home_score: float
     expected_away_score: float
@@ -105,9 +111,10 @@ class SportsForecast:
 @dataclass(frozen=True)
 class MarketEvaluation:
     """Real, executable market evidence for one specific contract."""
+
     market_id: str
     market_type: Literal["moneyline", "spread", "total"]
-    team_or_side: str                    # "home"/"away" for moneyline/spread, "over"/"under" for total
+    team_or_side: str  # "home"/"away" for moneyline/spread, "over"/"under" for total
     line: float | None
     executable_ask: float
     depth_adjusted_price: float
@@ -125,6 +132,11 @@ class MarketEvaluation:
     event_start_utc: str | None = None
     event_match_ambiguous: bool = False
     contract_valid: bool = True
+    # First-class market probability for an optional serving blend. It is
+    # deliberately separate from executable/depth-adjusted price: a caller
+    # must provide the probability it intends to blend rather than having the
+    # policy infer or de-vig a price silently.
+    market_probability: float | None = None
 
 
 @dataclass(frozen=True)
@@ -146,6 +158,24 @@ class BetDecision:
     # NO_BET); `evaluated_market` is the audit trail's own record of what
     # was actually looked at, populated on every decision, not just BETs.
     evaluated_market: MarketEvaluation | None = None
+    # Decision-boundary audit: the model output is never overwritten. When a
+    # blend policy is active these fields persist p_model, p_market, p_blend,
+    # the learned weight, and the exact policy/config identities together.
+    model_probability: float | None = None
+    market_probability: float | None = None
+    serving_probability: float | None = None
+    model_conservative_probability: float | None = None
+    serving_conservative_probability: float | None = None
+    blend_weight: float | None = None
+    blend_policy_artifact_hash: str | None = None
+    blend_experiment_spec_hash: str | None = None
+    blend_config_hash: str | None = None
+    serving_policy_block_reason: str | None = None
+    fee_rate: float | None = None
+    safety_margin: float | None = None
+    size_limits_version: str | None = None
+    size_limits_json: str | None = None
+    decision_economics_hash: str | None = None
 
 
 # Reason codes are deliberately explicit and stable — a dashboard/audit
@@ -164,13 +194,16 @@ POST_START_QUOTE = "post_start_quote"
 AMBIGUOUS_EVENT = "ambiguous_event"
 INVALID_CONTRACT = "invalid_contract"
 WRONG_MARKET_LINE = "wrong_market_line"
+MARKET_BLEND_POLICY_BLOCKED = "market_blend_policy_blocked"
 
 
 def _is_post_start(candidate: MarketEvaluation) -> bool:
     if candidate.observed_at_utc is None or candidate.event_start_utc is None:
         return False
     try:
-        return datetime.fromisoformat(candidate.observed_at_utc) >= datetime.fromisoformat(candidate.event_start_utc)
+        return datetime.fromisoformat(candidate.observed_at_utc) >= datetime.fromisoformat(
+            candidate.event_start_utc
+        )
     except (TypeError, ValueError):
         return True
 
@@ -195,14 +228,112 @@ def _quote_gate_reason(candidate: MarketEvaluation, limits: SizeLimits) -> str |
 
 
 def _no_bet(
-    forecast: SportsForecast, market_type: str, reason: str,
-    edge: float | None = None, evaluated: MarketEvaluation | None = None,
+    forecast: SportsForecast,
+    market_type: str,
+    reason: str,
+    edge: float | None = None,
+    evaluated: MarketEvaluation | None = None,
+    *,
+    model_probability: float | None = None,
+    market_probability: float | None = None,
+    serving_probability: float | None = None,
+    model_conservative_probability: float | None = None,
+    serving_conservative_probability: float | None = None,
+    blend_weight: float | None = None,
+    blend_policy_artifact_hash: str | None = None,
+    blend_experiment_spec_hash: str | None = None,
+    blend_config_hash: str | None = None,
+    serving_policy_block_reason: str | None = None,
+    fee_rate: float | None = None,
+    safety_margin: float | None = None,
+    size_limits_version: str | None = None,
+    size_limits_json: str | None = None,
+    decision_economics_hash: str | None = None,
 ) -> BetDecision:
     return BetDecision(
-        event_id=forecast.event_id, action="NO_BET", predicted_winner=forecast.predicted_winner,
-        market_type=market_type, selected_market=None, units=0.0, reason_code=reason,
-        cost_adjusted_edge=edge, evaluated_market=evaluated,
+        event_id=forecast.event_id,
+        action="NO_BET",
+        predicted_winner=forecast.predicted_winner,
+        market_type=market_type,
+        selected_market=None,
+        units=0.0,
+        reason_code=reason,
+        cost_adjusted_edge=edge,
+        evaluated_market=evaluated,
+        model_probability=model_probability,
+        market_probability=market_probability,
+        serving_probability=serving_probability,
+        blend_weight=blend_weight,
+        model_conservative_probability=model_conservative_probability,
+        serving_conservative_probability=serving_conservative_probability,
+        blend_policy_artifact_hash=blend_policy_artifact_hash,
+        blend_experiment_spec_hash=blend_experiment_spec_hash,
+        blend_config_hash=blend_config_hash,
+        serving_policy_block_reason=serving_policy_block_reason,
+        fee_rate=fee_rate,
+        safety_margin=safety_margin,
+        size_limits_version=size_limits_version,
+        size_limits_json=size_limits_json,
+        decision_economics_hash=decision_economics_hash,
     )
+
+
+def _economics_audit(limits: SizeLimits, fee_rate: float, safety_margin: float) -> dict[str, object]:
+    limits_json = json.dumps(asdict(limits), sort_keys=True, separators=(",", ":"))
+    payload = {
+        "fee_rate": fee_rate,
+        "safety_margin": safety_margin,
+        "size_limits_version": SIZE_LIMITS_VERSION,
+        "size_limits": json.loads(limits_json),
+    }
+    economics_hash = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    return {
+        "fee_rate": fee_rate,
+        "safety_margin": safety_margin,
+        "size_limits_version": SIZE_LIMITS_VERSION,
+        "size_limits_json": limits_json,
+        "decision_economics_hash": economics_hash,
+    }
+
+
+def _serving_probability(
+    *,
+    model_probability: float,
+    candidate: MarketEvaluation,
+    market_type: str,
+    forecast: SportsForecast,
+    blend_policy: MarketBlendPolicy | None,
+    sport: str | None,
+    serving_config_hash: str | None,
+) -> tuple[float, dict[str, object]]:
+    """Return the probability used by the edge gate plus its audit fields."""
+    if blend_policy is None:
+        return model_probability, {
+            "model_probability": model_probability,
+            "market_probability": candidate.market_probability,
+            "serving_probability": model_probability,
+        }
+    if sport is None:
+        raise MarketBlendBlockedError("sport is required when a market-blend policy is active")
+    audit = blend_policy.apply(
+        sport=sport,
+        market=market_type,
+        model_probability=model_probability,
+        market_probability=candidate.market_probability,
+        model_artifact_hash=forecast.model_artifact_hash,
+        config_hash=serving_config_hash,
+    )
+    return audit.blended_probability, {
+        "model_probability": audit.model_probability,
+        "market_probability": audit.market_probability,
+        "serving_probability": audit.blended_probability,
+        "blend_weight": audit.weight,
+        "blend_policy_artifact_hash": audit.policy_artifact_hash,
+        "blend_experiment_spec_hash": audit.experiment_spec_hash,
+        "blend_config_hash": audit.config_hash,
+    }
 
 
 def decide_team_market(
@@ -211,6 +342,10 @@ def decide_team_market(
     limits: SizeLimits | None = None,
     fee_rate: float = 0.0,
     safety_margin: float = 0.0,
+    *,
+    blend_policy: MarketBlendPolicy | None = None,
+    sport: str | None = None,
+    serving_config_hash: str | None = None,
 ) -> BetDecision:
     """Moneyline or spread decision. `candidate.team_or_side` must equal
     `forecast.predicted_winner` — market price never influences which side
@@ -228,21 +363,36 @@ def decide_team_market(
     when that line has no real spread forecast, rather than falling back
     to the moneyline number."""
     limits = limits if limits is not None else SizeLimits()
+    economics = _economics_audit(limits, fee_rate, safety_margin)
     if candidate.market_type not in ("moneyline", "spread"):
         raise ValueError(f"decide_team_market got market_type={candidate.market_type!r}")
     if candidate.team_or_side != forecast.predicted_winner:
-        return _no_bet(forecast, candidate.market_type, NOT_ALIGNED_WITH_PREDICTED_WINNER, evaluated=candidate)
+        return _no_bet(
+            forecast,
+            candidate.market_type,
+            NOT_ALIGNED_WITH_PREDICTED_WINNER,
+            evaluated=candidate,
+            **economics,
+        )
 
     gate_reason = _quote_gate_reason(candidate, limits)
     if gate_reason is not None:
-        return _no_bet(forecast, candidate.market_type, gate_reason, evaluated=candidate)
+        return _no_bet(forecast, candidate.market_type, gate_reason, evaluated=candidate, **economics)
 
     if candidate.market_type == "spread":
         line_probs = forecast.spread_probabilities.get(candidate.line) if candidate.line is not None else None
         if line_probs is None or forecast.predicted_winner not in line_probs:
-            return _no_bet(forecast, candidate.market_type, WRONG_MARKET_LINE, evaluated=candidate)
+            return _no_bet(
+                forecast,
+                candidate.market_type,
+                WRONG_MARKET_LINE,
+                evaluated=candidate,
+                **economics,
+            )
         model_prob = line_probs[forecast.predicted_winner]
-        assert candidate.line is not None  # narrowed: line_probs above is None whenever candidate.line is None
+        assert (
+            candidate.line is not None
+        )  # narrowed: line_probs above is None whenever candidate.line is None
         lower_line_probs = forecast.spread_probabilities_lower.get(candidate.line, {})
         conservative_prob = lower_line_probs.get(forecast.predicted_winner, model_prob)
     else:
@@ -255,31 +405,91 @@ def decide_team_market(
         # dict, so this is a real, backward-compatible preference, not a
         # required field).
         conservative_prob = forecast.conservative_probabilities.get(
-            forecast.predicted_winner, forecast.probability_lower[forecast.predicted_winner],
+            forecast.predicted_winner,
+            forecast.probability_lower[forecast.predicted_winner],
         )
         model_prob = forecast.calibrated_probabilities[forecast.predicted_winner]
 
-    cost_adjusted_edge = conservative_prob - candidate.depth_adjusted_price - fee_rate - safety_margin
+    try:
+        serving_prob, audit = _serving_probability(
+            model_probability=model_prob,
+            candidate=candidate,
+            market_type=candidate.market_type,
+            forecast=forecast,
+            blend_policy=blend_policy,
+            sport=sport,
+            serving_config_hash=serving_config_hash,
+        )
+        serving_conservative_prob, _conservative_audit = _serving_probability(
+            model_probability=conservative_prob,
+            candidate=candidate,
+            market_type=candidate.market_type,
+            forecast=forecast,
+            blend_policy=blend_policy,
+            sport=sport,
+            serving_config_hash=serving_config_hash,
+        )
+    except MarketBlendBlockedError as exc:
+        return _no_bet(
+            forecast,
+            candidate.market_type,
+            MARKET_BLEND_POLICY_BLOCKED,
+            evaluated=candidate,
+            model_probability=model_prob,
+            market_probability=candidate.market_probability,
+            model_conservative_probability=conservative_prob,
+            blend_policy_artifact_hash=blend_policy.artifact_hash,
+            blend_experiment_spec_hash=blend_policy.experiment_spec_hash_for(sport, candidate.market_type)
+            if sport is not None
+            else None,
+            blend_config_hash=serving_config_hash,
+            serving_policy_block_reason=str(exc),
+            **economics,
+        )
+
+    audit["model_conservative_probability"] = conservative_prob
+    audit["serving_conservative_probability"] = serving_conservative_prob
+    audit.update(economics)
+
+    cost_adjusted_edge = serving_conservative_prob - candidate.depth_adjusted_price - fee_rate - safety_margin
     if cost_adjusted_edge <= 0:
-        return _no_bet(forecast, candidate.market_type, NO_EDGE_AFTER_COSTS, cost_adjusted_edge, evaluated=candidate)
+        return _no_bet(
+            forecast,
+            candidate.market_type,
+            NO_EDGE_AFTER_COSTS,
+            cost_adjusted_edge,
+            evaluated=candidate,
+            **audit,
+        )
 
     sizing = edge_scaled_units(
-        model_prob=model_prob,
-        conservative_prob=conservative_prob,
+        model_prob=serving_prob,
+        conservative_prob=serving_conservative_prob,
         best_ask=candidate.executable_ask,
         limits=limits,
     )
     units = sizing.get("units", 0.0)
     if units <= 0:
         return _no_bet(
-            forecast, candidate.market_type, str(sizing.get("reason", ZERO_SIZED)),
-            cost_adjusted_edge, evaluated=candidate,
+            forecast,
+            candidate.market_type,
+            str(sizing.get("reason", ZERO_SIZED)),
+            cost_adjusted_edge,
+            evaluated=candidate,
+            **audit,
         )
 
     return BetDecision(
-        event_id=forecast.event_id, action="BET", predicted_winner=forecast.predicted_winner,
-        market_type=candidate.market_type, selected_market=candidate, units=units,
-        reason_code=QUALIFIED, cost_adjusted_edge=cost_adjusted_edge, evaluated_market=candidate,
+        event_id=forecast.event_id,
+        action="BET",
+        predicted_winner=forecast.predicted_winner,
+        market_type=candidate.market_type,
+        selected_market=candidate,
+        units=units,
+        reason_code=QUALIFIED,
+        cost_adjusted_edge=cost_adjusted_edge,
+        evaluated_market=candidate,
+        **audit,
     )
 
 
@@ -289,49 +499,121 @@ def decide_total(
     limits: SizeLimits | None = None,
     fee_rate: float = 0.0,
     safety_margin: float = 0.0,
+    *,
+    blend_policy: MarketBlendPolicy | None = None,
+    sport: str | None = None,
+    serving_config_hash: str | None = None,
 ) -> BetDecision:
     """Totals decision. The frozen side is whichever of OVER/UNDER the
     sports-only distribution favors for this exact line — decided by
     `forecast.frozen_totals_side()`, before `candidate`'s market price is
     inspected here."""
     limits = limits if limits is not None else SizeLimits()
+    economics = _economics_audit(limits, fee_rate, safety_margin)
     if candidate.market_type != "total":
         raise ValueError(f"decide_total got market_type={candidate.market_type!r}")
     if candidate.line is None:
-        return _no_bet(forecast, "total", NO_FORECAST_FOR_LINE, evaluated=candidate)
+        return _no_bet(forecast, "total", NO_FORECAST_FOR_LINE, evaluated=candidate, **economics)
 
     frozen_side = forecast.frozen_totals_side(candidate.line)
     if frozen_side is None:
-        return _no_bet(forecast, "total", WRONG_MARKET_LINE, evaluated=candidate)
+        return _no_bet(forecast, "total", WRONG_MARKET_LINE, evaluated=candidate, **economics)
     if candidate.team_or_side != frozen_side:
-        return _no_bet(forecast, "total", NOT_ALIGNED_WITH_FROZEN_TOTALS_SIDE, evaluated=candidate)
+        return _no_bet(
+            forecast,
+            "total",
+            NOT_ALIGNED_WITH_FROZEN_TOTALS_SIDE,
+            evaluated=candidate,
+            **economics,
+        )
 
     gate_reason = _quote_gate_reason(candidate, limits)
     if gate_reason is not None:
-        return _no_bet(forecast, "total", gate_reason, evaluated=candidate)
+        return _no_bet(forecast, "total", gate_reason, evaluated=candidate, **economics)
 
     model_prob = forecast.totals_probabilities[candidate.line][frozen_side]
     lower_line_probs = forecast.totals_probabilities_lower.get(candidate.line, {})
     conservative_prob = lower_line_probs.get(frozen_side, model_prob)
-    cost_adjusted_edge = conservative_prob - candidate.depth_adjusted_price - fee_rate - safety_margin
+    try:
+        serving_prob, audit = _serving_probability(
+            model_probability=model_prob,
+            candidate=candidate,
+            market_type="total",
+            forecast=forecast,
+            blend_policy=blend_policy,
+            sport=sport,
+            serving_config_hash=serving_config_hash,
+        )
+        serving_conservative_prob, _conservative_audit = _serving_probability(
+            model_probability=conservative_prob,
+            candidate=candidate,
+            market_type="total",
+            forecast=forecast,
+            blend_policy=blend_policy,
+            sport=sport,
+            serving_config_hash=serving_config_hash,
+        )
+    except MarketBlendBlockedError as exc:
+        return _no_bet(
+            forecast,
+            "total",
+            MARKET_BLEND_POLICY_BLOCKED,
+            evaluated=candidate,
+            model_probability=model_prob,
+            market_probability=candidate.market_probability,
+            model_conservative_probability=conservative_prob,
+            blend_policy_artifact_hash=blend_policy.artifact_hash,
+            blend_experiment_spec_hash=blend_policy.experiment_spec_hash_for(sport, "total")
+            if sport is not None
+            else None,
+            blend_config_hash=serving_config_hash,
+            serving_policy_block_reason=str(exc),
+            **economics,
+        )
+
+    audit["model_conservative_probability"] = conservative_prob
+    audit["serving_conservative_probability"] = serving_conservative_prob
+    audit.update(economics)
+
+    cost_adjusted_edge = serving_conservative_prob - candidate.depth_adjusted_price - fee_rate - safety_margin
     if cost_adjusted_edge <= 0:
-        return _no_bet(forecast, "total", NO_EDGE_AFTER_COSTS, cost_adjusted_edge, evaluated=candidate)
+        return _no_bet(
+            forecast,
+            "total",
+            NO_EDGE_AFTER_COSTS,
+            cost_adjusted_edge,
+            evaluated=candidate,
+            **audit,
+        )
 
     sizing = edge_scaled_units(
-        model_prob=model_prob, conservative_prob=conservative_prob,
-        best_ask=candidate.executable_ask, limits=limits,
+        model_prob=serving_prob,
+        conservative_prob=serving_conservative_prob,
+        best_ask=candidate.executable_ask,
+        limits=limits,
     )
     units = sizing.get("units", 0.0)
     if units <= 0:
         return _no_bet(
-            forecast, "total", str(sizing.get("reason", ZERO_SIZED)),
-            cost_adjusted_edge, evaluated=candidate,
+            forecast,
+            "total",
+            str(sizing.get("reason", ZERO_SIZED)),
+            cost_adjusted_edge,
+            evaluated=candidate,
+            **audit,
         )
 
     return BetDecision(
-        event_id=forecast.event_id, action="BET", predicted_winner=forecast.predicted_winner,
-        market_type="total", selected_market=candidate, units=units,
-        reason_code=QUALIFIED, cost_adjusted_edge=cost_adjusted_edge, evaluated_market=candidate,
+        event_id=forecast.event_id,
+        action="BET",
+        predicted_winner=forecast.predicted_winner,
+        market_type="total",
+        selected_market=candidate,
+        units=units,
+        reason_code=QUALIFIED,
+        cost_adjusted_edge=cost_adjusted_edge,
+        evaluated_market=candidate,
+        **audit,
     )
 
 
@@ -339,6 +621,10 @@ def evaluate_game(
     forecast: SportsForecast,
     candidates: list[MarketEvaluation],
     limits: SizeLimits | None = None,
+    *,
+    blend_policy: MarketBlendPolicy | None = None,
+    sport: str | None = None,
+    serving_config_hash: str | None = None,
 ) -> list[BetDecision]:
     """Evaluate every candidate market for one game. Every candidate produces
     a decision — including NO_BET — so a caller can persist a full audit
@@ -348,7 +634,25 @@ def evaluate_game(
     decisions = []
     for c in candidates:
         if c.market_type in ("moneyline", "spread"):
-            decisions.append(decide_team_market(forecast, c, limits))
+            decisions.append(
+                decide_team_market(
+                    forecast,
+                    c,
+                    limits,
+                    blend_policy=blend_policy,
+                    sport=sport,
+                    serving_config_hash=serving_config_hash,
+                )
+            )
         elif c.market_type == "total":
-            decisions.append(decide_total(forecast, c, limits))
+            decisions.append(
+                decide_total(
+                    forecast,
+                    c,
+                    limits,
+                    blend_policy=blend_policy,
+                    sport=sport,
+                    serving_config_hash=serving_config_hash,
+                )
+            )
     return decisions

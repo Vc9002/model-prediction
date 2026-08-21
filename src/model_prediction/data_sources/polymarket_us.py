@@ -83,13 +83,36 @@ POLYMARKET_SPORT_LEAGUES: dict[str, tuple[str, ...]] = {
     "nfl": ("NFL",),
     # WORLD_CUP dropped 2026-07: tournament is over, no games left to trade.
     "soccer": (
-        "EPL", "LA_LIGA", "BUNDESLIGA", "SERIE_A", "UCL", "UEFA", "MLS",
-        "BRASILEIRAO", "BRAZIL_SERIE_B", "ARGENTINA", "ARGENTINA_2",
-        "COLOMBIA", "CHILE", "URUGUAY", "ECUADOR", "PERU", "SUDAMERICANA",
-        "FRIENDLIES", "CLUB_FRIENDLIES",
-        "LIGA_MX", "NWSL", "SCOTTISH_PREM", "CSL", "ALLSVENSKAN",
-        "AUSTRIAN_BUND", "DANISH_SUPER", "RUSSIAN_PREM", "NORWEGIAN_ELITE",
-        "UEL", "UECL",
+        "EPL",
+        "LA_LIGA",
+        "BUNDESLIGA",
+        "SERIE_A",
+        "UCL",
+        "UEFA",
+        "MLS",
+        "BRASILEIRAO",
+        "BRAZIL_SERIE_B",
+        "ARGENTINA",
+        "ARGENTINA_2",
+        "COLOMBIA",
+        "CHILE",
+        "URUGUAY",
+        "ECUADOR",
+        "PERU",
+        "SUDAMERICANA",
+        "FRIENDLIES",
+        "CLUB_FRIENDLIES",
+        "LIGA_MX",
+        "NWSL",
+        "SCOTTISH_PREM",
+        "CSL",
+        "ALLSVENSKAN",
+        "AUSTRIAN_BUND",
+        "DANISH_SUPER",
+        "RUSSIAN_PREM",
+        "NORWEGIAN_ELITE",
+        "UEL",
+        "UECL",
     ),
     # ATP added 2026-08-03: live-verified against GET /v2/sports (real
     # operational league, 88 events including real matches with executable
@@ -251,9 +274,7 @@ class PolymarketUSClient:
         """
         leagues = POLYMARKET_SPORT_LEAGUES.get(sport.lower())
         if leagues is None:
-            raise ValueError(
-                f"unknown sport: {sport}; expected one of {sorted(POLYMARKET_SPORT_LEAGUES)}"
-            )
+            raise ValueError(f"unknown sport: {sport}; expected one of {sorted(POLYMARKET_SPORT_LEAGUES)}")
         events: dict[str, list[dict[str, Any]]] = {}
         errors: dict[str, str] = {}
 
@@ -306,15 +327,16 @@ class PolymarketUSClient:
         # always the negation, "Red Sox +1.5" == the opponent's own +1.5).
         # None for market types with no team anchor (total, btts).
         team = next(
-            (
-                (side.get("team") or {}).get("name")
-                for side in market["marketSides"]
-                if side.get("team")
-            ),
+            ((side.get("team") or {}).get("name") for side in market["marketSides"] if side.get("team")),
             None,
         )
         return {
             "provider": "polymarket_us",
+            # This object is built directly from authenticated live gateway
+            # market/book responses in this call; it is not reconstructed
+            # from historical prices or postgame data.
+            "reconstructed": False,
+            "reconstruction_status_source": "live_gateway_market_and_book_response",
             "market_id": str(market["id"]),
             "market_slug": slug,
             "event_start_utc": market.get("gameStartTime"),
@@ -493,9 +515,7 @@ def capture_slate_snapshots(
 ) -> dict[str, Any]:
     """Persist a prospective executable BBO for every discovered contract."""
     league_to_sport = {
-        league: sport
-        for sport, leagues in POLYMARKET_SPORT_LEAGUES.items()
-        for league in leagues
+        league: sport for sport, leagues in POLYMARKET_SPORT_LEAGUES.items() for league in leagues
     }
     qualification_sports = BBO_CAPTURE_SPORTS
     captured = missing_bbo = failures = skipped_nonqualification_contracts = 0
@@ -505,7 +525,7 @@ def capture_slate_snapshots(
     # Skip summer league / preseason events — they offer only moneyline
     # markets and pollute the spread/total readiness counts.
     _SUMMER_LEAGUE_PATTERNS = (
-        "nbasl",   # NBA Summer League
+        "nbasl",  # NBA Summer League
     )
 
     # Build one flat contract list across every qualifying league instead of
@@ -524,9 +544,7 @@ def capture_slate_snapshots(
             failure_details.append({"league": league, "reason": "league has no canonical sport mapping"})
             continue
         if sport not in qualification_sports:
-            skipped_nonqualification_contracts += sum(
-                len(event.get("markets", [])) for event in events
-            )
+            skipped_nonqualification_contracts += sum(len(event.get("markets", [])) for event in events)
             continue
         league_contracts = [
             (league, sport, event, market)
@@ -535,7 +553,8 @@ def capture_slate_snapshots(
             if market.get("market_slug")
         ]
         kept = [
-            entry for entry in league_contracts
+            entry
+            for entry in league_contracts
             if not (
                 any(
                     pattern in str(entry[3].get("market_slug", "")).casefold()
@@ -571,6 +590,8 @@ def capture_slate_snapshots(
                         None,
                     ),
                     "timestamp_valid": observed <= event_start,
+                    "reconstructed": snapshot.get("reconstructed"),
+                    "reconstruction_status_source": snapshot.get("reconstruction_status_source"),
                     "usage": "prospective_executable_bbo",
                 }
             )
@@ -614,9 +635,7 @@ def capture_slate_snapshots(
         if not snapshot.get("timestamp_valid", True):
             timestamp_invalid += 1
     return {
-        "status": (
-            "ok" if failures == 0 and missing_bbo == 0 and timestamp_invalid == 0 else "partial"
-        ),
+        "status": ("ok" if failures == 0 and missing_bbo == 0 and timestamp_invalid == 0 else "partial"),
         "captured": captured,
         "missing_executable_ask": missing_bbo,
         "failures": failures,
@@ -673,15 +692,12 @@ def refresh_contract_snapshots(
             snapshot = client.snapshot(slug)
             observed = parse_utc(snapshot["observed_at_utc"])
             event_start = parse_utc(snapshot["event_start_utc"])
-            snapshot.update(
-                {
-                    key: previous.get(key)
-                    for key in ("league", "event_id", "market_type", "line")
-                }
-            )
+            snapshot.update({key: previous.get(key) for key in ("league", "event_id", "market_type", "line")})
             snapshot.update(
                 {
                     "timestamp_valid": observed <= event_start,
+                    "reconstructed": snapshot.get("reconstructed"),
+                    "reconstruction_status_source": snapshot.get("reconstruction_status_source"),
                     "usage": "prospective_executable_bbo",
                 }
             )
@@ -710,9 +726,7 @@ def refresh_contract_snapshots(
     }
 
 
-def _best_level(
-    book: dict[str, Any], side: str, best: Any
-) -> tuple[float | None, float | None]:
+def _best_level(book: dict[str, Any], side: str, best: Any) -> tuple[float | None, float | None]:
     """Best price and its resting size from a depth array of {px, qty} levels."""
     levels = []
     for level in book.get(side) or []:

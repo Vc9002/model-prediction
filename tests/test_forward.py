@@ -143,7 +143,13 @@ def _odds_snapshot() -> MLBGameOdds:
                 "under": MarketSideQuote("under", 8.5, -110, 0.524, None),
             },
         },
-        raw_response={},
+        raw_response={
+            "books": {
+                "moneyline": {"reconstructed": False},
+                "spread": {"reconstructed": False},
+                "total": {"reconstructed": False},
+            }
+        },
         snapshot_hash="snaphash",
     )
 
@@ -182,6 +188,11 @@ def test_paired_event_candidates_selects_the_model_favorite() -> None:
     total = by_market[MarketType.TOTAL]
     assert total.selection == "over"
     assert total.line == 8.5
+    assert total.market_snapshot_hash == "snaphash"
+    assert total.market_quote_timestamp_valid is True
+    assert total.market_quote_source == "polymarket_us"
+    assert total.market_quote_provenance == "decision_time_executable_quote"
+    assert total.market_quote_reconstructed is False
 
 
 def test_paired_event_candidates_never_switches_to_the_underdog_for_a_better_price() -> None:

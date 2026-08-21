@@ -20,8 +20,6 @@ from typing import Any
 
 import httpx
 
-logger = logging.getLogger(__name__)
-
 from .domain import eastern_today
 from .features.elo_ratings import expected_win_probability
 from .research_io import atomic_write as _atomic_write
@@ -30,6 +28,8 @@ from .research_io import canonical_json as _canonical_json
 from .research_io import identity_key as _identity_key
 from .research_io import sha256_file as _sha256
 from .research_io import utc_now as _utc_now
+
+logger = logging.getLogger(__name__)
 
 BO3_BASE_URL = "https://api.bo3.gg/api/v1"
 # discipline_id values verified live against GET /api/v1/disciplines
@@ -105,7 +105,11 @@ RECENCY_HALF_LIFE_DAYS: float = 90.0
 RECENCY_MAX_BOOST: float = 1.3
 # Tournament tier multipliers: S/A-tier weighted higher, lower tiers dampened.
 TOURNAMENT_TIER_WEIGHT: dict[str, float] = {
-    "s": 1.15, "a": 1.05, "b": 1.0, "c": 0.95, "d": 0.90,
+    "s": 1.15,
+    "a": 1.05,
+    "b": 1.0,
+    "c": 0.95,
+    "d": 0.90,
 }
 # Inactivity decay (v6, 2026-08-04): a team's rating is pulled toward the
 # neutral 1500 prior the longer it's been since their last recorded match,
@@ -390,7 +394,10 @@ def backfill_esports(
         ],
     }
     _atomic_write(manifest_path, json.dumps(manifest, indent=2, sort_keys=True) + "\n")
-    return {**manifest, "paths": {"matches": str(matches_path), "teams": str(teams_path), "manifest": str(manifest_path)}}
+    return {
+        **manifest,
+        "paths": {"matches": str(matches_path), "teams": str(teams_path), "manifest": str(manifest_path)},
+    }
 
 
 def refresh_recent_matches(
@@ -479,7 +486,9 @@ def refresh_recent_matches(
         "requires_signup": False,
         "extracted_at_utc": _utc_now(),
         "requested_window": {"from": from_date.isoformat(), "to": today.isoformat()},
-        "effective_window": old_manifest.get("effective_window", {"from": from_date.isoformat(), "to": today.isoformat()}),
+        "effective_window": old_manifest.get(
+            "effective_window", {"from": from_date.isoformat(), "to": today.isoformat()}
+        ),
         "match_count": len(ordered),
         "team_count": len(used_teams),
         "request_pages": {"matches": match_pages, "teams": team_pages},
@@ -517,6 +526,18 @@ class NeutralElo:
     # is maximal, matching the existing 1500 neutral-rating default).
     last_match_utc: dict[str, str] = field(default_factory=dict)
     games_played: dict[str, int] = field(default_factory=dict)
+    # Title-split overrides (esports_titles package, 2026-08-18): None means
+    # "use the module-level default" -- every pre-split caller is therefore
+    # bit-for-bit unchanged, while a per-title config can override each knob
+    # independently. The shared engine stays the shared infrastructure; the
+    # per-title NUMBERS live in the esports_titles package, not here.
+    inactivity_half_life_days: float | None = None
+    inactivity_max_pull: float | None = None
+    minimum_reliable_games: int | None = None
+    thin_data_max_shrink: float | None = None
+    recency_half_life_days: float | None = None
+    recency_max_boost: float | None = None
+    tier_weights: dict[str, float] | None = None
 
     def raw_probability(self, team1_id: str, team2_id: str) -> float:
         """Unshrunk Elo expectation — the correct basis for rating updates.
@@ -536,8 +557,14 @@ class NeutralElo:
         reference_date -- roster/meta drift makes an old rating less
         trustworthy the staler it gets. A no-op with no reference_date, no
         recorded last match (team has never played), or decay disabled."""
+        half_life = (
+            self.inactivity_half_life_days
+            if self.inactivity_half_life_days is not None
+            else INACTIVITY_HALF_LIFE_DAYS
+        )
+        max_pull = self.inactivity_max_pull if self.inactivity_max_pull is not None else INACTIVITY_MAX_PULL
         rating = self.ratings.get(team_id, 1500.0)
-        if reference_date is None or INACTIVITY_HALF_LIFE_DAYS <= 0:
+        if reference_date is None or half_life <= 0:
             return rating
         last_seen = self.last_match_utc.get(team_id)
         if not last_seen:
@@ -552,7 +579,7 @@ class NeutralElo:
         elif last_dt.tzinfo is not None and ref_dt.tzinfo is None:
             ref_dt = ref_dt.replace(tzinfo=last_dt.tzinfo)
         age_days = max(0.0, (ref_dt - last_dt).total_seconds() / 86400)
-        pull = INACTIVITY_MAX_PULL * (1.0 - 2 ** (-age_days / INACTIVITY_HALF_LIFE_DAYS))
+        pull = max_pull * (1.0 - 2 ** (-age_days / half_life))
         return rating + (1500.0 - rating) * pull
 
     def _thin_data_shrink(self, team1_id: str, team2_id: str) -> float:
@@ -560,16 +587,18 @@ class NeutralElo:
         side of the matchup has the FEWER recorded games -- one unreliable
         rating is enough to make the whole matchup's prediction unreliable.
         Full shrink at zero games, none at/above MINIMUM_RELIABLE_GAMES."""
-        if MINIMUM_RELIABLE_GAMES <= 0:
-            return 0.0
-        least_established = min(
-            self.games_played.get(team1_id, 0), self.games_played.get(team2_id, 0)
+        minimum_games = (
+            self.minimum_reliable_games if self.minimum_reliable_games is not None else MINIMUM_RELIABLE_GAMES
         )
-        return THIN_DATA_MAX_SHRINK * max(0.0, 1.0 - least_established / MINIMUM_RELIABLE_GAMES)
+        max_shrink = (
+            self.thin_data_max_shrink if self.thin_data_max_shrink is not None else THIN_DATA_MAX_SHRINK
+        )
+        if minimum_games <= 0:
+            return 0.0
+        least_established = min(self.games_played.get(team1_id, 0), self.games_played.get(team2_id, 0))
+        return max_shrink * max(0.0, 1.0 - least_established / minimum_games)
 
-    def probability(
-        self, team1_id: str, team2_id: str, reference_date: datetime | None = None
-    ) -> float:
+    def probability(self, team1_id: str, team2_id: str, reference_date: datetime | None = None) -> float:
         """Platt-calibrated prediction, with inactivity decay and thin-data
         shrinkage applied on top -- both prediction-time-only adjustments,
         never fed back into raw_probability()/update()'s rating dynamics.
@@ -594,22 +623,32 @@ class NeutralElo:
         # Recency boost: newer matches (relative to reference date) get higher K.
         # Reference date defaults to the match's own date (no boost) unless set.
         # Disabled when RECENCY_HALF_LIFE_DAYS == 0.
+        recency_half_life = (
+            self.recency_half_life_days if self.recency_half_life_days is not None else RECENCY_HALF_LIFE_DAYS
+        )
+        recency_boost = self.recency_max_boost if self.recency_max_boost is not None else RECENCY_MAX_BOOST
         start = row.get("start_utc")
-        if RECENCY_HALF_LIFE_DAYS > 0 and start and hasattr(self, 'reference_date') and self.reference_date is not None:
+        if (
+            recency_half_life > 0
+            and start
+            and hasattr(self, "reference_date")
+            and self.reference_date is not None
+        ):
             try:
                 match_dt = datetime.fromisoformat(str(start))
                 ref_dt = self.reference_date
                 if match_dt.tzinfo is None and ref_dt.tzinfo is not None:
                     match_dt = match_dt.replace(tzinfo=ref_dt.tzinfo)
                 age_days = max(0, (ref_dt - match_dt).days)
-                decay = 2 ** (-age_days / RECENCY_HALF_LIFE_DAYS)
-                k_eff *= 1.0 + (RECENCY_MAX_BOOST - 1.0) * decay
+                decay = 2 ** (-age_days / recency_half_life)
+                k_eff *= 1.0 + (recency_boost - 1.0) * decay
             except (ValueError, TypeError) as exc:
                 logger.debug("esports Elo: skipping row with unparseable date: %s", exc)
 
         # Tournament tier bonus: higher-tier matches get more weight
         tier = str(row.get("tier") or "").lower().strip()
-        tier_mult = TOURNAMENT_TIER_WEIGHT.get(tier, 1.0)
+        tier_weights = self.tier_weights if self.tier_weights is not None else TOURNAMENT_TIER_WEIGHT
+        tier_mult = tier_weights.get(tier, 1.0)
         k_eff *= tier_mult
 
         delta = k_eff * (outcome - probability)
@@ -658,15 +697,19 @@ def _metrics(rows: Sequence[dict[str, Any]], threshold: float = 0.0) -> dict[str
     selected = [row for row in rows if abs(float(row["probability"]) - 0.5) >= threshold]
     if not selected:
         return {
-            "observations": 0, "brier": None, "log_loss": None, "accuracy": None,
-            "calls": 0, "hits": 0, "units_at_minus_110": 0.0,
+            "observations": 0,
+            "brier": None,
+            "log_loss": None,
+            "accuracy": None,
+            "calls": 0,
+            "hits": 0,
+            "units_at_minus_110": 0.0,
         }
     probabilities = [min(1 - 1e-9, max(1e-9, float(row["probability"]))) for row in selected]
     outcomes = [int(row["outcome"]) for row in selected]
     brier = sum((p - y) ** 2 for p, y in zip(probabilities, outcomes, strict=True)) / len(selected)
     log_loss = -sum(
-        y * math.log(p) + (1 - y) * math.log(1 - p)
-        for p, y in zip(probabilities, outcomes, strict=True)
+        y * math.log(p) + (1 - y) * math.log(1 - p) for p, y in zip(probabilities, outcomes, strict=True)
     ) / len(selected)
     correct = sum((p >= 0.5) == bool(y) for p, y in zip(probabilities, outcomes, strict=True))
     expected_calibration_error = 0.0
@@ -681,9 +724,7 @@ def _metrics(rows: Sequence[dict[str, Any]], threshold: float = 0.0) -> dict[str
             continue
         mean_probability = sum(item[0] for item in bucket) / len(bucket)
         observed_rate = sum(item[1] for item in bucket) / len(bucket)
-        expected_calibration_error += len(bucket) / len(selected) * abs(
-            mean_probability - observed_rate
-        )
+        expected_calibration_error += len(bucket) / len(selected) * abs(mean_probability - observed_rate)
     # Diagnostic flat one-unit -110 P&L -- the same convention used by the
     # production MLB/NBA/WNBA/NFL validation pipeline (validation.py). This is
     # a comparability diagnostic, not real or Polymarket-executable
@@ -743,9 +784,7 @@ def validate_esports_baseline(
 
     # Grid search K: train Elo on train, predict validation (no update), score raw.
     # Set reference_date to last train match for recency weighting.
-    train_ref_date = datetime.fromisoformat(
-        str(train[-1]["start_utc"])
-    )
+    train_ref_date = datetime.fromisoformat(str(train[-1]["start_utc"]))
     candidate_scores: list[dict[str, Any]] = []
     validation_predictions_raw: dict[float, list[dict[str, Any]]] = {}
     for k in K_CANDIDATES:
@@ -782,8 +821,10 @@ def validate_esports_baseline(
         for threshold in CONFIDENCE_CANDIDATES
     ]
     viable = [
-        row for row in threshold_scores
-        if int(row["observations"]) >= 50 and float(row["accuracy"] or 0) >= 0.60  # source: config.ESPORTS_MIN_*
+        row
+        for row in threshold_scores
+        if int(row["observations"]) >= 50
+        and float(row["accuracy"] or 0) >= 0.60  # source: config.ESPORTS_MIN_*
     ]
     # Unlike K above, Brier is NOT a valid criterion here: restricting to an
     # ever-smaller, ever-more-confident subset mechanically improves Brier
@@ -797,25 +838,18 @@ def validate_esports_baseline(
     # tradeoff) -- confirmed it produces a real interior optimum (~0.03-0.05)
     # for every title, not a grid-edge artifact.
     chosen_threshold = (
-        float(max(viable, key=lambda row: float(row["units_at_minus_110"]))["threshold"])
-        if viable
-        else 0.0
+        float(max(viable, key=lambda row: float(row["units_at_minus_110"]))["threshold"]) if viable else 0.0
     )
 
     # Locked test with Platt: train Elo on train+validation, predict test
-    val_ref_date = datetime.fromisoformat(
-        str(validation[-1]["start_utc"])
-    )
-    test_book = NeutralElo(k=chosen_k, ratings={},
-                           platt_intercept=platt_intercept, platt_slope=platt_slope)
+    val_ref_date = datetime.fromisoformat(str(validation[-1]["start_utc"]))
+    test_book = NeutralElo(k=chosen_k, ratings={}, platt_intercept=platt_intercept, platt_slope=platt_slope)
     test_book.reference_date = val_ref_date  # type: ignore[attr-defined]
     _predict(test_book, [*train, *validation])  # train Elo on non-test data
     test_predictions = _predict(test_book, test)  # predict + chronologically update with Platt
 
     # Final ratings trained on all data (no Platt — ratings are raw)
-    all_ref_date = datetime.fromisoformat(
-        str(rows[-1]["start_utc"])
-    )
+    all_ref_date = datetime.fromisoformat(str(rows[-1]["start_utc"]))
     all_book = NeutralElo(k=chosen_k, ratings={})
     all_book.reference_date = all_ref_date  # type: ignore[attr-defined]
     _predict(all_book, rows)
@@ -901,8 +935,12 @@ def validate_esports_baseline(
         },
         "k_selection_on_validation": candidate_scores,
         "confidence_selection_on_validation": threshold_scores,
-        "chosen": {"k": chosen_k, "confidence_threshold": chosen_threshold,
-                   "platt_intercept": platt_intercept, "platt_slope": platt_slope},
+        "chosen": {
+            "k": chosen_k,
+            "confidence_threshold": chosen_threshold,
+            "platt_intercept": platt_intercept,
+            "platt_slope": platt_slope,
+        },
         "locked_test": {
             "all_matches": _metrics(test_predictions),
             "selected_matches": _metrics(test_predictions, chosen_threshold),
@@ -1017,6 +1055,7 @@ def forecast_esports_slate(
     # Fetch today + tomorrow to capture all open contracts without stale
     # yesterday events that may have already resolved or expired.
     from datetime import timedelta
+
     base_date = date.fromisoformat(game_date)
     events: list[dict[str, Any]] = []
     seen_event_ids: set[str] = set()
@@ -1032,9 +1071,14 @@ def forecast_esports_slate(
     platt_slope = artifact.get("platt_slope")
     last_match_utc = {key: str(value) for key, value in (artifact.get("last_match_utc") or {}).items()}
     games_played = {key: int(value) for key, value in (artifact.get("games_played") or {}).items()}
-    book = NeutralElo(k=float(artifact["k"]), ratings=ratings,
-                      platt_intercept=platt_intercept, platt_slope=platt_slope,
-                      last_match_utc=last_match_utc, games_played=games_played)
+    book = NeutralElo(
+        k=float(artifact["k"]),
+        ratings=ratings,
+        platt_intercept=platt_intercept,
+        platt_slope=platt_slope,
+        last_match_utc=last_match_utc,
+        games_played=games_played,
+    )
     trained_through = parse_utc(str(artifact["trained_through_utc"]))
     observed_now = utc_now()
     manual_aliases = _load_manual_aliases(data_root).get(title, {})
@@ -1100,12 +1144,8 @@ def forecast_esports_slate(
             # complete research ledger with the neutral 1500 prior. They are
             # not valid inputs for the curated gated-research ledger until
             # both identities have learned ratings in the pinned artifact.
-            source_teams_resolved = all(
-                not team_id.startswith("unknown:") for team_id in team_ids
-            )
-            source_teams_trained = source_teams_resolved and all(
-                team_id in ratings for team_id in team_ids
-            )
+            source_teams_resolved = all(not team_id.startswith("unknown:") for team_id in team_ids)
+            source_teams_trained = source_teams_resolved and all(team_id in ratings for team_id in team_ids)
             probability1 = book.probability(team_ids[0], team_ids[1], observed_now)
             probabilities_by_name = {
                 _identity_key(descriptions[0]): probability1,
@@ -1155,9 +1195,7 @@ def forecast_esports_slate(
                     "source_teams_trained": source_teams_trained,
                     "gated_research_eligible": source_teams_trained,
                     "gated_research_ineligibility_reason": (
-                        None
-                        if source_teams_trained
-                        else "NO_CALL_MODEL_UNVALIDATED_NEW_TEAM"
+                        None if source_teams_trained else "NO_CALL_MODEL_UNVALIDATED_NEW_TEAM"
                     ),
                     "model_version": artifact["model_version"],
                     "model_state": "research",

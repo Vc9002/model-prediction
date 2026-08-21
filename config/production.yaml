@@ -29,6 +29,13 @@ prediction_service:
       artifact: config/models/mlb-elo-trend-lr-v8.json
       enabled: true
       rollback_model: mlb-elo-trend-lr-v7
+    - model_id: measured-edge-totals-v3
+      sport: MLB
+      market: total
+      implementation: json_artifact
+      artifact: config/models/measured-edge-totals-v3.json
+      enabled: true
+      rollback_model: null
     - model_id: nba-elo-trend-lr-v4
       sport: NBA
       market: moneyline

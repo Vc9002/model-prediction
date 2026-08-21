@@ -90,12 +90,19 @@ class TestResumeRunId:
     def test_resume_run_id_reuses_the_same_real_ledger_run_row(self, tmp_path):
         r1 = rebuild_shadow_cli.run("nba", "2026-08-06", "late", str(tmp_path), "collect")
         r2 = rebuild_shadow_cli.run(
-            "nba", "2026-08-06", "late", str(tmp_path), "collect", resume_run_id=r1["run_id"],
+            "nba",
+            "2026-08-06",
+            "late",
+            str(tmp_path),
+            "collect",
+            resume_run_id=r1["run_id"],
         )
         assert r1["run_id"] == r2["run_id"]
 
         ledger = ShadowLedger(f"{tmp_path}/shadow.db")
-        rows = ledger.conn.execute("SELECT COUNT(*) as n FROM runs WHERE run_id=?", (r1["run_id"],)).fetchone()
+        rows = ledger.conn.execute(
+            "SELECT COUNT(*) as n FROM runs WHERE run_id=?", (r1["run_id"],)
+        ).fetchone()
         ledger.close()
         assert rows["n"] == 1  # one real row, not duplicated by the second call
 
@@ -106,7 +113,12 @@ class TestResumeRunId:
         # requires predict()/match_markets() to have run first.
         r1 = rebuild_shadow_cli.run("mlb", "2026-08-06", "late", str(tmp_path), "predict")
         r2 = rebuild_shadow_cli.run(
-            "mlb", "2026-08-06", "late", str(tmp_path), "decide", resume_run_id=r1["run_id"],
+            "mlb",
+            "2026-08-06",
+            "late",
+            str(tmp_path),
+            "decide",
+            resume_run_id=r1["run_id"],
         )
         assert r2["stages"]["decide"]["status"] == "ERROR"
 
@@ -128,7 +140,12 @@ class TestTrueResumeSkipsCompletedResumableStages:
         ledger.close()
 
         r2 = rebuild_shadow_cli.run(
-            "nba", "2026-08-06", "late", str(tmp_path), "collect", resume_run_id=run_id,
+            "nba",
+            "2026-08-06",
+            "late",
+            str(tmp_path),
+            "collect",
+            resume_run_id=run_id,
         )
 
         assert r2["stages"]["collect"]["status"] == "SKIPPED_ALREADY_COMPLETE"
@@ -161,7 +178,12 @@ class TestTrueResumeSkipsCompletedResumableStages:
         ledger.close()
 
         r2 = rebuild_shadow_cli.run(
-            "mlb", "2026-08-06", "late", str(tmp_path), "predict", resume_run_id=run_id,
+            "mlb",
+            "2026-08-06",
+            "late",
+            str(tmp_path),
+            "predict",
+            resume_run_id=run_id,
         )
 
         assert r2["stages"]["predict"]["status"] != "SKIPPED_ALREADY_COMPLETE"
@@ -174,3 +196,28 @@ class TestTrueResumeSkipsCompletedResumableStages:
         ledger.close()
 
         assert completed.get("collect") == r1["stages"]["collect"]["status"]
+
+
+def test_symlinked_repo_local_data_root_is_rejected(tmp_path):
+    """A research worktree shares the canonical checkout's data/ tree via a
+    symlink; a data_root supplied THROUGH that symlink resolves into the
+    live production tree, so the lexical (unresolved) path must be
+    rejected even though the resolved path escapes the repo. Pins the
+    2026-08-17 worktree safety-gap fix."""
+    from model_prediction.rebuild.safety import assert_runtime_data_root
+
+    canonical_data = tmp_path / "canonical" / "data"
+    canonical_data.mkdir(parents=True)
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+    (worktree / "data").symlink_to(canonical_data)
+    protected = worktree / "data" / "main" / "rebuild_must_not_create"
+    with pytest.raises(RebuildSafetyError):
+        assert_runtime_data_root(str(protected), str(worktree))
+
+
+def test_external_tmp_root_still_allowed(tmp_path):
+    from model_prediction.rebuild.safety import assert_runtime_data_root
+
+    external = tmp_path / "external_root"
+    assert assert_runtime_data_root(str(external), str(tmp_path / "repo")) == external.resolve()

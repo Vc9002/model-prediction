@@ -20,20 +20,32 @@ def _write_snapshots(path, rows) -> None:
     path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
 
 
-def _start(game_start, player_id, name, innings="6.0", earned_runs=2, *, side="home") -> dict:
+def _start(
+    game_start,
+    player_id,
+    name,
+    innings="6.0",
+    earned_runs=2,
+    *,
+    side="home",
+    strike_outs=None,
+    walks=None,
+    batters_faced=None,
+) -> dict:
     other_side = "away" if side == "home" else "home"
+    pitching = {"inningsPitched": innings, "earnedRuns": earned_runs}
+    if strike_outs is not None:
+        pitching["strikeOuts"] = strike_outs
+    if walks is not None:
+        pitching["baseOnBalls"] = walks
+    if batters_faced is not None:
+        pitching["battersFaced"] = batters_faced
     return {
         "game_start_utc": game_start,
         side: {
             "team_name": "Team A",
             "pitcher_order": [player_id],
-            "players": [
-                {
-                    "player_id": player_id,
-                    "name": name,
-                    "pitching": {"inningsPitched": innings, "earnedRuns": earned_runs},
-                }
-            ],
+            "players": [{"player_id": player_id, "name": name, "pitching": pitching}],
         },
         other_side: {"team_name": "Team B", "pitcher_order": [], "players": []},
     }
@@ -126,6 +138,41 @@ class TestStarterRollingEra:
         assert result["status"] == "unavailable_from_source"
 
 
+class TestStarterRollingKbb:
+    def test_kbb_pct_uses_batters_faced_not_innings(self, tmp_path) -> None:
+        """Regression for the 2026-08-20 bug where K-BB% was computed as
+        (K-BB)/IP (K-BB per inning) instead of the real sabermetric
+        (K-BB)/battersFaced. Innings and batters-faced are deliberately
+        different here (6 IP, 27 BF) so a formula using the wrong
+        denominator produces a visibly wrong result."""
+        path = tmp_path / "snapshots.jsonl"
+        rows = [
+            _start(
+                f"2026-05-{d:02d}T18:00:00Z",
+                100,
+                "Grayson Rodriguez",
+                innings="6.0",
+                strike_outs=9,
+                walks=3,
+                batters_faced=27,
+            )
+            for d in range(1, 4)
+        ]
+        _write_snapshots(path, rows)
+        starter_history._STARTER_INDEX_CACHE.clear()
+
+        result = starter_history.starter_rolling_kbb(
+            "Grayson Rodriguez", datetime(2026, 5, 20, tzinfo=UTC), snapshot_path=path
+        )
+
+        assert result["status"] == "available"
+        # (9-3)*3 = 18 net K-BB over 3 starts, 27*3 = 81 BF -> 18/81
+        assert result["kbb_pct"] == pytest.approx(18 / 81, abs=1e-4)
+        # sanity: the old (K-BB)/IP formula would give 18/18 = 1.0, a
+        # visibly different (and wrong) number.
+        assert result["kbb_pct"] != pytest.approx(1.0)
+
+
 class TestStarterEraGapLive:
     def test_returns_home_minus_away_era_when_both_available(self, tmp_path) -> None:
         path = tmp_path / "snapshots.jsonl"
@@ -150,10 +197,7 @@ class TestStarterEraGapLive:
         path = tmp_path / "snapshots.jsonl"
         _write_snapshots(
             path,
-            [
-                _start(f"2026-05-{d:02d}T18:00:00Z", 100, "Home Ace", side="home")
-                for d in range(1, 4)
-            ],
+            [_start(f"2026-05-{d:02d}T18:00:00Z", 100, "Home Ace", side="home") for d in range(1, 4)],
         )
         starter_history._STARTER_INDEX_CACHE.clear()
 

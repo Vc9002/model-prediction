@@ -1,0 +1,152 @@
+{
+  "artifact_hash": "015870385798c37b5bc4a3230a69db98ab21362f535aae7393d1beccd3d75d5e",
+  "calibration_provenance": {
+    "base_model_version": "nfl-elo-trend-lr-v4",
+    "experiment_registry_ids": [
+      "nfl-v4-temperature-calibration-T0.7"
+    ],
+    "fitted_on": "146-game threshold_selection validation window (2025-09-14..2025-11-17)",
+    "grid_search": "log-loss minimizing grid search, TemperatureCalibrator.fit",
+    "holdout_validation": {
+      "bootstrap_p_better": 0.7695,
+      "brier_after": 0.215625,
+      "brier_before": 0.217894,
+      "brier_delta": -0.002269,
+      "calibration_slope_after": 1.11,
+      "calibration_slope_before": 1.586,
+      "ece_after": 0.07721,
+      "ece_before": 0.079936,
+      "log_loss_after": 0.618786,
+      "log_loss_before": 0.625581,
+      "n": 122
+    },
+    "settled_picks_validation": null,
+    "status": "PROMOTION_CANDIDATE -- settled-picks retrospective + prospective N>=30 shadow both still required; weaker/noisier signal than WNBA's (P(better)=0.77 vs 0.81, bootstrap CI crosses zero)"
+  },
+  "market_models": {
+    "moneyline": {
+      "calibration": {
+        "method": "temperature",
+        "temperature": 0.7
+      },
+      "coefficients": [
+        2.6154014596,
+        0.0502116986
+      ],
+      "confidence_threshold": 0.54411292,
+      "feature_names": [
+        "elo_probability",
+        "trend_gap"
+      ],
+      "intercept": -1.330143552,
+      "positive_class": "home"
+    }
+  },
+  "method": "logistic_regression",
+  "model_version": "nfl-elo-trend-lr-v4-temperature",
+  "qualification": {
+    "brier_score": 0.204736,
+    "calibration": {
+      "brier_score": 0.20473579397750238,
+      "calibration_intercept": 0.18451279966224257,
+      "calibration_slope": 1.2318945376153096,
+      "expected_calibration_error": 0.10085016000128659,
+      "log_loss": 0.5979160642807883,
+      "reliability_buckets": [
+        {
+          "count": 27,
+          "hit_rate": 0.7407407407407407,
+          "lower": 0.5,
+          "mean_p": 0.5661397662760724,
+          "upper": 0.6
+        },
+        {
+          "count": 39,
+          "hit_rate": 0.6153846153846154,
+          "lower": 0.6,
+          "mean_p": 0.6525186570626519,
+          "upper": 0.7
+        },
+        {
+          "count": 21,
+          "hit_rate": 0.8571428571428571,
+          "lower": 0.7,
+          "mean_p": 0.732785238851311,
+          "upper": 0.8
+        }
+      ],
+      "sample_size": 87,
+      "status": "ok"
+    },
+    "called_rate": 0.713115,
+    "calls": 87,
+    "every_called_month_positive_at_minus_110": true,
+    "every_qualifying_month_positive_at_minus_110": true,
+    "failures": [],
+    "framework": "locked_complete_date_60_20_20",
+    "hit_rate": 0.712644,
+    "hits": 62,
+    "locked_holdout": true,
+    "market_type": "moneyline",
+    "meets_primary_holdout_metrics": true,
+    "minimum_calls": 50,
+    "minimum_hit_rate": 0.6,
+    "monthly_at_minus_110": [
+      {
+        "calls": 22,
+        "hit_rate": 0.772727,
+        "hits": 17,
+        "month": "2025-11",
+        "qualification_status": "qualifying",
+        "units_at_minus_110": 10.454545
+      },
+      {
+        "calls": 44,
+        "hit_rate": 0.659091,
+        "hits": 29,
+        "month": "2025-12",
+        "qualification_status": "qualifying",
+        "units_at_minus_110": 11.363636
+      },
+      {
+        "calls": 21,
+        "hit_rate": 0.761905,
+        "hits": 16,
+        "month": "2026-01",
+        "qualification_status": "qualifying",
+        "units_at_minus_110": 9.545455
+      }
+    ],
+    "monthly_minimum_calls": 10,
+    "price_diagnostics": null,
+    "qualification_eligible": true,
+    "qualified": true,
+    "roi": null,
+    "secondary_reporting_complete": true,
+    "selectivity": 0.713115,
+    "total_predictions": 122,
+    "units_at_minus_110": 31.363636
+  },
+  "schema_version": "1",
+  "sport": "nfl",
+  "training": {
+    "coefficient_fit": {
+      "end": "2025-09-11",
+      "observations": 366,
+      "start": "2024-08-18"
+    },
+    "locked_holdout": {
+      "end": "2026-02-08",
+      "observations": 122,
+      "start": "2025-11-20"
+    },
+    "market_inputs_used": false,
+    "threshold_selection": {
+      "end": "2025-11-17",
+      "observations": 146,
+      "start": "2025-09-14"
+    },
+    "threshold_source": "later validation cohort; never locked holdout",
+    "walk_forward_features": true
+  }
+}

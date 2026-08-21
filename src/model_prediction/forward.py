@@ -42,6 +42,13 @@ class MLBForwardCandidate:
     model_artifact_hash: str
     calibration_version: str
     feature_schema_version: str
+    market_snapshot_hash: str | None = None
+    market_snapshot_archive_path: str | None = None
+    market_snapshot_record_id: str | None = None
+    market_quote_timestamp_valid: bool | None = None
+    market_quote_source: str | None = None
+    market_quote_provenance: str | None = None
+    market_quote_reconstructed: bool | None = None
 
 
 def build_mlb_slate(
@@ -156,9 +163,7 @@ def _paired_event_candidates(
         # Swapped from the pre-2026-08-03 order (pick then calibrate)
         # where calibration could only rescale confidence in the already-
         # chosen side, never flip the pick back to the other side.
-        calibrated_on_both = {
-            side: model.calibrate_selected_side(probabilities[side]) for side in sides
-        }
+        calibrated_on_both = {side: model.calibrate_selected_side(probabilities[side]) for side in sides}
         selection = max(sides, key=lambda side: calibrated_on_both[side])
         raw_probability = probabilities[selection]
         calibrated_probability = calibrated_on_both[selection]
@@ -169,6 +174,20 @@ def _paired_event_candidates(
             )
         )
         selected_line = None if market_type is MarketType.MONEYLINE else prices[selection].line
+        quote_timestamp_valid = parse_utc(odds_snapshot.observed_at_utc) < parse_utc(
+            odds_snapshot.event_start_utc
+        )
+        source_book = odds_snapshot.raw_response.get("books", {}).get(market_type.value)
+        reconstructed = (
+            source_book.get("reconstructed")
+            if isinstance(source_book, dict) and isinstance(source_book.get("reconstructed"), bool)
+            else None
+        )
+        provenance = (
+            "decision_time_executable_quote"
+            if odds_snapshot.provider == "polymarket_us"
+            else "decision_time_sportsbook_quote"
+        )
         output.append(
             MLBForwardCandidate(
                 event_id=str(event["id"]),
@@ -200,6 +219,13 @@ def _paired_event_candidates(
                 model_artifact_hash=str(model.raw["artifact_hash"]),
                 calibration_version=str(model.raw["calibration_version"]),
                 feature_schema_version=estimate.feature_schema_version,
+                market_snapshot_hash=odds_snapshot.snapshot_hash,
+                market_snapshot_archive_path=odds_snapshot.snapshot_archive_path,
+                market_snapshot_record_id=odds_snapshot.snapshot_record_id,
+                market_quote_timestamp_valid=quote_timestamp_valid,
+                market_quote_source=odds_snapshot.provider,
+                market_quote_provenance=provenance,
+                market_quote_reconstructed=reconstructed,
             )
         )
     return output

@@ -27,16 +27,12 @@ def test_shadow_pipeline_has_no_import_path_to_production_persistence() -> None:
     """The rebuild/shadow package must never import the production store
     or the production ledger — a shadow process can't write production
     tables if it can't even name them."""
-    text = "".join(
-        p.read_text(errors="ignore")
-        for p in Path("src/model_prediction/rebuild").rglob("*.py")
-    )
+    text = "".join(p.read_text(errors="ignore") for p in Path("src/model_prediction/rebuild").rglob("*.py"))
     forbidden = ("production_store", "ProductionPredictionStore", "ProductionLedger")
     hits = [
         line
         for line in text.splitlines()
-        if any(name in line for name in forbidden)
-        and ("import" in line or "from " in line)
+        if any(name in line for name in forbidden) and ("import" in line or "from " in line)
     ]
     assert not hits, f"rebuild imports production persistence:\n{chr(10).join(hits)}"
 
@@ -50,25 +46,23 @@ def test_store_migrations_run_from_zero() -> None:
     tmp = Path(tempfile.mkdtemp())
     paths = RuntimePaths.for_test(tmp)
     with ProductionPredictionStore(paths) as store:
-        tables = {
-            r[0]
-            for r in store._conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            )
-        }
+        tables = {r[0] for r in store._conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         assert {"runs", "predictions", "decisions", "market_snapshots"} <= tables
         run_id = store.start_run()
-        assert store.append_prediction(
-            run_id=run_id,
-            prediction_id="p1",
-            event_id="e1",
-            sport="WNBA",
-            market="moneyline",
-            market_type="moneyline",
-            model_id="wnba-elo-trend-lr-v4",
-            probabilities={"home": 0.6, "away": 0.4},
-            decision_time_utc="2026-08-14T12:00:00+00:00",
-        ) is not None
+        assert (
+            store.append_prediction(
+                run_id=run_id,
+                prediction_id="p1",
+                event_id="e1",
+                sport="WNBA",
+                market="moneyline",
+                market_type="moneyline",
+                model_id="wnba-elo-trend-lr-v4",
+                probabilities={"home": 0.6, "away": 0.4},
+                decision_time_utc="2026-08-14T12:00:00+00:00",
+            )
+            is not None
+        )
     shutil.rmtree(tmp, ignore_errors=True)
 
 
@@ -104,5 +98,5 @@ def test_ci_imports_of_checked_in_config_resolve() -> None:
     from model_prediction.production_registry import ProductionModelRegistry
 
     registry = ProductionModelRegistry.load(Path(__file__).resolve().parents[1])
-    assert len(registry.entries) == 13
+    assert len(registry.entries) == 14  # 13 + measured-edge-totals-v3 (MLB total promotion, 2026-08-18)
     assert len(registry.problem_entries()) == 0

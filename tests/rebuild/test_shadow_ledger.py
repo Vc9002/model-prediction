@@ -40,6 +40,7 @@ from model_prediction.rebuild.shadow_ledger import ShadowLedger, _as_dict
 @dataclass(frozen=True)
 class _SportsForecast:
     """Mirrors model_prediction.rebuild.decision.SportsForecast."""
+
     event_id: str
     predicted_winner: Literal["home", "away"]
     raw_probabilities: dict[str, float]
@@ -65,6 +66,7 @@ class _SportsForecast:
 @dataclass(frozen=True)
 class _MarketEvaluation:
     """Mirrors model_prediction.rebuild.decision.MarketEvaluation."""
+
     market_id: str
     market_type: Literal["moneyline", "spread", "total"]
     team_or_side: str
@@ -78,6 +80,7 @@ class _MarketEvaluation:
 @dataclass(frozen=True)
 class _BetDecision:
     """Mirrors model_prediction.rebuild.decision.BetDecision."""
+
     event_id: str
     action: Literal["BET", "NO_BET"]
     predicted_winner: str
@@ -150,14 +153,24 @@ class TestSchemaCreation:
 
     def test_all_sixteen_required_tables_exist(self, ledger: ShadowLedger):
         required = {
-            "runs", "raw_snapshots", "normalized_observations", "feature_snapshots",
-            "dataset_manifests", "model_artifacts", "calibration_artifacts",
-            "predictions", "market_snapshots", "market_evaluations", "trade_decisions",
-            "paper_orders", "settlements", "closing_prices", "reviews", "audit_events",
+            "runs",
+            "raw_snapshots",
+            "normalized_observations",
+            "feature_snapshots",
+            "dataset_manifests",
+            "model_artifacts",
+            "calibration_artifacts",
+            "predictions",
+            "market_snapshots",
+            "market_evaluations",
+            "trade_decisions",
+            "paper_orders",
+            "settlements",
+            "closing_prices",
+            "reviews",
+            "audit_events",
         }
-        rows = ledger.conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        ).fetchall()
+        rows = ledger.conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         present = {r["name"] for r in rows}
         missing = required - present
         assert not missing, f"required tables missing from schema: {missing}"
@@ -174,6 +187,56 @@ class TestSchemaCreation:
         assert led2.get_run(run_id) is not None, "data from the first open must survive a reopen"
         led2.close()
 
+    def test_stale_v2_idempotency_index_is_replaced_and_verified(self, tmp_path: Path):
+        db_path = tmp_path / "stale-index.db"
+        initial = ShadowLedger(db_path)
+        initial.close()
+        conn = sqlite3.connect(db_path)
+        conn.execute("DROP INDEX ux_trade_decisions_idempotency_v2")
+        conn.execute(
+            "CREATE UNIQUE INDEX ux_trade_decisions_idempotency_v2 "
+            "ON trade_decisions(sport, event_id) WHERE supersedes_id IS NULL"
+        )
+        conn.commit()
+        conn.close()
+
+        migrated = ShadowLedger(db_path)
+        installed = migrated.conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='index' AND name='ux_trade_decisions_idempotency_v2'"
+        ).fetchone()["sql"]
+        expected = ShadowLedger._trade_decision_idempotency_index_sql()
+        assert ShadowLedger._normalize_index_sql(installed) == (ShadowLedger._normalize_index_sql(expected))
+        assert "decision_economics_hash" in installed
+        migrated.close()
+
+    def test_index_migration_failure_rolls_back_legacy_index_drop(self, tmp_path: Path, monkeypatch):
+        db_path = tmp_path / "rollback-index.db"
+        initial = ShadowLedger(db_path)
+        initial.close()
+        conn = sqlite3.connect(db_path)
+        conn.execute("DROP INDEX ux_trade_decisions_idempotency_v2")
+        conn.execute(
+            "CREATE UNIQUE INDEX ux_trade_decisions_idempotency "
+            "ON trade_decisions(sport, event_id) WHERE supersedes_id IS NULL"
+        )
+        conn.commit()
+        conn.close()
+
+        def fail_create(_self, _sql):
+            raise sqlite3.OperationalError("injected index creation failure")
+
+        monkeypatch.setattr(ShadowLedger, "_create_trade_decision_idempotency_index", fail_create)
+        with pytest.raises(sqlite3.OperationalError, match="injected index creation failure"):
+            ShadowLedger(db_path)
+
+        verify = sqlite3.connect(db_path)
+        names = {
+            row[0] for row in verify.execute("SELECT name FROM sqlite_master WHERE type='index'").fetchall()
+        }
+        verify.close()
+        assert "ux_trade_decisions_idempotency" in names
+        assert "ux_trade_decisions_idempotency_v2" not in names
+
 
 class TestNoMutationMethodsExist:
     """Real invariant, not a style preference: if an UPDATE/DELETE-shaped
@@ -184,13 +247,11 @@ class TestNoMutationMethodsExist:
 
     def test_no_update_or_delete_method_on_the_class(self):
         method_names = [
-            name for name in dir(ShadowLedger)
+            name
+            for name in dir(ShadowLedger)
             if not name.startswith("_") and callable(getattr(ShadowLedger, name))
         ]
-        offending = [
-            name for name in method_names
-            if "update" in name.lower() or "delete" in name.lower()
-        ]
+        offending = [name for name in method_names if "update" in name.lower() or "delete" in name.lower()]
         assert offending == [], f"append-only ledger must expose no update/delete methods, found: {offending}"
 
 
@@ -261,8 +322,14 @@ class TestRunStages:
     def test_stage_health_round_trips_without_fabricated_rows(self, ledger: ShadowLedger):
         run_id = ledger.record_run("mlb")
         ledger.record_stage_result(
-            run_id, "predict", "ERROR", {"reason": "missing model"},
-            duration_seconds=0.25, error="missing model", mode="fresh", row_count=None,
+            run_id,
+            "predict",
+            "ERROR",
+            {"reason": "missing model"},
+            duration_seconds=0.25,
+            error="missing model",
+            mode="fresh",
+            row_count=None,
         )
         row = ledger.get_stage_result(run_id, "predict")
         assert row["duration_seconds"] == pytest.approx(0.25)
@@ -308,8 +375,12 @@ class TestPredictionRecordingAcceptsRealDataclass:
         run_id = ledger.record_run("mlb")
         forecast = _forecast()
         pred_id, created = ledger.record_prediction(
-            run_id=run_id, sport="mlb", event_id=forecast.event_id, horizon="late",
-            decision_time_utc="2026-08-06T23:00:00+00:00", forecast=forecast,
+            run_id=run_id,
+            sport="mlb",
+            event_id=forecast.event_id,
+            horizon="late",
+            decision_time_utc="2026-08-06T23:00:00+00:00",
+            forecast=forecast,
         )
         assert created is True
         row = ledger.get_prediction(pred_id)
@@ -332,8 +403,12 @@ class TestPredictionRecordingAcceptsRealDataclass:
             "calibration_artifact_hash": "calib-dict-1",
         }
         pred_id, created = ledger.record_prediction(
-            run_id=run_id, sport="mlb", event_id="mlb_2026-08-06_LAD_SF", horizon="late",
-            decision_time_utc="2026-08-06T23:00:00+00:00", forecast=forecast_dict,
+            run_id=run_id,
+            sport="mlb",
+            event_id="mlb_2026-08-06_LAD_SF",
+            horizon="late",
+            decision_time_utc="2026-08-06T23:00:00+00:00",
+            forecast=forecast_dict,
         )
         assert created is True
         row = ledger.get_prediction(pred_id)
@@ -354,13 +429,20 @@ class TestPredictionUncertaintyColumns:
     def test_real_uncertainty_fields_round_trip(self, ledger: ShadowLedger):
         run_id = ledger.record_run("mlb")
         forecast = _forecast(
-            model_disagreement=0.09, calibration_uncertainty=0.02, missingness_penalty=0.04,
+            model_disagreement=0.09,
+            calibration_uncertainty=0.02,
+            missingness_penalty=0.04,
             missing_flags=["weather_availability", "home_sp_availability"],
-            lineup_uncertainty=None, conservative_probabilities={"home": 0.50, "away": 0.44},
+            lineup_uncertainty=None,
+            conservative_probabilities={"home": 0.50, "away": 0.44},
         )
         pred_id, created = ledger.record_prediction(
-            run_id=run_id, sport="mlb", event_id=forecast.event_id, horizon="late",
-            decision_time_utc="2026-08-06T23:00:00+00:00", forecast=forecast,
+            run_id=run_id,
+            sport="mlb",
+            event_id=forecast.event_id,
+            horizon="late",
+            decision_time_utc="2026-08-06T23:00:00+00:00",
+            forecast=forecast,
         )
         assert created is True
         row = ledger.get_prediction(pred_id)
@@ -372,23 +454,48 @@ class TestPredictionUncertaintyColumns:
         assert row["lineup_uncertainty"] is None
         assert json.loads(row["conservative_probabilities_json"]) == {"home": 0.50, "away": 0.44}
 
+    def test_totals_and_spread_lower_probabilities_round_trip(self, ledger: ShadowLedger):
+        run_id = ledger.record_run("mlb")
+        forecast = _forecast(
+            totals_probabilities_lower={8.5: {"over": 0.51, "under": 0.41}},
+            spread_probabilities_lower={-1.5: {"home": 0.49}},
+        )
+        pred_id, _created = ledger.record_prediction(
+            run_id=run_id,
+            sport="mlb",
+            event_id=forecast.event_id,
+            horizon="late",
+            decision_time_utc="2026-08-06T23:00:00+00:00",
+            forecast=forecast,
+        )
+        row = ledger.get_prediction(pred_id)
+        assert json.loads(row["totals_probabilities_lower_json"]) == {"8.5": {"over": 0.51, "under": 0.41}}
+        assert json.loads(row["spread_probabilities_lower_json"]) == {"-1.5": {"home": 0.49}}
+
     def test_defaults_to_real_zero_not_fabricated_when_forecast_omits_them(self, ledger: ShadowLedger):
         # A forecast dict (not the full dataclass) that doesn't populate
         # the new fields at all must not crash or silently fabricate a
         # nonzero value -- NULL/empty, matching "not computed."
         run_id = ledger.record_run("mlb")
         forecast_dict = {
-            "event_id": "mlb_2026-08-07_X_Y", "predicted_winner": "home",
+            "event_id": "mlb_2026-08-07_X_Y",
+            "predicted_winner": "home",
             "raw_probabilities": {"home": 0.5, "away": 0.5},
             "calibrated_probabilities": {"home": 0.5, "away": 0.5},
             "probability_lower": {"home": 0.45, "away": 0.45},
             "probability_upper": {"home": 0.55, "away": 0.55},
-            "expected_home_score": 4.0, "expected_away_score": 4.0,
-            "model_artifact_hash": "model-x", "calibration_artifact_hash": "calib-x",
+            "expected_home_score": 4.0,
+            "expected_away_score": 4.0,
+            "model_artifact_hash": "model-x",
+            "calibration_artifact_hash": "calib-x",
         }
         pred_id, _ = ledger.record_prediction(
-            run_id=run_id, sport="mlb", event_id="mlb_2026-08-07_X_Y", horizon="late",
-            decision_time_utc="2026-08-07T23:00:00+00:00", forecast=forecast_dict,
+            run_id=run_id,
+            sport="mlb",
+            event_id="mlb_2026-08-07_X_Y",
+            horizon="late",
+            decision_time_utc="2026-08-07T23:00:00+00:00",
+            forecast=forecast_dict,
         )
         row = ledger.get_prediction(pred_id)
         assert row is not None
@@ -415,7 +522,9 @@ class TestPredictionUncertaintyColumns:
                 totals_probabilities_json TEXT, spread_probabilities_json TEXT
             )
         """)
-        conn.execute("CREATE TABLE IF NOT EXISTS runs (run_id TEXT PRIMARY KEY, created_at TEXT, sport TEXT, run_type TEXT, horizon TEXT, status TEXT, params_json TEXT, schema_version TEXT)")
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS runs (run_id TEXT PRIMARY KEY, created_at TEXT, sport TEXT, run_type TEXT, horizon TEXT, status TEXT, params_json TEXT, schema_version TEXT)"
+        )
         conn.commit()
         conn.close()
 
@@ -423,13 +532,19 @@ class TestPredictionUncertaintyColumns:
         cols = {row["name"] for row in migrated.conn.execute("PRAGMA table_info(predictions)").fetchall()}
         assert "model_disagreement" in cols
         assert "conservative_probabilities_json" in cols
+        assert "totals_probabilities_lower_json" in cols
+        assert "spread_probabilities_lower_json" in cols
 
         # And it's actually usable, not just present.
         run_id = migrated.record_run("mlb")
         forecast = _forecast(model_disagreement=0.05)
         pred_id, created = migrated.record_prediction(
-            run_id=run_id, sport="mlb", event_id=forecast.event_id, horizon="late",
-            decision_time_utc="2026-08-06T23:00:00+00:00", forecast=forecast,
+            run_id=run_id,
+            sport="mlb",
+            event_id=forecast.event_id,
+            horizon="late",
+            decision_time_utc="2026-08-06T23:00:00+00:00",
+            forecast=forecast,
         )
         assert created is True
         row = migrated.get_prediction(pred_id)
@@ -454,8 +569,12 @@ class TestPredictionAppendOnlyCorrections:
         original = _forecast(calibrated_probabilities={"home": 0.60, "away": 0.40})
 
         original_id, created = ledger.record_prediction(
-            run_id=run_id, sport="mlb", event_id=original.event_id, horizon="late",
-            decision_time_utc="2026-08-06T23:00:00+00:00", forecast=original,
+            run_id=run_id,
+            sport="mlb",
+            event_id=original.event_id,
+            horizon="late",
+            decision_time_utc="2026-08-06T23:00:00+00:00",
+            forecast=original,
         )
         assert created is True
 
@@ -463,8 +582,12 @@ class TestPredictionAppendOnlyCorrections:
         # (e.g. a bug found in the calibrator after the fact).
         corrected = _forecast(calibrated_probabilities={"home": 0.63, "away": 0.37})
         corrected_id, created = ledger.record_prediction(
-            run_id=run_id, sport="mlb", event_id=corrected.event_id, horizon="late",
-            decision_time_utc="2026-08-06T23:00:00+00:00", forecast=corrected,
+            run_id=run_id,
+            sport="mlb",
+            event_id=corrected.event_id,
+            horizon="late",
+            decision_time_utc="2026-08-06T23:00:00+00:00",
+            forecast=corrected,
             supersedes_id=original_id,
         )
         assert created is True
@@ -490,9 +613,12 @@ class TestTradeDecisionIdempotency:
     not create duplicate decision rows."""
 
     IDEMPOTENCY_KWARGS: ClassVar[dict] = {
-        "sport": "mlb", "event_id": "mlb_2026-08-06_NYY_BOS", "horizon": "late",
+        "sport": "mlb",
+        "event_id": "mlb_2026-08-06_NYY_BOS",
+        "horizon": "late",
         "decision_time_utc": "2026-08-06T23:00:00+00:00",
-        "model_artifact_hash": "model-abc123", "market_snapshot_hash": "mkt-snap-hash-1",
+        "model_artifact_hash": "model-abc123",
+        "market_snapshot_hash": "mkt-snap-hash-1",
         "decision_policy_version": "policy-v1",
     }
 
@@ -501,14 +627,20 @@ class TestTradeDecisionIdempotency:
         decision = _decision()
 
         id1, created1 = ledger.record_trade_decision(
-            run_id=run_id, decision=decision, **self.IDEMPOTENCY_KWARGS,
+            run_id=run_id,
+            decision=decision,
+            **self.IDEMPOTENCY_KWARGS,
         )
         id2, created2 = ledger.record_trade_decision(
-            run_id=run_id, decision=decision, **self.IDEMPOTENCY_KWARGS,
+            run_id=run_id,
+            decision=decision,
+            **self.IDEMPOTENCY_KWARGS,
         )
 
         assert created1 is True
-        assert created2 is False, "the second identical-key insert must be recognized as a rerun, not a new row"
+        assert created2 is False, (
+            "the second identical-key insert must be recognized as a rerun, not a new row"
+        )
         assert id1 == id2
 
         count = ledger.conn.execute(
@@ -516,6 +648,108 @@ class TestTradeDecisionIdempotency:
             ("mlb", "mlb_2026-08-06_NYY_BOS"),
         ).fetchone()["n"]
         assert count == 1, f"rerunning the identical job must not duplicate the row, found {count}"
+
+    def test_market_blend_audit_fields_round_trip_beside_raw_probabilities(self, ledger: ShadowLedger):
+        run_id = ledger.record_run("mlb")
+        decision = {
+            **_decision().__dict__,
+            "model_probability": 0.60,
+            "market_probability": 0.40,
+            "serving_probability": 0.45,
+            "model_conservative_probability": 0.55,
+            "serving_conservative_probability": 0.4375,
+            "blend_weight": 0.25,
+            "blend_policy_artifact_hash": "a" * 64,
+            "blend_experiment_spec_hash": "c" * 64,
+            "blend_config_hash": "b" * 64,
+            "serving_policy_block_reason": None,
+            "fee_rate": 0.01,
+            "safety_margin": 0.02,
+            "size_limits_version": "size_limits_v1",
+            "size_limits_json": '{"max_bet_units":1.0}',
+            "decision_economics_hash": "e" * 64,
+        }
+
+        row_id, created = ledger.record_trade_decision(
+            run_id=run_id,
+            decision=decision,
+            **self.IDEMPOTENCY_KWARGS,
+        )
+        row = ledger.get_trade_decision(row_id)
+
+        assert created is True
+        assert row["model_probability"] == 0.60
+        assert row["market_probability"] == 0.40
+        assert row["serving_probability"] == 0.45
+        assert row["model_conservative_probability"] == 0.55
+        assert row["serving_conservative_probability"] == 0.4375
+        assert row["blend_weight"] == 0.25
+        assert row["blend_policy_artifact_hash"] == "a" * 64
+        assert row["blend_experiment_spec_hash"] == "c" * 64
+        assert row["blend_config_hash"] == "b" * 64
+        assert row["fee_rate"] == 0.01
+        assert row["safety_margin"] == 0.02
+        assert row["size_limits_version"] == "size_limits_v1"
+        assert row["size_limits_json"] == '{"max_bet_units":1.0}'
+        assert row["decision_economics_hash"] == "e" * 64
+
+    def test_changed_blend_identity_is_distinct_but_exact_rerun_dedupes(self, ledger: ShadowLedger):
+        run_id = ledger.record_run("mlb")
+        base = {
+            **_decision().__dict__,
+            "model_probability": 0.60,
+            "market_probability": 0.40,
+            "serving_probability": 0.45,
+            "model_conservative_probability": 0.55,
+            "serving_conservative_probability": 0.4375,
+            "blend_weight": 0.25,
+            "blend_policy_artifact_hash": "a" * 64,
+            "blend_experiment_spec_hash": "c" * 64,
+            "blend_config_hash": "b" * 64,
+        }
+        first_id, first_created = ledger.record_trade_decision(
+            run_id=run_id, decision=base, **self.IDEMPOTENCY_KWARGS
+        )
+        rerun_id, rerun_created = ledger.record_trade_decision(
+            run_id=run_id, decision=base, **self.IDEMPOTENCY_KWARGS
+        )
+        changed = {**base, "blend_policy_artifact_hash": "d" * 64}
+        changed_id, changed_created = ledger.record_trade_decision(
+            run_id=run_id, decision=changed, **self.IDEMPOTENCY_KWARGS
+        )
+
+        assert first_created is True
+        assert rerun_created is False and rerun_id == first_id
+        assert changed_created is True and changed_id != first_id
+
+    def test_changed_economics_is_distinct_but_exact_rerun_dedupes(self, ledger: ShadowLedger):
+        run_id = ledger.record_run("mlb")
+        base = {
+            **_decision().__dict__,
+            "fee_rate": 0.01,
+            "safety_margin": 0.02,
+            "size_limits_version": "size_limits_v1",
+            "size_limits_json": '{"max_bet_units":1.0}',
+            "decision_economics_hash": "e" * 64,
+        }
+        first_id, first_created = ledger.record_trade_decision(
+            run_id=run_id, decision=base, **self.IDEMPOTENCY_KWARGS
+        )
+        rerun_id, rerun_created = ledger.record_trade_decision(
+            run_id=run_id, decision=base, **self.IDEMPOTENCY_KWARGS
+        )
+        changed = {
+            **base,
+            "fee_rate": 0.02,
+            "decision_economics_hash": "f" * 64,
+        }
+        changed_id, changed_created = ledger.record_trade_decision(
+            run_id=run_id, decision=changed, **self.IDEMPOTENCY_KWARGS
+        )
+
+        assert first_created is True
+        assert rerun_created is False and rerun_id == first_id
+        assert changed_created is True and changed_id != first_id
 
     def test_the_real_db_unique_index_is_what_actually_enforces_this(self, ledger: ShadowLedger):
         # Belt-and-suspenders check: even bypassing record_trade_decision's
@@ -537,8 +771,11 @@ class TestTradeDecisionIdempotency:
                 ) VALUES ('2026-01-01T00:00:00+00:00', ?, ?, ?, ?, '1', NULL,
                           ?, ?, ?, ?, 'BET', 'home', 'moneyline', 1.0, 'qualified', 0.03, NULL, NULL)""",
                 (
-                    run_id, self.IDEMPOTENCY_KWARGS["sport"], self.IDEMPOTENCY_KWARGS["event_id"],
-                    self.IDEMPOTENCY_KWARGS["horizon"], self.IDEMPOTENCY_KWARGS["decision_time_utc"],
+                    run_id,
+                    self.IDEMPOTENCY_KWARGS["sport"],
+                    self.IDEMPOTENCY_KWARGS["event_id"],
+                    self.IDEMPOTENCY_KWARGS["horizon"],
+                    self.IDEMPOTENCY_KWARGS["decision_time_utc"],
                     self.IDEMPOTENCY_KWARGS["model_artifact_hash"],
                     self.IDEMPOTENCY_KWARGS["market_snapshot_hash"],
                     self.IDEMPOTENCY_KWARGS["decision_policy_version"],
@@ -576,19 +813,27 @@ class TestTradeDecisionIdempotency:
         run_id = ledger.record_run("mlb")
         moneyline_home = _decision(
             market_type="moneyline",
-            evaluated_market=_evaluation(market_id="ml-1", market_type="moneyline", team_or_side="home", line=None),
+            evaluated_market=_evaluation(
+                market_id="ml-1", market_type="moneyline", team_or_side="home", line=None
+            ),
         )
         spread_home = _decision(
             market_type="spread",
-            evaluated_market=_evaluation(market_id="sp-1", market_type="spread", team_or_side="home", line=-1.5),
+            evaluated_market=_evaluation(
+                market_id="sp-1", market_type="spread", team_or_side="home", line=-1.5
+            ),
         )
         spread_away = _decision(
             market_type="spread",
-            evaluated_market=_evaluation(market_id="sp-1", market_type="spread", team_or_side="away", line=1.5),
+            evaluated_market=_evaluation(
+                market_id="sp-1", market_type="spread", team_or_side="away", line=1.5
+            ),
         )
         total_over = _decision(
             market_type="total",
-            evaluated_market=_evaluation(market_id="tot-1", market_type="total", team_or_side="over", line=8.5),
+            evaluated_market=_evaluation(
+                market_id="tot-1", market_type="total", team_or_side="over", line=8.5
+            ),
         )
 
         ids = [
@@ -596,7 +841,9 @@ class TestTradeDecisionIdempotency:
             for d in (moneyline_home, spread_home, spread_away, total_over)
         ]
 
-        assert all(created for _id, created in ids), "every distinct real market decision must be a real new row"
+        assert all(created for _id, created in ids), (
+            "every distinct real market decision must be a real new row"
+        )
         assert len({_id for _id, _ in ids}) == 4, "four distinct markets must yield four distinct rows"
 
         count = ledger.conn.execute(
@@ -612,11 +859,15 @@ class TestTradeDecisionIdempotency:
         run_id = ledger.record_run("mlb")
         moneyline_home = _decision(
             market_type="moneyline",
-            evaluated_market=_evaluation(market_id="ml-1", market_type="moneyline", team_or_side="home", line=None),
+            evaluated_market=_evaluation(
+                market_id="ml-1", market_type="moneyline", team_or_side="home", line=None
+            ),
         )
         spread_home = _decision(
             market_type="spread",
-            evaluated_market=_evaluation(market_id="sp-1", market_type="spread", team_or_side="home", line=-1.5),
+            evaluated_market=_evaluation(
+                market_id="sp-1", market_type="spread", team_or_side="home", line=-1.5
+            ),
         )
 
         for d in (moneyline_home, spread_home, moneyline_home, spread_home):
@@ -636,7 +887,9 @@ class TestTradeDecisionIdempotency:
         run_id = ledger.record_run("mlb")
         id1, _ = ledger.record_trade_decision(run_id=run_id, decision=_decision(), **self.IDEMPOTENCY_KWARGS)
         id2, created2 = ledger.record_trade_decision(
-            run_id=run_id, decision=_decision(units=2.0), supersedes_id=id1,
+            run_id=run_id,
+            decision=_decision(units=2.0),
+            supersedes_id=id1,
             **self.IDEMPOTENCY_KWARGS,
         )
         assert created2 is True
@@ -652,9 +905,16 @@ class TestMarketSnapshotRecording:
     def test_append_and_idempotent_duplicate(self, ledger: ShadowLedger):
         run_id = ledger.record_run("mlb")
         kwargs = {
-            "run_id": run_id, "sport": "mlb", "event_id": "mlb_2026-08-06_NYY_BOS",
-            "market_id": "poly-market-1", "side_id": "home", "line": None, "period": "FULL_GAME",
-            "observed_at_utc": "2026-08-06T22:00:00+00:00", "best_bid": 0.51, "best_ask": 0.53,
+            "run_id": run_id,
+            "sport": "mlb",
+            "event_id": "mlb_2026-08-06_NYY_BOS",
+            "market_id": "poly-market-1",
+            "side_id": "home",
+            "line": None,
+            "period": "FULL_GAME",
+            "observed_at_utc": "2026-08-06T22:00:00+00:00",
+            "best_bid": 0.51,
+            "best_ask": 0.53,
         }
         id1, created1 = ledger.record_market_snapshot(**kwargs)
         id2, created2 = ledger.record_market_snapshot(**kwargs)
@@ -665,8 +925,13 @@ class TestMarketSnapshotRecording:
     def test_different_content_same_key_fails_closed(self, ledger: ShadowLedger):
         run_id = ledger.record_run("mlb")
         common = {
-            "run_id": run_id, "sport": "mlb", "event_id": "mlb_2026-08-06_NYY_BOS",
-            "market_id": "poly-market-1", "side_id": "home", "line": None, "period": "FULL_GAME",
+            "run_id": run_id,
+            "sport": "mlb",
+            "event_id": "mlb_2026-08-06_NYY_BOS",
+            "market_id": "poly-market-1",
+            "side_id": "home",
+            "line": None,
+            "period": "FULL_GAME",
             "observed_at_utc": "2026-08-06T22:00:00+00:00",
         }
         ledger.record_market_snapshot(best_bid=0.51, best_ask=0.53, **common)
@@ -680,13 +945,20 @@ class TestMarketSnapshotRecording:
     def test_a_real_price_change_at_a_new_timestamp_appends(self, ledger: ShadowLedger):
         run_id = ledger.record_run("mlb")
         base = {
-            "run_id": run_id, "sport": "mlb", "event_id": "mlb_2026-08-06_NYY_BOS",
-            "market_id": "poly-market-1", "side_id": "home", "line": None, "period": "FULL_GAME",
+            "run_id": run_id,
+            "sport": "mlb",
+            "event_id": "mlb_2026-08-06_NYY_BOS",
+            "market_id": "poly-market-1",
+            "side_id": "home",
+            "line": None,
+            "period": "FULL_GAME",
         }
-        ledger.record_market_snapshot(observed_at_utc="2026-08-06T20:00:00+00:00",
-                                       best_bid=0.50, best_ask=0.52, **base)
-        ledger.record_market_snapshot(observed_at_utc="2026-08-06T21:00:00+00:00",
-                                       best_bid=0.55, best_ask=0.57, **base)
+        ledger.record_market_snapshot(
+            observed_at_utc="2026-08-06T20:00:00+00:00", best_bid=0.50, best_ask=0.52, **base
+        )
+        ledger.record_market_snapshot(
+            observed_at_utc="2026-08-06T21:00:00+00:00", best_bid=0.55, best_ask=0.57, **base
+        )
         rows = ledger.market_snapshots_for_event("mlb", "mlb_2026-08-06_NYY_BOS")
         assert len(rows) == 2
 
@@ -695,7 +967,9 @@ class TestMarketEvaluationRecording:
     def test_accepts_dataclass_instance_directly(self, ledger: ShadowLedger):
         run_id = ledger.record_run("mlb")
         eval_id = ledger.record_market_evaluation(
-            run_id=run_id, sport="mlb", event_id="mlb_2026-08-06_NYY_BOS",
+            run_id=run_id,
+            sport="mlb",
+            event_id="mlb_2026-08-06_NYY_BOS",
             evaluation=_evaluation(),
         )
         row = ledger.get_market_evaluation(eval_id)
@@ -707,14 +981,22 @@ class TestTradeDecisionReferencesMarketEvaluation:
     def test_trade_decision_can_reference_a_recorded_evaluation(self, ledger: ShadowLedger):
         run_id = ledger.record_run("mlb")
         eval_id = ledger.record_market_evaluation(
-            run_id=run_id, sport="mlb", event_id="mlb_2026-08-06_NYY_BOS",
+            run_id=run_id,
+            sport="mlb",
+            event_id="mlb_2026-08-06_NYY_BOS",
             evaluation=_evaluation(),
         )
         decision_id, _ = ledger.record_trade_decision(
-            run_id=run_id, sport="mlb", event_id="mlb_2026-08-06_NYY_BOS", horizon="late",
-            decision_time_utc="2026-08-06T23:00:00+00:00", model_artifact_hash="model-abc123",
-            market_snapshot_hash="mkt-snap-hash-1", decision_policy_version="policy-v1",
-            decision=_decision(), selected_market_evaluation_id=eval_id,
+            run_id=run_id,
+            sport="mlb",
+            event_id="mlb_2026-08-06_NYY_BOS",
+            horizon="late",
+            decision_time_utc="2026-08-06T23:00:00+00:00",
+            model_artifact_hash="model-abc123",
+            market_snapshot_hash="mkt-snap-hash-1",
+            decision_policy_version="policy-v1",
+            decision=_decision(),
+            selected_market_evaluation_id=eval_id,
             evaluated_market_evaluation_id=eval_id,
         )
         row = ledger.get_trade_decision(decision_id)
@@ -725,24 +1007,41 @@ class TestPaperOrderAndSettlement:
     def test_paper_order_and_settlement_round_trip(self, ledger: ShadowLedger):
         run_id = ledger.record_run("mlb")
         decision_id, _ = ledger.record_trade_decision(
-            run_id=run_id, sport="mlb", event_id="mlb_2026-08-06_NYY_BOS", horizon="late",
-            decision_time_utc="2026-08-06T23:00:00+00:00", model_artifact_hash="model-abc123",
-            market_snapshot_hash="mkt-snap-hash-1", decision_policy_version="policy-v1",
+            run_id=run_id,
+            sport="mlb",
+            event_id="mlb_2026-08-06_NYY_BOS",
+            horizon="late",
+            decision_time_utc="2026-08-06T23:00:00+00:00",
+            model_artifact_hash="model-abc123",
+            market_snapshot_hash="mkt-snap-hash-1",
+            decision_policy_version="policy-v1",
             decision=_decision(),
         )
         order_id = ledger.record_paper_order(
-            run_id=run_id, sport="mlb", event_id="mlb_2026-08-06_NYY_BOS",
-            trade_decision_id=decision_id, market_id="poly-market-1", side="home",
-            requested_units=1.5, avg_fill_price=0.53, filled_units=1.5, status="FILLED",
+            run_id=run_id,
+            sport="mlb",
+            event_id="mlb_2026-08-06_NYY_BOS",
+            trade_decision_id=decision_id,
+            market_id="poly-market-1",
+            side="home",
+            requested_units=1.5,
+            avg_fill_price=0.53,
+            filled_units=1.5,
+            status="FILLED",
         )
         order_row = ledger.get_paper_order(order_id)
         assert order_row["trade_decision_id"] == decision_id
         assert order_row["status"] == "FILLED"
 
         settlement_id = ledger.record_settlement(
-            run_id=run_id, sport="mlb", event_id="mlb_2026-08-06_NYY_BOS",
-            paper_order_id=order_id, trade_decision_id=decision_id,
-            outcome="WIN", settled_price=1.0, pnl=0.705,
+            run_id=run_id,
+            sport="mlb",
+            event_id="mlb_2026-08-06_NYY_BOS",
+            paper_order_id=order_id,
+            trade_decision_id=decision_id,
+            outcome="WIN",
+            settled_price=1.0,
+            pnl=0.705,
         )
         settlement_row = ledger.get_settlement(settlement_id)
         assert settlement_row["outcome"] == "WIN"
@@ -766,6 +1065,7 @@ class TestNoProductionLedgerTouched:
 
     def test_module_has_no_legacy_ledger_import(self):
         import model_prediction.rebuild.shadow_ledger as mod
+
         source = Path(mod.__file__).read_text()
         assert "model_prediction.ledger" not in source
         assert "model_prediction.main_ledgers" not in source
@@ -788,37 +1088,64 @@ class TestRealDecisionModuleIntegration:
         from model_prediction.rebuild.decision import BetDecision, MarketEvaluation, SportsForecast
 
         forecast = SportsForecast(
-            event_id="e1", predicted_winner="home",
+            event_id="e1",
+            predicted_winner="home",
             raw_probabilities={"home": 0.6, "away": 0.4},
             calibrated_probabilities={"home": 0.6, "away": 0.4},
             probability_lower={"home": 0.55, "away": 0.35},
             probability_upper={"home": 0.65, "away": 0.45},
-            expected_home_score=4.5, expected_away_score=4.0,
-            model_artifact_hash="abc", calibration_artifact_hash="def",
+            expected_home_score=4.5,
+            expected_away_score=4.0,
+            model_artifact_hash="abc",
+            calibration_artifact_hash="def",
         )
         market = MarketEvaluation(
-            market_id="m1", market_type="moneyline", team_or_side="home", line=None,
-            executable_ask=0.55, depth_adjusted_price=0.55,
-            quote_age_seconds=10.0, available_depth=999.0,
+            market_id="m1",
+            market_type="moneyline",
+            team_or_side="home",
+            line=None,
+            executable_ask=0.55,
+            depth_adjusted_price=0.55,
+            quote_age_seconds=10.0,
+            available_depth=999.0,
         )
         decision = BetDecision(
-            event_id="e1", action="BET", predicted_winner="home", market_type="moneyline",
-            selected_market=market, units=0.5, reason_code="qualified",
-            cost_adjusted_edge=0.05, evaluated_market=market,
+            event_id="e1",
+            action="BET",
+            predicted_winner="home",
+            market_type="moneyline",
+            selected_market=market,
+            units=0.5,
+            reason_code="qualified",
+            cost_adjusted_edge=0.05,
+            evaluated_market=market,
         )
 
         run_id = ledger.record_run("mlb")
         pred_id, pred_created = ledger.record_prediction(
-            run_id=run_id, sport="mlb", event_id="e1", horizon="late",
-            decision_time_utc="2026-08-06T20:00:00Z", forecast=forecast,
+            run_id=run_id,
+            sport="mlb",
+            event_id="e1",
+            horizon="late",
+            decision_time_utc="2026-08-06T20:00:00Z",
+            forecast=forecast,
         )
         eval_id = ledger.record_market_evaluation(
-            run_id=run_id, sport="mlb", event_id="e1", evaluation=market,
+            run_id=run_id,
+            sport="mlb",
+            event_id="e1",
+            evaluation=market,
         )
         dec_id, dec_created = ledger.record_trade_decision(
-            run_id=run_id, sport="mlb", event_id="e1", horizon="late",
-            decision_time_utc="2026-08-06T20:00:00Z", model_artifact_hash="abc",
-            market_snapshot_hash="xyz", decision_policy_version="v1", decision=decision,
+            run_id=run_id,
+            sport="mlb",
+            event_id="e1",
+            horizon="late",
+            decision_time_utc="2026-08-06T20:00:00Z",
+            model_artifact_hash="abc",
+            market_snapshot_hash="xyz",
+            decision_policy_version="v1",
+            decision=decision,
             evaluated_market_evaluation_id=eval_id,
         )
 
@@ -834,12 +1161,20 @@ class TestRawSnapshots:
     def test_record_and_dedupe_on_snapshot_hash(self, ledger: ShadowLedger):
         run_id = ledger.record_run("mlb")
         id1, created1 = ledger.record_raw_snapshot(
-            run_id=run_id, sport="mlb", source="espn_public", source_record_id="401",
-            observed_at_utc="2026-08-06T10:00:00Z", snapshot_hash="abc123",
+            run_id=run_id,
+            sport="mlb",
+            source="espn_public",
+            source_record_id="401",
+            observed_at_utc="2026-08-06T10:00:00Z",
+            snapshot_hash="abc123",
         )
         id2, created2 = ledger.record_raw_snapshot(
-            run_id=run_id, sport="mlb", source="espn_public", source_record_id="401",
-            observed_at_utc="2026-08-06T11:00:00Z", snapshot_hash="abc123",
+            run_id=run_id,
+            sport="mlb",
+            source="espn_public",
+            source_record_id="401",
+            observed_at_utc="2026-08-06T11:00:00Z",
+            snapshot_hash="abc123",
         )
         assert created1 and not created2
         assert id1 == id2
@@ -847,12 +1182,22 @@ class TestRawSnapshots:
     def test_different_hash_creates_a_new_row(self, ledger: ShadowLedger):
         run_id = ledger.record_run("mlb")
         id1, _ = ledger.record_raw_snapshot(
-            run_id=run_id, sport="mlb", source="espn_public", source_record_id="401",
-            observed_at_utc="2026-08-06T10:00:00Z", snapshot_hash="hash1", event_id="401",
+            run_id=run_id,
+            sport="mlb",
+            source="espn_public",
+            source_record_id="401",
+            observed_at_utc="2026-08-06T10:00:00Z",
+            snapshot_hash="hash1",
+            event_id="401",
         )
         id2, created2 = ledger.record_raw_snapshot(
-            run_id=run_id, sport="mlb", source="espn_public", source_record_id="401",
-            observed_at_utc="2026-08-06T22:00:00Z", snapshot_hash="hash2", event_id="401",
+            run_id=run_id,
+            sport="mlb",
+            source="espn_public",
+            source_record_id="401",
+            observed_at_utc="2026-08-06T22:00:00Z",
+            snapshot_hash="hash2",
+            event_id="401",
         )
         assert created2
         assert id1 != id2
@@ -863,13 +1208,19 @@ class TestNormalizedObservations:
     def test_record_and_dedupe_on_identical_content(self, ledger: ShadowLedger):
         run_id = ledger.record_run("mlb")
         id1, created1 = ledger.record_normalized_observation(
-            run_id=run_id, sport="mlb", table_name="scoreboard",
-            primary_key={"event_id": "401"}, observed_at_utc="2026-08-06T10:00:00Z",
+            run_id=run_id,
+            sport="mlb",
+            table_name="scoreboard",
+            primary_key={"event_id": "401"},
+            observed_at_utc="2026-08-06T10:00:00Z",
             payload={"status": "STATUS_SCHEDULED"},
         )
         id2, created2 = ledger.record_normalized_observation(
-            run_id=run_id, sport="mlb", table_name="scoreboard",
-            primary_key={"event_id": "401"}, observed_at_utc="2026-08-06T10:00:00Z",
+            run_id=run_id,
+            sport="mlb",
+            table_name="scoreboard",
+            primary_key={"event_id": "401"},
+            observed_at_utc="2026-08-06T10:00:00Z",
             payload={"status": "STATUS_SCHEDULED"},
         )
         assert created1 and not created2
@@ -878,13 +1229,19 @@ class TestNormalizedObservations:
     def test_a_real_state_change_at_the_same_key_creates_a_new_row(self, ledger: ShadowLedger):
         run_id = ledger.record_run("mlb")
         id1, _ = ledger.record_normalized_observation(
-            run_id=run_id, sport="mlb", table_name="scoreboard",
-            primary_key={"event_id": "401"}, observed_at_utc="2026-08-06T10:00:00Z",
+            run_id=run_id,
+            sport="mlb",
+            table_name="scoreboard",
+            primary_key={"event_id": "401"},
+            observed_at_utc="2026-08-06T10:00:00Z",
             payload={"status": "STATUS_SCHEDULED"},
         )
         id2, created2 = ledger.record_normalized_observation(
-            run_id=run_id, sport="mlb", table_name="scoreboard",
-            primary_key={"event_id": "401"}, observed_at_utc="2026-08-06T10:00:00Z",
+            run_id=run_id,
+            sport="mlb",
+            table_name="scoreboard",
+            primary_key={"event_id": "401"},
+            observed_at_utc="2026-08-06T10:00:00Z",
             payload={"status": "STATUS_FINAL"},
         )
         assert created2
@@ -895,10 +1252,18 @@ class TestFeatureSnapshotsLedger:
     def test_record_and_dedupe_on_dataset_hash(self, ledger: ShadowLedger):
         run_id = ledger.record_run("mlb")
         id1, created1 = ledger.record_feature_snapshot(
-            run_id=run_id, sport="mlb", horizon="late", dataset_hash="hash1", row_count=5,
+            run_id=run_id,
+            sport="mlb",
+            horizon="late",
+            dataset_hash="hash1",
+            row_count=5,
         )
         id2, created2 = ledger.record_feature_snapshot(
-            run_id=run_id, sport="mlb", horizon="late", dataset_hash="hash1", row_count=5,
+            run_id=run_id,
+            sport="mlb",
+            horizon="late",
+            dataset_hash="hash1",
+            row_count=5,
         )
         assert created1 and not created2
         assert id1 == id2
@@ -909,11 +1274,17 @@ class TestDatasetManifestsLedger:
     def test_record_and_dedupe_on_dataset_hash(self, ledger: ShadowLedger):
         run_id = ledger.record_run("mlb")
         id1, created1 = ledger.record_dataset_manifest(
-            run_id=run_id, sport="mlb", dataset_hash="hash1",
-            final_test_start="2026-08-02", final_test_end="2026-08-04", final_test_consumed=True,
+            run_id=run_id,
+            sport="mlb",
+            dataset_hash="hash1",
+            final_test_start="2026-08-02",
+            final_test_end="2026-08-04",
+            final_test_consumed=True,
         )
         id2, created2 = ledger.record_dataset_manifest(
-            run_id=run_id, sport="mlb", dataset_hash="hash1",
+            run_id=run_id,
+            sport="mlb",
+            dataset_hash="hash1",
         )
         assert created1 and not created2
         assert id1 == id2
@@ -923,11 +1294,17 @@ class TestModelArtifactsLedger:
     def test_record_and_dedupe_on_artifact_hash(self, ledger: ShadowLedger):
         run_id = ledger.record_run("mlb")
         id1, created1 = ledger.record_model_artifact(
-            run_id=run_id, sport="mlb", model_name="mlb-two-head-v1", model_version="1",
+            run_id=run_id,
+            sport="mlb",
+            model_name="mlb-two-head-v1",
+            model_version="1",
             artifact_hash="hash1",
         )
         id2, created2 = ledger.record_model_artifact(
-            run_id=run_id, sport="mlb", model_name="mlb-two-head-v1", model_version="1",
+            run_id=run_id,
+            sport="mlb",
+            model_name="mlb-two-head-v1",
+            model_version="1",
             artifact_hash="hash1",
         )
         assert created1 and not created2
@@ -939,11 +1316,17 @@ class TestCalibrationArtifactsLedger:
     def test_record_and_dedupe_bound_to_model_hash(self, ledger: ShadowLedger):
         run_id = ledger.record_run("mlb")
         id1, created1 = ledger.record_calibration_artifact(
-            run_id=run_id, sport="mlb", model_artifact_hash="model1", calibration_hash="calib1",
+            run_id=run_id,
+            sport="mlb",
+            model_artifact_hash="model1",
+            calibration_hash="calib1",
             method="bootstrap_uncertainty",
         )
         id2, created2 = ledger.record_calibration_artifact(
-            run_id=run_id, sport="mlb", model_artifact_hash="model1", calibration_hash="calib1",
+            run_id=run_id,
+            sport="mlb",
+            model_artifact_hash="model1",
+            calibration_hash="calib1",
             method="bootstrap_uncertainty",
         )
         assert created1 and not created2
@@ -954,25 +1337,41 @@ class TestClosingPricesLedger:
     def test_record_and_dedupe_on_identical_price(self, ledger: ShadowLedger):
         run_id = ledger.record_run("mlb")
         id1, created1 = ledger.record_closing_price(
-            run_id=run_id, sport="mlb", market_id="m1", side_id="home", closing_price=0.55,
+            run_id=run_id,
+            sport="mlb",
+            market_id="m1",
+            side_id="home",
+            closing_price=0.55,
         )
         id2, created2 = ledger.record_closing_price(
-            run_id=run_id, sport="mlb", market_id="m1", side_id="home", closing_price=0.55,
+            run_id=run_id,
+            sport="mlb",
+            market_id="m1",
+            side_id="home",
+            closing_price=0.55,
         )
         assert created1 and not created2
         assert id1 == id2
 
     def test_conflicting_closing_price_at_the_same_key_fails_closed(self, ledger: ShadowLedger):
         run_id = ledger.record_run("mlb")
-        ledger.record_closing_price(run_id=run_id, sport="mlb", market_id="m1", side_id="home", closing_price=0.55)
+        ledger.record_closing_price(
+            run_id=run_id, sport="mlb", market_id="m1", side_id="home", closing_price=0.55
+        )
         with pytest.raises(ValueError, match="conflicting closing_price"):
-            ledger.record_closing_price(run_id=run_id, sport="mlb", market_id="m1", side_id="home", closing_price=0.60)
+            ledger.record_closing_price(
+                run_id=run_id, sport="mlb", market_id="m1", side_id="home", closing_price=0.60
+            )
 
     def test_quote_type_defaults_to_last_pregame_quote(self, ledger: ShadowLedger):
         # MLB-7: never an unlabeled "closing" price.
         run_id = ledger.record_run("mlb")
         pred_id, _ = ledger.record_closing_price(
-            run_id=run_id, sport="mlb", market_id="m1", side_id="home", closing_price=0.55,
+            run_id=run_id,
+            sport="mlb",
+            market_id="m1",
+            side_id="home",
+            closing_price=0.55,
         )
         row = ledger.conn.execute("SELECT quote_type FROM closing_prices WHERE id=?", (pred_id,)).fetchone()
         assert row["quote_type"] == "last_pregame_quote"
@@ -984,12 +1383,22 @@ class TestClosingPricesLedger:
         # collide as a "conflicting closing_price".
         run_id = ledger.record_run("mlb")
         id1, created1 = ledger.record_closing_price(
-            run_id=run_id, sport="mlb", market_id="m1", side_id="home", closing_price=0.50,
-            quote_type="T-30", seconds_to_start=1800.0,
+            run_id=run_id,
+            sport="mlb",
+            market_id="m1",
+            side_id="home",
+            closing_price=0.50,
+            quote_type="T-30",
+            seconds_to_start=1800.0,
         )
         id2, created2 = ledger.record_closing_price(
-            run_id=run_id, sport="mlb", market_id="m1", side_id="home", closing_price=0.55,
-            quote_type="last_pregame_quote", seconds_to_start=120.0,
+            run_id=run_id,
+            sport="mlb",
+            market_id="m1",
+            side_id="home",
+            closing_price=0.55,
+            quote_type="last_pregame_quote",
+            seconds_to_start=120.0,
         )
         assert created1 and created2
         assert id1 != id2
@@ -997,10 +1406,16 @@ class TestClosingPricesLedger:
     def test_seconds_to_start_round_trips(self, ledger: ShadowLedger):
         run_id = ledger.record_run("mlb")
         pred_id, _ = ledger.record_closing_price(
-            run_id=run_id, sport="mlb", market_id="m1", side_id="home", closing_price=0.55,
+            run_id=run_id,
+            sport="mlb",
+            market_id="m1",
+            side_id="home",
+            closing_price=0.55,
             seconds_to_start=95.5,
         )
-        row = ledger.conn.execute("SELECT seconds_to_start FROM closing_prices WHERE id=?", (pred_id,)).fetchone()
+        row = ledger.conn.execute(
+            "SELECT seconds_to_start FROM closing_prices WHERE id=?", (pred_id,)
+        ).fetchone()
         assert row["seconds_to_start"] == pytest.approx(95.5)
 
     def test_migration_adds_taxonomy_columns_to_a_pre_existing_database(self, tmp_path: Path):
@@ -1014,7 +1429,9 @@ class TestClosingPricesLedger:
                 market_id TEXT, side_id TEXT, line REAL, closing_price REAL, observed_at_utc TEXT
             )
         """)
-        conn.execute("CREATE TABLE IF NOT EXISTS runs (run_id TEXT PRIMARY KEY, created_at TEXT, sport TEXT, run_type TEXT, horizon TEXT, status TEXT, params_json TEXT, schema_version TEXT)")
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS runs (run_id TEXT PRIMARY KEY, created_at TEXT, sport TEXT, run_type TEXT, horizon TEXT, status TEXT, params_json TEXT, schema_version TEXT)"
+        )
         conn.commit()
         conn.close()
 
@@ -1025,8 +1442,13 @@ class TestClosingPricesLedger:
 
         run_id = migrated.record_run("mlb")
         _, created = migrated.record_closing_price(
-            run_id=run_id, sport="mlb", market_id="m1", side_id="home", closing_price=0.55,
-            quote_type="T-15", seconds_to_start=900.0,
+            run_id=run_id,
+            sport="mlb",
+            market_id="m1",
+            side_id="home",
+            closing_price=0.55,
+            quote_type="T-15",
+            seconds_to_start=900.0,
         )
         assert created is True
 
@@ -1035,8 +1457,12 @@ class TestReviewsLedger:
     def test_record_and_query_by_subject(self, ledger: ShadowLedger):
         run_id = ledger.record_run("mlb")
         review_id = ledger.record_review(
-            run_id=run_id, subject_table="trade_decisions", subject_id=1,
-            verdict="approved", reviewer="operator", notes="looks right",
+            run_id=run_id,
+            subject_table="trade_decisions",
+            subject_id=1,
+            verdict="approved",
+            reviewer="operator",
+            notes="looks right",
         )
         reviews = ledger.reviews_for_subject("trade_decisions", 1)
         assert len(reviews) == 1
