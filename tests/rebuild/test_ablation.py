@@ -175,3 +175,66 @@ class TestFeatureAblationRunner:
             all_features=["informative_feature"],  # deliberately excludes noise_feature
         )
         assert {r.group for r in results} == {"informative"}
+
+
+class TestPreRegisteredExperiment:
+    def test_pre_registered_threshold_clears_candidate(self):
+        from model_prediction.rebuild.ablation import AblationResult, PreRegisteredExperiment
+
+        exp = PreRegisteredExperiment(
+            experiment_id="exp_001",
+            hypothesis="Starter rest improves OOF Brier score",
+            feature_group="starter_rest",
+            registered_at_utc="2026-08-22T18:00:00Z",
+            registered_brier_threshold=0.002,
+            registered_log_loss_threshold=0.003,
+            registered_coverage_floor=0.90,
+        )
+
+        res = AblationResult(
+            group="starter_rest",
+            baseline_log_loss=0.680,
+            ablated_log_loss=0.685,
+            delta_log_loss=0.005,  # > 0.003 threshold
+            baseline_brier=0.240,
+            ablated_brier=0.243,
+            delta_brier=0.003,  # > 0.002 threshold
+            baseline_ece=0.02,
+            ablated_ece=0.02,
+            coverage_impact=0.02,  # 98% retained >= 90%
+            fold_stability=0.001,
+            verdict="PASS",
+        )
+
+        evaluation = exp.evaluate(res)
+        assert evaluation["verdict"] == "PROMOTION_CANDIDATE"
+        assert evaluation["brier_improvement"] == 0.003
+
+    def test_pre_registered_threshold_rejects_underperforming_candidate(self):
+        from model_prediction.rebuild.ablation import AblationResult, PreRegisteredExperiment
+
+        exp = PreRegisteredExperiment(
+            experiment_id="exp_002",
+            hypothesis="Noise feature test",
+            feature_group="noise",
+            registered_at_utc="2026-08-22T18:00:00Z",
+            registered_brier_threshold=0.002,
+        )
+
+        res = AblationResult(
+            group="noise",
+            baseline_log_loss=0.680,
+            ablated_log_loss=0.678,
+            delta_log_loss=-0.002,
+            baseline_brier=0.240,
+            ablated_brier=0.238,
+            delta_brier=-0.002,
+            baseline_ece=0.02,
+            ablated_ece=0.02,
+            coverage_impact=0.0,
+            fold_stability=0.001,
+            verdict="REJECT",
+        )
+
+        evaluation = exp.evaluate(res)
+        assert evaluation["verdict"] == "REJECT"

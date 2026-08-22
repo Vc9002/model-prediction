@@ -61,6 +61,56 @@ class AblationResult:
         }
 
 
+@dataclass
+class PreRegisteredExperiment:
+    """A pre-registered experimental hypothesis and minimum threshold.
+
+    Prevents post-hoc rationalization by requiring thresholds to be recorded
+    before running an ablation.
+    """
+
+    experiment_id: str
+    hypothesis: str
+    feature_group: str
+    registered_at_utc: str
+    registered_brier_threshold: float = 0.001
+    registered_log_loss_threshold: float = 0.002
+    registered_coverage_floor: float = 0.90
+
+    def evaluate(self, result: AblationResult) -> dict[str, Any]:
+        """Evaluate an ablation result strictly against pre-registered thresholds."""
+        # Removing the feature group causes delta_brier = ablated - baseline.
+        # Positive delta_brier means the model gets worse when the group is removed (group helps).
+        brier_improvement = result.delta_brier
+        ll_improvement = result.delta_log_loss
+        coverage_retained = 1.0 - result.coverage_impact
+
+        cleared_brier = brier_improvement >= self.registered_brier_threshold
+        cleared_ll = ll_improvement >= self.registered_log_loss_threshold
+        cleared_coverage = coverage_retained >= self.registered_coverage_floor
+
+        if cleared_brier and cleared_ll and cleared_coverage:
+            verdict = "PROMOTION_CANDIDATE"
+        elif not cleared_coverage or brier_improvement < -0.001:
+            verdict = "REJECT"
+        else:
+            verdict = "INCONCLUSIVE"
+
+        return {
+            "experiment_id": self.experiment_id,
+            "hypothesis": self.hypothesis,
+            "feature_group": self.feature_group,
+            "registered_at_utc": self.registered_at_utc,
+            "brier_improvement": round(brier_improvement, 6),
+            "registered_brier_threshold": self.registered_brier_threshold,
+            "log_loss_improvement": round(ll_improvement, 6),
+            "registered_log_loss_threshold": self.registered_log_loss_threshold,
+            "coverage_retained": round(coverage_retained, 4),
+            "registered_coverage_floor": self.registered_coverage_floor,
+            "verdict": verdict,
+        }
+
+
 # Real gap fixed here: every feature name below used to be a legacy/
 # aspirational name (elo_probability, starter_era_gap, lineup_xwoba,
 # home_availability_pct, ...) that doesn't exist anywhere in the real
