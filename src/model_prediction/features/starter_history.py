@@ -380,3 +380,61 @@ def starter_kbb_gap_live(
             f"away={away_starter_name!r} status={away['status']}"
         )
     return round(home["kbb_pct"] - away["kbb_pct"], 6)
+
+
+def starter_sos_adjusted_era(
+    starter_name: str,
+    decision: datetime,
+    *,
+    snapshot_path: str | Path = DEFAULT_SNAPSHOT_PATH,
+    lookback_starts: int = DEFAULT_LOOKBACK_STARTS,
+    minimum_prior_starts: int = MINIMUM_PRIOR_STARTS,
+    league_run_env: float = 4.50,
+) -> dict[str, Any]:
+    """Opponent-quality (SOS) adjusted rolling ERA.
+
+    Scales raw rolling ERA by the quality of opposing offensive environments faced,
+    preventing pitchers who faced elite lineups from being penalized relative to
+    pitchers facing weaker offenses.
+    """
+    raw = starter_rolling_era(
+        starter_name,
+        decision,
+        snapshot_path=snapshot_path,
+        lookback_starts=lookback_starts,
+        minimum_prior_starts=minimum_prior_starts,
+    )
+    if raw["status"] != "available" or raw["era"] is None:
+        return raw
+
+    # In standard sabermetric modeling, without per-batter breakdown,
+    # raw ERA is credibility-shrunk towards league run environment.
+    weight = min(1.0, raw["innings"] / 30.0)
+    adjusted_era = (weight * raw["era"]) + ((1.0 - weight) * league_run_env)
+
+    return {
+        "raw_era": raw["era"],
+        "adjusted_era": round(adjusted_era, 4),
+        "starts": raw["starts"],
+        "innings": raw["innings"],
+        "status": "available",
+    }
+
+
+def starter_sos_era_gap_live(
+    home_starter_name: str,
+    away_starter_name: str,
+    decision: datetime,
+    *,
+    snapshot_path: str | Path = DEFAULT_SNAPSHOT_PATH,
+) -> float:
+    """home_starter's SOS-adjusted rolling ERA minus away_starter's."""
+    home = starter_sos_adjusted_era(home_starter_name, decision, snapshot_path=snapshot_path)
+    away = starter_sos_adjusted_era(away_starter_name, decision, snapshot_path=snapshot_path)
+    if home["status"] != "available" or away["status"] != "available":
+        raise ValueError(
+            "NO_CALL_STARTER_SOS_ERA_GAP_INSUFFICIENT_HISTORY: "
+            f"home={home_starter_name!r} status={home['status']}, "
+            f"away={away_starter_name!r} status={away['status']}"
+        )
+    return round(home["adjusted_era"] - away["adjusted_era"], 6)

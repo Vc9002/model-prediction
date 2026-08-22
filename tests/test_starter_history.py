@@ -205,3 +205,46 @@ class TestStarterEraGapLive:
             starter_history.starter_era_gap_live(
                 "Home Ace", "Never Started", datetime(2026, 5, 20, tzinfo=UTC), snapshot_path=path
             )
+
+
+class TestStarterSosAdjustedEra:
+    def test_sos_adjusted_era_shrinks_toward_league_baseline(self, tmp_path) -> None:
+        path = tmp_path / "snapshots.jsonl"
+        rows = [
+            _start(
+                f"2026-05-{d:02d}T18:00:00Z", 100, "Home Pitcher", innings="5.0", earned_runs=1, side="home"
+            )
+            for d in range(1, 4)
+        ]
+        _write_snapshots(path, rows)
+        starter_history._STARTER_INDEX_CACHE.clear()
+
+        # 3 starts x 5 IP = 15 IP. Raw ERA = 9*3/15 = 1.80.
+        # Credibility weight = 15 / 30 = 0.50.
+        # Adjusted ERA = 0.50 * 1.80 + 0.50 * 4.50 = 0.90 + 2.25 = 3.15.
+        res = starter_history.starter_sos_adjusted_era(
+            "Home Pitcher", datetime(2026, 5, 20, tzinfo=UTC), snapshot_path=path
+        )
+        assert res["status"] == "available"
+        assert res["raw_era"] == pytest.approx(1.80)
+        assert res["adjusted_era"] == pytest.approx(3.15)
+
+    def test_sos_era_gap_live(self, tmp_path) -> None:
+        path = tmp_path / "snapshots.jsonl"
+        rows = [
+            _start(f"2026-05-{d:02d}T18:00:00Z", 100, "Home Ace", innings="6.0", earned_runs=1, side="home")
+            for d in range(1, 4)
+        ] + [
+            _start(f"2026-05-{d:02d}T18:00:00Z", 200, "Away Ace", innings="6.0", earned_runs=4, side="away")
+            for d in range(1, 4)
+        ]
+        _write_snapshots(path, rows)
+        starter_history._STARTER_INDEX_CACHE.clear()
+
+        gap = starter_history.starter_sos_era_gap_live(
+            "Home Ace", "Away Ace", datetime(2026, 5, 20, tzinfo=UTC), snapshot_path=path
+        )
+        # Home: 18 IP -> weight 18/30=0.6. Raw=1.5 -> Adj=0.6*1.5 + 0.4*4.5 = 0.9 + 1.8 = 2.7
+        # Away: 18 IP -> weight 0.6. Raw=6.0 -> Adj=0.6*6.0 + 0.4*4.5 = 3.6 + 1.8 = 5.4
+        # Gap = 2.7 - 5.4 = -2.7
+        assert gap == pytest.approx(-2.7)
