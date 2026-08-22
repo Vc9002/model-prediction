@@ -356,7 +356,12 @@ def _net_position_quantity(slug: str, portfolio_history: dict) -> float | None:
     return net
 
 
-def _decorate_pick(row: dict, orders: dict | None = None, portfolio_history: dict | None = None) -> dict:
+def _decorate_pick(
+    row: dict,
+    orders: dict | None = None,
+    portfolio_history: dict | None = None,
+    archived_ids: set[str] | None = None,
+) -> dict:
     quote = _pick_quote(row)
     ready, reason = _order_readiness(row, quote)
     order = _latest_order_for_pick(row, quote, orders)
@@ -409,6 +414,8 @@ def _decorate_pick(row: dict, orders: dict | None = None, portfolio_history: dic
         "buy_block_reason": reason,
         "unit_value_usd": _unit_value_usd(),
         "order_authorization": ("manual_research_override" if manual else "qualified_model"),
+        "archived": str(row.get("pick_id") or "")
+        in (archived_ids if archived_ids is not None else set(_load_archive().get("pick_ids", []))),
     }
 
 

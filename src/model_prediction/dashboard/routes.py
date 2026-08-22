@@ -60,6 +60,7 @@ from model_prediction.dashboard.orders import (
     _audit_tail,
     _auto_adjust_unit_value,
     _decorate_pick,
+    _load_archive,
     _load_orders,
     _load_portfolio_history,
     _safe_sport,
@@ -153,7 +154,8 @@ class Handler(BaseHTTPRequestHandler):
                     flat = read_flat_picks()
                     orders = _load_orders()
                     portfolio = _load_portfolio_history()
-                    return [_decorate_pick(row, orders, portfolio) for row in flat]
+                    archived = set(_load_archive().get("pick_ids", []))
+                    return [_decorate_pick(row, orders, portfolio, archived_ids=archived) for row in flat]
 
                 self._send(_cached("flat-picks", 30, _flat_picks_decorated))
             elif route in ("/api/polymarket-picks", "/api/picks/polymarket"):
@@ -162,7 +164,10 @@ class Handler(BaseHTTPRequestHandler):
                     poly_rows = read_polymarket_picks()
                     orders = _load_orders()
                     portfolio = _load_portfolio_history()
-                    return [_decorate_pick(row, orders, portfolio) for row in poly_rows]
+                    archived = set(_load_archive().get("pick_ids", []))
+                    return [
+                        _decorate_pick(row, orders, portfolio, archived_ids=archived) for row in poly_rows
+                    ]
 
                 self._send(_cached("polymarket-picks", 10, _poly_picks_decorated))
             elif route == "/api/performance":
@@ -199,7 +204,11 @@ class Handler(BaseHTTPRequestHandler):
                 def _research_decorated():
                     orders = _load_orders()
                     portfolio = _load_portfolio_history()
-                    return [_decorate_pick(r, orders, portfolio) for r in _parse_research_picks()]
+                    archived = set(_load_archive().get("pick_ids", []))
+                    return [
+                        _decorate_pick(r, orders, portfolio, archived_ids=archived)
+                        for r in _parse_research_picks()
+                    ]
 
                 self._send(_cached("research-picks", 60, _research_decorated))
             elif route == "/api/gated-research-performance":
@@ -216,7 +225,11 @@ class Handler(BaseHTTPRequestHandler):
                 def _gated_research_decorated():
                     orders = _load_orders()
                     portfolio = _load_portfolio_history()
-                    return [_decorate_pick(r, orders, portfolio) for r in _parse_research_picks(gated=True)]
+                    archived = set(_load_archive().get("pick_ids", []))
+                    return [
+                        _decorate_pick(r, orders, portfolio, archived_ids=archived)
+                        for r in _parse_research_picks(gated=True)
+                    ]
 
                 self._send(_cached("gated-research-picks", 60, _gated_research_decorated))
             elif route == "/api/backtests":
