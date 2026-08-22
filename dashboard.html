@@ -1603,17 +1603,16 @@ function ledgerRowHtml(p,showCheckbox,mode="default"){
 const FILTER_TABS=["L","F","R","G","PL"];
 let ledgerUrlRestored=false;
 function filterBarHTML(tab){
-  const archiveTools=tab==="L"?`
-    <button onclick="clearSelected()" id="clearSelBtn" style="display:none">Clear selected (<span id="selCount">0</span>)</button>
+  const archiveTools=`
     <details class="view-tools"><summary>Manage hidden rows</summary><div class="menu">
       <span class="dim small">Hide from this dashboard:</span>
       <button onclick="clearLedger('day')">Today</button>
       <button onclick="clearLedger('week')">7 days</button>
       <button onclick="clearLedger('month')">30 days</button>
       <button onclick="clearLedger('all')">Everything</button>
-      <label class="small dim"><input type="checkbox" id="fArchived_${tab}" onchange="onFilterChange('${tab}')"> show hidden (<span id="archCount">0</span>)</label>
-      <button onclick="restoreLedger()" id="restoreBtn" style="display:none">Restore hidden</button>
-    </div></details>`:"";
+      <label class="small dim"><input type="checkbox" id="fArchived_${tab}" onchange="onFilterChange('${tab}')"> show hidden</label>
+      <button onclick="restoreLedger()" id="restoreBtn_${tab}">Restore hidden</button>
+    </div></details>`;
   return `
     <button class="primary" onclick="preset('open','${tab}')">Active (<span id="openCount_${tab}">0</span>)</button>
     <button onclick="preset('settled','${tab}')">Settled (<span id="settledCount_${tab}">0</span>)</button>
@@ -1863,8 +1862,10 @@ function filteredFlatRows(){
   const fs=$("#fSport_F").value, fm=$("#fMarket_F").value, fst=$("#fStatus_F").value, fr=$("#fResult_F").value;
   const fq=($("#fSearch_F").value||'').toLowerCase();
   const ff=$("#fFrom_F").value, ft=$("#fTo_F").value;
+  const showArchived=$("#fArchived_F")?.checked;
   return (_flatCache||[]).filter(p=>{
     if(!passesDisplaySettings(p))return false;
+    if(p.archived&&!showArchived)return false;
     if(fs&&(p.league||p.Sport||'')!==fs)return false;
     if(fm&&(p.market_type||p.Type||'moneyline')!==fm)return false;
     const st=String(p.status||p.State||'').toLowerCase();
@@ -2729,8 +2730,10 @@ function filteredResearchRows(){
   const fs=$("#fSport_R").value, fm=$("#fMarket_R").value, fst=$("#fStatus_R").value, fr=$("#fResult_R").value;
   const fq=($("#fSearch_R").value||'').toLowerCase();
   const ff=$("#fFrom_R").value, ft=$("#fTo_R").value;
+  const showArchived=$("#fArchived_R")?.checked;
   return (_researchCache||[]).filter(p=>{
     if(!passesDisplaySettings(p))return false;
+    if(p.archived&&!showArchived)return false;
     if(fs&&(p.league||'')!==fs)return false;
     if(fm&&(p.market_type||'moneyline')!==fm)return false;
     const st=String(p.status||'').toLowerCase();
@@ -2827,8 +2830,10 @@ function filteredGatedResearchRows(){
   const fs=$("#fSport_G").value, fm=$("#fMarket_G").value, fst=$("#fStatus_G").value, fr=$("#fResult_G").value;
   const fq=($("#fSearch_G").value||'').toLowerCase();
   const ff=$("#fFrom_G").value, ft=$("#fTo_G").value;
+  const showArchived=$("#fArchived_G")?.checked;
   return (_gatedResearchCache||[]).filter(p=>{
     if(!passesDisplaySettings(p))return false;
+    if(p.archived&&!showArchived)return false;
     if(fs&&(p.league||'')!==fs)return false;
     if(fm&&(p.market_type||'moneyline')!==fm)return false;
     const st=String(p.status||'').toLowerCase();
@@ -2897,8 +2902,10 @@ function filteredPolyLedgerRows(){
         r=$("#fResult_PL")?$("#fResult_PL").value:"",
         fq=$("#fSearch_PL")?$("#fSearch_PL").value.trim().toLowerCase():"",
         ff=$("#fFrom_PL")?$("#fFrom_PL").value:"",
-        ft=$("#fTo_PL")?$("#fTo_PL").value:"";
+        ft=$("#fTo_PL")?$("#fTo_PL").value:"",
+        showArchived=$("#fArchived_PL")?.checked;
   return (_polyLedgerCache||[]).filter(p=>{
+    if(p.archived&&!showArchived)return false;
     if(s&&p.league!==s&&p.Sport!==s)return false;
     if(m&&p.market_type!==m&&p.Type!==m)return false;
     if(st&&String(p.status||p.State||'').toLowerCase()!==st)return false;
