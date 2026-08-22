@@ -290,6 +290,7 @@ class Handler(BaseHTTPRequestHandler):
                         "orders": [
                             {
                                 "market_id": o.market_id,
+                                "question": o.question,
                                 "side": o.side,
                                 "order_price": o.order_price,
                                 "model_probability": o.model_probability,

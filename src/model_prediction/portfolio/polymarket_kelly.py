@@ -59,6 +59,7 @@ class PolymarketOrderDecision:
     kelly_fraction_recommended: float
     stake_units: float  # Dollars/units to stake based on bankroll
     reason: str
+    question: str = ""
 
 
 class PolymarketKellyEngine:
@@ -126,6 +127,7 @@ class PolymarketKellyEngine:
                 kelly_fraction_recommended=round(rec_k, 4),
                 stake_units=stake,
                 reason=f"YES Edge +{edge_yes:.1%} exceeds min {self.min_edge:.1%} threshold (EV +{ev_yes:.1f}%)",
+                question=quote.question,
             )
 
         elif edge_no >= self.min_edge:
@@ -148,6 +150,7 @@ class PolymarketKellyEngine:
                 kelly_fraction_recommended=round(rec_k, 4),
                 stake_units=stake,
                 reason=f"NO Edge +{edge_no:.1%} exceeds min {self.min_edge:.1%} threshold (EV +{ev_no:.1f}%)",
+                question=quote.question,
             )
 
         else:
@@ -166,4 +169,5 @@ class PolymarketKellyEngine:
                 kelly_fraction_recommended=0.0,
                 stake_units=0.0,
                 reason=f"Edge +{best_edge:.1%} on {side_candidate} below min threshold {self.min_edge:.1%}",
+                question=quote.question,
             )

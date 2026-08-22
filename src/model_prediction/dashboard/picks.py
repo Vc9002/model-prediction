@@ -21,6 +21,7 @@ from model_prediction.dashboard.common import (
     _MAIN_LEDGER_SPORTS,
     _PICKS_CACHE,
     DATA,
+    ROOT,
     _get_dashboard_cache,
     _number,
 )
@@ -49,8 +50,8 @@ def _read_split_picks(paths: list[Path], cache: dict[str, object]) -> list[dict]
     """
     dc = _get_dashboard_cache()
 
-    # Try SQLite cache first
-    if dc is not None and paths:
+    # Try SQLite cache first if paths are under the standard repo data root
+    if dc is not None and paths and str(paths[0]).startswith(str(ROOT / "data")):
         first_path = str(paths[0])
         if "/flat/" in first_path or "\\flat\\" in first_path:
             tier = "flat"
