@@ -18,9 +18,30 @@ from .polymarket_dispatcher import (
 )
 
 
+def _normalize_league(lg: str) -> str:
+    s = lg.upper().replace(" ", "_").replace("-", "_")
+    if s in ("CSGO", "COUNTER_STRIKE", "COUNTER_STRIKE_2"):
+        return "CS2"
+    if s in ("LEAGUE_OF_LEGENDS", "LEAGUEOFLEGENDS"):
+        return "LOL"
+    if s in ("R6", "RAINBOW6", "RAINBOW_6", "R6_SIEGE"):
+        return "RAINBOW_SIX"
+    if s in ("DOTA", "DOTA_2"):
+        return "DOTA2"
+    if s in ("ATP", "WTA"):
+        return "TENNIS"
+    return s
+
+
+def _normalize_name(name: str) -> str:
+    return " ".join(
+        name.casefold().replace(".", "").replace("-", " ").replace("'", "").replace("_", " ").split()
+    )
+
+
 def _team_matches(team_name: str, side_description: str) -> bool:
-    team = " ".join(team_name.casefold().split())
-    description = " ".join(side_description.casefold().split())
+    team = _normalize_name(team_name)
+    description = _normalize_name(side_description)
     if not team or not description:
         return False
     if team == description:
@@ -51,9 +72,10 @@ def _get_logged_picks() -> list[dict]:
 
 def _lookup_model_prob(league: str, home_desc: str, away_desc: str) -> float | None:
     picks = _get_logged_picks()
-    lg_upper = league.upper()
+    lg_norm = _normalize_league(league)
     for p in picks:
-        if str(p.get("league") or "").upper() != lg_upper:
+        p_lg = _normalize_league(str(p.get("league") or ""))
+        if p_lg != lg_norm:
             continue
         p_home = str(p.get("home_team") or "")
         p_away = str(p.get("away_team") or "")
@@ -107,7 +129,7 @@ class PolymarketSlateScanner:
             max_position_pct=max_position_pct,
         )
 
-    def parse_snapshot_line(self, line: str) -> DispatchRequest | None:
+    def parse_snapshot_line(self, line: str, require_model: bool = True) -> DispatchRequest | None:
         """Parse a single JSONL snapshot line into a DispatchRequest."""
         try:
             data = json.loads(line.strip())
@@ -139,6 +161,8 @@ class PolymarketSlateScanner:
 
         # Look up true calibrated domain model probability
         p_model = _lookup_model_prob(league, home_or_a, away_or_b)
+        if require_model and p_model is None:
+            return None
 
         return DispatchRequest(
             market_id=market_id,
@@ -156,6 +180,7 @@ class PolymarketSlateScanner:
         self,
         snapshot_path: Path | str,
         prefer_maker: bool = False,
+        require_model: bool = True,
     ) -> list[PolymarketOrderDecision]:
         """Scan a specific polymarket_snapshots.jsonl file with market deduplication."""
         p = Path(snapshot_path)
@@ -165,7 +190,7 @@ class PolymarketSlateScanner:
         latest_by_market: dict[str, DispatchRequest] = {}
         with open(p, encoding="utf-8") as f:
             for line in f:
-                req = self.parse_snapshot_line(line)
+                req = self.parse_snapshot_line(line, require_model=require_model)
                 if req is not None:
                     latest_by_market[req.market_id] = req
 
@@ -179,6 +204,7 @@ class PolymarketSlateScanner:
         sport_filter: str | None = None,
         date_filter: str | None = None,
         prefer_maker: bool = False,
+        require_model: bool = True,
     ) -> PolymarketScanResult:
         """Scan multiple snapshot files across sports and dates."""
         base = Path(base_dir)
@@ -222,7 +248,7 @@ class PolymarketSlateScanner:
         for f_path in target_files:
             with open(f_path, encoding="utf-8") as f:
                 for line in f:
-                    req = self.parse_snapshot_line(line)
+                    req = self.parse_snapshot_line(line, require_model=require_model)
                     if req is not None:
                         latest_by_market[req.market_id] = req
 

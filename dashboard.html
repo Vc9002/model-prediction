@@ -680,6 +680,9 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
             <input id="polyBankroll" type="number" value="1000" step="100" style="width:75px;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 6px;font-family:var(--mono)" onchange="loadPolymarketScanner()">
           </label>
           <label class="small dim" style="display:flex;align-items:center;gap:4px;cursor:pointer">
+            <input id="polyModeledOnly" type="checkbox" checked onchange="loadPolymarketScanner()"> Modeled Games Only
+          </label>
+          <label class="small dim" style="display:flex;align-items:center;gap:4px;cursor:pointer">
             <input id="polyMaker" type="checkbox" onchange="loadPolymarketScanner()"> Maker Pricing
           </label>
           <button class="primary" onclick="loadPolymarketScanner()">Refresh Slate</button>
@@ -3044,15 +3047,16 @@ async function refreshAll(){
 let _polyOrdersCache = [];
 
 async function loadPolymarketScanner() {
-  const sportEl = $("#polySport"), minEdgeEl = $("#polyMinEdge"), bankrollEl = $("#polyBankroll"), makerEl = $("#polyMaker");
+  const sportEl = $("#polySport"), minEdgeEl = $("#polyMinEdge"), bankrollEl = $("#polyBankroll"), makerEl = $("#polyMaker"), modeledEl = $("#polyModeledOnly");
   const sport = sportEl ? sportEl.value : "all";
   const minEdge = minEdgeEl ? minEdgeEl.value : "0.025";
   const bankroll = bankrollEl ? bankrollEl.value : "1000";
   const maker = makerEl && makerEl.checked ? "true" : "false";
+  const modeledOnly = !modeledEl || modeledEl.checked ? "true" : "false";
 
   setPanelState("polyMeta", "loading", "Scanning Polymarket live CLOB order books…");
   try {
-    const url = `/api/polymarket/scan?sport=${encodeURIComponent(sport)}&min_edge=${encodeURIComponent(minEdge)}&bankroll=${encodeURIComponent(bankroll)}&maker=${encodeURIComponent(maker)}`;
+    const url = `/api/polymarket/scan?sport=${encodeURIComponent(sport)}&min_edge=${encodeURIComponent(minEdge)}&bankroll=${encodeURIComponent(bankroll)}&maker=${encodeURIComponent(maker)}&require_model=${encodeURIComponent(modeledOnly)}`;
     const res = await fetch(url, { headers: { "X-Dashboard-Token": window._DASHBOARD_TOKEN || "" } });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();

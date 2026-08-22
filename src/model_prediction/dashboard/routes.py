@@ -270,6 +270,7 @@ class Handler(BaseHTTPRequestHandler):
                 bankroll = float(query.get("bankroll", "1000.0"))
                 min_edge = float(query.get("min_edge", "0.025"))
                 maker = query.get("maker", "false").lower() in ("true", "1", "yes")
+                require_model = query.get("require_model", "true").lower() in ("true", "1", "yes")
 
                 def _do_scan():
                     scanner = PolymarketSlateScanner(
@@ -281,6 +282,7 @@ class Handler(BaseHTTPRequestHandler):
                         sport_filter=sport_filter,
                         date_filter=date_filter,
                         prefer_maker=maker,
+                        require_model=require_model,
                     )
                     return {
                         "as_of_utc": res.as_of_utc,
@@ -306,7 +308,7 @@ class Handler(BaseHTTPRequestHandler):
                         ],
                     }
 
-                cache_key = f"polymarket:scan:{sport_filter or 'all'}:{date_filter or 'all'}:{bankroll}:{min_edge}:{maker}"
+                cache_key = f"polymarket:scan:{sport_filter or 'all'}:{date_filter or 'all'}:{bankroll}:{min_edge}:{maker}:{require_model}"
                 self._send(_cached(cache_key, 10, _do_scan))
             elif route == "/api/health":
                 self._send({"ok": True, "at": datetime.now(UTC).isoformat()[:19]})

@@ -26,7 +26,7 @@ def test_parse_snapshot_line():
         }
     )
 
-    req = scanner.parse_snapshot_line(line)
+    req = scanner.parse_snapshot_line(line, require_model=False)
     assert req is not None
     assert req.market_id == "m_1001"
     assert req.league == "MLB"
@@ -46,8 +46,8 @@ def test_scan_file_filtering(tmp_path: Path):
                 "market_id": "m1",
                 "market_type": "moneyline",
                 "league": "CS2",
-                "long": {"ask": 0.40, "bid": 0.38, "description": "NaVi"},
-                "short": {"ask": 0.62, "bid": 0.60, "description": "FaZe"},
+                "long": {"ask": 0.40, "bid": 0.38, "description": "Synthetic Home"},
+                "short": {"ask": 0.62, "bid": 0.60, "description": "Synthetic Away"},
                 "event_start_utc": "2026-08-22T10:00:00Z",
             }
         ),
@@ -58,16 +58,40 @@ def test_scan_file_filtering(tmp_path: Path):
                 "market_id": "m2",
                 "market_type": "moneyline",
                 "league": "CS2",
-                "long": {"ask": 0.50, "bid": 0.48, "description": "G2"},
-                "short": {"ask": 0.52, "bid": 0.50, "description": "Vitality"},
+                "long": {"ask": 0.50, "bid": 0.48, "description": "Synthetic Home 2"},
+                "short": {"ask": 0.52, "bid": 0.50, "description": "Synthetic Away 2"},
                 "event_start_utc": "2026-08-22T12:00:00Z",
             }
         ),
     ]
     f_path.write_text("\n".join(lines))
 
-    orders = scanner.scan_file(f_path)
+    # Without require_model, synthetic teams evaluate with fallback
+    orders = scanner.scan_file(f_path, require_model=False)
     assert len(orders) == 1
     assert orders[0].market_id == "m1"
     assert orders[0].side == "BUY_YES"
     assert orders[0].edge == pytest.approx(0.10, abs=1e-4)
+
+
+def test_scan_file_unmodeled_exclusion(tmp_path: Path):
+    scanner = PolymarketSlateScanner(bankroll=1000.0, min_edge=0.01)
+    f_path = tmp_path / "polymarket_snapshots.jsonl"
+    lines = [
+        json.dumps(
+            {
+                "event_id": "unmodeled_99",
+                "market_id": "m_unmodeled",
+                "market_type": "moneyline",
+                "league": "UNKNOWN_SPORT",
+                "long": {"ask": 0.30, "bid": 0.28, "description": "Unknown Team A"},
+                "short": {"ask": 0.72, "bid": 0.70, "description": "Unknown Team B"},
+                "event_start_utc": "2026-08-22T10:00:00Z",
+            }
+        )
+    ]
+    f_path.write_text("\n".join(lines))
+
+    # With require_model=True (default), unmodeled games are excluded
+    orders = scanner.scan_file(f_path, require_model=True)
+    assert len(orders) == 0
