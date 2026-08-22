@@ -357,16 +357,46 @@ def _set_unit_value_usd(raw_value: object) -> dict:
     }
 
 
+_CONFIG_PAYLOAD_CACHE: tuple[float, dict] | None = None
+_CONFIG_PAYLOAD_LOCK = threading.Lock()
+
+
 def _config_payload() -> dict:
+    global _CONFIG_PAYLOAD_CACHE
+    try:
+        mtime = CONFIG_FILE.stat().st_mtime
+    except OSError:
+        return {}
+    with _CONFIG_PAYLOAD_LOCK:
+        if _CONFIG_PAYLOAD_CACHE is not None and _CONFIG_PAYLOAD_CACHE[0] == mtime:
+            return _CONFIG_PAYLOAD_CACHE[1]
     try:
         payload = yaml.safe_load(CONFIG_FILE.read_text(encoding="utf-8")) or {}
     except (OSError, yaml.YAMLError):
-        return {}
-    # ── SECTION: Configuration ──────────────────────────────────────────
-    return payload if isinstance(payload, dict) else {}
+        payload = {}
+    final_payload = payload if isinstance(payload, dict) else {}
+    with _CONFIG_PAYLOAD_LOCK:
+        _CONFIG_PAYLOAD_CACHE = (mtime, final_payload)
+    return final_payload
 
 
-def _row_has_banned_team(row: dict) -> bool:
+_BANNED_NAMES_CACHE: tuple[float, float, set[str]] | None = None
+_BANNED_NAMES_LOCK = threading.Lock()
+
+
+def _banned_team_names() -> set[str]:
+    global _BANNED_NAMES_CACHE
+    teams_file = DATA / "entities" / "teams.json"
+    mtime_cfg = CONFIG_FILE.stat().st_mtime if CONFIG_FILE.exists() else 0.0
+    mtime_teams = teams_file.stat().st_mtime if teams_file.exists() else 0.0
+    with _BANNED_NAMES_LOCK:
+        if (
+            _BANNED_NAMES_CACHE is not None
+            and _BANNED_NAMES_CACHE[0] == mtime_cfg
+            and _BANNED_NAMES_CACHE[1] == mtime_teams
+        ):
+            return _BANNED_NAMES_CACHE[2]
+
     config = _config_payload()
     configured = (config.get("team_ban_list") or {}).get("teams") or {}
     banned_ids = {
@@ -375,7 +405,7 @@ def _row_has_banned_team(row: dict) -> bool:
         for item in (values or [])
         if isinstance(item, dict)
     }
-    registry = _read_json(DATA / "entities" / "teams.json") or {}
+    registry = _read_json(teams_file) or {}
     entries = registry.get("teams") if isinstance(registry, dict) else registry
     banned_names: set[str] = set()
     for entry in entries or []:
@@ -387,9 +417,17 @@ def _row_has_banned_team(row: dict) -> bool:
                 banned_names.add(str(alias.get("source_name") or "").strip().casefold())
             else:
                 banned_names.add(str(alias or "").strip().casefold())
-    return any(
-        str(row.get(key) or "").strip().casefold() in banned_names for key in ("away_team", "home_team")
-    )
+
+    with _BANNED_NAMES_LOCK:
+        _BANNED_NAMES_CACHE = (mtime_cfg, mtime_teams, banned_names)
+    return banned_names
+
+
+def _row_has_banned_team(row: dict) -> bool:
+    banned = _banned_team_names()
+    if not banned:
+        return False
+    return any(str(row.get(key) or "").strip().casefold() in banned for key in ("away_team", "home_team"))
 
 
 def _manual_research_eligibility(row: dict) -> tuple[bool, str]:
