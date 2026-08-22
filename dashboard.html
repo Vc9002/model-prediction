@@ -3038,6 +3038,7 @@ async function refreshAll(){
   // requests settle. One failed source no longer blanks every other panel.
   await Promise.allSettled([renderResearch(false),renderFlat(false),renderGatedResearch(false)]);
   populateFilters();renderIntegrity();
+  if($("#tab-polymarket") && $("#tab-polymarket").style.display!=="none") loadPolymarketScanner();
   const failures=[...core,...panels].filter(result=>result.status==="rejected").length;
   $("#updatedTxt").innerHTML=failures
     ?`<span class="yellow">Updated with ${failures} panel error${failures===1?"":"s"}</span>`
@@ -3099,11 +3100,19 @@ function renderPolymarketOrdersTable(orders) {
     const edgeClass = o.edge >= 0.05 ? "green" : "yellow";
     const evClass = o.ev_pct >= 10.0 ? "green" : "text";
 
+    const age = o.observed_at_utc ? ageInfo(o.observed_at_utc) : null;
+    const ageBadge = age
+      ? `<span class="health-state ${age.stale ? "warn" : "ok"}" style="padding:1px 5px;font-size:10px;border-radius:4px">${age.stale ? "! " + age.label : "✓ " + age.label}</span>`
+      : "";
+
     return `
       <tr>
         <td>
           <div style="font-weight:600;color:var(--text);white-space:nowrap">${esc(o.question || o.market_id)}</div>
-          <div class="dim small" style="font-family:var(--mono)">ID: ${esc(o.market_id)}</div>
+          <div class="dim small" style="font-family:var(--mono);display:flex;gap:6px;align-items:center;margin-top:2px">
+            <span>ID: ${esc(o.market_id)}</span>
+            ${ageBadge}
+          </div>
         </td>
         <td>${sideBadge}</td>
         <td style="font-weight:600">${(o.order_price * 100).toFixed(1)}¢</td>

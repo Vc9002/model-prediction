@@ -191,6 +191,8 @@ class PolymarketSlateScanner:
         if require_model and p_model is None:
             return None
 
+        observed_at_utc = str(data.get("observed_at_utc") or "")
+
         return DispatchRequest(
             market_id=market_id,
             league=league,
@@ -201,6 +203,7 @@ class PolymarketSlateScanner:
             best_ask=float(ask),
             event_start_utc=event_start_utc,
             p_model_override=p_model,
+            observed_at_utc=observed_at_utc,
         )
 
     def scan_file(

@@ -42,6 +42,7 @@ class DispatchRequest:
     format: str = "Bo3"
     p_model_override: float | None = None
     p_tie_override: float = 0.0
+    observed_at_utc: str = ""
 
 
 class PolymarketDispatcher:
@@ -73,6 +74,7 @@ class PolymarketDispatcher:
             best_bid=req.best_bid,
             best_ask=req.best_ask,
             spread=round(req.best_ask - req.best_bid, 4),
+            observed_at_utc=req.observed_at_utc,
         )
 
         p_model = req.p_model_override if req.p_model_override is not None else 0.50

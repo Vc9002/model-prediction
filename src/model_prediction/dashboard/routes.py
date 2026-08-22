@@ -303,6 +303,7 @@ class Handler(BaseHTTPRequestHandler):
                                 "kelly_fraction": o.kelly_fraction_recommended,
                                 "is_maker": o.is_maker,
                                 "reason": o.reason,
+                                "observed_at_utc": o.observed_at_utc,
                             }
                             for o in res.actionable_orders
                         ],

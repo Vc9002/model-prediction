@@ -33,7 +33,7 @@ MAX_CONTRACT_PRICE = 0.99
 
 @dataclass(slots=True)
 class PolymarketQuote:
-    """Point-in-time quote from Polymarket US order book."""
+    """Executable Best Bid and Offer (BBO) quote from Polymarket CLOB."""
 
     market_id: str
     question: str
@@ -41,6 +41,7 @@ class PolymarketQuote:
     best_ask: float  # e.g. 0.60
     spread: float  # best_ask - best_bid
     last_traded_price: float | None = None
+    observed_at_utc: str = ""
 
 
 @dataclass(slots=True)
@@ -60,6 +61,7 @@ class PolymarketOrderDecision:
     stake_units: float  # Dollars/units to stake based on bankroll
     reason: str
     question: str = ""
+    observed_at_utc: str = ""
 
 
 class PolymarketKellyEngine:
@@ -128,6 +130,7 @@ class PolymarketKellyEngine:
                 stake_units=stake,
                 reason=f"YES Edge +{edge_yes:.1%} exceeds min {self.min_edge:.1%} threshold (EV +{ev_yes:.1f}%)",
                 question=quote.question,
+                observed_at_utc=quote.observed_at_utc,
             )
 
         elif edge_no >= self.min_edge:
@@ -151,6 +154,7 @@ class PolymarketKellyEngine:
                 stake_units=stake,
                 reason=f"NO Edge +{edge_no:.1%} exceeds min {self.min_edge:.1%} threshold (EV +{ev_no:.1f}%)",
                 question=quote.question,
+                observed_at_utc=quote.observed_at_utc,
             )
 
         else:
@@ -170,4 +174,5 @@ class PolymarketKellyEngine:
                 stake_units=0.0,
                 reason=f"Edge +{best_edge:.1%} on {side_candidate} below min threshold {self.min_edge:.1%}",
                 question=quote.question,
+                observed_at_utc=quote.observed_at_utc,
             )
