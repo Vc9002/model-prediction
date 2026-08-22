@@ -186,11 +186,13 @@ def _research_ledger_paths(*, gated: bool = False) -> list[Path]:
     return [legacy] if legacy.exists() else []
 
 
+_RESEARCH_PICKS_CACHE: dict[str, object] = {"mtime": None, "rows": []}
+_GATED_RESEARCH_PICKS_CACHE: dict[str, object] = {"mtime": None, "rows": []}
+
+
 def _parse_research_picks(*, gated: bool = False) -> list[dict]:
-    rows: list[dict] = []
-    for path in _research_ledger_paths(gated=gated):
-        rows.extend(_parse_picks(path))
-    return rows
+    cache = _GATED_RESEARCH_PICKS_CACHE if gated else _RESEARCH_PICKS_CACHE
+    return _read_split_picks(_research_ledger_paths(gated=gated), cache)
 
 
 def _pick_probability(row) -> float | None:

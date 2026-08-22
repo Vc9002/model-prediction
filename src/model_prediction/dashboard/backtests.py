@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from pathlib import Path
 
 try:
     from openpyxl import load_workbook
@@ -263,6 +264,49 @@ def _total_side_for_row(row: dict, snapshot: dict) -> str | None:
     return "long" if matches_long else "short"
 
 
+import threading
+
+_SNAPSHOT_FILE_CACHE: dict[Path, tuple[float, list[dict]]] = {}
+_SNAPSHOT_FILE_CACHE_LOCK = threading.Lock()
+
+
+def _load_snapshot_file(path: Path) -> list[dict]:
+    """Read and parse a polymarket_snapshots.jsonl file with mtime caching.
+
+    Avoids re-opening and parsing large JSON Lines files thousands of times
+    during bulk ledger decoration.
+    """
+    if not path.exists():
+        return []
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        return []
+
+    with _SNAPSHOT_FILE_CACHE_LOCK:
+        cached = _SNAPSHOT_FILE_CACHE.get(path)
+        if cached is not None and cached[0] == mtime:
+            return cached[1]
+
+    records: list[dict] = []
+    try:
+        with path.open(encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                try:
+                    snapshot = json.loads(line)
+                    records.append(snapshot)
+                except json.JSONDecodeError:
+                    continue
+    except OSError:
+        return []
+
+    with _SNAPSHOT_FILE_CACHE_LOCK:
+        _SNAPSHOT_FILE_CACHE[path] = (mtime, records)
+    return records
+
+
 def _pick_quote(row: dict) -> dict | None:
     """Last valid pregame executable side quote for a moneyline, spread, or
     total pick.
@@ -292,55 +336,49 @@ def _pick_quote(row: dict) -> dict | None:
         return None
     day = event_start.astimezone(EASTERN).date().isoformat()
     path = DATA / "odds" / sport / day / "polymarket_snapshots.jsonl"
-    if not path.exists():
+    snapshots = _load_snapshot_file(path)
+    if not snapshots:
         return None
     latest: dict[str, dict] = {}
-    with path.open(encoding="utf-8") as handle:
-        for line in handle:
-            if not line.strip():
-                continue
+    for snapshot in snapshots:
+        if snapshot.get("timestamp_valid") is False:
+            continue
+        observed_raw = snapshot.get("observed_at_utc")
+        if observed_raw:
             try:
-                snapshot = json.loads(line)
-            except json.JSONDecodeError:
+                snapshot_observed = datetime.fromisoformat(str(observed_raw))
+            except ValueError:
+                snapshot_observed = None
+            if snapshot_observed is not None and snapshot_observed >= event_start:
                 continue
-            if snapshot.get("timestamp_valid") is False:
-                continue
-            observed_raw = snapshot.get("observed_at_utc")
-            if observed_raw:
-                try:
-                    snapshot_observed = datetime.fromisoformat(str(observed_raw))
-                except ValueError:
-                    snapshot_observed = None
-                if snapshot_observed is not None and snapshot_observed >= event_start:
-                    continue
-            if snapshot.get("market_type") != market_type:
-                continue
-            slug = str(snapshot.get("market_slug") or "")
-            if not slug or any(
-                marker in slug.casefold() for marker in ("-f5-", "-f3-", "-f7-", "-1st-", "-h1-", "-h2-")
+        if snapshot.get("market_type") != market_type:
+            continue
+        slug = str(snapshot.get("market_slug") or "")
+        if not slug or any(
+            marker in slug.casefold() for marker in ("-f5-", "-f3-", "-f7-", "-1st-", "-h1-", "-h2-")
+        ):
+            continue
+        if market_type == "moneyline":
+            long_description = str((snapshot.get("long") or {}).get("description") or "")
+            short_description = str((snapshot.get("short") or {}).get("description") or "")
+            away = str(row.get("away_team") or "")
+            home = str(row.get("home_team") or "")
+            if not (
+                (_team_matches(away, long_description) and _team_matches(home, short_description))
+                or (_team_matches(home, long_description) and _team_matches(away, short_description))
             ):
                 continue
-            if market_type == "moneyline":
-                long_description = str((snapshot.get("long") or {}).get("description") or "")
-                short_description = str((snapshot.get("short") or {}).get("description") or "")
-                away = str(row.get("away_team") or "")
-                home = str(row.get("home_team") or "")
-                if not (
-                    (_team_matches(away, long_description) and _team_matches(home, short_description))
-                    or (_team_matches(home, long_description) and _team_matches(away, short_description))
-                ):
-                    continue
-            elif market_type == "spread":
-                # Multiple alternate-line markets exist per event -- this
-                # must match the row's exact team+line, not just the game,
-                # or every alternate line would collide in `latest` and trip
-                # the doubleheader guard below.
-                if _spread_side_for_row(row, snapshot) is None:
-                    continue
-            else:  # total
-                if _total_side_for_row(row, snapshot) is None:
-                    continue
-            latest[slug] = snapshot
+        elif market_type == "spread":
+            # Multiple alternate-line markets exist per event -- this
+            # must match the row's exact team+line, not just the game,
+            # or every alternate line would collide in `latest` and trip
+            # the doubleheader guard below.
+            if _spread_side_for_row(row, snapshot) is None:
+                continue
+        else:  # total
+            if _total_side_for_row(row, snapshot) is None:
+                continue
+        latest[slug] = snapshot
     if not latest:
         return None
     if len(latest) > 1:

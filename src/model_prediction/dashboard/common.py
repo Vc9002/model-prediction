@@ -228,11 +228,28 @@ def _count_lines(path: Path) -> int:
         return sum(1 for _ in handle)
 
 
+_JSON_FILE_CACHE: dict[Path, tuple[float, object]] = {}
+_JSON_FILE_CACHE_LOCK = threading.Lock()
+
+
 def _read_json(path: Path):
+    if not path.exists():
+        return None
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        mtime = path.stat().st_mtime
+    except OSError:
+        return None
+    with _JSON_FILE_CACHE_LOCK:
+        cached = _JSON_FILE_CACHE.get(path)
+        if cached is not None and cached[0] == mtime:
+            return cached[1]
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
+    with _JSON_FILE_CACHE_LOCK:
+        _JSON_FILE_CACHE[path] = (mtime, data)
+    return data
 
 
 _runtime_paths_cache: list = []
@@ -261,13 +278,28 @@ def rebuild_view(name: str) -> dict:
     return read_rebuild_view(name, ROOT, paths=paths)
 
 
+_UNIT_VALUE_CACHE: tuple[float, float] | None = None
+_UNIT_VALUE_LOCK = threading.Lock()
+
+
 def _unit_value_usd() -> float:
+    global _UNIT_VALUE_CACHE
+    try:
+        mtime = CONFIG_FILE.stat().st_mtime
+    except OSError:
+        return 7.5
+    with _UNIT_VALUE_LOCK:
+        if _UNIT_VALUE_CACHE is not None and _UNIT_VALUE_CACHE[0] == mtime:
+            return _UNIT_VALUE_CACHE[1]
     try:
         payload = yaml.safe_load(CONFIG_FILE.read_text(encoding="utf-8")) or {}
         value = float((payload.get("bankroll") or {}).get("unit_value_usd", 7.5))
     except (OSError, TypeError, ValueError, yaml.YAMLError):
-        return 7.5
-    return value if value > 0 else 7.5
+        value = 7.5
+    final_val = value if value > 0 else 7.5
+    with _UNIT_VALUE_LOCK:
+        _UNIT_VALUE_CACHE = (mtime, final_val)
+    return final_val
 
 
 def _set_unit_value_usd(raw_value: object) -> dict:
