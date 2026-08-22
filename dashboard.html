@@ -1610,8 +1610,8 @@ function filterBarHTML(tab){
       <button onclick="clearLedger('week')">7 days</button>
       <button onclick="clearLedger('month')">30 days</button>
       <button onclick="clearLedger('all')">Everything</button>
-      <label class="small dim"><input type="checkbox" id="fArchived_${tab}" onchange="onFilterChange('${tab}')"> show hidden</label>
-      <button onclick="restoreLedger()" id="restoreBtn_${tab}">Restore hidden</button>
+      <label class="small dim"><input type="checkbox" id="fArchived_${tab}" onchange="onFilterChange('${tab}')"> show hidden (<span id="archCount_${tab}">0</span>)</label>
+      <button onclick="restoreLedger()" id="restoreBtn_${tab}" style="display:none">Restore hidden</button>
     </div></details>`;
   return `
     <button class="primary" onclick="preset('open','${tab}')">Active (<span id="openCount_${tab}">0</span>)</button>
@@ -1707,10 +1707,12 @@ function onFilterChange(tab){
 let sortKey="event_start_utc",sortAsc=false;
 function updateCounts(){
   const archivedCount=state.picks.filter(p=>p.archived).length;
-  $("#openCount_L").textContent=state.picks.filter(p=>!p.archived&&p.status==='open').length;
-  $("#settledCount_L").textContent=state.picks.filter(p=>!p.archived&&p.status==='settled').length;
-  $("#archCount").textContent=archivedCount;
-  $("#restoreBtn").style.display=archivedCount?'':'none';
+  if($("#openCount_L")) $("#openCount_L").textContent=state.picks.filter(p=>!p.archived&&p.status==='open').length;
+  if($("#settledCount_L")) $("#settledCount_L").textContent=state.picks.filter(p=>!p.archived&&p.status==='settled').length;
+  if($("#archCount_L")) $("#archCount_L").textContent=archivedCount;
+  if($("#archCount")) $("#archCount").textContent=archivedCount;
+  if($("#restoreBtn_L")) $("#restoreBtn_L").style.display=archivedCount?'':'none';
+  if($("#restoreBtn")) $("#restoreBtn").style.display=archivedCount?'':'none';
 }
 function renderPicks(){
   updateCounts();
