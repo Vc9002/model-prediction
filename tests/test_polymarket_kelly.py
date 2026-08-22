@@ -22,11 +22,18 @@ def test_qualifying_taker_yes_opportunity():
         best_bid=0.53,
         best_ask=0.55,
         spread=0.02,
+        home_or_player_a="New York Yankees",
+        away_or_player_b="Boston Red Sox",
     )
 
     decision = engine.evaluate_binary_opportunity(quote, p_model=0.62)
 
     assert decision.side == "BUY_YES"
+    assert decision.target_selection == "New York Yankees"
+    assert decision.target_side == "YES"
+    assert decision.home_team == "New York Yankees"
+    assert decision.away_team == "Boston Red Sox"
+    assert decision.selection_label == "New York Yankees (BUY YES)"
     assert decision.order_price == 0.55
     assert decision.edge == pytest.approx(0.07, abs=1e-4)
     assert decision.expected_value_pct > 10.0  # EV = 0.07 / 0.55 = 12.7%
@@ -48,11 +55,16 @@ def test_qualifying_taker_no_opportunity():
         best_bid=0.65,
         best_ask=0.67,
         spread=0.02,
+        home_or_player_a="Favorite Team",
+        away_or_player_b="Underdog Team",
     )
 
     decision = engine.evaluate_binary_opportunity(quote, p_model=0.50)
 
     assert decision.side == "BUY_NO"
+    assert decision.target_selection == "Underdog Team"
+    assert decision.target_side == "NO"
+    assert decision.selection_label == "Underdog Team (BUY NO)"
     assert decision.order_price == 0.35
     assert decision.edge == pytest.approx(0.15, abs=1e-4)
     assert decision.stake_units > 0.0

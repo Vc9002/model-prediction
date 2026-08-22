@@ -271,6 +271,51 @@ class Handler(BaseHTTPRequestHandler):
                 min_edge = float(query.get("min_edge", "0.025"))
                 maker = query.get("maker", "false").lower() in ("true", "1", "yes")
                 require_model = query.get("require_model", "true").lower() in ("true", "1", "yes")
+                pregame_only = query.get("pregame_only", "true").lower() in ("true", "1", "yes")
+                timeframe = query.get("timeframe", "today").lower()
+                today_only = timeframe in ("today", "24h", "true", "1")
+                max_start_hours = (
+                    24.0 if timeframe in ("today", "24h") else (48.0 if timeframe == "48h" else None)
+                )
+                max_age_param = query.get("max_age", "60")
+                try:
+                    max_age_minutes = (
+                        None
+                        if not max_age_param or max_age_param.lower() in ("all", "none")
+                        else int(max_age_param)
+                    )
+                except ValueError:
+                    max_age_minutes = 60
+                live = query.get("live", "false").lower() in ("true", "1", "yes")
+
+                if live:
+                    try:
+                        from datetime import date
+
+                        from model_prediction.data_sources.polymarket_us import (
+                            PolymarketUSClient,
+                            capture_slate_snapshots,
+                        )
+
+                        client = PolymarketUSClient()
+                        today_utc = datetime.now(UTC).strftime("%Y-%m-%d")
+                        sports_to_fetch = (
+                            [sport_filter]
+                            if sport_filter and sport_filter != "all"
+                            else ["mlb", "wnba", "tennis", "soccer", "esports", "kbo", "npb"]
+                        )
+                        all_events = {}
+                        for s in sports_to_fetch:
+                            try:
+                                res_s = client.sport_slate(s, date.fromisoformat(today_utc))
+                                for lg, evs in res_s.events.items():
+                                    all_events[lg] = evs
+                            except Exception:  # noqa: BLE001, S110
+                                pass
+                        if all_events:
+                            capture_slate_snapshots(client, all_events, ROOT / "data", today_utc)
+                    except Exception:  # noqa: BLE001, S110
+                        pass
 
                 def _do_scan():
                     scanner = PolymarketSlateScanner(
@@ -283,6 +328,10 @@ class Handler(BaseHTTPRequestHandler):
                         date_filter=date_filter,
                         prefer_maker=maker,
                         require_model=require_model,
+                        pregame_only=pregame_only,
+                        today_only=today_only,
+                        max_start_hours=max_start_hours,
+                        max_age_minutes=max_age_minutes,
                     )
                     return {
                         "as_of_utc": res.as_of_utc,
@@ -294,6 +343,11 @@ class Handler(BaseHTTPRequestHandler):
                                 "market_id": o.market_id,
                                 "question": o.question,
                                 "side": o.side,
+                                "target_selection": o.target_selection,
+                                "target_side": o.target_side,
+                                "selection_label": o.selection_label,
+                                "home_team": o.home_team,
+                                "away_team": o.away_team,
                                 "order_price": o.order_price,
                                 "model_probability": o.model_probability,
                                 "market_price": o.market_price,
@@ -303,14 +357,18 @@ class Handler(BaseHTTPRequestHandler):
                                 "kelly_fraction": o.kelly_fraction_recommended,
                                 "is_maker": o.is_maker,
                                 "reason": o.reason,
+                                "event_start_utc": o.event_start_utc,
                                 "observed_at_utc": o.observed_at_utc,
                             }
                             for o in res.actionable_orders
                         ],
                     }
 
-                cache_key = f"polymarket:scan:{sport_filter or 'all'}:{date_filter or 'all'}:{bankroll}:{min_edge}:{maker}:{require_model}"
-                self._send(_cached(cache_key, 10, _do_scan))
+                cache_key = f"polymarket:scan:{sport_filter or 'all'}:{date_filter or 'all'}:{bankroll}:{min_edge}:{maker}:{require_model}:{pregame_only}:{timeframe}:{max_age_minutes}"
+                if live:
+                    self._send(_do_scan())
+                else:
+                    self._send(_cached(cache_key, 10, _do_scan))
             elif route == "/api/health":
                 self._send({"ok": True, "at": datetime.now(UTC).isoformat()[:19]})
             elif route.startswith("/api/rebuild/"):

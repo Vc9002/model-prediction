@@ -28,6 +28,11 @@ def test_dispatcher_single_order_evaluation():
     decision = dispatcher.evaluate_request(req)
 
     assert decision.side == "BUY_YES"
+    assert decision.target_selection == "Dodgers"
+    assert decision.target_side == "YES"
+    assert decision.home_team == "Dodgers"
+    assert decision.away_team == "Padres"
+    assert decision.selection_label == "Dodgers (BUY YES)"
     assert decision.order_price == 0.60
     assert decision.edge == pytest.approx(0.07, abs=1e-4)
     assert decision.stake_units == 60.00  # 3% of $2000
@@ -64,3 +69,24 @@ def test_dispatcher_batch_filtering():
     assert len(actionable) == 1
     assert actionable[0].market_id == "m_pass"
     assert actionable[0].side == "BUY_YES"
+
+
+def test_dispatcher_rejects_missing_model_data():
+    dispatcher = PolymarketDispatcher(bankroll=1000.0, min_edge=0.025)
+
+    req_no_data = DispatchRequest(
+        market_id="m_no_data",
+        league="TENNIS",
+        question="Will Unknown Player win?",
+        home_or_player_a="Player A",
+        away_or_player_b="Player B",
+        best_bid=0.20,
+        best_ask=0.25,
+        event_start_utc="2026-08-22T00:00:00Z",
+        p_model_override=None,  # No model data available
+    )
+
+    decision = dispatcher.evaluate_request(req_no_data)
+    assert decision.side == "NO_ORDER"
+    assert "NO_CALL_NO_DATA" in decision.reason
+    assert decision.stake_units == 0.0

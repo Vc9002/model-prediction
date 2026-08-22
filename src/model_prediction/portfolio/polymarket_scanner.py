@@ -193,7 +193,16 @@ class PolymarketSlateScanner:
             max_position_pct=max_position_pct,
         )
 
-    def parse_snapshot_line(self, line: str, require_model: bool = True) -> DispatchRequest | None:
+    def parse_snapshot_line(
+        self,
+        line: str,
+        require_model: bool = True,
+        pregame_only: bool = False,
+        today_only: bool = False,
+        max_start_hours: float | None = None,
+        max_age_minutes: int | None = None,
+        now_dt: Any | None = None,
+    ) -> DispatchRequest | None:
         """Parse a single JSONL snapshot line into a DispatchRequest."""
         try:
             data = json.loads(line.strip())
@@ -220,6 +229,35 @@ class PolymarketSlateScanner:
         league = str(data.get("league", "")).upper()
         event_title = str(data.get("event_title", ""))
         event_start_utc = str(data.get("event_start_utc", ""))
+        observed_at_utc = str(data.get("observed_at_utc") or "")
+
+        if (pregame_only or today_only or max_start_hours is not None) and event_start_utc:
+            try:
+                from datetime import UTC, datetime, timedelta
+
+                start_dt = datetime.fromisoformat(event_start_utc)
+                cur = now_dt or datetime.now(UTC)
+                if pregame_only and start_dt <= cur:
+                    return None
+                if today_only or max_start_hours is not None:
+                    limit_hours = max_start_hours if max_start_hours is not None else 24.0
+                    if start_dt > cur + timedelta(hours=limit_hours):
+                        return None
+            except (ValueError, TypeError):
+                pass
+
+        if max_age_minutes is not None and observed_at_utc:
+            try:
+                from datetime import UTC, datetime
+
+                obs_dt = datetime.fromisoformat(observed_at_utc)
+                cur = now_dt or datetime.now(UTC)
+                age_mins = (cur - obs_dt).total_seconds() / 60.0
+                if age_mins > max_age_minutes:
+                    return None
+            except (ValueError, TypeError):
+                pass
+
         home_or_a = str(long_q.get("description", ""))
         away_or_b = str(short_q.get("description", ""))
 
@@ -229,8 +267,6 @@ class PolymarketSlateScanner:
         )
         if require_model and p_model is None:
             return None
-
-        observed_at_utc = str(data.get("observed_at_utc") or "")
 
         return DispatchRequest(
             market_id=market_id,
@@ -250,6 +286,10 @@ class PolymarketSlateScanner:
         snapshot_path: Path | str,
         prefer_maker: bool = False,
         require_model: bool = True,
+        pregame_only: bool = False,
+        today_only: bool = False,
+        max_start_hours: float | None = None,
+        max_age_minutes: int | None = None,
     ) -> list[PolymarketOrderDecision]:
         """Scan a specific polymarket_snapshots.jsonl file with market deduplication."""
         p = Path(snapshot_path)
@@ -259,7 +299,14 @@ class PolymarketSlateScanner:
         latest_by_market: dict[str, DispatchRequest] = {}
         with open(p, encoding="utf-8") as f:
             for line in f:
-                req = self.parse_snapshot_line(line, require_model=require_model)
+                req = self.parse_snapshot_line(
+                    line,
+                    require_model=require_model,
+                    pregame_only=pregame_only,
+                    today_only=today_only,
+                    max_start_hours=max_start_hours,
+                    max_age_minutes=max_age_minutes,
+                )
                 if req is not None:
                     latest_by_market[req.market_id] = req
 
@@ -274,6 +321,10 @@ class PolymarketSlateScanner:
         date_filter: str | None = None,
         prefer_maker: bool = False,
         require_model: bool = True,
+        pregame_only: bool = False,
+        today_only: bool = False,
+        max_start_hours: float | None = None,
+        max_age_minutes: int | None = None,
     ) -> PolymarketScanResult:
         """Scan multiple snapshot files across sports and dates."""
         base = Path(base_dir)
@@ -317,7 +368,14 @@ class PolymarketSlateScanner:
         for f_path in target_files:
             with open(f_path, encoding="utf-8") as f:
                 for line in f:
-                    req = self.parse_snapshot_line(line, require_model=require_model)
+                    req = self.parse_snapshot_line(
+                        line,
+                        require_model=require_model,
+                        pregame_only=pregame_only,
+                        today_only=today_only,
+                        max_start_hours=max_start_hours,
+                        max_age_minutes=max_age_minutes,
+                    )
                     if req is not None:
                         latest_by_market[req.market_id] = req
 

@@ -41,6 +41,9 @@ class PolymarketQuote:
     best_ask: float  # e.g. 0.60
     spread: float  # best_ask - best_bid
     last_traded_price: float | None = None
+    home_or_player_a: str = ""
+    away_or_player_b: str = ""
+    event_start_utc: str = ""
     observed_at_utc: str = ""
 
 
@@ -61,6 +64,12 @@ class PolymarketOrderDecision:
     stake_units: float  # Dollars/units to stake based on bankroll
     reason: str
     question: str = ""
+    target_selection: str = ""  # The explicit team/entity being bet (e.g. "Minnesota Lynx")
+    target_side: str = ""  # "YES" or "NO"
+    home_team: str = ""
+    away_team: str = ""
+    selection_label: str = ""  # e.g. "Minnesota Lynx (BUY YES)"
+    event_start_utc: str = ""
     observed_at_utc: str = ""
 
 
@@ -93,6 +102,9 @@ class PolymarketKellyEngine:
         bid = max(MIN_CONTRACT_PRICE, min(MAX_CONTRACT_PRICE, quote.best_bid))
         ask = max(MIN_CONTRACT_PRICE, min(MAX_CONTRACT_PRICE, quote.best_ask))
 
+        home = quote.home_or_player_a
+        away = quote.away_or_player_b
+
         # 1. Evaluate YES Opportunity
         # Taker buys at ask; Maker posts at bid + 0.01 (if inside spread)
         price_yes = min(ask, bid + 0.01) if prefer_maker and (ask - bid > 0.01) else ask
@@ -115,6 +127,8 @@ class PolymarketKellyEngine:
             rec_k = min(self.max_position_pct, max(0.0, full_k * self.kelly_fraction))
             stake = round(self.bankroll * rec_k, 2)
             is_maker = prefer_maker and (price_yes < ask)
+            target = home or "YES"
+            sel_lbl = f"{home} (BUY YES)" if home else "BUY YES"
 
             return PolymarketOrderDecision(
                 market_id=quote.market_id,
@@ -128,8 +142,14 @@ class PolymarketKellyEngine:
                 kelly_fraction_full=round(full_k, 4),
                 kelly_fraction_recommended=round(rec_k, 4),
                 stake_units=stake,
-                reason=f"YES Edge +{edge_yes:.1%} exceeds min {self.min_edge:.1%} threshold (EV +{ev_yes:.1f}%)",
+                reason=f"BUY YES on {target}: Edge +{edge_yes:.1%} (Model {p_effective:.1%} vs Ask {price_yes * 100:.1f}¢, EV +{ev_yes:.1f}%)",
                 question=quote.question,
+                target_selection=target,
+                target_side="YES",
+                home_team=home,
+                away_team=away,
+                selection_label=sel_lbl,
+                event_start_utc=quote.event_start_utc,
                 observed_at_utc=quote.observed_at_utc,
             )
 
@@ -139,6 +159,8 @@ class PolymarketKellyEngine:
             rec_k = min(self.max_position_pct, max(0.0, full_k * self.kelly_fraction))
             stake = round(self.bankroll * rec_k, 2)
             is_maker = prefer_maker and (price_no < cost_no_taker)
+            target = away or "NO"
+            sel_lbl = f"{away} (BUY NO)" if away else "BUY NO"
 
             return PolymarketOrderDecision(
                 market_id=quote.market_id,
@@ -152,14 +174,24 @@ class PolymarketKellyEngine:
                 kelly_fraction_full=round(full_k, 4),
                 kelly_fraction_recommended=round(rec_k, 4),
                 stake_units=stake,
-                reason=f"NO Edge +{edge_no:.1%} exceeds min {self.min_edge:.1%} threshold (EV +{ev_no:.1f}%)",
+                reason=f"BUY NO on {target}: Edge +{edge_no:.1%} (Model {p_effective_no:.1%} vs Ask {price_no * 100:.1f}¢, EV +{ev_no:.1f}%)",
                 question=quote.question,
+                target_selection=target,
+                target_side="NO",
+                home_team=home,
+                away_team=away,
+                selection_label=sel_lbl,
+                event_start_utc=quote.event_start_utc,
                 observed_at_utc=quote.observed_at_utc,
             )
 
         else:
             best_edge = max(edge_yes, edge_no)
-            side_candidate = "YES" if edge_yes >= edge_no else "NO"
+            side_candidate = (
+                f"YES ({home})"
+                if home and edge_yes >= edge_no
+                else ("NO (" + away + ")" if away else ("YES" if edge_yes >= edge_no else "NO"))
+            )
             return PolymarketOrderDecision(
                 market_id=quote.market_id,
                 side="NO_ORDER",
@@ -174,5 +206,11 @@ class PolymarketKellyEngine:
                 stake_units=0.0,
                 reason=f"Edge +{best_edge:.1%} on {side_candidate} below min threshold {self.min_edge:.1%}",
                 question=quote.question,
+                target_selection="",
+                target_side="",
+                home_team=home,
+                away_team=away,
+                selection_label="",
+                event_start_utc=quote.event_start_utc,
                 observed_at_utc=quote.observed_at_utc,
             )

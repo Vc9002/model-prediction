@@ -74,10 +74,31 @@ class PolymarketDispatcher:
             best_bid=req.best_bid,
             best_ask=req.best_ask,
             spread=round(req.best_ask - req.best_bid, 4),
+            home_or_player_a=req.home_or_player_a,
+            away_or_player_b=req.away_or_player_b,
+            event_start_utc=req.event_start_utc,
             observed_at_utc=req.observed_at_utc,
         )
 
-        p_model = req.p_model_override if req.p_model_override is not None else 0.50
+        if req.p_model_override is None:
+            return PolymarketOrderDecision(
+                market_id=quote.market_id,
+                side="NO_ORDER",
+                is_maker=False,
+                order_price=0.0,
+                model_probability=0.0,
+                market_price=quote.best_ask,
+                edge=0.0,
+                expected_value_pct=0.0,
+                kelly_fraction_full=0.0,
+                kelly_fraction_recommended=0.0,
+                stake_units=0.0,
+                reason="NO_CALL_NO_DATA: No validated model probability on record for matchup",
+                question=quote.question,
+                observed_at_utc=quote.observed_at_utc,
+            )
+
+        p_model = req.p_model_override
         p_tie = req.p_tie_override
 
         # Tie probabilities for specific leagues if not overridden
