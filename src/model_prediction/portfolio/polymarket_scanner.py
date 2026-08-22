@@ -268,6 +268,8 @@ class PolymarketSlateScanner:
         if require_model and p_model is None:
             return None
 
+        effective_p = p_model if p_model is not None else 0.50
+
         return DispatchRequest(
             market_id=market_id,
             league=league,
@@ -277,7 +279,7 @@ class PolymarketSlateScanner:
             best_bid=float(bid),
             best_ask=float(ask),
             event_start_utc=event_start_utc,
-            p_model_override=p_model,
+            p_model_override=effective_p,
             observed_at_utc=observed_at_utc,
         )
 
