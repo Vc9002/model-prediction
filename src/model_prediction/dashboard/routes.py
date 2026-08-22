@@ -391,6 +391,27 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(_do_scan())
                 else:
                     self._send(_cached(cache_key, 10, _do_scan))
+            elif route == "/api/polymarket/rehearsal":
+                from dataclasses import asdict
+
+                from model_prediction.portfolio.execution_rehearsal import ExecutionRehearsalRunner
+
+                sport_param = query.get("sport")
+                r_sport_filter = None if not sport_param or sport_param == "all" else sport_param
+                r_date_filter = query.get("date")
+                r_bankroll = float(query.get("bankroll", "1000.0"))
+                r_min_edge = float(query.get("min_edge", "0.025"))
+                r_maker = query.get("maker", "false").lower() in ("true", "1", "yes")
+                r_require_model = query.get("require_model", "false").lower() in ("true", "1", "yes")
+
+                runner = ExecutionRehearsalRunner(bankroll=r_bankroll, min_edge=r_min_edge)
+                rehearsal_report = runner.run_rehearsal(
+                    sport_filter=r_sport_filter,
+                    date_filter=r_date_filter,
+                    prefer_maker=r_maker,
+                    require_model=r_require_model,
+                )
+                self._send(asdict(rehearsal_report))
             elif route == "/api/health":
                 self._send({"ok": True, "at": datetime.now(UTC).isoformat()[:19]})
             elif route == "/api/drawdown":

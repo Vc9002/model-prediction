@@ -168,3 +168,25 @@ def test_polymarket_ledger_settlement(tmp_path):
     assert int(rows[0]["home_score"]) == 5
     assert int(rows[0]["away_score"]) == 3
     assert float(rows[0]["pnl_units"]) > 0
+
+
+def test_dashboard_polymarket_rehearsal_endpoint():
+    handler = Handler.__new__(Handler)
+    handler.path = "/api/polymarket/rehearsal?sport=esports&min_edge=0.03&bankroll=1000"
+    handler.headers = {}
+    handler.wfile = BytesIO()
+    handler.send_response = Mock()
+    handler.send_header = Mock()
+    handler.end_headers = Mock()
+
+    handler.do_GET()
+
+    response_bytes = handler.wfile.getvalue()
+    assert len(response_bytes) > 0
+    data = json.loads(response_bytes.decode("utf-8"))
+
+    assert "total_markets_scanned" in data
+    assert "actionable_orders_count" in data
+    assert "pipeline_health" in data
+    assert "compliance_checks" in data
+    assert "tickets" in data
