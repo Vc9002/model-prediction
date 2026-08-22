@@ -82,6 +82,23 @@ def load_starter_index(
     if not path.exists():
         _STARTER_INDEX_CACHE[path] = index
         return index
+
+    cache_file = path.with_suffix(".cache")
+    if cache_file.exists():
+        try:
+            stat = path.stat()
+            cache_stat = cache_file.stat()
+            if cache_stat.st_mtime >= stat.st_mtime:
+                import pickle
+
+                with cache_file.open("rb") as cf:
+                    cached_data = pickle.load(cf)
+                    if isinstance(cached_data, dict):
+                        _STARTER_INDEX_CACHE[path] = cached_data
+                        return cached_data
+        except (OSError, pickle.UnpicklingError, ValueError, EOFError):
+            pass
+
     from ..domain import parse_utc
 
     with path.open(encoding="utf-8") as handle:
@@ -126,6 +143,18 @@ def load_starter_index(
     for starts in index.values():
         starts.sort(key=lambda item: item[0])
     _STARTER_INDEX_CACHE[path] = index
+
+    try:
+        import pickle
+        import uuid
+
+        temp_cache = cache_file.with_name(f"{cache_file.name}.tmp.{uuid.uuid4().hex[:6]}")
+        with temp_cache.open("wb") as cf:
+            pickle.dump(index, cf, protocol=pickle.HIGHEST_PROTOCOL)
+        temp_cache.replace(cache_file)
+    except OSError:
+        pass
+
     return index
 
 
