@@ -120,7 +120,7 @@ class ServeReturnModel:
 
         X = np.array(X_list)
         y = np.array(y_list)
-        lr = LogisticRegression(penalty="l2", C=10.0, solver="lbfgs", max_iter=1000)
+        lr = LogisticRegression(l1_ratio=0, C=10.0, solver="lbfgs", max_iter=1000)
         lr.fit(X, y)
         self.intercept = float(lr.intercept_[0])
         self.coef_spw = float(lr.coef_[0, 0])

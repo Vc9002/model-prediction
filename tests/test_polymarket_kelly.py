@@ -128,3 +128,72 @@ def test_polymarket_tie_half_payout_rule():
     assert decision.side == "BUY_YES"
     assert decision.model_probability == pytest.approx(0.50, abs=1e-4)
     assert decision.edge == pytest.approx(0.04, abs=1e-4)
+
+
+def test_correlation_exposure_capping():
+    from model_prediction.portfolio.polymarket_kelly import PolymarketOrderDecision
+
+    engine = PolymarketKellyEngine(bankroll=1000.0)
+
+    # 3 correlated orders for the same game (Moneyline + Spread + Total)
+    # Total nominal stake = $30 + $30 + $30 = $90 (9% of $1000 bankroll)
+    # Max game exposure = 5% ($50) -> should scale all 3 down to $16.67 each
+    orders = [
+        PolymarketOrderDecision(
+            market_id="m_ml",
+            side="BUY_YES",
+            is_maker=False,
+            order_price=0.55,
+            model_probability=0.65,
+            market_price=0.55,
+            edge=0.10,
+            expected_value_pct=18.0,
+            kelly_fraction_full=0.22,
+            kelly_fraction_recommended=0.03,
+            stake_units=30.0,
+            reason="Moneyline Edge",
+            home_team="Team A",
+            away_team="Team B",
+            event_start_utc="2026-08-22T20:00:00Z",
+        ),
+        PolymarketOrderDecision(
+            market_id="m_spread",
+            side="BUY_YES",
+            is_maker=False,
+            order_price=0.50,
+            model_probability=0.60,
+            market_price=0.50,
+            edge=0.10,
+            expected_value_pct=20.0,
+            kelly_fraction_full=0.20,
+            kelly_fraction_recommended=0.03,
+            stake_units=30.0,
+            reason="Spread Edge",
+            home_team="Team A",
+            away_team="Team B",
+            event_start_utc="2026-08-22T20:00:00Z",
+        ),
+        PolymarketOrderDecision(
+            market_id="m_total",
+            side="BUY_YES",
+            is_maker=False,
+            order_price=0.52,
+            model_probability=0.62,
+            market_price=0.52,
+            edge=0.10,
+            expected_value_pct=19.0,
+            kelly_fraction_full=0.21,
+            kelly_fraction_recommended=0.03,
+            stake_units=30.0,
+            reason="Total Edge",
+            home_team="Team A",
+            away_team="Team B",
+            event_start_utc="2026-08-22T20:00:00Z",
+        ),
+    ]
+
+    capped = engine.apply_correlation_exposure_caps(orders, max_game_exposure_pct=0.05)
+    assert len(capped) == 3
+    total_staked = sum(o.stake_units for o in capped)
+    assert round(total_staked, 2) <= 50.01
+    assert all("Correlation capped" in o.reason for o in capped)

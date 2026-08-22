@@ -180,16 +180,44 @@ def record_polymarket_orders(
 
 def settle_polymarket_ledger_rows(
     data_root: Path | str | None = None,
+    espn_client: Any | None = None,
 ) -> dict[str, Any]:
-    """Settle open rows in the Polymarket Edge Ledger."""
+    """Settle open rows in the Polymarket Edge Ledger against ESPN and match scores."""
+    from ..data_sources.espn import ESPNClient
+    from ..domain import MarketType, PickResult
+    from ..pricing import grade_pick, profit_units
+
     path = _get_ledger_path(data_root)
     if not path.exists():
-        return {"settled_count": 0, "open_count": 0}
+        return {"settled_count": 0, "open_count": 0, "total_rows": 0, "settled_picks": []}
 
     _, rows = read_xlsx_rows(path)
     now = utc_now()
-    settled_count = 0
+    now_iso = now.isoformat()
+    espn = espn_client or ESPNClient()
+
+    settled_picks: list[dict[str, Any]] = []
     open_count = 0
+    modified = False
+
+    # League to ESPN league mapping
+    league_map = {
+        "MLB": ("mlb",),
+        "NBA": ("nba",),
+        "WNBA": ("wnba",),
+        "NFL": ("nfl",),
+        "SOCCER": (
+            "eng.1",
+            "esp.1",
+            "ger.1",
+            "ita.1",
+            "fra.1",
+            "usa.1",
+            "uefa.champions",
+            "uefa.europa",
+            "mex.1",
+        ),
+    }
 
     for row in rows:
         status = str(row.get("status") or "").lower()
@@ -203,14 +231,112 @@ def settle_polymarket_ledger_rows(
 
         try:
             start_dt = datetime.fromisoformat(event_start_str)
-            # If event started more than 3 hours ago, attempt evaluation
-            if (now - start_dt).total_seconds() > 3 * 3600:
-                pass
+            if start_dt.tzinfo is None:
+                start_dt = start_dt.replace(tzinfo=now.tzinfo)
         except (ValueError, TypeError):
             continue
 
+        # Check games that have already started
+        if start_dt > now:
+            continue
+
+        lg = str(row.get("league") or "").upper()
+        espn_leagues = league_map.get(lg, (lg.lower(),))
+        game_day = start_dt.date().isoformat()
+
+        away_name = str(row.get("away_team") or "").casefold()
+        home_name = str(row.get("home_team") or "").casefold()
+
+        match_found = None
+        for espn_lg in espn_leagues:
+            try:
+                sb = espn.scoreboard(espn_lg, game_day)
+                for event in sb.get("events", []):
+                    status_type = event.get("status", {}).get("type", {})
+                    if not status_type.get("completed", False):
+                        continue
+                    comps = event.get("competitions", [{}])[0].get("competitors", [])
+                    if len(comps) != 2:
+                        continue
+                    c_away = next((c for c in comps if c.get("homeAway") == "away"), comps[1])
+                    c_home = next((c for c in comps if c.get("homeAway") == "home"), comps[0])
+
+                    h_names = {
+                        str(c_home.get("team", {}).get("displayName") or "").casefold(),
+                        str(c_home.get("team", {}).get("name") or "").casefold(),
+                        str(c_home.get("team", {}).get("abbreviation") or "").casefold(),
+                    }
+                    a_names = {
+                        str(c_away.get("team", {}).get("displayName") or "").casefold(),
+                        str(c_away.get("team", {}).get("name") or "").casefold(),
+                        str(c_away.get("team", {}).get("abbreviation") or "").casefold(),
+                    }
+
+                    if (home_name in h_names or any(hn in home_name for hn in h_names if len(hn) > 3)) and (
+                        away_name in a_names or any(an in away_name for an in a_names if len(an) > 3)
+                    ):
+                        try:
+                            h_score = int(c_home.get("score", 0))
+                            a_score = int(c_away.get("score", 0))
+                            match_found = (a_score, h_score)
+                        except (ValueError, TypeError):
+                            continue
+                if match_found is not None:
+                    break
+            except (KeyError, TypeError, ValueError, OSError):
+                logger.debug("Scoreboard lookup failed for %s on %s", espn_lg, game_day, exc_info=True)
+                continue
+
+        if match_found is not None:
+            a_score, h_score = match_found
+            mtype_str = str(row.get("market_type") or "moneyline").lower()
+            try:
+                mtype = MarketType(mtype_str)
+            except ValueError:
+                mtype = MarketType.MONEYLINE
+
+            sel = str(row.get("selection") or "home").lower()
+            line_val = None
+            if row.get("line") not in (None, ""):
+                try:
+                    line_val = float(row["line"])
+                except (ValueError, TypeError):
+                    line_val = None
+
+            graded_result = grade_pick(
+                market_type=mtype,
+                selection=sel,
+                line=line_val,
+                away_score=a_score,
+                home_score=h_score,
+                league=lg,
+            )
+
+            units = float(row.get("units") or 1.0)
+            dec_odds = float(row.get("decimal_odds") or 1.909)
+            pnl = profit_units(graded_result, units, dec_odds)
+
+            row["status"] = "settled"
+            row["result"] = (
+                "win"
+                if graded_result is PickResult.WIN
+                else ("loss" if graded_result is PickResult.LOSS else "push")
+            )
+            row["away_score"] = a_score
+            row["home_score"] = h_score
+            row["pnl_units"] = round(pnl, 4)
+            row["settled_at_utc"] = now_iso
+            modified = True
+            open_count -= 1
+            settled_picks.append({"pick_id": row.get("pick_id"), "result": row["result"], "pnl": pnl})
+
+    if modified:
+        write_xlsx_rows_atomic(path, FIELDNAMES, rows)
+
     return {
-        "settled_count": settled_count,
+        "status": "ok",
+        "settled_count": len(settled_picks),
         "open_count": open_count,
         "total_rows": len(rows),
+        "settled_picks": settled_picks,
     }

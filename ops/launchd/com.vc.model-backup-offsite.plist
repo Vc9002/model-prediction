@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Nightly hot-backup + offsite sync of the runtime-root SQLite ledgers
+  (ops brainstorm #2, 2026-08-17 — "the single most important piece of
+  boring infra not yet present"; wired 2026-08-22).
+
+  User-level LaunchAgent, matching com.vc.model-dashboard's convention
+  (not a root LaunchDaemon — no privileged access needed, and this only
+  needs to run while the user is logged in since it writes to iCloud
+  Drive under the user's home directory).
+
+  03:10 local, after the overnight daily/production cycles and ahead of
+  the mlb-lineup-capture hourly job's next tick; the backup script only
+  ever opens the source databases read-only, so exact timing relative to
+  other jobs isn't load-bearing, just chosen to avoid overlapping I/O.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.vc.model-backup-offsite</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/vincentc9002/model-prediction/scripts/backup_offsite_sync.sh</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>MODEL_PREDICTION_RUNTIME_ROOT</key>
+        <string>/Users/vincentc9002/model-prediction-runtime</string>
+    </dict>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>3</integer>
+        <key>Minute</key>
+        <integer>10</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/vincentc9002/model-prediction-runtime/logs/backup/launchd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/vincentc9002/model-prediction-runtime/logs/backup/launchd.err.log</string>
+</dict>
+</plist>

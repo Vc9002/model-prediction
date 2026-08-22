@@ -87,6 +87,7 @@ from model_prediction.dashboard.picks import (
 from model_prediction.dashboard.status import (
     _capture_health_summary,
     _clv_summary,
+    _drawdown_summary,
     status,
 )
 from model_prediction.portfolio.polymarket_scanner import PolymarketSlateScanner
@@ -118,7 +119,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
-        query = {key: values[0] for key, values in parse_qs(parsed.query).items()}
+        params = parse_qs(parsed.query)
+        query = {key: values[0] for key, values in params.items()}
+        sport_filter = query.get("sport")
         route = parsed.path
         try:
             if route in ("/", "/dashboard.html"):
@@ -389,6 +392,38 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(_cached(cache_key, 10, _do_scan))
             elif route == "/api/health":
                 self._send({"ok": True, "at": datetime.now(UTC).isoformat()[:19]})
+            elif route == "/api/drawdown":
+                self._send(
+                    _cached(f"drawdown:{sport_filter or 'all'}", 10, lambda: _drawdown_summary(sport_filter))
+                )
+            elif route == "/api/export/picks":
+                import csv
+                import io
+
+                ledger_type = (params.get("ledger") or ["main"])[0].lower()
+                if ledger_type == "flat":
+                    raw_rows = read_flat_picks()
+                elif ledger_type == "polymarket":
+                    raw_rows = read_polymarket_picks()
+                else:
+                    raw_rows = read_picks()
+
+                output = io.StringIO()
+                if raw_rows:
+                    fieldnames = list(raw_rows[0].keys())
+                    writer = csv.DictWriter(output, fieldnames=fieldnames)
+                    writer.writeheader()
+                    for r in raw_rows:
+                        writer.writerow(r)
+                csv_bytes = output.getvalue().encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/csv; charset=utf-8")
+                self.send_header("Content-Disposition", f'attachment; filename="{ledger_type}_picks.csv"')
+                self.send_header("Content-Length", str(len(csv_bytes)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(csv_bytes)
+                return
             elif route.startswith("/api/rebuild/"):
                 view = route.removeprefix("/api/rebuild/")
                 if view in _REBUILD_VIEWS:

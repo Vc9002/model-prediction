@@ -228,3 +228,63 @@ class PolymarketKellyEngine:
                 depth_imbalance=round(quote.depth_imbalance, 3),
                 spread_cents=spread_c,
             )
+
+    def apply_correlation_exposure_caps(
+        self,
+        orders: list[PolymarketOrderDecision],
+        max_game_exposure_pct: float = 0.05,
+    ) -> list[PolymarketOrderDecision]:
+        """Apply correlation-aware joint exposure caps across same-game derivative markets."""
+        max_game_dollars = self.bankroll * max_game_exposure_pct
+        by_game: dict[str, list[PolymarketOrderDecision]] = {}
+
+        for o in orders:
+            if o.side == "NO_ORDER" or o.stake_units <= 0:
+                continue
+            game_key = f"{o.event_start_utc}:{o.home_team}:{o.away_team}"
+            by_game.setdefault(game_key, []).append(o)
+
+        adjusted_orders: list[PolymarketOrderDecision] = []
+        for o in orders:
+            if o.side == "NO_ORDER" or o.stake_units <= 0:
+                adjusted_orders.append(o)
+                continue
+
+            game_key = f"{o.event_start_utc}:{o.home_team}:{o.away_team}"
+            game_orders = by_game.get(game_key, [])
+            total_game_stake = sum(go.stake_units for go in game_orders)
+
+            if total_game_stake > max_game_dollars and total_game_stake > 0:
+                scale_factor = max_game_dollars / total_game_stake
+                adj_stake = round(o.stake_units * scale_factor, 2)
+                adj_rec_k = round(o.kelly_fraction_recommended * scale_factor, 4)
+                adjusted_orders.append(
+                    PolymarketOrderDecision(
+                        market_id=o.market_id,
+                        side=o.side,
+                        is_maker=o.is_maker,
+                        order_price=o.order_price,
+                        model_probability=o.model_probability,
+                        market_price=o.market_price,
+                        edge=o.edge,
+                        expected_value_pct=o.expected_value_pct,
+                        kelly_fraction_full=o.kelly_fraction_full,
+                        kelly_fraction_recommended=adj_rec_k,
+                        stake_units=adj_stake,
+                        reason=f"{o.reason} [Correlation capped: {scale_factor:.1%} scale]",
+                        question=o.question,
+                        target_selection=o.target_selection,
+                        target_side=o.target_side,
+                        home_team=o.home_team,
+                        away_team=o.away_team,
+                        selection_label=o.selection_label,
+                        event_start_utc=o.event_start_utc,
+                        observed_at_utc=o.observed_at_utc,
+                        depth_imbalance=o.depth_imbalance,
+                        spread_cents=o.spread_cents,
+                    )
+                )
+            else:
+                adjusted_orders.append(o)
+
+        return adjusted_orders

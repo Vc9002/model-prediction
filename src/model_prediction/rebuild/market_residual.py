@@ -69,7 +69,7 @@ class MarketResidualModel:
     MODEL_VERSION = "market-residual-v2"
 
     def __init__(self) -> None:
-        self.model = LogisticRegression(penalty="l2", C=1.0, solver="lbfgs", max_iter=1000)
+        self.model = LogisticRegression(l1_ratio=0, C=1.0, solver="lbfgs", max_iter=1000)
         self.scaler = StandardScaler()
         self._fitted = False
 

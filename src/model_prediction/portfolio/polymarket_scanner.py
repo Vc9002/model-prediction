@@ -339,10 +339,10 @@ class PolymarketSlateScanner:
                 )
                 if req is not None:
                     latest_by_market[req.market_id] = req
-
-        return self.dispatcher.get_actionable_orders(
+        orders = self.dispatcher.get_actionable_orders(
             list(latest_by_market.values()), prefer_maker=prefer_maker
         )
+        return self.dispatcher.kelly_engine.apply_correlation_exposure_caps(orders)
 
     def scan_directory(
         self,
@@ -412,7 +412,8 @@ class PolymarketSlateScanner:
                         latest_by_market[req.market_id] = req
 
         unique_requests = list(latest_by_market.values())
-        actionable = self.dispatcher.get_actionable_orders(unique_requests, prefer_maker=prefer_maker)
+        raw_actionable = self.dispatcher.get_actionable_orders(unique_requests, prefer_maker=prefer_maker)
+        actionable = self.dispatcher.kelly_engine.apply_correlation_exposure_caps(raw_actionable)
         total_staked = sum(o.stake_units for o in actionable)
 
         return PolymarketScanResult(

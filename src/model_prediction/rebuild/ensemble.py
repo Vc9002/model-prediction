@@ -146,7 +146,7 @@ class Ensemble:
             from sklearn.linear_model import LogisticRegression
 
             logit_matrix = np.array([[_logit(p) for p in matrices[i]] for i in range(len(names))]).T
-            lr = LogisticRegression(penalty=None, solver="lbfgs")
+            lr = LogisticRegression(C=np.inf, solver="lbfgs")
             lr.fit(logit_matrix, np.array(y_true))
             self._lr_model = lr
             self._lr_feature_order = names

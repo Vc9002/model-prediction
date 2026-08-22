@@ -325,3 +325,53 @@ def _capture_health_summary() -> dict:
         "generated_at": datetime.now(UTC).isoformat(),
         "sports": summary_by_sport,
     }
+
+
+def _drawdown_summary(sport: str | None = None) -> dict:
+    """Calculate realized cumulative P&L curve, peak high water mark, and maximum drawdown."""
+    from model_prediction.dashboard.picks import read_flat_picks, read_picks
+
+    picks = read_picks() or read_flat_picks()
+    if sport:
+        picks = [
+            p for p in picks if str(p.get("sport") or p.get("league") or "").casefold() == sport.casefold()
+        ]
+
+    settled_picks = [p for p in picks if str(p.get("status") or "").lower() == "settled"]
+    settled_picks.sort(key=lambda p: str(p.get("event_start_utc") or p.get("created_at_utc") or ""))
+
+    cumulative_pnl = 0.0
+    high_water_mark = 0.0
+    max_drawdown_units = 0.0
+    series: list[dict] = []
+
+    for p in settled_picks:
+        try:
+            pnl = float(p.get("pnl_units") or 0.0)
+        except (ValueError, TypeError):
+            pnl = 0.0
+        cumulative_pnl += pnl
+        high_water_mark = max(high_water_mark, cumulative_pnl)
+        drawdown = high_water_mark - cumulative_pnl
+        max_drawdown_units = max(max_drawdown_units, drawdown)
+
+        series.append(
+            {
+                "date": str(p.get("event_start_utc") or p.get("created_at_utc") or "")[:10],
+                "pnl": round(pnl, 4),
+                "cumulative_pnl": round(cumulative_pnl, 4),
+                "high_water_mark": round(high_water_mark, 4),
+                "drawdown": round(drawdown, 4),
+            }
+        )
+
+    current_drawdown = high_water_mark - cumulative_pnl if settled_picks else 0.0
+
+    return {
+        "total_settled_picks": len(settled_picks),
+        "total_pnl_units": round(cumulative_pnl, 2),
+        "high_water_mark_units": round(high_water_mark, 2),
+        "max_drawdown_units": round(max_drawdown_units, 2),
+        "current_drawdown_units": round(current_drawdown, 2),
+        "series": series[-100:],
+    }

@@ -1864,3 +1864,43 @@ def test_job_history_survives_restart(monkeypatch, tmp_path: Path, patch_dash) -
     dashboard_server._persist_jobs()
     reloaded = json.loads(dashboard_server.JOBS_FILE.read_text(encoding="utf-8"))
     assert set(reloaded) == {"a", "b", "c", "d"}
+
+
+def test_drawdown_endpoint():
+    from io import BytesIO
+    from unittest.mock import Mock
+
+    handler = dashboard_server.Handler.__new__(dashboard_server.Handler)
+    handler.path = "/api/drawdown"
+    handler.headers = {}
+    handler.wfile = BytesIO()
+    handler.send_response = Mock()
+    handler.send_header = Mock()
+    handler.end_headers = Mock()
+
+    handler.do_GET()
+
+    response_bytes = handler.wfile.getvalue()
+    assert len(response_bytes) > 0
+    data = json.loads(response_bytes.decode("utf-8"))
+    assert "total_settled_picks" in data
+    assert "max_drawdown_units" in data
+    assert "current_drawdown_units" in data
+
+
+def test_export_picks_endpoint():
+    from io import BytesIO
+    from unittest.mock import Mock
+
+    handler = dashboard_server.Handler.__new__(dashboard_server.Handler)
+    handler.path = "/api/export/picks?ledger=main"
+    handler.headers = {}
+    handler.wfile = BytesIO()
+    handler.send_response = Mock()
+    handler.send_header = Mock()
+    handler.end_headers = Mock()
+
+    handler.do_GET()
+
+    response_bytes = handler.wfile.getvalue()
+    assert len(response_bytes) > 0

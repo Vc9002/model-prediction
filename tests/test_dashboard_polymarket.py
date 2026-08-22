@@ -108,3 +108,63 @@ def test_dashboard_polymarket_picks_endpoint():
     assert len(response_bytes) > 0
     data = json.loads(response_bytes.decode("utf-8"))
     assert isinstance(data, list)
+
+
+def test_polymarket_ledger_settlement(tmp_path):
+    from model_prediction.portfolio.polymarket_ledger import (
+        read_polymarket_ledger_rows,
+        record_polymarket_orders,
+        settle_polymarket_ledger_rows,
+    )
+
+    orders = [
+        {
+            "market_id": "999888",
+            "side": "BUY_YES",
+            "order_price": 0.50,
+            "market_price": 0.50,
+            "model_probability": 0.60,
+            "edge": 0.10,
+            "ev_pct": 0.20,
+            "stake_units": 2.0,
+            "target_selection": "home",
+            "home_team": "Boston Red Sox",
+            "away_team": "New York Yankees",
+            "league": "MLB",
+            "event_start_utc": "2026-08-20T17:00:00Z",
+            "reason": "BUY YES on Boston Red Sox: Edge +10%",
+        }
+    ]
+
+    record_polymarket_orders(orders, data_root=tmp_path)
+
+    # Mock ESPN client returning a completed game
+    mock_espn = Mock()
+    mock_espn.scoreboard.return_value = {
+        "events": [
+            {
+                "status": {"type": {"completed": True}},
+                "competitions": [
+                    {
+                        "competitors": [
+                            {"homeAway": "home", "team": {"displayName": "Boston Red Sox"}, "score": 5},
+                            {"homeAway": "away", "team": {"displayName": "New York Yankees"}, "score": 3},
+                        ]
+                    }
+                ],
+            }
+        ]
+    }
+
+    res = settle_polymarket_ledger_rows(data_root=tmp_path, espn_client=mock_espn)
+    assert res["status"] == "ok"
+    assert res["settled_count"] == 1
+    assert res["open_count"] == 0
+
+    rows = read_polymarket_ledger_rows(data_root=tmp_path)
+    assert len(rows) == 1
+    assert rows[0]["status"] == "settled"
+    assert rows[0]["result"] == "win"
+    assert int(rows[0]["home_score"]) == 5
+    assert int(rows[0]["away_score"]) == 3
+    assert float(rows[0]["pnl_units"]) > 0

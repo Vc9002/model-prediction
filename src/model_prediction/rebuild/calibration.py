@@ -77,7 +77,7 @@ class PlattCalibrator:
         if len(y_prob) < 50:
             return PlattCalibrator(0.0, 1.0, "platt", base_model_hash)
         logits = np.array([[_logit(p)] for p in y_prob])
-        lr = LogisticRegression(penalty=None, solver="lbfgs")
+        lr = LogisticRegression(C=np.inf, solver="lbfgs")
         lr.fit(logits, np.array(y_true))
         return PlattCalibrator(
             intercept=float(lr.intercept_[0]),
@@ -242,7 +242,7 @@ def calibration_intercept_slope(y_prob: Sequence[float], y_true: Sequence[int]) 
     if len(y_prob) < 50:
         return 0.0, 1.0
     logits = np.array([[_logit(p)] for p in y_prob])
-    lr = LogisticRegression(penalty=None, solver="lbfgs")
+    lr = LogisticRegression(C=np.inf, solver="lbfgs")
     lr.fit(logits, np.array(y_true))
     return float(lr.intercept_[0]), float(lr.coef_[0][0])
 

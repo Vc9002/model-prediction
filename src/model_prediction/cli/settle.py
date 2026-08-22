@@ -154,11 +154,21 @@ def _settle_all_unsettled(args, config, ledger) -> dict:
             settled.append({"pick_id": row["pick_id"], "result": result["result"]})
         except (KeyError, ValueError) as error:
             failures.append({"pick_id": row["pick_id"], "reason": str(error)})
+
+    try:
+        from ..portfolio.polymarket_ledger import settle_polymarket_ledger_rows
+
+        poly_settle_res = settle_polymarket_ledger_rows(data_root=data_root, espn_client=espn)
+    except Exception:
+        logger.warning("Polymarket edge ledger settlement failed", exc_info=True)
+        poly_settle_res = {"status": "error"}
+
     return {
         "settled": settled,
         "voided": voided,
         "still_open": pending,
         "failures": failures,
+        "polymarket_edge_settlement": poly_settle_res,
         "note": "Results pulled from ESPN scoreboards; closing prices from stored pregame BBO asks.",
     }
 

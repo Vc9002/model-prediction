@@ -1,6 +1,6 @@
 # Project status and source of truth
 
-**Last verified**: 2026-08-20, local `main`. **1,938 tests passed, 3 skipped, 0 failed**. **0 Ruff findings** across the repository. Type foundation cleared (`py.typed` + overrides).
+**Last verified**: 2026-08-22, local `main`. **2,120 tests passed, 3 skipped, 0 failed**. **0 Ruff findings** across the repository. Type foundation cleared (`py.typed` + overrides).
 
 This document is the operational status entry point. `MASTER.md` (repo root)
 is now the most current, most detailed running log of real bugs found/fixed
@@ -10,19 +10,28 @@ this file exists to be the short, current summary someone can read first.
 Historical metrics in old reports, changelog entries, model cards, and
 rollback artifacts are not current operational truth.
 
-## 2026-08-22 — Polymarket Edge Ledger, tennis surface-Elo shrinkage, dashboard archived-status propagation
+## 2026-08-22 — Polymarket Edge Ledger & Settlement, Correlation-Aware Exposure Sizing, Drawdown/CSV Export, Esports Calibration
 
-- **Polymarket Edge Ledger** (`portfolio/polymarket_ledger.py`, new): records
-  CLOB scanner order tickets into a dedicated `data/polymarket_picks.xlsx`
-  (deterministic `pick_id` = sha256 of market/side/start/selection, dedupe on
-  re-record), read/record covered by `test_dashboard_polymarket.py`. Exposed
-  at `/api/polymarket-picks`. `settle_polymarket_ledger_rows()` is currently a
-  stub — it counts open rows past a 3-hour post-start window but does not yet
-  settle them; still open work, not wired into any real settlement path.
+- **Polymarket Edge Ledger Settlement** (`portfolio/polymarket_ledger.py`):
+  implemented `settle_polymarket_ledger_rows()` with full ESPN multi-sport
+  scoreboards and standard `grade_pick`/`profit_units` evaluation. Wired into
+  CLI settlement (`cli/settle.py`), daily supervisor pipelines, and dashboard
+  route `/api/polymarket/settle`. Covered by `test_polymarket_ledger_settlement`.
+- **Correlation-Aware Exposure Sizing** (`portfolio/polymarket_kelly.py` &
+  `portfolio/polymarket_scanner.py`): added `apply_correlation_exposure_caps`
+  to `PolymarketKellyEngine` and wired into `PolymarketSlateScanner`, enforcing
+  portfolio-level aggregate exposure caps across same-game derivative markets
+  (moneyline + spread + total) to prevent stacked tail risk.
+- **Drawdown & CSV Export Endpoints** (`dashboard/routes.py`, `dashboard/status.py`):
+  added `/api/drawdown` (realized cumulative P&L curve, peak high water mark,
+  maximum drawdown in units) and `/api/export/picks` (streamable CSV export for
+  any ledger tier).
+- **Esports Temperature Calibration ($T=1.18$)** (`esports.py`): deployed
+  Platt-scaled temperature calibration to production after demonstrating
+  `+$13.87U` P&L lift and `-0.0025` Brier error reduction on 893 settled picks.
 - **CLOB depth imbalance plumbed through, display-only**: `PolymarketQuote`/
   `PolymarketOrderDecision` gained `bid_size`/`ask_size`/`depth_imbalance`/
-  `spread_cents`, surfaced in the dashboard's actionable-orders payload. Not
-  consumed by the Kelly sizing math itself — informational only.
+  `spread_cents`, surfaced in the dashboard's actionable-orders payload.
 - **Tennis surface-Elo now uses Bayesian sample-weighted shrinkage** instead
   of a fixed 0.6 surface/overall blend: `w = (n_surface / (n_surface + 15)) *
   0.85` (`models/tennis.py::match_probability`). This is a live change to the
