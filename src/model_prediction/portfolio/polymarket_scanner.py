@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from .polymarket_dispatcher import (
     DispatchRequest,
@@ -70,12 +71,42 @@ def _get_logged_picks() -> list[dict]:
     return _PICKS_INDEX_CACHE
 
 
+_PLATT_CALIBRATOR: Any | None = None
+
+
+def _get_platt_calibrator() -> Any | None:
+    global _PLATT_CALIBRATOR
+    if _PLATT_CALIBRATOR is not None:
+        return _PLATT_CALIBRATOR
+    try:
+        from model_prediction.calibration import TrainablePlattCalibrator
+
+        picks = _get_logged_picks()
+        settled = [
+            p
+            for p in picks
+            if str(p.get("status")).lower() == "settled"
+            and p.get("result") in ("win", "loss")
+            and p.get("model_probability") is not None
+        ]
+        if len(settled) >= 50:
+            probs = [float(p["model_probability"]) for p in settled]
+            outcomes = [1 if p["result"] == "win" else 0 for p in settled]
+            _PLATT_CALIBRATOR = TrainablePlattCalibrator.fit(
+                probs, outcomes, base_model_version="polymarket-unified-v1", minimum_sample=50
+            )
+    except Exception:  # noqa: BLE001
+        _PLATT_CALIBRATOR = None
+    return _PLATT_CALIBRATOR
+
+
 def _lookup_model_prob(
     league: str,
     home_desc: str,
     away_desc: str,
     event_start_utc: str | None = None,
     market_type: str = "moneyline",
+    calibrate: bool = True,
 ) -> float | None:
     picks = _get_logged_picks()
     lg_norm = _normalize_league(league)
@@ -122,7 +153,15 @@ def _lookup_model_prob(
 
     if candidates:
         candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
-        return candidates[0][2]
+        raw_prob = candidates[0][2]
+        if calibrate:
+            cal = _get_platt_calibrator()
+            if cal is not None and hasattr(cal, "transform"):
+                try:
+                    return cal.transform(raw_prob)
+                except Exception:  # noqa: BLE001, S110
+                    pass
+        return raw_prob
     return None
 
 
