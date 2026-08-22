@@ -815,6 +815,10 @@ const observedNow=()=>new Date().toLocaleTimeString([], {hour:"2-digit",minute:"
 $$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.classList.remove("on"));
   b.classList.add("on"); $$("section[id^=tab-]").forEach(s=>s.style.display="none");
   $("#tab-"+b.dataset.tab).style.display=""; setUrlState({tab:b.dataset.tab});updateCounts();
+  if(b.dataset.tab==="ledger")renderPicks();
+  if(b.dataset.tab==="flat")renderFlat(true);
+  if(b.dataset.tab==="research")renderResearch(true);
+  if(b.dataset.tab==="gated")renderGatedResearch(true);
   if(b.dataset.tab==="perf")performanceControlChanged(false);
   if(b.dataset.tab==="market")loadMarket();
   if(b.dataset.tab==="today")renderToday();
@@ -822,7 +826,7 @@ $$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.cl
   if(b.dataset.tab==="production")loadProduction();
   if(b.dataset.tab==="rebuild")loadRebuild();
   if(b.dataset.tab==="polymarket")loadPolymarketScanner();
-  if(b.dataset.tab==="poly-ledger")renderPolyLedger(false);
+  if(b.dataset.tab==="poly-ledger")renderPolyLedger(true);
 });
 
 /* ---------- settings ---------- */
@@ -3187,7 +3191,7 @@ async function refreshAll(){
   const panels=await Promise.allSettled([renderToday(),renderFolio(),loadMarket()]);
   // populateFilters() reads every cache, so it must run after the ledger
   // requests settle. One failed source no longer blanks every other panel.
-  await Promise.allSettled([renderResearch(false),renderFlat(false),renderGatedResearch(false),renderPolyLedger(false)]);
+  await Promise.allSettled([renderResearch(true),renderFlat(true),renderGatedResearch(true),renderPolyLedger(true)]);
   populateFilters();renderIntegrity();
   if($("#tab-polymarket") && $("#tab-polymarket").style.display!=="none") loadPolymarketScanner();
   const failures=[...core,...panels].filter(result=>result.status==="rejected").length;
