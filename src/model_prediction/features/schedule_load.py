@@ -62,11 +62,74 @@ def matchup_schedule_load(
             "rest_disparity": 0.0,
             "back_to_back_gap": 0.0,
             "games_last_7_gap": 0.0,
+            "travel_tz_displacement": 0.0,
             "schedule_available": 0.0,
         }
+
+    travel_tz = travel_timezone_displacement(away_team, home_team)
     return {
         "rest_disparity": float(home.rest_days_capped - away.rest_days_capped),
         "back_to_back_gap": float(int(home.back_to_back) - int(away.back_to_back)),
         "games_last_7_gap": float(home.games_last_7_days - away.games_last_7_days),
+        "travel_tz_displacement": float(travel_tz),
         "schedule_available": 1.0,
     }
+
+
+# Standard North American team timezone offsets for circadian jetlag modeling
+TEAM_TIMEZONE_OFFSETS: dict[str, int] = {
+    # Eastern
+    "BOS": -5,
+    "NYY": -5,
+    "NYM": -5,
+    "PHI": -5,
+    "BAL": -5,
+    "WSH": -5,
+    "TB": -5,
+    "MIA": -5,
+    "ATL": -5,
+    "PIT": -5,
+    "CLE": -5,
+    "DET": -5,
+    "CIN": -5,
+    "TOR": -5,
+    "IND": -5,
+    "CON": -5,
+    "ATL_W": -5,
+    "NY_W": -5,
+    # Central
+    "CWS": -6,
+    "CHC": -6,
+    "MIL": -6,
+    "MIN": -6,
+    "STL": -6,
+    "KC": -6,
+    "HOU": -6,
+    "TEX": -6,
+    "CHI_W": -6,
+    "MIN_W": -6,
+    "DAL_W": -6,
+    # Mountain
+    "COL": -7,
+    "AZ": -7,
+    "PHX_W": -7,
+    # Pacific
+    "LAD": -8,
+    "LAA": -8,
+    "SF": -8,
+    "OAK": -8,
+    "SD": -8,
+    "SEA": -8,
+    "LA_W": -8,
+    "LV_W": -8,
+    "SEA_W": -8,
+}
+
+
+def travel_timezone_displacement(origin_team: str, destination_team: str) -> int:
+    """Calculate absolute timezone difference in hours between origin and destination."""
+    tz_orig = TEAM_TIMEZONE_OFFSETS.get(origin_team.upper())
+    tz_dest = TEAM_TIMEZONE_OFFSETS.get(destination_team.upper())
+    if tz_orig is None or tz_dest is None:
+        return 0
+    return abs(tz_orig - tz_dest)

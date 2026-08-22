@@ -40,8 +40,20 @@ def test_matchup_schedule_load_is_home_minus_away_and_caps_long_rest() -> None:
         "rest_disparity": 6.0,
         "back_to_back_gap": -1.0,
         "games_last_7_gap": -1.0,
+        "travel_tz_displacement": 0.0,
         "schedule_available": 1.0,
     }
+
+
+def test_travel_timezone_displacement() -> None:
+    from model_prediction.features.schedule_load import travel_timezone_displacement
+
+    # LAD (Pacific, -8) traveling to BOS (Eastern, -5) -> 3 hours displacement
+    assert travel_timezone_displacement("LAD", "BOS") == 3
+    # NYY (Eastern, -5) traveling to BOS (Eastern, -5) -> 0 hours displacement
+    assert travel_timezone_displacement("NYY", "BOS") == 0
+    # Unknown team -> fails closed to 0
+    assert travel_timezone_displacement("UNKNOWN", "BOS") == 0
 
 
 def test_matchup_schedule_load_fails_closed_when_one_team_missing() -> None:
