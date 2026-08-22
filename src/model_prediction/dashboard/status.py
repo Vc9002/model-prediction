@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 from datetime import UTC, datetime
+from typing import Any
 
 try:
     from openpyxl import load_workbook
@@ -228,6 +229,20 @@ def status() -> dict:
     evidence = _cached("production-evidence", 30, production_evidence)
     operational_checks_green = not any(alert.get("level") == "error" for alert in alerts)
     promotion_allowed = bool(evidence.get("all_production_evidence_valid")) and operational_checks_green
+    loss_review_summary = _post_loss_review_alerts()
+    if loss_review_summary.get("pending_reviews_count", 0) > 0:
+        for item in loss_review_summary.get("alerts", []):
+            alerts.append(
+                {
+                    "level": "warn",
+                    "kind": "consecutive_signal_losses",
+                    "text": (
+                        f"{item['sport'].upper()} ({item['model_version']}): "
+                        f"{item['consecutive_losses']} consecutive unreviewed losses"
+                    ),
+                }
+            )
+
     return {
         "generated_at": datetime.now(UTC).isoformat(),
         "models_loaded": len(models),
@@ -242,12 +257,60 @@ def status() -> dict:
         "tests": tests or {"status": "not_run_this_session"},
         "validation_status": termination.get("status") or validation.get("status"),
         "promotion_allowed": promotion_allowed,
+        "post_loss_reviews": loss_review_summary,
         "polymarket_odds": odds_summary(),
         "polymarket_configured": bool(
             os.environ.get("POLYMARKET_KEY_ID") and os.environ.get("POLYMARKET_SECRET_KEY")
         ),
         "edge_filter_min": 0.02,
         "unit_value_usd": _unit_value_usd(),
+    }
+
+
+def _post_loss_review_alerts(picks: list[dict] | None = None) -> dict[str, Any]:
+    """Identify clusters of consecutive signal losses requiring operator review."""
+    from collections import defaultdict
+
+    from model_prediction.dashboard.picks import read_picks
+
+    if picks is None:
+        picks = read_picks()
+
+    settled = [p for p in picks if p.get("status") == "settled" and p.get("result") in ("win", "loss")]
+    settled.sort(key=lambda p: str(p.get("settled_at_utc") or p.get("event_start_utc") or ""))
+
+    by_model: dict[str, list[dict]] = defaultdict(list)
+    for p in settled:
+        model = str(p.get("model_version") or "unknown")
+        by_model[model].append(p)
+
+    alerts: list[dict[str, Any]] = []
+    for model, m_picks in by_model.items():
+        streak = 0
+        unreviewed: list[str] = []
+        sport = str(m_picks[-1].get("sport") or m_picks[-1].get("league") or "unknown")
+        for p in reversed(m_picks):
+            if p.get("result") == "loss":
+                if p.get("review_status") != "complete":
+                    streak += 1
+                    unreviewed.append(str(p.get("pick_id")))
+                else:
+                    break
+            else:
+                break
+        if streak >= 3:
+            alerts.append(
+                {
+                    "sport": sport,
+                    "model_version": model,
+                    "consecutive_losses": streak,
+                    "unreviewed_pick_ids": unreviewed,
+                }
+            )
+
+    return {
+        "pending_reviews_count": sum(a["consecutive_losses"] for a in alerts),
+        "alerts": alerts,
     }
 
 

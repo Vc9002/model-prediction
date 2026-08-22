@@ -1924,3 +1924,41 @@ def test_explain_pick_endpoint():
     assert len(response_bytes) > 0
     data = json.loads(response_bytes.decode("utf-8"))
     assert data.get("status") == "not_found"
+
+
+def test_post_loss_review_alerts():
+    from model_prediction.dashboard.status import _post_loss_review_alerts
+
+    # 3 consecutive unreviewed losses for mlb-model-v1
+    sample_picks = [
+        {
+            "pick_id": "p1",
+            "sport": "MLB",
+            "model_version": "mlb-v1",
+            "status": "settled",
+            "result": "loss",
+            "review_status": "none",
+        },
+        {
+            "pick_id": "p2",
+            "sport": "MLB",
+            "model_version": "mlb-v1",
+            "status": "settled",
+            "result": "loss",
+            "review_status": "none",
+        },
+        {
+            "pick_id": "p3",
+            "sport": "MLB",
+            "model_version": "mlb-v1",
+            "status": "settled",
+            "result": "loss",
+            "review_status": "none",
+        },
+    ]
+
+    res = _post_loss_review_alerts(sample_picks)
+    assert res["pending_reviews_count"] == 3
+    assert len(res["alerts"]) == 1
+    assert res["alerts"][0]["sport"] == "MLB"
+    assert res["alerts"][0]["consecutive_losses"] == 3
