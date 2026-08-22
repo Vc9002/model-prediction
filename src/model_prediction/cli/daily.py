@@ -640,6 +640,57 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             )
         }
 
+    # Step 10 & 11: Automated Polymarket CLOB Edge Scanner & Settlement
+    poly_edge_record_result: dict[str, Any] = {"status": "skipped"}
+    poly_edge_settle_result: dict[str, Any] = {"status": "skipped"}
+    try:
+        from ..portfolio.polymarket_ledger import (
+            record_polymarket_orders,
+            settle_polymarket_ledger_rows,
+        )
+        from ..portfolio.polymarket_scanner import PolymarketScanner
+
+        scanner = PolymarketScanner(min_edge=0.025, bankroll=1000.0)
+        scan_res = scanner.scan_directory(
+            base_dir=data_directory / "odds",
+            require_model=True,
+            pregame_only=True,
+        )
+        if scan_res.actionable_orders:
+            orders_payload = [
+                {
+                    "market_id": o.market_id,
+                    "question": o.question,
+                    "side": o.side,
+                    "target_selection": o.target_selection,
+                    "target_side": o.target_side,
+                    "selection_label": o.selection_label,
+                    "home_team": o.home_team,
+                    "away_team": o.away_team,
+                    "order_price": o.order_price,
+                    "model_probability": o.model_probability,
+                    "market_price": o.market_price,
+                    "edge": o.edge,
+                    "ev_pct": o.ev_pct,
+                    "stake_units": o.stake_units,
+                    "is_maker": o.is_maker,
+                    "reason": o.reason,
+                    "event_start_utc": o.event_start_utc,
+                    "observed_at_utc": o.observed_at_utc,
+                }
+                for o in scan_res.actionable_orders
+            ]
+            poly_edge_record_result = record_polymarket_orders(orders_payload, data_root=data_directory)
+        else:
+            poly_edge_record_result = {"status": "ok", "recorded_count": 0, "actionable_orders": 0}
+
+        if not args.skip_settlement:
+            poly_edge_settle_result = settle_polymarket_ledger_rows(data_root=data_directory)
+    except Exception:
+        logger.warning("Automated Polymarket edge scan/settle failed", exc_info=True)
+        poly_edge_record_result = {"status": "error"}
+        poly_edge_settle_result = {"status": "error"}
+
     return {
         "date": args.date,
         "step0_mlb_baseline_refresh": mlb_baseline_refresh_result,
@@ -668,4 +719,6 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         "step7_flat_settlement": flat_settlement,
         "step8_research_settlement": _research_settlement,
         "step9_gated_research_settlement": _gated_settlement,
+        "step10_polymarket_edge_record": poly_edge_record_result,
+        "step11_polymarket_edge_settle": poly_edge_settle_result,
     }
