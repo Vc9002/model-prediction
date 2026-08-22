@@ -79,6 +79,7 @@ from model_prediction.dashboard.orders import (
 )
 from model_prediction.dashboard.picks import (
     _parse_research_picks,
+    explain_pick,
     performance_for_sport,
     read_flat_picks,
     read_picks,
@@ -424,6 +425,12 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(csv_bytes)
                 return
+            elif route == "/api/picks/explanation":
+                pick_id = query.get("pick_id")
+                if not pick_id:
+                    self._send({"error": "pick_id parameter required"}, code=400)
+                else:
+                    self._send(_cached(f"pick_exp:{pick_id}", 30, lambda: explain_pick(pick_id)))
             elif route.startswith("/api/rebuild/"):
                 view = route.removeprefix("/api/rebuild/")
                 if view in _REBUILD_VIEWS:

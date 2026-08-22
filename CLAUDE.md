@@ -53,10 +53,14 @@ gated dashboard surface — treat anything touching it as high-stakes.
    and a "Reproduction commands" checklist. This is the most-current, most-
    trustworthy record of what actually works right now — trust it over
    older docs when they disagree.
-3. `docs/MODEL_IMPROVEMENTS.md` — the per-sport feature roadmap and research
-   contract (promotion rules, point-in-time feature contract, what's been
-   tried and rejected). Section 1 and section 12 carry a live "what's done
-   vs. still open" status, not just a wishlist.
+3. `docs/ROADMAP.md` — the consolidated engineering, dashboard, portfolio,
+   and research roadmap (promotion rules, verdict taxonomy, and what's
+   actually still open, not just a wishlist). Merged 2026-08-22 from seven
+   overlapping planning docs (`TODO.md`, `ENGINEERING_ROADMAP.md`,
+   `RESEARCH_BACKLOG.md`, `V9_RESEARCH_PLAN.md`,
+   `RESEARCH_DECISION_2026-08-18.md`, `POST_MLB_RESEARCH_PLANS.md`,
+   `MODEL_IMPROVEMENTS.md`), all now deleted — don't re-create them; add
+   new open items to `ROADMAP.md` instead.
 4. `docs/AGENTS.md` — short, durable execution rules (walk-forward only,
    never hardcode thresholds, protected files, etc.). Still binding.
 5. `docs/ARCHITECTURE.md` — the durable architecture contract (data flow,
@@ -160,7 +164,7 @@ ablation, not a promotion decision by itself.
 - Config/model promotion (`status: research` -> `shadow_qualified`, or a
   new artifact version becoming the active one) is a real decision with
   real governance requirements (see the Promotion rule in
-  `docs/MODEL_IMPROVEMENTS.md` section 2). Don't do it as a side effect of
+  `docs/ROADMAP.md`). Don't do it as a side effect of
   something else; confirm scope first if it's not explicitly requested.
 
 ## Working with subagents on this codebase

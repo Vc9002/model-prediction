@@ -266,3 +266,28 @@ def test_broken_registry_primary_is_down(tmp_path: Path) -> None:
 
     assert report["status"] == "DOWN"
     assert any("registry failed to load" in r for r in report["reasons"])
+
+
+def test_clv_health_monitoring_and_alerting(tmp_path: Path, monkeypatch) -> None:
+    from unittest.mock import Mock
+
+    repo = _make_repo(tmp_path)
+    _seed_prediction_state(repo, minutes_ago=10)
+
+    # Mock _clv_summary to return negative CLV over sufficient sample
+    mock_clv = {
+        "count": 25,
+        "mean_clv_pct": -2.45,
+        "beat_close_rate": 0.36,
+        "series": [],
+    }
+    monkeypatch.setattr("model_prediction.system_health._get_clv_summary", lambda: mock_clv)
+
+    mock_notify = Mock()
+    monkeypatch.setattr("model_prediction.run_supervisor.notify_operator", mock_notify)
+
+    report = system_health(repo_root=repo, runtime_root=repo / "data")
+
+    assert report["status"] == "DEGRADED"
+    assert any("Rolling 30-day CLV negative" in r for r in report["reasons"])
+    assert mock_notify.called

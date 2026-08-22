@@ -1019,20 +1019,31 @@ def _auto_adjust_unit_value(pct: float = 10.0) -> dict:
             "error": "exchange returned no positive USD balance",
             "note": "Unit value unchanged.",
         }
-    suggested = round(balance * fraction, 2)
+    raw_target = round(balance * fraction, 2)
     current = _unit_value_usd()
+
+    # Formal bankroll re-scaling policy (Tier 1, item 5):
+    # Small steps only (clamped to max ±10% per adjustment) to prevent emotional sizing swings
+    max_step = 0.10
+    step_min = round(current * (1.0 - max_step), 2)
+    step_max = round(current * (1.0 + max_step), 2)
+    suggested = max(step_min, min(step_max, raw_target))
+    suggested = max(1.0, min(100.0, suggested))
+
     if abs(suggested - current) < 0.01:
         return {
             "status": "no_change",
             "balance_usd": round(balance, 2),
             "current_unit": current,
             "suggested_unit": suggested,
-            "note": f"{pct:.1f}% of ${balance:,.2f} = ${suggested:.2f}, already current.",
+            "note": f"{pct:.1f}% of ${balance:,.2f} = ${raw_target:.2f} (clamped to ${suggested:.2f} via ±10% policy), already current.",
         }
     try:
         result = _set_unit_value_usd(suggested)
         result["balance_usd"] = round(balance, 2)
+        result["raw_target_usd"] = raw_target
         result["action"] = "raised" if suggested > current else "lowered"
+        result["policy_clamped"] = raw_target != suggested
         return result
     except (OSError, RuntimeError, ValueError, yaml.YAMLError) as error:
         return {"status": "error", "error": str(error)}

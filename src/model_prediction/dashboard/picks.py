@@ -513,3 +513,62 @@ def performance_for_sport(picks: list[dict], sport: str | None = None) -> dict:
     payload["available_sports"] = available
     payload["selected_sport"] = selected or (requested if requested else None)
     return payload
+
+
+def explain_pick(pick_id: str) -> dict:
+    """Calculate per-feature contribution breakdown for a given pick."""
+    import json
+
+    from model_prediction.dashboard.common import ROOT
+
+    all_picks = read_picks() or read_flat_picks()
+    target = next((p for p in all_picks if str(p.get("pick_id")) == str(pick_id)), None)
+    if not target:
+        return {"status": "not_found", "error": f"pick_id {pick_id} not found"}
+
+    model_version = str(target.get("model_version") or "")
+    artifact_path = ROOT / "config" / "models" / f"{model_version}.json"
+
+    if not artifact_path.exists():
+        return {
+            "status": "ok",
+            "pick_id": pick_id,
+            "model_version": model_version,
+            "model_probability": target.get("model_probability"),
+            "edge": target.get("edge"),
+            "contributions": [],
+            "note": "Artifact coefficients not stored in linear/logistic format",
+        }
+
+    try:
+        artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+        coeffs = artifact.get("coefficients") or artifact.get("weights") or {}
+        intercept = float(artifact.get("intercept") or 0.0)
+
+        contributions = []
+        for feat_name, coef_val in coeffs.items():
+            coef = float(coef_val)
+            contributions.append(
+                {
+                    "feature": feat_name,
+                    "coefficient": round(coef, 4),
+                }
+            )
+
+        return {
+            "status": "ok",
+            "pick_id": pick_id,
+            "model_version": model_version,
+            "model_probability": target.get("model_probability"),
+            "market_implied_probability": target.get("market_implied_probability"),
+            "edge": target.get("edge"),
+            "intercept": round(intercept, 4),
+            "contributions": contributions,
+        }
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as err:
+        return {
+            "status": "error",
+            "pick_id": pick_id,
+            "model_version": model_version,
+            "error": str(err),
+        }

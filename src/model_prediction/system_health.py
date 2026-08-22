@@ -45,6 +45,16 @@ _MARKET_STALE_DAYS = 2.0
 _RECENT_ACTIVITY_DAYS = 21.0
 
 
+def _get_clv_summary() -> dict:
+    try:
+        import importlib
+
+        mod = importlib.import_module("model_prediction.dashboard.status")
+        return mod._clv_summary()  # type: ignore[no-any-return]
+    except (ImportError, AttributeError, KeyError, ValueError, TypeError, OSError):
+        return {}
+
+
 def _age_minutes(iso_utc: str) -> float:
     try:
         dt = datetime.fromisoformat(iso_utc)
@@ -267,7 +277,30 @@ def system_health(
         degrade(flag)
     report["checks"]["market_capture"] = markets
 
+    # 5. Rolling Closing Line Value (CLV) health monitoring
+    clv_data = _get_clv_summary()
+    if clv_data:
+        report["checks"]["clv"] = clv_data
+        clv_count = clv_data.get("count", 0)
+        mean_clv = clv_data.get("mean_clv_pct", 0.0)
+        if clv_count >= 20 and mean_clv < -1.0:
+            degrade(f"Rolling 30-day CLV negative ({mean_clv:.2f}%) across {clv_count} graded picks")
+
     report["reasons"] = reasons
+
+    # 6. Push alerting on degraded or down state
+    if report["status"] in ("DEGRADED", "DOWN"):
+        try:
+            from .run_supervisor import notify_operator
+
+            notify_operator(
+                title=f"System Health: {report['status']}",
+                message="; ".join(reasons[:3]),
+                level="warning" if report["status"] == "DEGRADED" else "error",
+            )
+        except Exception:  # noqa: BLE001, S110
+            pass
+
     return report
 
 

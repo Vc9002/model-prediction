@@ -1904,3 +1904,23 @@ def test_export_picks_endpoint():
 
     response_bytes = handler.wfile.getvalue()
     assert len(response_bytes) > 0
+
+
+def test_explain_pick_endpoint():
+    from io import BytesIO
+    from unittest.mock import Mock
+
+    handler = dashboard_server.Handler.__new__(dashboard_server.Handler)
+    handler.path = "/api/picks/explanation?pick_id=nonexistent"
+    handler.headers = {}
+    handler.wfile = BytesIO()
+    handler.send_response = Mock()
+    handler.send_header = Mock()
+    handler.end_headers = Mock()
+
+    handler.do_GET()
+
+    response_bytes = handler.wfile.getvalue()
+    assert len(response_bytes) > 0
+    data = json.loads(response_bytes.decode("utf-8"))
+    assert data.get("status") == "not_found"
