@@ -452,11 +452,24 @@ def decide_team_market(
     audit.update(economics)
 
     cost_adjusted_edge = serving_conservative_prob - candidate.depth_adjusted_price - fee_rate - safety_margin
-    if cost_adjusted_edge <= 0:
+    min_edge_threshold = 0.035 if candidate.market_type == "spread" else 0.0
+    if cost_adjusted_edge <= min_edge_threshold:
+        reason = "SPREAD_MIN_EDGE_NOT_MET" if candidate.market_type == "spread" else NO_EDGE_AFTER_COSTS
         return _no_bet(
             forecast,
             candidate.market_type,
-            NO_EDGE_AFTER_COSTS,
+            reason,
+            cost_adjusted_edge,
+            evaluated=candidate,
+            **audit,
+        )
+
+    # Spread Price Cap: Buying expensive underdog runlines/spreads (> 60c) bleeds EV to vig.
+    if candidate.market_type == "spread" and candidate.executable_ask > 0.60:
+        return _no_bet(
+            forecast,
+            candidate.market_type,
+            "SPREAD_PRICE_EXCEEDS_CAP",
             cost_adjusted_edge,
             evaluated=candidate,
             **audit,

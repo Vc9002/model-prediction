@@ -1904,8 +1904,8 @@ async function loadFlatCache(force){
 // and re-decorating every row (orders + portfolio history) on each keystroke.
 function renderFlatTable(){
   try{
-    $("#openCount_F").textContent=_flatCache.filter(p=>String(p.status||p.State||'').toLowerCase()==='open').length;
-    $("#settledCount_F").textContent=_flatCache.filter(p=>String(p.status||p.State||'').toLowerCase()==='settled').length;
+    $("#openCount_F").textContent=_flatCache.filter(p=>!p.archived&&String(p.status||p.State||'').toLowerCase()==='open').length;
+    $("#settledCount_F").textContent=_flatCache.filter(p=>!p.archived&&String(p.status||p.State||'').toLowerCase()==='settled').length;
 
     let rows=filteredFlatRows();
     rows.sort((a,b)=>(b.event_start_utc||'').localeCompare(a.event_start_utc||''));
@@ -2771,8 +2771,8 @@ async function loadResearchCache(force){
 function renderResearchTable(){
   try{
     if(_researchCache.length){
-      const active=_researchCache.filter(p=>p.status==="open").length;
-      const settled=_researchCache.filter(p=>p.status==="settled").length;
+      const active=_researchCache.filter(p=>!p.archived&&p.status==="open").length;
+      const settled=_researchCache.filter(p=>!p.archived&&p.status==="settled").length;
       $("#researchActive").textContent=active;
       $("#researchSettled").textContent=settled;
       $("#openCount_R").textContent=active;
@@ -2868,8 +2868,8 @@ async function loadGatedResearchCache(force){
 }
 function renderGatedResearchTable(){
   try{
-    const active=_gatedResearchCache.filter(p=>p.status==="open").length;
-    const settled=_gatedResearchCache.filter(p=>p.status==="settled").length;
+    const active=_gatedResearchCache.filter(p=>!p.archived&&p.status==="open").length;
+    const settled=_gatedResearchCache.filter(p=>!p.archived&&p.status==="settled").length;
     $("#gatedResearchActive").textContent=active;
     $("#gatedResearchSettled").textContent=settled;
     $("#openCount_G").textContent=active;

@@ -53,30 +53,22 @@ def edge_scaled_units(
     american_odds: int,
     policy: UnitPolicy | None = None,
 ) -> float:
-    """Scale units by uncertainty-adjusted model edge: 0.5U base + 10× edge
-    above 50/50.
+    """Scale units by real market-relative edge, adjusted for model uncertainty.
 
-    The +34.1U vs +13.3U flat MLB walk-forward result (2026-07-17) validated
-    the "scale by distance from 50/50" shape of this formula, using a
-    version that took `model_uncertainty` as a parameter but never actually
-    read it -- found 2026-07-31 (operator directive to fix): two picks with
-    identical model_probability got identically-sized stakes regardless of
-    whether the model's own uncertainty on that pick was 0.01 or 0.49. Since
-    this is the dominant sizing path project-wide (every real CALL, plus
-    every research observation after this session's "every pick has units"
-    fix), that meant model confidence had zero effect on stake size
-    anywhere in the system. Fixed by haircutting the raw distance from 50/50
-    by the model's own uncertainty before scaling -- the same
-    "probability minus uncertainty" conservatism `recommend_units`'s
-    accept/reject gate already applies below, just also applied to sizing,
-    which previously bypassed it entirely via this function.
+    Fixed: Previously scaled by distance from 50% (abs(model_prob - 0.5)), which
+    erroneously assigned max 2.0U stakes to heavy favorites with tiny edges over
+    the market. Now scales strictly by the conservative edge over the implied
+    market probability (adjusted_probability - market_probability).
 
-    Higher (uncertainty-adjusted) edge = more units. Lower edge = fewer
-    units. Caps at policy.max_pick_units, floors at policy.min_pick_units.
+    Higher real edge = more units. Lower edge = fewer units.
+    Caps at policy.max_pick_units (2.0U), floors at policy.min_pick_units (1.0U).
     """
     if policy is None:
         policy = UnitPolicy()
-    adjusted_edge = max(0.0, abs(model_probability - 0.5) - max(0.0, model_uncertainty))
+    market_prob = implied_probability(american_odds) if american_odds else 0.5
+    unc = max(0.0, model_uncertainty or 0.0)
+    adjusted_prob = max(0.0, model_probability - unc)
+    adjusted_edge = max(0.0, adjusted_prob - market_prob)
     raw = policy.min_pick_units + adjusted_edge * (policy.max_pick_units - policy.min_pick_units) / 0.15
     units = max(policy.min_pick_units, min(policy.max_pick_units, raw))
     # Nearest increment (0.5 + 0.1235*10 = 1.735 -> 1.75U); caps above bound risk.

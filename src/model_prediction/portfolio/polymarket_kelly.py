@@ -125,8 +125,49 @@ class PolymarketKellyEngine:
         edge_no = p_effective_no - price_no
         ev_no = (edge_no / price_no) * 100.0 if price_no > 0 else 0.0
 
+        is_spread = any(
+            k in (quote.question or "").lower()
+            for k in [
+                "spread",
+                "run line",
+                "runline",
+                "puck line",
+                "handicap",
+                "+1.5",
+                "-1.5",
+                "+2.5",
+                "-2.5",
+            ]
+        )
+        effective_min_edge = max(self.min_edge, 0.035) if is_spread else self.min_edge
+
         # Determine if YES, NO, or NO_ORDER qualifies
-        if edge_yes >= self.min_edge and edge_yes >= edge_no:
+        if edge_yes >= effective_min_edge and edge_yes >= edge_no:
+            if is_spread and price_yes > 0.60:
+                return PolymarketOrderDecision(
+                    market_id=quote.market_id,
+                    side="NO_ORDER",
+                    is_maker=False,
+                    order_price=0.0,
+                    model_probability=round(p_effective, 4),
+                    market_price=round(ask, 4),
+                    edge=round(edge_yes, 4),
+                    expected_value_pct=round(ev_yes, 2),
+                    kelly_fraction_full=0.0,
+                    kelly_fraction_recommended=0.0,
+                    stake_units=0.0,
+                    reason=f"Spread price {price_yes * 100:.1f}¢ exceeds 60¢ cap (edge +{edge_yes:.1%})",
+                    question=quote.question,
+                    target_selection=home or "YES",
+                    target_side="YES",
+                    home_team=home,
+                    away_team=away,
+                    selection_label="NO_ORDER",
+                    event_start_utc=quote.event_start_utc,
+                    observed_at_utc=quote.observed_at_utc,
+                    depth_imbalance=round(quote.depth_imbalance, 3),
+                    spread_cents=round((ask - bid) * 100.0, 1),
+                )
             # Full Kelly for YES: (P - Price) / (1 - Price)
             full_k = (p_effective - price_yes) / (1.0 - price_yes) if price_yes < 1.0 else 0.0
             rec_k = min(self.max_position_pct, max(0.0, full_k * self.kelly_fraction))
@@ -161,7 +202,32 @@ class PolymarketKellyEngine:
                 spread_cents=spread_c,
             )
 
-        elif edge_no >= self.min_edge:
+        elif edge_no >= effective_min_edge:
+            if is_spread and price_no > 0.60:
+                return PolymarketOrderDecision(
+                    market_id=quote.market_id,
+                    side="NO_ORDER",
+                    is_maker=False,
+                    order_price=0.0,
+                    model_probability=round(p_effective_no, 4),
+                    market_price=round(cost_no_taker, 4),
+                    edge=round(edge_no, 4),
+                    expected_value_pct=round(ev_no, 2),
+                    kelly_fraction_full=0.0,
+                    kelly_fraction_recommended=0.0,
+                    stake_units=0.0,
+                    reason=f"Spread price {price_no * 100:.1f}¢ exceeds 60¢ cap (edge +{edge_no:.1%})",
+                    question=quote.question,
+                    target_selection=away or "NO",
+                    target_side="NO",
+                    home_team=home,
+                    away_team=away,
+                    selection_label="NO_ORDER",
+                    event_start_utc=quote.event_start_utc,
+                    observed_at_utc=quote.observed_at_utc,
+                    depth_imbalance=round(quote.depth_imbalance, 3),
+                    spread_cents=round((ask - bid) * 100.0, 1),
+                )
             # Full Kelly for NO: (P_no - Price_no) / (1 - Price_no)
             full_k = (p_effective_no - price_no) / (1.0 - price_no) if price_no < 1.0 else 0.0
             rec_k = min(self.max_position_pct, max(0.0, full_k * self.kelly_fraction))
