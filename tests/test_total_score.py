@@ -62,3 +62,22 @@ def test_total_score_artifact_hash_and_prediction() -> None:
     payload["coefficients"] = [3.0]
     with pytest.raises(ValueError, match="hash mismatch"):
         TotalScoreArtifact(payload)
+
+
+def test_total_over_under_probability():
+    from model_prediction.total_score import total_over_under_probability
+
+    # Test half-line (e.g. 8.5) -> push_prob must be 0.0, over + under == 1.0
+    res_half = total_over_under_probability(projected_total=8.5, market_line=8.5)
+    assert res_half["push_prob"] == 0.0
+    assert pytest.approx(res_half["over_prob"] + res_half["under_prob"], abs=1e-4) == 1.0
+    assert 0.40 < res_half["over_prob"] < 0.60
+
+    # Test integer line (e.g. 9.0) -> push_prob > 0
+    res_int = total_over_under_probability(projected_total=9.0, market_line=9.0)
+    assert res_int["push_prob"] > 0.05
+    assert pytest.approx(res_int["over_prob"] + res_int["under_prob"] + res_int["push_prob"], abs=1e-4) == 1.0
+
+    # Higher projected total increases over probability
+    res_high = total_over_under_probability(projected_total=11.0, market_line=8.5)
+    assert res_high["over_prob"] > res_half["over_prob"]

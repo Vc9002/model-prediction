@@ -327,3 +327,64 @@ def validate_all_total_score_models(
         "status": "research_only",
         "sports": results,
     }
+
+
+def total_over_under_probability(
+    projected_total: float,
+    market_line: float,
+    dispersion_r: float = 6.5,
+) -> dict[str, float]:
+    """Calculate Over/Under/Push probabilities using Gamma-Poisson / Negative-Binomial distribution.
+
+    Parameters
+    ----------
+    projected_total : float
+        Mean total projected runs/points (lambda_total > 0).
+    market_line : float
+        Market over/under line (e.g. 8.5, 9.0).
+    dispersion_r : float, default 6.5
+        Negative binomial shape parameter matching empirical run distributions.
+
+    Returns
+    -------
+    dict with 'over_prob', 'under_prob', 'push_prob' summing to 1.0.
+    """
+    from scipy.stats import nbinom
+
+    mu = max(0.1, float(projected_total))
+    r = max(0.5, float(dispersion_r))
+    p = r / (r + mu)
+
+    # In scipy.stats.nbinom, pmf(k, r, p) represents k failures before r successes.
+    # Cumulative CDF: F(k) = P(X <= k).
+    line = float(market_line)
+    is_integer = abs(line - round(line)) < 1e-6
+
+    if is_integer:
+        k = round(line)
+        # P(Under) = P(X < k) = P(X <= k - 1)
+        under_prob = float(nbinom.cdf(k - 1, r, p)) if k > 0 else 0.0
+        # P(Push) = P(X == k)
+        push_prob = float(nbinom.pmf(k, r, p))
+        # P(Over) = P(X > k) = 1 - P(X <= k)
+        over_prob = float(1.0 - nbinom.cdf(k, r, p))
+    else:
+        k = math.floor(line)
+        # P(Under) = P(X <= floor(line))
+        under_prob = float(nbinom.cdf(k, r, p))
+        push_prob = 0.0
+        # P(Over) = 1 - P(X <= floor(line))
+        over_prob = float(1.0 - under_prob)
+
+    # Normalize float sums
+    total_p = over_prob + under_prob + push_prob
+    if total_p > 0:
+        over_prob /= total_p
+        under_prob /= total_p
+        push_prob /= total_p
+
+    return {
+        "over_prob": round(over_prob, 6),
+        "under_prob": round(under_prob, 6),
+        "push_prob": round(push_prob, 6),
+    }
