@@ -803,3 +803,26 @@ def test_refresh_falls_back_to_full_backfill_when_no_history_exists(tmp_path) ->
     assert client.requested_years[0] == 2015
     assert (tmp_path / "international_baseball/kbo/games.jsonl").exists()
     assert result["game_count"] == 1
+
+
+def test_kbo_npb_multinomial_probabilities() -> None:
+    from model_prediction.international_baseball import kbo_npb_multinomial_probabilities
+
+    res = kbo_npb_multinomial_probabilities(
+        home_rating=1500.0,
+        away_rating=1500.0,
+        home_advantage=24.0,
+        starter_gap_rating=10.0,
+        park_factor=1.0,
+        baseline_tie_rate=0.045,
+    )
+
+    # 1. Probabilities sum to 1.0
+    assert pytest.approx(res["p_home_win"] + res["p_tie"] + res["p_away_win"], abs=1e-5) == 1.0
+
+    # 2. Polymarket values sum to 1.0 (since tie split 50/50)
+    assert pytest.approx(res["p_polymarket_home"] + res["p_polymarket_away"], abs=1e-5) == 1.0
+
+    # 3. Home advantage + starter advantage gives home > 50%
+    assert res["p_polymarket_home"] > 0.50
+    assert res["p_tie"] == 0.045
