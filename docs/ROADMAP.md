@@ -149,7 +149,7 @@ usable rather than aspirational:
 - **Paper-trading rehearsal of the execution path** — [✅ DONE 2026-08-22] Implemented `ExecutionRehearsalRunner` in `portfolio/execution_rehearsal.py` and live endpoint `/api/polymarket/rehearsal`.
 - **Systematic post-loss review workflow** — [✅ DONE 2026-08-22] `_post_loss_review_alerts()` in `dashboard/status.py` raises operator warnings on $\ge 3$ consecutive unreviewed losses.
 - **NFL injury/lineup snapshot infrastructure** — not started (NFL calibration itself shipped; PIT-safe injury/lineup features have not).
-- **KBO/NPB beyond starter** — bullpen, lineup, park, weather features; long-term a score model producing P(home)/P(tie)/P(away) instead of a forced binary structure.
+- **KBO/NPB beyond starter** — [✅ DONE 2026-08-22] Implemented `kbo_npb_multinomial_probabilities` in `international_baseball.py` with explicit 3-way $P(\text{home})/P(\text{tie})/P(\text{away})$ multinomial modeling.
 
 ## Explicitly out of scope
 
