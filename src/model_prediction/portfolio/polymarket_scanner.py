@@ -199,6 +199,7 @@ class PolymarketSlateScanner:
         require_model: bool = True,
         pregame_only: bool = False,
         today_only: bool = False,
+        timeframe: str = "all",
         max_start_hours: float | None = None,
         max_age_minutes: int | None = None,
         now_dt: Any | None = None,
@@ -231,16 +232,36 @@ class PolymarketSlateScanner:
         event_start_utc = str(data.get("event_start_utc", ""))
         observed_at_utc = str(data.get("observed_at_utc") or "")
 
-        if (pregame_only or today_only or max_start_hours is not None) and event_start_utc:
+        if (
+            pregame_only or today_only or timeframe != "all" or max_start_hours is not None
+        ) and event_start_utc:
             try:
                 from datetime import UTC, datetime, timedelta
+                from zoneinfo import ZoneInfo
 
+                EASTERN = ZoneInfo("America/New_York")
                 start_dt = datetime.fromisoformat(event_start_utc)
                 cur = now_dt or datetime.now(UTC)
                 if pregame_only and start_dt <= cur:
                     return None
-                if today_only or max_start_hours is not None:
-                    limit_hours = max_start_hours if max_start_hours is not None else 24.0
+
+                start_dt_et = start_dt.astimezone(EASTERN)
+                cur_et = cur.astimezone(EASTERN)
+                today_et_str = cur_et.date().isoformat()
+                tomorrow_et_str = (cur_et.date() + timedelta(days=1)).isoformat()
+
+                if timeframe == "today":
+                    if start_dt_et.date().isoformat() != today_et_str:
+                        return None
+                elif timeframe == "tomorrow":
+                    if start_dt_et.date().isoformat() != tomorrow_et_str:
+                        return None
+                elif timeframe in ("24h", "48h") or today_only or max_start_hours is not None:
+                    limit_hours = (
+                        48.0
+                        if timeframe == "48h"
+                        else (max_start_hours if max_start_hours is not None else 24.0)
+                    )
                     if start_dt > cur + timedelta(hours=limit_hours):
                         return None
             except (ValueError, TypeError):
@@ -290,6 +311,7 @@ class PolymarketSlateScanner:
         require_model: bool = True,
         pregame_only: bool = False,
         today_only: bool = False,
+        timeframe: str = "all",
         max_start_hours: float | None = None,
         max_age_minutes: int | None = None,
     ) -> list[PolymarketOrderDecision]:
@@ -306,6 +328,7 @@ class PolymarketSlateScanner:
                     require_model=require_model,
                     pregame_only=pregame_only,
                     today_only=today_only,
+                    timeframe=timeframe,
                     max_start_hours=max_start_hours,
                     max_age_minutes=max_age_minutes,
                 )
@@ -325,6 +348,7 @@ class PolymarketSlateScanner:
         require_model: bool = True,
         pregame_only: bool = False,
         today_only: bool = False,
+        timeframe: str = "all",
         max_start_hours: float | None = None,
         max_age_minutes: int | None = None,
     ) -> PolymarketScanResult:
@@ -375,6 +399,7 @@ class PolymarketSlateScanner:
                         require_model=require_model,
                         pregame_only=pregame_only,
                         today_only=today_only,
+                        timeframe=timeframe,
                         max_start_hours=max_start_hours,
                         max_age_minutes=max_age_minutes,
                     )
@@ -383,14 +408,12 @@ class PolymarketSlateScanner:
 
         unique_requests = list(latest_by_market.values())
         actionable = self.dispatcher.get_actionable_orders(unique_requests, prefer_maker=prefer_maker)
-        total_stake = sum(order.stake_units for order in actionable)
-
-        as_of = date_filter or (target_files[-1].parent.name if target_files else "latest_slate")
+        total_staked = sum(o.stake_units for o in actionable)
 
         return PolymarketScanResult(
-            as_of_utc=as_of,
+            as_of_utc=date_filter or "latest",
             total_markets_scanned=len(unique_requests),
             actionable_orders_count=len(actionable),
             actionable_orders=actionable,
-            total_capital_staked=round(total_stake, 2),
+            total_capital_staked=round(total_staked, 2),
         )

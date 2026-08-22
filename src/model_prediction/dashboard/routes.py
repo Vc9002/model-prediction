@@ -330,6 +330,7 @@ class Handler(BaseHTTPRequestHandler):
                         require_model=require_model,
                         pregame_only=pregame_only,
                         today_only=today_only,
+                        timeframe=timeframe,
                         max_start_hours=max_start_hours,
                         max_age_minutes=max_age_minutes,
                     )
