@@ -538,6 +538,7 @@ class NeutralElo:
     recency_half_life_days: float | None = None
     recency_max_boost: float | None = None
     tier_weights: dict[str, float] | None = None
+    temperature: float | None = None
 
     def raw_probability(self, team1_id: str, team2_id: str) -> float:
         """Unshrunk Elo expectation — the correct basis for rating updates.
@@ -599,8 +600,8 @@ class NeutralElo:
         return max_shrink * max(0.0, 1.0 - least_established / minimum_games)
 
     def probability(self, team1_id: str, team2_id: str, reference_date: datetime | None = None) -> float:
-        """Platt-calibrated prediction, with inactivity decay and thin-data
-        shrinkage applied on top -- both prediction-time-only adjustments,
+        """Platt-calibrated prediction, with optional temperature scaling, inactivity decay,
+        and thin-data shrinkage applied on top -- all prediction-time-only adjustments,
         never fed back into raw_probability()/update()'s rating dynamics.
         Falls back to plain Platt-calibrated Elo if reference_date is
         omitted (decay disabled) -- unchanged behavior for any caller not
@@ -610,6 +611,10 @@ class NeutralElo:
         rating2 = self._decayed_rating(team2_id, reference_date)
         raw = expected_win_probability(rating1, rating2)
         calibrated = _apply_platt(raw, self.platt_intercept, self.platt_slope)
+        if self.temperature is not None and self.temperature > 0 and self.temperature != 1.0:
+            clipped = min(1.0 - 1e-9, max(1e-9, calibrated))
+            temp_logit = math.log(clipped / (1.0 - clipped)) / self.temperature
+            calibrated = 1.0 / (1.0 + math.exp(-temp_logit))
         shrink = self._thin_data_shrink(team1_id, team2_id)
         return calibrated * (1.0 - shrink) + 0.5 * shrink
 
@@ -1078,6 +1083,7 @@ def forecast_esports_slate(
         platt_slope=platt_slope,
         last_match_utc=last_match_utc,
         games_played=games_played,
+        temperature=float(artifact.get("temperature", 1.18)),
     )
     trained_through = parse_utc(str(artifact["trained_through_utc"]))
     observed_now = utc_now()
