@@ -87,6 +87,7 @@ from model_prediction.dashboard.status import (
     _clv_summary,
     status,
 )
+from model_prediction.portfolio.polymarket_scanner import PolymarketSlateScanner
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -260,6 +261,50 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(_cached(f"clv:{sport or 'all'}", 60, lambda: _clv_summary(sport)))
             elif route == "/api/capture_health":
                 self._send(_cached("capture_health", 60, _capture_health_summary))
+            elif route == "/api/polymarket/scan":
+                sport_param = query.get("sport")
+                sport_filter = None if not sport_param or sport_param == "all" else sport_param
+                date_filter = query.get("date")
+                bankroll = float(query.get("bankroll", "1000.0"))
+                min_edge = float(query.get("min_edge", "0.025"))
+                maker = query.get("maker", "false").lower() in ("true", "1", "yes")
+
+                def _do_scan():
+                    scanner = PolymarketSlateScanner(
+                        bankroll=bankroll,
+                        min_edge=min_edge,
+                    )
+                    res = scanner.scan_directory(
+                        base_dir=ROOT / "data" / "odds",
+                        sport_filter=sport_filter,
+                        date_filter=date_filter,
+                        prefer_maker=maker,
+                    )
+                    return {
+                        "as_of_utc": res.as_of_utc,
+                        "total_markets_scanned": res.total_markets_scanned,
+                        "actionable_orders_count": res.actionable_orders_count,
+                        "total_capital_staked": res.total_capital_staked,
+                        "orders": [
+                            {
+                                "market_id": o.market_id,
+                                "side": o.side,
+                                "order_price": o.order_price,
+                                "model_probability": o.model_probability,
+                                "market_price": o.market_price,
+                                "edge": o.edge,
+                                "ev_pct": o.expected_value_pct,
+                                "stake_units": o.stake_units,
+                                "kelly_fraction": o.kelly_fraction_recommended,
+                                "is_maker": o.is_maker,
+                                "reason": o.reason,
+                            }
+                            for o in res.actionable_orders
+                        ],
+                    }
+
+                cache_key = f"polymarket:scan:{sport_filter or 'all'}:{date_filter or 'all'}:{bankroll}:{min_edge}:{maker}"
+                self._send(_cached(cache_key, 10, _do_scan))
             elif route == "/api/health":
                 self._send({"ok": True, "at": datetime.now(UTC).isoformat()[:19]})
             elif route.startswith("/api/rebuild/"):

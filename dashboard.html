@@ -338,6 +338,10 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <button data-tab="folio">Portfolio</button>
     </div>
     <div class="rail-group">
+      <div class="rail-label">Polymarket US</div>
+      <button data-tab="polymarket">Edge Scanner</button>
+    </div>
+    <div class="rail-group">
       <div class="rail-label">System</div>
       <button data-tab="rebuild">Rebuild Shadow</button>
       <button data-tab="evidence">Evidence</button>
@@ -644,6 +648,82 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <div class="small dim" style="margin-top:10px">Display preferences stay in this browser. The 1U control in the top bar updates the shared bankroll setting used by future dollar displays and order sizing; historical unit records and existing orders do not change.</div>
     </div>
   </section>
+
+  <section id="tab-polymarket" style="display:none">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px">
+        <div>
+          <h2>Polymarket US CLOB Edge Scanner</h2>
+          <div class="small dim">Executes specialized domain models against Central Limit Order Book (CLOB) live snapshots with +2.5% minimum edge gate and Quarter-Kelly bet sizing.</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <label class="small dim">Sport:
+            <select id="polySport" onchange="loadPolymarketScanner()" style="background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-family:var(--mono)">
+              <option value="all">All Sports & Titles</option>
+              <option value="esports">Esports (CS2, LoL, Val, Dota2, R6)</option>
+              <option value="mlb">MLB Baseball</option>
+              <option value="tennis">Tennis</option>
+              <option value="wnba">WNBA</option>
+              <option value="soccer">Soccer (EPL, LaLiga, UCL)</option>
+              <option value="kbo">KBO / NPB</option>
+            </select>
+          </label>
+          <label class="small dim">Min Edge:
+            <select id="polyMinEdge" onchange="loadPolymarketScanner()" style="background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-family:var(--mono)">
+              <option value="0.025">+2.5% (Standard Gate)</option>
+              <option value="0.035">+3.5% (Conservative)</option>
+              <option value="0.050">+5.0% (High Conviction)</option>
+              <option value="0.075">+7.5% (Alpha Only)</option>
+            </select>
+          </label>
+          <label class="small dim">Bankroll:
+            <input id="polyBankroll" type="number" value="1000" step="100" style="width:75px;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 6px;font-family:var(--mono)" onchange="loadPolymarketScanner()">
+          </label>
+          <label class="small dim" style="display:flex;align-items:center;gap:4px;cursor:pointer">
+            <input id="polyMaker" type="checkbox" onchange="loadPolymarketScanner()"> Maker Pricing
+          </label>
+          <button class="primary" onclick="loadPolymarketScanner()">Refresh Slate</button>
+        </div>
+      </div>
+      <div class="panel-meta" id="polyMeta" role="status" aria-live="polite">Scanning live quotes…</div>
+      <div class="health-kpis" id="polyKpis" style="margin-top:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">
+        <div class="health-kpi"><b id="polyScannedCount">—</b><span>Total Scanned</span></div>
+        <div class="health-kpi"><b id="polyOrdersCount" class="green">—</b><span>Actionable Edge Orders</span></div>
+        <div class="health-kpi"><b id="polyTotalCapital" class="yellow">—</b><span>Recommended Capital</span></div>
+        <div class="health-kpi"><b id="polyAvgEdge" class="green">—</b><span>Avg Net Edge</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h2>Actionable Quarter-Kelly Order Tickets</h2>
+        <div style="display:flex;gap:8px">
+          <button onclick="copyPolymarketOrdersJson()">Copy JSON Orders</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data" id="polyOrdersTable" style="width:100%;font-family:var(--mono);font-size:12px">
+          <thead>
+            <tr>
+              <th>Market ID</th>
+              <th>Side</th>
+              <th>Order Price</th>
+              <th>Model Prob</th>
+              <th>Market Price</th>
+              <th>Edge</th>
+              <th>EV%</th>
+              <th>Stake ($)</th>
+              <th>Type</th>
+              <th>Reason / Diagnostics</th>
+            </tr>
+          </thead>
+          <tbody id="polyOrdersBody">
+            <tr><td colspan="10" class="dim" style="text-align:center;padding:16px">Loading Polymarket edge opportunities…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
   </div>
 </div>
 
@@ -697,6 +777,7 @@ $$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.cl
   if(b.dataset.tab==="folio"&&state.livePortfolio)renderFolioHistory();
   if(b.dataset.tab==="production")loadProduction();
   if(b.dataset.tab==="rebuild")loadRebuild();
+  if(b.dataset.tab==="polymarket")loadPolymarketScanner();
 });
 
 /* ---------- settings ---------- */
@@ -2959,6 +3040,91 @@ async function refreshAll(){
     ?`<span class="yellow">Updated with ${failures} panel error${failures===1?"":"s"}</span>`
     :`Updated: ${new Date().toLocaleTimeString()}`;
 }
+
+let _polyOrdersCache = [];
+
+async function loadPolymarketScanner() {
+  const sportEl = $("#polySport"), minEdgeEl = $("#polyMinEdge"), bankrollEl = $("#polyBankroll"), makerEl = $("#polyMaker");
+  const sport = sportEl ? sportEl.value : "all";
+  const minEdge = minEdgeEl ? minEdgeEl.value : "0.025";
+  const bankroll = bankrollEl ? bankrollEl.value : "1000";
+  const maker = makerEl && makerEl.checked ? "true" : "false";
+
+  setPanelState("polyMeta", "loading", "Scanning Polymarket live CLOB order books…");
+  try {
+    const url = `/api/polymarket/scan?sport=${encodeURIComponent(sport)}&min_edge=${encodeURIComponent(minEdge)}&bankroll=${encodeURIComponent(bankroll)}&maker=${encodeURIComponent(maker)}`;
+    const res = await fetch(url, { headers: { "X-Dashboard-Token": window._DASHBOARD_TOKEN || "" } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    _polyOrdersCache = data.orders || [];
+
+    if ($("#polyScannedCount")) $("#polyScannedCount").textContent = (data.total_markets_scanned || 0).toLocaleString();
+    if ($("#polyOrdersCount")) $("#polyOrdersCount").textContent = (data.actionable_orders_count || 0).toLocaleString();
+    if ($("#polyTotalCapital")) $("#polyTotalCapital").textContent = "$" + (data.total_capital_staked || 0).toFixed(2);
+
+    const avgEdge = _polyOrdersCache.length
+      ? (_polyOrdersCache.reduce((sum, o) => sum + (o.edge || 0), 0) / _polyOrdersCache.length * 100).toFixed(1) + "%"
+      : "—";
+    if ($("#polyAvgEdge")) $("#polyAvgEdge").textContent = avgEdge;
+
+    renderPolymarketOrdersTable(_polyOrdersCache);
+    setPanelState("polyMeta", "ok", `Scanned ${data.total_markets_scanned} markets · ${data.actionable_orders_count} actionable orders passing +${(Number(minEdge)*100).toFixed(1)}% edge gate · ${observedNow()}`);
+  } catch (err) {
+    setPanelState("polyMeta", "error", `Scan failed: ${err.message}`, "loadPolymarketScanner()");
+  }
+}
+
+function renderPolymarketOrdersTable(orders) {
+  const tbody = $("#polyOrdersBody");
+  if (!tbody) return;
+  if (!orders || orders.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="10" class="dim" style="text-align:center;padding:24px">No executable orders currently pass the edge gate. Try lowering threshold or enabling Maker pricing.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = orders.map(o => {
+    const isYes = o.side === "BUY_YES";
+    const sideBadge = isYes
+      ? `<span class="health-state ok" style="background:rgba(51,209,126,.12);color:var(--green);font-weight:700">BUY YES</span>`
+      : `<span class="health-state bad" style="background:rgba(255,92,92,.12);color:var(--red);font-weight:700">BUY NO</span>`;
+
+    const typeBadge = o.is_maker
+      ? `<span class="health-state" style="background:rgba(164,140,245,.12);color:var(--violet);border-color:var(--violet)">MAKER</span>`
+      : `<span class="health-state" style="background:rgba(91,140,255,.12);color:var(--accent);border-color:var(--accent)">TAKER</span>`;
+
+    const edgeClass = o.edge >= 0.05 ? "green" : "yellow";
+    const evClass = o.ev_pct >= 10.0 ? "green" : "text";
+
+    return `
+      <tr>
+        <td style="font-weight:600">${esc(o.market_id)}</td>
+        <td>${sideBadge}</td>
+        <td style="font-weight:600">${(o.order_price * 100).toFixed(1)}¢</td>
+        <td>${(o.model_probability * 100).toFixed(1)}%</td>
+        <td class="dim">${(o.market_price * 100).toFixed(1)}¢</td>
+        <td class="${edgeClass}" style="font-weight:700">+${(o.edge * 100).toFixed(1)}%</td>
+        <td class="${evClass}">+${o.ev_pct.toFixed(1)}%</td>
+        <td style="font-weight:700;color:var(--green)">$${o.stake_units.toFixed(2)}</td>
+        <td>${typeBadge}</td>
+        <td class="dim small" style="max-width:280px;white-space:normal">${esc(o.reason || "—")}</td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function copyPolymarketOrdersJson() {
+  if (!_polyOrdersCache || _polyOrdersCache.length === 0) {
+    alert("No actionable orders to copy.");
+    return;
+  }
+  const jsonStr = JSON.stringify(_polyOrdersCache, null, 2);
+  navigator.clipboard.writeText(jsonStr).then(() => {
+    alert(`Copied ${_polyOrdersCache.length} executable orders to clipboard!`);
+  }).catch(err => {
+    alert("Failed to copy orders: " + err);
+  });
+}
+
 if(location.protocol==="file:"){
   document.body.innerHTML='<div style="max-width:640px;margin:80px auto;font-family:monospace;color:#e7e9f0;background:#12151d;border:1px solid #ff5c5c;border-radius:12px;padding:24px">'+
   '<h2 style="color:#ff5c5c">Opened as a file — the dashboard needs its server</h2>'+
