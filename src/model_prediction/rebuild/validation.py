@@ -267,6 +267,98 @@ def team_cluster_bootstrap(
     }
 
 
+def season_block_bootstrap(
+    values: Sequence[float],
+    dates: Sequence[str],
+    n_bootstrap: int = 1000,
+    seed: int = 42,
+) -> dict[str, float]:
+    """Hierarchical season-block bootstrap for MLB/sports data.
+
+    Preserves both within-season temporal autocorrelation and year-over-year
+    structural shifts (rule changes, ball aerodynamics, run environments).
+    Resamples season blocks, and then resamples date clusters within each season.
+    """
+    rng = np.random.default_rng(seed)
+    season_date_groups: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
+
+    for d, v in zip(dates, values, strict=True):
+        season = d[:4] if len(d) >= 4 else "unknown"
+        season_date_groups[season][d].append(v)
+
+    seasons = list(season_date_groups.keys())
+    if not seasons:
+        return {
+            "mean": 0.0,
+            "ci_lower": 0.0,
+            "ci_upper": 0.0,
+            "std": 0.0,
+            "n_bootstrap": n_bootstrap,
+        }
+
+    means: list[float] = []
+    for _ in range(n_bootstrap):
+        sampled_seasons = rng.choice(seasons, size=len(seasons), replace=True)
+        sample_vals: list[float] = []
+        for s in sampled_seasons:
+            date_keys = list(season_date_groups[s].keys())
+            sampled_dates = rng.choice(date_keys, size=len(date_keys), replace=True)
+            for dk in sampled_dates:
+                sample_vals.extend(season_date_groups[s][dk])
+        if sample_vals:
+            means.append(float(np.mean(sample_vals)))
+
+    means_arr = np.array(means) if means else np.array([0.0])
+    return {
+        "mean": float(np.mean(means_arr)),
+        "ci_lower": float(np.percentile(means_arr, 2.5)),
+        "ci_upper": float(np.percentile(means_arr, 97.5)),
+        "std": float(np.std(means_arr)),
+        "n_bootstrap": n_bootstrap,
+    }
+
+
+def minimum_detectable_effect(
+    n_samples: int,
+    alpha: float = 0.05,
+    power: float = 0.80,
+    baseline_sd: float = 0.50,
+) -> dict[str, Any]:
+    """Calculate Minimum Detectable Effect (MDE) pre-check before feature ablation.
+
+    Standard formula: MDE = (z_{1 - alpha/2} + z_{power}) * (sigma / sqrt(N)).
+    Prevents false negatives from running underpowered tests where plausible
+    alpha (< 2%) cannot be statistically distinguished from zero.
+    """
+    if n_samples <= 0:
+        return {
+            "n_samples": 0,
+            "mde_absolute": float("inf"),
+            "mde_percentage": float("inf"),
+            "is_powered_for_standard_edge": False,
+            "note": "Sample size must be positive",
+        }
+
+    # Standard normal quantiles (two-tailed alpha=0.05 -> z=1.96; power=0.80 -> z=0.8416)
+    z_alpha = 1.95996 if abs(alpha - 0.05) < 0.01 else 2.57583
+    z_power = 0.84162 if abs(power - 0.80) < 0.01 else 1.28155
+
+    mde_abs = (z_alpha + z_power) * (baseline_sd / math.sqrt(n_samples))
+
+    return {
+        "n_samples": n_samples,
+        "alpha": alpha,
+        "power": power,
+        "baseline_sd": baseline_sd,
+        "mde_absolute": round(float(mde_abs), 5),
+        "mde_percentage": round(float(mde_abs * 100.0), 2),
+        "is_powered_for_standard_edge": bool(mde_abs <= 0.02),  # can detect <= 2.0% delta
+        "note": "Powered"
+        if mde_abs <= 0.02
+        else f"Underpowered: cannot detect deltas < {mde_abs * 100:.2f}%",
+    }
+
+
 # ── Metrics ──────────────────────────────────────────────────────────────────
 
 

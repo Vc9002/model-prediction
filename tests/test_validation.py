@@ -712,3 +712,30 @@ def test_adaptive_hfa_features_now_serve_and_match_training_definitions(tmp_path
     expected_rate, expected_games = _trailing_home_rate(history, "2026-07-14", HOME)
     assert features["trailing_home_win_rate_30d"] == pytest.approx(expected_rate)
     assert expected_games == 11  # 12 games minus the excluded tie
+
+
+def test_season_block_bootstrap():
+    from model_prediction.rebuild.validation import season_block_bootstrap
+
+    dates = ["2024-05-01", "2024-05-02", "2025-06-01", "2025-06-02", "2026-07-01"]
+    values = [0.10, 0.20, 0.15, 0.25, 0.30]
+
+    result = season_block_bootstrap(values, dates, n_bootstrap=100, seed=42)
+    assert "mean" in result
+    assert "ci_lower" in result
+    assert "ci_upper" in result
+    assert result["ci_lower"] <= result["mean"] <= result["ci_upper"]
+
+
+def test_minimum_detectable_effect():
+    from model_prediction.rebuild.validation import minimum_detectable_effect
+
+    # Small sample (N=100) cannot detect 2% edge
+    small = minimum_detectable_effect(n_samples=100)
+    assert small["is_powered_for_standard_edge"] is False
+    assert small["mde_percentage"] > 2.0
+
+    # Large sample (N=10,000) is well-powered
+    large = minimum_detectable_effect(n_samples=10000)
+    assert large["is_powered_for_standard_edge"] is True
+    assert large["mde_percentage"] < 2.0
