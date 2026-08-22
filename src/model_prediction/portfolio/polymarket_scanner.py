@@ -70,34 +70,59 @@ def _get_logged_picks() -> list[dict]:
     return _PICKS_INDEX_CACHE
 
 
-def _lookup_model_prob(league: str, home_desc: str, away_desc: str) -> float | None:
+def _lookup_model_prob(
+    league: str,
+    home_desc: str,
+    away_desc: str,
+    event_start_utc: str | None = None,
+    market_type: str = "moneyline",
+) -> float | None:
     picks = _get_logged_picks()
     lg_norm = _normalize_league(league)
+    target_date = event_start_utc[:10] if event_start_utc else None
+
+    candidates: list[tuple[int, str, float]] = []
     for p in picks:
         p_lg = _normalize_league(str(p.get("league") or ""))
         if p_lg != lg_norm:
             continue
+        p_mtype = str(p.get("market_type") or "moneyline").lower()
+        if p_mtype != market_type.lower():
+            continue
+
         p_home = str(p.get("home_team") or "")
         p_away = str(p.get("away_team") or "")
         if not p_home or not p_away:
             continue
 
-        if _team_matches(p_home, home_desc) and _team_matches(p_away, away_desc):
+        p_date = str(p.get("event_start_utc") or "")[:10]
+
+        match_direct = _team_matches(p_home, home_desc) and _team_matches(p_away, away_desc)
+        match_reverse = _team_matches(p_away, home_desc) and _team_matches(p_home, away_desc)
+
+        if match_direct or match_reverse:
             prob = p.get("model_probability")
             if prob is not None:
                 try:
                     val = float(prob)
-                    return val if str(p.get("selection") or "").lower() == "home" else (1.0 - val)
+                    sel = str(p.get("selection") or "").lower()
+                    if match_direct:
+                        # home_desc is p_home
+                        p_win = val if sel == "home" else (1.0 - val)
+                    else:
+                        # home_desc is p_away
+                        p_win = (1.0 - val) if sel == "home" else val
+
+                    score = 0
+                    if target_date and p_date == target_date:
+                        score += 10
+                    candidates.append((score, str(p.get("created_at_utc") or ""), p_win))
                 except (ValueError, TypeError):
                     pass
-        elif _team_matches(p_away, home_desc) and _team_matches(p_home, away_desc):
-            prob = p.get("model_probability")
-            if prob is not None:
-                try:
-                    val = float(prob)
-                    return (1.0 - val) if str(p.get("selection") or "").lower() == "home" else val
-                except (ValueError, TypeError):
-                    pass
+
+    if candidates:
+        candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
+        return candidates[0][2]
     return None
 
 
@@ -160,7 +185,9 @@ class PolymarketSlateScanner:
         away_or_b = str(short_q.get("description", ""))
 
         # Look up true calibrated domain model probability
-        p_model = _lookup_model_prob(league, home_or_a, away_or_b)
+        p_model = _lookup_model_prob(
+            league, home_or_a, away_or_b, event_start_utc=event_start_utc, market_type=market_type
+        )
         if require_model and p_model is None:
             return None
 
