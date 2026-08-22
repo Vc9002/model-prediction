@@ -137,15 +137,15 @@ Recorded for future triage; honest scoping notes kept so the queue stays
 usable rather than aspirational:
 
 - **Sequential promotion testing (SPRT)** — [✅ DONE 2026-08-22] Implemented `BernoulliSPRT` and `GaussianSPRT` in `rebuild/sprt.py` with stopping boundaries $(\alpha, \beta)$ for early stopping.
-- **Pre-registered experiment thresholds** — extend the experiment template with a `registered_threshold` field recorded before the ablation runs, not after seeing OOF deltas.
+- **Pre-registered experiment thresholds** — [✅ DONE 2026-08-22] Implemented `PreRegisteredExperiment` in `rebuild/ablation.py` requiring thresholds to be recorded before running ablations.
 - **High-performance binary caching for `game_snapshots.jsonl`** — [✅ DONE 2026-08-22] Added disk-backed binary cache with mtime validation in `features/starter_history.py` (225x cold-start speedup).
 - **Declarative schema-validation layer at ingestion** — consolidate the hand-rolled fail-closed-on-bad-data logic per provider; pydantic is already a dependency.
 - **Batter-level lineup features** — `game_snapshots.jsonl` carries full box-score player data but only `pitcher_order[0]` (+ partial bullpen) is consumed.
 - **Opponent-quality (SOS) adjustment** for rolling pitcher ERA/FIP/K-BB% — [✅ DONE 2026-08-22] Implemented `starter_sos_adjusted_era` and `starter_sos_era_gap_live` in `features/starter_history.py`.
 - **Gap-flagging for starter windows** — a start from >90 days ago currently blends into "last 5 starts" as if equally recent. Shadow variant `starter_era_gap_recency_gated` built 2026-08-16.
 - **Shared cross-sport rest/travel module** — Elo/trend infra duplicated per sport (soccer, esports, NFL, tennis).
-- **Sharp-book lead/lag signal** — treat the sharpest available book as a reference price, measure Polymarket's lag behind sharp moves for execution timing.
-- **Hypothesis stateful testing of ledger APIs** — beyond property tests, stateful testing of create→settle→void sequences against chain invariants.
+- **Sharp-book lead/lag signal** — [✅ DONE 2026-08-22] Implemented `SharpLeadLagAnalyzer` in `portfolio/lead_lag.py` detecting exchange pricing latency.
+- **Hypothesis stateful testing of ledger APIs** — [✅ DONE 2026-08-22] Implemented `LedgerStateMachine` in `tests/test_ledger_stateful.py` testing continuous invariant chains.
 - **Paper-trading rehearsal of the execution path** — [✅ DONE 2026-08-22] Implemented `ExecutionRehearsalRunner` in `portfolio/execution_rehearsal.py` and live endpoint `/api/polymarket/rehearsal`.
 - **Systematic post-loss review workflow** — [✅ DONE 2026-08-22] `_post_loss_review_alerts()` in `dashboard/status.py` raises operator warnings on $\ge 3$ consecutive unreviewed losses.
 - **NFL injury/lineup snapshot infrastructure** — not started (NFL calibration itself shipped; PIT-safe injury/lineup features have not).
