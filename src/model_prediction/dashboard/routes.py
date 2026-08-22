@@ -193,11 +193,13 @@ class Handler(BaseHTTPRequestHandler):
                     )
                 )
             elif route == "/api/research-picks":
-                self._send(
-                    _cached(
-                        "research-picks", 60, lambda: [_decorate_pick(r) for r in _parse_research_picks()]
-                    )
-                )
+
+                def _research_decorated():
+                    orders = _load_orders()
+                    portfolio = _load_portfolio_history()
+                    return [_decorate_pick(r, orders, portfolio) for r in _parse_research_picks()]
+
+                self._send(_cached("research-picks", 60, _research_decorated))
             elif route == "/api/gated-research-performance":
                 sport = str(query.get("sport") or "").strip()
                 self._send(
@@ -208,13 +210,13 @@ class Handler(BaseHTTPRequestHandler):
                     )
                 )
             elif route == "/api/gated-research-picks":
-                self._send(
-                    _cached(
-                        "gated-research-picks",
-                        60,
-                        lambda: [_decorate_pick(r) for r in _parse_research_picks(gated=True)],
-                    )
-                )
+
+                def _gated_research_decorated():
+                    orders = _load_orders()
+                    portfolio = _load_portfolio_history()
+                    return [_decorate_pick(r, orders, portfolio) for r in _parse_research_picks(gated=True)]
+
+                self._send(_cached("gated-research-picks", 60, _gated_research_decorated))
             elif route == "/api/backtests":
                 self._send(_cached("backtests", 60, backtests))
             elif route == "/api/backtest":
