@@ -40,6 +40,9 @@ class PolymarketQuote:
     best_bid: float  # e.g. 0.58
     best_ask: float  # e.g. 0.60
     spread: float  # best_ask - best_bid
+    bid_size: float = 0.0  # Size available at best bid
+    ask_size: float = 0.0  # Size available at best ask
+    depth_imbalance: float = 0.50  # bid_size / (bid_size + ask_size)
     last_traded_price: float | None = None
     home_or_player_a: str = ""
     away_or_player_b: str = ""
@@ -71,6 +74,8 @@ class PolymarketOrderDecision:
     selection_label: str = ""  # e.g. "Minnesota Lynx (BUY YES)"
     event_start_utc: str = ""
     observed_at_utc: str = ""
+    depth_imbalance: float = 0.50
+    spread_cents: float = 0.0
 
 
 class PolymarketKellyEngine:
@@ -130,6 +135,7 @@ class PolymarketKellyEngine:
             target = home or "YES"
             sel_lbl = f"{home} (BUY YES)" if home else "BUY YES"
 
+            spread_c = round((ask - bid) * 100.0, 1)
             return PolymarketOrderDecision(
                 market_id=quote.market_id,
                 side="BUY_YES",
@@ -151,6 +157,8 @@ class PolymarketKellyEngine:
                 selection_label=sel_lbl,
                 event_start_utc=quote.event_start_utc,
                 observed_at_utc=quote.observed_at_utc,
+                depth_imbalance=round(quote.depth_imbalance, 3),
+                spread_cents=spread_c,
             )
 
         elif edge_no >= self.min_edge:
@@ -161,6 +169,7 @@ class PolymarketKellyEngine:
             is_maker = prefer_maker and (price_no < cost_no_taker)
             target = away or "NO"
             sel_lbl = f"{away} (BUY NO)" if away else "BUY NO"
+            spread_c = round((ask - bid) * 100.0, 1)
 
             return PolymarketOrderDecision(
                 market_id=quote.market_id,
@@ -183,6 +192,8 @@ class PolymarketKellyEngine:
                 selection_label=sel_lbl,
                 event_start_utc=quote.event_start_utc,
                 observed_at_utc=quote.observed_at_utc,
+                depth_imbalance=round(quote.depth_imbalance, 3),
+                spread_cents=spread_c,
             )
 
         else:
@@ -192,6 +203,7 @@ class PolymarketKellyEngine:
                 if home and edge_yes >= edge_no
                 else ("NO (" + away + ")" if away else ("YES" if edge_yes >= edge_no else "NO"))
             )
+            spread_c = round((ask - bid) * 100.0, 1)
             return PolymarketOrderDecision(
                 market_id=quote.market_id,
                 side="NO_ORDER",
@@ -213,4 +225,6 @@ class PolymarketKellyEngine:
                 selection_label="",
                 event_start_utc=quote.event_start_utc,
                 observed_at_utc=quote.observed_at_utc,
+                depth_imbalance=round(quote.depth_imbalance, 3),
+                spread_cents=spread_c,
             )

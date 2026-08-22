@@ -89,6 +89,7 @@ data/market_odds_snapshots.jsonl
 data/audit_log.jsonl
 data/espn_probables_cache.jsonl
 data/features/
+data/polymarket_picks.xlsx
 
 # Quarantined DB artifacts are local evidence only — never publish
 backups/**/*.db

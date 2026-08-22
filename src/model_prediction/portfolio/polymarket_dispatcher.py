@@ -43,6 +43,8 @@ class DispatchRequest:
     p_model_override: float | None = None
     p_tie_override: float = 0.0
     observed_at_utc: str = ""
+    bid_size: float = 0.0
+    ask_size: float = 0.0
 
 
 class PolymarketDispatcher:
@@ -68,12 +70,18 @@ class PolymarketDispatcher:
         prefer_maker: bool = False,
     ) -> PolymarketOrderDecision:
         """Route request to appropriate domain model and compute Kelly order decision."""
+        tot_size = req.bid_size + req.ask_size
+        imbal = (req.bid_size / tot_size) if tot_size > 0 else 0.50
+
         quote = PolymarketQuote(
             market_id=req.market_id,
             question=req.question,
             best_bid=req.best_bid,
             best_ask=req.best_ask,
             spread=round(req.best_ask - req.best_bid, 4),
+            bid_size=req.bid_size,
+            ask_size=req.ask_size,
+            depth_imbalance=round(imbal, 3),
             home_or_player_a=req.home_or_player_a,
             away_or_player_b=req.away_or_player_b,
             event_start_utc=req.event_start_utc,

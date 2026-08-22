@@ -291,6 +291,9 @@ class PolymarketSlateScanner:
 
         effective_p = p_model if p_model is not None else 0.50
 
+        bid_sz = float(long_q.get("bid_size") or long_q.get("size") or 0.0)
+        ask_sz = float(long_q.get("ask_size") or short_q.get("size") or 0.0)
+
         return DispatchRequest(
             market_id=market_id,
             league=league,
@@ -299,6 +302,8 @@ class PolymarketSlateScanner:
             away_or_player_b=away_or_b,
             best_bid=float(bid),
             best_ask=float(ask),
+            bid_size=bid_sz,
+            ask_size=ask_sz,
             event_start_utc=event_start_utc,
             p_model_override=effective_p,
             observed_at_utc=observed_at_utc,

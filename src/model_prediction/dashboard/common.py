@@ -198,6 +198,12 @@ def _runner_env() -> dict[str, str]:
     env = dict(os.environ)
     src = str(ROOT / "src")
     env["PYTHONPATH"] = src + (":" + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+    if not env.get("MODEL_PREDICTION_RUNTIME_ROOT"):
+        default_runtime = Path.home() / "model-prediction-runtime"
+        if default_runtime.exists():
+            env["MODEL_PREDICTION_RUNTIME_ROOT"] = str(default_runtime)
+        else:
+            env["MODEL_PREDICTION_RUNTIME_ROOT"] = str(ROOT / "data")
     return env
 
 

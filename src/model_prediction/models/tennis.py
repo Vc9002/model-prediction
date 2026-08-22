@@ -57,17 +57,16 @@ class TennisModel:
 
     def build_elo(
         self, matches: Sequence[dict[str, Any]]
-    ) -> tuple[dict[str, float], dict[tuple[str, str], float], dict[str, int]]:
+    ) -> tuple[dict[str, float], dict[tuple[str, str], float], dict[str, int], dict[tuple[str, str], int]]:
         """Chronological overall and per-surface Elo from match dicts.
 
         Matches need keys: winner, loser, surface, match_date (sortable).
-        Also returns a real per-player match count -- "known" (present in
-        `overall`) only means at least one real match; a player one win/loss
-        away from cold-start still isn't a genuine model opinion.
+        Also returns per-player and per-surface match counts for Bayesian shrinkage.
         """
         overall: dict[str, float] = {}
         by_surface: dict[tuple[str, str], float] = {}
         counts: dict[str, int] = {}
+        surface_counts: dict[tuple[str, str], int] = {}
         for match in sorted(matches, key=lambda item: str(item.get("match_date", ""))):
             winner = str(match.get("winner", ""))
             loser = str(match.get("loser", ""))
@@ -85,23 +84,35 @@ class TennisModel:
                 book[key_l] = rating_l - K_FACTOR * (1 - expected)  # type: ignore[index]
             counts[winner] = counts.get(winner, 0) + 1
             counts[loser] = counts.get(loser, 0) + 1
-        return overall, by_surface, counts
+            surface_counts[(winner, surface)] = surface_counts.get((winner, surface), 0) + 1
+            surface_counts[(loser, surface)] = surface_counts.get((loser, surface), 0) + 1
+        return overall, by_surface, counts, surface_counts
 
     def match_probability(
         self,
         overall: dict[str, float],
         by_surface: dict[tuple[str, str], float],
+        surface_counts: dict[tuple[str, str], int],
         player_one: str,
         player_two: str,
         surface: str,
-        surface_weight: float = 0.6,
+        shrinkage_prior_matches: float = 15.0,
+        max_surface_weight: float = 0.85,
     ) -> float:
-        blend_one = surface_weight * by_surface.get((player_one, surface), DEFAULT_ELO) + (
-            1 - surface_weight
-        ) * overall.get(player_one, DEFAULT_ELO)
-        blend_two = surface_weight * by_surface.get((player_two, surface), DEFAULT_ELO) + (
-            1 - surface_weight
-        ) * overall.get(player_two, DEFAULT_ELO)
+        """Bayesian sample-weighted surface Elo shrinkage:
+        w = (n_surface / (n_surface + 15)) * 0.85
+        """
+        n1 = surface_counts.get((player_one, surface), 0)
+        n2 = surface_counts.get((player_two, surface), 0)
+        w1 = (n1 / (n1 + shrinkage_prior_matches)) * max_surface_weight
+        w2 = (n2 / (n2 + shrinkage_prior_matches)) * max_surface_weight
+
+        blend_one = w1 * by_surface.get((player_one, surface), DEFAULT_ELO) + (1 - w1) * overall.get(
+            player_one, DEFAULT_ELO
+        )
+        blend_two = w2 * by_surface.get((player_two, surface), DEFAULT_ELO) + (1 - w2) * overall.get(
+            player_two, DEFAULT_ELO
+        )
         return expected_win_probability(blend_one, blend_two)
 
     def predict_games(
@@ -109,21 +120,15 @@ class TennisModel:
         matches: Sequence[dict[str, Any]],
         upcoming: Sequence[UpcomingMatch],
     ) -> list[GamePrediction]:
-        overall, by_surface, counts = self.build_elo(matches)
+        overall, by_surface, counts, surface_counts = self.build_elo(matches)
         predictions = []
         for match in upcoming:
             known_one = match.player_one in overall
             known_two = match.player_two in overall
-            # Too many WTA/ITF matches run every day to call them all; a player
-            # missing from `overall` has zero real history, so their side of
-            # the prediction would silently fall back to DEFAULT_ELO (a coin
-            # flip dressed up as a model call) rather than a genuine edge.
-            # Hard skip instead of just widening uncertainty -- see project
-            # instruction to only call matches we actually have data for.
             if not (known_one and known_two):
                 continue
             p_one = self.match_probability(
-                overall, by_surface, match.player_one, match.player_two, match.surface
+                overall, by_surface, surface_counts, match.player_one, match.player_two, match.surface
             )
             uncertainty = 0.05  # source of truth: config.TENNIS_MODEL_UNCERTAINTY
             predictions.append(

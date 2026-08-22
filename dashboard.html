@@ -3092,8 +3092,8 @@ function showPickDrawer(p){
   ]));
 }
 function showPickDrawerById(pickId,mode){
-  const rows=mode==="research"?_researchCache:mode==="gated"?_gatedResearchCache:
-    [...state.picks,..._flatCache,..._researchCache,..._gatedResearchCache];
+  const rows=mode==="research"?_researchCache:mode==="gated"?_gatedResearchCache:mode==="poly"?_polyLedgerCache:
+    [...state.picks,..._flatCache,..._researchCache,..._gatedResearchCache,..._polyLedgerCache];
   showPickDrawer((rows||[]).find(row=>String(row.pick_id)===String(pickId)));
 }
 function showMarketDrawer(index){
@@ -3178,7 +3178,7 @@ async function refreshAll(){
   const panels=await Promise.allSettled([renderToday(),renderFolio(),loadMarket()]);
   // populateFilters() reads every cache, so it must run after the ledger
   // requests settle. One failed source no longer blanks every other panel.
-  await Promise.allSettled([renderResearch(false),renderFlat(false),renderGatedResearch(false)]);
+  await Promise.allSettled([renderResearch(false),renderFlat(false),renderGatedResearch(false),renderPolyLedger(false)]);
   populateFilters();renderIntegrity();
   if($("#tab-polymarket") && $("#tab-polymarket").style.display!=="none") loadPolymarketScanner();
   const failures=[...core,...panels].filter(result=>result.status==="rejected").length;
@@ -3273,6 +3273,7 @@ function renderPolymarketOrdersTable(orders) {
           <div class="dim small" style="font-family:var(--mono);display:flex;gap:6px;align-items:center;margin-top:2px">
             <span>ID: ${esc(o.market_id)}</span>
             ${ageBadge}
+            <span class="health-state" style="font-size:10px;padding:1px 5px;background:rgba(255,255,255,.06);color:var(--text);border-radius:4px">Depth: ${((o.depth_imbalance || 0.5) * 100).toFixed(0)}% Bid · ${o.spread_cents ? o.spread_cents.toFixed(1) : "1.0"}¢ Spread</span>
           </div>
         </td>
         <td>

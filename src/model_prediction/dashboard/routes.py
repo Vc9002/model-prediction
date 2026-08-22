@@ -362,6 +362,8 @@ class Handler(BaseHTTPRequestHandler):
                                 "reason": o.reason,
                                 "event_start_utc": o.event_start_utc,
                                 "observed_at_utc": o.observed_at_utc,
+                                "depth_imbalance": getattr(o, "depth_imbalance", 0.5),
+                                "spread_cents": getattr(o, "spread_cents", 0.0),
                             }
                             for o in res.actionable_orders
                         ],
