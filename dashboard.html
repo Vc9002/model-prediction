@@ -815,10 +815,10 @@ const observedNow=()=>new Date().toLocaleTimeString([], {hour:"2-digit",minute:"
 $$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.classList.remove("on"));
   b.classList.add("on"); $$("section[id^=tab-]").forEach(s=>s.style.display="none");
   $("#tab-"+b.dataset.tab).style.display=""; setUrlState({tab:b.dataset.tab});updateCounts();
-  if(b.dataset.tab==="ledger")renderPicks();
+  if(b.dataset.tab==="ledger"||b.dataset.tab==="picks")renderPicks();
   if(b.dataset.tab==="flat")renderFlat(true);
   if(b.dataset.tab==="research")renderResearch(true);
-  if(b.dataset.tab==="gated")renderGatedResearch(true);
+  if(b.dataset.tab==="gated"||b.dataset.tab==="gated-research")renderGatedResearch(true);
   if(b.dataset.tab==="perf")performanceControlChanged(false);
   if(b.dataset.tab==="market")loadMarket();
   if(b.dataset.tab==="today")renderToday();
