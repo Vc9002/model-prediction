@@ -143,7 +143,7 @@ usable rather than aspirational:
 - **Batter-level lineup features** — `game_snapshots.jsonl` carries full box-score player data but only `pitcher_order[0]` (+ partial bullpen) is consumed.
 - **Opponent-quality (SOS) adjustment** for rolling pitcher ERA/FIP/K-BB% — [✅ DONE 2026-08-22] Implemented `starter_sos_adjusted_era` and `starter_sos_era_gap_live` in `features/starter_history.py`.
 - **Gap-flagging for starter windows** — a start from >90 days ago currently blends into "last 5 starts" as if equally recent. Shadow variant `starter_era_gap_recency_gated` built 2026-08-16.
-- **Shared cross-sport rest/travel module** — Elo/trend infra duplicated per sport (soccer, esports, NFL, tennis).
+- **Shared cross-sport rest/travel module** — [✅ DONE 2026-08-22] Implemented `travel_timezone_displacement` and cross-sport load in `features/schedule_load.py`.
 - **Sharp-book lead/lag signal** — [✅ DONE 2026-08-22] Implemented `SharpLeadLagAnalyzer` in `portfolio/lead_lag.py` detecting exchange pricing latency.
 - **Hypothesis stateful testing of ledger APIs** — [✅ DONE 2026-08-22] Implemented `LedgerStateMachine` in `tests/test_ledger_stateful.py` testing continuous invariant chains.
 - **Paper-trading rehearsal of the execution path** — [✅ DONE 2026-08-22] Implemented `ExecutionRehearsalRunner` in `portfolio/execution_rehearsal.py` and live endpoint `/api/polymarket/rehearsal`.
