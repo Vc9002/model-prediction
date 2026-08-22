@@ -296,6 +296,14 @@ def _load_snapshot_file(path: Path) -> list[dict]:
                     continue
                 try:
                     snapshot = json.loads(line)
+                    obs = snapshot.get("observed_at_utc")
+                    if obs:
+                        try:
+                            snapshot["_observed_dt"] = datetime.fromisoformat(str(obs))
+                        except ValueError:
+                            snapshot["_observed_dt"] = None
+                    else:
+                        snapshot["_observed_dt"] = None
                     records.append(snapshot)
                 except json.JSONDecodeError:
                     continue
@@ -343,14 +351,9 @@ def _pick_quote(row: dict) -> dict | None:
     for snapshot in snapshots:
         if snapshot.get("timestamp_valid") is False:
             continue
-        observed_raw = snapshot.get("observed_at_utc")
-        if observed_raw:
-            try:
-                snapshot_observed = datetime.fromisoformat(str(observed_raw))
-            except ValueError:
-                snapshot_observed = None
-            if snapshot_observed is not None and snapshot_observed >= event_start:
-                continue
+        snapshot_observed = snapshot.get("_observed_dt")
+        if snapshot_observed is not None and snapshot_observed >= event_start:
+            continue
         if snapshot.get("market_type") != market_type:
             continue
         slug = str(snapshot.get("market_slug") or "")
