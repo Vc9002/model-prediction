@@ -103,12 +103,24 @@ def read_flat_picks() -> list[dict]:
     return _read_split_picks(_flat_ledger_paths(), _FLAT_PICKS_CACHE)
 
 
+_POLYMARKET_PICKS_CACHE: dict[str, object] = {"mtime": None, "rows": []}
+
+
+def read_polymarket_picks() -> list[dict]:
+    """Parse Polymarket Edge Ledger (data/polymarket_picks.xlsx)."""
+    poly_path = DATA / "polymarket_picks.xlsx"
+    if not poly_path.exists():
+        poly_path = DATA / "polymarket" / "picks.xlsx"
+    return _read_split_picks([poly_path], _POLYMARKET_PICKS_CACHE)
+
+
 def _find_pick_by_id(pick_id: str) -> dict | None:
-    """Search both main and flat ledgers for a pick by pick_id."""
-    row = next((item for item in read_picks() if str(item.get("pick_id")) == pick_id), None)
-    if row is not None:
-        return row
-    return next((item for item in read_flat_picks() if str(item.get("pick_id")) == pick_id), None)
+    """Search main, flat, research, and polymarket ledgers for a pick by pick_id."""
+    for fn in (read_picks, read_flat_picks, read_polymarket_picks):
+        row = next((item for item in fn() if str(item.get("pick_id")) == pick_id), None)
+        if row is not None:
+            return row
+    return None
 
 
 def _parse_picks(path: Path) -> list[dict]:

@@ -363,7 +363,7 @@ models:
     active_production_version: lol-tiered-elo-v6
     production_artifact: config/models/lol-tiered-elo-v6.json
     market_target: esports_match_winner
-    min_edge: 0.0
+    min_edge: 0.025
     # v5 (2026-07-31): re-validated with K/threshold selected by proper
     # scoring rules instead of a raw flat-stake P&L proxy (v4's K=96 override
     # sat at the exact top of its search grid for 4 of 5 titles -- a classic
@@ -398,7 +398,7 @@ models:
     active_production_version: cs2-tiered-elo-v6
     production_artifact: config/models/cs2-tiered-elo-v6.json
     market_target: esports_match_winner
-    min_edge: 0.01
+    min_edge: 0.025
     # v6 (2026-08-04) -- see LOL's comment above for the full rationale.
     # This title's own locked-test numbers actually improved slightly
     # (65.8%->66.0% accuracy) despite the same thin-data edge reduction
@@ -415,7 +415,7 @@ models:
     active_production_version: dota2-tiered-elo-v6
     production_artifact: config/models/dota2-tiered-elo-v6.json
     market_target: esports_match_winner
-    min_edge: 0.02
+    min_edge: 0.025
     # v6 (2026-08-04) -- see LOL's comment above for the full rationale.
     # This title showed the largest locked-test accuracy trade-off
     # (68.1%->64.8%) of the five -- flagged here rather than smoothed over;
@@ -434,7 +434,7 @@ models:
     active_production_version: valorant-tiered-elo-v6
     production_artifact: config/models/valorant-tiered-elo-v6.json
     market_target: esports_match_winner
-    min_edge: 0.02
+    min_edge: 0.025
     # v6 (2026-08-04) -- see LOL's comment above for the full rationale.
     # Value matches this artifact's own re-validated confidence_threshold
     # (re-run search found 0.0 for this title under the new decay/shrink
@@ -446,7 +446,7 @@ models:
     origin: statistical_model
     active_research_version: rainbow_six-tiered-elo-v6
     market_target: esports_match_winner
-    min_edge: 0.02
+    min_edge: 0.025
     # v6 (2026-08-04) -- see LOL's comment above for the full rationale.
     # Value matches this artifact's own re-validated confidence_threshold
     # (re-run search found 0.0 for this title under the new decay/shrink

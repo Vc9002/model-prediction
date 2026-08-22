@@ -81,6 +81,7 @@ from model_prediction.dashboard.picks import (
     performance_for_sport,
     read_flat_picks,
     read_picks,
+    read_polymarket_picks,
 )
 from model_prediction.dashboard.status import (
     _capture_health_summary,
@@ -149,20 +150,21 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/flat-picks":
 
                 def _flat_picks_decorated():
-                    # Flat is now split per sport (data/flat/<sport>.xlsx),
-                    # populated only for the sports that actually pair with
-                    # Main -- esports/KBO/NPB physically can't appear here
-                    # anymore (see main_ledgers.py), so the old
-                    # FLAT_HIDDEN_LEAGUES filter is redundant for them and
-                    # was actively wrong for tennis (real flat rows exist for
-                    # it, same as soccer, but the set never got updated when
-                    # tennis was promoted alongside soccer on 2026-08-03).
                     flat = read_flat_picks()
                     orders = _load_orders()
                     portfolio = _load_portfolio_history()
                     return [_decorate_pick(row, orders, portfolio) for row in flat]
 
                 self._send(_cached("flat-picks", 30, _flat_picks_decorated))
+            elif route in ("/api/polymarket-picks", "/api/picks/polymarket"):
+
+                def _poly_picks_decorated():
+                    poly_rows = read_polymarket_picks()
+                    orders = _load_orders()
+                    portfolio = _load_portfolio_history()
+                    return [_decorate_pick(row, orders, portfolio) for row in poly_rows]
+
+                self._send(_cached("polymarket-picks", 10, _poly_picks_decorated))
             elif route == "/api/performance":
                 sport = str(query.get("sport") or "").strip()
                 self._send(
@@ -467,6 +469,17 @@ class Handler(BaseHTTPRequestHandler):
         elif parsed.path == "/api/settings/auto-unit-value":
             pct = float(payload.get("pct", 10))
             self._send(_auto_adjust_unit_value(pct))
+        elif parsed.path == "/api/polymarket/record":
+            from model_prediction.portfolio.polymarket_ledger import record_polymarket_orders
+
+            orders = payload.get("orders") or []
+            res = record_polymarket_orders(orders)
+            self._send(res)
+        elif parsed.path == "/api/polymarket/settle":
+            from model_prediction.portfolio.polymarket_ledger import settle_polymarket_ledger_rows
+
+            res = settle_polymarket_ledger_rows()
+            self._send(res)
         else:
             self._send({"error": "unknown route"}, code=404)
 

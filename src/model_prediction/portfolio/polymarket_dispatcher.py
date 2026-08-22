@@ -108,6 +108,8 @@ class PolymarketDispatcher:
                 p_tie = 0.075
             elif lg in ("KBO", "DOTA2_BO2"):
                 p_tie = 0.035
+            elif lg == "SOCCER":
+                p_tie = 0.265
 
         return self.kelly_engine.evaluate_binary_opportunity(
             quote=quote,
