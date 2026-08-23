@@ -1,5 +1,5 @@
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from model_prediction.data_sources.mlb_market_odds import (
     MarketOddsSnapshotStore,
@@ -168,6 +168,36 @@ def test_feed_prices_polymarket_at_executable_ask_and_stores_raw_snapshot(tmp_pa
         "over",
     )
     assert closing["decision_probability"] == 0.51
+    decision = store.decision_quote(
+        "espn-1",
+        OBSERVED + timedelta(minutes=5),
+        "moneyline",
+        "away",
+        provider="polymarket_us",
+    )
+    assert decision is not None
+    assert decision["quote"]["decision_probability"] == 0.44
+    assert decision["snapshot"]["snapshot_record_id"] == decision["snapshot"]["snapshot_hash"]
+    assert (
+        store.decision_quote(
+            "espn-1",
+            OBSERVED - timedelta(seconds=1),
+            "moneyline",
+            "away",
+            provider="polymarket_us",
+        )
+        is None
+    )
+    assert (
+        store.decision_quote(
+            "espn-1",
+            OBSERVED + timedelta(minutes=31),
+            "moneyline",
+            "away",
+            provider="polymarket_us",
+        )
+        is None
+    )
 
 
 def test_feed_falls_back_to_draftkings_when_polymarket_event_is_unavailable(

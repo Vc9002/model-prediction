@@ -1,11 +1,20 @@
 import fcntl
 from datetime import UTC, datetime
 
+import pytest
 from openpyxl import Workbook, load_workbook
 
-from model_prediction.domain import League, MarketType, ModelOrigin, ModelState, PickRequest, RecordType
+from model_prediction.domain import (
+    League,
+    MarketType,
+    ModelOrigin,
+    ModelState,
+    PickRequest,
+    PickResult,
+    RecordType,
+)
 from model_prediction.eligibility import evaluate_eligibility
-from model_prediction.ledger import FIELDNAMES, LEGACY_FIELDNAMES, PickLedger
+from model_prediction.ledger import FIELDNAMES, LEGACY_FIELDNAMES, PickLedger, _settlement_pnl
 from model_prediction.units import Exposure, UnitPolicy
 from model_prediction.xlsx_ledger import read_xlsx_rows
 
@@ -232,6 +241,58 @@ def test_tied_binary_contract_uses_half_value_instead_of_zero_pnl(tmp_path) -> N
     assert settled["result"] == "push"
     assert float(settled["pnl_units"]) == round(0.5 / entry_probability - 1, 4)
     assert ledger.audit.events()[-1]["payload"]["binary_contract_settlement_value"] == 0.5
+
+
+def test_prediction_market_pricing_is_selected_by_explicit_venue_not_minus_110() -> None:
+    sportsbook_pnl = _settlement_pnl(
+        result=PickResult.WIN,
+        units=1.0,
+        sportsbook="consensus",
+        decimal_odds=1.909091,
+        entry_probability=0.40,
+        binary_contract_settlement_value=None,
+    )
+    contract_pnl = _settlement_pnl(
+        result=PickResult.WIN,
+        units=1.0,
+        sportsbook="polymarket_us",
+        decimal_odds=1.909091,
+        entry_probability=0.40,
+        binary_contract_settlement_value=None,
+    )
+
+    assert sportsbook_pnl == pytest.approx(0.909091)
+    assert contract_pnl == pytest.approx(1.5)
+    assert (
+        _settlement_pnl(
+            result=PickResult.PUSH,
+            units=1.0,
+            sportsbook="polymarket_us",
+            decimal_odds=1.909091,
+            entry_probability=0.40,
+            binary_contract_settlement_value=None,
+        )
+        == 0.0
+    )
+
+
+def test_prediction_market_settlement_prefers_exact_recorded_entry_price(tmp_path) -> None:
+    ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
+    req = request("exact-contract-entry")
+    req = PickRequest(
+        **{
+            **req.__dict__,
+            "sportsbook": "polymarket_us",
+            "market_probability_at_decision": 0.40,
+        }
+    )
+    row = ledger.append_call(req, 1.0, 60, now=NOW)
+
+    settled = ledger.settle(row["pick_id"], 2, 3)
+
+    assert settled["decision_raw_implied_probability"] == "0.523810"
+    assert float(settled["market_probability_at_decision"]) == pytest.approx(0.40)
+    assert float(settled["pnl_units"]) == pytest.approx(1.5)
 
 
 def test_report_filters_are_version_aware(tmp_path) -> None:

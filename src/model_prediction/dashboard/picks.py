@@ -151,6 +151,7 @@ def _parse_picks(path: Path) -> list[dict]:
         "line",
         "american_odds",
         "market_implied_probability",
+        "market_probability_at_decision",
         "model_probability",
         "model_uncertainty",
         "edge",

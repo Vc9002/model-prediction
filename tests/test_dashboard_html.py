@@ -218,6 +218,11 @@ def test_dashboard_operational_views_are_null_safe_filterable_and_accessible() -
     # Purchase controls fail closed in the row instead of inviting a rejected click.
     assert "if(p.buy_ready!==true)" in html
     assert 'class="blocked-order"' in html
+
+    pnl_helper = html.split("const pickPnl=p=>{", 1)[1].split("const pnlClass", 1)[0]
+    assert "p.quote?.ask" not in pnl_helper
+    assert "Number(p.units)||1.0" not in pnl_helper
+    assert "if(p.pnl_units!=null)return Number(p.pnl_units)" in pnl_helper
     assert 'class="pill loss">Blocked' in html
     assert 'aria-label="Purchase blocked:' in html
 

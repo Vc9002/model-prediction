@@ -376,29 +376,46 @@ def _decorate_pick(
     display_units = (
         _number(row.get("units")) or _number(row.get("research_score_units")) or _suggested_units(row) or 0
     )
-    display_pnl = _number(row.get("pnl_units")) or _number(row.get("research_pnl_units"))
-    # Fallback: compute P&L from american_odds when research_pnl_units is
-    # absent. Confirmed 2026-08-01: this never fires against real data --
-    # every row settle() ever touches already has a real pnl_units/
-    # research_pnl_units -- it's a defensive net for malformed/legacy rows
-    # only. Deliberately NOT importing pricing.profit_units here (this file
-    # has zero dependencies on the model_prediction package by design, kept
-    # runnable standalone); this formula must instead be kept in exact sync
-    # with pricing.profit_units by hand -- see
-    # tests/test_dashboard_server.py's
-    # test_pnl_fallback_formula_matches_pricing_profit_units, which fails
-    # loudly if the two ever diverge.
-    if display_pnl == 0 and row.get("result") in ("win", "loss") and row.get("american_odds"):
-        try:
-            odds = int(row["american_odds"])
-            if odds > 0:
-                display_pnl = display_units * odds / 100
+    ledger_pnl = _number(row.get("pnl_units"), None)
+    research_pnl = _number(row.get("research_pnl_units"), None)
+    display_pnl = ledger_pnl if ledger_pnl is not None else research_pnl
+    # Recorded settlement is authoritative, including a legitimate 0.0 push.
+    # This fallback exists only for malformed legacy rows. It uses immutable
+    # decision-time prices and never a current quote, which would rewrite history.
+    if display_pnl is None and row.get("result") in ("win", "loss"):
+        effective_units = _number(row.get("units"), None)
+        if effective_units is None:
+            effective_units = _number(row.get("research_score_units"), None)
+        if effective_units is not None:
+            sportsbook = str(row.get("sportsbook") or "").strip().lower()
+            if sportsbook in {"kalshi", "polymarket", "polymarket_us", "prediction_market"}:
+                entry_price = _number(
+                    row.get("decision_raw_implied_probability") or row.get("market_implied_probability"),
+                    None,
+                )
+                if entry_price is None and filled_entry:
+                    entry_price = _number(filled_entry.get("price"), None)
+                if entry_price is not None and 0 < entry_price < 1:
+                    display_pnl = (
+                        effective_units * (1.0 / entry_price - 1.0)
+                        if row["result"] == "win"
+                        else -effective_units
+                    )
             else:
-                display_pnl = display_units * 100 / abs(odds)
-            if row["result"] == "loss":
-                display_pnl = -display_units
-        except (ValueError, TypeError):
-            pass
+                decimal_odds = _number(
+                    row.get("decision_decimal_odds") or row.get("decimal_odds"),
+                    None,
+                )
+                if decimal_odds is None and row.get("american_odds") is not None:
+                    odds = _number(row.get("american_odds"), None)
+                    if odds is not None and odds != 0:
+                        decimal_odds = 1 + (odds / 100 if odds > 0 else 100 / abs(odds))
+                if decimal_odds is not None and decimal_odds > 1:
+                    display_pnl = (
+                        effective_units * (decimal_odds - 1.0) if row["result"] == "win" else -effective_units
+                    )
+            if display_pnl is not None:
+                display_pnl = round(display_pnl, 4)
     return {
         **row,
         # Preserve ledger facts in the API. A Research NO_CALL must remain

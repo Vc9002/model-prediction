@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import asdict, dataclass, replace
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -102,6 +102,59 @@ class MarketOddsSnapshotStore:
                 if quote is not None:
                     candidates.append((observed, quote))
         return max(candidates, key=lambda item: item[0])[1] if candidates else None
+
+    def decision_quote(
+        self,
+        event_id: str,
+        decision_at_utc: str | datetime,
+        market_type: str,
+        selection: str,
+        *,
+        provider: str | None = None,
+        maximum_age: timedelta = timedelta(minutes=30),
+    ) -> dict[str, Any] | None:
+        """Return the latest authenticated quote known by decision time.
+
+        This is intentionally different from :meth:`closing_quote`: a close
+        observed after a forecast cannot be substituted for the forecast's
+        entry price. Invalid hashes, future observations, stale quotes, and
+        mismatched providers fail closed.
+        """
+        if not self.path.exists():
+            return None
+        decision_at = decision_at_utc if isinstance(decision_at_utc, datetime) else parse_utc(decision_at_utc)
+        candidates: list[tuple[datetime, dict[str, Any], dict[str, Any]]] = []
+        with self.path.open(encoding="utf-8") as handle:
+            for raw_line in handle:
+                if not raw_line.strip():
+                    continue
+                item = json.loads(raw_line)
+                if item.get("event_id") != event_id:
+                    continue
+                if provider is not None and item.get("provider") != provider:
+                    continue
+                observed = parse_utc(item["observed_at_utc"])
+                if observed > decision_at or decision_at - observed > maximum_age:
+                    continue
+                event_start = parse_utc(item["event_start_utc"])
+                if observed > event_start:
+                    continue
+                snapshot_hash = str(item.get("snapshot_hash") or "")
+                if (
+                    not snapshot_hash
+                    or item.get("snapshot_record_id") != snapshot_hash
+                    or item.get("snapshot_archive_path") != str(self.path.resolve())
+                    or canonical_mlb_market_snapshot_hash(item) != snapshot_hash
+                ):
+                    continue
+                quote = item.get("markets", {}).get(market_type, {}).get(selection)
+                if not isinstance(quote, dict):
+                    continue
+                candidates.append((observed, item, quote))
+        if not candidates:
+            return None
+        observed, snapshot, quote = max(candidates, key=lambda candidate: candidate[0])
+        return {"observed_at_utc": iso_utc(observed), "snapshot": snapshot, "quote": quote}
 
 
 class MLBMarketOddsFeed:

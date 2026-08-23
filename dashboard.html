@@ -1538,23 +1538,28 @@ function renderMatrix(m){
 /* ---------- picks ---------- */
 const pickPnl=p=>{
   if(p.display_pnl_units!=null)return Number(p.display_pnl_units);
-  const u=Number(p.units)||1.0;
   const isSettled=String(p.status||"").toLowerCase()==="settled"||p.result==="win"||p.result==="loss"||p.result==="push";
   if(!isSettled)return null;
-  const entryProb=Number(p.filled_entry?.price??p.quote?.ask??p.market_implied_probability);
-  if(p.pnl_units!=null){
-    const raw=Number(p.pnl_units);
-    if(p.result==="win"&&Math.abs(raw-0.91*u)<0.02&&entryProb>0&&entryProb<1){
-      return Number((u*(1.0/entryProb-1.0)).toFixed(4));
-    }
-    return raw;
+  if(p.pnl_units!=null)return Number(p.pnl_units);
+  if(p.research_pnl_units!=null)return Number(p.research_pnl_units);
+  if(p.result==="push")return null;
+  const rawUnits=p.units??p.research_score_units;
+  if(rawUnits==null)return null;
+  const u=Number(rawUnits);
+  if(!Number.isFinite(u))return null;
+  const book=String(p.sportsbook||"").trim().toLowerCase();
+  if(["kalshi","polymarket","polymarket_us","prediction_market"].includes(book)){
+    const entryProb=Number(p.decision_raw_implied_probability??p.market_implied_probability??p.filled_entry?.price);
+    if(!(entryProb>0&&entryProb<1))return null;
+    return p.result==="win"?Number((u*(1.0/entryProb-1.0)).toFixed(4)):-u;
   }
-  if(entryProb>0&&entryProb<1){
-    if(p.result==="win")return Number((u*(1.0/entryProb-1.0)).toFixed(4));
-    if(p.result==="loss")return -u;
-    return 0.0;
+  let decimal=Number(p.decision_decimal_odds??p.decimal_odds);
+  if(!(decimal>1)&&p.american_odds!=null){
+    const odds=Number(p.american_odds);
+    if(odds!==0)decimal=1+(odds>0?odds/100:100/Math.abs(odds));
   }
-  return (p.research_score_units==null||p.research_pnl_units==null)?null:Number(p.research_pnl_units);
+  if(!(decimal>1))return null;
+  return p.result==="win"?Number((u*(decimal-1)).toFixed(4)):-u;
 };
 const pnlClass=v=>v==null?"":(v>=0?"green":"red");
 const ET_ZONE="America/New_York";
@@ -1592,7 +1597,7 @@ function quoteStateBadge(value,staleMinutes=15){
   if(age.minutes==null)return '<span class="state-badge bad" aria-label="Quote timestamp unavailable">! no timestamp</span>';
   return `<span class="state-badge ${age.stale?"warn":"ok"}" aria-label="Quote ${age.stale?"stale":"current"}; ${age.label}">${age.stale?"! stale":"✓ current"} · ${age.label}</span>`;
 }
-const pregamePrice=p=>Number(p.quote?.ask??p.market_implied_probability)||null;
+const pregamePrice=p=>Number(p.market_probability_at_decision??p.market_implied_probability)||null;
 const entryPrice=p=>Number(p.filled_entry?.price)||null;
 const cents=value=>{if(value==null)return "—";const c=Number(value)*100;return `${Number.isInteger(c)?c.toFixed(0):c.toFixed(1)}¢`;};
 const edgePoints=p=>{const stored=Number(p.edge);if(Number.isFinite(stored))return stored;

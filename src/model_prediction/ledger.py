@@ -72,9 +72,45 @@ EXPOSURE_TIMEZONE = EASTERN
 LOCK_TIMEOUT_SECONDS = 30
 LOCK_POLL_INTERVAL_SECONDS = 0.1
 
+PREDICTION_MARKET_SPORTSBOOKS = frozenset({"kalshi", "polymarket", "polymarket_us", "prediction_market"})
+
 
 class LedgerLockTimeout(TimeoutError):
     """Raised when a ledger file lock can't be acquired within the timeout."""
+
+
+def _settlement_pnl(
+    *,
+    result: PickResult,
+    units: float,
+    sportsbook: object,
+    decimal_odds: float,
+    entry_probability: float,
+    binary_contract_settlement_value: float | None,
+) -> float:
+    """Return P&L from immutable decision-time economics.
+
+    Exchange contracts settle from their recorded entry probability. Sportsbook
+    rows settle from their recorded decimal odds. Do not infer the venue from a
+    common price such as -110: consensus and MLB v9 sportsbook rows legitimately
+    use that price too.
+    """
+    normalized_sportsbook = str(sportsbook or "").strip().lower()
+    is_prediction_market = normalized_sportsbook in PREDICTION_MARKET_SPORTSBOOKS
+    if binary_contract_settlement_value is not None or is_prediction_market:
+        if not 0 < entry_probability < 1:
+            raise ValueError("prediction-market settlement requires a valid decision-time entry price")
+        settlement_value = binary_contract_settlement_value
+        if settlement_value is None:
+            if result is PickResult.PUSH:
+                return 0.0
+            settlement_value = 1.0 if result is PickResult.WIN else 0.0
+        return units * (settlement_value / entry_probability - 1.0)
+    return profit_units(
+        result,
+        units,
+        decimal_odds if decimal_odds > 0 else 1.909091,
+    )
 
 
 def _acquire_exclusive_lock(fileno: int, path: Path, timeout: float = LOCK_TIMEOUT_SECONDS) -> None:
@@ -956,32 +992,22 @@ class PickLedger:
             # a ledger's P&L represents actually-staked money is a property of
             # the ledger itself (main only), not something settle() decides.
             units = float(row["units"] or 0)
-            raw_entry = row["decision_raw_implied_probability"] or row["market_implied_probability"]
+            raw_entry = (
+                row.get("market_probability_at_decision")
+                or row["decision_raw_implied_probability"]
+                or row["market_implied_probability"]
+            )
             entry_probability = float(raw_entry) if raw_entry not in (None, "") else 0.0
 
             dec_odds_val = float(row["decision_decimal_odds"] or row["decimal_odds"] or 0.0)
-            if binary_contract_settlement_value is not None and entry_probability > 0:
-                pnl = units * (binary_contract_settlement_value / entry_probability - 1)
-            elif (
-                entry_probability > 0
-                and entry_probability < 1.0
-                and (
-                    row.get("sportsbook") in ("polymarket", "kalshi", "prediction_market")
-                    or abs(dec_odds_val - 1.909091) < 0.01
-                )
-            ):
-                if result == PickResult.WIN:
-                    pnl = units * (1.0 / entry_probability - 1.0)
-                elif result == PickResult.LOSS:
-                    pnl = -units
-                else:
-                    pnl = 0.0
-            else:
-                pnl = profit_units(
-                    result,
-                    units,
-                    dec_odds_val if dec_odds_val > 0 else 1.909091,
-                )
+            pnl = _settlement_pnl(
+                result=result,
+                units=units,
+                sportsbook=row.get("sportsbook"),
+                decimal_odds=dec_odds_val,
+                entry_probability=entry_probability,
+                binary_contract_settlement_value=binary_contract_settlement_value,
+            )
             research_units = None
             if (
                 row["record_type"] == RecordType.RESEARCH_OBSERVATION.value
@@ -1003,27 +1029,14 @@ class PickLedger:
                         )
             if research_units is None:
                 research_pnl = None
-            elif binary_contract_settlement_value is not None and entry_probability > 0:
-                research_pnl = research_units * (binary_contract_settlement_value / entry_probability - 1)
-            elif (
-                entry_probability > 0
-                and entry_probability < 1.0
-                and (
-                    row.get("sportsbook") in ("polymarket", "kalshi", "prediction_market")
-                    or abs(dec_odds_val - 1.909091) < 0.01
-                )
-            ):
-                if result == PickResult.WIN:
-                    research_pnl = research_units * (1.0 / entry_probability - 1.0)
-                elif result == PickResult.LOSS:
-                    research_pnl = -research_units
-                else:
-                    research_pnl = 0.0
             else:
-                research_pnl = profit_units(
-                    result,
-                    research_units,
-                    dec_odds_val if dec_odds_val > 0 else 1.909091,
+                research_pnl = _settlement_pnl(
+                    result=result,
+                    units=research_units,
+                    sportsbook=row.get("sportsbook"),
+                    decimal_odds=dec_odds_val,
+                    entry_probability=entry_probability,
+                    binary_contract_settlement_value=binary_contract_settlement_value,
                 )
             settled_at_utc = iso_utc(settled_at or utc_now())
             row.update(
@@ -1054,7 +1067,7 @@ class PickLedger:
                     else str(closing_consensus_line),
                     "probability_clv": ""
                     if closing_probability is None
-                    else f"{closing_probability - float(row['decision_raw_implied_probability'] or row['market_implied_probability']):.6f}",
+                    else f"{closing_probability - entry_probability:.6f}",
                     "pnl_units": f"{pnl:.4f}",
                     "settled_at_utc": settled_at_utc,
                     "review_status": "review_required" if result is PickResult.LOSS else "not_applicable",
