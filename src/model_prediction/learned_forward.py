@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 from collections.abc import Mapping
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -455,9 +456,19 @@ def build_learned_moneyline_slate(
         )
     espn_leagues = leagues or (key.upper(),)
     events: list[dict[str, Any]] = []
-    for league in espn_leagues:
-        scoreboard = client.scoreboard(league, game_date)
-        events.extend(scoreboard.get("events", []))
+    if len(espn_leagues) == 1:
+        events.extend(client.scoreboard(espn_leagues[0], game_date).get("events", []))
+    else:
+        # Soccer alone passes multiple leagues here (up to 18 -- EPL,
+        # LA_LIGA, ... WORLD_CUP); fetching them one at a time made this
+        # the single largest sequential ESPN-call chain in the daily
+        # pipeline. Each league's scoreboard is an independent read, so
+        # fan them out concurrently the same way forward.py's per-event
+        # feature fetch was parallelized.
+        with ThreadPoolExecutor(max_workers=min(8, len(espn_leagues))) as pool:
+            scoreboards = pool.map(lambda league: client.scoreboard(league, game_date), espn_leagues)
+        for scoreboard in scoreboards:
+            events.extend(scoreboard.get("events", []))
     wanted = set(artifact.raw.get("market_models", {}).get("moneyline", {}).get("feature_names", []))
     if "weather_factor" in wanted:
         # The per-event loop below is sequential and each event's
