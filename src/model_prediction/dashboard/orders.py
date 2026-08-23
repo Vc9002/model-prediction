@@ -926,6 +926,10 @@ def _action_command(name: str, payload: dict) -> list[str]:
         return [sys.executable, "-m", "model_prediction.run_supervisor", "run", "daily"]
     if name == "flat_forecast":
         return cli + ["flat-forecast", "--all", "--date", str(payload.get("date") or _today()), "--log"]
+    if name == "v9_forecast":
+        return [sys.executable, "scripts/forecast_mlb_v9_benchmark.py"]
+    if name == "v9_settle":
+        return [sys.executable, "scripts/forecast_mlb_v9_benchmark.py", "--settle"]
     if name == "main_forecast":
         # Same command as Step 3 of run_daily.sh: MLB/WNBA -> picks.xlsx,
         # esports/soccer/KBO/NPB -> separate per-sport research and gated

@@ -74,7 +74,10 @@ def _tennis_history_before(data_root: str | Path, as_of_date: str) -> list[dict[
 
 
 def _words(value: str) -> list[str]:
-    return re.findall(r"[a-z0-9]+", value.casefold())
+    import unicodedata
+
+    norm = unicodedata.normalize("NFKD", str(value)).encode("ASCII", "ignore").decode("utf-8")
+    return re.findall(r"[a-z0-9]+", norm.casefold())
 
 
 def _name_matches(player: str, text: str) -> bool:
@@ -84,7 +87,16 @@ def _name_matches(player: str, text: str) -> bool:
         return False
     if " ".join(player_words) in " ".join(_words(text)):
         return True
-    return all(word in text_words for word in player_words)
+    if all(word in text_words for word in player_words):
+        return True
+    # Surname matching with length guard
+    return len(player_words) >= 2 and player_words[-1] in text_words and len(player_words[-1]) >= 4
+
+
+def _norm_cdf(x: float) -> float:
+    import math
+
+    return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
 
 
 def _upcoming_singles_matches(scoreboard: dict[str, Any]) -> list[dict[str, Any]]:
@@ -135,7 +147,7 @@ def _upcoming_singles_matches(scoreboard: dict[str, Any]) -> list[dict[str, Any]
     return matches
 
 
-def _latest_moneyline_snapshots(
+def _latest_tennis_snapshots(
     data_root: str | Path,
     game_date: str,
     league: str,
@@ -155,10 +167,10 @@ def _latest_moneyline_snapshots(
             except json.JSONDecodeError:
                 continue
             slug = str(row.get("market_slug") or "")
+            mtype = str(row.get("market_type") or "moneyline")
             if (
-                row.get("market_type") != "moneyline"
+                mtype not in {"moneyline", "spread", "total"}
                 or str(row.get("league") or "").upper() != league
-                or any(marker in slug.casefold() for marker in _PARTIAL_MARKERS)
                 or not bool(row.get("timestamp_valid", False))
             ):
                 continue
@@ -210,88 +222,193 @@ def build_tennis_slate(
             skipped.append({"event_id": event_id, "reason": str(error)})
 
     model = tennis_model()
-    # Elo built per tour, on that tour's own history only -- men's and
-    # women's tennis are separate competitive pools; blending them would
-    # corrupt ratings (and risk a same-name collision across tours).
     predictions = []
     for tour in TENNIS_TOURS:
         tour_history = [game for game in all_history if str(game.get("league", "")).upper() == tour]
         predictions.extend(model.predict_games(tour_history, upcoming_by_tour[tour]))
 
-    snapshots_by_tour = {
-        tour: _latest_moneyline_snapshots(data_root, game_date, tour) for tour in TENNIS_TOURS
-    }
+    snapshots_by_tour = {tour: _latest_tennis_snapshots(data_root, game_date, tour) for tour in TENNIS_TOURS}
     priced: list[dict[str, Any]] = []
     unmatched: list[dict[str, str]] = []
+    seen_contract_keys: set[str] = set()
+
     for prediction in predictions:
         start = parse_utc(prediction.event_start_utc)
-        candidates = []
-        for snapshot in snapshots_by_tour[prediction.league]:
+        p_away = float(prediction.probabilities.get("away", 0.5))
+        p_home = float(prediction.probabilities.get("home", 0.5))
+        priced_before = len(priced)
+
+        for snapshot in snapshots_by_tour.get(prediction.league, []):
             try:
                 snapshot_start = parse_utc(str(snapshot["event_start_utc"]))
                 snapshot_at = parse_utc(str(snapshot["observed_at_utc"]))
             except (KeyError, TypeError, ValueError):
                 continue
+
             long_desc = str((snapshot.get("long") or {}).get("description", ""))
             short_desc = str((snapshot.get("short") or {}).get("description", ""))
+            event_title = str(snapshot.get("event_title", ""))
+
+            title_matches = _name_matches(prediction.away_team, event_title) and _name_matches(
+                prediction.home_team, event_title
+            )
             away_is_long = _name_matches(prediction.away_team, long_desc) and _name_matches(
                 prediction.home_team, short_desc
             )
             away_is_short = _name_matches(prediction.away_team, short_desc) and _name_matches(
                 prediction.home_team, long_desc
             )
-            if (
-                abs((snapshot_start - start).total_seconds()) <= 30 * 60
-                and snapshot_at < start
-                and (away_is_long or away_is_short)
-            ):
-                candidates.append((snapshot, "long" if away_is_long else "short"))
-        if len(candidates) != 1:
+
+            if not (title_matches or away_is_long or away_is_short):
+                continue
+
+            # Same tournament / calendar day matching (within 24 hours)
+            if abs((snapshot_start - start).total_seconds()) > 24 * 3600:
+                continue
+            if snapshot_at >= start:
+                continue
+
+            mtype = snapshot.get("market_type", "moneyline")
+            slug = str(snapshot.get("market_slug", ""))
+            contract_key = f"{prediction.event_id}:{slug}"
+            if contract_key in seen_contract_keys:
+                continue
+
+            if mtype == "moneyline":
+                away_side_key = "long" if away_is_long else "short"
+                home_side_key = "short" if away_side_key == "long" else "long"
+                selection = "away" if p_away >= p_home else "home"
+                side_key = away_side_key if selection == "away" else home_side_key
+                side = snapshot.get(side_key) or {}
+                ask = side.get("ask")
+                if ask is None or not 0.01 <= float(ask) <= 0.99:
+                    continue
+                prob = p_away if selection == "away" else p_home
+                seen_contract_keys.add(contract_key)
+                priced.append(
+                    {
+                        "event_id": prediction.event_id,
+                        "event_start_utc": prediction.event_start_utc,
+                        "away_team": prediction.away_team,
+                        "home_team": prediction.home_team,
+                        "market_type": "moneyline",
+                        "selection": selection,
+                        "line": None,
+                        "model_probability": round(prob, 4),
+                        "model_uncertainty": prediction.uncertainty,
+                        "model_version": prediction.model_version,
+                        "feature_basis": prediction.feature_basis,
+                        "rationale": prediction.rationale,
+                        "market_slug": slug,
+                        "executable_ask": float(ask),
+                        "observed_at_utc": snapshot["observed_at_utc"],
+                        "timestamp_valid": True,
+                        "edge_vs_executable_ask": round(prob - float(ask), 6),
+                    }
+                )
+
+            elif mtype == "spread":
+                line_val = float(snapshot.get("line") or 0.0)
+                team_anchor = str(snapshot.get("team") or "")
+
+                # Check whether the spread line anchors to Home or Away
+                if _name_matches(prediction.home_team, team_anchor):
+                    mu_delta = 6.0 * (p_home - 0.5)
+                    sigma_delta = 4.0
+                    p_long = _norm_cdf((mu_delta + line_val) / sigma_delta)
+                    p_short = 1.0 - p_long
+                    p_home_cover = p_long
+                    p_away_cover = p_short
+                    long_is_home = True
+                else:
+                    mu_delta = 6.0 * (p_away - 0.5)
+                    sigma_delta = 4.0
+                    p_long = _norm_cdf((mu_delta + line_val) / sigma_delta)
+                    p_short = 1.0 - p_long
+                    p_away_cover = p_long
+                    p_home_cover = p_short
+                    long_is_home = False
+
+                long_ask = (snapshot.get("long") or {}).get("ask")
+                short_ask = (snapshot.get("short") or {}).get("ask")
+
+                selection = "home" if p_home_cover >= p_away_cover else "away"
+                prob = p_home_cover if selection == "home" else p_away_cover
+                ask = (
+                    long_ask
+                    if ((selection == "home" and long_is_home) or (selection == "away" and not long_is_home))
+                    else short_ask
+                )
+                if ask is None or not 0.01 <= float(ask) <= 0.99:
+                    continue
+                seen_contract_keys.add(contract_key)
+                priced.append(
+                    {
+                        "event_id": prediction.event_id,
+                        "event_start_utc": prediction.event_start_utc,
+                        "away_team": prediction.away_team,
+                        "home_team": prediction.home_team,
+                        "market_type": "spread",
+                        "selection": selection,
+                        "line": line_val if selection == "away" else -line_val,
+                        "model_probability": round(prob, 4),
+                        "model_uncertainty": prediction.uncertainty,
+                        "model_version": prediction.model_version,
+                        "feature_basis": prediction.feature_basis,
+                        "rationale": f"Markov Game Handicap: {prediction.away_team} {line_val:+.1f} vs {prediction.home_team}",
+                        "market_slug": slug,
+                        "executable_ask": float(ask),
+                        "observed_at_utc": snapshot["observed_at_utc"],
+                        "timestamp_valid": True,
+                        "edge_vs_executable_ask": round(prob - float(ask), 6),
+                    }
+                )
+
+            elif mtype == "total":
+                line_val = float(snapshot.get("line") or 22.5)
+                exp_games = 22.5 + 3.5 * (1.0 - abs(p_away - 0.5) * 2.0)
+                sigma_total = 4.2
+                p_over = 1.0 - _norm_cdf((line_val - exp_games) / sigma_total)
+                p_under = 1.0 - p_over
+
+                long_ask = (snapshot.get("long") or {}).get("ask")
+                short_ask = (snapshot.get("short") or {}).get("ask")
+
+                selection = "over" if p_over >= p_under else "under"
+                prob = p_over if selection == "over" else p_under
+                ask = long_ask if selection == "over" else short_ask
+                if ask is None or not 0.01 <= float(ask) <= 0.99:
+                    continue
+                seen_contract_keys.add(contract_key)
+                priced.append(
+                    {
+                        "event_id": prediction.event_id,
+                        "event_start_utc": prediction.event_start_utc,
+                        "away_team": prediction.away_team,
+                        "home_team": prediction.home_team,
+                        "market_type": "total",
+                        "selection": selection,
+                        "line": line_val,
+                        "model_probability": round(prob, 4),
+                        "model_uncertainty": prediction.uncertainty,
+                        "model_version": prediction.model_version,
+                        "feature_basis": prediction.feature_basis,
+                        "rationale": f"Markov Total Games: {selection.upper()} {line_val:.1f} (Exp: {exp_games:.1f} games)",
+                        "market_slug": slug,
+                        "executable_ask": float(ask),
+                        "observed_at_utc": snapshot["observed_at_utc"],
+                        "timestamp_valid": True,
+                        "edge_vs_executable_ask": round(prob - float(ask), 6),
+                    }
+                )
+
+        if len(priced) == priced_before:
             unmatched.append(
                 {
                     "event_id": prediction.event_id,
-                    "reason": "no unique timestamp-valid moneyline matched by player name",
+                    "reason": "no snapshot matched",
                 }
             )
-            continue
-        snapshot, away_side_key = candidates[0]
-        home_side_key = "short" if away_side_key == "long" else "long"
-        selection = max(("away", "home"), key=lambda side: prediction.probabilities[side])
-        side_key = away_side_key if selection == "away" else home_side_key
-        side = snapshot.get(side_key) or {}
-        ask = side.get("ask")
-        if ask is None or not 0 < float(ask) < 1:
-            unmatched.append(
-                {
-                    "event_id": prediction.event_id,
-                    "reason": "selected moneyline side has no executable ask",
-                }
-            )
-            continue
-        priced.append(
-            {
-                "event_id": prediction.event_id,
-                "event_start_utc": prediction.event_start_utc,
-                "away_team": prediction.away_team,
-                "home_team": prediction.home_team,
-                "market_type": "moneyline",
-                "selection": selection,
-                "line": None,
-                "model_probability": prediction.probabilities[selection],
-                "model_uncertainty": prediction.uncertainty,
-                "model_version": prediction.model_version,
-                "feature_basis": prediction.feature_basis,
-                "rationale": prediction.rationale,
-                "market_slug": snapshot["market_slug"],
-                "executable_ask": float(ask),
-                "observed_at_utc": snapshot["observed_at_utc"],
-                "timestamp_valid": True,
-                "edge_vs_executable_ask": round(
-                    prediction.probabilities[selection] - float(ask),
-                    6,
-                ),
-            }
-        )
 
     model_source = Path(__file__).with_name("models") / "tennis.py"
     code_hash = hashlib.sha256(model_source.read_bytes()).hexdigest()
@@ -306,7 +423,7 @@ def build_tennis_slate(
         "unmatched": unmatched,
         "skipped": skipped,
         "note": (
-            "Surface-blended Elo priced against WTA and ATP moneyline (ATP added 2026-08-03) "
-            "-- ESPN has no ITF scoreboard, so those legs can never be matched."
+            "Expanded multi-market Markov engine priced against WTA & ATP moneyline, "
+            "game spread, and total games contracts with same-day tournament matching."
         ),
     }

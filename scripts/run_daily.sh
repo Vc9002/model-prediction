@@ -39,6 +39,12 @@ PYTHONPATH=src .venv/bin/python -m model_prediction.cli settle --all-unsettled >
 SETTLE_EXIT=$?
 echo "Settlement exit code: $SETTLE_EXIT" >> "$LOG"
 
+# ── Step 1c: MLB v9 Flat benchmark settlement ───────────────────────
+echo "--- Step 1c: MLB v9 benchmark settlement ---" >> "$LOG"
+PYTHONPATH=src:. .venv/bin/python scripts/forecast_mlb_v9_benchmark.py --settle >> "$LOG" 2>&1
+V9_SETTLE_EXIT=$?
+echo "MLB v9 settlement exit code: $V9_SETTLE_EXIT" >> "$LOG"
+
 # ── Step 1b: Historical game ingestion ──────────────────────────────
 # Settlement above only grades ledger PICKS from ESPN scoreboards — it does
 # NOT feed completed games back into data/historical/*_games_all.jsonl, the
@@ -94,8 +100,14 @@ PYTHONPATH=src .venv/bin/python -m model_prediction.cli daily \
 DAILY_EXIT=$?
 echo "Unified daily exit code: $DAILY_EXIT" >> "$LOG"
 
+# ── Step 2b: MLB v9 Challenger flat forecast ────────────────────────
+echo "--- Step 2b: MLB v9 Challenger flat forecast ---" >> "$LOG"
+PYTHONPATH=src:. .venv/bin/python scripts/forecast_mlb_v9_benchmark.py >> "$LOG" 2>&1
+V9_FORECAST_EXIT=$?
+echo "MLB v9 forecast exit code: $V9_FORECAST_EXIT" >> "$LOG"
+
 echo "Finished: $(TZ=America/New_York date)" >> "$LOG"
-echo "Exit codes — settle: $SETTLE_EXIT, ingest: $INGEST_EXIT, daily: $DAILY_EXIT" >> "$LOG"
+echo "Exit codes — settle: $SETTLE_EXIT, v9_settle: $V9_SETTLE_EXIT, ingest: $INGEST_EXIT, daily: $DAILY_EXIT, v9_forecast: $V9_FORECAST_EXIT" >> "$LOG"
 
 # Cleanup old logs
 find data/logs -name "daily_*.log" -mtime +30 -delete

@@ -124,10 +124,9 @@ def main() -> int:
         home_score = int(float(meta.get("home_score", 0) or 0)) if meta.get("home_score") is not None else 0
         away_score = int(float(meta.get("away_score", 0) or 0)) if meta.get("away_score") is not None else 0
 
+        # Availability must strictly come from boolean flags, never numeric gap != 0
         starter_avail = bool(
-            getattr(row, "probable_starter_available", False)
-            or getattr(row, "starter_fip_gap", 0.0) != 0.0
-            or getattr(row, "starter_era_gap", 0.0) != 0.0
+            getattr(row, "probable_starter_available", False) or getattr(row, "starter_available", False)
         )
         bullpen_avail = bool(getattr(row, "bullpen_available", False))
         weather_avail = bool(getattr(row, "weather_available", False))
@@ -182,7 +181,9 @@ def main() -> int:
         "created_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "builder_git_sha": git_sha,
         "dataset_sha256": sha256_file(parquet_path),
-        "schema_sha256": hashlib.sha256(json.dumps(sorted(frame.columns)).encode()).hexdigest(),
+        "schema_sha256": hashlib.sha256(
+            json.dumps(sorted([(c, str(t)) for c, t in frame.schema.items()]), sort_keys=True).encode()
+        ).hexdigest(),
         "train_event_ids_sha256": sha256_file(train_ids_path),
         "validation_event_ids_sha256": sha256_file(val_ids_path),
         "research_test_event_ids_sha256": sha256_file(test_ids_path),

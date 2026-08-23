@@ -104,6 +104,13 @@ def read_flat_picks() -> list[dict]:
 
 
 _POLYMARKET_PICKS_CACHE: dict[str, object] = {"mtime": None, "rows": []}
+_FLAT_V9_PICKS_CACHE: dict[str, object] = {"mtime": None, "rows": []}
+
+
+def read_v9_flat_picks() -> list[dict]:
+    """Parse dedicated MLB v9 Flat benchmark ledger (data/flat_v9/mlb.xlsx)."""
+    path = DATA / "flat_v9" / "mlb.xlsx"
+    return _read_split_picks([path], _FLAT_V9_PICKS_CACHE) if path.exists() else []
 
 
 def read_polymarket_picks() -> list[dict]:
@@ -115,8 +122,8 @@ def read_polymarket_picks() -> list[dict]:
 
 
 def _find_pick_by_id(pick_id: str) -> dict | None:
-    """Search main, flat, research, and polymarket ledgers for a pick by pick_id."""
-    for fn in (read_picks, read_flat_picks, read_polymarket_picks):
+    """Search main, flat, v9, research, and polymarket ledgers for a pick by pick_id."""
+    for fn in (read_picks, read_flat_picks, read_v9_flat_picks, read_polymarket_picks):
         row = next((item for item in fn() if str(item.get("pick_id")) == pick_id), None)
         if row is not None:
             return row

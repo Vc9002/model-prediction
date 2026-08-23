@@ -14,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 
 from ..config import PROJECT_ROOT
-from .park_factors import park_factor
+from .park_factors_pit import park_factor_at
 from .platoon_matchup import platoon_matchup_gaps
 from .projected_offense import projected_offense_matchup_gaps
 from .reliever_availability import reliever_availability_matchup_gaps
@@ -126,8 +126,9 @@ def extract_mlb_v9_features(
         home_team, away_team, home_starter_throws, away_starter_throws, as_of, snapshot_path=snapshot_path
     )
 
-    # 5. Park factor
-    pf = float(park_factor(home_team).get("park_factor", 1.0))
+    # 5. Park factor (Point-In-Time)
+    pf_obj = park_factor_at(home_team, as_of_date)
+    pf = float(pf_obj.get("park_factor", 1.0)) if isinstance(pf_obj, dict) else float(pf_obj or 1.0)
 
     return MLBv9FeatureVector(
         home_team=home_team,
@@ -141,8 +142,8 @@ def extract_mlb_v9_features(
         away_expected_starter_ip=starter_gaps.get("away_expected_starter_ip", 5.5),
         projected_woba_gap=offense_gaps.get("projected_offense_quality_gap", 0.0),
         projected_iso_gap=offense_gaps.get("projected_offense_power_gap", 0.0),
-        projected_k_pct_gap=offense_gaps.get("projected_offense_kbb_gap", 0.0),
-        projected_bb_pct_gap=0.0,
+        projected_k_pct_gap=offense_gaps.get("projected_offense_k_pct_gap", 0.0),
+        projected_bb_pct_gap=offense_gaps.get("projected_offense_bb_pct_gap", 0.0),
         home_projected_woba=offense_gaps.get("home_projected_xwoba", 0.318),
         away_projected_woba=offense_gaps.get("away_projected_xwoba", 0.318),
         bullpen_fip_advantage=bullpen_gaps.get("bullpen_fip_advantage", 0.0),

@@ -1,62 +1,8 @@
 {
-  "schema": "mlb-standard-evaluator-v2",
   "mode": "v9_research",
-  "manifest": {
-    "schema_version": "mlb-v9-feature-table-v1",
-    "created_at_utc": "2026-08-23T08:36:59.998548Z",
-    "builder_git_sha": "92de6000877f39a7ded5ff4cefb8adcba5c6c9d7",
-    "dataset_sha256": "98f8b6e8d42dde8a10c5cb8b45ad8f40c66e490af7d53fd352268887ef91d6b9",
-    "schema_sha256": "e3132a396baca48e923f48658c247e2d060c8d93679fb5198a8561984ce1602f",
-    "train_event_ids_sha256": "bafb1454c0d40da171d98361ad2fb7e557000996b9a9dbd02b0ee9c0a7c8980d",
-    "validation_event_ids_sha256": "aeee61e80fb4eb466c607ddc3ca314e4a63c206a755b7d6641132d2aa0afb710",
-    "research_test_event_ids_sha256": "321dbef5b0f5b84bf9d2c9b5e2ec6a18000d1de38d3f3bf305ebe7c658798998",
-    "rows": {
-      "total": 6638,
-      "train": 3814,
-      "validation": 1082,
-      "research_test": 1742
-    },
-    "features": [
-      "back_to_back_gap",
-      "bullpen_available",
-      "bullpen_fatigue_available",
-      "bullpen_fatigue_gap",
-      "bullpen_weakness_gap",
-      "consistency_gap",
-      "defensive_trend_gap",
-      "elo_neutral_probability",
-      "elo_probability",
-      "games_last_7_gap",
-      "hot_cold_gap",
-      "park_available",
-      "park_factor",
-      "park_factor_pit",
-      "pitcher_era_gap",
-      "probable_starter_available",
-      "probable_starter_era_gap",
-      "residual_trend_gap",
-      "rest_disparity",
-      "schedule_available",
-      "starter_available",
-      "starter_era_gap",
-      "starter_fip_gap",
-      "starter_kbb_gap",
-      "trailing_home_games_30d",
-      "trailing_home_win_rate_30d",
-      "trend_gap",
-      "weather_available",
-      "weather_factor"
-    ],
-    "sources": {
-      "mlb_games_all.jsonl": "639e4b9c0e0e7aa7730d50bba51d919bfedc047aae1d1f31fc2e416d1b9baf23"
-    },
-    "missingness_policy": {
-      "starter_available": "Boolean flag indicating pitcher data presence",
-      "bullpen_available": "Boolean flag indicating bullpen data presence",
-      "weather_available": "Boolean flag indicating weather data presence",
-      "park_available": "Boolean flag indicating park factor presence"
-    }
-  },
+  "dataset_sha256": "98f8b6e8d42dde8a10c5cb8b45ad8f40c66e490af7d53fd352268887ef91d6b9",
+  "schema_sha256": "77fca387f362d96714424d5656feae6b35380137672ef8d52053cf8c84a1316b",
+  "train_rows": 3814,
   "holdout_rows": 1742,
   "baseline": {
     "name": "elo_trend_park_weather_starter_bullpen",
@@ -69,84 +15,100 @@
       "bullpen_weakness_gap"
     ],
     "metrics": {
-      "log_loss": 0.684707,
-      "brier": 0.245772,
-      "accuracy": 0.5643,
-      "auc": 0.57
+      "log_loss": 0.684099,
+      "brier": 0.245492,
+      "accuracy": 0.562,
+      "auc": 0.5705
     }
   },
   "variants": {
-    "elo_probability": {
-      "features": [
-        "elo_probability"
-      ],
-      "metrics": {
-        "log_loss": 0.687553,
-        "brier": 0.247171,
-        "accuracy": 0.5557,
-        "auc": 0.5588
-      },
-      "paired_delta_ll": {
-        "observed_delta": 0.002846,
-        "ci_95": [
-          0.000426,
-          0.005233
-        ],
-        "P_challenger_better": 0.01,
-        "n_bootstrap": 200,
-        "seed": 20260815
-      },
-      "paired_delta_brier": {
-        "observed_delta": 0.001399,
-        "ci_95": [
-          0.000263,
-          0.002544
-        ],
-        "P_challenger_better": 0.01,
-        "n_bootstrap": 200,
-        "seed": 20260815
-      },
-      "verdict": "REJECT"
-    },
-    "elo_trend_park_weather_starter_bullpen": {
+    "mlb_v9_full": {
       "features": [
         "elo_probability",
         "trend_gap",
         "park_factor",
         "weather_factor",
         "starter_era_gap",
+        "starter_kbb_gap",
+        "bullpen_weakness_gap",
+        "bullpen_fatigue_gap",
+        "rest_disparity"
+      ],
+      "metrics": {
+        "log_loss": 0.682312,
+        "brier": 0.24464,
+        "accuracy": 0.562,
+        "auc": 0.5767
+      },
+      "paired_delta_ll": {
+        "observed_delta": -0.001787,
+        "mean_delta": -0.001783,
+        "ci_95": [
+          -0.004058,
+          0.00056
+        ],
+        "p_challenger_better": 0.93,
+        "P_challenger_better": 0.93,
+        "p_base_mean": 0.68404,
+        "p_cand_mean": 0.682257
+      },
+      "paired_delta_brier": {
+        "observed_delta": -0.000852,
+        "mean_delta": -0.00085,
+        "ci_95": [
+          -0.001967,
+          0.000276
+        ],
+        "p_challenger_better": 0.926,
+        "P_challenger_better": 0.926,
+        "p_base_mean": 0.245463,
+        "p_cand_mean": 0.244613
+      },
+      "verdict": "KEEP"
+    },
+    "starter_rate_kbb": {
+      "features": [
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_kbb_gap",
         "bullpen_weakness_gap"
       ],
       "metrics": {
-        "log_loss": 0.684707,
-        "brier": 0.245772,
-        "accuracy": 0.5643,
-        "auc": 0.57
+        "log_loss": 0.682712,
+        "brier": 0.244823,
+        "accuracy": 0.5563,
+        "auc": 0.577
       },
       "paired_delta_ll": {
-        "observed_delta": 0.0,
+        "observed_delta": -0.001387,
+        "mean_delta": -0.001374,
         "ci_95": [
-          0.0,
-          0.0
+          -0.003771,
+          0.000986
         ],
-        "P_challenger_better": 0.0,
-        "n_bootstrap": 200,
-        "seed": 20260815
+        "p_challenger_better": 0.8845,
+        "P_challenger_better": 0.8845,
+        "p_base_mean": 0.68404,
+        "p_cand_mean": 0.682666
       },
       "paired_delta_brier": {
-        "observed_delta": 0.0,
+        "observed_delta": -0.000669,
+        "mean_delta": -0.000662,
         "ci_95": [
-          0.0,
-          0.0
+          -0.001829,
+          0.000472
         ],
-        "P_challenger_better": 0.0,
-        "n_bootstrap": 200,
-        "seed": 20260815
+        "p_challenger_better": 0.8855,
+        "P_challenger_better": 0.8855,
+        "p_base_mean": 0.245463,
+        "p_cand_mean": 0.244801
       },
       "verdict": "INCONCLUSIVE"
     }
   },
-  "constant_home_baseline": {
+  "constant_home_prior": {
     "train_home_rate": 0.5341,
     "metrics": {
       "log_loss": 0.692184,

@@ -1,6 +1,8 @@
 # Project status and source of truth
 
-**Last verified**: 2026-08-23, local `main`. **2,170 tests passed, 3 skipped, 0 failed** (2,173 total). **0 Ruff findings** across the repository. Type foundation cleared (`py.typed` + overrides).
+**Last verified**: 2026-08-23, local `main`. **2,188 tests passed, 3 skipped, 0 failed** (2,191 total). **0 Ruff findings** across the repository. Type foundation cleared (`py.typed` + overrides).
+
+**Operating Architecture**: MLB operates on two isolated tracks — **Production Track** (`mlb-elo-trend-lr-v8` frozen champion) and **Research Track** (`mlb-v9` isolated challenger). See [`docs/ROADMAP.md`](file:///Users/vincentc9002/model-prediction/docs/ROADMAP.md) and [`docs/RESEARCH_BACKLOG.md`](file:///Users/vincentc9002/model-prediction/docs/RESEARCH_BACKLOG.md) for full lifecycle details.
 
 This document is the operational status entry point. `MASTER.md` (repo root)
 is now the most current, most detailed running log of real bugs found/fixed
@@ -10,7 +12,7 @@ this file exists to be the short, current summary someone can read first.
 Historical metrics in old reports, changelog entries, model cards, and
 rollback artifacts are not current operational truth.
 
-## 2026-08-22 — Roadmap Items 1–5 Delivered, Flat vs Gated Invariants, Polymarket Automation & Dashboard Hardening
+## 2026-08-23 — Two-Track MLB Architecture Locked, Step 26 Player Models Deployed & Research Backlog Synchronized
 
 - **Roadmap Tier 2 & Tier 4 Deliveries (Items 1–5)**:
   - **MLB Totals v2 Component Rebuild** (`src/model_prediction/total_score.py`, `tests/test_total_score.py`):

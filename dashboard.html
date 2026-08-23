@@ -322,6 +322,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
        <div class="rail-label">Ledger</div>
        <button data-tab="picks">Ledger</button>
        <button data-tab="flat">Flat</button>
+       <button data-tab="v9-ledger">MLB v9</button>
        <button data-tab="research">Flat Research</button>
        <button data-tab="gated-research">Gated Research</button>
        <button data-tab="poly-ledger">Polymarket</button>
@@ -616,6 +617,21 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     </div>
   </section>
 
+  <section id="tab-v9-ledger" style="display:none">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+      <h2 style="margin:0">MLB v9 Flat Forecast — Dedicated Challenger Benchmark (1.0U)</h2>
+      <span class="chip dim">Challenger model run on every MLB game regardless of edge</span>
+      <span style="flex:1"></span>
+      <button class="primary" onclick="confirmAction('v9_forecast','Run MLB v9 flat forecast for today?')">Run MLB v9 Forecast</button>
+      <button onclick="confirmAction('v9_settle','Settle open MLB v9 benchmark games?')">Settle MLB v9</button>
+    </div>
+    <div class="filters" id="filters_V9" style="margin-bottom:12px"></div>
+    <div id="v9LedgerKpis" class="kpis" style="margin-bottom:16px"></div>
+    <div class="card">
+      <div style="overflow-x:auto"><table class="data" id="v9LedgerTable"><tr><td>Loading…</td></tr></table></div>
+    </div>
+  </section>
+
   <section id="tab-poly-ledger" style="display:none">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
       <h2 style="margin:0">Polymarket Edge Ledger — Live Executed & Scanned Trades</h2>
@@ -821,6 +837,7 @@ $$("#tabs button").forEach(b=>b.onclick=()=>{
   updateCounts();
   if(b.dataset.tab==="ledger"||b.dataset.tab==="picks")renderPicks();
   if(b.dataset.tab==="flat")renderFlat(false);
+  if(b.dataset.tab==="v9-ledger")renderV9Ledger(false);
   if(b.dataset.tab==="research")renderResearch(false);
   if(b.dataset.tab==="gated"||b.dataset.tab==="gated-research")renderGatedResearch(false);
   if(b.dataset.tab==="perf")performanceControlChanged(false);
@@ -1603,10 +1620,10 @@ function ledgerRowHtml(p,showCheckbox,mode="default"){
     <td>${order}</td>
     <td class="dim">${p.away_team} @ ${p.home_team}</td></tr>`;
 }
-/* Each ledger view (Ledger=L, Flat=F, Research=R, Gated=G, Polymarket=PL) gets its own independent
+/* Each ledger view (Ledger=L, Flat=F, MLB v9=V9, Research=R, Gated=G, Polymarket=PL) gets its own independent
    copy of the filter bar (own sport/market/status/result/search/date-range
    state) so switching or filtering one never affects the others. */
-const FILTER_TABS=["L","F","R","G","PL"];
+const FILTER_TABS=["L","F","V9","R","G","PL"];
 let ledgerUrlRestored=false;
 let _filterDebounceTimers={};
 function onFilterInput(tab){
@@ -1652,6 +1669,7 @@ function filterBarHTML(tab){
 function mountFilterBars(){
   $("#filters_L").innerHTML=filterBarHTML("L");
   $("#filters_F").innerHTML=filterBarHTML("F");
+  if($("#filters_V9")) $("#filters_V9").innerHTML=filterBarHTML("V9");
   $("#filters_R").innerHTML=filterBarHTML("R");
   $("#filters_G").innerHTML=filterBarHTML("G");
   if($("#filters_PL")) $("#filters_PL").innerHTML=filterBarHTML("PL");
@@ -1677,6 +1695,7 @@ function populateFilters(){
   const perTabRows={
     L: state.picks || [],
     F: _flatCache || [],
+    V9: _v9LedgerCache || [],
     R: _researchCache || [],
     G: _gatedResearchCache || [],
     PL: _polyLedgerCache || [],
@@ -1783,11 +1802,12 @@ function onFilterChange(tab){
   });
   updateCounts();
   if(tab==="F"){renderFlatTable();return;}
+  if(tab==="V9"){renderV9LedgerTable();return;}
   if(tab==="R"){renderResearchTable();return;}
   if(tab==="G"){renderGatedResearchTable();return;}
   if(tab==="PL"){renderPolyLedgerTable();return;}
   if(tab==="L"){renderPicks();return;}
-  renderPicks();renderFlatTable();renderResearchTable();renderGatedResearchTable();renderPolyLedgerTable();
+  renderPicks();renderFlatTable();renderV9LedgerTable();renderResearchTable();renderGatedResearchTable();renderPolyLedgerTable();
 }
 
 let sortKey="event_start_utc",sortAsc=false;
@@ -1796,6 +1816,7 @@ function updateCounts(){
   const perTabRows={
     L: state.picks || [],
     F: _flatCache || [],
+    V9: _v9LedgerCache || [],
     R: _researchCache || [],
     G: _gatedResearchCache || [],
     PL: _polyLedgerCache || [],
@@ -1816,6 +1837,8 @@ function updateCounts(){
   if ($("#archCount")) $("#archCount").textContent = lArch;
   if ($("#restoreBtn")) $("#restoreBtn").style.display = lArch ? '' : 'none';
 
+  if ($("#v9Active")) $("#v9Active").textContent = (_v9LedgerCache||[]).filter(p=>!p.archived&&String(p.status||'').toLowerCase()==="open").length;
+  if ($("#v9Settled")) $("#v9Settled").textContent = (_v9LedgerCache||[]).filter(p=>!p.archived&&String(p.status||'').toLowerCase()==="settled").length;
   if ($("#researchActive")) $("#researchActive").textContent = (_researchCache||[]).filter(p=>!p.archived&&String(p.status||'').toLowerCase()==="open").length;
   if ($("#researchSettled")) $("#researchSettled").textContent = (_researchCache||[]).filter(p=>!p.archived&&String(p.status||'').toLowerCase()==="settled").length;
   if ($("#gatedResearchActive")) $("#gatedResearchActive").textContent = (_gatedResearchCache||[]).filter(p=>!p.archived&&String(p.status||'').toLowerCase()==="open").length;
@@ -2955,6 +2978,53 @@ async function renderGatedResearch(force){
   renderGatedResearchTable();
 }
 
+/* ---------- MLB v9 Dedicated Challenger Ledger ---------- */
+let _v9LedgerCache=[];
+function filteredV9LedgerRows(){
+  return (_v9LedgerCache || []).filter(p => {
+    if(!passesDisplaySettings(p))return false;
+    return filterLedgerRow("V9", p);
+  });
+}
+let _v9LedgerLoaded=false;
+async function loadV9LedgerCache(force){
+  if(_v9LedgerLoaded&&!force)return;
+  const rp=await api("/api/v9-picks");
+  _v9LedgerCache=Array.isArray(rp)?rp:[];
+  _v9LedgerLoaded=true;
+  populateFilters();
+  updateCounts();
+}
+function renderV9LedgerTable(){
+  try{
+    updateCounts();
+    let rows=filteredV9LedgerRows();
+    rows.sort((a,b)=>(b.event_start_utc||'').localeCompare(a.event_start_utc||''));
+
+    // KPI
+    const settled=rows.filter(p=>String(p.status||p.State||'').toLowerCase()==='settled'&&(String(p.result||p.Result||'')==='win'||String(p.result||p.Result||'')==='loss'));
+    const wins=settled.filter(p=>String(p.result||p.Result||'')==='win').length;
+    const losses=settled.filter(p=>String(p.result||p.Result||'')==='loss').length;
+    const hasSettled=wins+losses>0;
+    const pnl=hasSettled?settled.reduce((s,p)=>s+pickPnl(p),0):null;
+    const risked=settled.reduce((s,p)=>s+(Number(p.units||p.Units)||0),0);
+    $("#v9LedgerKpis").innerHTML=`
+      <div class="k"><b>${rows.length}</b><span>games</span></div>
+      <div class="k"><b>${hasSettled?pct(wins/(wins+losses)):'—'}</b><span>win rate</span></div>
+      <div class="k"><b class="${pnl==null?'':pnl>=0?'green':'red'}">${fmt(pnl)}</b><span>P&L (U)</span></div>
+      <div class="k"><b>${hasSettled&&risked>0?pct(pnl/risked):'—'}</b><span>ROI</span></div>`;
+    
+    let html=ledgerHeaderRow(false);
+    if(!rows.length){html+='<tr><td colspan=12 class="dim" style="text-align:center;padding:24px">No matches found for current filter settings.</td></tr>';}
+    rows.forEach(p=>{html+=ledgerRowHtml(p,false);});
+    document.getElementById('v9LedgerTable').innerHTML=html;
+  }catch(e){document.getElementById('v9LedgerTable').innerHTML='<tr><td colspan=12>Error: '+esc(String(e))+'</td></tr>';}
+}
+async function renderV9Ledger(force){
+  await loadV9LedgerCache(force);
+  renderV9LedgerTable();
+}
+
 /* ---------- Polymarket Edge Ledger ---------- */
 let _polyLedgerCache = [];
 let _polyLedgerLoaded = false;
@@ -3214,11 +3284,12 @@ function currentActiveTab(){
 }
 
 async function refreshAll(){
-  const [coreResults, flatRes, researchRes, gatedRes, polyRes] = await Promise.allSettled([
+  const [coreResults, flatRes, v9Res, researchRes, gatedRes, polyRes] = await Promise.allSettled([
     Promise.allSettled([
       api("/api/status"),api("/api/matrix"),api("/api/picks"),api("/api/performance"),api("/api/production-evidence"),api("/api/model-ledgers")
     ]),
     api("/api/flat-picks"),
+    api("/api/v9-picks"),
     api("/api/research-picks"),
     api("/api/gated-research-picks"),
     api("/api/polymarket-picks")
@@ -3242,6 +3313,11 @@ async function refreshAll(){
     _flatCache=Array.isArray(raw)?raw:(raw.picks||raw.rows||[]);
     _flatLoaded=true;
   }
+  if(v9Res.status==="fulfilled"){
+    const raw=v9Res.value;
+    _v9LedgerCache=Array.isArray(raw)?raw:(raw.picks||raw.rows||[]);
+    _v9LedgerLoaded=true;
+  }
   if(researchRes.status==="fulfilled"){
     _researchCache=Array.isArray(researchRes.value)?researchRes.value:[];
     _researchLoaded=true;
@@ -3264,6 +3340,7 @@ async function refreshAll(){
   const active = currentActiveTab();
   if(active==="ledger"||active==="picks") renderPicks();
   else if(active==="flat") renderFlatTable();
+  else if(active==="v9-ledger") renderV9LedgerTable();
   else if(active==="research") renderResearchTable();
   else if(active==="gated"||active==="gated-research") renderGatedResearchTable();
   else if(active==="poly-ledger") renderPolyLedgerTable();

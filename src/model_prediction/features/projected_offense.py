@@ -76,17 +76,26 @@ def projected_offense_matchup_gaps(
     )
 
     quality_gap = round(home_off.quality_xwoba - away_off.quality_xwoba, 4)
+    k_gap = round(home_off.k_pct - away_off.k_pct, 4)
+    bb_gap = round(home_off.bb_pct - away_off.bb_pct, 4)
     kbb_gap = round(home_off.k_minus_bb_pct - away_off.k_minus_bb_pct, 4)
     power_gap = round(home_off.power_iso - away_off.power_iso, 4)
     sample_strength = home_off.sample_strength_pa + away_off.sample_strength_pa
 
     return {
         "projected_offense_quality_gap": quality_gap,
+        "projected_offense_k_pct_gap": k_gap,
+        "projected_offense_bb_pct_gap": bb_gap,
+        "projected_offense_k_minus_bb_pct_gap": kbb_gap,
         "projected_offense_kbb_gap": kbb_gap,
         "projected_offense_power_gap": power_gap,
         "projected_offense_sample_strength": float(sample_strength),
         "home_projected_xwoba": home_off.quality_xwoba,
         "away_projected_xwoba": away_off.quality_xwoba,
+        "home_projected_k_pct": home_off.k_pct,
+        "away_projected_k_pct": away_off.k_pct,
+        "home_projected_bb_pct": home_off.bb_pct,
+        "away_projected_bb_pct": away_off.bb_pct,
         "home_projected_iso": home_off.power_iso,
         "away_projected_iso": away_off.power_iso,
     }

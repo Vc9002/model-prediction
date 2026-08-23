@@ -179,10 +179,11 @@ def test_dashboard_exposes_live_health_and_applies_display_settings() -> None:
     assert "Set 1U to this percentage of the live balance; adjusts up or down" in html
     assert 'data-tab="perf">Performance<' in html
 
-    # Settings were previously persisted but never applied. All four ledger
-    # filters and the Today source loaders now honor the shared predicate.
+    # Settings were previously persisted but never applied. All ledger
+    # filters (including the MLB v9 challenger ledger) and the Today
+    # source loaders now honor the shared predicate.
     assert "const passesDisplaySettings" in html
-    assert html.count("if(!passesDisplaySettings(p))return false;") == 4
+    assert html.count("if(!passesDisplaySettings(p))return false;") == 5
     assert html.count("passesDisplaySettings(p)&&todayPassesControls(p)&&etDate(start)===todayET()") == 2
 
     # Today must use the real America/New_York conversion (including DST),

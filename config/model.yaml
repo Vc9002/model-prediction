@@ -163,6 +163,8 @@ models:
       available as legacy_research_rollback.'
     active_production_version: mlb-elo-trend-lr-v8
     production_artifact: config/models/mlb-elo-trend-lr-v8.json
+    protected_versions:
+    - mlb-elo-trend-lr-v8
     active_research_version: spread-baseline-v1
     active_research_name: Spread & Total Baseline
     min_edge: 0.05

@@ -86,6 +86,9 @@ class FeatureStore:
     def __init__(self, data_root: str | Path) -> None:
         self.data_root = Path(data_root)
         self._event_metadata_cache: dict[str, dict[str, dict[str, Any]]] = {}
+        self._loaded_games_cache: dict[str, list[GameRecord]] = {}
+        self._loaded_games_mtime: dict[str, float] = {}
+        self._game_starts_cache: dict[str, list[datetime]] = {}
 
     # ---------------------------------------------------------------- games
 
@@ -93,9 +96,13 @@ class FeatureStore:
         return self.data_root / "processed" / sport.lower() / "games.jsonl"
 
     def load_games(self, sport: str) -> list[GameRecord]:
+        key = sport.lower()
         path = self.processed_path(sport)
         if not path.exists():
             return []
+        mtime = path.stat().st_mtime
+        if key in self._loaded_games_cache and self._loaded_games_mtime.get(key) == mtime:
+            return self._loaded_games_cache[key]
         games: list[GameRecord] = []
         metadata = self._event_metadata(sport)
         seen: set[str] = set()
@@ -104,31 +111,29 @@ class FeatureStore:
                 if not line.strip():
                     continue
                 raw = json.loads(line)
-                key = str(raw.get("event_id"))
-                if key in seen:
+                k = str(raw.get("event_id"))
+                if k in seen:
                     continue
-                seen.add(key)
+                seen.add(k)
                 try:
                     event_start_utc = str(raw["event_start_utc"])
                     event_start = parse_utc(event_start_utc)
-                    event_metadata = metadata.get(key, {})
+                    event_metadata = metadata.get(k, {})
                     season_type = str(
                         raw.get("season_type") or event_metadata.get("season_type") or "unknown"
                     )
                     # Exhibition and All-Star results are a different data-generating
                     # process. They must not train MLB regular/postseason forecasts.
-                    if sport.lower() == "mlb" and season_type in {"preseason", "all-star"}:
+                    if key == "mlb" and season_type in {"preseason", "all-star"}:
                         continue
                     # ESPN's historical MLB rows frequently omit season_type.
                     # The project governance rule therefore limits the MLB
                     # modeling population to April 1 through October 31.
-                    if sport.lower() == "mlb" and not _is_mlb_modeling_date(
-                        event_start.astimezone(EASTERN).date()
-                    ):
+                    if key == "mlb" and not _is_mlb_modeling_date(event_start.astimezone(EASTERN).date()):
                         continue
                     games.append(
                         GameRecord(
-                            event_id=key,
+                            event_id=k,
                             event_start_utc=event_start_utc,
                             league=str(raw.get("league", sport.upper())),
                             away_team=str(raw["away_team"]),
@@ -149,6 +154,9 @@ class FeatureStore:
                 except (KeyError, TypeError, ValueError):
                     continue
         games.sort(key=lambda game: game.start)
+        self._loaded_games_cache[key] = games
+        self._loaded_games_mtime[key] = mtime
+        self._game_starts_cache[key] = [g.start for g in games]
         return games
 
     def _event_metadata(self, sport: str) -> dict[str, dict[str, Any]]:
@@ -229,8 +237,18 @@ class FeatureStore:
         a snapshot computed for that date. Yesterday's late ET-evening games
         are included; under the previous UTC cutoff they were dropped.
         """
+        import bisect
+
+        games = self.load_games(sport)
+        if not games:
+            return []
+        starts = self._game_starts_cache.get(sport.lower())
+        if starts is None or len(starts) != len(games):
+            starts = [g.start for g in games]
+            self._game_starts_cache[sport.lower()] = starts
         cutoff = datetime.combine(date.fromisoformat(as_of_date), time.min, tzinfo=EASTERN)
-        return [game for game in self.load_games(sport) if game.start < cutoff]
+        idx = bisect.bisect_left(starts, cutoff)
+        return games[:idx]
 
     # ------------------------------------------------------------- snapshots
 

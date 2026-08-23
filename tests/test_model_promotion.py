@@ -209,3 +209,28 @@ def test_rollback_without_rollback_pointer_rejected(tmp_path: Path) -> None:
     repo = _make_repo(tmp_path)
     with pytest.raises(ValueError, match="no rollback model"):
         rollback(sport="WNBA", market="moneyline", repo_root=repo)
+
+
+def test_mlb_v8_champion_permanently_protected() -> None:
+    """MLB v8 champion must remain frozen and protected in production config."""
+    from model_prediction.config import PROJECT_ROOT, load_config
+
+    config = load_config()
+    mlb_cfg = config["models"]["MLB"]
+    assert mlb_cfg["active_production_version"] == "mlb-elo-trend-lr-v8"
+    assert "mlb-elo-trend-lr-v8" in mlb_cfg.get("protected_versions", [])
+
+    artifact_path = PROJECT_ROOT / "config" / "models" / "mlb-elo-trend-lr-v8.json"
+    assert artifact_path.is_file()
+    artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+    assert artifact["model_version"] == "mlb-elo-trend-lr-v8"
+    assert "market_models" in artifact and "moneyline" in artifact["market_models"]
+    expected_features = [
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_era_gap",
+        "bullpen_weakness_gap",
+    ]
+    assert artifact["market_models"]["moneyline"]["feature_names"] == expected_features

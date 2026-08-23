@@ -51,7 +51,7 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def verify_dataset_contract(manifest_path: Path, parquet_path: Path) -> dict:
+def verify_dataset_contract(manifest_path: Path, parquet_path: Path) -> tuple[dict, pl.DataFrame]:
     """Strictly verify dataset contract. Aborts with ABORT_DATASET_CONTRACT_MISMATCH on failure."""
     if not manifest_path.exists():
         raise FileNotFoundError(f"ABORT_DATASET_CONTRACT_MISMATCH: manifest missing at {manifest_path}")
@@ -59,13 +59,47 @@ def verify_dataset_contract(manifest_path: Path, parquet_path: Path) -> dict:
         raise FileNotFoundError(f"ABORT_DATASET_CONTRACT_MISMATCH: parquet table missing at {parquet_path}")
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    actual_hash = sha256_file(parquet_path)
-    if manifest.get("dataset_sha256") != actual_hash:
+    actual_dataset_hash = sha256_file(parquet_path)
+    if manifest.get("dataset_sha256") != actual_dataset_hash:
         raise ValueError(
-            f"ABORT_DATASET_CONTRACT_MISMATCH: Parquet sha256 mismatch! "
-            f"expected={manifest.get('dataset_sha256')}, actual={actual_hash}"
+            f"ABORT_DATASET_CONTRACT_MISMATCH: Parquet dataset_sha256 mismatch! "
+            f"expected={manifest.get('dataset_sha256')}, actual={actual_dataset_hash}"
         )
-    return manifest
+
+    df = pl.read_parquet(parquet_path)
+
+    # 1. Verify schema hash
+    schema_str = json.dumps(sorted([(c, str(t)) for c, t in df.schema.items()]), sort_keys=True)
+    actual_schema_hash = hashlib.sha256(schema_str.encode()).hexdigest()
+    if manifest.get("schema_sha256") and manifest.get("schema_sha256") != actual_schema_hash:
+        raise ValueError(
+            f"ABORT_DATASET_CONTRACT_MISMATCH: Parquet schema_sha256 mismatch! "
+            f"expected={manifest.get('schema_sha256')}, actual={actual_schema_hash}"
+        )
+
+    # 2. Verify split cohort event ID hashes and alignment
+    cohorts_dir = manifest_path.parent.parent / "cohorts"
+    for split_name, key, filename in [
+        ("train", "train_event_ids_sha256", "train_event_ids_v1.json"),
+        ("validation", "validation_event_ids_sha256", "validation_event_ids_v1.json"),
+        ("research_test", "research_test_event_ids_sha256", "research_test_event_ids_v1.json"),
+    ]:
+        cohort_file = cohorts_dir / filename
+        if cohort_file.exists():
+            file_hash = sha256_file(cohort_file)
+            if manifest.get(key) and manifest.get(key) != file_hash:
+                raise ValueError(
+                    f"ABORT_DATASET_CONTRACT_MISMATCH: Cohort file {filename} sha mismatch! "
+                    f"expected={manifest.get(key)}, actual={file_hash}"
+                )
+            cohort_ids = json.loads(cohort_file.read_text(encoding="utf-8"))
+            split_ids = df.filter(pl.col("split") == split_name)["event_id"].to_list()
+            if cohort_ids != split_ids:
+                raise ValueError(
+                    f"ABORT_DATASET_CONTRACT_MISMATCH: Split {split_name} does not match {filename}!"
+                )
+
+    return manifest, df
 
 
 def _scores(probabilities: list[float], outcomes: list[int]) -> dict:
@@ -98,45 +132,64 @@ def _date_cluster_bootstrap_paired(
         by_day[day].append(i)
     clusters = list(by_day.values())
     rng = np.random.default_rng(seed)
-    base_arr = np.asarray(p_base)
-    cand_arr = np.asarray(p_cand)
-    y_arr = np.asarray(y)
 
-    def metric_delta(indices: list[int]) -> float:
-        base_m = _scores(base_arr[indices].tolist(), y_arr[indices].tolist())[metric]
-        cand_m = _scores(cand_arr[indices].tolist(), y_arr[indices].tolist())[metric]
-        return cand_m - base_m
-
-    observed = metric_delta(list(range(len(p_base))))
     deltas = []
+    base_scores = []
+    cand_scores = []
+
     for _ in range(n_bootstrap):
-        sample: list[int] = []
-        for _ in range(len(clusters)):
-            sample.extend(clusters[int(rng.integers(0, len(clusters)))])
-        deltas.append(metric_delta(sample))
-    deltas_arr = np.asarray(deltas)
-    p_better = float(np.mean(deltas_arr < 0))
+        sampled = rng.choice(len(clusters), size=len(clusters), replace=True)
+        idx = [i for s in sampled for i in clusters[s]]
+        if not idx:
+            continue
+        sub_base = [p_base[i] for i in idx]
+        sub_cand = [p_cand[i] for i in idx]
+        sub_y = [y[i] for i in idx]
+
+        s_b = _scores(sub_base, sub_y)[metric]
+        s_c = _scores(sub_cand, sub_y)[metric]
+        if s_b is not None and s_c is not None:
+            base_scores.append(s_b)
+            cand_scores.append(s_c)
+            deltas.append(s_c - s_b)
+
+    if not deltas:
+        return {
+            "mean_delta": None,
+            "ci_95": None,
+            "p_challenger_better": None,
+            "p_base_mean": None,
+            "p_cand_mean": None,
+        }
+
+    obs_base = _scores(p_base, y)[metric]
+    obs_cand = _scores(p_cand, y)[metric]
+    observed_delta = round(obs_cand - obs_base, 6) if obs_base is not None and obs_cand is not None else 0.0
+
+    deltas.sort()
+    lower = float(np.percentile(deltas, 2.5))
+    upper = float(np.percentile(deltas, 97.5))
+    p_better = float(np.mean([d < 0 for d in deltas]))
+
     return {
-        "observed_delta": round(observed, 6),
-        "ci_95": [
-            round(float(np.percentile(deltas_arr, 2.5)), 6),
-            round(float(np.percentile(deltas_arr, 97.5)), 6),
-        ],
+        "observed_delta": observed_delta,
+        "mean_delta": round(float(np.mean(deltas)), 6),
+        "ci_95": [round(lower, 6), round(upper, 6)],
+        "p_challenger_better": round(p_better, 4),
         "P_challenger_better": round(p_better, 4),
-        "n_bootstrap": n_bootstrap,
-        "seed": seed,
+        "p_base_mean": round(float(np.mean(base_scores)), 6),
+        "p_cand_mean": round(float(np.mean(cand_scores)), 6),
     }
 
 
 def v9_research_fit(df_train: pl.DataFrame, features: list[str]) -> Pipeline:
-    """v9 Standardized Pipeline: StandardScaler fit ONLY on training -> LogisticRegression."""
     X = df_train.select(features).to_numpy()
     y = df_train["home_win"].to_numpy()
     pipe = Pipeline(
         [
             ("imputer", SimpleImputer(strategy="median")),
             ("scaler", StandardScaler()),
-            ("model", LogisticRegression(max_iter=5000, solver="lbfgs")),
+            ("clf", LogisticRegression(max_iter=5000, solver="lbfgs", C=0.01)),
         ]
     )
     pipe.fit(X, y)
@@ -144,7 +197,6 @@ def v9_research_fit(df_train: pl.DataFrame, features: list[str]) -> Pipeline:
 
 
 def v8_reproduction_fit(df_train: pl.DataFrame, features: list[str]) -> LogisticRegression:
-    """Historical v8 unscaled fitting."""
     X = df_train.select(features).to_numpy()
     y = df_train["home_win"].to_numpy()
     clf = LogisticRegression(fit_intercept=True, max_iter=1000, solver="lbfgs")
@@ -158,13 +210,52 @@ def predict_model(model: Any, df_eval: pl.DataFrame, features: list[str]) -> lis
     return [float(p) for p in probs]
 
 
+V9_FEATURE_SETS: dict[str, list[str]] = {
+    "mlb_v8_baseline": [
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_era_gap",
+        "bullpen_weakness_gap",
+    ],
+    "mlb_v9_full": [
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_era_gap",
+        "starter_kbb_gap",
+        "bullpen_weakness_gap",
+        "bullpen_fatigue_gap",
+        "rest_disparity",
+    ],
+    "starter_rate_kbb": [
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "starter_kbb_gap",
+        "bullpen_weakness_gap",
+    ],
+}
+
+
+def _resolve_features(variant: str) -> list[str]:
+    if variant in V9_FEATURE_SETS:
+        return list(V9_FEATURE_SETS[variant])
+    if variant in FEATURE_VARIANTS:
+        return list(FEATURE_VARIANTS[variant])
+    return [variant]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--variants",
         nargs="+",
         required=True,
-        help="feature-variant names (validation.FEATURE_VARIANTS keys or list of column names)",
+        help="feature-variant names (V9_FEATURE_SETS, FEATURE_VARIANTS keys, or list of column names)",
     )
     parser.add_argument("--baseline", default=DEFAULT_BASELINE)
     parser.add_argument("--mode", choices=["v9_research", "v8_reproduction"], default="v9_research")
@@ -172,42 +263,16 @@ def main() -> int:
     parser.add_argument("--out", default=str(PROJECT_ROOT / "outputs/research/mlb_evaluator/report.json"))
     args = parser.parse_args()
 
-    # If v9 feature table is ready, use it with contract verification
-    if V9_PARQUET_PATH.exists() and V9_MANIFEST_PATH.exists():
-        manifest = verify_dataset_contract(V9_MANIFEST_PATH, V9_PARQUET_PATH)
-        print(f"[evaluator] Contract verified against manifest (sha256={manifest['dataset_sha256'][:12]}...)")
-        df = pl.read_parquet(V9_PARQUET_PATH)
-        df_train = df.filter(pl.col("split") == "train")
-        df_holdout = df.filter(pl.col("split") == "research_test")
-    else:
-        # Fallback to pinned_cohort until feature table build finishes
-        from mlb_research_common import pinned_cohort
-
-        cohort = pinned_cohort()
-        # Convert cohort objects to DataFrame
-        df_train = pl.DataFrame(
-            [
-                {
-                    "home_win": r.outcome,
-                    "date_et": r.date,
-                    **{k: getattr(r, k, 0.0) for k in FEATURE_VARIANTS.get(args.baseline, [])},
-                }
-                for r in cohort["train"]
-            ]
-        )
-        df_holdout = pl.DataFrame(
-            [
-                {
-                    "home_win": r.outcome,
-                    "date_et": r.date,
-                    **{k: getattr(r, k, 0.0) for k in cohort["exact_holdout"]},
-                }
-                for r in cohort["exact_holdout"]
-            ]
-        )
+    # Immutable dataset contract verification (NO silent fallback)
+    manifest, df = verify_dataset_contract(V9_MANIFEST_PATH, V9_PARQUET_PATH)
+    print(
+        f"[evaluator] Dataset contract verified against manifest (sha256={manifest['dataset_sha256'][:12]}...)"
+    )
+    df_train = df.filter(pl.col("split") == "train")
+    df_holdout = df.filter(pl.col("split") == "research_test")
 
     fitter = v9_research_fit if args.mode == "v9_research" else v8_reproduction_fit
-    base_features = list(FEATURE_VARIANTS.get(args.baseline, [args.baseline]))
+    base_features = _resolve_features(args.baseline)
 
     base_model = fitter(df_train, base_features)
     base_probabilities = predict_model(base_model, df_holdout, base_features)
@@ -219,21 +284,20 @@ def main() -> int:
     )
 
     base_metrics = _scores(base_probabilities, holdout_outcomes)
+    train_home_rate = float(np.mean(df_train["home_win"].to_numpy()))
+    const_probs = [train_home_rate] * len(holdout_outcomes)
+    const_metrics = _scores(const_probs, holdout_outcomes)
 
-    report: dict = {
-        "schema": "mlb-standard-evaluator-v2",
+    report: dict[str, Any] = {
         "mode": args.mode,
-        "manifest": manifest,
+        "dataset_sha256": manifest["dataset_sha256"],
+        "schema_sha256": manifest.get("schema_sha256"),
+        "train_rows": len(df_train),
         "holdout_rows": len(df_holdout),
         "baseline": {"name": args.baseline, "features": base_features, "metrics": base_metrics},
         "variants": {},
     }
-
-    # Constant home rate baseline
-    train_home_rate = float(df_train["home_win"].mean() or 0.5)
-    const_probs = [train_home_rate] * len(df_holdout)
-    const_metrics = _scores(const_probs, holdout_outcomes)
-    report["constant_home_baseline"] = {
+    report["constant_home_prior"] = {
         "train_home_rate": round(train_home_rate, 4),
         "metrics": const_metrics,
     }
@@ -247,7 +311,7 @@ def main() -> int:
     )
 
     for variant in args.variants:
-        var_features = list(FEATURE_VARIANTS.get(variant, [variant]))
+        var_features = _resolve_features(variant)
         cand_model = fitter(df_train, var_features)
         cand_probs = predict_model(cand_model, df_holdout, var_features)
         cand_metrics = _scores(cand_probs, holdout_outcomes)

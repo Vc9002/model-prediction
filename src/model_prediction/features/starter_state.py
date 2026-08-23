@@ -34,6 +34,9 @@ class StarterStateVector:
     expected_depth_ip: float
     sample_bf: int
     starts_count: int
+    csw_available: bool = False
+    xwoba_available: bool = False
+    velo_available: bool = False
     status: str = "available"
 
 
@@ -63,6 +66,7 @@ def get_starter_state_vector(
     decision: datetime,
     handedness: str = "R",
     *,
+    statcast_metrics: dict | None = None,
     snapshot_path: str | Path = DEFAULT_SNAPSHOT_PATH,
     lookback_starts: int = 5,
 ) -> StarterStateVector:
@@ -84,10 +88,22 @@ def get_starter_state_vector(
     k_pct = rates.get("k_pct") or 0.225
     bb_pct = rates.get("bb_pct") or 0.082
     k_minus_bb = rates.get("k_minus_bb_pct") or 0.143
-    # Approximated CSW% from K% correlation (~ 0.15 + 0.6 * K%)
-    csw_pct = round(0.15 + 0.60 * k_pct, 4)
-    # Approximated xwOBA allowed from K% and BB% (~ 0.38 - 0.5 * K% + 0.4 * BB%)
-    xwoba_allowed = round(0.38 - 0.50 * k_pct + 0.40 * bb_pct, 4)
+
+    # Use real Statcast measurements when present; never fabricate with deterministic formulas
+    if statcast_metrics:
+        csw_pct = statcast_metrics.get("csw_pct", 0.285)
+        csw_avail = "csw_pct" in statcast_metrics
+        xwoba_allowed = statcast_metrics.get("xwoba_allowed", 0.315)
+        xwoba_avail = "xwoba_allowed" in statcast_metrics
+        fastball_velo = statcast_metrics.get("fastball_velo", 93.8)
+        velo_avail = "fastball_velo" in statcast_metrics
+    else:
+        csw_pct = 0.285  # League prior
+        csw_avail = False
+        xwoba_allowed = 0.315  # League prior
+        xwoba_avail = False
+        fastball_velo = 93.8  # League prior
+        velo_avail = False
 
     return StarterStateVector(
         pitcher_name=starter_name,
@@ -97,10 +113,13 @@ def get_starter_state_vector(
         k_minus_bb_pct=k_minus_bb,
         csw_pct=csw_pct,
         xwoba_allowed=xwoba_allowed,
-        fastball_velo=93.8,  # baseline MLB average fastball velo
+        fastball_velo=fastball_velo,
         expected_depth_ip=expected_depth,
         sample_bf=rates.get("batters_faced", 0),
         starts_count=len(recent_starts),
+        csw_available=csw_avail,
+        xwoba_available=xwoba_avail,
+        velo_available=velo_avail,
         status=rates["status"],
     )
 

@@ -175,6 +175,7 @@ class DashboardCache:
     def _all_tiers(self) -> dict[str, list[Path]]:
         """Return all tier → file-paths mappings."""
         flat_dir = self.data_root / "flat"
+        flat_v9_dir = self.data_root / "flat_v9"
         research_dir = self.data_root / "research"
         gated_dir = self.data_root / "gated_research"
         model_dir = self.data_root / "model_ledgers"
@@ -183,6 +184,8 @@ class DashboardCache:
 
         if flat_dir.exists():
             tiers["flat"] = sorted(flat_dir.glob("*.xlsx"))
+        if flat_v9_dir.exists():
+            tiers["flat_v9"] = sorted(flat_v9_dir.glob("*.xlsx"))
         if research_dir.exists():
             tiers["research"] = sorted(research_dir.glob("*.xlsx"))
         if gated_dir.exists():
