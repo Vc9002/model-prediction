@@ -956,18 +956,32 @@ class PickLedger:
             # a ledger's P&L represents actually-staked money is a property of
             # the ledger itself (main only), not something settle() decides.
             units = float(row["units"] or 0)
-            entry_probability = float(
-                row["decision_raw_implied_probability"] or row["market_implied_probability"]
-            )
-            pnl = (
-                units * (binary_contract_settlement_value / entry_probability - 1)
-                if binary_contract_settlement_value is not None
-                else profit_units(
+            raw_entry = row["decision_raw_implied_probability"] or row["market_implied_probability"]
+            entry_probability = float(raw_entry) if raw_entry not in (None, "") else 0.0
+
+            dec_odds_val = float(row["decision_decimal_odds"] or row["decimal_odds"] or 0.0)
+            if binary_contract_settlement_value is not None and entry_probability > 0:
+                pnl = units * (binary_contract_settlement_value / entry_probability - 1)
+            elif (
+                entry_probability > 0
+                and entry_probability < 1.0
+                and (
+                    row.get("sportsbook") in ("polymarket", "kalshi", "prediction_market")
+                    or abs(dec_odds_val - 1.909091) < 0.01
+                )
+            ):
+                if result == PickResult.WIN:
+                    pnl = units * (1.0 / entry_probability - 1.0)
+                elif result == PickResult.LOSS:
+                    pnl = -units
+                else:
+                    pnl = 0.0
+            else:
+                pnl = profit_units(
                     result,
                     units,
-                    float(row["decision_decimal_odds"] or row["decimal_odds"]),
+                    dec_odds_val if dec_odds_val > 0 else 1.909091,
                 )
-            )
             research_units = None
             if (
                 row["record_type"] == RecordType.RESEARCH_OBSERVATION.value
@@ -989,13 +1003,27 @@ class PickLedger:
                         )
             if research_units is None:
                 research_pnl = None
-            elif binary_contract_settlement_value is not None:
+            elif binary_contract_settlement_value is not None and entry_probability > 0:
                 research_pnl = research_units * (binary_contract_settlement_value / entry_probability - 1)
+            elif (
+                entry_probability > 0
+                and entry_probability < 1.0
+                and (
+                    row.get("sportsbook") in ("polymarket", "kalshi", "prediction_market")
+                    or abs(dec_odds_val - 1.909091) < 0.01
+                )
+            ):
+                if result == PickResult.WIN:
+                    research_pnl = research_units * (1.0 / entry_probability - 1.0)
+                elif result == PickResult.LOSS:
+                    research_pnl = -research_units
+                else:
+                    research_pnl = 0.0
             else:
                 research_pnl = profit_units(
                     result,
                     research_units,
-                    float(row["decision_decimal_odds"] or row["decimal_odds"]),
+                    dec_odds_val if dec_odds_val > 0 else 1.909091,
                 )
             settled_at_utc = iso_utc(settled_at or utc_now())
             row.update(
