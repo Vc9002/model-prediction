@@ -131,14 +131,24 @@ def starter_state_matchup_gaps(
     home_sp_hand: str = "R",
     away_sp_hand: str = "R",
     *,
+    home_statcast_metrics: dict | None = None,
+    away_statcast_metrics: dict | None = None,
     snapshot_path: str | Path = DEFAULT_SNAPSHOT_PATH,
 ) -> dict[str, float]:
     """Compute differential features for starting pitcher state and expected depth."""
     home_sp = get_starter_state_vector(
-        home_starter_name, decision, handedness=home_sp_hand, snapshot_path=snapshot_path
+        home_starter_name,
+        decision,
+        handedness=home_sp_hand,
+        statcast_metrics=home_statcast_metrics,
+        snapshot_path=snapshot_path,
     )
     away_sp = get_starter_state_vector(
-        away_starter_name, decision, handedness=away_sp_hand, snapshot_path=snapshot_path
+        away_starter_name,
+        decision,
+        handedness=away_sp_hand,
+        statcast_metrics=away_statcast_metrics,
+        snapshot_path=snapshot_path,
     )
 
     k_pct_gap = round(home_sp.k_pct - away_sp.k_pct, 4)

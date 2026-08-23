@@ -75,34 +75,35 @@
 - [x] **2I Bullpen Availability Naming**: Explicitly named `availability_score` (not `P(available)`).
 - [x] **2J PIT Park Factor**: Standardized on `park_factor_pit` to prevent static artifact leakage.
 
-### Gate 3 — Build MLB v9 Feature Table v2 [COMPLETED ✅]
-- [x] **3.1 Table v2 Schema Builder**: Built [`outputs/research/mlb_v9/tables/mlb_v9_feature_table_v2.parquet`](file:///Users/vincentc9002/model-prediction/outputs/research/mlb_v9/tables/mlb_v9_feature_table_v2.parquet) (6,638 rows $\times$ 77 cols) and manifest `mlb_v9_feature_table_v2.json`.
-- [x] **3.2 Complete Feature Columns**: Real starter state, projected offense, bullpen availability/fatigue, platoon splits, pitch arsenal, rest/schedule.
-- [x] **3.3 Explicit Missingness & Source Flags**: Validated on `research_test` cohort (1,742 games).
+### Gate 3 — MLB v9 Feature Table Artifacts
+- [x] **3.1 Table v1 (Immutable Standardized Research Control)**: [`outputs/research/mlb_v9/tables/mlb_v9_feature_table_v1.parquet`](file:///Users/vincentc9002/model-prediction/outputs/research/mlb_v9/tables/mlb_v9_feature_table_v1.parquet) (6,638 games: 3,814 train / 1,082 val / 1,742 test). Standardized 6-feature baseline: LogLoss **0.684707**, Brier **0.245772**, AUC **0.5700**. (PERMANENT CONTROL BASELINE ✅)
+- [x] **3.2 Table v2 Manifest (QUARANTINED)**: [`outputs/research/mlb_v9/manifests/mlb_v9_feature_table_v2.json`](file:///Users/vincentc9002/model-prediction/outputs/research/mlb_v9/manifests/mlb_v9_feature_table_v2.json) classified as `VOID_SYNTHETIC_PROTOTYPE` due to deterministic proxy transformations.
+- [ ] **3.3 Table v3 (Real Observed PIT Player-State)**: Build `mlb_v9_feature_table_v3.parquet` from verified Statcast game metrics, batter vs-hand PA records, canonical bullpen engine, and pitch arsenal summaries with full feature distribution integrity audit.
 
-### Gate 4 — Disciplined Feature-Family Ablation Ladder [COMPLETED ✅]
-- [x] **4.1 Evaluation Runs**: Evaluated R0 through R5. Retained feature set (R4) achieved $\Delta\text{LogLoss} = -0.001973$, $\Delta\text{Brier} = -0.000949$, $P(\text{better}) = 97.4\%$.
-- [x] **4.2 Paired Bootstrap**: 2,000 date-clustered resamples on `research_test`.
+### Gate 4 — Disciplined Feature-Family Ablation Ladder (v3 Matrix)
+- [ ] **4.1 R0 Control**: 6-feature standardized LR baseline on v3.
+- [ ] **4.2 R1 Projected Offense**: Real batter priors with continuous Gaussian/Beta-Binomial shrinkage.
+- [ ] **4.3 R2 Starter State**: Real CSW%, velo, xwOBA allowed, and expected depth.
+- [ ] **4.4 R3 Canonical Bullpen State**: `PointInTimeBullpenEngine` talent × workload availability × leverage role.
+- [ ] **4.5 R4 Platoon Matchups**: Real batter vs-hand splits with hierarchical shrinkage.
+- [ ] **4.6 R5 Arsenal Summary**: Real pitch repertoire mix and entropy.
+- [ ] **4.7 Paired Bootstrap**: 2,000 date-clustered resamples on holdout cohort.
 
-### Gate 5 — Model Architecture Tournament [COMPLETED ✅]
-- [x] **5.1 Architecture Tournament**: Standardized $L_2$ Logistic Regression ($C=0.01$) achieved best LogLoss (0.6825) and calibration stability over Elastic-Net and Monotonic XGBoost.
+### Gate 5 — Model Architecture Tournament & Freezing
+- [ ] **5.1 Architecture Tournament**: Standardized $L_2$ LR vs Elastic-Net LR vs Monotonic XGBoost.
+- [ ] **5.2 Calibration**: Out-of-fold Platt / Beta calibration.
+- [x] **5.3 Candidate-1 Classification (QUARANTINED)**: [`config/models/research/mlb-v9-candidate-1.json`](file:///Users/vincentc9002/model-prediction/config/models/research/mlb-v9-candidate-1.json) classified as `VOID_INVALID_FEATURE_PROVENANCE` (preserved for audit evidence).
+- [ ] **5.4 Candidate-2 Freeze**: Freeze `config/models/research/mlb-v9-candidate-2.json` with complete scaler, imputer, hashes, and fail-closed contract.
 
-### Gate 6 — Model Calibration & Candidate-1 Freeze [COMPLETED ✅]
-- [x] **6.1 Calibration & Freezing**: ECE = **0.0095** on holdout test set. Saved immutable artifact to [`config/models/research/mlb-v9-candidate-1.json`](file:///Users/vincentc9002/model-prediction/config/models/research/mlb-v9-candidate-1.json).
-
-### Gate 7 — Dual-Horizon Serving & Dedicated Ledger [COMPLETED ✅]
-- [x] **7.1 Dedicated Benchmark Ledger**: Live 1.0U flat tracking in [`data/flat_v9/mlb.xlsx`](file:///Users/vincentc9002/model-prediction/data/flat_v9/mlb.xlsx).
-- [x] **7.2 Dashboard Integration**: Dedicated **MLB v9** tab in Dashboard sidebar with identical Flat ledger styling, filters, and KPIs.
-- [x] **7.3 Shadow Logging**: Point-in-time paired pregame probabilities recorded to [`data/point_in_time/mlb_v8_v9_shadow_logs.jsonl`](file:///Users/vincentc9002/model-prediction/data/point_in_time/mlb_v8_v9_shadow_logs.jsonl).
-
-### Gate 8 — Prospective Paired Shadow Evaluation & Promotion Gate [ACTIVE PROSPECTIVE SHADOWING 🚀]
-- [ ] **8.1 Minimum Evaluation Threshold**: Accumulate $\ge 100$ settled prospective regular season games logged strictly before first pitch.
-- [ ] **8.2 Superiority Gates**:
-  1. $\Delta\text{LogLoss} < 0$ vs v8 production champion.
-  2. $\Delta\text{Brier} < 0$ vs v8 production champion.
-  3. $P(\text{better}) \ge 90\%$ across date-clustered bootstrap.
-  4. Positive CLV rate $\ge 50\%$ against sharp consensus.
-- [ ] **8.3 Promotion Sign-off**: Atomic cutover only after all Gate 8 criteria are fulfilled.
+### Gate 6 — True Prospective Paired Shadow & Promotion Gating
+- [ ] **6.1 Shadow Logging**: Real-time pregame logging (`observed_at < event_start`) of v8 champion vs frozen candidate-2 into append-only ledger.
+- [ ] **6.2 Minimum Sample & MDE Gate**: Accumulate $\ge 200$ prospective games across $\ge 30$ unique dates.
+- [ ] **6.3 4-Gate Promotion Evaluation**:
+  1. $\Delta\text{LogLoss} < 0$ vs v8 ($P \ge 90\%$).
+  2. $\Delta\text{Brier} \le 0$ vs v8.
+  3. Clean operational serving ($\ge 95\%$ coverage, zero PIT violations).
+  4. Positive CLV rate ($\ge 50\%$) against sharp consensus.
+- [ ] **6.4 Atomic Promotion Cutover**: Switch `active_production_version` in `config/production.yaml` only upon passing all four gates.
 
 ---
 
@@ -111,12 +112,13 @@
 * **Soccer v2**:
   - [x] Dynamic Polymarket league discovery (`discover_soccer_leagues`).
   - [x] Hierarchical Dixon-Coles bivariate Poisson score matrix with time decay ($w = e^{-\Delta t/\tau}$).
-  - [x] Separately calibrated Double Chance and BTTS distributions.
+  - [x] Separately calibrated Double Chance, Draw No Bet, Clean Sheet, and BTTS distributions.
 * **Tennis Surface-Elo**:
   - [x] Surface-blended Elo ratings (60% surface, 40% overall) across 26,458 historical matches.
 * **WNBA**:
   - [x] Hierarchical Empirical-Bayes rotation and minutes shrinkage engine (`features/wnba_player_impact.py`).
   - [x] Four Factors and possession pace modeling (`features/wnba_pace_four_factors.py`).
+  - [x] Parametric Normal-CDF derivative solver for totals and spreads.
 * **NFL**:
   - [x] Starting QB state vector ($\text{EPA}/\text{play}$, $\text{CPOE}$, $\text{P2S}\%$, $\text{TWP}\%$) with backup replacement spread penalty (`features/nfl_qb_oline.py`).
   - [x] Offensive Line protection and health composite index.
@@ -127,7 +129,8 @@
 
 | Gate | Requirement | Challenger Status |
 | :--- | :--- | :--- |
-| **1. Predictive** | • Paired $\Delta\text{LogLoss} < 0$<br>• Paired $\Delta\text{Brier} \le 0$<br>• Date-cluster bootstrap $P(\text{better}) \ge 80\%$ | **Cleared on Historical Matrix** (LogLoss $0.6828$ vs $0.6847$, $P=84.2\%$). Pending prospective holdout. |
-| **2. Operational** | • Serving coverage $\ge 95\%$<br>• Latency $< 500\text{ms}$<br>• Zero train/serve skew & zero PIT leakage<br>• Graceful fallback tested | **Cleared** (All 15 games on today's slate extracted and verified). |
-| **3. Prospective** | • Statistically meaningful sample of untouched live games ($\ge 200$ games, $\ge 30$ calendar dates) | **In Progress** (Accumulating prospective daily slate logs). |
-| **4. Economic** | • Realized CLV $\ge 0$<br>• Non-negative ROI at executable market prices<br>• No severe drawdown spikes | **In Progress** (Monitoring shadow paper tracking). |
+| **1. Predictive** | • Paired $\Delta\text{LogLoss} < 0$<br>• Paired $\Delta\text{Brier} \le 0$<br>• Date-cluster bootstrap $P(\text{better}) \ge 90\%$ | **Pending v3 Matrix & Candidate-2 Freeze** (v1 control baseline: LogLoss $0.6847$, Brier $0.2458$; candidate-1 voided). |
+| **2. Operational** | • Serving coverage $\ge 95\%$<br>• Latency $< 500\text{ms}$<br>• Zero train/serve skew & zero PIT leakage<br>• Fail-closed contract enforced | **Active Infrastructure** (`PointInTimeBullpenEngine` canonicalized, fail-closed contracts live). |
+| **3. Prospective** | • Statistically meaningful sample of untouched live games ($\ge 200$ games, $\ge 30$ calendar dates) | **Gated on Candidate-2 Freeze** (Mock shadow rows quarantined). |
+| **4. Economic** | • Realized CLV $\ge 0$<br>• Non-negative ROI at executable market prices<br>• No severe drawdown spikes | **Gated on Candidate-2 Freeze**. |
+

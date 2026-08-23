@@ -63,7 +63,13 @@ def log_shadow_game(
 
 def evaluate_paired_shadow(logs: list[dict[str, Any]], n_bootstrap: int = 2000) -> dict[str, Any]:
     """Compute paired LogLoss and Brier deltas with date-clustered bootstrap."""
-    settled = [r for r in logs if r.get("status") == "settled" and r.get("home_win") is not None]
+    settled = [
+        r
+        for r in logs
+        if r.get("status") == "settled"
+        and r.get("home_win") is not None
+        and r.get("status") != "VOID_MOCK_SHADOW"
+    ]
     if not settled:
         return {"status": "insufficient_data", "settled_games": 0}
 
@@ -121,75 +127,21 @@ def evaluate_paired_shadow(logs: list[dict[str, Any]], n_bootstrap: int = 2000) 
 
 
 def capture_today_slate() -> list[dict[str, Any]]:
-    """Fetch live MLB scoreboard for today and record prospective shadow predictions."""
-    import sys
+    """Fetch live MLB scoreboard for today and record prospective shadow predictions.
 
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    FAILS CLOSED: Candidate-1 is VOID_INVALID_FEATURE_PROVENANCE.
+    Prospective shadow collection is locked until mlb-v9-candidate-2 is trained on real data.
+    """
+    candidate_artifact_path = Path("config/models/research/mlb-v9-candidate-1.json")
+    if candidate_artifact_path.exists():
+        candidate_data = json.loads(candidate_artifact_path.read_text(encoding="utf-8"))
+        if candidate_data.get("status") == "VOID_INVALID_FEATURE_PROVENANCE":
+            raise RuntimeError(
+                "ABORT_SHADOW_CANDIDATE_VOID: mlb-v9-candidate-1 is VOID due to synthetic feature provenance. "
+                "Prospective shadow logging is gated until mlb-v9-candidate-2 is frozen."
+            )
 
-    from model_prediction.data_sources.espn import ESPNMLBClient
-
-    today_str = datetime.now(UTC).strftime("%Y%m%d")
-    client = ESPNMLBClient()
-    sb = client.scoreboard(today_str)
-    events = sb.get("events", [])
-    print(f"[shadow] Found {len(events)} live MLB events for {today_str}")
-
-    logged_entries = []
-
-    # Check already logged event IDs to prevent duplicate open records
-    existing_ids: set[str] = set()
-    if SHADOW_LOG_PATH.exists():
-        for line in SHADOW_LOG_PATH.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                try:
-                    eid = json.loads(line).get("event_id")
-                    if eid:
-                        existing_ids.add(str(eid))
-                except (json.JSONDecodeError, ValueError):
-                    continue
-
-    for ev in events:
-        event_id = str(ev.get("id"))
-        if event_id in existing_ids:
-            continue
-        comps = ev.get("competitions", [{}])[0].get("competitors", [])
-        if len(comps) != 2:
-            continue
-        home_comp = next((c for c in comps if c.get("homeAway") == "home"), comps[0])
-        away_comp = next((c for c in comps if c.get("homeAway") == "away"), comps[1])
-        home_team = home_comp.get("team", {}).get("abbreviation") or "HOME"
-        away_team = away_comp.get("team", {}).get("abbreviation") or "AWAY"
-
-        # Construct baseline v8 and v9 candidate features
-        # Mock / baseline probability model lookup for live shadow record
-        v8_prob = 0.542
-        v9_raw = 0.556
-        v9_cal = 0.551
-        features = {
-            "elo_prob": 0.535,
-            "trend_gap": 0.02,
-            "park_factor": 1.02,
-            "weather_factor": 1.00,
-            "starter_kbb_gap": 0.045,
-            "bullpen_weakness_gap": -0.012,
-        }
-
-        entry = log_shadow_game(
-            event_id=event_id,
-            game_date=today_str,
-            home_team=home_team,
-            away_team=away_team,
-            v8_prob=v8_prob,
-            v9_prob_raw=v9_raw,
-            v9_prob_calibrated=v9_cal,
-            v9_features=features,
-        )
-        logged_entries.append(entry)
-        print(f"  Logged shadow: {away_team} @ {home_team} (v8={v8_prob:.3f}, v9={v9_cal:.3f})")
-
-    print(f"[shadow] Logged {len(logged_entries)} new prospective games to {SHADOW_LOG_PATH}")
-    return logged_entries
+    raise NotImplementedError("Candidate-2 shadow logging will be activated upon candidate-2 freeze.")
 
 
 def main() -> int:

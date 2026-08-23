@@ -14,10 +14,10 @@ from datetime import datetime
 from pathlib import Path
 
 from ..config import PROJECT_ROOT
+from .bullpen_state import PointInTimeBullpenEngine
 from .park_factors_pit import park_factor_at
 from .platoon_matchup import platoon_matchup_gaps
 from .projected_offense import projected_offense_matchup_gaps
-from .reliever_availability import reliever_availability_matchup_gaps
 from .starter_state import starter_state_matchup_gaps
 
 DEFAULT_SNAPSHOT_PATH = PROJECT_ROOT / "data/mlb_statsapi/game_snapshots.jsonl"
@@ -116,10 +116,9 @@ def extract_mlb_v9_features(
         away_sp_hand=away_starter_throws,
     )
 
-    # 3. Reliever availability
-    bullpen_gaps = reliever_availability_matchup_gaps(
-        home_team, away_team, as_of, snapshot_path=snapshot_path
-    )
+    # 3. Dynamic bullpen state (Canonical PIT Engine)
+    bp_engine = PointInTimeBullpenEngine(snapshot_path=snapshot_path)
+    bp_adv = bp_engine.evaluate_matchup(home_team, away_team, as_of_date)
 
     # 4. Platoon splits
     platoon_gaps = platoon_matchup_gaps(
@@ -146,11 +145,11 @@ def extract_mlb_v9_features(
         projected_bb_pct_gap=offense_gaps.get("projected_offense_bb_pct_gap", 0.0),
         home_projected_woba=offense_gaps.get("home_projected_xwoba", 0.318),
         away_projected_woba=offense_gaps.get("away_projected_xwoba", 0.318),
-        bullpen_fip_advantage=bullpen_gaps.get("bullpen_fip_advantage", 0.0),
-        bullpen_freshness_advantage=bullpen_gaps.get("bullpen_freshness_advantage", 0.0),
-        bullpen_hl_advantage=bullpen_gaps.get("bullpen_hl_advantage", 0.0),
-        home_bullpen_effective_fip=bullpen_gaps.get("home_bullpen_effective_fip", 4.10),
-        away_bullpen_effective_fip=bullpen_gaps.get("away_bullpen_effective_fip", 4.10),
+        bullpen_fip_advantage=bp_adv.fip_gap,
+        bullpen_freshness_advantage=bp_adv.availability_gap,
+        bullpen_hl_advantage=bp_adv.high_leverage_avail_gap,
+        home_bullpen_effective_fip=bp_adv.home_state.available_fip,
+        away_bullpen_effective_fip=bp_adv.away_state.available_fip,
         platoon_woba_advantage=platoon_gaps.get("platoon_woba_advantage", 0.0),
         platoon_iso_advantage=platoon_gaps.get("platoon_iso_advantage", 0.0),
         park_factor=pf,

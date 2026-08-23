@@ -268,6 +268,10 @@ class PointInTimeBatterPriorEngine:
         agg_hard_hit = 0.0
         total_pa = 0
 
+        has_xwoba = False
+        has_barrel = False
+        has_hard_hit = False
+
         for player_id, w in zip(batting_order_player_ids, weights):
             prior = self.get_player_prior(player_id, as_of_date=as_of_date, vs_hand=opposing_pitcher_hand)
             agg_xwoba += w * prior.shrunk_xwoba()
@@ -277,6 +281,12 @@ class PointInTimeBatterPriorEngine:
             agg_barrel += w * prior.shrunk_barrel_pct()
             agg_hard_hit += w * prior.shrunk_hard_hit_pct()
             total_pa += prior.total_pa
+            if prior.total_xwoba_sum > 0:
+                has_xwoba = True
+            if prior.total_barrel > 0:
+                has_barrel = True
+            if prior.total_hard_hit > 0:
+                has_hard_hit = True
 
         return LineupPriorVector(
             xwoba=round(agg_xwoba, 4),
@@ -286,6 +296,9 @@ class PointInTimeBatterPriorEngine:
             barrel_pct=round(agg_barrel, 4),
             hard_hit_pct=round(agg_hard_hit, 4),
             sample_pa=total_pa,
+            barrel_available=has_barrel,
+            hard_hit_available=has_hard_hit,
+            xwoba_available=has_xwoba,
         )
 
     def evaluate_projected_team_offense(
@@ -330,6 +343,10 @@ class PointInTimeBatterPriorEngine:
         agg_hard_hit = 0.0
         total_sample_pa = 0
 
+        has_xwoba = False
+        has_barrel = False
+        has_hard_hit = False
+
         for p_id, pa in player_pa.items():
             weight = pa / total_recent_pa
             prior = self.get_player_prior(p_id, as_of_date=as_of_date, vs_hand=opposing_pitcher_hand)
@@ -340,6 +357,12 @@ class PointInTimeBatterPriorEngine:
             agg_barrel += weight * prior.shrunk_barrel_pct()
             agg_hard_hit += weight * prior.shrunk_hard_hit_pct()
             total_sample_pa += prior.total_pa
+            if prior.total_xwoba_sum > 0:
+                has_xwoba = True
+            if prior.total_barrel > 0:
+                has_barrel = True
+            if prior.total_hard_hit > 0:
+                has_hard_hit = True
 
         return LineupPriorVector(
             xwoba=round(agg_xwoba, 4),
@@ -349,6 +372,9 @@ class PointInTimeBatterPriorEngine:
             barrel_pct=round(agg_barrel, 4),
             hard_hit_pct=round(agg_hard_hit, 4),
             sample_pa=total_sample_pa,
+            barrel_available=has_barrel,
+            hard_hit_available=has_hard_hit,
+            xwoba_available=has_xwoba,
         )
 
 

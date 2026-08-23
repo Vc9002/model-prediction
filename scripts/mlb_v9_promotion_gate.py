@@ -115,23 +115,57 @@ def evaluate_promotion_gates(
 
 
 def main() -> int:
+    import json
+    from pathlib import Path
+
     parser = argparse.ArgumentParser(description="Evaluate MLB v9 promotion gate status")
-    parser.add_argument("--model-id", default="mlb-v9-lr-l2-shrinkage")
+    parser.add_argument("--model-id", default="mlb-v9-candidate-2", help="Candidate model ID")
+    parser.add_argument(
+        "--shadow-summary",
+        type=Path,
+        default=Path("outputs/prospective/mlb_v9/paired_shadow_summary.json"),
+        help="Path to real paired shadow summary JSON",
+    )
+    parser.add_argument(
+        "--operational-summary",
+        type=Path,
+        default=Path("outputs/prospective/mlb_v9/operational_summary.json"),
+        help="Path to real operational metrics JSON",
+    )
+    parser.add_argument(
+        "--economic-summary",
+        type=Path,
+        default=Path("outputs/prospective/mlb_v9/economic_summary.json"),
+        help="Path to real economic summary JSON",
+    )
     args = parser.parse_args()
 
-    # Evaluation against current state
-    mock_shadow = {
-        "settled_games": 32,
-        "unique_dates": 1,
-        "delta_log_loss": -0.0013,
-        "p_log_loss_better": 0.842,
-        "delta_brier": -0.0006,
-        "p_brier_better": 0.842,
-    }
-    mock_op = {"serving_coverage": 0.985, "latency_ms": 85.0}
-    mock_econ = {"rolling_clv_pp": 1.4, "executable_roi": 0.086}
+    # Fail closed: No mock / demo evaluations permitted
+    missing_evidence = []
+    if not args.shadow_summary.exists():
+        missing_evidence.append(f"Missing paired shadow summary: {args.shadow_summary}")
+    if not args.operational_summary.exists():
+        missing_evidence.append(f"Missing operational summary: {args.operational_summary}")
+    if not args.economic_summary.exists():
+        missing_evidence.append(f"Missing economic summary: {args.economic_summary}")
 
-    eval_result = evaluate_promotion_gates(args.model_id, mock_shadow, mock_op, mock_econ)
+    if missing_evidence:
+        print("=== MLB PROMOTION GATE EVALUATION: INCOMPLETE EVIDENCE ===")
+        print("FAIL-CLOSED: Cannot evaluate promotion gates without verified evidence artifacts:")
+        for m in missing_evidence:
+            print(f"  - {m}")
+        print("\nVerdict: ABORT_INSUFFICIENT_EVIDENCE")
+        return 1
+
+    try:
+        shadow_metrics = json.loads(args.shadow_summary.read_text(encoding="utf-8"))
+        op_metrics = json.loads(args.operational_summary.read_text(encoding="utf-8"))
+        econ_metrics = json.loads(args.economic_summary.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        print(f"ERROR: Failed to parse evidence artifacts: {exc}")
+        return 1
+
+    eval_result = evaluate_promotion_gates(args.model_id, shadow_metrics, op_metrics, econ_metrics)
     print("=== MLB PROMOTION GATE EVALUATION ===")
     print(f"Model Candidate : {eval_result.model_id}")
     print(f"Champion Baseline: {eval_result.incumbent_id} (FROZEN)")
@@ -146,7 +180,7 @@ def main() -> int:
         status = "PASSED [OK]" if g.passed else f"PENDING/FAILED: {g.failure_reason}"
         print(f"  - {g.name:<20s}: {status}")
 
-    return 0
+    return 0 if eval_result.overall_verdict == "PROMOTION_CANDIDATE" else 2
 
 
 if __name__ == "__main__":

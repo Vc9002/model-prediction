@@ -399,43 +399,49 @@ Raw PIT data
 
 ---
 
-# Revised Priority Queue
+# Revised Priority Queue (32-Step Sequential Execution)
 
-### P0 — Preserve Champion and Repair Research
-1. **Freeze MLB v8** (`protected_versions: [mlb-elo-trend-lr-v8]`). [✅ DONE]
-2. Create `research/mlb-v9` from current `main`. [✅ DONE]
-3. Preserve old v8-reproduction branch as archive. [✅ DONE]
-4. Transplant only valid research tooling. [✅ DONE]
-5. Make frozen Parquet authoritative (`mlb_v9_feature_table_v1.parquet`). [✅ DONE]
-6. Freeze explicit event cohorts and SHA-256 hashes in manifest. [✅ DONE]
-7. Separate v8 reproduction fitter from v9 research fitter. [✅ DONE]
-8. Correct old KBB verdict to VOID. [✅ DONE]
+### Phase 1 — Quarantine Synthetic Prototypes & Safety Hardening [COMPLETED ✅]
+1. `research`: Mark MLB v9 feature-table-v2 synthetic prototype as `VOID_SYNTHETIC_PROTOTYPE` in manifest. [✅ DONE]
+2. `research`: Mark `mlb-v9-candidate-1` artifact as `VOID_INVALID_FEATURE_PROVENANCE` (preserved for audit, never promoted). [✅ DONE]
+3. `safety`: Disable mock prospective shadow capture; fail closed on void candidates. [✅ DONE]
+4. `safety`: Make promotion gate fail closed without real verified evidence files. [✅ DONE]
+5. `safety`: Remove retroactive `observed_at` timestamp manipulation from v9 benchmark forecaster. [✅ DONE]
+6. `safety`: Make v9 prospective ledgers append-only with event deduplication. [✅ DONE]
 
-### P1 — Build v9 Representation
-9. Implement true K%, BB%, K-BB% over Batters Faced. [✅ DONE]
-10. Build Empirical-Bayes batter priors. [✅ DONE]
-11. Build historical projected offense without target-game order leakage. [✅ DONE]
-12. Test projected-offense family. [✅ DONE]
-13. Build richer starter state (FIP, CSW%, pitch mix, K-BB%). [✅ DONE]
-14. Build expected starter IP depth. [✅ DONE]
-15. Build reliever talent × workload availability × leverage role. [✅ DONE]
-16. Test the complete pitching-state family. [✅ DONE]
+### Phase 2 — Real PIT Source Adapters & Data Foundations [IN PROGRESS ⚙️]
+7. `data`: Ingest real batter Statcast game metrics (BIP, hard-hit, barrel, xwOBA) with explicit missingness flags.
+8. `data`: Ingest real batter vs-hand (L/R) plate appearance tagging with hierarchical shrinkage.
+9. `data`: Wire real starter Statcast state by player and decision time (CSW%, velo, xwOBA allowed).
+10. `refactor`: Make `bullpen_state.py` (`PointInTimeBullpenEngine`) the single canonical v9 bullpen authority. [✅ DONE]
+11. `data`: Build PIT reliever appearance + roster/role adapter strictly satisfying `game_start < decision_time`.
+12. `data`: Populate real pitch arsenal summaries (fastball velo, breaking/offspeed usage, repertoire entropy).
 
-### P1 — Expand Data & Secondary Sports
-17. Audit BALLDONTLIE access and rate limits. [✅ DONE]
-18. Build MLB player crosswalk (`canonical_player_id`). [✅ DONE]
-19. Backfill plate appearances. [✅ DONE]
-20. Backfill pitch-type stats. [✅ DONE]
-21. Build pitcher-arsenal × hitter-matchup features. [✅ DONE]
-22. Keep prospective lineup capture running continuously. [✅ DONE]
-23. Dynamic Soccer Polymarket discovery & Dixon-Coles v2 hierarchical model with BTTS. [✅ DONE]
-24. Player-level WNBA rotation & NFL QB/OL engines. [✅ DONE]
+### Phase 3 — Real Feature Table v3 & Integrity Audit
+13. `research`: Build `mlb_v9_feature_table_v3.parquet` from verified point-in-time observed data.
+14. `research`: Add feature distribution, std > 0, and correlation integrity audit before fitting.
+15. `research`: Freeze v3 manifest with per-family source hashes and cohort event IDs.
 
-### P2 — Finish v9 Evaluation & Gating
-25. Compare early vs late v9 horizons on confirmed lineups. [ACTIVE PROSPECTIVE]
-26. Compare standardized LR vs XGB vs monotonic XGB on frozen data. [✅ DONE — Regularized LR $C=0.01$ locked: 0.6828 Log Loss, 0.2449 Brier, 0.575 AUC, 84.2% $P(\text{better})$ vs v8]. [✅ DONE]
-27. Select and freeze calibration (`mlb-v9-candidate-1`). [✅ DONE]
-28. Record challenger experiment in `runs.db` registry (`exp-20260823T161136Z-38f09c`). [✅ DONE]
-29. Accumulate untouched prospective shadow predictions for live games. [ACTIVE PROSPECTIVE]
-30. Execute paired date-clustered bootstrap v8 vs v9 evaluation. [ACTIVE PROSPECTIVE]
-31. Promote to production **only if the complete v9 candidate clears all four gates**. [PENDING PROSPECTIVE SAMPLE]
+### Phase 4 — Disciplined Feature-Family Ablation Ladder
+16. `research`: R0 Control (Standardized 6-feature baseline: Elo, trend, PIT park, weather, starter ERA, bullpen weakness).
+17. `research`: R1 Real Projected Offense.
+18. `research`: R2 Real Starter State (K%, BB%, CSW%, velo, depth).
+19. `research`: R3 Real Canonical Bullpen State.
+20. `research`: R4 Real Platoon Matchup Interactions.
+21. `research`: R5 Real Pitch Arsenal Summary.
+22. `research`: Freeze retained feature set based on 2,000 date-clustered bootstrap paired deltas.
+
+### Phase 5 — Model Architecture & Candidate-2 Freeze
+23. `research`: Compare standardized L2 LR vs Elastic-Net LR vs Monotonic XGBoost on identical v3 matrix.
+24. `research`: Fit out-of-fold calibration (identity, Platt, beta).
+25. `artifact`: Freeze `mlb-v9-candidate-2.json` with complete scaler, imputer, hashes, and fail-closed contract.
+26. `test`: Verify 100% train/serve parity for every candidate-2 feature.
+
+### Phase 6 — True Prospective Shadow & Promotion Gating
+27. `ops`: Wire actual frozen candidate-2 predictor into paired shadow harness.
+28. `ops`: Begin untouched v8 vs v9 prospective shadow chain with strict `observed_at < event_start` enforcement.
+29. `ops`: Keep confirmed-lineup hourly capture running continuously.
+30. `research`: Evaluate paired performance only after minimum sample size ($\ge 200$ games, $\ge 30$ dates) and MDE power.
+31. `governance`: Execute formal four-gate promotion evaluation against signed artifacts.
+32. `operator`: Atomic production promotion cutover if and only if candidate-2 passes all four gates.
+

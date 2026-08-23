@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -70,15 +70,25 @@ def run_v9_flat_forecast(date_str: str | None = None) -> list[dict]:
     trends = TrendEngine(history)
     registry = EntityRegistry.from_json(Path("data/entities/teams.json"))
 
-    # Reset workbook for fresh live slate capture
-    if FLAT_V9_PATH.exists():
-        FLAT_V9_PATH.unlink()
+    # Append-only workbook with deduplication
     ledger = PickLedger(path=FLAT_V9_PATH)
+    existing_event_ids: set[str] = set()
+    try:
+        existing_picks = ledger.list_picks()
+        for p in existing_picks:
+            if hasattr(p, "event_id") and p.event_id:
+                existing_event_ids.add(str(p.event_id))
+    except Exception as exc:  # noqa: BLE001
+        print(f"[v9-benchmark] Note: could not load existing picks: {exc}")
 
     generated_picks = []
 
     for ev in events:
         event_id = str(ev.get("id"))
+        if event_id in existing_event_ids:
+            print(f"[v9-benchmark] Skipping already recorded event {event_id}")
+            continue
+
         comps = ev.get("competitions", [{}])[0].get("competitors", [])
         if len(comps) != 2:
             continue
@@ -86,7 +96,18 @@ def run_v9_flat_forecast(date_str: str | None = None) -> list[dict]:
         home_comp = next((c for c in comps if c.get("homeAway") == "home"), comps[0])
         away_comp = next((c for c in comps if c.get("homeAway") == "away"), comps[1])
         start_str = ev.get("date") or datetime.now(UTC).isoformat()
-        start_dt = datetime.fromisoformat(start_str)
+        try:
+            start_dt = datetime.fromisoformat(start_str)
+        except ValueError:
+            start_dt = datetime.now(UTC)
+
+        now_utc = datetime.now(UTC)
+        # Enforce strict pre-game timing: Never fabricate a pre-game timestamp post-pitch
+        if now_utc >= start_dt:
+            print(
+                f"[v9-benchmark] NO_CALL_EVENT_STARTED: Skipping {event_id} (start={start_str}, observed={now_utc.isoformat()})"
+            )
+            continue
 
         home_raw = home_comp.get("team", {}).get("displayName") or home_comp.get("team", {}).get("name")
         away_raw = away_comp.get("team", {}).get("displayName") or away_comp.get("team", {}).get("name")
@@ -166,8 +187,7 @@ def run_v9_flat_forecast(date_str: str | None = None) -> list[dict]:
             pick_prob = prob_away
             selected_team = away_team
 
-        pregame_ts = min(datetime.now(UTC), start_dt - timedelta(minutes=15))
-        pregame_str = pregame_ts.isoformat()
+        observed_at_str = now_utc.isoformat()
 
         req = PickRequest(
             event_start_utc=start_str,
@@ -187,7 +207,7 @@ def run_v9_flat_forecast(date_str: str | None = None) -> list[dict]:
             risks="Model candidate under prospective shadow evaluation",
             model_origin=ModelOrigin.STATISTICAL_MODEL,
             model_state=ModelState.RESEARCH,
-            observed_at_utc=pregame_str,
+            observed_at_utc=observed_at_str,
         )
 
         away_canonical = registry.resolve(League.MLB, away_team, start_str)
@@ -205,8 +225,8 @@ def run_v9_flat_forecast(date_str: str | None = None) -> list[dict]:
             home_team=home_canonical,
         )
 
-        ledger.append_evaluated(req, elig, now=pregame_ts)
-        generated_picks.append((req, pregame_ts))
+        ledger.append_evaluated(req, elig, now=now_utc)
+        generated_picks.append((req, now_utc))
         print(
             f"  [flat-v9] Logged {away_team} @ {home_team} -> {selected_team} ({selection.upper()}) (P={pick_prob:.3f}, 1.0U)"
         )

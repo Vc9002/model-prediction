@@ -1,5 +1,8 @@
 {
   "model_id": "mlb-v9-candidate-1",
+  "status": "VOID_INVALID_FEATURE_PROVENANCE",
+  "invalidation_reason": "feature_table_v2 uses synthetic deterministic proxies and constants rather than the observed PIT player-state sources claimed by its schema",
+  "replacement": "mlb-v9-candidate-2 TBD",
   "model_type": "standardized_logistic_regression",
   "league": "MLB",
   "version": "9.0.0-rc1",
