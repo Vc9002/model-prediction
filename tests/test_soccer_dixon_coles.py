@@ -421,3 +421,35 @@ def test_dixon_coles_engine_empty_or_small_data_guards() -> None:
 
     with pytest.raises(RuntimeError, match="must be fitted"):
         engine.predict_expected_goals("TeamA", "TeamB")
+
+
+def test_double_chance_and_draw_calibration() -> None:
+    """Test Double Chance (1X, X2, 12) derivations and draw calibration."""
+    from model_prediction.models.soccer_dixon_coles import (
+        draw_calibrated_probabilities,
+        soccer_double_chance_probabilities,
+    )
+
+    grid = build_score_grid(lambda_h=1.5, lambda_a=1.0, rho=-0.08)
+    p_1x2 = grid.prob_1x2()
+    dc = grid.prob_double_chance()
+
+    # 1X = home + draw
+    assert pytest.approx(dc["1X"], abs=1e-5) == (p_1x2["home"] + p_1x2["draw"])
+    # X2 = draw + away
+    assert pytest.approx(dc["X2"], abs=1e-5) == (p_1x2["draw"] + p_1x2["away"])
+    # 12 = home + away
+    assert pytest.approx(dc["12"], abs=1e-5) == (p_1x2["home"] + p_1x2["away"])
+
+    # Test standalone helper function
+    dc_standalone = soccer_double_chance_probabilities(p_home=0.45, p_draw=0.30, p_away=0.25)
+    assert dc_standalone["1X"] == 0.75
+    assert dc_standalone["X2"] == 0.55
+    assert dc_standalone["12"] == 0.70
+
+    # Test draw calibration with inflation factor
+    calibrated = draw_calibrated_probabilities(
+        p_home=0.45, p_draw=0.25, p_away=0.30, draw_inflation_factor=1.20
+    )
+    assert calibrated["draw"] > 0.25
+    assert pytest.approx(calibrated["home"] + calibrated["draw"] + calibrated["away"], abs=1e-5) == 1.0

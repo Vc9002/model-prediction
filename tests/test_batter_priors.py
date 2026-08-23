@@ -150,3 +150,67 @@ def test_point_in_time_engine_empty_team_fallback():
     proj = engine.evaluate_projected_team_offense("NONEXISTENT", as_of_date="2026-05-01")
     assert proj.xwoba == PRIOR_HYPERPARAMETERS["xwoba"][0]
     assert proj.sample_pa == 0
+
+
+def test_lineup_state_engine_matchup_evaluation():
+    from model_prediction.features.lineup_state import (
+        ConfirmedLineup,
+        LineupBatter,
+        LineupStateEngine,
+    )
+
+    prior_engine = PointInTimeBatterPriorEngine()
+    # Populate hitters for home and away
+    for i in range(1, 10):
+        prior_engine.update_player_game(
+            BatterGameRecord(
+                player_id=f"home_bat_{i}",
+                team_id="NYY",
+                game_date="2026-05-01",
+                pa=50,
+                ab=40,
+                hits=15,
+                doubles=4,
+                home_runs=5,
+                strikeouts=8,
+                walks=10,
+            )
+        )
+        prior_engine.update_player_game(
+            BatterGameRecord(
+                player_id=f"away_bat_{i}",
+                team_id="BOS",
+                game_date="2026-05-01",
+                pa=50,
+                ab=45,
+                hits=10,
+                doubles=1,
+                home_runs=1,
+                strikeouts=15,
+                walks=5,
+            )
+        )
+
+    state_engine = LineupStateEngine(prior_engine)
+
+    # Register confirmed home lineup
+    home_lineup = ConfirmedLineup(
+        team_id="NYY",
+        game_date="2026-05-10",
+        is_confirmed=True,
+        batters=[LineupBatter(player_id=f"home_bat_{i}", batting_order=i) for i in range(1, 10)],
+    )
+    state_engine.register_confirmed_lineup(home_lineup)
+
+    adv = state_engine.evaluate_matchup(
+        home_team="NYY",
+        away_team="BOS",
+        game_date="2026-05-10",
+        home_pitcher_hand="R",
+        away_pitcher_hand="L",
+    )
+
+    # Confirmed home lineup has higher xwOBA than projected away offense
+    assert adv.home_xwoba > adv.away_xwoba
+    assert adv.xwoba_gap > 0
+    assert adv.k_pct_gap > 0  # Positive k_pct_gap indicates away strikes out more than home

@@ -339,9 +339,10 @@ def minimum_detectable_effect(
             "note": "Sample size must be positive",
         }
 
-    # Standard normal quantiles (two-tailed alpha=0.05 -> z=1.96; power=0.80 -> z=0.8416)
-    z_alpha = 1.95996 if abs(alpha - 0.05) < 0.01 else 2.57583
-    z_power = 0.84162 if abs(power - 0.80) < 0.01 else 1.28155
+    from scipy.stats import norm
+
+    z_alpha = float(norm.ppf(1.0 - alpha / 2.0))
+    z_power = float(norm.ppf(power))
 
     mde_abs = (z_alpha + z_power) * (baseline_sd / math.sqrt(n_samples))
 

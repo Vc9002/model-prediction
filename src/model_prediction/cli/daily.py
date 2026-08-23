@@ -37,6 +37,7 @@ from .commands import _clear_today_open, _polymarket_slate, _research_models_dir
 from .forecast import (
     _forecast_international_sport,
     _forecast_learned_sport,
+    _forecast_mlb_nrfi_flat,
     _forecast_mlb_totals_flat,
     _forecast_soccer_sport,
     _forecast_tennis_sport,
@@ -391,6 +392,21 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         except Exception:
             logger.warning("MLB totals flat forecast failed", exc_info=True)
 
+    def _mlb_nrfi_task() -> None:
+        try:
+            forecast_result["mlb_nrfi"] = _forecast_mlb_nrfi_flat(
+                args.date,
+                True,
+                config,
+                registry,
+                bans,
+                flat_ledger,
+                audit,
+                main_ledger=ledger,
+            )
+        except Exception:
+            logger.warning("MLB NRFI flat forecast failed", exc_info=True)
+
     def _soccer_task() -> None:
         # Soccer: Main+Flat only (operator directive 2026-08-03).
         # Previously uncaught here (a crash would have taken down
@@ -546,9 +562,10 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                         exc_info=True,
                     )
 
-    with ThreadPoolExecutor(max_workers=6) as research_pool:
+    with ThreadPoolExecutor(max_workers=7) as research_pool:
         research_futures = [
             research_pool.submit(_mlb_totals_task),
+            research_pool.submit(_mlb_nrfi_task),
             research_pool.submit(_soccer_task),
             research_pool.submit(_tennis_task),
             research_pool.submit(_wnba_spread_task),

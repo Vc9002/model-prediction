@@ -248,3 +248,45 @@ class TestStarterSosAdjustedEra:
         # Away: 18 IP -> weight 0.6. Raw=6.0 -> Adj=0.6*6.0 + 0.4*4.5 = 3.6 + 1.8 = 5.4
         # Gap = 2.7 - 5.4 = -2.7
         assert gap == pytest.approx(-2.7)
+
+
+class TestStarterRecencyGatedEra:
+    def test_recency_discounting_on_vintage_starts(self, tmp_path) -> None:
+        path = tmp_path / "snapshots.jsonl"
+        # 1 very old start (150 days ago) with 0 ER, 2 recent starts with 4 ER
+        rows = [
+            _start("2026-01-01T18:00:00Z", 100, "Veteran Pitcher", innings="6.0", earned_runs=0),
+            _start("2026-05-15T18:00:00Z", 100, "Veteran Pitcher", innings="6.0", earned_runs=4),
+            _start("2026-05-20T18:00:00Z", 100, "Veteran Pitcher", innings="6.0", earned_runs=4),
+        ]
+        _write_snapshots(path, rows)
+        starter_history._STARTER_INDEX_CACHE.clear()
+
+        # Decision on 2026-05-25:
+        # First start was 144 days ago (>90 days gap), gets discounted.
+        res = starter_history.starter_rolling_era_recency_gated(
+            "Veteran Pitcher", datetime(2026, 5, 25, tzinfo=UTC), snapshot_path=path, max_gap_days=90
+        )
+        assert res["status"] == "available"
+        assert res["gap_status"] == "fresh"  # most recent start was 5 days ago
+        # Raw ERA = 9 * 8 / 18 = 4.0
+        assert res["raw_era"] == pytest.approx(4.0)
+        # Because the 0-ER vintage start is decayed, the recency-gated ERA is higher than 4.0
+        assert res["era"] > 4.0
+
+    def test_recency_gated_gap_live(self, tmp_path) -> None:
+        path = tmp_path / "snapshots.jsonl"
+        rows = [
+            _start("2026-05-10T18:00:00Z", 100, "Home Ace", innings="6.0", earned_runs=1, side="home"),
+            _start("2026-05-15T18:00:00Z", 100, "Home Ace", innings="6.0", earned_runs=1, side="home"),
+            _start("2026-05-10T18:00:00Z", 200, "Away Ace", innings="6.0", earned_runs=3, side="away"),
+            _start("2026-05-15T18:00:00Z", 200, "Away Ace", innings="6.0", earned_runs=3, side="away"),
+        ]
+        _write_snapshots(path, rows)
+        starter_history._STARTER_INDEX_CACHE.clear()
+
+        gap = starter_history.starter_era_gap_recency_gated(
+            "Home Ace", "Away Ace", datetime(2026, 5, 20, tzinfo=UTC), snapshot_path=path
+        )
+        # Home ERA = 1.50, Away ERA = 4.50 -> Gap = 1.50 - 4.50 = -3.0
+        assert gap == pytest.approx(-3.0)

@@ -55,6 +55,25 @@ def _get_clv_summary() -> dict:
         return {}
 
 
+def _status_transitioned(runtime_root: Path, status: str) -> bool:
+    """True iff `status` differs from the last-recorded status, and records it.
+
+    Persisted under runtime_root so debounce survives process restarts
+    (each dashboard poll / cron run is a fresh Python process).
+    """
+    state_file = runtime_root / "system_health_last_status.txt"
+    try:
+        last = state_file.read_text(encoding="utf-8").strip() if state_file.exists() else None
+    except OSError:
+        last = None
+    try:
+        state_file.parent.mkdir(parents=True, exist_ok=True)
+        state_file.write_text(status, encoding="utf-8")
+    except OSError:
+        pass
+    return last != status
+
+
 def _age_minutes(iso_utc: str) -> float:
     try:
         dt = datetime.fromisoformat(iso_utc)
@@ -288,8 +307,12 @@ def system_health(
 
     report["reasons"] = reasons
 
-    # 6. Push alerting on degraded or down state
-    if report["status"] in ("DEGRADED", "DOWN"):
+    # 6. Push alerting on DEGRADED/DOWN *transitions* only — system_health()
+    # may be called repeatedly (dashboard polling, cron), and re-alerting on
+    # every call while the same state persists would spam the operator.
+    if report["status"] in ("DEGRADED", "DOWN") and _status_transitioned(
+        paths.runtime_root, report["status"]
+    ):
         try:
             from .run_supervisor import notify_operator
 
@@ -300,6 +323,8 @@ def system_health(
             )
         except Exception:  # noqa: BLE001, S110
             pass
+    elif report["status"] == "HEALTHY":
+        _status_transitioned(paths.runtime_root, "HEALTHY")
 
     return report
 

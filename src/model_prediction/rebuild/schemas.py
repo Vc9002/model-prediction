@@ -13,8 +13,10 @@ required columns present, primary key never null, declared types held.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 import polars as pl
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 SCHEMA_VERSION = "1"
 
@@ -171,3 +173,55 @@ MARKET_SNAPSHOT_CONTRACT = TableContract(
         ColumnSpec("team_canonical_id", str, nullable=True),
     ],
 )
+
+
+# ── Declarative Pydantic Ingestion Schemas ─────────────────────────────────
+
+
+class IngestionScoreboardRow(BaseModel):
+    event_id: str = Field(min_length=1)
+    home_team: str = Field(min_length=1)
+    away_team: str = Field(min_length=1)
+    home_score: float = Field(ge=0.0)
+    away_score: float = Field(ge=0.0)
+    status: str = Field(min_length=1)
+    observed_at_utc: str = Field(min_length=1)
+    event_start_utc: str = Field(min_length=1)
+    source: str = Field(min_length=1)
+    venue: str | None = None
+    home_team_canonical_id: str | None = None
+    away_team_canonical_id: str | None = None
+    event_canonical_id: str | None = None
+    venue_canonical_id: str | None = None
+
+
+class IngestionMarketSnapshotRow(BaseModel):
+    event_id: str = Field(min_length=1)
+    market_id: str = Field(min_length=1)
+    market_type: str
+    team_or_side: str
+    line: float | None = None
+    executable_price: float | None = Field(default=None, ge=0.0, le=1.0)
+    observed_at_utc: str = Field(min_length=1)
+    source: str = Field(min_length=1)
+    team_canonical_id: str | None = None
+
+    @field_validator("market_type")
+    @classmethod
+    def validate_market_type(cls, v: str) -> str:
+        valid = {"moneyline", "spread", "total", "double_chance", "btts", "runline", "puckline"}
+        if v.lower() not in valid:
+            raise ValueError(f"unknown market type: {v}")
+        return v.lower()
+
+
+def validate_ingestion_payload(
+    payload: dict[str, Any],
+    schema_cls: type[BaseModel],
+) -> tuple[bool, str | None]:
+    """Validate raw ingestion payload with declarative Pydantic schema."""
+    try:
+        schema_cls.model_validate(payload)
+        return True, None
+    except ValidationError as exc:
+        return False, str(exc)

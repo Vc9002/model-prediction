@@ -212,6 +212,16 @@ class BivariateScoreGrid:
             "away": p_away,
         }
 
+    def prob_double_chance(self) -> dict[str, float]:
+        """Double chance derivative market probabilities (1X, X2, 12)."""
+        p_1x2 = self.prob_1x2()
+        h, d, a = p_1x2["home"], p_1x2["draw"], p_1x2["away"]
+        return {
+            "1X": round(h + d, 6),
+            "X2": round(d + a, 6),
+            "12": round(h + a, 6),
+        }
+
     def prob_btts(self) -> dict[str, float]:
         """Both Teams To Score (BTTS) probabilities."""
         # BTTS Yes: Home >= 1 and Away >= 1
@@ -866,3 +876,61 @@ def optimize_decay_xi(
 
     best_xi = min(results.keys(), key=lambda k: results[k])
     return best_xi, results
+
+
+def soccer_double_chance_probabilities(
+    p_home: float,
+    p_draw: float,
+    p_away: float,
+) -> dict[str, float]:
+    """Calculate Double Chance market probabilities (1X, X2, 12).
+
+    Parameters
+    ----------
+    p_home : float
+        Probability of Home Win in [0, 1].
+    p_draw : float
+        Probability of Draw in [0, 1].
+    p_away : float
+        Probability of Away Win in [0, 1].
+
+    Returns
+    -------
+    dict with '1X', 'X2', '12' probabilities.
+    """
+    total = float(p_home) + float(p_draw) + float(p_away)
+    if total <= 0:
+        return {"1X": 0.5, "X2": 0.5, "12": 0.5}
+
+    h = float(p_home) / total
+    d = float(p_draw) / total
+    a = float(p_away) / total
+
+    return {
+        "1X": round(min(1.0, h + d), 6),
+        "X2": round(min(1.0, d + a), 6),
+        "12": round(min(1.0, h + a), 6),
+    }
+
+
+def draw_calibrated_probabilities(
+    p_home: float,
+    p_draw: float,
+    p_away: float,
+    draw_inflation_factor: float = 1.0,
+) -> dict[str, float]:
+    """Calibrate 3-way soccer probabilities with optional draw inflation/shrinkage."""
+    factor = max(0.5, min(2.0, float(draw_inflation_factor)))
+    d_adj = float(p_draw) * factor
+    h_adj = float(p_home)
+    a_adj = float(p_away)
+
+    total = h_adj + d_adj + a_adj
+    if total <= 0:
+        return {"home": 0.333333, "draw": 0.333333, "away": 0.333333}
+
+    return {
+        "home": round(h_adj / total, 6),
+        "draw": round(d_adj / total, 6),
+        "away": round(a_adj / total, 6),
+    }

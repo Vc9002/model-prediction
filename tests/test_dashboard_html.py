@@ -545,3 +545,139 @@ def test_production_evidence_warns_on_conflict_and_uses_first_verified_record() 
     assert "selected-first-verified" in rendered
     assert "discarded-unverified" not in rendered
     assert "discarded-later-verified" not in rendered
+
+
+def test_dashboard_ledger_filter_system_node_execution() -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node.js is unavailable")
+    html = (ROOT / "dashboard.html").read_text(encoding="utf-8")
+
+    # Verify filter container sections and template strings exist in HTML
+    for tab in ["L", "F", "R", "G", "PL"]:
+        assert f'id="filters_{tab}"' in html
+
+    assert 'id="fSport_${tab}"' in html
+    assert 'id="fMarket_${tab}"' in html
+    assert 'id="fStatus_${tab}"' in html
+    assert 'id="fResult_${tab}"' in html
+    assert 'id="fSearch_${tab}"' in html
+    assert 'id="fFrom_${tab}"' in html
+    assert 'id="fTo_${tab}"' in html
+    assert 'id="fArchived_${tab}"' in html
+
+    assert "function filterLedgerRow" in html
+    assert "function filterLedgerRows" in html
+    assert "function populateFilters" in html
+    assert "function resetFilters" in html
+    assert "function updateCounts" in html
+
+    # Execute in Node.js VM to test filtering invariants
+    script = (
+        """
+    const dom = {};
+    const $ = id => {
+      const key = id.replace(/^#/, '');
+      if (!dom[key]) {
+        dom[key] = { value: '', checked: false, textContent: '', innerHTML: '', style: {} };
+      }
+      return dom[key];
+    };
+    const etParts = value => {
+      if (!value) return null;
+      const str = String(value);
+      if (str.startsWith('2026-08-22')) return { year: '2026', month: '08', day: '22' };
+      if (str.startsWith('2026-08-20')) return { year: '2026', month: '08', day: '20' };
+      return { year: '2026', month: '08', day: '22' };
+    };
+    const etDate = value => {
+      const p = etParts(value);
+      return p ? `${p.year}-${p.month}-${p.day}` : '';
+    };
+    const ALL_SPORTS = ['mlb', 'wnba', 'nba', 'nfl', 'soccer', 'tennis', 'lol', 'cs2', 'dota2', 'valorant', 'rainbow_six', 'kbo', 'npb'];
+    const state = { settings: { sports: ALL_SPORTS, minConf: 0.5 }, picks: [] };
+    const visibleSports = () => state.settings.sports || ALL_SPORTS;
+    const passesDisplaySettings = p => {
+      const league = String(p.league || p.Sport || '').toLowerCase();
+      if (league && !visibleSports().includes(league)) return false;
+      const probability = Number(p.model_probability);
+      const minimum = Number(state.settings.minConf ?? 0.5);
+      return !Number.isFinite(probability) || probability >= minimum;
+    };
+    const marketLabel = s => s;
+    """
+        + (
+            "function filterLedgerRow(tab, p) {\n"
+            + html.split("function filterLedgerRow(tab, p){")[1].split(
+                "function filterLedgerRows(tab, rows){"
+            )[0]
+        )
+        + """
+    // Test rows
+    const rows = [
+      { pick_id: 'p1', league: 'MLB', market_type: 'moneyline', status: 'open', away_team: 'NYY', home_team: 'BOS', event_start_utc: '2026-08-22T19:00:00Z', archived: false },
+      { pick_id: 'p2', Sport: 'mlb', Type: 'spread', status: 'settled', result: 'win', away_team: 'LAD', home_team: 'SF', event_start_utc: '2026-08-20T19:00:00Z', archived: false },
+      { pick_id: 'p3', sport: 'CS2', market: 'moneyline', status: 'settled', result: 'loss', away_team: 'Navi', home_team: 'FaZe', event_start_utc: '2026-08-22T12:00:00Z', archived: true },
+    ];
+
+    // 1. Default filter (status=open)
+    $('#fStatus_L').value = 'open';
+    const openPicks = rows.filter(p => filterLedgerRow('L', p));
+    if (openPicks.length !== 1 || openPicks[0].pick_id !== 'p1') {
+      throw new Error('Default open filter failed: got ' + JSON.stringify(openPicks));
+    }
+
+    // 2. Filter by sport case-insensitively
+    $('#fStatus_L').value = '';
+    $('#fSport_L').value = 'mlb';
+    const mlbPicks = rows.filter(p => filterLedgerRow('L', p));
+    if (mlbPicks.length !== 2) {
+      throw new Error('Sport filter failed: got ' + JSON.stringify(mlbPicks));
+    }
+
+    // 3. Filter by search query
+    $('#fSport_L').value = '';
+    $('#fSearch_L').value = 'faze';
+    $('#fArchived_L').checked = true;
+    const searchPicks = rows.filter(p => filterLedgerRow('L', p));
+    if (searchPicks.length !== 1 || searchPicks[0].pick_id !== 'p3') {
+      throw new Error('Search filter failed: got ' + JSON.stringify(searchPicks));
+    }
+
+    // 4. Filter by date range
+    $('#fSearch_L').value = '';
+    $('#fFrom_L').value = '2026-08-22';
+    $('#fTo_L').value = '2026-08-22';
+    const datePicks = rows.filter(p => filterLedgerRow('L', p));
+    if (datePicks.length !== 2) {
+      throw new Error('Date filter failed: got ' + JSON.stringify(datePicks));
+    }
+
+    // 5. Filter by market type case-insensitively
+    $('#fFrom_L').value = '';
+    $('#fTo_L').value = '';
+    $('#fMarket_L').value = 'spread';
+    const spreadPicks = rows.filter(p => filterLedgerRow('L', p));
+    if (spreadPicks.length !== 1 || spreadPicks[0].pick_id !== 'p2') {
+      throw new Error('Market filter failed: got ' + JSON.stringify(spreadPicks));
+    }
+
+    // 6. Filter by result (win/loss/push)
+    $('#fMarket_L').value = '';
+    $('#fResult_L').value = 'win';
+    const winPicks = rows.filter(p => filterLedgerRow('L', p));
+    if (winPicks.length !== 1 || winPicks[0].pick_id !== 'p2') {
+      throw new Error('Result filter failed: got ' + JSON.stringify(winPicks));
+    }
+
+    process.stdout.write('OK');
+    """
+    )
+
+    result = subprocess.run(
+        [node, "-e", script],
+        text=True,
+        check=True,
+        capture_output=True,
+    )
+    assert result.stdout == "OK"

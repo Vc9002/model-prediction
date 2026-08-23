@@ -60,6 +60,8 @@ class MarketType(StrEnum):
     SPREAD = "spread"
     TOTAL = "total"
     BTTS = "btts"  # soccer "both teams to score" -- a binary yes/no, no line
+    NRFI = "nrfi"  # MLB 1st inning: No Run First Inning
+    YRFI = "yrfi"  # MLB 1st inning: Yes Run First Inning
 
 
 class PickStatus(StrEnum):
@@ -278,10 +280,15 @@ class PickRequest:
             allowed = {"yes", "no"}
             if self.line is not None:
                 raise ValueError("btts calls must not have a line")
+        elif self.market_type in (MarketType.NRFI, MarketType.YRFI):
+            allowed = {"nrfi", "yrfi", "yes", "no", "over", "under"}
+            if self.line is not None and self.line != 0.5:
+                raise ValueError("nrfi/yrfi calls must have line=None or line=0.5")
         else:
             allowed = {"over", "under"}
             if self.line is None or self.line <= 0:
                 raise ValueError("total calls require a positive line")
+
         if self.selection.lower() not in allowed:
             raise ValueError(f"selection must be one of {sorted(allowed)}")
         if not (-100000 < self.american_odds < 100000) or -99 <= self.american_odds <= 99:

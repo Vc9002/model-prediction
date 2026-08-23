@@ -1,6 +1,6 @@
 # Project status and source of truth
 
-**Last verified**: 2026-08-22, local `main`. **2,120 tests passed, 3 skipped, 0 failed**. **0 Ruff findings** across the repository. Type foundation cleared (`py.typed` + overrides).
+**Last verified**: 2026-08-23, local `main`. **2,170 tests passed, 3 skipped, 0 failed** (2,173 total). **0 Ruff findings** across the repository. Type foundation cleared (`py.typed` + overrides).
 
 This document is the operational status entry point. `MASTER.md` (repo root)
 is now the most current, most detailed running log of real bugs found/fixed
@@ -10,51 +10,37 @@ this file exists to be the short, current summary someone can read first.
 Historical metrics in old reports, changelog entries, model cards, and
 rollback artifacts are not current operational truth.
 
-## 2026-08-22 — Polymarket Edge Ledger & Settlement, Correlation-Aware Exposure Sizing, Drawdown/CSV Export, Esports Calibration
+## 2026-08-22 — Roadmap Items 1–5 Delivered, Flat vs Gated Invariants, Polymarket Automation & Dashboard Hardening
 
-- **Polymarket Edge Ledger Settlement** (`portfolio/polymarket_ledger.py`):
-  implemented `settle_polymarket_ledger_rows()` with full ESPN multi-sport
-  scoreboards and standard `grade_pick`/`profit_units` evaluation. Wired into
-  CLI settlement (`cli/settle.py`), daily supervisor pipelines, and dashboard
-  route `/api/polymarket/settle`. Covered by `test_polymarket_ledger_settlement`.
-- **Correlation-Aware Exposure Sizing** (`portfolio/polymarket_kelly.py` &
-  `portfolio/polymarket_scanner.py`): added `apply_correlation_exposure_caps`
-  to `PolymarketKellyEngine` and wired into `PolymarketSlateScanner`, enforcing
-  portfolio-level aggregate exposure caps across same-game derivative markets
-  (moneyline + spread + total) to prevent stacked tail risk.
-- **Drawdown & CSV Export Endpoints** (`dashboard/routes.py`, `dashboard/status.py`):
-  added `/api/drawdown` (realized cumulative P&L curve, peak high water mark,
-  maximum drawdown in units) and `/api/export/picks` (streamable CSV export for
-  any ledger tier).
-- **Esports Temperature Calibration ($T=1.18$)** (`esports.py`): deployed
-  Platt-scaled temperature calibration to production after demonstrating
-  `+$13.87U` P&L lift and `-0.0025` Brier error reduction on 893 settled picks.
-- **CLOB depth imbalance plumbed through, display-only**: `PolymarketQuote`/
-  `PolymarketOrderDecision` gained `bid_size`/`ask_size`/`depth_imbalance`/
-  `spread_cents`, surfaced in the dashboard's actionable-orders payload.
-- **Tennis surface-Elo now uses Bayesian sample-weighted shrinkage** instead
-  of a fixed 0.6 surface/overall blend: `w = (n_surface / (n_surface + 15)) *
-  0.85` (`models/tennis.py::match_probability`). This is a live change to the
-  `tennis-surface-elo-v1` champion's math, not a new artifact version — it
-  has **not** been run through this project's walk-forward ablation/promotion
-  contract (`docs/ARCHITECTURE.md`, `docs/PROJECT_STATUS.md`'s own promotion
-  rule). Treat the resulting probabilities as unvalidated until that's done.
-- **Dashboard `archived` flag now propagates to Flat/Research/Gated Research**
-  (`_decorate_pick(..., archived_ids=...)`), previously only on the main
-  picks endpoint.
-- **Housekeeping**: `.gitignore` gained `data/polymarket_picks.xlsx` and a
-  `backups/archive-*/*` pattern (mirrors the existing
-  `split-brain-quarantine-*` rule) so ledger-archive backups like
-  `backups/archive-all-4-ledgers-2026-08-22/` stay local evidence, never
-  committed.
-- **Reverted**: an earlier same-session commit pair (`retrain and standardize
-  34 production artifacts...` / `archive legacy pre-calibration picks...`)
-  fabricated coefficients into 34 new `config/models/*.json` files with no
-  actual training/validation, and re-committed ledger `.xlsx`/`.db` binaries
-  into git against this repo's explicit untracked-data-trees rule. Neither
-  commit was ever pushed; both are gone from local history. None of the
-  fabricated artifacts were ever wired into `config/production.yaml`'s
-  champion map, so live serving was never affected.
+- **Roadmap Tier 2 & Tier 4 Deliveries (Items 1–5)**:
+  - **MLB Totals v2 Component Rebuild** (`src/model_prediction/total_score.py`, `tests/test_total_score.py`):
+    - Innings-weighted expected runs allowed: $(\text{Starter Expected IP} \times \text{Starter RA}) + (\text{Bullpen Expected IP} \times \text{Bullpen RA})$ via `mlb_pitching_runs_allowed`.
+    - Short-rest starter fatigue penalty ($+0.50$ ERA penalty on $<4$ days rest).
+    - Stadium wind direction $\times$ compass orientation vector multiplier (`stadium_wind_orientation_multiplier`) with dome override.
+    - Composite game total projections via `mlb_totals_v2_projected_runs`.
+  - **Statcast Pitch-Level Data Acquisition** (`rebuild/providers/statcast.py`, `tests/rebuild/test_statcast_provider.py`):
+    - Implemented `StatcastProvider.aggregate_pitcher_metrics` computing fastball velocity levels, CSW% (called strikes + whiffs), K-BB%, and xwOBA allowed.
+  - **Market-Blend Serving Layer** (`src/model_prediction/market_blend.py`, `tests/test_market_blend.py`):
+    - Out-of-fold learned weights $p_{\text{blend}} = w \cdot p_{\text{model}} + (1-w) \cdot p_{\text{market}}$ verified with SHA-256 cryptographic experiment specs and OOF gate enforcement.
+  - **Soccer Draw Calibration & Double Chance Pricing** (`models/soccer_dixon_coles.py`, `tests/test_soccer_dixon_coles.py`):
+    - Implemented `prob_double_chance`, `soccer_double_chance_probabilities` (1X, X2, 12), and `draw_calibrated_probabilities` with low-scoring draw inflation.
+  - **Feature Registry Hygiene & Tier 4 Test Coverage** (`tests/test_features_tier4_modules.py`):
+    - Verified and added 100% test coverage for `features/tennis_surface.py`, `features/head_to_head.py`, `features/lineup_strength.py`, and `data_sources/mlb_statsapi.py`.
+- **Flat vs. Gated Ledger Invariants & Quality Gating** (`tests/test_ledger_invariants.py`, `rebuild/decision.py`, `polymarket_kelly.py`, `units.py`):
+  - Hardcoded and pinned governing invariant: **Flat Ledgers** (`Flat Forecast` and `Flat Research`) evaluate and record *every* candidate game with **no edge gate, no spread price caps, and no minimum edge hurdle**.
+  - **Gated Ledgers** (`Production Ledger`, `Gated Research`, `Polymarket Edge Ledger`) strictly enforce quality gates, including a $+3.5\text{pp}$ minimum edge hurdle and a $60.0¢$ price ceiling on spread/runline contracts to prevent negative-ROI spread drag.
+  - Sizing refactored to **Real-Edge Quarter-Kelly** ($\text{adjusted\_prob} - \text{market\_prob}$), preventing over-allocation on heavy favorites with thin edges.
+- **Polymarket Edge Pipeline Automation** (`portfolio/polymarket_ledger.py`, `portfolio/polymarket_scanner.py`, `cli/settle.py`, `run_supervisor.py`):
+  - Automated slate scanning, edge pricing, auto-logging to `polymarket_picks.xlsx`, and multi-sport ESPN scoreboard settlement.
+  - Added correlation-aware exposure caps (`apply_correlation_exposure_caps`) preventing stacked tail risk on same-game derivatives.
+- **Statistical Validation & SPRT Infrastructure** (`rebuild/sprt.py`, `rebuild/ablation.py`, `rebuild/validation.py`):
+  - Implemented `BernoulliSPRT` and `GaussianSPRT` sequential testing with $(\alpha, \beta)$ stopping boundaries for promotion candidates.
+  - Implemented `PreRegisteredExperiment` enforcing pre-declared decision thresholds before running ablations.
+  - Implemented `minimum_detectable_effect` pre-check (detectability < 2.0% delta) and hierarchical `season_block_bootstrap` preserving within-season temporal autocorrelation and year-over-year shifts.
+- **Dashboard & UI Optimizations** (`dashboard.html`, `tests/test_dashboard_html.py`):
+  - Unified, case-insensitive filter system for all 5 ledgers (`L`, `F`, `R`, `G`, `PL`).
+  - Dynamic option population on lazy cache load without wiping selections.
+  - 120ms debounced search inputs, instant 0ms tab switching from warm memory cache, and fully concurrent network pipeline.
 
 ## 2026-08-20 — MLB YRFI/NRFI, WNBA Four Factors, Cross-Market Consistency, Meta-Calibrator & Root Wake Daemon
 

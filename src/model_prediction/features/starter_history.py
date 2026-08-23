@@ -233,36 +233,7 @@ def starter_era_gap_live(
     return round(home["era"] - away["era"], 6)
 
 
-def starter_era_gap_recency_gated(
-    home_starter_name: str,
-    away_starter_name: str,
-    decision: datetime,
-    *,
-    snapshot_path: str | Path = DEFAULT_SNAPSHOT_PATH,
-    max_days_since_start: int = 90,
-) -> float:
-    """Shadow variant of ``starter_era_gap_live`` -- excludes starts older
-    than ``max_days_since_start`` before ``decision``, so a pitcher's rolling
-    window can't silently blend in a start from a different season after a
-    long injury/demotion gap. Not wired into any model; for offline
-    comparison against settled picks before any promotion decision.
-    """
-    home = starter_rolling_era(
-        home_starter_name, decision, snapshot_path=snapshot_path, max_days_since_start=max_days_since_start
-    )
-    away = starter_rolling_era(
-        away_starter_name, decision, snapshot_path=snapshot_path, max_days_since_start=max_days_since_start
-    )
-    if home["status"] != "available" or away["status"] != "available":
-        raise ValueError(
-            "NO_CALL_STARTER_ERA_GAP_INSUFFICIENT_HISTORY: "
-            f"home={home_starter_name!r} status={home['status']}, "
-            f"away={away_starter_name!r} status={away['status']}"
-        )
-    return round(home["era"] - away["era"], 6)
-
-
-def _rolling_fip(recent: list[tuple]) -> float:
+def _rolling_fip(recent: list[_StarterRow]) -> float:
     """FIP = ((13*HR) + (3*(BB+HBP)) - (2*K)) / IP + FIP_CONSTANT."""
     innings = sum(item[1] for item in recent)
     so = sum(item[3] for item in recent)
@@ -438,3 +409,86 @@ def starter_sos_era_gap_live(
             f"away={away_starter_name!r} status={away['status']}"
         )
     return round(home["adjusted_era"] - away["adjusted_era"], 6)
+
+
+def starter_rolling_era_recency_gated(
+    starter_name: str,
+    decision: datetime,
+    *,
+    snapshot_path: str | Path = DEFAULT_SNAPSHOT_PATH,
+    lookback_starts: int = DEFAULT_LOOKBACK_STARTS,
+    minimum_prior_starts: int = MINIMUM_PRIOR_STARTS,
+    max_gap_days: int = 90,
+    half_life_days: float = 60.0,
+) -> dict[str, Any]:
+    """Rolling starter ERA with exponential recency decay on starts older than max_gap_days.
+
+    Prevents vintage starts (e.g. from prior season or before 90+ day IL stint) from
+    blending equally into rolling form without recency discounting.
+    """
+    import math
+
+    index = load_starter_index(snapshot_path)
+    starts = [s for s in index.get(_normalize_name(starter_name), []) if s[0] < decision]
+    if not starts:
+        return {"era": None, "starts": 0, "status": "unavailable_from_source"}
+    recent = starts[-lookback_starts:]
+    if len(recent) < minimum_prior_starts:
+        return {"era": None, "starts": len(recent), "status": "insufficient_sample"}
+
+    most_recent = recent[-1]
+    gap_days = max(0, (decision - most_recent[0]).days)
+
+    weighted_ip = 0.0
+    weighted_er = 0.0
+    raw_ip = sum(item[1] for item in recent)
+    raw_er = sum(item[2] for item in recent)
+    raw_era = round(9.0 * raw_er / raw_ip, 4) if raw_ip > 0 else None
+
+    for item in recent:
+        start_time, ip, er = item[0], item[1], item[2]
+        delta_days = max(0, (decision - start_time).days)
+        if delta_days <= max_gap_days:
+            weight = 1.0
+        else:
+            excess = delta_days - max_gap_days
+            weight = math.exp(-math.log(2.0) * excess / half_life_days)
+        weighted_ip += weight * ip
+        weighted_er += weight * er
+
+    recency_era = round(9.0 * weighted_er / weighted_ip, 4) if weighted_ip > 0 else raw_era
+
+    return {
+        "era": recency_era,
+        "raw_era": raw_era,
+        "starts": len(recent),
+        "innings": round(raw_ip, 2),
+        "effective_innings": round(weighted_ip, 2),
+        "gap_days": gap_days,
+        "gap_status": "stale_gap" if gap_days > max_gap_days else "fresh",
+        "status": "available",
+    }
+
+
+def starter_era_gap_recency_gated(
+    home_starter_name: str,
+    away_starter_name: str,
+    decision: datetime,
+    *,
+    snapshot_path: str | Path = DEFAULT_SNAPSHOT_PATH,
+    max_gap_days: int = 90,
+) -> float:
+    """home_starter's recency-gated ERA minus away_starter's."""
+    home = starter_rolling_era_recency_gated(
+        home_starter_name, decision, snapshot_path=snapshot_path, max_gap_days=max_gap_days
+    )
+    away = starter_rolling_era_recency_gated(
+        away_starter_name, decision, snapshot_path=snapshot_path, max_gap_days=max_gap_days
+    )
+    if home["status"] != "available" or away["status"] != "available":
+        raise ValueError(
+            "NO_CALL_STARTER_RECENCY_GATED_ERA_GAP_INSUFFICIENT_HISTORY: "
+            f"home={home_starter_name!r} status={home['status']}, "
+            f"away={away_starter_name!r} status={away['status']}"
+        )
+    return round(home["era"] - away["era"], 6)

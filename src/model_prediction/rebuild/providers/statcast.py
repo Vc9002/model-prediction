@@ -138,3 +138,67 @@ class StatcastProvider:
             reason=result.reason,
         )
         return result
+
+    @staticmethod
+    def aggregate_pitcher_metrics(frame: pl.DataFrame) -> pl.DataFrame:
+        """Aggregate pitch-level Statcast frame into pitcher-level summary metrics."""
+        if frame.is_empty() or "pitcher" not in frame.columns:
+            return pl.DataFrame()
+
+        exprs = [
+            pl.len().alias("total_pitches"),
+        ]
+
+        if "release_speed" in frame.columns:
+            if "pitch_type" in frame.columns:
+                exprs.append(
+                    pl.col("release_speed")
+                    .filter(pl.col("pitch_type").is_in(["FF", "FA", "SI", "FC"]))
+                    .mean()
+                    .alias("fastball_velocity_mean")
+                )
+            else:
+                exprs.append(pl.col("release_speed").mean().alias("fastball_velocity_mean"))
+
+        if "description" in frame.columns:
+            csw_descriptions = ["called_strike", "swinging_strike", "swinging_strike_blocked", "foul_tip"]
+            whiff_descriptions = ["swinging_strike", "swinging_strike_blocked", "foul_tip"]
+            swing_descriptions = [
+                "foul",
+                "foul_tip",
+                "hit_into_play",
+                "swinging_strike",
+                "swinging_strike_blocked",
+                "foul_bunt",
+                "missed_bunt",
+            ]
+            exprs.append((pl.col("description").is_in(csw_descriptions).sum() / pl.len()).alias("csw_rate"))
+            exprs.append(
+                (
+                    pl.col("description").is_in(whiff_descriptions).sum()
+                    / pl.max_horizontal(pl.col("description").is_in(swing_descriptions).sum(), pl.lit(1))
+                ).alias("whiff_rate")
+            )
+
+        if "events" in frame.columns:
+            k_events = ["strikeout", "strikeout_looking"]
+            bb_events = ["walk", "intent_walk", "hit_by_pitch"]
+            pa_count = pl.col("events").is_not_null().sum()
+            exprs.append(
+                (pl.col("events").is_in(k_events).sum() / pl.max_horizontal(pa_count, pl.lit(1))).alias(
+                    "k_rate"
+                )
+            )
+            exprs.append(
+                (pl.col("events").is_in(bb_events).sum() / pl.max_horizontal(pa_count, pl.lit(1))).alias(
+                    "bb_rate"
+                )
+            )
+
+        if "estimated_woba_using_speedangle" in frame.columns:
+            exprs.append(pl.col("estimated_woba_using_speedangle").drop_nulls().mean().alias("xwoba_allowed"))
+
+        agg = frame.group_by("pitcher").agg(exprs)
+        if "k_rate" in agg.columns and "bb_rate" in agg.columns:
+            agg = agg.with_columns((pl.col("k_rate") - pl.col("bb_rate")).alias("k_minus_bb_rate"))
+        return agg

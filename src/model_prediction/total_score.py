@@ -329,62 +329,136 @@ def validate_all_total_score_models(
     }
 
 
-def total_over_under_probability(
-    projected_total: float,
-    market_line: float,
-    dispersion_r: float = 6.5,
-) -> dict[str, float]:
-    """Calculate Over/Under/Push probabilities using Gamma-Poisson / Negative-Binomial distribution.
+def mlb_pitching_runs_allowed(
+    starter_era: float,
+    starter_expected_ip: float = 5.5,
+    bullpen_era: float = 4.10,
+    rest_days: float = 5.0,
+    short_rest_threshold_days: float = 4.0,
+    short_rest_era_penalty: float = 0.50,
+) -> dict[str, Any]:
+    """Calculate innings-weighted pitching expected runs allowed.
 
     Parameters
     ----------
-    projected_total : float
-        Mean total projected runs/points (lambda_total > 0).
-    market_line : float
-        Market over/under line (e.g. 8.5, 9.0).
-    dispersion_r : float, default 6.5
-        Negative binomial shape parameter matching empirical run distributions.
+    starter_era : float
+        Starting pitcher rolling ERA or FIP (e.g. 3.65).
+    starter_expected_ip : float, default 5.5
+        Expected innings pitched for starter in [1.0, 8.5].
+    bullpen_era : float, default 4.10
+        Bullpen rolling ERA/runs allowed per 9 innings.
+    rest_days : float, default 5.0
+        Days of rest since starting pitcher's last appearance.
+    short_rest_threshold_days : float, default 4.0
+        Threshold below which starter is penalized for short rest fatigue.
+    short_rest_era_penalty : float, default 0.50
+        ERA penalty added if starter has short rest (< 4 days).
 
     Returns
     -------
-    dict with 'over_prob', 'under_prob', 'push_prob' summing to 1.0.
+    dict with expected_runs_allowed, starter_runs, bullpen_runs, starter_ip, bullpen_ip, rest_penalty_applied.
     """
-    from scipy.stats import nbinom
+    ip_s = max(1.0, min(8.5, float(starter_expected_ip)))
+    ip_bp = max(0.5, 9.0 - ip_s)
 
-    mu = max(0.1, float(projected_total))
-    r = max(0.5, float(dispersion_r))
-    p = r / (r + mu)
+    # Apply short-rest fatigue penalty
+    rest = float(rest_days)
+    rest_penalty = rest < short_rest_threshold_days
+    adj_starter_era = float(starter_era) + (short_rest_era_penalty if rest_penalty else 0.0)
+    adj_starter_era = max(1.0, adj_starter_era)
+    bp_era = max(1.0, float(bullpen_era))
 
-    # In scipy.stats.nbinom, pmf(k, r, p) represents k failures before r successes.
-    # Cumulative CDF: F(k) = P(X <= k).
-    line = float(market_line)
-    is_integer = abs(line - round(line)) < 1e-6
-
-    if is_integer:
-        k = round(line)
-        # P(Under) = P(X < k) = P(X <= k - 1)
-        under_prob = float(nbinom.cdf(k - 1, r, p)) if k > 0 else 0.0
-        # P(Push) = P(X == k)
-        push_prob = float(nbinom.pmf(k, r, p))
-        # P(Over) = P(X > k) = 1 - P(X <= k)
-        over_prob = float(1.0 - nbinom.cdf(k, r, p))
-    else:
-        k = math.floor(line)
-        # P(Under) = P(X <= floor(line))
-        under_prob = float(nbinom.cdf(k, r, p))
-        push_prob = 0.0
-        # P(Over) = 1 - P(X <= floor(line))
-        over_prob = float(1.0 - under_prob)
-
-    # Normalize float sums
-    total_p = over_prob + under_prob + push_prob
-    if total_p > 0:
-        over_prob /= total_p
-        under_prob /= total_p
-        push_prob /= total_p
+    starter_runs = (adj_starter_era / 9.0) * ip_s
+    bullpen_runs = (bp_era / 9.0) * ip_bp
+    total_runs_allowed = starter_runs + bullpen_runs
 
     return {
-        "over_prob": round(over_prob, 6),
-        "under_prob": round(under_prob, 6),
-        "push_prob": round(push_prob, 6),
+        "expected_runs_allowed": round(total_runs_allowed, 4),
+        "starter_runs": round(starter_runs, 4),
+        "bullpen_runs": round(bullpen_runs, 4),
+        "starter_ip": round(ip_s, 2),
+        "bullpen_ip": round(ip_bp, 2),
+        "rest_penalty_applied": rest_penalty,
+        "effective_starter_era": round(adj_starter_era, 3),
+    }
+
+
+def stadium_wind_orientation_multiplier(
+    wind_speed_mph: float,
+    wind_direction_deg: float,
+    park_orientation_deg: float = 0.0,
+    temp_f: float = 72.0,
+    is_dome: bool = False,
+) -> float:
+    """Calculate park-orientation and wind/temperature run scoring multiplier.
+
+    Vector math: theta_rel = wind_direction - park_orientation (from home to center).
+    Wind blowing directly out to center (+cos(theta) > 0) boosts run expectancy.
+    Wind blowing directly in from center (+cos(theta) < 0) depresses run expectancy.
+
+    Parameters
+    ----------
+    wind_speed_mph : float
+        Wind speed in miles per hour.
+    wind_direction_deg : float
+        Compass direction wind is coming from or blowing toward (0-360 deg).
+    park_orientation_deg : float, default 0.0
+        Compass heading from home plate to centerfield (e.g. 45 deg for NE).
+    temp_f : float, default 72.0
+        Ambient air temperature in Fahrenheit.
+    is_dome : bool, default False
+        True if venue is closed roof/dome where weather is nullified.
+
+    Returns
+    -------
+    float : run scoring multiplier in [0.70, 1.30] (1.0 = neutral).
+    """
+    if is_dome:
+        return 1.0
+
+    speed = max(0.0, float(wind_speed_mph))
+    wind_rad = math.radians(float(wind_direction_deg) - float(park_orientation_deg))
+    cos_component = math.cos(wind_rad)
+
+    # 10mph wind blowing straight out gives ~ +8% run scoring boost
+    wind_delta = 0.08 * cos_component * min(speed / 10.0, 2.5)
+
+    # Temperature adjustment: +0.5% per degree above 72F, -0.5% below 72F
+    temp_delta = 0.005 * (max(30.0, min(105.0, float(temp_f))) - 72.0)
+
+    multiplier = 1.0 + wind_delta + temp_delta
+    return round(max(0.70, min(1.30, multiplier)), 4)
+
+
+def mlb_totals_v2_projected_runs(
+    home_pitching: dict[str, Any],
+    away_pitching: dict[str, Any],
+    home_lineup_ops_ratio: float = 1.0,
+    away_lineup_ops_ratio: float = 1.0,
+    park_factor: float = 1.0,
+    wind_weather_multiplier: float = 1.0,
+) -> dict[str, float]:
+    """Calculate combined MLB game projected total from innings-weighted components.
+
+    Returns
+    -------
+    dict with home_projected_runs, away_projected_runs, total_projected_runs.
+    """
+    pf = max(0.75, min(1.35, float(park_factor)))
+    wm = max(0.70, min(1.30, float(wind_weather_multiplier)))
+
+    # Home team bats against away pitching
+    home_expected = (
+        float(away_pitching["expected_runs_allowed"]) * max(0.6, float(home_lineup_ops_ratio)) * pf * wm
+    )
+    # Away team bats against home pitching
+    away_expected = (
+        float(home_pitching["expected_runs_allowed"]) * max(0.6, float(away_lineup_ops_ratio)) * pf * wm
+    )
+
+    total = home_expected + away_expected
+    return {
+        "home_projected_runs": round(home_expected, 3),
+        "away_projected_runs": round(away_expected, 3),
+        "total_projected_runs": round(total, 3),
     }

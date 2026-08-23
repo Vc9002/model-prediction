@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from typing import Any, Final
 
@@ -102,6 +103,22 @@ NFLVERSE_RELEASE_ASSETS: Final[dict[str, NFLVerseAsset]] = {
                 "gsis_id",
                 "full_name",
                 "position",
+            }
+        ),
+    ),
+    "injuries": NFLVerseAsset(
+        release_tag="injuries",
+        filename_pattern="injuries_{season}.parquet",
+        minimum_season=2009,
+        required_columns=frozenset(
+            {
+                "season",
+                "week",
+                "team",
+                "gsis_id",
+                "full_name",
+                "position",
+                "report_status",
             }
         ),
     ),
@@ -245,3 +262,62 @@ class NFLVerseProvider:
         if sport != "nfl":
             return ProviderResult.unavailable(f"nflverse play-by-play is not implemented for {sport}")
         return self.season_table("pbp", season, force=bool(kwargs.get("force", False)))
+
+    def injuries(self, *, sport: str, season: int, **kwargs: Any) -> ProviderResult:
+        if sport != "nfl":
+            return ProviderResult.unavailable(f"nflverse injuries are not implemented for {sport}")
+        return self.season_table("injuries", season, force=bool(kwargs.get("force", False)))
+
+
+class NFLInjuryImpactCalculator:
+    """Calculates Point-in-Time positional injury impact penalties on team spread ratings."""
+
+    # Default point value deductions by position and designation
+    POSITION_VALUES: Final[dict[str, float]] = {
+        "QB": 5.0,
+        "WR": 1.25,
+        "RB": 0.75,
+        "TE": 0.75,
+        "OT": 0.75,
+        "C": 0.50,
+        "OG": 0.50,
+        "EDGE": 1.0,
+        "DT": 0.50,
+        "CB": 1.0,
+        "S": 0.50,
+        "LB": 0.50,
+        "K": 0.50,
+    }
+
+    STATUS_MULTIPLIERS: Final[dict[str, float]] = {
+        "OUT": 1.0,
+        "INJURED_RESERVE": 1.0,
+        "IR": 1.0,
+        "DOUBTFUL": 0.75,
+        "QUESTIONABLE": 0.35,
+        "PROBABLE": 0.05,
+    }
+
+    @classmethod
+    def calculate_team_injury_penalty(cls, injury_rows: Sequence[dict[str, Any]]) -> float:
+        """Sum positional injury penalty points for a team in a given week."""
+        total_penalty = 0.0
+        for row in injury_rows:
+            pos = str(row.get("position", "")).upper()
+            raw_status = str(row.get("report_status", "")).upper().replace(" ", "_")
+            base_val = cls.POSITION_VALUES.get(pos, 0.25)
+            multiplier = cls.STATUS_MULTIPLIERS.get(raw_status, 0.0)
+            total_penalty += base_val * multiplier
+        # Cap total non-QB team injury penalty at 7.0 points to prevent blowout stacking
+        return round(min(12.0, total_penalty), 2)
+
+    @classmethod
+    def calculate_matchup_injury_delta(
+        cls,
+        home_injuries: Sequence[dict[str, Any]],
+        away_injuries: Sequence[dict[str, Any]],
+    ) -> float:
+        """Net injury spread adjustment from Home perspective (Away penalty - Home penalty)."""
+        home_pen = cls.calculate_team_injury_penalty(home_injuries)
+        away_pen = cls.calculate_team_injury_penalty(away_injuries)
+        return round(away_pen - home_pen, 2)

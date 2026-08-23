@@ -195,3 +195,101 @@ class TestMLBNRFIModel:
         assert loaded.intercept == 0.15
         assert loaded.decomposed_blend_weight == 0.60
         assert loaded.model_version == model.model_version
+
+
+class TestNRFIForecastAndLedgerWiring:
+    def test_forecast_mlb_nrfi_flat_and_main_ledger(self, tmp_path: Path) -> None:
+        from model_prediction.cli.forecast import _forecast_mlb_nrfi_flat
+        from model_prediction.domain import MarketType
+        from model_prediction.ledger import PickLedger
+
+        flat_ledger = PickLedger(tmp_path / "flat_picks.xlsx", tier="flat", sport="mlb")
+        main_ledger = PickLedger(tmp_path / "main_picks.xlsx", tier="main", sport="mlb")
+
+        class _MockESPN:
+            def scoreboard(self, league: str, date: str):
+                return {
+                    "events": [
+                        {
+                            "id": "mlb_1001",
+                            "date": "2026-05-20T23:05:00Z",
+                            "competitions": [
+                                {
+                                    "competitors": [
+                                        {"homeAway": "home", "team": {"displayName": "New York Yankees"}},
+                                        {"homeAway": "away", "team": {"displayName": "Boston Red Sox"}},
+                                    ]
+                                }
+                            ],
+                        }
+                    ]
+                }
+
+        res = _forecast_mlb_nrfi_flat(
+            args_date="2026-05-20",
+            log=True,
+            config={},
+            registry=None,
+            bans=[],
+            flat_ledger=flat_ledger,
+            audit=None,
+            main_ledger=main_ledger,
+            client=_MockESPN(),
+        )
+
+        assert res["status"] == "ok"
+        assert res["nrfi_candidates"] == 1
+        assert res["logged"] == 1
+
+        from model_prediction.xlsx_ledger import read_xlsx_rows
+
+        # Verify row in flat ledger
+        _, flat_rows = read_xlsx_rows(flat_ledger.path)
+        assert len(flat_rows) == 1
+        row = flat_rows[0]
+        assert row["event_id"] == "mlb_1001"
+        assert row["market_type"] == MarketType.NRFI.value
+        assert row["selection"] == "nrfi"
+        assert float(row["line"]) == 0.5
+        assert 0.0 < float(row["model_probability"]) < 1.0
+
+    def test_nrfi_grading_and_settlement(self) -> None:
+        from model_prediction.domain import MarketType, PickResult
+        from model_prediction.pricing import grade_pick
+
+        # 0-0 in 1st inning -> NRFI wins
+        assert grade_pick(MarketType.NRFI, "nrfi", 0.5, 0, 0) == PickResult.WIN
+        # 1-0 in 1st inning -> NRFI loses
+        assert grade_pick(MarketType.NRFI, "nrfi", 0.5, 1, 0) == PickResult.LOSS
+        # 0-1 in 1st inning -> NRFI loses
+        assert grade_pick(MarketType.NRFI, "nrfi", 0.5, 0, 1) == PickResult.LOSS
+
+        # YRFI betting
+        assert grade_pick(MarketType.YRFI, "yrfi", 0.5, 0, 0) == PickResult.LOSS
+        assert grade_pick(MarketType.YRFI, "yrfi", 0.5, 1, 0) == PickResult.WIN
+        assert grade_pick(MarketType.YRFI, "yrfi", 0.5, 1, 1) == PickResult.WIN
+
+    def test_nrfi_polymarket_scanner_workflow(self) -> None:
+        import json
+
+        from model_prediction.portfolio.polymarket_scanner import PolymarketSlateScanner
+
+        scanner = PolymarketSlateScanner()
+
+        raw_line = json.dumps(
+            {
+                "event_id": "mlb_1001",
+                "market_type": "nrfi",
+                "league": "MLB",
+                "home_team": "New York Yankees",
+                "away_team": "Boston Red Sox",
+                "long": {"ask": 0.52, "bid": 0.50},
+                "short": {"ask": 0.50, "bid": 0.48},
+            }
+        )
+
+        parsed = scanner.parse_snapshot_line(raw_line, require_model=False)
+        assert parsed is not None
+        assert parsed.league == "MLB"
+        assert parsed.best_ask == 0.52
+        assert parsed.best_bid == 0.50

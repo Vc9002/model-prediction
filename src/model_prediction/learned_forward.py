@@ -85,6 +85,7 @@ def _compute_features(
         "rest_disparity",
         "back_to_back_gap",
         "games_last_7_gap",
+        "travel_tz_displacement",
         "schedule_available",
     }
     if wanted & schedule_names:

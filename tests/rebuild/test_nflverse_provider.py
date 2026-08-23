@@ -126,3 +126,27 @@ def test_every_nflverse_asset_is_attribution_tagged_and_not_production_cleared()
         assert asset.upstream_rights_status == "unresolved"
         assert asset.commercial_use_status == "unresolved"
         assert asset.production_allowed is False
+
+
+def test_nfl_injury_impact_calculator():
+    from model_prediction.rebuild.providers.nflverse import NFLInjuryImpactCalculator
+
+    # Home team missing Starting QB (OUT = 5.0) and WR1 (QUESTIONABLE = 0.35 * 1.25 = 0.4375)
+    home_injuries = [
+        {"position": "QB", "report_status": "Out"},
+        {"position": "WR", "report_status": "Questionable"},
+    ]
+    # Away team missing starting Cornerback (OUT = 1.0)
+    away_injuries = [
+        {"position": "CB", "report_status": "Out"},
+    ]
+
+    home_penalty = NFLInjuryImpactCalculator.calculate_team_injury_penalty(home_injuries)
+    away_penalty = NFLInjuryImpactCalculator.calculate_team_injury_penalty(away_injuries)
+
+    assert home_penalty == pytest.approx(5.44, abs=0.01)
+    assert away_penalty == pytest.approx(1.00, abs=0.01)
+
+    # Net spread delta from Home perspective: Away penalty (1.0) - Home penalty (5.44) = -4.44
+    delta = NFLInjuryImpactCalculator.calculate_matchup_injury_delta(home_injuries, away_injuries)
+    assert delta == pytest.approx(-4.44, abs=0.01)

@@ -143,15 +143,23 @@ def _settle_all_unsettled(args, config, ledger) -> dict:
                 except (OSError, ValueError):
                     logger.warning("soccer closing-snapshot lookup failed for slug %s", slug, exc_info=True)
         try:
+            if row.get("market_type") in ("nrfi", "yrfi") and "away_1st" in match and "home_1st" in match:
+                settle_away = int(match["away_1st"])
+                settle_home = int(match["home_1st"])
+            else:
+                settle_away = int(match["away_score"])
+                settle_home = int(match["home_score"])
+
             result = ledger.settle(
                 row["pick_id"],
-                int(match["away_score"]),
-                int(match["home_score"]),
+                settle_away,
+                settle_home,
                 closing_line,
                 closing_odds,
                 closing_raw_probability=closing_probability,
             )
             settled.append({"pick_id": row["pick_id"], "result": result["result"]})
+
         except (KeyError, ValueError) as error:
             failures.append({"pick_id": row["pick_id"], "reason": str(error)})
 
@@ -217,9 +225,15 @@ def _find_espn_result(espn: ESPNClient, leagues, game_day: str, row) -> dict | N
                 try:
                     record["away_score"] = int(float(away.get("score", 0) or 0))
                     record["home_score"] = int(float(home.get("score", 0) or 0))
+                    away_lines = away.get("linescores", [])
+                    home_lines = home.get("linescores", [])
+                    if away_lines and home_lines:
+                        record["away_1st"] = int(float(away_lines[0].get("value", 0) or 0))
+                        record["home_1st"] = int(float(home_lines[0].get("value", 0) or 0))
                 except (TypeError, ValueError):
                     record["completed"] = False
             return record
+
     return None
 
 

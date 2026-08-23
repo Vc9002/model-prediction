@@ -66,3 +66,29 @@ def test_missing_required_columns_is_degraded(tmp_path):
     result = provider.pitches(date(2026, 8, 1), date(2026, 8, 2))
     assert result.status is ProviderStatus.DEGRADED
     assert "schema drift" in (result.reason or "")
+
+
+def test_aggregate_pitcher_metrics():
+    import polars as pl
+
+    df = pl.DataFrame(
+        {
+            "pitcher": [101, 101, 101, 101, 102],
+            "pitch_type": ["FF", "FF", "SL", "FF", "CH"],
+            "release_speed": [96.5, 97.0, 85.0, 96.0, 84.0],
+            "description": ["swinging_strike", "called_strike", "foul", "ball", "swinging_strike"],
+            "events": [None, None, "strikeout", None, "walk"],
+            "estimated_woba_using_speedangle": [None, None, 0.0, None, 0.7],
+        }
+    )
+
+    agg = StatcastProvider.aggregate_pitcher_metrics(df)
+    assert len(agg) == 2
+    row_101 = agg.filter(pl.col("pitcher") == 101).to_dicts()[0]
+    assert row_101["total_pitches"] == 4
+    # fastball velocity mean of 96.5, 97.0, 96.0 = 96.5
+    assert pytest.approx(row_101["fastball_velocity_mean"], abs=0.01) == 96.50
+    # CSW rate: 2 out of 4 (swinging_strike + called_strike) = 0.50
+    assert pytest.approx(row_101["csw_rate"], abs=0.01) == 0.50
+    # K-rate = 1.0, BB-rate = 0.0 -> K-BB = 1.0
+    assert row_101["k_minus_bb_rate"] == 1.0

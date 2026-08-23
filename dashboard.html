@@ -812,13 +812,17 @@ function setPanelState(id,status,message,retry){
 const observedNow=()=>new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"});
 
 /* ---------- tabs ---------- */
-$$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.classList.remove("on"));
-  b.classList.add("on"); $$("section[id^=tab-]").forEach(s=>s.style.display="none");
-  $("#tab-"+b.dataset.tab).style.display=""; setUrlState({tab:b.dataset.tab});updateCounts();
+$$("#tabs button").forEach(b=>b.onclick=()=>{ 
+  $$("#tabs button").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); 
+  $$("section[id^=tab-]").forEach(s=>s.style.display="none");
+  $("#tab-"+b.dataset.tab).style.display=""; 
+  setUrlState({tab:b.dataset.tab});
+  updateCounts();
   if(b.dataset.tab==="ledger"||b.dataset.tab==="picks")renderPicks();
-  if(b.dataset.tab==="flat")renderFlat(true);
-  if(b.dataset.tab==="research")renderResearch(true);
-  if(b.dataset.tab==="gated"||b.dataset.tab==="gated-research")renderGatedResearch(true);
+  if(b.dataset.tab==="flat")renderFlat(false);
+  if(b.dataset.tab==="research")renderResearch(false);
+  if(b.dataset.tab==="gated"||b.dataset.tab==="gated-research")renderGatedResearch(false);
   if(b.dataset.tab==="perf")performanceControlChanged(false);
   if(b.dataset.tab==="market")loadMarket();
   if(b.dataset.tab==="today")renderToday();
@@ -826,7 +830,7 @@ $$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.cl
   if(b.dataset.tab==="production")loadProduction();
   if(b.dataset.tab==="rebuild")loadRebuild();
   if(b.dataset.tab==="polymarket")loadPolymarketScanner();
-  if(b.dataset.tab==="poly-ledger")renderPolyLedger(true);
+  if(b.dataset.tab==="poly-ledger")renderPolyLedger(false);
 });
 
 /* ---------- settings ---------- */
@@ -1599,15 +1603,21 @@ function ledgerRowHtml(p,showCheckbox,mode="default"){
     <td>${order}</td>
     <td class="dim">${p.away_team} @ ${p.home_team}</td></tr>`;
 }
-/* Each ledger view (Ledger=L, Flat=F, Research=R) gets its own independent
+/* Each ledger view (Ledger=L, Flat=F, Research=R, Gated=G, Polymarket=PL) gets its own independent
    copy of the filter bar (own sport/market/status/result/search/date-range
-   state) so switching or filtering one never affects the others. Only the
-   Ledger bar gets the archive/hide-rows tools, since those act on pick_id
-   rows in the main ledger only. */
+   state) so switching or filtering one never affects the others. */
 const FILTER_TABS=["L","F","R","G","PL"];
 let ledgerUrlRestored=false;
+let _filterDebounceTimers={};
+function onFilterInput(tab){
+  clearTimeout(_filterDebounceTimers[tab]);
+  _filterDebounceTimers[tab]=setTimeout(()=>onFilterChange(tab),120);
+}
+
 function filterBarHTML(tab){
-  const archiveTools=`
+  const isMain = tab === "L";
+  const archiveTools = isMain ? `
+    <button onclick="clearSelected()" id="clearSelBtn" style="display:none">Clear selected (<span id="selCount">0</span>)</button>
     <details class="view-tools"><summary>Manage hidden rows</summary><div class="menu">
       <span class="dim small">Hide from this dashboard:</span>
       <button onclick="clearLedger('day')">Today</button>
@@ -1616,24 +1626,29 @@ function filterBarHTML(tab){
       <button onclick="clearLedger('all')">Everything</button>
       <label class="small dim"><input type="checkbox" id="fArchived_${tab}" onchange="onFilterChange('${tab}')"> show hidden (<span id="archCount_${tab}">0</span>)</label>
       <button onclick="restoreLedger()" id="restoreBtn_${tab}" style="display:none">Restore hidden</button>
-    </div></details>`;
+    </div></details>` : `
+    <label class="small dim" style="margin-left:4px"><input type="checkbox" id="fArchived_${tab}" onchange="onFilterChange('${tab}')"> show hidden (<span id="archCount_${tab}">0</span>)</label>`;
+
   return `
-    <button class="primary" onclick="preset('open','${tab}')">Active (<span id="openCount_${tab}">0</span>)</button>
-    <button onclick="preset('settled','${tab}')">Settled (<span id="settledCount_${tab}">0</span>)</button>
-    <button onclick="preset('today','${tab}')">Today active</button>
-    <button onclick="preset('7d','${tab}')">Active 7d</button>
-    <button onclick="preset('all','${tab}')">All picks</button>
+    <button class="primary" id="btnActive_${tab}" onclick="preset('open','${tab}')">Active (<span id="openCount_${tab}">0</span>)</button>
+    <button id="btnSettled_${tab}" onclick="preset('settled','${tab}')">Settled (<span id="settledCount_${tab}">0</span>)</button>
+    <button id="btnToday_${tab}" onclick="preset('today','${tab}')">Today active</button>
+    <button id="btn7d_${tab}" onclick="preset('7d','${tab}')">Active 7d</button>
+    <button id="btnAll_${tab}" onclick="preset('all','${tab}')">All picks</button>
     ${archiveTools}
-    <span style="width:10px"></span>
+    <span style="width:8px"></span>
     <select aria-label="Filter ${tab} ledger by sport" id="fSport_${tab}" onchange="onFilterChange('${tab}')"><option value="">all sports</option></select>
     <select aria-label="Filter ${tab} ledger by market" id="fMarket_${tab}" onchange="onFilterChange('${tab}')"><option value="">all markets</option></select>
-    <select aria-label="Filter ${tab} ledger by status" id="fStatus_${tab}" onchange="onFilterChange('${tab}')"><option value="open" selected>active only</option><option value="settled">settled only</option><option value="">all picks</option></select>
-    <select aria-label="Filter ${tab} ledger by result" id="fResult_${tab}" onchange="onFilterChange('${tab}')"><option value="">all results</option><option>win</option><option>loss</option><option>push</option></select>
-    <input aria-label="Search ${tab} ledger by team or event ID" id="fSearch_${tab}" placeholder="search team / event id" size="22" oninput="onFilterChange('${tab}')">
-    <input aria-label="${tab} ledger start date" id="fFrom_${tab}" type="date"><input aria-label="${tab} ledger end date" id="fTo_${tab}" type="date">
+    <select aria-label="Filter ${tab} ledger by status" id="fStatus_${tab}" onchange="onFilterChange('${tab}')"><option value="open" selected>active only</option><option value="settled">settled only</option><option value="">all status</option></select>
+    <select aria-label="Filter ${tab} ledger by result" id="fResult_${tab}" onchange="onFilterChange('${tab}')"><option value="">all results</option><option value="win">win</option><option value="loss">loss</option><option value="push">push</option></select>
+    <input aria-label="Search ${tab} ledger" id="fSearch_${tab}" placeholder="search team / event id / pick" size="22" oninput="onFilterInput('${tab}')">
+    <input aria-label="${tab} start date" id="fFrom_${tab}" type="date" onchange="onFilterChange('${tab}')">
+    <input aria-label="${tab} end date" id="fTo_${tab}" type="date" onchange="onFilterChange('${tab}')">
     <button onclick="onFilterChange('${tab}')">Apply</button>
+    <button onclick="resetFilters('${tab}')">Reset</button>
     <button onclick="exportCsv('${tab}')">Export CSV</button>`;
 }
+
 function mountFilterBars(){
   $("#filters_L").innerHTML=filterBarHTML("L");
   $("#filters_F").innerHTML=filterBarHTML("F");
@@ -1641,24 +1656,42 @@ function mountFilterBars(){
   $("#filters_G").innerHTML=filterBarHTML("G");
   if($("#filters_PL")) $("#filters_PL").innerHTML=filterBarHTML("PL");
 }
+
+function resetFilters(tab){
+  tab = tab || "L";
+  const s=$("#fSport_"+tab), m=$("#fMarket_"+tab), st=$("#fStatus_"+tab);
+  const r=$("#fResult_"+tab), q=$("#fSearch_"+tab), from=$("#fFrom_"+tab), to=$("#fTo_"+tab), arch=$("#fArchived_"+tab);
+  if(s) s.value="";
+  if(m) m.value="";
+  if(st) st.value="open";
+  if(r) r.value="";
+  if(q) q.value="";
+  if(from) from.value="";
+  if(to) to.value="";
+  if(arch) arch.checked=false;
+  preset("open", tab);
+}
+window.resetFilters = resetFilters;
+
 function populateFilters(){
   const perTabRows={
-    L: state.picks,
-    F: _flatCache||[],
-    R: _researchCache||[],
-    G: _gatedResearchCache||[],
-    PL: _polyLedgerCache||[],
+    L: state.picks || [],
+    F: _flatCache || [],
+    R: _researchCache || [],
+    G: _gatedResearchCache || [],
+    PL: _polyLedgerCache || [],
   };
   FILTER_TABS.forEach(tab=>{
     const sportSel=$("#fSport_"+tab), marketSel=$("#fMarket_"+tab);
     if(!sportSel||!marketSel)return;
-    const curS=sportSel.value, curM=marketSel.value;
+    const curS=(sportSel.value||"").toLowerCase(), curM=(marketSel.value||"").toLowerCase();
     const rows=perTabRows[tab]||[];
-    const leagues=[...new Set(rows.map(p=>p.league||p.Sport||''))].filter(Boolean).sort();
-    const markets=[...new Set(rows.map(p=>p.market_type||p.Type||'moneyline'))].filter(Boolean).sort();
-    sportSel.innerHTML='<option value="">all sports</option>'+leagues.map(s=>`<option>${s}</option>`).join("");
-    marketSel.innerHTML='<option value="">all markets</option>'+markets.map(s=>`<option>${s}</option>`).join("");
-    sportSel.value=curS; marketSel.value=curM;
+    const leagues=[...new Set(rows.map(p=>String(p.league||p.Sport||p.sport||'').toUpperCase()))].filter(Boolean).sort();
+    const markets=[...new Set(rows.map(p=>String(p.market_type||p.Type||p.market||'moneyline').toLowerCase()))].filter(Boolean).sort();
+    sportSel.innerHTML='<option value="">all sports</option>'+leagues.map(s=>`<option value="${s.toLowerCase()}">${s}</option>`).join("");
+    marketSel.innerHTML='<option value="">all markets</option>'+markets.map(s=>`<option value="${s.toLowerCase()}">${marketLabel(s)}</option>`).join("");
+    if(curS) sportSel.value=curS;
+    if(curM) marketSel.value=curM;
   });
   if(!ledgerUrlRestored){
     FILTER_TABS.forEach(tab=>{
@@ -1669,38 +1702,86 @@ function populateFilters(){
       setControlFromUrl("fTo_"+tab,key+"_to");
     });
     ledgerUrlRestored=true;
-    renderPicks();renderFlatTable();renderResearchTable();renderGatedResearchTable();
+    renderPicks();renderFlatTable();renderResearchTable();renderGatedResearchTable();renderPolyLedgerTable();
   }
 }
+
+function filterLedgerRow(tab, p){
+  const sportSel = ($("#fSport_" + tab)?.value || "").toLowerCase();
+  const marketSel = ($("#fMarket_" + tab)?.value || "").toLowerCase();
+  const statusSel = ($("#fStatus_" + tab)?.value || "").toLowerCase();
+  const resultSel = ($("#fResult_" + tab)?.value || "").toLowerCase();
+  const query = ($("#fSearch_" + tab)?.value || "").trim().toLowerCase();
+  const from = $("#fFrom_" + tab)?.value || "";
+  const to = $("#fTo_" + tab)?.value || "";
+  const showArchived = Boolean($("#fArchived_" + tab)?.checked);
+
+  if (p.archived && !showArchived) return false;
+
+  if (sportSel) {
+    const pSport = String(p.league || p.Sport || p.sport || "").toLowerCase();
+    if (pSport !== sportSel) return false;
+  }
+
+  if (marketSel) {
+    const pMarket = String(p.market_type || p.Type || p.market || "moneyline").toLowerCase();
+    if (pMarket !== marketSel) return false;
+  }
+
+  const pStatus = String(p.status || p.State || "").toLowerCase();
+  if (statusSel === "open" && pStatus !== "open") return false;
+  if (statusSel === "settled" && pStatus !== "settled") return false;
+  if (statusSel && statusSel !== "open" && statusSel !== "settled" && pStatus !== statusSel) return false;
+
+  if (resultSel) {
+    const pResult = String(p.result || p.Result || "").toLowerCase();
+    if (pResult !== resultSel) return false;
+  }
+
+  if (query) {
+    const haystack = (
+      String(p.away_team || p.Away || "") + " " +
+      String(p.home_team || p.Home || "") + " " +
+      String(p.event_id || p.EventId || "") + " " +
+      String(p.pick_id || p.PickId || "") + " " +
+      String(p.selection || p.Selection || "") + " " +
+      String(p.rationale || p.notes || "") + " " +
+      String(p.model_version || p.model_origin || "")
+    ).toLowerCase();
+    if (!haystack.includes(query)) return false;
+  }
+
+  const d = etDate(p.event_start_utc || p.created_at_utc || p.start_et || p.date || p.Date);
+  if (from && d && d < from) return false;
+  if (to && d && d > to) return false;
+  if ((from || to) && !d) return false;
+
+  return true;
+}
+
+function filterLedgerRows(tab, rows){
+  return (rows || []).filter(p => filterLedgerRow(tab, p));
+}
+
 function filteredPicks(){
-  const s=$("#fSport_L").value,m=$("#fMarket_L").value,st=$("#fStatus_L").value,r=$("#fResult_L").value,
-        q=$("#fSearch_L").value.trim().toLowerCase(),from=$("#fFrom_L").value,to=$("#fTo_L").value;
-  const showArchived=$("#fArchived_L").checked;
-  return state.picks.filter(p=>{
+  return (state.picks || []).filter(p => {
     if(!passesDisplaySettings(p))return false;
-    if(p.archived&&!showArchived)return false;
-    if(s&&p.league!==s)return false;
-    if(m&&p.market_type!==m)return false;
-    if(st&&p.status!==st)return false;
-    if(r&&p.result!==r)return false;
-    if(q&&!(String(p.away_team).toLowerCase().includes(q)||String(p.home_team).toLowerCase().includes(q)||String(p.event_id).includes(q)))return false;
-    // Date range filters on the US-Eastern GAME date, not UTC or log time.
-    const d=etDate(p.event_start_utc||p.created_at_utc);
-    if(from&&d<from)return false;
-    if(to&&d>to)return false;
-    return true;
+    return filterLedgerRow("L", p);
   });
 }
+
 function onFilterChange(tab){
-  // Filtering only ever re-slices already-fetched data (renderFlatTable /
-  // renderResearchTable), never re-fetches — see loadFlatCache/loadResearchCache.
-  // Filtering used to call renderFlat()/renderResearch(), which always
-  // re-fetched and re-decorated every row (orders + portfolio history) from
-  // the server on every keystroke/dropdown change: that was the 5-10s lag.
   const key=tab.toLowerCase();
-  setUrlState({[key+"_sport"]:$("#fSport_"+tab)?.value,[key+"_market"]:$("#fMarket_"+tab)?.value,
-    [key+"_status"]:$("#fStatus_"+tab)?.value,[key+"_result"]:$("#fResult_"+tab)?.value,
-    [key+"_search"]:$("#fSearch_"+tab)?.value,[key+"_from"]:$("#fFrom_"+tab)?.value,[key+"_to"]:$("#fTo_"+tab)?.value});
+  setUrlState({
+    [key+"_sport"]:$("#fSport_"+tab)?.value,
+    [key+"_market"]:$("#fMarket_"+tab)?.value,
+    [key+"_status"]:$("#fStatus_"+tab)?.value,
+    [key+"_result"]:$("#fResult_"+tab)?.value,
+    [key+"_search"]:$("#fSearch_"+tab)?.value,
+    [key+"_from"]:$("#fFrom_"+tab)?.value,
+    [key+"_to"]:$("#fTo_"+tab)?.value
+  });
+  updateCounts();
   if(tab==="F"){renderFlatTable();return;}
   if(tab==="R"){renderResearchTable();return;}
   if(tab==="G"){renderGatedResearchTable();return;}
@@ -1708,16 +1789,39 @@ function onFilterChange(tab){
   if(tab==="L"){renderPicks();return;}
   renderPicks();renderFlatTable();renderResearchTable();renderGatedResearchTable();renderPolyLedgerTable();
 }
+
 let sortKey="event_start_utc",sortAsc=false;
+
 function updateCounts(){
-  const archivedCount=state.picks.filter(p=>p.archived).length;
-  if($("#openCount_L")) $("#openCount_L").textContent=state.picks.filter(p=>!p.archived&&p.status==='open').length;
-  if($("#settledCount_L")) $("#settledCount_L").textContent=state.picks.filter(p=>!p.archived&&p.status==='settled').length;
-  if($("#archCount_L")) $("#archCount_L").textContent=archivedCount;
-  if($("#archCount")) $("#archCount").textContent=archivedCount;
-  if($("#restoreBtn_L")) $("#restoreBtn_L").style.display=archivedCount?'':'none';
-  if($("#restoreBtn")) $("#restoreBtn").style.display=archivedCount?'':'none';
+  const perTabRows={
+    L: state.picks || [],
+    F: _flatCache || [],
+    R: _researchCache || [],
+    G: _gatedResearchCache || [],
+    PL: _polyLedgerCache || [],
+  };
+  FILTER_TABS.forEach(tab=>{
+    const rows = perTabRows[tab] || [];
+    const openCount = rows.filter(p => !p.archived && String(p.status || p.State || '').toLowerCase() === 'open').length;
+    const settledCount = rows.filter(p => !p.archived && String(p.status || p.State || '').toLowerCase() === 'settled').length;
+    const archCount = rows.filter(p => p.archived).length;
+
+    if ($("#openCount_" + tab)) $("#openCount_" + tab).textContent = openCount;
+    if ($("#settledCount_" + tab)) $("#settledCount_" + tab).textContent = settledCount;
+    if ($("#archCount_" + tab)) $("#archCount_" + tab).textContent = archCount;
+    if ($("#restoreBtn_" + tab)) $("#restoreBtn_" + tab).style.display = archCount ? '' : 'none';
+  });
+
+  const lArch = (state.picks || []).filter(p => p.archived).length;
+  if ($("#archCount")) $("#archCount").textContent = lArch;
+  if ($("#restoreBtn")) $("#restoreBtn").style.display = lArch ? '' : 'none';
+
+  if ($("#researchActive")) $("#researchActive").textContent = (_researchCache||[]).filter(p=>!p.archived&&String(p.status||'').toLowerCase()==="open").length;
+  if ($("#researchSettled")) $("#researchSettled").textContent = (_researchCache||[]).filter(p=>!p.archived&&String(p.status||'').toLowerCase()==="settled").length;
+  if ($("#gatedResearchActive")) $("#gatedResearchActive").textContent = (_gatedResearchCache||[]).filter(p=>!p.archived&&String(p.status||'').toLowerCase()==="open").length;
+  if ($("#gatedResearchSettled")) $("#gatedResearchSettled").textContent = (_gatedResearchCache||[]).filter(p=>!p.archived&&String(p.status||'').toLowerCase()==="settled").length;
 }
+
 function renderPicks(){
   updateCounts();
   const rows=filteredPicks().sort((a,b)=>{
@@ -1747,6 +1851,7 @@ function renderPicks(){
      <div class="k"><b>${pct(roi)}</b><span>ROI</span></div>
      <div class="k"><b>${streakLabel}</b><span>streak</span></div>`;
   let html=ledgerHeaderRow(true);
+  if(!rows.length){html+='<tr><td colspan=12 class="dim" style="text-align:center;padding:24px">No picks match the current filter criteria.</td></tr>';}
   rows.forEach(p=>{html+=ledgerRowHtml(p,true);});
   $("#pickTable").innerHTML=html;
   window.updateSelCount?.();
@@ -1776,8 +1881,8 @@ async function restoreLedger(){
 window.toggleAllRows=box=>{$$(".rowSel").forEach(c=>{c.checked=box.checked;});updateSelCount();};
 window.updateSelCount=()=>{
   const n=$$(".rowSel").filter(c=>c.checked).length;
-  $("#selCount").textContent=n;
-  $("#clearSelBtn").style.display=n?"":"none";
+  if($("#selCount")) $("#selCount").textContent=n;
+  if($("#clearSelBtn")) $("#clearSelBtn").style.display=n?"":"none";
 };
 async function clearSelected(){
   const ids=$$(".rowSel").filter(c=>c.checked).map(c=>c.value);
@@ -1797,22 +1902,47 @@ window.clearLedger=clearLedger; window.restoreLedger=restoreLedger;
 window.preset=(which,tab)=>{
   tab=tab||"L";
   const today=todayET();
-  $("#fStatus_"+tab).value="open";$("#fFrom_"+tab).value="";$("#fTo_"+tab).value="";$("#fResult_"+tab).value="";
-  if(which==="today"){$("#fFrom_"+tab).value=today;$("#fTo_"+tab).value=today;}
-  else if(which==="settled"){$("#fStatus_"+tab).value="settled";}
-  else if(which==="all"){$("#fStatus_"+tab).value="";}
-  else if(which==="7d"){
-    const [year,month,day]=today.split("-").map(Number);
-    $("#fFrom_"+tab).value=new Date(Date.UTC(year,month-1,day-6)).toISOString().slice(0,10);
+  if($("#fResult_"+tab)) $("#fResult_"+tab).value="";
+  if($("#fFrom_"+tab)) $("#fFrom_"+tab).value="";
+  if($("#fTo_"+tab)) $("#fTo_"+tab).value="";
+
+  if(which==="today"){
+    if($("#fStatus_"+tab)) $("#fStatus_"+tab).value="open";
+    if($("#fFrom_"+tab)) $("#fFrom_"+tab).value=today;
+    if($("#fTo_"+tab)) $("#fTo_"+tab).value=today;
   }
+  else if(which==="settled"){
+    if($("#fStatus_"+tab)) $("#fStatus_"+tab).value="settled";
+  }
+  else if(which==="all"){
+    if($("#fStatus_"+tab)) $("#fStatus_"+tab).value="";
+  }
+  else if(which==="7d"){
+    if($("#fStatus_"+tab)) $("#fStatus_"+tab).value="open";
+    const [year,month,day]=today.split("-").map(Number);
+    if($("#fFrom_"+tab)) $("#fFrom_"+tab).value=new Date(Date.UTC(year,month-1,day-6)).toISOString().slice(0,10);
+  } else {
+    if($("#fStatus_"+tab)) $("#fStatus_"+tab).value="open";
+  }
+
+  ["Active","Settled","Today","7d","All"].forEach(btn=>{
+    const el=$(`#btn${btn}_${tab}`);
+    if(el) el.classList.remove("primary");
+  });
+  const activeBtnId = which==="open"?"Active":which==="settled"?"Settled":which==="today"?"Today":which==="7d"?"7d":"All";
+  const activeEl=$(`#btn${activeBtnId}_${tab}`);
+  if(activeEl) activeEl.classList.add("primary");
+
   onFilterChange(tab);
 };
+
 function exportCsv(tab){
   tab=tab||"L";
   const rows=tab==="F"?filteredFlatRows():tab==="R"?filteredResearchRows():tab==="G"?filteredGatedResearchRows():tab==="PL"?filteredPolyLedgerRows():filteredPicks();
+  if(!rows.length){alert("No rows to export for the current filters.");return;}
   const cols=Object.keys(rows[0]||{});
   const csv=[cols.join(",")].concat(rows.map(r=>cols.map(c=>{
-    let v=r[c]==null?"":String(r[c]).replace(/"/g,'""');
+    let v=r[c]==null?"":typeof r[c]==="object"?JSON.stringify(r[c]):String(r[c]).replace(/"/g,'""');
     return /[,"\n]/.test(v)?`"${v}"`:v;}).join(","))).join("\n");
   const a=document.createElement("a");
   a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
@@ -1864,31 +1994,9 @@ function noData(ctx,w,h){ctx.fillStyle="#556";ctx.font="12px monospace";ctx.fill
 
 let _flatCache=[];
 function filteredFlatRows(){
-  // Own filter bar (fSport_F etc.) — independent of the Ledger tab's fSport_L.
-  const fs=$("#fSport_F").value, fm=$("#fMarket_F").value, fst=$("#fStatus_F").value, fr=$("#fResult_F").value;
-  const fq=($("#fSearch_F").value||'').toLowerCase();
-  const ff=$("#fFrom_F").value, ft=$("#fTo_F").value;
-  const showArchived=$("#fArchived_F")?.checked;
-  return (_flatCache||[]).filter(p=>{
+  return (_flatCache || []).filter(p => {
     if(!passesDisplaySettings(p))return false;
-    if(p.archived&&!showArchived)return false;
-    if(fs&&(p.league||p.Sport||'')!==fs)return false;
-    if(fm&&(p.market_type||p.Type||'moneyline')!==fm)return false;
-    const st=String(p.status||p.State||'').toLowerCase();
-    if(fst==='open'&&st!=='open')return false;
-    if(fst==='settled'&&st!=='settled')return false;
-    const res=String(p.result||p.Result||'').toLowerCase();
-    if(fr&&res!==fr)return false;
-    if(fq){
-      const hay=(p.away_team||p.Away||'')+' '+(p.home_team||p.Home||'')+' '+(p.event_id||'');
-      if(!hay.toLowerCase().includes(fq))return false;
-    }
-    if(ff||ft){
-      const d=etDate(p.event_start_utc);
-      if(ff&&d<ff)return false;
-      if(ft&&d>ft)return false;
-    }
-    return true;
+    return filterLedgerRow("F", p);
   });
 }
 let _flatLoaded=false;
@@ -1898,15 +2006,13 @@ async function loadFlatCache(force){
   const raw=await resp.json();
   _flatCache=Array.isArray(raw)?raw:(raw.picks||raw.rows||[]);
   _flatLoaded=true;
+  populateFilters();
+  updateCounts();
 }
-// Pure render from the already-fetched cache — no network call, so filtering
-// (typing in search, flipping a dropdown) is instant instead of re-fetching
-// and re-decorating every row (orders + portfolio history) on each keystroke.
+
 function renderFlatTable(){
   try{
-    $("#openCount_F").textContent=_flatCache.filter(p=>!p.archived&&String(p.status||p.State||'').toLowerCase()==='open').length;
-    $("#settledCount_F").textContent=_flatCache.filter(p=>!p.archived&&String(p.status||p.State||'').toLowerCase()==='settled').length;
-
+    updateCounts();
     let rows=filteredFlatRows();
     rows.sort((a,b)=>(b.event_start_utc||'').localeCompare(a.event_start_utc||''));
 
@@ -1919,12 +2025,12 @@ function renderFlatTable(){
     const risked=settled.reduce((s,p)=>s+(Number(p.units||p.Units)||0),0);
     $("#flatKpis").innerHTML=`
       <div class=\"k\"><b>${rows.length}</b><span>games</span></div>
-      <div class=\"k\"><b>${wins+losses>0?pct(wins/(wins+losses)):'—'}</b><span>win rate</span></div>
+      <div class=\"k\"><b>${hasSettled?pct(wins/(wins+losses)):'—'}</b><span>win rate</span></div>
       <div class=\"k\"><b class=\"${pnl==null?'':pnl>=0?'green':'red'}\">${fmt(pnl)}</b><span>P&L (U)</span></div>
       <div class=\"k\"><b>${hasSettled&&risked>0?pct(pnl/risked):'—'}</b><span>ROI</span></div>`;
     
     let html=ledgerHeaderRow(false);
-    if(!rows.length){html+='<tr><td colspan=12 class="dim">No matches.</td></tr>';}
+    if(!rows.length){html+='<tr><td colspan=12 class="dim" style="text-align:center;padding:24px">No matches found for current filter settings.</td></tr>';}
     rows.forEach(p=>{html+=ledgerRowHtml(p,false);});
     document.getElementById('flatTable').innerHTML=html;
   }catch(e){document.getElementById('flatTable').innerHTML='<tr><td colspan=12>Error: '+esc(String(e))+'</td></tr>';}
@@ -2732,31 +2838,9 @@ async function loadMarket(){
 /* ---------- research ---------- */
 let _researchCache=[];
 function filteredResearchRows(){
-  // Own filter bar (fSport_R etc.) — independent of Ledger/Flat's filters.
-  const fs=$("#fSport_R").value, fm=$("#fMarket_R").value, fst=$("#fStatus_R").value, fr=$("#fResult_R").value;
-  const fq=($("#fSearch_R").value||'').toLowerCase();
-  const ff=$("#fFrom_R").value, ft=$("#fTo_R").value;
-  const showArchived=$("#fArchived_R")?.checked;
-  return (_researchCache||[]).filter(p=>{
+  return (_researchCache || []).filter(p => {
     if(!passesDisplaySettings(p))return false;
-    if(p.archived&&!showArchived)return false;
-    if(fs&&(p.league||'')!==fs)return false;
-    if(fm&&(p.market_type||'moneyline')!==fm)return false;
-    const st=String(p.status||'').toLowerCase();
-    if(fst==='open'&&st!=='open')return false;
-    if(fst==='settled'&&st!=='settled')return false;
-    const res=String(p.result||'').toLowerCase();
-    if(fr&&res!==fr)return false;
-    if(fq){
-      const hay=(p.away_team||'')+' '+(p.home_team||'')+' '+(p.event_id||'');
-      if(!hay.toLowerCase().includes(fq))return false;
-    }
-    if(ff||ft){
-      const d=etDate(p.event_start_utc);
-      if(ff&&d<ff)return false;
-      if(ft&&d>ft)return false;
-    }
-    return true;
+    return filterLedgerRow("R", p);
   });
 }
 let _researchLoaded=false;
@@ -2765,63 +2849,62 @@ async function loadResearchCache(force){
   const rp=await api("/api/research-picks");
   _researchCache=Array.isArray(rp)?rp:[];
   _researchLoaded=true;
+  populateFilters();
+  updateCounts();
 }
 // Pure render from the already-fetched cache — no network call, so filtering
 // is instant instead of re-fetching/re-decorating on every keystroke.
 function renderResearchTable(){
   try{
-    if(_researchCache.length){
-      const active=_researchCache.filter(p=>!p.archived&&p.status==="open").length;
-      const settled=_researchCache.filter(p=>!p.archived&&p.status==="settled").length;
-      $("#researchActive").textContent=active;
-      $("#researchSettled").textContent=settled;
-      $("#openCount_R").textContent=active;
-      $("#settledCount_R").textContent=settled;
-      const rows=filteredResearchRows().sort((a,b)=>(b.event_start_utc||'').localeCompare(a.event_start_utc||''));
-      $("#researchShown").textContent=rows.length;
-      const rSettled=rows.filter(p=>String(p.status||'').toLowerCase()==='settled'&&(p.result==='win'||p.result==='loss'));
-      const rWins=rSettled.filter(p=>p.result==='win').length,rLosses=rSettled.filter(p=>p.result==='loss').length;
-      const rHasSettled=rWins+rLosses>0;
-      const rPnl=rHasSettled?rSettled.reduce((s,p)=>s+pickPnl(p),0):null;
-      const rRisked=rSettled.reduce((s,p)=>s+(Number(p.units)||0),0);
-      $("#researchKpis").innerHTML=`
-        <div class="k"><b>${rows.length}</b><span>games</span></div>
-        <div class="k"><b>${rHasSettled?pct(rWins/(rWins+rLosses)):'—'}</b><span>win rate</span></div>
-        <div class="k"><b class="${rPnl==null?'':rPnl>=0?'green':'red'}">${fmt(rPnl)}</b><span>P&L (U)</span></div>
-        <div class="k"><b>${rHasSettled&&rRisked>0?pct(rPnl/rRisked):'—'}</b><span>ROI</span></div>`;
-      let html=ledgerHeaderRow(false,"research");
-      if(!rows.length)html+='<tr><td colspan=12 class="dim">No matches.</td></tr>';
-      rows.forEach(p=>{html+=ledgerRowHtml(p,false,"research");});
-      $("#researchTable").innerHTML=html;
-    }
+    updateCounts();
+    const rows=filteredResearchRows().sort((a,b)=>(b.event_start_utc||'').localeCompare(a.event_start_utc||''));
+    $("#researchShown").textContent=rows.length;
+    const rSettled=rows.filter(p=>String(p.status||'').toLowerCase()==='settled'&&(p.result==='win'||p.result==='loss'));
+    const rWins=rSettled.filter(p=>p.result==='win').length,rLosses=rSettled.filter(p=>p.result==='loss').length;
+    const rHasSettled=rWins+rLosses>0;
+    const rPnl=rHasSettled?rSettled.reduce((s,p)=>s+pickPnl(p),0):null;
+    const rRisked=rSettled.reduce((s,p)=>s+(Number(p.units)||0),0);
+    $("#researchKpis").innerHTML=`
+      <div class="k"><b>${rows.length}</b><span>games</span></div>
+      <div class="k"><b>${rHasSettled?pct(rWins/(rWins+rLosses)):'—'}</b><span>win rate</span></div>
+      <div class="k"><b class="${rPnl==null?'':rPnl>=0?'green':'red'}">${fmt(rPnl)}</b><span>P&L (U)</span></div>
+      <div class="k"><b>${rHasSettled&&rRisked>0?pct(rPnl/rRisked):'—'}</b><span>ROI</span></div>`;
+    let html=ledgerHeaderRow(false,"research");
+    if(!rows.length)html+='<tr><td colspan=12 class="dim" style="text-align:center;padding:24px">No research picks match the current filter criteria.</td></tr>';
+    rows.forEach(p=>{html+=ledgerRowHtml(p,false,"research");});
+    $("#researchTable").innerHTML=html;
   }catch(e){$("#researchTable").innerHTML='<tr><td colspan=12 class="dim">No research picks loaded.</td></tr>';}
 }
 async function renderResearch(force){
   await loadResearchCache(force);
   renderResearchTable();
 
-  // Existing backtest/audit/pipeline content
-  const bt=await api("/api/backtests");
-  let html="<tr><th>File</th><th>Modified</th><th>Status / sport</th><th>kB</th></tr>";
-  bt.forEach(b=>{html+=`<tr onclick="openBacktest('${b.file}')" style="cursor:pointer">
-    <td>${b.file}</td><td class="dim">${b.modified}</td>
-    <td class="dim">${b.status||b.sport||""}</td><td class="dim">${b.size_kb}</td></tr>`;});
-  $("#btTable").innerHTML=html;
+  // Parallelize secondary backtest/audit/pipeline content
   try{
-    // Pick the newest termination-audit file instead of a hardcoded date --
-    // "modified" is an ISO timestamp string, so lexical sort works.
-    const audits=bt.filter(b=>b.file.startsWith("termination-audit-")).sort((a,b)=>a.modified<b.modified?1:-1);
-    if(!audits.length)throw new Error("no termination-audit file present");
-    const v=await api("/api/backtest?file="+encodeURIComponent(audits[0].file));
-    const fi=v.feature_impact||{};
-    $("#featureLog").innerHTML=Object.entries(fi).map(([k,val])=>`<div style="margin-bottom:6px"><b>${k}</b><br><span class="dim">${val}</span></div>`).join("")||'<span class="dim">none</span>';
-  }catch(e){$("#featureLog").innerHTML='<span class="dim">no audit file</span>';}
-  const a=await api("/api/audit");
-  $("#auditBox").innerHTML=`total events <b>${a.total_events}</b><br>`+
-    (a.tail||[]).slice(0,10).map(e=>`<span class="dim">${e.at}</span> ${e.type}`).join("<br>");
-  const s=state.status||await api("/api/status");
-  $("#pipelineBox").innerHTML=Object.entries(s.data_counts).map(([k,v])=>
-    `${k.toUpperCase()}: <b>${v.toLocaleString()}</b> games <span class="dim">· last ingest ${s.last_ingest[k]||"never"}</span>`).join("<br>");
+    const [bt, a, s] = await Promise.all([
+      api("/api/backtests").catch(()=>[]),
+      api("/api/audit").catch(()=>({total_events:0,tail:[]})),
+      state.status ? Promise.resolve(state.status) : api("/api/status").catch(()=>({data_counts:{},last_ingest:{}}))
+    ]);
+    let html="<tr><th>File</th><th>Modified</th><th>Status / sport</th><th>kB</th></tr>";
+    (bt||[]).forEach(b=>{html+=`<tr onclick="openBacktest('${b.file}')" style="cursor:pointer">
+      <td>${b.file}</td><td class="dim">${b.modified}</td>
+      <td class="dim">${b.status||b.sport||""}</td><td class="dim">${b.size_kb}</td></tr>`;});
+    $("#btTable").innerHTML=html;
+
+    const audits=(bt||[]).filter(b=>b.file.startsWith("termination-audit-")).sort((a,b)=>a.modified<b.modified?1:-1);
+    if(audits.length){
+      const v=await api("/api/backtest?file="+encodeURIComponent(audits[0].file)).catch(()=>({}));
+      const fi=v.feature_impact||{};
+      $("#featureLog").innerHTML=Object.entries(fi).map(([k,val])=>`<div style="margin-bottom:6px"><b>${k}</b><br><span class="dim">${val}</span></div>`).join("")||'<span class="dim">none</span>';
+    }else{
+      $("#featureLog").innerHTML='<span class="dim">no audit file</span>';
+    }
+    $("#auditBox").innerHTML=`total events <b>${a.total_events||0}</b><br>`+
+      (a.tail||[]).slice(0,10).map(e=>`<span class="dim">${e.at}</span> ${e.type}`).join("<br>");
+    $("#pipelineBox").innerHTML=Object.entries(s.data_counts||{}).map(([k,v])=>
+      `${k.toUpperCase()}: <b>${v.toLocaleString()}</b> games <span class="dim">· last ingest ${s.last_ingest?.[k]||"never"}</span>`).join("<br>");
+  }catch(e){}
 }
 window.openBacktest=async f=>{const d=await api("/api/backtest?file="+encodeURIComponent(f));
   showDrawer(f,detailGrid([
@@ -2832,31 +2915,9 @@ window.openBacktest=async f=>{const d=await api("/api/backtest?file="+encodeURIC
 /* ---------- gated research (esports/soccer picks that genuinely cleared eligibility) ---------- */
 let _gatedResearchCache=[];
 function filteredGatedResearchRows(){
-  // Own filter bar (fSport_G etc.) — independent of the other tabs' filters.
-  const fs=$("#fSport_G").value, fm=$("#fMarket_G").value, fst=$("#fStatus_G").value, fr=$("#fResult_G").value;
-  const fq=($("#fSearch_G").value||'').toLowerCase();
-  const ff=$("#fFrom_G").value, ft=$("#fTo_G").value;
-  const showArchived=$("#fArchived_G")?.checked;
-  return (_gatedResearchCache||[]).filter(p=>{
+  return (_gatedResearchCache || []).filter(p => {
     if(!passesDisplaySettings(p))return false;
-    if(p.archived&&!showArchived)return false;
-    if(fs&&(p.league||'')!==fs)return false;
-    if(fm&&(p.market_type||'moneyline')!==fm)return false;
-    const st=String(p.status||'').toLowerCase();
-    if(fst==='open'&&st!=='open')return false;
-    if(fst==='settled'&&st!=='settled')return false;
-    const res=String(p.result||'').toLowerCase();
-    if(fr&&res!==fr)return false;
-    if(fq){
-      const hay=(p.away_team||'')+' '+(p.home_team||'')+' '+(p.event_id||'');
-      if(!hay.toLowerCase().includes(fq))return false;
-    }
-    if(ff||ft){
-      const d=etDate(p.event_start_utc);
-      if(ff&&d<ff)return false;
-      if(ft&&d>ft)return false;
-    }
-    return true;
+    return filterLedgerRow("G", p);
   });
 }
 let _gatedResearchLoaded=false;
@@ -2865,15 +2926,12 @@ async function loadGatedResearchCache(force){
   const rp=await api("/api/gated-research-picks");
   _gatedResearchCache=Array.isArray(rp)?rp:[];
   _gatedResearchLoaded=true;
+  populateFilters();
+  updateCounts();
 }
 function renderGatedResearchTable(){
   try{
-    const active=_gatedResearchCache.filter(p=>!p.archived&&p.status==="open").length;
-    const settled=_gatedResearchCache.filter(p=>!p.archived&&p.status==="settled").length;
-    $("#gatedResearchActive").textContent=active;
-    $("#gatedResearchSettled").textContent=settled;
-    $("#openCount_G").textContent=active;
-    $("#settledCount_G").textContent=settled;
+    updateCounts();
     const rows=filteredGatedResearchRows().sort((a,b)=>(b.event_start_utc||'').localeCompare(a.event_start_utc||''));
     $("#gatedResearchShown").textContent=rows.length;
     const gSettled=rows.filter(p=>String(p.status||'').toLowerCase()==='settled'&&(p.result==='win'||p.result==='loss'));
@@ -2887,7 +2945,7 @@ function renderGatedResearchTable(){
       <div class="k"><b class="${gPnl==null?'':gPnl>=0?'green':'red'}">${fmt(gPnl)}</b><span>P&L (U)</span></div>
       <div class="k"><b>${gHasSettled&&gRisked>0?pct(gPnl/gRisked):'—'}</b><span>ROI</span></div>`;
     let html=ledgerHeaderRow(false,"gated");
-    if(!rows.length)html+='<tr><td colspan=12 class="dim">No matches.</td></tr>';
+    if(!rows.length)html+='<tr><td colspan=12 class="dim" style="text-align:center;padding:24px">No gated research picks match the current filter criteria.</td></tr>';
     rows.forEach(p=>{html+=ledgerRowHtml(p,false,"gated");});
     $("#gatedResearchTable").innerHTML=html;
   }catch(e){$("#gatedResearchTable").innerHTML='<tr><td colspan=12 class="dim">No gated research picks loaded.</td></tr>';}
@@ -2902,31 +2960,7 @@ let _polyLedgerCache = [];
 let _polyLedgerLoaded = false;
 
 function filteredPolyLedgerRows(){
-  const s=$("#fSport_PL")?$("#fSport_PL").value:"",
-        m=$("#fMarket_PL")?$("#fMarket_PL").value:"",
-        st=$("#fStatus_PL")?$("#fStatus_PL").value:"",
-        r=$("#fResult_PL")?$("#fResult_PL").value:"",
-        fq=$("#fSearch_PL")?$("#fSearch_PL").value.trim().toLowerCase():"",
-        ff=$("#fFrom_PL")?$("#fFrom_PL").value:"",
-        ft=$("#fTo_PL")?$("#fTo_PL").value:"",
-        showArchived=$("#fArchived_PL")?.checked;
-  return (_polyLedgerCache||[]).filter(p=>{
-    if(p.archived&&!showArchived)return false;
-    if(s&&p.league!==s&&p.Sport!==s)return false;
-    if(m&&p.market_type!==m&&p.Type!==m)return false;
-    if(st&&String(p.status||p.State||'').toLowerCase()!==st)return false;
-    if(r&&String(p.result||p.Result||'').toLowerCase()!==r)return false;
-    if(fq){
-      const hay=((p.away_team||'')+' '+(p.home_team||'')+' '+(p.selection||'')+' '+(p.event_id||'')+' '+(p.pick_id||'')+' '+(p.rationale||'')).toLowerCase();
-      if(!hay.includes(fq))return false;
-    }
-    if(ff||ft){
-      const d=etDate(p.event_start_utc);
-      if(ff&&d<ff)return false;
-      if(ft&&d>ft)return false;
-    }
-    return true;
-  });
+  return filterLedgerRows("PL", _polyLedgerCache || []);
 }
 
 async function loadPolyLedgerCache(force = false){
@@ -2935,6 +2969,8 @@ async function loadPolyLedgerCache(force = false){
     const raw = await api("/api/polymarket-picks");
     _polyLedgerCache = Array.isArray(raw) ? raw : (raw.picks || raw.rows || []);
     _polyLedgerLoaded = true;
+    populateFilters();
+    updateCounts();
   } catch (e) {
     _polyLedgerCache = [];
   }
@@ -2942,14 +2978,11 @@ async function loadPolyLedgerCache(force = false){
 
 function renderPolyLedgerTable(){
   try{
-    const active = (_polyLedgerCache||[]).filter(p=>String(p.status||p.State||'').toLowerCase()==='open').length;
-    const settled = (_polyLedgerCache||[]).filter(p=>String(p.status||p.State||'').toLowerCase()==='settled').length;
-    if($("#openCount_PL")) $("#openCount_PL").textContent = active;
-    if($("#settledCount_PL")) $("#settledCount_PL").textContent = settled;
-
+    updateCounts();
     const rows = filteredPolyLedgerRows().sort((a,b)=>(b.event_start_utc||'').localeCompare(a.event_start_utc||''));
+    const active = (_polyLedgerCache||[]).filter(p=>String(p.status||p.State||'').toLowerCase()==='open').length;
 
-    const pSettled = rows.filter(p=>String(p.status||'').toLowerCase()==='settled'&&(p.result==='win'||p.result==='loss'));
+    const pSettled = rows.filter(p=>String(p.status||p.State||'').toLowerCase()==='settled'&&(p.result==='win'||p.result==='loss'));
     const pWins = pSettled.filter(p=>p.result==='win').length;
     const pLosses = pSettled.filter(p=>p.result==='loss').length;
     const pHasSettled = pWins + pLosses > 0;
@@ -2964,7 +2997,7 @@ function renderPolyLedgerTable(){
       <div class="k"><b>${pHasSettled && pRisked > 0 ? pct(pPnl/pRisked) : '—'}</b><span>ROI</span></div>`;
 
     let html = ledgerHeaderRow(false, "poly");
-    if(!rows.length) html += '<tr><td colspan=12 class="dim" style="text-align:center;padding:24px">No Polymarket edge trades recorded yet. Click "Log All to Polymarket Ledger" in the Edge Scanner tab to record active trades.</td></tr>';
+    if(!rows.length) html += '<tr><td colspan=12 class="dim" style="text-align:center;padding:24px">No Polymarket edge trades match the current filter criteria.</td></tr>';
     rows.forEach(p=>{ html += ledgerRowHtml(p, false, "poly"); });
     $("#polyLedgerTable").innerHTML = html;
   }catch(e){ $("#polyLedgerTable").innerHTML = '<tr><td colspan=12 class="dim">Error rendering Polymarket ledger: ' + esc(String(e)) + '</td></tr>'; }
@@ -3175,26 +3208,75 @@ function resetTimer(){
   timer=setInterval(()=>{remaining--; $("#countdown").textContent=remaining;
     if(remaining<=0){remaining=every;refreshAll();}},1000);
 }
+function currentActiveTab(){
+  const onBtn = $("#tabs button.on");
+  return onBtn ? onBtn.dataset.tab : "rebuild";
+}
+
 async function refreshAll(){
-  const core=await Promise.allSettled([
-    api("/api/status"),api("/api/matrix"),api("/api/picks"),api("/api/performance"),api("/api/production-evidence"),api("/api/model-ledgers")
+  const [coreResults, flatRes, researchRes, gatedRes, polyRes] = await Promise.allSettled([
+    Promise.allSettled([
+      api("/api/status"),api("/api/matrix"),api("/api/picks"),api("/api/performance"),api("/api/production-evidence"),api("/api/model-ledgers")
+    ]),
+    api("/api/flat-picks"),
+    api("/api/research-picks"),
+    api("/api/gated-research-picks"),
+    api("/api/polymarket-picks")
   ]);
-  const [statusResult,matrixResult,picksResult,perfResult,evidenceResult,modelLedgersResult]=core;
-  if(statusResult.status==="fulfilled")renderStatus(statusResult.value);
-  else setPanelState("healthMeta","error",`Health request failed: ${statusResult.reason?.message||"unknown error"}`,"refreshAll()");
-  if(matrixResult.status==="fulfilled")renderMatrix(matrixResult.value);
-  if(picksResult.status==="fulfilled"){state.picks=picksResult.value;renderPicks();}
-  if(perfResult.status==="fulfilled")renderPerf(perfResult.value);
-  else setPanelState("perfMeta","error",`Performance request failed: ${perfResult.reason?.message||"unknown error"}`,"performanceControlChanged()");
-  if(evidenceResult.status==="fulfilled")renderProductionEvidence(evidenceResult.value);
-  if(modelLedgersResult.status==="fulfilled")renderModelLedgers(modelLedgersResult.value);
-  const panels=await Promise.allSettled([renderToday(),renderFolio(),loadMarket()]);
-  // populateFilters() reads every cache, so it must run after the ledger
-  // requests settle. One failed source no longer blanks every other panel.
-  await Promise.allSettled([renderResearch(true),renderFlat(true),renderGatedResearch(true),renderPolyLedger(true)]);
-  populateFilters();renderIntegrity();
-  if($("#tab-polymarket") && $("#tab-polymarket").style.display!=="none") loadPolymarketScanner();
-  const failures=[...core,...panels].filter(result=>result.status==="rejected").length;
+
+  const core = coreResults.status === "fulfilled" ? coreResults.value : [];
+  const [statusResult,matrixResult,picksResult,perfResult,evidenceResult,modelLedgersResult] = core;
+
+  if(statusResult?.status==="fulfilled") renderStatus(statusResult.value);
+  else setPanelState("healthMeta","error",`Health request failed: ${statusResult?.reason?.message||"unknown error"}`,"refreshAll()");
+
+  if(matrixResult?.status==="fulfilled") renderMatrix(matrixResult.value);
+  if(picksResult?.status==="fulfilled") state.picks=picksResult.value;
+  if(perfResult?.status==="fulfilled") renderPerf(perfResult.value);
+  else setPanelState("perfMeta","error",`Performance request failed: ${perfResult?.reason?.message||"unknown error"}`,"performanceControlChanged()");
+  if(evidenceResult?.status==="fulfilled") renderProductionEvidence(evidenceResult.value);
+  if(modelLedgersResult?.status==="fulfilled") renderModelLedgers(modelLedgersResult.value);
+
+  if(flatRes.status==="fulfilled"){
+    const raw=flatRes.value;
+    _flatCache=Array.isArray(raw)?raw:(raw.picks||raw.rows||[]);
+    _flatLoaded=true;
+  }
+  if(researchRes.status==="fulfilled"){
+    _researchCache=Array.isArray(researchRes.value)?researchRes.value:[];
+    _researchLoaded=true;
+  }
+  if(gatedRes.status==="fulfilled"){
+    _gatedResearchCache=Array.isArray(gatedRes.value)?gatedRes.value:[];
+    _gatedResearchLoaded=true;
+  }
+  if(polyRes.status==="fulfilled"){
+    const raw=polyRes.value;
+    _polyLedgerCache=Array.isArray(raw)?raw:(raw.picks||raw.rows||[]);
+    _polyLedgerLoaded=true;
+  }
+
+  updateCounts();
+  populateFilters();
+  renderIntegrity();
+
+  // Render the currently active tab & visible panels
+  const active = currentActiveTab();
+  if(active==="ledger"||active==="picks") renderPicks();
+  else if(active==="flat") renderFlatTable();
+  else if(active==="research") renderResearchTable();
+  else if(active==="gated"||active==="gated-research") renderGatedResearchTable();
+  else if(active==="poly-ledger") renderPolyLedgerTable();
+  else if(active==="perf") performanceControlChanged(false);
+  else if(active==="today") renderToday();
+  else if(active==="market") loadMarket();
+  else if(active==="polymarket") loadPolymarketScanner();
+
+  if($("#tab-today") && $("#tab-today").style.display!=="none" && active!=="today") renderToday();
+  if($("#tab-folio") && $("#tab-folio").style.display!=="none" && active!=="folio") renderFolio();
+
+  const allRequests = [...(core||[]), flatRes, researchRes, gatedRes, polyRes];
+  const failures = allRequests.filter(result => result.status === "rejected").length;
   $("#updatedTxt").innerHTML=failures
     ?`<span class="yellow">Updated with ${failures} panel error${failures===1?"":"s"}</span>`
     :`Updated: ${new Date().toLocaleTimeString()}`;

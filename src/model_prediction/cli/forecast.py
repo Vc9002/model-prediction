@@ -518,6 +518,206 @@ def _forecast_mlb_totals_flat(
     }
 
 
+def _forecast_mlb_nrfi_flat(
+    args_date: str,
+    log: bool,
+    config,
+    registry,
+    bans,
+    flat_ledger,
+    audit,
+    main_ledger=None,
+    *,
+    client=None,
+) -> dict:
+    """MLB NRFI / YRFI 1st-inning component run model into Flat and Main ledgers.
+
+    Evaluates Poisson/Logit blended 1st-inning run probabilities for every
+    scheduled MLB game on `args_date`. Generates PickRequests for NRFI (under 0.5 runs).
+    Logs unconditionally to Flat Ledger, and to Main Ledger when eligible.
+    """
+    from ..data_sources.espn import ESPNMLBClient
+    from ..models.mlb_nrfi import MLBNRFIModel
+
+    espn_client = client or ESPNMLBClient()
+    try:
+        scoreboard_data = espn_client.scoreboard("MLB", args_date)
+        events = scoreboard_data.get("events", [])
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed to fetch ESPN MLB scoreboard for NRFI on %s: %s", args_date, exc)
+        events = []
+
+    model = MLBNRFIModel()
+    logged, duplicates, main_duplicates = [], [], []
+    nrfi_candidates = 0
+    decision_dt = utc_now()
+
+    for event in events:
+        comps = event.get("competitions", [{}])[0]
+        competitors = comps.get("competitors", [])
+        if len(competitors) < 2:
+            continue
+        home_comp = next((c for c in competitors if c.get("homeAway") == "home"), None)
+        away_comp = next((c for c in competitors if c.get("homeAway") == "away"), None)
+        if not home_comp or not away_comp:
+            continue
+
+        home_team = home_comp.get("team", {}).get("displayName", "")
+        away_team = away_comp.get("team", {}).get("displayName", "")
+        event_id = str(event.get("id", ""))
+        event_start_utc = event.get("date", "")
+
+        if not home_team or not away_team or not event_id:
+            continue
+
+        event_decision_dt = decision_dt
+        if event_start_utc:
+            try:
+                from ..domain import parse_utc
+
+                start_dt = parse_utc(event_start_utc)
+                if event_decision_dt >= start_dt:
+                    event_decision_dt = start_dt - timedelta(hours=2)
+            except (ValueError, TypeError):
+                pass
+
+        try:
+            pred = model.predict(
+                home_team=home_team,
+                away_team=away_team,
+                decision=event_decision_dt,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("NRFI prediction failed for %s @ %s: %s", away_team, home_team, exc)
+            continue
+
+        nrfi_candidates += 1
+
+        if log:
+            req_nrfi = PickRequest(
+                event_start_utc=event_start_utc or (event_decision_dt + timedelta(hours=2)).isoformat(),
+                event_id=event_id,
+                league=League.MLB,
+                away_team=away_team,
+                home_team=home_team,
+                market_type=MarketType.NRFI,
+                selection="nrfi",
+                line=0.5,
+                sportsbook="model_fair",
+                american_odds=pred.fair_american_nrfi,
+                model_probability=pred.p_nrfi,
+                model_uncertainty=0.04,
+                model_version=model.model_version,
+                rationale=(
+                    f"MLB 1st Inning NRFI: p={pred.p_nrfi:.3f} "
+                    f"(Expected 1st Inning Runs: top={pred.half_top_expected_runs:.2f}, "
+                    f"bot={pred.half_bot_expected_runs:.2f})"
+                ),
+                risks="1st inning variance, leadoff home run risk",
+                model_origin=ModelOrigin.STATISTICAL_MODEL,
+                model_state=ModelState.SHADOW_QUALIFIED,
+                observed_at_utc=event_decision_dt.isoformat(),
+            )
+
+            # Build EligibilityResult
+            from ..eligibility import EligibilityResult, evaluate_eligibility
+            from ..entities import CanonicalTeam
+            from ..units import Exposure, UnitPolicy
+
+            away_team_obj = CanonicalTeam(
+                canonical_team_id=away_team,
+                league=League.MLB,
+                canonical_name=away_team,
+                abbreviation=away_team[:3].upper(),
+                active=True,
+                valid_from=None,
+                valid_to=None,
+                aliases=(),
+            )
+            home_team_obj = CanonicalTeam(
+                canonical_team_id=home_team,
+                league=League.MLB,
+                canonical_name=home_team,
+                abbreviation=home_team[:3].upper(),
+                active=True,
+                valid_from=None,
+                valid_to=None,
+                aliases=(),
+            )
+
+            if registry is not None and bans is not None:
+                try:
+                    eligibility = evaluate_eligibility(
+                        req_nrfi,
+                        registry,
+                        bans,
+                        Exposure(
+                            max_total_exposure=10.0,
+                            max_team_exposure=5.0,
+                            canonical_team_ids=(away_team, home_team),
+                        ),
+                        unit_policy(config) if config else UnitPolicy(min_units=0.0, max_units=2.0),
+                        now=decision_dt,
+                    )
+                except Exception:  # noqa: BLE001
+                    eligibility = EligibilityResult(
+                        record_type=RecordType.RESEARCH_OBSERVATION,
+                        decision="NO_CALL",
+                        reason_code="RESEARCH_OBSERVATION",
+                        units=0.0,
+                        confidence_score=50,
+                        edge=0.0,
+                        adjusted_edge=0.0,
+                        away_team=away_team_obj,
+                        home_team=home_team_obj,
+                    )
+            else:
+                eligibility = EligibilityResult(
+                    record_type=RecordType.RESEARCH_OBSERVATION,
+                    decision="NO_CALL",
+                    reason_code="RESEARCH_OBSERVATION",
+                    units=0.0,
+                    confidence_score=50,
+                    edge=0.0,
+                    adjusted_edge=0.0,
+                    away_team=away_team_obj,
+                    home_team=home_team_obj,
+                )
+
+            # Log to Flat Ledger
+            if flat_ledger is not None:
+                try:
+                    logged.append(flat_ledger.append_evaluated(req_nrfi, eligibility, now=event_decision_dt))
+                except DuplicatePickError:
+                    duplicates.append(req_nrfi.pick_id)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Flat ledger append error for NRFI %s: %s", event_id, exc)
+
+            # Log to Main Ledger if provided and passes eligibility
+            if main_ledger is not None and eligibility.decision == "CALL":
+                try:
+                    existing_pick_id = _append_secondary_ledger(
+                        main_ledger, req_nrfi, eligibility, event_decision_dt, "mlb_nrfi:main_ledger"
+                    )
+                    if existing_pick_id is not None:
+                        main_duplicates.append(existing_pick_id)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Main ledger append error for NRFI %s: %s", event_id, exc)
+
+    return {
+        "status": "ok",
+        "sport": "mlb_nrfi",
+        "model_name": "MLB NRFI / YRFI Component Model",
+        "model_version": model.model_version,
+        "game_date": args_date,
+        "scheduled_events": len(events),
+        "nrfi_candidates": nrfi_candidates,
+        "logged": len(logged),
+        "duplicate_pick_ids": duplicates,
+        "main_duplicates": main_duplicates,
+    }
+
+
 def _select_wnba_spread_market(rows: list[dict]) -> dict | None:
     """Among alternate WNBA spread lines for one event, the main line is the
     one whose long-side ask sits closest to a coin flip -- same "most

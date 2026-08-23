@@ -137,7 +137,9 @@ def _lookup_model_prob(
                 try:
                     val = float(prob)
                     sel = str(p.get("selection") or "").lower()
-                    if match_direct:
+                    if market_type.lower() in ("nrfi", "yrfi"):
+                        p_win = val if sel in ("nrfi", "under", "no") else (1.0 - val)
+                    elif match_direct:
                         # home_desc is p_home
                         p_win = val if sel == "home" else (1.0 - val)
                     else:
@@ -211,8 +213,8 @@ class PolymarketSlateScanner:
             return None
 
         market_type = data.get("market_type")
-        if market_type != "moneyline":
-            return None  # Focus primary execution on Moneylines
+        if market_type not in ("moneyline", "nrfi", "yrfi"):
+            return None  # Focus execution on Moneylines, NRFI, and YRFI
 
         long_q = data.get("long", {})
         short_q = data.get("short", {})

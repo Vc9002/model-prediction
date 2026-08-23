@@ -69,6 +69,12 @@ def grade_pick(
         # moneyline's "draw" sub-case above.
         both_scored = away_score > 0 and home_score > 0
         return PickResult.WIN if (both_scored == (selection == "yes")) else PickResult.LOSS
+    elif market_type in (MarketType.NRFI, MarketType.YRFI):
+        # 1st-inning binary proposition: zero runs vs >=1 runs
+        zero_runs = away_score == 0 and home_score == 0
+        is_nrfi = selection in ("nrfi", "no", "under")
+        return PickResult.WIN if (zero_runs == is_nrfi) else PickResult.LOSS
+
     else:
         if line is None:
             raise ValueError("total requires a line")

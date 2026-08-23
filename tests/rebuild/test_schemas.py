@@ -172,3 +172,62 @@ class TestRealContracts:
             },
         )
         assert validate_against_contract(df, MARKET_SNAPSHOT_CONTRACT) == []
+
+
+class TestPydanticIngestionSchemas:
+    def test_valid_scoreboard_payload_passes(self):
+        from model_prediction.rebuild.schemas import IngestionScoreboardRow, validate_ingestion_payload
+
+        payload = {
+            "event_id": "401584321",
+            "home_team": "Boston Red Sox",
+            "away_team": "New York Yankees",
+            "home_score": 5.0,
+            "away_score": 3.0,
+            "status": "STATUS_FINAL",
+            "observed_at_utc": "2026-08-22T23:00:00Z",
+            "event_start_utc": "2026-08-22T19:05:00Z",
+            "source": "espn_scoreboard",
+        }
+        ok, err = validate_ingestion_payload(payload, IngestionScoreboardRow)
+        assert ok is True
+        assert err is None
+
+    def test_invalid_scoreboard_payload_fails(self):
+        from model_prediction.rebuild.schemas import IngestionScoreboardRow, validate_ingestion_payload
+
+        # Missing required home_team and negative home_score
+        payload = {
+            "event_id": "401584321",
+            "away_team": "New York Yankees",
+            "home_score": -1.0,
+            "away_score": 3.0,
+            "status": "STATUS_FINAL",
+            "observed_at_utc": "2026-08-22T23:00:00Z",
+            "event_start_utc": "2026-08-22T19:05:00Z",
+            "source": "espn_scoreboard",
+        }
+        ok, err = validate_ingestion_payload(payload, IngestionScoreboardRow)
+        assert ok is False
+        assert err is not None
+
+    def test_market_snapshot_validates_market_types_and_prices(self):
+        from model_prediction.rebuild.schemas import IngestionMarketSnapshotRow, validate_ingestion_payload
+
+        valid_payload = {
+            "event_id": "401584321",
+            "market_id": "mkt_123",
+            "market_type": "MONEYLINE",
+            "team_or_side": "Boston Red Sox",
+            "executable_price": 0.54,
+            "observed_at_utc": "2026-08-22T19:00:00Z",
+            "source": "polymarket_us",
+        }
+        ok, err = validate_ingestion_payload(valid_payload, IngestionMarketSnapshotRow)
+        assert ok is True
+
+        # Invalid market type
+        invalid_payload = dict(valid_payload, market_type="unknown_derivative")
+        ok, err = validate_ingestion_payload(invalid_payload, IngestionMarketSnapshotRow)
+        assert ok is False
+        assert "unknown market type" in err
