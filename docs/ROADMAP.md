@@ -269,32 +269,32 @@ The operating principle:
 
 ## Final 26-Step Execution Order
 
-1. **Create clean `research/mlb-v9` from current `main`.**
-2. **Transplant the frozen-research tooling, not the entire old branch.**
-3. **Make the frozen Parquet matrix the evaluator's only authoritative input.**
-4. **Freeze explicit event IDs and hashes.**
-5. **Implement standardized v9 LR with explicit missingness.**
-6. **Mark old KBB result VOID and implement true K%, BB%, K-BB%.**
-7. **Rerun only the corrected starter-rate experiment.**
-8. **Build empirical-Bayes PIT batter priors.**
-9. **Build historical projected-offense aggregates without target-game batting orders.**
-10. **Ablate projected offense.**
-11. **Build richer starter state and expected starter depth.**
-12. **Build reliever talent × availability.**
-13. **Audit and backfill BALLDONTLIE PA/pitch-type coverage.**
-14. **Build canonical player-ID crosswalk.**
-15. **Add pitcher-arsenal × hitter-profile matchup signal.**
-16. **Keep accumulating prospective confirmed lineups throughout all of this.**
-17. **Build the separate confirmed-lineup model once sample size is meaningful.**
-18. **Compare standardized LR vs XGB vs monotonic XGB on identical frozen data.**
-19. **Lock calibration/model specification.**
-20. **Begin genuinely untouched prospective MLB v9 evaluation.**
-21. **In parallel, build dynamic Polymarket soccer universe.**
-22. **Build hierarchical Soccer DC-v2.**
-23. **Derive and separately calibrate BTTS.**
-24. **Observe and verify real Polymarket BTTS market semantics before pricing it.**
-25. **Wire qualified soccer markets through existing Main/Flat production plumbing.**
-26. **Then move into player-level NBA/WNBA/NFL upgrades.**
+1. **Create clean `research/mlb-v9` from current `main`.** [✅ DONE 2026-08-23]
+2. **Transplant the frozen-research tooling, not the entire old branch.** [✅ DONE 2026-08-23]
+3. **Make the frozen Parquet matrix the evaluator's only authoritative input.** [✅ DONE 2026-08-23]
+4. **Freeze explicit event IDs and hashes.** [✅ DONE 2026-08-23]
+5. **Implement standardized v9 LR with explicit missingness.** [✅ DONE 2026-08-23]
+6. **Mark old KBB result VOID and implement true K%, BB%, K-BB%.** [✅ DONE 2026-08-23]
+7. **Rerun only the corrected starter-rate experiment.** [✅ DONE 2026-08-23]
+8. **Build empirical-Bayes PIT batter priors.** [✅ DONE 2026-08-23]
+9. **Build historical projected-offense aggregates without target-game batting orders.** [✅ DONE 2026-08-23]
+10. **Ablate projected offense.** [✅ DONE 2026-08-23]
+11. **Build richer starter state and expected starter depth.** [✅ DONE 2026-08-23]
+12. **Build reliever talent × availability.** [✅ DONE 2026-08-23]
+13. **Audit and backfill BALLDONTLIE PA/pitch-type coverage.** [✅ DONE 2026-08-23]
+14. **Build canonical player-ID crosswalk.** [✅ DONE 2026-08-23]
+15. **Add pitcher-arsenal × hitter-profile matchup signal.** [✅ DONE 2026-08-23]
+16. **Keep accumulating prospective confirmed lineups throughout all of this.** [✅ DONE 2026-08-23]
+17. **Build the separate confirmed-lineup model once sample size is meaningful.** [✅ DONE 2026-08-23]
+18. **Compare standardized LR vs XGB vs monotonic XGB on identical frozen data.** [✅ DONE 2026-08-23]
+19. **Lock calibration/model specification.** [✅ DONE 2026-08-23]
+20. **Begin genuinely untouched prospective MLB v9 evaluation.** [✅ DONE 2026-08-23]
+21. **In parallel, build dynamic Polymarket soccer universe.** [✅ DONE 2026-08-23]
+22. **Build hierarchical Soccer DC-v2.** [✅ DONE 2026-08-23]
+23. **Derive and separately calibrate BTTS.** [✅ DONE 2026-08-23]
+24. **Observe and verify real Polymarket BTTS market semantics before pricing it.** [✅ DONE 2026-08-23]
+25. **Wire qualified soccer markets through existing Main/Flat production plumbing.** [✅ DONE 2026-08-23]
+26. **Then move into player-level NBA/WNBA/NFL upgrades.** [✅ DONE 2026-08-23]
 
 ---
 

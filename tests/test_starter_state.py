@@ -1,105 +1,59 @@
-"""Unit tests for Point-in-time multidimensional starter state engine."""
+"""Tests for starting pitcher state vector & expected depth engine."""
 
 from __future__ import annotations
 
+import json
+from datetime import UTC, datetime
+from pathlib import Path
+
+import pytest
+
+from model_prediction.features import starter_history
 from model_prediction.features.starter_state import (
-    PointInTimeStarterEngine,
-    StarterGameRecord,
-    StarterStateAccumulator,
+    estimate_expected_starter_depth,
+    get_starter_state_vector,
+    starter_state_matchup_gaps,
 )
 
 
-def test_starter_state_accumulator_basic():
-    acc = StarterStateAccumulator()
-    rec = StarterGameRecord(
-        pitcher_id="sp1",
-        game_date="2026-05-01",
-        innings_pitched=6.0,
-        pitches_thrown=90,
-        batters_faced=24,
-        strikeouts=7,
-        walks=2,
-        earned_runs=2,
-        called_strikes=18,
-        whiffs=12,
-        first_pitch_strikes=16,
-        fastball_velocity_avg=95.2,
-        fastball_pitches=50,
-    )
-    metrics = acc.compute_metrics([rec])
-
-    assert metrics.starts_count == 1
-    assert metrics.innings_pitched == 6.0
-    assert metrics.k_pct > 0.20
-    assert metrics.csw_pct > 0.25
-    assert metrics.fastball_velocity is not None and metrics.fastball_velocity > 94.0
+def _write_snapshots(path: Path, rows: list) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
 
 
-def test_starter_engine_pit_isolation():
-    engine = PointInTimeStarterEngine()
-    engine.update_starter_game(
-        StarterGameRecord(
-            pitcher_id="sp1",
-            game_date="2026-05-01",
-            innings_pitched=6.0,
-            pitches_thrown=90,
-            batters_faced=24,
-            strikeouts=8,
-            walks=1,
-        )
-    )
-    engine.update_starter_game(
-        StarterGameRecord(
-            pitcher_id="sp1",
-            game_date="2026-05-15",
-            innings_pitched=5.0,
-            pitches_thrown=80,
-            batters_faced=20,
-            strikeouts=4,
-            walks=3,
-        )
+@pytest.fixture(autouse=True)
+def _reset() -> None:
+    starter_history._STARTER_INDEX_CACHE.clear()
+
+
+def test_estimate_expected_starter_depth() -> None:
+    # Empty history shrinks to prior mean ~5.30
+    assert estimate_expected_starter_depth([]) == pytest.approx(5.30)
+
+    # Workhorse starter averaging 7.0 IP over 5 starts
+    workhorse_starts = [
+        (datetime(2026, 5, i, tzinfo=UTC), 7.0, 1.0, 8.0, 1.0, 0.0, 0.0, 26.0) for i in range(1, 6)
+    ]
+    depth = estimate_expected_starter_depth(workhorse_starts)
+    assert depth > 6.0
+
+
+def test_starter_state_vector_and_matchup(tmp_path: Path) -> None:
+    path = tmp_path / "game_snapshots.jsonl"
+    _write_snapshots(path, [])
+
+    home_vec = get_starter_state_vector("Gerrit Cole", datetime(2026, 6, 1, tzinfo=UTC), snapshot_path=path)
+    away_vec = get_starter_state_vector(
+        "Opposing Pitcher", datetime(2026, 6, 1, tzinfo=UTC), snapshot_path=path
     )
 
-    # As of May 10, only May 1 game is visible
-    snap_early = engine.get_starter_state("sp1", as_of_date="2026-05-10")
-    assert snap_early.season_metrics.starts_count == 1
+    assert 0.0 < home_vec.k_pct < 1.0
+    assert home_vec.expected_depth_ip > 0
+    assert away_vec.expected_depth_ip > 0
 
-    # As of May 20, both games are visible
-    snap_late = engine.get_starter_state("sp1", as_of_date="2026-05-20")
-    assert snap_late.season_metrics.starts_count == 2
-
-
-def test_starter_matchup_evaluation():
-    engine = PointInTimeStarterEngine()
-    engine.update_starter_game(
-        StarterGameRecord(
-            pitcher_id="sp_home",
-            game_date="2026-05-01",
-            innings_pitched=7.0,
-            pitches_thrown=95,
-            batters_faced=26,
-            strikeouts=9,
-            walks=1,
-            earned_runs=1,
-            called_strikes=20,
-            whiffs=15,
-        )
+    gaps = starter_state_matchup_gaps(
+        "Gerrit Cole", "Opposing Pitcher", datetime(2026, 6, 1, tzinfo=UTC), snapshot_path=path
     )
-    engine.update_starter_game(
-        StarterGameRecord(
-            pitcher_id="sp_away",
-            game_date="2026-05-01",
-            innings_pitched=4.0,
-            pitches_thrown=85,
-            batters_faced=22,
-            strikeouts=2,
-            walks=4,
-            earned_runs=5,
-            called_strikes=10,
-            whiffs=3,
-        )
-    )
-
-    matchup = engine.evaluate_matchup("sp_home", "sp_away", as_of_date="2026-05-10")
-    assert matchup.k_bb_gap > 0  # Home SP has higher K-BB%
-    assert matchup.csw_gap > 0  # Home SP misses more bats
+    assert "starter_k_pct_gap" in gaps
+    assert "starter_depth_gap" in gaps
+    assert "home_expected_starter_ip" in gaps

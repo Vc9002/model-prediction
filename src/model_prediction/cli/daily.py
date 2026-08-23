@@ -42,6 +42,7 @@ from .forecast import (
     _forecast_soccer_sport,
     _forecast_tennis_sport,
     _forecast_wnba_spread_sport,
+    _forecast_wnba_total_sport,
     _log_esports_forecast,
     _refresh_esports_ratings,
     _refresh_international_baseball_ratings,
@@ -458,6 +459,26 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         except Exception:
             logger.warning("WNBA spread forecast failed", exc_info=True)
 
+    def _wnba_total_task() -> None:
+        try:
+            forecast_result["wnba_total"] = _forecast_wnba_total_sport(
+                data_root=data_directory,
+                args_date=args.date,
+                config=config,
+                registry=registry,
+                bans=bans,
+                main_ledger=ledger,
+                flat_ledger=flat_ledger,
+            )
+            _priced_wnba_total = forecast_result["wnba_total"].get("priced_contracts") or []
+            if _priced_wnba_total and not forecast_result["wnba_total"].get("logged"):
+                logger.warning(
+                    "zero rows logged for wnba_total despite %d priced contracts",
+                    len(_priced_wnba_total),
+                )
+        except Exception:
+            logger.warning("WNBA total forecast failed", exc_info=True)
+
     def _tennis_task() -> None:
         try:
             forecast_result["tennis"] = _forecast_tennis_sport(
@@ -562,16 +583,18 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                         exc_info=True,
                     )
 
-    with ThreadPoolExecutor(max_workers=7) as research_pool:
+    with ThreadPoolExecutor(max_workers=8) as research_pool:
         research_futures = [
             research_pool.submit(_mlb_totals_task),
             research_pool.submit(_mlb_nrfi_task),
             research_pool.submit(_soccer_task),
             research_pool.submit(_tennis_task),
             research_pool.submit(_wnba_spread_task),
+            research_pool.submit(_wnba_total_task),
             research_pool.submit(_esports_block),
             research_pool.submit(_intl_baseball_block),
         ]
+
         # Each task above already catches and logs its own real
         # forecast errors; .result() here only re-raises a bug in the
         # wrapper itself (e.g. a NameError), which should still stop

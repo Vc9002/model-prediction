@@ -56,13 +56,34 @@ INGEST_EXIT=0
 # from data/processed/tennis/games.jsonl on every forecast, and nothing on
 # the schedule advanced that file — ratings had been frozen since 2026-07-27
 # while the daily pipeline kept forecasting tennis games against them.
+#
+# Each sport writes to its own data/historical/{sport}_games_all.jsonl, so
+# sports are independent and safe to run concurrently; each sport's own two
+# dates stay sequential in one subshell to avoid two processes racing on the
+# same file's read-dedupe-append. This also amortizes the ~1.4s Python
+# import/startup cost that used to be paid 10x serially (5 sports x 2
+# dates) down to 5 parallel payments.
+INGEST_TMPDIR=$(mktemp -d)
 for sport in mlb nba wnba nfl tennis; do
-    for d in "$YESTERDAY" "$RUN_DATE"; do
-        PYTHONPATH=src .venv/bin/python -m model_prediction.cli ingest --sport "$sport" --date "$d" >> "$LOG" 2>&1
-        code=$?
-        if [ "$code" -ne 0 ]; then INGEST_EXIT=$code; fi
-    done
+    (
+        sport_exit=0
+        for d in "$YESTERDAY" "$RUN_DATE"; do
+            PYTHONPATH=src .venv/bin/python -m model_prediction.cli ingest --sport "$sport" --date "$d" \
+                >> "$INGEST_TMPDIR/$sport.log" 2>&1
+            code=$?
+            if [ "$code" -ne 0 ]; then sport_exit=$code; fi
+        done
+        exit "$sport_exit"
+    ) &
 done
+INGEST_EXIT=0
+for job in $(jobs -p); do
+    wait "$job" || INGEST_EXIT=$?
+done
+for sport in mlb nba wnba nfl tennis; do
+    cat "$INGEST_TMPDIR/$sport.log" >> "$LOG"
+done
+rm -rf "$INGEST_TMPDIR"
 echo "Ingestion exit code: $INGEST_EXIT" >> "$LOG"
 
 # ── Step 2: Unified daily forecast ───────────────────────────────────

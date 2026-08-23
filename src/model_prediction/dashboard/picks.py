@@ -486,8 +486,19 @@ def performance(picks: list[dict]) -> dict:
     }
 
 
-def performance_for_sport(picks: list[dict], sport: str | None = None) -> dict:
-    """Return one ledger's performance, optionally scoped to an actual ledger sport."""
+def performance_for_sport(
+    picks: list[dict],
+    sport: str | None = None,
+    *,
+    archived_ids: set[str] | None = None,
+) -> dict:
+    """Return one ledger's performance, optionally scoped to an actual ledger sport.
+
+    Filters out archived picks when archived_ids is supplied so performance
+    metrics reflect only active visible picks.
+    """
+    if archived_ids is not None:
+        picks = [row for row in picks if str(row.get("pick_id") or "") not in archived_ids]
     available = sorted(
         {
             str(row.get("league") or "").strip()

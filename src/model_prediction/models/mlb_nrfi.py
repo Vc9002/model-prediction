@@ -50,7 +50,7 @@ class MLBNRFIModel:
         *,
         model_version: str = "mlb-nrfi-v1",
         weights: dict[str, float] | None = None,
-        intercept: float = 0.50,
+        intercept: float = 0.0424,
         decomposed_blend_weight: float = 0.50,
     ) -> None:
         self.model_version = model_version
@@ -75,6 +75,8 @@ class MLBNRFIModel:
         *,
         home_starter_id: int | None = None,
         away_starter_id: int | None = None,
+        home_starter_name: str | None = None,
+        away_starter_name: str | None = None,
         home_top3_ids: list[int] | None = None,
         away_top3_ids: list[int] | None = None,
         snapshot_path: str | Path | None = None,
@@ -90,6 +92,8 @@ class MLBNRFIModel:
             decision=decision,
             home_starter_id=home_starter_id,
             away_starter_id=away_starter_id,
+            home_starter_name=home_starter_name,
+            away_starter_name=away_starter_name,
             home_top3_ids=home_top3_ids,
             away_top3_ids=away_top3_ids,
             weather_factor=weather_factor,
@@ -99,12 +103,23 @@ class MLBNRFIModel:
         # 1. Decomposed Poisson probability
         p_decomposed = feats.nrfi_decomposed_prob
 
-        # 2. Linear logit probability
+        # 2. Linear logit probability with mean-centered features
+        baseline_means = {
+            "home_sp_fip": 4.10,
+            "away_sp_fip": 4.10,
+            "home_sp_nrfi_rate": 0.74,
+            "away_sp_nrfi_rate": 0.74,
+            "home_sp_k_rate": 0.22,
+            "away_sp_k_rate": 0.22,
+            "park_factor": 1.00,
+            "nrfi_decomposed_prob": 0.5106,
+        }
         logit = self.intercept
         feat_dict = asdict(feats)
         for k, w in self.weights.items():
             if k in feat_dict:
-                logit += w * float(feat_dict[k])
+                mean_val = baseline_means.get(k, 0.0)
+                logit += w * (float(feat_dict[k]) - mean_val)
         p_logit = 1.0 / (1.0 + math.exp(-max(-10.0, min(10.0, logit))))
 
         # 3. Blended probability estimate

@@ -1,45 +1,36 @@
-"""Freeze the MLB v9 research feature table (prep-only tooling).
+"""Freeze the MLB v9 research feature table (immutable dataset contract).
 
-Builds ``mlb_v9_feature_table.parquet`` from the full walk-forward
-dataset (no date cap — the whole history through today) with every
-feature column the current codebase can compute, plus availability
-flags, plus a manifest:
-
-    dataset_hash        sha256 of the parquet bytes
-    feature_schema_hash sha256 of the sorted column list
-    source_hashes       sha256 of the games file(s) read
-    git_sha             HEAD when the table was built
-    created_at          UTC timestamp
-    decision_horizon    game-day walk-forward, ET dates
-
-Do NOT use this table to select a model during burn-in; it exists so
-post-burn-in v9 research cites one immutable dataset. Features that do
-not exist yet (lineup strength, bullpen talent, PIT forecast
-temperature/humidity/wind/roof) are added later — any addition changes
-feature_schema_hash, which is the point.
+Builds ``outputs/research/mlb_v9/tables/mlb_v9_feature_table_v1.parquet`` from
+the full walk-forward dataset with explicit identity columns, split assignments,
+availability flags, and a hard-pinned JSON manifest with SHA-256 integrity hashes.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import polars as pl
+from mlb_research_common import v8_contract
 
 from model_prediction.config import PROJECT_ROOT
 from model_prediction.features.base import FeatureStore
 from model_prediction.validation import build_walk_forward_rows
 
-OUT_DIR = PROJECT_ROOT / "outputs" / "research" / "mlb_v9_feature_table"
+BASE_OUT_DIR = PROJECT_ROOT / "outputs" / "research" / "mlb_v9"
+TABLES_DIR = BASE_OUT_DIR / "tables"
+MANIFESTS_DIR = BASE_OUT_DIR / "manifests"
+COHORTS_DIR = BASE_OUT_DIR / "cohorts"
 GAMES_PATH = PROJECT_ROOT / "data" / "historical" / "mlb_games_all.jsonl"
 
-# Every field ValidationRow exposes (the frozen column contract). New
-# features get appended here AND to ValidationRow together.
 COLUMNS = [
     "date",
     "event_id",
@@ -83,13 +74,17 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def sha256_obj(obj: object) -> str:
+    return hashlib.sha256(json.dumps(obj, sort_keys=True).encode("utf-8")).hexdigest()
+
+
 def main() -> int:
-    print("[1/3] Building walk-forward rows (full history, no cap) ...")
+    print("[1/4] Building walk-forward rows from feature store ...")
     store = FeatureStore(PROJECT_ROOT / "data")
     rows = build_walk_forward_rows(store, "mlb")
-    print(f"      {len(rows)} rows")
+    print(f"      {len(rows)} raw walk-forward rows")
 
-    print("[2/3] Joining event identity (teams, decision timestamp) ...")
+    print("[2/4] Joining event identity, scores, and ET dates ...")
     game_meta: dict[str, dict] = {}
     for line in GAMES_PATH.read_text(encoding="utf-8").splitlines():
         if not line.strip():
@@ -98,70 +93,137 @@ def main() -> int:
             game = json.loads(line)
         except json.JSONDecodeError:
             continue
-        game_meta[game.get("event_id")] = game
+        game_meta[str(game.get("event_id"))] = game
+
+    contract = v8_contract()
+    train_end = contract["train_end"]
+    val_end = contract["validation_end"]
 
     records = []
-    missing = 0
+    train_ids, val_ids, test_ids = [], [], []
+
     for row in rows:
-        meta = game_meta.get(row.event_id) or {}
-        records.append(
-            {
-                "event_id": row.event_id,
-                "date": row.date,
-                "decision_time_utc": meta.get("event_start_utc") or f"{row.date}T00:00:00Z",
-                "home_team": meta.get("home_team"),
-                "away_team": meta.get("away_team"),
-                "outcome": row.outcome,
-                **{
-                    name: getattr(row, name)
-                    for name in COLUMNS
-                    if name not in ("date", "event_id", "outcome")
-                },
-            }
+        meta = game_meta.get(str(row.event_id)) or {}
+        start_utc = meta.get("event_start_utc") or f"{row.date}T00:00:00Z"
+        try:
+            dt = datetime.fromisoformat(start_utc)
+            date_et = dt.astimezone(ZoneInfo("America/New_York")).date().isoformat()
+        except (ValueError, TypeError):
+            date_et = row.date
+
+        if date_et <= train_end:
+            split = "train"
+            train_ids.append(str(row.event_id))
+        elif date_et <= val_end:
+            split = "validation"
+            val_ids.append(str(row.event_id))
+        else:
+            split = "research_test"
+            test_ids.append(str(row.event_id))
+
+        home_score = int(float(meta.get("home_score", 0) or 0)) if meta.get("home_score") is not None else 0
+        away_score = int(float(meta.get("away_score", 0) or 0)) if meta.get("away_score") is not None else 0
+
+        starter_avail = bool(
+            getattr(row, "probable_starter_available", False)
+            or getattr(row, "starter_fip_gap", 0.0) != 0.0
+            or getattr(row, "starter_era_gap", 0.0) != 0.0
         )
-        if not meta:
-            missing += 1
-    print(f"      {missing} rows without game metadata (decision_time defaulted)")
+        bullpen_avail = bool(getattr(row, "bullpen_available", False))
+        weather_avail = bool(getattr(row, "weather_available", False))
+        park_avail = bool(getattr(row, "park_available", False))
+
+        rec = {
+            "event_id": str(row.event_id),
+            "game_start_utc": start_utc,
+            "decision_time_utc": start_utc,
+            "date_et": date_et,
+            "home_team_id": str(meta.get("home_team", "")),
+            "away_team_id": str(meta.get("away_team", "")),
+            "home_score": home_score,
+            "away_score": away_score,
+            "home_win": int(row.outcome),
+            "split": split,
+            "starter_available": starter_avail,
+            "bullpen_available": bullpen_avail,
+            "weather_available": weather_avail,
+            "park_available": park_avail,
+            **{name: getattr(row, name) for name in COLUMNS if name not in ("date", "event_id", "outcome")},
+        }
+        records.append(rec)
 
     frame = pl.DataFrame(records)
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    parquet_path = OUT_DIR / "mlb_v9_feature_table.parquet"
+    TABLES_DIR.mkdir(parents=True, exist_ok=True)
+    MANIFESTS_DIR.mkdir(parents=True, exist_ok=True)
+    COHORTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    parquet_path = TABLES_DIR / "mlb_v9_feature_table_v1.parquet"
     frame.write_parquet(parquet_path)
-    print(f"[3/3] wrote {parquet_path} ({len(records)} rows, {frame.width} columns)")
+    print(f"[3/4] Wrote {parquet_path} ({len(records)} rows, {frame.width} cols)")
+
+    # Write Cohort Files
+    train_ids_path = COHORTS_DIR / "train_event_ids_v1.json"
+    val_ids_path = COHORTS_DIR / "validation_event_ids_v1.json"
+    test_ids_path = COHORTS_DIR / "research_test_event_ids_v1.json"
+
+    train_ids_path.write_text(json.dumps(train_ids, indent=2) + "\n", encoding="utf-8")
+    val_ids_path.write_text(json.dumps(val_ids, indent=2) + "\n", encoding="utf-8")
+    test_ids_path.write_text(json.dumps(test_ids, indent=2) + "\n", encoding="utf-8")
 
     try:
-        git_sha = (
-            __import__("subprocess")
-            .run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True)
-            .stdout.strip()
-        )
-    except Exception:  # noqa: BLE001 — sha is informational
+        git_sha = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+    except Exception:  # noqa: BLE001
         git_sha = "unknown"
 
     manifest = {
         "schema_version": "mlb-v9-feature-table-v1",
         "created_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-        "rows": len(records),
-        "columns": sorted(frame.columns),
-        "dataset_hash": sha256_file(parquet_path),
-        "feature_schema_hash": hashlib.sha256(json.dumps(sorted(frame.columns)).encode()).hexdigest(),
-        "source_hashes": {"mlb_games_all.jsonl": sha256_file(GAMES_PATH)},
-        "git_sha": git_sha,
-        "decision_horizon": "game-day walk-forward, ET dates; features computed from strictly prior completed games",
-        "status": "PREP_ONLY — not to be used for model selection until burn-in passes (2026-08-18)",
-        "missing_features_not_yet_built": [
-            "lineup_strength_projected",
-            "lineup_strength_confirmed",
-            "bullpen_talent",
-            "pit_weather_temperature",
-            "pit_weather_humidity",
-            "pit_weather_wind",
-            "pit_weather_roof",
-        ],
+        "builder_git_sha": git_sha,
+        "dataset_sha256": sha256_file(parquet_path),
+        "schema_sha256": hashlib.sha256(json.dumps(sorted(frame.columns)).encode()).hexdigest(),
+        "train_event_ids_sha256": sha256_file(train_ids_path),
+        "validation_event_ids_sha256": sha256_file(val_ids_path),
+        "research_test_event_ids_sha256": sha256_file(test_ids_path),
+        "rows": {
+            "total": len(records),
+            "train": len(train_ids),
+            "validation": len(val_ids),
+            "research_test": len(test_ids),
+        },
+        "features": sorted(
+            [
+                c
+                for c in frame.columns
+                if c
+                not in (
+                    "event_id",
+                    "game_start_utc",
+                    "decision_time_utc",
+                    "date_et",
+                    "home_team_id",
+                    "away_team_id",
+                    "home_score",
+                    "away_score",
+                    "home_win",
+                    "split",
+                )
+            ]
+        ),
+        "sources": {"mlb_games_all.jsonl": sha256_file(GAMES_PATH)},
+        "missingness_policy": {
+            "starter_available": "Boolean flag indicating pitcher data presence",
+            "bullpen_available": "Boolean flag indicating bullpen data presence",
+            "weather_available": "Boolean flag indicating weather data presence",
+            "park_available": "Boolean flag indicating park factor presence",
+        },
     }
-    manifest_path = OUT_DIR / "manifest.json"
+
+    manifest_path = MANIFESTS_DIR / "mlb_v9_feature_table_v1.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps(manifest, indent=2))
+    print(f"[4/4] Wrote manifest to {manifest_path}")
+    print(f"      Train: {len(train_ids)} | Val: {len(val_ids)} | Research Test: {len(test_ids)}")
     return 0
 
 

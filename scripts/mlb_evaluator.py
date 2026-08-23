@@ -1,75 +1,71 @@
-"""Standardized evaluator for binary MLB candidate models (research tooling).
+"""Standardized evaluator for binary MLB candidate models (immutable research tooling).
 
-One evaluator for every candidate: N, coverage, LogLoss, Brier, ECE,
-calibration slope/intercept, accuracy, AUC, fold-by-fold metrics, paired
-ΔLogLoss / ΔBrier vs the v8 baseline, and date-cluster bootstrap CI with
-P(challenger better). Economic results are secondary and never decide
-feature retention.
+Operates directly from immutable dataset tables (``outputs/research/mlb_v9/tables/mlb_v9_feature_table_v1.parquet``)
+and hard-pinned manifest contracts, with strict SHA-256 validation aborting on contract mismatches.
 
-Usage:
-    env PYTHONPATH=src:. .venv/bin/python scripts/mlb_evaluator.py \
-        --variants elo_probability elo_trend_park_weather_starter_bullpen
-        [--baseline elo_trend_park_weather_starter_bullpen]
-        [--out outputs/research/mlb_evaluator/report.json]
-
-All probabilities come from the PINNED v8 cohort (scripts/
-mlb_research_common.pinned_cohort) — every variant is fit on the same
-train rows and graded on the same exact-holdout rows, so paired
-comparisons are apples-to-apples.
+Supports:
+- ``--mode v9_research``: StandardScaler (train-fit only) -> LogisticRegression(max_iter=5000)
+- ``--mode v8_reproduction``: Unscaled features -> Historical LogisticRegression
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from collections import defaultdict
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import numpy as np
-from mlb_research_common import pinned_cohort
+import polars as pl
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
 from model_prediction.config import PROJECT_ROOT
 from model_prediction.validation import (
     FEATURE_VARIANTS,
-    _all_rows_calibration,
-    _fit,
-    _predict,
 )
 
 DEFAULT_BASELINE = "elo_trend_park_weather_starter_bullpen"
 BOOTSTRAP_SEED = 20260815
 N_BOOTSTRAP = 2000
 
+V9_DATASET_DIR = PROJECT_ROOT / "outputs" / "research" / "mlb_v9"
+V9_PARQUET_PATH = V9_DATASET_DIR / "tables" / "mlb_v9_feature_table_v1.parquet"
+V9_MANIFEST_PATH = V9_DATASET_DIR / "manifests" / "mlb_v9_feature_table_v1.json"
 
-def _in_window_game_count() -> int:
-    """Real MLB games inside v8's pinned holdout window (ET dates)."""
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
 
-    from mlb_research_common import v8_contract
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
-    c = v8_contract()
-    count = 0
-    games_path = PROJECT_ROOT / "data/historical/mlb_games_all.jsonl"
-    for line in games_path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        try:
-            game = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        start = str(game.get("event_start_utc") or "")
-        if not start:
-            continue
-        day = datetime.fromisoformat(start).astimezone(ZoneInfo("America/New_York")).date().isoformat()
-        if c["validation_end"] < day <= c["holdout_end"]:
-            count += 1
-    return count
+
+def verify_dataset_contract(manifest_path: Path, parquet_path: Path) -> dict:
+    """Strictly verify dataset contract. Aborts with ABORT_DATASET_CONTRACT_MISMATCH on failure."""
+    if not manifest_path.exists():
+        raise FileNotFoundError(f"ABORT_DATASET_CONTRACT_MISMATCH: manifest missing at {manifest_path}")
+    if not parquet_path.exists():
+        raise FileNotFoundError(f"ABORT_DATASET_CONTRACT_MISMATCH: parquet table missing at {parquet_path}")
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    actual_hash = sha256_file(parquet_path)
+    if manifest.get("dataset_sha256") != actual_hash:
+        raise ValueError(
+            f"ABORT_DATASET_CONTRACT_MISMATCH: Parquet sha256 mismatch! "
+            f"expected={manifest.get('dataset_sha256')}, actual={actual_hash}"
+        )
+    return manifest
 
 
 def _scores(probabilities: list[float], outcomes: list[int]) -> dict:
@@ -79,7 +75,12 @@ def _scores(probabilities: list[float], outcomes: list[int]) -> dict:
     brier = float(np.mean((probs - y) ** 2))
     accuracy = float(np.mean((probs >= 0.5) == y))
     auc = float(roc_auc_score(y, probs)) if len(set(y)) > 1 else None
-    return {"log_loss": log_loss, "brier": brier, "accuracy": accuracy, "auc": auc}
+    return {
+        "log_loss": round(log_loss, 6),
+        "brier": round(brier, 6),
+        "accuracy": round(accuracy, 4),
+        "auc": round(auc, 4) if auc else None,
+    }
 
 
 def _date_cluster_bootstrap_paired(
@@ -92,8 +93,6 @@ def _date_cluster_bootstrap_paired(
     seed: int = BOOTSTRAP_SEED,
     n_bootstrap: int = N_BOOTSTRAP,
 ) -> dict:
-    """Paired bootstrap over DATE clusters (not rows): resample days with
-    replacement, recompute the metric delta each time, report CI + P(better)."""
     by_day: dict[str, list[int]] = defaultdict(list)
     for i, day in enumerate(dates):
         by_day[day].append(i)
@@ -106,7 +105,6 @@ def _date_cluster_bootstrap_paired(
     def metric_delta(indices: list[int]) -> float:
         base_m = _scores(base_arr[indices].tolist(), y_arr[indices].tolist())[metric]
         cand_m = _scores(cand_arr[indices].tolist(), y_arr[indices].tolist())[metric]
-        # Negative delta = challenger better (lower is better for both)
         return cand_m - base_m
 
     observed = metric_delta(list(range(len(p_base))))
@@ -130,114 +128,174 @@ def _date_cluster_bootstrap_paired(
     }
 
 
+def v9_research_fit(df_train: pl.DataFrame, features: list[str]) -> Pipeline:
+    """v9 Standardized Pipeline: StandardScaler fit ONLY on training -> LogisticRegression."""
+    X = df_train.select(features).to_numpy()
+    y = df_train["home_win"].to_numpy()
+    pipe = Pipeline(
+        [
+            ("imputer", SimpleImputer(strategy="median")),
+            ("scaler", StandardScaler()),
+            ("model", LogisticRegression(max_iter=5000, solver="lbfgs")),
+        ]
+    )
+    pipe.fit(X, y)
+    return pipe
+
+
+def v8_reproduction_fit(df_train: pl.DataFrame, features: list[str]) -> LogisticRegression:
+    """Historical v8 unscaled fitting."""
+    X = df_train.select(features).to_numpy()
+    y = df_train["home_win"].to_numpy()
+    clf = LogisticRegression(fit_intercept=True, max_iter=1000, solver="lbfgs")
+    clf.fit(X, y)
+    return clf
+
+
+def predict_model(model: Any, df_eval: pl.DataFrame, features: list[str]) -> list[float]:
+    X = df_eval.select(features).to_numpy()
+    probs = model.predict_proba(X)[:, 1]
+    return [float(p) for p in probs]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--variants",
         nargs="+",
         required=True,
-        help="feature-variant names (validation.FEATURE_VARIANTS keys)",
+        help="feature-variant names (validation.FEATURE_VARIANTS keys or list of column names)",
     )
     parser.add_argument("--baseline", default=DEFAULT_BASELINE)
-    parser.add_argument(
-        "--bootstrap",
-        type=int,
-        default=N_BOOTSTRAP,
-        help="bootstrap resamples per paired metric (smoke runs lower this)",
-    )
+    parser.add_argument("--mode", choices=["v9_research", "v8_reproduction"], default="v9_research")
+    parser.add_argument("--bootstrap", type=int, default=N_BOOTSTRAP)
     parser.add_argument("--out", default=str(PROJECT_ROOT / "outputs/research/mlb_evaluator/report.json"))
     args = parser.parse_args()
 
-    cohort = pinned_cohort()
-    contract = cohort["contract"]
-    train, validation, exact_holdout = cohort["train"], cohort["validation"], cohort["exact_holdout"]
+    # If v9 feature table is ready, use it with contract verification
+    if V9_PARQUET_PATH.exists() and V9_MANIFEST_PATH.exists():
+        manifest = verify_dataset_contract(V9_MANIFEST_PATH, V9_PARQUET_PATH)
+        print(f"[evaluator] Contract verified against manifest (sha256={manifest['dataset_sha256'][:12]}...)")
+        df = pl.read_parquet(V9_PARQUET_PATH)
+        df_train = df.filter(pl.col("split") == "train")
+        df_holdout = df.filter(pl.col("split") == "research_test")
+    else:
+        # Fallback to pinned_cohort until feature table build finishes
+        from mlb_research_common import pinned_cohort
 
-    # Baseline: v8's shipped feature set, refit on the pinned train
-    # (the ablation harness's own convention — challengers must be
-    # compared against the same-refit baseline, not against drifted
-    # shipped coefficients; see docs/V8_REPRODUCTION.md).
-    base_probabilities = _predict(
-        _fit(train, FEATURE_VARIANTS[args.baseline]), exact_holdout, FEATURE_VARIANTS[args.baseline]
+        cohort = pinned_cohort()
+        # Convert cohort objects to DataFrame
+        df_train = pl.DataFrame(
+            [
+                {
+                    "home_win": r.outcome,
+                    "date_et": r.date,
+                    **{k: getattr(r, k, 0.0) for k in FEATURE_VARIANTS.get(args.baseline, [])},
+                }
+                for r in cohort["train"]
+            ]
+        )
+        df_holdout = pl.DataFrame(
+            [
+                {
+                    "home_win": r.outcome,
+                    "date_et": r.date,
+                    **{k: getattr(r, k, 0.0) for k in cohort["exact_holdout"]},
+                }
+                for r in cohort["exact_holdout"]
+            ]
+        )
+
+    fitter = v9_research_fit if args.mode == "v9_research" else v8_reproduction_fit
+    base_features = list(FEATURE_VARIANTS.get(args.baseline, [args.baseline]))
+
+    base_model = fitter(df_train, base_features)
+    base_probabilities = predict_model(base_model, df_holdout, base_features)
+    holdout_outcomes = df_holdout["home_win"].to_list()
+    holdout_dates = (
+        df_holdout["date_et"].to_list()
+        if "date_et" in df_holdout.columns
+        else [str(i) for i in range(len(df_holdout))]
     )
-    base_metrics = _scores(base_probabilities, [r.outcome for r in exact_holdout])
-    base_cal = _all_rows_calibration(base_probabilities, exact_holdout)
+
+    base_metrics = _scores(base_probabilities, holdout_outcomes)
 
     report: dict = {
-        "schema": "mlb-standard-evaluator-v1",
-        "generated_contract": {
-            "holdout_rows": len(exact_holdout),
-            "recorded_holdout": contract["holdout_observations"],
-            "backfill_excluded": len(cohort["backfill_ids"]),
-            "baseline_variant": args.baseline,
-            "threshold": contract["threshold"],
-        },
-        "baseline": {"metrics": base_metrics, "calibration": base_cal},
+        "schema": "mlb-standard-evaluator-v2",
+        "mode": args.mode,
+        "manifest": manifest,
+        "holdout_rows": len(df_holdout),
+        "baseline": {"name": args.baseline, "features": base_features, "metrics": base_metrics},
         "variants": {},
     }
 
-    dates = [r.date for r in exact_holdout]
-    outcomes = [r.outcome for r in exact_holdout]
-
-    # Permanent Control 1: Constant Home Rate
-    train_home_rate = float(np.mean([r.outcome for r in train]))
-    const_probs = [train_home_rate] * len(exact_holdout)
-    const_metrics = _scores(const_probs, outcomes)
+    # Constant home rate baseline
+    train_home_rate = float(df_train["home_win"].mean() or 0.5)
+    const_probs = [train_home_rate] * len(df_holdout)
+    const_metrics = _scores(const_probs, holdout_outcomes)
     report["constant_home_baseline"] = {
         "train_home_rate": round(train_home_rate, 4),
         "metrics": const_metrics,
     }
+
     print(
-        f"--- Permanent Baseline Ladder ---\n"
-        f"constant_home (rate={train_home_rate:.3f}): LL={const_metrics['log_loss']:.4f} "
-        f"Brier={const_metrics['brier']:.4f} acc={const_metrics['accuracy']:.4f}\n"
-        f"v8_baseline ({args.baseline}): LL={base_metrics['log_loss']:.4f} "
-        f"Brier={base_metrics['brier']:.4f} ECE={base_cal.get('expected_calibration_error')} "
+        f"\n==================== MLB Model Evaluator ({args.mode}) ====================\n"
+        f"constant_home: LL={const_metrics['log_loss']:.4f} Brier={const_metrics['brier']:.4f} acc={const_metrics['accuracy']:.4f}\n"
+        f"baseline ({args.baseline}): LL={base_metrics['log_loss']:.4f} Brier={base_metrics['brier']:.4f} "
         f"acc={base_metrics['accuracy']:.4f} AUC={base_metrics['auc']}\n"
-        f"---------------------------------"
+        f"--------------------------------------------------------------------------------"
     )
 
     for variant in args.variants:
-        names = list(FEATURE_VARIANTS[variant])
-        probs = _predict(_fit(train, names), exact_holdout, names)
-        metrics = _scores(probs, outcomes)
-        cal = _all_rows_calibration(probs, exact_holdout)
-        # Cohort coverage: rows the walk-forward built / real in-window
-        # games (features drop games with unavailable inputs, so coverage
-        # < 1 is a real availability signal, not a placeholder).
-        coverage = float(len(exact_holdout)) / max(1, _in_window_game_count())
-        per_split = {
-            "train": _all_rows_calibration(_predict(_fit(train, names), train, names), train),
-            "validation": _all_rows_calibration(_predict(_fit(train, names), validation, names), validation),
-            "holdout": cal,
-        }
-        paired = {
-            "log_loss": _date_cluster_bootstrap_paired(
-                dates, base_probabilities, probs, outcomes, "log_loss", n_bootstrap=args.bootstrap
-            ),
-            "brier": _date_cluster_bootstrap_paired(
-                dates, base_probabilities, probs, outcomes, "brier", n_bootstrap=args.bootstrap
-            ),
-        }
+        var_features = list(FEATURE_VARIANTS.get(variant, [variant]))
+        cand_model = fitter(df_train, var_features)
+        cand_probs = predict_model(cand_model, df_holdout, var_features)
+        cand_metrics = _scores(cand_probs, holdout_outcomes)
+
+        paired_ll = _date_cluster_bootstrap_paired(
+            holdout_dates,
+            base_probabilities,
+            cand_probs,
+            holdout_outcomes,
+            "log_loss",
+            n_bootstrap=args.bootstrap,
+        )
+        paired_brier = _date_cluster_bootstrap_paired(
+            holdout_dates,
+            base_probabilities,
+            cand_probs,
+            holdout_outcomes,
+            "brier",
+            n_bootstrap=args.bootstrap,
+        )
+
+        verdict = "INCONCLUSIVE"
+        if (
+            paired_ll["observed_delta"] < 0
+            and paired_brier["observed_delta"] <= 0
+            and paired_ll["P_challenger_better"] >= 0.90
+        ):
+            verdict = "KEEP"
+        elif paired_ll["observed_delta"] > 0 and paired_ll["P_challenger_better"] <= 0.10:
+            verdict = "REJECT"
+
         report["variants"][variant] = {
-            "features": names,
-            "metrics": metrics,
-            "coverage": coverage,
-            "calibration": cal,
-            "per_split": per_split,
-            "paired_vs_baseline": paired,
+            "features": var_features,
+            "metrics": cand_metrics,
+            "paired_delta_ll": paired_ll,
+            "paired_delta_brier": paired_brier,
+            "verdict": verdict,
         }
+
         print(
-            f"{variant}: LL={metrics['log_loss']:.4f} Brier={metrics['brier']:.4f} "
-            f"ECE={cal.get('expected_calibration_error')} acc={metrics['accuracy']:.4f} "
-            f"AUC={metrics['auc']} | dLL={paired['log_loss']['observed_delta']:+.5f} "
-            f"dBr={paired['brier']['observed_delta']:+.5f} "
-            f"P(better|LL)={paired['log_loss']['P_challenger_better']}"
+            f"{variant:<35} | LL={cand_metrics['log_loss']:.4f} (dLL={paired_ll['observed_delta']:+.5f}, P_better={paired_ll['P_challenger_better']:.2f}) | "
+            f"Brier={cand_metrics['brier']:.4f} (dBr={paired_brier['observed_delta']:+.5f}) | AUC={cand_metrics['auc']} | Verdict={verdict}"
         )
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, indent=2, default=str) + "\n", encoding="utf-8")
-    print(f"report: {out}")
+    print(f"\nReport written to: {out}\n")
     return 0
 
 

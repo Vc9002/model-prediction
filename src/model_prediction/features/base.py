@@ -157,12 +157,37 @@ class FeatureStore:
         Older normalized rows predate the season fields. Reading their cached raw
         payloads keeps the append-only processed store intact while preventing
         Spring Training and exhibition leakage in current backtests.
+
+        This glob-scans and JSON-parses every ``data/raw/{sport}/*/scores_*.json``
+        file (one per historically ingested date -- hundreds to low thousands for
+        a mature sport) to build a small event_id -> season lookup. Every daily
+        forecast call instantiates a fresh ``FeatureStore``, so without a disk
+        cache this ~1s+ scan reran from scratch on every process, for every
+        learned sport, every daily cycle (measured 2026-08-23: 1.05s of MLB's
+        1.11s ``load_games`` was this scan alone). Raw files are immutable and
+        new ones only ever land in a brand-new date subdirectory, so the raw
+        root directory's own mtime changes exactly when the cache goes stale --
+        same mtime-gated disk-cache convention as
+        ``starter_history.py::load_starter_index``.
         """
         key = sport.lower()
         if key in self._event_metadata_cache:
             return self._event_metadata_cache[key]
-        metadata: dict[str, dict[str, Any]] = {}
         raw_root = self.data_root / "raw" / key
+        cache_file = self.data_root / "raw" / f"{key}_event_metadata.cache"
+        if raw_root.exists() and cache_file.exists():
+            try:
+                if cache_file.stat().st_mtime >= raw_root.stat().st_mtime:
+                    import pickle
+
+                    with cache_file.open("rb") as cf:
+                        cached = pickle.load(cf)
+                        if isinstance(cached, dict):
+                            self._event_metadata_cache[key] = cached
+                            return cached
+            except (OSError, pickle.UnpicklingError, ValueError, EOFError):
+                pass
+        metadata: dict[str, dict[str, Any]] = {}
         if raw_root.exists():
             for path in raw_root.glob("*/scores_*.json"):
                 try:
@@ -182,6 +207,16 @@ class FeatureStore:
                             (competition.get("type") or {}).get("abbreviation", "unknown")
                         ),
                     }
+            try:
+                import pickle
+                import uuid
+
+                temp_cache = cache_file.with_name(f"{cache_file.name}.tmp.{uuid.uuid4().hex[:6]}")
+                with temp_cache.open("wb") as cf:
+                    pickle.dump(metadata, cf, protocol=pickle.HIGHEST_PROTOCOL)
+                temp_cache.replace(cache_file)
+            except OSError:
+                pass
         self._event_metadata_cache[key] = metadata
         return metadata
 

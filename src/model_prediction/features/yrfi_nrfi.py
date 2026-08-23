@@ -13,7 +13,6 @@ strictly preceding that game's start timestamp.
 from __future__ import annotations
 
 import json
-import math
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -135,13 +134,47 @@ def _load_pitcher_first_inning_index(
 
 
 def starter_first_inning_profile(
-    pitcher_id: int | None,
+    pitcher_id: int | str | None,
     decision: datetime,
     *,
+    pitcher_name: str | None = None,
     snapshot_path: str | Path = DEFAULT_SNAPSHOT_PATH,
     lookback_starts: int = 15,
 ) -> dict[str, Any]:
     """Credibility-shrunk first-inning run suppression profile for one starting pitcher."""
+    from .starter_history import starter_rolling_fip, starter_rolling_rates
+
+    # Attempt name-based lookup first if pitcher_name is given or pitcher_id is string
+    lookup_name = pitcher_name or (
+        str(pitcher_id) if isinstance(pitcher_id, str) and not pitcher_id.isdigit() else None
+    )
+    if lookup_name:
+        fip_data = starter_rolling_fip(
+            lookup_name, decision, snapshot_path=snapshot_path, lookback_starts=lookback_starts
+        )
+        rates_data = starter_rolling_rates(
+            lookup_name, decision, snapshot_path=snapshot_path, lookback_starts=lookback_starts
+        )
+        if fip_data.get("status") == "available" and rates_data.get("status") == "available":
+            fip = float(fip_data.get("fip") or 4.10)
+            k_rate = float(rates_data.get("k_pct") or 0.22)
+            bb_rate = float(rates_data.get("bb_pct") or 0.08)
+            starts = int(fip_data.get("starts") or 1)
+            # Scale 1st inning run rate by pitcher talent relative to league average
+            fip_factor = max(0.40, min(1.80, fip / 4.10))
+            expected_runs_1st = (LEAGUE_FIRST_INNING_RUN_RATE / 2.0) * fip_factor
+            nrfi_rate = max(0.20, min(0.85, 1.0 - (0.2855 * fip_factor)))
+            return {
+                "starts": starts,
+                "raw_nrfi_rate": round(nrfi_rate, 4),
+                "nrfi_rate": round(nrfi_rate, 4),
+                "runs_per_first_inning": round(expected_runs_1st, 4),
+                "fip": round(fip, 3),
+                "k_rate": round(k_rate, 4),
+                "bb_rate": round(bb_rate, 4),
+                "status": "available",
+            }
+
     if pitcher_id is None:
         return {
             "starts": 0,
@@ -154,7 +187,11 @@ def starter_first_inning_profile(
         }
 
     index = _load_pitcher_first_inning_index(snapshot_path)
-    lines = index.get(pitcher_id, [])
+    try:
+        numeric_id = int(pitcher_id)
+    except (ValueError, TypeError):
+        numeric_id = -1
+    lines = index.get(numeric_id, [])
     prior_starts = [item[1] for item in lines if item[0] < decision][-lookback_starts:]
 
     if not prior_starts:
@@ -291,40 +328,49 @@ def compute_nrfi_features(
     *,
     home_starter_id: int | None = None,
     away_starter_id: int | None = None,
+    home_starter_name: str | None = None,
+    away_starter_name: str | None = None,
     home_top3_ids: list[int] | None = None,
     away_top3_ids: list[int] | None = None,
     snapshot_path: str | Path = DEFAULT_SNAPSHOT_PATH,
     weather_factor: float = 1.0,
 ) -> NRFIFeatures:
     """Compute point-in-time NRFI / YRFI feature vector and decomposed probability."""
-    home_sp = starter_first_inning_profile(home_starter_id, decision, snapshot_path=snapshot_path)
-    away_sp = starter_first_inning_profile(away_starter_id, decision, snapshot_path=snapshot_path)
+    home_sp = starter_first_inning_profile(
+        home_starter_id, decision, pitcher_name=home_starter_name, snapshot_path=snapshot_path
+    )
+    away_sp = starter_first_inning_profile(
+        away_starter_id, decision, pitcher_name=away_starter_name, snapshot_path=snapshot_path
+    )
 
     away_top3 = top3_lineup_offense_profile(away_team, away_top3_ids, decision, snapshot_path=snapshot_path)
     home_top3 = top3_lineup_offense_profile(home_team, home_top3_ids, decision, snapshot_path=snapshot_path)
 
     pf = float(park_factor(home_team).get("park_factor", 1.0))
-    base_half_lambda = LEAGUE_FIRST_INNING_RUN_RATE / 2.0
 
     top_mult = (
         (away_top3["composite"] / 0.126)
-        * (home_sp["runs_per_first_inning"] / base_half_lambda)
+        * (home_sp["runs_per_first_inning"] / (LEAGUE_FIRST_INNING_RUN_RATE / 2.0))
         * pf
         * weather_factor
     )
     bot_mult = (
         (home_top3["composite"] / 0.126)
-        * (away_sp["runs_per_first_inning"] / base_half_lambda)
+        * (away_sp["runs_per_first_inning"] / (LEAGUE_FIRST_INNING_RUN_RATE / 2.0))
         * pf
         * weather_factor
     )
 
-    lambda_top = max(0.05, min(1.5, base_half_lambda * top_mult))
-    lambda_bot = max(0.05, min(1.5, base_half_lambda * bot_mult))
+    # Base half-inning run-scoring probability ~ 28.55% (clean probability = 71.45% -> 0.7145^2 = 0.5106 NRFI)
+    p_score_top = min(0.80, max(0.05, 0.2855 * top_mult))
+    p_score_bot = min(0.80, max(0.05, 0.2855 * bot_mult))
 
-    p_clean_top = math.exp(-lambda_top)
-    p_clean_bot = math.exp(-lambda_bot)
+    p_clean_top = 1.0 - p_score_top
+    p_clean_bot = 1.0 - p_score_bot
     p_nrfi = round(p_clean_top * p_clean_bot, 4)
+
+    exp_top = round((LEAGUE_FIRST_INNING_RUN_RATE / 2.0) * top_mult, 4)
+    exp_bot = round((LEAGUE_FIRST_INNING_RUN_RATE / 2.0) * bot_mult, 4)
 
     return NRFIFeatures(
         home_sp_fip=home_sp["fip"],
@@ -337,7 +383,7 @@ def compute_nrfi_features(
         home_top3_composite=home_top3["composite"],
         park_factor=round(pf, 3),
         weather_factor=round(weather_factor, 3),
-        half_top_expected_runs=round(lambda_top, 4),
-        half_bot_expected_runs=round(lambda_bot, 4),
+        half_top_expected_runs=exp_top,
+        half_bot_expected_runs=exp_bot,
         nrfi_decomposed_prob=p_nrfi,
     )

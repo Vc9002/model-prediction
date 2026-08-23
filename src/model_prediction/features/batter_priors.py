@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 PRIOR_HYPERPARAMETERS: dict[str, tuple[float, float]] = {
     "k_pct": (0.225, 60.0),
@@ -140,9 +141,55 @@ class LineupPriorVector:
 class PointInTimeBatterPriorEngine:
     """Maintains sequential PIT batter states and constructs order-weighted lineup features."""
 
-    def __init__(self) -> None:
+    def __init__(self, snapshot_path: str | Path | None = None) -> None:
         self._player_history: dict[str, list[BatterGameRecord]] = {}
         self._team_history: dict[str, list[tuple[str, str, int]]] = {}
+        if snapshot_path is not None:
+            self._load_from_snapshot(Path(snapshot_path))
+
+    def _load_from_snapshot(self, path: Path) -> None:
+        if not path.exists():
+            return
+        import json
+
+        with path.open(encoding="utf-8") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                game_date = str(row.get("game_date") or row.get("official_date") or "")[:10]
+                for side in ("home", "away"):
+                    team_name = row.get(f"{side}_team", "")
+                    for p in row.get(f"{side}_batters", []):
+                        pid = str(p.get("id") or p.get("player_id") or "")
+                        if not pid:
+                            continue
+                        pa = int(p.get("pa") or p.get("plateAppearances") or 0)
+                        ab = int(p.get("ab") or p.get("atBats") or pa)
+                        hits = int(p.get("hits") or p.get("h") or 0)
+                        doubles = int(p.get("doubles") or p.get("2b") or 0)
+                        triples = int(p.get("triples") or p.get("3b") or 0)
+                        hr = int(p.get("hr") or p.get("homeRuns") or 0)
+                        bb = int(p.get("bb") or p.get("baseOnBalls") or 0)
+                        so = int(p.get("so") or p.get("strikeOuts") or 0)
+                        self.update_player_game(
+                            BatterGameRecord(
+                                player_id=pid,
+                                game_date=game_date,
+                                team_id=team_name,
+                                pa=pa,
+                                ab=ab,
+                                hits=hits,
+                                doubles=doubles,
+                                triples=triples,
+                                home_runs=hr,
+                                walks=bb,
+                                strikeouts=so,
+                            )
+                        )
 
     def update_player_game(self, record: BatterGameRecord) -> None:
         """Record a player game result sequentially."""
@@ -151,6 +198,9 @@ class PointInTimeBatterPriorEngine:
             self._team_history.setdefault(record.team_id, []).append(
                 (record.player_id, record.game_date, record.pa)
             )
+
+    def ingest_game_record(self, record: BatterGameRecord) -> None:
+        self.update_player_game(record)
 
     def get_player_prior(
         self,
@@ -284,3 +334,6 @@ class PointInTimeBatterPriorEngine:
             hard_hit_pct=round(agg_hard_hit, 4),
             sample_pa=total_sample_pa,
         )
+
+
+BatterPriorEngine = PointInTimeBatterPriorEngine
