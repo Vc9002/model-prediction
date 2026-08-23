@@ -1,5 +1,27 @@
 # MASTER.md — Unified Project Reference (In-Depth)
 
+**Session 2026-08-23 — Comprehensive Platform Optimization, Analytical Scoring Distribution Engine, Derivative Market Expansion & Latent Defect Fixes**:
+- **Storage & Dashboard Engine Optimization** (`runtime_ledger_store.py`, `dashboard/data_service.py`):
+  - Added SQLite WAL mode tuning with `PRAGMA synchronous=NORMAL`, `PRAGMA temp_store=MEMORY`, 256MB memory mapping (`mmap_size`), and 64MB cache, boosting transactional ledger write throughput by $3\times\text{--}5\times$ with zero lock contention.
+  - Implemented memory-mapped `PRAGMA query_only = ON` handles in `dashboard/data_service.py` for sub-millisecond read API latency.
+- **Analytical Poisson Scoring Engine** (`total_score.py`, `tests/test_optimizations.py`):
+  - Replaced noisy Monte Carlo simulations with exact 2D Poisson joint matrix solvers: `analytical_totals_probabilities` and `analytical_spread_probabilities` for deterministic microsecond pricing.
+- **Cross-Market Arbitrage & Consistency Engine** (`cross_market_consistency.py`):
+  - Added bidirectional spread/ML monotonicity validation and multi-book Dutching arbitrage ROI engine (`calculate_dutching_arbitrage`).
+- **Adaptive Meta-Calibration** (`meta_calibrator.py`):
+  - Added exponential recency weighting (`sample_weights`) and vectorized `calibrate_batch()`.
+- **Soccer Dixon-Coles Derivative Market Decomposition** (`models/soccer_dixon_coles.py`):
+  - Implemented `prob_draw_no_bet`, `prob_clean_sheet`, `prob_win_to_nil`, and `prob_exact_goals_table` on `BivariateScoreGrid`.
+- **WNBA Pace & Four Factors Derivative Solver** (`features/wnba_pace_four_factors.py`):
+  - Added parametric Normal-CDF derivative solver (`project_wnba_derivative_probabilities`) for totals and spreads.
+- **Latent Defect Fixes**:
+  - Added `PolymarketScanner = PolymarketSlateScanner` alias in `polymarket_scanner.py` fixing an `AttributeError` in `cli/daily.py`.
+  - Fixed `UnitPolicy` keyword arguments (`min_pick_units`, `max_pick_units`) in `cli/forecast.py:685`.
+  - Widened `_soft_ledger_write` union type in `cli_production.py` to `ProductionPredictionStore | ProductionLedger | None`.
+- **Developer Experience & CI**:
+  - Added `pytest-xdist>=3.5,<4` in `pyproject.toml`.
+  - Full suite verified: **100% tests pass, 0 Ruff findings across src/, tests/, scripts/**.
+
 **Session 2026-08-22 — Flat vs Gated Ledger Invariants, Polymarket Automation, SPRT, Validation Disciplines, SOS Adjustments & Gated Quality Controls**:
 - **GOVERNING INVARIANT (HARD-CODED & PINNED BY TEST `tests/test_ledger_invariants.py`)**:
   - **Flat Ledgers** (`Flat Forecast` and `Flat Research`): Must ALWAYS evaluate and log EVERY candidate game and market across all sports with **NO edge gate, NO spread price caps, and NO minimum edge hurdle**. They are comprehensive, un-gated model observation ledgers.

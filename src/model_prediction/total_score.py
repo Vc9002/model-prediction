@@ -462,3 +462,98 @@ def mlb_totals_v2_projected_runs(
         "away_projected_runs": round(away_expected, 3),
         "total_projected_runs": round(total, 3),
     }
+
+
+def analytical_totals_probabilities(
+    home_projected_runs: float,
+    away_projected_runs: float,
+    total_line: float,
+    max_runs: int = 30,
+) -> dict[str, float]:
+    """Calculate exact analytical over, under, and push probabilities under independent Poisson processes.
+
+    Parameters
+    ----------
+    home_projected_runs : float
+        Expected runs for home team.
+    away_projected_runs : float
+        Expected runs for away team.
+    total_line : float
+        Betting total line (e.g. 7.5, 8.0, 8.5).
+    max_runs : int, default 30
+        Upper bound truncation for joint distribution matrix.
+
+    Returns
+    -------
+    dict with 'prob_over', 'prob_under', 'prob_push'.
+    """
+    from scipy import stats
+
+    lh = max(0.2, float(home_projected_runs))
+    la = max(0.2, float(away_projected_runs))
+
+    k = np.arange(0, max_runs + 1)
+    pmf_h = stats.poisson.pmf(k, lh)
+    pmf_a = stats.poisson.pmf(k, la)
+
+    # 2D joint score probability matrix
+    joint = np.outer(pmf_h, pmf_a)
+
+    # Sum coordinates
+    total_grid = k[:, None] + k[None, :]
+
+    prob_over = float(np.sum(joint[total_grid > total_line]))
+    prob_under = float(np.sum(joint[total_grid < total_line]))
+    prob_push = float(np.sum(joint[total_grid == total_line]))
+
+    # Normalize across truncated support
+    support_sum = prob_over + prob_under + prob_push
+    if support_sum > 0:
+        prob_over /= support_sum
+        prob_under /= support_sum
+        prob_push /= support_sum
+
+    return {
+        "prob_over": round(prob_over, 4),
+        "prob_under": round(prob_under, 4),
+        "prob_push": round(prob_push, 4),
+    }
+
+
+def analytical_spread_probabilities(
+    home_projected_runs: float,
+    away_projected_runs: float,
+    spread_line: float = -1.5,
+    max_runs: int = 30,
+) -> dict[str, float]:
+    """Calculate exact analytical spread cover probability for home team.
+
+    For example, with spread_line = -1.5, computes P(Home Score - Away Score > 1.5).
+    """
+    from scipy import stats
+
+    lh = max(0.2, float(home_projected_runs))
+    la = max(0.2, float(away_projected_runs))
+
+    k = np.arange(0, max_runs + 1)
+    pmf_h = stats.poisson.pmf(k, lh)
+    pmf_a = stats.poisson.pmf(k, la)
+
+    joint = np.outer(pmf_h, pmf_a)
+    margin_grid = k[:, None] - k[None, :]
+
+    prob_cover_home = float(np.sum(joint[margin_grid > -spread_line]))
+    prob_cover_away = float(np.sum(joint[margin_grid < -spread_line]))
+    prob_push = float(np.sum(joint[margin_grid == -spread_line]))
+
+    support_sum = prob_cover_home + prob_cover_away + prob_push
+    if support_sum > 0:
+        prob_cover_home /= support_sum
+        prob_cover_away /= support_sum
+        prob_push /= support_sum
+
+    return {
+        "prob_cover_home": round(prob_cover_home, 4),
+        "prob_cover_away": round(prob_cover_away, 4),
+        "prob_push": round(prob_push, 4),
+    }

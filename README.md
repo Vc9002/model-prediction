@@ -9,7 +9,7 @@ CLI and read [`docs/rebuild/README.md`](docs/rebuild/README.md) before operating
 it. Rebuild output cannot submit live orders, write incumbent ledgers, or
 promote a model into production.
 
-**Last updated**: 2026-08-20
+**Last updated**: 2026-08-23
 
 The current operational verdict and audit evidence live in
 [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) and [`docs/MASTER.md`](docs/MASTER.md).
@@ -19,10 +19,10 @@ Complete documentation index lives in **[`docs/INDEX.md`](docs/INDEX.md)**.
 
 | Metric | Value |
 |--------|-------|
-| Tests | **1,938 passed, 3 skipped, 0 failed** (2026-08-20) |
+| Tests | **2,205 passed, 3 skipped, 0 failed** (2026-08-23) |
 | Ruff | **0 findings** (clean across `src/`, `tests/`, and `scripts/`) |
 | Type safety | `src/model_prediction/py.typed` marker + library overrides |
-| Git | `main` (clean branch topology) |
+| Git | `main` / `research/mlb-v9` (clean branch topology) |
 | CI | `.github/workflows/ci.yml` — ruff + pytest on push/PR |
 | Documentation | Consolidated under [`docs/`](docs/) (master index: [`docs/INDEX.md`](docs/INDEX.md)) |
 

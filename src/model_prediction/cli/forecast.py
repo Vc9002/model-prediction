@@ -682,7 +682,9 @@ def _forecast_mlb_nrfi_flat(
                                 now=event_decision_dt,
                                 canonical_team_ids=(away_obj.canonical_team_id, home_obj.canonical_team_id),
                             ),
-                            unit_policy(config) if config else UnitPolicy(min_units=0.0, max_units=2.0),
+                            unit_policy(config)
+                            if config
+                            else UnitPolicy(min_pick_units=0.0, max_pick_units=2.0),
                             now=event_decision_dt,
                         )
                 except Exception as exc:  # noqa: BLE001

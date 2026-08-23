@@ -32,6 +32,7 @@ dev = [
   "hypothesis>=6,<7",
   "mypy>=1.11,<2",
   "pytest>=8,<9",
+  "pytest-xdist>=3.5,<4",
   "ruff>=0.6,<1",
   "scipy-stubs",
   "types-PyYAML",
