@@ -23,6 +23,7 @@ data/logs/
 dashboard/server.log
 data/events.jsonl
 data/mlb_statsapi/game_snapshots.jsonl
+data/statcast/
 data/**/*.cache
 *.cache
 
