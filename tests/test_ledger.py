@@ -363,6 +363,31 @@ def test_recompute_research_sizing_is_idempotent(tmp_path) -> None:
     assert changed_again == 0
 
 
+def test_recompute_research_sizing_can_scope_exact_reason_and_pick_identity(tmp_path) -> None:
+    ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
+    targeted = ledger.append_evaluated(
+        replace(request(), event_id="targeted"), _observation("NO_CALL_LOW_EDGE", 0.0)
+    )
+    other_reason = ledger.append_evaluated(
+        replace(request(), event_id="other-reason"),
+        _observation("NO_CALL_MODEL_UNVALIDATED", 0.0),
+    )
+    same_reason_other_pick = ledger.append_evaluated(
+        replace(request(), event_id="other-pick"), _observation("NO_CALL_LOW_EDGE", 0.0)
+    )
+
+    changed = ledger.recompute_research_sizing(
+        reason_codes={"NO_CALL_LOW_EDGE"},
+        pick_ids={targeted["pick_id"]},
+    )
+
+    rows = {row["pick_id"]: row for row in ledger.rows()}
+    assert changed == 1
+    assert float(rows[targeted["pick_id"]]["units"]) > 0
+    assert float(rows[other_reason["pick_id"]]["units"]) == 0
+    assert float(rows[same_reason_other_pick["pick_id"]]["units"]) == 0
+
+
 def test_a_retired_ledger_never_touches_disk(tmp_path) -> None:
     """2026-08-11: data/main was archived and its automated daily job
     paused specifically because a fresh PickLedger.initialize() would have

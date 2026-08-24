@@ -112,6 +112,6 @@ echo "Exit codes — settle: $SETTLE_EXIT, v9_settle: $V9_SETTLE_EXIT, ingest: $
 # Cleanup old logs
 find data/logs -name "daily_*.log" -mtime +30 -delete
 
-if [ "$SETTLE_EXIT" -ne 0 ] || [ "$INGEST_EXIT" -ne 0 ] || [ "$DAILY_EXIT" -ne 0 ]; then
+if [ "$SETTLE_EXIT" -ne 0 ] || [ "$V9_SETTLE_EXIT" -ne 0 ] || [ "$INGEST_EXIT" -ne 0 ] || [ "$DAILY_EXIT" -ne 0 ] || [ "$V9_FORECAST_EXIT" -ne 0 ]; then
     exit 1
 fi

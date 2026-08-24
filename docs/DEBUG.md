@@ -49,12 +49,56 @@ derivative workflows are explicit blocked/research-only health entries.
 Material daily substep failures now produce a nonzero supervisor result after
 fail-soft work completes. Production serving was not expanded.
 
-Verification: 2,267 tests passed, 4 skipped; changed-path Ruff and YAML parsing
-passed; SQLite integrity and the 37,805-event replay chain passed. Whole-tree
+The Flat MLB moneyline P&L anomaly had a separate cause. The confidence
+downgrade wrote `units=0` and later settled `pnl_units=0`, while the dashboard
+silently substituted a suggested 0.75--1.75U display size. That mixed a
+30-game win-rate denominator with only five genuinely scored rows. The repair
+was scoped to the exact canonical signature
+`flat/mlb + NO_CALL_BELOW_LEARNED_CONFIDENCE + units=0`: 112 settled rows were
+resized from their stored decision-time inputs and regraded, then 649 matching
+model-ledger observations were synchronized from SQLite. The reported
+08-22--08-23 slice is now 19-11, `+1.8975U`, `6.3% ROI` over 30.0U, with no
+zero-P&L wins or losses. Timestamped SQLite/XLSX backups were created before
+mutation. The repair script is dry-run by default, requires SQLite authority,
+and refuses to run while the daily writer lock is held.
+
+Flat forecasts now retain model-derived paper size when confidence or live
+market availability makes the row a research `NO_CALL`; an unverifiable quote
+is discarded and the row is explicitly labeled as a standard `-110` paper
+benchmark. Main remains fail-closed. The dashboard no longer invents size for
+a settled zero-unit row, and system health now checks every settled binary row
+for a positive scoring basis and coherent win/loss P&L directly in canonical
+SQLite.
+
+The same investigation found a scheduler false green: the latest daily run's
+MLB v9 forecast exited 1 after calling a removed `PickLedger.list_picks()` API
+and then hitting a duplicate, but `run_daily.sh` ignored both v9 child exit
+codes in its final gate. The benchmark now reads the public `rows()` API and
+handles a concurrent duplicate idempotently; the shell gate includes settle,
+v9 settle, ingest, daily, and v9 forecast exits. A live v9 rerun scanned ten
+events, skipped all ten existing identities, and exited zero.
+
+A fresh full supervisor run then finished with
+`settle=0, v9_settle=0, ingest=0, daily=0, v9_forecast=0`; a separate
+production refresh also exited zero and cleared its stale-prediction warning.
+System health remains deliberately `DEGRADED` only for the five explicitly
+unqualified serving workflows above. It must not be relabeled healthy until
+those exact sport/market artifacts earn qualification.
+
+Five ambiguous model-ledger conflicts remain deliberately unmodified (three
+tennis, one CS2, one LoL): multiple stored observations disagree on settlement
+economics, so there is no safe identity-scoped correction without stronger
+source evidence. They are evidence gaps, not candidates for automatic P&L
+normalization.
+
+Verification after both repairs: 2,273 tests passed, 4 skipped; changed-path
+Ruff and shell syntax passed; SQLite integrity and the 39,576-event replay
+chain passed. Whole-tree
 Ruff still reports five findings in the pre-existing untracked
 `scripts/audit_mlb_v9_feature_distribution.py`, which this repair preserved.
 
-Remaining evidence gaps are explicit, not repaired with fake history: 3,240
+At the pre-repair audit snapshot, remaining evidence gaps were explicit, not
+repaired with fake history: 3,240
 active rows predate market-snapshot lineage, 40 active MLB rows lack an
 artifact hash, and 11,398 canonical rows have no recorded feature values.
 There are 232 open rows, including 24 more than 24 hours past start and 19

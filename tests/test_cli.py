@@ -1646,6 +1646,7 @@ def test_below_learned_confidence_threshold_downgraded_and_kept_off_main(monkeyp
             "timestamp_valid": True,
         },
     )
+    monkeypatch.setattr(cli_forecast, "_canonical_market_snapshot_lineage", _verified_market_lineage)
 
     class Registry:
         version = "1"
@@ -1700,6 +1701,52 @@ def test_below_learned_confidence_threshold_downgraded_and_kept_off_main(monkeyp
     # production sport in non-flat mode).
     assert result["logged"] == 0
     assert ledger.appended == []
+
+    # Flat is explicitly the every-game paper benchmark. The confidence
+    # threshold still labels the row as a research NO_CALL, but must not
+    # erase its model-derived paper size and make settled P&L impossible.
+    flat_ledger = _CaptureLedger()
+    flat_result = cli._forecast_learned_sport(
+        "mlb",
+        "2026-07-26",
+        True,
+        config,
+        Registry(),
+        object(),
+        flat_ledger,
+        flat_mode=True,
+    )
+
+    assert flat_result["logged"] == 1
+    flat_eligibility = flat_ledger.appended[0][1]
+    assert flat_eligibility.record_type is RecordType.RESEARCH_OBSERVATION
+    assert flat_eligibility.decision == "NO_CALL"
+    assert flat_eligibility.reason_code == "NO_CALL_BELOW_LEARNED_CONFIDENCE"
+    assert flat_eligibility.units == pytest.approx(1.0)
+
+    # If the matched exchange quote has no verifiable archive lineage, Flat
+    # must not pretend it was the decision price. It remains a sized paper
+    # observation on the explicit -110 benchmark; Main remains fail-closed.
+    monkeypatch.setattr(cli_forecast, "_canonical_market_snapshot_lineage", lambda *_args: None)
+    fallback_ledger = _CaptureLedger()
+    fallback_result = cli._forecast_learned_sport(
+        "mlb",
+        "2026-07-26",
+        True,
+        config,
+        Registry(),
+        object(),
+        fallback_ledger,
+        flat_mode=True,
+    )
+
+    assert fallback_result["logged"] == 1
+    fallback_request, fallback_eligibility = fallback_ledger.appended[0]
+    assert fallback_request.sportsbook == "model_opinion_no_executable_quote"
+    assert fallback_request.american_odds == -110
+    assert fallback_request.market_snapshot_hash is None
+    assert fallback_eligibility.reason_code == "NO_CALL_MARKET_UNAVAILABLE"
+    assert fallback_eligibility.units == pytest.approx(1.0)
 
 
 def test_market_residual_probability_recorded_when_artifact_configured(monkeypatch, tmp_path) -> None:

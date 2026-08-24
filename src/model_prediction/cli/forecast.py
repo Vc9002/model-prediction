@@ -1616,6 +1616,12 @@ def _forecast_learned_sport(
                             ),
                         }
                     )
+                    if flat_mode:
+                        # Flat is a paper benchmark, not an execution claim.
+                        # An unverifiable quote cannot be stored as its price,
+                        # but the row can still be scored on the explicit
+                        # standard -110 fallback used when no quote matched.
+                        quote = None
             # Operator directive (2026-07-30): the minimum-edge-vs-executable-
             # ask check no longer hides a candidate from the ledger. Sizing
             # (edge_scaled_units, applied downstream in evaluate_eligibility)
@@ -1760,7 +1766,7 @@ def _forecast_learned_sport(
                             record_type=RecordType.RESEARCH_OBSERVATION,
                             decision="NO_CALL",
                             reason_code="NO_CALL_MARKET_UNAVAILABLE",
-                            units=0,
+                            units=eligibility.units if flat_mode else 0,
                         )
                     # evaluate_eligibility itself no longer gates on
                     # disagreement, exposure, or edge (operator directive,
@@ -1784,7 +1790,6 @@ def _forecast_learned_sport(
                             record_type=RecordType.RESEARCH_OBSERVATION,
                             decision="NO_CALL",
                             reason_code="NO_CALL_BELOW_LEARNED_CONFIDENCE",
-                            units=0,
                         )
                     if eligibility.decision == "CALL" and not _is_registered_serving_model(
                         request.model_version,

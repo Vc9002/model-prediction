@@ -544,6 +544,52 @@ class ModelLedger:
                 self._write_unlocked(rows)
         return settled_rows
 
+    def repair_events_from_canonical(
+        self,
+        corrections: dict[tuple[str, str, str, str, str], dict[str, Any]],
+        *,
+        correction_reason: str,
+    ) -> list[dict[str, str]]:
+        """Synchronize open or already-settled rows from canonical evidence.
+
+        This is an explicit repair boundary, not part of normal settlement.
+        A model ledger may contain several forecast-time observations of the
+        same contract; all share one realized outcome. The caller must back up
+        the workbook and provide a nonblank reason before this method can
+        correct stranded open rows or stale zero-P&L settlements in one atomic
+        workbook rewrite.
+        """
+        if not correction_reason.strip():
+            raise ValueError("a nonblank correction reason is required")
+        repaired: list[dict[str, str]] = []
+        with self._lock():
+            rows = self._read_unlocked()
+            for row in rows:
+                if row["status"] == "failed":
+                    continue
+                correction = corrections.get(_event_settlement_key(row))
+                if correction is None:
+                    continue
+                result = str(correction.get("result") or "")
+                if result not in {"win", "loss", "push"}:
+                    raise ValueError("canonical correction requires win/loss/push result")
+                row.update(
+                    {
+                        "status": "settled",
+                        "result": result,
+                        "settled_at_utc": str(correction.get("settled_at_utc") or iso_utc(utc_now())),
+                    }
+                )
+                for field in ("closing_price", "probability_clv", "pnl_units"):
+                    value = correction.get(field)
+                    if value not in (None, ""):
+                        decimals = 4 if field == "pnl_units" else 6
+                        row[field] = f"{float(value):.{decimals}f}"
+                repaired.append(row)
+            if repaired:
+                self._write_unlocked(rows)
+        return repaired
+
     def record_operator_decision(
         self,
         prediction_id: str,

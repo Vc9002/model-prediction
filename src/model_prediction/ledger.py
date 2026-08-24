@@ -1223,7 +1223,13 @@ class PickLedger:
         )
         return row
 
-    def recompute_research_sizing(self, policy=None) -> int:
+    def recompute_research_sizing(
+        self,
+        policy=None,
+        *,
+        reason_codes: set[str] | None = None,
+        pick_ids: set[str] | None = None,
+    ) -> int:
         """Recompute ``units`` (and ``pnl_units`` for already-settled rows)
         for every RESEARCH_OBSERVATION row, from that row's own stored
         decision-time fields, using the current sizing rule in
@@ -1245,12 +1251,16 @@ class PickLedger:
 
         policy = policy or _unit_policy(load_config())
         unsizable_reasons = {"NO_CALL_TEAM_BANNED"}
-        changed = 0
+        changed_rows: list[dict[str, str]] = []
         with self._lock():
             self._migrate_if_needed()
             rows = self._read_unlocked()
             for row in rows:
                 if row["record_type"] != RecordType.RESEARCH_OBSERVATION.value:
+                    continue
+                if reason_codes is not None and row.get("reason_code") not in reason_codes:
+                    continue
+                if pick_ids is not None and row.get("pick_id") not in pick_ids:
                     continue
                 try:
                     model_probability = float(row["model_probability"])
@@ -1272,20 +1282,38 @@ class PickLedger:
                     decimal_odds = float(row["decision_decimal_odds"] or row["decimal_odds"])
                     pnl = profit_units(PickResult(row["result"]), new_units, decimal_odds)
                     row["pnl_units"] = f"{pnl:.4f}"
-                changed += 1
-            if changed:
+                changed_rows.append(row)
+            if changed_rows:
                 self.audit.append(
                     "ledger_units_recomputed",
                     str(self.path),
-                    {"rows_changed": changed, "reason": "backfill fixed research-observation sizing rule"},
+                    {
+                        "rows_changed": len(changed_rows),
+                        "pick_ids": [row["pick_id"] for row in changed_rows],
+                        "reason_codes": sorted(reason_codes) if reason_codes is not None else None,
+                        "reason": "backfill fixed research-observation sizing rule",
+                    },
                 )
                 if self.authority == "sqlite":
-                    for row in rows:
-                        self._mirror_row(row, "update", f"op-resize-{row['pick_id']}")
+                    for row in changed_rows:
+                        operation_material = f"{row['pick_id']}|{row['units']}|{row.get('pnl_units') or ''}"
+                        operation_suffix = uuid.uuid5(uuid.NAMESPACE_URL, operation_material).hex[:16]
+                        self._mirror_row(
+                            row,
+                            "update",
+                            f"op-resize-{row['pick_id']}-{operation_suffix}",
+                        )
                 self._write_rows(rows)
-        for row in rows:
-            self._mirror_row(row, "update", f"op-resize-{row['pick_id']}")
-        return changed
+        if self.authority != "sqlite":
+            for row in changed_rows:
+                operation_material = f"{row['pick_id']}|{row['units']}|{row.get('pnl_units') or ''}"
+                operation_suffix = uuid.uuid5(uuid.NAMESPACE_URL, operation_material).hex[:16]
+                self._mirror_row(
+                    row,
+                    "update",
+                    f"op-resize-{row['pick_id']}-{operation_suffix}",
+                )
+        return len(changed_rows)
 
     def remove_open_rows(
         self, pick_ids: list[str], reason: str, allow_staked_removal: bool = False

@@ -374,20 +374,34 @@ def _decorate_pick(
         if slug:
             net = _net_position_quantity(slug, portfolio_history or _load_portfolio_history())
             position_closed = net is not None and abs(net) < 1e-6
-    display_units = (
-        _number(row.get("units")) or _number(row.get("research_score_units")) or _suggested_units(row) or 0
-    )
+    ledger_units = _number(row.get("units"), None)
+    research_units = _number(row.get("research_score_units"), None)
+    if ledger_units is not None and ledger_units > 0:
+        display_units = ledger_units
+    elif research_units is not None and research_units > 0:
+        display_units = research_units
+    elif str(row.get("status") or "").lower() != "settled":
+        display_units = _suggested_units(row) or 0
+    elif ledger_units is not None:
+        display_units = ledger_units
+    else:
+        display_units = 0
     ledger_pnl = _number(row.get("pnl_units"), None)
     research_pnl = _number(row.get("research_pnl_units"), None)
-    display_pnl = ledger_pnl if ledger_pnl is not None else research_pnl
+    if (row.get("result") == "push" and ledger_pnl is not None) or (
+        ledger_units is not None and ledger_units > 0
+    ):
+        display_pnl = ledger_pnl
+    elif research_units is not None and research_units > 0:
+        display_pnl = research_pnl
+    else:
+        display_pnl = None
     # Recorded settlement is authoritative, including a legitimate 0.0 push.
     # This fallback exists only for malformed legacy rows. It uses immutable
     # decision-time prices and never a current quote, which would rewrite history.
     if display_pnl is None and row.get("result") in ("win", "loss"):
-        effective_units = _number(row.get("units"), None)
-        if effective_units is None:
-            effective_units = _number(row.get("research_score_units"), None)
-        if effective_units is not None:
+        effective_units = ledger_units if ledger_units is not None and ledger_units > 0 else research_units
+        if effective_units is not None and effective_units > 0:
             sportsbook = str(row.get("sportsbook") or "").strip().lower()
             if sportsbook in {"kalshi", "polymarket", "polymarket_us", "prediction_market"}:
                 entry_price = _number(

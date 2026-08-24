@@ -574,3 +574,36 @@ def test_settle_event_does_not_grade_a_sign_flipped_line(tmp_path) -> None:
     assert [r["prediction_id"] for r in settled] == [plus["prediction_id"]]
     rows = {r["prediction_id"]: r for r in ledger.rows()}
     assert rows[minus["prediction_id"]]["status"] == "open"
+
+
+def test_repair_events_from_canonical_updates_open_and_zero_pnl_refreshes_atomically(tmp_path) -> None:
+    from model_prediction.model_ledger import _event_settlement_key
+
+    ledger = ModelLedger(tmp_path / "mlb-moneyline-elo-trend-lr.xlsx")
+    first = ledger.append_prediction(_prediction(observed_at_utc="2026-08-02T12:00:00Z"))
+    second = ledger.append_prediction(_prediction(observed_at_utc="2026-08-02T13:00:00Z"))
+    ledger.settle(first["prediction_id"], result="win", pnl_units=0.0)
+    correction = {
+        _event_settlement_key(first): {
+            "result": "win",
+            "pnl_units": 1.25,
+            "closing_price": 0.60,
+            "probability_clv": 0.02,
+            "settled_at_utc": "2026-08-03T02:00:00Z",
+        }
+    }
+
+    repaired = ledger.repair_events_from_canonical(
+        correction,
+        correction_reason="canonical Flat P&L repair",
+    )
+
+    assert {row["prediction_id"] for row in repaired} == {
+        first["prediction_id"],
+        second["prediction_id"],
+    }
+    rows = {row["prediction_id"]: row for row in ledger.rows()}
+    assert {rows[first["prediction_id"]]["pnl_units"], rows[second["prediction_id"]]["pnl_units"]} == {
+        "1.2500"
+    }
+    assert rows[second["prediction_id"]]["status"] == "settled"

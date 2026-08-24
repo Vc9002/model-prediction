@@ -1622,7 +1622,7 @@ function ledgerRowHtml(p,showCheckbox,mode="default"){
   const research=mode==="research",gated=mode==="gated";
   const res=p.result?`<span class="pill ${p.result}">${p.result}</span>`:(p.status==="open"?'<span class="pill open">open</span>':"");
   const mp=pregamePrice(p),entry=entryPrice(p),edge=edgePoints(p);
-  const size=research?(Number(p.units)||0):(Number(p.display_units??p.units)||Number(p.suggested_paper_units)||0);
+  const size=research?(Number(p.units)||0):Number(p.display_units??p.units??p.research_score_units??0);
   const isSettled=String(p.status||"").toLowerCase()==="settled";
   const rowPnl=isSettled?(research?(Number(p.pnl_units)||0):pickPnl(p)):null;
   const order=(research||gated)?'<span class="dim">paper only</span>':orderControl(p);

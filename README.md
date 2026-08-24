@@ -280,7 +280,7 @@ is only one forecast/settlement code path regardless of how it's invoked:
 | Dashboard button | Command it runs |
 |---|---|
 | Run Tests | `pytest tests/ -q --no-header` |
-| Daily | `scripts/run_daily.sh` (full locked settle → ingest → daily pipeline) |
+| Daily | `run_supervisor run daily` → `scripts/run_daily.sh` (full locked settle → ingest → daily pipeline) |
 | Ledger / Research / Gated tabs → Forecast | `cli forecast --all --date ... --log --replace-today --model learned` |
 | Flat tab → Forecast | `cli flat-forecast --all --date ... --log` |
 | Refresh Prices | `cli polymarket-ledger-prices --date ...` (one `--contract` per open, unarchived pick) |

@@ -223,6 +223,7 @@ def test_dashboard_operational_views_are_null_safe_filterable_and_accessible() -
     assert "p.quote?.ask" not in pnl_helper
     assert "Number(p.units)||1.0" not in pnl_helper
     assert "if(p.pnl_units!=null)return Number(p.pnl_units)" in pnl_helper
+    assert "Number(p.display_units??p.units)||Number(p.suggested_paper_units)" not in html
     assert 'class="pill loss">Blocked' in html
     assert 'aria-label="Purchase blocked:' in html
 

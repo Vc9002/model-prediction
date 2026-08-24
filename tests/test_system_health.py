@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -12,7 +13,8 @@ import yaml
 
 from model_prediction.production_canary import _compute_artifact_hash
 from model_prediction.run_supervisor import RunSupervisor
-from model_prediction.system_health import system_health
+from model_prediction.runtime_paths import RuntimePaths
+from model_prediction.system_health import _ledger_economics, system_health
 
 
 def _iso_days_ago(days: float) -> str:
@@ -206,6 +208,44 @@ def test_non_normalized_stored_probabilities_are_down(tmp_path: Path) -> None:
 
     assert report["status"] == "DOWN"
     assert any("not normalized" in r for r in report["reasons"])
+
+
+def test_ledger_economics_flags_settled_result_without_scoring_basis(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    paths = RuntimePaths(repo_root=repo, runtime_root=repo / "data")
+    paths.ledgers_db.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(paths.ledgers_db)
+    connection.execute(
+        """CREATE TABLE ledger_records (
+        ledger_tier TEXT, sport TEXT, pick_id TEXT, status TEXT, result TEXT,
+        units REAL, pnl_units REAL, decision_payload_json TEXT)"""
+    )
+    connection.execute(
+        "INSERT INTO ledger_records VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "flat",
+            "mlb",
+            "zero-paper-pnl",
+            "settled",
+            "win",
+            0.0,
+            0.0,
+            json.dumps(
+                {
+                    "record_type": "RESEARCH_OBSERVATION",
+                    "reason_code": "NO_CALL_BELOW_LEARNED_CONFIDENCE",
+                }
+            ),
+        ),
+    )
+    connection.commit()
+    connection.close()
+
+    check = _ledger_economics(paths)
+
+    assert check["semantic_errors"] == 1
+    assert check["unscored_results"] == 1
+    assert check["examples"][0]["pick_id"] == "zero-paper-pnl"
 
 
 def test_stale_prediction_degrades(tmp_path: Path) -> None:

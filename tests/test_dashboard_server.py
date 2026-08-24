@@ -1821,6 +1821,29 @@ def test_decorated_pick_preserves_recorded_zero_pnl_and_zero_units(patch_dash) -
     assert decorated["display_pnl_units"] == 0.0
 
 
+def test_decorated_pick_does_not_invent_size_or_zero_pnl_for_unscored_result(patch_dash) -> None:
+    patch_dash("_pick_quote", lambda _: {"ask": 0.20})
+    patch_dash("_order_readiness", lambda *_: (False, "not executable"))
+    patch_dash("_latest_order_for_pick", lambda *_: None)
+    patch_dash("_manual_research_eligibility", lambda _: (False, "no"))
+    patch_dash("_filled_entry_for_pick", lambda *_: None)
+    patch_dash("_suggested_units", lambda _: 1.5)
+    row = {
+        "pick_id": "unscored-win",
+        "status": "settled",
+        "result": "win",
+        "sportsbook": "polymarket_us",
+        "units": 0.0,
+        "pnl_units": 0.0,
+        "market_implied_probability": 0.40,
+    }
+
+    decorated = dashboard_server._decorate_pick(row)
+
+    assert decorated["display_units"] == 0.0
+    assert decorated["display_pnl_units"] is None
+
+
 @pytest.mark.parametrize(
     ("sportsbook", "decision_price", "decimal_odds", "expected"),
     [

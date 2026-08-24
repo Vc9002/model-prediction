@@ -32,12 +32,17 @@ from model_prediction.data_sources.espn import ESPNMLBClient
 from model_prediction.data_sources.mlb_market_odds import MarketOddsSnapshotStore
 from model_prediction.domain import League, MarketType, ModelOrigin, ModelState, PickRequest, RecordType
 from model_prediction.eligibility import EligibilityResult
-from model_prediction.ledger import PickLedger
+from model_prediction.ledger import DuplicatePickError, PickLedger
 from model_prediction.model_ledger import ModelLedger, _event_settlement_key
 
 FLAT_V9_PATH = Path("data/flat_v9/mlb.xlsx")
 V9_MODEL_LEDGER_PATH = Path("data/model_ledgers/mlb-v9-candidate-1.xlsx")
 MARKET_SNAPSHOT_PATH = Path("data/market_odds_snapshots.jsonl")
+
+
+def _existing_event_ids(ledger: PickLedger) -> set[str]:
+    """Return every already-recorded event from the ledger's public row API."""
+    return {str(row["event_id"]) for row in ledger.rows() if row.get("event_id")}
 
 
 def run_v9_flat_forecast(date_str: str | None = None) -> list[dict]:
@@ -77,14 +82,7 @@ def run_v9_flat_forecast(date_str: str | None = None) -> list[dict]:
 
     # Append-only workbook with deduplication
     ledger = PickLedger(path=FLAT_V9_PATH)
-    existing_event_ids: set[str] = set()
-    try:
-        existing_picks = ledger.list_picks()
-        for p in existing_picks:
-            if hasattr(p, "event_id") and p.event_id:
-                existing_event_ids.add(str(p.event_id))
-    except Exception as exc:  # noqa: BLE001
-        print(f"[v9-benchmark] Note: could not load existing picks: {exc}")
+    existing_event_ids = _existing_event_ids(ledger)
 
     generated_picks = []
 
@@ -258,8 +256,16 @@ def run_v9_flat_forecast(date_str: str | None = None) -> list[dict]:
             home_team=home_canonical,
         )
 
-        ledger.append_evaluated(req, elig, now=now_utc)
+        try:
+            ledger.append_evaluated(req, elig, now=now_utc)
+        except DuplicatePickError as error:
+            # The pre-read makes normal reruns idempotent; this guard closes
+            # the race if another process appends the same event afterward.
+            existing_event_ids.add(event_id)
+            print(f"[v9-benchmark] Skipping duplicate {event_id} ({error.pick_id})")
+            continue
         generated_picks.append((req, now_utc))
+        existing_event_ids.add(event_id)
         print(
             f"  [flat-v9] Logged {away_team} @ {home_team} -> {selected_team} "
             f"({selection.upper()}) (model={pick_prob:.3f}, entry={decision_probability:.3f}, 1.0U)"
