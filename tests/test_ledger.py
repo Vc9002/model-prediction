@@ -126,6 +126,69 @@ def test_verified_closing_can_be_added_after_result_without_mutating_decision(tm
     assert {field: updated[field] for field in decision_before} == decision_before
 
 
+def test_settled_row_requires_explicit_reasoned_correction_to_void(tmp_path) -> None:
+    import json
+    import sqlite3
+
+    from model_prediction.runtime_ledger_store import RuntimeLedgerStore
+    from model_prediction.runtime_paths import RuntimePaths
+
+    paths = RuntimePaths.for_test(tmp_path)
+    store = RuntimeLedgerStore(paths)
+    ledger = PickLedger(
+        tmp_path / "picks.xlsx",
+        tmp_path / "events.jsonl",
+        tier="main",
+        mirror=store,
+        authority="sqlite",
+        sport="mlb",
+    )
+    logged = ledger.append_call(request(), 1.0, 70)
+    ledger.settle(logged["pick_id"], away_score=2, home_score=3)
+    event_count_before = store.event_count()
+
+    with pytest.raises(ValueError, match="correction reason"):
+        ledger.void(logged["pick_id"], "invalid derivative settlement")
+    with pytest.raises(ValueError, match="correction reason"):
+        ledger.void(
+            logged["pick_id"],
+            "invalid derivative settlement",
+            correction_reason="   ",
+        )
+
+    corrected = ledger.void(
+        logged["pick_id"],
+        "invalid derivative settlement",
+        correction_reason="winner-only source cannot settle totals",
+    )
+    assert corrected["status"] == "settled"
+    assert corrected["result"] == "push"
+    assert float(corrected["pnl_units"]) == 0
+    assert corrected["void_reason"] == "invalid derivative settlement"
+    assert store.event_count() == event_count_before + 1
+    conn = sqlite3.connect(paths.ledgers_db)
+    try:
+        [payload_json] = conn.execute(
+            "SELECT payload_json FROM ledger_events ORDER BY sequence DESC LIMIT 1"
+        ).fetchone()
+    finally:
+        conn.close()
+    event_payload = json.loads(payload_json)
+    assert event_payload["event_type"] == "void"
+    assert event_payload["note"] == "winner-only source cannot settle totals"
+    assert event_payload["decision_payload"]["void_reason"] == "invalid derivative settlement"
+
+    repeated = ledger.void(
+        logged["pick_id"],
+        "invalid derivative settlement",
+        correction_reason="winner-only source cannot settle totals",
+    )
+    assert repeated == corrected
+    assert store.event_count() == event_count_before + 1
+    assert store.verify_integrity() == (True, [])
+    store.close()
+
+
 AWAY = CanonicalTeam("mlb-nyy", League.MLB, "NYY", "NYY", True, None, None, ())
 HOME = CanonicalTeam("mlb-bos", League.MLB, "BOS", "BOS", True, None, None, ())
 

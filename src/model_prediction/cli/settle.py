@@ -28,7 +28,7 @@ from ..data_sources.polymarket_us import (
 from ..domain import EASTERN, parse_utc, utc_now
 from ..main_ledgers import MultiSportPickLedger
 from ..research_ledgers import existing_research_ledgers
-from ..tennis_forward import TENNIS_TOURS
+from ..tennis_forward import TENNIS_TOURS, _is_tennis_subperiod_slug
 from .state import _LEDGER_LEAGUE_TO_ESPN, _TERMINAL_MARKET_STATES
 
 logger = logging.getLogger("model_prediction.cli")
@@ -424,6 +424,85 @@ def _settle_international_baseball_pick(row: dict, ledger, config) -> dict | Non
         return {"pick_id": row["pick_id"], "reason": str(error)}
 
 
+_TENNIS_IRREGULAR_RESULT_MARKERS = (
+    "abandon",
+    "cancel",
+    "default",
+    "disqualif",
+    "retire",
+    "walkover",
+    "w/o",
+)
+
+
+def _tennis_irregular_result_reason(competition: dict) -> str | None:
+    """Identify results whose derivative settlement is book-specific."""
+
+    def strings(value: Any):
+        if isinstance(value, str):
+            yield value
+        elif isinstance(value, dict):
+            for nested in value.values():
+                yield from strings(nested)
+        elif isinstance(value, list):
+            for nested in value:
+                yield from strings(nested)
+
+    result_text = " ".join(
+        strings(
+            {
+                "status": competition.get("status"),
+                "notes": competition.get("notes"),
+            }
+        )
+    ).casefold()
+    marker = next((item for item in _TENNIS_IRREGULAR_RESULT_MARKERS if item in result_text), None)
+    if marker is None:
+        return None
+    return f"irregular result marker {marker!r} in ESPN status/notes"
+
+
+def _tennis_completed_game_totals(away: dict, home: dict) -> tuple[int, int] | str:
+    """Extract aligned set-game scores, or explain why derivatives cannot grade."""
+    away_lines = away.get("linescores")
+    home_lines = home.get("linescores")
+    if not isinstance(away_lines, list) or not isinstance(home_lines, list):
+        return "ESPN result is missing per-set linescores"
+    if len(away_lines) != len(home_lines) or not 2 <= len(away_lines) <= 5:
+        return "ESPN per-set linescores are missing or misaligned"
+
+    away_games: list[int] = []
+    home_games: list[int] = []
+    try:
+        for away_set, home_set in zip(away_lines, home_lines, strict=True):
+            away_value = float(away_set["value"])
+            home_value = float(home_set["value"])
+            if (
+                away_value < 0
+                or home_value < 0
+                or not away_value.is_integer()
+                or not home_value.is_integer()
+                or away_value == home_value
+            ):
+                return "ESPN per-set linescores contain an invalid game score"
+            away_games.append(int(away_value))
+            home_games.append(int(home_value))
+    except (KeyError, TypeError, ValueError):
+        return "ESPN per-set linescores contain a non-numeric game score"
+
+    away_set_wins = sum(away_game > home_game for away_game, home_game in zip(away_games, home_games))
+    home_set_wins = len(away_games) - away_set_wins
+    away_winner = away.get("winner") is True
+    home_winner = home.get("winner") is True
+    if away_winner == home_winner:
+        return "ESPN completed result lacks one unambiguous match winner"
+    winner_set_wins = away_set_wins if away_winner else home_set_wins
+    loser_set_wins = home_set_wins if away_winner else away_set_wins
+    if winner_set_wins < 2 or winner_set_wins <= loser_set_wins:
+        return "ESPN per-set linescores do not describe a normally completed match"
+    return sum(away_games), sum(home_games)
+
+
 def _find_tennis_result(espn: ESPNClient, game_day: str, row: dict) -> dict | None:
     """Match a ledger row to a completed WTA or ATP singles match by player name.
 
@@ -445,6 +524,7 @@ def _find_tennis_result(espn: ESPNClient, game_day: str, row: dict) -> dict | No
     """
     away_names = {row["away_team"].casefold(), row["original_away_team"].casefold()}
     home_names = {row["home_team"].casefold(), row["original_home_team"].casefold()}
+    competitions: list[tuple[dict, dict]] = []
     for tour in TENNIS_TOURS:
         try:
             scoreboard = espn.scoreboard(tour, game_day)
@@ -459,27 +539,56 @@ def _find_tennis_result(espn: ESPNClient, game_day: str, row: dict) -> dict | No
         for event in scoreboard.get("events", []):
             for grouping in event.get("groupings", []):
                 for competition in grouping.get("competitions", []):
-                    slug = str(competition.get("type", {}).get("slug", ""))
-                    if "singles" not in slug:
-                        continue
-                    competitors = competition.get("competitors", [])
-                    if len(competitors) != 2:
-                        continue
-                    by_side = {item.get("homeAway"): item for item in competitors}
-                    away, home = by_side.get("away"), by_side.get("home")
-                    if not away or not home:
-                        continue
-                    away_name = str((away.get("athlete") or {}).get("displayName", ""))
-                    home_name = str((home.get("athlete") or {}).get("displayName", ""))
-                    if away_name.casefold() not in away_names or home_name.casefold() not in home_names:
-                        continue
-                    status = competition.get("status", {}).get("type", {})
-                    completed = bool(status.get("completed"))
-                    record = {"completed": completed, "status_name": str(status.get("name", ""))}
-                    if completed:
-                        record["away_score"] = 1 if away.get("winner") else 0
-                        record["home_score"] = 1 if home.get("winner") else 0
-                    return record
+                    competitions.append((event, competition))
+
+    ledger_event_id = str(row.get("event_id") or "")
+    for identity_only in (True, False):
+        for event, competition in competitions:
+            slug = str(competition.get("type", {}).get("slug", ""))
+            if "singles" not in slug:
+                continue
+            competitors = competition.get("competitors", [])
+            if len(competitors) != 2:
+                continue
+            by_side = {item.get("homeAway"): item for item in competitors}
+            away, home = by_side.get("away"), by_side.get("home")
+            if not away or not home:
+                continue
+            source_result_id = f"{event.get('id')}:{competition.get('id')}"
+            identity_match = bool(ledger_event_id) and source_result_id == ledger_event_id
+            if identity_only and not identity_match:
+                continue
+            away_name = str((away.get("athlete") or {}).get("displayName", ""))
+            home_name = str((home.get("athlete") or {}).get("displayName", ""))
+            name_match = away_name.casefold() in away_names and home_name.casefold() in home_names
+            if not identity_only and not name_match:
+                continue
+
+            status = competition.get("status", {}).get("type", {})
+            completed = bool(status.get("completed"))
+            record = {"completed": completed, "status_name": str(status.get("name", ""))}
+            if ledger_event_id:
+                record.update(
+                    {
+                        "source_event_id": str(event.get("id") or ""),
+                        "source_competition_id": str(competition.get("id") or ""),
+                        "source_result_id": source_result_id,
+                        "match_basis": "event_id" if identity_match else "player_names",
+                    }
+                )
+            if completed:
+                record["away_score"] = 1 if away.get("winner") else 0
+                record["home_score"] = 1 if home.get("winner") else 0
+                irregular_reason = _tennis_irregular_result_reason(competition)
+                game_totals = _tennis_completed_game_totals(away, home)
+                if irregular_reason is not None:
+                    record["derivative_ungradeable_reason"] = irregular_reason
+                elif isinstance(game_totals, str):
+                    if game_totals != "ESPN result is missing per-set linescores":
+                        record["derivative_ungradeable_reason"] = game_totals
+                else:
+                    record["away_games"], record["home_games"] = game_totals
+            return record
     return None
 
 
@@ -492,27 +601,57 @@ def _settle_tennis_pick(row: dict, ledger, espn: ESPNClient, data_root=None) -> 
     match = _find_tennis_result(espn, game_day, row)
     if match is None or not match.get("completed"):
         return None
+    market_type = str(row.get("market_type") or "").casefold()
+    slug = _extract_market_slug(str(row.get("rationale", "")))
+    if market_type != "moneyline" and slug is not None and _is_tennis_subperiod_slug(slug):
+        return {
+            "pick_id": row["pick_id"],
+            "reason": (
+                "UNSUPPORTED_TENNIS_SUBPERIOD_SETTLEMENT: exact set/period identity "
+                "and result dimensions are unavailable"
+            ),
+        }
+    if market_type in {"spread", "total"}:
+        ungradeable_reason = match.get("derivative_ungradeable_reason")
+        if ungradeable_reason is not None:
+            return {
+                "pick_id": row["pick_id"],
+                "reason": f"UNGRADEABLE_TENNIS_DERIVATIVE: {ungradeable_reason}",
+            }
+        if "away_games" not in match or "home_games" not in match:
+            return {
+                "pick_id": row["pick_id"],
+                "reason": ("UNGRADEABLE_TENNIS_DERIVATIVE: actual aligned per-set game scores are required"),
+            }
+        settle_away = int(match["away_games"])
+        settle_home = int(match["home_games"])
+    elif market_type == "moneyline":
+        settle_away = int(match["away_score"])
+        settle_home = int(match["home_score"])
+    else:
+        return {
+            "pick_id": row["pick_id"],
+            "reason": f"UNSUPPORTED_TENNIS_MARKET_TYPE: {market_type or 'unknown'}",
+        }
     closing_probability = closing_odds = None
-    if data_root is not None:
-        slug = _extract_market_slug(str(row.get("rationale", "")))
-        if slug is not None:
-            try:
-                closing_probability, closing_odds = _closing_probability_for_moneyline_pick(
-                    data_root,
-                    "tennis",
-                    slug,
-                    row["event_start_utc"],
-                    row["home_team"],
-                    row["away_team"],
-                    row["selection"],
-                )
-            except (OSError, ValueError):
-                logger.warning("tennis closing-snapshot lookup failed for slug %s", slug, exc_info=True)
+    if market_type == "moneyline" and data_root is not None and slug is not None:
+        try:
+            closing_probability, closing_odds = _closing_probability_for_moneyline_pick(
+                data_root,
+                "tennis",
+                slug,
+                row["event_start_utc"],
+                row["home_team"],
+                row["away_team"],
+                row["selection"],
+            )
+        except (OSError, ValueError):
+            logger.warning("tennis closing-snapshot lookup failed for slug %s", slug, exc_info=True)
     try:
         settled = ledger.settle(
             row["pick_id"],
-            match["away_score"],
-            match["home_score"],
+            settle_away,
+            settle_home,
             None,
             closing_odds,
             closing_raw_probability=closing_probability,

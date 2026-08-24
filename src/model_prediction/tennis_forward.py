@@ -33,7 +33,7 @@ from .data_sources.espn import _infer_tennis_surface
 from .domain import EASTERN, parse_utc
 from .models.tennis import UpcomingMatch, tennis_model
 
-_PARTIAL_MARKERS = ("-fh-", "-h1-", "-h2-", "-1h-", "-set-")
+_TENNIS_SUBPERIOD_MARKERS = ("fh", "h1", "h2", "1h", "set", "ss", "st")
 
 TENNIS_TOURS = ("WTA", "ATP")
 
@@ -93,10 +93,79 @@ def _name_matches(player: str, text: str) -> bool:
     return len(player_words) >= 2 and player_words[-1] in text_words and len(player_words[-1]) >= 4
 
 
-def _norm_cdf(x: float) -> float:
-    import math
+def _is_tennis_subperiod_slug(slug: str) -> bool:
+    """Return whether a market slug identifies a set/partial-match contract."""
+    normalized = f"-{slug.casefold().strip('-')}-"
+    return any(f"-{marker}-" in normalized for marker in _TENNIS_SUBPERIOD_MARKERS)
 
-    return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+
+def _unsupported_tennis_market_reason(market_type: str, slug: str) -> str | None:
+    if _is_tennis_subperiod_slug(slug):
+        return (
+            "UNSUPPORTED_TENNIS_SUBPERIOD_MARKET: exact set/period identity "
+            "and result dimensions are unavailable"
+        )
+    if market_type in {"spread", "total"}:
+        return "UNSUPPORTED_TENNIS_DERIVATIVE_PRICING: no validated game-score distribution is available"
+    return None
+
+
+def _select_one_tennis_line_per_market(
+    contracts: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
+    """Cap each match at one spread and one total, selected prospectively.
+
+    Alternate lines are distinct contracts but strongly correlated exposure.
+    Ranking uses only information known at decision time: expected return per
+    unit risk for a binary contract (model_probability / executable_ask - 1),
+    then raw edge and quote time as deterministic tie-breakers. Outcomes are
+    deliberately absent, so historical winners can never influence selection.
+    """
+    grouped: dict[tuple[str, str], list[tuple[int, dict[str, Any]]]] = {}
+    passthrough: list[tuple[int, dict[str, Any]]] = []
+    for index, contract in enumerate(contracts):
+        market_type = str(contract.get("market_type") or "").casefold()
+        if market_type not in {"spread", "total"}:
+            passthrough.append((index, contract))
+            continue
+        key = (str(contract.get("event_id") or ""), market_type)
+        grouped.setdefault(key, []).append((index, contract))
+
+    chosen: list[tuple[int, dict[str, Any]]] = list(passthrough)
+    suppressed: list[dict[str, str]] = []
+    for (event_id, market_type), members in grouped.items():
+
+        def rank(item: tuple[int, dict[str, Any]]) -> tuple[float, float, str, str]:
+            _, row = item
+            probability = float(row.get("model_probability") or 0.0)
+            ask = float(row.get("executable_ask") or 0.0)
+            expected_return = probability / ask - 1.0 if 0.0 < ask < 1.0 else float("-inf")
+            edge = float(row.get("edge_vs_executable_ask") or probability - ask)
+            return (
+                expected_return,
+                edge,
+                str(row.get("observed_at_utc") or ""),
+                str(row.get("market_slug") or ""),
+            )
+
+        survivor = max(members, key=rank)
+        chosen.append(survivor)
+        survivor_slug = str(survivor[1].get("market_slug") or "")
+        for _, row in members:
+            if row is survivor[1]:
+                continue
+            suppressed.append(
+                {
+                    "event_id": event_id,
+                    "market_slug": str(row.get("market_slug") or ""),
+                    "reason": "TENNIS_CORRELATED_LINE_SUPERSEDED",
+                    "selected_market_slug": survivor_slug,
+                    "market_type": market_type,
+                }
+            )
+
+    chosen.sort(key=lambda item: item[0])
+    return [row for _, row in chosen], suppressed
 
 
 def _upcoming_singles_matches(scoreboard: dict[str, Any]) -> list[dict[str, Any]]:
@@ -174,10 +243,24 @@ def _latest_tennis_snapshots(
                 or not bool(row.get("timestamp_valid", False))
             ):
                 continue
+            canonical = json.dumps(row, sort_keys=True, separators=(",", ":"))
+            snapshot_hash = hashlib.sha256(canonical.encode()).hexdigest()
+            enriched = dict(row)
+            enriched["_market_snapshot_hash"] = snapshot_hash
+            enriched["_market_snapshot_archive_path"] = str(path.resolve())
+            existing_record_id = row.get("market_snapshot_record_id") or row.get("snapshot_record_id")
+            market_id = row.get("market_id")
+            observed_at_utc = row.get("observed_at_utc")
+            if existing_record_id:
+                enriched["_market_snapshot_record_id"] = str(existing_record_id)
+            elif market_id and observed_at_utc:
+                enriched["_market_snapshot_record_id"] = f"{market_id}:{observed_at_utc}"
+            else:
+                enriched["_market_snapshot_record_id"] = snapshot_hash
             if slug not in latest or str(row.get("observed_at_utc") or "") > str(
                 latest[slug].get("observed_at_utc") or ""
             ):
-                latest[slug] = row
+                latest[slug] = enriched
     return list(latest.values())
 
 
@@ -237,6 +320,7 @@ def build_tennis_slate(
         p_away = float(prediction.probabilities.get("away", 0.5))
         p_home = float(prediction.probabilities.get("home", 0.5))
         priced_before = len(priced)
+        saw_unsupported_market = False
 
         for snapshot in snapshots_by_tour.get(prediction.league, []):
             try:
@@ -274,6 +358,19 @@ def build_tennis_slate(
             if contract_key in seen_contract_keys:
                 continue
 
+            unsupported_reason = _unsupported_tennis_market_reason(str(mtype), slug)
+            if unsupported_reason is not None:
+                seen_contract_keys.add(contract_key)
+                saw_unsupported_market = True
+                skipped.append(
+                    {
+                        "event_id": prediction.event_id,
+                        "market_slug": slug,
+                        "reason": unsupported_reason,
+                    }
+                )
+                continue
+
             if mtype == "moneyline":
                 away_side_key = "long" if away_is_long else "short"
                 home_side_key = "short" if away_side_key == "long" else "long"
@@ -304,111 +401,22 @@ def build_tennis_slate(
                         "observed_at_utc": snapshot["observed_at_utc"],
                         "timestamp_valid": True,
                         "edge_vs_executable_ask": round(prob - float(ask), 6),
+                        "market_snapshot_hash": snapshot["_market_snapshot_hash"],
+                        "market_snapshot_archive_path": snapshot["_market_snapshot_archive_path"],
+                        "market_snapshot_record_id": snapshot["_market_snapshot_record_id"],
                     }
                 )
 
-            elif mtype == "spread":
-                line_val = float(snapshot.get("line") or 0.0)
-                team_anchor = str(snapshot.get("team") or "")
-
-                # Check whether the spread line anchors to Home or Away
-                if _name_matches(prediction.home_team, team_anchor):
-                    mu_delta = 6.0 * (p_home - 0.5)
-                    sigma_delta = 4.0
-                    p_long = _norm_cdf((mu_delta + line_val) / sigma_delta)
-                    p_short = 1.0 - p_long
-                    p_home_cover = p_long
-                    p_away_cover = p_short
-                    long_is_home = True
-                else:
-                    mu_delta = 6.0 * (p_away - 0.5)
-                    sigma_delta = 4.0
-                    p_long = _norm_cdf((mu_delta + line_val) / sigma_delta)
-                    p_short = 1.0 - p_long
-                    p_away_cover = p_long
-                    p_home_cover = p_short
-                    long_is_home = False
-
-                long_ask = (snapshot.get("long") or {}).get("ask")
-                short_ask = (snapshot.get("short") or {}).get("ask")
-
-                selection = "home" if p_home_cover >= p_away_cover else "away"
-                prob = p_home_cover if selection == "home" else p_away_cover
-                ask = (
-                    long_ask
-                    if ((selection == "home" and long_is_home) or (selection == "away" and not long_is_home))
-                    else short_ask
-                )
-                if ask is None or not 0.01 <= float(ask) <= 0.99:
-                    continue
-                seen_contract_keys.add(contract_key)
-                priced.append(
-                    {
-                        "event_id": prediction.event_id,
-                        "event_start_utc": prediction.event_start_utc,
-                        "away_team": prediction.away_team,
-                        "home_team": prediction.home_team,
-                        "market_type": "spread",
-                        "selection": selection,
-                        "line": line_val if selection == "away" else -line_val,
-                        "model_probability": round(prob, 4),
-                        "model_uncertainty": prediction.uncertainty,
-                        "model_version": prediction.model_version,
-                        "feature_basis": prediction.feature_basis,
-                        "rationale": f"Markov Game Handicap: {prediction.away_team} {line_val:+.1f} vs {prediction.home_team}",
-                        "market_slug": slug,
-                        "executable_ask": float(ask),
-                        "observed_at_utc": snapshot["observed_at_utc"],
-                        "timestamp_valid": True,
-                        "edge_vs_executable_ask": round(prob - float(ask), 6),
-                    }
-                )
-
-            elif mtype == "total":
-                line_val = float(snapshot.get("line") or 22.5)
-                exp_games = 22.5 + 3.5 * (1.0 - abs(p_away - 0.5) * 2.0)
-                sigma_total = 4.2
-                p_over = 1.0 - _norm_cdf((line_val - exp_games) / sigma_total)
-                p_under = 1.0 - p_over
-
-                long_ask = (snapshot.get("long") or {}).get("ask")
-                short_ask = (snapshot.get("short") or {}).get("ask")
-
-                selection = "over" if p_over >= p_under else "under"
-                prob = p_over if selection == "over" else p_under
-                ask = long_ask if selection == "over" else short_ask
-                if ask is None or not 0.01 <= float(ask) <= 0.99:
-                    continue
-                seen_contract_keys.add(contract_key)
-                priced.append(
-                    {
-                        "event_id": prediction.event_id,
-                        "event_start_utc": prediction.event_start_utc,
-                        "away_team": prediction.away_team,
-                        "home_team": prediction.home_team,
-                        "market_type": "total",
-                        "selection": selection,
-                        "line": line_val,
-                        "model_probability": round(prob, 4),
-                        "model_uncertainty": prediction.uncertainty,
-                        "model_version": prediction.model_version,
-                        "feature_basis": prediction.feature_basis,
-                        "rationale": f"Markov Total Games: {selection.upper()} {line_val:.1f} (Exp: {exp_games:.1f} games)",
-                        "market_slug": slug,
-                        "executable_ask": float(ask),
-                        "observed_at_utc": snapshot["observed_at_utc"],
-                        "timestamp_valid": True,
-                        "edge_vs_executable_ask": round(prob - float(ask), 6),
-                    }
-                )
-
-        if len(priced) == priced_before:
+        if len(priced) == priced_before and not saw_unsupported_market:
             unmatched.append(
                 {
                     "event_id": prediction.event_id,
                     "reason": "no snapshot matched",
                 }
             )
+
+    priced, correlated_line_skips = _select_one_tennis_line_per_market(priced)
+    skipped.extend(correlated_line_skips)
 
     model_source = Path(__file__).with_name("models") / "tennis.py"
     code_hash = hashlib.sha256(model_source.read_bytes()).hexdigest()
@@ -423,7 +431,8 @@ def build_tennis_slate(
         "unmatched": unmatched,
         "skipped": skipped,
         "note": (
-            "Expanded multi-market Markov engine priced against WTA & ATP moneyline, "
-            "game spread, and total games contracts with same-day tournament matching."
+            "Surface-Elo prices WTA & ATP full-match moneylines only. Tennis spread, "
+            "total, set, and partial-match contracts fail closed until validated score-distribution "
+            "pricing and exact result dimensions are available."
         ),
     }

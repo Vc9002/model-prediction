@@ -64,6 +64,7 @@ from ..market_blend import MarketBlendBlockedError, MarketBlendPolicy, canonical
 from ..models.market_residual import MarketResidualModel
 from ..models.mlb import canonical_mlb_artifact_hash, load_formula_spec
 from ..pricing import implied_probability
+from ..production_registry import ProductionModelRegistry, compute_artifact_hash
 from ..research_ledgers import RESEARCH_LEDGER_SPORTS, research_ledger
 from ..runtime_paths import RuntimePaths
 from ..soccer_forward import build_soccer_total_slate
@@ -79,6 +80,95 @@ from .state import (
 )
 
 logger = logging.getLogger("model_prediction.cli")
+
+
+def _load_exact_artifact_contract(model_version: str) -> tuple[dict[str, Any] | None, str | None]:
+    """Load only the artifact whose own identity exactly matches the model.
+
+    A similarly named artifact is not lineage.  Missing, mismatched, or
+    hash-invalid files return a fail-closed reason and are never replaced by
+    a placeholder hash.
+    """
+    artifact_path = PROJECT_ROOT / "config" / "models" / f"{model_version}.json"
+    if not artifact_path.is_file():
+        return None, f"exact serving artifact missing for {model_version}"
+    try:
+        payload = json.loads(artifact_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        return None, f"exact serving artifact unreadable for {model_version}: {exc}"
+    if payload.get("model_version") != model_version:
+        return None, f"artifact model_version does not match {model_version}"
+    computed_hash = compute_artifact_hash(payload)
+    if payload.get("artifact_hash") != computed_hash:
+        return None, f"artifact_hash mismatch for {model_version}"
+    return payload, None
+
+
+def _is_registered_serving_model(model_version: str, sport: str, market: str) -> bool:
+    """True only for the exact checked-in champion contract."""
+    try:
+        champion = ProductionModelRegistry.load(PROJECT_ROOT).champion(sport, market)
+    except (FileNotFoundError, OSError, TypeError, ValueError):
+        return False
+    return champion is not None and champion.model_id == model_version
+
+
+def _downgrade_unserved(eligibility: Any, reason_code: str = "NO_CALL_MODEL_UNVALIDATED") -> Any:
+    return replace(
+        eligibility,
+        record_type=RecordType.RESEARCH_OBSERVATION,
+        decision="NO_CALL",
+        reason_code=reason_code,
+    )
+
+
+def _canonical_market_snapshot_lineage(row: dict[str, Any], archive_path: Path) -> dict[str, Any] | None:
+    """Bind a parsed prospective quote to its exact archived JSON record."""
+    observed_at = str(row.get("observed_at_utc") or "")
+    source = str(row.get("provider") or "")
+    reconstructed = row.get("reconstructed")
+    prospective_marker = row.get("usage") == "prospective_executable_bbo"
+    if (
+        not archive_path.is_file()
+        or not observed_at
+        or source != "polymarket_us"
+        or row.get("timestamp_valid") is not True
+        or not (reconstructed is False or (reconstructed is None and prospective_marker))
+    ):
+        return None
+    payload = {key: value for key, value in row.items() if not str(key).startswith("_")}
+    digest = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return {
+        "market_quote_observed_at_utc": observed_at,
+        "market_quote_timestamp_valid": True,
+        "market_quote_source": source,
+        "market_quote_provenance": "decision_time_executable_quote",
+        "market_quote_reconstructed": False,
+        "market_snapshot_hash": digest,
+        "market_snapshot_archive_path": str(archive_path.resolve()),
+        "market_snapshot_record_id": digest,
+    }
+
+
+def _read_polymarket_snapshot_rows(snapshot_path: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    if not snapshot_path.is_file():
+        return rows
+    with snapshot_path.open(encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            lineage = _canonical_market_snapshot_lineage(row, snapshot_path)
+            if lineage is not None:
+                row["_lineage"] = lineage
+            rows.append(row)
+    return rows
 
 
 def _forecast_mlb(args_date: str, log: bool, config, registry, bans, ledger, audit) -> dict:
@@ -477,6 +567,12 @@ def _forecast_mlb_totals_flat(
                         unit_policy(config),
                         now=observed_at,
                     )
+                if not _is_registered_serving_model(
+                    request.model_version,
+                    request.league.value,
+                    request.market_type.value,
+                ):
+                    eligibility = _downgrade_unserved(eligibility)
                 planned_rows.append((request, eligibility))
             except (EntityResolutionError, ValueError) as error:
                 if preflight_only or blend_policy is not None:
@@ -511,9 +607,8 @@ def _forecast_mlb_totals_flat(
         "main_ledger_duplicate_event_ids": main_duplicates,
         "skipped": skipped,
         "note": (
-            "Spread/total go to Flat always and Main when genuinely eligible "
-            "(operator directive, 2026-08-03); MLB moneyline is served "
-            "separately by the learned production path."
+            "Spread/total go to Flat for research evidence. Main receives only "
+            "the exact registered champion contract; unregistered workflows fail closed."
         ),
     }
 
@@ -691,8 +786,8 @@ def _forecast_mlb_nrfi_flat(
                     logger.warning("Eligibility evaluation error for NRFI %s: %s", event_id, exc)
                     eligibility = EligibilityResult(
                         record_type=RecordType.RESEARCH_OBSERVATION,
-                        decision="CALL",
-                        reason_code="QUALIFIED",
+                        decision="NO_CALL",
+                        reason_code="NO_CALL_MODEL_UNVALIDATED",
                         units=1.0,
                         confidence_score=50,
                         edge=0.05,
@@ -703,8 +798,8 @@ def _forecast_mlb_nrfi_flat(
             else:
                 eligibility = EligibilityResult(
                     record_type=RecordType.RESEARCH_OBSERVATION,
-                    decision="CALL",
-                    reason_code="QUALIFIED",
+                    decision="NO_CALL",
+                    reason_code="NO_CALL_MODEL_UNVALIDATED",
                     units=1.0,
                     confidence_score=50,
                     edge=0.05,
@@ -712,6 +807,13 @@ def _forecast_mlb_nrfi_flat(
                     away_team=away_team_obj,
                     home_team=home_team_obj,
                 )
+
+            if not _is_registered_serving_model(
+                req_nrfi.model_version,
+                req_nrfi.league.value,
+                req_nrfi.market_type.value,
+            ):
+                eligibility = _downgrade_unserved(eligibility)
 
             # Log to Flat Ledger
             if flat_ledger is not None:
@@ -727,7 +829,7 @@ def _forecast_mlb_nrfi_flat(
                         logged.append(req_nrfi)
 
             # Log to Main Ledger
-            if main_ledger is not None:
+            if main_ledger is not None and eligibility.decision == "CALL":
                 with _LEDGER_LOCK:
                     if (
                         _append_secondary_ledger(
@@ -784,12 +886,22 @@ def _forecast_wnba_spread_slate(data_root, args_date: str, client) -> dict:
 
     observed_at = utc_now()
     model_version = "wnba-spread-margin-v1"
-    # Read the artifact's own hash rather than hardcode it -- a hand-copied
-    # literal silently goes stale the moment the artifact is regenerated
-    # (see F-73/F-74 in DEBUG.md for two real incidents this exact failure
-    # mode caused elsewhere in this project).
-    artifact_path = PROJECT_ROOT / "config/models/wnba-spread-margin-v1.json"
-    model_artifact_hash = str(json.loads(artifact_path.read_text(encoding="utf-8"))["artifact_hash"])
+    artifact, artifact_error = _load_exact_artifact_contract(model_version)
+    if artifact is None:
+        return {
+            "status": "blocked",
+            "reason": artifact_error,
+            "sport": "wnba_spread",
+            "model_version": model_version,
+            "game_date": args_date,
+            "scheduled_games": 0,
+            "market_candidates": 0,
+            "priced_contracts": [],
+            "unmatched": [],
+            "observed_at_utc": observed_at.isoformat(),
+        }
+    model_artifact_hash = str(artifact["artifact_hash"])
+    model_qualified = artifact.get("qualification", {}).get("qualified") is True
     model = BasketballModel(sport="wnba", version=model_version, margin_sd=10.5, total_sd=15.0, league="WNBA")
     store = FeatureStore(data_root)
     history = store.games_before("wnba", args_date)
@@ -798,16 +910,7 @@ def _forecast_wnba_spread_slate(data_root, args_date: str, client) -> dict:
     events = scoreboard.get("events", [])
 
     snapshot_path = Path(data_root) / "odds" / "wnba" / args_date / "polymarket_snapshots.jsonl"
-    snapshot_rows: list[dict] = []
-    if snapshot_path.exists():
-        with snapshot_path.open(encoding="utf-8") as handle:
-            for line in handle:
-                if not line.strip():
-                    continue
-                try:
-                    snapshot_rows.append(json.loads(line))
-                except json.JSONDecodeError:
-                    continue
+    snapshot_rows = _read_polymarket_snapshot_rows(snapshot_path)
     spread_rows = [row for row in snapshot_rows if row.get("market_type") == "spread"]
 
     upcoming: list[UpcomingGame] = []
@@ -853,6 +956,7 @@ def _forecast_wnba_spread_slate(data_root, args_date: str, client) -> dict:
     priced_contracts = []
     for prediction in predictions:
         market = market_by_event_id[prediction.event_id]
+        market_lineage = market.get("_lineage")
         # Model's own pick: the side with higher probability (same
         # convention as every other sport in this project).
         away_prob = prediction.probability("away")
@@ -880,9 +984,15 @@ def _forecast_wnba_spread_slate(data_root, args_date: str, client) -> dict:
                 "model_uncertainty": prediction.uncertainty,
                 "model_version": model_version,
                 "model_artifact_hash": model_artifact_hash,
+                "model_qualified": model_qualified,
                 "rationale": prediction.rationale,
                 "market_slug": market.get("market_slug"),
-                "observed_at_utc": observed_at.isoformat(),
+                "observed_at_utc": (
+                    market_lineage["market_quote_observed_at_utc"]
+                    if market_lineage is not None
+                    else observed_at.isoformat()
+                ),
+                "market_lineage": market_lineage,
             }
         )
 
@@ -890,6 +1000,7 @@ def _forecast_wnba_spread_slate(data_root, args_date: str, client) -> dict:
         "sport": "wnba_spread",
         "model_name": "WNBA Spread (margin normal CDF)",
         "model_version": model_version,
+        "model_qualified": model_qualified,
         "game_date": args_date,
         "scheduled_games": len(events),
         "market_candidates": len(priced_contracts),
@@ -960,6 +1071,7 @@ def _forecast_wnba_spread_sport(
             calibration_artifact_hash=contract["model_artifact_hash"],
             feature_schema_version="wnba-spread-margin-v1",
             code_revision=contract["model_artifact_hash"],
+            **(contract.get("market_lineage") or {}),
         )
         try:
             request.validate(now=observed_now)
@@ -978,6 +1090,16 @@ def _forecast_wnba_spread_sport(
                     unit_policy(config),
                     now=observed_now,
                 )
+                if (
+                    contract.get("model_qualified") is not True
+                    or contract.get("market_lineage") is None
+                    or not _is_registered_serving_model(
+                        request.model_version,
+                        request.league.value,
+                        request.market_type.value,
+                    )
+                ):
+                    eligibility = _downgrade_unserved(eligibility)
                 if (
                     flat_ledger is not None
                     and _append_secondary_ledger(
@@ -1033,16 +1155,22 @@ def _forecast_wnba_total_slate(data_root, args_date: str, client) -> dict:
 
     observed_at = utc_now()
     model_version = "wnba-total-margin-v1"
-    artifact_path = PROJECT_ROOT / "config/models/wnba-total-score-ridge-v1.json"
-    if artifact_path.exists():
-        try:
-            model_artifact_hash = str(
-                json.loads(artifact_path.read_text(encoding="utf-8")).get("artifact_hash", "wnba-total-v1")
-            )
-        except (OSError, ValueError, json.JSONDecodeError):
-            model_artifact_hash = "wnba-total-v1"
-    else:
-        model_artifact_hash = "wnba-total-v1"
+    artifact, artifact_error = _load_exact_artifact_contract(model_version)
+    if artifact is None:
+        return {
+            "status": "blocked",
+            "reason": artifact_error,
+            "sport": "wnba_total",
+            "model_version": model_version,
+            "game_date": args_date,
+            "scheduled_games": 0,
+            "market_candidates": 0,
+            "priced_contracts": [],
+            "unmatched": [],
+            "observed_at_utc": observed_at.isoformat(),
+        }
+    model_artifact_hash = str(artifact["artifact_hash"])
+    model_qualified = artifact.get("qualification", {}).get("qualified") is True
 
     model = BasketballModel(sport="wnba", version=model_version, margin_sd=10.5, total_sd=15.0, league="WNBA")
     store = FeatureStore(data_root)
@@ -1052,16 +1180,7 @@ def _forecast_wnba_total_slate(data_root, args_date: str, client) -> dict:
     events = scoreboard.get("events", [])
 
     snapshot_path = Path(data_root) / "odds" / "wnba" / args_date / "polymarket_snapshots.jsonl"
-    snapshot_rows: list[dict] = []
-    if snapshot_path.exists():
-        with snapshot_path.open(encoding="utf-8") as handle:
-            for line in handle:
-                if not line.strip():
-                    continue
-                try:
-                    snapshot_rows.append(json.loads(line))
-                except json.JSONDecodeError:
-                    continue
+    snapshot_rows = _read_polymarket_snapshot_rows(snapshot_path)
     total_rows = [
         row
         for row in snapshot_rows
@@ -1130,6 +1249,7 @@ def _forecast_wnba_total_slate(data_root, args_date: str, client) -> dict:
     priced_contracts = []
     for prediction in predictions:
         market = market_by_event_id[prediction.event_id]
+        market_lineage = market.get("_lineage")
         over_prob = prediction.probability("over")
         if over_prob >= 0.5:
             selection, model_probability = "over", over_prob
@@ -1155,9 +1275,15 @@ def _forecast_wnba_total_slate(data_root, args_date: str, client) -> dict:
                 "model_uncertainty": prediction.uncertainty,
                 "model_version": model_version,
                 "model_artifact_hash": model_artifact_hash,
+                "model_qualified": model_qualified,
                 "rationale": prediction.rationale,
                 "market_slug": market.get("market_slug"),
-                "observed_at_utc": observed_at.isoformat(),
+                "observed_at_utc": (
+                    market_lineage["market_quote_observed_at_utc"]
+                    if market_lineage is not None
+                    else observed_at.isoformat()
+                ),
+                "market_lineage": market_lineage,
             }
         )
 
@@ -1165,6 +1291,7 @@ def _forecast_wnba_total_slate(data_root, args_date: str, client) -> dict:
         "sport": "wnba_total",
         "model_name": "WNBA Total (trend normal CDF)",
         "model_version": model_version,
+        "model_qualified": model_qualified,
         "game_date": args_date,
         "scheduled_games": len(events),
         "market_candidates": len(priced_contracts),
@@ -1225,6 +1352,7 @@ def _forecast_wnba_total_sport(
             calibration_artifact_hash=contract["model_artifact_hash"],
             feature_schema_version="wnba-total-margin-v1",
             code_revision=contract["model_artifact_hash"],
+            **(contract.get("market_lineage") or {}),
         )
         try:
             request.validate(now=observed_now)
@@ -1243,6 +1371,16 @@ def _forecast_wnba_total_sport(
                     unit_policy(config),
                     now=observed_now,
                 )
+                if (
+                    contract.get("model_qualified") is not True
+                    or contract.get("market_lineage") is None
+                    or not _is_registered_serving_model(
+                        request.model_version,
+                        request.league.value,
+                        request.market_type.value,
+                    )
+                ):
+                    eligibility = _downgrade_unserved(eligibility)
                 if (
                     flat_ledger is not None
                     and _append_secondary_ledger(
@@ -1414,6 +1552,7 @@ def _forecast_learned_sport(
                 effective_now = decision_observed_at
             quote = match_executable_quote(data_root, sport, args_date, candidate)
             quote_warning: str | None = None
+            quote_lineage: dict[str, Any] | None = None
             if quote is None:
                 if flat_mode:
                     # Flat mode: log every game even without a Polymarket quote.
@@ -1461,6 +1600,22 @@ def _forecast_learned_sport(
                         }
                     )
                     continue
+            if quote is not None:
+                quote_lineage = _canonical_market_snapshot_lineage(
+                    quote,
+                    data_root / "odds" / sport / args_date / "polymarket_snapshots.jsonl",
+                )
+                if quote_lineage is None:
+                    quote_warning = "executable_quote_lineage_unverifiable"
+                    unmatched.append(
+                        {
+                            "event_id": candidate.event_id,
+                            "reason": (
+                                "model call retained for visibility; execution blocked because "
+                                "the matched quote lacks verifiable archive lineage"
+                            ),
+                        }
+                    )
             # Operator directive (2026-07-30): the minimum-edge-vs-executable-
             # ask check no longer hides a candidate from the ledger. Sizing
             # (edge_scaled_units, applied downstream in evaluate_eligibility)
@@ -1573,6 +1728,7 @@ def _forecast_learned_sport(
                 unavailable_features=(
                     ",".join(row_unavailable_features) if row_unavailable_features else None
                 ),
+                **(quote_lineage or {}),
             )
             try:
                 request.validate(now=effective_now)
@@ -1630,6 +1786,12 @@ def _forecast_learned_sport(
                             reason_code="NO_CALL_BELOW_LEARNED_CONFIDENCE",
                             units=0,
                         )
+                    if eligibility.decision == "CALL" and not _is_registered_serving_model(
+                        request.model_version,
+                        request.league.value,
+                        request.market_type.value,
+                    ):
+                        eligibility = _downgrade_unserved(eligibility)
                     # What's still NO_CALL here is always a hard trust-
                     # boundary reason or the confidence gate just above.
                     genuinely_eligible = eligibility.decision == "CALL"
@@ -1639,10 +1801,7 @@ def _forecast_learned_sport(
                     # information that still belongs in flat_picks.xlsx (which
                     # already logs every game every day) rather than muddying main.
                     skip_main_no_call = (
-                        not flat_mode
-                        and not research_routed
-                        and eligibility.decision != "CALL"
-                        and quote_warning is None
+                        not flat_mode and not research_routed and eligibility.decision != "CALL"
                     )
                     if not skip_main_no_call:
                         logged.append(
@@ -2430,6 +2589,14 @@ def _forecast_tennis_sport(
             calibration_artifact_hash=str(forecast["model_code_hash"]),
             feature_schema_version="tennis-surface-elo-v1",
             code_revision=str(forecast["model_code_hash"]),
+            market_quote_observed_at_utc=contract.get("market_quote_observed_at_utc"),
+            market_quote_timestamp_valid=contract.get("market_quote_timestamp_valid"),
+            market_quote_source=contract.get("market_quote_source"),
+            market_quote_provenance=contract.get("market_quote_provenance"),
+            market_quote_reconstructed=contract.get("market_quote_reconstructed"),
+            market_snapshot_hash=contract.get("market_snapshot_hash"),
+            market_snapshot_archive_path=contract.get("market_snapshot_archive_path"),
+            market_snapshot_record_id=contract.get("market_snapshot_record_id"),
         )
         try:
             request.validate(now=observed_now)
@@ -2452,6 +2619,17 @@ def _forecast_tennis_sport(
                         )
                     ),
                 )
+                if not all(
+                    (
+                        request.market_snapshot_hash,
+                        request.market_snapshot_archive_path,
+                        request.market_snapshot_record_id,
+                    )
+                ):
+                    eligibility = _downgrade_unserved(
+                        eligibility,
+                        reason_code="NO_CALL_MARKET_UNAVAILABLE",
+                    )
                 genuinely_eligible = eligibility.decision == "CALL"
                 if (
                     research_ledger is not None

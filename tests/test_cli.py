@@ -15,6 +15,7 @@ import json
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -38,6 +39,50 @@ from model_prediction.units import Exposure
 
 AWAY = CanonicalTeam("mlb-bos", League.MLB, "Boston Red Sox", "BOS", True, None, None, ())
 HOME = CanonicalTeam("mlb-nyy", League.MLB, "New York Yankees", "NYY", True, None, None, ())
+
+
+def _verified_market_lineage(*_args, **_kwargs) -> dict:
+    return {
+        "market_quote_observed_at_utc": "2026-07-26T11:00:00Z",
+        "market_quote_timestamp_valid": True,
+        "market_quote_source": "polymarket_us",
+        "market_quote_provenance": "decision_time_executable_quote",
+        "market_quote_reconstructed": False,
+        "market_snapshot_hash": "a" * 64,
+        "market_snapshot_archive_path": "/tmp/polymarket_snapshots.jsonl",
+        "market_snapshot_record_id": "a" * 64,
+    }
+
+
+def test_market_snapshot_lineage_accepts_positive_prospective_marker_without_reconstructed(
+    tmp_path,
+) -> None:
+    archive = tmp_path / "polymarket_snapshots.jsonl"
+    row = {
+        "provider": "polymarket_us",
+        "usage": "prospective_executable_bbo",
+        "timestamp_valid": True,
+        "observed_at_utc": "2026-08-24T12:00:00Z",
+        "market_id": "m1",
+        "long": {"ask": 0.51},
+        "short": {"ask": 0.50},
+    }
+    archive.write_text(json.dumps(row) + "\n", encoding="utf-8")
+
+    lineage = cli_forecast._canonical_market_snapshot_lineage(row, archive)
+
+    assert lineage is not None
+    assert lineage["market_quote_reconstructed"] is False
+    assert lineage["market_snapshot_archive_path"] == str(archive.resolve())
+    assert lineage["market_snapshot_record_id"] == lineage["market_snapshot_hash"]
+
+    assert (
+        cli_forecast._canonical_market_snapshot_lineage(
+            {**row, "reconstructed": True},
+            archive,
+        )
+        is None
+    )
 
 
 def _ledger(tmp_path) -> PickLedger:
@@ -978,6 +1023,14 @@ def _tennis_forecast() -> dict:
                 "market_slug": "wta-alpha-beta-2026",
                 "observed_at_utc": "2026-07-27T10:00:00Z",
                 "feature_basis": {"min_player_matches": 20},
+                "market_quote_observed_at_utc": "2026-07-27T10:00:00Z",
+                "market_quote_timestamp_valid": True,
+                "market_quote_source": "polymarket_us",
+                "market_quote_provenance": "decision_time_executable_quote",
+                "market_quote_reconstructed": False,
+                "market_snapshot_hash": "snapshot-hash",
+                "market_snapshot_archive_path": "/tmp/tennis-snapshots.jsonl",
+                "market_snapshot_record_id": "snapshot-hash",
             }
         ],
     }
@@ -1250,7 +1303,7 @@ def test_tennis_settlement_populates_clv_from_captured_closing_snapshot(tmp_path
     assert float(settled_row["closing_raw_implied_probability"]) == pytest.approx(0.58)
 
 
-def test_invalid_quote_timestamp_keeps_mlb_model_opinion_visible_but_non_executable(
+def test_invalid_quote_timestamp_keeps_mlb_model_opinion_off_main(
     monkeypatch,
     tmp_path,
 ) -> None:
@@ -1340,13 +1393,9 @@ def test_invalid_quote_timestamp_keeps_mlb_model_opinion_visible_but_non_executa
         ledger,
     )
 
-    assert result["logged"] == 1
-    request, eligibility = ledger.appended[0]
-    assert request.sportsbook == "model_opinion_no_executable_quote"
-    assert "executable_quote_timestamp_invalid" in request.unavailable_features
-    assert eligibility.record_type is RecordType.RESEARCH_OBSERVATION
-    assert eligibility.reason_code == "NO_CALL_MARKET_UNAVAILABLE"
-    assert eligibility.units == 0
+    assert result["logged"] == 0
+    assert ledger.appended == []
+    assert any("timestamp is invalid" in row["reason"] for row in result["unmatched_quotes"])
 
 
 def test_below_min_edge_vs_market_still_gets_logged_not_skipped(monkeypatch, tmp_path) -> None:
@@ -1379,6 +1428,8 @@ def test_below_min_edge_vs_market_still_gets_logged_not_skipped(monkeypatch, tmp
         feature_snapshot_hash="feature-hash-2",
     )
     monkeypatch.setattr(cli_forecast, "utc_now", lambda: observed)
+    monkeypatch.setattr(cli_forecast, "_canonical_market_snapshot_lineage", _verified_market_lineage)
+    monkeypatch.setattr(cli_forecast, "_is_registered_serving_model", lambda *_args: True)
     monkeypatch.setattr(
         cli_forecast,
         "build_learned_moneyline_slate",
@@ -1547,7 +1598,8 @@ def test_learned_sport_gated_ledger_duplicate_is_tracked_not_silently_dropped(mo
         gated_ledger=gated_ledger,
     )
 
-    assert result["gated_ledger_duplicate_pick_ids"] == ["gated-existing-learned-1"]
+    assert result["gated_ledger_duplicate_pick_ids"] == []
+    assert research_ledger.appended[0][1].decision == "NO_CALL"
 
 
 def test_below_learned_confidence_threshold_downgraded_and_kept_off_main(monkeypatch, tmp_path) -> None:
@@ -1684,6 +1736,8 @@ def test_market_residual_probability_recorded_when_artifact_configured(monkeypat
         feature_snapshot_hash="feature-hash-3",
     )
     monkeypatch.setattr(cli_forecast, "utc_now", lambda: observed)
+    monkeypatch.setattr(cli_forecast, "_canonical_market_snapshot_lineage", _verified_market_lineage)
+    monkeypatch.setattr(cli_forecast, "_is_registered_serving_model", lambda *_args: True)
     monkeypatch.setattr(cli_forecast, "build_learned_moneyline_slate", lambda **kwargs: ([candidate], [], 1))
     monkeypatch.setattr(
         cli_forecast,
@@ -1777,6 +1831,8 @@ def test_market_residual_probability_none_without_configured_artifact(monkeypatc
         feature_snapshot_hash="feature-hash-4",
     )
     monkeypatch.setattr(cli_forecast, "utc_now", lambda: observed)
+    monkeypatch.setattr(cli_forecast, "_canonical_market_snapshot_lineage", _verified_market_lineage)
+    monkeypatch.setattr(cli_forecast, "_is_registered_serving_model", lambda *_args: True)
     monkeypatch.setattr(cli_forecast, "build_learned_moneyline_slate", lambda **kwargs: ([candidate], [], 1))
     monkeypatch.setattr(
         cli_forecast,
@@ -2316,10 +2372,11 @@ def test_wnba_spread_flat_ledger_logs_every_contract_regardless_of_eligibility(
     assert request.market_type is MarketType.SPREAD
     assert request.selection == "home"
     assert request.line == 10.5
-    assert eligibility.reason_code == "QUALIFIED"
+    assert eligibility.decision == "NO_CALL"
+    assert eligibility.reason_code == "NO_CALL_MODEL_UNVALIDATED"
 
 
-def test_wnba_spread_main_ledger_only_gets_call_rows(monkeypatch, registry, ban_list) -> None:
+def test_unqualified_wnba_spread_never_reaches_main(monkeypatch, registry, ban_list) -> None:
     monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 8, 13, 18, tzinfo=UTC))
     monkeypatch.setattr(
         cli_forecast,
@@ -2340,17 +2397,12 @@ def test_wnba_spread_main_ledger_only_gets_call_rows(monkeypatch, registry, ban_
     )
 
     assert len(flat_ledger.appended) == 1
-    # Trust-boundary-only eligibility (no min-edge gate, MLB's "show
-    # everything" philosophy) -- a fully-formed request clears CALL, so Main
-    # gets it too, mirroring flat exactly for this fixture.
     _request, eligibility = flat_ledger.appended[0]
-    if eligibility.decision == "CALL":
-        assert len(main_ledger.appended) == 1
-    else:
-        assert len(main_ledger.appended) == 0
+    assert eligibility.decision == "NO_CALL"
+    assert len(main_ledger.appended) == 0
 
 
-def test_wnba_spread_main_ledger_duplicate_is_tracked_not_silently_dropped(
+def test_unqualified_wnba_spread_does_not_attempt_main_duplicate_write(
     monkeypatch,
     registry,
     ban_list,
@@ -2375,7 +2427,97 @@ def test_wnba_spread_main_ledger_duplicate_is_tracked_not_silently_dropped(
     )
 
     assert len(flat_ledger.appended) == 1  # flat always logs, unaffected
-    assert result["main_ledger_duplicate_event_ids"] == ["wnba-spread-1"]
+    assert result["main_ledger_duplicate_event_ids"] == []
+
+
+def test_wnba_total_fails_closed_without_exact_model_artifact(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(
+        cli_forecast,
+        "_load_exact_artifact_contract",
+        lambda model_version: (None, f"exact serving artifact missing for {model_version}"),
+    )
+
+    class UnexpectedClient:
+        def scoreboard(self, *_args, **_kwargs):
+            raise AssertionError("scoreboard must not be read after artifact preflight fails")
+
+    result = cli_forecast._forecast_wnba_total_slate(tmp_path, "2026-08-24", UnexpectedClient())
+
+    assert result["status"] == "blocked"
+    assert result["priced_contracts"] == []
+    assert "wnba-total-margin-v1" in result["reason"]
+    assert "model_artifact_hash" not in result
+
+
+def test_nrfi_unregistered_model_is_flat_no_call_and_never_main(
+    monkeypatch,
+    registry,
+    ban_list,
+) -> None:
+    from model_prediction.models import mlb_nrfi
+
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 8, 24, 12, tzinfo=UTC))
+
+    class FakeNRFIModel:
+        model_version = "mlb-nrfi-v1"
+
+        def predict(self, **_kwargs):
+            return SimpleNamespace(
+                p_yrfi=0.60,
+                p_nrfi=0.40,
+                fair_american_yrfi=-150,
+                fair_american_nrfi=150,
+                half_top_expected_runs=0.3,
+                half_bot_expected_runs=0.3,
+            )
+
+    monkeypatch.setattr(mlb_nrfi, "MLBNRFIModel", FakeNRFIModel)
+    client = SimpleNamespace(
+        scoreboard=lambda *_args: {
+            "events": [
+                {
+                    "id": "nrfi-1",
+                    "date": "2026-08-24T23:00:00Z",
+                    "competitions": [
+                        {
+                            "competitors": [
+                                {
+                                    "homeAway": "away",
+                                    "team": {"displayName": "Boston Red Sox"},
+                                    "probables": [],
+                                },
+                                {
+                                    "homeAway": "home",
+                                    "team": {"displayName": "New York Yankees"},
+                                    "probables": [],
+                                },
+                            ]
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+    flat = _CaptureLedger()
+    main = _CaptureLedger()
+
+    result = cli_forecast._forecast_mlb_nrfi_flat(
+        "2026-08-24",
+        True,
+        _wnba_spread_config(),
+        registry,
+        ban_list,
+        flat,
+        None,
+        main_ledger=main,
+        client=client,
+    )
+
+    assert result["logged"] == 1
+    assert len(flat.appended) == 1
+    assert flat.appended[0][1].decision == "NO_CALL"
+    assert flat.appended[0][1].reason_code == "NO_CALL_MODEL_UNVALIDATED"
+    assert main.appended == []
 
 
 def test_research_models_dir_prefers_rolling_over_frozen(monkeypatch, tmp_path) -> None:

@@ -53,6 +53,85 @@ from .state import DAILY_INTERNATIONAL_BASEBALL_SPORTS, DAILY_LEARNED_SPORTS, ES
 logger = logging.getLogger("model_prediction.cli")
 
 
+class DailyIntegrityError(RuntimeError):
+    """Raised after fail-soft work completes when a material substep failed."""
+
+    def __init__(self, report: dict[str, Any]) -> None:
+        self.report = report
+        errors = "; ".join(report.get("material_errors", []))
+        super().__init__(f"daily completed with material substep errors: {errors}")
+
+
+def _polymarket_order_payload(order: Any) -> dict[str, Any]:
+    """Translate the actual PolymarketOrderDecision contract for the ledger."""
+    return {
+        "market_id": order.market_id,
+        "question": order.question,
+        "side": order.side,
+        "target_selection": order.target_selection,
+        "target_side": order.target_side,
+        "selection_label": order.selection_label,
+        "home_team": order.home_team,
+        "away_team": order.away_team,
+        "order_price": order.order_price,
+        "model_probability": order.model_probability,
+        "market_price": order.market_price,
+        "edge": order.edge,
+        "ev_pct": order.expected_value_pct,
+        "stake_units": order.stake_units,
+        "is_maker": order.is_maker,
+        "reason": order.reason,
+        "event_start_utc": order.event_start_utc,
+        "observed_at_utc": order.observed_at_utc,
+    }
+
+
+def _contains_error_status(value: Any) -> bool:
+    if isinstance(value, dict):
+        if str(value.get("status") or "").casefold() in {"error", "failed"}:
+            return True
+        return any(_contains_error_status(item) for item in value.values())
+    if isinstance(value, list):
+        return any(_contains_error_status(item) for item in value)
+    return False
+
+
+def _material_daily_errors(report: dict[str, Any]) -> list[str]:
+    """Return errors that must make the unattended daily run non-green.
+
+    Capture/enrichment tasks remain fail-soft. Forecast, settlement, and
+    automated edge-ledger failures are material because silently losing any
+    of those steps produces incomplete decision or grading state.
+    """
+    errors: list[str] = []
+    forecasts = report.get("step2_3_forecast_and_log") or {}
+    if isinstance(forecasts, dict):
+        for workflow, result in forecasts.items():
+            if _contains_error_status(result):
+                errors.append(f"forecast:{workflow}")
+    for step in (
+        "step4_settlement",
+        "step7_flat_settlement",
+        "step8_research_settlement",
+        "step9_gated_research_settlement",
+        "step10_polymarket_edge_record",
+        "step11_polymarket_edge_settle",
+    ):
+        if _contains_error_status(report.get(step)):
+            errors.append(step)
+    return errors
+
+
+def _finalize_daily_report(report: dict[str, Any]) -> dict[str, Any]:
+    material_errors = _material_daily_errors(report)
+    report["status"] = "error" if material_errors else "ok"
+    report["material_errors"] = material_errors
+    if material_errors:
+        logger.error("Daily integrity failure after fail-soft completion: %s", material_errors)
+        raise DailyIntegrityError(report)
+    return report
+
+
 def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     # Self-throttled to weekly (see mlb_baseline_refresh's module
     # docstring) -- safe to call every daily cron cycle since it's a
@@ -364,6 +443,12 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 forecast_result[f"_flat_{sport}"] = future.result()
             except Exception:
                 logger.warning("Flat forecast failed for sport %s", sport, exc_info=True)
+                forecast_result[f"_flat_{sport}"] = {
+                    "sport": sport,
+                    "status": "error",
+                    "reason": "flat forecast failed",
+                    "logged": 0,
+                }
 
     # MLB totals, soccer, tennis, esports, and international baseball
     # are independent of each other and of the four learned sports
@@ -390,8 +475,14 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 audit,
                 main_ledger=ledger,
             )
-        except Exception:
+        except Exception as exc:
             logger.warning("MLB totals flat forecast failed", exc_info=True)
+            forecast_result["mlb_totals"] = {
+                "sport": "mlb_totals",
+                "status": "error",
+                "reason": str(exc),
+                "logged": 0,
+            }
 
     def _mlb_nrfi_task() -> None:
         try:
@@ -405,8 +496,14 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 audit,
                 main_ledger=ledger,
             )
-        except Exception:
+        except Exception as exc:
             logger.warning("MLB NRFI flat forecast failed", exc_info=True)
+            forecast_result["mlb_nrfi"] = {
+                "sport": "mlb_nrfi",
+                "status": "error",
+                "reason": str(exc),
+                "logged": 0,
+            }
 
     def _soccer_task() -> None:
         # Soccer: Main+Flat only (operator directive 2026-08-03).
@@ -422,8 +519,14 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 flat_ledger=flat_ledger,
                 main_ledger=ledger,
             )
-        except Exception:
+        except Exception as exc:
             logger.warning("Soccer forecast failed", exc_info=True)
+            forecast_result["soccer"] = {
+                "sport": "soccer",
+                "status": "error",
+                "reason": str(exc),
+                "logged": 0,
+            }
             return
         # Not a hard failure -- these are separate leagues in one daily
         # run, and a loud warning here (rather than an exception) is what
@@ -456,8 +559,14 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                     "zero rows logged for wnba_spread despite %d priced contracts",
                     len(_priced_wnba_spread),
                 )
-        except Exception:
+        except Exception as exc:
             logger.warning("WNBA spread forecast failed", exc_info=True)
+            forecast_result["wnba_spread"] = {
+                "sport": "wnba_spread",
+                "status": "error",
+                "reason": str(exc),
+                "logged": 0,
+            }
 
     def _wnba_total_task() -> None:
         try:
@@ -476,8 +585,14 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                     "zero rows logged for wnba_total despite %d priced contracts",
                     len(_priced_wnba_total),
                 )
-        except Exception:
+        except Exception as exc:
             logger.warning("WNBA total forecast failed", exc_info=True)
+            forecast_result["wnba_total"] = {
+                "sport": "wnba_total",
+                "status": "error",
+                "reason": str(exc),
+                "logged": 0,
+            }
 
     def _tennis_task() -> None:
         try:
@@ -494,8 +609,14 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                     "zero rows logged for tennis despite %d priced contracts",
                     len(_priced_tennis),
                 )
-        except Exception:
+        except Exception as exc:
             logger.warning("Tennis forecast failed", exc_info=True)
+            forecast_result["tennis"] = {
+                "sport": "tennis",
+                "status": "error",
+                "reason": str(exc),
+                "logged": 0,
+            }
 
     def _esports_title_task(title: str) -> None:
         forecast_result[title] = forecast_esports_slate(
@@ -538,6 +659,12 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                     future.result()
                 except Exception:
                     logger.warning("Esports forecast failed for title %s", title, exc_info=True)
+                    forecast_result[title] = {
+                        "sport": title,
+                        "status": "error",
+                        "reason": "esports forecast failed",
+                        "logged": 0,
+                    }
 
     def _intl_baseball_league_task(league: str) -> None:
         # KBO/NPB never reach Main, so no Flat row either (operator
@@ -582,6 +709,12 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                         league,
                         exc_info=True,
                     )
+                    forecast_result[league] = {
+                        "sport": league,
+                        "status": "error",
+                        "reason": "international baseball forecast failed",
+                        "logged": 0,
+                    }
 
     with ThreadPoolExecutor(max_workers=8) as research_pool:
         research_futures = [
@@ -686,7 +819,6 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     try:
         from ..portfolio.polymarket_ledger import (
             record_polymarket_orders,
-            settle_polymarket_ledger_rows,
         )
         from ..portfolio.polymarket_scanner import PolymarketScanner
 
@@ -697,41 +829,28 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             pregame_only=True,
         )
         if scan_res.actionable_orders:
-            orders_payload = [
-                {
-                    "market_id": o.market_id,
-                    "question": o.question,
-                    "side": o.side,
-                    "target_selection": o.target_selection,
-                    "target_side": o.target_side,
-                    "selection_label": o.selection_label,
-                    "home_team": o.home_team,
-                    "away_team": o.away_team,
-                    "order_price": o.order_price,
-                    "model_probability": o.model_probability,
-                    "market_price": o.market_price,
-                    "edge": o.edge,
-                    "ev_pct": o.ev_pct,
-                    "stake_units": o.stake_units,
-                    "is_maker": o.is_maker,
-                    "reason": o.reason,
-                    "event_start_utc": o.event_start_utc,
-                    "observed_at_utc": o.observed_at_utc,
-                }
-                for o in scan_res.actionable_orders
-            ]
+            orders_payload = [_polymarket_order_payload(order) for order in scan_res.actionable_orders]
             poly_edge_record_result = record_polymarket_orders(orders_payload, data_root=data_directory)
         else:
             poly_edge_record_result = {"status": "ok", "recorded_count": 0, "actionable_orders": 0}
-
-        if not args.skip_settlement:
-            poly_edge_settle_result = settle_polymarket_ledger_rows(data_root=data_directory)
     except Exception:
-        logger.warning("Automated Polymarket edge scan/settle failed", exc_info=True)
+        logger.warning("Automated Polymarket edge scan/record failed", exc_info=True)
         poly_edge_record_result = {"status": "error"}
-        poly_edge_settle_result = {"status": "error"}
 
-    return {
+    if not args.skip_settlement:
+        try:
+            from ..portfolio.polymarket_ledger import settle_polymarket_ledger_rows
+
+            poly_edge_settle_result = settle_polymarket_ledger_rows(data_root=data_directory)
+        except Exception:
+            logger.warning("Automated Polymarket edge settlement failed", exc_info=True)
+            poly_edge_settle_result = {"status": "error"}
+    elif poly_edge_record_result.get("status") == "error":
+        # Keep the skipped settlement truthful when --skip-settlement was
+        # explicit; the record failure remains independently material.
+        poly_edge_settle_result = {"status": "skipped"}
+
+    report = {
         "date": args.date,
         "step0_mlb_baseline_refresh": mlb_baseline_refresh_result,
         "step1_polymarket_search": {
@@ -762,3 +881,4 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         "step10_polymarket_edge_record": poly_edge_record_result,
         "step11_polymarket_edge_settle": poly_edge_settle_result,
     }
+    return _finalize_daily_report(report)

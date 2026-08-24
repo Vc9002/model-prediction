@@ -27,7 +27,7 @@ def test_wnba_total_grade_pick() -> None:
     assert grade_pick(MarketType.TOTAL, "under", 165.5, 82, 85) == PickResult.LOSS
 
 
-def test_forecast_wnba_total_slate_and_sport(tmp_path: Path) -> None:
+def test_forecast_wnba_total_fails_closed_without_exact_artifact(tmp_path: Path) -> None:
     data_root = tmp_path / "data"
     future_dt = utc_now() + timedelta(days=2)
     args_date = future_dt.date().isoformat()
@@ -91,8 +91,8 @@ def test_forecast_wnba_total_slate_and_sport(tmp_path: Path) -> None:
 
     slate = _forecast_wnba_total_slate(data_root, args_date, mock_client)
     assert slate["sport"] == "wnba_total"
-    assert len(slate["priced_contracts"]) == 1
-    contract = slate["priced_contracts"][0]
-    assert contract["market_type"] == "total"
-    assert contract["line"] == 165.5
-    assert contract["selection"] in ("over", "under")
+    assert slate["status"] == "blocked"
+    assert slate["model_version"] == "wnba-total-margin-v1"
+    assert slate["priced_contracts"] == []
+    assert "exact serving artifact" in slate["reason"]
+    mock_client.scoreboard.assert_not_called()

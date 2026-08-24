@@ -99,8 +99,8 @@ def test_real_production_yaml_resolves_every_model() -> None:
     registry = ProductionModelRegistry.load(REPO)
 
     assert registry.schema_version == "3"
-    assert len(registry.entries) == 14  # 13 + measured-edge-totals-v3 (MLB total promotion, 2026-08-18)
-    assert len(registry.available_entries()) == 14
+    assert len(registry.entries) == 13
+    assert len(registry.available_entries()) == 13
     assert registry.problem_entries() == []
     assert registry.primary.model_id == "wnba-elo-trend-lr-v4"
     assert registry.primary.artifact_hash
@@ -109,10 +109,9 @@ def test_real_production_yaml_resolves_every_model() -> None:
     assert mlb.rollback_model == "mlb-elo-trend-lr-v7"
     assert mlb.feature_schema_version == "1"
 
-    totals = registry.entries["measured-edge-totals-v3"]
-    assert totals.sport == "MLB"
-    assert totals.market == "total"
-    assert registry.champion("MLB", "total").model_id == "measured-edge-totals-v3"  # type: ignore[union-attr]
+    assert registry.champion("MLB", "total") is None
+    assert "measured-edge-totals-v3" in registry.blocked_workflows
+    assert "wnba-spread-margin-v1" in registry.blocked_workflows
 
     soccer = registry.entries["soccer-poisson-dc-v1"]
     assert soccer.implementation == IMPLEMENTATION_CODE_BACKED
@@ -120,6 +119,29 @@ def test_real_production_yaml_resolves_every_model() -> None:
     tennis = registry.entries["tennis-surface-elo-v1"]
     assert tennis.implementation == IMPLEMENTATION_CODE_BACKED
     assert tennis.entry == "model_prediction.models.tennis:tennis_model"
+
+    config = yaml.safe_load((REPO / "config/production.yaml").read_text(encoding="utf-8"))
+    service = config["prediction_service"]
+    model_ids = [entry["model_id"] for entry in service["models"]]
+    expected_artifacts = {
+        entry["model_id"]: entry["artifact"]
+        for entry in service["models"]
+        if entry["implementation"] == IMPLEMENTATION_JSON_ARTIFACT
+    }
+    assert service["allowed_models"] == model_ids
+    assert service["artifact_map"] == expected_artifacts
+
+
+def test_v3_legacy_mirrors_cannot_drift_from_models(tmp_path: Path) -> None:
+    models = [_v3_entry("wnba-elo-trend-lr-v4", "config/models/wnba-elo-trend-lr-v4.json")]
+    repo = _setup_v3(tmp_path, models, "wnba-elo-trend-lr-v4")
+    config_path = repo / "config/production.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["prediction_service"]["allowed_models"] = ["different-model"]
+    _write_yaml(config_path, config)
+
+    with pytest.raises(ValueError, match="allowed_models must exactly mirror"):
+        ProductionModelRegistry.load(repo)
 
 
 # ── fail-closed per model ───────────────────────────────────────────────────

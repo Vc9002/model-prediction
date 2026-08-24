@@ -268,6 +268,27 @@ def test_broken_registry_primary_is_down(tmp_path: Path) -> None:
     assert any("registry failed to load" in r for r in report["reasons"])
 
 
+def test_explicitly_blocked_active_workflow_degrades_health(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    config_path = repo / "config" / "production.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["prediction_service"]["blocked_workflows"] = [
+        {
+            "model_id": "research-total-v1",
+            "sport": "WNBA",
+            "market": "total",
+            "reason": "no exact serving artifact",
+        }
+    ]
+    _write_yaml(config_path, config)
+
+    report = system_health(repo_root=repo, runtime_root=repo / "data")
+
+    assert report["status"] == "DEGRADED"
+    assert "research-total-v1" in report["checks"]["registry"]["blocked_workflows"]
+    assert any("explicitly blocked" in reason for reason in report["reasons"])
+
+
 def test_clv_health_monitoring_and_alerting(tmp_path: Path, monkeypatch) -> None:
     from unittest.mock import Mock
 

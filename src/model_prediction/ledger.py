@@ -58,7 +58,7 @@ from .domain import (
 from .eligibility import EligibilityResult
 from .model_ledger import record_from_pick_request, settle_from_pick_row
 from .pricing import american_to_decimal, grade_pick, implied_probability, profit_units
-from .runtime_ledger_store import LedgerMutation, RuntimeLedgerStore
+from .runtime_ledger_store import LedgerMutation, RuntimeLedgerDuplicateError, RuntimeLedgerStore
 from .units import Exposure, edge_scaled_units
 from .xlsx_ledger import read_xlsx_rows, write_xlsx_rows_atomic
 
@@ -277,6 +277,24 @@ FIELDNAMES = [
     "blend_config_hash",
     "serving_policy_block_reason",
 ]
+FEATURE_PAYLOAD_SCHEMA_VERSION = "ledger-row-features-v1"
+FEATURE_VALUE_FIELDS = (
+    "elo_probability",
+    "trend_gap",
+    "park_factor",
+    "weather_factor",
+    "pitcher_era_gap",
+    "probable_starter_era_gap",
+    "defensive_trend_gap",
+    "neutral_elo_rating_difference",
+    "bullpen_weakness_gap",
+    "starter_era_gap",
+    "rest_disparity",
+    "back_to_back_gap",
+    "games_last_7_gap",
+    "schedule_missingness",
+    "market_residual_probability",
+)
 DECISION_FIELDS = {
     "pick_id",
     "created_at_utc",
@@ -519,6 +537,11 @@ class PickLedger:
         # would touch every call site. Schema migration is a rare, one-time
         # event per ledger file (not part of the hot pick-lifecycle path),
         # so this stays lower priority than the fixes above.
+        # SQLite authority never bootstraps or migrates from its XLSX export.
+        # In particular, a missing projection must not be recreated as an empty
+        # workbook while canonical rows already exist.
+        if self.authority == "sqlite":
+            return
         migrated_from: str | None = None
         with self._lock():
             if not self.path.exists() or self.path.stat().st_size == 0:
@@ -545,8 +568,30 @@ class PickLedger:
             # contract _read_unlocked() already uses, and the same one the
             # dashboard's picks reader already relies on post-archival.
             return self._filter_rows([], filters or {})
-        _, rows = read_xlsx_rows(self.path)
-        return self._filter_rows(rows, filters or {})
+        return self._filter_rows(self._read_unlocked(), filters or {})
+
+    def export_rows(self) -> list[dict[str, str]]:
+        """Read the XLSX projection directly, regardless of ledger authority.
+
+        Parity and repair tooling must compare the physical export with the
+        canonical store. Calling ``rows()`` after the SQLite cutover would read
+        SQLite twice and manufacture a false-green parity result.
+        """
+        if not self.path.exists() or self.path.stat().st_size == 0:
+            return []
+        headers, rows = read_xlsx_rows(self.path)
+        if headers != FIELDNAMES:
+            raise ValueError("picks.xlsx schema does not match this code version")
+        return rows
+
+    def rebuild_xlsx_projection(self) -> int:
+        """Replace the disposable XLSX export from canonical SQLite rows."""
+        if self.authority != "sqlite":
+            raise ValueError("XLSX projection rebuild requires sqlite authority")
+        with self._lock():
+            rows = self._read_unlocked()
+            self._write_rows_unchecked(rows)
+        return len(rows)
 
     def exposure(
         self,
@@ -849,7 +894,14 @@ class PickLedger:
         self._write_rows(rows_to_write)
         self._mirror_row(mirror_row, event_type, operation_id)
 
-    def _mirror_row(self, row: dict[str, str], event_type: str, operation_id: str) -> None:
+    def _mirror_row(
+        self,
+        row: dict[str, str],
+        event_type: str,
+        operation_id: str,
+        *,
+        note: str | None = None,
+    ) -> None:
         """Mirror write with the authority-aware failure contract.
 
         xlsx authority (dual-write phase): the mirror is fail-soft — a
@@ -862,7 +914,15 @@ class PickLedger:
         if self.mirror is None or not self.tier or self.retired:
             return
         try:
-            self.mirror.apply(self._row_mutation(row, event_type, operation_id))
+            self.mirror.apply(self._row_mutation(row, event_type, operation_id, note=note))
+        except RuntimeLedgerDuplicateError as error:
+            if self.authority == "sqlite":
+                raise DuplicatePickError(error.pick_id) from error
+            logging.getLogger(__name__).warning(
+                "runtime ledger mirror duplicate suppressed for pick %s (xlsx authority unchanged)",
+                row["pick_id"],
+            )
+            _parity_alarm(self.mirror, f"duplicate {row['pick_id']}")
         except Exception:
             if self.authority == "sqlite":
                 raise
@@ -874,7 +934,14 @@ class PickLedger:
             )
             _parity_alarm(self.mirror, f"{event_type} {row['pick_id']}")
 
-    def _row_mutation(self, row: dict[str, str], event_type: str, operation_id: str) -> LedgerMutation:
+    def _row_mutation(
+        self,
+        row: dict[str, str],
+        event_type: str,
+        operation_id: str,
+        *,
+        note: str | None = None,
+    ) -> LedgerMutation:
         """Map a canonical XLSX row to the mirror mutation (G3/G4).
 
         The full row rides along in decision_payload so reconciliation can
@@ -914,7 +981,31 @@ class PickLedger:
             pnl_units=_num(row.get("pnl_units")),
             settled_at_utc=row.get("settled_at_utc") or None,
             decision_payload=dict(row),
+            feature_payload=self._feature_payload(row),
+            note=note,
         )
+
+    @staticmethod
+    def _feature_payload(row: dict[str, str]) -> dict[str, Any]:
+        """Build an auditable feature snapshot without synthesizing values."""
+        features = {field: row[field] for field in FEATURE_VALUE_FIELDS if row.get(field) not in (None, "")}
+        unavailable_features = row.get("unavailable_features") or None
+        if not features:
+            availability_status = "unavailable_not_recorded"
+        elif unavailable_features:
+            availability_status = "partial_with_unavailable_features"
+        else:
+            availability_status = "available"
+        return {
+            "feature_payload_schema_version": FEATURE_PAYLOAD_SCHEMA_VERSION,
+            "feature_schema_version": row.get("feature_schema_version") or None,
+            "model_version": row.get("model_version") or None,
+            "model_artifact_hash": row.get("model_artifact_hash") or None,
+            "availability_status": availability_status,
+            "observed_feature_count": len(features),
+            "unavailable_features": unavailable_features,
+            "features": features,
+        }
 
     def settle(
         self,
@@ -1410,10 +1501,18 @@ class PickLedger:
                 self._write_rows(existing)
         return [row["pick_id"] for row in imported]
 
-    def void(self, pick_id: str, reason: str) -> dict[str, str]:
+    def void(
+        self,
+        pick_id: str,
+        reason: str,
+        *,
+        correction_reason: str | None = None,
+    ) -> dict[str, str]:
         self.initialize()
         if not reason.strip():
             raise ValueError("void reason is required")
+        if correction_reason is not None and not correction_reason.strip():
+            raise ValueError("a nonblank correction reason is required")
         with self._lock():
             self._migrate_if_needed()
             rows = self._read_unlocked()
@@ -1421,7 +1520,8 @@ class PickLedger:
             if row["status"] == PickStatus.SETTLED.value:
                 if row["void_reason"] == reason:
                     return row
-                raise ValueError("pick is already settled")
+                if not correction_reason:
+                    raise ValueError("a nonblank correction reason is required to void a settled pick")
             row.update(
                 {
                     "status": PickStatus.SETTLED.value,
@@ -1432,11 +1532,25 @@ class PickLedger:
                     "review_status": "not_applicable",
                 }
             )
-            self.audit.append("pick_voided", pick_id, {"reason": reason})
+            if row.get("research_pnl_units"):
+                row["research_pnl_units"] = "0.000000"
+            corrected = bool(correction_reason and correction_reason.strip())
+            self.audit.append(
+                "pick_voided_corrected" if corrected else "pick_voided",
+                pick_id,
+                {
+                    "reason": reason,
+                    **({"correction_reason": correction_reason.strip()} if corrected else {}),
+                },
+            )
+            operation_suffix = (
+                uuid.uuid5(uuid.NAMESPACE_URL, correction_reason.strip()).hex if corrected else "initial"
+            )
+            operation_id = f"op-void-{pick_id}-{operation_suffix}"
             if self.authority == "sqlite":
-                self._mirror_row(row, "void", f"op-void-{pick_id}")
+                self._mirror_row(row, "void", operation_id, note=correction_reason)
             self._write_rows(rows)
-        self._mirror_row(row, "void", f"op-void-{pick_id}")
+        self._mirror_row(row, "void", operation_id, note=correction_reason)
         return row
 
     def update_closing(
@@ -1657,6 +1771,8 @@ class PickLedger:
         return output
 
     def _migrate_if_needed(self) -> str | None:
+        if self.authority == "sqlite":
+            return None
         if not self.path.exists() or self.path.stat().st_size == 0:
             return None
         headers, rows = read_xlsx_rows(self.path)
@@ -1760,6 +1876,23 @@ class PickLedger:
         write_xlsx_rows_atomic(self.path, FIELDNAMES, rows)
 
     def _read_unlocked(self) -> list[dict[str, str]]:
+        if self.authority == "sqlite":
+            if self.mirror is None or not self.tier:
+                raise RuntimeError("sqlite ledger authority requires a RuntimeLedgerStore and ledger tier")
+            canonical_rows: list[dict[str, str]] = []
+            for projected in self.mirror.pick_rows(tier=self.tier, sport=self.sport):
+                if projected.get("status") in {"archived", "removed"}:
+                    continue
+                row = {field: "" for field in FIELDNAMES}
+                row.update(
+                    {
+                        key: "" if value is None else str(value)
+                        for key, value in projected.items()
+                        if key in row
+                    }
+                )
+                canonical_rows.append(row)
+            return canonical_rows
         if not self.path.exists() or self.path.stat().st_size == 0:
             return []
         headers, rows = read_xlsx_rows(self.path)

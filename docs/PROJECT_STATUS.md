@@ -1,6 +1,6 @@
 # Project status and source of truth
 
-**Last verified**: 2026-08-23, local `main`. **2,188 tests passed, 3 skipped, 0 failed** (2,191 total). **0 Ruff findings** across the repository. Type foundation cleared (`py.typed` + overrides).
+**Last verified**: 2026-08-24, local `research/mlb-v9`. **2,267 tests passed, 4 skipped, 0 failed**. Changed-path Ruff and production YAML parsing passed. Whole-tree Ruff is not clean because the preserved, pre-existing untracked `scripts/audit_mlb_v9_feature_distribution.py` has five findings.
 
 **Operating Architecture**: MLB operates on two isolated tracks — **Production Track** (`mlb-elo-trend-lr-v8` frozen champion) and **Research Track** (`mlb-v9` isolated challenger). See [`docs/ROADMAP.md`](file:///Users/vincentc9002/model-prediction/docs/ROADMAP.md) and [`docs/RESEARCH_BACKLOG.md`](file:///Users/vincentc9002/model-prediction/docs/RESEARCH_BACKLOG.md) for full lifecycle details.
 
@@ -11,6 +11,33 @@ this file exists to be the short, current summary someone can read first.
 
 Historical metrics in old reports, changelog entries, model cards, and
 rollback artifacts are not current operational truth.
+
+## 2026-08-24 — Canonical ledger and tennis integrity repair
+
+- Corrected 221 tennis spread/total settlements using exact ESPN identities
+  and per-set game totals: 205 regraded, 16 retirement derivatives voided,
+  corruption signature zero, P&L corrected by `+187.0556U`.
+- Removed unsupported tennis derivative pricing; the forward path is now
+  moneyline-only and rejects subperiod markets. A second boundary permits at
+  most one spread and one total per match if validated derivative pricing is
+  introduced later.
+- Archived 457 settled duplicate/correlated-exposure rows and removed 9 open
+  rows with exact-ID audited mutations. The post-repair planner reports zero
+  remaining refresh groups and zero tennis ladders; SQLite now enforces active
+  contract/model uniqueness across writers.
+- Made SQLite authoritative for all ledger and dashboard reads; rebuilt and
+  verified all 22 XLSX projections with no canonical tombstones.
+- Backfilled explicit feature-availability payloads on all 12,335 canonical
+  records without synthesizing missing values.
+- Removed unqualified MLB totals from production serving, blocked WNBA total
+  without its exact artifact, and made all active non-serving workflows
+  degrade health instead of passing green.
+- Rebuilt the dashboard cache from canonical rows: Main 494, Flat 1,682,
+  Research 996, Gated Research 356.
+- Remaining historical gaps are fail-closed: 3,240 active rows lack market
+  snapshot lineage, 40 active MLB rows lack artifact hashes, and 24 open rows
+  are more than 24 hours past start. These values cannot be reconstructed as
+  decision-time evidence after the fact.
 
 ## 2026-08-23 — Comprehensive Platform Optimization, Quantitative Upgrades & Parallel Test Harness
 

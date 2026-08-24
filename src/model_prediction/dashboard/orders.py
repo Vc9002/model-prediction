@@ -59,6 +59,7 @@ from model_prediction.dashboard.common import (
     _unit_value_usd,
 )
 from model_prediction.dashboard.picks import (
+    _dedupe_contract_observations,
     _find_pick_by_id,
     _main_ledger_paths,
     _parse_research_picks,
@@ -460,14 +461,8 @@ def _pick_identity(row: dict) -> tuple[str, ...]:
 
 
 def _dedupe_picks(rows: list[dict]) -> list[dict]:
-    """Keep the latest ledger observation for each actual bet shown in the UI."""
-    latest: dict[tuple[str, ...], tuple[str, int, dict]] = {}
-    for index, row in enumerate(rows):
-        rank = (str(row.get("created_at_utc") or ""), index, row)
-        key = _pick_identity(row)
-        if key not in latest or rank[:2] >= latest[key][:2]:
-            latest[key] = rank
-    return [item[2] for item in sorted(latest.values(), key=lambda item: item[1])]
+    """Keep one verified-pregame observation for each actual UI contract."""
+    return _dedupe_contract_observations(rows)
 
 
 def dashboard_picks() -> list[dict]:

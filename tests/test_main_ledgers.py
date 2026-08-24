@@ -19,7 +19,9 @@ from model_prediction.config import load_config
 from model_prediction.domain import League, MarketType, PickRequest
 from model_prediction.eligibility import EligibilityResult, RecordType
 from model_prediction.entities import CanonicalTeam
-from model_prediction.main_ledgers import MAIN_LEDGER_SPORTS, MultiSportPickLedger
+from model_prediction.ledger import FIELDNAMES
+from model_prediction.main_ledgers import MAIN_LEDGER_SPORTS, MultiSportPickLedger, existing_flat_ledgers
+from model_prediction.xlsx_ledger import write_xlsx_rows_atomic
 
 AWAY = CanonicalTeam("mlb-nyy", League.MLB, "NYY", "NYY", True, None, None, ())
 HOME = CanonicalTeam("mlb-bos", League.MLB, "BOS", "BOS", True, None, None, ())
@@ -93,3 +95,18 @@ def test_cli_main_reads_the_retired_flag_the_same_way_it_constructs_the_ledger(t
     ledger = MultiSportPickLedger(tmp_path, retired=retired)
     ledger.append_evaluated(_request("event-mlb"), _qualified_call(), now=datetime.now(UTC))
     assert (tmp_path / "main").exists()
+
+
+def test_existing_flat_ledgers_honor_sqlite_authority(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("MODEL_PREDICTION_LEDGER_AUTHORITY", "sqlite")
+    path = tmp_path / "flat" / "mlb.xlsx"
+    write_xlsx_rows_atomic(path, FIELDNAMES, [])
+
+    [ledger] = existing_flat_ledgers(tmp_path)
+    try:
+        assert ledger.authority == "sqlite"
+        assert ledger.tier == "flat"
+        assert ledger.sport == "mlb"
+        assert ledger.mirror is not None
+    finally:
+        ledger.mirror.close()

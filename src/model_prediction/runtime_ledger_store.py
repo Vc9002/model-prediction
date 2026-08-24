@@ -83,6 +83,17 @@ CREATE INDEX IF NOT EXISTS idx_ledger_records_event
     ON ledger_records (event_id, ledger_tier);
 CREATE INDEX IF NOT EXISTS idx_ledger_records_operation
     ON ledger_records (operation_id);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_ledger_active_contract_model
+    ON ledger_records (
+        ledger_tier,
+        sport,
+        event_id,
+        lower(coalesce(market_type, '')),
+        coalesce(abs(line), -1.7976931348623157e308),
+        lower(coalesce(json_extract(decision_payload_json, '$.sportsbook'), '')),
+        coalesce(model_id, '')
+    )
+    WHERE status = 'open' AND event_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS ledger_events (
     sequence       INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -157,6 +168,14 @@ class LedgerMutation:
     decision_payload: dict[str, Any] | None = None
     feature_payload: dict[str, Any] | None = None
     note: str | None = field(default=None, kw_only=True)
+
+
+class RuntimeLedgerDuplicateError(ValueError):
+    """A second active row attempted to claim one contract/model identity."""
+
+    def __init__(self, pick_id: str) -> None:
+        self.pick_id = pick_id
+        super().__init__(f"active contract/model already logged as {pick_id}")
 
 
 def new_pick_ids() -> tuple[str, str]:
@@ -273,8 +292,9 @@ class RuntimeLedgerStore:
             if existing is not None and existing["operation_id"] == mutation.operation_id:
                 return False  # idempotent retry of the exact same mutation
 
-            self._conn.execute(
-                """INSERT INTO ledger_records (
+            try:
+                self._conn.execute(
+                    """INSERT INTO ledger_records (
                     pick_id, operation_id, ledger_tier, sport,
                     event_id, canonical_event_id, event_start_utc,
                     market_type, selection, line,
@@ -324,8 +344,39 @@ class RuntimeLedgerStore:
                     settled_at_utc = excluded.settled_at_utc,
                     decision_payload_json = excluded.decision_payload_json,
                     feature_payload_json = excluded.feature_payload_json""",
-                _mutation_row(mutation),
-            )
+                    _mutation_row(mutation),
+                )
+            except sqlite3.IntegrityError as error:
+                # The partial unique index is the final cross-process guard.
+                # Translate only that identity collision; unrelated schema or
+                # constraint failures must retain their original exception.
+                if "ux_ledger_active_contract_model" not in str(error):
+                    raise
+                sportsbook = ""
+                if mutation.decision_payload:
+                    sportsbook = str(mutation.decision_payload.get("sportsbook") or "").casefold()
+                existing_duplicate = self._conn.execute(
+                    """SELECT pick_id FROM ledger_records
+                       WHERE status = 'open' AND ledger_tier = ? AND sport = ?
+                         AND event_id = ? AND lower(coalesce(market_type, '')) = ?
+                         AND coalesce(abs(line), -1.7976931348623157e308)
+                             = coalesce(abs(?), -1.7976931348623157e308)
+                         AND lower(coalesce(json_extract(decision_payload_json, '$.sportsbook'), '')) = ?
+                         AND coalesce(model_id, '') = coalesce(?, '')
+                       LIMIT 1""",
+                    (
+                        mutation.ledger_tier,
+                        mutation.sport,
+                        mutation.event_id,
+                        str(mutation.market_type or "").casefold(),
+                        mutation.line,
+                        sportsbook,
+                        mutation.model_id,
+                    ),
+                ).fetchone()
+                if existing_duplicate is None:
+                    raise
+                raise RuntimeLedgerDuplicateError(existing_duplicate["pick_id"]) from error
 
             # Hash-linked audit event, SAME transaction as the record.
             previous = self._conn.execute(
@@ -365,6 +416,72 @@ class RuntimeLedgerStore:
             query += " WHERE " + " AND ".join(clauses)
         query += " ORDER BY created_at_utc"
         return [dict(r) for r in self._conn.execute(query, params).fetchall()]
+
+    def pick_rows(self, *, tier: str | None = None, sport: str | None = None) -> list[dict[str, Any]]:
+        """Project canonical records back into the rich PickLedger row shape.
+
+        ``decision_payload_json`` contains the complete versioned ledger row
+        supplied at each mutation.  The real SQLite columns remain authoritative
+        for lifecycle fields, so a stale payload can never resurrect an open or
+        unsettled state.  This is the single projection used by PickLedger and
+        dashboard consumers after the SQLite authority cutover.
+        """
+        projected: list[dict[str, Any]] = []
+        for record in self.records(tier=tier, sport=sport):
+            payload: dict[str, Any] = {}
+            raw_payload = record.get("decision_payload_json")
+            if isinstance(raw_payload, str) and raw_payload:
+                try:
+                    decoded = json.loads(raw_payload)
+                except json.JSONDecodeError:
+                    decoded = None
+                if isinstance(decoded, dict):
+                    payload = decoded
+
+            row = dict(payload)
+            # Fill identity/decision fields when an older or manually-created
+            # canonical record has only the normalized SQLite columns.
+            for target, source in (
+                ("pick_id", "pick_id"),
+                ("created_at_utc", "created_at_utc"),
+                ("event_start_utc", "event_start_utc"),
+                ("event_id", "event_id"),
+                ("market_type", "market_type"),
+                ("selection", "selection"),
+                ("line", "line"),
+                ("model_version", "model_id"),
+                ("model_artifact_hash", "model_artifact_hash"),
+                ("market_snapshot_hash", "market_snapshot_hash"),
+                ("market_snapshot_archive_path", "market_snapshot_archive_path"),
+                ("market_snapshot_record_id", "market_snapshot_record_id"),
+                ("feature_schema_version", "feature_schema_version"),
+                ("model_probability", "model_probability"),
+                ("market_probability_at_decision", "market_probability"),
+                ("edge", "edge"),
+                ("confidence_score", "confidence"),
+                ("units", "units"),
+                ("decision", "decision"),
+                ("reason_code", "reason_code"),
+            ):
+                if target not in row or row[target] in (None, ""):
+                    value = record.get(source)
+                    row[target] = "" if value is None else str(value)
+
+            # Lifecycle state is always overwritten from normalized canonical
+            # columns. These are the fields mutations change after decision time.
+            for column in ("status", "result", "pnl_units", "settled_at_utc"):
+                value = record.get(column)
+                if column == "pnl_units" and row.get(column) not in (None, "") and value is not None:
+                    try:
+                        if float(row[column]) == float(value):
+                            continue
+                    except (TypeError, ValueError):
+                        pass
+                row[column] = "" if value is None else str(value)
+            row["ledger_tier"] = record["ledger_tier"]
+            row["sport"] = record["sport"]
+            projected.append(row)
+        return projected
 
     def event_count(self) -> int:
         """Total hash-linked audit events (I2 overlap report)."""

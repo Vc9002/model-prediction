@@ -1,6 +1,65 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
-**Last audited**: 2026-08-19 (see new section directly below)
+**Last audited**: 2026-08-24 (see new section directly below)
+
+## 2026-08-24 — tennis settlement, ledger authority, lineage, and false-green repair
+
+The tennis loss wall was a settlement defect, not measured model performance.
+Full-match spread and total rows were graded from a binary match-winner result
+(`0-1` or `1-0`) instead of summed per-set games. The exact persisted defect
+signature identified 221 settled Main/Flat rows. Every row was resolved by its
+exact ESPN event/competition ID before mutation: 205 were regraded from real
+game totals and 16 retirement-dependent derivatives were voided. Results are
+now 100 wins, 105 losses, and 16 pushes; aggregate P&L changed from
+`-269.5966U` to `-82.5410U`. The binary derivative signature is zero and the
+runtime hash chain remains intact.
+
+Future tennis pricing is moneyline-only. Unsupported heuristic spread/total
+and set/subperiod contracts are no longer emitted. Settlement uses per-set
+line scores for derivatives, exact source identity first, and fails closed on
+retirement, walkover, missing/misaligned line scores, or subperiod markets.
+The logging boundary also caps any future validated tennis derivative slate at
+one spread and one total per match, selected by pregame expected return only.
+It cannot use the result to choose a survivor.
+
+The canonical duplicate/exposure cleanup classified identity separately from
+correlation. It archived 457 settled rows and removed 9 open rows through the
+audited ledger APIs: 188 exact-contract refresh groups retained their latest
+valid pregame observation, while 58 tennis derivative ladders retained one
+pregame-EV-selected line per market family. Alternate lines remain distinct in
+the full JSON archive; the live repair planner now reports zero refresh groups
+and zero tennis ladders. A partial SQLite unique index prevents a second active
+contract/model identity across processes.
+
+SQLite is now the sole ledger authority. Application reads, exposure,
+duplicate detection, settlement, and dashboard cache reads use canonical
+SQLite rows. XLSX is a disposable projection with an explicit raw reader for
+parity. Reconciliation follows authority direction and cannot tombstone a
+canonical row because XLSX omitted it. All 22 tier/sport projections were
+rebuilt and verify clean.
+
+All 12,335 historical records now carry `ledger-row-features-v1` payloads.
+Only stored decision-time fields were copied: 944 rows are `available`, 366
+are `partial_with_unavailable_features`, and 11,025 are explicitly
+`unavailable_not_recorded`. No feature or market value was invented.
+
+Serving now requires the exact registered sport/market champion and exact
+artifact. WNBA total, unqualified WNBA spread, MLB NRFI, and unqualified MLB
+derivative workflows are explicit blocked/research-only health entries.
+Material daily substep failures now produce a nonzero supervisor result after
+fail-soft work completes. Production serving was not expanded.
+
+Verification: 2,267 tests passed, 4 skipped; changed-path Ruff and YAML parsing
+passed; SQLite integrity and the 37,805-event replay chain passed. Whole-tree
+Ruff still reports five findings in the pre-existing untracked
+`scripts/audit_mlb_v9_feature_distribution.py`, which this repair preserved.
+
+Remaining evidence gaps are explicit, not repaired with fake history: 3,240
+active rows predate market-snapshot lineage, 40 active MLB rows lack an
+artifact hash, and 11,398 canonical rows have no recorded feature values.
+There are 232 open rows, including 24 more than 24 hours past start and 19
+more than 72 hours past start. A broad settlement sweep was intentionally not
+run without an identity-scoped result manifest.
 
 ## 2026-08-19 — prospective lineup capture, overnight wake planning, v9 isolating ladder
 

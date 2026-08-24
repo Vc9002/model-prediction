@@ -228,10 +228,16 @@ def system_health(
             entry.model_id: ("ok" if entry.available else f"failed: {entry.load_error}")
             for entry in registry.entries.values()
         },
+        "blocked_workflows": registry.blocked_workflows,
     }
     report["checks"]["registry"] = registry_check
     if registry.problem_entries():
         degrade(f"{len(registry.problem_entries())} production model(s) failed contract validation")
+    if registry.blocked_workflows:
+        degrade(
+            f"{len(registry.blocked_workflows)} active workflow(s) are explicitly blocked "
+            "from production serving"
+        )
 
     # 2. Supervisor run rows (A-2): latest run per worker.
     supervisor = RunSupervisor(db_path=paths.runs_db, paths=paths)

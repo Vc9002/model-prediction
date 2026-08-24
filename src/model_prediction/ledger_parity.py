@@ -20,6 +20,8 @@ Exit 0 only when the hash-linked ledger_events chain replays intact.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -102,13 +104,14 @@ def compare(xlsx_rows: list[dict[str, Any]], sqlite_rows: list[dict[str, Any]]) 
         if not _close(xrow.get("pnl_units"), srow.get("pnl_units"), _MONEY_TOLERANCE):
             report["financial"]["pnl_mismatches"] += 1
             _note("pnl", pick_id, "pnl_units", xrow.get("pnl_units"), srow.get("pnl_units"))
-        if not _close(xrow.get("model_probability"), srow.get("model_probability"), _PROB_TOLERANCE):
+        x_probability = xrow.get("model_probability_raw") or xrow.get("model_probability")
+        if not _close(x_probability, srow.get("model_probability"), _PROB_TOLERANCE):
             report["prediction"]["prob_mismatches"] += 1
             _note(
                 "prob",
                 pick_id,
                 "model_probability",
-                xrow.get("model_probability"),
+                x_probability,
                 srow.get("model_probability"),
             )
         if not _close(xrow.get("line"), srow.get("line"), _MONEY_TOLERANCE):
@@ -153,19 +156,19 @@ def _xlsx_rows(tier: str, sport: str, data_root: Path) -> list[dict[str, Any]]:
     if tier == "research":
         from .research_ledgers import research_ledger
 
-        return research_ledger(data_root, sport).rows()
+        return research_ledger(data_root, sport).export_rows()
     if tier == "main":
         from .main_ledgers import main_ledger
 
-        return main_ledger(data_root, sport).rows()
+        return main_ledger(data_root, sport).export_rows()
     if tier == "flat":
         from .main_ledgers import flat_ledger
 
-        return flat_ledger(data_root, sport).rows()
+        return flat_ledger(data_root, sport).export_rows()
     if tier == "gated_research":
         from .research_ledgers import research_ledger
 
-        return research_ledger(data_root, sport, gated=True).rows()
+        return research_ledger(data_root, sport, gated=True).export_rows()
     raise ValueError(f"unsupported tier: {tier}")
 
 
@@ -303,48 +306,90 @@ def _open_tier_ledger(tier: str, sport: str, data_root: Path):
 
 
 def reconcile(tier: str, sport: str) -> dict[str, int]:
-    """Bring one tier-sport mirror to exact parity with the XLSX (H).
+    """Reconcile in the configured authority direction.
 
-    Two deterministic repairs:
-    1. backfill rows the mirror is missing;
-    2. tombstone mirror rows the XLSX no longer has (status='removed')
-       — those rows were removed from the XLSX through a path that
-       predates the mirror hooks, so the tombstone preserves the audit
-       reference while parity exempts them.
-    Both carry fixed operation ids, so re-runs are no-ops.
+    XLSX authority repairs SQLite from the workbook. SQLite authority only
+    rebuilds the disposable XLSX projection; it never tombstones canonical
+    rows merely because the projection omitted them.
     """
-    result = backfill(tier, sport)
     paths = RuntimePaths.resolve(repo_root=PROJECT_ROOT)
     data_root = paths.repo_root / "data"
     ledger = _open_tier_ledger(tier, sport, data_root)
-    xlsx_rows = {row["pick_id"]: row for row in ledger.rows()}
     store = RuntimeLedgerStore(paths)
     try:
-        tombstoned = synced = 0
-        for record in store.records(tier=tier, sport=sport):
-            if record["pick_id"] in xlsx_rows:
-                # Present in both: replay the XLSX row so any field drift
-                # (e.g. settlements written through a pre-mirror path) is
-                # repaired deterministically — upsert overwrites fields.
-                xrow = xlsx_rows[record["pick_id"]]
-                mutation = ledger._row_mutation(xrow, "update", f"op-sync-{tier}-{record['pick_id']}")
-                if store.apply(mutation):
-                    synced += 1
-                continue
-            if record["status"] in ("archived", "removed"):
-                continue
-            mutation = ledger._row_mutation(
-                {**record, "status": "removed"},
-                "remove",
-                f"op-tombstone-{tier}-{record['pick_id']}",
-            )
-            if store.apply(mutation):
-                tombstoned += 1
+        return _reconcile_ledger(ledger, store, tier=tier, sport=sport)
     finally:
         store.close()
-    result["tombstoned"] = tombstoned
-    result["synced"] = synced
-    return result
+
+
+def _row_state_hash(row: dict[str, Any]) -> str:
+    encoded = json.dumps(row, sort_keys=True, separators=(",", ":"), default=str).encode()
+    return hashlib.sha256(encoded).hexdigest()[:16]
+
+
+def _reconcile_ledger(ledger, store: RuntimeLedgerStore, *, tier: str, sport: str) -> dict[str, int]:
+    """Authority-aware reconciliation core, isolated for exact-direction tests."""
+    export_rows = ledger.export_rows()
+    canonical_records = store.records(tier=tier, sport=sport)
+    export_by_id = {row["pick_id"]: row for row in export_rows}
+    active_canonical = {
+        row["pick_id"]: row for row in canonical_records if row.get("status") not in {"archived", "removed"}
+    }
+
+    if ledger.authority == "sqlite":
+        report = compare(export_rows, canonical_records)
+        if report["clean"]:
+            return {
+                "tier": tier,
+                "sport": sport,
+                "applied": 0,
+                "already_present": len(active_canonical),
+                "tombstoned": 0,
+                "synced": 0,
+            }
+        missing_export = len(set(active_canonical) - set(export_by_id))
+        common = len(set(active_canonical) & set(export_by_id))
+        ledger.rebuild_xlsx_projection()
+        return {
+            "tier": tier,
+            "sport": sport,
+            "applied": missing_export,
+            "already_present": common,
+            "tombstoned": 0,
+            "synced": common,
+        }
+
+    projected_by_id = {row["pick_id"]: row for row in store.pick_rows(tier=tier, sport=sport)}
+    applied = synced = tombstoned = already_present = 0
+    for pick_id, xrow in export_by_id.items():
+        if pick_id not in active_canonical:
+            mutation = ledger._row_mutation(xrow, "append", f"op-backfill-{tier}-{pick_id}")
+            if store.apply(mutation):
+                applied += 1
+            continue
+        already_present += 1
+        operation_id = f"op-sync-{tier}-{pick_id}-{_row_state_hash(xrow)}"
+        if store.apply(ledger._row_mutation(xrow, "update", operation_id)):
+            synced += 1
+
+    for pick_id in active_canonical:
+        if pick_id in export_by_id:
+            continue
+        mutation = ledger._row_mutation(
+            {**projected_by_id[pick_id], "status": "removed"},
+            "remove",
+            f"op-tombstone-{tier}-{pick_id}",
+        )
+        if store.apply(mutation):
+            tombstoned += 1
+    return {
+        "tier": tier,
+        "sport": sport,
+        "applied": applied,
+        "already_present": already_present,
+        "tombstoned": tombstoned,
+        "synced": synced,
+    }
 
 
 def backfill(tier: str, sport: str) -> dict[str, int]:
@@ -358,12 +403,14 @@ def backfill(tier: str, sport: str) -> dict[str, int]:
     paths = RuntimePaths.resolve(repo_root=PROJECT_ROOT)
     data_root = paths.repo_root / "data"
     ledger = _open_tier_ledger(tier, sport, data_root)
+    if ledger.authority != "xlsx":
+        raise ValueError("backfill is XLSX-authority only; use reconcile under sqlite authority")
     store = RuntimeLedgerStore(paths)
     try:
         existing = {r["pick_id"] for r in store.records(tier=tier, sport=sport)}
         applied = 0
         skipped = 0
-        for row in ledger.rows():
+        for row in ledger.export_rows():
             if row["pick_id"] in existing:
                 skipped += 1
                 continue
