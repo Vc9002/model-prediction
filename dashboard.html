@@ -1537,7 +1537,9 @@ function renderMatrix(m){
 }
 /* ---------- picks ---------- */
 const pickPnl=p=>{
-  if(p.display_pnl_units!=null)return Number(p.display_pnl_units);
+  if(Object.prototype.hasOwnProperty.call(p,"display_pnl_units")){
+    return p.display_pnl_units==null?null:Number(p.display_pnl_units);
+  }
   const isSettled=String(p.status||"").toLowerCase()==="settled"||p.result==="win"||p.result==="loss"||p.result==="push";
   if(!isSettled)return null;
   if(p.pnl_units!=null)return Number(p.pnl_units);
@@ -1560,6 +1562,12 @@ const pickPnl=p=>{
   }
   if(!(decimal>1))return null;
   return p.result==="win"?Number((u*(decimal-1)).toFixed(4)):-u;
+};
+const pickPerformanceScored=p=>{
+  if(p.performance_scored===true)return true;
+  if(p.performance_scored===false)return false;
+  const units=Number(p.display_units??p.units??p.research_score_units);
+  return Number.isFinite(units)&&units>0&&pickPnl(p)!=null;
 };
 const pnlClass=v=>v==null?"":(v>=0?"green":"red");
 const ET_ZONE="America/New_York";
@@ -1600,7 +1608,8 @@ function quoteStateBadge(value,staleMinutes=15){
 const pregamePrice=p=>Number(p.market_probability_at_decision??p.market_implied_probability)||null;
 const entryPrice=p=>Number(p.filled_entry?.price)||null;
 const cents=value=>{if(value==null)return "—";const c=Number(value)*100;return `${Number.isInteger(c)?c.toFixed(0):c.toFixed(1)}¢`;};
-const edgePoints=p=>{const stored=Number(p.edge);if(Number.isFinite(stored))return stored;
+const edgePoints=p=>{if(p.economics_status==="unscored_no_price"||p.reason_code==="NO_CALL_MARKET_PRICE_UNAVAILABLE")return null;
+  const stored=Number(p.edge);if(Number.isFinite(stored))return stored;
   const m=pregamePrice(p),model=Number(p.model_probability);return m&&model?model-m:null;};
 // Single shared row/header renderer for all 4 ledger tabs (Ledger/Flat/
 // Research/Gated Research) so they can never visually drift apart again —
@@ -1620,7 +1629,9 @@ function ledgerHeaderRow(showCheckbox,mode="default"){
 }
 function ledgerRowHtml(p,showCheckbox,mode="default"){
   const research=mode==="research",gated=mode==="gated";
-  const res=p.result?`<span class="pill ${p.result}">${p.result}</span>`:(p.status==="open"?'<span class="pill open">open</span>':"");
+  const noCall=String(p.decision||"").toUpperCase()==="NO_CALL";
+  const resultState=p.result?`<span class="pill ${p.result}">${p.result}</span>`:(p.status==="open"?'<span class="pill open">open</span>':"");
+  const res=resultState+(noCall?' <span class="pill push">no call</span>':"");
   const mp=pregamePrice(p),entry=entryPrice(p),edge=edgePoints(p);
   const size=research?(Number(p.units)||0):Number(p.display_units??p.units??p.research_score_units??0);
   const isSettled=String(p.status||"").toLowerCase()==="settled";
@@ -3014,6 +3025,25 @@ async function loadV9LedgerCache(force){
   populateFilters();
   updateCounts();
 }
+function v9LedgerMetrics(rows){
+  const outcomes=(rows||[]).filter(p=>String(p.status||p.State||'').toLowerCase()==='settled'&&(String(p.result||p.Result||'')==='win'||String(p.result||p.Result||'')==='loss'));
+  const scored=outcomes.filter(pickPerformanceScored);
+  const wins=scored.filter(p=>String(p.result||p.Result||'')==='win').length;
+  const losses=scored.length-wins;
+  const pnl=scored.length?scored.reduce((sum,p)=>sum+pickPnl(p),0):null;
+  const risked=scored.reduce((sum,p)=>sum+Number(p.display_units??p.units??p.research_score_units??0),0);
+  return {
+    outcomes:outcomes.length,
+    scored:scored.length,
+    unscored:outcomes.length-scored.length,
+    wins,
+    losses,
+    winRate:scored.length?wins/scored.length:null,
+    pnl,
+    risked,
+    roi:pnl!=null&&risked>0?pnl/risked:null,
+  };
+}
 function renderV9LedgerTable(){
   try{
     updateCounts();
@@ -3021,17 +3051,13 @@ function renderV9LedgerTable(){
     rows.sort((a,b)=>(b.event_start_utc||'').localeCompare(a.event_start_utc||''));
 
     // KPI
-    const settled=rows.filter(p=>String(p.status||p.State||'').toLowerCase()==='settled'&&(String(p.result||p.Result||'')==='win'||String(p.result||p.Result||'')==='loss'));
-    const wins=settled.filter(p=>String(p.result||p.Result||'')==='win').length;
-    const losses=settled.filter(p=>String(p.result||p.Result||'')==='loss').length;
-    const hasSettled=wins+losses>0;
-    const pnl=hasSettled?settled.reduce((s,p)=>s+pickPnl(p),0):null;
-    const risked=settled.reduce((s,p)=>s+(Number(p.units||p.Units)||0),0);
+    const metrics=v9LedgerMetrics(rows);
     $("#v9LedgerKpis").innerHTML=`
-      <div class="k"><b>${rows.length}</b><span>games</span></div>
-      <div class="k"><b>${hasSettled?pct(wins/(wins+losses)):'—'}</b><span>win rate</span></div>
-      <div class="k"><b class="${pnl==null?'':pnl>=0?'green':'red'}">${fmt(pnl)}</b><span>P&L (U)</span></div>
-      <div class="k"><b>${hasSettled&&risked>0?pct(pnl/risked):'—'}</b><span>ROI</span></div>`;
+      <div class="k"><b>${metrics.scored}</b><span>scored games</span></div>
+      <div class="k"><b>${metrics.winRate==null?'—':pct(metrics.winRate)}</b><span>scored win rate</span></div>
+      <div class="k"><b class="${metrics.pnl==null?'':metrics.pnl>=0?'green':'red'}">${fmt(metrics.pnl)}</b><span>P&L (U)</span></div>
+      <div class="k"><b>${metrics.roi==null?'—':pct(metrics.roi)}</b><span>ROI</span></div>
+      ${metrics.unscored?`<div class="dim" style="grid-column:1/-1">${metrics.unscored} settled no-price no-call outcome${metrics.unscored===1?'':'s'} excluded from betting performance.</div>`:''}`;
     
     let html=ledgerHeaderRow(false);
     if(!rows.length){html+='<tr><td colspan=12 class="dim" style="text-align:center;padding:24px">No matches found for current filter settings.</td></tr>';}

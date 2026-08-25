@@ -1832,16 +1832,19 @@ def test_decorated_pick_does_not_invent_size_or_zero_pnl_for_unscored_result(pat
         "pick_id": "unscored-win",
         "status": "settled",
         "result": "win",
-        "sportsbook": "polymarket_us",
+        "decision": "NO_CALL",
+        "reason_code": "NO_CALL_MARKET_PRICE_UNAVAILABLE",
+        "sportsbook": "market_unavailable",
         "units": 0.0,
         "pnl_units": 0.0,
-        "market_implied_probability": 0.40,
     }
 
     decorated = dashboard_server._decorate_pick(row)
 
     assert decorated["display_units"] == 0.0
     assert decorated["display_pnl_units"] is None
+    assert decorated["performance_scored"] is False
+    assert decorated["economics_status"] == "unscored_no_price"
 
 
 @pytest.mark.parametrize(

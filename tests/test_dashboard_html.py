@@ -227,6 +227,80 @@ def test_dashboard_operational_views_are_null_safe_filterable_and_accessible() -
     assert 'class="pill loss">Blocked' in html
     assert 'aria-label="Purchase blocked:' in html
 
+
+def test_v9_kpis_exclude_unpriced_no_calls_from_betting_performance() -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node.js is unavailable")
+    html = (ROOT / "dashboard.html").read_text(encoding="utf-8")
+    pnl_source = "const pickPnl=p=>{" + html.split("const pickPnl=p=>{", 1)[1].split("const pnlClass", 1)[0]
+    metrics_source = (
+        "function v9LedgerMetrics"
+        + html.split("function v9LedgerMetrics", 1)[1].split("function renderV9LedgerTable", 1)[0]
+    )
+    price_source = (
+        "const pregamePrice"
+        + html.split("const pregamePrice", 1)[1].split("// Single shared row/header renderer", 1)[0]
+    )
+    scored = [
+        {
+            "status": "settled",
+            "result": "win" if index < 8 else "loss",
+            "units": 1.0,
+            "display_units": 1.0,
+            "pnl_units": 0.725 if index < 8 else -1.0,
+            "display_pnl_units": 0.725 if index < 8 else -1.0,
+        }
+        for index in range(11)
+    ]
+    unpriced = [
+        {
+            "status": "settled",
+            "result": "win",
+            "decision": "NO_CALL",
+            "reason_code": "NO_CALL_MARKET_PRICE_UNAVAILABLE",
+            "units": 0.0,
+            "pnl_units": 0.0,
+            "edge": 0.0,
+            "display_units": 0.0,
+            "display_pnl_units": None,
+            "economics_status": "unscored_no_price",
+        }
+        for _ in range(4)
+    ]
+    script = (
+        pnl_source
+        + "\n"
+        + price_source
+        + "\n"
+        + metrics_source
+        + "\nconst rows=JSON.parse(process.argv[1]);"
+        + "process.stdout.write(JSON.stringify({metrics:v9LedgerMetrics(rows),"
+        + "unpricedPnl:pickPnl(rows.at(-1)),unpricedEdge:edgePoints(rows.at(-1))}));"
+    )
+
+    result = subprocess.run(
+        [node, "-e", script, json.dumps(scored + unpriced)],
+        text=True,
+        check=True,
+        capture_output=True,
+    )
+    payload = json.loads(result.stdout)
+
+    assert payload["metrics"] == {
+        "outcomes": 15,
+        "scored": 11,
+        "unscored": 4,
+        "wins": 8,
+        "losses": 3,
+        "winRate": pytest.approx(8 / 11),
+        "pnl": pytest.approx(2.8),
+        "risked": 11,
+        "roi": pytest.approx(2.8 / 11),
+    }
+    assert payload["unpricedPnl"] is None
+    assert payload["unpricedEdge"] is None
+
     # Market/Today/Portfolio controls and their URL-backed state are first class.
     for element_id in (
         "marketMode",

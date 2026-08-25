@@ -85,6 +85,25 @@ System health remains deliberately `DEGRADED` only for the five explicitly
 unqualified serving workflows above. It must not be relabeled healthy until
 those exact sport/market artifacts earn qualification.
 
+The dedicated MLB v9 view had one remaining denominator leak. Four settled
+model outcomes were correctly invalidated as
+`NO_CALL_MARKET_PRICE_UNAVAILABLE`, but the page counted their wins in a
+15-game win rate while its P&L/ROI used only the 11 price-backed 1U rows; the
+row renderer also converted their null display P&L and undefined edge back to
+`0.00` and `+0.0pp`. V9 performance now reports only economically scored
+calls: 11 games, 8-3, `+2.80U`, `25.4% ROI`, with an explicit note that four
+settled no-price no-calls are excluded. Those rows remain visible as model
+outcomes labeled `win · no call`, with dashes for price, edge, size, and P&L.
+No price was fabricated.
+
+The follow-up v9 model-ledger audit also found 71 stale economic observations
+across the legacy and candidate workbooks. The lock-protected repair created
+timestamped backups, synchronized 63 observations to authenticated
+decision-time prices/P&L, and cleared unsupported price/difference/P&L fields
+on eight observations while preserving their model results and recording
+`missing_inputs=decision_price`. A post-repair dry run plans zero changes in
+both workbooks.
+
 Five ambiguous model-ledger conflicts remain deliberately unmodified (three
 tennis, one CS2, one LoL): multiple stored observations disagree on settlement
 economics, so there is no safe identity-scoped correction without stronger

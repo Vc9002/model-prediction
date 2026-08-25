@@ -431,6 +431,22 @@ def _decorate_pick(
                     )
             if display_pnl is not None:
                 display_pnl = round(display_pnl, 4)
+    binary_settled = str(row.get("status") or "").lower() == "settled" and row.get("result") in {
+        "win",
+        "loss",
+    }
+    performance_scored = bool(binary_settled and display_units > 0 and display_pnl is not None)
+    if performance_scored:
+        economics_status = "scored"
+    elif binary_settled and (
+        row.get("reason_code") == "NO_CALL_MARKET_PRICE_UNAVAILABLE"
+        or str(row.get("sportsbook") or "").lower() == "market_unavailable"
+    ):
+        economics_status = "unscored_no_price"
+    elif binary_settled:
+        economics_status = "unscored_no_basis"
+    else:
+        economics_status = "not_applicable"
     return {
         **row,
         # Preserve ledger facts in the API. A Research NO_CALL must remain
@@ -438,6 +454,8 @@ def _decorate_pick(
         # the dashboard can calculate a hypothetical display size.
         "display_units": display_units,
         "display_pnl_units": display_pnl,
+        "performance_scored": performance_scored,
+        "economics_status": economics_status,
         "quote": quote,
         "order": order,
         "filled_entry": filled_entry,
