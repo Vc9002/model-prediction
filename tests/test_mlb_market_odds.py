@@ -198,6 +198,16 @@ def test_feed_prices_polymarket_at_executable_ask_and_stores_raw_snapshot(tmp_pa
         )
         is None
     )
+    stale_benchmark_decision = store.decision_quote(
+        "espn-1",
+        OBSERVED + timedelta(hours=2),
+        "moneyline",
+        "away",
+        provider="polymarket_us",
+        maximum_age=None,
+    )
+    assert stale_benchmark_decision is not None
+    assert stale_benchmark_decision["quote"]["decision_probability"] == 0.44
 
 
 def test_feed_falls_back_to_draftkings_when_polymarket_event_is_unavailable(

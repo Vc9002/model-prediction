@@ -765,6 +765,12 @@ def _read_model_ledger_rows(path: Path) -> list[dict]:
         wb.close()
 
 
+def _is_model_ledger_backup(path: Path) -> bool:
+    """Keep timestamped safety copies out of the active model registry."""
+    stem = path.stem.casefold()
+    return any(marker in stem for marker in (".bak-", ".backup", "-backup-"))
+
+
 def _model_evidence_from_rows(model_id: str, rows: list[dict]) -> dict:
     """Lighter-weight duplicate of model_ledger.compute_model_evidence's
     Brier/log-loss/sample-size math for dashboard display -- no calibration
@@ -821,6 +827,8 @@ def model_ledger_comparison() -> dict:
     evidence_by_model: dict[str, dict] = {}
     predictions_by_event: dict[str, list[dict]] = {}
     for path in sorted(ledgers_dir.glob("*.xlsx")):
+        if _is_model_ledger_backup(path):
+            continue
         model_id = path.stem
         rows = _read_model_ledger_rows(path)
         evidence_by_model[model_id] = _model_evidence_from_rows(model_id, rows)
@@ -873,7 +881,7 @@ def record_model_ledger_decision(payload: dict) -> dict:
     if not model_id or not prediction_id or not decision:
         return {"status": "refused", "error": "model_id, prediction_id, and decision are required"}
     path = DATA / "model_ledgers" / f"{model_id}.xlsx"
-    if not path.exists():
+    if not path.exists() or _is_model_ledger_backup(path):
         return {"status": "refused", "error": f"unknown model_id {model_id!r}"}
 
     from model_prediction.model_ledger import ModelLedger  # local: heavy import

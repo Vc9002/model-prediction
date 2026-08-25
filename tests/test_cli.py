@@ -232,16 +232,14 @@ def test_esports_research_keeps_unvalidated_teams_and_gated_requires_positive_ed
 
     logged = cli._log_esports_forecast(_esports_forecast(), config, research, gated_ledger=gated)
 
-    # Every safely priced candidate reaches the research ledger, including
-    # the unvalidated/new-team one (as a downgraded NO_CALL row) -- only the
-    # gated ledger is a curated subset.
+    # Universal paper-call routing records every priced candidate in both
+    # research views; record_type still marks untrusted rows research-only.
     assert logged == 3
     assert len(research.appended) == 3
-    assert len(gated.appended) == 1
-    assert gated.appended[0][0].event_id == "valid"
+    assert len(gated.appended) == 3
     by_event = {request.event_id: eligibility for request, eligibility in research.appended}
-    assert by_event["negative-edge"].reason_code == "NO_CALL_LOW_EDGE"
-    assert by_event["untrained-team"].reason_code == "NO_CALL_MODEL_UNVALIDATED"
+    assert by_event["negative-edge"].reason_code == "PAPER_CALL_LOW_EDGE"
+    assert by_event["untrained-team"].reason_code == "PAPER_CALL_MODEL_UNVALIDATED"
 
 
 def test_esports_gated_ledger_duplicate_is_tracked_not_silently_dropped(monkeypatch) -> None:
@@ -274,7 +272,7 @@ def test_esports_gated_ledger_duplicate_is_tracked_not_silently_dropped(monkeypa
     # The one "valid" contract clears gated eligibility and hits the
     # duplicate; primary (research) writes are unaffected.
     assert logged == 3
-    assert forecast["duplicates"]["gated_ledger"] == 1
+    assert forecast["duplicates"]["gated_ledger"] == 3
     assert forecast["duplicates"]["primary_ledger"] == 0
 
 
@@ -793,9 +791,7 @@ def test_soccer_gated_ledger_duplicate_is_tracked_not_silently_dropped(monkeypat
     assert len(main.appended) == 1
 
 
-def test_soccer_main_ledger_stays_empty_when_gated_ledger_does(monkeypatch) -> None:
-    """A high min_edge that blocks Gated Research must also block Main --
-    they share one eligibility computation."""
+def test_soccer_low_edge_is_a_research_only_call_in_every_ledger(monkeypatch) -> None:
     monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
     monkeypatch.setattr(cli_forecast, "build_soccer_total_slate", lambda **kwargs: _soccer_forecast())
     research = _CaptureLedger()
@@ -812,14 +808,14 @@ def test_soccer_main_ledger_stays_empty_when_gated_ledger_does(monkeypatch) -> N
         main_ledger=main,
     )
 
-    assert result["gated_logged"] == 0
-    assert result["main_logged"] == 0
-    assert gated.appended == []
-    assert main.appended == []
+    assert result["gated_logged"] == 1
+    assert result["main_logged"] == 1
+    assert len(gated.appended) == 1
+    assert len(main.appended) == 1
     assert len(research.appended) == 1
 
 
-def test_soccer_gated_and_main_blocked_when_either_team_lacks_real_history(monkeypatch) -> None:
+def test_soccer_thin_history_is_a_research_only_call_in_every_ledger(monkeypatch) -> None:
     """A contract whose feature_basis shows a team resting on the neutral
     cold-start default (min_team_games below MINIMUM_TEAM_GAMES) must not
     reach Gated Research or Main even with a comfortably clearing edge --
@@ -843,10 +839,10 @@ def test_soccer_gated_and_main_blocked_when_either_team_lacks_real_history(monke
         main_ledger=main,
     )
 
-    assert result["gated_logged"] == 0
-    assert result["main_logged"] == 0
-    assert gated.appended == []
-    assert main.appended == []
+    assert result["gated_logged"] == 1
+    assert result["main_logged"] == 1
+    assert len(gated.appended) == 1
+    assert len(main.appended) == 1
     assert len(research.appended) == 1
 
 
@@ -1210,7 +1206,7 @@ def test_tennis_gated_ledger_duplicate_is_tracked_not_silently_dropped(monkeypat
     assert result["main_logged"] == 1
 
 
-def test_tennis_gated_and_main_blocked_when_either_player_lacks_real_history(monkeypatch) -> None:
+def test_tennis_thin_history_is_a_research_only_call_in_every_ledger(monkeypatch) -> None:
     """A contract whose feature_basis shows a player resting on thin history
     (min_player_matches below MINIMUM_PLAYER_MATCHES) must not reach Gated
     Research or Main even with a comfortably clearing edge."""
@@ -1231,10 +1227,10 @@ def test_tennis_gated_and_main_blocked_when_either_player_lacks_real_history(mon
         main_ledger=main,
     )
 
-    assert result["gated_logged"] == 0
-    assert result["main_logged"] == 0
-    assert gated.appended == []
-    assert main.appended == []
+    assert result["gated_logged"] == 1
+    assert result["main_logged"] == 1
+    assert len(gated.appended) == 1
+    assert len(main.appended) == 1
     assert len(research.appended) == 1
 
 
@@ -1393,8 +1389,9 @@ def test_invalid_quote_timestamp_keeps_mlb_model_opinion_off_main(
         ledger,
     )
 
-    assert result["logged"] == 0
-    assert ledger.appended == []
+    assert result["logged"] == 1
+    assert len(ledger.appended) == 1
+    assert ledger.appended[0][1].record_type is RecordType.RESEARCH_OBSERVATION
     assert any("timestamp is invalid" in row["reason"] for row in result["unmatched_quotes"])
 
 
@@ -1598,18 +1595,12 @@ def test_learned_sport_gated_ledger_duplicate_is_tracked_not_silently_dropped(mo
         gated_ledger=gated_ledger,
     )
 
-    assert result["gated_ledger_duplicate_pick_ids"] == []
-    assert research_ledger.appended[0][1].decision == "NO_CALL"
+    assert result["gated_ledger_duplicate_pick_ids"] == ["gated-existing-learned-1"]
+    assert research_ledger.appended[0][1].decision == "CALL"
 
 
 def test_below_learned_confidence_threshold_downgraded_and_kept_off_main(monkeypatch, tmp_path) -> None:
-    """Operator directive reversing F-34/F-35: unlike the min-edge-vs-market
-    number above (still just a visible note, never exclusionary), the
-    model's own learned confidence_threshold IS restored as a real gate. A
-    candidate whose model_probability falls short of it must be downgraded
-    from CALL to a NO_CALL research observation, and -- same as any other
-    hard NO_CALL reason for a production sport in non-flat mode -- kept off
-    Main entirely rather than muddying it."""
+    """Low-confidence opinions remain paper calls but lose trusted-call status."""
     observed = datetime(2026, 7, 26, 12, tzinfo=UTC)
     candidate = LearnedForwardCandidate(
         event_id="mlb-conf",
@@ -1697,14 +1688,13 @@ def test_below_learned_confidence_threshold_downgraded_and_kept_off_main(monkeyp
         ledger,
     )
 
-    # Kept off Main entirely (mirrors any other hard NO_CALL reason for a
-    # production sport in non-flat mode).
-    assert result["logged"] == 0
-    assert ledger.appended == []
+    assert result["logged"] == 1
+    assert len(ledger.appended) == 1
+    assert ledger.appended[0][1].decision == "CALL"
+    assert ledger.appended[0][1].record_type is RecordType.RESEARCH_OBSERVATION
 
-    # Flat is explicitly the every-game paper benchmark. The confidence
-    # threshold still labels the row as a research NO_CALL, but must not
-    # erase its model-derived paper size and make settled P&L impossible.
+    # Flat is explicitly the every-game paper benchmark. The row retains a
+    # positive paper size even when its artifact is not production validated.
     flat_ledger = _CaptureLedger()
     flat_result = cli._forecast_learned_sport(
         "mlb",
@@ -1720,13 +1710,14 @@ def test_below_learned_confidence_threshold_downgraded_and_kept_off_main(monkeyp
     assert flat_result["logged"] == 1
     flat_eligibility = flat_ledger.appended[0][1]
     assert flat_eligibility.record_type is RecordType.RESEARCH_OBSERVATION
-    assert flat_eligibility.decision == "NO_CALL"
-    assert flat_eligibility.reason_code == "NO_CALL_BELOW_LEARNED_CONFIDENCE"
+    assert flat_eligibility.decision == "CALL"
+    assert flat_eligibility.reason_code == "PAPER_CALL_MODEL_UNVALIDATED"
     assert flat_eligibility.units == pytest.approx(1.0)
 
     # If the matched exchange quote has no verifiable archive lineage, Flat
     # must not pretend it was the decision price. It remains a sized paper
-    # observation on the explicit -110 benchmark; Main remains fail-closed.
+    # observation on the explicit -110 benchmark and keeps the stricter
+    # model-validation reason.
     monkeypatch.setattr(cli_forecast, "_canonical_market_snapshot_lineage", lambda *_args: None)
     fallback_ledger = _CaptureLedger()
     fallback_result = cli._forecast_learned_sport(
@@ -1745,7 +1736,8 @@ def test_below_learned_confidence_threshold_downgraded_and_kept_off_main(monkeyp
     assert fallback_request.sportsbook == "model_opinion_no_executable_quote"
     assert fallback_request.american_odds == -110
     assert fallback_request.market_snapshot_hash is None
-    assert fallback_eligibility.reason_code == "NO_CALL_MARKET_UNAVAILABLE"
+    assert fallback_eligibility.decision == "CALL"
+    assert fallback_eligibility.reason_code == "PAPER_CALL_MODEL_UNVALIDATED"
     assert fallback_eligibility.units == pytest.approx(1.0)
 
 
@@ -2045,8 +2037,8 @@ def test_international_forecast_logs_low_edge_to_research_but_not_gated(monkeypa
     assert result["logged"] == 1
     assert len(research.appended) == 1
     assert research.appended[0][1].record_type is RecordType.RESEARCH_OBSERVATION
-    assert research.appended[0][1].reason_code == "NO_CALL_LOW_EDGE"
-    assert gated.appended == []
+    assert research.appended[0][1].reason_code == "PAPER_CALL_LOW_EDGE"
+    assert len(gated.appended) == 1
 
 
 def test_international_forecast_logging_failure_is_recorded_not_silently_discarded(
@@ -2190,8 +2182,8 @@ def test_international_forecast_gated_blocked_when_team_lacks_real_history(monke
     )
 
     assert result["logged"] == 1
-    assert research.appended[0][1].decision == "NO_CALL"
-    assert gated.appended == []
+    assert research.appended[0][1].decision == "CALL"
+    assert len(gated.appended) == 1
 
 
 def _log_pick(ledger: PickLedger, *, event_start_utc: str, created_at, units: float = 1.0) -> dict:
@@ -2419,11 +2411,11 @@ def test_wnba_spread_flat_ledger_logs_every_contract_regardless_of_eligibility(
     assert request.market_type is MarketType.SPREAD
     assert request.selection == "home"
     assert request.line == 10.5
-    assert eligibility.decision == "NO_CALL"
-    assert eligibility.reason_code == "NO_CALL_MODEL_UNVALIDATED"
+    assert eligibility.decision == "CALL"
+    assert eligibility.reason_code == "PAPER_CALL_MODEL_UNVALIDATED"
 
 
-def test_unqualified_wnba_spread_never_reaches_main(monkeypatch, registry, ban_list) -> None:
+def test_unqualified_wnba_spread_reaches_main_as_research_only_call(monkeypatch, registry, ban_list) -> None:
     monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 8, 13, 18, tzinfo=UTC))
     monkeypatch.setattr(
         cli_forecast,
@@ -2445,8 +2437,9 @@ def test_unqualified_wnba_spread_never_reaches_main(monkeypatch, registry, ban_l
 
     assert len(flat_ledger.appended) == 1
     _request, eligibility = flat_ledger.appended[0]
-    assert eligibility.decision == "NO_CALL"
-    assert len(main_ledger.appended) == 0
+    assert eligibility.decision == "CALL"
+    assert eligibility.record_type is RecordType.RESEARCH_OBSERVATION
+    assert len(main_ledger.appended) == 1
 
 
 def test_unqualified_wnba_spread_does_not_attempt_main_duplicate_write(
@@ -2474,7 +2467,7 @@ def test_unqualified_wnba_spread_does_not_attempt_main_duplicate_write(
     )
 
     assert len(flat_ledger.appended) == 1  # flat always logs, unaffected
-    assert result["main_ledger_duplicate_event_ids"] == []
+    assert result["main_ledger_duplicate_event_ids"] == ["wnba-spread-1"]
 
 
 def test_wnba_total_fails_closed_without_exact_model_artifact(monkeypatch, tmp_path) -> None:
@@ -2496,7 +2489,7 @@ def test_wnba_total_fails_closed_without_exact_model_artifact(monkeypatch, tmp_p
     assert "model_artifact_hash" not in result
 
 
-def test_nrfi_unregistered_model_is_flat_no_call_and_never_main(
+def test_nrfi_unregistered_model_is_research_only_paper_call_in_both_ledgers(
     monkeypatch,
     registry,
     ban_list,
@@ -2562,9 +2555,11 @@ def test_nrfi_unregistered_model_is_flat_no_call_and_never_main(
 
     assert result["logged"] == 1
     assert len(flat.appended) == 1
-    assert flat.appended[0][1].decision == "NO_CALL"
-    assert flat.appended[0][1].reason_code == "NO_CALL_MODEL_UNVALIDATED"
-    assert main.appended == []
+    assert flat.appended[0][1].decision == "CALL"
+    assert flat.appended[0][1].record_type is RecordType.RESEARCH_OBSERVATION
+    assert flat.appended[0][1].reason_code == "PAPER_CALL_MODEL_UNVALIDATED"
+    assert len(main.appended) == 1
+    assert main.appended[0][1].decision == "CALL"
 
 
 def test_research_models_dir_prefers_rolling_over_frozen(monkeypatch, tmp_path) -> None:

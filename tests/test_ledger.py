@@ -251,6 +251,8 @@ def test_append_evaluated_also_writes_the_new_per_model_ledger(tmp_path) -> None
     assert len(rows) == 1
     assert rows[0]["event_id"] == row["event_id"]
     assert float(rows[0]["model_market_difference"]) == pytest.approx(float(row["edge"]))
+    assert rows[0]["operator_decision"] == "CALL"
+    assert float(rows[0]["operator_units"]) == pytest.approx(1.5)
 
 
 def test_a_model_ledger_write_failure_never_breaks_the_primary_ledger_write(tmp_path, monkeypatch) -> None:
@@ -308,29 +310,28 @@ def test_a_model_ledger_settle_failure_never_breaks_the_primary_ledger_settle(tm
     assert ledger.report()["open"] == 0
 
 
-def test_recompute_research_sizing_fills_in_a_zero_unit_sizable_reason(tmp_path) -> None:
+def test_append_evaluated_hard_codes_positive_units_before_recompute(tmp_path) -> None:
     ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
     row = ledger.append_evaluated(request(), _observation("NO_CALL_LOW_EDGE", 0.0))
-    assert float(row["units"]) == 0.0
+    assert row["decision"] == "CALL"
+    assert row["reason_code"] == "PAPER_CALL_LOW_EDGE"
+    assert float(row["units"]) > 0
 
     changed = ledger.recompute_research_sizing()
-    assert changed == 1
+    assert changed == 0
 
     updated = ledger.rows()[0]
     expected = edge_scaled_units(0.59, 0.01, -110)
     assert float(updated["units"]) == expected
 
 
-def test_recompute_research_sizing_zeroes_a_hard_zero_reason_that_had_leaked_units(tmp_path) -> None:
-    """Simulates the too-broad mid-session bug: a structurally-untrustworthy
-    reason (team banned) must never keep a non-zero size regardless of how
-    it got there."""
+def test_recompute_research_sizing_keeps_banned_team_as_positive_paper_units(tmp_path) -> None:
     ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
     ledger.append_evaluated(request(), _observation("NO_CALL_TEAM_BANNED", 1.5))
 
     changed = ledger.recompute_research_sizing()
     assert changed == 1
-    assert float(ledger.rows()[0]["units"]) == 0.0
+    assert float(ledger.rows()[0]["units"]) > 0
 
 
 def test_recompute_research_sizing_never_touches_a_real_qualified_call(tmp_path) -> None:
@@ -346,7 +347,7 @@ def test_recompute_research_sizing_recomputes_pnl_for_already_settled_rows(tmp_p
     ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
     row = ledger.append_evaluated(request(), _observation("NO_CALL_LOW_EDGE", 0.0))
     settled = ledger.settle(row["pick_id"], away_score=5, home_score=5)  # total 10 > 8.5 -> over wins
-    assert float(settled["pnl_units"]) == 0.0  # old bug: zero units -> zero pnl regardless of result
+    assert float(settled["pnl_units"]) > 0
 
     ledger.recompute_research_sizing()
     updated = ledger.rows()[0]
@@ -375,6 +376,17 @@ def test_recompute_research_sizing_can_scope_exact_reason_and_pick_identity(tmp_
     same_reason_other_pick = ledger.append_evaluated(
         replace(request(), event_id="other-pick"), _observation("NO_CALL_LOW_EDGE", 0.0)
     )
+
+    with ledger._lock():
+        legacy_rows = ledger._read_unlocked()
+        for legacy_row in legacy_rows:
+            legacy_row["units"] = "0.00"
+            legacy_row["reason_code"] = (
+                "NO_CALL_MODEL_UNVALIDATED"
+                if legacy_row["pick_id"] == other_reason["pick_id"]
+                else "NO_CALL_LOW_EDGE"
+            )
+        ledger._write_rows(legacy_rows)
 
     changed = ledger.recompute_research_sizing(
         reason_codes={"NO_CALL_LOW_EDGE"},

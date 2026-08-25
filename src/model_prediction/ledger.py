@@ -651,6 +651,9 @@ class PickLedger:
     def append_evaluated(
         self, request: PickRequest, eligibility: EligibilityResult, now: datetime | None = None
     ) -> dict[str, str]:
+        from .eligibility import enforce_universal_paper_call
+
+        eligibility = enforce_universal_paper_call(request, eligibility)
         return self._append_record(request, eligibility, now or utc_now())
 
     def append_call(
@@ -663,7 +666,7 @@ class PickLedger:
     ) -> dict[str, str]:
         """Backward-compatible writer used by older callers and tests.
 
-        Legacy forced calls are converted to zero-unit research observations.
+        Legacy forced calls remain research-only but are persisted as positive-unit paper CALLs.
         """
         from .entities import CanonicalTeam
 
@@ -676,9 +679,9 @@ class PickLedger:
         )
         eligibility = EligibilityResult(
             RecordType.RESEARCH_OBSERVATION if research else RecordType.QUALIFIED_SHADOW_CALL,
-            "RESEARCH_OBSERVATION" if research else "CALL",
-            "NO_CALL_MODEL_UNVALIDATED" if research else "QUALIFIED",
-            0 if research else units,
+            "CALL",
+            "PAPER_CALL_MODEL_UNVALIDATED" if research else "QUALIFIED",
+            (units if units > 0 else 1.0) if research else units,
             confidence_score,
             request.model_probability - implied_probability(request.american_odds),
             request.model_probability
@@ -740,8 +743,8 @@ class PickLedger:
                 if eligibility.record_type is RecordType.QUALIFIED_SHADOW_CALL
                 else "research_observation"
             )
-            if eligibility.reason_code == "NO_CALL_TEAM_BANNED":
-                call_type = "no_call"
+            if eligibility.record_type is RecordType.RESEARCH_OBSERVATION:
+                call_type = "paper_call"
             row.update(
                 {
                     "pick_id": pick_id,
@@ -820,12 +823,6 @@ class PickLedger:
                 else "research_observation_created"
             )
             self.audit.append(event_type, pick_id, self._decision_audit_payload(row))
-            if eligibility.decision == "NO_CALL":
-                self.audit.append(
-                    "pick_rejected",
-                    pick_id,
-                    {"reason_code": eligibility.reason_code, "record_type": eligibility.record_type.value},
-                )
             if self.authority == "sqlite":
                 # Canonical store commits first — its failure aborts the
                 # mutation (the export write below becomes best-effort).
@@ -1234,9 +1231,7 @@ class PickLedger:
         for every RESEARCH_OBSERVATION row, from that row's own stored
         decision-time fields, using the current sizing rule in
         ``eligibility._research``/``_downgrade_research_call``: every reason
-        gets a real edge_scaled_units paper size except NO_CALL_TEAM_BANNED,
-        which always stays zero (a banned team is never sized, regardless of
-        model opinion).
+        gets a real edge_scaled_units paper size, including trust-blocked rows.
 
         One-time backfill for rows logged under an earlier, buggier version
         of that rule (a flat min_pick_units cap regardless of edge, or a
@@ -1250,7 +1245,6 @@ class PickLedger:
         from .config import unit_policy as _unit_policy
 
         policy = policy or _unit_policy(load_config())
-        unsizable_reasons = {"NO_CALL_TEAM_BANNED"}
         changed_rows: list[dict[str, str]] = []
         with self._lock():
             self._migrate_if_needed()
@@ -1269,10 +1263,11 @@ class PickLedger:
                     continue
                 uncertainty_raw = row.get("model_uncertainty")
                 uncertainty = float(uncertainty_raw) if uncertainty_raw not in (None, "") else 0.05
-                new_units = (
-                    0.0
-                    if row.get("reason_code") in unsizable_reasons
-                    else edge_scaled_units(model_probability, uncertainty or 0.05, american_odds, policy)
+                new_units = edge_scaled_units(
+                    model_probability,
+                    uncertainty or 0.05,
+                    american_odds,
+                    policy,
                 )
                 old_units = float(row["units"] or 0)
                 if abs(new_units - old_units) < 1e-9:
@@ -1760,7 +1755,9 @@ class PickLedger:
             "qualified_shadow_calls": len(qualified),
             "research_observations": len(research),
             "no_calls": sum(row["decision"] == "NO_CALL" for row in rows),
-            "no_call_team_banned_count": sum(row["reason_code"] == "NO_CALL_TEAM_BANNED" for row in rows),
+            "paper_call_team_banned_count": sum(
+                row["reason_code"] == "PAPER_CALL_TEAM_BANNED" for row in rows
+            ),
             "open": sum(row["status"] == PickStatus.OPEN.value for row in rows),
             "settled_qualified": len(settled_qualified),
             "qualified_wins": sum(row["result"] == "win" for row in settled_qualified),

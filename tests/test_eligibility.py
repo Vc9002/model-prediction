@@ -46,7 +46,9 @@ def request(
 
 @pytest.mark.parametrize("market", list(MarketType))
 @pytest.mark.parametrize("banned_side", ["home", "away"])
-def test_ban_blocks_every_market_and_side_with_zero_exposure(registry, ban_list, market, banned_side) -> None:
+def test_ban_keeps_every_market_research_only_but_records_a_paper_call(
+    registry, ban_list, market, banned_side
+) -> None:
     ban_list.add(League.MLB, "NYY")
     req = request(
         market=market,
@@ -55,8 +57,9 @@ def test_ban_blocks_every_market_and_side_with_zero_exposure(registry, ban_list,
     )
     result = evaluate_eligibility(req, registry, ban_list, Exposure(), UnitPolicy(), NOW)
     assert result.record_type is RecordType.RESEARCH_OBSERVATION
-    assert result.reason_code == "NO_CALL_TEAM_BANNED"
-    assert result.units == 0
+    assert result.decision == "CALL"
+    assert result.reason_code == "PAPER_CALL_TEAM_BANNED"
+    assert result.units > 0
     assert result.banned_team.canonical_team_id == "mlb-nyy"
 
 
@@ -67,7 +70,8 @@ def test_ban_cannot_be_bypassed_by_origin(registry, ban_list, origin) -> None:
     if origin is ModelOrigin.MARKET_BASELINE:
         object.__setattr__(req, "baseline_identifier", "BASELINE_BOOK_RAW")
     result = evaluate_eligibility(req, registry, ban_list, Exposure(), UnitPolicy(), NOW)
-    assert result.reason_code == "NO_CALL_TEAM_BANNED" and result.units == 0
+    assert result.decision == "CALL"
+    assert result.reason_code == "PAPER_CALL_TEAM_BANNED" and result.units > 0
 
 
 def test_promotion_tier_no_longer_gates_qualified_calls(registry, ban_list) -> None:
@@ -104,7 +108,7 @@ def test_future_observed_at_becomes_research(registry, ban_list) -> None:
     outright (only the "too old" direction was ever guarded), letting a
     clock-skewed or malformed observed_at_utc slip through as trusted,
     current data. Confirms the future-timestamp branch fires before the
-    stale-data branch and produces the same NO_CALL_STALE_DATA outcome."""
+    stale-data branch and produces the same research-only paper-call outcome."""
     future = evaluate_eligibility(
         request(home="BAL", observed_at="2026-07-13T13:00:00Z"),
         registry,
@@ -113,7 +117,8 @@ def test_future_observed_at_becomes_research(registry, ban_list) -> None:
         UnitPolicy(),
         NOW,
     )
-    assert future.reason_code == "NO_CALL_STALE_DATA"
+    assert future.decision == "CALL"
+    assert future.reason_code == "PAPER_CALL_STALE_DATA"
     assert future.record_type is RecordType.RESEARCH_OBSERVATION
     assert future.units > 0
 
@@ -136,7 +141,8 @@ def test_stale_missing_uncertainty_low_edge_and_exposure_become_research(registr
     capped = evaluate_eligibility(
         request(home="BAL"), registry, ban_list, Exposure(event_units=2), UnitPolicy(), NOW
     )
-    assert stale.reason_code == "NO_CALL_STALE_DATA"
+    assert stale.decision == "CALL"
+    assert stale.reason_code == "PAPER_CALL_STALE_DATA"
     assert missing.reason_code == "QUALIFIED"  # uncertainty defaults to 0.05 — pick qualifies
     # Low edge and exposure caps no longer gate CALL vs NO_CALL at all
     # (operator directive, 2026-07-26): once a candidate clears the

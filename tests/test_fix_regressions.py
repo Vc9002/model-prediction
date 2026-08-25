@@ -272,7 +272,8 @@ def test_esports_eligibility_qualifies_only_with_full_provenance():
 def test_esports_eligibility_fails_closed_on_stale_data():
     stale = _future_request(observed_at_utc=(datetime.now(UTC) - timedelta(hours=13)).isoformat())
     result = evaluate_esports_eligibility(stale, Exposure(), UnitPolicy())
-    assert result.reason_code == "NO_CALL_STALE_DATA"
+    assert result.decision == "CALL"
+    assert result.reason_code == "PAPER_CALL_STALE_DATA"
     # Still gets a real paper size (operator directive, 2026-07-31); it just
     # can't become a real CALL.
     assert result.units > 0
@@ -285,7 +286,8 @@ def test_esports_eligibility_fails_closed_on_future_data():
     side of the clock."""
     future = _future_request(observed_at_utc=(datetime.now(UTC) + timedelta(hours=1)).isoformat())
     result = evaluate_esports_eligibility(future, Exposure(), UnitPolicy())
-    assert result.reason_code == "NO_CALL_STALE_DATA"
+    assert result.decision == "CALL"
+    assert result.reason_code == "PAPER_CALL_STALE_DATA"
     assert result.units > 0
 
 
@@ -309,8 +311,8 @@ def test_gated_research_eligibility_centrally_enforces_edge_and_inputs():
         model_inputs_valid=True,
         minimum_edge=0.02,
     )
-    assert result.decision == "NO_CALL"
-    assert result.reason_code == "NO_CALL_LOW_EDGE"
+    assert result.decision == "CALL"
+    assert result.reason_code == "PAPER_CALL_LOW_EDGE"
     # Downgraded from Gated Research only -- it still gets a real paper size
     # for the Research ledger (operator directive, 2026-07-31).
     assert result.units > 0
@@ -323,8 +325,8 @@ def test_gated_research_eligibility_centrally_enforces_edge_and_inputs():
         model_inputs_valid=False,
         minimum_edge=0.02,
     )
-    assert result.decision == "NO_CALL"
-    assert result.reason_code == "NO_CALL_MODEL_UNVALIDATED"
+    assert result.decision == "CALL"
+    assert result.reason_code == "PAPER_CALL_MODEL_UNVALIDATED"
     assert result.units > 0
 
     valid = evaluate_gated_research_eligibility(

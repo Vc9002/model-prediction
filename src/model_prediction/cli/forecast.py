@@ -113,12 +113,12 @@ def _is_registered_serving_model(model_version: str, sport: str, market: str) ->
     return champion is not None and champion.model_id == model_version
 
 
-def _downgrade_unserved(eligibility: Any, reason_code: str = "NO_CALL_MODEL_UNVALIDATED") -> Any:
+def _downgrade_unserved(eligibility: Any, reason_code: str = "PAPER_CALL_MODEL_UNVALIDATED") -> Any:
     return replace(
         eligibility,
         record_type=RecordType.RESEARCH_OBSERVATION,
-        decision="NO_CALL",
-        reason_code=reason_code,
+        decision="CALL",
+        reason_code=reason_code.replace("NO_CALL_", "PAPER_CALL_"),
     )
 
 
@@ -786,8 +786,8 @@ def _forecast_mlb_nrfi_flat(
                     logger.warning("Eligibility evaluation error for NRFI %s: %s", event_id, exc)
                     eligibility = EligibilityResult(
                         record_type=RecordType.RESEARCH_OBSERVATION,
-                        decision="NO_CALL",
-                        reason_code="NO_CALL_MODEL_UNVALIDATED",
+                        decision="CALL",
+                        reason_code="PAPER_CALL_MODEL_UNVALIDATED",
                         units=1.0,
                         confidence_score=50,
                         edge=0.05,
@@ -798,8 +798,8 @@ def _forecast_mlb_nrfi_flat(
             else:
                 eligibility = EligibilityResult(
                     record_type=RecordType.RESEARCH_OBSERVATION,
-                    decision="NO_CALL",
-                    reason_code="NO_CALL_MODEL_UNVALIDATED",
+                    decision="CALL",
+                    reason_code="PAPER_CALL_MODEL_UNVALIDATED",
                     units=1.0,
                     confidence_score=50,
                     edge=0.05,
@@ -1764,9 +1764,9 @@ def _forecast_learned_sport(
                         eligibility = replace(
                             eligibility,
                             record_type=RecordType.RESEARCH_OBSERVATION,
-                            decision="NO_CALL",
-                            reason_code="NO_CALL_MARKET_UNAVAILABLE",
-                            units=eligibility.units if flat_mode else 0,
+                            decision="CALL",
+                            reason_code="PAPER_CALL_MARKET_UNAVAILABLE",
+                            units=eligibility.units,
                         )
                     # evaluate_eligibility itself no longer gates on
                     # disagreement, exposure, or edge (operator directive,
@@ -1788,8 +1788,8 @@ def _forecast_learned_sport(
                         eligibility = replace(
                             eligibility,
                             record_type=RecordType.RESEARCH_OBSERVATION,
-                            decision="NO_CALL",
-                            reason_code="NO_CALL_BELOW_LEARNED_CONFIDENCE",
+                            decision="CALL",
+                            reason_code="PAPER_CALL_BELOW_LEARNED_CONFIDENCE",
                         )
                     if eligibility.decision == "CALL" and not _is_registered_serving_model(
                         request.model_version,
@@ -2633,7 +2633,7 @@ def _forecast_tennis_sport(
                 ):
                     eligibility = _downgrade_unserved(
                         eligibility,
-                        reason_code="NO_CALL_MARKET_UNAVAILABLE",
+                        reason_code="PAPER_CALL_MARKET_UNAVAILABLE",
                     )
                 genuinely_eligible = eligibility.decision == "CALL"
                 if (

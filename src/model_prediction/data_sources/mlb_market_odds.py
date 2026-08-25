@@ -111,14 +111,16 @@ class MarketOddsSnapshotStore:
         selection: str,
         *,
         provider: str | None = None,
-        maximum_age: timedelta = timedelta(minutes=30),
+        maximum_age: timedelta | None = timedelta(minutes=30),
     ) -> dict[str, Any] | None:
         """Return the latest authenticated quote known by decision time.
 
         This is intentionally different from :meth:`closing_quote`: a close
         observed after a forecast cannot be substituted for the forecast's
-        entry price. Invalid hashes, future observations, stale quotes, and
-        mismatched providers fail closed.
+        entry price. Invalid hashes, future observations, and mismatched
+        providers fail closed. Callers may pass ``maximum_age=None`` only for
+        an explicitly stale-tolerant benchmark; the quote must still have
+        been observed by decision time and before the event started.
         """
         if not self.path.exists():
             return None
@@ -134,7 +136,9 @@ class MarketOddsSnapshotStore:
                 if provider is not None and item.get("provider") != provider:
                     continue
                 observed = parse_utc(item["observed_at_utc"])
-                if observed > decision_at or decision_at - observed > maximum_age:
+                if observed > decision_at or (
+                    maximum_age is not None and decision_at - observed > maximum_age
+                ):
                     continue
                 event_start = parse_utc(item["event_start_utc"])
                 if observed > event_start:

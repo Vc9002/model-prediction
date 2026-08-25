@@ -3,9 +3,11 @@
 The original benchmark script hard-coded every row to consensus -110 while
 the dashboard displayed a separate market close. This made every winning row
 show +0.9091U regardless of the real decision-time price. The correction is
-strictly identity- and time-scoped: only v9 placeholder rows are eligible, and
-each requires an authenticated market snapshot observed no later than that
-row's forecast timestamp and no more than 30 minutes old.
+strictly identity- and time-scoped: only v9 placeholder or prior no-price rows
+are eligible, and each requires an authenticated market snapshot observed no
+later than that row's forecast timestamp and before first pitch. The flat
+benchmark is explicitly stale-tolerant because every recorded pick is a 1.0U
+CALL; the normal 30-minute execution freshness gate does not apply here.
 
 Dry-run is the default. ``--apply`` backs up every changed workbook and the
 append-only audit log, records one correction event per primary-ledger row,
@@ -43,10 +45,6 @@ REASON = (
     "Correct fabricated consensus -110 v9 entry using the latest authenticated "
     "Polymarket US snapshot known at the original forecast timestamp."
 )
-INVALIDATION_REASON = (
-    "Invalidate fabricated consensus -110 v9 entry because no authenticated "
-    "market snapshot existed within 30 minutes of the original forecast."
-)
 
 
 def _number(value: object) -> float | None:
@@ -67,6 +65,14 @@ def _is_placeholder(row: dict[str, str]) -> bool:
     )
 
 
+def _needs_primary_price_repair(row: dict[str, str]) -> bool:
+    return _is_placeholder(row) or (
+        row.get("model_version") == MODEL_VERSION
+        and row.get("decision") == "NO_CALL"
+        and row.get("reason_code") == "NO_CALL_MARKET_PRICE_UNAVAILABLE"
+    )
+
+
 def _evidence_for_row(store: MarketOddsSnapshotStore, row: dict[str, str]) -> dict[str, Any] | None:
     observed_at = row.get("observed_at_utc") or row.get("created_at_utc")
     if not observed_at:
@@ -77,6 +83,7 @@ def _evidence_for_row(store: MarketOddsSnapshotStore, row: dict[str, str]) -> di
         str(row.get("market_type") or "moneyline"),
         str(row.get("selection") or ""),
         provider="polymarket_us",
+        maximum_age=None,
     )
 
 
@@ -108,10 +115,14 @@ def _correct_primary_row(row: dict[str, str], evidence: dict[str, Any]) -> dict[
             "market_snapshot_hash": str(snapshot["snapshot_hash"]),
             "market_snapshot_archive_path": str(snapshot["snapshot_archive_path"]),
             "market_snapshot_record_id": str(snapshot["snapshot_record_id"]),
+            "record_type": "QUALIFIED_SHADOW_CALL",
+            "decision": "CALL",
+            "reason_code": "FLAT_BENCHMARK_TRACK",
+            "units": "1.00",
         }
     )
     if row.get("status") == "settled" and row.get("result"):
-        units = float(row.get("units") or 0.0)
+        units = float(corrected["units"])
         if row["result"] == "win":
             pnl = units * (1.0 / entry - 1.0)
         elif row["result"] == "loss":
@@ -129,6 +140,13 @@ def _correct_model_row(row: dict[str, str], evidence: dict[str, Any]) -> dict[st
     model_probability = _number(row.get("model_probability"))
     if model_probability is not None:
         corrected["model_market_difference"] = f"{model_probability - entry:.6f}"
+    missing_inputs = {
+        value.strip() for value in str(row.get("missing_inputs") or "").split(",") if value.strip()
+    }
+    missing_inputs.discard("decision_price")
+    corrected["missing_inputs"] = ",".join(sorted(missing_inputs))
+    if row.get("input_availability") == "market_price_unavailable_at_decision":
+        corrected["input_availability"] = "available" if not missing_inputs else "partial"
     if row.get("status") == "settled" and row.get("result"):
         if row["result"] == "win":
             corrected["pnl_units"] = f"{1.0 / entry - 1.0:.4f}"
@@ -136,50 +154,6 @@ def _correct_model_row(row: dict[str, str], evidence: dict[str, Any]) -> dict[st
             corrected["pnl_units"] = "-1.0000"
         else:
             corrected["pnl_units"] = "0.0000"
-    return corrected
-
-
-def _invalidate_unpriced_model_row(row: dict[str, str]) -> dict[str, str]:
-    """Preserve the model outcome while removing unsupported economics."""
-    corrected = dict(row)
-    missing_inputs = {
-        value.strip() for value in str(row.get("missing_inputs") or "").split(",") if value.strip()
-    }
-    missing_inputs.add("decision_price")
-    corrected.update(
-        {
-            "decision_price": "",
-            "market_no_vig_probability": "",
-            "model_market_difference": "",
-            "pnl_units": "",
-            "input_availability": "market_price_unavailable_at_decision",
-            "missing_inputs": ",".join(sorted(missing_inputs)),
-        }
-    )
-    return corrected
-
-
-def _invalidate_unpriced_primary_row(row: dict[str, str]) -> dict[str, str]:
-    corrected = dict(row)
-    corrected.update(
-        {
-            "sportsbook": "market_unavailable",
-            "american_odds": "",
-            "decimal_odds": "",
-            "market_implied_probability": "",
-            "decision_american_odds": "",
-            "decision_decimal_odds": "",
-            "decision_raw_implied_probability": "",
-            "market_probability_at_decision": "",
-            "record_type": "RESEARCH_OBSERVATION",
-            "decision": "NO_CALL",
-            "reason_code": "NO_CALL_MARKET_PRICE_UNAVAILABLE",
-            "units": "0.00",
-            "edge": "",
-            "trade_candidate": "False",
-            "pnl_units": "",
-        }
-    )
     return corrected
 
 
@@ -208,14 +182,13 @@ def main() -> int:
     primary_plan: dict[str, tuple[dict[str, str], dict[str, str], dict[str, Any] | None]] = {}
     primary_missing: list[str] = []
     for row in ledger.rows():
-        if not _is_placeholder(row):
+        if not _needs_primary_price_repair(row):
             continue
         evidence = _evidence_for_row(store, row)
         if evidence is None:
             primary_missing.append(row["pick_id"])
-            corrected = _invalidate_unpriced_primary_row(row)
-        else:
-            corrected = _correct_primary_row(row, evidence)
+            continue
+        corrected = _correct_primary_row(row, evidence)
         if _changed_fields(row, corrected):
             primary_plan[row["pick_id"]] = (row, corrected, evidence)
 
@@ -232,9 +205,8 @@ def main() -> int:
             evidence = _evidence_for_row(store, row)
             if evidence is None:
                 missing.append(row["prediction_id"])
-                corrected = _invalidate_unpriced_model_row(row)
-            else:
-                corrected = _correct_model_row(row, evidence)
+                continue
+            corrected = _correct_model_row(row, evidence)
             if _changed_fields(row, corrected):
                 changes[row["prediction_id"]] = corrected
         model_plans[path] = changes
@@ -259,18 +231,12 @@ def main() -> int:
                             continue
                         before, corrected, evidence = planned
                         ledger.audit.append(
-                            (
-                                "decision_price_corrected"
-                                if evidence is not None
-                                else "decision_price_invalidated"
-                            ),
+                            "decision_price_corrected",
                             row["pick_id"],
                             {
-                                "reason": REASON if evidence is not None else INVALIDATION_REASON,
-                                "snapshot_record_id": (
-                                    evidence["snapshot"]["snapshot_record_id"] if evidence else None
-                                ),
-                                "quote_observed_at_utc": (evidence["observed_at_utc"] if evidence else None),
+                                "reason": REASON,
+                                "snapshot_record_id": evidence["snapshot"]["snapshot_record_id"],
+                                "quote_observed_at_utc": evidence["observed_at_utc"],
                                 "changed_fields": _changed_fields(before, corrected),
                             },
                         )
@@ -299,7 +265,7 @@ def main() -> int:
         "primary_planned": len(primary_plan),
         "primary_applied": primary_applied,
         "primary_missing_evidence": primary_missing,
-        "primary_invalidated_no_call": primary_missing,
+        "primary_unrepairable_no_price": primary_missing,
         "model_planned": {str(path.relative_to(ROOT)): len(changes) for path, changes in model_plans.items()},
         "model_applied": model_applied,
         "model_missing_evidence": model_missing,

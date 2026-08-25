@@ -62,13 +62,24 @@ zero-P&L wins or losses. Timestamped SQLite/XLSX backups were created before
 mutation. The repair script is dry-run by default, requires SQLite authority,
 and refuses to run while the daily writer lock is held.
 
-Flat forecasts now retain model-derived paper size when confidence or live
-market availability makes the row a research `NO_CALL`; an unverifiable quote
-is discarded and the row is explicitly labeled as a standard `-110` paper
-benchmark. Main remains fail-closed. The dashboard no longer invents size for
-a settled zero-unit row, and system health now checks every settled binary row
-for a positive scoring basis and coherent win/loss P&L directly in canonical
-SQLite.
+Every persisted forecast is now an explicit paper `CALL` with positive units,
+including unqualified, low-edge, thin-history, and market-unavailable model
+opinions. Trust and execution authorization remain separate: those rows keep
+`record_type=RESEARCH_OBSERVATION`, so the universal paper-call label does not
+promote them to executable or qualified status. An unverifiable quote is still
+discarded and the flat row uses the explicit `-110` paper benchmark. The
+dashboard no longer invents size for a settled zero-unit row, and system health
+checks every settled binary row for a positive scoring basis and coherent
+win/loss P&L directly in canonical SQLite.
+
+The lock-protected universal migration changed 1,842 canonical active SQLite
+records, 1,844 active XLSX projection rows across 13 workbooks, and 11,806
+nonfailed model-ledger observations across 16 workbooks. All active stored
+predictions now carry `CALL` plus positive paper units; all settled predictions
+carry realized P&L computed from their stored entry economics. Open rows retain
+a blank P&L field, meaning pending settlement rather than a fabricated zero.
+Archived and removed lifecycle tombstones were intentionally excluded. The
+post-migration dry run plans zero changes and reports zero unresolved rows.
 
 The same investigation found a scheduler false green: the latest daily run's
 MLB v9 forecast exited 1 after calling a removed `PickLedger.list_picks()` API
@@ -86,23 +97,24 @@ unqualified serving workflows above. It must not be relabeled healthy until
 those exact sport/market artifacts earn qualification.
 
 The dedicated MLB v9 view had one remaining denominator leak. Four settled
-model outcomes were correctly invalidated as
-`NO_CALL_MARKET_PRICE_UNAVAILABLE`, but the page counted their wins in a
-15-game win rate while its P&L/ROI used only the 11 price-backed 1U rows; the
-row renderer also converted their null display P&L and undefined edge back to
-`0.00` and `+0.0pp`. V9 performance now reports only economically scored
-calls: 11 games, 8-3, `+2.80U`, `25.4% ROI`, with an explicit note that four
-settled no-price no-calls are excluded. Those rows remain visible as model
-outcomes labeled `win · no call`, with dashes for price, edge, size, and P&L.
-No price was fabricated.
+model outcomes lacked a quote inside the normal 30-minute execution freshness
+window, but each had an authenticated Polymarket snapshot known before the
+forecast and before first pitch. Because the v9 flat benchmark contract is one
+1.0U CALL on every recorded pick, its quote lookup is now explicitly
+stale-tolerant while retaining provider, hash, knowledge-time, and pregame
+checks. The four rows were restored as priced 1.0U calls and their settled P&L
+was recomputed from those stored quotes. The generic dashboard cohort guard
+remains in place so a genuinely unscored row cannot leak into betting
+performance or render null economics as fake zeros.
 
 The follow-up v9 model-ledger audit also found 71 stale economic observations
 across the legacy and candidate workbooks. The lock-protected repair created
-timestamped backups, synchronized 63 observations to authenticated
-decision-time prices/P&L, and cleared unsupported price/difference/P&L fields
-on eight observations while preserving their model results and recording
-`missing_inputs=decision_price`. A post-repair dry run plans zero changes in
-both workbooks.
+timestamped backups and synchronized all 71 observations to authenticated
+prices known at forecast time. Sixty-three used quotes inside the normal
+30-minute freshness window; eight benchmark observations use older but still
+authenticated, pre-decision, pregame snapshots under the explicit all-CALL
+flat-benchmark contract. A post-repair dry run plans zero changes in both
+workbooks.
 
 Five ambiguous model-ledger conflicts remain deliberately unmodified (three
 tennis, one CS2, one LoL): multiple stored observations disagree on settlement
@@ -110,11 +122,15 @@ economics, so there is no safe identity-scoped correction without stronger
 source evidence. They are evidence gaps, not candidates for automatic P&L
 normalization.
 
-Verification after both repairs: 2,273 tests passed, 4 skipped; changed-path
-Ruff and shell syntax passed; SQLite integrity and the 39,576-event replay
-chain passed. Whole-tree
-Ruff still reports five findings in the pre-existing untracked
-`scripts/audit_mlb_v9_feature_distribution.py`, which this repair preserved.
+Final verification after the universal-call and active-model discovery repairs:
+2,287 tests passed, 3 skipped; changed-path Ruff and `git diff --check` passed.
+The live API exposes 16 active model ledgers, zero backup models, 2,747 open
+model predictions, and zero non-CALL decisions. Dia rendered the same 16-model
+evidence table and the corrected v9 settled ledger at 18 scored games and
+`+5.92U`. SQLite integrity and the 39,576-event replay chain passed during the
+preceding repair verification. Whole-tree Ruff still reports five findings in
+the pre-existing untracked `scripts/audit_mlb_v9_feature_distribution.py`,
+which this repair preserved.
 
 At the pre-repair audit snapshot, remaining evidence gaps were explicit, not
 repaired with fake history: 3,240

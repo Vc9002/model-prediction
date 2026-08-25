@@ -197,11 +197,12 @@ def run_v9_flat_forecast(date_str: str | None = None) -> list[dict]:
             "moneyline",
             selection,
             provider="polymarket_us",
+            maximum_age=None,
         )
         if decision_evidence is None:
             print(
                 f"  [flat-v9] NO_CALL_MARKET_PRICE_UNAVAILABLE: {event_id} "
-                f"{selected_team} has no authenticated quote within 30 minutes"
+                f"{selected_team} has no authenticated pregame quote known by decision time"
             )
             continue
         snapshot = decision_evidence["snapshot"]

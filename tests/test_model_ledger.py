@@ -46,9 +46,9 @@ def _pick_request(**overrides) -> PickRequest:
     return PickRequest(**fields)
 
 
-def _eligibility(edge: float = 0.08) -> EligibilityResult:
+def _eligibility(edge: float = 0.08, units: float = 1.5) -> EligibilityResult:
     return EligibilityResult(
-        RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", 1.5, 70, edge, edge, _AWAY, _HOME
+        RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", units, 70, edge, edge, _AWAY, _HOME
     )
 
 
@@ -214,12 +214,14 @@ def test_append_prediction_refuses_a_duplicate_id(tmp_path) -> None:
 
 
 def test_record_from_pick_request_writes_into_the_right_model_ledger(tmp_path) -> None:
-    row = record_from_pick_request(tmp_path, _pick_request(), _eligibility())
+    row = record_from_pick_request(tmp_path, _pick_request(), _eligibility(units=0.75))
 
     assert row is not None
     assert row["model_id"] == "mlb-moneyline-elo-trend-lr"
     assert (tmp_path / "mlb-moneyline-elo-trend-lr.xlsx").exists()
     assert row["model_market_difference"] == "0.08"
+    assert row["operator_decision"] == "CALL"
+    assert row["operator_units"] == "0.75"
 
 
 def test_record_from_pick_request_dedupes_the_same_decision(tmp_path) -> None:

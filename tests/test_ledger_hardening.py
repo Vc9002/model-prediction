@@ -153,19 +153,18 @@ def test_research_model_recommended_skips_scoring_without_uncertainty(registry, 
     assert not settled["research_pnl_units"]
 
 
-def test_banned_total_is_recorded_as_zero_unit_no_call(registry, ban_list, tmp_path) -> None:
+def test_banned_total_is_recorded_as_positive_unit_research_paper_call(registry, ban_list, tmp_path) -> None:
     ban_list.add(League.MLB, "BAL")
     req = request("banned-total")
     req = PickRequest(**{**req.__dict__, "market_type": MarketType.TOTAL, "selection": "over", "line": 8.5})
     ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
     gate = evaluate_eligibility(req, registry, ban_list, Exposure(), UnitPolicy(), NOW)
     row = ledger.append_evaluated(req, gate, NOW)
-    assert row["decision"] == "NO_CALL"
-    assert row["reason_code"] == "NO_CALL_TEAM_BANNED"
+    assert row["decision"] == "CALL"
+    assert row["reason_code"] == "PAPER_CALL_TEAM_BANNED"
     assert row["banned_team_id"] == "mlb-bal"
-    assert float(row["units"]) == 0
-    assert ledger.report()["no_call_team_banned_count"] == 1
-    assert ledger.exposure(req, NOW).daily_units == 0
+    assert float(row["units"]) > 0
+    assert ledger.report()["paper_call_team_banned_count"] == 1
 
 
 def test_older_excel_schema_migrates_with_backup_and_preserved_units(tmp_path) -> None:
@@ -332,7 +331,7 @@ def test_research_scoring_is_separate_from_qualified_units(tmp_path) -> None:
     row = ledger.append_call(research, 1.0, 60, call_type="forced_call", now=NOW)
     ledger.settle(row["pick_id"], 2, 3)
     scored = ledger.score_research([row["pick_id"]], 1.0)[0]
-    assert scored["units"] == "0.00"
+    assert scored["units"] == "1.00"
     assert scored["research_score_units"] == "1.0000"
     assert float(scored["research_pnl_units"]) > 0
     report = ledger.report()

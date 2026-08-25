@@ -228,8 +228,8 @@ def _downgrade_research_call(
     units = edge_scaled_units(request.model_probability, uncertainty, request.american_odds, policy)
     return EligibilityResult(
         RecordType.RESEARCH_OBSERVATION,
-        "NO_CALL",
-        reason_code,
+        "CALL",
+        _paper_call_reason(reason_code),
         units,
         eligibility.confidence_score,
         eligibility.edge,
@@ -283,14 +283,12 @@ def _research(
     reason: NoCallReason,
     policy: UnitPolicy,
 ) -> EligibilityResult:
-    """NO_CALL for reasons where the decision itself can't be trusted (banned
-    team, stale/missing data, unvalidated model). These still get logged as
-    real Research/Gated-Research rows, and every logged pick carries a real,
-    model-derived paper size (operator directive, 2026-07-31: "every pick
-    should have units and pnl, hard code this") -- with one exception: a
-    banned team is never sized, paper or real, regardless of model opinion
-    (matches ledger._append_record's dedicated call_type="no_call" handling
-    for NO_CALL_TEAM_BANNED).
+    """Create a research-only paper CALL for an untrusted decision.
+
+    Trust failures still prevent execution because ``record_type`` remains
+    ``RESEARCH_OBSERVATION``. They no longer produce a NO_CALL or zero-unit
+    row: the operator's universal-ledger contract requires every stored
+    prediction to carry a model-derived paper size and settle P&L.
     """
     uncertainty = request.model_uncertainty or 0
     recommendation = recommend_units(
@@ -301,19 +299,58 @@ def _research(
         policy,
         validated_model=False,
     )
-    units = (
-        0.0
-        if reason is NoCallReason.TEAM_BANNED
-        else edge_scaled_units(request.model_probability, uncertainty or 0.05, request.american_odds, policy)
+    units = edge_scaled_units(
+        request.model_probability,
+        uncertainty or 0.05,
+        request.american_odds,
+        policy,
     )
     return EligibilityResult(
         RecordType.RESEARCH_OBSERVATION,
-        "NO_CALL",
-        reason.value,
+        "CALL",
+        _paper_call_reason(reason.value),
         units,
         recommendation.confidence_score,
         recommendation.edge,
         recommendation.adjusted_edge,
         away,
         home,
+    )
+
+
+def _paper_call_reason(reason_code: str) -> str:
+    if reason_code.startswith("NO_CALL_"):
+        return "PAPER_CALL_" + reason_code.removeprefix("NO_CALL_")
+    return reason_code
+
+
+def enforce_universal_paper_call(
+    request: PickRequest,
+    eligibility: EligibilityResult,
+    policy: UnitPolicy | None = None,
+) -> EligibilityResult:
+    """Normalize every persisted prediction to CALL + positive paper units.
+
+    The record type is deliberately preserved: research observations remain
+    ineligible for execution even though their paper decision is a CALL.
+    """
+    units = eligibility.units
+    if units <= 0:
+        units = edge_scaled_units(
+            request.model_probability,
+            request.model_uncertainty or 0.05,
+            request.american_odds,
+            policy or UnitPolicy(),
+        )
+    return EligibilityResult(
+        eligibility.record_type,
+        "CALL",
+        _paper_call_reason(eligibility.reason_code),
+        units,
+        eligibility.confidence_score,
+        eligibility.edge,
+        eligibility.adjusted_edge,
+        eligibility.away_team,
+        eligibility.home_team,
+        eligibility.banned_team,
     )

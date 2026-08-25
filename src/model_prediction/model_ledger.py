@@ -295,6 +295,9 @@ def record_from_pick_request(
         decision_price = implied_probability(request.american_odds)
     except (ImportError, ValueError, ZeroDivisionError):
         decision_price = None
+    operator_units = float(getattr(eligibility, "units", 0.0) or 0.0)
+    if operator_units <= 0:
+        operator_units = 1.0
     record = {
         "model_id": model_id,
         "model_version": request.model_version,
@@ -313,6 +316,10 @@ def record_from_pick_request(
         "observed_at_utc": request.observed_at_utc or iso_utc(created or utc_now()),
         "event_start_utc": request.event_start_utc,
         "status": "open",
+        "operator_decision": "CALL",
+        "operator_units": operator_units,
+        "operator_timestamp": request.observed_at_utc or iso_utc(created or utc_now()),
+        "operator_note": "automatic universal paper call",
     }
     key = _prediction_dedupe_key(record)
     existing_keys = {_prediction_dedupe_key(row) for row in ledger.rows()}
