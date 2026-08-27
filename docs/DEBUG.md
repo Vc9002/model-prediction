@@ -1,6 +1,267 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
-**Last audited**: 2026-08-24 (see new section directly below)
+**Last audited**: 2026-08-26 (see new section directly below)
+
+## 2026-08-26 — full-repo debugging scan (tests/lint/guardrails/model+feature audit)
+
+Full sweep, not a bug-motivated investigation: `pytest -q` (2,288 passed, 3
+skipped, 0 failed), `ruff check .` (clean after fixing 5 pre-existing stray
+f-strings in `scripts/audit_mlb_v9_feature_distribution.py`), `verify-chain`
+(hash chain intact, `break_count=0`), `validate-totals`, `feature_model_audit.py`,
+`check_rebuild_isolation.py`, `check_obsolete_paths.py`, `audit_ledger_pnl.py`,
+dashboard `/api/health`, and the installed vs. checked-in launchd plist diff.
+
+**Real findings, none auto-fixed (all need an owner decision):**
+- **MLB v9 feature table has 13 dead (zero-variance) features** — see
+  `docs/ROADMAP.md`'s Phase 5 "KNOWN ISSUE" callout for the full trace. Source
+  data exists and is populated; the bug is in the feature-engine lookup, not
+  absent data. This is the highest-priority finding — it means every v9
+  ablation result touching starter/offense/bullpen/platoon families to date
+  measured noise, not signal.
+- **2 model artifacts have SHA-256 hash mismatches against their own embedded
+  `artifact_hash`**: `config/models/archive/wnba-spread-baseline-v1.json` and
+  `config/models/research/mlb-v9-candidate-1.json`. Both inactive
+  (archived/quarantined), so no live-serving impact, but the provenance
+  record is currently wrong for both.
+- **3 model configs are orphaned** — never wired into `production.yaml`/
+  `config/model.yaml` and not registered as challengers:
+  `nfl-elo-trend-lr-v4-temperature.json`, `wnba-elo-trend-lr-v4-temperature.json`
+  (both committed as intended challengers, per their own commit messages, but
+  never actually hooked up), and `mlb-v9-candidate-1.json` (expected — it's
+  quarantined).
+- **`cs2-tiered-elo.xlsx` model ledger has a 22-row settlement backlog**
+  (unambiguous, unapplied since the 2026-08-23 sync) and **6 settlement
+  identity conflicts** (4 tennis-surface-elo-v1, 1 cs2-tiered-elo-v6, 1
+  lol-tiered-elo-v6) where the same pick has two different recorded P&L
+  signatures — `audit_ledger_pnl.py` correctly refuses to guess and leaves
+  both classes untouched.
+- **Installed launchd plist has drifted from the checked-in one**:
+  `~/Library/LaunchAgents/com.modelprediction.daily.plist`'s
+  `StartCalendarInterval` is a bare dict; `ops/launchd/com.modelprediction.daily.plist`
+  wraps the same value in a 1-element array. Both are valid launchd forms
+  (functionally identical), but the live file no longer byte-matches git.
+- **`docs/RESEARCH_BACKLOG.md` still exists** despite this file's own
+  "2026-08-13" note above (and the top-of-repo `CLAUDE.md`) recording it as
+  merged into `docs/ROADMAP.md` and deleted on 2026-08-22; its own
+  "Last Updated: 2026-08-23" header postdates the claimed deletion. Someone
+  (or some backfill script) recreated it after the merge — worth a decision
+  on whether to re-delete it or reconcile the two, since they can now drift
+  apart silently.
+
+**Confirmed non-issues (checked, not new):** `scripts/check_obsolete_paths.py`
+still flags `data/archive/research-ledger-split-20260726T192729Z/cleanup-report.json`
+— this is the exact pre-existing archived-artifact case
+`tests/test_obsolete_path_checker.py` already documents as known, deferred
+cleanup, not wired into blocking CI. Not a regression.
+
+Uncommitted working-tree changes present at scan time (Polymarket 429
+backoff, KBO/NPB timezone-of-"today" fix, ledger PnL sync, launchd
+once-daily schedule) were reviewed, tested, and left as-is per the no-commit-
+without-request policy — see the session's git status for the full list.
+
+## 2026-08-26 (later) — WNBA total unblocked (artifact identity repair) + model-wide identity/hash sweep
+
+**Bug found and fixed: WNBA total blocked at artifact resolution.**
+Both daily runs on 08-26 (12:43Z, 16:35Z) logged the `wnba_total` step as
+`status: blocked, reason: "exact serving artifact missing for
+wnba-total-margin-v1", scheduled_games: 0`. The slate builder hardcodes
+`model_version = "wnba-total-margin-v1"` (`cli/forecast.py:1157`) and loads
+artifacts through `_load_exact_artifact_contract`, which requires
+`config/models/<model_version>.json` whose embedded `model_version` matches
+exactly. The artifact existed only as `wnba-total-score-ridge-v1.json` with
+embedded `model_version: wnba-total-score-ridge-v1` — a three-way identity
+drift that fail-closed the whole step.
+
+**Fix (operator-directed name: `wnba-total-margin-v1`):**
+- `git mv config/models/wnba-total-score-ridge-v1.json → wnba-total-margin-v1.json`;
+  embedded `model_version` → `wnba-total-margin-v1`; `artifact_hash` re-signed
+  via `production_registry.compute_artifact_hash` (self-verifies).
+- `config/model.yaml` `total_research_artifact` → `config/models/wnba-total-margin-v1.json`.
+- `config/production.yaml` `blocked_workflows` reason for `wnba-total-margin-v1`
+  was stale ("no exact serving artifact exists for this model version") →
+  updated to the real remaining gate: "checked-in artifact has no
+  qualification.qualified; research-only pending over/under evaluation".
+  Reason strings are stored/display-only (`_parse_blocked_workflows`), no logic impact.
+- **Untouched on purpose:** `model_ledger.py` `MODEL_ID_BY_LEAGUE_AND_MARKET`
+  keeps `("WNBA","total"): "wnba-total-score-ridge"` — ledger identity is a
+  family name (NBA/NFL totals are also `*-total-score-ridge`), artifact
+  version and ledger id are different axes; renaming it would split history
+  into a new empty workbook. Rows already carry
+  `model_version: wnba-total-margin-v1` correctly.
+- The model remains **zero-unit research-only by design**: the artifact has no
+  top-level `qualification.qualified` and `market_qualification` is
+  `DATA_READY_PENDING_OVER_UNDER_EVALUATION`. No promotion was performed.
+- Tests: the fail-closed test in `tests/test_wnba_totals.py` now mocks the
+  loader instead of pinning the old filename; new regression test
+  `test_wnba_total_artifact_resolves_under_slate_model_version` pins that the
+  checked-in artifact resolves under the slate's exact version. WNBA 9/9,
+  registry 12/12, ledger+canary 46/46.
+
+**Model-wide sweep for the same error class (identity drift / hash failure /
+unresolvable contract):**
+- All 13 production models resolve (11 json_artifact via
+  `_load_exact_artifact_contract`, 2 code-backed soccer/tennis); all champions
+  resolve; blocked workflows resolve except `mlb-nrfi-v1`, which is
+  documented-intentional (code-backed step runs `status: ok`, 15 candidates
+  today; the block is Main-tier exclusion only). **No other model is blocked
+  the way WNBA total was.**
+- `config/models/research/mlb-v9-candidate-1.json` hash was re-hashed during
+  the sweep and then **reverted** — `tests/test_artifact_hash_verification.py`
+  pins the quarantine-annotation convention (`KNOWN_NON_VERIFIERS` +
+  `test_candidate_hash_verifies_without_quarantine_annotation`): its
+  `status`/`invalidation_reason`/`replacement` fields are post-signing
+  annotations deliberately never re-signed, same pattern as the
+  wnba-spread-baseline `_retired*` fields. This corrects the framing in the
+  earlier 08-26 scan above: those two "hash mismatches" are test-pinned
+  conventions, not broken provenance records. Whether the convention itself
+  should change (e.g. re-sign on annotation) is an owner decision.
+- Hygiene flags left untouched (challenger/rebuild or by-design):
+  `challengers/mlb-two-head-real-features-v1.json` embedded `model_id:
+  "mlb-two-head-v1"` ≠ filename (its hash verifies under a `sort_keys=False`
+  variant); `market-residual-v1.json` embedded name is the code's dynamic
+  `RESIDUAL_VERSION-identity-fallback` (diagnostic-only, fail-soft loader
+  never compares names).
+
+**New finding (owner decision, see ROADMAP Phase 21 KNOWN ISSUE):** the live
+v9 benchmark (`scripts/forecast_mlb_v9_benchmark.py`) records picks under
+`model_version: "mlb-v9-candidate-1"` but never loads
+`config/models/research/mlb-v9-candidate-1.json` — it retrains from the frozen
+cohort parquet via `mlb_evaluator`. The artifact under that exact name is
+`status: VOID_INVALID_FEATURE_PROVENANCE` (`replacement: mlb-v9-candidate-2
+TBD`). Functionally safe (voided artifact is not read), but any exact-contract
+lookup of "mlb-v9-candidate-1" resolves to a VOID artifact, and the benchmark
+rows' identity collides with it. Needs a rename decision on the research side.
+
+**Test suite:** 2,298 passed, 2 failed — both failures were the two
+test-pinned hash tests broken by the since-reverted re-hash; the affected
+file re-verified 4/4 after revert.
+
+## 2026-08-26 (evening) — resolution of the morning scan findings
+
+Every finding from the morning scan was resolved or superseded:
+
+- **13 dead v9 features — root-caused and fixed.** Four independent lookup
+  bugs, all in how snapshot-driven engines build keys vs. how callers query
+  them: (1) `features/batter_priors.py`'s loader read flat game fields while
+  `game_snapshots.jsonl` stores nested `side.team_name` /
+  `side.players[].batting` — every batter registered under an empty team key,
+  so `evaluate_projected_team_offense` hit the league-prior fallback for all
+  rows (4 Projected-Offense + 2 Platoon columns dead); (2)
+  `features/bullpen_state.py` keyed reliever appearances by numeric team_id
+  while `evaluate_matchup()` passes full names (3 Bullpen columns dead);
+  (3) `features/mlb_v9_features.py` read `starter_k_bb_gap` while the engine
+  returns `starter_k_minus_bb_pct_gap` (always the 0.0 default); (4)
+  `scripts/mlb_v9_feature_table_v3.py` never supplied starter names, fixed
+  via `load_probable_starter_index` (`mlb_v9_features.py:26-80`) reusing
+  `validation.py`'s `(start_utc[:16], home, away)` crosswalk. Direct engine
+  verification on a 200-game sample: all 19 previously-dead columns now have
+  66–185 distinct values (before: exactly 1 each). The builder's per-game
+  `platoon_matchup_gaps()` was replaced with the shared-engine equivalent
+  (value-identical on 100 real games) — the rebuild drops from hours to
+  tens of minutes. Regression tests: `tests/test_mlb_v9_feature_table_lookup.py`
+  (9 pass, revert-verified). The v3 parquet rebuild completed (6,678 rows,
+  hash 6b079f58cd82, pre-fix parquet backed up) and the distribution audit
+  now **PASSES ALL SANITY GATES** (0 nulls, all 24 features non-zero std).
+  Three pairs are documented construction-collinear in
+  `audit_mlb_v9_feature_distribution.py` (`KNOWN_COLLINEAR_PAIRS`, printed as
+  [KNOWN], never silent): `bullpen_freshness_advantage` /
+  `bullpen_hl_advantage` (r=1.00000 — boxscore snapshots carry no reliever
+  role, so every profile is MIDDLE_RELIEF and hl availability falls back to
+  general availability) and `projected_*_gap` / `platoon_*_advantage`
+  (r~0.9997 — the vs-hand filter needs per-batter PA by opposing-pitcher
+  hand, which boxscore snapshots cannot attribute). Revisit if a pitch-level
+  or roster-role source lands. **Ladder re-run on the rebuilt table
+  (2026-08-26, 2,000-bootstrap date-cluster paired, locked holdout):**
+  v3_baseline LL=0.6865/AUC=0.5589; `v3_starters` dLL=-0.00208 P_better=0.93
+  **KEEP**; `v3_offense` dLL=-0.00120 P=0.89 INCONCLUSIVE (borderline);
+  `v3_bullpen` +0.00038 (no signal); `v3_platoon` -0.00047 P=0.74;
+  `v3_full` dLL=-0.00300 P=0.91 **KEEP** (AUC 0.5743). The pre-fix ladder
+  measured all-null on these same families — the starter family is the
+  first real v9 signal. Report:
+  `outputs/research/mlb_evaluator/report_v3_20260826.json`; the evaluator
+  gained `--parquet`/`--manifest` args and `v3_*` feature sets pinned to
+  the v3 contract (`manifests/mlb_v9_feature_table_v3_eval.json`, cohort
+  files `*_event_ids_v3.json`).**
+- **2 artifact hash "mismatches" — confirmed deliberate non-issues.** Both
+  re-verify exactly under canonical conventions when their annotation fields
+  are excluded (archive/wnba-spread-baseline-v1: `_retired`/`_retired_date`/
+  `_retirement_reason`; research/mlb-v9-candidate-1: `status`/
+  `invalidation_reason`/`replacement`) — the never-re-signed evidence rule
+  (`docs/FEATURE_MODEL_AUDIT.md`) covers both. The morning scan's claim that
+  "the provenance record is currently wrong for both" was itself wrong.
+  `scripts/feature_model_audit.py` now documents `KNOWN_MISMATCH_ARTIFACTS`
+  and reports them as `known_hash_mismatch` instead of gaps;
+  `tests/test_artifact_hash_verification.py` pins the conventions.
+- **3 orphaned configs** — `nfl-`/`wnba-elo-trend-lr-v4-temperature.json`
+  removed (zero references anywhere; inert per their own commit messages).
+  `mlb-v9-candidate-1.json` stays: the quarantine is load-bearing for the
+  fail-closed paired-shadow gate.
+- **Ledger settlement backlog + identity conflicts — resolved.** The 22-row
+  cs2-tiered-elo backlog was applied via `audit_ledger_pnl.py
+  --apply-model-ledgers`; 27 further model-workbook settlements unlocked and
+  applied; all workbooks timestamped-backed-up first. New
+  `scripts/resolve_ledger_conflicts.py` resolves the 6 identity conflicts
+  from canonical SQLite evidence (latest-settlement authority, lineage-backed
+  reference, same-tier stale-survivor archive; result disagreements are never
+  auto-resolved). `audit_ledger_pnl.py`'s economic signature is now
+  stake-normalized (pnl per unit, 4dp) so tier-specific sizing variance is
+  no longer flagged as a settlement conflict. One early resolution-run bug
+  replaced four decision payloads instead of extending them; the original
+  payloads were restored from the daily backup
+  (`model-prediction-runtime/backups/ledgers.20260826T072220Z.db`) as audited
+  update events. Final audit: 0 repairs planned, 0 conflicts, 0 anomalies,
+  integrity ok. Tests: `tests/test_resolve_ledger_conflicts.py` +
+  `tests/test_audit_ledger_pnl.py` (17 pass).
+- **launchd plist drift** — installed `com.modelprediction.daily.plist` now
+  byte-matches `ops/launchd/`; job reloaded, schedule verified (daily 08:30,
+  no RunAtLoad/StartInterval), `tests/test_launchd_schedule.py` passes.
+- **RESEARCH_BACKLOG.md resurrection** — deleted for real (git rm, staged);
+  unique content (evaluation contracts, v1 control baseline numbers, Phase 23
+  gate criteria, secondary-sports status) ported into `docs/ROADMAP.md`;
+  repo references retargeted.
+- **Production scheduler stall (new finding from the data-gap audit)** —
+  `com.modelprediction.production` and `com.modelprediction.rebuild-shadow`
+  were DISABLED in launchd (37h stall, undocumented; the canary health reason
+  in system_health). Operator approved re-enabling: both jobs loaded, fired,
+  and completed exit 0 on 2026-08-26.
+- **NRFI model improvement (operator: "calling the same as fair market
+  prices")** — two defects found: (1) `features/yrfi_nrfi.py`'s
+  `LEAGUE_FIRST_INNING_RUN_RATE` was 0.52 — the per-TEAM half-inning mean
+  mistaken for the per-GAME total (a 2x error that inflated every starter
+  run-rate multiplier and deflated p_nrfi; corrected to the empirical 1.036
+  measured over the 6,683 snapshots, pinned by test); (2) the v1 model's
+  logit weights were hand-set, never fitted, and its first-inning component
+  was full-game FIP scaled against that wrong constant. New research module
+  `models/mlb_first_inning.py` builds a PIT chronological ledger with
+  genuinely first-inning features (starter opponent-1st-runs/start, team
+  1st-inning scored/allowed split by home/away half, park 1st-inning rate,
+  starter rolling FIP/K%/BB%, top-of-order offense composite) and fits a
+  walk-forward logistic regression (train-only priors frozen at the train
+  window). Locked 1,337-game test window: logloss 0.691033 / Brier 0.248944
+  vs incumbent mlb-nrfi-v1 0.694537 / 0.250691 and the fixed-vig market
+  proxy 0.694982 / 0.250916; calibration error 0.0163 vs proxy 0.0309.
+  Research script: `scripts/mlb_nrfi_first_inning_research.py` (report in
+  `tmp/nrfi-first-inning-research.json`); tests:
+  `tests/test_mlb_nrfi_improvement.py` (7 new, incl. PIT no-self-leak pins).
+  Open follow-up: the repo captures no real Polymarket NRFI quotes (the
+  ledger's mlb-nrfi-v1 market_probability is the model's own fair price,
+  `sportsbook="model_fair"`) — capturing live NRFI market prices is the
+  prerequisite for measuring true CLV/edge, and wiring the new module into
+  the daily research path is an operator decision.
+- **Data-gap audit (full per-sport/feature/model scan)** — key gaps needing
+  follow-up: soccer results capture replaced 2026-08-26 — new
+  `data_sources/api_football.py` (API-Football v3, fail-closed without
+  `API_FOOTBALL_KEY`, provenance snapshots via `provider_capture`) wired into
+  daily step1b + `cmd_collect_scores`; the dormant Odds path is documented
+  fallback. Remaining after the key lands: live league-ID/AET/PEN verification.
+  Still open: WNBA official availability snapshots stale 1.5 days (today's
+  WNBA calls degraded to NO_CALL_AVAILABILITY_UNAVAILABLE); Statcast aggregate
+  parquets 3 days behind (manual-only ingester, not wired into daily);
+  market-snapshot lineage absent for 7,263 esports/soccer/KBO/NPB rows;
+  NBA/NFL have zero odds sources wired (TheRundown shortlisted). Corrected
+  false alarms: Polymarket DOES have ATP (and ITF) tennis markets as of
+  08-26; the repo-local `data/ledgers/ledgers.db` (not `data/model_ledgers/`)
+  is the frozen 08-23 artifact.
 
 ## 2026-08-24 — tennis settlement, ledger authority, lineage, and false-green repair
 

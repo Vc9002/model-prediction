@@ -1,4 +1,4 @@
-"""Per-title esports packages (docs/RESEARCH_BACKLOG.md P2, operator
+"""Per-title esports packages (docs/ROADMAP.md, operator
 directive 2026-08-14: "esports, split by title").
 
 The shared engine stays ``model_prediction.esports.NeutralElo`` (now with

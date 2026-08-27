@@ -1,8 +1,8 @@
 # Project status and source of truth
 
-**Last verified**: 2026-08-24, local `research/mlb-v9`. **2,267 tests passed, 4 skipped, 0 failed**. Changed-path Ruff and production YAML parsing passed. Whole-tree Ruff is not clean because the preserved, pre-existing untracked `scripts/audit_mlb_v9_feature_distribution.py` has five findings.
+**Last verified**: 2026-08-26, local `research/mlb-v9`. Full suite 2,298 passed (concurrent-session run). All post-fix targeted runs green (ledger audit/resolution 17, artifact-hash 4, v9 feature-table lookup 9, v9+validation parity 28, config/registry/champion 154). Canonical ledger audit: 0 repairs planned, 0 conflicts, 0 anomalies, integrity ok. `docs/DEBUG.md`'s 2026-08-26 sections are the authoritative record of the day's scan findings and their resolutions — trust them over this summary on specifics.
 
-**Operating Architecture**: MLB operates on two isolated tracks — **Production Track** (`mlb-elo-trend-lr-v8` frozen champion) and **Research Track** (`mlb-v9` isolated challenger). See [`docs/ROADMAP.md`](file:///Users/vincentc9002/model-prediction/docs/ROADMAP.md) and [`docs/RESEARCH_BACKLOG.md`](file:///Users/vincentc9002/model-prediction/docs/RESEARCH_BACKLOG.md) for full lifecycle details.
+**Operating Architecture**: MLB operates on two isolated tracks — **Production Track** (`mlb-elo-trend-lr-v8` frozen champion) and **Research Track** (`mlb-v9` isolated challenger). See [`docs/ROADMAP.md`](file:///Users/vincentc9002/model-prediction/docs/ROADMAP.md) for full lifecycle details (the former `docs/RESEARCH_BACKLOG.md` was merged into it and deleted 2026-08-26).
 
 This document is the operational status entry point. `MASTER.md` (repo root)
 is now the most current, most detailed running log of real bugs found/fixed
@@ -11,6 +11,18 @@ this file exists to be the short, current summary someone can read first.
 
 Historical metrics in old reports, changelog entries, model cards, and
 rollback artifacts are not current operational truth.
+
+## 2026-08-26 — Full-repo scan resolutions, ledger conflict repair, scheduler restoration
+
+- **13 dead v9 features root-caused and fixed** — four lookup bugs (nested snapshot schema, team-ID vs name keys, wrong feature name, missing starter-name crosswalk). All 19 previously-zero-variance columns now vary per game (66–185 distinct values on a 200-game sample). Prior v9 ablation results on those families remain void pending the rebuilt-table audit. New flag: platoon/projected collinearity (r≈0.9997) needs an operator decision.
+- **2 artifact hash "mismatches" confirmed deliberate non-issues** (never-re-signed archive/quarantine annotations); the verifier now documents them as `known_hash_mismatch` instead of gaps.
+- **3 orphaned model configs resolved** — two inert temperature-challenger configs removed; `mlb-v9-candidate-1.json` stays quarantined (fail-closed gate depends on it).
+- **Ledger settlement backlog cleared** — 22-row cs2 backlog applied, 6 identity conflicts resolved from canonical SQLite (latest-settlement + lineage evidence), 27 further settlements unlocked, audit economic signature stake-normalized, all tier projections rebuilt. Final audit: 0/0/0, integrity ok.
+- **Production scheduler restored** — `production` + `rebuild-shadow` launchd jobs were disabled (37h, undocumented); operator approved re-enable; both loaded and completed exit 0.
+- **launchd daily plist re-synced** to the checked-in form (byte-identical, reloaded, schedule verified).
+- **`docs/RESEARCH_BACKLOG.md` re-deleted**; unique content ported to `docs/ROADMAP.md`.
+- **Data-gap audit (new)** — soccer capture replaced with API-Football v3 (`data_sources/api_football.py` + daily wiring; dormant Odds path kept as fallback; awaiting `API_FOOTBALL_KEY` + live verification). Open follow-ups: WNBA availability snapshots 1.5d stale; Statcast aggregates manual-only; zero snapshot lineage for esports/soccer/KBO/NPB rows; NBA/NFL no odds source wired. Corrected: Polymarket has ATP/ITF tennis markets; soccer Odds-API outage is ≥31 days (not 11.7).
+- **NRFI model improved** — 2x league-constant bug fixed (0.52 per-team mean vs 1.036 per-game total); new fitted first-inning model (`models/mlb_first_inning.py`) beats the incumbent and the market proxy on the locked 1,337-game test window (logloss 0.6910 vs 0.6945 vs 0.6950). Next: capture real Polymarket NRFI quotes to measure true edge.
 
 ## 2026-08-24 — Canonical ledger and tennis integrity repair
 

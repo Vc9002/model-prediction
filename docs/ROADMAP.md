@@ -54,6 +54,7 @@ Tests fail if research code attempts to:
 - Change its calibrator or threshold.
 - Change its serving definitions.
 - Silently point `active_production_version` elsewhere.
+- Guardrail test identity: `tests/test_model_promotion.py::test_mlb_v8_champion_permanently_protected` (L214-236) validates the exact artifact SHA-256 and `active_production_version == "mlb-elo-trend-lr-v8"` — ported from RESEARCH_BACKLOG.md (recreated 08-23, deleted 2026-08-26).
 
 ### v8's Only Job Now
 It is the **champion benchmark**. Every v9 result gets compared against:
@@ -109,6 +110,13 @@ outputs/research/mlb_v9/
 ```
 *Never rewrite old tables.*
 
+### Evaluation Verification Contracts (ported from RESEARCH_BACKLOG.md — recreated 08-23, deleted 2026-08-26)
+
+- **No evaluator fallback**: `scripts/mlb_evaluator.py` raises `ABORT_DATASET_CONTRACT_MISMATCH` on a missing dataset — never falls back to a synthetic or partial evaluation.
+- **Full 5-hash verification**: verifies `dataset_sha256`, `schema_sha256`, `train_event_ids_sha256`, `validation_event_ids_sha256`, `research_test_event_ids_sha256`, plus cohort JSON equality.
+- **Missingness decoupled from numeric equality**: check source-availability flags, never `gap != 0`.
+- **Cohort nomenclature**: the holdout cohort is `research_test` / `historical_model_selection_test`.
+
 ---
 
 ## Phase 3 — Define v9's Development/Test Structure
@@ -122,6 +130,8 @@ LEVEL 3: Prospective untouched evaluation (Future live games logged before first
 ```
 
 The final promotion decision relies heavily on Level 3. Prospective evaluation is critical because confirmed lineups, late scratches, and real-time injuries cannot honestly be reconstructed historically.
+
+**v1 control baseline (PERMANENT CONTROL BASELINE)** — `outputs/research/mlb_v9/tables/mlb_v9_feature_table_v1.parquet`: 6,638 games (3,814 train / 1,082 val / 1,742 test), standardized 6-feature baseline, LogLoss 0.684707, Brier 0.245772, AUC 0.5700. (Ported from RESEARCH_BACKLOG.md Gate 3.1 — recreated 08-23, deleted 2026-08-26.)
 
 ---
 
@@ -152,6 +162,24 @@ Do not define v9 as "v8 plus one better feature." Define it as a **new player-st
 ```
 
 ---
+
+**KNOWN ISSUE (found 2026-08-26, unresolved):** `scripts/audit_mlb_v9_feature_distribution.py`
+against `outputs/research/mlb_v9/tables/mlb_v9_feature_table_v3.parquet` (6,638 rows) shows
+13 of the 24 features below are **dead (zero variance)** — every game gets the identical
+fallback constant instead of a real per-game value: all four Starter-State gap features
+(`starter_k_pct_gap`, `starter_bb_pct_gap`, `starter_k_bb_gap`, `starter_depth_gap`), all four
+Projected-Offense gap features, all three Bullpen-State advantage features, and both Platoon
+gap features. `home_expected_starter_ip`/`away_expected_starter_ip` are constant 5.30,
+`home/away_projected_woba` constant 0.3150, `home/away_bullpen_effective_fip` constant 3.9000
+— consistent with `starter_state_matchup_gaps()`, `projected_offense_matchup_gaps()`,
+`bp_engine.evaluate_matchup()`, and `platoon_matchup_gaps()` in
+`scripts/mlb_v9_feature_table_v3.py` silently falling through to their `.get(key, default)`
+fallback for every row, not a genuine absence of signal. The underlying source data exists and
+is populated (`data/mlb_statsapi/game_snapshots.jsonl`, 6,683 rows; both Statcast parquets) —
+this points to a lookup/matching bug (team-ID or date-key mismatch against the snapshot) inside
+those four feature engines, not missing data. Any v9 ablation result claiming to have measured
+Phases 6/9/11 (below) or the offense-projection phase is void until this is root-caused — those
+feature families have contributed zero signal in every historical run to date.
 
 ## Phase 6 — PIT Batter Priors
 
@@ -318,6 +346,11 @@ Promotion requires the **complete final candidate** to clear all four gates:
 3. **Prospective**: Statistically meaningful sample of live untouched games (not 5 games, not 10 bets).
 4. **Economic**: Non-degraded executable decision efficiency and CLV.
 
+**Stricter gate criteria carried over from RESEARCH_BACKLOG.md (recreated 08-23, deleted 2026-08-26):**
+- Predictive: paired $\Delta\text{LogLoss} < 0$ with date-cluster bootstrap $P(\text{better}) \ge 90\%$ — **conflicts with the 80% stated in gate 1 above; unresolved, operator to decide**; $\Delta\text{Brier} \le 0$.
+- Economic: positive CLV rate $\ge 50\%$ against sharp consensus; realized CLV $\ge 0$; no severe drawdown spikes.
+- Status as of 08-23: predictive gate pending the v3 matrix and candidate-2 freeze (v1 control baseline LogLoss 0.6847 / Brier 0.2458; candidate-1 voided); prospective and economic gates gated on candidate-2 freeze (mock shadow rows quarantined).
+
 ---
 
 ## Phase 24 — Atomic Promotion & Rollback Safeguard
@@ -444,4 +477,15 @@ Raw PIT data
 30. `research`: Evaluate paired performance only after minimum sample size ($\ge 200$ games, $\ge 30$ dates) and MDE power.
 31. `governance`: Execute formal four-gate promotion evaluation against signed artifacts.
 32. `operator`: Atomic production promotion cutover if and only if candidate-2 passes all four gates.
+
+---
+
+## Secondary Sports Track Status
+
+(Ported from RESEARCH_BACKLOG.md — recreated 08-23, deleted 2026-08-26. This section was removed from ROADMAP.md in the 2026-08-23 reset commit 37e3be6; restoring it here keeps the secondary-sports status in the consolidated roadmap.)
+
+- **Soccer v2**: dynamic Polymarket league discovery (`discover_soccer_leagues`); hierarchical Dixon-Coles bivariate Poisson score matrix with time decay ($w = e^{-\Delta t/\tau}$); separately calibrated Double Chance, Draw No Bet, Clean Sheet, and BTTS distributions.
+- **Tennis Surface-Elo**: surface-blended Elo ratings (60% surface, 40% overall) across 26,458 historical matches.
+- **WNBA**: hierarchical Empirical-Bayes rotation and minutes shrinkage engine (`features/wnba_player_impact.py`); Four Factors and possession pace modeling (`features/wnba_pace_four_factors.py`); parametric Normal-CDF derivative solver for totals and spreads.
+- **NFL**: starting QB state vector (EPA/play, CPOE, P2S%, TWP%) with backup replacement spread penalty (`features/nfl_qb_oline.py`); offensive line protection and health composite index.
 

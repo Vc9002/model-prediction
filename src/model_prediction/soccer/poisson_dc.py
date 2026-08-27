@@ -1,6 +1,6 @@
 """Shared Poisson / Dixon-Coles scoring math -- sport-universal infrastructure,
 not a per-league predictive assumption (per the binding rule in docs/
-RESEARCH_BACKLOG.md: "shared infrastructure != shared model... never
+ROADMAP.md: "shared infrastructure != shared model... never
 predictive assumptions across different sports/games"). The functional
 FORM (independent Poisson rates with a Dixon-Coles low-score correction) is
 shared; every number that goes INTO it (baseline, home advantage, rho) is

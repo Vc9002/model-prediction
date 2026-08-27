@@ -1,4 +1,4 @@
-"""Per-league soccer models (docs/RESEARCH_BACKLOG.md P2, operator directive
+"""Per-league soccer models (docs/ROADMAP.md, operator directive
 2026-08-14: "soccer, split league").
 
 Research-tier only -- nothing here is wired into soccer_forward.py,

@@ -1,6 +1,6 @@
 """Tennis v2 (Step 8 item 3) -- dynamic surface-weight challenger vs fixed 60/40.
 
-Backlog (docs/RESEARCH_BACKLOG.md P1): "Tennis v2 challenge fixed 60/40
+Backlog (docs/ROADMAP.md): "Tennis v2 challenge fixed 60/40
 surface weighting `w_max x n_surface/(n_surface + c)`". TennisModel's live
 `match_probability` uses a hardcoded `surface_weight=0.6` regardless of how
 much surface-specific history either player has -- a player's first-ever

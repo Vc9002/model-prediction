@@ -1,7 +1,7 @@
 """Parametrized per-league Poisson-Dixon-Coles model.
 
 One class, not six copy-pasted ones -- the DIFFERENTIATING content per
-league (baseline, home advantage, rho; per docs/RESEARCH_BACKLOG.md P2)
+league (baseline, home advantage, rho; per docs/ROADMAP.md)
 lives entirely in each league's own ``LeagueSoccerConfig`` instance
 (epl.py, la_liga.py, ...), fit independently from that league's own
 history only. The scoring math is identical across leagues by design --

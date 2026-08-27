@@ -104,3 +104,9 @@ backups/archive-*/*
 data/experiments/
 data/ledgers/
 outputs/research/
+GATES.md
+.unlazy/
+.unlazy-hook-state.json
+
+# Session scratch: audit reports, one-off repair scripts
+tmp/

@@ -15,8 +15,8 @@ or superseded by shipped work:
   for the production-feature harness.
 - `MLB_TOTALS_DATA_BACKLOG.md`, `MLB_TOTALS_CONTINUOUS_RESEARCH.md`,
   `EVAL_METHODOLOGY_BRIEF.md`, `INPUT_README.md` — dated research
-  notes; the live research contract is `RESEARCH_BACKLOG.md` +
-  `MODEL_IMPROVEMENTS.md`.
+  notes; the live research contract is `docs/ROADMAP.md` (`RESEARCH_BACKLOG.md`
+  and `MODEL_IMPROVEMENTS.md` merged there 2026-08-22).
 - `model_audit/`, `mlb_trend_score_v2/`, `leagues/` — historical audit
   and experiment trees (model_audit is still referenced by
   `FEATURE_REGISTRY.md` for per-feature evidence).
