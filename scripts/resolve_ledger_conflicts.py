@@ -75,9 +75,7 @@ def _normalized_pnl(row: dict[str, Any]) -> float | None:
     return round(pnl / abs(units), 6)
 
 
-def _settled_sqlite_rows(
-    store: RuntimeLedgerStore, key: list[str]
-) -> list[dict[str, Any]]:
+def _settled_sqlite_rows(store: RuntimeLedgerStore, key: list[str]) -> list[dict[str, Any]]:
     event_id, market_type, _line, model_id, selection = key
     rows = []
     for row in store.records():
@@ -121,7 +119,9 @@ def _mutation(
     return LedgerMutation(
         pick_id=row["pick_id"],
         operation_id=_operation_id(
-            row["pick_id"], row["ledger_tier"], resolution,
+            row["pick_id"],
+            row["ledger_tier"],
+            resolution,
             f"{market_probability}|{pnl_units}",
         ),
         ledger_tier=row["ledger_tier"],
@@ -142,9 +142,7 @@ def _mutation(
         feature_schema_version=row["feature_schema_version"],
         model_probability=_number(row.get("model_probability")),
         market_probability=(
-            market_probability
-            if market_probability is not None
-            else _number(row.get("market_probability"))
+            market_probability if market_probability is not None else _number(row.get("market_probability"))
         ),
         edge=edge if edge is not None else _number(row.get("edge")),
         confidence=_number(row.get("confidence")),
@@ -342,9 +340,7 @@ def _resolve(store: RuntimeLedgerStore, key: list[str]) -> dict[str, Any] | None
         corrected_pnl = round(ref_norm * abs(stale_units), 4)
         model_prob = _number(row.get("model_probability"))
         edge = (
-            round(model_prob - ref_market, 6)
-            if model_prob is not None and ref_market is not None
-            else None
+            round(model_prob - ref_market, 6) if model_prob is not None and ref_market is not None else None
         )
         resolutions.append(
             {
