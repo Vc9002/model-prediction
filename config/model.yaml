@@ -82,6 +82,9 @@ data_sources:
     provider: the_odds_api
     base_url: https://api.the-odds-api.com/v4
     requires: THE_ODDS_API_KEY
+    # Superseded 2026-08-26: soccer results now come from api_football
+    # (requires API_FOOTBALL_KEY). Nothing reads this block; kept as the
+    # documented fallback record.
   sport_data:
     provider: espn_public
     mlb_deep: mlb_statsapi
@@ -254,7 +257,7 @@ models:
     active_research_version: spread-margin-v1
     active_research_name: Spread & Total Baseline
     spread_research_artifact: config/models/wnba-spread-margin-v1.json
-    total_research_artifact: config/models/wnba-total-score-ridge-v1.json
+    total_research_artifact: config/models/wnba-total-margin-v1.json
     sizing_recommendation: flat_1.5_to_2.0u
     sizing_recommendation_reason: '2026-07-22 analysis: Kelly/edge-scaled sizing underperforms
       flat betting for WNBA due to thin edges. Flat 2.0u produced +2.64u on 13 settled

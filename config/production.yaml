@@ -198,7 +198,7 @@ prediction_service:
     - model_id: wnba-total-margin-v1
       sport: WNBA
       market: total
-      reason: no exact serving artifact exists for this model version
+      reason: checked-in artifact has no qualification.qualified; research-only pending over/under evaluation
 
   fallback_action: no_prediction
 

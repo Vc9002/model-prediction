@@ -7,6 +7,7 @@ from datetime import timedelta
 from pathlib import Path
 from unittest.mock import MagicMock
 
+from model_prediction.cli import forecast as cli_forecast
 from model_prediction.cli.forecast import _forecast_wnba_total_slate
 from model_prediction.domain import (
     MarketType,
@@ -27,7 +28,17 @@ def test_wnba_total_grade_pick() -> None:
     assert grade_pick(MarketType.TOTAL, "under", 165.5, 82, 85) == PickResult.LOSS
 
 
-def test_forecast_wnba_total_fails_closed_without_exact_artifact(tmp_path: Path) -> None:
+def test_forecast_wnba_total_fails_closed_without_exact_artifact(
+    monkeypatch, tmp_path: Path
+) -> None:
+    # The fail-closed path is exercised directly: the loader is forced to
+    # report a missing artifact, so the test doesn't depend on which file
+    # happens to be checked in today.
+    monkeypatch.setattr(
+        cli_forecast,
+        "_load_exact_artifact_contract",
+        lambda model_version: (None, f"exact serving artifact missing for {model_version}"),
+    )
     data_root = tmp_path / "data"
     future_dt = utc_now() + timedelta(days=2)
     args_date = future_dt.date().isoformat()
@@ -96,3 +107,17 @@ def test_forecast_wnba_total_fails_closed_without_exact_artifact(tmp_path: Path)
     assert slate["priced_contracts"] == []
     assert "exact serving artifact" in slate["reason"]
     mock_client.scoreboard.assert_not_called()
+
+
+def test_wnba_total_artifact_resolves_under_slate_model_version() -> None:
+    """Regression: the checked-in artifact must resolve under the slate's
+    exact model_version (wnba-total-margin-v1) with a self-verifying hash.
+
+    The artifact file, its embedded model_version, and the slate's
+    model_version drifted apart once before, blocking the WNBA total step
+    at artifact resolution with scheduled_games=0.
+    """
+    artifact, error = cli_forecast._load_exact_artifact_contract("wnba-total-margin-v1")
+    assert error is None
+    assert artifact is not None
+    assert artifact["model_version"] == "wnba-total-margin-v1"
