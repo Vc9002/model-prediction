@@ -16,6 +16,7 @@ import pytest
 from model_prediction import learned_forward
 from model_prediction.audit import AuditLog
 from model_prediction.cli import _settle_esports_pick
+from model_prediction.cli import forecast as cli_forecast
 from model_prediction.data_sources import polymarket_us
 from model_prediction.data_sources.polymarket_execute import (
     ExecutionGateError,
@@ -465,3 +466,41 @@ def test_match_executable_quote_skips_doubleheaders_and_ambiguous_sides(tmp_path
     )
     quote = learned_forward.match_executable_quote(tmp_path, "mlb", "2026-07-17", _Candidate())
     assert quote is not None and quote["side"] == "short"
+
+
+def test_match_executable_quote_output_passes_archive_lineage_check(tmp_path):
+    """A quote matched from a genuine archived snapshot must carry the
+    provenance fields (`reconstructed`, `usage`) that
+    ``cli.forecast._canonical_market_snapshot_lineage`` requires -- dropping
+    them silently blocked every real MLB Main-ledger call while still
+    matching the quote for pricing (2026-08-24)."""
+    odds_dir = tmp_path / "odds/mlb/2026-07-17"
+    odds_dir.mkdir(parents=True)
+    snapshot_path = odds_dir / "polymarket_snapshots.jsonl"
+    snapshot_path.write_text(
+        json.dumps(
+            {
+                "market_type": "moneyline",
+                "market_slug": "aec-mlb-nyy-nym-1",
+                "long": {"description": "Yankees", "ask": 0.55},
+                "short": {"description": "Mets", "ask": 0.47},
+                "observed_at_utc": "2026-07-17T12:00:00Z",
+                "timestamp_valid": True,
+                "reconstructed": False,
+                "usage": "prospective_executable_bbo",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    class _Candidate:
+        away_team = "New York Yankees"
+        home_team = "New York Mets"
+        selection = "home"
+        event_start_utc = "2026-07-17T19:00:00Z"
+
+    quote = learned_forward.match_executable_quote(tmp_path, "mlb", "2026-07-17", _Candidate())
+    assert quote is not None
+    lineage = cli_forecast._canonical_market_snapshot_lineage(quote, snapshot_path)
+    assert lineage is not None

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 from dataclasses import dataclass
@@ -203,9 +204,21 @@ class PolymarketUSClient:
         self.client = client or httpx.Client(timeout=30)
 
     def _get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
-        response = self.client.get(f"{self.base_url}{path}", params=params)
-        response.raise_for_status()
-        return response.json()
+        # The gateway throttles bursts from the 16-worker snapshot pool with
+        # plain 429s (no Retry-After header observed in practice); a short
+        # bounded backoff recovers most of these in place instead of losing
+        # the market's book snapshot for the day (2026-08-24, ~1,700/day
+        # dropped book fetches -- concentrated in ITF tennis and esports,
+        # the highest-market-count leagues).
+        max_attempts = 4
+        for attempt in range(max_attempts):
+            response = self.client.get(f"{self.base_url}{path}", params=params)
+            if response.status_code == 429 and attempt < max_attempts - 1:
+                time.sleep(0.5 * (2**attempt))
+                continue
+            response.raise_for_status()
+            return response.json()
+        raise AssertionError("unreachable")  # pragma: no cover
 
     def events(self, league: str, limit: int = 500) -> list[dict[str, Any]]:
         """Fetch all events for a league, paginating until exhaustion.

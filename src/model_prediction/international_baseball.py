@@ -1104,15 +1104,33 @@ def forecast_international_baseball_slate(
     game_date: str,
     timezone_name: str | None = None,
     client: Any | None = None,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     """Price exact KBO/NPB moneylines as zero-unit research observations."""
+    from zoneinfo import ZoneInfo
+
     from .data_sources.polymarket_us import PolymarketUSClient
-    from .domain import parse_utc, utc_now
+    from .domain import EASTERN, parse_utc, utc_now
 
     league = league.lower()
     if league not in LEAGUE_SPECS:
         raise ValueError(f"unsupported international baseball league: {league}")
     timezone_name = timezone_name or str(LEAGUE_SPECS[league]["timezone"])
+    reference_now = now if now is not None else utc_now()
+    # Callers (the CLI's shared --date flag) default game_date to
+    # eastern_today() -- but this league's real calendar day lives in its
+    # own timezone (KST/JST), which is up to 13-14h ahead of US-Eastern.
+    # By the back half of every Eastern day, Eastern "today" has already
+    # rolled past in league-local time, so a literal pass-through asked
+    # Polymarket for a slate that was already fully in the past there --
+    # silently zeroing coverage for roughly half of every day's runs. Only
+    # the unspecified "give me today" case is corrected this way; an
+    # explicit historical --date (a real backfill request) is honored
+    # exactly as given, matching slate()'s existing calendar-day semantics.
+    # Compared against reference_now's own Eastern date (not a fresh
+    # eastern_today() call) so this stays correct under an injected `now`.
+    if game_date == reference_now.astimezone(EASTERN).date().isoformat():
+        game_date = reference_now.astimezone(ZoneInfo(timezone_name)).date().isoformat()
     directory = Path(data_root) / "international_baseball" / league
     # v2 filename: matches the artifact's own model_version (see the
     # comment at the write site in validate_international_baseball_baseline).
