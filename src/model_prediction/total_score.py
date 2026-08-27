@@ -23,6 +23,11 @@ import numpy as np
 from sklearn.linear_model import Ridge
 
 from .features.base import FeatureStore, GameRecord
+from .features.schedule_load import team_schedule_load, travel_timezone_displacement
+from .features.wnba_boxscores import build_wnba_four_factors_logs, load_wnba_boxscore_files
+from .features.wnba_pace_four_factors import compute_team_four_factors, project_wnba_game_total
+from .features.wnba_player_impact import compute_lineup_impact
+from .features.wnba_player_logs import build_wnba_player_logs, team_player_profiles
 
 # ── Feature definitions ──────────────────────────────────────────────────────
 FEATURE_NAMES = (
@@ -38,6 +43,38 @@ FEATURE_NAMES = (
     "last_10_total_avg",  # Both teams' last 10 game total averages
     "season_total_std",  # Season run total standard deviation
 )
+
+# WNBA replaces the MLB-centric dead slots of FEATURE_NAMES with real
+# point-in-time signals (2026-08-26). park_factor/weather_factor stay at
+# their WNBA-correct neutrals (no WNBA park or weather feed exists);
+# bullpen_rest_days/travel_distance are baseball constructs -- WNBA gets the
+# real rest-day average and the in-repo timezone-displacement travel proxy;
+# wnba_pace_40m is the credibility-shrunk four-factors pace of both teams.
+# MLB/NBA/NFL keep FEATURE_NAMES unchanged (see build_total_score_rows).
+WNBA_FEATURE_NAMES = (
+    "league_total_mean",
+    "away_run_rate_ewma",
+    "away_run_rate_allowed_ewma",
+    "home_run_rate_ewma",
+    "home_run_rate_allowed_ewma",
+    "park_factor",
+    "weather_factor",
+    "wnba_rest_days_avg",
+    "wnba_travel_tz_hours",
+    "last_10_total_avg",
+    "season_total_std",
+    "wnba_pace_40m",
+)
+# Structural-challenger extras (plan P0 possessions×PPP + player impact),
+# appended only under ``include_player_impact=True`` so the incumbent
+# vector stays byte-identical for before/after reproduction.
+WNBA_CHALLENGER_FEATURE_NAMES = WNBA_FEATURE_NAMES + (
+    "lineup_net_advantage",
+    "injury_impact_gap",
+    "structural_total",
+)
+WNBA_FF_LOOKBACK = 15  # matches wnba_pace_four_factors.compute_team_four_factors
+WNBA_SCHEDULE_LOOKBACK = 10  # rest needs only the last game + 7-day window
 
 MINIMUM_TEAM_GAMES = 8
 MINIMUM_LEAGUE_GAMES = 40
@@ -106,16 +143,38 @@ def build_total_score_rows(
     *,
     minimum_team_games: int = MINIMUM_TEAM_GAMES,
     minimum_league_games: int = MINIMUM_LEAGUE_GAMES,
+    wnba_boxscores: dict[str, dict[str, dict[str, float]]] | None = None,
+    wnba_legacy_signals: bool = False,
+    wnba_player_boxscores: dict[str, dict[str, Any]] | None = None,
+    include_player_impact: bool = False,
 ) -> list[TotalScoreRow]:
+    """Build PIT totals rows.
+
+    ``wnba_boxscores`` (from ``features.wnba_boxscores.load_wnba_boxscore_files``)
+    enables the WNBA pace signal: per-team four-factors logs are appended only
+    after the row for their game is built, so every row sees strictly-prior
+    games (the 2026-08-18 last-10 pattern). ``wnba_legacy_signals`` reproduces
+    the pre-2026-08-26 WNBA vector (hardcoded constants) for before/after
+    walk-forward comparisons; MLB/NBA/NFL are never affected by either flag.
+    ``include_player_impact`` (with ``wnba_player_boxscores`` from
+    ``features.wnba_player_logs.load_wnba_player_boxscores``) appends the
+    three structural-challenger features; without it the incumbent vector is
+    byte-identical.
+    """
     scored_ewma: dict[str, float | None] = {}
     allowed_ewma: dict[str, float | None] = {}
     league_totals: deque[float] = deque(maxlen=200)
     recent_totals: dict[str, deque[float]] = {}
+    recent_games: dict[str, deque[GameRecord]] = {}
+    wnba_ff_logs: dict[str, deque[dict[str, float]]] = {}
+    wnba_pl_logs: dict[str, deque[dict[str, Any]]] = {}
     rows: list[TotalScoreRow] = []
 
     for game in sorted(games, key=lambda g: g.start):
         home = game.home_team
         away = game.away_team
+        is_wnba = game.league.upper() == "WNBA"
+        use_wnba_signals = is_wnba and not wnba_legacy_signals
 
         if (
             len(league_totals) >= minimum_league_games
@@ -147,7 +206,7 @@ def build_total_score_rows(
             last_10_avg = _mean(recent) if recent else baseline
             season_std = max(pstdev(league_totals) if len(league_totals) > 3 else 2.0, 1.0)
 
-            features: tuple[float, ...] = (
+            common: tuple[float, ...] = (
                 round(baseline, 4),
                 round(away_run_rate, 4),
                 round(away_allow_rate, 4),
@@ -155,11 +214,49 @@ def build_total_score_rows(
                 round(home_allow_rate, 4),
                 round(pf, 4),
                 round(weather, 4),
-                round(bullpen_rest, 4),
-                round(travel, 4),
-                round(last_10_avg, 4),
-                round(season_std, 4),
             )
+            if use_wnba_signals:
+                # Real WNBA signals, all strictly-prior:
+                # rest days from the schedule of games already played
+                # (schedule_load caps at 7, matching the validation harness),
+                # travel as the in-repo timezone-displacement proxy (no
+                # venue-coordinate history exists -- rest_travel.json records
+                # travel_status "unavailable_from_source"), pace from the
+                # four-factors module over strictly-prior boxscore logs.
+                home_rest = team_schedule_load(recent_games.get(home, ()), home, game.start)
+                away_rest = team_schedule_load(recent_games.get(away, ()), away, game.start)
+                rest_avg = (home_rest.rest_days_capped + away_rest.rest_days_capped) / 2.0
+                tz_hours = float(travel_timezone_displacement(away, home))
+                home_ff = compute_team_four_factors(home, list(wnba_ff_logs.get(home, ())))
+                away_ff = compute_team_four_factors(away, list(wnba_ff_logs.get(away, ())))
+                pace_avg = (home_ff.pace_40m + away_ff.pace_40m) / 2.0
+                features = common + (
+                    round(rest_avg, 4),
+                    round(tz_hours, 4),
+                    round(last_10_avg, 4),
+                    round(season_std, 4),
+                    round(pace_avg, 4),
+                )
+                if include_player_impact:
+                    # Structural-challenger block: lineup strength +
+                    # absence proxy from strictly-prior player logs, and
+                    # the pure possessions×PPP projection as a feature.
+                    home_profiles, home_missing = team_player_profiles(list(wnba_pl_logs.get(home, ())))
+                    away_profiles, away_missing = team_player_profiles(list(wnba_pl_logs.get(away, ())))
+                    impact = compute_lineup_impact(home_profiles, away_profiles, home_missing, away_missing)
+                    structural_total = project_wnba_game_total(home_ff, away_ff)["projected_total"]
+                    features = features + (
+                        round(impact.lineup_net_advantage, 4),
+                        round(impact.injury_impact_gap, 4),
+                        round(structural_total, 4),
+                    )
+            else:
+                features = common + (
+                    round(bullpen_rest, 4),
+                    round(travel, 4),
+                    round(last_10_avg, 4),
+                    round(season_std, 4),
+                )
             rows.append(
                 TotalScoreRow(
                     date=game.start.date().isoformat(),
@@ -180,6 +277,28 @@ def build_total_score_rows(
         # available to a decision made before it started.
         for team in (away, home):
             recent_totals.setdefault(team, deque(maxlen=10)).append(total)
+        if is_wnba:
+            # Same strict-prior discipline for the WNBA schedule and
+            # four-factors pace state: a game joins these deques only after
+            # every decision row that precedes it has been built.
+            for team in (away, home):
+                recent_games.setdefault(team, deque(maxlen=WNBA_SCHEDULE_LOOKBACK)).append(game)
+            if wnba_boxscores is not None:
+                stats = wnba_boxscores.get(game.event_id)
+                if stats is not None:
+                    logs = build_wnba_four_factors_logs(home, away, game.home_score, game.away_score, stats)
+                    if logs is not None:
+                        for team in (away, home):
+                            wnba_ff_logs.setdefault(team, deque(maxlen=WNBA_FF_LOOKBACK)).append(logs[team])
+                    if include_player_impact and wnba_player_boxscores is not None:
+                        player_box = wnba_player_boxscores.get(game.event_id)
+                        if player_box is not None:
+                            plogs = build_wnba_player_logs(home, away, player_box, stats)
+                            if plogs is not None:
+                                for team in (home, away):
+                                    wnba_pl_logs.setdefault(team, deque(maxlen=WNBA_FF_LOOKBACK)).append(
+                                        plogs[team]
+                                    )
 
     return rows
 
@@ -209,10 +328,22 @@ def _paired_mae_gain_interval(
 
 
 def validate_total_score_model(store: FeatureStore, sport: str) -> dict[str, Any]:
+    is_wnba = sport.lower() == "wnba"
+    feature_names = list(WNBA_FEATURE_NAMES if is_wnba else FEATURE_NAMES)
+    wnba_boxscores = (
+        load_wnba_boxscore_files(store.data_root / "availability" / "wnba" / "espn_boxscores")
+        if is_wnba
+        else None
+    )
     games = store.load_games(sport)
     if len(games) < 200:
         return {"status": "insufficient_data", "games": len(games)}
-    rows = build_total_score_rows(games, minimum_team_games=8, minimum_league_games=40)
+    rows = build_total_score_rows(
+        games,
+        minimum_team_games=8,
+        minimum_league_games=40,
+        wnba_boxscores=wnba_boxscores,
+    )
     if len(rows) < 50:
         return {"status": "insufficient_rows", "rows": len(rows)}
 
@@ -237,7 +368,7 @@ def validate_total_score_model(store: FeatureStore, sport: str) -> dict[str, Any
     artifact = {
         "model_version": f"{sport.lower()}-total-score-ridge-v2",
         "method": "ridge_regression",
-        "feature_names": list(FEATURE_NAMES),
+        "feature_names": feature_names,
         "coefficients": [round(float(c), 6) for c in model.coef_],
         "intercept": round(float(model.intercept_), 6),
         "alpha": 1.0,
