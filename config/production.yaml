@@ -198,7 +198,14 @@ prediction_service:
     - model_id: wnba-total-margin-v1
       sport: WNBA
       market: total
-      reason: checked-in artifact has no qualification.qualified; research-only pending over/under evaluation
+      reason: >-
+        research-only — the 2026-08-26 market-relative walk-forward
+        (scripts/wnba_totals_market_residual_walkforward.py) on 89 lined
+        holdout games measured the market line decisively better than the
+        model: MAE 13.1 vs 20.9, Brier 0.252 vs 0.369, ROI -4.1% at
+        executable asks (CLV rate 0.0). Over/under evaluation is now
+        complete and negative; remains blocked pending a challenger that
+        clears the Phase-23 market-relative gates.
 
   fallback_action: no_prediction
 

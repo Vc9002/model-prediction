@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS promotions (
     new_artifact_hash  TEXT,
     approved_by        TEXT NOT NULL,
     evidence_id        TEXT,
+    market_evidence_id TEXT,
+    market_evidence_unavailable_reason TEXT,
     git_sha            TEXT,
     promoted_at_utc    TEXT NOT NULL,
     status             TEXT NOT NULL,
@@ -73,6 +75,17 @@ def _conn(repo_root: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(db, timeout=10.0)
     conn.execute("PRAGMA busy_timeout=5000")
     conn.executescript(_PROMOTIONS_SCHEMA)
+    # Schema migration for pre-2026-08-27 promotion DBs: CREATE IF NOT
+    # EXISTS never touches an existing table, so the gate columns are
+    # added explicitly (duplicate-column on a fresh DB is expected).
+    for column, kind in (
+        ("market_evidence_id", "TEXT"),
+        ("market_evidence_unavailable_reason", "TEXT"),
+    ):
+        try:
+            conn.execute(f"ALTER TABLE promotions ADD COLUMN {column} {kind}")
+        except sqlite3.OperationalError:
+            pass
     return conn
 
 
@@ -123,6 +136,8 @@ def promote(
     new_model_id: str,
     approved_by: str,
     evidence_id: str | None = None,
+    market_evidence_id: str | None = None,
+    market_evidence_unavailable_reason: str | None = None,
     repo_root: Path | str | None = None,
 ) -> dict[str, Any]:
     """Atomically promote *new_model_id* to serve (sport, market)."""
@@ -143,6 +158,18 @@ def promote(
     current = registry.champion(sport, market)
     if current is not None and current.model_id == new_model_id:
         raise ValueError(f"'{new_model_id}' already serves {sport} {market}")
+
+    # Phase-23 market-relative gate (operator directive, wired 2026-08-27):
+    # a promotion must carry market-relative evidence, or the operator must
+    # explicitly record why no market evidence exists for this market.
+    # Fail-closed: forgetting the evidence is a refusal, not a warning.
+    if not market_evidence_id and not market_evidence_unavailable_reason:
+        raise ValueError(
+            "promotion requires market-relative evidence: pass "
+            "market_evidence_id (the market_eval report artifact) or "
+            "market_evidence_unavailable_reason (explicit operator statement "
+            "why no market exists for this market) — see ROADMAP Phase 23"
+        )
 
     # Mutate the yaml dict in memory, then write atomically.
     config = _load_yaml_dict(root)
@@ -165,6 +192,8 @@ def promote(
         "new_artifact_hash": candidate.artifact_hash,
         "approved_by": approved_by,
         "evidence_id": evidence_id,
+        "market_evidence_id": market_evidence_id,
+        "market_evidence_unavailable_reason": market_evidence_unavailable_reason,
         "git_sha": _git_sha(root),
         "promoted_at_utc": datetime.now(UTC).isoformat(),
         "status": "recorded",
@@ -176,12 +205,14 @@ def promote(
             conn.execute(
                 "INSERT INTO promotions (promotion_id, sport, market, "
                 "old_model_id, new_model_id, old_artifact_hash, "
-                "new_artifact_hash, approved_by, evidence_id, git_sha, "
-                "promoted_at_utc, status) "
+                "new_artifact_hash, approved_by, evidence_id, "
+                "market_evidence_id, market_evidence_unavailable_reason, "
+                "git_sha, promoted_at_utc, status) "
                 "VALUES (:promotion_id, :sport, :market, :old_model_id, "
                 ":new_model_id, :old_artifact_hash, :new_artifact_hash, "
-                ":approved_by, :evidence_id, :git_sha, :promoted_at_utc, "
-                ":status)",
+                ":approved_by, :evidence_id, :market_evidence_id, "
+                ":market_evidence_unavailable_reason, :git_sha, "
+                ":promoted_at_utc, :status)",
                 record,
             )
     finally:

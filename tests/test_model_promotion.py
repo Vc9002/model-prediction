@@ -124,6 +124,7 @@ def test_promote_switches_champion_preserves_rollback_and_records(tmp_path: Path
         new_model_id="mlb-elo-trend-lr-v9",
         approved_by="operator",
         evidence_id="exp-42",
+        market_evidence_id="mkt-evidence-42",
         repo_root=repo,
     )
 
@@ -189,6 +190,7 @@ def test_rollback_restores_previous_champion_in_one_command(tmp_path: Path) -> N
         market="moneyline",
         new_model_id="mlb-elo-trend-lr-v9",
         approved_by="operator",
+        market_evidence_id="mkt-evidence-42",
         repo_root=repo,
     )
 
@@ -234,3 +236,26 @@ def test_mlb_v8_champion_permanently_protected() -> None:
         "bullpen_weakness_gap",
     ]
     assert artifact["market_models"]["moneyline"]["feature_names"] == expected_features
+
+
+def test_promote_fails_closed_without_market_evidence(tmp_path: Path) -> None:
+    """Phase-23 gate (2026-08-27): promotion refuses without market
+    evidence, and the explicit unavailable-reason escape hatch works."""
+    repo = _make_repo(tmp_path)
+    with pytest.raises(ValueError, match="market-relative evidence"):
+        promote(
+            sport="MLB",
+            market="moneyline",
+            new_model_id="mlb-elo-trend-lr-v9",
+            approved_by="operator",
+            repo_root=repo,
+        )
+    record = promote(
+        sport="MLB",
+        market="moneyline",
+        new_model_id="mlb-elo-trend-lr-v9",
+        approved_by="operator",
+        market_evidence_unavailable_reason="no market data exists for this market",
+        repo_root=repo,
+    )
+    assert record["status"] == "active"

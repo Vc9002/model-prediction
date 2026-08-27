@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +44,70 @@ from .runtime_paths import RuntimePaths
 _CAPTURE_STALE_DAYS = 7.0
 _MARKET_STALE_DAYS = 2.0
 _RECENT_ACTIVITY_DAYS = 21.0
+_STALE_OPEN_WARN_HOURS = 24.0
+_STALE_OPEN_HARD_HOURS = 72.0
+
+
+def _stale_open_rows(paths: RuntimePaths) -> dict[str, Any]:
+    """Open rows far past their frozen start with no settlement resolution.
+
+    Postponed/rescheduled games expose this class: a re-dated game never
+    completes under its original event_id, and the non-ESPN settlement
+    paths (tennis, KBO/NPB, edge ledger, ESPN-dropped events) can pend
+    forever. This makes the 2026-08-24 audit's manual "24 open rows past
+    start" count continuously visible. Drain-minimal by design: a pure
+    read-only query of the canonical ledger the daily already maintains —
+    health never polls the network.
+    """
+    if not paths.ledgers_db.is_file():
+        return {"available": False, "open_over_24h": 0, "open_over_72h": 0}
+    connection = sqlite3.connect(f"file:{paths.ledgers_db}?mode=ro", uri=True, timeout=10.0)
+    connection.row_factory = sqlite3.Row
+    cutoff_24 = (datetime.now(UTC) - timedelta(hours=_STALE_OPEN_WARN_HOURS)).isoformat()
+    cutoff_72 = (datetime.now(UTC) - timedelta(hours=_STALE_OPEN_HARD_HOURS)).isoformat()
+    try:
+        by_sport = {
+            str(row["sport"]): int(row["n"])
+            for row in connection.execute(
+                """
+                SELECT sport, COUNT(*) AS n FROM ledger_records
+                WHERE status = 'open' AND event_start_utc < ?
+                GROUP BY sport ORDER BY n DESC
+                """,
+                (cutoff_24,),
+            )
+        }
+        open_over_72h = int(
+            connection.execute(
+                """
+                SELECT COUNT(*) FROM ledger_records
+                WHERE status = 'open' AND event_start_utc < ?
+                """,
+                (cutoff_72,),
+            ).fetchone()[0]
+        )
+        samples = [
+            dict(row)
+            for row in connection.execute(
+                """
+                SELECT pick_id, sport, event_start_utc, market_type
+                FROM ledger_records
+                WHERE status = 'open' AND event_start_utc < ?
+                ORDER BY event_start_utc ASC
+                LIMIT 10
+                """,
+                (cutoff_24,),
+            )
+        ]
+    finally:
+        connection.close()
+    return {
+        "available": True,
+        "open_over_24h": sum(by_sport.values()),
+        "open_over_72h": open_over_72h,
+        "by_sport": by_sport,
+        "samples": samples,
+    }
 
 
 def _ledger_economics(paths: RuntimePaths) -> dict[str, Any]:
@@ -266,6 +330,9 @@ def _flag_market_staleness(markets: dict[str, Any]) -> list[str]:
     return flags
 
 
+from .market_health import market_relative_health
+
+
 def system_health(
     repo_root: Path | str | None = None,
     runtime_root: Path | str | None = None,
@@ -392,6 +459,15 @@ def system_health(
     # this semantic invariant.
     ledger_economics = _ledger_economics(paths)
     report["checks"]["ledger_economics"] = ledger_economics
+
+    stale_open = _stale_open_rows(paths)
+    report["checks"]["stale_open_rows"] = stale_open
+    if stale_open.get("open_over_72h", 0) > 0:
+        degrade(
+            f"{stale_open['open_over_72h']} open ledger rows are more than 72h past "
+            "their scheduled start with no settlement resolution (postponed or "
+            "rescheduled events never complete under their original event_id)"
+        )
     if ledger_economics["semantic_errors"]:
         degrade(
             f"canonical ledger has {ledger_economics['semantic_errors']} "
@@ -406,6 +482,14 @@ def system_health(
         mean_clv = clv_data.get("mean_clv_pct", 0.0)
         if clv_count >= 20 and mean_clv < -1.0:
             degrade(f"Rolling 30-day CLV negative ({mean_clv:.2f}%) across {clv_count} graded picks")
+
+    # Phase-23 market-relative evidence (wired 2026-08-27): read-only
+    # battery from settled ledger rows. Informational by design — it
+    # never flips health status by itself; the operator reads it.
+    try:
+        report["market_relative"] = market_relative_health(paths)
+    except Exception as exc:  # noqa: BLE001 — evidence must never crash health
+        report["market_relative"] = {"status": "unavailable", "error": f"{type(exc).__name__}: {exc}"}
 
     report["reasons"] = reasons
 
