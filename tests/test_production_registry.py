@@ -112,6 +112,12 @@ def test_real_production_yaml_resolves_every_model() -> None:
     assert registry.champion("MLB", "total") is None
     assert "measured-edge-totals-v3" in registry.blocked_workflows
     assert "wnba-spread-margin-v1" in registry.blocked_workflows
+    # Phase-23 research challengers (NRFI half-inning/umpire, PA simulator,
+    # WNBA totals) must stay outside the served set — the count above is
+    # the enforcement: any accidental registration would move it off 13.
+    assert "wnba-total-margin-v1" in registry.blocked_workflows
+    assert "mlb-nrfi-v1" in registry.blocked_workflows
+    assert registry.champion("WNBA", "total") is None
 
     soccer = registry.entries["soccer-poisson-dc-v1"]
     assert soccer.implementation == IMPLEMENTATION_CODE_BACKED

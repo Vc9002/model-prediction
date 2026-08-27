@@ -60,6 +60,22 @@ def test_skips_unsettled_push_and_missing_probabilities():
     assert report["by_market"]["wnba:total"]["n_bets"] == 40
 
 
+def test_settled_n_and_market_evidence_n_are_distinct_denominators():
+    """A ledger's settled row count is not the same as its count of rows
+    with trustworthy market-evidence probabilities — the two missing-
+    probability rows are settled (real outcomes) but carry no evidence."""
+    rows = [
+        *_good_rows(40),
+        _row("wnba", "total", None, 0.55, pick_id="x3"),
+        _row("wnba", "total", 0.6, None, pick_id="x4"),
+    ]
+    report = market_relative_from_rows(rows)
+    market = report["by_market"]["wnba:total"]
+    assert market["settled_n"] == 42
+    assert market["market_evidence_n"] == 40
+    assert market["n_bets"] == 40
+
+
 def _good_rows(n: int) -> list[dict]:
     return [_row("wnba", "total", 0.6, 0.55, pick_id=f"p{i}", event_id=f"e{i}") for i in range(n)]
 

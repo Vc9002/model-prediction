@@ -36,17 +36,23 @@ def market_relative_from_rows(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
     a gate, so it prefers honest small samples over fabricated ones.
     """
     groups: dict[tuple[str, str], list[MarketEvalRow]] = defaultdict(list)
+    settled_n: dict[tuple[str, str], int] = defaultdict(int)
     for row in rows:
         if row.get("status") != "settled" or row.get("result") not in ("win", "loss"):
             continue
+        sport = str(row.get("sport") or "unknown")
+        market_type = str(row.get("market_type") or "unknown")
+        # settled_n counts every settled win/loss row for the market,
+        # independent of whether it carries market-evidence probabilities —
+        # this is the denominator gap the Phase-23 review flagged: ledger
+        # row count is not the same as trustworthy market-evidence count.
+        settled_n[(sport, market_type)] += 1
         model_prob = row.get("model_probability")
         market_prob = row.get("market_probability")
         if model_prob is None or market_prob is None:
             continue
         if not (0.0 < model_prob < 1.0 and 0.0 < market_prob < 1.0):
             continue
-        sport = str(row.get("sport") or "unknown")
-        market_type = str(row.get("market_type") or "unknown")
         decision_utc = str(row.get("event_start_utc") or row.get("created_at_utc") or "")
         groups[(sport, market_type)].append(
             MarketEvalRow(
@@ -63,8 +69,13 @@ def market_relative_from_rows(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
             )
         )
     by_market: dict[str, Any] = {}
-    for (sport, market_type), eval_rows in sorted(groups.items()):
-        by_market[f"{sport}:{market_type}"] = market_relative_report(eval_rows)
+    keys = sorted(set(groups) | set(settled_n))
+    for key in keys:
+        sport, market_type = key
+        report = market_relative_report(groups.get(key, []))
+        report["settled_n"] = settled_n.get(key, 0)
+        report["market_evidence_n"] = len(groups.get(key, []))
+        by_market[f"{sport}:{market_type}"] = report
     return {"status": "ok", "n_markets": len(by_market), "by_market": by_market}
 
 

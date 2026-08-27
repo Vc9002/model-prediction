@@ -492,3 +492,46 @@ def test_stale_open_rows_counts_and_degrades_health(tmp_path: Path) -> None:
 
     report = system_health(repo_root=repo, runtime_root=repo / "data")
     assert any("more than 72h past" in reason for reason in report["reasons"])
+
+
+def test_market_relative_evidence_is_informational_and_cannot_flip_health(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Phase-23 gate (2026-08-27): the market-relative battery is
+    read-only evidence for the operator. A catastrophically negative
+    battery (deep-negative ROI/Brier delta) must still leave the system
+    HEALTHY, and a battery read failure must degrade to 'unavailable',
+    never crash or flip status."""
+    import model_prediction.system_health as system_health_module
+
+    repo = _make_repo(tmp_path)
+    for worker in ("daily", "production", "rebuild-shadow"):
+        _seed_successful_run(repo, worker)
+    _seed_prediction_state(repo, minutes_ago=5)
+    _seed_game(repo, "mlb", days_ago=1)
+    _seed_market(repo, "mlb", days_ago=1)
+
+    bad_battery = {
+        "status": "ok",
+        "n_markets": 1,
+        "by_market": {
+            "wnba:total": {
+                "status": "ok",
+                "n_bets": 89,
+                "predictive": {"delta_brier": 0.5, "delta_logloss": 0.9},
+                "economic": {"roi": -0.9, "clv_rate": 0.0},
+            }
+        },
+    }
+    monkeypatch.setattr(system_health_module, "market_relative_health", lambda paths: bad_battery)
+    report = system_health(repo_root=repo, runtime_root=repo / "data")
+    assert report["status"] == "HEALTHY", report["reasons"]
+    assert report["market_relative"] == bad_battery
+
+    def _boom(_paths: Any) -> dict[str, Any]:
+        raise RuntimeError("ledger unreachable")
+
+    monkeypatch.setattr(system_health_module, "market_relative_health", _boom)
+    report = system_health(repo_root=repo, runtime_root=repo / "data")
+    assert report["status"] == "HEALTHY", report["reasons"]
+    assert report["market_relative"]["status"] == "unavailable"

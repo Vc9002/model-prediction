@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,7 @@ import yaml
 
 from model_prediction.model_promotion import (
     _active_record,
+    _db_path,
     history,
     promote,
     rollback,
@@ -143,6 +145,8 @@ def test_promote_switches_champion_preserves_rollback_and_records(tmp_path: Path
     assert active["new_model_id"] == "mlb-elo-trend-lr-v9"
     assert active["old_model_id"] == "mlb-elo-trend-lr-v8"
     assert active["evidence_id"] == "exp-42"
+    assert active["market_evidence_id"] == "mkt-evidence-42"
+    assert active["market_evidence_unavailable_reason"] is None
     assert active["approved_by"] == "operator"
 
 
@@ -259,3 +263,106 @@ def test_promote_fails_closed_without_market_evidence(tmp_path: Path) -> None:
         repo_root=repo,
     )
     assert record["status"] == "active"
+    assert record["market_evidence_unavailable_reason"] == "no market data exists for this market"
+    persisted = _active_record(repo, "MLB", "moneyline")
+    assert persisted["market_evidence_unavailable_reason"] == "no market data exists for this market"
+    assert persisted["market_evidence_id"] is None
+
+
+_OLD_PROMOTIONS_SCHEMA = """
+CREATE TABLE promotions (
+    promotion_id       TEXT PRIMARY KEY,
+    sport              TEXT NOT NULL,
+    market             TEXT NOT NULL,
+    old_model_id       TEXT,
+    new_model_id       TEXT NOT NULL,
+    old_artifact_hash  TEXT,
+    new_artifact_hash  TEXT,
+    approved_by        TEXT NOT NULL,
+    evidence_id        TEXT,
+    git_sha            TEXT,
+    promoted_at_utc    TEXT NOT NULL,
+    status             TEXT NOT NULL,
+    rolled_back_at_utc TEXT,
+    note               TEXT
+);
+"""
+
+
+def test_promote_migrates_pre_phase23_schema_and_preserves_old_records(tmp_path: Path) -> None:
+    """A promotions DB created before the market-evidence gate landed
+    (2026-08-27) has no market_evidence_id/market_evidence_unavailable_reason
+    columns. _conn's ALTER TABLE migration must add them without touching
+    rows already recorded under the old schema."""
+    repo = _make_repo(tmp_path)
+    db_path = _db_path(repo)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    raw = sqlite3.connect(db_path)
+    try:
+        raw.executescript(_OLD_PROMOTIONS_SCHEMA)
+        raw.execute(
+            "INSERT INTO promotions (promotion_id, sport, market, old_model_id, "
+            "new_model_id, old_artifact_hash, new_artifact_hash, approved_by, "
+            "evidence_id, git_sha, promoted_at_utc, status) VALUES "
+            "('promo-legacy-1', 'WNBA', 'moneyline', NULL, "
+            "'wnba-elo-trend-lr-v4', NULL, 'hash-legacy', 'operator', "
+            "'exp-legacy', 'sha-legacy', '2026-08-01T00:00:00+00:00', 'active')"
+        )
+        raw.commit()
+    finally:
+        raw.close()
+
+    record = promote(
+        sport="MLB",
+        market="moneyline",
+        new_model_id="mlb-elo-trend-lr-v9",
+        approved_by="operator",
+        market_evidence_id="mkt-evidence-99",
+        repo_root=repo,
+    )
+    assert record["status"] == "active"
+
+    rows = {row["promotion_id"]: row for row in history(repo_root=repo, limit=20)}
+    legacy = rows["promo-legacy-1"]
+    assert legacy["new_model_id"] == "wnba-elo-trend-lr-v4"
+    assert legacy["evidence_id"] == "exp-legacy"
+    assert legacy["market_evidence_id"] is None
+    new = rows[record["promotion_id"]]
+    assert new["market_evidence_id"] == "mkt-evidence-99"
+
+
+def test_promote_leaves_champion_unchanged_when_yaml_write_fails(tmp_path: Path, monkeypatch) -> None:
+    """If the atomic yaml write (or its re-validate) fails after the
+    promotion row is inserted, the champion pointer must not move — the
+    failure is recorded for audit, but production keeps serving the old
+    model."""
+    from model_prediction import model_promotion
+
+    repo = _make_repo(tmp_path)
+
+    def _boom(_root: Path, _config: dict[str, Any]) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(model_promotion, "_atomic_write_yaml", _boom)
+
+    with pytest.raises(OSError, match="disk full"):
+        promote(
+            sport="MLB",
+            market="moneyline",
+            new_model_id="mlb-elo-trend-lr-v9",
+            approved_by="operator",
+            market_evidence_id="mkt-evidence-42",
+            repo_root=repo,
+        )
+
+    # Champion pointer on disk is untouched.
+    registry = ProductionModelRegistry.load(repo)
+    assert registry.champion("MLB", "moneyline").model_id == "mlb-elo-trend-lr-v8"
+
+    # The attempt is recorded as failed, not active, and never became the
+    # active record for the market.
+    rows = history(repo_root=repo)
+    assert len(rows) == 1
+    assert rows[0]["status"] == "failed"
+    assert "disk full" in (rows[0]["note"] or "")
+    assert _active_record(repo, "MLB", "moneyline") is None
