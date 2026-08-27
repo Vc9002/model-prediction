@@ -153,7 +153,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     )
     # Run slate/BBO capture, WNBA availability, priors, soccer scores,
     # and MLB probables concurrently. These are independent I/O tasks.
-    from ..data_sources.odds_soccer_scores import collect_soccer_scores
+    from ..data_sources.api_football import collect_soccer_scores
 
     wnba_priors_result = {"status": "skipped"}
     mlb_probables_result: dict[str, Any] = {}
@@ -204,6 +204,11 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         nonlocal soccer_collection
         try:
             soccer_collection = collect_soccer_scores(days_from=3)
+            if soccer_collection.get("status") == "no_api_key":
+                # Fail-soft exactly like the The Odds API 401 era: a missing
+                # key must never abort the daily run, but it must be loudly
+                # visible in the log so the capture gap doesn't go quiet.
+                logger.warning("missing API_FOOTBALL_KEY — soccer results capture skipped")
         except Exception:
             logger.warning("Soccer score collection failed", exc_info=True)
 
@@ -820,9 +825,9 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         from ..portfolio.polymarket_ledger import (
             record_polymarket_orders,
         )
-        from ..portfolio.polymarket_scanner import PolymarketScanner
+        from ..portfolio.polymarket_scanner import PolymarketSlateScanner
 
-        scanner = PolymarketScanner(min_edge=0.025, bankroll=1000.0)
+        scanner = PolymarketSlateScanner(min_edge=0.025, bankroll=1000.0)
         scan_res = scanner.scan_directory(
             base_dir=data_directory / "odds",
             require_model=True,

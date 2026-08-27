@@ -111,7 +111,14 @@ DEFAULT_SOURCES: dict[str, SourceSpec] = {
         SourceTier.PAID_OR_KEYED_OPTIONAL,
         True,
         ("soccer",),
-        "Keyed; used only for soccer score lookback, not as a default MLB/NBA/WNBA/NFL dependency.",
+        "DORMANT since 2026-08-26 (key 401 for 31+ days; superseded by api_football). Code kept as documented fallback.",
+    ),
+    "api_football": SourceSpec(
+        "API-Football v3",
+        SourceTier.PAID_OR_KEYED_OPTIONAL,
+        True,
+        ("soccer",),
+        "Keyed; primary soccer results capture since 2026-08-26. Free tier ~100 req/day; season-limited.",
     ),
     "sportsdataio": SourceSpec(
         "SportsDataIO",
