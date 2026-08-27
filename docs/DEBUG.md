@@ -2,7 +2,115 @@
 
 **Last audited**: 2026-08-26 (see new section directly below)
 
-## 2026-08-26 — full-repo debugging scan (tests/lint/guardrails/model+feature audit)
+## 2026-08-26 (night) — continuation: documented-bug triage, Bet Better capture, WNBA parser root cause, postponed-game watcher
+
+Every remaining open item from the morning/evening scan was triaged, and the
+fixable ones were fixed (uncommitted at handoff of this section; commit
+policy unchanged — none pushed):
+
+- **WNBA morning-report parse failures — root-caused and fixed.** All 48
+  morning/midday reports on 08-26 failed `parse_report_pdf` with "row is
+  missing game/team context" while afternoon/evening reports parsed. Root
+  cause: `_parse_coordinate_table` (wnba_injuries.py) runs a two-pass
+  coordinate parse; the entry pass propagated date/time/matchup/team
+  context ONLY through player rows. The morning layout prints the game date
+  on a team-level "NOT YET SUBMITTED" row (no player, so not a player row),
+  so the date never reached the first real player row and every morning
+  report failed closed. Fix: the pass now walks ALL data lines in document
+  order (context propagates from every row; only player rows emit entries),
+  preserving the fail-closed raise for genuinely contextless rows and the
+  pass-1 `not_yet_submitted` status. Verified against all 81 real 08-26
+  reports (0 failures); two real PDFs saved as fixtures
+  (`tests/fixtures/wnba/report-morning-not-yet-submitted.pdf`,
+  `report-afternoon-submitted.pdf`); regression tests revert-verified
+  (`tests/test_wnba_injuries_parser.py`). This closes the handoff's "WNBA
+  availability snapshots stale 1.5 days" item: capture itself was healthy —
+  every morning report had been failing to parse, so no snapshot existed
+  for the feature to read, and the feature correctly degraded to
+  NO_CALL_AVAILABILITY_UNAVAILABLE.
+- **Soccer capture data_root split-brain — fixed before it fired.** The
+  daily's `_collect_soccer` called `collect_soccer_scores(days_from=3)`
+  without `data_root`, so it defaulted to `PROJECT_ROOT/data` while every
+  sibling capture writes to the caller's `data_root` (the scheduler-
+  resolved root under launchd). Harmless locally, divergent under launchd —
+  and never manifest because API_FOOTBALL_KEY was never provisioned, so the
+  step always exited at the no-key check. Fixed by passing
+  `data_root=data_root` explicitly; comment records the bug class.
+- **Bet Better model-feed capture wired (new research-only source).**
+  `data_sources/bet_better.py`: keyless, no-account, CC BY 4.0 feed of a
+  third-party model's win probabilities + real lines across mlb/wnba/nba/
+  nfl/soccer (7 leagues)/wta. Live-verified 2026-08-26 (all 12 feed paths;
+  1,317 picks captured in a smoke run; NBA/NFL/World Cup empty = offseason,
+  captured as available=False so "provider empty" is provably distinct from
+  "we never asked"). Day-bucketed snapshots via provider_capture with the
+  licence/attribution in an envelope entry. Daily wiring:
+  `step1e_bet_better_models`. Reference evidence ONLY — the provider mints
+  no stable event ids, so the feed must never become a ledger identity, and
+  its picks are model estimates, not bookmaker prices.
+- **Statcast aggregates wired into the daily.** The build moved from
+  `scripts/ingest_statcast_aggregates.py` (manual-only, 3 days behind) into
+  `statcast_aggregates.py` with an explicit `data_root`; the daily runs it
+  AFTER the capture pool (it consumes game_snapshots.jsonl the pool writes)
+  as `step5e_statcast_aggregates`, fail-soft. Live rebuild: 57,057 pitcher /
+  134,765 batter rows through 2026-08-26. Script kept as a thin wrapper.
+- **Esports capture/pricing drift pinned.** `CAPTURED_UNPRICED_ESPORTS_
+  LEAGUES = {COD, ROCKET_LEAGUE, OVERWATCH}` documents the 8-captured vs
+  4-priced split; `test_esports_capture_and_pricing_sets_cannot_drift_
+  silently` makes any capture/pricing change land in a named tier or fail.
+- **Unknown Polymarket market types no longer vanish silently.**
+  `_log_unknown_market_type` logs each unrecognized (league, type-string)
+  once per run — the BTTS gap (soccer.py emits `market_type="btts"` but no
+  BTTS PM type string has ever been observed; 3-day snapshot sweep shows
+  only team_win/spread/total) stays documented until a live string appears.
+  NBA/NFL: PM gateway leagues are operational and `BBO_CAPTURE_SPORTS`
+  already includes them — capture flows automatically when seasons start;
+  the gap is consumer-side. NRFI: no NRFI/YRFI markets exist on PM US; the
+  closest real market is the first-5-innings (f5) spread/total, already
+  captured (290 f5 rows on 08-26) but distinguishable only via the
+  `-f5-` slug pattern, not market_type.
+- **World Cup settle-stall guard.** A league with no `_LEDGER_LEAGUE_TO_ESPN`
+  entry now reports a failure ("no ESPN result path for league X") instead
+  of pending forever (the 07-27 WORLD_CUP stall class). Regression tests in
+  `tests/test_settle_guard.py`.
+- **Registry-free ban enforcement wired.** `bans.py`'s name-based fallback
+  existed (fixed 08-04) but `evaluate_esports_eligibility` never consulted
+  a ban list (the 07-27 gap's second half). It now checks first when a
+  `ban_list` is passed (optional — legacy callers unchanged); the forecast
+  call sites still need to thread their `bans` object through to arm it.
+- **mlb-v9-candidate-1 identity collision.** `forecast_mlb_v9_benchmark.py`
+  recorded rows under `model_version="mlb-v9-candidate-1"` — the name of a
+  VOID quarantined artifact. New rows record `mlb-v9-benchmark`
+  (`V9_BENCHMARK_MODEL_VERSION`); the workbook keeps the family name for
+  history continuity; historical rows untouched.
+- **Postponed-game workaround (drain-minimal, operator-chosen).** Research
+  confirmed PM's per-market contract: a postponed game's market STAYS OPEN;
+  it resolves to the makeup result if played within two weeks of the
+  original date, else last-fair-market-price (US boilerplate) or 50-50.
+  ESPN issues a new event_id on reschedule. Repo behavior: the daily already
+  auto-voids STATUS_POSTPONED/CANCELED rows (`void_postponed=True`), but
+  tennis/KBO/NPB/edge-ledger rows and ESPN-dropped events pend forever. Built
+  the zero-new-I/O option: `system_health._stale_open_rows` counts open rows
+  >24h/72h past their frozen start (pure read-only sqlite query) and
+  degrades health when the >72h bucket is non-empty. Live first run: 22 rows
+  (kbo 13, cs2 7, soccer 3, npb 3, tennis 2) — now continuously visible.
+  Shelved (heaviest): the multi-day ESPN reconciliation sweep; do it only as
+  a targeted, identity-scoped, operator-approved re-grade when needed.
+- **Daily-run timing instrumentation.** `scripts/run_daily.sh` now logs
+  per-step wall-clock; `run_daily`'s report carries a `timing` block
+  (total / capture_pool / settlement / post_settlement seconds). Today's
+  runs ranged 6.7–22.9 minutes; the instrumentation exists so tomorrow's
+  log shows which phase to optimize first.
+- **Triaged as already-fixed by later sessions (records closed here):**
+  KBO phantom-tie settlements (canonical sqlite has zero phantom 0-0
+  pushes; the 3 KBO pushes are real 3-3 ties); tennis surface inference at
+  forecast time (`_upcoming_singles_matches` already calls
+  `_infer_tennis_surface` and threads `surface=` into UpcomingMatch); the
+  stale WORLD_CUP conftest fixture (removed); the DD items from 08-20
+  (pre-commit hook, dashboard_server split to 259 lines, TODO tracking) —
+  all present. MLB totals absolute-run-environment signal remains the one
+  genuinely open research gap (see repair order #2).
+
+
 
 Full sweep, not a bug-motivated investigation: `pytest -q` (2,288 passed, 3
 skipped, 0 failed), `ruff check .` (clean after fixing 5 pre-existing stray

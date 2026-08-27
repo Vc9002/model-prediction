@@ -127,10 +127,15 @@ Execution phases (research track only; v8 frozen invariant unchanged):
   battery, stability slices, hit-rate diagnostic-only, beta
   calibration, per-market×league calibration, rolling walk-forward);
   80%/90% conflict resolved in favor of 80%.
-- **E — Later-phase items** (in progress): PA-level inning simulator,
-  structural+ML+market stacking, heteroskedastic game-level σ,
-  conformal intervals, WNBA travel/fatigue. Umpire features delivered
-  under C; PA simulator and stacking next.
+- **E — Later-phase items** ✅ (a439987): PA-level inning simulator
+  (honest null vs incumbent, level-term overshoot in the current
+  regime), OOF stack of structural+ridge+market (meta learns to weight
+  the market line +1.28) and per-game σ model (ridge Brier 0.445 →
+  0.357) — mechanisms delivered and tested in the 6-week window.
+  Umpire features delivered under C. Deferred: conformal intervals
+  (per-game σ covers the same need at this data depth) and extra
+  WNBA travel/fatigue counters (plan itself rates them tiny marginal
+  value; existing rest/tz signals already wired).
 
 ## Phase 0 — Freeze v8 Permanently
 

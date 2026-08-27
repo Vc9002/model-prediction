@@ -39,6 +39,18 @@ FLAT_V9_PATH = Path("data/flat_v9/mlb.xlsx")
 V9_MODEL_LEDGER_PATH = Path("data/model_ledgers/mlb-v9-candidate-1.xlsx")
 MARKET_SNAPSHOT_PATH = Path("data/market_odds_snapshots.jsonl")
 
+# Rows recorded by this benchmark must NOT use "mlb-v9-candidate-1" as their
+# model_version: that exact name resolves to a VOID quarantined artifact
+# (config/models/research/mlb-v9-candidate-1.json, status
+# VOID_INVALID_FEATURE_PROVENANCE), and any exact-contract lookup of a row's
+# recorded version would collide with it (2026-08-26 audit finding). The
+# benchmark retrains from the frozen cohort parquet via mlb_evaluator and
+# never loads that artifact, so the recorded identity is independent of the
+# quarantine -- it just must not share the name. The ledger workbook keeps
+# the family name for history continuity (ledger id and artifact version are
+# different axes; historical rows keep their recorded version untouched).
+V9_BENCHMARK_MODEL_VERSION = "mlb-v9-benchmark"
+
 
 def _existing_event_ids(ledger: PickLedger) -> set[str]:
     """Return every already-recorded event from the ledger's public row API."""
@@ -223,7 +235,7 @@ def run_v9_flat_forecast(date_str: str | None = None) -> list[dict]:
             american_odds=american_odds,
             model_probability=round(pick_prob, 4),
             model_uncertainty=0.035,
-            model_version="mlb-v9-candidate-1",
+            model_version=V9_BENCHMARK_MODEL_VERSION,
             rationale="MLB v9 Flat Benchmark Candidate Forecast",
             risks="Model candidate under prospective shadow evaluation",
             model_origin=ModelOrigin.STATISTICAL_MODEL,

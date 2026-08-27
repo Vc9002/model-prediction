@@ -1,6 +1,6 @@
 # Project Maintenance Checklist
 
-**Last updated**: 2026-08-16
+**Last updated**: 2026-08-26
 
 Current status and blockers: `docs/PROJECT_STATUS.md`.
 
@@ -42,7 +42,8 @@ Run these checks regularly. Pinned to the repo root for discovery.
 
 ## Debug (when things look wrong)
 
-- [ ] **Pre-flight** — `env PYTHONPATH=src:. .venv/bin/python -m pytest tests/ -q` (expect 0 failures; current pass: 1759, 3 skipped)
+- [ ] **Pre-flight** — `env PYTHONPATH=src:. .venv/bin/python -m pytest tests/ -q` (expect 0 failures; current pass: 2,298, 3 skipped)
+- [ ] **Stale-open rows** — `env PYTHONPATH=src:. .venv/bin/python -m model_prediction.system_health` reports `stale_open_rows` (open rows >24h/72h past start = postponed/rescheduled exposure); >72h degrades health
 - [ ] **Ruff lint** — `.venv/bin/ruff check src/ tests/` (expect ~118 findings; 79 are EXE002 shebang on test files)
 - [ ] **Full DEBUG.md audit** — see `DEBUG.md` for the full 12-step audit and reproduction commands
 - [ ] **Module imports** — every current package module imports cleanly (DEBUG.md check 3)

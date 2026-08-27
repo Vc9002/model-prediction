@@ -5,9 +5,13 @@ from datetime import UTC, date, datetime, timedelta
 import httpx
 import pytest
 
-from model_prediction.data_sources.polymarket_us import POLYMARKET_SPORT_LEAGUES
+from model_prediction.data_sources.polymarket_us import (
+    CAPTURED_UNPRICED_ESPORTS_LEAGUES,
+    POLYMARKET_SPORT_LEAGUES,
+)
 from model_prediction.domain import eastern_today
 from model_prediction.esports import (
+    TITLE_SPECS,
     Bo3EsportsClient,
     NeutralElo,
     _metrics,
@@ -15,6 +19,7 @@ from model_prediction.esports import (
     refresh_recent_matches,
     validate_esports_baseline,
 )
+from model_prediction.production_feature_ablation import ESPORTS_TITLES
 
 
 def test_polymarket_us_esports_taxonomy_is_explicit_and_complete() -> None:
@@ -27,6 +32,23 @@ def test_polymarket_us_esports_taxonomy_is_explicit_and_complete() -> None:
         "ROCKET_LEAGUE",
         "OVERWATCH",
         "RAINBOW_SIX",
+    )
+
+
+def test_esports_capture_and_pricing_sets_cannot_drift_silently() -> None:
+    """2026-07-27 audit gap: BBO capture covered all 8 esports leagues while
+    models priced only 4, with no test catching the drift. Capture of the
+    extra leagues is deliberate (market evidence for future models), but
+    every captured league must land in exactly one named tier: priced
+    (ESPORTS_TITLES), spec'd-but-unpriced (TITLE_SPECS), or the documented
+    deferral set -- so a future capture/pricing change fails here instead of
+    drifting silently."""
+    captured = set(POLYMARKET_SPORT_LEAGUES["esports"])
+    priced = {TITLE_SPECS[title]["polymarket_league"] for title in ESPORTS_TITLES}
+    speced = {spec["polymarket_league"] for spec in TITLE_SPECS.values()}
+    assert priced <= captured, "a priced league has no BBO capture"
+    assert captured - speced == CAPTURED_UNPRICED_ESPORTS_LEAGUES, (
+        "capture set drifted: every captured league must be priced, spec'd, or named deferred"
     )
 
 

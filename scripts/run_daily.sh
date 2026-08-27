@@ -35,15 +35,19 @@ echo "Started: $(TZ=America/New_York date)" >> "$LOG"
 # Polymarket resolution for esports). Idempotent on already-settled rows.
 # Both main ledger and flat_picks.xlsx are settled by the command.
 echo "--- Step 1: Settlement ---" >> "$LOG"
+STEP_START=$SECONDS
 PYTHONPATH=src .venv/bin/python -m model_prediction.cli settle --all-unsettled >> "$LOG" 2>&1
 SETTLE_EXIT=$?
 echo "Settlement exit code: $SETTLE_EXIT" >> "$LOG"
+echo "Settlement took: $((SECONDS - STEP_START))s" >> "$LOG"
 
 # ── Step 1c: MLB v9 Flat benchmark settlement ───────────────────────
 echo "--- Step 1c: MLB v9 benchmark settlement ---" >> "$LOG"
+STEP_START=$SECONDS
 PYTHONPATH=src:. .venv/bin/python scripts/forecast_mlb_v9_benchmark.py --settle >> "$LOG" 2>&1
 V9_SETTLE_EXIT=$?
 echo "MLB v9 settlement exit code: $V9_SETTLE_EXIT" >> "$LOG"
+echo "MLB v9 settlement took: $((SECONDS - STEP_START))s" >> "$LOG"
 
 # ── Step 1b: Historical game ingestion ──────────────────────────────
 # Settlement above only grades ledger PICKS from ESPN scoreboards — it does
@@ -91,20 +95,25 @@ for sport in mlb nba wnba nfl tennis; do
 done
 rm -rf "$INGEST_TMPDIR"
 echo "Ingestion exit code: $INGEST_EXIT" >> "$LOG"
+echo "Ingestion took: $((SECONDS - STEP_START))s" >> "$LOG"
 
 # ── Step 2: Unified daily forecast ───────────────────────────────────
 echo "--- Step 2: Unified slate + main/flat/research forecasts ---" >> "$LOG"
+STEP_START=$SECONDS
 PYTHONPATH=src .venv/bin/python -m model_prediction.cli daily \
     --date "$RUN_DATE" --skip-settlement \
     >> "$LOG" 2>&1
 DAILY_EXIT=$?
 echo "Unified daily exit code: $DAILY_EXIT" >> "$LOG"
+echo "Unified daily took: $((SECONDS - STEP_START))s" >> "$LOG"
 
 # ── Step 2b: MLB v9 Challenger flat forecast ────────────────────────
 echo "--- Step 2b: MLB v9 Challenger flat forecast ---" >> "$LOG"
+STEP_START=$SECONDS
 PYTHONPATH=src:. .venv/bin/python scripts/forecast_mlb_v9_benchmark.py >> "$LOG" 2>&1
 V9_FORECAST_EXIT=$?
 echo "MLB v9 forecast exit code: $V9_FORECAST_EXIT" >> "$LOG"
+echo "MLB v9 forecast took: $((SECONDS - STEP_START))s" >> "$LOG"
 
 echo "Finished: $(TZ=America/New_York date)" >> "$LOG"
 echo "Exit codes — settle: $SETTLE_EXIT, v9_settle: $V9_SETTLE_EXIT, ingest: $INGEST_EXIT, daily: $DAILY_EXIT, v9_forecast: $V9_FORECAST_EXIT" >> "$LOG"

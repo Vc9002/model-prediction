@@ -22,6 +22,9 @@ data/*.pre-fix-*
 data/logs/
 dashboard/server.log
 data/events.jsonl
+# Operational capture output (bet_better provider snapshots, 2026-08-26
+# night continuation) — same policy as the other untracked data trees.
+data/providers/
 data/mlb_statsapi/game_snapshots.jsonl
 data/statcast/
 data/**/*.cache

@@ -21,6 +21,22 @@ from model_prediction.models.mlb_first_inning import (
 )
 
 
+def _batter(player_id: int, bat_side: str, pa: float) -> dict:
+    return {
+        "player_id": player_id,
+        "name": f"batter-{player_id}",
+        "bat_side": bat_side,
+        "batting": {
+            "plateAppearances": pa,
+            "atBats": pa,
+            "hits": 0.0,
+            "baseOnBalls": 0.0,
+            "strikeOuts": 0.0,
+            "totalBases": 0.0,
+        },
+    }
+
+
 def _snapshot(
     game_pk: int,
     start_utc: str,
@@ -32,6 +48,10 @@ def _snapshot(
     runs_home: int,
     *,
     venue: str = "Test Park",
+    away_starter_hand: str = "R",
+    home_starter_hand: str = "R",
+    away_batters: list[dict] | None = None,
+    home_batters: list[dict] | None = None,
 ) -> dict:
     """Minimal snapshot in the real schema shape (verified against
     data/mlb_statsapi/game_snapshots.jsonl field layout)."""
@@ -49,6 +69,7 @@ def _snapshot(
                 {
                     "player_id": away_starter_id,
                     "name": "away-sp",
+                    "pitch_hand": away_starter_hand,
                     "pitching": {
                         "inningsPitched": "5.0",
                         "strikeOuts": 6,
@@ -56,7 +77,8 @@ def _snapshot(
                         "battersFaced": 20,
                         "homeRuns": 1,
                     },
-                }
+                },
+                *(away_batters or []),
             ],
         },
         "home": {
@@ -67,6 +89,7 @@ def _snapshot(
                 {
                     "player_id": home_starter_id,
                     "name": "home-sp",
+                    "pitch_hand": home_starter_hand,
                     "pitching": {
                         "inningsPitched": "5.0",
                         "strikeOuts": 5,
@@ -74,7 +97,8 @@ def _snapshot(
                         "battersFaced": 21,
                         "homeRuns": 0,
                     },
-                }
+                },
+                *(home_batters or []),
             ],
         },
     }
@@ -102,8 +126,14 @@ def test_ledger_has_no_self_leak_first_game_is_pure_priors(tmp_path) -> None:
         tmp_path,
         [
             _snapshot(
-                1, "2026-04-01T17:05:00Z", "Home A", "Away A",
-                away_starter_id=101, home_starter_id=201, runs_away=2, runs_home=1,
+                1,
+                "2026-04-01T17:05:00Z",
+                "Home A",
+                "Away A",
+                away_starter_id=101,
+                home_starter_id=201,
+                runs_away=2,
+                runs_home=1,
             )
         ],
     )
@@ -125,12 +155,24 @@ def test_ledger_is_chronological_and_prior_games_only(tmp_path) -> None:
         tmp_path,
         [
             _snapshot(
-                1, "2026-04-01T17:05:00Z", "Home A", "Away A",
-                away_starter_id=101, home_starter_id=201, runs_away=0, runs_home=0,
+                1,
+                "2026-04-01T17:05:00Z",
+                "Home A",
+                "Away A",
+                away_starter_id=101,
+                home_starter_id=201,
+                runs_away=0,
+                runs_home=0,
             ),
             _snapshot(
-                2, "2026-04-02T17:05:00Z", "Home B", "Away A",
-                away_starter_id=101, home_starter_id=202, runs_away=3, runs_home=0,
+                2,
+                "2026-04-02T17:05:00Z",
+                "Home B",
+                "Away A",
+                away_starter_id=101,
+                home_starter_id=202,
+                runs_away=3,
+                runs_home=0,
             ),
         ],
     )
@@ -145,6 +187,123 @@ def test_ledger_is_chronological_and_prior_games_only(tmp_path) -> None:
     assert rows[0].features["away_starter_opp_1st_runs"] == priors["half_away"]
     # Away team A scored 0 in its first game's away half.
     assert rows[1].features["away_team_1st_scored_away"] < priors["half_away"]
+
+
+def test_new_features_first_game_are_defaults(tmp_path) -> None:
+    # The new rest/handedness features must not leak the game itself: the
+    # very first game has no history, so each takes its default constant.
+    path = _write_snapshots(
+        tmp_path,
+        [
+            _snapshot(
+                1,
+                "2026-04-01T17:05:00Z",
+                "Home A",
+                "Away A",
+                away_starter_id=101,
+                home_starter_id=201,
+                runs_away=2,
+                runs_home=1,
+                away_batters=[_batter(601, "L", 4.0), _batter(602, "L", 3.0)],
+                home_starter_hand="L",
+            )
+        ],
+    )
+    rows = build_first_inning_ledger(path)
+    priors = compute_first_inning_priors(path)
+    features = rows[0].features
+    # No prior pool, and the opposing starter's hand is not yet recorded
+    # (it is first seen in this game) -> the league R/L share, not 0/1.
+    assert features["away_top3_same_hand_share"] == round(priors["same_hand"], 4)
+    assert features["home_top3_same_hand_share"] == round(priors["same_hand"], 4)
+    # No prior team game -> modal one-day rest; no prior start -> 4.0.
+    assert features["away_team_days_rest"] == 1.0
+    assert features["home_team_days_rest"] == 1.0
+    assert features["away_starter_days_rest"] == 4.0
+    assert features["home_starter_days_rest"] == 4.0
+
+
+def test_new_features_are_strictly_prior(tmp_path) -> None:
+    # Game 2+ rest and handedness values must be computable from strictly
+    # prior games only, and game 1's values must not change when later
+    # games are appended.
+    # Game 1: Away A (lefty batters 601/602) at Home B, home starter 202 LHP.
+    # Game 2: Away A at Home C, 202 starts again (next day).
+    # Game 3: Away A at Home D, 101 (an RHP, first seen in game 1) starts.
+    # Game 4: Away A at Home E after a week-long break.
+    snaps = [
+        _snapshot(
+            1,
+            "2026-04-01T17:05:00Z",
+            "Home B",
+            "Away A",
+            away_starter_id=101,
+            home_starter_id=202,
+            runs_away=0,
+            runs_home=0,
+            away_batters=[_batter(601, "L", 4.0), _batter(602, "L", 3.0)],
+            home_starter_hand="L",
+        ),
+        _snapshot(
+            2,
+            "2026-04-02T17:05:00Z",
+            "Home C",
+            "Away A",
+            away_starter_id=101,
+            home_starter_id=202,
+            runs_away=1,
+            runs_home=0,
+            home_starter_hand="L",
+        ),
+        _snapshot(
+            3,
+            "2026-04-03T17:05:00Z",
+            "Home D",
+            "Away A",
+            away_starter_id=101,
+            home_starter_id=101,
+            runs_away=0,
+            runs_home=2,
+        ),
+        _snapshot(
+            4,
+            "2026-04-10T17:05:00Z",
+            "Home E",
+            "Away A",
+            away_starter_id=101,
+            home_starter_id=204,
+            runs_away=0,
+            runs_home=0,
+        ),
+    ]
+    path = _write_snapshots(tmp_path, snaps)
+    rows = build_first_inning_ledger(path)
+    priors = compute_first_inning_priors(path)
+
+    # Handedness: only lefty batters are in Away A's pool, and 202/101's
+    # hands are only known because games strictly prior to 2/3 recorded them.
+    assert rows[0].features["away_top3_same_hand_share"] == round(priors["same_hand"], 4)
+    assert rows[1].features["away_top3_same_hand_share"] == 1.0  # lefties vs LHP 202
+    assert rows[2].features["away_top3_same_hand_share"] == 0.0  # lefties vs RHP 101
+
+    # Starter rest: 101 started games 1, 2, 3 and last started 04-03.
+    assert rows[0].features["away_starter_days_rest"] == 4.0  # default, no prior start
+    assert rows[1].features["away_starter_days_rest"] == 1.0  # 24h back-to-back
+    assert rows[2].features["away_starter_days_rest"] == 1.0
+    assert rows[3].features["away_starter_days_rest"] == 6.0  # 7 days, capped at 6
+
+    # Team rest: Away A played 04-01/02/03, then a week-long break.
+    assert rows[0].features["away_team_days_rest"] == 1.0  # default
+    assert rows[1].features["away_team_days_rest"] == 1.0
+    assert rows[2].features["away_team_days_rest"] == 1.0
+    assert rows[3].features["away_team_days_rest"] == 6.0  # 7 days, capped at 6
+
+    # Game 1's features were emitted before game 1 entered the accumulators:
+    # the 4-game ledger must emit identical values to the game-1-only ledger.
+    only_g1 = build_first_inning_ledger(path, priors=priors)
+    assert len(only_g1) == 4
+    for key, value in rows[0].features.items():
+        assert only_g1[0].features[key] == value, f"game 1 feature {key} leaked from later games"
 
 
 def test_market_proxy_is_fair_two_way_with_vig() -> None:

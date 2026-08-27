@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
@@ -136,6 +137,15 @@ POLYMARKET_SPORT_LEAGUES: dict[str, tuple[str, ...]] = {
     "npb": ("NPB",),
 }
 
+# Esports leagues captured for BBO but priced by no model yet (2026-07-27
+# audit gap: the mismatch between the 8 captured leagues and the 4 priced
+# ones was silent -- no test caught the drift). Capture is deliberate
+# (market evidence for future models), but the deferral must be named:
+# the pinning test fails if a league is added to capture without landing
+# in TITLE_SPECS or this set, or if a model starts pricing a league that
+# is not captured. Remove a name when its model ships.
+CAPTURED_UNPRICED_ESPORTS_LEAGUES: frozenset[str] = frozenset({"COD", "ROCKET_LEAGUE", "OVERWATCH"})
+
 # Sports whose prospective BBO capture feeds the daily qualification/promotion
 # pipeline (config/model.yaml, models/registry.py). Do not derive this from
 # "every league in POLYMARKET_SPORT_LEAGUES" or from registry.MODEL_SPECS
@@ -163,9 +173,40 @@ MARKET_TYPES = {
     # the more descriptive "soccer_team_full_time_winner", kept below as a
     # defensive fallback in case some response omits V2). Neither key was
     # previously recognized, so these markets were silently dropped entirely.
+    # Known consumer-side gap (2026-07-27 audit, still open): models/soccer.py
+    # emits market_type="btts" predictions, but no BTTS Polymarket type
+    # string has ever been observed in live captures (a 3-day snapshot sweep
+    # 2026-08-26 showed only team_win/spread/total), so no mapping exists.
+    # Unrecognized strings are logged once per run (_log_unknown_market_type)
+    # instead of vanishing silently -- when a BTTS market appears, add its
+    # string here with the date it was first observed.
     "SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME": "team_win",
     "soccer_team_full_time_winner": "team_win",
 }
+
+logger = logging.getLogger(__name__)
+
+# Per-process dedup so an unknown market type is logged once per run, not
+# once per event (the daily slates carry thousands of markets). Bounded by
+# the gateway's actual type vocabulary, so the set stays small even in the
+# long-running dashboard process.
+_UNKNOWN_MARKET_TYPES_LOGGED: set[str] = set()
+
+
+def _log_unknown_market_type(raw_type: str | None, league: str) -> None:
+    """Unrecognized market types are dropped from capture (see MARKET_TYPES)
+    -- make that visible in the daily log instead of silent, so a new market
+    type (e.g. a BTTS market) is discoverable from the log line instead of
+    disappearing with no trace."""
+    key = f"{league}:{raw_type}"
+    if key in _UNKNOWN_MARKET_TYPES_LOGGED:
+        return
+    _UNKNOWN_MARKET_TYPES_LOGGED.add(key)
+    logger.warning(
+        "unrecognized Polymarket market type dropped from capture: %r (league %s)",
+        raw_type,
+        league,
+    )
 
 
 def probability_to_american(probability: float) -> int:
@@ -383,8 +424,10 @@ class PolymarketUSClient:
         start = parse_utc(event["startTime"])
         markets = []
         for market in event.get("markets", []):
-            market_type = MARKET_TYPES.get(market.get("sportsMarketTypeV2") or market.get("sportsMarketType"))
+            raw_type = market.get("sportsMarketTypeV2") or market.get("sportsMarketType")
+            market_type = MARKET_TYPES.get(raw_type)
             if market_type is None:
+                _log_unknown_market_type(raw_type, league)
                 continue
             sides = []
             for side in market.get("marketSides", []):

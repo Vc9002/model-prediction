@@ -268,7 +268,9 @@ def _parse_coordinate_table(
                     else:
                         current_team = value
 
-        for row_y, line in player_lines:
+        for line in data_lines:
+            row_y = line[0].y
+            is_player_line = round(row_y, 3) in player_y
             date_text = _column_text(line, 0, 110)
             time_text = _column_text(line, 110, 195)
             matchup_text = _column_text(line, 195, 260)
@@ -287,7 +289,17 @@ def _parse_coordinate_table(
                 teams.add(current_team)
                 if current_matchup:
                     team_matchups[current_team] = current_matchup
-                team_report_status[current_team] = "submitted"
+                if is_player_line:
+                    team_report_status[current_team] = "submitted"
+            if not is_player_line:
+                # Team-level rows (a "NOT YET SUBMITTED" team, a game block
+                # whose first row carries no players) hold date/time/matchup/
+                # team context that the player rows below them inherit -- so
+                # they must propagate it even though they produce no entry.
+                # 2026-08-26 regression: the game date printed only on such a
+                # row never reached the first player row, and every morning
+                # report failed to parse with "missing game/team context".
+                continue
             if not all((current_date, current_matchup, current_team)):
                 raise ValueError("official WNBA injury report row is missing game/team context")
 

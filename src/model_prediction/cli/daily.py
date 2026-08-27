@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -133,6 +134,13 @@ def _finalize_daily_report(report: dict[str, Any]) -> dict[str, Any]:
 
 
 def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
+    # Wall-clock markers for the daily-run timing report (2026-08-26 perf
+    # instrumentation — additive only, no behavior change; the report dict
+    # carries per-phase elapsed seconds so slow phases are visible in the
+    # daily log without a profiler).
+    _t_start = time.monotonic()
+    _t_pool_end = _t_start
+    _t_settle_end = _t_start
     # Self-throttled to weekly (see mlb_baseline_refresh's module
     # docstring) -- safe to call every daily cron cycle since it's a
     # cheap no-op most of the time, but keeps park factors and league
@@ -158,6 +166,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     wnba_priors_result = {"status": "skipped"}
     mlb_probables_result: dict[str, Any] = {}
     soccer_collection = {}
+    bet_better_result: dict[str, Any] = {}
 
     def _capture_wnba():
         try:
@@ -203,7 +212,14 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     def _collect_soccer():
         nonlocal soccer_collection
         try:
-            soccer_collection = collect_soccer_scores(days_from=3)
+            # data_root must be passed explicitly: every sibling capture in
+            # this file writes to the caller's data_root (the scheduler-
+            # resolved root under launchd), and collect_soccer_scores's
+            # default is PROJECT_ROOT/data -- under launchd env vars those
+            # two diverge, silently splitting soccer captures into the repo
+            # checkout. Fixed 2026-08-26 before the API-FOOTBALL key ever
+            # landed, so no data was written to the wrong tree.
+            soccer_collection = collect_soccer_scores(data_root=data_root, days_from=3)
             if soccer_collection.get("status") == "no_api_key":
                 # Fail-soft exactly like the The Odds API 401 era: a missing
                 # key must never abort the daily run, but it must be loudly
@@ -211,6 +227,19 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 logger.warning("missing API_FOOTBALL_KEY — soccer results capture skipped")
         except Exception:
             logger.warning("Soccer score collection failed", exc_info=True)
+
+    def _collect_bet_better():
+        # Research-only cross-check capture (see data_sources/bet_better.py):
+        # keyless, fail-soft, snapshots under data/providers/bet_better/ --
+        # never written to any ledger and never consumed by a live decision.
+        nonlocal bet_better_result
+        try:
+            from ..data_sources.bet_better import collect_bet_better_models
+
+            bet_better_result = collect_bet_better_models(data_root=data_root)
+        except Exception:
+            logger.warning("Bet Better model-feed capture failed", exc_info=True)
+            bet_better_result = {"status": "error"}
 
     def _capture_mlb_probables():
         nonlocal mlb_probables_result
@@ -338,7 +367,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         f5 = io_pool.submit(_capture_mlb_availability)
         f6 = io_pool.submit(_capture_mlb_starter_snapshots)
         f7 = io_pool.submit(_capture_mlb_lineups)
-        for f in (f1, f2, f3, f4, f5, f6, f7):
+        f8 = io_pool.submit(_collect_bet_better)
+        for f in (f1, f2, f3, f4, f5, f6, f7, f8):
             f.result()  # Wait for all, surface exceptions
         try:
             slate = f0.result()
@@ -360,6 +390,27 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 "events_by_league": {},
                 "prospective_bbo_capture": {},
             }
+    _t_pool_end = time.monotonic()
+
+    # Statcast aggregates consume game_snapshots.jsonl, which the MLB
+    # capture steps above write inside the pool -- so this rebuild must run
+    # after the pool, never inside it (a race here would silently drop the
+    # run's newest snapshots). Fail-soft: aggregate freshness is a research
+    # input, never a blocker for the daily run.
+    statcast_aggregates_result: dict[str, Any] = {"status": "skipped"}
+    try:
+        from ..statcast_aggregates import build_statcast_game_aggregates
+
+        pitcher_frame, batter_frame = build_statcast_game_aggregates(data_root)
+        statcast_aggregates_result = {
+            "status": "ok",
+            "pitcher_rows": len(pitcher_frame),
+            "batter_rows": len(batter_frame),
+        }
+    except Exception:
+        logger.warning("Statcast aggregate rebuild failed", exc_info=True)
+        statcast_aggregates_result = {"status": "error"}
+
     _clear_today_open(ledger, args.date, by_event_date=True)
     # Also clear and forecast for flat ledger
     flat_ledger = MultiSportPickLedger(data_root, flat=True)
@@ -817,6 +868,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 gated=True,
             )
         }
+    _t_settle_end = time.monotonic()
 
     # Step 10 & 11: Automated Polymarket CLOB Edge Scanner & Settlement
     poly_edge_record_result: dict[str, Any] = {"status": "skipped"}
@@ -856,6 +908,12 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         poly_edge_settle_result = {"status": "skipped"}
 
     report = {
+        "timing": {
+            "total_seconds": round(time.monotonic() - _t_start, 1),
+            "capture_pool_seconds": round(_t_pool_end - _t_start, 1),
+            "settlement_seconds": round(_t_settle_end - _t_pool_end, 1),
+            "post_settlement_seconds": round(time.monotonic() - _t_settle_end, 1),
+        },
         "date": args.date,
         "step0_mlb_baseline_refresh": mlb_baseline_refresh_result,
         "step1_polymarket_search": {
@@ -868,6 +926,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         "step3b_polymarket_odds_snapshots": odds_by_sport,
         "step4_settlement": settlement,
         "step1b_soccer_scores": soccer_collection,
+        "step1e_bet_better_models": bet_better_result,
         "step1c_mlb_probable_starters": {
             "captured_events": len(mlb_probables_result),
             "archive": "data/point_in_time/mlb_probable_starters.jsonl",
@@ -879,6 +938,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         "step5c_mlb_availability": mlb_availability_result,
         "step1d_mlb_lineups": mlb_lineups_result,
         "step5d_mlb_starter_snapshots": mlb_starter_snapshot_result,
+        "step5e_statcast_aggregates": statcast_aggregates_result,
         "step6_flat_forecast_and_log": flat_result,
         "step7_flat_settlement": flat_settlement,
         "step8_research_settlement": _research_settlement,

@@ -100,19 +100,20 @@ def evaluate_esports_eligibility(
     now: datetime | None = None,
     maximum_age_hours: float = 12,
     maximum_unreviewed_disagreement: float = 0.10,
+    ban_list: TeamBanList | None = None,
 ) -> EligibilityResult:
     """Standard eligibility gates for esports/soccer/KBO/NPB/tennis contracts
     without registry entities.
 
     These leagues' teams are not in the canonical registry, so entities are
-    name-based placeholder ``CanonicalTeam`` objects. Unlike
-    ``evaluate_eligibility``, there is deliberately no team-ban check here:
-    ``TeamBanList`` resolves through the canonical registry
-    (``bans.py``), which these leagues don't participate in, and no team
-    has ever actually been banned in any of them (removed the misleading
-    stub config sections 2026-08-02 rather than pretend this works --
-    building a real, registry-free ban mechanism for these leagues is a
-    separate, not-yet-scoped change). Every OTHER gate matches
+    name-based placeholder ``CanonicalTeam`` objects. ``ban_list`` is
+    optional and checked first when provided: registry-free sports ban
+    through the name-based fallback (``bans.py``'s ``_registry_free_check``,
+    which matches the raw team string against configured bans), closing the
+    2026-07-27 audit gap where no ban enforcement ever reached these
+    sports. Callers that do not thread a ban list through behave exactly as
+    before (no ban check) -- the forecast call sites must pass their
+    ``bans`` object to actually arm it. Every OTHER gate matches
     ``evaluate_eligibility``: model-state/origin, data staleness,
     provenance completeness, model/market disagreement, exposure caps, and
     the unit engine. Config may deliberately promote a title to
@@ -126,6 +127,23 @@ def evaluate_esports_eligibility(
     home = CanonicalTeam(
         request.home_team, request.league, request.home_team, request.home_team, True, None, None, ()
     )
+    if ban_list is not None:
+        for team in (away, home):
+            _, banned = ban_list.check(request.league, team.canonical_team_id)
+            if banned:
+                research = _research(request, away, home, NoCallReason.TEAM_BANNED, policy)
+                return EligibilityResult(
+                    research.record_type,
+                    research.decision,
+                    research.reason_code,
+                    research.units,
+                    research.confidence_score,
+                    research.edge,
+                    research.adjusted_edge,
+                    away,
+                    home,
+                    team,
+                )
     if request.model_state is ModelState.RETIRED:
         return _research(request, away, home, NoCallReason.MODEL_INELIGIBLE, policy)
     if (
@@ -165,6 +183,7 @@ def evaluate_gated_research_eligibility(
     now: datetime | None = None,
     maximum_age_hours: float = 12,
     maximum_unreviewed_disagreement: float = 0.10,
+    ban_list: TeamBanList | None = None,
 ) -> EligibilityResult:
     """Apply the complete invariant for a Gated Research row.
 
@@ -182,6 +201,7 @@ def evaluate_gated_research_eligibility(
         now=now,
         maximum_age_hours=maximum_age_hours,
         maximum_unreviewed_disagreement=maximum_unreviewed_disagreement,
+        ban_list=ban_list,
     )
     if eligibility.decision != "CALL":
         return eligibility

@@ -88,6 +88,20 @@ def _settle_all_unsettled(args, config, ledger) -> dict:
                 failures.append(result)
             continue
         leagues = _LEDGER_LEAGUE_TO_ESPN.get(row["league"], ())
+        if not leagues:
+            # Fail loudly instead of pending forever: a league with no ESPN
+            # result path can never settle through this branch (2026-07-27
+            # audit: a WORLD_CUP row would have stalled silently -- open
+            # forever, no error anywhere -- because the empty tuple can
+            # never match a result). League.WORLD_CUP stays retired-but-
+            # historical; any new league must be wired here deliberately.
+            failures.append(
+                {
+                    "pick_id": row["pick_id"],
+                    "reason": f"no ESPN result path for league {row['league']}",
+                }
+            )
+            continue
         game_day = start.astimezone(EASTERN).date().isoformat()
         match = _find_espn_result(espn, leagues, game_day, row)
         if match is None and row["league"] == "SOCCER":

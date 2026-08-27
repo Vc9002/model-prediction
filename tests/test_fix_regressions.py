@@ -28,6 +28,7 @@ from model_prediction.eligibility import (
     evaluate_esports_eligibility,
     evaluate_gated_research_eligibility,
 )
+from model_prediction.entities import CanonicalTeam
 from model_prediction.esports import NeutralElo, _fuzzy_match_team, _team_alias_index
 from model_prediction.features.base import FeatureStore
 from model_prediction.ledger import PickLedger
@@ -255,6 +256,40 @@ def test_esports_settlement_stays_pending_until_terminal_state(tmp_path, monkeyp
 
 
 # ------------------------------------------------------ esports eligibility
+
+
+class _StubBanList:
+    """Registry-free ban stub: bans whichever team names are in the set."""
+
+    def __init__(self, banned_teams: set[str]) -> None:
+        self.banned_teams = banned_teams
+
+    def check(self, league, team_input):
+        team = CanonicalTeam(team_input, league, team_input, team_input, True, None, None, ())
+        return team, team_input in self.banned_teams
+
+
+def test_esports_eligibility_ban_check_arms_only_when_ban_list_provided():
+    """2026-07-27 audit gap: registry-free sports never had ban enforcement.
+    evaluate_esports_eligibility now checks first when a ban_list is passed
+    (via bans.py's name-based registry-free fallback) and behaves exactly as
+    before when callers don't thread one through."""
+    request = _future_request()
+    result = evaluate_esports_eligibility(
+        request, Exposure(), UnitPolicy(), ban_list=_StubBanList({"Team Home"})
+    )
+    assert result.reason_code == "PAPER_CALL_TEAM_BANNED"
+
+    # The banned team must not become a qualified call even with full
+    # provenance; the other team is unaffected.
+    result = evaluate_esports_eligibility(
+        request, Exposure(), UnitPolicy(), ban_list=_StubBanList({"Nobody"})
+    )
+    assert result.record_type.value == "QUALIFIED_SHADOW_CALL"
+
+    # No ban_list at all: unchanged legacy behavior.
+    result = evaluate_esports_eligibility(_future_request(), Exposure(), UnitPolicy())
+    assert result.record_type.value == "QUALIFIED_SHADOW_CALL"
 
 
 def test_esports_eligibility_qualifies_only_with_full_provenance():
