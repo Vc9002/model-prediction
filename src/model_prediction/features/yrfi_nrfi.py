@@ -33,7 +33,13 @@ DEFAULT_SNAPSHOT_PATH = PROJECT_ROOT / "data/mlb_statsapi/game_snapshots.jsonl"
 
 # Pitcher 1st-inning shrinkage priors (sample sizes in starts/innings pitched)
 PITCHER_PRIOR_STARTS = 15.0
-LEAGUE_FIRST_INNING_RUN_RATE = 0.52  # average total runs per 1st inning (~0.26 per half-inning)
+# Empirical per-game total first-inning runs across the 6,683 real Stats API
+# snapshots (2024-2026): mean total 1.036 runs/game -- 0.470 in the away half,
+# 0.566 in the home half. The previous 0.52 value was the per-TEAM mean
+# mistaken for the per-GAME total (a 2x error); it inflated every starter
+# run-rate multiplier in compute_nrfi_features by ~2x and systematically
+# deflated p_nrfi. Half-inning priors derive from this constant as /2 = 0.518.
+LEAGUE_FIRST_INNING_RUN_RATE = 1.036
 LEAGUE_NRFI_PROBABILITY = 0.5106  # empirical historical baseline
 
 _PITCHER_FIRST_INNING_CACHE: dict[Path, dict[int, list[tuple[datetime, dict[str, float]]]]] = {}
