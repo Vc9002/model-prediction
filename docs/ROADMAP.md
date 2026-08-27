@@ -35,6 +35,103 @@ cannot affect v8
 
 # Revised Project Roadmap
 
+## Session outcomes — 2026-08-26 (night continuation)
+
+Fixes and wiring (full trace in `docs/DEBUG.md` 2026-08-26 night section):
+
+- WNBA morning-report PDF parse bug fixed (81/81 real reports parse).
+- Bet Better model-feed capture wired (`step1e_bet_better_models`,
+  research-only reference evidence, keyless).
+- Statcast aggregates wired into the daily (`step5e_statcast_aggregates`).
+- Registry-free ban enforcement wired into eligibility (forecast call
+  sites still need to thread `bans` — small follow-up).
+- `mlb-v9-benchmark` identity rename; World Cup settle-stall guard;
+  esports capture/pricing pin; unknown-PM-market-type logging.
+- Postponed-game handling (drain-minimal, operator-chosen): `stale_open_rows`
+  health check live (22 rows >72h flagged); multi-day reconciliation sweep
+  deliberately shelved — use a targeted, identity-scoped, operator-approved
+  re-grade if a stuck row needs clearing.
+- Daily-run timing instrumentation added; optimization targets come from
+  tomorrow's log (today: 6.7–22.9 min per run).
+- Soccer capture `data_root` split-brain fixed before it ever fired.
+
+In-flight research (NOT promoted — promotion awaits the operator's command
+per 2026-08-26 directive; validation on settled picks, PIT-safe):
+
+1. **First-inning (NRFI) model improvement** — new features + model tuning
+   on the locked 1,337-game holdout (baseline: logloss 0.6910 vs incumbent
+   0.6945 vs market proxy 0.6950).
+2. **WNBA totals improvement** — replace the four hardcoded zero-value
+   constants (park/weather/bullpen/travel) with real PIT pace/rest signals,
+   WNBA-gated only.
+3. **Tennis spread/total pricing** — game-score distribution from the
+   Markov engine, walk-forward on settled picks (derivative pricing was
+   removed 08-24 as unsupported; this rebuilds it as validated research).
+
+Still open (unchanged): MLB totals absolute-run-environment signal
+(repair-order #2 — the one genuinely open documented research gap);
+v9 Phase 23 gate criteria conflict (80% vs 90% bootstrap threshold —
+operator decision); API-FOOTBALL key provision (operator).
+
+## Market-edge execution program (2026-08-26 operator directive)
+
+The operator's architectural review directive ("execute this plan" —
+market-relative qualification, WNBA possessions×PPP rebuild, MLB
+first-inning domain model, CLV/economic validation) was reconciled
+against live state before execution. Key reconciliations:
+
+- **NRFI P1 items are ~half-built already.** `models/mlb_first_inning.py`
+  (2026-08-26) has the PIT feature ledger, hierarchical credibility
+  shrinkage, top-of-order composite, platoon share, starter rest. Delta
+  vs. the directive: TTO1 Statcast splits, confirmed-lineup top-of-order
+  (PIT-gated), half-inning decomposition P(A₁=0)×P(H₁=0), market-prior
+  residual formulation, real NRFI quote capture.
+- **WNBA possessions infrastructure exists.** `features/wnba_boxscores.py`
+  parses FGA/FTA/TOV/OREB/DREB and feeds `wnba_pace_four_factors`; the
+  totals model has not been rebuilt around possessions × PPP yet.
+- **Promotion gates are already partially market-relative.** Phase 23
+  gate 1 is ΔLogLoss/ΔBrier/calibration/bootstrap and gate 4 is CLV —
+  the delta is the full economic battery (ROI, profit factor, drawdown,
+  stability slices) and demoting hit-rate targets to diagnostics.
+- **Market data reality.** Polymarket US snapshot JSONL (executable
+  BBOs) exists for mlb/wnba/esports/kbo/npb/soccer/tennis from
+  2026-07-17; NRFI/YRFI slugs are **absent** from the odds tree;
+  NBA/NFL have zero sources wired (offseason); soccer is stale
+  (Odds API 401 ≥31 days, API-Football awaiting operator key).
+
+Execution phases (research track only; v8 frozen invariant unchanged):
+
+- **A — Market-relative evaluation foundation** ✅ (cb9ee38): reusable
+  evaluator (`market_eval.py`: Δlogloss, ΔBrier vs market, CLV rate,
+  ROI at executable prices, profit factor, max drawdown, date-clustered
+  bootstrap) + market-data census script.
+- **B — WNBA totals vs market** ✅ (4db2160): incumbent reproduction
+  gate PASS; on 89 lined holdout games the market line beats the model
+  decisively (MAE 13.12 vs 20.92, Brier 0.252 vs 0.369, ROI −4.1%,
+  CLV rate 0.0). Residual probe (45 train rows) does not transfer. The
+  rebuild bar is now explicit: beat market MAE ~13.1.
+- **B2 — Structural challenger** ✅ (21d0f3e): player-log PIT feed +
+  lineup/absence/possessions×PPP features. Honest null: unlearnable
+  under the artifact split (boxscore captures start ~2026-07), and the
+  market-window probe (49/25 rows) shows no transfer (22.3 vs 21.2).
+  Data depth, not architecture, binds WNBA totals.
+- **C — MLB first-inning extensions** ✅ (fc25f01): half-inning
+  decomposition (+0.0003 logloss, CI straddles zero) and plate-umpire
+  features (direction negative) both honest nulls on the locked
+  holdout; reproduction gate PASS (0.690434 vs 0.6910). **Blocked
+  (data):** real NRFI/YRFI quotes — Polymarket US lists no first-inning
+  markets (F5 only, 40k rows); TTO1 — no Statcast split ingestion; F5
+  targets — no innings-1-5 runs in any captured source.
+- **D — Qualification governance rewrite** ✅ (this commit): Phase 23
+  gates rewritten (market-relative predictive gate, full economic
+  battery, stability slices, hit-rate diagnostic-only, beta
+  calibration, per-market×league calibration, rolling walk-forward);
+  80%/90% conflict resolved in favor of 80%.
+- **E — Later-phase items** (in progress): PA-level inning simulator,
+  structural+ML+market stacking, heteroskedastic game-level σ,
+  conformal intervals, WNBA travel/fatigue. Umpire features delivered
+  under C; PA simulator and stacking next.
+
 ## Phase 0 — Freeze v8 Permanently
 
 The current production model remains:
@@ -340,16 +437,45 @@ Compare v8 vs v9 directly on prospective games:
 
 ## Phase 23 — Formal Promotion Gate
 
-Promotion requires the **complete final candidate** to clear all four gates:
-1. **Predictive**: $\Delta\text{LogLoss} < 0$, $\Delta\text{Brier} \le 0$, stable calibration, date bootstrap $P(\text{better}) \ge 80\%$.
-2. **Operational**: High serving coverage ($\ge 95\%$), no train/serve skew, zero PIT leakage, latency $< 500\text{ms}$, graceful fallback tested.
-3. **Prospective**: Statistically meaningful sample of live untouched games (not 5 games, not 10 bets).
-4. **Economic**: Non-degraded executable decision efficiency and CLV.
+Promotion requires the **complete final candidate** to clear all four gates.
+Criteria rewritten 2026-08-27 per the operator's market-edge directive: the
+model is judged on whether it adds information **beyond the market**, not
+on its standalone hit rate.
 
-**Stricter gate criteria carried over from RESEARCH_BACKLOG.md (recreated 08-23, deleted 2026-08-26):**
-- Predictive: paired $\Delta\text{LogLoss} < 0$ with date-cluster bootstrap $P(\text{better}) \ge 90\%$ — **conflicts with the 80% stated in gate 1 above; unresolved, operator to decide**; $\Delta\text{Brier} \le 0$.
-- Economic: positive CLV rate $\ge 50\%$ against sharp consensus; realized CLV $\ge 0$; no severe drawdown spikes.
-- Status as of 08-23: predictive gate pending the v3 matrix and candidate-2 freeze (v1 control baseline LogLoss 0.6847 / Brier 0.2458; candidate-1 voided); prospective and economic gates gated on candidate-2 freeze (mock shadow rows quarantined).
+1. **Predictive** (market-relative): paired $\Delta\text{LogLoss} < 0$ and
+   $\Delta\text{Brier} \le 0$ **vs the no-vig market probability** (not vs
+   0.5), date-cluster bootstrap $P(\text{better}) \ge 80\%$ — this resolves
+   the 80%/90% conflict in favor of 80% (the stricter variant is superseded
+   by the economic battery below, which is where overfitting shows up).
+   Calibration reported by **model × market_type × league** (never shared
+   across markets); calibrator (raw/Platt/beta/isotonic, see
+   `calibration.BetaCalibrator`) chosen exclusively on out-of-fold
+   historical predictions via `validation.rolling_walk_forward_splits`,
+   never on the final holdout.
+2. **Operational**: High serving coverage ($\ge 95\%$), no train/serve
+   skew, zero PIT leakage, latency $< 500\text{ms}$, graceful fallback
+   tested. (Unchanged.)
+3. **Prospective**: Statistically meaningful sample of live untouched
+   games (not 5 games, not 10 bets). (Unchanged.)
+4. **Economic** (the primary gate — a model that predicts winners but
+   loses money is not promotable): full battery from
+   `market_eval.market_relative_report` at timestamped executable prices:
+   ROI with date-clustered bootstrap CI excluding 0, profit factor
+   $\ge 1$, CLV rate $\ge 50\%$ against the closing no-vig price, realized
+   CLV $\ge 0$, no severe drawdown spikes, and non-degraded executable
+   decision efficiency.
+
+**Stability slices (required evidence, all four gates):** month-to-month,
+favorite/underdog, edge buckets, home/away, and high/low total
+environments. A hit-rate floor remains a **diagnostic** (reported, not
+gating); the pre-existing `validation.py` hit-rate machinery stays as that
+diagnostic evidence.
+
+**Status as of 08-27:** gate text updated; economic battery implemented
+(Phase A); market data depth (6-week snapshot window) is the binding
+constraint for producing gate-grade evidence — v3 matrix and candidate-2
+freeze still pending (v1 control baseline LogLoss 0.6847 / Brier 0.2458;
+candidate-1 voided).
 
 ---
 

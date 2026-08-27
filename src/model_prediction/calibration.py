@@ -251,6 +251,79 @@ class TemperatureCalibrator:
         return 1 / (1 + math.exp(-logit / self.temperature))
 
 
+class BetaCalibrator:
+    """Beta calibration (Kull et al. 2017): p -> BetaCDF(p; a, b).
+
+    Sports probabilities often distort asymmetrically (a model that is
+    overconfident on favorites only), which logistic calibration cannot
+    bend for — the beta family can. Parameters are fit by minimizing
+    logloss over the Beta CDF, exclusively on out-of-fold predictions
+    (never the locked holdout); falls back to identity below
+    ``minimum_sample`` like the Platt calibrator.
+    """
+
+    def __init__(self, a: float, b: float, metadata: CalibrationMetadata) -> None:
+        self.a = a
+        self.b = b
+        self.metadata = metadata
+
+    @classmethod
+    def fit(
+        cls,
+        probabilities: Sequence[float],
+        outcomes: Sequence[int],
+        base_model_version: str,
+        version: str = "beta-rolling-v1",
+        minimum_sample: int = 100,
+    ) -> BetaCalibrator | IdentityCalibrator:
+        if len(probabilities) != len(outcomes):
+            raise ValueError("probabilities and outcomes must have equal length")
+        if len(probabilities) < minimum_sample:
+            return IdentityCalibrator(base_model_version, f"{version}-identity-fallback")
+        from scipy.optimize import minimize
+        from scipy.stats import beta as beta_dist
+
+        clipped = [min(1 - 1e-9, max(1e-9, p)) for p in probabilities]
+        outcomes_f = [float(y) for y in outcomes]
+
+        def loss(params: Sequence[float]) -> float:
+            a, b = params
+            if a <= 0 or b <= 0:
+                return 1e12
+            calibrated = beta_dist.cdf(clipped, a, b)
+            calibrated = [min(1 - 1e-9, max(1e-9, p)) for p in calibrated]
+            return -sum(
+                y * math.log(p) + (1 - y) * math.log(1 - p)
+                for p, y in zip(calibrated, outcomes_f, strict=True)
+            ) / len(clipped)
+
+        result = minimize(
+            loss, x0=(2.0, 2.0), method="Nelder-Mead", options={"xatol": 1e-4, "fatol": 1e-6, "maxiter": 400}
+        )
+        a, b = float(result.x[0]), float(result.x[1])
+        raw = {
+            "method": "beta",
+            "version": version,
+            "base_model_version": base_model_version,
+            "a": round(a, 6),
+            "b": round(b, 6),
+            "sample_size": len(probabilities),
+        }
+        artifact_hash = hashlib.sha256(
+            json.dumps(raw, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        metadata = CalibrationMetadata(
+            "beta", version, base_model_version, None, None, len(probabilities), artifact_hash
+        )
+        return cls(a, b, metadata)
+
+    def transform(self, probability: float) -> float:
+        from scipy.stats import beta as beta_dist
+
+        clipped = min(1 - 1e-12, max(1e-12, probability))
+        return float(beta_dist.cdf(clipped, self.a, self.b))
+
+
 def calibration_metrics(
     probabilities: Sequence[float], outcomes: Sequence[int], minimum_sample: int = 30
 ) -> dict[str, object]:

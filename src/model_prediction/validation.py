@@ -540,6 +540,54 @@ def build_walk_forward_rows(
     return rows
 
 
+def rolling_walk_forward_splits(
+    rows: Sequence[ValidationRow],
+    *,
+    n_windows: int = 3,
+    train_fraction: float = 0.60,
+    validation_fraction: float = 0.20,
+) -> list[tuple[list[ValidationRow], list[ValidationRow], list[ValidationRow]]]:
+    """Rolling-origin walk-forward splits (the nested walk-forward structure).
+
+    Splits the unique dates into ``n_windows`` contiguous chronological
+    blocks. Window ``k`` uses block ``k`` as its test set and everything
+    strictly before it (split by the usual fractions over its own dates)
+    as train/validation — so hyperparameters, feature selection,
+    calibrators, and edge thresholds can all be chosen inside historical
+    folds while the newest block is only ever a final test. Windows whose
+    prior history has fewer than five distinct dates are skipped. Unlike
+    ``chronological_split``, the newest period is never mixed into any
+    train/validation cohort.
+    """
+    dates = sorted({row.date for row in rows})
+    if len(dates) < 5:
+        raise ValueError("rolling walk-forward requires at least five distinct game dates")
+    by_date: dict[str, list[ValidationRow]] = {}
+    for row in rows:
+        by_date.setdefault(row.date, []).append(row)
+
+    block_size = max(1, math.ceil(len(dates) / n_windows))
+    blocks = [dates[i : i + block_size] for i in range(0, len(dates), block_size)]
+
+    splits: list[tuple[list[ValidationRow], list[ValidationRow], list[ValidationRow]]] = []
+    for block in blocks:
+        prior_dates = [d for d in dates if d < block[0]]
+        if len(prior_dates) < 5:
+            continue
+        train_count = max(1, math.floor(len(prior_dates) * train_fraction))
+        val_count = max(1, math.floor(len(prior_dates) * validation_fraction))
+        train_dates = prior_dates[:train_count]
+        val_dates = prior_dates[train_count : train_count + val_count]
+        splits.append(
+            (
+                [row for d in train_dates for row in by_date[d]],
+                [row for d in val_dates for row in by_date[d]],
+                [row for d in block for row in by_date[d]],
+            )
+        )
+    return splits
+
+
 def chronological_split(
     rows: Sequence[ValidationRow],
     *,

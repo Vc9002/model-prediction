@@ -739,3 +739,39 @@ def test_minimum_detectable_effect():
     large = minimum_detectable_effect(n_samples=10000)
     assert large["is_powered_for_standard_edge"] is True
     assert large["mde_percentage"] < 2.0
+
+
+def _mk_rows(n_dates: int, per_date: int = 2):
+    from model_prediction.validation import ValidationRow
+
+    rows = []
+    for i in range(n_dates):
+        day = f"2026-{(i % 12) + 1:02d}-{(i % 28) + 1:02d}"
+        for j in range(per_date):
+            rows.append(ValidationRow(day, f"e{i}-{j}", (i + j) % 2, 0.5, 0, 1, 1, False, False))
+    return rows
+
+
+def test_rolling_walk_forward_splits_no_leakage():
+    from model_prediction.validation import rolling_walk_forward_splits
+
+    rows = _mk_rows(30)
+    splits = rolling_walk_forward_splits(rows, n_windows=3)
+    assert len(splits) >= 2
+    for train, val, test in splits:
+        assert train and val and test
+        # Every cohort strictly precedes the test block.
+        assert max(r.date for r in train) < min(r.date for r in test)
+        assert max(r.date for r in val) < min(r.date for r in test)
+    # The newest block is the final split's test set only.
+    newest = max(r.date for r in rows)
+    final_train, final_val, final_test = splits[-1]
+    assert newest in {r.date for r in final_test}
+    assert newest not in {r.date for r in final_train} | {r.date for r in final_val}
+
+
+def test_rolling_walk_forward_rejects_thin_history():
+    from model_prediction.validation import rolling_walk_forward_splits
+
+    with pytest.raises(ValueError):
+        rolling_walk_forward_splits(_mk_rows(3))
