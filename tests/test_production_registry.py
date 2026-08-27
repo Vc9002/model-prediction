@@ -99,8 +99,8 @@ def test_real_production_yaml_resolves_every_model() -> None:
     registry = ProductionModelRegistry.load(REPO)
 
     assert registry.schema_version == "3"
-    assert len(registry.entries) == 13
-    assert len(registry.available_entries()) == 13
+    assert len(registry.entries) == 17
+    assert len(registry.available_entries()) == 17
     assert registry.problem_entries() == []
     assert registry.primary.model_id == "wnba-elo-trend-lr-v4"
     assert registry.primary.artifact_hash
@@ -109,15 +109,15 @@ def test_real_production_yaml_resolves_every_model() -> None:
     assert mlb.rollback_model == "mlb-elo-trend-lr-v7"
     assert mlb.feature_schema_version == "1"
 
-    assert registry.champion("MLB", "total") is None
-    assert "measured-edge-totals-v3" in registry.blocked_workflows
-    assert "wnba-spread-margin-v1" in registry.blocked_workflows
-    # Phase-23 research challengers (NRFI half-inning/umpire, PA simulator,
-    # WNBA totals) must stay outside the served set — the count above is
-    # the enforcement: any accidental registration would move it off 13.
-    assert "wnba-total-margin-v1" in registry.blocked_workflows
+    assert registry.champion("MLB", "total").model_id == "measured-edge-totals-v3"
+    assert "measured-edge-totals-v3" not in registry.blocked_workflows
+    assert "wnba-spread-margin-v1" not in registry.blocked_workflows
+    # Phase-23 research challengers that remain genuinely unbuilt (NRFI) must
+    # stay outside the served set; MLB/WNBA spread+total were promoted this
+    # session (operator directive 2026-08-27, override on evidence quality).
+    assert "wnba-total-margin-v1" not in registry.blocked_workflows
     assert "mlb-nrfi-v1" in registry.blocked_workflows
-    assert registry.champion("WNBA", "total") is None
+    assert registry.champion("WNBA", "total").model_id == "wnba-total-margin-v1"
 
     soccer = registry.entries["soccer-poisson-dc-v1"]
     assert soccer.implementation == IMPLEMENTATION_CODE_BACKED

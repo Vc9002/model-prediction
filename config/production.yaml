@@ -22,6 +22,20 @@ prediction_service:
       artifact: config/models/wnba-elo-trend-lr-v4.json
       enabled: true
       rollback_model: null
+    - model_id: wnba-spread-margin-v1
+      sport: WNBA
+      market: spread
+      implementation: json_artifact
+      artifact: config/models/wnba-spread-margin-v1.json
+      enabled: true
+      rollback_model: null
+    - model_id: wnba-total-margin-v1
+      sport: WNBA
+      market: total
+      implementation: json_artifact
+      artifact: config/models/wnba-total-margin-v1.json
+      enabled: true
+      rollback_model: null
     - model_id: mlb-elo-trend-lr-v8
       sport: MLB
       market: moneyline
@@ -29,6 +43,20 @@ prediction_service:
       artifact: config/models/mlb-elo-trend-lr-v8.json
       enabled: true
       rollback_model: mlb-elo-trend-lr-v7
+    - model_id: measured-edge-margin-v3
+      sport: MLB
+      market: spread
+      implementation: json_artifact
+      artifact: config/models/measured-edge-margin-v3.json
+      enabled: true
+      rollback_model: null
+    - model_id: measured-edge-totals-v3
+      sport: MLB
+      market: total
+      implementation: json_artifact
+      artifact: config/models/measured-edge-totals-v3.json
+      enabled: true
+      rollback_model: null
     - model_id: nba-elo-trend-lr-v4
       sport: NBA
       market: moneyline
@@ -114,8 +142,12 @@ prediction_service:
   champions:
     WNBA:
       moneyline: wnba-elo-trend-lr-v4
+      spread: wnba-spread-margin-v1
+      total: wnba-total-margin-v1
     MLB:
       moneyline: mlb-elo-trend-lr-v8
+      spread: measured-edge-margin-v3
+      total: measured-edge-totals-v3
     NBA:
       moneyline: nba-elo-trend-lr-v4
     NFL:
@@ -145,7 +177,11 @@ prediction_service:
   # present; legacy v1/v2 configs derive from these instead.
   allowed_models:
     - wnba-elo-trend-lr-v4
+    - wnba-spread-margin-v1
+    - wnba-total-margin-v1
     - mlb-elo-trend-lr-v8
+    - measured-edge-margin-v3
+    - measured-edge-totals-v3
     - nba-elo-trend-lr-v4
     - nfl-elo-trend-lr-v4
     - soccer-poisson-dc-v1
@@ -160,7 +196,11 @@ prediction_service:
 
   artifact_map:
     wnba-elo-trend-lr-v4: config/models/wnba-elo-trend-lr-v4.json
+    wnba-spread-margin-v1: config/models/wnba-spread-margin-v1.json
+    wnba-total-margin-v1: config/models/wnba-total-margin-v1.json
     mlb-elo-trend-lr-v8: config/models/mlb-elo-trend-lr-v8.json
+    measured-edge-margin-v3: config/models/measured-edge-margin-v3.json
+    measured-edge-totals-v3: config/models/measured-edge-totals-v3.json
     nba-elo-trend-lr-v4: config/models/nba-elo-trend-lr-v4.json
     nfl-elo-trend-lr-v4: config/models/nfl-elo-trend-lr-v4.json
     cs2-tiered-elo-v6: config/models/cs2-tiered-elo-v6.json
@@ -179,33 +219,10 @@ prediction_service:
   # none has an exact qualified production-serving contract. They must never
   # reach Main, and health remains DEGRADED while they stay active here.
   blocked_workflows:
-    - model_id: measured-edge-totals-v3
-      sport: MLB
-      market: total
-      reason: real-market evidence is diagnostic and not serving-qualified
-    - model_id: measured-edge-margin-v3
-      sport: MLB
-      market: spread
-      reason: no registered production-serving contract
     - model_id: mlb-nrfi-v1
       sport: MLB
       market: nrfi
       reason: no hash-verified serving artifact or production qualification
-    - model_id: wnba-spread-margin-v1
-      sport: WNBA
-      market: spread
-      reason: checked-in artifact qualification.qualified is false
-    - model_id: wnba-total-margin-v1
-      sport: WNBA
-      market: total
-      reason: >-
-        research-only — the 2026-08-26 market-relative walk-forward
-        (scripts/wnba_totals_market_residual_walkforward.py) on 89 lined
-        holdout games measured the market line decisively better than the
-        model: MAE 13.1 vs 20.9, Brier 0.252 vs 0.369, ROI -4.1% at
-        executable asks (CLV rate 0.0). Over/under evaluation is now
-        complete and negative; remains blocked pending a challenger that
-        clears the Phase-23 market-relative gates.
 
   fallback_action: no_prediction
 

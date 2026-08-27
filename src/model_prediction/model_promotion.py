@@ -355,7 +355,9 @@ def main(argv: list[str] | None = None) -> int:
         print(
             "usage: python -m model_prediction.model_promotion "
             "{promote --new ID --sport S --market M --approved-by WHO "
-            "[--evidence ID] | rollback --sport S --market M | history [N]}",
+            "[--evidence ID] [--market-evidence ID | "
+            "--market-evidence-unavailable-reason TEXT] | "
+            "rollback --sport S --market M | history [N]}",
             file=sys.stderr,
         )
         return 2
@@ -374,6 +376,8 @@ def main(argv: list[str] | None = None) -> int:
                 new_model_id=new_id,
                 approved_by=approved,
                 evidence_id=_arg(args, "--evidence"),
+                market_evidence_id=_arg(args, "--market-evidence"),
+                market_evidence_unavailable_reason=_arg(args, "--market-evidence-unavailable-reason"),
             )
             print(json.dumps(record, indent=2))
             return 0
