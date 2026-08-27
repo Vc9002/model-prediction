@@ -329,7 +329,12 @@ def _logistic_calibration(
     x = [math.log(p / (1 - p)) for p in probabilities]
     a, b = 0.0, 1.0
     for _ in range(25):
-        fitted = [1 / (1 + math.exp(-(a + b * value))) for value in x]
+        # Exponents beyond +-50 are 0/1 at double precision, but IRLS can
+        # diverge toward them when the outcomes disagree hard with the
+        # probabilities (e.g. a 0.85 model losing most of its bets), and
+        # math.exp overflows past ~709. Clamp instead of crashing; the
+        # divergent a/b are still reported as the (useless) fit they are.
+        fitted = [1 / (1 + math.exp(-max(-50.0, min(50.0, a + b * value)))) for value in x]
         waa = sum(p * (1 - p) for p in fitted)
         wab = sum(p * (1 - p) * value for p, value in zip(fitted, x, strict=True))
         wbb = sum(p * (1 - p) * value * value for p, value in zip(fitted, x, strict=True))

@@ -112,3 +112,16 @@ def test_insufficient_sample_status():
 def test_no_vig_rejects_nonpositive_total():
     with pytest.raises(ValueError):
         no_vig(0.0, 0.0)
+
+
+def test_calibration_survives_high_probs_with_few_wins():
+    # Real failure shape from the WNBA market-residual harness: 89 bets at
+    # 0.72-0.95 that mostly lost. IRLS diverges toward a huge negative
+    # intercept and math.exp overflowed before the clamp in
+    # calibration._logistic_calibration.
+    from model_prediction.calibration import calibration_metrics
+
+    probs = [0.75 + 0.002 * i for i in range(89)]
+    outcomes = [1] * 25 + [0] * 64
+    report = calibration_metrics(probs, outcomes)
+    assert report["status"] == "ok"
