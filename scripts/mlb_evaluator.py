@@ -79,10 +79,11 @@ def verify_dataset_contract(manifest_path: Path, parquet_path: Path) -> tuple[di
 
     # 2. Verify split cohort event ID hashes and alignment
     cohorts_dir = manifest_path.parent.parent / "cohorts"
+    cohort_tag = manifest.get("cohort_tag", "v1")
     for split_name, key, filename in [
-        ("train", "train_event_ids_sha256", "train_event_ids_v1.json"),
-        ("validation", "validation_event_ids_sha256", "validation_event_ids_v1.json"),
-        ("research_test", "research_test_event_ids_sha256", "research_test_event_ids_v1.json"),
+        ("train", "train_event_ids_sha256", f"train_event_ids_{cohort_tag}.json"),
+        ("validation", "validation_event_ids_sha256", f"validation_event_ids_{cohort_tag}.json"),
+        ("research_test", "research_test_event_ids_sha256", f"research_test_event_ids_{cohort_tag}.json"),
     ]:
         cohort_file = cohorts_dir / filename
         if cohort_file.exists():
@@ -238,6 +239,90 @@ V9_FEATURE_SETS: dict[str, list[str]] = {
         "starter_kbb_gap",
         "bullpen_weakness_gap",
     ],
+    # v3 feature sets — the rebuilt feature table (2026-08-26). The prior
+    # sets above reference v1-column names that no longer exist in v3
+    # (park_factor/weather_factor/starter_era_gap/starter_kbb_gap/
+    # bullpen_weakness_gap/bullpen_fatigue_gap). v3_baseline is the v8-
+    # equivalent control built from v3 columns; the family rungs isolate
+    # one feature family at a time on top of it.
+    "v3_baseline": [
+        "elo_probability",
+        "trend_gap",
+        "park_factor_pit",
+        "rest_disparity",
+        "back_to_back_gap",
+    ],
+    "v3_starters": [
+        "elo_probability",
+        "trend_gap",
+        "park_factor_pit",
+        "rest_disparity",
+        "back_to_back_gap",
+        "starter_k_pct_gap",
+        "starter_bb_pct_gap",
+        "starter_k_bb_gap",
+        "starter_depth_gap",
+        "home_expected_starter_ip",
+        "away_expected_starter_ip",
+    ],
+    "v3_offense": [
+        "elo_probability",
+        "trend_gap",
+        "park_factor_pit",
+        "rest_disparity",
+        "back_to_back_gap",
+        "projected_woba_gap",
+        "projected_iso_gap",
+        "projected_k_pct_gap",
+        "projected_bb_pct_gap",
+        "home_projected_woba",
+        "away_projected_woba",
+    ],
+    "v3_bullpen": [
+        "elo_probability",
+        "trend_gap",
+        "park_factor_pit",
+        "rest_disparity",
+        "back_to_back_gap",
+        "bullpen_fip_advantage",
+        "bullpen_freshness_advantage",
+        "home_bullpen_effective_fip",
+        "away_bullpen_effective_fip",
+    ],
+    "v3_platoon": [
+        "elo_probability",
+        "trend_gap",
+        "park_factor_pit",
+        "rest_disparity",
+        "back_to_back_gap",
+        "platoon_woba_advantage",
+        "platoon_iso_advantage",
+    ],
+    "v3_full": [
+        "elo_probability",
+        "trend_gap",
+        "park_factor_pit",
+        "rest_disparity",
+        "back_to_back_gap",
+        "starter_k_pct_gap",
+        "starter_bb_pct_gap",
+        "starter_k_bb_gap",
+        "starter_depth_gap",
+        "home_expected_starter_ip",
+        "away_expected_starter_ip",
+        "projected_woba_gap",
+        "projected_iso_gap",
+        "projected_k_pct_gap",
+        "projected_bb_pct_gap",
+        "home_projected_woba",
+        "away_projected_woba",
+        "bullpen_fip_advantage",
+        "bullpen_freshness_advantage",
+        "home_bullpen_effective_fip",
+        "away_bullpen_effective_fip",
+        "platoon_woba_advantage",
+        "platoon_iso_advantage",
+    ],
 }
 
 
@@ -261,10 +346,12 @@ def main() -> int:
     parser.add_argument("--mode", choices=["v9_research", "v8_reproduction"], default="v9_research")
     parser.add_argument("--bootstrap", type=int, default=N_BOOTSTRAP)
     parser.add_argument("--out", default=str(PROJECT_ROOT / "outputs/research/mlb_evaluator/report.json"))
+    parser.add_argument("--parquet", type=Path, default=V9_PARQUET_PATH)
+    parser.add_argument("--manifest", type=Path, default=V9_MANIFEST_PATH)
     args = parser.parse_args()
 
     # Immutable dataset contract verification (NO silent fallback)
-    manifest, df = verify_dataset_contract(V9_MANIFEST_PATH, V9_PARQUET_PATH)
+    manifest, df = verify_dataset_contract(args.manifest, args.parquet)
     print(
         f"[evaluator] Dataset contract verified against manifest (sha256={manifest['dataset_sha256'][:12]}...)"
     )

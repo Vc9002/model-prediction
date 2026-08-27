@@ -23,6 +23,60 @@ from .starter_state import starter_state_matchup_gaps
 DEFAULT_SNAPSHOT_PATH = PROJECT_ROOT / "data/mlb_statsapi/game_snapshots.jsonl"
 
 
+def load_probable_starter_index(
+    snapshot_path: str | Path = DEFAULT_SNAPSHOT_PATH,
+) -> dict[tuple[str, str, str], dict[str, str]]:
+    """(start_utc[:16], home_team, away_team) -> probable starter names/throws.
+
+    The games files used by the feature-table builder (mlb_games_all.jsonl and
+    the walk-forward rows) carry no starter identity at all; the snapshot does
+    (``side.probable_pitcher_name``). This index uses the same crosswalk key
+    validation.py's ``_load_starter_era_map`` uses to join snapshots to games
+    (minute-level ``game_start_utc[:16]`` + full team names). Without it,
+    starter-state features never receive a name and fall back to league priors
+    for every game (DEBUG.md 2026-08-26). Later rows win so a game's last
+    captured snapshot (closest to first pitch) supplies the starter.
+    """
+    index: dict[tuple[str, str, str], dict[str, str]] = {}
+    path = Path(snapshot_path)
+    if not path.exists():
+        return index
+
+    def _probable(side: dict) -> tuple[str, str]:
+        pid = str(side.get("probable_pitcher_id") or "")
+        for p in side.get("players") or []:
+            if pid and str(p.get("player_id") or "") == pid:
+                return str(p.get("name") or ""), str(p.get("pitch_hand") or "R")
+        return str(side.get("probable_pitcher_name") or ""), "R"
+
+    import json
+
+    with path.open(encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            try:
+                snap = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            start = str(snap.get("game_start_utc") or "")[:16]
+            home = snap.get("home") or {}
+            away = snap.get("away") or {}
+            home_name = str(home.get("team_name") or "")
+            away_name = str(away.get("team_name") or "")
+            if not start or not home_name or not away_name:
+                continue
+            h_name, h_hand = _probable(home)
+            a_name, a_hand = _probable(away)
+            index[(start, home_name, away_name)] = {
+                "home_starter_name": h_name,
+                "home_starter_throws": h_hand if h_hand in ("L", "R") else "R",
+                "away_starter_name": a_name,
+                "away_starter_throws": a_hand if a_hand in ("L", "R") else "R",
+            }
+    return index
+
+
 @dataclass(slots=True)
 class MLBv9FeatureVector:
     """Complete unified point-in-time feature representation for an MLB matchup."""
@@ -135,7 +189,7 @@ def extract_mlb_v9_features(
         as_of=as_of,
         starter_k_pct_gap=starter_gaps.get("starter_k_pct_gap", 0.0),
         starter_bb_pct_gap=starter_gaps.get("starter_bb_pct_gap", 0.0),
-        starter_k_bb_gap=starter_gaps.get("starter_k_bb_gap", 0.0),
+        starter_k_bb_gap=starter_gaps.get("starter_k_minus_bb_pct_gap", 0.0),
         starter_depth_gap=starter_gaps.get("starter_depth_gap", 0.0),
         home_expected_starter_ip=starter_gaps.get("home_expected_starter_ip", 5.5),
         away_expected_starter_ip=starter_gaps.get("away_expected_starter_ip", 5.5),

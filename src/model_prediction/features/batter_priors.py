@@ -173,21 +173,37 @@ class PointInTimeBatterPriorEngine:
                     row = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                game_date = str(row.get("game_date") or row.get("official_date") or "")[:10]
+                # game_snapshots.jsonl keys the game date top-level as
+                # game_start_utc and nests the team under side.team_name;
+                # reading flat `game_date`/`home_team` keys here keyed every
+                # batter under an empty team id, leaving _team_history empty
+                # and every projected-offense/platoon query on league priors
+                # (DEBUG.md 2026-08-26: 6 dead v9 feature columns).
+                game_date = str(
+                    row.get("game_start_utc") or row.get("official_date") or row.get("game_date") or ""
+                )[:10]
                 for side in ("home", "away"):
-                    team_name = row.get(f"{side}_team", "")
-                    for p in row.get(f"{side}_batters", []):
+                    side_obj = row.get(side) if isinstance(row.get(side), dict) else {}
+                    team_name = str(side_obj.get("team_name") or row.get(f"{side}_team") or "")
+                    players = side_obj.get("players") or row.get(f"{side}_batters", [])
+                    for p in players:
                         pid = str(p.get("id") or p.get("player_id") or "")
                         if not pid:
                             continue
-                        pa = int(p.get("pa") or p.get("plateAppearances") or 0)
-                        ab = int(p.get("ab") or p.get("atBats") or pa)
-                        hits = int(p.get("hits") or p.get("h") or 0)
-                        doubles = int(p.get("doubles") or p.get("2b") or 0)
-                        triples = int(p.get("triples") or p.get("3b") or 0)
-                        hr = int(p.get("hr") or p.get("homeRuns") or 0)
-                        bb = int(p.get("bb") or p.get("baseOnBalls") or 0)
-                        so = int(p.get("so") or p.get("strikeOuts") or 0)
+                        # Real snapshot rows carry batting stats nested under
+                        # p["batting"]; keep the flat form for legacy fixtures.
+                        batting = p.get("batting")
+                        src = batting if isinstance(batting, dict) and batting else p
+                        pa = int(src.get("pa") or src.get("plateAppearances") or 0)
+                        ab = int(src.get("ab") or src.get("atBats") or pa)
+                        if pa == 0 and ab == 0:
+                            continue  # pitcher-only line, not a batter
+                        hits = int(src.get("hits") or src.get("h") or 0)
+                        doubles = int(src.get("doubles") or src.get("2b") or 0)
+                        triples = int(src.get("triples") or src.get("3b") or 0)
+                        hr = int(src.get("hr") or src.get("homeRuns") or 0)
+                        bb = int(src.get("bb") or src.get("baseOnBalls") or 0)
+                        so = int(src.get("so") or src.get("strikeOuts") or 0)
                         self.update_player_game(
                             BatterGameRecord(
                                 player_id=pid,

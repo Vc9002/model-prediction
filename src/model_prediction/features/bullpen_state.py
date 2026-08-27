@@ -445,7 +445,14 @@ class PointInTimeBullpenEngine:
                     side_obj = snap.get(side, {})
                     if not isinstance(side_obj, dict):
                         continue
-                    team_id = str(side_obj.get("team_id", ""))
+                    # The engine's public API keys teams by NAME
+                    # (evaluate_matchup("New York Yankees", ...) -- every
+                    # caller passes full team names). Keying appearances by
+                    # the numeric MLB Stats API team_id here made every
+                    # name-keyed lookup miss and every bullpen feature fall
+                    # back to the neutral league-prior vector
+                    # (DEBUG.md 2026-08-26: 5 dead v9 bullpen columns).
+                    team_id = str(side_obj.get("team_name") or side_obj.get("team_id") or "")
                     players = side_obj.get("players", [])
                     if not isinstance(players, list):
                         continue

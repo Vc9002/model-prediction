@@ -742,6 +742,8 @@ def match_executable_quote(
         "observed_at_utc": best.get("observed_at_utc"),
         "timestamp_valid": bool(best.get("timestamp_valid", False)),
         "provider": "polymarket_us",
+        "reconstructed": best.get("reconstructed"),
+        "usage": best.get("usage"),
     }
 
 
