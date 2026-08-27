@@ -59,6 +59,7 @@ from model_prediction.dashboard.common import (
     _unit_value_usd,
 )
 from model_prediction.dashboard.picks import (
+    _dedupe_contract_observations,
     _find_pick_by_id,
     _main_ledger_paths,
     _parse_research_picks,
@@ -373,32 +374,79 @@ def _decorate_pick(
         if slug:
             net = _net_position_quantity(slug, portfolio_history or _load_portfolio_history())
             position_closed = net is not None and abs(net) < 1e-6
-    display_units = (
-        _number(row.get("units")) or _number(row.get("research_score_units")) or _suggested_units(row) or 0
-    )
-    display_pnl = _number(row.get("pnl_units")) or _number(row.get("research_pnl_units"))
-    # Fallback: compute P&L from american_odds when research_pnl_units is
-    # absent. Confirmed 2026-08-01: this never fires against real data --
-    # every row settle() ever touches already has a real pnl_units/
-    # research_pnl_units -- it's a defensive net for malformed/legacy rows
-    # only. Deliberately NOT importing pricing.profit_units here (this file
-    # has zero dependencies on the model_prediction package by design, kept
-    # runnable standalone); this formula must instead be kept in exact sync
-    # with pricing.profit_units by hand -- see
-    # tests/test_dashboard_server.py's
-    # test_pnl_fallback_formula_matches_pricing_profit_units, which fails
-    # loudly if the two ever diverge.
-    if display_pnl == 0 and row.get("result") in ("win", "loss") and row.get("american_odds"):
-        try:
-            odds = int(row["american_odds"])
-            if odds > 0:
-                display_pnl = display_units * odds / 100
+    ledger_units = _number(row.get("units"), None)
+    research_units = _number(row.get("research_score_units"), None)
+    if ledger_units is not None and ledger_units > 0:
+        display_units = ledger_units
+    elif research_units is not None and research_units > 0:
+        display_units = research_units
+    elif str(row.get("status") or "").lower() != "settled":
+        display_units = _suggested_units(row) or 0
+    elif ledger_units is not None:
+        display_units = ledger_units
+    else:
+        display_units = 0
+    ledger_pnl = _number(row.get("pnl_units"), None)
+    research_pnl = _number(row.get("research_pnl_units"), None)
+    if (row.get("result") == "push" and ledger_pnl is not None) or (
+        ledger_units is not None and ledger_units > 0
+    ):
+        display_pnl = ledger_pnl
+    elif research_units is not None and research_units > 0:
+        display_pnl = research_pnl
+    else:
+        display_pnl = None
+    # Recorded settlement is authoritative, including a legitimate 0.0 push.
+    # This fallback exists only for malformed legacy rows. It uses immutable
+    # decision-time prices and never a current quote, which would rewrite history.
+    if display_pnl is None and row.get("result") in ("win", "loss"):
+        effective_units = ledger_units if ledger_units is not None and ledger_units > 0 else research_units
+        if effective_units is not None and effective_units > 0:
+            sportsbook = str(row.get("sportsbook") or "").strip().lower()
+            if sportsbook in {"kalshi", "polymarket", "polymarket_us", "prediction_market"}:
+                entry_price = _number(
+                    row.get("decision_raw_implied_probability") or row.get("market_implied_probability"),
+                    None,
+                )
+                if entry_price is None and filled_entry:
+                    entry_price = _number(filled_entry.get("price"), None)
+                if entry_price is not None and 0 < entry_price < 1:
+                    display_pnl = (
+                        effective_units * (1.0 / entry_price - 1.0)
+                        if row["result"] == "win"
+                        else -effective_units
+                    )
             else:
-                display_pnl = display_units * 100 / abs(odds)
-            if row["result"] == "loss":
-                display_pnl = -display_units
-        except (ValueError, TypeError):
-            pass
+                decimal_odds = _number(
+                    row.get("decision_decimal_odds") or row.get("decimal_odds"),
+                    None,
+                )
+                if decimal_odds is None and row.get("american_odds") is not None:
+                    odds = _number(row.get("american_odds"), None)
+                    if odds is not None and odds != 0:
+                        decimal_odds = 1 + (odds / 100 if odds > 0 else 100 / abs(odds))
+                if decimal_odds is not None and decimal_odds > 1:
+                    display_pnl = (
+                        effective_units * (decimal_odds - 1.0) if row["result"] == "win" else -effective_units
+                    )
+            if display_pnl is not None:
+                display_pnl = round(display_pnl, 4)
+    binary_settled = str(row.get("status") or "").lower() == "settled" and row.get("result") in {
+        "win",
+        "loss",
+    }
+    performance_scored = bool(binary_settled and display_units > 0 and display_pnl is not None)
+    if performance_scored:
+        economics_status = "scored"
+    elif binary_settled and (
+        row.get("reason_code") == "NO_CALL_MARKET_PRICE_UNAVAILABLE"
+        or str(row.get("sportsbook") or "").lower() == "market_unavailable"
+    ):
+        economics_status = "unscored_no_price"
+    elif binary_settled:
+        economics_status = "unscored_no_basis"
+    else:
+        economics_status = "not_applicable"
     return {
         **row,
         # Preserve ledger facts in the API. A Research NO_CALL must remain
@@ -406,6 +454,8 @@ def _decorate_pick(
         # the dashboard can calculate a hypothetical display size.
         "display_units": display_units,
         "display_pnl_units": display_pnl,
+        "performance_scored": performance_scored,
+        "economics_status": economics_status,
         "quote": quote,
         "order": order,
         "filled_entry": filled_entry,
@@ -443,14 +493,8 @@ def _pick_identity(row: dict) -> tuple[str, ...]:
 
 
 def _dedupe_picks(rows: list[dict]) -> list[dict]:
-    """Keep the latest ledger observation for each actual bet shown in the UI."""
-    latest: dict[tuple[str, ...], tuple[str, int, dict]] = {}
-    for index, row in enumerate(rows):
-        rank = (str(row.get("created_at_utc") or ""), index, row)
-        key = _pick_identity(row)
-        if key not in latest or rank[:2] >= latest[key][:2]:
-            latest[key] = rank
-    return [item[2] for item in sorted(latest.values(), key=lambda item: item[1])]
+    """Keep one verified-pregame observation for each actual UI contract."""
+    return _dedupe_contract_observations(rows)
 
 
 def dashboard_picks() -> list[dict]:
@@ -926,6 +970,10 @@ def _action_command(name: str, payload: dict) -> list[str]:
         return [sys.executable, "-m", "model_prediction.run_supervisor", "run", "daily"]
     if name == "flat_forecast":
         return cli + ["flat-forecast", "--all", "--date", str(payload.get("date") or _today()), "--log"]
+    if name == "v9_forecast":
+        return [sys.executable, "scripts/forecast_mlb_v9_benchmark.py"]
+    if name == "v9_settle":
+        return [sys.executable, "scripts/forecast_mlb_v9_benchmark.py", "--settle"]
     if name == "main_forecast":
         # Same command as Step 3 of run_daily.sh: MLB/WNBA -> picks.xlsx,
         # esports/soccer/KBO/NPB -> separate per-sport research and gated

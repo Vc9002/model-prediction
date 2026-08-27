@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -12,7 +13,8 @@ import yaml
 
 from model_prediction.production_canary import _compute_artifact_hash
 from model_prediction.run_supervisor import RunSupervisor
-from model_prediction.system_health import system_health
+from model_prediction.runtime_paths import RuntimePaths
+from model_prediction.system_health import _ledger_economics, _stale_open_rows, system_health
 
 
 def _iso_days_ago(days: float) -> str:
@@ -208,6 +210,44 @@ def test_non_normalized_stored_probabilities_are_down(tmp_path: Path) -> None:
     assert any("not normalized" in r for r in report["reasons"])
 
 
+def test_ledger_economics_flags_settled_result_without_scoring_basis(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    paths = RuntimePaths(repo_root=repo, runtime_root=repo / "data")
+    paths.ledgers_db.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(paths.ledgers_db)
+    connection.execute(
+        """CREATE TABLE ledger_records (
+        ledger_tier TEXT, sport TEXT, pick_id TEXT, status TEXT, result TEXT,
+        units REAL, pnl_units REAL, decision_payload_json TEXT)"""
+    )
+    connection.execute(
+        "INSERT INTO ledger_records VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "flat",
+            "mlb",
+            "zero-paper-pnl",
+            "settled",
+            "win",
+            0.0,
+            0.0,
+            json.dumps(
+                {
+                    "record_type": "RESEARCH_OBSERVATION",
+                    "reason_code": "NO_CALL_BELOW_LEARNED_CONFIDENCE",
+                }
+            ),
+        ),
+    )
+    connection.commit()
+    connection.close()
+
+    check = _ledger_economics(paths)
+
+    assert check["semantic_errors"] == 1
+    assert check["unscored_results"] == 1
+    assert check["examples"][0]["pick_id"] == "zero-paper-pnl"
+
+
 def test_stale_prediction_degrades(tmp_path: Path) -> None:
     repo = _make_repo(tmp_path)
     _seed_prediction_state(repo, minutes_ago=300)  # max_data_age_minutes=120
@@ -268,6 +308,27 @@ def test_broken_registry_primary_is_down(tmp_path: Path) -> None:
     assert any("registry failed to load" in r for r in report["reasons"])
 
 
+def test_explicitly_blocked_active_workflow_degrades_health(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    config_path = repo / "config" / "production.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["prediction_service"]["blocked_workflows"] = [
+        {
+            "model_id": "research-total-v1",
+            "sport": "WNBA",
+            "market": "total",
+            "reason": "no exact serving artifact",
+        }
+    ]
+    _write_yaml(config_path, config)
+
+    report = system_health(repo_root=repo, runtime_root=repo / "data")
+
+    assert report["status"] == "DEGRADED"
+    assert "research-total-v1" in report["checks"]["registry"]["blocked_workflows"]
+    assert any("explicitly blocked" in reason for reason in report["reasons"])
+
+
 def test_clv_health_monitoring_and_alerting(tmp_path: Path, monkeypatch) -> None:
     from unittest.mock import Mock
 
@@ -291,3 +352,143 @@ def test_clv_health_monitoring_and_alerting(tmp_path: Path, monkeypatch) -> None
     assert report["status"] == "DEGRADED"
     assert any("Rolling 30-day CLV negative" in r for r in report["reasons"])
     assert mock_notify.called
+
+
+def test_stale_open_rows_counts_and_degrades_health(tmp_path: Path) -> None:
+    """The postponed/rescheduled-game watcher (2026-08-26): open rows far
+    past their frozen start are counted from the canonical ledger -- pure
+    read, zero network -- and rows stuck >72h degrade health so the
+    settlement gap can never go silent again."""
+    repo = _make_repo(tmp_path)
+    paths = RuntimePaths(repo_root=repo, runtime_root=repo / "data")
+    paths.ledgers_db.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(paths.ledgers_db)
+    connection.execute(
+        """CREATE TABLE ledger_records (
+        pick_id TEXT, operation_id TEXT, ledger_tier TEXT, sport TEXT,
+        event_id TEXT, canonical_event_id TEXT, event_start_utc TEXT,
+        market_type TEXT, selection TEXT, line REAL,
+        model_id TEXT, model_artifact_hash TEXT, market_snapshot_hash TEXT,
+        market_snapshot_archive_path TEXT, market_snapshot_record_id TEXT,
+        feature_schema_version TEXT,
+        model_probability REAL, market_probability REAL,
+        edge REAL, confidence REAL, units REAL, decision TEXT, reason_code TEXT,
+        status TEXT, result TEXT, pnl_units REAL,
+        created_at_utc TEXT, settled_at_utc TEXT,
+        decision_payload_json TEXT, feature_payload_json TEXT)"""
+    )
+    stale = (_iso_days_ago(4),)
+    fresh = (_iso_days_ago(0.1),)
+    rows = [
+        (
+            "stale-1",
+            "op1",
+            "research",
+            "tennis",
+            "e1",
+            None,
+            stale[0],
+            "moneyline",
+            "A",
+            None,
+            "m",
+            "h",
+            None,
+            None,
+            None,
+            None,
+            0.5,
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            "CALL",
+            None,
+            "open",
+            None,
+            None,
+            None,
+            None,
+            "{}",
+            "{}",
+        ),
+        (
+            "stale-2",
+            "op2",
+            "research",
+            "kbo",
+            "e2",
+            None,
+            stale[0],
+            "moneyline",
+            "A",
+            None,
+            "m",
+            "h",
+            None,
+            None,
+            None,
+            None,
+            0.5,
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            "CALL",
+            None,
+            "open",
+            None,
+            None,
+            None,
+            None,
+            "{}",
+            "{}",
+        ),
+        (
+            "fresh-1",
+            "op3",
+            "flat",
+            "mlb",
+            "e3",
+            None,
+            fresh[0],
+            "moneyline",
+            "A",
+            None,
+            "m",
+            "h",
+            None,
+            None,
+            None,
+            None,
+            0.5,
+            0.5,
+            0.0,
+            0.0,
+            0.0,
+            "CALL",
+            None,
+            "open",
+            None,
+            None,
+            None,
+            None,
+            "{}",
+            "{}",
+        ),
+    ]
+    connection.executemany(
+        "INSERT INTO ledger_records VALUES (" + ",".join(["?"] * 30) + ")",
+        rows,
+    )
+    connection.commit()
+    connection.close()
+
+    check = _stale_open_rows(paths)
+    assert check["open_over_24h"] == 2
+    assert check["open_over_72h"] == 2
+    assert check["by_sport"] == {"tennis": 1, "kbo": 1}
+    assert {row["pick_id"] for row in check["samples"]} == {"stale-1", "stale-2"}
+
+    report = system_health(repo_root=repo, runtime_root=repo / "data")
+    assert any("more than 72h past" in reason for reason in report["reasons"])

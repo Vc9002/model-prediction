@@ -100,19 +100,20 @@ def evaluate_esports_eligibility(
     now: datetime | None = None,
     maximum_age_hours: float = 12,
     maximum_unreviewed_disagreement: float = 0.10,
+    ban_list: TeamBanList | None = None,
 ) -> EligibilityResult:
     """Standard eligibility gates for esports/soccer/KBO/NPB/tennis contracts
     without registry entities.
 
     These leagues' teams are not in the canonical registry, so entities are
-    name-based placeholder ``CanonicalTeam`` objects. Unlike
-    ``evaluate_eligibility``, there is deliberately no team-ban check here:
-    ``TeamBanList`` resolves through the canonical registry
-    (``bans.py``), which these leagues don't participate in, and no team
-    has ever actually been banned in any of them (removed the misleading
-    stub config sections 2026-08-02 rather than pretend this works --
-    building a real, registry-free ban mechanism for these leagues is a
-    separate, not-yet-scoped change). Every OTHER gate matches
+    name-based placeholder ``CanonicalTeam`` objects. ``ban_list`` is
+    optional and checked first when provided: registry-free sports ban
+    through the name-based fallback (``bans.py``'s ``_registry_free_check``,
+    which matches the raw team string against configured bans), closing the
+    2026-07-27 audit gap where no ban enforcement ever reached these
+    sports. Callers that do not thread a ban list through behave exactly as
+    before (no ban check) -- the forecast call sites must pass their
+    ``bans`` object to actually arm it. Every OTHER gate matches
     ``evaluate_eligibility``: model-state/origin, data staleness,
     provenance completeness, model/market disagreement, exposure caps, and
     the unit engine. Config may deliberately promote a title to
@@ -126,6 +127,23 @@ def evaluate_esports_eligibility(
     home = CanonicalTeam(
         request.home_team, request.league, request.home_team, request.home_team, True, None, None, ()
     )
+    if ban_list is not None:
+        for team in (away, home):
+            _, banned = ban_list.check(request.league, team.canonical_team_id)
+            if banned:
+                research = _research(request, away, home, NoCallReason.TEAM_BANNED, policy)
+                return EligibilityResult(
+                    research.record_type,
+                    research.decision,
+                    research.reason_code,
+                    research.units,
+                    research.confidence_score,
+                    research.edge,
+                    research.adjusted_edge,
+                    away,
+                    home,
+                    team,
+                )
     if request.model_state is ModelState.RETIRED:
         return _research(request, away, home, NoCallReason.MODEL_INELIGIBLE, policy)
     if (
@@ -165,6 +183,7 @@ def evaluate_gated_research_eligibility(
     now: datetime | None = None,
     maximum_age_hours: float = 12,
     maximum_unreviewed_disagreement: float = 0.10,
+    ban_list: TeamBanList | None = None,
 ) -> EligibilityResult:
     """Apply the complete invariant for a Gated Research row.
 
@@ -182,6 +201,7 @@ def evaluate_gated_research_eligibility(
         now=now,
         maximum_age_hours=maximum_age_hours,
         maximum_unreviewed_disagreement=maximum_unreviewed_disagreement,
+        ban_list=ban_list,
     )
     if eligibility.decision != "CALL":
         return eligibility
@@ -228,8 +248,8 @@ def _downgrade_research_call(
     units = edge_scaled_units(request.model_probability, uncertainty, request.american_odds, policy)
     return EligibilityResult(
         RecordType.RESEARCH_OBSERVATION,
-        "NO_CALL",
-        reason_code,
+        "CALL",
+        _paper_call_reason(reason_code),
         units,
         eligibility.confidence_score,
         eligibility.edge,
@@ -283,14 +303,12 @@ def _research(
     reason: NoCallReason,
     policy: UnitPolicy,
 ) -> EligibilityResult:
-    """NO_CALL for reasons where the decision itself can't be trusted (banned
-    team, stale/missing data, unvalidated model). These still get logged as
-    real Research/Gated-Research rows, and every logged pick carries a real,
-    model-derived paper size (operator directive, 2026-07-31: "every pick
-    should have units and pnl, hard code this") -- with one exception: a
-    banned team is never sized, paper or real, regardless of model opinion
-    (matches ledger._append_record's dedicated call_type="no_call" handling
-    for NO_CALL_TEAM_BANNED).
+    """Create a research-only paper CALL for an untrusted decision.
+
+    Trust failures still prevent execution because ``record_type`` remains
+    ``RESEARCH_OBSERVATION``. They no longer produce a NO_CALL or zero-unit
+    row: the operator's universal-ledger contract requires every stored
+    prediction to carry a model-derived paper size and settle P&L.
     """
     uncertainty = request.model_uncertainty or 0
     recommendation = recommend_units(
@@ -301,19 +319,58 @@ def _research(
         policy,
         validated_model=False,
     )
-    units = (
-        0.0
-        if reason is NoCallReason.TEAM_BANNED
-        else edge_scaled_units(request.model_probability, uncertainty or 0.05, request.american_odds, policy)
+    units = edge_scaled_units(
+        request.model_probability,
+        uncertainty or 0.05,
+        request.american_odds,
+        policy,
     )
     return EligibilityResult(
         RecordType.RESEARCH_OBSERVATION,
-        "NO_CALL",
-        reason.value,
+        "CALL",
+        _paper_call_reason(reason.value),
         units,
         recommendation.confidence_score,
         recommendation.edge,
         recommendation.adjusted_edge,
         away,
         home,
+    )
+
+
+def _paper_call_reason(reason_code: str) -> str:
+    if reason_code.startswith("NO_CALL_"):
+        return "PAPER_CALL_" + reason_code.removeprefix("NO_CALL_")
+    return reason_code
+
+
+def enforce_universal_paper_call(
+    request: PickRequest,
+    eligibility: EligibilityResult,
+    policy: UnitPolicy | None = None,
+) -> EligibilityResult:
+    """Normalize every persisted prediction to CALL + positive paper units.
+
+    The record type is deliberately preserved: research observations remain
+    ineligible for execution even though their paper decision is a CALL.
+    """
+    units = eligibility.units
+    if units <= 0:
+        units = edge_scaled_units(
+            request.model_probability,
+            request.model_uncertainty or 0.05,
+            request.american_odds,
+            policy or UnitPolicy(),
+        )
+    return EligibilityResult(
+        eligibility.record_type,
+        "CALL",
+        _paper_call_reason(eligibility.reason_code),
+        units,
+        eligibility.confidence_score,
+        eligibility.edge,
+        eligibility.adjusted_edge,
+        eligibility.away_team,
+        eligibility.home_team,
+        eligibility.banned_team,
     )

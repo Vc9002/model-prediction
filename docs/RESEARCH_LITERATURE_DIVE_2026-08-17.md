@@ -5,7 +5,7 @@
 prediction modeling and map each to THIS system — what we already do,
 what we're missing, and where the adoption slots into the existing plans
 (`docs/V9_RESEARCH_PLAN.md`, `docs/POST_MLB_RESEARCH_PLANS.md`,
-`docs/RESEARCH_BACKLOG.md`). Findings are synthesized, not copied;
+`docs/ROADMAP.md`). Findings are synthesized, not copied;
 sources are cited for verification.
 
 ---

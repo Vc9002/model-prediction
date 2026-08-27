@@ -31,14 +31,14 @@ When this variable is not set, the system falls back to `<repo_root>/data`.
 
 ## Scheduler
 
-| Job                        | Label                               | Interval |
-| -------------------------- | ----------------------------------- | -------- |
-| Production prediction      | `com.modelprediction.production`    | 3 hours  |
-| Rebuild shadow             | `com.modelprediction.rebuild-shadow`| 3 hours  |
+The combined `com.modelprediction.daily` worker runs once at 08:30 local time.
+It settles open picks first and then produces the day's unified forecasts.
 
-Both jobs fire every 10,800 seconds. The production prediction job queries the
-canary model and writes results; the rebuild shadow job runs the existing
-research/shadow pipeline as a companion.
+The separate `com.modelprediction.production` and
+`com.modelprediction.rebuild-shadow` launchd jobs are disabled. Their commands
+remain available for explicit manual use, but they do not run automatically.
+This avoids duplicate forecast work and continuous research rebuilds on a
+battery-powered workstation.
 
 ## Execution Policy
 

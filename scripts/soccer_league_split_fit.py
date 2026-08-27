@@ -1,4 +1,4 @@
-"""Fit per-league Poisson-Dixon-Coles parameters (docs/RESEARCH_BACKLOG.md P2).
+"""Fit per-league Poisson-Dixon-Coles parameters (docs/ROADMAP.md — per-league soccer directives).
 
 For each of the six named leagues (EPL, LA_LIGA, BUNDESLIGA, SERIE_A, MLS,
 UCL -- backlog's own priority order), using ONLY that league's own

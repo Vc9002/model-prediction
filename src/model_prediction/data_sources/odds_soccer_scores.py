@@ -1,5 +1,10 @@
 """Collect soccer scores from The Odds API (free tier, last 3 days).
 Appends to the existing historical soccer JSONL file.
+
+DORMANT since 2026-08-26: the daily pipeline's step1b_soccer_scores uses
+api_football.py as its primary soccer results source (The Odds API has been
+401 for 31+ days). This module is kept as a still-tested fallback and must
+not be re-wired as the primary path without an explicit decision.
 """
 
 from __future__ import annotations

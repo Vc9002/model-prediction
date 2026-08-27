@@ -13,9 +13,17 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+import httpx
+
+from model_prediction import forward as forward_module
 from model_prediction.data_sources.mlb_market_odds import MarketSideQuote, MLBGameOdds
 from model_prediction.domain import MarketType
-from model_prediction.forward import MLBForwardCandidate, _paired_event_candidates, _teams
+from model_prediction.forward import (
+    MLBForwardCandidate,
+    _paired_event_candidates,
+    _teams,
+    build_mlb_slate,
+)
 from model_prediction.models.base import ScoreSimulation
 from model_prediction.models.mlb import (
     MarginModelOutput,
@@ -289,3 +297,136 @@ def test_mlb_forward_candidate_is_frozen_and_carries_full_provenance() -> None:
     assert moneyline.calibration_version == "identity-v1"
     assert moneyline.sportsbook == "polymarket_us"
     assert moneyline.observed_at_utc == "2026-07-01T20:00:00Z"
+
+
+def _scheduled_event(event_id: str) -> dict:
+    return {
+        "id": event_id,
+        "date": "2026-07-01T23:00:00Z",
+        "competitions": [
+            {
+                "competitors": [
+                    {"homeAway": "home", "team": {"displayName": "Home Team"}},
+                    {"homeAway": "away", "team": {"displayName": "Away Team"}},
+                ]
+            }
+        ],
+    }
+
+
+class _FakeESPNClient:
+    """Stands in for ESPNMLBClient: no real HTTP, one call per event id."""
+
+    def __init__(self, event_ids: list[str], failing_event_ids: set[str]) -> None:
+        self._event_ids = event_ids
+        self._failing_event_ids = failing_event_ids
+        self.reconstructed_calls: list[str] = []
+
+    def scoreboard(self, game_date: str) -> dict:
+        return {"events": [_scheduled_event(event_id) for event_id in self._event_ids]}
+
+    def reconstructed_features(self, event: dict):
+        event_id = str(event["id"])
+        self.reconstructed_calls.append(event_id)
+        if event_id in self._failing_event_ids:
+            raise httpx.ReadTimeout("simulated ESPN timeout")
+        from model_prediction.models.mlb import MLBGameFeatures, PitcherForm, TeamForm
+
+        team_form = TeamForm(runs_scored=(4, 5, 3), runs_allowed=(3, 4, 5), wins=10, losses=10)
+        pitcher_form = PitcherForm(
+            player_id="1",
+            name="Fake Pitcher",
+            throwing_hand="R",
+            starts_before_game=15,
+            season_innings=90.0,
+            season_earned_runs=40,
+            season_strikeouts=80,
+            season_walks=25,
+            season_batters_faced=380,
+            last_five_innings=28.0,
+            last_five_earned_runs=12,
+            last_five_strikeouts=25,
+            last_five_walks=8,
+            last_five_batters_faced=115,
+        )
+        return MLBGameFeatures(
+            event_id=event_id,
+            event_start_utc="2026-07-01T23:00:00Z",
+            decision_timestamp_utc="2026-07-01T20:00:00Z",
+            away_team="Away Team",
+            home_team="Home Team",
+            away_form=team_form,
+            home_form=team_form,
+            away_starter=pitcher_form,
+            home_starter=pitcher_form,
+        )
+
+
+class _FakeOddsFeed:
+    def load(self, game_date: str) -> None:
+        return None
+
+    def for_game(self, event_id: str, event_start_utc: str, away_team: str, home_team: str) -> MLBGameOdds:
+        return _odds_snapshot()
+
+
+def test_build_mlb_slate_skips_event_on_network_timeout_without_crashing_others(monkeypatch) -> None:
+    # A single ESPN timeout used to propagate uncaught out of
+    # build_mlb_slate and abort the whole slate -- every other event on
+    # the day's schedule lost its forecast too (real 2026-08-23 incident).
+    client = _FakeESPNClient(event_ids=["1", "2", "3"], failing_event_ids={"2"})
+
+    class _FakePredictModel:
+        def predict(self, features, line):
+            return object()
+
+    monkeypatch.setattr(forward_module, "MeasuredEdgeMarginModel", lambda *a, **k: _FakePredictModel())
+    monkeypatch.setattr(forward_module, "MeasuredEdgeTotalsModel", lambda *a, **k: _FakePredictModel())
+    monkeypatch.setattr(
+        forward_module,
+        "_paired_event_candidates",
+        lambda event, *a, **k: [
+            MLBForwardCandidate(
+                event_id=str(event["id"]),
+                event_start_utc="2026-07-01T23:00:00Z",
+                away_team="Away Team",
+                home_team="Home Team",
+                market_type=MarketType.TOTAL,
+                selection="over",
+                line=8.5,
+                sportsbook="polymarket_us",
+                american_odds=-110,
+                raw_probability=0.55,
+                shrunk_probability=0.55,
+                no_vig_probability=0.55,
+                uncertainty=0.4,
+                rationale="",
+                risks="",
+                observed_at_utc="2026-07-01T20:00:00Z",
+                model_name="measured-edge-fake",
+                model_version="measured-edge-fake-v1",
+                model_artifact_hash="fakehash",
+                calibration_version="identity-v1",
+                feature_schema_version="1",
+                market_snapshot_hash="snaphash",
+            )
+        ],
+    )
+
+    candidates, skipped, scheduled = build_mlb_slate(
+        "2026-07-01",
+        client,
+        spec=None,
+        margin_model_path="unused",
+        totals_model_path="unused",
+        observed_at=datetime(2026, 7, 1, 20, tzinfo=UTC),
+        odds_feed=_FakeOddsFeed(),
+    )
+
+    assert scheduled == 3
+    assert {c.event_id for c in candidates} == {"1", "3"}
+    assert [s["event_id"] for s in skipped] == ["2"]
+    assert "simulated ESPN timeout" in skipped[0]["reason"]
+    # All three events still had their features fetched -- the failure
+    # was isolated to event 2, not lost along with the others.
+    assert set(client.reconstructed_calls) == {"1", "2", "3"}

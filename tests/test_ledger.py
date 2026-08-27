@@ -126,6 +126,69 @@ def test_verified_closing_can_be_added_after_result_without_mutating_decision(tm
     assert {field: updated[field] for field in decision_before} == decision_before
 
 
+def test_settled_row_requires_explicit_reasoned_correction_to_void(tmp_path) -> None:
+    import json
+    import sqlite3
+
+    from model_prediction.runtime_ledger_store import RuntimeLedgerStore
+    from model_prediction.runtime_paths import RuntimePaths
+
+    paths = RuntimePaths.for_test(tmp_path)
+    store = RuntimeLedgerStore(paths)
+    ledger = PickLedger(
+        tmp_path / "picks.xlsx",
+        tmp_path / "events.jsonl",
+        tier="main",
+        mirror=store,
+        authority="sqlite",
+        sport="mlb",
+    )
+    logged = ledger.append_call(request(), 1.0, 70)
+    ledger.settle(logged["pick_id"], away_score=2, home_score=3)
+    event_count_before = store.event_count()
+
+    with pytest.raises(ValueError, match="correction reason"):
+        ledger.void(logged["pick_id"], "invalid derivative settlement")
+    with pytest.raises(ValueError, match="correction reason"):
+        ledger.void(
+            logged["pick_id"],
+            "invalid derivative settlement",
+            correction_reason="   ",
+        )
+
+    corrected = ledger.void(
+        logged["pick_id"],
+        "invalid derivative settlement",
+        correction_reason="winner-only source cannot settle totals",
+    )
+    assert corrected["status"] == "settled"
+    assert corrected["result"] == "push"
+    assert float(corrected["pnl_units"]) == 0
+    assert corrected["void_reason"] == "invalid derivative settlement"
+    assert store.event_count() == event_count_before + 1
+    conn = sqlite3.connect(paths.ledgers_db)
+    try:
+        [payload_json] = conn.execute(
+            "SELECT payload_json FROM ledger_events ORDER BY sequence DESC LIMIT 1"
+        ).fetchone()
+    finally:
+        conn.close()
+    event_payload = json.loads(payload_json)
+    assert event_payload["event_type"] == "void"
+    assert event_payload["note"] == "winner-only source cannot settle totals"
+    assert event_payload["decision_payload"]["void_reason"] == "invalid derivative settlement"
+
+    repeated = ledger.void(
+        logged["pick_id"],
+        "invalid derivative settlement",
+        correction_reason="winner-only source cannot settle totals",
+    )
+    assert repeated == corrected
+    assert store.event_count() == event_count_before + 1
+    assert store.verify_integrity() == (True, [])
+    store.close()
+
+
 AWAY = CanonicalTeam("mlb-nyy", League.MLB, "NYY", "NYY", True, None, None, ())
 HOME = CanonicalTeam("mlb-bos", League.MLB, "BOS", "BOS", True, None, None, ())
 
@@ -188,6 +251,8 @@ def test_append_evaluated_also_writes_the_new_per_model_ledger(tmp_path) -> None
     assert len(rows) == 1
     assert rows[0]["event_id"] == row["event_id"]
     assert float(rows[0]["model_market_difference"]) == pytest.approx(float(row["edge"]))
+    assert rows[0]["operator_decision"] == "CALL"
+    assert float(rows[0]["operator_units"]) == pytest.approx(1.5)
 
 
 def test_a_model_ledger_write_failure_never_breaks_the_primary_ledger_write(tmp_path, monkeypatch) -> None:
@@ -245,29 +310,28 @@ def test_a_model_ledger_settle_failure_never_breaks_the_primary_ledger_settle(tm
     assert ledger.report()["open"] == 0
 
 
-def test_recompute_research_sizing_fills_in_a_zero_unit_sizable_reason(tmp_path) -> None:
+def test_append_evaluated_hard_codes_positive_units_before_recompute(tmp_path) -> None:
     ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
     row = ledger.append_evaluated(request(), _observation("NO_CALL_LOW_EDGE", 0.0))
-    assert float(row["units"]) == 0.0
+    assert row["decision"] == "CALL"
+    assert row["reason_code"] == "PAPER_CALL_LOW_EDGE"
+    assert float(row["units"]) > 0
 
     changed = ledger.recompute_research_sizing()
-    assert changed == 1
+    assert changed == 0
 
     updated = ledger.rows()[0]
     expected = edge_scaled_units(0.59, 0.01, -110)
     assert float(updated["units"]) == expected
 
 
-def test_recompute_research_sizing_zeroes_a_hard_zero_reason_that_had_leaked_units(tmp_path) -> None:
-    """Simulates the too-broad mid-session bug: a structurally-untrustworthy
-    reason (team banned) must never keep a non-zero size regardless of how
-    it got there."""
+def test_recompute_research_sizing_keeps_banned_team_as_positive_paper_units(tmp_path) -> None:
     ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
     ledger.append_evaluated(request(), _observation("NO_CALL_TEAM_BANNED", 1.5))
 
     changed = ledger.recompute_research_sizing()
     assert changed == 1
-    assert float(ledger.rows()[0]["units"]) == 0.0
+    assert float(ledger.rows()[0]["units"]) > 0
 
 
 def test_recompute_research_sizing_never_touches_a_real_qualified_call(tmp_path) -> None:
@@ -283,7 +347,7 @@ def test_recompute_research_sizing_recomputes_pnl_for_already_settled_rows(tmp_p
     ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
     row = ledger.append_evaluated(request(), _observation("NO_CALL_LOW_EDGE", 0.0))
     settled = ledger.settle(row["pick_id"], away_score=5, home_score=5)  # total 10 > 8.5 -> over wins
-    assert float(settled["pnl_units"]) == 0.0  # old bug: zero units -> zero pnl regardless of result
+    assert float(settled["pnl_units"]) > 0
 
     ledger.recompute_research_sizing()
     updated = ledger.rows()[0]
@@ -298,6 +362,42 @@ def test_recompute_research_sizing_is_idempotent(tmp_path) -> None:
     ledger.recompute_research_sizing()
     changed_again = ledger.recompute_research_sizing()
     assert changed_again == 0
+
+
+def test_recompute_research_sizing_can_scope_exact_reason_and_pick_identity(tmp_path) -> None:
+    ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
+    targeted = ledger.append_evaluated(
+        replace(request(), event_id="targeted"), _observation("NO_CALL_LOW_EDGE", 0.0)
+    )
+    other_reason = ledger.append_evaluated(
+        replace(request(), event_id="other-reason"),
+        _observation("NO_CALL_MODEL_UNVALIDATED", 0.0),
+    )
+    same_reason_other_pick = ledger.append_evaluated(
+        replace(request(), event_id="other-pick"), _observation("NO_CALL_LOW_EDGE", 0.0)
+    )
+
+    with ledger._lock():
+        legacy_rows = ledger._read_unlocked()
+        for legacy_row in legacy_rows:
+            legacy_row["units"] = "0.00"
+            legacy_row["reason_code"] = (
+                "NO_CALL_MODEL_UNVALIDATED"
+                if legacy_row["pick_id"] == other_reason["pick_id"]
+                else "NO_CALL_LOW_EDGE"
+            )
+        ledger._write_rows(legacy_rows)
+
+    changed = ledger.recompute_research_sizing(
+        reason_codes={"NO_CALL_LOW_EDGE"},
+        pick_ids={targeted["pick_id"]},
+    )
+
+    rows = {row["pick_id"]: row for row in ledger.rows()}
+    assert changed == 1
+    assert float(rows[targeted["pick_id"]]["units"]) > 0
+    assert float(rows[other_reason["pick_id"]]["units"]) == 0
+    assert float(rows[same_reason_other_pick["pick_id"]]["units"]) == 0
 
 
 def test_a_retired_ledger_never_touches_disk(tmp_path) -> None:

@@ -1,6 +1,6 @@
 {
   "alpha": 10.0,
-  "artifact_hash": "0dddbff34b848f65453428d052b256f6b23f7092d10c953a1de3b3e4606da517",
+  "artifact_hash": "113e1744e564570dce943be22f4609ea073b2c634f9429475f4ee76e24e2f9c8",
   "coefficients": [
     -2.5837087858,
     -0.0061901708,
@@ -45,7 +45,7 @@
     "total_snapshots": 2123
   },
   "method": "ridge_regression",
-  "model_version": "wnba-total-score-ridge-v1",
+  "model_version": "wnba-total-margin-v1",
   "schema_version": "1",
   "sport": "wnba",
   "status": "research_score_model_candidate",

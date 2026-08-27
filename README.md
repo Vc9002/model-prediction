@@ -9,7 +9,7 @@ CLI and read [`docs/rebuild/README.md`](docs/rebuild/README.md) before operating
 it. Rebuild output cannot submit live orders, write incumbent ledgers, or
 promote a model into production.
 
-**Last updated**: 2026-08-20
+**Last updated**: 2026-08-23
 
 The current operational verdict and audit evidence live in
 [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) and [`docs/MASTER.md`](docs/MASTER.md).
@@ -19,10 +19,10 @@ Complete documentation index lives in **[`docs/INDEX.md`](docs/INDEX.md)**.
 
 | Metric | Value |
 |--------|-------|
-| Tests | **1,938 passed, 3 skipped, 0 failed** (2026-08-20) |
+| Tests | **2,205 passed, 3 skipped, 0 failed** (2026-08-23) |
 | Ruff | **0 findings** (clean across `src/`, `tests/`, and `scripts/`) |
 | Type safety | `src/model_prediction/py.typed` marker + library overrides |
-| Git | `main` (clean branch topology) |
+| Git | `main` / `research/mlb-v9` (clean branch topology) |
 | CI | `.github/workflows/ci.yml` — ruff + pytest on push/PR |
 | Documentation | Consolidated under [`docs/`](docs/) (master index: [`docs/INDEX.md`](docs/INDEX.md)) |
 
@@ -160,17 +160,19 @@ flowchart TD
     DASHUI -.reads.-> LedgerStep
 ```
 
-### 1. Scheduled daily pipeline (`scripts/run_daily.sh`, launchd every 3h)
+### 1. Scheduled daily pipeline (`scripts/run_daily.sh`, launchd once daily)
 
 `~/Library/LaunchAgents/com.modelprediction.daily.plist` fires this script
-every `StartInterval=10800` (3h), with a `TimeOut=1800` (30min) watchdog. The
+at 08:30 local time, with a `TimeOut=1800` (30min) watchdog. The checked-in
+source is `ops/launchd/com.modelprediction.daily.plist`. It has no `RunAtLoad`,
+so login or service reloads do not launch an extra full pipeline. The
 script wraps its entire body in a single OS-level lock so an overlapping
 scheduled run and a manual invocation can never interleave and corrupt a
 ledger write:
 
 ```mermaid
 sequenceDiagram
-    participant L as launchd (3h cadence)
+    participant L as launchd (08:30 daily)
     participant Lock as daily_lock.py (fcntl.flock, non-blocking)
     participant S as Step 1: settle --all-unsettled
     participant I as Step 1b: ingest (mlb/nba/wnba/nfl, yesterday+today)
@@ -280,7 +282,7 @@ is only one forecast/settlement code path regardless of how it's invoked:
 | Dashboard button | Command it runs |
 |---|---|
 | Run Tests | `pytest tests/ -q --no-header` |
-| Daily | `scripts/run_daily.sh` (full locked settle → ingest → daily pipeline) |
+| Daily | `run_supervisor run daily` → `scripts/run_daily.sh` (full locked settle → ingest → daily pipeline) |
 | Ledger / Research / Gated tabs → Forecast | `cli forecast --all --date ... --log --replace-today --model learned` |
 | Flat tab → Forecast | `cli flat-forecast --all --date ... --log` |
 | Refresh Prices | `cli polymarket-ledger-prices --date ...` (one `--contract` per open, unarchived pick) |
@@ -320,7 +322,7 @@ python3 dashboard_server.py  # then open http://127.0.0.1:8765/
 
 - [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) — operational status and release verdict
 - [`docs/BURN_IN.md`](docs/BURN_IN.md) — burn-in window checks + results (through 08-18)
-- [`docs/RESEARCH_BACKLOG.md`](docs/RESEARCH_BACKLOG.md) — post-burn-in research queue (MLB v9 first)
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — consolidated roadmap: promotion rules, verdict taxonomy, open research items (MLB v9 first)
 - [`docs/V8_REPRODUCTION.md`](docs/V8_REPRODUCTION.md) — v8 reproduction contract + parity findings (on the `research/mlb-v8-reproduction` branch)
 - [`docs/archive/`](docs/archive/) — one-shot investigation records and dated artifacts
 - [`docs/HISTORY.md`](docs/HISTORY.md) — chronological project history, all phases

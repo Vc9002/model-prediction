@@ -134,6 +134,10 @@ def existing_flat_ledgers(data_root: str | Path) -> list[PickLedger]:
             path,
             audit_path=Path(data_root) / "events.jsonl",
             model_ledgers_dir=Path(data_root) / "model_ledgers",
+            tier="flat",
+            mirror=ledger_mirror(Path(data_root)),
+            authority=ledger_authority(),
+            sport=path.stem.casefold(),
         )
         for path in sorted(directory.glob("*.xlsx"))
         if path.stem.casefold() in MAIN_LEDGER_SPORTS

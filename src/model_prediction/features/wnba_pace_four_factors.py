@@ -160,3 +160,54 @@ def project_wnba_game_total(
         "projected_total": round(projected_total, 2),
         "projected_margin": round(projected_margin, 2),
     }
+
+
+def project_wnba_derivative_probabilities(
+    projected_total: float,
+    projected_margin: float,
+    total_line: float | None = None,
+    spread_line: float | None = None,
+    sigma_total: float = 14.5,
+    sigma_margin: float = 11.5,
+) -> dict[str, float]:
+    """Compute parametric Normal-CDF probabilities for WNBA totals and spreads.
+
+    Parameters
+    ----------
+    projected_total : float
+        Combined projected points.
+    projected_margin : float
+        Home margin of victory (Home - Away).
+    total_line : float, optional
+        Over/Under market line (e.g. 162.5).
+    spread_line : float, optional
+        Home spread market line (e.g. -4.5).
+    sigma_total : float, default 14.5
+        WNBA empirical total score residual standard deviation.
+    sigma_margin : float, default 11.5
+        WNBA empirical scoring margin residual standard deviation.
+
+    Returns
+    -------
+    dict with over/under and cover probabilities.
+    """
+    from scipy.stats import norm
+
+    result: dict[str, float] = {}
+
+    if total_line is not None:
+        z_tot = (total_line - projected_total) / max(1.0, sigma_total)
+        prob_under = float(norm.cdf(z_tot))
+        prob_over = 1.0 - prob_under
+        result["prob_over"] = round(prob_over, 4)
+        result["prob_under"] = round(prob_under, 4)
+
+    if spread_line is not None:
+        # Home covers -4.5 if Home Margin > 4.5 (-spread_line)
+        z_spd = (-spread_line - projected_margin) / max(1.0, sigma_margin)
+        prob_away_cover = float(norm.cdf(z_spd))
+        prob_home_cover = 1.0 - prob_away_cover
+        result["prob_home_cover"] = round(prob_home_cover, 4)
+        result["prob_away_cover"] = round(prob_away_cover, 4)
+
+    return result

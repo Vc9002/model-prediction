@@ -1,11 +1,20 @@
 import fcntl
 from datetime import UTC, datetime
 
+import pytest
 from openpyxl import Workbook, load_workbook
 
-from model_prediction.domain import League, MarketType, ModelOrigin, ModelState, PickRequest, RecordType
+from model_prediction.domain import (
+    League,
+    MarketType,
+    ModelOrigin,
+    ModelState,
+    PickRequest,
+    PickResult,
+    RecordType,
+)
 from model_prediction.eligibility import evaluate_eligibility
-from model_prediction.ledger import FIELDNAMES, LEGACY_FIELDNAMES, PickLedger
+from model_prediction.ledger import FIELDNAMES, LEGACY_FIELDNAMES, PickLedger, _settlement_pnl
 from model_prediction.units import Exposure, UnitPolicy
 from model_prediction.xlsx_ledger import read_xlsx_rows
 
@@ -144,19 +153,18 @@ def test_research_model_recommended_skips_scoring_without_uncertainty(registry, 
     assert not settled["research_pnl_units"]
 
 
-def test_banned_total_is_recorded_as_zero_unit_no_call(registry, ban_list, tmp_path) -> None:
+def test_banned_total_is_recorded_as_positive_unit_research_paper_call(registry, ban_list, tmp_path) -> None:
     ban_list.add(League.MLB, "BAL")
     req = request("banned-total")
     req = PickRequest(**{**req.__dict__, "market_type": MarketType.TOTAL, "selection": "over", "line": 8.5})
     ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
     gate = evaluate_eligibility(req, registry, ban_list, Exposure(), UnitPolicy(), NOW)
     row = ledger.append_evaluated(req, gate, NOW)
-    assert row["decision"] == "NO_CALL"
-    assert row["reason_code"] == "NO_CALL_TEAM_BANNED"
+    assert row["decision"] == "CALL"
+    assert row["reason_code"] == "PAPER_CALL_TEAM_BANNED"
     assert row["banned_team_id"] == "mlb-bal"
-    assert float(row["units"]) == 0
-    assert ledger.report()["no_call_team_banned_count"] == 1
-    assert ledger.exposure(req, NOW).daily_units == 0
+    assert float(row["units"]) > 0
+    assert ledger.report()["paper_call_team_banned_count"] == 1
 
 
 def test_older_excel_schema_migrates_with_backup_and_preserved_units(tmp_path) -> None:
@@ -234,6 +242,58 @@ def test_tied_binary_contract_uses_half_value_instead_of_zero_pnl(tmp_path) -> N
     assert ledger.audit.events()[-1]["payload"]["binary_contract_settlement_value"] == 0.5
 
 
+def test_prediction_market_pricing_is_selected_by_explicit_venue_not_minus_110() -> None:
+    sportsbook_pnl = _settlement_pnl(
+        result=PickResult.WIN,
+        units=1.0,
+        sportsbook="consensus",
+        decimal_odds=1.909091,
+        entry_probability=0.40,
+        binary_contract_settlement_value=None,
+    )
+    contract_pnl = _settlement_pnl(
+        result=PickResult.WIN,
+        units=1.0,
+        sportsbook="polymarket_us",
+        decimal_odds=1.909091,
+        entry_probability=0.40,
+        binary_contract_settlement_value=None,
+    )
+
+    assert sportsbook_pnl == pytest.approx(0.909091)
+    assert contract_pnl == pytest.approx(1.5)
+    assert (
+        _settlement_pnl(
+            result=PickResult.PUSH,
+            units=1.0,
+            sportsbook="polymarket_us",
+            decimal_odds=1.909091,
+            entry_probability=0.40,
+            binary_contract_settlement_value=None,
+        )
+        == 0.0
+    )
+
+
+def test_prediction_market_settlement_prefers_exact_recorded_entry_price(tmp_path) -> None:
+    ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
+    req = request("exact-contract-entry")
+    req = PickRequest(
+        **{
+            **req.__dict__,
+            "sportsbook": "polymarket_us",
+            "market_probability_at_decision": 0.40,
+        }
+    )
+    row = ledger.append_call(req, 1.0, 60, now=NOW)
+
+    settled = ledger.settle(row["pick_id"], 2, 3)
+
+    assert settled["decision_raw_implied_probability"] == "0.523810"
+    assert float(settled["market_probability_at_decision"]) == pytest.approx(0.40)
+    assert float(settled["pnl_units"]) == pytest.approx(1.5)
+
+
 def test_report_filters_are_version_aware(tmp_path) -> None:
     ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
     ledger.append_call(request("one"), 0.25, 60, now=NOW)
@@ -271,7 +331,7 @@ def test_research_scoring_is_separate_from_qualified_units(tmp_path) -> None:
     row = ledger.append_call(research, 1.0, 60, call_type="forced_call", now=NOW)
     ledger.settle(row["pick_id"], 2, 3)
     scored = ledger.score_research([row["pick_id"]], 1.0)[0]
-    assert scored["units"] == "0.00"
+    assert scored["units"] == "1.00"
     assert scored["research_score_units"] == "1.0000"
     assert float(scored["research_pnl_units"]) > 0
     report = ledger.report()

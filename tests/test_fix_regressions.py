@@ -16,6 +16,7 @@ import pytest
 from model_prediction import learned_forward
 from model_prediction.audit import AuditLog
 from model_prediction.cli import _settle_esports_pick
+from model_prediction.cli import forecast as cli_forecast
 from model_prediction.data_sources import polymarket_us
 from model_prediction.data_sources.polymarket_execute import (
     ExecutionGateError,
@@ -27,6 +28,7 @@ from model_prediction.eligibility import (
     evaluate_esports_eligibility,
     evaluate_gated_research_eligibility,
 )
+from model_prediction.entities import CanonicalTeam
 from model_prediction.esports import NeutralElo, _fuzzy_match_team, _team_alias_index
 from model_prediction.features.base import FeatureStore
 from model_prediction.ledger import PickLedger
@@ -256,6 +258,40 @@ def test_esports_settlement_stays_pending_until_terminal_state(tmp_path, monkeyp
 # ------------------------------------------------------ esports eligibility
 
 
+class _StubBanList:
+    """Registry-free ban stub: bans whichever team names are in the set."""
+
+    def __init__(self, banned_teams: set[str]) -> None:
+        self.banned_teams = banned_teams
+
+    def check(self, league, team_input):
+        team = CanonicalTeam(team_input, league, team_input, team_input, True, None, None, ())
+        return team, team_input in self.banned_teams
+
+
+def test_esports_eligibility_ban_check_arms_only_when_ban_list_provided():
+    """2026-07-27 audit gap: registry-free sports never had ban enforcement.
+    evaluate_esports_eligibility now checks first when a ban_list is passed
+    (via bans.py's name-based registry-free fallback) and behaves exactly as
+    before when callers don't thread one through."""
+    request = _future_request()
+    result = evaluate_esports_eligibility(
+        request, Exposure(), UnitPolicy(), ban_list=_StubBanList({"Team Home"})
+    )
+    assert result.reason_code == "PAPER_CALL_TEAM_BANNED"
+
+    # The banned team must not become a qualified call even with full
+    # provenance; the other team is unaffected.
+    result = evaluate_esports_eligibility(
+        request, Exposure(), UnitPolicy(), ban_list=_StubBanList({"Nobody"})
+    )
+    assert result.record_type.value == "QUALIFIED_SHADOW_CALL"
+
+    # No ban_list at all: unchanged legacy behavior.
+    result = evaluate_esports_eligibility(_future_request(), Exposure(), UnitPolicy())
+    assert result.record_type.value == "QUALIFIED_SHADOW_CALL"
+
+
 def test_esports_eligibility_qualifies_only_with_full_provenance():
     result = evaluate_esports_eligibility(_future_request(model_probability=0.58), Exposure(), UnitPolicy())
     assert result.record_type.value == "QUALIFIED_SHADOW_CALL"
@@ -272,7 +308,8 @@ def test_esports_eligibility_qualifies_only_with_full_provenance():
 def test_esports_eligibility_fails_closed_on_stale_data():
     stale = _future_request(observed_at_utc=(datetime.now(UTC) - timedelta(hours=13)).isoformat())
     result = evaluate_esports_eligibility(stale, Exposure(), UnitPolicy())
-    assert result.reason_code == "NO_CALL_STALE_DATA"
+    assert result.decision == "CALL"
+    assert result.reason_code == "PAPER_CALL_STALE_DATA"
     # Still gets a real paper size (operator directive, 2026-07-31); it just
     # can't become a real CALL.
     assert result.units > 0
@@ -285,7 +322,8 @@ def test_esports_eligibility_fails_closed_on_future_data():
     side of the clock."""
     future = _future_request(observed_at_utc=(datetime.now(UTC) + timedelta(hours=1)).isoformat())
     result = evaluate_esports_eligibility(future, Exposure(), UnitPolicy())
-    assert result.reason_code == "NO_CALL_STALE_DATA"
+    assert result.decision == "CALL"
+    assert result.reason_code == "PAPER_CALL_STALE_DATA"
     assert result.units > 0
 
 
@@ -309,8 +347,8 @@ def test_gated_research_eligibility_centrally_enforces_edge_and_inputs():
         model_inputs_valid=True,
         minimum_edge=0.02,
     )
-    assert result.decision == "NO_CALL"
-    assert result.reason_code == "NO_CALL_LOW_EDGE"
+    assert result.decision == "CALL"
+    assert result.reason_code == "PAPER_CALL_LOW_EDGE"
     # Downgraded from Gated Research only -- it still gets a real paper size
     # for the Research ledger (operator directive, 2026-07-31).
     assert result.units > 0
@@ -323,8 +361,8 @@ def test_gated_research_eligibility_centrally_enforces_edge_and_inputs():
         model_inputs_valid=False,
         minimum_edge=0.02,
     )
-    assert result.decision == "NO_CALL"
-    assert result.reason_code == "NO_CALL_MODEL_UNVALIDATED"
+    assert result.decision == "CALL"
+    assert result.reason_code == "PAPER_CALL_MODEL_UNVALIDATED"
     assert result.units > 0
 
     valid = evaluate_gated_research_eligibility(
@@ -463,3 +501,41 @@ def test_match_executable_quote_skips_doubleheaders_and_ambiguous_sides(tmp_path
     )
     quote = learned_forward.match_executable_quote(tmp_path, "mlb", "2026-07-17", _Candidate())
     assert quote is not None and quote["side"] == "short"
+
+
+def test_match_executable_quote_output_passes_archive_lineage_check(tmp_path):
+    """A quote matched from a genuine archived snapshot must carry the
+    provenance fields (`reconstructed`, `usage`) that
+    ``cli.forecast._canonical_market_snapshot_lineage`` requires -- dropping
+    them silently blocked every real MLB Main-ledger call while still
+    matching the quote for pricing (2026-08-24)."""
+    odds_dir = tmp_path / "odds/mlb/2026-07-17"
+    odds_dir.mkdir(parents=True)
+    snapshot_path = odds_dir / "polymarket_snapshots.jsonl"
+    snapshot_path.write_text(
+        json.dumps(
+            {
+                "market_type": "moneyline",
+                "market_slug": "aec-mlb-nyy-nym-1",
+                "long": {"description": "Yankees", "ask": 0.55},
+                "short": {"description": "Mets", "ask": 0.47},
+                "observed_at_utc": "2026-07-17T12:00:00Z",
+                "timestamp_valid": True,
+                "reconstructed": False,
+                "usage": "prospective_executable_bbo",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    class _Candidate:
+        away_team = "New York Yankees"
+        home_team = "New York Mets"
+        selection = "home"
+        event_start_utc = "2026-07-17T19:00:00Z"
+
+    quote = learned_forward.match_executable_quote(tmp_path, "mlb", "2026-07-17", _Candidate())
+    assert quote is not None
+    lineage = cli_forecast._canonical_market_snapshot_lineage(quote, snapshot_path)
+    assert lineage is not None

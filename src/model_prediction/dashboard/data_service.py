@@ -42,6 +42,9 @@ def _ro_conn(db_path: Path) -> sqlite3.Connection | None:
     conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA busy_timeout=3000")
+    conn.execute("PRAGMA query_only = ON")
+    conn.execute("PRAGMA mmap_size = 268435456")
+    conn.execute("PRAGMA cache_size = -32000")
     return conn
 
 

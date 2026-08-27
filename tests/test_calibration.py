@@ -32,3 +32,25 @@ def test_versioned_mlb_platt_calibrator_is_hash_verified_and_shrinks_overconfide
     assert calibrator.metadata.sample_size == 115
     assert calibrator.metadata.base_model_version == "mlb-analyst-poisson-trend-v0.2"
     assert calibrator.transform(0.70) < 0.70
+
+
+def test_beta_calibrator_pulls_overconfidence_down():
+    from model_prediction.calibration import BetaCalibrator, IdentityCalibrator
+
+    # A model that says 0.9 but wins 60% of the time: beta calibration
+    # must bend 0.9 toward the observed rate.
+    probs = [0.9] * 60 + [0.1] * 40
+    outcomes = [1] * 36 + [0] * 24 + [1] * 4 + [0] * 36  # 0.6 rate at 0.9, 0.1 rate at 0.1
+    cal = BetaCalibrator.fit(probs, outcomes, base_model_version="t", minimum_sample=50)
+    assert not isinstance(cal, IdentityCalibrator)
+    assert cal.transform(0.9) < 0.9
+    assert cal.transform(0.1) > 0.1
+    # Monotone in probability.
+    assert cal.transform(0.5) < cal.transform(0.8)
+
+
+def test_beta_calibrator_identity_fallback_below_minimum_sample():
+    from model_prediction.calibration import BetaCalibrator, IdentityCalibrator
+
+    cal = BetaCalibrator.fit([0.7, 0.6], [1, 0], base_model_version="t")
+    assert isinstance(cal, IdentityCalibrator)

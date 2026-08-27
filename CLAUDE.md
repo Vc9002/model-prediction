@@ -137,9 +137,9 @@ ablation, not a promotion decision by itself.
 ## Testing conventions
 
 - `env PYTHONPATH=src:. .venv/bin/python -m pytest tests/ -q` and
-  `.venv/bin/ruff check src/ tests/` should both stay clean. Ruff baseline
-  is ~117-118 pre-existing findings unrelated to any one session's work;
-  don't chase them down, just don't add new ones.
+  `.venv/bin/ruff check src/ tests/` should both stay clean. (The old
+  ~117-118 pre-existing ruff baseline was cleared by later sessions --
+  verified clean 2026-08-26; keep it clean, don't re-introduce findings.)
 - When you fix a bug, verify the regression test actually catches it:
   temporarily revert the fix, confirm the new test fails, then restore the
   fix. This has caught real "the test doesn't actually test anything"

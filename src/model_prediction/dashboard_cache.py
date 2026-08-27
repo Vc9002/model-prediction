@@ -1,7 +1,7 @@
-"""SQLite-backed dashboard cache — mirrors Excel ledger data for fast reads.
+"""SQLite-backed dashboard cache for canonical or projected ledger rows.
 
-Replaces the expensive openpyxl.load_workbook() path in dashboard_server.py
-with a SQLite mirror that refreshes only when source files change (mtime).
+Under SQLite ledger authority it consumes RuntimeLedgerStore directly. Under
+explicit XLSX authority it retains the legacy mtime-based Excel projection.
 
 Usage:
     cache = DashboardCache("/path/to/data")
@@ -12,17 +12,22 @@ Usage:
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import threading
 from pathlib import Path
 from typing import Any
 from zipfile import BadZipFile
 
+from .runtime_ledger_store import RuntimeLedgerStore
+from .runtime_paths import RuntimePaths
+
 # ── column mapping ──────────────────────────────────────────────────────
 
 # Columns the dashboard actually uses from parsed pick rows
 DASHBOARD_COLUMNS = [
     "pick_id",
+    "sport",
     "created_at_utc",
     "event_start_utc",
     "event_id",
@@ -33,7 +38,13 @@ DASHBOARD_COLUMNS = [
     "selection",
     "line",
     "american_odds",
+    "decision_american_odds",
+    "decision_decimal_odds",
+    "closing_american_odds",
+    "closing_decimal_odds",
+    "closing_line",
     "market_implied_probability",
+    "market_probability_at_decision",
     "model_probability",
     "model_uncertainty",
     "edge",
@@ -53,18 +64,44 @@ DASHBOARD_COLUMNS = [
     "reason_code",
     "research_score_units",
     "research_pnl_units",
+    "sportsbook",
+    "decision_no_vig_probability",
+    "rationale",
+    "risks",
+    "unavailable_features",
+    "elo_probability",
+    "trend_gap",
+    "defensive_trend_gap",
+    "park_factor",
+    "weather_factor",
+    "pitcher_era_gap",
+    "probable_starter_era_gap",
+    "bullpen_weakness_gap",
+    "starter_era_gap",
+    "market_residual_probability",
 ]
 
 
 class DashboardCache:
-    """SQLite mirror of all dashboard-relevant Excel ledger data."""
+    """SQLite cache of dashboard rows from the configured ledger authority."""
 
-    def __init__(self, data_root: str | Path, *, db_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        data_root: str | Path,
+        *,
+        db_path: Path | None = None,
+        authority: str | None = None,
+        ledger_store: RuntimeLedgerStore | None = None,
+    ) -> None:
         self.data_root = Path(data_root)
         # The cache DB is mutable runtime state: callers that run
         # operationally pass the runtime root's path; the repo-local
         # default survives only for dev/test convenience.
         self.db_path = Path(db_path) if db_path is not None else self.data_root / "dashboard_cache.db"
+        self.authority = authority or os.environ.get("MODEL_PREDICTION_LEDGER_AUTHORITY", "xlsx")
+        if self.authority not in {"xlsx", "sqlite"}:
+            raise ValueError("authority must be 'xlsx' or 'sqlite'")
+        self._ledger_store = ledger_store
         self._lock = threading.Lock()
 
     # ── public API ──────────────────────────────────────────────────────
@@ -82,6 +119,11 @@ class DashboardCache:
                 self._init_schema(conn)
                 counts: dict[str, int] = {}
 
+                if self.authority == "sqlite":
+                    counts.update(self._refresh_from_canonical_store(conn, force=force))
+                    conn.commit()
+                    return counts
+
                 for tier, paths in self._all_tiers().items():
                     mtimes = self._compute_mtime_key(paths)
                     if not force and self._is_fresh(conn, tier, mtimes):
@@ -94,6 +136,38 @@ class DashboardCache:
                 return counts
             finally:
                 conn.close()
+
+    def _refresh_from_canonical_store(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        force: bool,
+    ) -> dict[str, int]:
+        store = self._ledger_store
+        owned_store = store is None
+        if store is None:
+            paths = RuntimePaths.resolve(repo_root=self.data_root.parent)
+            if not paths.ledgers_db.is_file():
+                raise FileNotFoundError(f"canonical ledger database is missing: {paths.ledgers_db}")
+            store = RuntimeLedgerStore(paths)
+        try:
+            event_count = store.event_count()
+            counts: dict[str, int] = {}
+            for tier in ("main", "flat", "research", "gated_research"):
+                rows = [
+                    self._dashboard_row(row)
+                    for row in store.pick_rows(tier=tier)
+                    if row.get("status") not in {"archived", "removed"}
+                ]
+                state_key = f"sqlite-events:{event_count}:tier:{tier}"
+                if not force and self._is_fresh(conn, tier, state_key):
+                    continue
+                self._replace_tier(conn, tier, rows, state_key)
+                counts[tier] = len(rows)
+            return counts
+        finally:
+            if owned_store:
+                store.close()
 
     def read_picks(self, tier: str) -> list[dict[str, Any]]:
         """Read all picks for a tier from SQLite. Falls back to empty list."""
@@ -175,14 +249,20 @@ class DashboardCache:
     def _all_tiers(self) -> dict[str, list[Path]]:
         """Return all tier → file-paths mappings."""
         flat_dir = self.data_root / "flat"
+        main_dir = self.data_root / "main"
+        flat_v9_dir = self.data_root / "flat_v9"
         research_dir = self.data_root / "research"
         gated_dir = self.data_root / "gated_research"
         model_dir = self.data_root / "model_ledgers"
 
         tiers: dict[str, list[Path]] = {}
 
+        if main_dir.exists():
+            tiers["main"] = sorted(main_dir.glob("*.xlsx"))
         if flat_dir.exists():
             tiers["flat"] = sorted(flat_dir.glob("*.xlsx"))
+        if flat_v9_dir.exists():
+            tiers["flat_v9"] = sorted(flat_v9_dir.glob("*.xlsx"))
         if research_dir.exists():
             tiers["research"] = sorted(research_dir.glob("*.xlsx"))
         if gated_dir.exists():
@@ -247,6 +327,10 @@ class DashboardCache:
         for path in paths:
             rows.extend(self._parse_one(path))
         return rows
+
+    @staticmethod
+    def _dashboard_row(row: dict[str, Any]) -> dict[str, Any]:
+        return {column: row.get(column, "") for column in DASHBOARD_COLUMNS}
 
     @staticmethod
     def _parse_one(path: Path) -> list[dict[str, Any]]:

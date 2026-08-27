@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 PRIOR_HYPERPARAMETERS: dict[str, tuple[float, float]] = {
     "k_pct": (0.225, 60.0),
@@ -45,7 +46,7 @@ BATTING_ORDER_WEIGHTS: tuple[float, ...] = (
 
 
 def beta_binomial_shrink(k: float, n: float, metric: str) -> float:
-    """Apply closed-form Empirical Bayes shrinkage to rate metric."""
+    """Apply closed-form Empirical Bayes shrinkage to rate metric (successes / trials)."""
     if metric not in PRIOR_HYPERPARAMETERS:
         raise ValueError(f"Unknown metric for Beta-Binomial shrinkage: {metric}")
     mu_0, m = PRIOR_HYPERPARAMETERS[metric]
@@ -54,6 +55,16 @@ def beta_binomial_shrink(k: float, n: float, metric: str) -> float:
     alpha = mu_0 * m
     beta = (1.0 - mu_0) * m
     return (k + alpha) / (n + alpha + beta)
+
+
+def continuous_empirical_bayes_shrink(obs_sum: float, n: float, metric: str) -> float:
+    """Apply continuous Empirical Bayes shrinkage: (tau * mu_0 + obs_sum) / (tau + n)."""
+    if metric not in PRIOR_HYPERPARAMETERS:
+        raise ValueError(f"Unknown metric for continuous shrinkage: {metric}")
+    mu_0, tau = PRIOR_HYPERPARAMETERS[metric]
+    if n <= 0:
+        return mu_0
+    return (tau * mu_0 + obs_sum) / (tau + n)
 
 
 @dataclass(slots=True)
@@ -74,7 +85,7 @@ class BatterGameRecord:
     barrel_count: int = 0
     bip_count: int = 0
     xwoba_sum: float = 0.0
-    vs_hand: str = "all"  # "'R"', "'L"', or "'all"'
+    vs_hand: str = "all"  # 'R', 'L', or 'all'
 
 
 @dataclass(slots=True)
@@ -103,7 +114,7 @@ class BatterPriorState:
     def shrunk_iso(self) -> float:
         tb = self.total_hits + self.total_doubles + 2 * self.total_triples + 3 * self.total_home_runs
         iso_numerator = max(0, tb - self.total_hits)
-        return beta_binomial_shrink(iso_numerator, self.total_ab, "iso")
+        return continuous_empirical_bayes_shrink(iso_numerator, self.total_ab, "iso")
 
     def shrunk_hard_hit_pct(self) -> float:
         return beta_binomial_shrink(self.total_hard_hit, self.total_bip, "hard_hit_pct")
@@ -123,7 +134,7 @@ class BatterPriorState:
         )
         if self.total_xwoba_sum > 0:
             woba_sum = 0.5 * woba_sum + 0.5 * self.total_xwoba_sum
-        return beta_binomial_shrink(woba_sum, self.total_pa, "xwoba")
+        return continuous_empirical_bayes_shrink(woba_sum, self.total_pa, "xwoba")
 
 
 @dataclass
@@ -135,14 +146,79 @@ class LineupPriorVector:
     barrel_pct: float
     hard_hit_pct: float
     sample_pa: int
+    barrel_available: bool = False
+    hard_hit_available: bool = False
+    xwoba_available: bool = False
 
 
 class PointInTimeBatterPriorEngine:
     """Maintains sequential PIT batter states and constructs order-weighted lineup features."""
 
-    def __init__(self) -> None:
+    def __init__(self, snapshot_path: str | Path | None = None) -> None:
         self._player_history: dict[str, list[BatterGameRecord]] = {}
         self._team_history: dict[str, list[tuple[str, str, int]]] = {}
+        if snapshot_path is not None:
+            self._load_from_snapshot(Path(snapshot_path))
+
+    def _load_from_snapshot(self, path: Path) -> None:
+        if not path.exists():
+            return
+        import json
+
+        with path.open(encoding="utf-8") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                # game_snapshots.jsonl keys the game date top-level as
+                # game_start_utc and nests the team under side.team_name;
+                # reading flat `game_date`/`home_team` keys here keyed every
+                # batter under an empty team id, leaving _team_history empty
+                # and every projected-offense/platoon query on league priors
+                # (DEBUG.md 2026-08-26: 6 dead v9 feature columns).
+                game_date = str(
+                    row.get("game_start_utc") or row.get("official_date") or row.get("game_date") or ""
+                )[:10]
+                for side in ("home", "away"):
+                    side_obj = row.get(side) if isinstance(row.get(side), dict) else {}
+                    team_name = str(side_obj.get("team_name") or row.get(f"{side}_team") or "")
+                    players = side_obj.get("players") or row.get(f"{side}_batters", [])
+                    for p in players:
+                        pid = str(p.get("id") or p.get("player_id") or "")
+                        if not pid:
+                            continue
+                        # Real snapshot rows carry batting stats nested under
+                        # p["batting"]; keep the flat form for legacy fixtures.
+                        batting = p.get("batting")
+                        src = batting if isinstance(batting, dict) and batting else p
+                        pa = int(src.get("pa") or src.get("plateAppearances") or 0)
+                        ab = int(src.get("ab") or src.get("atBats") or pa)
+                        if pa == 0 and ab == 0:
+                            continue  # pitcher-only line, not a batter
+                        hits = int(src.get("hits") or src.get("h") or 0)
+                        doubles = int(src.get("doubles") or src.get("2b") or 0)
+                        triples = int(src.get("triples") or src.get("3b") or 0)
+                        hr = int(src.get("hr") or src.get("homeRuns") or 0)
+                        bb = int(src.get("bb") or src.get("baseOnBalls") or 0)
+                        so = int(src.get("so") or src.get("strikeOuts") or 0)
+                        self.update_player_game(
+                            BatterGameRecord(
+                                player_id=pid,
+                                game_date=game_date,
+                                team_id=team_name,
+                                pa=pa,
+                                ab=ab,
+                                hits=hits,
+                                doubles=doubles,
+                                triples=triples,
+                                home_runs=hr,
+                                walks=bb,
+                                strikeouts=so,
+                            )
+                        )
 
     def update_player_game(self, record: BatterGameRecord) -> None:
         """Record a player game result sequentially."""
@@ -151,6 +227,9 @@ class PointInTimeBatterPriorEngine:
             self._team_history.setdefault(record.team_id, []).append(
                 (record.player_id, record.game_date, record.pa)
             )
+
+    def ingest_game_record(self, record: BatterGameRecord) -> None:
+        self.update_player_game(record)
 
     def get_player_prior(
         self,
@@ -205,6 +284,10 @@ class PointInTimeBatterPriorEngine:
         agg_hard_hit = 0.0
         total_pa = 0
 
+        has_xwoba = False
+        has_barrel = False
+        has_hard_hit = False
+
         for player_id, w in zip(batting_order_player_ids, weights):
             prior = self.get_player_prior(player_id, as_of_date=as_of_date, vs_hand=opposing_pitcher_hand)
             agg_xwoba += w * prior.shrunk_xwoba()
@@ -214,6 +297,12 @@ class PointInTimeBatterPriorEngine:
             agg_barrel += w * prior.shrunk_barrel_pct()
             agg_hard_hit += w * prior.shrunk_hard_hit_pct()
             total_pa += prior.total_pa
+            if prior.total_xwoba_sum > 0:
+                has_xwoba = True
+            if prior.total_barrel > 0:
+                has_barrel = True
+            if prior.total_hard_hit > 0:
+                has_hard_hit = True
 
         return LineupPriorVector(
             xwoba=round(agg_xwoba, 4),
@@ -223,6 +312,9 @@ class PointInTimeBatterPriorEngine:
             barrel_pct=round(agg_barrel, 4),
             hard_hit_pct=round(agg_hard_hit, 4),
             sample_pa=total_pa,
+            barrel_available=has_barrel,
+            hard_hit_available=has_hard_hit,
+            xwoba_available=has_xwoba,
         )
 
     def evaluate_projected_team_offense(
@@ -247,7 +339,10 @@ class PointInTimeBatterPriorEngine:
                 sample_pa=0,
             )
 
-        recent = valid_entries[-max(len(valid_entries), lookback_games * 9) :]
+        # Select strictly preceding unique game dates for this team
+        unique_dates = sorted({dt for _, dt, _ in valid_entries})
+        selected_dates = set(unique_dates[-lookback_games:])
+        recent = [e for e in valid_entries if e[1] in selected_dates]
         player_pa: dict[str, int] = {}
         for p_id, _, pa in recent:
             player_pa[p_id] = player_pa.get(p_id, 0) + pa
@@ -264,6 +359,10 @@ class PointInTimeBatterPriorEngine:
         agg_hard_hit = 0.0
         total_sample_pa = 0
 
+        has_xwoba = False
+        has_barrel = False
+        has_hard_hit = False
+
         for p_id, pa in player_pa.items():
             weight = pa / total_recent_pa
             prior = self.get_player_prior(p_id, as_of_date=as_of_date, vs_hand=opposing_pitcher_hand)
@@ -274,6 +373,12 @@ class PointInTimeBatterPriorEngine:
             agg_barrel += weight * prior.shrunk_barrel_pct()
             agg_hard_hit += weight * prior.shrunk_hard_hit_pct()
             total_sample_pa += prior.total_pa
+            if prior.total_xwoba_sum > 0:
+                has_xwoba = True
+            if prior.total_barrel > 0:
+                has_barrel = True
+            if prior.total_hard_hit > 0:
+                has_hard_hit = True
 
         return LineupPriorVector(
             xwoba=round(agg_xwoba, 4),
@@ -283,4 +388,10 @@ class PointInTimeBatterPriorEngine:
             barrel_pct=round(agg_barrel, 4),
             hard_hit_pct=round(agg_hard_hit, 4),
             sample_pa=total_sample_pa,
+            barrel_available=has_barrel,
+            hard_hit_available=has_hard_hit,
+            xwoba_available=has_xwoba,
         )
+
+
+BatterPriorEngine = PointInTimeBatterPriorEngine

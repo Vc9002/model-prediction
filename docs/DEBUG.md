@@ -1,6 +1,513 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
-**Last audited**: 2026-08-19 (see new section directly below)
+**Last audited**: 2026-08-26 (see new section directly below)
+
+## 2026-08-26 (night) — continuation: documented-bug triage, Bet Better capture, WNBA parser root cause, postponed-game watcher
+
+Every remaining open item from the morning/evening scan was triaged, and the
+fixable ones were fixed (uncommitted at handoff of this section; commit
+policy unchanged — none pushed):
+
+- **WNBA morning-report parse failures — root-caused and fixed.** All 48
+  morning/midday reports on 08-26 failed `parse_report_pdf` with "row is
+  missing game/team context" while afternoon/evening reports parsed. Root
+  cause: `_parse_coordinate_table` (wnba_injuries.py) runs a two-pass
+  coordinate parse; the entry pass propagated date/time/matchup/team
+  context ONLY through player rows. The morning layout prints the game date
+  on a team-level "NOT YET SUBMITTED" row (no player, so not a player row),
+  so the date never reached the first real player row and every morning
+  report failed closed. Fix: the pass now walks ALL data lines in document
+  order (context propagates from every row; only player rows emit entries),
+  preserving the fail-closed raise for genuinely contextless rows and the
+  pass-1 `not_yet_submitted` status. Verified against all 81 real 08-26
+  reports (0 failures); two real PDFs saved as fixtures
+  (`tests/fixtures/wnba/report-morning-not-yet-submitted.pdf`,
+  `report-afternoon-submitted.pdf`); regression tests revert-verified
+  (`tests/test_wnba_injuries_parser.py`). This closes the handoff's "WNBA
+  availability snapshots stale 1.5 days" item: capture itself was healthy —
+  every morning report had been failing to parse, so no snapshot existed
+  for the feature to read, and the feature correctly degraded to
+  NO_CALL_AVAILABILITY_UNAVAILABLE.
+- **Soccer capture data_root split-brain — fixed before it fired.** The
+  daily's `_collect_soccer` called `collect_soccer_scores(days_from=3)`
+  without `data_root`, so it defaulted to `PROJECT_ROOT/data` while every
+  sibling capture writes to the caller's `data_root` (the scheduler-
+  resolved root under launchd). Harmless locally, divergent under launchd —
+  and never manifest because API_FOOTBALL_KEY was never provisioned, so the
+  step always exited at the no-key check. Fixed by passing
+  `data_root=data_root` explicitly; comment records the bug class.
+- **Bet Better model-feed capture wired (new research-only source).**
+  `data_sources/bet_better.py`: keyless, no-account, CC BY 4.0 feed of a
+  third-party model's win probabilities + real lines across mlb/wnba/nba/
+  nfl/soccer (7 leagues)/wta. Live-verified 2026-08-26 (all 12 feed paths;
+  1,317 picks captured in a smoke run; NBA/NFL/World Cup empty = offseason,
+  captured as available=False so "provider empty" is provably distinct from
+  "we never asked"). Day-bucketed snapshots via provider_capture with the
+  licence/attribution in an envelope entry. Daily wiring:
+  `step1e_bet_better_models`. Reference evidence ONLY — the provider mints
+  no stable event ids, so the feed must never become a ledger identity, and
+  its picks are model estimates, not bookmaker prices.
+- **Statcast aggregates wired into the daily.** The build moved from
+  `scripts/ingest_statcast_aggregates.py` (manual-only, 3 days behind) into
+  `statcast_aggregates.py` with an explicit `data_root`; the daily runs it
+  AFTER the capture pool (it consumes game_snapshots.jsonl the pool writes)
+  as `step5e_statcast_aggregates`, fail-soft. Live rebuild: 57,057 pitcher /
+  134,765 batter rows through 2026-08-26. Script kept as a thin wrapper.
+- **Esports capture/pricing drift pinned.** `CAPTURED_UNPRICED_ESPORTS_
+  LEAGUES = {COD, ROCKET_LEAGUE, OVERWATCH}` documents the 8-captured vs
+  4-priced split; `test_esports_capture_and_pricing_sets_cannot_drift_
+  silently` makes any capture/pricing change land in a named tier or fail.
+- **Unknown Polymarket market types no longer vanish silently.**
+  `_log_unknown_market_type` logs each unrecognized (league, type-string)
+  once per run — the BTTS gap (soccer.py emits `market_type="btts"` but no
+  BTTS PM type string has ever been observed; 3-day snapshot sweep shows
+  only team_win/spread/total) stays documented until a live string appears.
+  NBA/NFL: PM gateway leagues are operational and `BBO_CAPTURE_SPORTS`
+  already includes them — capture flows automatically when seasons start;
+  the gap is consumer-side. NRFI: no NRFI/YRFI markets exist on PM US; the
+  closest real market is the first-5-innings (f5) spread/total, already
+  captured (290 f5 rows on 08-26) but distinguishable only via the
+  `-f5-` slug pattern, not market_type.
+- **World Cup settle-stall guard.** A league with no `_LEDGER_LEAGUE_TO_ESPN`
+  entry now reports a failure ("no ESPN result path for league X") instead
+  of pending forever (the 07-27 WORLD_CUP stall class). Regression tests in
+  `tests/test_settle_guard.py`.
+- **Registry-free ban enforcement wired.** `bans.py`'s name-based fallback
+  existed (fixed 08-04) but `evaluate_esports_eligibility` never consulted
+  a ban list (the 07-27 gap's second half). It now checks first when a
+  `ban_list` is passed (optional — legacy callers unchanged); the forecast
+  call sites still need to thread their `bans` object through to arm it.
+- **mlb-v9-candidate-1 identity collision.** `forecast_mlb_v9_benchmark.py`
+  recorded rows under `model_version="mlb-v9-candidate-1"` — the name of a
+  VOID quarantined artifact. New rows record `mlb-v9-benchmark`
+  (`V9_BENCHMARK_MODEL_VERSION`); the workbook keeps the family name for
+  history continuity; historical rows untouched.
+- **Postponed-game workaround (drain-minimal, operator-chosen).** Research
+  confirmed PM's per-market contract: a postponed game's market STAYS OPEN;
+  it resolves to the makeup result if played within two weeks of the
+  original date, else last-fair-market-price (US boilerplate) or 50-50.
+  ESPN issues a new event_id on reschedule. Repo behavior: the daily already
+  auto-voids STATUS_POSTPONED/CANCELED rows (`void_postponed=True`), but
+  tennis/KBO/NPB/edge-ledger rows and ESPN-dropped events pend forever. Built
+  the zero-new-I/O option: `system_health._stale_open_rows` counts open rows
+  >24h/72h past their frozen start (pure read-only sqlite query) and
+  degrades health when the >72h bucket is non-empty. Live first run: 22 rows
+  (kbo 13, cs2 7, soccer 3, npb 3, tennis 2) — now continuously visible.
+  Shelved (heaviest): the multi-day ESPN reconciliation sweep; do it only as
+  a targeted, identity-scoped, operator-approved re-grade when needed.
+- **Daily-run timing instrumentation.** `scripts/run_daily.sh` now logs
+  per-step wall-clock; `run_daily`'s report carries a `timing` block
+  (total / capture_pool / settlement / post_settlement seconds). Today's
+  runs ranged 6.7–22.9 minutes; the instrumentation exists so tomorrow's
+  log shows which phase to optimize first.
+- **Triaged as already-fixed by later sessions (records closed here):**
+  KBO phantom-tie settlements (canonical sqlite has zero phantom 0-0
+  pushes; the 3 KBO pushes are real 3-3 ties); tennis surface inference at
+  forecast time (`_upcoming_singles_matches` already calls
+  `_infer_tennis_surface` and threads `surface=` into UpcomingMatch); the
+  stale WORLD_CUP conftest fixture (removed); the DD items from 08-20
+  (pre-commit hook, dashboard_server split to 259 lines, TODO tracking) —
+  all present. MLB totals absolute-run-environment signal remains the one
+  genuinely open research gap (see repair order #2).
+
+
+
+Full sweep, not a bug-motivated investigation: `pytest -q` (2,288 passed, 3
+skipped, 0 failed), `ruff check .` (clean after fixing 5 pre-existing stray
+f-strings in `scripts/audit_mlb_v9_feature_distribution.py`), `verify-chain`
+(hash chain intact, `break_count=0`), `validate-totals`, `feature_model_audit.py`,
+`check_rebuild_isolation.py`, `check_obsolete_paths.py`, `audit_ledger_pnl.py`,
+dashboard `/api/health`, and the installed vs. checked-in launchd plist diff.
+
+**Real findings, none auto-fixed (all need an owner decision):**
+- **MLB v9 feature table has 13 dead (zero-variance) features** — see
+  `docs/ROADMAP.md`'s Phase 5 "KNOWN ISSUE" callout for the full trace. Source
+  data exists and is populated; the bug is in the feature-engine lookup, not
+  absent data. This is the highest-priority finding — it means every v9
+  ablation result touching starter/offense/bullpen/platoon families to date
+  measured noise, not signal.
+- **2 model artifacts have SHA-256 hash mismatches against their own embedded
+  `artifact_hash`**: `config/models/archive/wnba-spread-baseline-v1.json` and
+  `config/models/research/mlb-v9-candidate-1.json`. Both inactive
+  (archived/quarantined), so no live-serving impact, but the provenance
+  record is currently wrong for both.
+- **3 model configs are orphaned** — never wired into `production.yaml`/
+  `config/model.yaml` and not registered as challengers:
+  `nfl-elo-trend-lr-v4-temperature.json`, `wnba-elo-trend-lr-v4-temperature.json`
+  (both committed as intended challengers, per their own commit messages, but
+  never actually hooked up), and `mlb-v9-candidate-1.json` (expected — it's
+  quarantined).
+- **`cs2-tiered-elo.xlsx` model ledger has a 22-row settlement backlog**
+  (unambiguous, unapplied since the 2026-08-23 sync) and **6 settlement
+  identity conflicts** (4 tennis-surface-elo-v1, 1 cs2-tiered-elo-v6, 1
+  lol-tiered-elo-v6) where the same pick has two different recorded P&L
+  signatures — `audit_ledger_pnl.py` correctly refuses to guess and leaves
+  both classes untouched.
+- **Installed launchd plist has drifted from the checked-in one**:
+  `~/Library/LaunchAgents/com.modelprediction.daily.plist`'s
+  `StartCalendarInterval` is a bare dict; `ops/launchd/com.modelprediction.daily.plist`
+  wraps the same value in a 1-element array. Both are valid launchd forms
+  (functionally identical), but the live file no longer byte-matches git.
+- **`docs/RESEARCH_BACKLOG.md` still exists** despite this file's own
+  "2026-08-13" note above (and the top-of-repo `CLAUDE.md`) recording it as
+  merged into `docs/ROADMAP.md` and deleted on 2026-08-22; its own
+  "Last Updated: 2026-08-23" header postdates the claimed deletion. Someone
+  (or some backfill script) recreated it after the merge — worth a decision
+  on whether to re-delete it or reconcile the two, since they can now drift
+  apart silently.
+
+**Confirmed non-issues (checked, not new):** `scripts/check_obsolete_paths.py`
+still flags `data/archive/research-ledger-split-20260726T192729Z/cleanup-report.json`
+— this is the exact pre-existing archived-artifact case
+`tests/test_obsolete_path_checker.py` already documents as known, deferred
+cleanup, not wired into blocking CI. Not a regression.
+
+Uncommitted working-tree changes present at scan time (Polymarket 429
+backoff, KBO/NPB timezone-of-"today" fix, ledger PnL sync, launchd
+once-daily schedule) were reviewed, tested, and left as-is per the no-commit-
+without-request policy — see the session's git status for the full list.
+
+## 2026-08-26 (later) — WNBA total unblocked (artifact identity repair) + model-wide identity/hash sweep
+
+**Bug found and fixed: WNBA total blocked at artifact resolution.**
+Both daily runs on 08-26 (12:43Z, 16:35Z) logged the `wnba_total` step as
+`status: blocked, reason: "exact serving artifact missing for
+wnba-total-margin-v1", scheduled_games: 0`. The slate builder hardcodes
+`model_version = "wnba-total-margin-v1"` (`cli/forecast.py:1157`) and loads
+artifacts through `_load_exact_artifact_contract`, which requires
+`config/models/<model_version>.json` whose embedded `model_version` matches
+exactly. The artifact existed only as `wnba-total-score-ridge-v1.json` with
+embedded `model_version: wnba-total-score-ridge-v1` — a three-way identity
+drift that fail-closed the whole step.
+
+**Fix (operator-directed name: `wnba-total-margin-v1`):**
+- `git mv config/models/wnba-total-score-ridge-v1.json → wnba-total-margin-v1.json`;
+  embedded `model_version` → `wnba-total-margin-v1`; `artifact_hash` re-signed
+  via `production_registry.compute_artifact_hash` (self-verifies).
+- `config/model.yaml` `total_research_artifact` → `config/models/wnba-total-margin-v1.json`.
+- `config/production.yaml` `blocked_workflows` reason for `wnba-total-margin-v1`
+  was stale ("no exact serving artifact exists for this model version") →
+  updated to the real remaining gate: "checked-in artifact has no
+  qualification.qualified; research-only pending over/under evaluation".
+  Reason strings are stored/display-only (`_parse_blocked_workflows`), no logic impact.
+- **Untouched on purpose:** `model_ledger.py` `MODEL_ID_BY_LEAGUE_AND_MARKET`
+  keeps `("WNBA","total"): "wnba-total-score-ridge"` — ledger identity is a
+  family name (NBA/NFL totals are also `*-total-score-ridge`), artifact
+  version and ledger id are different axes; renaming it would split history
+  into a new empty workbook. Rows already carry
+  `model_version: wnba-total-margin-v1` correctly.
+- The model remains **zero-unit research-only by design**: the artifact has no
+  top-level `qualification.qualified` and `market_qualification` is
+  `DATA_READY_PENDING_OVER_UNDER_EVALUATION`. No promotion was performed.
+- Tests: the fail-closed test in `tests/test_wnba_totals.py` now mocks the
+  loader instead of pinning the old filename; new regression test
+  `test_wnba_total_artifact_resolves_under_slate_model_version` pins that the
+  checked-in artifact resolves under the slate's exact version. WNBA 9/9,
+  registry 12/12, ledger+canary 46/46.
+
+**Model-wide sweep for the same error class (identity drift / hash failure /
+unresolvable contract):**
+- All 13 production models resolve (11 json_artifact via
+  `_load_exact_artifact_contract`, 2 code-backed soccer/tennis); all champions
+  resolve; blocked workflows resolve except `mlb-nrfi-v1`, which is
+  documented-intentional (code-backed step runs `status: ok`, 15 candidates
+  today; the block is Main-tier exclusion only). **No other model is blocked
+  the way WNBA total was.**
+- `config/models/research/mlb-v9-candidate-1.json` hash was re-hashed during
+  the sweep and then **reverted** — `tests/test_artifact_hash_verification.py`
+  pins the quarantine-annotation convention (`KNOWN_NON_VERIFIERS` +
+  `test_candidate_hash_verifies_without_quarantine_annotation`): its
+  `status`/`invalidation_reason`/`replacement` fields are post-signing
+  annotations deliberately never re-signed, same pattern as the
+  wnba-spread-baseline `_retired*` fields. This corrects the framing in the
+  earlier 08-26 scan above: those two "hash mismatches" are test-pinned
+  conventions, not broken provenance records. Whether the convention itself
+  should change (e.g. re-sign on annotation) is an owner decision.
+- Hygiene flags left untouched (challenger/rebuild or by-design):
+  `challengers/mlb-two-head-real-features-v1.json` embedded `model_id:
+  "mlb-two-head-v1"` ≠ filename (its hash verifies under a `sort_keys=False`
+  variant); `market-residual-v1.json` embedded name is the code's dynamic
+  `RESIDUAL_VERSION-identity-fallback` (diagnostic-only, fail-soft loader
+  never compares names).
+
+**New finding (owner decision, see ROADMAP Phase 21 KNOWN ISSUE):** the live
+v9 benchmark (`scripts/forecast_mlb_v9_benchmark.py`) records picks under
+`model_version: "mlb-v9-candidate-1"` but never loads
+`config/models/research/mlb-v9-candidate-1.json` — it retrains from the frozen
+cohort parquet via `mlb_evaluator`. The artifact under that exact name is
+`status: VOID_INVALID_FEATURE_PROVENANCE` (`replacement: mlb-v9-candidate-2
+TBD`). Functionally safe (voided artifact is not read), but any exact-contract
+lookup of "mlb-v9-candidate-1" resolves to a VOID artifact, and the benchmark
+rows' identity collides with it. Needs a rename decision on the research side.
+
+**Test suite:** 2,298 passed, 2 failed — both failures were the two
+test-pinned hash tests broken by the since-reverted re-hash; the affected
+file re-verified 4/4 after revert.
+
+## 2026-08-26 (evening) — resolution of the morning scan findings
+
+Every finding from the morning scan was resolved or superseded:
+
+- **13 dead v9 features — root-caused and fixed.** Four independent lookup
+  bugs, all in how snapshot-driven engines build keys vs. how callers query
+  them: (1) `features/batter_priors.py`'s loader read flat game fields while
+  `game_snapshots.jsonl` stores nested `side.team_name` /
+  `side.players[].batting` — every batter registered under an empty team key,
+  so `evaluate_projected_team_offense` hit the league-prior fallback for all
+  rows (4 Projected-Offense + 2 Platoon columns dead); (2)
+  `features/bullpen_state.py` keyed reliever appearances by numeric team_id
+  while `evaluate_matchup()` passes full names (3 Bullpen columns dead);
+  (3) `features/mlb_v9_features.py` read `starter_k_bb_gap` while the engine
+  returns `starter_k_minus_bb_pct_gap` (always the 0.0 default); (4)
+  `scripts/mlb_v9_feature_table_v3.py` never supplied starter names, fixed
+  via `load_probable_starter_index` (`mlb_v9_features.py:26-80`) reusing
+  `validation.py`'s `(start_utc[:16], home, away)` crosswalk. Direct engine
+  verification on a 200-game sample: all 19 previously-dead columns now have
+  66–185 distinct values (before: exactly 1 each). The builder's per-game
+  `platoon_matchup_gaps()` was replaced with the shared-engine equivalent
+  (value-identical on 100 real games) — the rebuild drops from hours to
+  tens of minutes. Regression tests: `tests/test_mlb_v9_feature_table_lookup.py`
+  (9 pass, revert-verified). The v3 parquet rebuild completed (6,678 rows,
+  hash 6b079f58cd82, pre-fix parquet backed up) and the distribution audit
+  now **PASSES ALL SANITY GATES** (0 nulls, all 24 features non-zero std).
+  Three pairs are documented construction-collinear in
+  `audit_mlb_v9_feature_distribution.py` (`KNOWN_COLLINEAR_PAIRS`, printed as
+  [KNOWN], never silent): `bullpen_freshness_advantage` /
+  `bullpen_hl_advantage` (r=1.00000 — boxscore snapshots carry no reliever
+  role, so every profile is MIDDLE_RELIEF and hl availability falls back to
+  general availability) and `projected_*_gap` / `platoon_*_advantage`
+  (r~0.9997 — the vs-hand filter needs per-batter PA by opposing-pitcher
+  hand, which boxscore snapshots cannot attribute). Revisit if a pitch-level
+  or roster-role source lands. **Ladder re-run on the rebuilt table
+  (2026-08-26, 2,000-bootstrap date-cluster paired, locked holdout):**
+  v3_baseline LL=0.6865/AUC=0.5589; `v3_starters` dLL=-0.00208 P_better=0.93
+  **KEEP**; `v3_offense` dLL=-0.00120 P=0.89 INCONCLUSIVE (borderline);
+  `v3_bullpen` +0.00038 (no signal); `v3_platoon` -0.00047 P=0.74;
+  `v3_full` dLL=-0.00300 P=0.91 **KEEP** (AUC 0.5743). The pre-fix ladder
+  measured all-null on these same families — the starter family is the
+  first real v9 signal. Report:
+  `outputs/research/mlb_evaluator/report_v3_20260826.json`; the evaluator
+  gained `--parquet`/`--manifest` args and `v3_*` feature sets pinned to
+  the v3 contract (`manifests/mlb_v9_feature_table_v3_eval.json`, cohort
+  files `*_event_ids_v3.json`).**
+- **2 artifact hash "mismatches" — confirmed deliberate non-issues.** Both
+  re-verify exactly under canonical conventions when their annotation fields
+  are excluded (archive/wnba-spread-baseline-v1: `_retired`/`_retired_date`/
+  `_retirement_reason`; research/mlb-v9-candidate-1: `status`/
+  `invalidation_reason`/`replacement`) — the never-re-signed evidence rule
+  (`docs/FEATURE_MODEL_AUDIT.md`) covers both. The morning scan's claim that
+  "the provenance record is currently wrong for both" was itself wrong.
+  `scripts/feature_model_audit.py` now documents `KNOWN_MISMATCH_ARTIFACTS`
+  and reports them as `known_hash_mismatch` instead of gaps;
+  `tests/test_artifact_hash_verification.py` pins the conventions.
+- **3 orphaned configs** — `nfl-`/`wnba-elo-trend-lr-v4-temperature.json`
+  removed (zero references anywhere; inert per their own commit messages).
+  `mlb-v9-candidate-1.json` stays: the quarantine is load-bearing for the
+  fail-closed paired-shadow gate.
+- **Ledger settlement backlog + identity conflicts — resolved.** The 22-row
+  cs2-tiered-elo backlog was applied via `audit_ledger_pnl.py
+  --apply-model-ledgers`; 27 further model-workbook settlements unlocked and
+  applied; all workbooks timestamped-backed-up first. New
+  `scripts/resolve_ledger_conflicts.py` resolves the 6 identity conflicts
+  from canonical SQLite evidence (latest-settlement authority, lineage-backed
+  reference, same-tier stale-survivor archive; result disagreements are never
+  auto-resolved). `audit_ledger_pnl.py`'s economic signature is now
+  stake-normalized (pnl per unit, 4dp) so tier-specific sizing variance is
+  no longer flagged as a settlement conflict. One early resolution-run bug
+  replaced four decision payloads instead of extending them; the original
+  payloads were restored from the daily backup
+  (`model-prediction-runtime/backups/ledgers.20260826T072220Z.db`) as audited
+  update events. Final audit: 0 repairs planned, 0 conflicts, 0 anomalies,
+  integrity ok. Tests: `tests/test_resolve_ledger_conflicts.py` +
+  `tests/test_audit_ledger_pnl.py` (17 pass).
+- **launchd plist drift** — installed `com.modelprediction.daily.plist` now
+  byte-matches `ops/launchd/`; job reloaded, schedule verified (daily 08:30,
+  no RunAtLoad/StartInterval), `tests/test_launchd_schedule.py` passes.
+- **RESEARCH_BACKLOG.md resurrection** — deleted for real (git rm, staged);
+  unique content (evaluation contracts, v1 control baseline numbers, Phase 23
+  gate criteria, secondary-sports status) ported into `docs/ROADMAP.md`;
+  repo references retargeted.
+- **Production scheduler stall (new finding from the data-gap audit)** —
+  `com.modelprediction.production` and `com.modelprediction.rebuild-shadow`
+  were DISABLED in launchd (37h stall, undocumented; the canary health reason
+  in system_health). Operator approved re-enabling: both jobs loaded, fired,
+  and completed exit 0 on 2026-08-26.
+- **NRFI model improvement (operator: "calling the same as fair market
+  prices")** — two defects found: (1) `features/yrfi_nrfi.py`'s
+  `LEAGUE_FIRST_INNING_RUN_RATE` was 0.52 — the per-TEAM half-inning mean
+  mistaken for the per-GAME total (a 2x error that inflated every starter
+  run-rate multiplier and deflated p_nrfi; corrected to the empirical 1.036
+  measured over the 6,683 snapshots, pinned by test); (2) the v1 model's
+  logit weights were hand-set, never fitted, and its first-inning component
+  was full-game FIP scaled against that wrong constant. New research module
+  `models/mlb_first_inning.py` builds a PIT chronological ledger with
+  genuinely first-inning features (starter opponent-1st-runs/start, team
+  1st-inning scored/allowed split by home/away half, park 1st-inning rate,
+  starter rolling FIP/K%/BB%, top-of-order offense composite) and fits a
+  walk-forward logistic regression (train-only priors frozen at the train
+  window). Locked 1,337-game test window: logloss 0.691033 / Brier 0.248944
+  vs incumbent mlb-nrfi-v1 0.694537 / 0.250691 and the fixed-vig market
+  proxy 0.694982 / 0.250916; calibration error 0.0163 vs proxy 0.0309.
+  Research script: `scripts/mlb_nrfi_first_inning_research.py` (report in
+  `tmp/nrfi-first-inning-research.json`); tests:
+  `tests/test_mlb_nrfi_improvement.py` (7 new, incl. PIT no-self-leak pins).
+  Open follow-up: the repo captures no real Polymarket NRFI quotes (the
+  ledger's mlb-nrfi-v1 market_probability is the model's own fair price,
+  `sportsbook="model_fair"`) — capturing live NRFI market prices is the
+  prerequisite for measuring true CLV/edge, and wiring the new module into
+  the daily research path is an operator decision.
+- **Data-gap audit (full per-sport/feature/model scan)** — key gaps needing
+  follow-up: soccer results capture replaced 2026-08-26 — new
+  `data_sources/api_football.py` (API-Football v3, fail-closed without
+  `API_FOOTBALL_KEY`, provenance snapshots via `provider_capture`) wired into
+  daily step1b + `cmd_collect_scores`; the dormant Odds path is documented
+  fallback. Remaining after the key lands: live league-ID/AET/PEN verification.
+  Still open: WNBA official availability snapshots stale 1.5 days (today's
+  WNBA calls degraded to NO_CALL_AVAILABILITY_UNAVAILABLE); Statcast aggregate
+  parquets 3 days behind (manual-only ingester, not wired into daily);
+  market-snapshot lineage absent for 7,263 esports/soccer/KBO/NPB rows;
+  NBA/NFL have zero odds sources wired (TheRundown shortlisted). Corrected
+  false alarms: Polymarket DOES have ATP (and ITF) tennis markets as of
+  08-26; the repo-local `data/ledgers/ledgers.db` (not `data/model_ledgers/`)
+  is the frozen 08-23 artifact.
+
+## 2026-08-24 — tennis settlement, ledger authority, lineage, and false-green repair
+
+The tennis loss wall was a settlement defect, not measured model performance.
+Full-match spread and total rows were graded from a binary match-winner result
+(`0-1` or `1-0`) instead of summed per-set games. The exact persisted defect
+signature identified 221 settled Main/Flat rows. Every row was resolved by its
+exact ESPN event/competition ID before mutation: 205 were regraded from real
+game totals and 16 retirement-dependent derivatives were voided. Results are
+now 100 wins, 105 losses, and 16 pushes; aggregate P&L changed from
+`-269.5966U` to `-82.5410U`. The binary derivative signature is zero and the
+runtime hash chain remains intact.
+
+Future tennis pricing is moneyline-only. Unsupported heuristic spread/total
+and set/subperiod contracts are no longer emitted. Settlement uses per-set
+line scores for derivatives, exact source identity first, and fails closed on
+retirement, walkover, missing/misaligned line scores, or subperiod markets.
+The logging boundary also caps any future validated tennis derivative slate at
+one spread and one total per match, selected by pregame expected return only.
+It cannot use the result to choose a survivor.
+
+The canonical duplicate/exposure cleanup classified identity separately from
+correlation. It archived 457 settled rows and removed 9 open rows through the
+audited ledger APIs: 188 exact-contract refresh groups retained their latest
+valid pregame observation, while 58 tennis derivative ladders retained one
+pregame-EV-selected line per market family. Alternate lines remain distinct in
+the full JSON archive; the live repair planner now reports zero refresh groups
+and zero tennis ladders. A partial SQLite unique index prevents a second active
+contract/model identity across processes.
+
+SQLite is now the sole ledger authority. Application reads, exposure,
+duplicate detection, settlement, and dashboard cache reads use canonical
+SQLite rows. XLSX is a disposable projection with an explicit raw reader for
+parity. Reconciliation follows authority direction and cannot tombstone a
+canonical row because XLSX omitted it. All 22 tier/sport projections were
+rebuilt and verify clean.
+
+All 12,335 historical records now carry `ledger-row-features-v1` payloads.
+Only stored decision-time fields were copied: 944 rows are `available`, 366
+are `partial_with_unavailable_features`, and 11,025 are explicitly
+`unavailable_not_recorded`. No feature or market value was invented.
+
+Serving now requires the exact registered sport/market champion and exact
+artifact. WNBA total, unqualified WNBA spread, MLB NRFI, and unqualified MLB
+derivative workflows are explicit blocked/research-only health entries.
+Material daily substep failures now produce a nonzero supervisor result after
+fail-soft work completes. Production serving was not expanded.
+
+The Flat MLB moneyline P&L anomaly had a separate cause. The confidence
+downgrade wrote `units=0` and later settled `pnl_units=0`, while the dashboard
+silently substituted a suggested 0.75--1.75U display size. That mixed a
+30-game win-rate denominator with only five genuinely scored rows. The repair
+was scoped to the exact canonical signature
+`flat/mlb + NO_CALL_BELOW_LEARNED_CONFIDENCE + units=0`: 112 settled rows were
+resized from their stored decision-time inputs and regraded, then 649 matching
+model-ledger observations were synchronized from SQLite. The reported
+08-22--08-23 slice is now 19-11, `+1.8975U`, `6.3% ROI` over 30.0U, with no
+zero-P&L wins or losses. Timestamped SQLite/XLSX backups were created before
+mutation. The repair script is dry-run by default, requires SQLite authority,
+and refuses to run while the daily writer lock is held.
+
+Every persisted forecast is now an explicit paper `CALL` with positive units,
+including unqualified, low-edge, thin-history, and market-unavailable model
+opinions. Trust and execution authorization remain separate: those rows keep
+`record_type=RESEARCH_OBSERVATION`, so the universal paper-call label does not
+promote them to executable or qualified status. An unverifiable quote is still
+discarded and the flat row uses the explicit `-110` paper benchmark. The
+dashboard no longer invents size for a settled zero-unit row, and system health
+checks every settled binary row for a positive scoring basis and coherent
+win/loss P&L directly in canonical SQLite.
+
+The lock-protected universal migration changed 1,842 canonical active SQLite
+records, 1,844 active XLSX projection rows across 13 workbooks, and 11,806
+nonfailed model-ledger observations across 16 workbooks. All active stored
+predictions now carry `CALL` plus positive paper units; all settled predictions
+carry realized P&L computed from their stored entry economics. Open rows retain
+a blank P&L field, meaning pending settlement rather than a fabricated zero.
+Archived and removed lifecycle tombstones were intentionally excluded. The
+post-migration dry run plans zero changes and reports zero unresolved rows.
+
+The same investigation found a scheduler false green: the latest daily run's
+MLB v9 forecast exited 1 after calling a removed `PickLedger.list_picks()` API
+and then hitting a duplicate, but `run_daily.sh` ignored both v9 child exit
+codes in its final gate. The benchmark now reads the public `rows()` API and
+handles a concurrent duplicate idempotently; the shell gate includes settle,
+v9 settle, ingest, daily, and v9 forecast exits. A live v9 rerun scanned ten
+events, skipped all ten existing identities, and exited zero.
+
+A fresh full supervisor run then finished with
+`settle=0, v9_settle=0, ingest=0, daily=0, v9_forecast=0`; a separate
+production refresh also exited zero and cleared its stale-prediction warning.
+System health remains deliberately `DEGRADED` only for the five explicitly
+unqualified serving workflows above. It must not be relabeled healthy until
+those exact sport/market artifacts earn qualification.
+
+The dedicated MLB v9 view had one remaining denominator leak. Four settled
+model outcomes lacked a quote inside the normal 30-minute execution freshness
+window, but each had an authenticated Polymarket snapshot known before the
+forecast and before first pitch. Because the v9 flat benchmark contract is one
+1.0U CALL on every recorded pick, its quote lookup is now explicitly
+stale-tolerant while retaining provider, hash, knowledge-time, and pregame
+checks. The four rows were restored as priced 1.0U calls and their settled P&L
+was recomputed from those stored quotes. The generic dashboard cohort guard
+remains in place so a genuinely unscored row cannot leak into betting
+performance or render null economics as fake zeros.
+
+The follow-up v9 model-ledger audit also found 71 stale economic observations
+across the legacy and candidate workbooks. The lock-protected repair created
+timestamped backups and synchronized all 71 observations to authenticated
+prices known at forecast time. Sixty-three used quotes inside the normal
+30-minute freshness window; eight benchmark observations use older but still
+authenticated, pre-decision, pregame snapshots under the explicit all-CALL
+flat-benchmark contract. A post-repair dry run plans zero changes in both
+workbooks.
+
+Five ambiguous model-ledger conflicts remain deliberately unmodified (three
+tennis, one CS2, one LoL): multiple stored observations disagree on settlement
+economics, so there is no safe identity-scoped correction without stronger
+source evidence. They are evidence gaps, not candidates for automatic P&L
+normalization.
+
+Final verification after the universal-call and active-model discovery repairs:
+2,287 tests passed, 3 skipped; changed-path Ruff and `git diff --check` passed.
+The live API exposes 16 active model ledgers, zero backup models, 2,747 open
+model predictions, and zero non-CALL decisions. Dia rendered the same 16-model
+evidence table and the corrected v9 settled ledger at 18 scored games and
+`+5.92U`. SQLite integrity and the 39,576-event replay chain passed during the
+preceding repair verification. Whole-tree Ruff still reports five findings in
+the pre-existing untracked `scripts/audit_mlb_v9_feature_distribution.py`,
+which this repair preserved.
+
+At the pre-repair audit snapshot, remaining evidence gaps were explicit, not
+repaired with fake history: 3,240
+active rows predate market-snapshot lineage, 40 active MLB rows lack an
+artifact hash, and 11,398 canonical rows have no recorded feature values.
+There are 232 open rows, including 24 more than 24 hours past start and 19
+more than 72 hours past start. A broad settlement sweep was intentionally not
+run without an identity-scoped result manifest.
 
 ## 2026-08-19 — prospective lineup capture, overnight wake planning, v9 isolating ladder
 

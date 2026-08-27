@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-LEAGUE_RELIEF_ERA = 4.0598
+LEAGUE_RELIEF_ERA = 4.0532
 # Same shrinkage rationale as models/mlb.py's starter ERA fix: a handful of
 # relief innings is extremely noisy on its own (one blown save skews it hard)
 # and must not be trusted at full confidence just because it's nonzero.

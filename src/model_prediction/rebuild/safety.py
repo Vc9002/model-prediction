@@ -15,7 +15,13 @@ class RebuildSafetyError(RuntimeError):
     """Raised before a rebuild operation can cross a production boundary."""
 
 
-PROTECTED_DATA_ROOTS = ("data/main", "data/flat", "data/gated_research", "data/research")
+PROTECTED_DATA_ROOTS = (
+    "data/main",
+    "data/flat",
+    "data/flat_v9",
+    "data/gated_research",
+    "data/research",
+)
 PRODUCTION_ADAPTER_TOKENS = ("order", "execute", "execution", "production_ledger", "live_adapter")
 
 

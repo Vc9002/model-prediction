@@ -1,7 +1,7 @@
 """Per-league champion resolution (research-tier only).
 
 Maps a competition code to its per-league Poisson-Dixon-Coles config and
-model. This is the read side of docs/RESEARCH_BACKLOG.md P2's proposed
+model. This is the read side of docs/ROADMAP.md's proposed
 `competition` dimension for champion identity -- but it is deliberately
 NOT wired into production_registry.py or soccer_forward.py yet. The
 backlog itself says that dimension is a "MODEL phase infrastructure

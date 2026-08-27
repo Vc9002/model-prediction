@@ -84,6 +84,7 @@ from model_prediction.dashboard.picks import (
     read_flat_picks,
     read_picks,
     read_polymarket_picks,
+    read_v9_flat_picks,
 )
 from model_prediction.dashboard.status import (
     _capture_health_summary,
@@ -162,6 +163,16 @@ class Handler(BaseHTTPRequestHandler):
                     return [_decorate_pick(row, orders, portfolio, archived_ids=archived) for row in flat]
 
                 self._send(_cached("flat-picks", 30, _flat_picks_decorated))
+            elif route == "/api/v9-picks":
+
+                def _v9_picks_decorated():
+                    v9_rows = read_v9_flat_picks()
+                    orders = _load_orders()
+                    portfolio = _load_portfolio_history()
+                    archived = set(_load_archive().get("pick_ids", []))
+                    return [_decorate_pick(row, orders, portfolio, archived_ids=archived) for row in v9_rows]
+
+                self._send(_cached("v9-picks", 10, _v9_picks_decorated))
             elif route in ("/api/polymarket-picks", "/api/picks/polymarket"):
 
                 def _poly_picks_decorated():
@@ -176,31 +187,34 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(_cached("polymarket-picks", 10, _poly_picks_decorated))
             elif route == "/api/performance":
                 sport = str(query.get("sport") or "").strip()
+                archived = set(_load_archive().get("pick_ids", []))
                 self._send(
                     _cached(
                         f"performance:{sport.casefold() or 'all'}",
                         30,
-                        lambda: performance_for_sport(read_picks(), sport),
+                        lambda: performance_for_sport(read_picks(), sport, archived_ids=archived),
                     )
                 )
             elif route == "/api/flat-performance":
                 sport = str(query.get("sport") or "").strip()
                 flat = read_flat_picks()
+                archived = set(_load_archive().get("pick_ids", []))
                 self._send(
                     _cached(
                         f"flat-performance:{sport.casefold() or 'all'}",
                         30,
-                        lambda: performance_for_sport(flat, sport),
+                        lambda: performance_for_sport(flat, sport, archived_ids=archived),
                     )
                 )
             elif route == "/api/research-performance":
                 sport = str(query.get("sport") or "").strip()
                 research = _parse_research_picks()
+                archived = set(_load_archive().get("pick_ids", []))
                 self._send(
                     _cached(
                         f"research-performance:{sport.casefold() or 'all'}",
                         30,
-                        lambda: performance_for_sport(research, sport),
+                        lambda: performance_for_sport(research, sport, archived_ids=archived),
                     )
                 )
             elif route == "/api/research-picks":
@@ -217,11 +231,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(_cached("research-picks", 60, _research_decorated))
             elif route == "/api/gated-research-performance":
                 sport = str(query.get("sport") or "").strip()
+                archived = set(_load_archive().get("pick_ids", []))
                 self._send(
                     _cached(
                         f"gated-research-performance:{sport.casefold() or 'all'}",
                         60,
-                        lambda: performance_for_sport(_parse_research_picks(gated=True), sport),
+                        lambda: performance_for_sport(
+                            _parse_research_picks(gated=True), sport, archived_ids=archived
+                        ),
                     )
                 )
             elif route == "/api/gated-research-picks":

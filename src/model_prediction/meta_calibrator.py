@@ -8,6 +8,7 @@ miscalibration and overconfidence.
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -34,25 +35,32 @@ class SharedMetaCalibrator:
         self.isotonic_model: IsotonicRegression | None = None
         self.is_fitted = False
 
-    def fit(self, raw_probabilities: list[float], true_outcomes: list[int]) -> MetaCalibrationResult:
+    def fit(
+        self,
+        raw_probabilities: list[float],
+        true_outcomes: list[int],
+        sample_weights: list[float] | None = None,
+    ) -> MetaCalibrationResult:
         probs = np.array(raw_probabilities, dtype=float)
         outcomes = np.array(true_outcomes, dtype=int)
+        weights = np.array(sample_weights, dtype=float) if sample_weights is not None else None
         n = len(probs)
         if n < 10:
             raise ValueError("Meta-calibrator requires at least 10 observations")
 
-        pre_brier = float(np.mean((probs - outcomes) ** 2))
+        pre_brier = float(np.average((probs - outcomes) ** 2, weights=weights))
         eps = 1e-7
         pre_ll = float(
-            -np.mean(
+            -np.average(
                 outcomes * np.log(np.clip(probs, eps, 1 - eps))
-                + (1 - outcomes) * np.log(np.clip(1 - probs, eps, 1 - eps))
+                + (1 - outcomes) * np.log(np.clip(1 - probs, eps, 1 - eps)),
+                weights=weights,
             )
         )
 
         if self.method == "isotonic":
             self.isotonic_model = IsotonicRegression(out_of_bounds="clip", y_min=0.01, y_max=0.99)
-            self.isotonic_model.fit(probs, outcomes)
+            self.isotonic_model.fit(probs, outcomes, sample_weight=weights)
             calibrated = self.isotonic_model.predict(probs)
         else:
             # Platt scaling: Logistic regression on logit(p)
@@ -60,14 +68,15 @@ class SharedMetaCalibrator:
                 -1, 1
             )
             self.platt_model = LogisticRegression(C=1.0)
-            self.platt_model.fit(logits, outcomes)
+            self.platt_model.fit(logits, outcomes, sample_weight=weights)
             calibrated = self.platt_model.predict_proba(logits)[:, 1]
 
-        post_brier = float(np.mean((calibrated - outcomes) ** 2))
+        post_brier = float(np.average((calibrated - outcomes) ** 2, weights=weights))
         post_ll = float(
-            -np.mean(
+            -np.average(
                 outcomes * np.log(np.clip(calibrated, eps, 1 - eps))
-                + (1 - outcomes) * np.log(np.clip(1 - calibrated, eps, 1 - eps))
+                + (1 - outcomes) * np.log(np.clip(1 - calibrated, eps, 1 - eps)),
+                weights=weights,
             )
         )
 
@@ -93,3 +102,16 @@ class SharedMetaCalibrator:
             logit = np.array([[math.log(p / (1.0 - p))]])
             return float(self.platt_model.predict_proba(logit)[0, 1])
         return raw_probability
+
+    def calibrate_batch(self, raw_probabilities: Sequence[float]) -> np.ndarray:
+        """Transform a sequence of model probabilities vectorially for high-performance slate evaluation."""
+        if not self.is_fitted:
+            return np.array(raw_probabilities, dtype=float)
+        eps = 1e-7
+        arr = np.clip(np.array(raw_probabilities, dtype=float), eps, 1.0 - eps)
+        if self.method == "isotonic" and self.isotonic_model is not None:
+            return self.isotonic_model.predict(arr)
+        elif self.platt_model is not None:
+            logits = np.log(arr / (1.0 - arr)).reshape(-1, 1)
+            return self.platt_model.predict_proba(logits)[:, 1]
+        return arr

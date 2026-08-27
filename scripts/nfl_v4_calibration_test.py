@@ -1,6 +1,6 @@
 """NFL v4 calibration challenger (Step 8 item 2) -- same temperature treatment as WNBA.
 
-Backlog directive (docs/RESEARCH_BACKLOG.md P1): "incumbent OOF probs: Identity /
+Backlog directive (docs/ROADMAP.md): "incumbent OOF probs: Identity /
 Platt / Temperature / Isotonic. Calibration first; QB/EPA/CPOE/OL/injuries/
 weather only after." This tests the frozen nfl-elo-trend-lr-v4 artifact's OWN
 served probabilities (no refit) on its own recorded validation/holdout split --

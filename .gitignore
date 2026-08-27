@@ -22,7 +22,11 @@ data/*.pre-fix-*
 data/logs/
 dashboard/server.log
 data/events.jsonl
+# Operational capture output (bet_better provider snapshots, 2026-08-26
+# night continuation) — same policy as the other untracked data trees.
+data/providers/
 data/mlb_statsapi/game_snapshots.jsonl
+data/statcast/
 data/**/*.cache
 *.cache
 
@@ -76,6 +80,7 @@ data/odds/
 data/point_in_time/
 data/main/
 data/flat/
+data/flat_v9/
 data/research/
 data/gated_research/
 data/model_ledgers/
@@ -102,3 +107,9 @@ backups/archive-*/*
 data/experiments/
 data/ledgers/
 outputs/research/
+GATES.md
+.unlazy/
+.unlazy-hook-state.json
+
+# Session scratch: audit reports, one-off repair scripts
+tmp/

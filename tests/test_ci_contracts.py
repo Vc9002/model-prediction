@@ -98,5 +98,7 @@ def test_ci_imports_of_checked_in_config_resolve() -> None:
     from model_prediction.production_registry import ProductionModelRegistry
 
     registry = ProductionModelRegistry.load(Path(__file__).resolve().parents[1])
-    assert len(registry.entries) == 14  # 13 + measured-edge-totals-v3 (MLB total promotion, 2026-08-18)
+    assert len(registry.entries) == 13
+    assert "measured-edge-totals-v3" not in registry.entries
+    assert "measured-edge-totals-v3" in registry.blocked_workflows
     assert len(registry.problem_entries()) == 0

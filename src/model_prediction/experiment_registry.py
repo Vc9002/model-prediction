@@ -53,7 +53,7 @@ CREATE INDEX IF NOT EXISTS idx_experiments_model
 
 # Matches the research-backlog experiment template's lifecycle
 # (queued | running | completed | void); "queued" was missing from the
-# registry while RESEARCH_BACKLOG.md documented it — found 2026-08-16.
+# registry while ROADMAP.md documented it — found 2026-08-16.
 _STATUSES = ("queued", "running", "completed", "void")
 
 

@@ -58,7 +58,7 @@ from .domain import (
 from .eligibility import EligibilityResult
 from .model_ledger import record_from_pick_request, settle_from_pick_row
 from .pricing import american_to_decimal, grade_pick, implied_probability, profit_units
-from .runtime_ledger_store import LedgerMutation, RuntimeLedgerStore
+from .runtime_ledger_store import LedgerMutation, RuntimeLedgerDuplicateError, RuntimeLedgerStore
 from .units import Exposure, edge_scaled_units
 from .xlsx_ledger import read_xlsx_rows, write_xlsx_rows_atomic
 
@@ -72,9 +72,45 @@ EXPOSURE_TIMEZONE = EASTERN
 LOCK_TIMEOUT_SECONDS = 30
 LOCK_POLL_INTERVAL_SECONDS = 0.1
 
+PREDICTION_MARKET_SPORTSBOOKS = frozenset({"kalshi", "polymarket", "polymarket_us", "prediction_market"})
+
 
 class LedgerLockTimeout(TimeoutError):
     """Raised when a ledger file lock can't be acquired within the timeout."""
+
+
+def _settlement_pnl(
+    *,
+    result: PickResult,
+    units: float,
+    sportsbook: object,
+    decimal_odds: float,
+    entry_probability: float,
+    binary_contract_settlement_value: float | None,
+) -> float:
+    """Return P&L from immutable decision-time economics.
+
+    Exchange contracts settle from their recorded entry probability. Sportsbook
+    rows settle from their recorded decimal odds. Do not infer the venue from a
+    common price such as -110: consensus and MLB v9 sportsbook rows legitimately
+    use that price too.
+    """
+    normalized_sportsbook = str(sportsbook or "").strip().lower()
+    is_prediction_market = normalized_sportsbook in PREDICTION_MARKET_SPORTSBOOKS
+    if binary_contract_settlement_value is not None or is_prediction_market:
+        if not 0 < entry_probability < 1:
+            raise ValueError("prediction-market settlement requires a valid decision-time entry price")
+        settlement_value = binary_contract_settlement_value
+        if settlement_value is None:
+            if result is PickResult.PUSH:
+                return 0.0
+            settlement_value = 1.0 if result is PickResult.WIN else 0.0
+        return units * (settlement_value / entry_probability - 1.0)
+    return profit_units(
+        result,
+        units,
+        decimal_odds if decimal_odds > 0 else 1.909091,
+    )
 
 
 def _acquire_exclusive_lock(fileno: int, path: Path, timeout: float = LOCK_TIMEOUT_SECONDS) -> None:
@@ -241,6 +277,24 @@ FIELDNAMES = [
     "blend_config_hash",
     "serving_policy_block_reason",
 ]
+FEATURE_PAYLOAD_SCHEMA_VERSION = "ledger-row-features-v1"
+FEATURE_VALUE_FIELDS = (
+    "elo_probability",
+    "trend_gap",
+    "park_factor",
+    "weather_factor",
+    "pitcher_era_gap",
+    "probable_starter_era_gap",
+    "defensive_trend_gap",
+    "neutral_elo_rating_difference",
+    "bullpen_weakness_gap",
+    "starter_era_gap",
+    "rest_disparity",
+    "back_to_back_gap",
+    "games_last_7_gap",
+    "schedule_missingness",
+    "market_residual_probability",
+)
 DECISION_FIELDS = {
     "pick_id",
     "created_at_utc",
@@ -483,6 +537,11 @@ class PickLedger:
         # would touch every call site. Schema migration is a rare, one-time
         # event per ledger file (not part of the hot pick-lifecycle path),
         # so this stays lower priority than the fixes above.
+        # SQLite authority never bootstraps or migrates from its XLSX export.
+        # In particular, a missing projection must not be recreated as an empty
+        # workbook while canonical rows already exist.
+        if self.authority == "sqlite":
+            return
         migrated_from: str | None = None
         with self._lock():
             if not self.path.exists() or self.path.stat().st_size == 0:
@@ -509,8 +568,30 @@ class PickLedger:
             # contract _read_unlocked() already uses, and the same one the
             # dashboard's picks reader already relies on post-archival.
             return self._filter_rows([], filters or {})
-        _, rows = read_xlsx_rows(self.path)
-        return self._filter_rows(rows, filters or {})
+        return self._filter_rows(self._read_unlocked(), filters or {})
+
+    def export_rows(self) -> list[dict[str, str]]:
+        """Read the XLSX projection directly, regardless of ledger authority.
+
+        Parity and repair tooling must compare the physical export with the
+        canonical store. Calling ``rows()`` after the SQLite cutover would read
+        SQLite twice and manufacture a false-green parity result.
+        """
+        if not self.path.exists() or self.path.stat().st_size == 0:
+            return []
+        headers, rows = read_xlsx_rows(self.path)
+        if headers != FIELDNAMES:
+            raise ValueError("picks.xlsx schema does not match this code version")
+        return rows
+
+    def rebuild_xlsx_projection(self) -> int:
+        """Replace the disposable XLSX export from canonical SQLite rows."""
+        if self.authority != "sqlite":
+            raise ValueError("XLSX projection rebuild requires sqlite authority")
+        with self._lock():
+            rows = self._read_unlocked()
+            self._write_rows_unchecked(rows)
+        return len(rows)
 
     def exposure(
         self,
@@ -570,6 +651,9 @@ class PickLedger:
     def append_evaluated(
         self, request: PickRequest, eligibility: EligibilityResult, now: datetime | None = None
     ) -> dict[str, str]:
+        from .eligibility import enforce_universal_paper_call
+
+        eligibility = enforce_universal_paper_call(request, eligibility)
         return self._append_record(request, eligibility, now or utc_now())
 
     def append_call(
@@ -582,7 +666,7 @@ class PickLedger:
     ) -> dict[str, str]:
         """Backward-compatible writer used by older callers and tests.
 
-        Legacy forced calls are converted to zero-unit research observations.
+        Legacy forced calls remain research-only but are persisted as positive-unit paper CALLs.
         """
         from .entities import CanonicalTeam
 
@@ -595,9 +679,9 @@ class PickLedger:
         )
         eligibility = EligibilityResult(
             RecordType.RESEARCH_OBSERVATION if research else RecordType.QUALIFIED_SHADOW_CALL,
-            "RESEARCH_OBSERVATION" if research else "CALL",
-            "NO_CALL_MODEL_UNVALIDATED" if research else "QUALIFIED",
-            0 if research else units,
+            "CALL",
+            "PAPER_CALL_MODEL_UNVALIDATED" if research else "QUALIFIED",
+            (units if units > 0 else 1.0) if research else units,
             confidence_score,
             request.model_probability - implied_probability(request.american_odds),
             request.model_probability
@@ -659,8 +743,8 @@ class PickLedger:
                 if eligibility.record_type is RecordType.QUALIFIED_SHADOW_CALL
                 else "research_observation"
             )
-            if eligibility.reason_code == "NO_CALL_TEAM_BANNED":
-                call_type = "no_call"
+            if eligibility.record_type is RecordType.RESEARCH_OBSERVATION:
+                call_type = "paper_call"
             row.update(
                 {
                     "pick_id": pick_id,
@@ -739,12 +823,6 @@ class PickLedger:
                 else "research_observation_created"
             )
             self.audit.append(event_type, pick_id, self._decision_audit_payload(row))
-            if eligibility.decision == "NO_CALL":
-                self.audit.append(
-                    "pick_rejected",
-                    pick_id,
-                    {"reason_code": eligibility.reason_code, "record_type": eligibility.record_type.value},
-                )
             if self.authority == "sqlite":
                 # Canonical store commits first — its failure aborts the
                 # mutation (the export write below becomes best-effort).
@@ -813,7 +891,14 @@ class PickLedger:
         self._write_rows(rows_to_write)
         self._mirror_row(mirror_row, event_type, operation_id)
 
-    def _mirror_row(self, row: dict[str, str], event_type: str, operation_id: str) -> None:
+    def _mirror_row(
+        self,
+        row: dict[str, str],
+        event_type: str,
+        operation_id: str,
+        *,
+        note: str | None = None,
+    ) -> None:
         """Mirror write with the authority-aware failure contract.
 
         xlsx authority (dual-write phase): the mirror is fail-soft — a
@@ -826,7 +911,15 @@ class PickLedger:
         if self.mirror is None or not self.tier or self.retired:
             return
         try:
-            self.mirror.apply(self._row_mutation(row, event_type, operation_id))
+            self.mirror.apply(self._row_mutation(row, event_type, operation_id, note=note))
+        except RuntimeLedgerDuplicateError as error:
+            if self.authority == "sqlite":
+                raise DuplicatePickError(error.pick_id) from error
+            logging.getLogger(__name__).warning(
+                "runtime ledger mirror duplicate suppressed for pick %s (xlsx authority unchanged)",
+                row["pick_id"],
+            )
+            _parity_alarm(self.mirror, f"duplicate {row['pick_id']}")
         except Exception:
             if self.authority == "sqlite":
                 raise
@@ -838,7 +931,14 @@ class PickLedger:
             )
             _parity_alarm(self.mirror, f"{event_type} {row['pick_id']}")
 
-    def _row_mutation(self, row: dict[str, str], event_type: str, operation_id: str) -> LedgerMutation:
+    def _row_mutation(
+        self,
+        row: dict[str, str],
+        event_type: str,
+        operation_id: str,
+        *,
+        note: str | None = None,
+    ) -> LedgerMutation:
         """Map a canonical XLSX row to the mirror mutation (G3/G4).
 
         The full row rides along in decision_payload so reconciliation can
@@ -878,7 +978,31 @@ class PickLedger:
             pnl_units=_num(row.get("pnl_units")),
             settled_at_utc=row.get("settled_at_utc") or None,
             decision_payload=dict(row),
+            feature_payload=self._feature_payload(row),
+            note=note,
         )
+
+    @staticmethod
+    def _feature_payload(row: dict[str, str]) -> dict[str, Any]:
+        """Build an auditable feature snapshot without synthesizing values."""
+        features = {field: row[field] for field in FEATURE_VALUE_FIELDS if row.get(field) not in (None, "")}
+        unavailable_features = row.get("unavailable_features") or None
+        if not features:
+            availability_status = "unavailable_not_recorded"
+        elif unavailable_features:
+            availability_status = "partial_with_unavailable_features"
+        else:
+            availability_status = "available"
+        return {
+            "feature_payload_schema_version": FEATURE_PAYLOAD_SCHEMA_VERSION,
+            "feature_schema_version": row.get("feature_schema_version") or None,
+            "model_version": row.get("model_version") or None,
+            "model_artifact_hash": row.get("model_artifact_hash") or None,
+            "availability_status": availability_status,
+            "observed_feature_count": len(features),
+            "unavailable_features": unavailable_features,
+            "features": features,
+        }
 
     def settle(
         self,
@@ -956,17 +1080,21 @@ class PickLedger:
             # a ledger's P&L represents actually-staked money is a property of
             # the ledger itself (main only), not something settle() decides.
             units = float(row["units"] or 0)
-            entry_probability = float(
-                row["decision_raw_implied_probability"] or row["market_implied_probability"]
+            raw_entry = (
+                row.get("market_probability_at_decision")
+                or row["decision_raw_implied_probability"]
+                or row["market_implied_probability"]
             )
-            pnl = (
-                units * (binary_contract_settlement_value / entry_probability - 1)
-                if binary_contract_settlement_value is not None
-                else profit_units(
-                    result,
-                    units,
-                    float(row["decision_decimal_odds"] or row["decimal_odds"]),
-                )
+            entry_probability = float(raw_entry) if raw_entry not in (None, "") else 0.0
+
+            dec_odds_val = float(row["decision_decimal_odds"] or row["decimal_odds"] or 0.0)
+            pnl = _settlement_pnl(
+                result=result,
+                units=units,
+                sportsbook=row.get("sportsbook"),
+                decimal_odds=dec_odds_val,
+                entry_probability=entry_probability,
+                binary_contract_settlement_value=binary_contract_settlement_value,
             )
             research_units = None
             if (
@@ -989,13 +1117,14 @@ class PickLedger:
                         )
             if research_units is None:
                 research_pnl = None
-            elif binary_contract_settlement_value is not None:
-                research_pnl = research_units * (binary_contract_settlement_value / entry_probability - 1)
             else:
-                research_pnl = profit_units(
-                    result,
-                    research_units,
-                    float(row["decision_decimal_odds"] or row["decimal_odds"]),
+                research_pnl = _settlement_pnl(
+                    result=result,
+                    units=research_units,
+                    sportsbook=row.get("sportsbook"),
+                    decimal_odds=dec_odds_val,
+                    entry_probability=entry_probability,
+                    binary_contract_settlement_value=binary_contract_settlement_value,
                 )
             settled_at_utc = iso_utc(settled_at or utc_now())
             row.update(
@@ -1026,7 +1155,7 @@ class PickLedger:
                     else str(closing_consensus_line),
                     "probability_clv": ""
                     if closing_probability is None
-                    else f"{closing_probability - float(row['decision_raw_implied_probability'] or row['market_implied_probability']):.6f}",
+                    else f"{closing_probability - entry_probability:.6f}",
                     "pnl_units": f"{pnl:.4f}",
                     "settled_at_utc": settled_at_utc,
                     "review_status": "review_required" if result is PickResult.LOSS else "not_applicable",
@@ -1091,14 +1220,18 @@ class PickLedger:
         )
         return row
 
-    def recompute_research_sizing(self, policy=None) -> int:
+    def recompute_research_sizing(
+        self,
+        policy=None,
+        *,
+        reason_codes: set[str] | None = None,
+        pick_ids: set[str] | None = None,
+    ) -> int:
         """Recompute ``units`` (and ``pnl_units`` for already-settled rows)
         for every RESEARCH_OBSERVATION row, from that row's own stored
         decision-time fields, using the current sizing rule in
         ``eligibility._research``/``_downgrade_research_call``: every reason
-        gets a real edge_scaled_units paper size except NO_CALL_TEAM_BANNED,
-        which always stays zero (a banned team is never sized, regardless of
-        model opinion).
+        gets a real edge_scaled_units paper size, including trust-blocked rows.
 
         One-time backfill for rows logged under an earlier, buggier version
         of that rule (a flat min_pick_units cap regardless of edge, or a
@@ -1112,13 +1245,16 @@ class PickLedger:
         from .config import unit_policy as _unit_policy
 
         policy = policy or _unit_policy(load_config())
-        unsizable_reasons = {"NO_CALL_TEAM_BANNED"}
-        changed = 0
+        changed_rows: list[dict[str, str]] = []
         with self._lock():
             self._migrate_if_needed()
             rows = self._read_unlocked()
             for row in rows:
                 if row["record_type"] != RecordType.RESEARCH_OBSERVATION.value:
+                    continue
+                if reason_codes is not None and row.get("reason_code") not in reason_codes:
+                    continue
+                if pick_ids is not None and row.get("pick_id") not in pick_ids:
                     continue
                 try:
                     model_probability = float(row["model_probability"])
@@ -1127,10 +1263,11 @@ class PickLedger:
                     continue
                 uncertainty_raw = row.get("model_uncertainty")
                 uncertainty = float(uncertainty_raw) if uncertainty_raw not in (None, "") else 0.05
-                new_units = (
-                    0.0
-                    if row.get("reason_code") in unsizable_reasons
-                    else edge_scaled_units(model_probability, uncertainty or 0.05, american_odds, policy)
+                new_units = edge_scaled_units(
+                    model_probability,
+                    uncertainty or 0.05,
+                    american_odds,
+                    policy,
                 )
                 old_units = float(row["units"] or 0)
                 if abs(new_units - old_units) < 1e-9:
@@ -1140,20 +1277,38 @@ class PickLedger:
                     decimal_odds = float(row["decision_decimal_odds"] or row["decimal_odds"])
                     pnl = profit_units(PickResult(row["result"]), new_units, decimal_odds)
                     row["pnl_units"] = f"{pnl:.4f}"
-                changed += 1
-            if changed:
+                changed_rows.append(row)
+            if changed_rows:
                 self.audit.append(
                     "ledger_units_recomputed",
                     str(self.path),
-                    {"rows_changed": changed, "reason": "backfill fixed research-observation sizing rule"},
+                    {
+                        "rows_changed": len(changed_rows),
+                        "pick_ids": [row["pick_id"] for row in changed_rows],
+                        "reason_codes": sorted(reason_codes) if reason_codes is not None else None,
+                        "reason": "backfill fixed research-observation sizing rule",
+                    },
                 )
                 if self.authority == "sqlite":
-                    for row in rows:
-                        self._mirror_row(row, "update", f"op-resize-{row['pick_id']}")
+                    for row in changed_rows:
+                        operation_material = f"{row['pick_id']}|{row['units']}|{row.get('pnl_units') or ''}"
+                        operation_suffix = uuid.uuid5(uuid.NAMESPACE_URL, operation_material).hex[:16]
+                        self._mirror_row(
+                            row,
+                            "update",
+                            f"op-resize-{row['pick_id']}-{operation_suffix}",
+                        )
                 self._write_rows(rows)
-        for row in rows:
-            self._mirror_row(row, "update", f"op-resize-{row['pick_id']}")
-        return changed
+        if self.authority != "sqlite":
+            for row in changed_rows:
+                operation_material = f"{row['pick_id']}|{row['units']}|{row.get('pnl_units') or ''}"
+                operation_suffix = uuid.uuid5(uuid.NAMESPACE_URL, operation_material).hex[:16]
+                self._mirror_row(
+                    row,
+                    "update",
+                    f"op-resize-{row['pick_id']}-{operation_suffix}",
+                )
+        return len(changed_rows)
 
     def remove_open_rows(
         self, pick_ids: list[str], reason: str, allow_staked_removal: bool = False
@@ -1369,10 +1524,18 @@ class PickLedger:
                 self._write_rows(existing)
         return [row["pick_id"] for row in imported]
 
-    def void(self, pick_id: str, reason: str) -> dict[str, str]:
+    def void(
+        self,
+        pick_id: str,
+        reason: str,
+        *,
+        correction_reason: str | None = None,
+    ) -> dict[str, str]:
         self.initialize()
         if not reason.strip():
             raise ValueError("void reason is required")
+        if correction_reason is not None and not correction_reason.strip():
+            raise ValueError("a nonblank correction reason is required")
         with self._lock():
             self._migrate_if_needed()
             rows = self._read_unlocked()
@@ -1380,7 +1543,8 @@ class PickLedger:
             if row["status"] == PickStatus.SETTLED.value:
                 if row["void_reason"] == reason:
                     return row
-                raise ValueError("pick is already settled")
+                if not correction_reason:
+                    raise ValueError("a nonblank correction reason is required to void a settled pick")
             row.update(
                 {
                     "status": PickStatus.SETTLED.value,
@@ -1391,11 +1555,25 @@ class PickLedger:
                     "review_status": "not_applicable",
                 }
             )
-            self.audit.append("pick_voided", pick_id, {"reason": reason})
+            if row.get("research_pnl_units"):
+                row["research_pnl_units"] = "0.000000"
+            corrected = bool(correction_reason and correction_reason.strip())
+            self.audit.append(
+                "pick_voided_corrected" if corrected else "pick_voided",
+                pick_id,
+                {
+                    "reason": reason,
+                    **({"correction_reason": correction_reason.strip()} if corrected else {}),
+                },
+            )
+            operation_suffix = (
+                uuid.uuid5(uuid.NAMESPACE_URL, correction_reason.strip()).hex if corrected else "initial"
+            )
+            operation_id = f"op-void-{pick_id}-{operation_suffix}"
             if self.authority == "sqlite":
-                self._mirror_row(row, "void", f"op-void-{pick_id}")
+                self._mirror_row(row, "void", operation_id, note=correction_reason)
             self._write_rows(rows)
-        self._mirror_row(row, "void", f"op-void-{pick_id}")
+        self._mirror_row(row, "void", operation_id, note=correction_reason)
         return row
 
     def update_closing(
@@ -1577,7 +1755,9 @@ class PickLedger:
             "qualified_shadow_calls": len(qualified),
             "research_observations": len(research),
             "no_calls": sum(row["decision"] == "NO_CALL" for row in rows),
-            "no_call_team_banned_count": sum(row["reason_code"] == "NO_CALL_TEAM_BANNED" for row in rows),
+            "paper_call_team_banned_count": sum(
+                row["reason_code"] == "PAPER_CALL_TEAM_BANNED" for row in rows
+            ),
             "open": sum(row["status"] == PickStatus.OPEN.value for row in rows),
             "settled_qualified": len(settled_qualified),
             "qualified_wins": sum(row["result"] == "win" for row in settled_qualified),
@@ -1616,6 +1796,8 @@ class PickLedger:
         return output
 
     def _migrate_if_needed(self) -> str | None:
+        if self.authority == "sqlite":
+            return None
         if not self.path.exists() or self.path.stat().st_size == 0:
             return None
         headers, rows = read_xlsx_rows(self.path)
@@ -1719,6 +1901,23 @@ class PickLedger:
         write_xlsx_rows_atomic(self.path, FIELDNAMES, rows)
 
     def _read_unlocked(self) -> list[dict[str, str]]:
+        if self.authority == "sqlite":
+            if self.mirror is None or not self.tier:
+                raise RuntimeError("sqlite ledger authority requires a RuntimeLedgerStore and ledger tier")
+            canonical_rows: list[dict[str, str]] = []
+            for projected in self.mirror.pick_rows(tier=self.tier, sport=self.sport):
+                if projected.get("status") in {"archived", "removed"}:
+                    continue
+                row = {field: "" for field in FIELDNAMES}
+                row.update(
+                    {
+                        key: "" if value is None else str(value)
+                        for key, value in projected.items()
+                        if key in row
+                    }
+                )
+                canonical_rows.append(row)
+            return canonical_rows
         if not self.path.exists() or self.path.stat().st_size == 0:
             return []
         headers, rows = read_xlsx_rows(self.path)

@@ -50,6 +50,33 @@ class FakeESPN:
         }
 
 
+class FakeMultiLeagueESPN:
+    """Records call order and returns one distinct event per league."""
+
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def scoreboard(self, league: str, game_date: str) -> dict:
+        assert game_date == "2026-07-17"
+        self.calls.append(league)
+        return {
+            "events": [
+                {
+                    "id": f"future-{league}",
+                    "date": "2026-07-17T23:00:00Z",
+                    "competitions": [
+                        {
+                            "competitors": [
+                                {"homeAway": "away", "team": {"displayName": f"{league} Away"}},
+                                {"homeAway": "home", "team": {"displayName": f"{league} Home"}},
+                            ]
+                        }
+                    ],
+                }
+            ]
+        }
+
+
 def _write_history(root) -> None:
     path = root / "processed/mlb/games.jsonl"
     path.parent.mkdir(parents=True)
@@ -68,9 +95,9 @@ def _write_history(root) -> None:
     path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
 
 
-def _write_artifact(path, *, qualified: bool) -> None:
+def _write_artifact(path, *, qualified: bool, sport: str = "mlb") -> None:
     artifact = build_artifact(
-        sport="mlb",
+        sport=sport,
         model_version="mlb-elo-trend-lr-test",
         market_models={
             "moneyline": {
@@ -401,3 +428,45 @@ def test_starter_fip_and_kbb_gaps_home_minus_away_sign_convention(tmp_path) -> N
     kbb_gap = starter_kbb_gap_live("Home Ace", "Away Arms", decision, snapshot_path=snap_path)
     # home K-BB% = (9-1)/24 = 0.3333; away = (3-4)/25 = -0.0400; gap = 0.3733
     assert kbb_gap == pytest.approx(0.3733, abs=0.01)
+
+
+def test_multi_league_scoreboard_fetch_is_concurrent_but_order_preserving(tmp_path) -> None:
+    """2026-08-23 perf fix: soccer passes up to 18 ESPN leagues via `leagues=`.
+    They must be fetched concurrently (not one-at-a-time), but the combined
+    event list must stay in the same league order as a sequential fetch would
+    have produced, so downstream dedup/ordering stays deterministic."""
+    root = tmp_path / "data"
+    path = root / "processed/soccer/games.jsonl"
+    path.parent.mkdir(parents=True)
+    rows = [
+        {
+            "event_id": f"history-{index}",
+            "event_start_utc": f"2026-05-{index % 28 + 1:02d}T12:00:00Z",
+            "league": "SOCCER",
+            "away_team": "Away Team",
+            "home_team": "Home Team",
+            "away_score": 1,
+            "home_score": 2,
+        }
+        for index in range(60)
+    ]
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+    artifact_path = tmp_path / "soccer_artifact.json"
+    _write_artifact(artifact_path, qualified=True, sport="soccer")
+
+    fake = FakeMultiLeagueESPN()
+    leagues = ("EPL", "LA_LIGA", "BUNDESLIGA")
+    candidates, skipped, scheduled = build_learned_moneyline_slate(
+        sport="soccer",
+        game_date="2026-07-17",
+        store=FeatureStore(root),
+        client=fake,
+        artifact_path=artifact_path,
+        observed_at=datetime(2026, 7, 17, 12, tzinfo=UTC),
+        leagues=leagues,
+    )
+
+    assert set(fake.calls) == set(leagues)
+    assert scheduled == len(leagues)
+    event_ids_in_order = [c.event_id for c in candidates] if candidates else [s["event_id"] for s in skipped]
+    assert event_ids_in_order == [f"future-{league}" for league in leagues]

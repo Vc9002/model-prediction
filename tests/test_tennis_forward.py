@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import UTC, datetime
 
@@ -222,6 +223,14 @@ def test_tennis_forward_prices_singles_moneyline_and_excludes_doubles(tmp_path) 
     assert contract["selection"] in {"away", "home"}
     expected_ask = 0.42 if contract["selection"] == "away" else 0.6
     assert contract["executable_ask"] == expected_ask
+    snapshot_path = tmp_path / "odds" / "tennis" / "2026-07-27" / "polymarket_snapshots.jsonl"
+    snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    expected_snapshot_hash = hashlib.sha256(
+        json.dumps(snapshot, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    assert contract["market_snapshot_hash"] == expected_snapshot_hash
+    assert contract["market_snapshot_archive_path"] == str(snapshot_path.resolve())
+    assert contract["market_snapshot_record_id"] == expected_snapshot_hash
 
 
 def test_tennis_forward_reports_no_op_when_no_moneyline_snapshot_exists(tmp_path) -> None:

@@ -7,6 +7,7 @@ DD-5 and dashboard/__init__.py for the re-export shim that keeps the old
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 
 try:
@@ -51,24 +52,16 @@ def _read_split_picks(paths: list[Path], cache: dict[str, object]) -> list[dict]
     dc = _get_dashboard_cache()
 
     # Try SQLite cache first if paths are under the standard repo data root
-    if dc is not None and paths and str(paths[0]).startswith(str(ROOT / "data")):
-        first_path = str(paths[0])
-        if "/flat/" in first_path or "\\flat\\" in first_path:
-            tier = "flat"
-        elif "/research/" in first_path or "\\research\\" in first_path:
-            tier = "research"
-        elif "/gated_research/" in first_path:
-            tier = "gated_research"
-        else:
-            tier = "main"
-
+    canonical_tiers = {"main", "flat", "research", "gated_research"}
+    tier = paths[0].parent.name if paths else None
+    if dc is not None and paths and str(paths[0]).startswith(str(ROOT / "data")) and tier in canonical_tiers:
         try:
             dc.refresh()  # no-op if mtimes unchanged, fast SQLite otherwise
-            if tier in ("flat", "main", "research", "gated_research"):
-                rows = dc.read_picks(tier)
-            else:
-                rows = dc.read_picks(tier)
-            if rows:
+            rows = dc.read_picks(tier)
+            # Under SQLite authority, an empty tier is an authoritative empty
+            # result. Falling through would resurrect stale XLSX projection
+            # rows precisely when canonical SQLite says the tier has none.
+            if rows or getattr(dc, "authority", None) == "sqlite":
                 return rows
         except Exception:  # noqa: BLE001, S110 - cache read is best-effort, Excel is the fallback
             pass
@@ -104,6 +97,13 @@ def read_flat_picks() -> list[dict]:
 
 
 _POLYMARKET_PICKS_CACHE: dict[str, object] = {"mtime": None, "rows": []}
+_FLAT_V9_PICKS_CACHE: dict[str, object] = {"mtime": None, "rows": []}
+
+
+def read_v9_flat_picks() -> list[dict]:
+    """Parse dedicated MLB v9 Flat benchmark ledger (data/flat_v9/mlb.xlsx)."""
+    path = DATA / "flat_v9" / "mlb.xlsx"
+    return _read_split_picks([path], _FLAT_V9_PICKS_CACHE) if path.exists() else []
 
 
 def read_polymarket_picks() -> list[dict]:
@@ -115,8 +115,8 @@ def read_polymarket_picks() -> list[dict]:
 
 
 def _find_pick_by_id(pick_id: str) -> dict | None:
-    """Search main, flat, research, and polymarket ledgers for a pick by pick_id."""
-    for fn in (read_picks, read_flat_picks, read_polymarket_picks):
+    """Search main, flat, v9, research, and polymarket ledgers for a pick by pick_id."""
+    for fn in (read_picks, read_flat_picks, read_v9_flat_picks, read_polymarket_picks):
         row = next((item for item in fn() if str(item.get("pick_id")) == pick_id), None)
         if row is not None:
             return row
@@ -144,6 +144,7 @@ def _parse_picks(path: Path) -> list[dict]:
         "line",
         "american_odds",
         "market_implied_probability",
+        "market_probability_at_decision",
         "model_probability",
         "model_uncertainty",
         "edge",
@@ -241,6 +242,76 @@ def _performance_game_key(row: dict) -> str:
     return "|".join(str(part or "").strip().casefold() for part in parts)
 
 
+def _contract_observation_identity(row: dict) -> tuple[str, ...]:
+    """Identity for one ledger contract, excluding refresh/model metadata.
+
+    The line remains part of the identity: OVER 17.5 and OVER 22.5 are
+    correlated tennis exposure, but they are not duplicate records.  The
+    separate tennis selection policy controls that exposure.  Model version,
+    quote, and timestamps are intentionally excluded because a re-forecast is
+    a replacement observation of the same contract, not another wager.
+    """
+    event = str(row.get("event_id") or "").strip()
+    if not event:
+        event = "|".join(
+            str(row.get(key) or "").strip().casefold()
+            for key in ("event_start_utc", "away_team", "home_team")
+        )
+    line = row.get("line")
+    try:
+        normalized_line = f"{float(line):g}" if line not in (None, "") else ""
+    except (TypeError, ValueError):
+        normalized_line = str(line or "").strip().casefold()
+    return (
+        str(row.get("ledger_tier") or row.get("tier") or "").strip().casefold(),
+        str(row.get("sport") or row.get("league") or "").strip().casefold(),
+        event,
+        str(row.get("market_type") or "").strip().casefold(),
+        str(row.get("selection") or "").strip().casefold(),
+        normalized_line,
+        str(row.get("period") or row.get("horizon") or "").strip().casefold(),
+        str(row.get("sportsbook") or "").strip().casefold(),
+        str(row.get("status") or "").strip().casefold(),
+    )
+
+
+def _parse_observation_time(value: object) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def _contract_observation_rank(row: dict, index: int) -> tuple[int, datetime, datetime, int]:
+    observed = _parse_observation_time(row.get("observed_at_utc") or row.get("created_at_utc"))
+    starts = _parse_observation_time(row.get("event_start_utc"))
+    created = _parse_observation_time(row.get("created_at_utc"))
+    floor = datetime.min.replace(tzinfo=UTC)
+    # A verified pregame observation always outranks an unverifiable or late
+    # one. This prevents a post-start refresh from becoming the dashboard or
+    # performance representative merely because it was created later.
+    pregame = int(observed is not None and starts is not None and observed < starts)
+    return pregame, observed or floor, created or floor, index
+
+
+def _dedupe_contract_observations(rows: list[dict]) -> list[dict]:
+    """Keep one pregame-safe observation per exact contract and lifecycle."""
+    survivors: dict[tuple[str, ...], tuple[tuple[int, datetime, datetime, int], dict]] = {}
+    for index, row in enumerate(rows):
+        identity = _contract_observation_identity(row)
+        rank = _contract_observation_rank(row, index)
+        if identity not in survivors or rank > survivors[identity][0]:
+            survivors[identity] = (rank, row)
+    survivor_ids = {id(item[1]) for item in survivors.values()}
+    return [row for row in rows if id(row) in survivor_ids]
+
+
 def _performance_breakdown(
     rows: list[dict],
     key_fn,
@@ -283,9 +354,10 @@ def _performance_breakdown(
 
 
 def performance(picks: list[dict]) -> dict:
-    settled = [
-        row for row in picks if row.get("status") == "settled" and row.get("result") in ("win", "loss")
-    ]
+    unique_picks = _dedupe_contract_observations(picks)
+    settled = _dedupe_contract_observations(
+        [row for row in picks if row.get("status") == "settled" and row.get("result") in ("win", "loss")]
+    )
     settled.sort(key=lambda row: str(row.get("settled_at_utc") or ""))
     wins = sum(1 for row in settled if row["result"] == "win")
     cumulative, curve = 0.0, []
@@ -450,9 +522,10 @@ def performance(picks: list[dict]) -> dict:
         str(row.get("event_start_utc") or "")[:10] for row in settled if row.get("event_start_utc")
     )
     return {
-        "total_picks": len(picks),
+        "total_picks": len(unique_picks),
+        "duplicate_observations_excluded": len(picks) - len(unique_picks),
         "settled": len(settled),
-        "open": sum(1 for row in picks if row.get("status") == "open"),
+        "open": sum(1 for row in unique_picks if row.get("status") == "open"),
         "wins": wins,
         "losses": len(settled) - wins,
         "scored_calls": len(scored),
@@ -486,8 +559,19 @@ def performance(picks: list[dict]) -> dict:
     }
 
 
-def performance_for_sport(picks: list[dict], sport: str | None = None) -> dict:
-    """Return one ledger's performance, optionally scoped to an actual ledger sport."""
+def performance_for_sport(
+    picks: list[dict],
+    sport: str | None = None,
+    *,
+    archived_ids: set[str] | None = None,
+) -> dict:
+    """Return one ledger's performance, optionally scoped to an actual ledger sport.
+
+    Filters out archived picks when archived_ids is supplied so performance
+    metrics reflect only active visible picks.
+    """
+    if archived_ids is not None:
+        picks = [row for row in picks if str(row.get("pick_id") or "") not in archived_ids]
     available = sorted(
         {
             str(row.get("league") or "").strip()

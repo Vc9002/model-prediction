@@ -336,6 +336,89 @@ def test_forecast_uses_home_away_and_current_asks_but_stays_zero_unit(tmp_path) 
     assert all(side["executable_ask"] is not None for side in contract["sides"])
 
 
+class _RecordingMarketClient:
+    """Returns no events; only records the game_date it was actually
+    queried with, so the test can assert on the resolved date itself."""
+
+    def __init__(self) -> None:
+        self.received_game_date: date | None = None
+
+    def slate(self, league, game_date, timezone_name):
+        self.received_game_date = game_date
+        return []
+
+
+def _write_kbo_fixture(tmp_path) -> tuple:
+    directory = tmp_path / "international_baseball/kbo"
+    directory.mkdir(parents=True)
+    (directory / "teams.json").write_text(
+        json.dumps(
+            {
+                "KIA": {"name": "Kia Tigers", "aliases": ["KIA"]},
+                "LG": {"name": "LG Twins", "aliases": ["LG"]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    models = tmp_path / "models"
+    models.mkdir()
+    (models / "kbo-tie-aware-elo-v2.json").write_text(
+        json.dumps(
+            {
+                "model_version": "kbo-tie-aware-elo-v2",
+                "artifact_hash": "abc",
+                "k": 20,
+                "home_advantage": 50,
+                "tie_probability": 0.04,
+                "trained_through_date": "2099-07-18",
+                "ratings": {"KIA": 1500, "LG": 1520},
+            }
+        ),
+        encoding="utf-8",
+    )
+    return directory, models
+
+
+def test_forecast_resolves_default_today_in_league_local_time_not_eastern(tmp_path) -> None:
+    """Real bug, 2026-08-24: the CLI's shared --date flag defaults to
+    eastern_today(), but KBO/NPB's calendar day lives in KST/JST (13-14h
+    ahead of US-Eastern) -- by the back half of every Eastern day, Seoul's
+    "today" has already rolled to eastern_date + 1, so a literal pass-
+    through asked Polymarket for a slate that was already fully in the
+    past there, zeroing coverage for roughly half of every day's runs.
+    `now` pinned just after 11:00 America/New_York on 2099-07-20, when
+    Asia/Seoul has already rolled over to 2099-07-21."""
+    from datetime import UTC, datetime
+
+    _write_kbo_fixture(tmp_path)
+    models = tmp_path / "models"
+    reference_now = datetime(2099, 7, 20, 16, 0, tzinfo=UTC)  # 12:00 EDT / 01:00 KST next day
+    client = _RecordingMarketClient()
+
+    # Eastern "today" (the CLI default) is still 2099-07-20 at this instant.
+    forecast_international_baseball_slate(
+        tmp_path, models, "kbo", "2099-07-20", client=client, now=reference_now
+    )
+    assert client.received_game_date == date(2099, 7, 21)
+
+
+def test_forecast_honors_an_explicit_historical_date_unmodified(tmp_path) -> None:
+    """An explicit backfill --date (not the eastern-today default) must be
+    honored exactly as given -- only the unspecified "give me today" case
+    gets timezone-corrected."""
+    from datetime import UTC, datetime
+
+    _write_kbo_fixture(tmp_path)
+    models = tmp_path / "models"
+    reference_now = datetime(2099, 7, 20, 16, 0, tzinfo=UTC)
+    client = _RecordingMarketClient()
+
+    forecast_international_baseball_slate(
+        tmp_path, models, "kbo", "2099-07-01", client=client, now=reference_now
+    )
+    assert client.received_game_date == date(2099, 7, 1)
+
+
 def test_forecast_refuses_when_training_prefix_hash_no_longer_matches(tmp_path) -> None:
     """Real bug this guards against, 2026-08-02: NPB's settlement fallback
     silently collapsed games.jsonl to a fraction of its real history while

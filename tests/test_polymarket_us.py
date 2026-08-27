@@ -52,6 +52,51 @@ def test_events_raises_instead_of_looping_forever_on_a_runaway_api() -> None:
         raise AssertionError("a runaway paginated API did not raise")
 
 
+def test_get_retries_past_transient_429_then_succeeds(monkeypatch) -> None:
+    """The gateway throttles bursts from the snapshot pool with plain 429s
+    (2026-08-24: ~1,700 dropped book fetches in one day, concentrated in
+    ITF tennis and esports). `_get` used to raise on the first 429 --
+    losing that market's snapshot for the day -- instead of retrying past
+    what is usually a transient burst-limit response."""
+    sleeps: list[float] = []
+    monkeypatch.setattr("model_prediction.data_sources.polymarket_us.time.sleep", sleeps.append)
+
+    attempts = {"count": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        attempts["count"] += 1
+        if attempts["count"] < 3:
+            return httpx.Response(429, text="Too Many Requests")
+        return httpx.Response(200, json={"events": []})
+
+    http_client = httpx.Client(transport=httpx.MockTransport(handler))
+    client = PolymarketUSClient("https://example.test", http_client)
+    result = client._get("/v2/leagues/wnba/events")
+
+    assert result == {"events": []}
+    assert attempts["count"] == 3
+    assert len(sleeps) == 2
+
+
+def test_get_raises_after_exhausting_429_retries(monkeypatch) -> None:
+    """A persistently rate-limited endpoint must still surface as an error
+    (caught by the existing snapshot-loop failure_details path) rather than
+    retrying forever."""
+    monkeypatch.setattr("model_prediction.data_sources.polymarket_us.time.sleep", lambda _seconds: None)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, text="Too Many Requests")
+
+    http_client = httpx.Client(transport=httpx.MockTransport(handler))
+    client = PolymarketUSClient("https://example.test", http_client)
+    try:
+        client._get("/v2/leagues/wnba/events")
+    except httpx.HTTPStatusError as error:
+        assert error.response.status_code == 429
+    else:
+        raise AssertionError("persistent 429s did not raise")
+
+
 def test_all_qualification_sports_are_available_to_slate_and_cli() -> None:
     assert {"mlb", "nba", "wnba", "nfl"} <= set(POLYMARKET_SPORT_LEAGUES)
     assert "esports" in POLYMARKET_SPORT_LEAGUES

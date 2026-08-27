@@ -46,9 +46,9 @@ def _pick_request(**overrides) -> PickRequest:
     return PickRequest(**fields)
 
 
-def _eligibility(edge: float = 0.08) -> EligibilityResult:
+def _eligibility(edge: float = 0.08, units: float = 1.5) -> EligibilityResult:
     return EligibilityResult(
-        RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", 1.5, 70, edge, edge, _AWAY, _HOME
+        RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", units, 70, edge, edge, _AWAY, _HOME
     )
 
 
@@ -214,12 +214,14 @@ def test_append_prediction_refuses_a_duplicate_id(tmp_path) -> None:
 
 
 def test_record_from_pick_request_writes_into_the_right_model_ledger(tmp_path) -> None:
-    row = record_from_pick_request(tmp_path, _pick_request(), _eligibility())
+    row = record_from_pick_request(tmp_path, _pick_request(), _eligibility(units=0.75))
 
     assert row is not None
     assert row["model_id"] == "mlb-moneyline-elo-trend-lr"
     assert (tmp_path / "mlb-moneyline-elo-trend-lr.xlsx").exists()
     assert row["model_market_difference"] == "0.08"
+    assert row["operator_decision"] == "CALL"
+    assert row["operator_units"] == "0.75"
 
 
 def test_record_from_pick_request_dedupes_the_same_decision(tmp_path) -> None:
@@ -574,3 +576,36 @@ def test_settle_event_does_not_grade_a_sign_flipped_line(tmp_path) -> None:
     assert [r["prediction_id"] for r in settled] == [plus["prediction_id"]]
     rows = {r["prediction_id"]: r for r in ledger.rows()}
     assert rows[minus["prediction_id"]]["status"] == "open"
+
+
+def test_repair_events_from_canonical_updates_open_and_zero_pnl_refreshes_atomically(tmp_path) -> None:
+    from model_prediction.model_ledger import _event_settlement_key
+
+    ledger = ModelLedger(tmp_path / "mlb-moneyline-elo-trend-lr.xlsx")
+    first = ledger.append_prediction(_prediction(observed_at_utc="2026-08-02T12:00:00Z"))
+    second = ledger.append_prediction(_prediction(observed_at_utc="2026-08-02T13:00:00Z"))
+    ledger.settle(first["prediction_id"], result="win", pnl_units=0.0)
+    correction = {
+        _event_settlement_key(first): {
+            "result": "win",
+            "pnl_units": 1.25,
+            "closing_price": 0.60,
+            "probability_clv": 0.02,
+            "settled_at_utc": "2026-08-03T02:00:00Z",
+        }
+    }
+
+    repaired = ledger.repair_events_from_canonical(
+        correction,
+        correction_reason="canonical Flat P&L repair",
+    )
+
+    assert {row["prediction_id"] for row in repaired} == {
+        first["prediction_id"],
+        second["prediction_id"],
+    }
+    rows = {row["prediction_id"]: row for row in ledger.rows()}
+    assert {rows[first["prediction_id"]]["pnl_units"], rows[second["prediction_id"]]["pnl_units"]} == {
+        "1.2500"
+    }
+    assert rows[second["prediction_id"]]["status"] == "settled"

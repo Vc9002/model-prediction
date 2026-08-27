@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import unicodedata
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -38,10 +39,23 @@ DEFAULT_LOOKBACK_STARTS = 5
 MINIMUM_PRIOR_STARTS = 2
 FIP_CONSTANT = 3.10  # MLB league-average FIP constant; updated annually
 
+
+@dataclass(frozen=True)
+class StarterGameLine:
+    """Explicit point-in-time single-game starter pitching performance."""
+
+    game_start_utc: datetime
+    innings: float
+    batters_faced: int
+    earned_runs: int
+    strikeouts: int
+    walks: int
+    home_runs: int
+    hit_by_pitch: int
+
+
 # (game_start, innings, earned_runs, strikeouts, walks, home_runs,
-# hit_by_pitch, batters_faced) -- widened for FIP (F-68), then again for real
-# K-BB% (needs batters_faced, not innings); ERA-only callers just ignore the
-# extra fields.
+# hit_by_pitch, batters_faced)
 _StarterRow = tuple[datetime, float, float, float, float, float, float, float]
 _STARTER_INDEX_CACHE: dict[Path, dict[str, list[_StarterRow]]] = {}
 
@@ -291,20 +305,83 @@ def starter_fip_gap_live(
     return round(home["fip"] - away["fip"], 6)
 
 
-def _rolling_kbb_pct(recent: list[tuple]) -> float:
-    """K-BB% = (K - BB) / batters faced, from a rolling window of starts.
+def _rolling_k_pct(recent: list[tuple]) -> float:
+    """K% = strikeouts / batters_faced."""
+    batters_faced = sum(item[7] for item in recent)
+    so = sum(item[3] for item in recent)
+    return (so / batters_faced) if batters_faced > 0 else 0.0
 
-    F-real (2026-08-20): this previously computed (K-BB)/IP -- K-BB *per
-    inning*, not the real sabermetric K-BB% -- because batters_faced wasn't
-    carried in the starter index. The prior REJECT verdict on this feature
-    was measured against that wrong statistic; see MODEL_IMPROVEMENTS.md.
-    """
+
+def _rolling_bb_pct(recent: list[tuple]) -> float:
+    """BB% = walks / batters_faced."""
+    batters_faced = sum(item[7] for item in recent)
+    bb = sum(item[4] for item in recent)
+    return (bb / batters_faced) if batters_faced > 0 else 0.0
+
+
+def _rolling_kbb_pct(recent: list[tuple]) -> float:
+    """K-BB% = (K - BB) / batters faced, from a rolling window of starts."""
     batters_faced = sum(item[7] for item in recent)
     so = sum(item[3] for item in recent)
     bb = sum(item[4] for item in recent)
     if batters_faced <= 0:
         return 0.0
     return (so - bb) / batters_faced
+
+
+def _rolling_kbb_legacy_per_ip(recent: list[tuple]) -> float:
+    """Legacy invalid (K-BB)/IP definition kept for reproducing historical parity."""
+    ip = sum(item[1] for item in recent)
+    so = sum(item[3] for item in recent)
+    bb = sum(item[4] for item in recent)
+    if ip <= 0:
+        return 0.0
+    return (so - bb) / ip
+
+
+def starter_rolling_rates(
+    starter_name: str,
+    decision: datetime,
+    *,
+    snapshot_path: str | Path = DEFAULT_SNAPSHOT_PATH,
+    lookback_starts: int = DEFAULT_LOOKBACK_STARTS,
+    minimum_prior_starts: int = MINIMUM_PRIOR_STARTS,
+) -> dict[str, Any]:
+    """Rolling K%, BB%, K-BB%, and sample strength (BF) from last N real starts."""
+    index = load_starter_index(snapshot_path)
+    starts = [s for s in index.get(_normalize_name(starter_name), []) if s[0] < decision]
+    if not starts:
+        return {
+            "k_pct": None,
+            "bb_pct": None,
+            "k_minus_bb_pct": None,
+            "kbb_legacy_per_ip": None,
+            "batters_faced": 0,
+            "starts": 0,
+            "status": "unavailable_from_source",
+        }
+    recent = starts[-lookback_starts:]
+    if len(recent) < minimum_prior_starts:
+        return {
+            "k_pct": None,
+            "bb_pct": None,
+            "k_minus_bb_pct": None,
+            "kbb_legacy_per_ip": None,
+            "batters_faced": sum(item[7] for item in recent),
+            "starts": len(recent),
+            "status": "insufficient_sample",
+        }
+    bf = sum(item[7] for item in recent)
+    return {
+        "k_pct": round(_rolling_k_pct(recent), 4),
+        "bb_pct": round(_rolling_bb_pct(recent), 4),
+        "k_minus_bb_pct": round(_rolling_kbb_pct(recent), 4),
+        "kbb_legacy_per_ip": round(_rolling_kbb_legacy_per_ip(recent), 4),
+        "batters_faced": bf,
+        "starts": len(recent),
+        "innings": round(sum(item[1] for item in recent), 2),
+        "status": "available",
+    }
 
 
 def starter_rolling_kbb(
@@ -315,22 +392,19 @@ def starter_rolling_kbb(
     lookback_starts: int = DEFAULT_LOOKBACK_STARTS,
     minimum_prior_starts: int = MINIMUM_PRIOR_STARTS,
 ) -> dict[str, Any]:
-    """Rolling K-BB% from this pitcher's last N real starts strictly before decision.
-
-    Same fail-closed contract as ``starter_rolling_era``.
-    """
-    index = load_starter_index(snapshot_path)
-    starts = [s for s in index.get(_normalize_name(starter_name), []) if s[0] < decision]
-    if not starts:
-        return {"kbb_pct": None, "starts": 0, "status": "unavailable_from_source"}
-    recent = starts[-lookback_starts:]
-    if len(recent) < minimum_prior_starts:
-        return {"kbb_pct": None, "starts": len(recent), "status": "insufficient_sample"}
+    """Rolling K-BB% from this pitcher's last N real starts strictly before decision."""
+    rates = starter_rolling_rates(
+        starter_name,
+        decision,
+        snapshot_path=snapshot_path,
+        lookback_starts=lookback_starts,
+        minimum_prior_starts=minimum_prior_starts,
+    )
     return {
-        "kbb_pct": round(_rolling_kbb_pct(recent), 4),
-        "starts": len(recent),
-        "innings": round(sum(item[1] for item in recent), 2),
-        "status": "available",
+        "kbb_pct": rates["k_minus_bb_pct"],
+        "starts": rates["starts"],
+        "innings": rates.get("innings", 0.0),
+        "status": rates["status"],
     }
 
 
@@ -351,6 +425,44 @@ def starter_kbb_gap_live(
             f"away={away_starter_name!r} status={away['status']}"
         )
     return round(home["kbb_pct"] - away["kbb_pct"], 6)
+
+
+def starter_k_pct_gap_live(
+    home_starter_name: str,
+    away_starter_name: str,
+    decision: datetime,
+    *,
+    snapshot_path: str | Path = DEFAULT_SNAPSHOT_PATH,
+) -> float:
+    """home_starter's rolling K% minus away_starter's (home_k_pct - away_k_pct)."""
+    home = starter_rolling_rates(home_starter_name, decision, snapshot_path=snapshot_path)
+    away = starter_rolling_rates(away_starter_name, decision, snapshot_path=snapshot_path)
+    if home["status"] != "available" or away["status"] != "available":
+        raise ValueError(
+            "NO_CALL_STARTER_K_PCT_GAP_INSUFFICIENT_HISTORY: "
+            f"home={home_starter_name!r} status={home['status']}, "
+            f"away={away_starter_name!r} status={away['status']}"
+        )
+    return round(home["k_pct"] - away["k_pct"], 6)
+
+
+def starter_bb_pct_gap_live(
+    home_starter_name: str,
+    away_starter_name: str,
+    decision: datetime,
+    *,
+    snapshot_path: str | Path = DEFAULT_SNAPSHOT_PATH,
+) -> float:
+    """home_starter's rolling BB% minus away_starter's (home_bb_pct - away_bb_pct)."""
+    home = starter_rolling_rates(home_starter_name, decision, snapshot_path=snapshot_path)
+    away = starter_rolling_rates(away_starter_name, decision, snapshot_path=snapshot_path)
+    if home["status"] != "available" or away["status"] != "available":
+        raise ValueError(
+            "NO_CALL_STARTER_BB_PCT_GAP_INSUFFICIENT_HISTORY: "
+            f"home={home_starter_name!r} status={home['status']}, "
+            f"away={away_starter_name!r} status={away['status']}"
+        )
+    return round(home["bb_pct"] - away["bb_pct"], 6)
 
 
 def starter_sos_adjusted_era(

@@ -1,6 +1,8 @@
 # Project status and source of truth
 
-**Last verified**: 2026-08-23, local `main`. **2,170 tests passed, 3 skipped, 0 failed** (2,173 total). **0 Ruff findings** across the repository. Type foundation cleared (`py.typed` + overrides).
+**Last verified**: 2026-08-26 (night continuation), local `research/mlb-v9`. Full suite 2,298 passed (concurrent-session run); this session's targeted runs all green (bet_better 8, wnba parser 3, wnba availability 15, statcast 4, settle guard 2, esports 14, system_health 13, fix-regressions 24, polymarket 16, tennis 163, daily 5). Canonical ledger audit: 0 repairs planned, 0 conflicts, 0 anomalies, integrity ok. `docs/DEBUG.md`'s 2026-08-26 sections (scan, resolutions, and the night continuation) are the authoritative record — trust them over this summary on specifics.
+
+**Operating Architecture**: MLB operates on two isolated tracks — **Production Track** (`mlb-elo-trend-lr-v8` frozen champion) and **Research Track** (`mlb-v9` isolated challenger). See [`docs/ROADMAP.md`](file:///Users/vincentc9002/model-prediction/docs/ROADMAP.md) for full lifecycle details (the former `docs/RESEARCH_BACKLOG.md` was merged into it and deleted 2026-08-26).
 
 This document is the operational status entry point. `MASTER.md` (repo root)
 is now the most current, most detailed running log of real bugs found/fixed
@@ -10,7 +12,97 @@ this file exists to be the short, current summary someone can read first.
 Historical metrics in old reports, changelog entries, model cards, and
 rollback artifacts are not current operational truth.
 
-## 2026-08-22 — Roadmap Items 1–5 Delivered, Flat vs Gated Invariants, Polymarket Automation & Dashboard Hardening
+## 2026-08-26 — Full-repo scan resolutions, ledger conflict repair, scheduler restoration
+
+- **13 dead v9 features root-caused and fixed** — four lookup bugs (nested snapshot schema, team-ID vs name keys, wrong feature name, missing starter-name crosswalk). All 19 previously-zero-variance columns now vary per game (66–185 distinct values on a 200-game sample). Prior v9 ablation results on those families remain void pending the rebuilt-table audit. New flag: platoon/projected collinearity (r≈0.9997) needs an operator decision.
+- **2 artifact hash "mismatches" confirmed deliberate non-issues** (never-re-signed archive/quarantine annotations); the verifier now documents them as `known_hash_mismatch` instead of gaps.
+- **3 orphaned model configs resolved** — two inert temperature-challenger configs removed; `mlb-v9-candidate-1.json` stays quarantined (fail-closed gate depends on it).
+- **Ledger settlement backlog cleared** — 22-row cs2 backlog applied, 6 identity conflicts resolved from canonical SQLite (latest-settlement + lineage evidence), 27 further settlements unlocked, audit economic signature stake-normalized, all tier projections rebuilt. Final audit: 0/0/0, integrity ok.
+- **Production scheduler restored** — `production` + `rebuild-shadow` launchd jobs were disabled (37h, undocumented); operator approved re-enable; both loaded and completed exit 0.
+- **launchd daily plist re-synced** to the checked-in form (byte-identical, reloaded, schedule verified).
+- **`docs/RESEARCH_BACKLOG.md` re-deleted**; unique content ported to `docs/ROADMAP.md`.
+- **Data-gap audit (new)** — soccer capture replaced with API-Football v3 (`data_sources/api_football.py` + daily wiring; dormant Odds path kept as fallback; awaiting `API_FOOTBALL_KEY` + live verification). Open follow-ups: WNBA availability snapshots 1.5d stale; Statcast aggregates manual-only; zero snapshot lineage for esports/soccer/KBO/NPB rows; NBA/NFL no odds source wired. Corrected: Polymarket has ATP/ITF tennis markets; soccer Odds-API outage is ≥31 days (not 11.7).
+- **NRFI model improved** — 2x league-constant bug fixed (0.52 per-team mean vs 1.036 per-game total); new fitted first-inning model (`models/mlb_first_inning.py`) beats the incumbent and the market proxy on the locked 1,337-game test window (logloss 0.6910 vs 0.6945 vs 0.6950). Next: capture real Polymarket NRFI quotes to measure true edge.
+
+## 2026-08-26 (night) — documented-bug triage + Bet Better capture + WNBA parser fix
+
+- **WNBA morning-report parse bug root-caused and fixed** — the entry pass
+  propagated date/team context only through player rows; the morning
+  layout prints the game date on a team-level "NOT YET SUBMITTED" row.
+  All 81 real 08-26 reports now parse; real-PDF regression fixtures added.
+  This closes the "WNBA availability snapshots stale" handoff item (the
+  feature's NO_CALL degradation was correct fail-closed behavior).
+- **Bet Better model-feed capture wired** (`step1e_bet_better_models`) —
+  keyless no-account cross-check source (mlb/wnba/nba/nfl/soccer/wta),
+  research-only reference evidence, CC BY attribution recorded.
+- **Statcast aggregates wired into the daily** (was manual-only, 3 days
+  behind) — live rebuild covers 57k pitcher / 135k batter rows through
+  08-26.
+- **Registry-free ban enforcement** wired into `evaluate_esports_eligibility`
+  (the bans.py mechanism already existed; the eligibility check never
+  consulted it). Forecast call sites still need to thread `bans` through.
+- **mlb-v9-candidate-1 identity collision** — benchmark rows now record
+  `mlb-v9-benchmark`; workbook/history untouched.
+- **Postponed-game handling (drain-minimal)**: Polymarket keeps postponed
+  markets OPEN (resolves to makeup result within two weeks, else last-fair
+  price / 50-50); the daily already auto-voids STATUS_POSTPONED rows. New
+  `stale_open_rows` health check (pure read, zero new I/O) surfaces the
+  stuck-open class continuously — first run: 22 rows >72h past start.
+- **Daily-run timing instrumentation** added (wrapper per-step seconds +
+  `timing` block in the daily report) — today's runs ranged 6.7–22.9 min;
+  optimization targets come from tomorrow's log.
+- **Soccer capture data_root split-brain** fixed before it ever fired
+  (explicit `data_root` at the daily call site).
+- Triaged as already-fixed by later sessions: KBO phantom ties, tennis
+  surface inference, DD items (pre-commit hook, dashboard split, TODO
+  tracking), WORLD_CUP conftest fixture. Remaining open research gap:
+  MLB totals absolute-run-environment signal.
+
+## 2026-08-24 — Canonical ledger and tennis integrity repair
+
+- Corrected 221 tennis spread/total settlements using exact ESPN identities
+  and per-set game totals: 205 regraded, 16 retirement derivatives voided,
+  corruption signature zero, P&L corrected by `+187.0556U`.
+- Removed unsupported tennis derivative pricing; the forward path is now
+  moneyline-only and rejects subperiod markets. A second boundary permits at
+  most one spread and one total per match if validated derivative pricing is
+  introduced later.
+- Archived 457 settled duplicate/correlated-exposure rows and removed 9 open
+  rows with exact-ID audited mutations. The post-repair planner reports zero
+  remaining refresh groups and zero tennis ladders; SQLite now enforces active
+  contract/model uniqueness across writers.
+- Made SQLite authoritative for all ledger and dashboard reads; rebuilt and
+  verified all 22 XLSX projections with no canonical tombstones.
+- Backfilled explicit feature-availability payloads on all 12,335 canonical
+  records without synthesizing missing values.
+- Removed unqualified MLB totals from production serving, blocked WNBA total
+  without its exact artifact, and made all active non-serving workflows
+  degrade health instead of passing green.
+- Rebuilt the dashboard cache from canonical rows: Main 494, Flat 1,682,
+  Research 996, Gated Research 356.
+- Remaining historical gaps are fail-closed: 3,240 active rows lack market
+  snapshot lineage, 40 active MLB rows lack artifact hashes, and 24 open rows
+  are more than 24 hours past start. These values cannot be reconstructed as
+  decision-time evidence after the fact.
+
+## 2026-08-23 — Comprehensive Platform Optimization, Quantitative Upgrades & Parallel Test Harness
+
+- **Storage & Dashboard I/O Optimization** (`runtime_ledger_store.py`, `dashboard/data_service.py`):
+  - Configured SQLite WAL mode connections with `PRAGMA synchronous=NORMAL`, `PRAGMA temp_store=MEMORY`, 256MB memory-mapped I/O (`mmap_size`), and 64MB cache for $3\times\text{--}5\times$ faster throughput without lock contention.
+  - Configured zero-contention read-only handles with `PRAGMA query_only = ON` in `dashboard/data_service.py` for sub-millisecond API response latency.
+- **Analytical Poisson Scoring Engine** (`src/model_prediction/total_score.py`, `tests/test_optimizations.py`):
+  - Replaced noisy Monte Carlo simulation with exact 2D Poisson joint matrix solvers: `analytical_totals_probabilities` and `analytical_spread_probabilities`.
+- **Cross-Market Consistency & Dutching Arbitrage** (`src/model_prediction/cross_market_consistency.py`):
+  - Implemented full bidirectional Spread vs. Moneyline monotonicity bounds and multi-book `calculate_dutching_arbitrage` with optimal stake distribution.
+- **Adaptive Meta-Calibration** (`src/model_prediction/meta_calibrator.py`):
+  - Added exponential recency weighting (`sample_weights`) to Platt/Isotonic fitting and high-speed `calibrate_batch` array transforms.
+- **Soccer Dixon-Coles Derivative Market Decomposition** (`src/model_prediction/models/soccer_dixon_coles.py`):
+  - Implemented `prob_draw_no_bet`, `prob_clean_sheet`, `prob_win_to_nil`, and `prob_exact_goals_table` directly on `BivariateScoreGrid`.
+- **Execution Ticket Safety & Test Harness** (`src/model_prediction/execution_ticket.py`, `pyproject.toml`):
+  - Added `is_ticket_valid` and `extract_order` non-raising inspection helpers.
+  - Pinned `pytest-xdist>=3.5,<4` in dev dependencies for parallel test execution.
+
+## 2026-08-23 — Two-Track MLB Architecture Locked, Step 26 Player Models Deployed & Research Backlog Synchronized
 
 - **Roadmap Tier 2 & Tier 4 Deliveries (Items 1–5)**:
   - **MLB Totals v2 Component Rebuild** (`src/model_prediction/total_score.py`, `tests/test_total_score.py`):

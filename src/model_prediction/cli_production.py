@@ -192,7 +192,12 @@ def _open_ledger(runtime_root: Path) -> ProductionPredictionStore | None:
         return None
 
 
-def _soft_ledger_write(ledger: ProductionLedger | None, name: str, *args: Any, **kwargs: Any) -> None:
+def _soft_ledger_write(
+    ledger: ProductionPredictionStore | ProductionLedger | None,
+    name: str,
+    *args: Any,
+    **kwargs: Any,
+) -> None:
     """Call a ledger method fail-soft: log, never raise.
 
     The prediction command must succeed even when the ledger is down —

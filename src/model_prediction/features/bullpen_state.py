@@ -18,6 +18,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import Enum
+from pathlib import Path
 
 # League average reliever priors for Empirical Bayes shrinkage
 FIP_CONSTANT = 3.10
@@ -410,12 +411,81 @@ class BullpenStateAccumulator:
 class PointInTimeBullpenEngine:
     """Point-in-time dynamic bullpen capability engine managing appearances, rosters, and matchups."""
 
-    def __init__(self, accumulator: BullpenStateAccumulator | None = None) -> None:
+    def __init__(
+        self,
+        accumulator: BullpenStateAccumulator | None = None,
+        snapshot_path: str | Path | None = None,
+    ) -> None:
         self.accumulator = accumulator or BullpenStateAccumulator()
         self._appearances: dict[str, list[RelieverAppearance]] = {}  # player_id -> appearances
         self._team_appearances: dict[str, list[tuple[str, RelieverAppearance]]] = {}
         self._rosters: dict[tuple[str, str], list[RelieverProfile]] = {}  # (team_id, game_date) -> roster
         self._reliever_profiles: dict[str, RelieverProfile] = {}  # player_id -> profile
+        if snapshot_path:
+            self._load_from_snapshots(Path(snapshot_path))
+
+    def _load_from_snapshots(self, path: Path) -> None:
+        import json
+
+        if not path.exists():
+            return
+        with path.open("r", encoding="utf-8") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    snap = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                game_start = str(snap.get("game_start_utc") or "")
+                game_date = game_start[:10] if len(game_start) >= 10 else ""
+                if not game_date:
+                    continue
+                for side in ("home", "away"):
+                    side_obj = snap.get(side, {})
+                    if not isinstance(side_obj, dict):
+                        continue
+                    # The engine's public API keys teams by NAME
+                    # (evaluate_matchup("New York Yankees", ...) -- every
+                    # caller passes full team names). Keying appearances by
+                    # the numeric MLB Stats API team_id here made every
+                    # name-keyed lookup miss and every bullpen feature fall
+                    # back to the neutral league-prior vector
+                    # (DEBUG.md 2026-08-26: 5 dead v9 bullpen columns).
+                    team_id = str(side_obj.get("team_name") or side_obj.get("team_id") or "")
+                    players = side_obj.get("players", [])
+                    if not isinstance(players, list):
+                        continue
+                    for p in players:
+                        order = int(p.get("pitching_order") or 0)
+                        if order > 1:  # Reliever appearance
+                            pid = str(p.get("player_id") or "")
+                            pname = str(p.get("name") or pid)
+                            pitching = p.get("pitching", {})
+                            ip_str = str(pitching.get("inningsPitched") or "1.0")
+                            try:
+                                ip = float(ip_str)
+                            except ValueError:
+                                ip = 1.0
+                            pitches = int(pitching.get("numberOfPitches") or int(ip * 16))
+                            k = int(pitching.get("strikeOuts") or 0)
+                            bb = int(pitching.get("baseOnBalls") or 0)
+                            er = int(pitching.get("earnedRuns") or 0)
+                            bf = int(pitching.get("battersFaced") or int(ip * 4))
+                            self.update_reliever_appearance(
+                                RelieverAppearance(
+                                    player_id=pid,
+                                    player_name=pname,
+                                    team_id=team_id,
+                                    game_date=game_date,
+                                    pitches_thrown=pitches,
+                                    innings_pitched=ip,
+                                    batters_faced=bf,
+                                    strikeouts=k,
+                                    walks=bb,
+                                    earned_runs=er,
+                                )
+                            )
 
     def update_reliever_appearance(self, record: RelieverAppearance) -> None:
         """Record a reliever game outing sequentially."""

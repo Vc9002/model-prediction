@@ -33,7 +33,7 @@ from .data_sources.espn import _infer_tennis_surface
 from .domain import EASTERN, parse_utc
 from .models.tennis import UpcomingMatch, tennis_model
 
-_PARTIAL_MARKERS = ("-fh-", "-h1-", "-h2-", "-1h-", "-set-")
+_TENNIS_SUBPERIOD_MARKERS = ("fh", "h1", "h2", "1h", "set", "ss", "st")
 
 TENNIS_TOURS = ("WTA", "ATP")
 
@@ -74,7 +74,10 @@ def _tennis_history_before(data_root: str | Path, as_of_date: str) -> list[dict[
 
 
 def _words(value: str) -> list[str]:
-    return re.findall(r"[a-z0-9]+", value.casefold())
+    import unicodedata
+
+    norm = unicodedata.normalize("NFKD", str(value)).encode("ASCII", "ignore").decode("utf-8")
+    return re.findall(r"[a-z0-9]+", norm.casefold())
 
 
 def _name_matches(player: str, text: str) -> bool:
@@ -84,7 +87,85 @@ def _name_matches(player: str, text: str) -> bool:
         return False
     if " ".join(player_words) in " ".join(_words(text)):
         return True
-    return all(word in text_words for word in player_words)
+    if all(word in text_words for word in player_words):
+        return True
+    # Surname matching with length guard
+    return len(player_words) >= 2 and player_words[-1] in text_words and len(player_words[-1]) >= 4
+
+
+def _is_tennis_subperiod_slug(slug: str) -> bool:
+    """Return whether a market slug identifies a set/partial-match contract."""
+    normalized = f"-{slug.casefold().strip('-')}-"
+    return any(f"-{marker}-" in normalized for marker in _TENNIS_SUBPERIOD_MARKERS)
+
+
+def _unsupported_tennis_market_reason(market_type: str, slug: str) -> str | None:
+    if _is_tennis_subperiod_slug(slug):
+        return (
+            "UNSUPPORTED_TENNIS_SUBPERIOD_MARKET: exact set/period identity "
+            "and result dimensions are unavailable"
+        )
+    if market_type in {"spread", "total"}:
+        return "UNSUPPORTED_TENNIS_DERIVATIVE_PRICING: no validated game-score distribution is available"
+    return None
+
+
+def _select_one_tennis_line_per_market(
+    contracts: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
+    """Cap each match at one spread and one total, selected prospectively.
+
+    Alternate lines are distinct contracts but strongly correlated exposure.
+    Ranking uses only information known at decision time: expected return per
+    unit risk for a binary contract (model_probability / executable_ask - 1),
+    then raw edge and quote time as deterministic tie-breakers. Outcomes are
+    deliberately absent, so historical winners can never influence selection.
+    """
+    grouped: dict[tuple[str, str], list[tuple[int, dict[str, Any]]]] = {}
+    passthrough: list[tuple[int, dict[str, Any]]] = []
+    for index, contract in enumerate(contracts):
+        market_type = str(contract.get("market_type") or "").casefold()
+        if market_type not in {"spread", "total"}:
+            passthrough.append((index, contract))
+            continue
+        key = (str(contract.get("event_id") or ""), market_type)
+        grouped.setdefault(key, []).append((index, contract))
+
+    chosen: list[tuple[int, dict[str, Any]]] = list(passthrough)
+    suppressed: list[dict[str, str]] = []
+    for (event_id, market_type), members in grouped.items():
+
+        def rank(item: tuple[int, dict[str, Any]]) -> tuple[float, float, str, str]:
+            _, row = item
+            probability = float(row.get("model_probability") or 0.0)
+            ask = float(row.get("executable_ask") or 0.0)
+            expected_return = probability / ask - 1.0 if 0.0 < ask < 1.0 else float("-inf")
+            edge = float(row.get("edge_vs_executable_ask") or probability - ask)
+            return (
+                expected_return,
+                edge,
+                str(row.get("observed_at_utc") or ""),
+                str(row.get("market_slug") or ""),
+            )
+
+        survivor = max(members, key=rank)
+        chosen.append(survivor)
+        survivor_slug = str(survivor[1].get("market_slug") or "")
+        for _, row in members:
+            if row is survivor[1]:
+                continue
+            suppressed.append(
+                {
+                    "event_id": event_id,
+                    "market_slug": str(row.get("market_slug") or ""),
+                    "reason": "TENNIS_CORRELATED_LINE_SUPERSEDED",
+                    "selected_market_slug": survivor_slug,
+                    "market_type": market_type,
+                }
+            )
+
+    chosen.sort(key=lambda item: item[0])
+    return [row for _, row in chosen], suppressed
 
 
 def _upcoming_singles_matches(scoreboard: dict[str, Any]) -> list[dict[str, Any]]:
@@ -135,7 +216,7 @@ def _upcoming_singles_matches(scoreboard: dict[str, Any]) -> list[dict[str, Any]
     return matches
 
 
-def _latest_moneyline_snapshots(
+def _latest_tennis_snapshots(
     data_root: str | Path,
     game_date: str,
     league: str,
@@ -155,17 +236,31 @@ def _latest_moneyline_snapshots(
             except json.JSONDecodeError:
                 continue
             slug = str(row.get("market_slug") or "")
+            mtype = str(row.get("market_type") or "moneyline")
             if (
-                row.get("market_type") != "moneyline"
+                mtype not in {"moneyline", "spread", "total"}
                 or str(row.get("league") or "").upper() != league
-                or any(marker in slug.casefold() for marker in _PARTIAL_MARKERS)
                 or not bool(row.get("timestamp_valid", False))
             ):
                 continue
+            canonical = json.dumps(row, sort_keys=True, separators=(",", ":"))
+            snapshot_hash = hashlib.sha256(canonical.encode()).hexdigest()
+            enriched = dict(row)
+            enriched["_market_snapshot_hash"] = snapshot_hash
+            enriched["_market_snapshot_archive_path"] = str(path.resolve())
+            existing_record_id = row.get("market_snapshot_record_id") or row.get("snapshot_record_id")
+            market_id = row.get("market_id")
+            observed_at_utc = row.get("observed_at_utc")
+            if existing_record_id:
+                enriched["_market_snapshot_record_id"] = str(existing_record_id)
+            elif market_id and observed_at_utc:
+                enriched["_market_snapshot_record_id"] = f"{market_id}:{observed_at_utc}"
+            else:
+                enriched["_market_snapshot_record_id"] = snapshot_hash
             if slug not in latest or str(row.get("observed_at_utc") or "") > str(
                 latest[slug].get("observed_at_utc") or ""
             ):
-                latest[slug] = row
+                latest[slug] = enriched
     return list(latest.values())
 
 
@@ -210,88 +305,118 @@ def build_tennis_slate(
             skipped.append({"event_id": event_id, "reason": str(error)})
 
     model = tennis_model()
-    # Elo built per tour, on that tour's own history only -- men's and
-    # women's tennis are separate competitive pools; blending them would
-    # corrupt ratings (and risk a same-name collision across tours).
     predictions = []
     for tour in TENNIS_TOURS:
         tour_history = [game for game in all_history if str(game.get("league", "")).upper() == tour]
         predictions.extend(model.predict_games(tour_history, upcoming_by_tour[tour]))
 
-    snapshots_by_tour = {
-        tour: _latest_moneyline_snapshots(data_root, game_date, tour) for tour in TENNIS_TOURS
-    }
+    snapshots_by_tour = {tour: _latest_tennis_snapshots(data_root, game_date, tour) for tour in TENNIS_TOURS}
     priced: list[dict[str, Any]] = []
     unmatched: list[dict[str, str]] = []
+    seen_contract_keys: set[str] = set()
+
     for prediction in predictions:
         start = parse_utc(prediction.event_start_utc)
-        candidates = []
-        for snapshot in snapshots_by_tour[prediction.league]:
+        p_away = float(prediction.probabilities.get("away", 0.5))
+        p_home = float(prediction.probabilities.get("home", 0.5))
+        priced_before = len(priced)
+        saw_unsupported_market = False
+
+        for snapshot in snapshots_by_tour.get(prediction.league, []):
             try:
                 snapshot_start = parse_utc(str(snapshot["event_start_utc"]))
                 snapshot_at = parse_utc(str(snapshot["observed_at_utc"]))
             except (KeyError, TypeError, ValueError):
                 continue
+
             long_desc = str((snapshot.get("long") or {}).get("description", ""))
             short_desc = str((snapshot.get("short") or {}).get("description", ""))
+            event_title = str(snapshot.get("event_title", ""))
+
+            title_matches = _name_matches(prediction.away_team, event_title) and _name_matches(
+                prediction.home_team, event_title
+            )
             away_is_long = _name_matches(prediction.away_team, long_desc) and _name_matches(
                 prediction.home_team, short_desc
             )
             away_is_short = _name_matches(prediction.away_team, short_desc) and _name_matches(
                 prediction.home_team, long_desc
             )
-            if (
-                abs((snapshot_start - start).total_seconds()) <= 30 * 60
-                and snapshot_at < start
-                and (away_is_long or away_is_short)
-            ):
-                candidates.append((snapshot, "long" if away_is_long else "short"))
-        if len(candidates) != 1:
+
+            if not (title_matches or away_is_long or away_is_short):
+                continue
+
+            # Same tournament / calendar day matching (within 24 hours)
+            if abs((snapshot_start - start).total_seconds()) > 24 * 3600:
+                continue
+            if snapshot_at >= start:
+                continue
+
+            mtype = snapshot.get("market_type", "moneyline")
+            slug = str(snapshot.get("market_slug", ""))
+            contract_key = f"{prediction.event_id}:{slug}"
+            if contract_key in seen_contract_keys:
+                continue
+
+            unsupported_reason = _unsupported_tennis_market_reason(str(mtype), slug)
+            if unsupported_reason is not None:
+                seen_contract_keys.add(contract_key)
+                saw_unsupported_market = True
+                skipped.append(
+                    {
+                        "event_id": prediction.event_id,
+                        "market_slug": slug,
+                        "reason": unsupported_reason,
+                    }
+                )
+                continue
+
+            if mtype == "moneyline":
+                away_side_key = "long" if away_is_long else "short"
+                home_side_key = "short" if away_side_key == "long" else "long"
+                selection = "away" if p_away >= p_home else "home"
+                side_key = away_side_key if selection == "away" else home_side_key
+                side = snapshot.get(side_key) or {}
+                ask = side.get("ask")
+                if ask is None or not 0.01 <= float(ask) <= 0.99:
+                    continue
+                prob = p_away if selection == "away" else p_home
+                seen_contract_keys.add(contract_key)
+                priced.append(
+                    {
+                        "event_id": prediction.event_id,
+                        "event_start_utc": prediction.event_start_utc,
+                        "away_team": prediction.away_team,
+                        "home_team": prediction.home_team,
+                        "market_type": "moneyline",
+                        "selection": selection,
+                        "line": None,
+                        "model_probability": round(prob, 4),
+                        "model_uncertainty": prediction.uncertainty,
+                        "model_version": prediction.model_version,
+                        "feature_basis": prediction.feature_basis,
+                        "rationale": prediction.rationale,
+                        "market_slug": slug,
+                        "executable_ask": float(ask),
+                        "observed_at_utc": snapshot["observed_at_utc"],
+                        "timestamp_valid": True,
+                        "edge_vs_executable_ask": round(prob - float(ask), 6),
+                        "market_snapshot_hash": snapshot["_market_snapshot_hash"],
+                        "market_snapshot_archive_path": snapshot["_market_snapshot_archive_path"],
+                        "market_snapshot_record_id": snapshot["_market_snapshot_record_id"],
+                    }
+                )
+
+        if len(priced) == priced_before and not saw_unsupported_market:
             unmatched.append(
                 {
                     "event_id": prediction.event_id,
-                    "reason": "no unique timestamp-valid moneyline matched by player name",
+                    "reason": "no snapshot matched",
                 }
             )
-            continue
-        snapshot, away_side_key = candidates[0]
-        home_side_key = "short" if away_side_key == "long" else "long"
-        selection = max(("away", "home"), key=lambda side: prediction.probabilities[side])
-        side_key = away_side_key if selection == "away" else home_side_key
-        side = snapshot.get(side_key) or {}
-        ask = side.get("ask")
-        if ask is None or not 0 < float(ask) < 1:
-            unmatched.append(
-                {
-                    "event_id": prediction.event_id,
-                    "reason": "selected moneyline side has no executable ask",
-                }
-            )
-            continue
-        priced.append(
-            {
-                "event_id": prediction.event_id,
-                "event_start_utc": prediction.event_start_utc,
-                "away_team": prediction.away_team,
-                "home_team": prediction.home_team,
-                "market_type": "moneyline",
-                "selection": selection,
-                "line": None,
-                "model_probability": prediction.probabilities[selection],
-                "model_uncertainty": prediction.uncertainty,
-                "model_version": prediction.model_version,
-                "feature_basis": prediction.feature_basis,
-                "rationale": prediction.rationale,
-                "market_slug": snapshot["market_slug"],
-                "executable_ask": float(ask),
-                "observed_at_utc": snapshot["observed_at_utc"],
-                "timestamp_valid": True,
-                "edge_vs_executable_ask": round(
-                    prediction.probabilities[selection] - float(ask),
-                    6,
-                ),
-            }
-        )
+
+    priced, correlated_line_skips = _select_one_tennis_line_per_market(priced)
+    skipped.extend(correlated_line_skips)
 
     model_source = Path(__file__).with_name("models") / "tennis.py"
     code_hash = hashlib.sha256(model_source.read_bytes()).hexdigest()
@@ -306,7 +431,8 @@ def build_tennis_slate(
         "unmatched": unmatched,
         "skipped": skipped,
         "note": (
-            "Surface-blended Elo priced against WTA and ATP moneyline (ATP added 2026-08-03) "
-            "-- ESPN has no ITF scoreboard, so those legs can never be matched."
+            "Surface-Elo prices WTA & ATP full-match moneylines only. Tennis spread, "
+            "total, set, and partial-match contracts fail closed until validated score-distribution "
+            "pricing and exact result dimensions are available."
         ),
     }

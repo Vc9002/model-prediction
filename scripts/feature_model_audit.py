@@ -33,6 +33,27 @@ from model_prediction.validation import FEATURE_VARIANTS, ValidationRow
 
 OUT = PROJECT_ROOT / "outputs" / "research" / "feature_model_audit.json"
 
+# Documented known-mismatch artifacts — deliberate, never re-signed
+# evidence. The stored artifact_hash records the payload at signing time;
+# later provenance annotations are appended WITHOUT re-signing so the
+# edit itself stays detectable. Re-signing archived/quarantine evidence
+# is prohibited (docs/FEATURE_MODEL_AUDIT.md "Archive integrity"; the
+# quarantine commits preserve the candidate for audit). These are not
+# corruption findings:
+#   - archive/wnba-spread-baseline-v1.json: `_retired*` fields appended at
+#     archive time.
+#   - research/mlb-v9-candidate-1.json: status/invalidation_reason/
+#     replacement appended by the quarantine commit (preserved for audit,
+#     never promoted). Its embedded hash was written under the writer's
+#     default-separators convention, so it never matched
+#     compute_artifact_hash even at generation.
+KNOWN_MISMATCH_ARTIFACTS = frozenset(
+    {
+        "config/models/archive/wnba-spread-baseline-v1.json",
+        "config/models/research/mlb-v9-candidate-1.json",
+    }
+)
+
 
 def _serving_feature_names() -> set[str]:
     """Every feature learned_forward can produce at prediction time."""
@@ -119,6 +140,7 @@ def main() -> int:
         unserved = [f for f in feature_names if f not in served]
         models_report[rel] = {
             "hash_valid": stored == computed,
+            "known_hash_mismatch": rel in KNOWN_MISMATCH_ARTIFACTS,
             "model_version": model_version,
             "feature_names": feature_names,
             "unserved_features": unserved,
@@ -126,7 +148,7 @@ def main() -> int:
                 (payload.get("qualification") or {}).get("qualified") if isinstance(payload, dict) else None
             ),
         }
-        if stored is not None and stored != computed:
+        if stored is not None and stored != computed and rel not in KNOWN_MISMATCH_ARTIFACTS:
             gaps.append(f"MODEL GAP: {rel} hash mismatch")
         if unserved:
             if "rebuild" not in str(model_version):

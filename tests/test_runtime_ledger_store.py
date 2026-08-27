@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+import pytest
+
 from model_prediction.runtime_ledger_store import (
     LedgerMutation,
+    RuntimeLedgerDuplicateError,
     RuntimeLedgerStore,
     new_pick_ids,
 )
@@ -60,6 +63,34 @@ def test_record_and_idempotent_retry(tmp_path) -> None:
 
         events = store._conn.execute("SELECT COUNT(*) AS n FROM ledger_events").fetchone()
         assert events["n"] == 1
+
+
+def test_active_contract_model_identity_is_unique_in_sqlite(tmp_path) -> None:
+    paths = RuntimePaths.for_test(tmp_path)
+    with RuntimeLedgerStore(paths) as store:
+        first = _mutation(decision_payload={"sportsbook": "polymarket_us"})
+        store.apply(first)
+        second = _mutation(
+            line=None,
+            selection="away",
+            decision_payload={"sportsbook": "polymarket_us"},
+        )
+
+        with pytest.raises(RuntimeLedgerDuplicateError) as error:
+            store.apply(second)
+
+        assert error.value.pick_id == first.pick_id
+        assert len(store.records()) == 1
+        assert store.event_count() == 1
+
+
+def test_active_contract_uniqueness_preserves_alternate_lines(tmp_path) -> None:
+    paths = RuntimePaths.for_test(tmp_path)
+    with RuntimeLedgerStore(paths) as store:
+        store.apply(_mutation(line=-1.5, decision_payload={"sportsbook": "polymarket_us"}))
+        store.apply(_mutation(line=-2.5, decision_payload={"sportsbook": "polymarket_us"}))
+
+        assert len(store.records()) == 2
 
 
 def test_mutation_and_audit_event_commit_in_one_transaction(tmp_path) -> None:
@@ -415,6 +446,9 @@ def test_sqlite_authority_mirror_failure_aborts_the_mutation(tmp_path) -> None:
         def apply(self, mutation) -> bool:
             raise RuntimeError("canonical store down")
 
+        def pick_rows(self, **filters) -> list[dict]:
+            return []
+
     paths = RuntimePaths.for_test(tmp_path)
     ledger = PickLedger(
         tmp_path / "picks.xlsx",
@@ -459,6 +493,118 @@ def test_sqlite_authority_export_failure_is_best_effort(tmp_path) -> None:
     assert len(records) == 1 and records[0]["pick_id"] == row["pick_id"]
     alarm = paths.ledgers_root / "parity_alarm.jsonl"
     assert alarm.is_file() and "export" in alarm.read_text(encoding="utf-8")
+    store.close()
+
+
+def test_sqlite_authority_reads_canonical_row_when_xlsx_projection_is_empty(tmp_path) -> None:
+    """A projection gap must not hide a canonical row from any PickLedger reader.
+
+    ``rows()`` is the common input for settlement, duplicate detection, and
+    exposure.  This regression deliberately empties only the disposable XLSX
+    projection after a successful canonical append, then exercises all three
+    paths against SQLite.
+    """
+    import pytest
+
+    from model_prediction.ledger import FIELDNAMES, DuplicatePickError, PickLedger
+    from model_prediction.runtime_ledger_store import RuntimeLedgerStore
+    from model_prediction.xlsx_ledger import write_xlsx_rows_atomic
+    from tests.test_ledger import request as make_request
+
+    paths = RuntimePaths.for_test(tmp_path)
+    store = RuntimeLedgerStore(paths)
+    ledger = PickLedger(
+        tmp_path / "picks.xlsx",
+        tier="main",
+        mirror=store,
+        authority="sqlite",
+        sport="mlb",
+    )
+    logged = ledger.append_call(make_request(), 0.25, 70)
+
+    write_xlsx_rows_atomic(ledger.path, FIELDNAMES, [])
+
+    assert [row["pick_id"] for row in ledger.rows()] == [logged["pick_id"]]
+    from dataclasses import replace
+
+    assert ledger.exposure(replace(make_request(), event_id="event-2")).daily_units == 0.25
+    with pytest.raises(DuplicatePickError):
+        ledger.append_call(make_request(), 0.25, 70)
+
+    settled = ledger.settle(logged["pick_id"], away_score=2, home_score=3)
+    assert settled["status"] == "settled"
+    assert store.pick_rows(tier="main", sport="mlb")[0]["result"] == "loss"
+    store.close()
+
+
+def test_pick_mutations_capture_only_observed_feature_values(tmp_path) -> None:
+    import json
+    from dataclasses import replace
+
+    from model_prediction.ledger import PickLedger
+    from tests.test_ledger import request as make_request
+
+    paths = RuntimePaths.for_test(tmp_path)
+    store = RuntimeLedgerStore(paths)
+    ledger = PickLedger(
+        tmp_path / "picks.xlsx",
+        tier="main",
+        mirror=store,
+        authority="sqlite",
+        sport="mlb",
+    )
+    req = replace(
+        make_request(),
+        feature_schema_version="mlb-feature-v8",
+        model_artifact_hash="a" * 64,
+        elo_probability=0.57,
+        trend_gap=-0.03,
+        unavailable_features="weather_factor,starter_era_gap",
+    )
+    logged = ledger.append_call(req, 0.25, 70)
+
+    [record] = store.records(tier="main", sport="mlb")
+    payload = json.loads(record["feature_payload_json"])
+    assert payload == {
+        "feature_payload_schema_version": "ledger-row-features-v1",
+        "feature_schema_version": "mlb-feature-v8",
+        "model_version": "mlb-test-v1",
+        "model_artifact_hash": "a" * 64,
+        "availability_status": "partial_with_unavailable_features",
+        "observed_feature_count": 2,
+        "unavailable_features": "weather_factor,starter_era_gap",
+        "features": {"elo_probability": "0.57", "trend_gap": "-0.03"},
+    }
+    assert "park_factor" not in payload["features"]
+
+    ledger.settle(logged["pick_id"], away_score=2, home_score=3)
+    [settled_record] = store.records(tier="main", sport="mlb")
+    assert json.loads(settled_record["feature_payload_json"]) == payload
+    store.close()
+
+
+def test_empty_feature_snapshot_is_explicitly_unavailable(tmp_path) -> None:
+    import json
+
+    from model_prediction.ledger import PickLedger
+    from tests.test_ledger import request as make_request
+
+    paths = RuntimePaths.for_test(tmp_path)
+    store = RuntimeLedgerStore(paths)
+    ledger = PickLedger(
+        tmp_path / "picks.xlsx",
+        tier="main",
+        mirror=store,
+        authority="sqlite",
+        sport="mlb",
+    )
+    ledger.append_call(make_request(), 0.25, 70)
+
+    [record] = store.records(tier="main", sport="mlb")
+    payload = json.loads(record["feature_payload_json"])
+    assert payload["features"] == {}
+    assert payload["observed_feature_count"] == 0
+    assert payload["availability_status"] == "unavailable_not_recorded"
     store.close()
 
 

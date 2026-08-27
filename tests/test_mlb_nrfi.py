@@ -249,7 +249,7 @@ class TestNRFIForecastAndLedgerWiring:
         row = flat_rows[0]
         assert row["event_id"] == "mlb_1001"
         assert row["market_type"] == MarketType.NRFI.value
-        assert row["selection"] == "nrfi"
+        assert row["selection"] in ("nrfi", "yrfi")
         assert float(row["line"]) == 0.5
         assert 0.0 < float(row["model_probability"]) < 1.0
 

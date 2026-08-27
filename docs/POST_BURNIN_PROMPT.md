@@ -136,4 +136,4 @@ data) → KBO/NPB starters. Details: `docs/POST_MLB_RESEARCH_PLANS.md`.
 - Per-sport plans: `docs/POST_MLB_RESEARCH_PLANS.md`
 - Research evidence + source tiers: `docs/RESEARCH_LITERATURE_DIVE_{1,2,3}_2026-08-17.md`
 - Row-parity baseline + three decisions: worktree `docs/V8_PARITY_BASELINE_2026-08-17.md`
-- Experiment template + retention rules: `docs/RESEARCH_BACKLOG.md`
+- Experiment template + retention rules: `docs/ROADMAP.md` (backlog merged 2026-08-22; open items live in ROADMAP.md)

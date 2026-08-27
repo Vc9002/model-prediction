@@ -425,3 +425,6 @@ class PolymarketSlateScanner:
             actionable_orders=actionable,
             total_capital_staked=round(total_staked, 2),
         )
+
+
+PolymarketScanner = PolymarketSlateScanner

@@ -1,5 +1,5 @@
 """Thin-league fallback config: hierarchical shrinkage toward a global
-soccer prior (docs/RESEARCH_BACKLOG.md P2: "Thin leagues use hierarchical
+soccer prior (docs/ROADMAP.md: "Thin leagues use hierarchical
 shrinkage toward a global soccer prior (theta = w*theta_league +
 (1-w)*theta_global, w from sample size)").
 

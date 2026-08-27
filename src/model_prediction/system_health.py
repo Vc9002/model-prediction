@@ -27,7 +27,8 @@ capture staleness flag only fires for a sport that was recently active.
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+import sqlite3
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -43,6 +44,154 @@ from .runtime_paths import RuntimePaths
 _CAPTURE_STALE_DAYS = 7.0
 _MARKET_STALE_DAYS = 2.0
 _RECENT_ACTIVITY_DAYS = 21.0
+_STALE_OPEN_WARN_HOURS = 24.0
+_STALE_OPEN_HARD_HOURS = 72.0
+
+
+def _stale_open_rows(paths: RuntimePaths) -> dict[str, Any]:
+    """Open rows far past their frozen start with no settlement resolution.
+
+    Postponed/rescheduled games expose this class: a re-dated game never
+    completes under its original event_id, and the non-ESPN settlement
+    paths (tennis, KBO/NPB, edge ledger, ESPN-dropped events) can pend
+    forever. This makes the 2026-08-24 audit's manual "24 open rows past
+    start" count continuously visible. Drain-minimal by design: a pure
+    read-only query of the canonical ledger the daily already maintains —
+    health never polls the network.
+    """
+    if not paths.ledgers_db.is_file():
+        return {"available": False, "open_over_24h": 0, "open_over_72h": 0}
+    connection = sqlite3.connect(f"file:{paths.ledgers_db}?mode=ro", uri=True, timeout=10.0)
+    connection.row_factory = sqlite3.Row
+    cutoff_24 = (datetime.now(UTC) - timedelta(hours=_STALE_OPEN_WARN_HOURS)).isoformat()
+    cutoff_72 = (datetime.now(UTC) - timedelta(hours=_STALE_OPEN_HARD_HOURS)).isoformat()
+    try:
+        by_sport = {
+            str(row["sport"]): int(row["n"])
+            for row in connection.execute(
+                """
+                SELECT sport, COUNT(*) AS n FROM ledger_records
+                WHERE status = 'open' AND event_start_utc < ?
+                GROUP BY sport ORDER BY n DESC
+                """,
+                (cutoff_24,),
+            )
+        }
+        open_over_72h = int(
+            connection.execute(
+                """
+                SELECT COUNT(*) FROM ledger_records
+                WHERE status = 'open' AND event_start_utc < ?
+                """,
+                (cutoff_72,),
+            ).fetchone()[0]
+        )
+        samples = [
+            dict(row)
+            for row in connection.execute(
+                """
+                SELECT pick_id, sport, event_start_utc, market_type
+                FROM ledger_records
+                WHERE status = 'open' AND event_start_utc < ?
+                ORDER BY event_start_utc ASC
+                LIMIT 10
+                """,
+                (cutoff_24,),
+            )
+        ]
+    finally:
+        connection.close()
+    return {
+        "available": True,
+        "open_over_24h": sum(by_sport.values()),
+        "open_over_72h": open_over_72h,
+        "by_sport": by_sport,
+        "samples": samples,
+    }
+
+
+def _ledger_economics(paths: RuntimePaths) -> dict[str, Any]:
+    """Check that every graded binary row has a coherent scoring basis.
+
+    A process-level green run cannot establish this invariant: the Flat MLB
+    confidence downgrade once wrote ``units=0``/``pnl=0`` and the dashboard
+    independently rendered a suggested size, so the scheduler succeeded while
+    the ledger told two contradictory economic stories. SQLite is canonical;
+    inspect it directly and treat research scoring columns as a separate basis.
+    """
+    if not paths.ledgers_db.is_file():
+        return {"available": False, "semantic_errors": 0, "examples": []}
+    connection = sqlite3.connect(f"file:{paths.ledgers_db}?mode=ro", uri=True, timeout=10.0)
+    connection.row_factory = sqlite3.Row
+    try:
+        counts = connection.execute(
+            """
+            WITH scored AS (
+              SELECT ledger_tier, sport, pick_id, result,
+                     COALESCE(units, 0.0) AS ledger_units,
+                     pnl_units AS ledger_pnl,
+                     CAST(COALESCE(NULLIF(json_extract(decision_payload_json,
+                         '$.research_score_units'), ''), 0.0) AS REAL) AS research_units,
+                     CAST(NULLIF(json_extract(decision_payload_json,
+                         '$.research_pnl_units'), '') AS REAL) AS research_pnl,
+                     json_extract(decision_payload_json, '$.reason_code') AS reason_code
+              FROM ledger_records
+              WHERE status = 'settled' AND result IN ('win', 'loss')
+            ), effective AS (
+              SELECT *,
+                     CASE WHEN ledger_units > 0 THEN ledger_units ELSE research_units END AS effective_units,
+                     CASE WHEN ledger_units > 0 THEN ledger_pnl ELSE research_pnl END AS effective_pnl
+              FROM scored
+            )
+            SELECT
+              SUM(CASE WHEN effective_units <= 0 THEN 1 ELSE 0 END) AS unscored_results,
+              SUM(CASE WHEN effective_units > 0 AND result = 'win'
+                        AND (effective_pnl IS NULL OR effective_pnl <= 0) THEN 1 ELSE 0 END)
+                  AS win_pnl_errors,
+              SUM(CASE WHEN effective_units > 0 AND result = 'loss'
+                        AND (effective_pnl IS NULL OR ABS(effective_pnl + effective_units) > 0.00011)
+                       THEN 1 ELSE 0 END) AS loss_pnl_errors
+            FROM effective
+            """
+        ).fetchone()
+        summary = {
+            "unscored_results": int(counts["unscored_results"] or 0),
+            "win_pnl_errors": int(counts["win_pnl_errors"] or 0),
+            "loss_pnl_errors": int(counts["loss_pnl_errors"] or 0),
+        }
+        examples = [
+            dict(row)
+            for row in connection.execute(
+                """
+                WITH effective AS (
+                  SELECT ledger_tier, sport, pick_id, result,
+                         json_extract(decision_payload_json, '$.reason_code') AS reason_code,
+                         CASE WHEN COALESCE(units, 0.0) > 0 THEN units
+                              ELSE CAST(COALESCE(NULLIF(json_extract(decision_payload_json,
+                                  '$.research_score_units'), ''), 0.0) AS REAL) END AS effective_units,
+                         CASE WHEN COALESCE(units, 0.0) > 0 THEN pnl_units
+                              ELSE CAST(NULLIF(json_extract(decision_payload_json,
+                                  '$.research_pnl_units'), '') AS REAL) END AS effective_pnl
+                  FROM ledger_records
+                  WHERE status = 'settled' AND result IN ('win', 'loss')
+                )
+                SELECT ledger_tier, sport, pick_id, result, reason_code,
+                       effective_units, effective_pnl
+                FROM effective
+                WHERE effective_units <= 0
+                   OR (effective_units > 0 AND result = 'win'
+                       AND (effective_pnl IS NULL OR effective_pnl <= 0))
+                   OR (effective_units > 0 AND result = 'loss'
+                       AND (effective_pnl IS NULL OR ABS(effective_pnl + effective_units) > 0.00011))
+                ORDER BY ledger_tier, sport, pick_id
+                LIMIT 10
+                """
+            )
+        ]
+    finally:
+        connection.close()
+    semantic_errors = sum(summary.values())
+    return {"available": True, **summary, "semantic_errors": semantic_errors, "examples": examples}
 
 
 def _get_clv_summary() -> dict:
@@ -181,6 +330,9 @@ def _flag_market_staleness(markets: dict[str, Any]) -> list[str]:
     return flags
 
 
+from .market_health import market_relative_health
+
+
 def system_health(
     repo_root: Path | str | None = None,
     runtime_root: Path | str | None = None,
@@ -228,10 +380,16 @@ def system_health(
             entry.model_id: ("ok" if entry.available else f"failed: {entry.load_error}")
             for entry in registry.entries.values()
         },
+        "blocked_workflows": registry.blocked_workflows,
     }
     report["checks"]["registry"] = registry_check
     if registry.problem_entries():
         degrade(f"{len(registry.problem_entries())} production model(s) failed contract validation")
+    if registry.blocked_workflows:
+        degrade(
+            f"{len(registry.blocked_workflows)} active workflow(s) are explicitly blocked "
+            "from production serving"
+        )
 
     # 2. Supervisor run rows (A-2): latest run per worker.
     supervisor = RunSupervisor(db_path=paths.runs_db, paths=paths)
@@ -296,7 +454,27 @@ def system_health(
         degrade(flag)
     report["checks"]["market_capture"] = markets
 
-    # 5. Rolling Closing Line Value (CLV) health monitoring
+    # 5. Canonical ledger economics. A settled win/loss must have a real
+    # scoring basis and sign-consistent P&L; scheduler exit codes cannot prove
+    # this semantic invariant.
+    ledger_economics = _ledger_economics(paths)
+    report["checks"]["ledger_economics"] = ledger_economics
+
+    stale_open = _stale_open_rows(paths)
+    report["checks"]["stale_open_rows"] = stale_open
+    if stale_open.get("open_over_72h", 0) > 0:
+        degrade(
+            f"{stale_open['open_over_72h']} open ledger rows are more than 72h past "
+            "their scheduled start with no settlement resolution (postponed or "
+            "rescheduled events never complete under their original event_id)"
+        )
+    if ledger_economics["semantic_errors"]:
+        degrade(
+            f"canonical ledger has {ledger_economics['semantic_errors']} "
+            "settled row(s) with incoherent size/P&L"
+        )
+
+    # 6. Rolling Closing Line Value (CLV) health monitoring
     clv_data = _get_clv_summary()
     if clv_data:
         report["checks"]["clv"] = clv_data
@@ -305,9 +483,17 @@ def system_health(
         if clv_count >= 20 and mean_clv < -1.0:
             degrade(f"Rolling 30-day CLV negative ({mean_clv:.2f}%) across {clv_count} graded picks")
 
+    # Phase-23 market-relative evidence (wired 2026-08-27): read-only
+    # battery from settled ledger rows. Informational by design — it
+    # never flips health status by itself; the operator reads it.
+    try:
+        report["market_relative"] = market_relative_health(paths)
+    except Exception as exc:  # noqa: BLE001 — evidence must never crash health
+        report["market_relative"] = {"status": "unavailable", "error": f"{type(exc).__name__}: {exc}"}
+
     report["reasons"] = reasons
 
-    # 6. Push alerting on DEGRADED/DOWN *transitions* only — system_health()
+    # 7. Push alerting on DEGRADED/DOWN *transitions* only — system_health()
     # may be called repeatedly (dashboard polling, cron), and re-alerting on
     # every call while the same state persists would spam the operator.
     if report["status"] in ("DEGRADED", "DOWN") and _status_transitioned(

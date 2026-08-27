@@ -201,13 +201,13 @@ def _row_rejection_reasons(
     if gated:
         if decision != "CALL":
             reasons.append("gated_row_not_call")
-        if record_type != "QUALIFIED_SHADOW_CALL":
-            reasons.append("gated_row_not_qualified_record")
+        if record_type not in {"QUALIFIED_SHADOW_CALL", "RESEARCH_OBSERVATION"}:
+            reasons.append("gated_row_invalid_record_type")
         if units is not None and units <= 0:
             reasons.append("gated_row_nonpositive_units")
     elif decision == "CALL":
-        if record_type != "QUALIFIED_SHADOW_CALL":
-            reasons.append("call_not_qualified_record")
+        if record_type not in {"QUALIFIED_SHADOW_CALL", "RESEARCH_OBSERVATION"}:
+            reasons.append("call_invalid_record_type")
         if units is not None and units <= 0:
             reasons.append("call_nonpositive_units")
     elif decision == "NO_CALL":
@@ -218,7 +218,7 @@ def _row_rejection_reasons(
     else:
         reasons.append("invalid_decision")
 
-    if decision == "CALL" or gated:
+    if (decision == "CALL" or gated) and record_type == "QUALIFIED_SHADOW_CALL":
         model_config = config.get("models", {}).get(sport.upper(), {})
         minimum_edge = float(model_config.get("min_edge", 0.0))
         minimum_confidence = float(model_config.get("research_confidence_gate", 0.0))

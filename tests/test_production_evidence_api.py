@@ -870,6 +870,17 @@ def test_model_ledger_comparison_groups_open_predictions_by_event(tmp_path, monk
             }
         ],
     )
+    _write_model_ledger(
+        tmp_path / "model_ledgers" / "mlb-moneyline-elo-trend-lr.bak-test.xlsx",
+        [
+            {
+                "prediction_id": "backup-pick",
+                "model_id": "mlb-moneyline-elo-trend-lr.bak-test",
+                "event_id": "backup-event",
+                "status": "open",
+            }
+        ],
+    )
 
     result = dashboard_server.model_ledger_comparison()
 

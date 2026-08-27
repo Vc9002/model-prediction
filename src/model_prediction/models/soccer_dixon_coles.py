@@ -305,6 +305,46 @@ class BivariateScoreGrid:
             away_cover=away_cover,
         )
 
+    def prob_draw_no_bet(self) -> dict[str, float]:
+        """Draw No Bet (DNB) market probabilities conditional on non-draw outcome."""
+        h = self.prob_home_win()
+        a = self.prob_away_win()
+        non_draw = h + a
+        if non_draw <= 0:
+            return {"home": 0.5, "away": 0.5}
+        return {
+            "home": round(h / non_draw, 6),
+            "away": round(a / non_draw, 6),
+        }
+
+    def prob_clean_sheet(self) -> dict[str, float]:
+        """Probability of either team keeping a clean sheet (0 goals conceded)."""
+        home_clean_sheet = float(np.sum(self.grid[:, 0]))  # Away scores 0
+        away_clean_sheet = float(np.sum(self.grid[0, :]))  # Home scores 0
+        return {
+            "home": round(home_clean_sheet, 6),
+            "away": round(away_clean_sheet, 6),
+        }
+
+    def prob_win_to_nil(self) -> dict[str, float]:
+        """Probability of winning without conceding a goal (Win to Nil)."""
+        home_win_to_nil = float(np.sum(self.grid[1:, 0]))  # Home >= 1, Away = 0
+        away_win_to_nil = float(np.sum(self.grid[0, 1:]))  # Home = 0, Away >= 1
+        return {
+            "home": round(home_win_to_nil, 6),
+            "away": round(away_win_to_nil, 6),
+        }
+
+    def prob_exact_goals_table(self, max_counted_goals: int = 6) -> dict[str, float]:
+        """Exact total goals frequency distribution."""
+        h_idx, a_idx = np.indices(self.grid.shape)
+        totals = h_idx + a_idx
+        result: dict[str, float] = {}
+        for g in range(max_counted_goals):
+            result[str(g)] = round(float(np.sum(self.grid[totals == g])), 6)
+        result[f"{max_counted_goals}+"] = round(float(np.sum(self.grid[totals >= max_counted_goals])), 6)
+        return result
+
     def asian_handicap_matrix(
         self,
         lines: Sequence[float] = (-2.5, -2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5),

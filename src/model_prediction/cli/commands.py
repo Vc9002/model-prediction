@@ -939,7 +939,7 @@ def cmd_ban_team(args, config, registry, bans, ledger, audit, data_root) -> dict
 
 
 def cmd_collect_scores(args, config, registry, bans, ledger, audit, data_root) -> dict:
-    from ..data_sources.odds_soccer_scores import collect_soccer_scores
+    from ..data_sources.api_football import collect_soccer_scores
 
     output = collect_soccer_scores(days_from=args.days)
     return output

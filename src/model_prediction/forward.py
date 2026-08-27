@@ -7,10 +7,13 @@ must be evaluated walk-forward and on a locked holdout before promotion.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from dataclasses import replace as _replace
 from datetime import datetime
 from pathlib import Path
+
+import httpx
 
 from .data_sources.espn import ESPNMLBClient
 from .data_sources.mlb_market_odds import MLBGameOdds, MLBMarketOddsFeed
@@ -67,6 +70,27 @@ def build_mlb_slate(
     odds_feed.load(game_date)
     candidates: list[MLBForwardCandidate] = []
     skipped: list[dict[str, str]] = []
+
+    # reconstructed_features() makes 6 sequential ESPN calls per event
+    # (2x schedule, 2x gamelog, 2x athlete). Run those calls across
+    # events concurrently instead of one event at a time -- a
+    # ~15-game slate serialized this into up to 90 sequential HTTP
+    # round trips, and a single slow/timed-out ESPN response stalled
+    # every event behind it (real 81-minute daily run, 2026-08-23).
+    upcoming_events = [event for event in events if parse_utc(event["date"]) > observed_at]
+
+    def _fetch_features(event: dict) -> tuple[dict, object]:
+        try:
+            return event, client.reconstructed_features(event)
+        except (KeyError, TypeError, ValueError, httpx.HTTPError) as error:
+            return event, error
+
+    features_by_event_id: dict[str, object] = {}
+    if upcoming_events:
+        with ThreadPoolExecutor(max_workers=min(16, len(upcoming_events))) as pool:
+            for event, result in pool.map(_fetch_features, upcoming_events):
+                features_by_event_id[str(event["id"])] = result
+
     for event in events:
         try:
             if parse_utc(event["date"]) <= observed_at:
@@ -78,8 +102,11 @@ def build_mlb_slate(
                 away_team,
                 home_team,
             )
+            prefetched = features_by_event_id.get(str(event["id"]))
+            if isinstance(prefetched, Exception):
+                raise prefetched
             features = _replace(
-                client.reconstructed_features(event),
+                prefetched,
                 market_snapshot_hash=odds.snapshot_hash,
             )
             spread_market = odds.markets.get("spread")
@@ -111,7 +138,7 @@ def build_mlb_slate(
                     observed_at,
                 )
             )
-        except (KeyError, TypeError, ValueError) as error:
+        except (KeyError, TypeError, ValueError, httpx.HTTPError) as error:
             skipped.append({"event_id": str(event.get("id", "unknown")), "reason": str(error)})
     return candidates, skipped, len(events)
 

@@ -97,6 +97,7 @@ class ProductionModelRegistry:
         manual_orders_only: bool,
         health: dict[str, Any] | None = None,
         champions: dict[str, dict[str, str]] | None = None,
+        blocked_workflows: dict[str, dict[str, Any]] | None = None,
     ) -> None:
         self.entries = entries
         self.primary = primary
@@ -109,6 +110,11 @@ class ProductionModelRegistry:
         # SERVES a sport/market; the primary is what the canary predict
         # cycle runs. They are separate notions on purpose.
         self.champions = champions or {}
+        # Research/shadow workflows that are invoked by the daily runner but
+        # are deliberately NOT production-serving contracts.  Keeping these
+        # explicit lets health report the gap instead of treating an absent
+        # registry entry as evidence that the workflow does not exist.
+        self.blocked_workflows = blocked_workflows or {}
 
     # ------------------------------------------------------------- loading
 
@@ -134,6 +140,7 @@ class ProductionModelRegistry:
         explicit_models = svc.get("models")
         if isinstance(explicit_models, list):
             entries, primary_id = cls._entries_from_explicit(svc, explicit_models, root)
+            cls._validate_explicit_mirrors(svc, explicit_models)
         else:
             entries, primary_id = cls._entries_from_legacy(svc, root)
 
@@ -154,6 +161,18 @@ class ProductionModelRegistry:
             for model_id in markets.values():
                 if model_id not in entries:
                     raise ValueError(f"champions references unknown model '{model_id}' for {sport}")
+            for market, model_id in markets.items():
+                entry = entries[model_id]
+                if (
+                    entry.sport.casefold() != str(sport).casefold()
+                    or entry.market.casefold() != str(market).casefold()
+                ):
+                    raise ValueError(
+                        f"champions[{sport}][{market}] points to '{model_id}' with contract "
+                        f"{entry.sport}/{entry.market}"
+                    )
+
+        blocked_workflows = cls._parse_blocked_workflows(svc, entries)
 
         return cls(
             entries,
@@ -164,7 +183,68 @@ class ProductionModelRegistry:
             manual_orders_only=bool(execution.get("manual_orders_only", True)),
             health=config.get("health") or {},
             champions={str(s): dict(m) for s, m in champions.items()},
+            blocked_workflows=blocked_workflows,
         )
+
+    @staticmethod
+    def _validate_explicit_mirrors(svc: dict[str, Any], models: list[Any]) -> None:
+        """Require legacy mirrors, when present, to match ``models`` exactly.
+
+        The v3 list is authoritative, but promotion/freeze compatibility code
+        still reads ``allowed_models`` and ``artifact_map``.  Drift between
+        those views must therefore be a startup error, not a latent routing
+        difference.
+        """
+        model_ids = [str(raw.get("model_id")) for raw in models if isinstance(raw, dict)]
+        if len(model_ids) != len(set(model_ids)):
+            raise ValueError("prediction_service.models contains duplicate model_id values")
+
+        if "allowed_models" in svc:
+            allowed = svc.get("allowed_models")
+            if not isinstance(allowed, list) or allowed != model_ids:
+                raise ValueError(
+                    "prediction_service.allowed_models must exactly mirror models model_id order"
+                )
+
+        if "artifact_map" in svc:
+            artifact_map = svc.get("artifact_map")
+            if not isinstance(artifact_map, dict):
+                raise ValueError("prediction_service.artifact_map must be a mapping")
+            expected = {
+                str(raw["model_id"]): str(raw["artifact"])
+                for raw in models
+                if isinstance(raw, dict)
+                and raw.get("implementation", IMPLEMENTATION_JSON_ARTIFACT) == IMPLEMENTATION_JSON_ARTIFACT
+                and raw.get("artifact")
+            }
+            if artifact_map != expected:
+                raise ValueError(
+                    "prediction_service.artifact_map must exactly mirror json_artifact entries in models"
+                )
+
+    @staticmethod
+    def _parse_blocked_workflows(
+        svc: dict[str, Any], entries: dict[str, ProductionModelEntry]
+    ) -> dict[str, dict[str, Any]]:
+        raw_workflows = svc.get("blocked_workflows") or []
+        if not isinstance(raw_workflows, list):
+            raise ValueError("prediction_service.blocked_workflows must be a list")  # noqa: TRY004
+        blocked: dict[str, dict[str, Any]] = {}
+        for raw in raw_workflows:
+            if not isinstance(raw, dict):
+                raise ValueError("blocked workflow entry must be a mapping")  # noqa: TRY004
+            model_id = raw.get("model_id")
+            reason = raw.get("reason")
+            if not isinstance(model_id, str) or not model_id.strip():
+                raise ValueError("blocked workflow entry missing model_id")
+            if model_id in blocked:
+                raise ValueError(f"duplicate blocked workflow '{model_id}'")
+            if model_id in entries:
+                raise ValueError(f"blocked workflow '{model_id}' is also a registered production model")
+            if not isinstance(reason, str) or not reason.strip():
+                raise ValueError(f"blocked workflow '{model_id}' is missing a reason")
+            blocked[model_id] = dict(raw)
+        return blocked
 
     @staticmethod
     def _entries_from_explicit(
@@ -183,6 +263,8 @@ class ProductionModelRegistry:
             model_id = raw.get("model_id")
             if not isinstance(model_id, str) or not model_id.strip():
                 raise ValueError("production model entry missing model_id")
+            if model_id in entries:
+                raise ValueError(f"duplicate production model entry '{model_id}'")
             entries[model_id] = ProductionModelRegistry._resolve_entry(raw, root)
         if not entries:
             raise ValueError("prediction_service.models must contain at least one model")

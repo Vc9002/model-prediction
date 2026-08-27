@@ -2,8 +2,9 @@
 
 Only completed games strictly before the event start are eligible. Rest is
 capped at seven days so offseason and long-break gaps do not dominate the
-coefficient. Travel is deliberately absent because the repository does not yet
-carry a versioned venue-coordinate history.
+coefficient. Travel *distance* is deliberately absent because the repository
+does not yet carry a versioned venue-coordinate history; timezone
+displacement between the two cities is the available jetlag proxy.
 """
 
 from __future__ import annotations
@@ -123,6 +124,26 @@ TEAM_TIMEZONE_OFFSETS: dict[str, int] = {
     "LA_W": -8,
     "LV_W": -8,
     "SEA_W": -8,
+    # WNBA canonical team names (games store uses full display names, so the
+    # abbreviation entries above never matched them). Uppercase keys: the
+    # lookup in travel_timezone_displacement uppercases its input. Additive --
+    # existing sport keys unchanged. Washington/Indiana share MLB Eastern
+    # cities; GSV and Portland are Pacific (2026 clubs).
+    "ATLANTA DREAM": -5,
+    "CHICAGO SKY": -6,
+    "CONNECTICUT SUN": -5,
+    "DALLAS WINGS": -6,
+    "GOLDEN STATE VALKYRIES": -8,
+    "INDIANA FEVER": -5,
+    "LAS VEGAS ACES": -8,
+    "LOS ANGELES SPARKS": -8,
+    "MINNESOTA LYNX": -6,
+    "NEW YORK LIBERTY": -5,
+    "PHOENIX MERCURY": -7,
+    "PORTLAND FIRE": -8,
+    "SEATTLE STORM": -8,
+    "TORONTO TEMPO": -5,
+    "WASHINGTON MYSTICS": -5,
 }
 
 

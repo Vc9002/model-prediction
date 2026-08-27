@@ -77,3 +77,21 @@ def verify_ticket(ticket: str) -> dict[str, Any]:
     if int(payload.get("expires_at", 0)) < int(time.time()):
         raise ValueError("ticket expired")
     return payload
+
+
+def is_ticket_valid(ticket: str) -> bool:
+    """Non-raising predicate to verify if an HMAC ticket is active and unexpired."""
+    try:
+        verify_ticket(ticket)
+        return True
+    except (ValueError, TypeError, KeyError):
+        return False
+
+
+def extract_order(ticket: str) -> dict[str, Any] | None:
+    """Safely extract order payload from a valid ticket; returns None if invalid or expired."""
+    try:
+        payload = verify_ticket(ticket)
+        return payload.get("order")
+    except (ValueError, TypeError, KeyError):
+        return None

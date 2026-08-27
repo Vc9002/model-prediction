@@ -179,10 +179,11 @@ def test_dashboard_exposes_live_health_and_applies_display_settings() -> None:
     assert "Set 1U to this percentage of the live balance; adjusts up or down" in html
     assert 'data-tab="perf">Performance<' in html
 
-    # Settings were previously persisted but never applied. All four ledger
-    # filters and the Today source loaders now honor the shared predicate.
+    # Settings were previously persisted but never applied. All ledger
+    # filters (including the MLB v9 challenger ledger) and the Today
+    # source loaders now honor the shared predicate.
     assert "const passesDisplaySettings" in html
-    assert html.count("if(!passesDisplaySettings(p))return false;") == 4
+    assert html.count("if(!passesDisplaySettings(p))return false;") == 5
     assert html.count("passesDisplaySettings(p)&&todayPassesControls(p)&&etDate(start)===todayET()") == 2
 
     # Today must use the real America/New_York conversion (including DST),
@@ -217,8 +218,88 @@ def test_dashboard_operational_views_are_null_safe_filterable_and_accessible() -
     # Purchase controls fail closed in the row instead of inviting a rejected click.
     assert "if(p.buy_ready!==true)" in html
     assert 'class="blocked-order"' in html
+
+    pnl_helper = html.split("const pickPnl=p=>{", 1)[1].split("const pnlClass", 1)[0]
+    assert "p.quote?.ask" not in pnl_helper
+    assert "Number(p.units)||1.0" not in pnl_helper
+    assert "if(p.pnl_units!=null)return Number(p.pnl_units)" in pnl_helper
+    assert "Number(p.display_units??p.units)||Number(p.suggested_paper_units)" not in html
     assert 'class="pill loss">Blocked' in html
     assert 'aria-label="Purchase blocked:' in html
+
+
+def test_v9_kpis_exclude_unpriced_no_calls_from_betting_performance() -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node.js is unavailable")
+    html = (ROOT / "dashboard.html").read_text(encoding="utf-8")
+    pnl_source = "const pickPnl=p=>{" + html.split("const pickPnl=p=>{", 1)[1].split("const pnlClass", 1)[0]
+    metrics_source = (
+        "function v9LedgerMetrics"
+        + html.split("function v9LedgerMetrics", 1)[1].split("function renderV9LedgerTable", 1)[0]
+    )
+    price_source = (
+        "const pregamePrice"
+        + html.split("const pregamePrice", 1)[1].split("// Single shared row/header renderer", 1)[0]
+    )
+    scored = [
+        {
+            "status": "settled",
+            "result": "win" if index < 8 else "loss",
+            "units": 1.0,
+            "display_units": 1.0,
+            "pnl_units": 0.725 if index < 8 else -1.0,
+            "display_pnl_units": 0.725 if index < 8 else -1.0,
+        }
+        for index in range(11)
+    ]
+    unpriced = [
+        {
+            "status": "settled",
+            "result": "win",
+            "decision": "NO_CALL",
+            "reason_code": "NO_CALL_MARKET_PRICE_UNAVAILABLE",
+            "units": 0.0,
+            "pnl_units": 0.0,
+            "edge": 0.0,
+            "display_units": 0.0,
+            "display_pnl_units": None,
+            "economics_status": "unscored_no_price",
+        }
+        for _ in range(4)
+    ]
+    script = (
+        pnl_source
+        + "\n"
+        + price_source
+        + "\n"
+        + metrics_source
+        + "\nconst rows=JSON.parse(process.argv[1]);"
+        + "process.stdout.write(JSON.stringify({metrics:v9LedgerMetrics(rows),"
+        + "unpricedPnl:pickPnl(rows.at(-1)),unpricedEdge:edgePoints(rows.at(-1))}));"
+    )
+
+    result = subprocess.run(
+        [node, "-e", script, json.dumps(scored + unpriced)],
+        text=True,
+        check=True,
+        capture_output=True,
+    )
+    payload = json.loads(result.stdout)
+
+    assert payload["metrics"] == {
+        "outcomes": 15,
+        "scored": 11,
+        "unscored": 4,
+        "wins": 8,
+        "losses": 3,
+        "winRate": pytest.approx(8 / 11),
+        "pnl": pytest.approx(2.8),
+        "risked": 11,
+        "roi": pytest.approx(2.8 / 11),
+    }
+    assert payload["unpricedPnl"] is None
+    assert payload["unpricedEdge"] is None
 
     # Market/Today/Portfolio controls and their URL-backed state are first class.
     for element_id in (

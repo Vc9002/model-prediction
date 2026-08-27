@@ -68,6 +68,56 @@ def tiebreak_probability(p_serve_a: float, p_serve_b: float) -> float:
     return float(p_reach_7_before_6 + p_reach_6_6 * p_win_from_6_6)
 
 
+def set_game_distribution(
+    p_hold_a: float,
+    p_hold_b: float,
+    p_tb_a: float,
+    a_serves_first: bool = True,
+) -> dict[tuple[int, int], float]:
+    """Full probability mass over (games won by A, games won by B) at set end.
+
+    Forward pass over the same 12-game absorbing grid ``set_win_probability``
+    solves as a backward recurrence, but accumulates the mass of every
+    terminal state instead of only the absorbing sum. Used to price tennis
+    spread/total derivatives (game counts), which the absorbing probability
+    alone cannot express. Terminal states are identical to
+    ``set_win_probability``'s: 6-0..6-4, 7-5, and 6-6 resolved by the
+    7-point tiebreak.
+    """
+    p_hold_a = max(0.01, min(0.99, float(p_hold_a)))
+    p_hold_b = max(0.01, min(0.99, float(p_hold_b)))
+    p_tb_a = max(0.01, min(0.99, float(p_tb_a)))
+
+    terminal: dict[tuple[int, int], float] = {}
+    states: dict[tuple[int, int, bool], float] = {(0, 0, a_serves_first): 1.0}
+    while states:
+        next_states: dict[tuple[int, int, bool], float] = {}
+        for (ga, gb, a_serving), prob in states.items():
+            if ga == 6 and gb <= 4:
+                terminal[(6, gb)] = terminal.get((6, gb), 0.0) + prob
+                continue
+            if gb == 6 and ga <= 4:
+                terminal[(ga, 6)] = terminal.get((ga, 6), 0.0) + prob
+                continue
+            if ga == 7 and gb == 5:
+                terminal[(7, 5)] = terminal.get((7, 5), 0.0) + prob
+                continue
+            if gb == 7 and ga == 5:
+                terminal[(5, 7)] = terminal.get((5, 7), 0.0) + prob
+                continue
+            if ga == 6 and gb == 6:
+                terminal[(7, 6)] = terminal.get((7, 6), 0.0) + prob * p_tb_a
+                terminal[(6, 7)] = terminal.get((6, 7), 0.0) + prob * (1.0 - p_tb_a)
+                continue
+            p_win = p_hold_a if a_serving else 1.0 - p_hold_b
+            key_a = (ga + 1, gb, not a_serving)
+            next_states[key_a] = next_states.get(key_a, 0.0) + prob * p_win
+            key_b = (ga, gb + 1, not a_serving)
+            next_states[key_b] = next_states.get(key_b, 0.0) + prob * (1.0 - p_win)
+        states = next_states
+    return terminal
+
+
 def set_win_probability(
     p_hold_a: float,
     p_hold_b: float,
@@ -151,6 +201,7 @@ class TennisMarkovMatchForecast:
     p_serve_pt_adj_b: float
     p_game_hold_a: float
     p_game_hold_b: float
+    p_tiebreak_a: float
     expected_total_games: float
 
 
@@ -237,5 +288,130 @@ class TennisMarkovEngine:
             p_serve_pt_adj_b=round(p_pt_b, 4),
             p_game_hold_a=round(p_hold_a, 4),
             p_game_hold_b=round(p_hold_b, 4),
+            p_tiebreak_a=round(p_tb_a, 4),
             expected_total_games=round(exp_games, 1),
         )
+
+
+@dataclass(slots=True)
+class MatchGameDistribution:
+    """Joint probability mass over a completed match's score shape.
+
+    States are ``(sets won by A, sets won by B, games won by A, games won by
+    B)``; the set-count dimension is load-bearing because a 2-1 match can end
+    with EQUAL game totals (e.g. 7-6/2-6/6-3 is 15-15 games) -- a
+    ``(games, games)``-only marginal cannot identify the match winner, which
+    ``p_match_a`` must agree with the engine's own forecast. ``states``
+    always sums to 1. Game spreads/totals are priced from the games
+    marginal; match-win from the sets marginal.
+    """
+
+    states: dict[tuple[int, int, int, int], float]
+    match_format: str
+    a_serves_first: bool | None
+
+    @property
+    def p_match_a(self) -> float:
+        return sum(prob for (sa, sb, ga, gb), prob in self.states.items() if sa > sb)
+
+    @property
+    def p_match_b(self) -> float:
+        return 1.0 - self.p_match_a
+
+    @property
+    def expected_total_games(self) -> float:
+        return sum((ga + gb) * prob for (sa, sb, ga, gb), prob in self.states.items())
+
+    @property
+    def expected_games_a(self) -> float:
+        return sum(ga * prob for (sa, sb, ga, gb), prob in self.states.items())
+
+    @property
+    def expected_games_b(self) -> float:
+        return sum(gb * prob for (sa, sb, ga, gb), prob in self.states.items())
+
+    def total_pmf(self) -> dict[int, float]:
+        totals: dict[int, float] = {}
+        for (sa, sb, ga, gb), prob in self.states.items():
+            totals[ga + gb] = totals.get(ga + gb, 0.0) + prob
+        return totals
+
+    def p_total_over(self, line: float) -> float:
+        """P(total games > line). Half lines settle without a push."""
+        return sum(prob for (sa, sb, ga, gb), prob in self.states.items() if ga + gb > line)
+
+    def p_cover(self, selection: str, line: float) -> float:
+        """P(selection covers the game spread), graded like ``grade_pick``:
+        margin_selection + line > 0 (half lines never push)."""
+        away = str(selection).casefold() != "home"
+        return sum(
+            prob
+            for (sa, sb, ga, gb), prob in self.states.items()
+            if ((ga - gb) if away else (gb - ga)) + line > 0.0
+        )
+
+
+def match_game_distribution(
+    p_hold_a: float,
+    p_hold_b: float,
+    p_tb_a: float,
+    match_format: str = "Bo3",
+    a_serves_first: bool | None = None,
+) -> MatchGameDistribution:
+    """Joint (games A, games B) distribution for a full Bo3/Bo5 match.
+
+    Sets alternate the initial server (A serves first in sets 1/3/5 when
+    ``a_serves_first`` is True) and the match stops as soon as one player
+    reaches 2 (Bo3) or 3 (Bo5) set wins, so consecutive sets are NOT
+    i.i.d. — each played set's game-count mass is drawn from the serve-order
+    appropriate to its index and the distribution truncates at match end.
+    With ``a_serves_first=None`` (typical for historical matches, where the
+    initial server is unrecorded) the two initial-server orders are
+    averaged, matching how ``forecast_match`` averages set win probabilities
+    across serve order.
+    """
+    p_hold_a = max(0.01, min(0.99, float(p_hold_a)))
+    p_hold_b = max(0.01, min(0.99, float(p_hold_b)))
+    p_tb_a = max(0.01, min(0.99, float(p_tb_a)))
+    best_of = 5 if match_format.upper() in ["BO5", "BEST_OF_5", "GRAND_SLAM"] else 3
+    sets_to_win = 3 if best_of == 5 else 2
+
+    pmf_by_order = {
+        True: set_game_distribution(p_hold_a, p_hold_b, p_tb_a, a_serves_first=True),
+        False: set_game_distribution(p_hold_a, p_hold_b, p_tb_a, a_serves_first=False),
+    }
+
+    def run(initial_serves_first: bool) -> dict[tuple[int, int, int, int], float]:
+        # state: (sets won by A, sets won by B, games won by A, games won by B)
+        states: dict[tuple[int, int, int, int], float] = {(0, 0, 0, 0): 1.0}
+        terminal: dict[tuple[int, int, int, int], float] = {}
+        set_index = 0
+        while states:
+            next_states: dict[tuple[int, int, int, int], float] = {}
+            a_serves_first_this_set = (set_index % 2 == 0) == initial_serves_first
+            set_pmf = pmf_by_order[a_serves_first_this_set]
+            for (sa, sb, ga, gb), prob in states.items():
+                if sa == sets_to_win or sb == sets_to_win:
+                    terminal[(sa, sb, ga, gb)] = terminal.get((sa, sb, ga, gb), 0.0) + prob
+                    continue
+                for (set_ga, set_gb), set_prob in set_pmf.items():
+                    key = (
+                        sa + (1 if set_ga > set_gb else 0),
+                        sb + (1 if set_gb > set_ga else 0),
+                        ga + set_ga,
+                        gb + set_gb,
+                    )
+                    next_states[key] = next_states.get(key, 0.0) + prob * set_prob
+            states = next_states
+            set_index += 1
+        return terminal
+
+    if a_serves_first is None:
+        combined: dict[tuple[int, int, int, int], float] = {}
+        for initial in (True, False):
+            for state, prob in run(initial).items():
+                combined[state] = combined.get(state, 0.0) + 0.5 * prob
+        terminal = combined
+    else:
+        terminal = run(bool(a_serves_first))
+    return MatchGameDistribution(terminal, match_format, a_serves_first)

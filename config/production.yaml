@@ -29,13 +29,6 @@ prediction_service:
       artifact: config/models/mlb-elo-trend-lr-v8.json
       enabled: true
       rollback_model: mlb-elo-trend-lr-v7
-    - model_id: measured-edge-totals-v3
-      sport: MLB
-      market: total
-      implementation: json_artifact
-      artifact: config/models/measured-edge-totals-v3.json
-      enabled: true
-      rollback_model: null
     - model_id: nba-elo-trend-lr-v4
       sport: NBA
       market: moneyline
@@ -170,12 +163,6 @@ prediction_service:
     mlb-elo-trend-lr-v8: config/models/mlb-elo-trend-lr-v8.json
     nba-elo-trend-lr-v4: config/models/nba-elo-trend-lr-v4.json
     nfl-elo-trend-lr-v4: config/models/nfl-elo-trend-lr-v4.json
-    # soccer-poisson-dc-v1 and tennis-surface-elo-v1 are code-backed models
-    # (their predictions come from Python modules); the paths below never
-    # existed on disk and freeze() treats exactly these two ids as
-    # code-backed champions (champion_challenger.CODE_BACKED_MODEL_IDS).
-    soccer-poisson-dc-v1: config/models/soccer-poisson-dc-v1.json
-    tennis-surface-elo-v1: config/models/tennis-surface-elo-v1.json
     cs2-tiered-elo-v6: config/models/cs2-tiered-elo-v6.json
     dota2-tiered-elo-v6: config/models/dota2-tiered-elo-v6.json
     lol-tiered-elo-v6: config/models/lol-tiered-elo-v6.json
@@ -187,6 +174,38 @@ prediction_service:
     # kbo/npb as code-backed (audit 2026-08-13).
     kbo-tie-aware-elo-v2: config/models/kbo-tie-aware-elo-v2.json
     npb-tie-aware-elo-v2: config/models/npb-tie-aware-elo-v2.json
+
+  # Daily still evaluates these workflows for Flat/research evidence, but
+  # none has an exact qualified production-serving contract. They must never
+  # reach Main, and health remains DEGRADED while they stay active here.
+  blocked_workflows:
+    - model_id: measured-edge-totals-v3
+      sport: MLB
+      market: total
+      reason: real-market evidence is diagnostic and not serving-qualified
+    - model_id: measured-edge-margin-v3
+      sport: MLB
+      market: spread
+      reason: no registered production-serving contract
+    - model_id: mlb-nrfi-v1
+      sport: MLB
+      market: nrfi
+      reason: no hash-verified serving artifact or production qualification
+    - model_id: wnba-spread-margin-v1
+      sport: WNBA
+      market: spread
+      reason: checked-in artifact qualification.qualified is false
+    - model_id: wnba-total-margin-v1
+      sport: WNBA
+      market: total
+      reason: >-
+        research-only — the 2026-08-26 market-relative walk-forward
+        (scripts/wnba_totals_market_residual_walkforward.py) on 89 lined
+        holdout games measured the market line decisively better than the
+        model: MAE 13.1 vs 20.9, Brier 0.252 vs 0.369, ROI -4.1% at
+        executable asks (CLV rate 0.0). Over/under evaluation is now
+        complete and negative; remains blocked pending a challenger that
+        clears the Phase-23 market-relative gates.
 
   fallback_action: no_prediction
 
