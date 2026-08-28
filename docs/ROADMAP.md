@@ -620,3 +620,57 @@ Raw PIT data
 - **WNBA**: hierarchical Empirical-Bayes rotation and minutes shrinkage engine (`features/wnba_player_impact.py`); Four Factors and possession pace modeling (`features/wnba_pace_four_factors.py`); parametric Normal-CDF derivative solver for totals and spreads.
 - **NFL**: starting QB state vector (EPA/play, CPOE, P2S%, TWP%) with backup replacement spread penalty (`features/nfl_qb_oline.py`); offensive line protection and health composite index.
 
+---
+
+## Data-expansion backlog (operator proposal, 2026-08-27)
+
+Not scheduled/started. The premise: the project's next real gains are more
+likely to come from better data coverage and market context than from a new
+model family. Every item below must clear the existing promotion discipline
+(`ablation_reproduction_gate`, walk-forward validation, real-numbers ablation
+delta) before touching a live feature — adding a data source is not itself a
+promotion decision.
+
+**Priority order proposed:**
+1. Historical sportsbook odds (opening/closing spread & total, line
+   movement, consensus, dispersion) — The Odds API historical snapshots
+   (paid, back to 2020) or TheRundown (free tier: 20k/day, 20+
+   books/exchanges incl. Polymarket/Polymarket US/Kalshi, unified schema).
+   Target: `Predict(Y - Market)` instead of `Predict(Y)`.
+2. Real historical weather (Open-Meteo historical archive) to replace
+   placeholder `weather = 1.0` / `travel = 0.0` values in the totals feature
+   builder; store raw observations (temp, dew point, humidity, pressure,
+   wind speed/gust/direction, precip), derive park-relative wind
+   in/out/cross vectors from stadium bearing afterward — don't collapse to
+   a single `weather_factor` before storing.
+3. Venue + travel geography — one-time geocoded venue table (lat/lon,
+   elevation, timezone, park dimensions), used to compute real
+   distance/timezone-change/rest features per team-game instead of proxies.
+4. Player availability + lineups as full **snapshot** history (status at
+   each observation time, not just game-day truth) — same PIT-safety
+   requirement as everything else in this codebase; a live-only signal
+   (e.g. today's roster) can never be used for a past decision time.
+5. Deeper player/team stat tables (Statcast batter/pitcher extensions,
+   NBA/WNBA lineup-possession data, NFL snap-share/injury participation).
+6. Play-by-play/period data for pace, possession, and inning/quarter state
+   features.
+7. Cross-provider reconciliation (starter/line consensus + disagreement) as
+   a data-quality signal, plus a source-reliability layer instead of a
+   single hardcoded provider per field.
+
+**Structural pieces**, if/when this is pursued: a `data/market_history/`
+warehouse (canonical `MarketQuote` schema: event_id, sport, market_type,
+provider, book, selection, line, price, observed_at_utc, is_main_line);
+standardized provider adapters (`fetch/normalize/validate/snapshot`) so a
+new API doesn't leak provider-specific JSON into model code; a canonical
+entity/alias graph (team/player/venue/event IDs, provider→canonical alias
+table) rather than joining on names — this codebase's MLB v9 experience
+already showed how badly identifier mismatches can silently zero out whole
+feature families; per-source daily coverage/drift health checks, run before
+training or forecasting, not just as an afterthought.
+
+**Explicitly out of scope until an operator decision**: any new paid API
+subscription (The Odds API historical, TheRundown beyond its free tier);
+any new third-party credential. Do not add a provider integration that
+requires a paid key without confirming first.
+
