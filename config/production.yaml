@@ -57,6 +57,13 @@ prediction_service:
       artifact: config/models/measured-edge-totals-v3.json
       enabled: true
       rollback_model: null
+    - model_id: mlb-nrfi-v1
+      sport: MLB
+      market: nrfi
+      implementation: json_artifact
+      artifact: config/models/mlb-nrfi-v1.json
+      enabled: true
+      rollback_model: null
     - model_id: nba-elo-trend-lr-v4
       sport: NBA
       market: moneyline
@@ -148,6 +155,7 @@ prediction_service:
       moneyline: mlb-elo-trend-lr-v8
       spread: measured-edge-margin-v3
       total: measured-edge-totals-v3
+      nrfi: mlb-nrfi-v1
     NBA:
       moneyline: nba-elo-trend-lr-v4
     NFL:
@@ -182,6 +190,7 @@ prediction_service:
     - mlb-elo-trend-lr-v8
     - measured-edge-margin-v3
     - measured-edge-totals-v3
+    - mlb-nrfi-v1
     - nba-elo-trend-lr-v4
     - nfl-elo-trend-lr-v4
     - soccer-poisson-dc-v1
@@ -201,6 +210,7 @@ prediction_service:
     mlb-elo-trend-lr-v8: config/models/mlb-elo-trend-lr-v8.json
     measured-edge-margin-v3: config/models/measured-edge-margin-v3.json
     measured-edge-totals-v3: config/models/measured-edge-totals-v3.json
+    mlb-nrfi-v1: config/models/mlb-nrfi-v1.json
     nba-elo-trend-lr-v4: config/models/nba-elo-trend-lr-v4.json
     nfl-elo-trend-lr-v4: config/models/nfl-elo-trend-lr-v4.json
     cs2-tiered-elo-v6: config/models/cs2-tiered-elo-v6.json
@@ -218,11 +228,7 @@ prediction_service:
   # Daily still evaluates these workflows for Flat/research evidence, but
   # none has an exact qualified production-serving contract. They must never
   # reach Main, and health remains DEGRADED while they stay active here.
-  blocked_workflows:
-    - model_id: mlb-nrfi-v1
-      sport: MLB
-      market: nrfi
-      reason: no hash-verified serving artifact or production qualification
+  blocked_workflows: []
 
   fallback_action: no_prediction
 

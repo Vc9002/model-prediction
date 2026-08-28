@@ -2494,24 +2494,35 @@ def test_nrfi_unregistered_model_is_research_only_paper_call_in_both_ledgers(
     registry,
     ban_list,
 ) -> None:
-    from model_prediction.models import mlb_nrfi
+    from model_prediction.models import mlb_first_inning_live
 
     monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 8, 24, 12, tzinfo=UTC))
 
-    class FakeNRFIModel:
-        model_version = "mlb-nrfi-v1"
-
-        def predict(self, **_kwargs):
-            return SimpleNamespace(
-                p_yrfi=0.60,
-                p_nrfi=0.40,
-                fair_american_yrfi=-150,
-                fair_american_nrfi=150,
-                half_top_expected_runs=0.3,
-                half_bot_expected_runs=0.3,
-            )
-
-    monkeypatch.setattr(mlb_nrfi, "MLBNRFIModel", FakeNRFIModel)
+    monkeypatch.setattr(
+        mlb_first_inning_live,
+        "live_first_inning_features",
+        lambda **_kwargs: {
+            "away_starter_opp_1st_runs": 0.47,
+            "home_starter_opp_1st_runs": 0.57,
+            "away_team_1st_scored_away": 0.45,
+            "home_team_1st_scored_home": 0.55,
+            "away_team_1st_allowed_away": 0.48,
+            "home_team_1st_allowed_home": 0.52,
+            "park_1st_runs": 1.0,
+            "away_starter_fip": 4.1,
+            "home_starter_fip": 4.1,
+            "away_starter_k_pct": 0.22,
+            "home_starter_k_pct": 0.22,
+            "away_starter_bb_pct": 0.08,
+            "home_starter_bb_pct": 0.08,
+            "away_top3_composite": 0.11,
+            "home_top3_composite": 0.11,
+            "away_starter_starts": 2.0,
+            "home_starter_starts": 2.0,
+            "away_starter_days_rest": 5.0,
+            "home_starter_days_rest": 5.0,
+        },
+    )
     client = SimpleNamespace(
         scoreboard=lambda *_args: {
             "events": [

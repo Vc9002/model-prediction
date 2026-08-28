@@ -99,8 +99,8 @@ def test_real_production_yaml_resolves_every_model() -> None:
     registry = ProductionModelRegistry.load(REPO)
 
     assert registry.schema_version == "3"
-    assert len(registry.entries) == 17
-    assert len(registry.available_entries()) == 17
+    assert len(registry.entries) == 18
+    assert len(registry.available_entries()) == 18
     assert registry.problem_entries() == []
     assert registry.primary.model_id == "wnba-elo-trend-lr-v4"
     assert registry.primary.artifact_hash
@@ -112,12 +112,17 @@ def test_real_production_yaml_resolves_every_model() -> None:
     assert registry.champion("MLB", "total").model_id == "measured-edge-totals-v3"
     assert "measured-edge-totals-v3" not in registry.blocked_workflows
     assert "wnba-spread-margin-v1" not in registry.blocked_workflows
-    # Phase-23 research challengers that remain genuinely unbuilt (NRFI) must
-    # stay outside the served set; MLB/WNBA spread+total were promoted this
-    # session (operator directive 2026-08-27, override on evidence quality).
+    # MLB/WNBA spread+total were promoted 2026-08-27 (operator directive,
+    # override on evidence quality); mlb-nrfi-v1 was promoted the same day
+    # after the live serving path (_forecast_mlb_nrfi_flat) was rewired off
+    # the old unfitted MLBNRFIModel onto the real fitted MLBFirstInningModel
+    # artifact (see docs/HANDOFF_2026-08-27-d.md) -- promoting the registry
+    # pointer alone, without that rewiring, would have silently served the
+    # wrong model under the validated artifact's model_id.
     assert "wnba-total-margin-v1" not in registry.blocked_workflows
-    assert "mlb-nrfi-v1" in registry.blocked_workflows
+    assert "mlb-nrfi-v1" not in registry.blocked_workflows
     assert registry.champion("WNBA", "total").model_id == "wnba-total-margin-v1"
+    assert registry.champion("MLB", "nrfi").model_id == "mlb-nrfi-v1"
 
     soccer = registry.entries["soccer-poisson-dc-v1"]
     assert soccer.implementation == IMPLEMENTATION_CODE_BACKED

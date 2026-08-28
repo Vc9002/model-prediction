@@ -632,7 +632,25 @@ def _forecast_mlb_nrfi_flat(
     Logs unconditionally to Flat Ledger, and to Main Ledger when eligible.
     """
     from ..data_sources.espn import ESPNClient
-    from ..models.mlb_nrfi import MLBNRFIModel
+    from ..models.mlb_first_inning import FirstInningGameRow, MLBFirstInningModel
+    from ..models.mlb_first_inning_live import live_first_inning_features
+    from ..pricing import probability_to_american
+
+    model_version = "mlb-nrfi-v1"
+    artifact, artifact_error = _load_exact_artifact_contract(model_version)
+    if artifact is None:
+        return {
+            "status": "blocked",
+            "reason": artifact_error,
+            "sport": "mlb_nrfi",
+            "model_version": model_version,
+            "game_date": args_date,
+            "scheduled_events": 0,
+            "nrfi_candidates": 0,
+            "logged": 0,
+            "duplicate_pick_ids": [],
+            "main_duplicates": [],
+        }
 
     espn_client = client or ESPNClient()
     try:
@@ -642,7 +660,7 @@ def _forecast_mlb_nrfi_flat(
         logger.warning("Failed to fetch ESPN MLB scoreboard for NRFI on %s: %s", args_date, exc)
         events = []
 
-    model = MLBNRFIModel()
+    model = MLBFirstInningModel.from_dict(artifact)
     logged, duplicates, main_duplicates = [], [], []
     nrfi_candidates = 0
     decision_dt = utc_now()
@@ -681,14 +699,31 @@ def _forecast_mlb_nrfi_flat(
             except (ValueError, TypeError):
                 pass
 
+        venue_name = comps.get("venue", {}).get("fullName", "") or ""
         try:
-            pred = model.predict(
+            live_features = live_first_inning_features(
                 home_team=home_team,
                 away_team=away_team,
-                decision=event_decision_dt,
+                venue_name=venue_name,
                 home_starter_name=home_sp_name,
                 away_starter_name=away_sp_name,
+                decision=event_decision_dt,
             )
+            row = FirstInningGameRow(
+                game_pk=None,
+                game_start_utc=event_decision_dt.isoformat(),
+                home_team=home_team,
+                away_team=away_team,
+                venue_name=venue_name,
+                features=live_features,
+                nrfi=0,
+                runs_1st_total=0.0,
+            )
+            p_nrfi = model.predict_p_nrfi(row)
+            p_yrfi = round(1.0 - p_nrfi, 4)
+            p_nrfi = round(p_nrfi, 4)
+            fair_american_nrfi = probability_to_american(p_nrfi)
+            fair_american_yrfi = probability_to_american(p_yrfi)
         except Exception as exc:  # noqa: BLE001
             logger.warning("NRFI prediction failed for %s @ %s: %s", away_team, home_team, exc)
             continue
@@ -696,23 +731,19 @@ def _forecast_mlb_nrfi_flat(
         nrfi_candidates += 1
 
         if log:
-            if pred.p_yrfi >= 0.50:
+            if p_yrfi >= 0.50:
                 pick_selection = "yrfi"
-                pick_prob = pred.p_yrfi
-                pick_odds = pred.fair_american_yrfi
+                pick_prob = p_yrfi
+                pick_odds = fair_american_yrfi
                 pick_rationale = (
-                    f"MLB 1st Inning YRFI: p={pred.p_yrfi:.3f} "
-                    f"(Expected 1st Inning Runs: top={pred.half_top_expected_runs:.2f}, "
-                    f"bot={pred.half_bot_expected_runs:.2f})"
+                    f"MLB 1st Inning YRFI: p={p_yrfi:.3f} (mlb-nrfi-v1, {model.fit_n_games} training games)"
                 )
             else:
                 pick_selection = "nrfi"
-                pick_prob = pred.p_nrfi
-                pick_odds = pred.fair_american_nrfi
+                pick_prob = p_nrfi
+                pick_odds = fair_american_nrfi
                 pick_rationale = (
-                    f"MLB 1st Inning NRFI: p={pred.p_nrfi:.3f} "
-                    f"(Expected 1st Inning Runs: top={pred.half_top_expected_runs:.2f}, "
-                    f"bot={pred.half_bot_expected_runs:.2f})"
+                    f"MLB 1st Inning NRFI: p={p_nrfi:.3f} (mlb-nrfi-v1, {model.fit_n_games} training games)"
                 )
 
             req_nrfi = PickRequest(
@@ -728,7 +759,7 @@ def _forecast_mlb_nrfi_flat(
                 american_odds=pick_odds,
                 model_probability=pick_prob,
                 model_uncertainty=0.04,
-                model_version=model.model_version,
+                model_version=model_version,
                 rationale=pick_rationale,
                 risks="1st inning variance, leadoff home run risk",
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
@@ -843,7 +874,7 @@ def _forecast_mlb_nrfi_flat(
         "status": "ok",
         "sport": "mlb_nrfi",
         "model_name": "MLB NRFI / YRFI Component Model",
-        "model_version": model.model_version,
+        "model_version": model_version,
         "game_date": args_date,
         "scheduled_events": len(events),
         "nrfi_candidates": nrfi_candidates,
