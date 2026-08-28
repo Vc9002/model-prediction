@@ -390,7 +390,21 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def notify_operator(title: str, message: str, level: str = "info") -> bool:
-    """Send an operational push notification to the operator via native macOS alert or webhook."""
+    """Send an operational push notification to the operator via native macOS alert or webhook.
+
+    Suppressed when ``MODEL_PREDICTION_OPERATOR_NOTIFICATIONS`` is set to a
+    falsey value ("0"/"false"/"no"/"off") -- the operator removed these
+    alerts on 2026-08-27; the launchd plists carry the env var, and the
+    toggle lives here (not at the call site) so manual system_health runs
+    are quiet too.
+    """
+    if os.getenv("MODEL_PREDICTION_OPERATOR_NOTIFICATIONS", "1").strip().lower() in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }:
+        return False
     if sys.platform == "darwin":
         try:
             escaped_msg = message.replace('"', '\\"')
