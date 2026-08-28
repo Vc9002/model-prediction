@@ -147,6 +147,7 @@ def build_total_score_rows(
     wnba_legacy_signals: bool = False,
     wnba_player_boxscores: dict[str, dict[str, Any]] | None = None,
     include_player_impact: bool = False,
+    real_mlb_context: bool = False,
 ) -> list[TotalScoreRow]:
     """Build PIT totals rows.
 
@@ -159,7 +160,12 @@ def build_total_score_rows(
     ``include_player_impact`` (with ``wnba_player_boxscores`` from
     ``features.wnba_player_logs.load_wnba_player_boxscores``) appends the
     three structural-challenger features; without it the incumbent vector is
-    byte-identical.
+    byte-identical. ``real_mlb_context`` (MLB only, default off) replaces the
+    weather/travel placeholder constants with real values from
+    ``features.mlb_game_context`` -- real historical Open-Meteo archive
+    weather and away-team travel distance from the previous game's venue.
+    Off, every MLB row is byte-identical to the pre-2026-08-27 incumbent
+    (weather=1.0, travel=0.0 constants).
     """
     scored_ewma: dict[str, float | None] = {}
     allowed_ewma: dict[str, float | None] = {}
@@ -168,7 +174,17 @@ def build_total_score_rows(
     recent_games: dict[str, deque[GameRecord]] = {}
     wnba_ff_logs: dict[str, deque[dict[str, float]]] = {}
     wnba_pl_logs: dict[str, deque[dict[str, Any]]] = {}
+    last_venue_by_team: dict[str, str] = {}
     rows: list[TotalScoreRow] = []
+
+    is_mlb = bool(games) and getattr(games[0], "league", "").upper() == "MLB"
+    mlb_weather_run_factor = mlb_away_travel_miles = venue_for_game = None
+    if real_mlb_context and is_mlb:
+        from .features.mlb_game_context import (
+            mlb_away_travel_miles,
+            mlb_weather_run_factor,
+            venue_for_game,
+        )
 
     for game in sorted(games, key=lambda g: g.start):
         home = game.home_team
@@ -191,9 +207,20 @@ def build_total_score_rows(
             home_allowed = allowed_ewma.get(home)
             home_allow_rate = home_allowed if home_allowed is not None else baseline / 2
             pf = PARK_FACTORS.get(home, 1.0)
-            weather = 1.0  # Neutral — no live weather feed yet
+            # Real MLB context when requested (flag off = incumbent constants):
+            # realized-weather run factor at first pitch and away-team travel
+            # miles from the previous game's venue. Both are strictly-prior
+            # lookups; missing data falls back to the constants unchanged.
+            weather = 1.0
             bullpen_rest = 3.0  # Default 3 days rest
             travel = 0.0  # Default no travel
+            if real_mlb_context and is_mlb:
+                real_weather = mlb_weather_run_factor(home, game.start)  # type: ignore[misc]
+                if real_weather is not None:
+                    weather = real_weather
+                travel_miles = mlb_away_travel_miles(away, home, game.start, last_venue_by_team)  # type: ignore[misc]
+                if travel_miles is not None:
+                    travel = travel_miles
             # Was `last_10_avg = baseline` -- a placeholder that made this an
             # exact duplicate of league_total_mean. Ridge then split one
             # weight across two identical columns (both landed on the same
@@ -275,6 +302,11 @@ def build_total_score_rows(
         league_totals.append(total)
         # After the row is built, never before: this game is not information
         # available to a decision made before it started.
+        if real_mlb_context and is_mlb:
+            this_venue = venue_for_game(home, game.start)  # type: ignore[misc]
+            if this_venue:
+                last_venue_by_team[home] = this_venue
+                last_venue_by_team[away] = this_venue
         for team in (away, home):
             recent_totals.setdefault(team, deque(maxlen=10)).append(total)
         if is_wnba:
