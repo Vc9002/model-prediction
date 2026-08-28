@@ -1,5 +1,19 @@
 # MASTER.md — Unified Project Reference (In-Depth)
 
+**Session 2026-08-27 — Full-System Defect Audit, Serving Landmine Identification, Weather/Travel Research & Documentation Sync**:
+- **Comprehensive Defect Audit & Gaps Catalog** ([`docs/SYSTEM_DEFECTS_AND_GAPS_AUDIT.md`](SYSTEM_DEFECTS_AND_GAPS_AUDIT.md)):
+  - **Serving Landmine Identified then RESOLVED (MLB NRFI)**: Model fitted and frozen into `config/models/mlb-nrfi-v1.json` with holdout logloss `0.690572` (matching `0.6910` baseline), but `_forecast_mlb_nrfi_flat` in `cli/forecast.py` had been invoking the legacy hand-set `MLBNRFIModel()` (`0.0424` intercept) under the same `mlb-nrfi-v1` model_version string. Resolved 2026-08-27 (commit `693744b`): live pre-game feature builder `models/mlb_first_inning_live.py` (exact-match verified vs the batch ledger), artifact-backed prediction with fail-closed loading, champion `MLB.nrfi` promoted, `blocked_workflows` now empty. Polymarket carries no NRFI market — no market-side grading for these rows.
+  - **WNBA Totals Serving Path**: No live serving execution path wired in `cli/forecast.py` (`total_research_artifact` read only for dashboard strings). WNBA totals models are data-bound (~2026-07 start) and underperform the market closing line (MAE 13.12 vs 20.92).
+  - **Code-Backed Sentinel Hash**: `soccer-poisson-dc-v1` and `tennis-surface-elo-v1` use `CODE_BACKED` sentinel hashes without versioned JSON artifacts.
+  - **Upstream Feed Outages**: The Odds API soccer feed remains down (401 Unauthorized, $\ge 31$ days). `api_football.py` is implemented but awaits `API_FOOTBALL_KEY` secret.
+  - **Polymarket Market Coverage**: NRFI/YRFI and F5 runs markets are missing from current quote ingestion pipelines.
+  - **Static Typing**: 0 Ruff findings across the codebase; Mypy surfaces 220 errors across 59 files (primarily unchecked annotations in dashboard routes, ledger casting, and optional openpyxl imports).
+- **MLB Real Weather & Travel Research Ablation** (`scripts/mlb_weather_travel_ablation.py`):
+  - Ingested historical Open-Meteo archive weather and away-team travel distance via `features/mlb_game_context.py` and `features/mlb_venue_geocoding.py`.
+  - Control MAE: `3.584296`, RMSE: `4.487904`. Candidate MAE: `3.578813`, RMSE: `4.484318`. Point estimate gain: `+0.005484` MAE, 95% bootstrap CI: `[-0.000215, +0.011088]`.
+  - Verdict: `NO_PROMOTION` (Honest null: 95% CI straddles zero under the ablation reproduction gate).
+- **Test Suite Verification**: **100% PASS** (2,414 tests pass, 3 skipped, 0 fail; verified via parallel `pytest -n auto`).
+
 **Session 2026-08-23 — Comprehensive Platform Optimization, Analytical Scoring Distribution Engine, Derivative Market Expansion & Latent Defect Fixes**:
 - **Storage & Dashboard Engine Optimization** (`runtime_ledger_store.py`, `dashboard/data_service.py`):
   - Added SQLite WAL mode tuning with `PRAGMA synchronous=NORMAL`, `PRAGMA temp_store=MEMORY`, 256MB memory mapping (`mmap_size`), and 64MB cache, boosting transactional ledger write throughput by $3\times\text{--}5\times$ with zero lock contention.

@@ -1,16 +1,22 @@
 # Project status and source of truth
 
-**Last verified**: 2026-08-26 (night continuation), local `research/mlb-v9`. Full suite 2,298 passed (concurrent-session run); this session's targeted runs all green (bet_better 8, wnba parser 3, wnba availability 15, statcast 4, settle guard 2, esports 14, system_health 13, fix-regressions 24, polymarket 16, tennis 163, daily 5). Canonical ledger audit: 0 repairs planned, 0 conflicts, 0 anomalies, integrity ok. `docs/DEBUG.md`'s 2026-08-26 sections (scan, resolutions, and the night continuation) are the authoritative record — trust them over this summary on specifics.
+**Last verified**: 2026-08-28. Full suite 2,414 passed, 3 skipped, 0 failed (verified via `pytest -n auto`); ruff 100% clean (0 findings); mypy triaged (220 findings across 59 files documented in [`docs/SYSTEM_DEFECTS_AND_GAPS_AUDIT.md`](file:///Users/vincentc9002/model-prediction/docs/SYSTEM_DEFECTS_AND_GAPS_AUDIT.md)). MLB weather/travel ablation verified honest null (`NO_PROMOTION`). MLB NRFI `mlb-nrfi-v1` frozen at `0.690572` holdout logloss and **promoted 2026-08-27** (commit `693744b`) after the live pre-game feature builder (`models/mlb_first_inning_live.py`) was built and verified — serving path rewired off the legacy unfitted `MLBNRFIModel`. Canonical ledger integrity ok.
 
-**Operating Architecture**: MLB operates on two isolated tracks — **Production Track** (`mlb-elo-trend-lr-v8` frozen champion) and **Research Track** (`mlb-v9` isolated challenger). See [`docs/ROADMAP.md`](file:///Users/vincentc9002/model-prediction/docs/ROADMAP.md) for full lifecycle details (the former `docs/RESEARCH_BACKLOG.md` was merged into it and deleted 2026-08-26).
+**Operating Architecture**: MLB operates on two isolated tracks — **Production Track** (`mlb-elo-trend-lr-v8` frozen champion) and **Research Track** (`mlb-v9` isolated challenger). See [`docs/ROADMAP.md`](file:///Users/vincentc9002/model-prediction/docs/ROADMAP.md) for full lifecycle details.
 
 This document is the operational status entry point. `MASTER.md` (repo root)
-is now the most current, most detailed running log of real bugs found/fixed
-with full evidence — trust it over this file when they disagree on specifics;
-this file exists to be the short, current summary someone can read first.
+is the running log of real bugs found/fixed with full evidence.
 
 Historical metrics in old reports, changelog entries, model cards, and
 rollback artifacts are not current operational truth.
+
+## 2026-08-27 — Full-System Defect Audit, Serving Landmine Identification, Weather/Travel Research & Documentation Sync
+
+- **Exhaustive System Defect Audit cataloged** in [`docs/SYSTEM_DEFECTS_AND_GAPS_AUDIT.md`](file:///Users/vincentc9002/model-prediction/docs/SYSTEM_DEFECTS_AND_GAPS_AUDIT.md) covering serving landmines, external data outages, PIT risks, and static type safety.
+- **MLB NRFI promotion landmine identified, fixed, and promoted** — holdout logloss `0.690572` reproduces `0.6910` baseline in `mlb-nrfi-v1.json`. The live path `_forecast_mlb_nrfi_flat` had been invoking the legacy unfitted `MLBNRFIModel()` under the same `mlb-nrfi-v1` model_version string; rewired to `MLBFirstInningModel.from_dict(artifact)` with a live PIT feature builder (`mlb_first_inning_live.py`, exact-match verified against the batch ledger on 7 real games). Champion `MLB.nrfi` set; `blocked_workflows` now empty.
+- **MLB Weather & Travel research ablation completed** (`scripts/mlb_weather_travel_ablation.py`): Control MAE 3.584296 vs Candidate 3.578813 (gain +0.005484, 95% CI `[-0.000215, +0.011088]`) $\rightarrow$ `NO_PROMOTION` verdict under strict reproduction gate.
+- **Static type audit**: Ruff 0 findings; Mypy 220 errors across 59 files documented.
+- **Full suite verified**: 2,414 tests pass, 3 skipped, 0 fail.
 
 ## 2026-08-26 — Full-repo scan resolutions, ledger conflict repair, scheduler restoration
 

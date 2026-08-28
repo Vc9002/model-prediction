@@ -1,6 +1,44 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
-**Last audited**: 2026-08-26 (see new section directly below)
+**Last audited**: 2026-08-27 (see new section directly below)
+
+## 2026-08-27 — Full-System Defect Audit, Serving Landmine Gating & Weather/Travel Reproduction
+
+### 1. Reproduction Commands
+- **Full Suite Parallel Run**:
+  ```bash
+  .venv/bin/pytest -n auto
+  ```
+  Result: `2414 passed, 3 skipped` in 43s.
+- **Ruff Lint Check**:
+  ```bash
+  .venv/bin/ruff check src/ tests/ scripts/
+  ```
+  Result: `All checks passed!` (0 findings).
+- **Mypy Type Triage**:
+  ```bash
+  .venv/bin/mypy src/model_prediction
+  ```
+  Result: 220 errors across 59 files (documented in [`docs/SYSTEM_DEFECTS_AND_GAPS_AUDIT.md`](SYSTEM_DEFECTS_AND_GAPS_AUDIT.md)).
+- **MLB Weather & Travel Ablation**:
+  ```bash
+  env PYTHONPATH=src:. .venv/bin/python scripts/mlb_weather_travel_ablation.py
+  ```
+  Result: Control MAE `3.584296`, Candidate MAE `3.578813`, Gain `+0.005484`, 95% CI `[-0.000215, +0.011088]`, Verdict: `NO_PROMOTION`.
+
+### 2. Verified Findings & Gated Landmines
+- **MLB NRFI Live Serving Landmine — RESOLVED 2026-08-27 (commit `693744b`)**:
+  - `config/models/mlb-nrfi-v1.json` reproduces `0.690572` holdout logloss via `MLBFirstInningModel`.
+  - At audit time `_forecast_mlb_nrfi_flat` in `src/model_prediction/cli/forecast.py` still invoked the legacy hand-set `MLBNRFIModel()` — whose default `model_version` is the SAME string the validated artifact must use, so a registry-only promotion would have silently served the wrong model to Main.
+  - Fixed: live point-in-time feature accumulator `models/mlb_first_inning_live.py` (starter-name-keyed, exact-match verified against the batch ledger on 7 real games across 3 seasons; parity test `tests/test_mlb_first_inning_live.py`, 1e-4 tolerance for one documented floating-point rounding-boundary artifact). Serving now fails closed on a missing/hash-invalid artifact and predicts with `MLBFirstInningModel.from_dict(artifact)`. Champion `MLB.nrfi` set; `blocked_workflows` now empty.
+  - Remaining caveat: Polymarket has no NRFI/YRFI market, so these rows have no market-side CLV/ROI grading.
+- **MLB Weather & Travel Research (backfill state)**: Open-Meteo archive raw hourly observations for ~5,800/5,899 venue-days live in `data/weather/mlb_historical.jsonl` (untracked operational output; script `scripts/backfill_mlb_weather.py` is idempotent/resumable). 52 venue-days were still HTTP-429 after two retry passes — one more `--workers 2` resume run clears most. Feature wiring lives behind `total_score.py`'s `real_mlb_context` flag (default OFF = byte-identical incumbent); verdict NO_PROMOTION (see commands above). Venue table: `features/mlb_venue_geocoding.py` (venue-name keyed, relocation-correct; one-off exhibition venues deliberately excluded).
+- **The Odds API — historical access audit**: `data_sources/the_odds_api.py` implements in-season endpoints only (`odds`/`scores`/`tennis_odds`); no `/v4/historical/` client and no quota monitoring (the `x-requests-remaining` header is never read). Historical snapshots are a paid tier — whether the existing `THE_ODDS_API_KEY` can reach them was NOT tested (the live call was blocked by the configured `Read(.env)` deny rule; do not work around it). Operator decision needed before any historical-market warehouse work. Cheap win regardless of tier: log `x-requests-remaining` in `_safe_get`.
+- **WNBA Totals Pipeline Absence**:
+  - No serving execution path wired in `cli/forecast.py` (`total_research_artifact` read only for dashboard strings). Model underperforms market lines due to limited boxscore history (MAE 13.12 vs 20.92).
+- **Soccer Odds API Outage**:
+  - Outage $\ge 31$ days (`401 Unauthorized`).
+  - `src/model_prediction/data_sources/api_football.py` is implemented and awaiting `API_FOOTBALL_KEY`.
 
 ## 2026-08-26 (night) — continuation: documented-bug triage, Bet Better capture, WNBA parser root cause, postponed-game watcher
 

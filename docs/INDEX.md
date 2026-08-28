@@ -11,6 +11,7 @@ Welcome to the unified documentation directory for the `model-prediction` platfo
 | [`MASTER.md`](MASTER.md) | **Comprehensive Source of Truth**: Deep running log of all real bugs, fixes, session notes, and system state. | Primary reference for codebase state & history |
 | [`PROJECT_STATUS.md`](PROJECT_STATUS.md) | **Operational Status Entry Point**: High-level verdict, verified test metrics, and active champions. | First document to read for current health |
 | [`DEBUG.md`](DEBUG.md) | **Exact Reproduction & Audit Ledger**: Repro commands, incident logs, line refs, and defect triage. | When diagnosing issues or reproducing bug states |
+| [`SYSTEM_DEFECTS_AND_GAPS_AUDIT.md`](SYSTEM_DEFECTS_AND_GAPS_AUDIT.md) | **Comprehensive Defect & Risk Audit**: Detailed catalog of serving landmines, data gaps, PIT integrity, and technical debt. | High-priority audit of system gaps & risks |
 | [`ROADMAP.md`](ROADMAP.md) | **Active Task Queue**: consolidated engineering, dashboard, portfolio, and research roadmap. | Planning next development & research tasks |
 | [`CHECKLIST.md`](CHECKLIST.md) | **Operational Verification Protocols**: Step-by-step checklists for daily runs, audits, and promotion. | Executing release and verification gates |
 | [`CHANGELOG.md`](CHANGELOG.md) | **Release History**: Chronological log of major updates, new sports, and architectural changes. | Reviewing version evolution over time |

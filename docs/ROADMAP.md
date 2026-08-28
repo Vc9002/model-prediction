@@ -55,6 +55,14 @@ Fixes and wiring (full trace in `docs/DEBUG.md` 2026-08-26 night section):
   tomorrow's log (today: 6.7–22.9 min per run).
 - Soccer capture `data_root` split-brain fixed before it ever fired.
 
+## Session outcomes — 2026-08-27 (system audit & ablation gate pass)
+
+- **Comprehensive System Audit**: Cataloged in [`docs/SYSTEM_DEFECTS_AND_GAPS_AUDIT.md`](SYSTEM_DEFECTS_AND_GAPS_AUDIT.md).
+- **MLB NRFI live serving landmine identified AND resolved**: `config/models/mlb-nrfi-v1.json` frozen with `0.690572` holdout logloss; the live forecast path in `cli/forecast.py` had been invoking the unfitted `MLBNRFIModel()` under the same model_version string. Resolved same session (commit `693744b`): live pre-game feature builder (`models/mlb_first_inning_live.py`, starter-name-keyed, exact-match verified vs the batch ledger) + artifact-backed prediction + champion `MLB.nrfi` promotion; `blocked_workflows` is now empty. Caveat: Polymarket has no NRFI market, so no market-side CLV/ROI grading exists for these rows.
+- **MLB Weather & Travel ablation completed**: Tested via `scripts/mlb_weather_travel_ablation.py` (gain +0.005484 MAE, 95% CI `[-0.000215, +0.011088]`) $\rightarrow$ `NO_PROMOTION` verdict under the reproduction gate.
+- **Static type audit**: 0 Ruff findings; 220 Mypy findings cataloged for progressive type hardening.
+- **Full suite verified**: 2,414 tests pass, 3 skipped, 0 fail.
+
 In-flight research (NOT promoted — promotion awaits the operator's command
 per 2026-08-26 directive; validation on settled picks, PIT-safe):
 
@@ -673,4 +681,123 @@ training or forecasting, not just as an afterthought.
 subscription (The Odds API historical, TheRundown beyond its free tier);
 any new third-party credential. Do not add a provider integration that
 requires a paid key without confirming first.
+
+---
+
+## Testing & Quality Engineering Roadmap
+
+A structured testing initiative to harden the platform, prevent regressions, and enforce strict compile-time and runtime guarantees:
+
+### 1. Mypy Static Type Hardening (Zero-Error Initiative)
+- **Current Baseline**: 220 errors across 59 files (`.venv/bin/mypy src/model_prediction`).
+- **Target**: 0 Mypy errors with strict type checking enabled across `src/model_prediction`.
+- **Phased Milestones**:
+  - `T1.1`: Type-annotate dashboard route handlers and query parameters (`src/model_prediction/dashboard/routes.py`, `orders.py`, `backtests.py`).
+  - `T1.2`: Resolve dictionary-to-primitive casting and type mismatches in ledger stores (`src/model_prediction/portfolio/polymarket_ledger.py`, `runtime_ledger_store.py`).
+  - `T1.3`: Fix Future/ThreadPoolExecutor return type mismatches in daily fanout (`src/model_prediction/cli/daily.py`).
+  - `T1.4`: Enforce `mypy` as a mandatory pre-commit and CI blocking gate.
+
+### 2. Fast Deterministic CI Daily Cycle Smoke Test
+- **Target**: Run a full synthetic slate end-to-end (ingest $\rightarrow$ forecast $\rightarrow$ settle $\rightarrow$ ledger write $\rightarrow$ dashboard cache build) in $< 3.0$ seconds inside CI.
+- **Implementation**: Pure in-memory SQLite (`:memory:`) with mock HTTP fixtures for ESPN, Polymarket, and StatsAPI feeds, validating all multi-sport workflows on every git push without external network I/O.
+
+### 3. Hypothesis Stateful Property-Based Ledger Testing
+- **Target**: Continuous fuzzing of ledger transitions, split-brain protections, and financial invariants.
+- **Invariants Verified**:
+  - P&L conservation: $\sum \text{P&L}_{\text{individual}} \equiv \text{P&L}_{\text{aggregate}}$.
+  - State machine irreversibility: Once settled or voided, a pick row can never transition back to open.
+  - Dedup idempotency: Re-running a forecast across an identical slate never generates duplicate active calls.
+
+### 4. Parallel Benchmark & Latency Profiling Harness
+- **Current Run Time**: 6.7 to 22.9 minutes per scheduled daily run.
+- **Target**: Reduce daily run time to $< 60$ seconds.
+- **Action**: Profile network bottlenecks using `cProfile` and migrate sequential HTTP queries in [`cli/daily.py`](../src/model_prediction/cli/daily.py) to concurrent `httpx.AsyncClient` pipelines with strict rate-limiting.
+
+---
+
+## Public API Ecosystem Survey & Data Enhancement Roadmap
+
+A systematic evaluation of the public API catalog ([`public-apis/public-apis`](https://github.com/public-apis/public-apis)) to identify high-leverage data sources for expanding model accuracy, sports coverage, environmental physics, and market context without unnecessary paid subscriptions.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    PUBLIC APIS RECONNAISSANCE MATRIX                        │
+├───────────────────┬─────────────┬─────────────┬─────────────┬───────────────┤
+│ Domain / Category │ Target APIs │ Auth Type   │ Cost        │ Model Utility │
+├───────────────────┼─────────────┼─────────────┼─────────────┼───────────────┤
+│ Sports & Scores   │ API-Football│ apiKey      │ Freemium    │ Soccer 1X2/Tot│
+│                   │ balldontlie │ No Auth     │ Free        │ NBA/WNBA Pace │
+│                   │ TheSportsDB │ apiKey      │ Free        │ Entity Metadata│
+│                   │ Ergast/OpenF1│ No Auth    │ Free        │ Racing (Exp.) │
+├───────────────────┼─────────────┼─────────────┼─────────────┼───────────────┤
+│ Weather & Physics │ Open-Meteo  │ No Auth     │ Free        │ Air density ρ │
+│                   │ NWS / NOAA  │ User-Agent  │ Free        │ Wind & Press. │
+│                   │ OpenWeather │ apiKey      │ Freemium    │ Fallback T/H  │
+├───────────────────┼─────────────┼─────────────┼─────────────┼───────────────┤
+│ Geocoding & Travel│ OpenRoute   │ apiKey      │ Free Tier   │ Road distance │
+│                   │ Positionstack│ apiKey     │ Free Tier   │ Venue geocoding│
+│                   │ Aviationstack│ apiKey     │ Freemium    │ Charter flights│
+├───────────────────┼─────────────┼─────────────┼─────────────┼───────────────┤
+│ Esports & Gaming  │ OpenDota    │ No Auth/Key │ Free        │ Dota 2 draft  │
+│                   │ Riot Games  │ apiKey      │ Free (Dev)  │ LoL / Val PBP │
+│                   │ PandaScore  │ apiKey      │ Freemium    │ CS2/R6 events │
+├───────────────────┼─────────────┼─────────────┼─────────────┼───────────────┤
+│ Markets & Liquidity│ Polymarket  │ No Auth/Key │ Free        │ US BBO CLOB   │
+│                   │ Kalshi      │ RSA / Key   │ Free        │ Event spreads │
+│                   │ CoinGecko   │ No Auth     │ Free        │ Settlement gas│
+└───────────────────┴─────────────┴─────────────┴─────────────┴───────────────┘
+```
+
+### 1. Sports & Live Match Feeds
+1. **`API-FOOTBALL` (RapidAPI / API-Sports)**
+   - **Scope**: Live scores, lineups, player ratings, substitutions, and xG for 1,000+ soccer competitions.
+   - **Status in Repo**: Adapter written in [`src/model_prediction/data_sources/api_football.py`](../src/model_prediction/data_sources/api_football.py).
+   - **Action**: Provision `API_FOOTBALL_KEY` to restore soccer live tracking and Dixon-Coles settlement.
+2. **`balldontlie` (NBA / Basketball Data)**
+   - **Scope**: Boxscores, player game logs, shot charts, advanced pace, and team efficiency metrics.
+   - **Status in Repo**: Adapter live in [`src/model_prediction/data_sources/balldontlie.py`](../src/model_prediction/data_sources/balldontlie.py).
+   - **Roadmap Enhancement**: Integrate player-level usage and offensive rating priors to replace flat team averages.
+3. **`TheSportsDB` (Cross-Sport Entity & Venue Master Table)**
+   - **Scope**: Canonical team aliases, stadium capacities, surface types, and league metadata.
+   - **Roadmap Enhancement**: Use to seed the canonical entity crosswalk graph, preventing join collisions.
+4. **`Ergast Developer API / OpenF1` (Motorsports Expansion)**
+   - **Scope**: Lap times, pit stops, tire degradation, and circuit weather telemetries.
+   - **Roadmap Enhancement**: Candidate for future high-frequency prediction market expansion (Formula 1 driver match-ups).
+
+### 2. Weather, Aerodynamics & Environmental Physics
+1. **`Open-Meteo Historical Archive & Forecast API`**
+   - **Scope**: High-resolution hourly temperature, relative humidity, barometric pressure, dew point, wind speed, wind gusts, and wind direction.
+   - **Auth / Cost**: No API key required; completely free for open non-commercial research.
+   - **Roadmap Application**: Derive Bahill air density ($\rho$) and stadium-relative wind vectors ($W_{\text{in/out}}, W_{\text{cross}}$) for MLB/NFL totals modeling.
+2. **`National Weather Service (NWS / weather.gov) API`**
+   - **Scope**: Station-level surface observations and Terminal Aerodrome Forecasts (TAF) with official barometric altimeter settings.
+   - **Auth / Cost**: Free public US government data (requires descriptive `User-Agent`).
+   - **Roadmap Application**: Serves as a zero-cost, high-reliability live pre-game weather verification feed.
+
+### 3. Geocoding, Circadian Logistics & Travel Distance
+1. **`OpenRouteService / OSRM (Open Source Routing Machine)`**
+   - **Scope**: High-precision driving/transit matrices and travel duration factoring in traffic and terrain.
+   - **Roadmap Application**: Compute real ground travel fatigue for regional basketball (WNBA) and minor leagues where teams travel by bus rather than charter aircraft.
+2. **`Positionstack / OpenStreetMap Nominatim`**
+   - **Scope**: Forward and reverse geocoding for stadiums, neutral-site arenas, and training facilities.
+   - **Roadmap Application**: Automatically resolve one-off exhibition and neutral-site venues (e.g. London Series, Field of Dreams, Tokyo Dome) into verified lat/lon coordinates.
+
+### 4. Esports Micro-Data Feeds
+1. **`OpenDota API`**
+   - **Scope**: Complete match replay parsing, hero drafting synergy, gold/XP net worth graphs, and combat logs.
+   - **Roadmap Application**: Replace flat team-level Elo with hero-composition drafting advantage matrices.
+2. **`Riot Games Developer API (LoL & Valorant)`**
+   - **Scope**: Official match timelines, champion bans/picks, dragon/Baron neutral objective timing, and round economy.
+   - **Roadmap Application**: Predict map outcomes based on live draft synergy and champion mastery vectors.
+
+### 5. Multi-Exchange Liquidity & Consensus Feeds
+1. **`Polymarket CLOB WebSocket & REST API`**
+   - **Scope**: Level 2 orderbook depth, best bid/ask (BBO), last traded price, and volume across all prediction markets.
+   - **Roadmap Application**: Real-time arbitrage detection and sub-second line movement execution.
+2. **`Kalshi API`**
+   - **Scope**: Regulated US market event contract odds and settlement determinations.
+   - **Roadmap Application**: Multi-book Dutching arbitrage and consensus line formation.
+
+---
+
 
