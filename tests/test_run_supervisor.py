@@ -178,31 +178,17 @@ def test_fails_closed_without_runtime_env(tmp_path, monkeypatch) -> None:
     assert not (repo / "data" / "ledgers" / "ledgers.db").exists()
 
 
-def test_notify_operator_suppressed_by_env_toggle(monkeypatch) -> None:
-    """The operator removed macOS/slack notifications 2026-08-27 via
-    MODEL_PREDICTION_OPERATOR_NOTIFICATIONS=0; the toggle must suppress the
-    send entirely (return False, no osascript subprocess)."""
-    import subprocess
-
+def test_notify_operator_disabled_by_default(monkeypatch) -> None:
+    """Operator notifications are permanently disabled by default."""
     from model_prediction.run_supervisor import notify_operator
 
-    calls: list[list[str]] = []
-    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: calls.append(args[0]))
+    monkeypatch.delenv("MODEL_PREDICTION_OPERATOR_NOTIFICATIONS", raising=False)
+    assert notify_operator("System Health: DEGRADED", "reason", "warning") is False
+
+
+def test_notify_operator_suppressed_by_env_toggle(monkeypatch) -> None:
+    """The operator removed macOS/slack notifications; the toggle suppresses the send entirely."""
+    from model_prediction.run_supervisor import notify_operator
+
     monkeypatch.setenv("MODEL_PREDICTION_OPERATOR_NOTIFICATIONS", "0")
     assert notify_operator("System Health: DEGRADED", "reason", "warning") is False
-    assert calls == []
-
-
-def test_notify_operator_default_still_attempts_send(monkeypatch) -> None:
-    """Default behavior (env var unset) must keep attempting the native
-    alert -- only an explicit falsey value suppresses."""
-    import subprocess
-
-    from model_prediction.run_supervisor import notify_operator
-
-    calls: list[list[str]] = []
-    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: calls.append(args[0]))
-    monkeypatch.delenv("MODEL_PREDICTION_OPERATOR_NOTIFICATIONS", raising=False)
-    notify_operator("System Health: DEGRADED", "reason", "warning")
-    assert len(calls) == 1
-    assert calls[0][0] == "osascript"

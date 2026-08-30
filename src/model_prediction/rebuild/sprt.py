@@ -82,6 +82,7 @@ class BernoulliSPRT:
         losses = len(outcomes) - wins
         llr = wins * self.llr_win + losses * self.llr_loss
 
+        verdict: Literal["ACCEPT_H1", "REJECT_H1", "CONTINUE_TESTING"]
         if llr >= self.upper_bound:
             verdict = "ACCEPT_H1"
         elif llr <= self.lower_bound:
@@ -159,6 +160,7 @@ class GaussianSPRT:
         # Log likelihood ratio under normal distribution
         llr = (self.target_delta / variance) * (sum_deltas - (n * self.target_delta / 2.0))
 
+        verdict: Literal["ACCEPT_H1", "REJECT_H1", "CONTINUE_TESTING"]
         if llr >= self.upper_bound:
             verdict = "ACCEPT_H1"
         elif llr <= self.lower_bound:

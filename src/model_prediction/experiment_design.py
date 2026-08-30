@@ -46,7 +46,7 @@ def ablation_table(variants: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
     """
     rows = []
     for name, metrics in variants.items():
-        row = {"variant": name}
+        row: dict[str, Any] = {"variant": name}
         for column in ABLATION_COLUMNS[1:]:
             row[column] = metrics.get(column)
         rows.append(row)

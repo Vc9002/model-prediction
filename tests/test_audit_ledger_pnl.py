@@ -62,9 +62,9 @@ def test_economic_signature_still_detects_real_quote_conflicts() -> None:
 def test_economic_signature_agrees_when_quote_matches_across_sizing() -> None:
     # Same quote, different sizing (1.0U vs 1.25U) — identical
     # stake-normalized economics, so signatures must match.
-    assert audit_ledger_pnl._economic_signature(
-        _row("0.80", "1.00")
-    ) == audit_ledger_pnl._economic_signature(_row("1.00", "1.25"))
+    assert audit_ledger_pnl._economic_signature(_row("0.80", "1.00")) == audit_ledger_pnl._economic_signature(
+        _row("1.00", "1.25")
+    )
 
 
 def test_economic_signature_handles_missing_units_safely() -> None:

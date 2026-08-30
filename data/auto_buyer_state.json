@@ -1,0 +1,42 @@
+{
+  "enabled": true,
+  "unit_value_usd": 0.005,
+  "min_edge": 0.035,
+  "max_daily_spend_usd": 25.0,
+  "max_game_stake_usd": 2.5,
+  "whitelist_models": [
+    "tennis-surface-elo-v1",
+    "soccer-poisson-dc-v1",
+    "wnba-elo-trend-lr-v4",
+    "cs2-tiered-elo-v6",
+    "lol-tiered-elo-v6",
+    "mlb-nrfi-v1",
+    "measured-edge-totals-v3"
+  ],
+  "blacklist_models": [
+    "measured-edge-margin-v3",
+    "wnba-spread-margin-v1",
+    "cfb-total-v1"
+  ],
+  "last_run": {
+    "executed_at_utc": "2026-08-30T05:58:55.585948Z",
+    "forecast_date": "2026-08-30",
+    "mode": "LIVE_EXECUTION",
+    "total_evaluated": 1208,
+    "whitelisted_count": 839,
+    "rejected_blacklist": 252,
+    "rejected_future_slate": 35,
+    "rejected_started": 0,
+    "rejected_stale_quote": 36,
+    "rejected_unmapped_market": 34,
+    "rejected_closed_market": 0,
+    "rejected_low_edge": 0,
+    "rejected_budget": 0,
+    "rejected_dedup": 0,
+    "total_spend_usd": 0.0,
+    "orders_count": 0,
+    "orders": []
+  },
+  "last_daily_date": "2026-08-30",
+  "updated_at_utc": "2026-08-30T04:18:28.924817Z"
+}

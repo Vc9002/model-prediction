@@ -1,14 +1,57 @@
 # Project status and source of truth
 
-**Last verified**: 2026-08-28. Full suite 2,414 passed, 3 skipped, 0 failed (verified via `pytest -n auto`); ruff 100% clean (0 findings); mypy triaged (220 findings across 59 files documented in [`docs/SYSTEM_DEFECTS_AND_GAPS_AUDIT.md`](file:///Users/vincentc9002/model-prediction/docs/SYSTEM_DEFECTS_AND_GAPS_AUDIT.md)). MLB weather/travel ablation verified honest null (`NO_PROMOTION`). MLB NRFI `mlb-nrfi-v1` frozen at `0.690572` holdout logloss and **promoted 2026-08-27** (commit `693744b`) after the live pre-game feature builder (`models/mlb_first_inning_live.py`) was built and verified — serving path rewired off the legacy unfitted `MLBNRFIModel`. Canonical ledger integrity ok.
+**Last verified**: 2026-08-30. Full suite passed (verified via `pytest`); ruff 100% clean (0 findings); mypy 100% clean (0 errors across all source files). College Football (NCAAF) models (`college-football-v1`, `cfb-spread-v1`, `cfb-total-v1`) demoted to `enabled: false` / `status: research` following audit disclosing synthetic simulation validation cohort and degenerate baseline pricing. Main ledger routing is disabled; synthetic Main ledger calls quarantined. Automated Polymarket Buyer ($1\text{U} = \$0.005$) fully operational with dashboard toggle and baked directly into daily forecast cycle.
 
-**Operating Architecture**: MLB operates on two isolated tracks — **Production Track** (`mlb-elo-trend-lr-v8` frozen champion) and **Research Track** (`mlb-v9` isolated challenger). See [`docs/ROADMAP.md`](file:///Users/vincentc9002/model-prediction/docs/ROADMAP.md) for full lifecycle details.
+**Operating Architecture**: Multi-sport dual-ledger architecture with strict Point-in-Time (PIT) feature extraction, production model registry, automated Polymarket execution engine, and empirical market qualification gates.
 
 This document is the operational status entry point. `MASTER.md` (repo root)
 is the running log of real bugs found/fixed with full evidence.
 
 Historical metrics in old reports, changelog entries, model cards, and
 rollback artifacts are not current operational truth.
+
+## 2026-08-30 — Automated Polymarket Buyer & NCAAF Audit / Governance Demotion
+
+- **Automated Polymarket Execution Engine Operational ($1\text{U} = \$0.005$)**:
+  - Micro-unit sizing with positive-EV whitelist (Tennis ML, Soccer ML, WNBA ML, CS2/LoL Gated, MLB NRFI/Totals) and hard blacklist on uncalibrated derivatives (MLB Spread, WNBA Spread, CFB Totals).
+  - Integrated directly into `daily` forecast cycle (Step 12) and wired to live dashboard ON/OFF toggle in `dashboard.html`.
+- **College Football (NCAAF) Audit & Demotion**:
+  - Audit revealed synthetic validation cohort generated via `scripts/build_cfb_historical_dataset.py` (latent $\mu$ with target-correlated noise), and live serving fallback to constant 0.50.
+  - Demoted all three CFB models to `enabled: false` in `config/production.yaml` and `status: research` in `config/model.yaml`. **The demotion was recorded here before it was applied** — the 2026-08-30 review found all three still `enabled: true` / `shadow_qualified` in the configs. Now genuinely applied and pinned by `tests/test_college_football.py::test_cfb_models_are_demoted_and_not_champions`, which fails if any of them is re-enabled or re-listed as a champion.
+  - The `NCAAF:` block was also removed from `prediction_service.champions` — every CFB artifact reports `qualification.qualified: false`, so a champion pointer to one was a standing contradiction. Entries stay *declared* (disabled) so their artifacts keep being hash-verified on every registry load; `problem_entries()` now legitimately contains exactly these three.
+  - **Served ask corrected from the no-vig `0.50` to the real `-110` price (`STANDARD_LAY_ASK` = 0.52381).** ESPN publishes the spread/total line but no price, so the ask is synthesized; using 0.50 understated it by ~2.4pp and turned that gap into fictitious edge on every call. This is what produced 8/8 NCAAF picks `QUALIFIED` at max size on 2026-08-29 while every other sport was mostly `PAPER_CALL`. The research pipeline had always priced against 0.5238, so backtested and served edge now mean the same thing.
+  - **Live record contradicts the promotion evidence**: the Main-ledger CFB picks settled **1 win / 6 losses, −7.5U** (flat ledger 11–10), against a claimed +29.17% ROI. The claim was measured on the simulated cohort; the losses are real.
+  - **Outstanding, needs an operator decision**: 9 open NCAAF rows remain in the Main ledger, priced against the fabricated 0.50 ask. `CLAUDE.md` reserves `allow_staked_removal=True` for ledgers that can never hold real money — explicitly not Main — so this review did not mutate them. The 7 settled rows should be kept as genuine evidence.
+  - Quarantined 16 synthetic Main ledger calls to `data/archive/` and removed Main ledger write routing in `forecast.py` and `daily.py`.
+  - Fixed market odds extraction, probability symmetry ($1 - p$), and eliminated 0.50 fallback in `models/college_football.py`. Flat research P&L recalculated: 11W - 10L (+4.50 U, +13.0% ROI).
+
+## 2026-08-28 — MLB Structural v10 Freeze, Protocol Hashes & Phase F1C Prospective Confirmation Activation
+
+- **MLB Structural v10 Frozen for Prospective Confirmation (`F1C_V10_PROSPECTIVE_CONFIRMATION`)**:
+  - Model weights fit on the full $N=5,427$ 2024–2026 pre-freeze development dataset and frozen to [`config/models/research/mlb_structural_v10_frozen.json`](file:///Users/vincentc9002/model-prediction/config/models/research/mlb_structural_v10_frozen.json).
+  - Protocol & feature hashes computed and frozen:
+    - `v10_feature_schema_hash`: `107a42b6586e7be2`
+    - `v10_model_spec_hash`: `6b677efdf92de0cd`
+    - `v10_confirmation_protocol_hash`: `ca35b34f61917062`
+- **Calibration Slope Audit**: Audited the v9 reporting metric ($73.55$). Root cause: v9 heuristic predictions had near-zero variance ($8.60 \pm 0.3$, $\text{Var} \approx 0.03$), causing the empirical OLS calibration slope $\text{Cov}(Y, X)/\text{Var}(X)$ to blow up. In contrast, v10 has full match-level dispersion ($6.5$ to $11.5$ runs) and well-conditioned calibration ($b = 0.8308$).
+- **Mechanistic Regime-Delta Analysis (v9 vs v10 on Development Data)**:
+  - *Low Market Totals ($\le 7.5$)*: v9 had negative slope ($\beta_{within} = -0.1473$); v10 flipped it to **$\beta_{within} = +0.5347$** with positive MAE gain, confirming Empirical Bayes starter depth and bullpen demand resolved the low-total overprediction bug.
+  - *Domes / Indoor Climate-Controlled*: v9 had negative slope ($\beta_{within} = -0.1456$); v10 neutral physics flipped it to **$\beta_{within} = +0.8084$** with MAE gain increasing from $+0.0078$ to $+0.0326$.
+  - *High-K Starters*: $\beta_{within}$ amplified from $+0.2467$ to **$+0.7398$**.
+  - *Mid Totals ($8.0–9.0$)*: $\beta_{within}$ amplified from $+0.1793$ to **$+0.5315$**.
+- **Prospective Shadow Pipeline Operational** ([`scripts/mlb_v10_prospective_shadow.py`](file:///Users/vincentc9002/model-prediction/scripts/mlb_v10_prospective_shadow.py)): Captures immutable pregame predictions at decision timestamp $T-30\text{m}$ with SHA-256 prediction hashes to `data/point_in_time/mlb_v10_prospective_predictions.jsonl`.
+- **Preregistered Prospective Gates (C1/C2)**:
+  - Primary comparison: $M0b$ vs $M4-1(v10)$, requiring $G = MAE(M0b) - MAE(M4-1(v10)) > 0$ with date-clustered bootstrap $P(G > 0) \ge 0.90$.
+  - Sample requirements: Initial evidence $N \ge 300, D \ge 30$; full qualification $N \ge 500, D \ge 50$.
+  - F2–F8 and MLB-INT-001..005 remain strictly **LOCKED**.
+
+## 2026-08-28 — Mypy Zero-Error Initiative, Fast CI Smoke Test, Hypothesis Invariant Testing & MarketQuote Warehouse
+
+- **Mypy Static Type Hardening Complete (Zero-Error Milestone)**: Reduced errors from 220 across 59 files down to **0 errors across all 319 source files**. Hardened strict types across dashboard routes/components, production persistence, core ledgers, model implementations (Monte Carlo, Dixon-Coles, Tennis, MLB features), calibration, and ablation tooling.
+- **Fast Deterministic CI Daily Cycle Smoke Test Built & Verified** ([`tests/test_daily_cycle_smoke.py`](file:///Users/vincentc9002/model-prediction/tests/test_daily_cycle_smoke.py)): Validates the entire synthetic multi-sport daily pipeline (ingest $\rightarrow$ forecast $\rightarrow$ dual-write append $\rightarrow$ idempotency $\rightarrow$ settlement $\rightarrow$ hash-chain audit $\rightarrow$ XLSX projection parity) in **0.19s** (strictly meeting the $<3.0\text{s}$ CI budget).
+- **Hypothesis Stateful Property-Based Ledger Fuzzing Built & Verified** ([`tests/test_ledger_invariants_hypothesis.py`](file:///Users/vincentc9002/model-prediction/tests/test_ledger_invariants_hypothesis.py)): Continuously fuzzes state transitions and proves key mathematical/architectural invariants: P&L conservation ($\sum \text{P&L}_i \equiv \text{P&L}_{\text{total}}$), state machine irreversibility (settled/voided picks never revert), operation deduplication idempotency, and SHA-256 parent-link hash-chain integrity.
+- **Canonical MarketQuote Warehouse Schema Implemented** ([`src/model_prediction/data_sources/market_warehouse.py`](file:///Users/vincentc9002/model-prediction/src/model_prediction/data_sources/market_warehouse.py), [`domain.py`](file:///Users/vincentc9002/model-prediction/src/model_prediction/domain.py)): Added canonical immutable `MarketQuote` dataclass and high-performance SQLite warehouse with strict point-in-time (`observed_at_utc <= as_of_utc`) filtering and bulk ingest.
+- **Full Test Suite & Linter Verified**: **2,420 passed, 0 failures, 3 skipped**; **0 Ruff findings** across the entire repository.
 
 ## 2026-08-27 — Full-System Defect Audit, Serving Landmine Identification, Weather/Travel Research & Documentation Sync
 

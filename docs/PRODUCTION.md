@@ -31,7 +31,7 @@ When this variable is not set, the system falls back to `<repo_root>/data`.
 
 ## Scheduler
 
-The combined `com.modelprediction.daily` worker runs once at 08:30 local time.
+The combined `com.modelprediction.daily` worker runs at 08:30 and 12:00 local time.
 It settles open picks first and then produces the day's unified forecasts.
 
 The separate `com.modelprediction.production` and

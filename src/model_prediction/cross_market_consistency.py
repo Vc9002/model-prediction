@@ -9,6 +9,7 @@ Validates probabilistic coherence across interrelated betting markets:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -94,7 +95,7 @@ def check_cross_market_consistency(
     )
 
 
-def calculate_dutching_arbitrage(decimal_odds: list[float]) -> dict[str, float]:
+def calculate_dutching_arbitrage(decimal_odds: list[float]) -> dict[str, Any]:
     """Calculate dutching arbitrage margins and guaranteed ROI across independent books.
 
     Parameters

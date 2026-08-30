@@ -23,6 +23,7 @@ from __future__ import annotations
 import random
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from .calibration import calibration_metrics
 
@@ -126,8 +127,8 @@ def market_relative_report(
     outcomes = [r.outcome for r in rows]
 
     # Predictive block: model vs market on the same settled sides.
-    model_cal = calibration_metrics(model_probs, outcomes)
-    market_cal = calibration_metrics(market_probs, outcomes)
+    model_cal: dict[str, Any] = calibration_metrics(model_probs, outcomes)
+    market_cal: dict[str, Any] = calibration_metrics(market_probs, outcomes)
     if model_cal.get("status") == "insufficient_sample":
         model_logloss = model_brier = None
         market_logloss = market_brier = None

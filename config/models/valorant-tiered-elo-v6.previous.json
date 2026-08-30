@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "7eb633e8aa21fb28facf2bf266f60caef5b1d1d3853954ef04bdd97f5b7b968d",
+  "artifact_hash": "c4ccfd3d8e918298685c6e43139c3f08c77f39365c0302550db303670d2d2b21",
   "confidence_threshold": 0.03,
   "games_played": {
     "bo3:2:10021": 31,
@@ -5480,7 +5480,7 @@
     "bo3:2:9999": 1399.729483
   },
   "schema_version": "esports-neutral-elo-v2",
-  "source_manifest_sha256": "fc608c9dfe4faa449aafd817383a342d5fc816db088694608efb1e648dbb8130",
+  "source_manifest_sha256": "fcf8f6ff3af600eada9286c5f8575e25c932c8240effbd5de0fd39aca998b0f0",
   "target": "best-of match/series winner",
   "title": "valorant",
   "trained_through_utc": "2026-08-14T15:00:00Z",

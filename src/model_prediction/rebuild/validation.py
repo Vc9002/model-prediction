@@ -396,7 +396,7 @@ def calibration_curve(
     y_true: Sequence[int],
     y_prob: Sequence[float],
     n_bins: int = 10,
-) -> dict[str, list[float]]:
+) -> dict[str, Any]:
     """Reliability curve: bin centers, actual fraction of positives."""
     yt = np.array(y_true)
     yp = np.array(y_prob)

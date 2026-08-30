@@ -343,11 +343,11 @@ class FeatureAblationRunner:
                 "ece": ece(y_test.tolist(), probs),
             }
         except Exception:  # noqa: BLE001 -- train_fn/predict_fn are caller-supplied callables that can raise anything; falls back to a disclosed coin-flip result, not silently swallowed
-            y_test = test_df[target_col].to_list()
+            fallback_y_test = [int(v) for v in test_df[target_col].to_list()]
             return {
-                "log_loss": log_loss(y_test, [0.5] * len(y_test)),
-                "brier": brier_score(y_test, [0.5] * len(y_test)),
-                "ece": ece(y_test, [0.5] * len(y_test)),
+                "log_loss": log_loss(fallback_y_test, [0.5] * len(fallback_y_test)),
+                "brier": brier_score(fallback_y_test, [0.5] * len(fallback_y_test)),
+                "ece": ece(fallback_y_test, [0.5] * len(fallback_y_test)),
             }
 
     @staticmethod
@@ -357,7 +357,8 @@ class FeatureAblationRunner:
         if not available:
             return 0.0
         mask = ~data.select(available).to_series().is_null()
-        return float(mask.mean()) if len(mask) > 0 else 0.0
+        mean_val: Any = mask.mean()
+        return float(mean_val) if mean_val is not None else 0.0
 
     def report(self) -> dict[str, Any]:
         """Generate an ablation report."""

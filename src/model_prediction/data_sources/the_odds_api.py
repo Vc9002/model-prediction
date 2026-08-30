@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import httpx
@@ -7,11 +8,14 @@ import httpx
 from ..domain import League
 from ..entities import EntityRegistry
 
+logger = logging.getLogger(__name__)
+
 SPORT_KEYS = {
     "MLB": "baseball_mlb",
     "NBA": "basketball_nba",
     "WNBA": "basketball_wnba",
     "NFL": "americanfootball_nfl",
+    "NCAAF": "americanfootball_ncaaf",
     "WORLD_CUP": "soccer_fifa_world_cup",
     "BRAZIL_SERIE_B": "soccer_brazil_serie_b",
     "K_LEAGUE_1": "soccer_korea_kleague1",
@@ -45,6 +49,14 @@ class TheOddsAPIClient:
         """GET + raise_for_status, with API key redacted from any error message."""
         try:
             response = self.client.get(url, **kwargs)
+            remaining = response.headers.get("x-requests-remaining")
+            used = response.headers.get("x-requests-used")
+            if remaining is not None or used is not None:
+                logger.info(
+                    "The Odds API quota: remaining=%s, used=%s",
+                    remaining,
+                    used,
+                )
             response.raise_for_status()
             return response
         except Exception as exc:  # noqa: BLE001 — both transport and HTTP errors embed the URL; the key must be redacted before re-raising

@@ -199,7 +199,8 @@ def _get_clv_summary() -> dict:
         import importlib
 
         mod = importlib.import_module("model_prediction.dashboard.status")
-        return mod._clv_summary()  # type: ignore[no-any-return]
+        res = mod._clv_summary()
+        return dict(res) if isinstance(res, dict) else {}
     except (ImportError, AttributeError, KeyError, ValueError, TypeError, OSError):
         return {}
 
@@ -492,26 +493,6 @@ def system_health(
         report["market_relative"] = {"status": "unavailable", "error": f"{type(exc).__name__}: {exc}"}
 
     report["reasons"] = reasons
-
-    # 7. Push alerting on DEGRADED/DOWN *transitions* only — system_health()
-    # may be called repeatedly (dashboard polling, cron), and re-alerting on
-    # every call while the same state persists would spam the operator.
-    if report["status"] in ("DEGRADED", "DOWN") and _status_transitioned(
-        paths.runtime_root, report["status"]
-    ):
-        try:
-            from .run_supervisor import notify_operator
-
-            notify_operator(
-                title=f"System Health: {report['status']}",
-                message="; ".join(reasons[:3]),
-                level="warning" if report["status"] == "DEGRADED" else "error",
-            )
-        except Exception:  # noqa: BLE001, S110
-            pass
-    elif report["status"] == "HEALTHY":
-        _status_transitioned(paths.runtime_root, "HEALTHY")
-
     return report
 
 

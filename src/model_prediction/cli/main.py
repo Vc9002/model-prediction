@@ -4,6 +4,7 @@ import json
 import logging
 import sys
 from pathlib import Path
+from typing import Any
 
 from ..audit import AuditLog
 from ..bans import TeamBanList
@@ -144,6 +145,7 @@ def main(argv: list[str] | None = None) -> None:
         research_scoring_note=research_scoring.get("note", "fixed-stake hypothetical research scoring"),
         retired=not config["project"].get("main_ledger_enabled", True),
     )
+    output: Any = {}
     try:
         if args.command == "init-ledger":
             output = cmd_init_ledger(args, config, registry, bans, ledger, audit, data_root)

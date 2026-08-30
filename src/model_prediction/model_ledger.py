@@ -376,9 +376,13 @@ def settle_from_pick_row(model_ledgers_dir: str | Path, row: dict[str, Any]) -> 
     return ledger.settle_event(
         key,
         result=str(row.get("result", "")),
-        closing_price=float(closing_price_raw) if closing_price_raw not in (None, "") else None,
-        pnl_units=float(pnl_units_raw) if pnl_units_raw not in (None, "") else None,
-        probability_clv=float(probability_clv_raw) if probability_clv_raw not in (None, "") else None,
+        closing_price=float(closing_price_raw)
+        if closing_price_raw is not None and closing_price_raw != ""
+        else None,
+        pnl_units=float(pnl_units_raw) if pnl_units_raw is not None and pnl_units_raw != "" else None,
+        probability_clv=float(probability_clv_raw)
+        if probability_clv_raw is not None and probability_clv_raw != ""
+        else None,
     )
 
 
@@ -589,7 +593,7 @@ class ModelLedger:
                 )
                 for field in ("closing_price", "probability_clv", "pnl_units"):
                     value = correction.get(field)
-                    if value not in (None, ""):
+                    if value is not None and value != "":
                         decimals = 4 if field == "pnl_units" else 6
                         row[field] = f"{float(value):.{decimals}f}"
                 repaired.append(row)

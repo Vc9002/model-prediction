@@ -136,6 +136,25 @@ This document provides an exhaustive, code-verified audit of all identified defe
    - Provide `API_FOOTBALL_KEY` to restore soccer live data feeds.
    - Install lineup wake LaunchDaemon (`com.vc.mlb-lineup-wake-planner.plist`) with root privileges.
 3. **Phase 3: Codebase Type Hardening**
-   - Address the 220 Mypy typing errors across `src/model_prediction/dashboard/` and `src/model_prediction/cli/`.
+   - ✅ DONE 2026-08-28: Resolved all 220 Mypy typing errors across `src/model_prediction/dashboard/`, `cli/`, `ledger.py`, and models. Repository achieves 0 Mypy errors across all 319 source files.
 4. **Phase 4: Data Warehouse Architecture**
-   - Implement canonical `MarketQuote` schema for multi-source odds ingestion as specified in [`docs/ROADMAP.md`](file:///Users/vincentc9002/model-prediction/docs/ROADMAP.md#L661-L670).
+   - ✅ DONE 2026-08-28: Implemented canonical `MarketQuote` schema and `MarketQuoteWarehouse` with strict Point-In-Time (`observed_at_utc <= as_of_utc`) filtering (`data_sources/market_warehouse.py`, `domain.py`, `tests/test_market_warehouse.py`).
+
+---
+
+## Addendum — 2026-08-30 NCAAF serving and governance audit
+
+Four defects, all found in the CFB system built and production-wired on 2026-08-29. Each is now closed with a regression test unless noted.
+
+| # | Defect | Evidence | Status |
+| :--- | :--- | :--- | :--- |
+| A-1 | **Qualification measured on a simulated cohort.** `scripts/build_cfb_historical_dataset.py` was named like an ingest script but its body was `generate_historical_dataset()` — a seeded RNG simulator. Every headline metric (`N=8,146` walk-forward, `+29.17%` ROI, `66.97%` hit rate) came from it. | Builder had no HTTP/import call anywhere; `data_sources/cfb_data.py` was a static team registry. Cohort has since been rebuilt from the real ESPN API (3,930 games), so the original numbers are unreproducible. | **CLOSED** — cohort replaced; all three artifacts self-report `qualification.qualified: false`. |
+| A-2 | **Backtest edge was circular by construction.** The simulator drew scores from a latent `mu`, then set the market total line to `mu + gauss(0, 3.0)` — the model's own estimation target plus noise. The model beat that by arithmetic, not skill. | A 66.97% hit rate against a −110 line is outside any plausible market range and should have halted acceptance before any code was read. | **CLOSED** — generator removed with the cohort. |
+| A-3 | **Served ask was the no-vig `0.50`, not the real price.** ESPN publishes the spread/total line but no price, so the ask is synthesized. `0.50` understates the true −110 ask by ~2.4pp, and that gap became fictitious edge on every call. Three market-probability variables were also declared and never assigned, so *all* asks fell through to the constant. | 32/32 NCAAF ledger rows had `market_probability` exactly `0.5` (1 distinct value); every other sport showed 5–53 distinct values. Result: 8/8 NCAAF picks `QUALIFIED` at up to 2.0U while peers were mostly `PAPER_CALL`. | **CLOSED** — `STANDARD_LAY_ASK` (0.52381) matches the research pipeline; contracts are skipped when no ask is available. Pinned by `test_cfb_standard_lay_ask_is_vig_inclusive_not_no_vig`. |
+| A-4 | **Config contradicted the artifacts, and the docs contradicted the config.** All three artifacts read `qualified: false`, yet `production.yaml` had them `enabled: true` and listed as `champions`, and `model.yaml` had NCAAF `shadow_qualified`. `PROJECT_STATUS.md` had already *recorded* the demotion as done. | Verified directly in the config files after the doc claimed otherwise. | **CLOSED** — demotion genuinely applied; pinned by `test_cfb_models_are_demoted_and_not_champions`. |
+
+**Open, needs an operator decision:** 9 open NCAAF rows remain in the Main ledger, priced against the fabricated 0.50 ask. `CLAUDE.md` reserves `allow_staked_removal=True` for ledgers that can never hold real money — explicitly not Main — so this audit did not mutate them. The 7 settled rows (**1 win / 6 losses, −7.5U**) are genuine evidence and should be kept.
+
+### The generalisable lesson
+
+The full verification stack was green throughout: 2,462 tests passing, 0 ruff findings, 0 mypy errors. None of it could see any of this, because no test asserts anything about the *distribution* of served values. A-3 was found in a single `GROUP BY` against the ledger, comparing distinct-value counts per sport — a constant where a distribution belongs is invisible to every static check and obvious in one query against real output. Suite and linter cleanliness is not evidence about served values.

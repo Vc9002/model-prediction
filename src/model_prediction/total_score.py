@@ -23,6 +23,11 @@ import numpy as np
 from sklearn.linear_model import Ridge
 
 from .features.base import FeatureStore, GameRecord
+from .features.mlb_game_context import (
+    mlb_away_travel_miles,
+    mlb_weather_run_factor,
+    venue_for_game,
+)
 from .features.schedule_load import team_schedule_load, travel_timezone_displacement
 from .features.wnba_boxscores import build_wnba_four_factors_logs, load_wnba_boxscore_files
 from .features.wnba_pace_four_factors import compute_team_four_factors, project_wnba_game_total
@@ -178,14 +183,6 @@ def build_total_score_rows(
     rows: list[TotalScoreRow] = []
 
     is_mlb = bool(games) and getattr(games[0], "league", "").upper() == "MLB"
-    mlb_weather_run_factor = mlb_away_travel_miles = venue_for_game = None
-    if real_mlb_context and is_mlb:
-        from .features.mlb_game_context import (
-            mlb_away_travel_miles,
-            mlb_weather_run_factor,
-            venue_for_game,
-        )
-
     for game in sorted(games, key=lambda g: g.start):
         home = game.home_team
         away = game.away_team
@@ -215,10 +212,10 @@ def build_total_score_rows(
             bullpen_rest = 3.0  # Default 3 days rest
             travel = 0.0  # Default no travel
             if real_mlb_context and is_mlb:
-                real_weather = mlb_weather_run_factor(home, game.start)  # type: ignore[misc]
+                real_weather = mlb_weather_run_factor(home, game.start)
                 if real_weather is not None:
                     weather = real_weather
-                travel_miles = mlb_away_travel_miles(away, home, game.start, last_venue_by_team)  # type: ignore[misc]
+                travel_miles = mlb_away_travel_miles(away, home, game.start, last_venue_by_team)
                 if travel_miles is not None:
                     travel = travel_miles
             # Was `last_10_avg = baseline` -- a placeholder that made this an
@@ -303,7 +300,7 @@ def build_total_score_rows(
         # After the row is built, never before: this game is not information
         # available to a decision made before it started.
         if real_mlb_context and is_mlb:
-            this_venue = venue_for_game(home, game.start)  # type: ignore[misc]
+            this_venue = venue_for_game(home, game.start)
             if this_venue:
                 last_venue_by_team[home] = this_venue
                 last_venue_by_team[away] = this_venue

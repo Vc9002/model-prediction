@@ -28,9 +28,7 @@ def test_wnba_total_grade_pick() -> None:
     assert grade_pick(MarketType.TOTAL, "under", 165.5, 82, 85) == PickResult.LOSS
 
 
-def test_forecast_wnba_total_fails_closed_without_exact_artifact(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_forecast_wnba_total_fails_closed_without_exact_artifact(monkeypatch, tmp_path: Path) -> None:
     # The fail-closed path is exercised directly: the loader is forced to
     # report a missing artifact, so the test doesn't depend on which file
     # happens to be checked in today.

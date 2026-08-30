@@ -1,0 +1,212 @@
+phase_f:
+  current_stage: F1C_V10_PROSPECTIVE_CONFIRMATION
+  schema_version: 1.3.0
+  sub_stages:
+    historical_backfill: RUNNING
+    prospective_capture: ACTIVE
+  frozen:
+    f1r_protocol_hash: 57ba415265505282
+    v10_feature_schema_hash: 107a42b6586e7be2
+    v10_model_spec_hash: 6b677efdf92de0cd
+    v10_confirmation_protocol_hash: e9c2b6dcc235c9af
+    v10_probability_model_hash: 466f2c81e28b322f
+    market_state_version: v1
+    development_games: 5427
+    development_dates: 460
+    development_seasons:
+    - '2024'
+    - '2025'
+    - '2026'
+    hypothesis_ledger_locked: true
+    f1r_frozen_result:
+      status: FAIL_INCREMENTAL_ACCURACY
+      beta_within: 0.1905
+      beta_within_2024: 0.1586
+      beta_within_2025: 0.1148
+      beta_within_2026: 0.4963
+      signal_exists: true
+      incremental_MAE_edge: false
+      diagnosis: Structural matchup signal exists and is positive across seasons,
+        but incremental predictive magnitude vs M0b is insufficient (MAE gain ~ 0.0001,
+        paired bootstrap P(M4-1 > M0b) = 48.55%).
+    f1s_v10_development_result:
+      status: PROMOTED_TO_PROSPECTIVE_CONFIRMATION
+      reproduction_gate: PASS (beta_within_v9 = 0.1905 exact match)
+      mae_struct_v9: 3.5940
+      mae_struct_v10: 3.5702
+      structural_mae_gain: 0.0238
+      bias_v10_total: 0.0053
+      calibration_slope_v10: 0.8308
+      beta_within_v10: 0.3672
+      beta_within_v10_ci_95: [0.2209, 0.5295]
+      mae_gain_v10_vs_m0b: 0.0192
+      p_paired_bootstrap_v10_beats_m0b: 1.0
+    prospective_confirmation_gates:
+      gate_a_structural_discrimination: beta_within_v10 > 0 (date-clustered 95% CI > 0)
+      gate_b_continuous_edge: MAE(M4-1_v10) < MAE(M0b) with P(G > 0) >= 0.90 (G = MAE_M0b - MAE_M4-1)
+      gate_c_bias_tolerance: '|Bias_v10| < 0.25 runs'
+      gate_d_probability_improvement: Brier(v10) < Brier(M0) or NLL(v10) < NLL(M0)
+      gate_e_calibration_slope: '0.85 <= slope <= 1.15'
+      gate_f_temporal_stability: Positive direction across temporal blocks
+      sample_requirement_initial: N >= 300, D >= 30
+      sample_requirement_full: N >= 500, D >= 50
+      stages:
+        c1: PROSPECTIVE_REPLICATION_2026 (remaining 2026 games post-freeze)
+        c2: PROSPECTIVE_CONTINUATION_2027 (if C1 sample N < 500, continue identical frozen v10 into 2027)
+    sign_conventions:
+      totals_residual: R_total = ActualTotal - MarketConsensus
+      totals_delta: Delta = StructuralPred - MarketConsensus
+      totals_linear_calibration: R = alpha + beta * Delta
+      spreads_margin: Margin = HomeScore - AwayScore
+      spreads_market_margin: MarketImpliedHomeMargin = -HomeSpreadLine
+      spreads_residual: R_margin = ActualMargin - MarketImpliedHomeMargin
+      mae_gain_vs_m0b: mae_m0b - mae_m4_1 (>0 is candidate improvement)
+      rmse_gain_vs_m0b: rmse_m0b - rmse_m4_1 (>0 is candidate improvement)
+      brier_improvement: brier_m0 - brier_m4_1 (>0 is candidate improvement)
+      nll_improvement: nll_m0 - nll_m4_1 (>0 is candidate improvement)
+  market_data:
+    raw_payloads_observed: 90188
+    normalized_quotes_emitted: 156699
+    normalized_quotes_archived: 156617
+    unique_quote_signatures: 184817
+    eligible_pit_quotes: 156617
+    decision_lookup_quote_candidates: 422461
+    closing_quotes: 28200
+    duplicate_quotes: 82
+    rejected_quotes: 0
+  market_quality:
+    historical_backfill_operational: true
+    multibook_consensus_adequate: true
+    closing_coverage_adequate: true
+  sample:
+    games: 5433
+    dates: 460
+    seasons: 3
+    quotes_ingested: 156617
+    last_audit_utc: '2026-08-28T17:49:53.052930+00:00'
+  replication_gate:
+    min_games: 1000
+    min_dates: 100
+    min_seasons: 2
+    max_pit_violations: 0
+    checkpoint_type: FORMAL_REPLICATION_GATE
+    decision_authority: BINDING_GATE
+    status: FAIL_INCREMENTAL_ACCURACY
+    last_evaluated_utc: '2026-08-28T17:56:15.618158+00:00'
+    scoreboard:
+      sample_games: PASS
+      sample_dates: PASS
+      sample_seasons: PASS
+      pit_violations_zero: PASS
+      beta_within_positive: PASS
+      beta_ci_excludes_zero: PASS
+      permutation_null: PASS
+      m4_1_beats_m0b_mae: PASS
+      paired_bootstrap_probability: FAIL
+      temporal_sign_stability: PASS
+      probability_metric_improvement: PASS
+  checkpoints:
+    milestones:
+    - name: 250_games
+      target_games: 250
+      target_dates: 27
+      completed: true
+      evaluated_at_utc: '2026-08-28T17:50:31.310776+00:00'
+      beta_within: 0.1905
+    - name: 500_games
+      target_games: 500
+      target_dates: 50
+      completed: true
+      evaluated_at_utc: '2026-08-28T17:50:31.310778+00:00'
+      beta_within: 0.1905
+    - name: 750_games
+      target_games: 750
+      target_dates: 75
+      completed: true
+      evaluated_at_utc: '2026-08-28T17:50:31.310780+00:00'
+      beta_within: 0.1905
+    - name: 1000_games
+      target_games: 1000
+      target_dates: 100
+      target_seasons: 2
+      completed: true
+      evaluated_at_utc: '2026-08-28T17:50:31.310781+00:00'
+      beta_within: 0.1905
+    - name: 1500_games
+      target_games: 1500
+      completed: false
+      evaluated_at_utc: null
+      beta_within: null
+    - name: 2000_games
+      target_games: 2000
+      completed: false
+      evaluated_at_utc: null
+      beta_within: null
+    effect_size_trajectories:
+    - evaluated_at_utc: '2026-08-28T17:56:15.589807+00:00'
+      sample_size_N: 5427
+      unique_dates_D: 460
+      beta_raw: 0.2241
+      beta_within: 0.1905
+      beta_within_ci_95:
+      - 0.0641
+      - 0.322
+      mae_gain_vs_m0b: 0.0001
+      rmse_gain_vs_m0b: 0.0048
+      brier_improvement: 0.0039
+      nll_improvement: 0.0087
+      permutation_p: 0.002
+      positive_delta_share: 0.4516
+      negative_delta_share: 0.5484
+  season_coverage_panel:
+    '2024':
+      games_scheduled: 2899
+      games_matched: 2747
+      games_with_market_state: 2747
+      unique_dates: 242
+      decision_coverage: 0.9476
+      sharp_coverage: 0.0
+      soft_coverage: 1.0
+      closing_coverage: 0.0
+      books_per_game_mean: 5.74
+      books_per_game_median: 6.0
+      decision_quote_age_median_sec: 900.0
+    '2025':
+      games_scheduled: 2909
+      games_matched: 2132
+      games_with_market_state: 2132
+      unique_dates: 175
+      decision_coverage: 0.7329
+      sharp_coverage: 0.0
+      soft_coverage: 0.9995
+      closing_coverage: 0.0
+      books_per_game_mean: 5.83
+      books_per_game_median: 6.0
+      decision_quote_age_median_sec: 900.0
+    '2026':
+      games_scheduled: 2442
+      games_matched: 554
+      games_with_market_state: 549
+      unique_dates: 43
+      decision_coverage: 0.2248
+      sharp_coverage: 1.0
+      soft_coverage: 0.0
+      closing_coverage: 0.0
+      books_per_game_mean: 1.0
+      books_per_game_median: 1.0
+      decision_quote_age_median_sec: 5645.3
+  unlocked:
+    f2_distribution: false
+    f3_complex_m4: false
+    f4_interactions: false
+    f5_ensemble: false
+    f6_mlb_spreads: false
+    f7_multisport: false
+    f8_production: false
+  production_changes_allowed: false
+  last_experiment_id: f1r_replication_20260828_175615_ff6c6a1
+  last_verdict: FAIL_INCREMENTAL_ACCURACY
+  last_failure_reason: Structural matchup signal exists (beta_within > 0), but its
+    magnitude is insufficient to beat M0b reliably.
+  failure_router_action: Open F1S_STRUCTURAL_SIGNAL_AMPLIFICATION to increase matchup-specific
+    component before retesting.

@@ -31,6 +31,7 @@ LEAGUE_PATHS: dict[str, str] = {
     "NBA": "basketball/nba",
     "WNBA": "basketball/wnba",
     "NFL": "football/nfl",
+    "NCAAF": "football/college-football",
     "EPL": "soccer/eng.1",
     "LA_LIGA": "soccer/esp.1",
     "BUNDESLIGA": "soccer/ger.1",
@@ -75,6 +76,7 @@ SPORT_LEAGUES: dict[str, tuple[str, ...]] = {
     "nba": ("NBA",),
     "wnba": ("WNBA",),
     "nfl": ("NFL",),
+    "ncaaf": ("NCAAF",),
     "soccer": (
         "EPL",
         "LA_LIGA",

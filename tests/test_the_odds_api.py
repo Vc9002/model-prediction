@@ -90,3 +90,22 @@ def test_world_cup_uses_fifa_world_cup_sport_key() -> None:
         httpx.Client(transport=httpx.MockTransport(handler)),
     )
     assert client.odds("WORLD_CUP") == [{"id": "wc-match-1"}]
+
+
+def test_quota_headers_logged(caplog: pytest.LogCaptureFixture) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json=[{"id": "match-1"}],
+            headers={"x-requests-remaining": "450", "x-requests-used": "50"},
+        )
+
+    client = TheOddsAPIClient(
+        "test-key",
+        "https://example.test/v4",
+        httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    with caplog.at_level("INFO"):
+        res = client.odds("MLB")
+    assert res == [{"id": "match-1"}]
+    assert "The Odds API quota: remaining=450, used=50" in caplog.text

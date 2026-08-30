@@ -298,6 +298,11 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <span class="chip dim">auto <span id="countdown" class="mono">—</span>s</span>
   <button class="status-health-link" onclick="gotoTab('health')" aria-label="Open full system health details">Health details</button>
   <label class="chip unit-control" title="Changes future dollar displays and order sizing; historical unit records stay unchanged">1U = $<input id="unitValueInput" aria-label="Dollar value of one unit" type="number" min="0.01" max="100000" step="0.01" value="7.50" onkeydown="if(event.key==='Enter')saveUnitValue()"><button onclick="saveUnitValue()">Set</button><input id="autoPctInput" aria-label="Bankroll percentage for one unit" type="number" min="1" max="50" step="0.5" value="10" style="width:42px;padding:1px 2px" title="Percentage of bankroll">%<button onclick="autoUnitValue()" title="Set 1U to this percentage of the live balance; adjusts up or down">Apply</button></label>
+  <div id="autoBuyerTopControl" style="display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:3px 8px;font-family:var(--mono);font-size:11px">
+    <span>Auto-Buyer (0.5¢/U):</span>
+    <button id="autoBuyerToggleBtn" onclick="toggleAutoBuyer()" style="font-weight:700;padding:2px 8px;border-radius:5px;font-size:11px;background:rgba(255,92,92,0.2);color:var(--red)">OFF</button>
+    <button onclick="runAutoBuyerNow()" title="Trigger Auto-Buyer check now" style="padding:2px 6px;font-size:11px">⚡ Run</button>
+  </div>
   <span style="flex:1"></span>
   <button class="desktop-action" onclick="confirmAction('run_tests','Run pytest for the whole suite?')">Run Tests</button>
   <button class="desktop-action" onclick="bootstrapDialog()">Bootstrap</button>
@@ -343,6 +348,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <div class="rail-label">Polymarket US</div>
       <button data-tab="polymarket">Edge Scanner</button>
       <button data-tab="poly-ledger">Edge Ledger</button>
+      <button data-tab="auto-buyer-ledger">Auto-Buyer Ledger</button>
     </div>
     <div class="rail-group">
       <div class="rail-label">System</div>
@@ -646,6 +652,34 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <div style="overflow-x:auto"><table class="data" id="polyLedgerTable"><tr><td>Loading Polymarket trades…</td></tr></table></div>
     </div>
   </section>
+
+  <section id="tab-auto-buyer-ledger" style="display:none">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+      <h2 style="margin:0">🤖 Auto-Buyer Ledger — Dedicated Shares & Fills</h2>
+      <span class="chip dim">Live automated Polymarket purchases (0.5¢/U) | Whitelisted models only | Deduplication protected</span>
+      <span style="flex:1"></span>
+      <button onclick="renderAutoBuyerLedger(true)">↻ Refresh</button>
+      <button onclick="runAutoBuyerNow()" style="background:rgba(51,209,126,0.15);color:var(--green);font-weight:700">⚡ Run Auto-Buyer</button>
+      <button class="primary" onclick="settleAutoBuyerTrades()">Settle Auto-Buyer Trades</button>
+    </div>
+    <div id="autoBuyerKpis" class="kpis" style="margin-bottom:16px"></div>
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <h3 style="margin:0">Automated Purchases & Positions</h3>
+        <span class="small dim" id="autoBuyerLastRunNotice">Last Run: —</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data" id="autoBuyerTable"><tr><td>Loading Auto-Buyer ledger…</td></tr></table>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <h3 style="margin:0">📜 Operational Execution Log (data/logs/auto_buyer.log)</h3>
+        <button onclick="loadAutoBuyerLog()" style="padding:2px 8px;font-size:11px">↻ Refresh Log</button>
+      </div>
+      <pre id="autoBuyerLogBox" style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:var(--mono);font-size:11px;max-height:260px;overflow-y:auto;white-space:pre-wrap;color:var(--text)">Loading operational log…</pre>
+    </div>
+  </section>
   <section id="tab-settings" style="display:none">
     <div class="card" style="max-width:560px">
       <h2>Settings</h2>
@@ -665,6 +699,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
             <label><input type="checkbox" class="sSport" value="nba" checked>NBA</label>
             <label><input type="checkbox" class="sSport" value="wnba" checked>WNBA</label>
             <label><input type="checkbox" class="sSport" value="nfl" checked>NFL</label>
+            <label><input type="checkbox" class="sSport" value="ncaaf" checked>NCAAF</label>
             <label><input type="checkbox" class="sSport" value="soccer" checked>Soccer</label>
             <label><input type="checkbox" class="sSport" value="tennis" checked>Tennis</label>
             <label><input type="checkbox" class="sSport" value="lol" checked>LOL</label>
@@ -803,7 +838,7 @@ const state={picks:[],perf:null,matrix:null,status:null,productionEvidence:null,
   settings:JSON.parse(localStorage.getItem("dash-settings")||"{}")};
 const fmt=(v,d=2)=>v==null?"—":Number(v).toFixed(d);
 const pct=v=>v==null?"—":(100*v).toFixed(1)+"%";
-const ALL_SPORTS=["mlb","nba","wnba","nfl","soccer","tennis","lol","cs2","dota2","valorant","rainbow_six","kbo","npb"];
+const ALL_SPORTS=["mlb","nba","wnba","nfl","ncaaf","soccer","tennis","lol","cs2","dota2","valorant","rainbow_six","kbo","npb"];
 const urlParams=()=>new URLSearchParams(location.search);
 const initialUrlState=urlParams();
 function setUrlState(patch){
@@ -848,6 +883,7 @@ $$("#tabs button").forEach(b=>b.onclick=()=>{
   if(b.dataset.tab==="rebuild")loadRebuild();
   if(b.dataset.tab==="polymarket")loadPolymarketScanner();
   if(b.dataset.tab==="poly-ledger")renderPolyLedger(false);
+  if(b.dataset.tab==="auto-buyer-ledger")renderAutoBuyerLedger(false);
 });
 
 /* ---------- settings ---------- */
@@ -856,9 +892,10 @@ function applySettings(){
   // Older settings could only name five sports and the controls were not
   // actually applied. Preserve any explicit choices while making newly
   // introduced sports visible by default during this one-time migration.
-  if(Array.isArray(s.sports)&&!s.sportsV3){
+  if(Array.isArray(s.sports)&&(!s.sportsV3||!s.sportsV4)){
     ALL_SPORTS.forEach(sport=>{if(!s.sports.includes(sport))s.sports.push(sport);});
     s.sportsV3=true;
+    s.sportsV4=true;
   }
   if(s.refresh!==undefined)$("#sRefresh").value=s.refresh;
   if(s.theme){$("#sTheme").value=s.theme;document.documentElement.dataset.theme=s.theme;}
@@ -867,7 +904,7 @@ function applySettings(){
 }
 function saveSettings(){
   state.settings={refresh:$("#sRefresh").value,theme:$("#sTheme").value,
-    minConf:parseFloat($("#sMinConf").value)||0.5,sportsV2:true,sportsV3:true,
+    minConf:parseFloat($("#sMinConf").value)||0.5,sportsV2:true,sportsV3:true,sportsV4:true,
     sports:$$(".sSport").filter(c=>c.checked).map(c=>c.value)};
   localStorage.setItem("dash-settings",JSON.stringify(state.settings));
   document.documentElement.dataset.theme=state.settings.theme;
@@ -2623,9 +2660,14 @@ window.previewPositionSell=previewPositionSell;
 async function manualRefresh(btn){
   const label=btn?btn.textContent:null;
   if(btn){btn.disabled=true;btn.textContent="↻ …";}
-  await refreshAll();
-  resetTimer();
-  if(btn){btn.disabled=false;btn.textContent=label;}
+  try {
+    await refreshAll();
+    resetTimer();
+  } catch(e) {
+    console.error("Dashboard refresh failed:", e);
+  } finally {
+    if(btn){btn.disabled=false;btn.textContent=label||"↻ Refresh";}
+  }
 }
 window.manualRefresh=manualRefresh;
 async function openBuy(pickId,initialPrice){
@@ -3399,6 +3441,7 @@ async function refreshAll(){
   if($("#tab-today") && $("#tab-today").style.display!=="none" && active!=="today") renderToday();
   if($("#tab-folio") && $("#tab-folio").style.display!=="none" && active!=="folio") renderFolio();
 
+  loadAutoBuyerStatus();
   const allRequests = [...(core||[]), flatRes, researchRes, gatedRes, polyRes];
   const failures = allRequests.filter(result => result.status === "rejected").length;
   $("#updatedTxt").innerHTML=failures
@@ -3524,6 +3567,226 @@ function copyPolymarketOrdersJson() {
   }).catch(err => {
     alert("Failed to copy orders: " + err);
   });
+}
+
+/* ---------- Auto-Buyer Controls ---------- */
+async function loadAutoBuyerStatus(){
+  try{
+    const res=await fetch("/api/auto-buyer/status",{headers:{"X-Dashboard-Token":window._DASHBOARD_TOKEN||""}});
+    if(!res.ok)return;
+    const data=await res.json();
+    updateAutoBuyerUI(data);
+  }catch(e){}
+}
+function updateAutoBuyerUI(data){
+  const btn=$("#autoBuyerToggleBtn");
+  if(!btn)return;
+  if(data.enabled){
+    btn.textContent="ON (LIVE)";
+    btn.style.background="var(--green)";
+    btn.style.color="#000";
+    btn.title="Auto-Buyer is LIVE and ACTIVE (1U=0.5¢). Click to turn OFF.";
+  }else{
+    btn.textContent="OFF";
+    btn.style.background="rgba(255,92,92,0.2)";
+    btn.style.color="var(--red)";
+    btn.title="Auto-Buyer is DISABLED. Click to turn ON.";
+  }
+}
+async function toggleAutoBuyer(){
+  const btn=$("#autoBuyerToggleBtn");
+  const currentlyOn=btn&&btn.textContent.includes("ON");
+  const nextState=!currentlyOn;
+  const msg=nextState
+    ?"Enable LIVE Polymarket Auto-Buyer?\n\n- Sizing: 1U = $0.005 (0.5¢/U)\n- Whitelisted models only (Tennis, Soccer, WNBA ML, CS2/LoL Gated, MLB NRFI/Totals)\n- Blacklisted negative-EV derivatives blocked\n- Limit IOC orders placed on Polymarket US API"
+    :"Disable Polymarket Auto-Buyer?";
+  if(!confirm(msg))return;
+  try{
+    const res=await fetch("/api/auto-buyer/toggle",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","X-Dashboard-Token":window._DASHBOARD_TOKEN||""},
+      body:JSON.stringify({confirm:true,enabled:nextState})
+    });
+    const data=await res.json();
+    updateAutoBuyerUI(data);
+  }catch(e){
+    alert("Failed to toggle Auto-Buyer: "+e);
+  }
+}
+async function runAutoBuyerNow(){
+  const btn=$("#autoBuyerToggleBtn");
+  const isLive=btn&&btn.textContent.includes("ON");
+  const msg=isLive
+    ?"Trigger LIVE Auto-Buyer execution cycle now against current open model picks?"
+    :"Auto-Buyer is currently OFF. Run in paper/dry-run check mode?";
+  if(!confirm(msg))return;
+  try{
+    const res=await fetch("/api/auto-buyer/run",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","X-Dashboard-Token":window._DASHBOARD_TOKEN||""},
+      body:JSON.stringify({confirm:true,execute:isLive})
+    });
+    const data=await res.json();
+    alert(`Auto-Buyer run completed!\n\nMode: ${data.mode}\nPicks Evaluated: ${data.total_evaluated}\nWhitelisted: ${data.whitelisted_count}\nOrders: ${data.orders_count}\nTotal Spend: $${Number(data.total_spend_usd).toFixed(2)}`);
+    refreshAll();
+    if ($("#tab-auto-buyer-ledger") && $("#tab-auto-buyer-ledger").style.display !== "none") {
+      renderAutoBuyerLedger(true);
+    }
+  }catch(e){
+    alert("Auto-Buyer execution failed: "+e);
+  }
+}
+
+/* ---------- Auto-Buyer Dedicated Ledger & Log ---------- */
+let _autoBuyerLedgerCache = [];
+
+async function loadAutoBuyerLedgerCache(force = false) {
+  if (!force && _autoBuyerLedgerCache && _autoBuyerLedgerCache.length) return;
+  try {
+    const res = await fetch("/api/auto-buyer/ledger", {
+      headers: { "X-Dashboard-Token": window._DASHBOARD_TOKEN || "" }
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    _autoBuyerLedgerCache = await res.json();
+  } catch (e) {
+    _autoBuyerLedgerCache = [];
+  }
+}
+
+async function renderAutoBuyerLedger(force = false) {
+  await loadAutoBuyerLedgerCache(force);
+  await loadAutoBuyerStatus();
+  renderAutoBuyerTable();
+  await loadAutoBuyerLog();
+}
+
+function renderAutoBuyerTable() {
+  const rows = _autoBuyerLedgerCache || [];
+  const active = rows.filter(r => String(r.status || "").toLowerCase() === "open").length;
+  const settled = rows.filter(r => String(r.status || "").toLowerCase() === "settled");
+  const wins = settled.filter(r => r.result === "win").length;
+  const losses = settled.filter(r => r.result === "loss").length;
+  const hasSettled = wins + losses > 0;
+  const totalCostUsd = rows.reduce((s, r) => s + (Number(r.cost_usd) || 0), 0);
+  const totalPnlUsd = rows.reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
+  const totalPnlUnits = rows.reduce((s, r) => s + (Number(r.pnl_units) || 0), 0);
+  const avgEdge = rows.length ? rows.reduce((s, r) => s + (Number(r.edge) || 0), 0) / rows.length : 0;
+
+  const kpisEl = $("#autoBuyerKpis");
+  if (kpisEl) {
+    kpisEl.innerHTML = `
+      <div class="k"><b>${rows.length}</b><span>shares bought</span></div>
+      <div class="k"><b class="green">${active}</b><span>open positions</span></div>
+      <div class="k"><b>$${totalCostUsd.toFixed(2)}</b><span>total invested</span></div>
+      <div class="k"><b>${hasSettled ? `${wins}-${losses}` : '0-0'}</b><span>record (${hasSettled ? pct(wins/(wins+losses)) : '—'})</span></div>
+      <div class="k"><b class="${totalPnlUsd >= 0 ? 'green' : 'red'}">$${totalPnlUsd >= 0 ? '+' : ''}${totalPnlUsd.toFixed(2)}</b><span>realized P&L (${totalPnlUnits >= 0 ? '+' : ''}${totalPnlUnits.toFixed(1)}U)</span></div>
+      <div class="k"><b class="green">+${(avgEdge * 100).toFixed(1)}%</b><span>avg model edge</span></div>
+    `;
+  }
+
+  const tableEl = $("#autoBuyerTable");
+  if (!tableEl) return;
+
+  let html = `
+    <thead>
+      <tr>
+        <th>Order ID</th>
+        <th>Sport</th>
+        <th>Matchup</th>
+        <th>Pick / Market</th>
+        <th>Contract Slug</th>
+        <th>Side</th>
+        <th>Shares</th>
+        <th>Price</th>
+        <th>Cost ($)</th>
+        <th>Model (Prob vs Ask)</th>
+        <th>Edge</th>
+        <th>Status</th>
+        <th>Result</th>
+        <th>P&L</th>
+      </tr>
+    </thead>
+    <tbody>
+  `;
+
+  if (!rows.length) {
+    html += '<tr><td colspan=14 class="dim" style="text-align:center;padding:24px">No auto-buyer shares recorded yet. Run Auto-Buyer to execute qualifying trades.</td></tr>';
+  } else {
+    const sorted = [...rows].reverse();
+    sorted.forEach(r => {
+      const isWin = r.result === "win";
+      const isLoss = r.result === "loss";
+      const isOpen = String(r.status || "").toLowerCase() === "open";
+      const resBadge = isWin ? '<span class="badge green">WIN</span>' : isLoss ? '<span class="badge red">LOSS</span>' : '<span class="badge yellow">OPEN</span>';
+      const edgePct = (Number(r.edge) * 100).toFixed(1);
+      const modelProb = (Number(r.model_probability) * 100).toFixed(1);
+      const askProb = (Number(r.market_probability) * 100).toFixed(1);
+      const pnlUsd = Number(r.pnl_usd) || 0;
+      const pnlUnits = Number(r.pnl_units) || 0;
+      const pnlStr = isOpen ? '—' : `<span class="${pnlUsd >= 0 ? 'green' : 'red'}">$${pnlUsd >= 0 ? '+' : ''}${pnlUsd.toFixed(2)} (${pnlUnits >= 0 ? '+' : ''}${pnlUnits.toFixed(1)}U)</span>`;
+
+      html += `
+        <tr>
+          <td class="mono font-bold">${esc(r.order_id || '—')}</td>
+          <td><span class="chip dim">${esc(r.sport || '')}</span></td>
+          <td style="font-weight:600">${esc(r.away_team || '')} @ ${esc(r.home_team || '')}</td>
+          <td><span class="chip">${esc(r.selection || '')}</span> <span class="dim small">(${esc(r.market_type || 'ML')})</span></td>
+          <td class="mono small dim">${esc(r.market_slug || '')}</td>
+          <td><span class="chip ${r.token_side === 'long' ? 'green' : 'red'}">${esc(String(r.token_side || '').toUpperCase())}</span></td>
+          <td class="mono">${Number(r.shares || 1).toFixed(1)}</td>
+          <td class="mono">$${Number(r.entry_price || 0).toFixed(2)}</td>
+          <td class="mono font-bold">$${Number(r.cost_usd || 0).toFixed(2)}</td>
+          <td><span class="small dim">${esc(r.model_id || '')}</span><br><b>${modelProb}%</b> vs ${askProb}%</td>
+          <td><b class="green">+${edgePct}%</b></td>
+          <td><span class="chip ${isOpen ? 'yellow' : 'green'}">${esc(String(r.status || '').toUpperCase())}</span></td>
+          <td>${resBadge}</td>
+          <td class="mono font-bold">${pnlStr}</td>
+        </tr>
+      `;
+    });
+  }
+  html += '</tbody>';
+  tableEl.innerHTML = html;
+}
+
+async function loadAutoBuyerLog() {
+  const box = $("#autoBuyerLogBox");
+  if (!box) return;
+  try {
+    const res = await fetch("/api/auto-buyer/log", {
+      headers: { "X-Dashboard-Token": window._DASHBOARD_TOKEN || "" }
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    const lines = data.lines || [];
+    if (!lines.length) {
+      box.textContent = "No log lines recorded in data/logs/auto_buyer.log.";
+    } else {
+      box.textContent = lines.join("\n");
+      box.scrollTop = box.scrollHeight;
+    }
+  } catch (e) {
+    box.textContent = "Error loading operational log: " + e;
+  }
+}
+
+async function settleAutoBuyerTrades() {
+  if (!confirm("Settle all completed matches in the Auto-Buyer ledger and update realized P&L?")) return;
+  try {
+    const res = await fetch("/api/auto-buyer/settle", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Dashboard-Token": window._DASHBOARD_TOKEN || ""
+      },
+      body: JSON.stringify({ confirm: true })
+    });
+    const data = await res.json();
+    alert(`Auto-Buyer settlement complete!\n\nSettled: ${data.settled}\nPending: ${data.pending}`);
+    renderAutoBuyerLedger(true);
+  } catch (e) {
+    alert("Auto-Buyer settlement failed: " + e);
+  }
 }
 
 if(location.protocol==="file:"){

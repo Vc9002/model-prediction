@@ -42,6 +42,21 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from ..audit import AuditLog
 from ..domain import iso_utc, parse_utc, utc_now
+from ..runtime_paths import RuntimePaths
+
+_paths = RuntimePaths.resolve()
+_env_file = _paths.repo_root / ".env"
+if _env_file.exists():
+    try:
+        with _env_file.open(encoding="utf-8") as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if _line and not _line.startswith("#") and "=" in _line:
+                    _key, _val = _line.split("=", 1)
+                    if _key.strip() and _key.strip() not in os.environ:
+                        os.environ[_key.strip()] = _val.strip()
+    except OSError:
+        pass
 
 _MARKET_SLUG_RE = re.compile(r"market_slug=([a-z0-9\-]+)")
 _MARKET_SLUG_LEGACY_RE = re.compile(r"\(([a-z0-9\-]+)\)\.?\s*$")
@@ -493,28 +508,41 @@ class PolymarketExecutor:
         path: str,
         payload: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        try:
-            response = httpx.request(
-                method,
-                f"{API_HOST}{path}",
-                headers=self._auth_headers(method, path),
-                json=payload,
-                timeout=15,
-            )
-            response.raise_for_status()
-            output = response.json()
-        except httpx.HTTPStatusError as error:
-            detail = error.response.text[:500]
-            raise ExecutionGateError(
-                f"REFUSED by Polymarket US ({error.response.status_code}): {detail}"
-            ) from error
-        except (httpx.HTTPError, ValueError) as error:
-            raise ExecutionGateError(
-                f"REFUSED: Polymarket US order request failed ({type(error).__name__})."
-            ) from error
-        if not isinstance(output, dict):
-            raise ExecutionGateError("REFUSED: Polymarket US returned an invalid response.")
-        return output
+        max_retries = 3
+        backoff = 0.5
+        for attempt in range(max_retries):
+            try:
+                response = httpx.request(
+                    method,
+                    f"{API_HOST}{path}",
+                    headers=self._auth_headers(method, path),
+                    json=payload,
+                    timeout=15,
+                )
+                if response.status_code == 429 and attempt < max_retries - 1:
+                    time.sleep(backoff * (2**attempt))
+                    continue
+                response.raise_for_status()
+                output = response.json()
+                if not isinstance(output, dict):
+                    raise ExecutionGateError("REFUSED: Polymarket US returned an invalid response.")
+                return output
+            except httpx.HTTPStatusError as error:
+                if error.response.status_code == 429 and attempt < max_retries - 1:
+                    time.sleep(backoff * (2**attempt))
+                    continue
+                detail = error.response.text[:500]
+                raise ExecutionGateError(
+                    f"REFUSED by Polymarket US ({error.response.status_code}): {detail}"
+                ) from error
+            except (httpx.HTTPError, ValueError) as error:
+                if attempt < max_retries - 1:
+                    time.sleep(backoff * (2**attempt))
+                    continue
+                raise ExecutionGateError(
+                    f"REFUSED: Polymarket US order request failed ({type(error).__name__})."
+                ) from error
+        raise ExecutionGateError("REFUSED: Polymarket US request exceeded retry attempts.")
 
     def _submit(self, ticket: OrderTicket) -> dict[str, Any]:
         """Submit a capped resting or immediately marketable limit order.

@@ -36,6 +36,7 @@ from ..mlb_baseline_refresh import refresh_if_due
 from ..research_ledgers import RESEARCH_LEDGER_SPORTS, existing_research_ledgers, research_ledger
 from .commands import _clear_today_open, _polymarket_slate, _research_models_dir, _summary
 from .forecast import (
+    _forecast_cfb_sport,
     _forecast_international_sport,
     _forecast_learned_sport,
     _forecast_mlb_nrfi_flat,
@@ -674,6 +675,30 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 "logged": 0,
             }
 
+    def _cfb_task() -> None:
+        try:
+            forecast_result["ncaaf"] = _forecast_cfb_sport(
+                data_root=data_directory,
+                args_date=args.date,
+                config=config,
+                flat_ledger=flat_ledger,
+                main_ledger=None,
+            )
+            _priced_cfb = forecast_result["ncaaf"].get("priced_contracts") or []
+            if _priced_cfb and not forecast_result["ncaaf"].get("logged"):
+                logger.warning(
+                    "zero rows logged for ncaaf despite %d priced contracts",
+                    len(_priced_cfb),
+                )
+        except Exception as exc:
+            logger.warning("NCAAF forecast failed", exc_info=True)
+            forecast_result["ncaaf"] = {
+                "sport": "ncaaf",
+                "status": "error",
+                "reason": str(exc),
+                "logged": 0,
+            }
+
     def _esports_title_task(title: str) -> None:
         forecast_result[title] = forecast_esports_slate(
             data_root=data_directory,
@@ -772,12 +797,13 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                         "logged": 0,
                     }
 
-    with ThreadPoolExecutor(max_workers=8) as research_pool:
+    with ThreadPoolExecutor(max_workers=9) as research_pool:
         research_futures = [
             research_pool.submit(_mlb_totals_task),
             research_pool.submit(_mlb_nrfi_task),
             research_pool.submit(_soccer_task),
             research_pool.submit(_tennis_task),
+            research_pool.submit(_cfb_task),
             research_pool.submit(_wnba_spread_task),
             research_pool.submit(_wnba_total_task),
             research_pool.submit(_esports_block),
@@ -788,8 +814,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         # forecast errors; .result() here only re-raises a bug in the
         # wrapper itself (e.g. a NameError), which should still stop
         # the run loudly rather than be swallowed.
-        for future in as_completed(research_futures):
-            future.result()
+        for rf in as_completed(research_futures):
+            rf.result()
     flat_result = {
         sport: forecast_result.get(f"_flat_{sport}", forecast_result.get(sport, {}))
         for sport in DAILY_LEARNED_SPORTS
@@ -827,6 +853,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             }
     for result in flat_result.values():
         result.pop("candidates", None)
+    _research_settlement: dict[str, Any]
+    _gated_settlement: dict[str, Any]
     if args.skip_settlement:
         settlement = {"status": "skipped", "reason": "caller_settled_before daily"}
         flat_settlement = settlement
@@ -907,6 +935,29 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         # explicit; the record failure remains independently material.
         poly_edge_settle_result = {"status": "skipped"}
 
+    # Step 12: Automated Polymarket Buyer (if enabled in dashboard state)
+    auto_buyer_result: dict[str, Any] = {"status": "skipped"}
+    try:
+        from ..portfolio.auto_executor import load_auto_buyer_state, run_auto_buyer_cycle
+
+        auto_state = load_auto_buyer_state()
+        if auto_state.get("enabled", False):
+            logger.info("Auto-Buyer is ENABLED. Executing automated purchase cycle...")
+            buyer_run = run_auto_buyer_cycle(execute_override=True, forecast_date=args.date)
+            auto_buyer_result = {
+                "status": buyer_run.get("status", "executed"),
+                "mode": buyer_run.get("mode"),
+                "orders_count": buyer_run.get("orders_count", 0),
+                "total_spend_usd": buyer_run.get("total_spend_usd", 0.0),
+                "whitelisted_evaluated": buyer_run.get("whitelisted_count", 0),
+                "reason": buyer_run.get("reason"),
+            }
+        else:
+            auto_buyer_result = {"status": "disabled", "reason": "auto_buyer_disabled"}
+    except Exception:
+        logger.warning("Automated Polymarket buyer cycle failed", exc_info=True)
+        auto_buyer_result = {"status": "error"}
+
     report = {
         "timing": {
             "total_seconds": round(time.monotonic() - _t_start, 1),
@@ -945,5 +996,6 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         "step9_gated_research_settlement": _gated_settlement,
         "step10_polymarket_edge_record": poly_edge_record_result,
         "step11_polymarket_edge_settle": poly_edge_settle_result,
+        "step12_auto_polymarket_buyer": auto_buyer_result,
     }
     return _finalize_daily_report(report)

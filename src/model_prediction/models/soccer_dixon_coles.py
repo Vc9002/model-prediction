@@ -22,7 +22,7 @@ import math
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from scipy.optimize import minimize
@@ -449,8 +449,8 @@ def _extract_match_arrays(
         if isinstance(m, dict):
             h_team = str(m.get("home_team", m.get("home", "")))
             a_team = str(m.get("away_team", m.get("away", "")))
-            h_g = int(m.get("home_score", m.get("home_goals", 0)))
-            a_g = int(m.get("away_score", m.get("away_goals", 0)))
+            h_g = int(m.get("home_score") or m.get("home_goals") or 0)
+            a_g = int(m.get("away_score") or m.get("away_goals") or 0)
             dt = m.get("event_start_utc", m.get("date", m.get("timestamp", None)))
         elif hasattr(m, "home_team") and hasattr(m, "away_team"):
             h_team = str(m.home_team)
@@ -633,7 +633,7 @@ class DixonColesEngine:
             init_params,
             method="SLSQP",
             bounds=bounds,
-            constraints=constraints,
+            constraints=cast(Any, constraints),
             options={"maxiter": max_iter, "ftol": tol, "disp": False},
         )
 
@@ -844,8 +844,8 @@ def temporal_cross_validation(
             if isinstance(m, dict):
                 h_team = str(m.get("home_team", m.get("home", "")))
                 a_team = str(m.get("away_team", m.get("away", "")))
-                h_g = int(m.get("home_score", m.get("home_goals", 0)))
-                a_g = int(m.get("away_score", m.get("away_goals", 0)))
+                h_g = int(m.get("home_score") or m.get("home_goals") or 0)
+                a_g = int(m.get("away_score") or m.get("away_goals") or 0)
             else:
                 h_team = str(m.home_team)
                 a_team = str(m.away_team)

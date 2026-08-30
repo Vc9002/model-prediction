@@ -38,7 +38,7 @@ CREATE INDEX IF NOT EXISTS idx_canonical_events_by_canonical
 _ESPN_PROVIDER = "espn"
 
 
-def _conn(repo_root: Path | None = None) -> sqlite3.Connection:
+def _conn(repo_root: Path | str | None = None) -> sqlite3.Connection:
     root = Path(repo_root) if repo_root is not None else PROJECT_ROOT
     paths = RuntimePaths.resolve(repo_root=root)
     migrate_legacy_state(paths)

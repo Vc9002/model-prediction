@@ -361,7 +361,7 @@ class MLBCollector:
             if is_future_or_today
             else "https://historical-forecast-api.open-meteo.com/v1/forecast"
         )
-        params = {
+        params: dict[str, Any] = {
             "latitude": latitude,
             "longitude": longitude,
             "start_date": game_date,

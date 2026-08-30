@@ -20,6 +20,7 @@ class League(StrEnum):
     NBA = "NBA"
     WNBA = "WNBA"
     NFL = "NFL"
+    NCAAF = "NCAAF"
     TENNIS = "TENNIS"
     SOCCER = "SOCCER"
     LOL = "LOL"
@@ -45,6 +46,7 @@ LEARNED_PRODUCTION_SPORTS: tuple[str, ...] = (
     "nba",
     "wnba",
     "nfl",
+    "ncaaf",
     "soccer",
     "lol",
     "cs2",
@@ -52,7 +54,7 @@ LEARNED_PRODUCTION_SPORTS: tuple[str, ...] = (
     "valorant",
     "rainbow_six",
 )
-ALL_SPORTS: tuple[str, ...] = ("mlb", "nba", "wnba", "nfl", "soccer", "tennis")
+ALL_SPORTS: tuple[str, ...] = ("mlb", "nba", "wnba", "nfl", "ncaaf", "soccer", "tennis")
 
 
 class MarketType(StrEnum):
@@ -147,6 +149,52 @@ def parse_utc(value: str) -> datetime:
 
 def iso_utc(value: datetime) -> str:
     return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
+@dataclass(frozen=True)
+class MarketQuote:
+    """Canonical representation of an observable sportsbook or prediction market quote.
+
+    Provides strict point-in-time provenance, executable best bid/ask, implied probabilities,
+    and exchange metadata across multi-exchange feeds.
+    """
+
+    event_id: str
+    sport: str
+    market_type: str
+    selection: str
+    source: str
+    observed_at_utc: str
+    best_bid: float | None = None
+    best_ask: float | None = None
+    last_price: float | None = None
+    american_odds: int | None = None
+    decimal_odds: float | None = None
+    raw_implied_probability: float | None = None
+    no_vig_probability: float | None = None
+    depth_liquidity_usd: float | None = None
+    line: float | None = None
+    is_executable: bool = True
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "event_id": self.event_id,
+            "sport": self.sport,
+            "market_type": self.market_type,
+            "selection": self.selection,
+            "source": self.source,
+            "observed_at_utc": self.observed_at_utc,
+            "best_bid": self.best_bid,
+            "best_ask": self.best_ask,
+            "last_price": self.last_price,
+            "american_odds": self.american_odds,
+            "decimal_odds": self.decimal_odds,
+            "raw_implied_probability": self.raw_implied_probability,
+            "no_vig_probability": self.no_vig_probability,
+            "depth_liquidity_usd": self.depth_liquidity_usd,
+            "line": self.line,
+            "is_executable": self.is_executable,
+        }
 
 
 @dataclass(frozen=True)

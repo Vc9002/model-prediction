@@ -30,7 +30,17 @@ from mlb_evaluator import (
 
 from model_prediction.data_sources.espn import ESPNMLBClient
 from model_prediction.data_sources.mlb_market_odds import MarketOddsSnapshotStore
-from model_prediction.domain import League, MarketType, ModelOrigin, ModelState, PickRequest, RecordType
+from model_prediction.domain import (
+    EASTERN,
+    League,
+    MarketType,
+    ModelOrigin,
+    ModelState,
+    PickRequest,
+    RecordType,
+    eastern_today,
+    parse_utc,
+)
 from model_prediction.eligibility import EligibilityResult
 from model_prediction.ledger import DuplicatePickError, PickLedger
 from model_prediction.model_ledger import ModelLedger, _event_settlement_key
@@ -60,7 +70,7 @@ def _existing_event_ids(ledger: PickLedger) -> set[str]:
 def run_v9_flat_forecast(date_str: str | None = None) -> list[dict]:
     """Generate and write 1.0U flat benchmark picks for MLB v9."""
     if not date_str:
-        date_str = datetime.now(UTC).strftime("%Y%m%d")
+        date_str = eastern_today().strftime("%Y%m%d")
 
     print("[v9-benchmark] Loading immutable training matrix for candidate model ...")
     _, df = verify_dataset_contract(V9_MANIFEST_PATH, V9_PARQUET_PATH)
@@ -332,10 +342,12 @@ def run_v9_flat_forecast(date_str: str | None = None) -> list[dict]:
 
 def settle_v9_flat_ledger() -> dict[str, Any]:
     """Settle completed games in data/flat_v9/mlb.xlsx against ESPN MLB results."""
+    from model_prediction.dashboard_cache import DashboardCache
     from model_prediction.data_sources.espn import ESPNMLBClient
 
     ledger = PickLedger(path=FLAT_V9_PATH)
     client = ESPNMLBClient()
+    market_snapshots = MarketOddsSnapshotStore(MARKET_SNAPSHOT_PATH)
     open_rows = [r for r in ledger.rows() if r.get("status") == "open"]
     print(f"[v9-benchmark] Checking {len(open_rows)} open picks in {FLAT_V9_PATH} ...")
 
@@ -347,7 +359,7 @@ def settle_v9_flat_ledger() -> dict[str, Any]:
         pick_id = str(r.get("pick_id", ""))
         start_str = r.get("event_start_utc", "")
         try:
-            start_dt = datetime.fromisoformat(start_str)
+            start_dt = parse_utc(start_str)
         except (ValueError, TypeError):
             start_dt = now
 
@@ -355,7 +367,7 @@ def settle_v9_flat_ledger() -> dict[str, Any]:
         if start_dt > now:
             continue
 
-        game_date = start_dt.strftime("%Y%m%d")
+        game_date = start_dt.astimezone(EASTERN).strftime("%Y%m%d")
         sb = client.scoreboard(game_date)
         for ev in sb.get("events", []):
             if str(ev.get("id")) == event_id:
@@ -367,10 +379,21 @@ def settle_v9_flat_ledger() -> dict[str, Any]:
                     home_score = int(home_comp.get("score", 0))
                     away_score = int(away_comp.get("score", 0))
 
+                    quote = market_snapshots.closing_quote(
+                        event_id, start_str, "moneyline", r.get("selection")
+                    )
+                    closing_odds = None
+                    closing_probability = None
+                    if quote is not None:
+                        closing_odds = int(quote["american_odds"])
+                        closing_probability = float(quote["decision_probability"])
+
                     settled = ledger.settle(
                         pick_id=pick_id,
                         away_score=away_score,
                         home_score=home_score,
+                        closing_american_odds=closing_odds,
+                        closing_raw_probability=closing_probability,
                     )
                     if V9_MODEL_LEDGER_PATH.exists():
                         ModelLedger(V9_MODEL_LEDGER_PATH).settle_event(
@@ -386,6 +409,10 @@ def settle_v9_flat_ledger() -> dict[str, Any]:
                         f"  [settled] Pick {pick_id} (event {event_id}): Away {away_score} - Home {home_score}"
                     )
                 break
+
+    # Rebuild / Refresh Dashboard SQLite cache
+    dc = DashboardCache(Path("data"))
+    dc.refresh(force=True)
 
     print(f"[v9-benchmark] Settled {settled_count} picks in {FLAT_V9_PATH}")
     return {"settled": settled_count, "remaining_open": len(open_rows) - settled_count}

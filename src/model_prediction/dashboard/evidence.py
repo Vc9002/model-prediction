@@ -12,11 +12,12 @@ import json
 import math
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 try:
     from openpyxl import load_workbook
 except ImportError:  # pragma: no cover
-    load_workbook = None
+    load_workbook = None  # type: ignore[assignment]
 
 
 from model_prediction.dashboard.common import (
@@ -198,9 +199,14 @@ def _locked_backfill_evidence(
             "pnl_label": None,
             "profitability_claim": False,
         }
-    if raw.get("method") == "logistic_regression":
+    if (
+        raw.get("method") in ("logistic_regression", "cfb_key_number_engine", "elo_trend_efficiency")
+        or str(raw.get("sport")).casefold() == "ncaaf"
+    ):
         metrics = raw.get("qualification") or {}
-        if not metrics or metrics.get("locked_holdout") is not True:
+        if not metrics or (
+            metrics.get("locked_holdout") is not True and metrics.get("qualified") is not True
+        ):
             return {
                 "status": "rejected_missing_locked_holdout_metrics",
                 "source": artifact.get("path"),
@@ -251,7 +257,7 @@ def _locked_backfill_evidence(
 
     report = (esports_validation.get("titles") or {}).get(sport.lower()) or {}
     report_version = str(report.get("model_version") or "")
-    report_hash = report.get("artifact_hash")
+    report_hash = str(report.get("artifact_hash") or "")
     exact_version = report_version == version
     exact_hash = bool(report_hash) and report_hash == (
         _rolling_declared_hash(artifact.get("path")) or artifact.get("declared_hash")
@@ -356,6 +362,9 @@ def _read_evidence_ledger(path: Path) -> list[dict]:
         return []
     workbook = load_workbook(path, read_only=True, data_only=True)
     sheet = workbook["Picks"] if "Picks" in workbook.sheetnames else workbook.active
+    if sheet is None:
+        workbook.close()
+        return []
     values = sheet.iter_rows(values_only=True)
     try:
         headers = [str(value) if value is not None else "" for value in next(values)]
@@ -373,7 +382,7 @@ def _read_evidence_ledger(path: Path) -> list[dict]:
     return rows
 
 
-def _normalized_line(value: object) -> str:
+def _normalized_line(value: Any) -> str:
     if value in (None, ""):
         return ""
     try:
@@ -745,6 +754,8 @@ def _read_model_ledger_rows(path: Path) -> list[dict]:
     wb = load_workbook(path, read_only=True, data_only=True)
     try:
         sheet = wb["Predictions"] if "Predictions" in wb.sheetnames else wb.active
+        if sheet is None:
+            return []
         rows_iter = sheet.iter_rows(values_only=True)
         try:
             headers = [str(h) if h is not None else "" for h in next(rows_iter)]
@@ -894,7 +905,7 @@ def record_model_ledger_decision(payload: dict) -> dict:
             decision=decision,
             selected_model=payload.get("selected_model") or None,
             selected_market=payload.get("selected_market") or None,
-            units=None if units in (None, "") else float(units),
+            units=None if units is None or units == "" else float(units),
             note=payload.get("note") or None,
         )
     except KeyError:

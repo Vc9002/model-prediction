@@ -1317,7 +1317,7 @@ def _all_rows_calibration(probabilities: Sequence[float], rows: Sequence[Validat
     threshold-independent, so they are the honest first-order comparison
     between variants; units/P&L come after (operator directive 2026-08-13:
     metrics-first reporting, units secondary)."""
-    metrics = calibration_metrics(
+    metrics: dict[str, Any] = calibration_metrics(
         [min(1 - 1e-12, max(1e-12, float(p))) for p in probabilities],
         [row.outcome for row in rows],
     )
@@ -1661,7 +1661,7 @@ def qualify_soccer_poisson_model(store: FeatureStore, minimum_history_games: int
                     else:
                         true_outcome = "draw"
                     confidence = max(probabilities.values())
-                    selection = max(probabilities, key=probabilities.get)
+                    selection = max(probabilities, key=lambda k: probabilities[k])
                     hit = 1 if selection == true_outcome else 0
                     if game.event_id in validation_ids:
                         val_confidences.append(confidence)
@@ -2815,9 +2815,9 @@ def _load_bullpen_map() -> dict[str, tuple[float, bool]]:
                         away_weakness = weakness
 
         # Update history AFTER computing this game's feature (point-in-time)
-        for team, line in game_relief.items():
-            if line["innings"] > 0:
-                history.setdefault(team, []).append(line)
+        for team, relief_entry in game_relief.items():
+            if relief_entry["innings"] > 0:
+                history.setdefault(team, []).append(relief_entry)
 
         if home_weakness is not None and away_weakness is not None:
             result[eid] = (round(home_weakness - away_weakness, 6), True)

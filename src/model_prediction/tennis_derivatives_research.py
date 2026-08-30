@@ -389,7 +389,7 @@ def price_contract(
     context: MatchContext,
     *,
     data_root: str | Path,
-    history_cache: dict[str, list[dict[str, Any]]],
+    history_cache: dict[tuple[str, str], list[dict[str, Any]]],
     elo_cache: dict[tuple[str, str, str], Any],
     engine: TennisMarkovEngine,
 ) -> ContractPrice:
@@ -575,7 +575,7 @@ def run_derivative_walkforward(
     )
     naive_mae = (
         sum(abs(actual - empirical_mean) for _, actual, _ in event_totals) / len(event_totals)
-        if event_totals
+        if event_totals and empirical_mean is not None
         else None
     )
 

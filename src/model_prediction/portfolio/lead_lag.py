@@ -57,6 +57,7 @@ class SharpLeadLagAnalyzer:
         else:
             velocity_bps = 0.0
 
+        urgency: Literal["URGENT_TAKER", "PASSIVE_MAKER", "ADVERSE_SELECTION_WARN"]
         if lag_delta >= self.min_lag_taker_threshold:
             urgency = "URGENT_TAKER"
             action = f"Immediate IOC market order: Polymarket lags sharp consensus by {lag_delta * 100:.1f}%"

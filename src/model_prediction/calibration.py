@@ -6,7 +6,9 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
+
+import numpy as np
 
 
 @dataclass(frozen=True)
@@ -286,19 +288,26 @@ class BetaCalibrator:
         clipped = [min(1 - 1e-9, max(1e-9, p)) for p in probabilities]
         outcomes_f = [float(y) for y in outcomes]
 
-        def loss(params: Sequence[float]) -> float:
-            a, b = params
+        def loss(params: Any) -> float:
+            a, b = float(params[0]), float(params[1])
             if a <= 0 or b <= 0:
                 return 1e12
-            calibrated = beta_dist.cdf(clipped, a, b)
-            calibrated = [min(1 - 1e-9, max(1e-9, p)) for p in calibrated]
-            return -sum(
-                y * math.log(p) + (1 - y) * math.log(1 - p)
-                for p, y in zip(calibrated, outcomes_f, strict=True)
-            ) / len(clipped)
+            cal_arr: Any = beta_dist.cdf(clipped, a, b)
+            calibrated_list = [min(1 - 1e-9, max(1e-9, float(p))) for p in cal_arr]
+            total_loss = sum(
+                (
+                    y * math.log(p) + (1.0 - y) * math.log(1.0 - p)
+                    for p, y in zip(calibrated_list, outcomes_f, strict=True)
+                ),
+                0.0,
+            )
+            return float(-total_loss / len(clipped))
 
         result = minimize(
-            loss, x0=(2.0, 2.0), method="Nelder-Mead", options={"xatol": 1e-4, "fatol": 1e-6, "maxiter": 400}
+            loss,
+            x0=np.array([2.0, 2.0]),
+            method="Nelder-Mead",
+            options={"xatol": 1e-4, "fatol": 1e-6, "maxiter": 400},
         )
         a, b = float(result.x[0]), float(result.x[1])
         raw = {

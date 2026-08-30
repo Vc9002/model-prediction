@@ -16,6 +16,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+import numpy as np
 import polars as pl
 
 from .mlb_features import MLB_DIFFERENTIAL_FEATURES, MLB_INTENSITY_FEATURES
@@ -81,7 +82,7 @@ def build_mlb_moneyline_oof(features: pl.DataFrame, folds) -> dict[str, dict[str
         )
         X_val = val_df.select(XGB_DIRECT_FEATURES).to_numpy()
         nested_result = nested_xgboost_fold(
-            X_train, y_train_arr, X_val, y_val_fold, fold_index=fold.fold_index
+            X_train, y_train_arr, X_val, np.array(y_val_fold), fold_index=fold.fold_index
         )
 
         oof["two_head"]["probs"].extend(two_head_probs)

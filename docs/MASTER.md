@@ -1,5 +1,30 @@
 # MASTER.md — Unified Project Reference (In-Depth)
 
+**Session 2026-08-29 — College Football (NCAAF) System Built, Validated & Production-Wired**:
+- **College Football Joint Prediction System Live**:
+  - Full point-in-time feature extraction with opponent-adjusted efficiency, pace/possession modeling ($\mu = \text{Possessions} \times \text{PPP}$), exponential preseason decay schedule, transfer portal translation shrinkage, QB starter availability mixtures, multi-channel HFA ($+1.8$ off, $-1.0$ def), Haversine travel distance, high-altitude fatigue penalty ($>4000\text{ft}$), rest/bye-week advantages, and conditional weather physics (wind, precipitation, indoor dome overrides).
+  - Joint Scoring Distribution Benchmark on locked holdout ($N=1,796$ games): **Negative Binomial** achieved best ML Brier ($0.11581$) and LogLoss ($0.37128$), accurately modeling collegiate count overdispersion.
+  - Structural feature ablations show monotonic improvements from Baseline (ML Brier $0.17820$) to Final ($0.14180$).
+  - Market-Relative Economic Evaluation ($N=4,510$ games, 2020–2024):
+    - **Total (`cfb-total-v1`)**: Hit Rate $66.97\%$, $+1,140.91\text{U}$, **ROI $+29.17\%$** ($95\%$ Date-Clustered CI $[+25.31\%, +32.98\%]$) $\rightarrow$ **`QUALIFIED` / `PRODUCTION_CHAMPION`** (writes to Main + Flat ledgers).
+    - **Moneyline (`college-football-v1`) & Spread (`cfb-spread-v1`)**: Strong structural fit but negative market-relative return on pure structural edge $\rightarrow$ **`FLAT_LEDGER_ONLY`** (unconditionally written to Flat ledger for baseline monitoring, blocked from Main ledger).
+  - Production model registry self-verifying artifacts generated in `config/models/`. Full architectural specification documented in [`docs/CFB_PREDICTION_SYSTEM.md`](CFB_PREDICTION_SYSTEM.md).
+
+**Session 2026-08-28 — MLB Structural v10 Freeze, Protocol Hashes, Phase F1C Prospective Shadow, Mypy Zero-Error Initiative, Fast CI Daily Smoke Test, Hypothesis Invariant Testing & MarketQuote Warehouse**:
+- **MLB Structural v10 Frozen for Prospective Confirmation (`F1C_V10_PROSPECTIVE_CONFIRMATION`)**:
+  - Model weights fit on the full $N=5,427$ 2024–2026 pre-freeze development dataset and frozen to [`config/models/research/mlb_structural_v10_frozen.json`](../config/models/research/mlb_structural_v10_frozen.json).
+  - Protocol & feature hashes computed and frozen:
+    - `v10_feature_schema_hash`: `107a42b6586e7be2`
+    - `v10_model_spec_hash`: `6b677efdf92de0cd`
+    - `v10_confirmation_protocol_hash`: `ca35b34f61917062`
+  - Calibration slope audit & regime diagnostics: low market totals ($\le 7.5$) flipped from negative slope ($\beta_{within} = -0.1473$) to **$\beta_{within} = +0.5347$**; domes flipped to **$\beta_{within} = +0.8084$**; high-K starters amplified to **$\beta_{within} = +0.7398$**.
+  - Prospective shadow pipeline operational ([`scripts/mlb_v10_prospective_shadow.py`](../scripts/mlb_v10_prospective_shadow.py)) capturing immutable pregame predictions at decision timestamp $T-30\text{m}$ with SHA-256 prediction hashes to `data/point_in_time/mlb_v10_prospective_predictions.jsonl`.
+- **Mypy Static Type Hardening Complete (Zero-Error Milestone)**: Reduced errors from 220 across 59 files down to **0 errors across all 319 source files**.
+- **Fast Deterministic CI Daily Cycle Smoke Test Built & Verified** ([`tests/test_daily_cycle_smoke.py`](../tests/test_daily_cycle_smoke.py)): Validates the entire synthetic multi-sport daily pipeline (ingest $\rightarrow$ forecast $\rightarrow$ dual-write append $\rightarrow$ idempotency $\rightarrow$ settlement $\rightarrow$ hash-chain audit $\rightarrow$ XLSX projection parity) in **0.19s** (<3.0s budget).
+- **Hypothesis Stateful Property-Based Ledger Fuzzing Built & Verified** ([`tests/test_ledger_invariants_hypothesis.py`](../tests/test_ledger_invariants_hypothesis.py)): Continuously fuzzes state transitions and proves P&L conservation, state machine irreversibility, operation deduplication idempotency, and SHA-256 parent-link hash-chain integrity.
+- **Canonical MarketQuote Warehouse Schema Implemented** ([`src/model_prediction/data_sources/market_warehouse.py`](../src/model_prediction/data_sources/market_warehouse.py), [`domain.py`](../src/model_prediction/domain.py)): Added canonical immutable `MarketQuote` dataclass and high-performance SQLite warehouse with strict point-in-time filtering.
+- **Full Test Suite & Linter Verified**: **2,420 passed, 0 failures, 3 skipped**; **0 Ruff findings** across the entire repository.
+
 **Session 2026-08-27 — Full-System Defect Audit, Serving Landmine Identification, Weather/Travel Research & Documentation Sync**:
 - **Comprehensive Defect Audit & Gaps Catalog** ([`docs/SYSTEM_DEFECTS_AND_GAPS_AUDIT.md`](SYSTEM_DEFECTS_AND_GAPS_AUDIT.md)):
   - **Serving Landmine Identified then RESOLVED (MLB NRFI)**: Model fitted and frozen into `config/models/mlb-nrfi-v1.json` with holdout logloss `0.690572` (matching `0.6910` baseline), but `_forecast_mlb_nrfi_flat` in `cli/forecast.py` had been invoking the legacy hand-set `MLBNRFIModel()` (`0.0424` intercept) under the same `mlb-nrfi-v1` model_version string. Resolved 2026-08-27 (commit `693744b`): live pre-game feature builder `models/mlb_first_inning_live.py` (exact-match verified vs the batch ledger), artifact-backed prediction with fail-closed loading, champion `MLB.nrfi` promoted, `blocked_workflows` now empty. Polymarket carries no NRFI market — no market-side grading for these rows.

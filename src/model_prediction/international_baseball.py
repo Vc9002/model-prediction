@@ -1261,7 +1261,7 @@ def forecast_international_baseball_slate(
             except (httpx.HTTPError, KeyError, StopIteration, TypeError, ValueError) as error:
                 no_calls.append({**base, "reason": "NO_CALL_MARKET_UNAVAILABLE", "detail": str(error)[:200]})
                 continue
-            sides = []
+            sides: list[dict[str, Any]] = []
             for side_name in ("long", "short"):
                 side = snapshot[side_name]
                 fair = by_name.get(_identity_key(str(side["description"])))

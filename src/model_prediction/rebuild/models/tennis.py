@@ -108,7 +108,7 @@ class ServeReturnModel:
             a_rpw = m.get("a_rpw", m.get("winner_rpw"))
             b_spw = m.get("b_spw", m.get("loser_spw"))
             b_rpw = m.get("b_rpw", m.get("loser_rpw"))
-            if None not in (a_spw, a_rpw, b_spw, b_rpw):
+            if a_spw is not None and a_rpw is not None and b_spw is not None and b_rpw is not None:
                 X_list.append([a_spw - b_spw, a_rpw - b_rpw])
                 y_list.append(1)
                 X_list.append([b_spw - a_spw, b_rpw - a_rpw])

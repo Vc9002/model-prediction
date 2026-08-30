@@ -135,7 +135,7 @@ def record(
                 ),
             )
         row = conn.execute("SELECT * FROM experiments WHERE experiment_id = ?", (experiment_id,)).fetchone()
-        return _decode(row)
+        return _decode(row) or {}
     finally:
         conn.close()
 
@@ -158,7 +158,7 @@ def void(
             if cursor.rowcount == 0:
                 raise ValueError(f"no experiment with id {experiment_id}")
         row = conn.execute("SELECT * FROM experiments WHERE experiment_id = ?", (experiment_id,)).fetchone()
-        return _decode(row)
+        return _decode(row) or {}
     finally:
         conn.close()
 
@@ -180,7 +180,7 @@ def complete(
             if cursor.rowcount == 0:
                 raise ValueError(f"no running experiment with id {experiment_id}")
         row = conn.execute("SELECT * FROM experiments WHERE experiment_id = ?", (experiment_id,)).fetchone()
-        return _decode(row)
+        return _decode(row) or {}
     finally:
         conn.close()
 
@@ -201,7 +201,7 @@ def list_experiments(
             params.append(model_id)
         query += " ORDER BY created_at_utc DESC LIMIT ?"
         params.append(int(limit))
-        return [_decode(r) for r in conn.execute(query, params).fetchall()]
+        return [d for r in conn.execute(query, params).fetchall() if (d := _decode(r)) is not None]
     finally:
         conn.close()
 
@@ -292,7 +292,7 @@ def main(argv: list[str] | None = None) -> int:
         if cmd == "void":
             if len(args) < 2 or not _arg(args, "--reason"):
                 raise ValueError("usage: void <experiment_id> --reason TEXT")
-            print(json.dumps(void(args[1], _arg(args, "--reason")), indent=2, default=str))
+            print(json.dumps(void(args[1], _arg(args, "--reason") or ""), indent=2, default=str))
             return 0
         if cmd == "list":
             limit = int(args[1]) if len(args) > 1 and args[1].isdigit() else 50
@@ -306,11 +306,11 @@ def main(argv: list[str] | None = None) -> int:
         if cmd == "show":
             if len(args) < 2:
                 raise ValueError("usage: show <experiment_id>")
-            row = show(args[1])
-            if row is None:
+            show_row = show(args[1])
+            if show_row is None:
                 print(f"no experiment with id {args[1]}", file=sys.stderr)
                 return 1
-            print(json.dumps(row, indent=2, default=str))
+            print(json.dumps(show_row, indent=2, default=str))
             return 0
         return 2
     except Exception as exc:  # noqa: BLE001

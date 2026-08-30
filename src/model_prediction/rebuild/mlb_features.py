@@ -178,7 +178,7 @@ def load_raw_statcast_dates(raw_root: str | Path, dates: list[str]) -> pl.DataFr
     return pl.concat(frames, how="diagonal_relaxed")
 
 
-_NORMALIZED_PITCH_SCHEMA: dict[str, pl.PolarsDataType] = {
+_NORMALIZED_PITCH_SCHEMA: dict[str, pl.DataType | type[pl.DataType]] = {
     "game_pk": pl.Int64,
     "game_date": pl.Utf8,
     "pitcher": pl.Int64,
@@ -386,7 +386,7 @@ def pitcher_rolling_features(
     )["pitcher_days_since_prev_game"]
     days_rest = float(days_rest_vals[0]) if days_rest_vals.len() > 0 else _NAN
 
-    avg_velocity_raw = recent["release_speed"].mean()
+    avg_velocity_raw: Any = recent["release_speed"].mean()
 
     return {
         "availability": 1.0,
@@ -577,7 +577,7 @@ def bullpen_rolling_features(
         return dict(no_bullpen)
 
     appearances = relief.select(["game_pk", "pitcher"]).unique().height
-    avg_velocity_raw = relief["release_speed"].mean()
+    avg_velocity_raw: Any = relief["release_speed"].mean()
     return {
         "availability": 1.0,
         "bullpen_pitches": float(relief.height),

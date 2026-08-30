@@ -74,7 +74,7 @@ def _artifact_predict(
 
 def _all_metrics(probabilities: Sequence[float], rows: Sequence[ValidationRow]) -> dict[str, Any]:
     outcomes = [row.outcome for row in rows]
-    metrics = calibration_metrics(probabilities, outcomes)
+    metrics: dict[str, Any] = calibration_metrics(probabilities, outcomes)
     hits = sum(
         (probability >= 0.5) == bool(outcome)
         for probability, outcome in zip(probabilities, outcomes, strict=True)
@@ -91,9 +91,15 @@ def _all_metrics(probabilities: Sequence[float], rows: Sequence[ValidationRow]) 
         "brier_score": round(float(brier_score), 6),
         "log_loss": round(float(log_loss), 6),
         "expected_calibration_error": round(float(expected_calibration_error), 6),
-        "brier_reliability": round(float(metrics.get("brier_reliability", float("nan"))), 6),
-        "brier_resolution": round(float(metrics.get("brier_resolution", float("nan"))), 6),
-        "brier_uncertainty": round(float(metrics.get("brier_uncertainty", float("nan"))), 6),
+        "brier_reliability": round(float(metrics["brier_reliability"]), 6)
+        if "brier_reliability" in metrics
+        else float("nan"),
+        "brier_resolution": round(float(metrics["brier_resolution"]), 6)
+        if "brier_resolution" in metrics
+        else float("nan"),
+        "brier_uncertainty": round(float(metrics["brier_uncertainty"]), 6)
+        if "brier_uncertainty" in metrics
+        else float("nan"),
         "calibration_intercept": metrics.get("calibration_intercept"),
         "calibration_slope": metrics.get("calibration_slope"),
     }

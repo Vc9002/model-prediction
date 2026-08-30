@@ -295,7 +295,7 @@ def build_cleanup_plan(
     valid_gated: dict[str, list[dict[str, str]]] = {sport: [] for sport in RESEARCH_LEDGER_SPORTS}
     rejected_gated: dict[str, tuple[str, ...]] = {}
     for row in gated_rows:
-        reasons = list(
+        gated_reasons = list(
             _row_rejection_reasons(
                 row,
                 config=config,
@@ -305,10 +305,12 @@ def build_cleanup_plan(
             )
         )
         if _decision_key(row) not in valid_research_keys:
-            reasons.append("missing_valid_research_pair")
+            gated_reasons.append("missing_valid_research_pair")
         sport = _sport_for_row(row)
-        if reasons or sport is None:
-            rejected_gated[row["pick_id"]] = tuple(dict.fromkeys(reasons)) or ("unsupported_research_sport",)
+        if gated_reasons or sport is None:
+            rejected_gated[row["pick_id"]] = tuple(dict.fromkeys(gated_reasons)) or (
+                "unsupported_research_sport",
+            )
         else:
             valid_gated[sport].append(row)
 
@@ -358,9 +360,9 @@ def apply_cleanup_plan(
         if not source.exists():
             continue
         digest = hashlib.sha256(source.read_bytes()).hexdigest()
-        destination = archive / name
-        source.replace(destination)
-        archived[name] = str(destination)
+        dest_path = archive / name
+        source.replace(dest_path)
+        archived[name] = str(dest_path)
         digests[name] = digest
 
     report = {

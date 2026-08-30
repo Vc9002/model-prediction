@@ -18,7 +18,7 @@ import httpx
 from .data_sources.espn import ESPNMLBClient
 from .data_sources.mlb_market_odds import MLBGameOdds, MLBMarketOddsFeed
 from .domain import MarketType, parse_utc
-from .models.mlb import FormulaSpec, MeasuredEdgeMarginModel, MeasuredEdgeTotalsModel
+from .models.mlb import FormulaSpec, MeasuredEdgeMarginModel, MeasuredEdgeTotalsModel, MLBGameFeatures
 from .pricing import normalize_no_vig
 
 
@@ -79,13 +79,13 @@ def build_mlb_slate(
     # every event behind it (real 81-minute daily run, 2026-08-23).
     upcoming_events = [event for event in events if parse_utc(event["date"]) > observed_at]
 
-    def _fetch_features(event: dict) -> tuple[dict, object]:
+    def _fetch_features(event: dict) -> tuple[dict, MLBGameFeatures | Exception]:
         try:
             return event, client.reconstructed_features(event)
         except (KeyError, TypeError, ValueError, httpx.HTTPError) as error:
             return event, error
 
-    features_by_event_id: dict[str, object] = {}
+    features_by_event_id: dict[str, MLBGameFeatures | Exception] = {}
     if upcoming_events:
         with ThreadPoolExecutor(max_workers=min(16, len(upcoming_events))) as pool:
             for event, result in pool.map(_fetch_features, upcoming_events):
@@ -105,6 +105,8 @@ def build_mlb_slate(
             prefetched = features_by_event_id.get(str(event["id"]))
             if isinstance(prefetched, Exception):
                 raise prefetched
+            if not isinstance(prefetched, MLBGameFeatures):
+                raise TypeError("features_unavailable")
             features = _replace(
                 prefetched,
                 market_snapshot_hash=odds.snapshot_hash,

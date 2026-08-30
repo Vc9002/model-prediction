@@ -445,7 +445,7 @@ def build_learned_moneyline_slate(
     # Cache: primary and flat forecasts call with identical params
     cache_key = (key, game_date, str(artifact_path), observed_at.isoformat())
     if cache_key in _slate_cache:
-        return _slate_cache[cache_key]  # type: ignore[return-value]
+        return _slate_cache[cache_key]
     artifact = LearnedMarketArtifact.load(artifact_path)
     if artifact.sport != key:
         raise ValueError(f"artifact sport {artifact.sport} does not match {key}")

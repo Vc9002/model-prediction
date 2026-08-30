@@ -5,8 +5,8 @@ The stacker sees only out-of-fold predictions, never training predictions.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import Any
+from collections.abc import Mapping, Sequence
+from typing import Any, cast
 
 import numpy as np
 from scipy.optimize import minimize
@@ -74,7 +74,7 @@ def logistic_stacking(
     bounds = [(0.0, 1.0) for _ in range(n_models)]
     w0 = np.ones(n_models) / n_models
 
-    result = minimize(objective, w0, method="SLSQP", bounds=bounds, constraints=constraints)
+    result = minimize(objective, w0, method="SLSQP", bounds=bounds, constraints=cast(Any, constraints))
     weights = result.x
     weights = np.maximum(weights, 0)
     weights /= weights.sum()
@@ -88,10 +88,8 @@ class Ensemble:
     """Chronological out-of-fold ensemble.
 
     Usage:
-        ens = Ensemble()
-        ens.add_model("statistical", stat_probs)
-        ens.add_model("gradient_boosting", gbm_probs)
-        result = ens.fit(oof_probs_dict, y_true)
+        ens = Ensemble(method="logistic_stacking")
+        ens.fit({"two_head": oof1, "xgb": oof2}, y_true)
         cal_probs = ens.predict(oof_probs_dict)
     """
 
@@ -107,7 +105,7 @@ class Ensemble:
 
     def fit(
         self,
-        oof_probs: dict[str, Sequence[float]],
+        oof_probs: Mapping[str, Sequence[float]],
         y_true: Sequence[int],
     ) -> Ensemble:
         """Fit ensemble weights from out-of-fold predictions."""
@@ -179,8 +177,8 @@ class Ensemble:
         if self.method == "logistic_regression_stack" and self._lr_model is not None:
             if not all(n in probs for n in self._lr_feature_order):
                 return 0.5  # fail closed rather than guess at a missing model's contribution
-            logits = [[_logit(probs[n]) for n in self._lr_feature_order]]
-            return float(self._lr_model.predict_proba(logits)[0][1])
+            lr_features = np.array([[_logit(probs[n]) for n in self._lr_feature_order]])
+            return float(self._lr_model.predict_proba(lr_features)[0][1])
         total = 0.0
         for name, p in probs.items():
             total += self.weights.get(name, 0.0) * p

@@ -7,7 +7,6 @@ gated call is qualified shadow output or a zero-unit research observation.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
@@ -73,6 +72,14 @@ MODEL_SPECS = {
         "moneyline, margin, and total via normal approximation",
         "Elo win probability; normal margin/total",
         ("scoring form", "opponent adjustment", "momentum"),
+        status=ModelState.SHADOW_QUALIFIED,
+    ),
+    League.NCAAF: ModelSpec(
+        League.NCAAF,
+        "Elo + opponent-adjusted trend & key-number engine",
+        "moneyline, spread margin, and total via calibrated continuous-discrete distribution",
+        "Elo win probability; key-number adjusted margin/total",
+        ("adjusted efficiency", "tempo", "conference strength", "rest disparity", "momentum"),
         status=ModelState.SHADOW_QUALIFIED,
     ),
     League.LOL: ModelSpec(
@@ -185,13 +192,15 @@ def model_spec(league: League) -> ModelSpec:
 def get_model(sport: str) -> Any:
     """Return the unified model object for a sport key."""
     key = sport.lower()
-    factories: dict[str, Callable[[], Any]] = {}
+    from .college_football import cfb_model
     from .soccer import soccer_model
     from .tennis import tennis_model
 
     factories = {
         "soccer": soccer_model,
         "tennis": tennis_model,
+        "ncaaf": cfb_model,
+        "cfb": cfb_model,
     }
     if key in ("mlb", "nba", "wnba", "nfl"):
         raise ValueError(

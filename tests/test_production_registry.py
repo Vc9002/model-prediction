@@ -99,9 +99,19 @@ def test_real_production_yaml_resolves_every_model() -> None:
     registry = ProductionModelRegistry.load(REPO)
 
     assert registry.schema_version == "3"
-    assert len(registry.entries) == 18
+    assert len(registry.entries) == 21
+    # 21 declared, 18 available: the three NCAAF entries are demoted to
+    # enabled: false pending requalification on the real ESPN cohort. They stay
+    # declared so their artifacts remain hash-verified on every load.
     assert len(registry.available_entries()) == 18
-    assert registry.problem_entries() == []
+    # Only the demoted NCAAF three may appear here, and only for being disabled
+    # -- no entry may fail contract validation.
+    assert {e.model_id for e in registry.problem_entries()} == {
+        "college-football-v1",
+        "cfb-spread-v1",
+        "cfb-total-v1",
+    }
+    assert all(e.load_error is None for e in registry.problem_entries())
     assert registry.primary.model_id == "wnba-elo-trend-lr-v4"
     assert registry.primary.artifact_hash
 

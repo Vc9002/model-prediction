@@ -1012,7 +1012,7 @@ class ShadowLedger:
                 raise
             return int(existing["id"])
         self.conn.commit()
-        return int(cur.lastrowid)
+        return int(cur.lastrowid or 0)
 
     def get_prediction(self, id_: int) -> dict[str, Any] | None:
         row = self.conn.execute("SELECT * FROM predictions WHERE id=?", (id_,)).fetchone()
@@ -1123,7 +1123,7 @@ class ShadowLedger:
             ),
         )
         self.conn.commit()
-        return int(cur.lastrowid), True
+        return int(cur.lastrowid or 0), True
 
     def market_snapshots_for_event(self, sport: str, event_id: str) -> list[dict[str, Any]]:
         rows = self.conn.execute(
@@ -1175,7 +1175,7 @@ class ShadowLedger:
             ),
         )
         self.conn.commit()
-        return int(cur.lastrowid)
+        return int(cur.lastrowid or 0)
 
     def get_market_evaluation(self, id_: int) -> dict[str, Any] | None:
         row = self.conn.execute("SELECT * FROM market_evaluations WHERE id=?", (id_,)).fetchone()
@@ -1336,7 +1336,7 @@ class ShadowLedger:
                 raise
             return existing, False
         self.conn.commit()
-        return int(cur.lastrowid), True
+        return int(cur.lastrowid or 0), True
 
     def _find_trade_decision(
         self,
@@ -1466,7 +1466,7 @@ class ShadowLedger:
             ),
         )
         self.conn.commit()
-        return int(cur.lastrowid)
+        return int(cur.lastrowid or 0)
 
     def get_paper_order(self, id_: int) -> dict[str, Any] | None:
         row = self.conn.execute("SELECT * FROM paper_orders WHERE id=?", (id_,)).fetchone()
@@ -1512,7 +1512,7 @@ class ShadowLedger:
             ),
         )
         self.conn.commit()
-        return int(cur.lastrowid)
+        return int(cur.lastrowid or 0)
 
     def get_settlement(self, id_: int) -> dict[str, Any] | None:
         row = self.conn.execute("SELECT * FROM settlements WHERE id=?", (id_,)).fetchone()
@@ -1575,7 +1575,7 @@ class ShadowLedger:
             ),
         )
         self.conn.commit()
-        return int(cur.lastrowid), True
+        return int(cur.lastrowid or 0), True
 
     def raw_snapshots_for_event(self, sport: str, event_id: str) -> list[dict[str, Any]]:
         rows = self.conn.execute(
@@ -1638,7 +1638,7 @@ class ShadowLedger:
             ),
         )
         self.conn.commit()
-        return int(cur.lastrowid), True
+        return int(cur.lastrowid or 0), True
 
     # ── feature_snapshots (real caller: horizon_builder / FeatureStore) ──
     # Idempotent on dataset_hash -- FeatureStore.write_snapshot() is itself
@@ -1686,7 +1686,7 @@ class ShadowLedger:
             ),
         )
         self.conn.commit()
-        return int(cur.lastrowid), True
+        return int(cur.lastrowid or 0), True
 
     def feature_snapshots_for_horizon(self, sport: str, horizon: str) -> list[dict[str, Any]]:
         rows = self.conn.execute(
@@ -1740,7 +1740,7 @@ class ShadowLedger:
             ),
         )
         self.conn.commit()
-        return int(cur.lastrowid), True
+        return int(cur.lastrowid or 0), True
 
     # ── model_artifacts (real caller: MLBTwoHeadModel.to_artifact()) ──
     # Idempotent on artifact_hash -- matches the real artifact-hash
@@ -1834,7 +1834,7 @@ class ShadowLedger:
             ),
         )
         self.conn.commit()
-        return int(cur.lastrowid), True
+        return int(cur.lastrowid or 0), True
 
     def get_model_artifact_by_hash(self, sport: str, artifact_hash: str) -> dict[str, Any] | None:
         row = self.conn.execute(
@@ -1886,7 +1886,7 @@ class ShadowLedger:
             ),
         )
         self.conn.commit()
-        return int(cur.lastrowid), True
+        return int(cur.lastrowid or 0), True
 
     # ── closing_prices (real caller: post-settlement CLV measurement) ──
     # Append-only observation log, same idempotency shape as
@@ -1955,7 +1955,7 @@ class ShadowLedger:
             ),
         )
         self.conn.commit()
-        return int(cur.lastrowid), True
+        return int(cur.lastrowid or 0), True
 
     # ── reviews (human/operator annotations -- always append) ──────────
 
@@ -1993,7 +1993,7 @@ class ShadowLedger:
             ),
         )
         self.conn.commit()
-        return int(cur.lastrowid)
+        return int(cur.lastrowid or 0)
 
     def reviews_for_subject(self, subject_table: str, subject_id: int) -> list[dict[str, Any]]:
         rows = self.conn.execute(

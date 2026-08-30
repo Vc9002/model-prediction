@@ -16,6 +16,7 @@ import sys
 import time
 import urllib.request
 from datetime import UTC, datetime
+from typing import Any
 from urllib.parse import quote
 
 import yaml
@@ -23,7 +24,7 @@ import yaml
 try:
     from openpyxl import load_workbook
 except ImportError:  # pragma: no cover
-    load_workbook = None
+    load_workbook = None  # type: ignore[assignment]
 
 
 from model_prediction.dashboard.backtests import (
@@ -479,7 +480,7 @@ def _pick_identity(row: dict) -> tuple[str, ...]:
         )
     line = row.get("line")
     try:
-        line_value = f"{float(line):g}" if line not in (None, "") else ""
+        line_value = f"{float(line):g}" if line is not None and line != "" else ""
     except (TypeError, ValueError):
         line_value = str(line or "").strip().casefold()
     return (
@@ -536,8 +537,8 @@ def preview_order(payload: dict) -> dict:
     if action == "buy" and not decorated["buy_ready"]:
         return {"status": "refused", "error": decorated["buy_block_reason"]}
     try:
-        raw_price = float(payload.get("price"))
-        size_shares = float(payload.get("size_shares"))
+        raw_price = float(payload.get("price") or 0)
+        size_shares = float(payload.get("size_shares") or 0)
     except (TypeError, ValueError):
         return {"status": "refused", "error": "price and shares must be numeric"}
     # Validate the tick on the RAW input; rounding first would silently accept
@@ -601,7 +602,7 @@ def preview_order(payload: dict) -> dict:
                 ),
             }
     ask = float(quote["ask"]) if action == "buy" else None
-    marketable = action == "buy" and price >= ask
+    marketable = action == "buy" and ask is not None and price >= ask
     order_type = "limit_ioc" if marketable else "limit_gtc"
     nonce = secrets.token_urlsafe(24)
     ticket = {
@@ -743,8 +744,8 @@ def preview_position_sell(payload: dict) -> dict:
     if not slug or side not in ("long", "short"):
         return {"status": "refused", "error": "market_slug and side (long|short) are required"}
     try:
-        raw_price = float(payload.get("price"))
-        size_shares = float(payload.get("size_shares"))
+        raw_price = float(payload.get("price") or 0)
+        size_shares = float(payload.get("size_shares") or 0)
     except (TypeError, ValueError):
         return {"status": "refused", "error": "price and shares must be numeric"}
     if not 0.01 <= raw_price <= 0.99 or abs(raw_price * 100 - round(raw_price * 100)) > 1e-8:
@@ -1278,11 +1279,11 @@ def _live_model_links() -> dict[tuple[str, str], dict]:
     for order in _load_orders()["orders"]:
         if order.get("status") not in {"submitted", "filled", "canceled", "replaced"}:
             continue
-        row = rows_by_id.get(str(order.get("pick_id") or ""))
+        order_row = rows_by_id.get(str(order.get("pick_id") or ""))
         slug = str(order.get("market_slug") or "")
         side = str(order.get("side") or "")
-        if row is not None and slug and side:
-            links[(slug, side)] = _link(row, side)
+        if order_row is not None and slug and side:
+            links[(slug, side)] = _link(order_row, side)
     return links
 
 
@@ -1858,7 +1859,7 @@ def _save_archive(archive: dict) -> None:
     ARCHIVE_FILE.write_text(json.dumps(archive, indent=1), encoding="utf-8")
 
 
-def archive_action(action: str, scope: str) -> dict:
+def archive_action(action: str, scope: Any) -> dict:
     """Persistently hide safe ledger rows from the dashboard table.
 
     picks.xlsx is never touched: archived rows keep feeding performance,
@@ -1896,8 +1897,8 @@ def archive_action(action: str, scope: str) -> dict:
             id_to_identity[pid] = identity
         expanded: set[str] = set()
         for pid in requested:
-            identity = id_to_identity.get(pid)
-            expanded |= identity_to_ids.get(identity, {pid}) if identity else {pid}
+            opt_identity = id_to_identity.get(pid)
+            expanded |= identity_to_ids.get(opt_identity, {pid}) if opt_identity else {pid}
         exposed = {
             str(row.get("pick_id"))
             for row in all_rows

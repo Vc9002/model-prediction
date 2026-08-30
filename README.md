@@ -160,10 +160,10 @@ flowchart TD
     DASHUI -.reads.-> LedgerStep
 ```
 
-### 1. Scheduled daily pipeline (`scripts/run_daily.sh`, launchd once daily)
+### 1. Scheduled daily pipeline (`scripts/run_daily.sh`, launchd twice daily)
 
 `~/Library/LaunchAgents/com.modelprediction.daily.plist` fires this script
-at 08:30 local time, with a `TimeOut=1800` (30min) watchdog. The checked-in
+at 08:30 and 12:00 local time, with a `TimeOut=1800` (30min) watchdog. The checked-in
 source is `ops/launchd/com.modelprediction.daily.plist`. It has no `RunAtLoad`,
 so login or service reloads do not launch an extra full pipeline. The
 script wraps its entire body in a single OS-level lock so an overlapping
@@ -172,7 +172,7 @@ ledger write:
 
 ```mermaid
 sequenceDiagram
-    participant L as launchd (08:30 daily)
+    participant L as launchd (08:30 & 12:00 daily)
     participant Lock as daily_lock.py (fcntl.flock, non-blocking)
     participant S as Step 1: settle --all-unsettled
     participant I as Step 1b: ingest (mlb/nba/wnba/nfl, yesterday+today)

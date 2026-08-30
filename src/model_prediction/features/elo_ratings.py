@@ -35,6 +35,7 @@ ELO_CONFIG: dict[str, dict[str, float]] = {
     "nba": {"k": 20.0, "home_advantage": 70.0, "offseason_regression": 0.35},
     "wnba": {"k": 20.0, "home_advantage": 60.0, "offseason_regression": 0.40},
     "nfl": {"k": 20.0, "home_advantage": 55.0, "offseason_regression": 0.50},
+    "ncaaf": {"k": 25.0, "home_advantage": 75.0, "offseason_regression": 0.40},
     "soccer": {"k": 20.0, "home_advantage": 60.0, "offseason_regression": 0.50},
     "tennis": {"k": 32.0, "home_advantage": 0.0, "offseason_regression": 0.50},
     "generic": {"k": 20.0, "home_advantage": 50.0, "offseason_regression": 0.50},

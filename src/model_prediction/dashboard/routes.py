@@ -18,7 +18,7 @@ import yaml
 try:
     from openpyxl import load_workbook
 except ImportError:  # pragma: no cover
-    load_workbook = None
+    load_workbook = None  # type: ignore[assignment]
 
 
 from http.server import BaseHTTPRequestHandler
@@ -91,6 +91,16 @@ from model_prediction.dashboard.status import (
     _clv_summary,
     _drawdown_summary,
     status,
+)
+from model_prediction.portfolio.auto_buyer_ledger import (
+    AUTO_BUYER_LOG_PATH,
+    read_auto_buyer_ledger,
+    settle_auto_buyer_ledger,
+)
+from model_prediction.portfolio.auto_executor import (
+    load_auto_buyer_state,
+    run_auto_buyer_cycle,
+    toggle_auto_buyer,
 )
 from model_prediction.portfolio.polymarket_scanner import PolymarketSlateScanner
 
@@ -278,25 +288,33 @@ class Handler(BaseHTTPRequestHandler):
                 day = query.get("date") or _today()
                 self._send(_cached(f"today:{day}", 20, lambda: today_picks(day)))
             elif route == "/api/odds":
-                sport = query.get("sport")
+                odds_sport = query.get("sport")
                 self._send(
-                    _cached(f"odds:{sport or 'all'}", 30, lambda: odds_summary(sport if sport else None))
+                    _cached(
+                        f"odds:{odds_sport or 'all'}",
+                        30,
+                        lambda: odds_summary(odds_sport if odds_sport else None),
+                    )
                 )
             elif route == "/api/open":
                 self._send(_cached("open", 15, open_picks))
             elif route == "/api/history":
                 days = int(query.get("days", "30"))
-                sport = query.get("sport")
+                history_sport = query.get("sport")
                 self._send(
-                    _cached(f"history:{days}:{sport or 'all'}", 30, lambda: history_picks(days, sport))
+                    _cached(
+                        f"history:{days}:{history_sport or 'all'}",
+                        30,
+                        lambda: history_picks(days, history_sport),
+                    )
                 )
             elif route == "/api/bets":
                 self._send(_cached("bets", 15, bets_view))
             elif route == "/api/orders":
                 self._send(_load_orders())
             elif route == "/api/clv":
-                sport = query.get("sport")
-                self._send(_cached(f"clv:{sport or 'all'}", 60, lambda: _clv_summary(sport)))
+                clv_sport = query.get("sport")
+                self._send(_cached(f"clv:{clv_sport or 'all'}", 60, lambda: _clv_summary(clv_sport)))
             elif route == "/api/capture_health":
                 self._send(_cached("capture_health", 60, _capture_health_summary))
             elif route == "/api/polymarket/scan":
@@ -431,6 +449,19 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(asdict(rehearsal_report))
             elif route == "/api/health":
                 self._send({"ok": True, "at": datetime.now(UTC).isoformat()[:19]})
+            elif route == "/api/auto-buyer/status":
+                self._send(load_auto_buyer_state())
+            elif route == "/api/auto-buyer/ledger":
+                self._send(_cached("auto-buyer-ledger", 5, read_auto_buyer_ledger))
+            elif route == "/api/auto-buyer/log":
+                if AUTO_BUYER_LOG_PATH.exists():
+                    try:
+                        lines = AUTO_BUYER_LOG_PATH.read_text(encoding="utf-8").splitlines()
+                        self._send({"lines": lines[-200:]})
+                    except OSError:
+                        self._send({"lines": []})
+                else:
+                    self._send({"lines": []})
             elif route == "/api/drawdown":
                 self._send(
                     _cached(f"drawdown:{sport_filter or 'all'}", 10, lambda: _drawdown_summary(sport_filter))
@@ -575,6 +606,14 @@ class Handler(BaseHTTPRequestHandler):
 
             res = settle_polymarket_ledger_rows()
             self._send(res)
+        elif parsed.path == "/api/auto-buyer/toggle":
+            enabled = payload.get("enabled")
+            self._send(toggle_auto_buyer(enabled))
+        elif parsed.path == "/api/auto-buyer/run":
+            exec_override = payload.get("execute")
+            self._send(run_auto_buyer_cycle(execute_override=exec_override, force=True))
+        elif parsed.path == "/api/auto-buyer/settle":
+            self._send(settle_auto_buyer_ledger())
         else:
             self._send({"error": "unknown route"}, code=404)
 

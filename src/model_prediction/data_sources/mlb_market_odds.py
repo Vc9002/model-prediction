@@ -59,6 +59,7 @@ class MarketOddsSnapshotStore:
         self.path = Path(path)
 
     def append(self, snapshot: MLBGameOdds | dict[str, Any]) -> MLBGameOdds | dict[str, Any]:
+        bound: MLBGameOdds | dict[str, Any]
         if isinstance(snapshot, MLBGameOdds):
             bound = replace(
                 snapshot,

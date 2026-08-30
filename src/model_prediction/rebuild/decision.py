@@ -25,7 +25,7 @@ import hashlib
 import json
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from ..market_blend import MarketBlendBlockedError, MarketBlendPolicy
 from .economic import SizeLimits, edge_scaled_units
@@ -278,7 +278,7 @@ def _no_bet(
     )
 
 
-def _economics_audit(limits: SizeLimits, fee_rate: float, safety_margin: float) -> dict[str, object]:
+def _economics_audit(limits: SizeLimits, fee_rate: float, safety_margin: float) -> dict[str, Any]:
     limits_json = json.dumps(asdict(limits), sort_keys=True, separators=(",", ":"))
     payload = {
         "fee_rate": fee_rate,
@@ -307,7 +307,7 @@ def _serving_probability(
     blend_policy: MarketBlendPolicy | None,
     sport: str | None,
     serving_config_hash: str | None,
-) -> tuple[float, dict[str, object]]:
+) -> tuple[float, dict[str, Any]]:
     """Return the probability used by the edge gate plus its audit fields."""
     if blend_policy is None:
         return model_probability, {
@@ -438,9 +438,9 @@ def decide_team_market(
             model_probability=model_prob,
             market_probability=candidate.market_probability,
             model_conservative_probability=conservative_prob,
-            blend_policy_artifact_hash=blend_policy.artifact_hash,
+            blend_policy_artifact_hash=blend_policy.artifact_hash if blend_policy is not None else None,
             blend_experiment_spec_hash=blend_policy.experiment_spec_hash_for(sport, candidate.market_type)
-            if sport is not None
+            if blend_policy is not None and sport is not None
             else None,
             blend_config_hash=serving_config_hash,
             serving_policy_block_reason=str(exc),
@@ -575,9 +575,9 @@ def decide_total(
             model_probability=model_prob,
             market_probability=candidate.market_probability,
             model_conservative_probability=conservative_prob,
-            blend_policy_artifact_hash=blend_policy.artifact_hash,
+            blend_policy_artifact_hash=blend_policy.artifact_hash if blend_policy is not None else None,
             blend_experiment_spec_hash=blend_policy.experiment_spec_hash_for(sport, "total")
-            if sport is not None
+            if blend_policy is not None and sport is not None
             else None,
             blend_config_hash=serving_config_hash,
             serving_policy_block_reason=str(exc),

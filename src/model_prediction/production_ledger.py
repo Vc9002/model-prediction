@@ -430,7 +430,10 @@ class ProductionLedger:
                 f"only '{OPEN_PREDICTION_STATUS}' -> terminal transitions "
                 f"are allowed"
             )
-        return self.get_prediction(row_id)
+        result = self.get_prediction(row_id)
+        if result is None:
+            raise ValueError(f"no prediction row with id={row_id}")
+        return result
 
     def settle_prediction(
         self,

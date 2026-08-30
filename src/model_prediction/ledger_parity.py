@@ -327,7 +327,7 @@ def _row_state_hash(row: dict[str, Any]) -> str:
     return hashlib.sha256(encoded).hexdigest()[:16]
 
 
-def _reconcile_ledger(ledger, store: RuntimeLedgerStore, *, tier: str, sport: str) -> dict[str, int]:
+def _reconcile_ledger(ledger, store: RuntimeLedgerStore, *, tier: str, sport: str) -> dict[str, Any]:
     """Authority-aware reconciliation core, isolated for exact-direction tests."""
     export_rows = ledger.export_rows()
     canonical_records = store.records(tier=tier, sport=sport)
@@ -392,7 +392,7 @@ def _reconcile_ledger(ledger, store: RuntimeLedgerStore, *, tier: str, sport: st
     }
 
 
-def backfill(tier: str, sport: str) -> dict[str, int]:
+def backfill(tier: str, sport: str) -> dict[str, Any]:
     """Replay XLSX rows missing from the mirror, deterministically (H-prep).
 
     Historical rows predate the dual-write; this brings the mirror to

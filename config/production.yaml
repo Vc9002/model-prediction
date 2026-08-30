@@ -92,6 +92,32 @@ prediction_service:
       entry: model_prediction.models.tennis:tennis_model
       enabled: true
       rollback_model: null
+    # NCAAF disabled 2026-08-30: the qualification evidence was measured on a
+    # simulated cohort whose market line was the model's own target plus noise,
+    # so the reported edge was arithmetic, not skill. Each artifact's own
+    # qualification block now reads qualified: false / FLAT_LEDGER_ONLY.
+    # Re-enable only after a walk-forward run on the real ESPN cohort.
+    - model_id: college-football-v1
+      sport: NCAAF
+      market: moneyline
+      implementation: json_artifact
+      artifact: config/models/college-football-v1.json
+      enabled: false
+      rollback_model: null
+    - model_id: cfb-spread-v1
+      sport: NCAAF
+      market: spread
+      implementation: json_artifact
+      artifact: config/models/cfb-spread-v1.json
+      enabled: false
+      rollback_model: null
+    - model_id: cfb-total-v1
+      sport: NCAAF
+      market: total
+      implementation: json_artifact
+      artifact: config/models/cfb-total-v1.json
+      enabled: false
+      rollback_model: null
     - model_id: cs2-tiered-elo-v6
       sport: CS2
       market: moneyline
@@ -195,6 +221,9 @@ prediction_service:
     - nfl-elo-trend-lr-v4
     - soccer-poisson-dc-v1
     - tennis-surface-elo-v1
+    - college-football-v1
+    - cfb-spread-v1
+    - cfb-total-v1
     - cs2-tiered-elo-v6
     - dota2-tiered-elo-v6
     - lol-tiered-elo-v6
@@ -213,6 +242,9 @@ prediction_service:
     mlb-nrfi-v1: config/models/mlb-nrfi-v1.json
     nba-elo-trend-lr-v4: config/models/nba-elo-trend-lr-v4.json
     nfl-elo-trend-lr-v4: config/models/nfl-elo-trend-lr-v4.json
+    college-football-v1: config/models/college-football-v1.json
+    cfb-spread-v1: config/models/cfb-spread-v1.json
+    cfb-total-v1: config/models/cfb-total-v1.json
     cs2-tiered-elo-v6: config/models/cs2-tiered-elo-v6.json
     dota2-tiered-elo-v6: config/models/dota2-tiered-elo-v6.json
     lol-tiered-elo-v6: config/models/lol-tiered-elo-v6.json

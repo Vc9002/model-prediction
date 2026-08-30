@@ -553,7 +553,7 @@ class MLBTwoHeadModel:
         and `path/metadata.json` (feature names, version, artifact hash) as
         a self-contained directory.
         """
-        import joblib
+        import joblib  # type: ignore[import-untyped]
 
         if not self._fitted:
             raise RuntimeError("cannot save an unfitted model")

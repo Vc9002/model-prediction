@@ -23,6 +23,7 @@ Welcome to the unified documentation directory for the `model-prediction` platfo
 | Document | Purpose |
 | :--- | :--- |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | System design, data ingestion, feature stores, model registry, and order pipelines. |
+| [`CFB_PREDICTION_SYSTEM.md`](CFB_PREDICTION_SYSTEM.md) | Complete College Football (NCAAF) Prediction System: joint scoring, priors, weather, ablations, market validation, and dual-ledger gating. |
 | [`LEDGER_ROUTING.md`](LEDGER_ROUTING.md) | Multi-tier ledger topology (Main, Flat, Research, Gated Research) and workbook separation. |
 | [`PRODUCTION.md`](PRODUCTION.md) | Production canary, run supervisor, launchd scheduling, and fail-closed safety gates. |
 | [`FEATURE_REGISTRY.md`](FEATURE_REGISTRY.md) | Canonical registry of engineered features and their strict Point-in-Time (PIT) contracts. |
@@ -36,6 +37,7 @@ Welcome to the unified documentation directory for the `model-prediction` platfo
 
 | Document | Purpose |
 | :--- | :--- |
+| [`PHASE_F_EXECUTION_PROTOCOL.md`](PHASE_F_EXECUTION_PROTOCOL.md) | **Phase F Execution Protocol**: Market-relative edge discovery, preregistered gates, empirical distribution shifting, and F1–F8 stage gates. |
 | [`RESEARCH_LITERATURE_DIVE_4_2026-08-20.md`](RESEARCH_LITERATURE_DIVE_4_2026-08-20.md) | **Literature Dive #4**: Plate-Appearance Monte Carlo, Catcher Framing, and 15–30m Lineup Alpha Window. |
 | [`V8_REPRODUCTION.md`](V8_REPRODUCTION.md) | Forensic reproduction report and holdout cohort definitions for MLB v8. |
 | [`FEATURE_MODEL_AUDIT.md`](FEATURE_MODEL_AUDIT.md) | Comprehensive model and feature audit across all active sport models. |

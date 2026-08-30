@@ -95,7 +95,8 @@ def _config_path(repo_root: Path) -> Path:
 
 def _load_yaml_dict(repo_root: Path) -> dict[str, Any]:
     with open(_config_path(repo_root), "r", encoding="utf-8") as fh:
-        return yaml.safe_load(fh) or {}  # type: ignore[no-any-return]
+        data = yaml.safe_load(fh)
+        return dict(data) if isinstance(data, dict) else {}
 
 
 def _atomic_write_yaml(repo_root: Path, config: dict[str, Any]) -> None:

@@ -18,6 +18,7 @@ import threading
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import yaml
@@ -25,7 +26,7 @@ import yaml
 try:
     from openpyxl import load_workbook
 except ImportError:  # pragma: no cover
-    load_workbook = None
+    load_workbook = None  # type: ignore[assignment]
 
 # ── SECTION: Paths & Constants ───────────────────────────────────────────
 
@@ -132,7 +133,7 @@ def _inject_dashboard_token(html: bytes) -> bytes:
     than raising and breaking the whole page load over a missing feature."""
     marker = b'<script>\n"use strict";'
     injected = (
-        b'<script>\n"use strict";\nwindow.__DASH_TOKEN__='
+        b'<script>\n"use strict";\nwindow._DASHBOARD_TOKEN=window.__DASH_TOKEN__='
         + json.dumps(_DASHBOARD_TOKEN).encode()
         + b";\nconst __nativeFetch__=window.fetch.bind(window);"
         b"\nwindow.fetch=(input,init)=>{"
@@ -308,7 +309,7 @@ def _unit_value_usd() -> float:
     return final_val
 
 
-def _set_unit_value_usd(raw_value: object) -> dict:
+def _set_unit_value_usd(raw_value: Any) -> dict:
     """Atomically persist the one-unit dollar value used by UI and execution."""
     try:
         value = float(raw_value)
@@ -328,7 +329,7 @@ def _set_unit_value_usd(raw_value: object) -> dict:
         if count != 1:
             raise RuntimeError("expected exactly one bankroll.unit_value_usd setting")
         parsed = yaml.safe_load(updated) or {}
-        persisted = float((parsed.get("bankroll") or {}).get("unit_value_usd"))
+        persisted = float((parsed.get("bankroll") or {}).get("unit_value_usd") or 0.0)
         if not math.isclose(persisted, value, rel_tol=0, abs_tol=0.000001):
             raise RuntimeError("unit value failed configuration validation")
 

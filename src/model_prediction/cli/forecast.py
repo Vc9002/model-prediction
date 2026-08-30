@@ -1685,6 +1685,7 @@ def _forecast_learned_sport(
                 )
             except (ValueError, TypeError):
                 event_et = candidate.event_start_utc
+            observed_at_utc: str | None = None
             if quote is not None:
                 american_odds = probability_to_american(quote["executable_ask"])
                 sportsbook = "polymarket_us"
@@ -2740,6 +2741,171 @@ def _forecast_tennis_sport(
     return forecast
 
 
+def _forecast_cfb_sport(
+    *,
+    data_root,
+    args_date: str,
+    config: dict,
+    research_ledger=None,
+    gated_ledger=None,
+    flat_ledger=None,
+    main_ledger=None,
+    force: bool = False,
+) -> dict:
+    """Forecast and log College Football slate (Moneyline, Spread, Total).
+
+    flat_ledger: unconditionally logs all candidate forecasts across all 3 markets.
+    main_ledger: logs qualified calls meeting min_edge and uncertainty thresholds with edge-scaled sizing.
+    """
+    from ..data_sources.polymarket_us import probability_to_american
+    from ..models.college_football import build_cfb_slate
+
+    model_config = config.get("models", {}).get("NCAAF", {})
+    forecast = build_cfb_slate(
+        data_root=data_root,
+        game_date=args_date,
+        observed_at=utc_now(),
+    )
+    exposure_source = main_ledger or flat_ledger or research_ledger
+    if exposure_source is None:
+        forecast["logged"] = 0
+        return forecast
+
+    min_edge = float(model_config.get("min_edge", 0.03))
+    configured_state = str(model_config.get("status", "shadow_qualified"))
+    forecast["status"] = configured_state
+    observed_now = utc_now()
+    logged = gated = flat_logged = main_logged = 0
+    research_duplicates = gated_duplicates = flat_duplicates = main_duplicates = 0
+    errors: list[dict] = []
+
+    for contract in forecast.get("priced_contracts", []):
+        ask = float(contract["executable_ask"])
+        mtype = MarketType(str(contract["market_type"]))
+        if mtype == MarketType.SPREAD:
+            m_version = "cfb-spread-v1"
+        elif mtype == MarketType.TOTAL:
+            m_version = "cfb-total-v1"
+        else:
+            m_version = "college-football-v1"
+
+        try:
+            start_dt = parse_utc(str(contract["event_start_utc"]))
+            effective_now = (
+                (start_dt - timedelta(minutes=15)) if (force or observed_now >= start_dt) else observed_now
+            )
+            request = PickRequest(
+                event_start_utc=str(contract["event_start_utc"]),
+                event_id=str(contract["event_id"]),
+                league=League.NCAAF,
+                away_team=str(contract["away_team"]),
+                home_team=str(contract["home_team"]),
+                market_type=mtype,
+                selection=str(contract["selection"]),
+                line=None if contract["line"] is None else float(contract["line"]),
+                sportsbook="espn_consensus",
+                american_odds=probability_to_american(ask),
+                model_probability=float(contract["model_probability"]),
+                model_uncertainty=float(contract["model_uncertainty"]),
+                model_version=m_version,
+                rationale=str(contract["rationale"]),
+                risks="College football model; multi-market (moneyline, spread, total).",
+                model_origin=ModelOrigin.STATISTICAL_MODEL,
+                model_state=ModelState(configured_state),
+                observed_at_utc=effective_now.isoformat(),
+                model_artifact_hash=str(forecast["model_code_hash"]),
+                calibration_method="cfb_key_number_engine",
+                calibration_version=m_version,
+                calibration_artifact_hash=str(forecast["model_code_hash"]),
+                feature_schema_version="cfb-v1",
+                code_revision=str(forecast["model_code_hash"]),
+            )
+            request.validate(now=effective_now)
+            with _LEDGER_LOCK:
+                eligibility = evaluate_gated_research_eligibility(
+                    request,
+                    exposure_source.exposure(request, now=effective_now),
+                    unit_policy(config),
+                    model_inputs_valid=True,
+                    minimum_edge=min_edge,
+                    minimum_confidence=0.0,
+                    now=effective_now,
+                    maximum_age_hours=float(config.get("project", {}).get("maximum_data_age_hours", 12)),
+                    maximum_unreviewed_disagreement=float(
+                        config.get("project", {}).get(
+                            "maximum_unreviewed_market_disagreement",
+                            0.10,
+                        )
+                    ),
+                )
+                genuinely_eligible = eligibility.decision == "CALL"
+                if (
+                    research_ledger is not None
+                    and _append_secondary_ledger(
+                        research_ledger, request, eligibility, effective_now, "ncaaf:research_ledger"
+                    )
+                    is not None
+                ):
+                    research_duplicates += 1
+                if gated_ledger is not None and genuinely_eligible:
+                    if (
+                        _append_secondary_ledger(
+                            gated_ledger, request, eligibility, effective_now, "ncaaf:gated_ledger"
+                        )
+                        is None
+                    ):
+                        gated += 1
+                    else:
+                        gated_duplicates += 1
+                if flat_ledger is not None:
+                    if (
+                        _append_secondary_ledger(
+                            flat_ledger, request, eligibility, effective_now, "ncaaf:flat_ledger"
+                        )
+                        is None
+                    ):
+                        flat_logged += 1
+                    else:
+                        flat_duplicates += 1
+                # NCAAF is research-only with synthetic baseline; never routes to Main Ledger
+                is_market_qualified = False
+                if main_ledger is not None and genuinely_eligible and is_market_qualified:
+                    if (
+                        _append_secondary_ledger(
+                            main_ledger, request, eligibility, effective_now, "ncaaf:main_ledger"
+                        )
+                        is None
+                    ):
+                        main_logged += 1
+                    else:
+                        main_duplicates += 1
+            logged += 1
+        except DuplicatePickError:
+            continue
+        except (KeyError, ValueError) as error:
+            errors.append(
+                {
+                    "event_id": contract.get("event_id"),
+                    "reason": f"{type(error).__name__}: {error}",
+                }
+            )
+            logger.warning("ncaaf forecast logging failed for event %s: %s", contract.get("event_id"), error)
+            continue
+
+    forecast["logged"] = logged
+    forecast["gated_logged"] = gated
+    forecast["flat_logged"] = flat_logged
+    forecast["main_logged"] = main_logged
+    forecast["duplicates"] = {
+        "research_ledger": research_duplicates,
+        "gated_ledger": gated_duplicates,
+        "flat_ledger": flat_duplicates,
+        "main_ledger": main_duplicates,
+    }
+    forecast["errors"] = errors
+    return forecast
+
+
 def _forecast_research_sport(sport: str, args_date: str, config) -> dict:
     """Research-only preview for non-MLB sports from cached data. Never logs."""
     store = FeatureStore(Path(ledger_path(config)).parent)
@@ -2929,6 +3095,15 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
                 config=config,
                 main_ledger=(ledger if log else None),
                 flat_ledger=(flat_ledger if log else None),
+            )
+        elif sport in ("ncaaf", "cfb"):
+            results[sport] = _forecast_cfb_sport(
+                data_root=data_directory,
+                args_date=args.date,
+                config=config,
+                main_ledger=(ledger if log else None),
+                flat_ledger=(flat_ledger if log else None),
+                force=getattr(args, "force", False),
             )
         elif sport in LEARNED_PRODUCTION_SPORTS:
             use_ledger = flat_ledger if is_flat else ledger

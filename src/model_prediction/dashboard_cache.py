@@ -350,6 +350,9 @@ class DashboardCache:
 
         try:
             sheet = wb["Picks"] if "Picks" in wb.sheetnames else wb.active
+            if sheet is None:
+                wb.close()
+                return []
             row_iter = sheet.iter_rows(values_only=True)
             try:
                 raw_headers = next(row_iter)

@@ -76,7 +76,7 @@ Run these checks regularly. Pinned to the repo root for discovery.
 - [x] `/api/scan` dashboard route called a nonexistent function — route no longer exists (removed; P1-9)
 - [x] Orphaned source modules — corrected 2026-08-14 (operator GO): the earlier "7 orphans" claim was a scan artifact (the import-graph check missed `__init__` re-exports: `from . import (a, b)` for `@register_feature` side effects and same-package `from .x import` package exports). The precise verification: **4 true orphans deleted** (`data_sources/football_data.py`, `features/starting_pitcher.py`, `models/nfl.py`, `models/wnba.py` — zero imports anywhere, zero tests; the inert `soccer_enrichment` config key removed; the `starting_pitcher_fip` entry removed from `tested_features.json`, counts 25→24) and **3 false positives restored** (`sportsdataio.py` is the package's `SportsDataIOClient` export used by rebuild; `lineup_strength.py` + `tennis_surface.py` are load-bearing feature registrations).
 - [x] `cli.py` (3,943 lines) has zero dedicated test file — `tests/test_cli.py` exists with substantial coverage (grading, ledger routing, WNBA spread promotion tests added 2026-08-14); still not comprehensive line-for-line, but no longer zero.
-- [ ] `dashboard_server.py` (4,782 lines) is monolithic; recommended split into `dashboard/` package
+- [x] `dashboard_server.py` (previously 4,782 lines) split into `model_prediction.dashboard` package (thin 260-line re-export shim in place)
 - [x] ~~Audit chain has 9 verified breaks~~ — repaired (43,304 events, 0 breaks)
 - [x] ~~MLB artifact qualification is inconsistent~~ — operator override documented
 - [x] ~~NFL config test drift~~ — resolved

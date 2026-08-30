@@ -215,7 +215,7 @@ class RebuildStatusReader:
         parquet_path = self.output_root / "model_benchmark.parquet"
         if parquet_path.is_file():
             try:
-                import duckdb  # type: ignore[import-not-found]
+                import duckdb
 
                 connection = duckdb.connect(database=":memory:")
                 try:
@@ -448,9 +448,8 @@ class RebuildStatusReader:
             # evaluated_market_evaluation_id is an INTEGER FK, so sqlite3
             # already returns an int; _as_int_or_none keeps a malformed row
             # from raising and 500ing the whole view.
-            market_eval = (
-                market_evals_by_id.get(_as_int_or_none(row.get("evaluated_market_evaluation_id")))
-            ) or {}
+            eval_id = _as_int_or_none(row.get("evaluated_market_evaluation_id"))
+            market_eval = (market_evals_by_id.get(eval_id) if eval_id is not None else None) or {}
 
             side = str(row.get("evaluated_team_or_side") or "") or None
             model_probability = None
@@ -700,11 +699,15 @@ class RebuildStatusReader:
                 "enabled": cfg.get("enabled"),
                 "system_state": system_state,
                 "current_model": (
-                    raw.get("current_model") or raw_model.get("model_id") or (model or {}).get("model_id")
+                    raw.get("current_model")
+                    or (raw_model or {}).get("model_id")
+                    or (model or {}).get("model_id")
                 ),
                 "dataset_size": raw.get("dataset_size"),
                 "oof_sample": (
-                    raw.get("oof_sample") or raw_model.get("oof_sample") or raw_model.get("benchmark_sample")
+                    raw.get("oof_sample")
+                    or (raw_model or {}).get("oof_sample")
+                    or (raw_model or {}).get("benchmark_sample")
                 ),
                 "prospective_sample": raw.get("prospective_sample"),
                 "last_run": sport_runs[0].get("created_at") if sport_runs else raw.get("last_run"),

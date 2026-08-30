@@ -14,7 +14,7 @@ from pathlib import Path
 try:
     from openpyxl import load_workbook
 except ImportError:  # pragma: no cover
-    load_workbook = None
+    load_workbook = None  # type: ignore[assignment]
 
 
 from model_prediction.dashboard.common import (
@@ -118,10 +118,10 @@ def market_snapshots(sport: str, day: str) -> dict:
                     try:
                         observed_at = datetime.fromisoformat(str(observed_raw))
                         event_start = datetime.fromisoformat(str(event_start_raw))
+                        if observed_at >= event_start:
+                            continue
                     except ValueError:
-                        observed_at = event_start = None
-                    if observed_at is not None and observed_at >= event_start:
-                        continue
+                        pass
                 ask = (snap.get("long") or {}).get("ask")
                 if slug not in first_ask and ask is not None:
                     first_ask[slug] = ask
@@ -387,6 +387,7 @@ def _pick_quote(row: dict) -> dict | None:
     if len(latest) > 1:
         return None  # doubleheader: two contracts matched; never guess which game
     snapshot = max(latest.values(), key=lambda item: str(item.get("observed_at_utc") or ""))
+    side_name: str | None = None
     if market_type == "moneyline":
         selected_team = (
             str(row.get("home_team") or "")

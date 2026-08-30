@@ -235,6 +235,7 @@ class RunSupervisor:
         started_at = datetime.now(UTC).isoformat()
         self.log_dir.mkdir(parents=True, exist_ok=True)
         log_path = self.log_dir / f"{run_id}.log"
+        note: str | None = None
         try:
             with log_path.open("wb") as log_handle:
                 proc = subprocess.Popen(
@@ -390,29 +391,15 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def notify_operator(title: str, message: str, level: str = "info") -> bool:
-    """Send an operational push notification to the operator via native macOS alert or webhook.
-
-    Suppressed when ``MODEL_PREDICTION_OPERATOR_NOTIFICATIONS`` is set to a
-    falsey value ("0"/"false"/"no"/"off") -- the operator removed these
-    alerts on 2026-08-27; the launchd plists carry the env var, and the
-    toggle lives here (not at the call site) so manual system_health runs
-    are quiet too.
-    """
-    if os.getenv("MODEL_PREDICTION_OPERATOR_NOTIFICATIONS", "1").strip().lower() in {
-        "0",
-        "false",
-        "no",
-        "off",
+    """Operator notifications are disabled (removed per operator directive)."""
+    # Permanently suppressed — never trigger macOS osascript desktop alerts
+    if os.getenv("MODEL_PREDICTION_OPERATOR_NOTIFICATIONS", "0").strip().lower() not in {
+        "1",
+        "true",
+        "yes",
+        "on",
     }:
         return False
-    if sys.platform == "darwin":
-        try:
-            escaped_msg = message.replace('"', '\\"')
-            escaped_title = title.replace('"', '\\"')
-            script = f'display notification "{escaped_msg}" with title "{escaped_title}"'
-            subprocess.run(["osascript", "-e", script], capture_output=True, timeout=2.0, check=False)
-        except (OSError, subprocess.SubprocessError):
-            pass
 
     slack_url = os.getenv("SLACK_WEBHOOK_URL")
     if slack_url:

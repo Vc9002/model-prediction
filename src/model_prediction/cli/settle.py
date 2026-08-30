@@ -775,6 +775,13 @@ def run_settle(args, config, registry, bans, ledger, audit, data_root) -> dict:
             )
         if gated_settlement:
             output["gated_research_settlement"] = gated_settlement
+        # Also settle the dedicated Auto-Buyer ledger
+        try:
+            from ..portfolio.auto_buyer_ledger import settle_auto_buyer_ledger
+
+            output["auto_buyer_settlement"] = settle_auto_buyer_ledger(data_directory)
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError) as err:
+            logger.warning("Auto-buyer settlement failed: %s", err)
     else:
         if not args.pick_id or args.away_score is None or args.home_score is None:
             raise ValueError("provide --pick-id with --away-score/--home-score, or --all-unsettled")

@@ -104,7 +104,7 @@ FEATURE_NAMES = [
     "home_starter_days_rest",
 ]
 
-_LEDGER_CACHE: dict[Path, list[FirstInningGameRow]] = {}
+_LEDGER_CACHE: dict[tuple[Path, bool], list[FirstInningGameRow]] = {}
 
 
 @dataclass(frozen=True)

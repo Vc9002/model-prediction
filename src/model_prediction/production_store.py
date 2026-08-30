@@ -410,7 +410,7 @@ class ProductionPredictionStore:
         has_more = len(rows) > int(limit)
         rows = rows[: int(limit)]
         next_cursor = rows[-1]["id"] if has_more and rows else None
-        return [_decode(r) for r in rows], next_cursor
+        return [d for r in rows if (d := _decode(r)) is not None], next_cursor
 
     def counts_by(self, *, sport: str | None = None, status: str | None = None) -> dict[str, int]:
         """Aggregated counts via SQL GROUP BY — no full-table Python scans."""
@@ -440,7 +440,10 @@ class ProductionPredictionStore:
 
         wb = Workbook()
         ws = wb.active
-        ws.title = "predictions"
+        if ws is None:
+            ws = wb.create_sheet("predictions")
+        else:
+            ws.title = "predictions"
         columns = [
             "id",
             "prediction_id",
@@ -459,7 +462,7 @@ class ProductionPredictionStore:
         ws.append(columns)
         count = 0
         for row in self._conn.execute("SELECT * FROM predictions ORDER BY id").fetchall():
-            decoded = _decode(row)
+            decoded = _decode(row) or {}
             ws.append([_cell_value(decoded.get(c)) for c in columns])
             count += 1
         Path(path).parent.mkdir(parents=True, exist_ok=True)

@@ -800,4 +800,82 @@ A systematic evaluation of the public API catalog ([`public-apis/public-apis`](h
 
 ---
 
+## Phase F — Market-Relative Edge & Information Discovery Roadmap
+
+Authoritative Protocol Reference: [`docs/PHASE_F_EXECUTION_PROTOCOL.md`](PHASE_F_EXECUTION_PROTOCOL.md)  
+State Machine: [`config/research/phase_f_state.yaml`](../config/research/phase_f_state.yaml)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    PHASE F: THREE PARALLEL OPERATING TRACKS                 │
+├──────────────────┬──────────────────────────────────────────────────────────┤
+│ Track            │ Purpose & Governance Rule                                │
+├──────────────────┼──────────────────────────────────────────────────────────┤
+│ Scientific Track │ M0→M5 research ladder; advances ONLY on preregistered    │
+│                  │ gates passing.                                           │
+│ Data Track       │ Accumulate quotes, weather, lineups, player state.       │
+│                  │ Always allowed; cannot silently change model behavior.   │
+│ Production Track │ Existing champions & live serving; frozen unless a       │
+│                  │ formal 5-dimensional promotion battery passes.           │
+└──────────────────┴──────────────────────────────────────────────────────────┘
+```
+
+### 1. Stage Structure & Unlock Conditions
+
+| Phase | Objective | Unlock Condition |
+|---|---|---|
+| **F1R** | Multi-season market-relative replication ($N_{games}\ge 1000, N_{dates}\ge 100, N_{seasons}\ge 2$) | Frozen result: FAIL_INCREMENTAL_ACCURACY ($\beta_{within}=+0.1905$, MAE gain ~0.0001) |
+| **F1S** | Structural Signal Amplification (MLB Structural v10 starter/lineup/bullpen decomposition) | Completed on development panel ($N=5427$, $\beta_{within}=0.3672$, MAE gain 0.0192) |
+| **F1C** | MLB Structural v10 Prospective Confirmation (daily immutable shadow testing on unseen games) | Current active phase ($N\ge 300/500$ unseen games) |
+| **F2** | Probability/distribution modeling (D0 empirical $\to$ D1 Normal $\to$ D2 Student-t $\to$ D3 heteroskedastic) | F1C prospective confirmation passes (LOCKED) |
+| **F3** | M4 residual-model ladder (M4-0 $\to$ M4-1 $\to$ M4-2 Ridge $\to$ M4-3 ElasticNet $\to$ M4-4 shallow GBDT) | F1C + probability foundation (LOCKED) |
+| **F4** | M3 feature/interactions (preregistered MLB-INT-001..005 tested individually) | Simple M4 baselines established (LOCKED) |
+| **F5** | M5 constrained OOF ensemble (regularized linear combiner over genuine OOF predictions) | M3/M4 candidates qualified (LOCKED) |
+| **F6** | MLB spreads replication ($Margin = Home - Away, R_M = ActualMargin - MarketMargin$) | MLB totals reference methodology stable (LOCKED) |
+| **F7** | NBA/WNBA/NFL/Soccer replication ($Market \to Residual$ architecture ported) | MLB reference implementation stable (LOCKED) |
+| **F8** | Production qualification | 5-dimensional battery passes (LOCKED) |
+
+### 2. Standardized Sign Conventions & Target Definitions
+* **Totals**:
+  $$R_T = \text{ActualTotal} - \text{MarketTotal}_{\text{decision}}$$
+  $$\Delta = \text{StructuralPrediction} - \text{MarketTotal}_{\text{decision}}$$
+  $$R = \alpha + \beta \Delta$$
+* **Spreads**:
+  $$\text{Margin} = \text{HomeScore} - \text{AwayScore}$$
+  $$\text{MarketImpliedHomeMargin} = -\text{HomeSpreadLine} \quad (\text{e.g., Home } -3.5 \implies +3.5 \text{ margin})$$
+  $$R_M = \text{ActualMargin} - \text{MarketImpliedHomeMargin}$$
+
+### 3. F1R Replication Panels & Trajectory Tracking
+Every F1R evaluation produces 3 panels:
+1. `ORIGINAL_IDENTIFICATION_SAMPLE`: First 250 games / 27 dates.
+2. `NEW_UNTOUCHED_SAMPLE`: Games strictly outside the original identification sample.
+3. `POOLED_SAMPLE`: Official frozen preregistration gate ($N\ge 1000, D\ge 100, S\ge 2$).
+
+Effect-size trajectories across sample sizes ($N=250, 500, 750, 1000, 1500, 2000$) track $\beta_{within}(N)$, $\Delta\text{MAE}$, $\Delta\text{RMSE}$, $\Delta\text{Brier}$, $\Delta\text{NLL}$, and within-date permutation $p$.
+
+### 4. Probability Foundation (F1R)
+* Use training-fold empirical residual distribution $\hat{F}_{train}(R)$ shifted by conditional mean $\mu_R = \alpha + \beta\Delta$.
+* Explicitly preserve integer total push probability: $P(Over) = P(R > 0 \mid \mu_R)$, $P(Under) = P(R < 0 \mid \mu_R)$, $P(Push) = P(R = 0 \mid \mu_R)$ (for half-point totals, $P(Push) = 0$).
+* Decision-time no-vig market price is benchmark; closing prices are never inputs.
+
+### 5. Formal Failure Router
+
+| Failure Mode | Action / Research Path |
+|---|---|
+| `FAIL_DATA` | Repair source/matching/PIT issue ($PIT\_violations == 0$ hard requirement); rerun frozen model. |
+| `FAIL_LEVEL_ONLY` | Structural model does not discriminate matchups ($\beta_{within}\le 0$); improve sports features. |
+| `FAIL_PROBABILITY` | Mean edge exists but probability mapping fails; work on F2 distribution only. |
+| `FAIL_STABILITY` | Temporal signs flip or permutation null fails across seasons; investigate regime shifts. |
+| `FAIL_INCREMENTAL_ACCURACY` | Matchup signal exists ($\beta_{within} > 0$ stable), but incremental MAE gain vs M0b is insufficient; route to `F1S_STRUCTURAL_SIGNAL_AMPLIFICATION`. |
+| `FAIL_ECONOMIC` | Predictive edge exists but execution/pricing insufficient. |
+| `INSUFFICIENT_EVIDENCE` | Sample size threshold ($N < 1000$ or $D < 100$) not reached. |
+| `PASS` | Unlock next stage in `config/research/phase_f_state.yaml`. |
+
+### 6. Five-Dimensional Qualification Battery
+Every candidate must clear all 5 dimensions on locked chronological out-of-sample holdouts:
+1. **Continuous Accuracy**: Residual MAE, RMSE, Unconditional Bias.
+2. **Market-Relative Edge**: $\Delta\text{LogLoss}_{\text{vs-market}}$, $\Delta\text{Brier}_{\text{vs-market}}$, $\text{CLV}_{\text{line}}$ and $\text{CLV}_{\text{price}}$.
+3. **Probabilistic Calibration**: ECE, Calibration slope ($1.0 \pm 0.15$), intercept, and Empirical Interval Coverage (50%, 80%, 95% nominal bounds).
+4. **Economic Viability**: Date-clustered bootstrap ROI (95% CI strictly $>0$), Profit Factor $>1.10$, Maximum Drawdown within capital limits.
+5. **Temporal & Regime Stability (Hard Gate)**: Consistent edge across rolling 60/90-day windows, season-by-season partitions, line buckets, and favorite/underdog regimes.
 

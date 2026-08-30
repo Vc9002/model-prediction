@@ -851,7 +851,7 @@ def load_settled_predictions(
         if model_version is not None and row.get("model_version") != model_version:
             continue
         prob = row.get("model_probability")
-        if prob in (None, ""):
+        if prob is None or prob == "":
             continue
         date = row.get("event_start_utc") or row.get("observed_at_utc") or row.get("settled_at_utc") or ""
         settled.append(

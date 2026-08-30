@@ -23,6 +23,7 @@ LEAGUE_SLUGS = {
     "NBA": "nba",
     "WNBA": "wnba",
     "NFL": "nfl",
+    "NCAAF": "cfb",
     "NHL": "nhl",
     "EPL": "epl",
     "LA_LIGA": "lal",
@@ -83,6 +84,7 @@ POLYMARKET_SPORT_LEAGUES: dict[str, tuple[str, ...]] = {
     "nba": ("NBA",),
     "wnba": ("WNBA",),
     "nfl": ("NFL",),
+    "ncaaf": ("NCAAF",),
     # WORLD_CUP dropped 2026-07: tournament is over, no games left to trade.
     "soccer": (
         "EPL",

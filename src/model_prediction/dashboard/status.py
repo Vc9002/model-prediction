@@ -15,7 +15,7 @@ from typing import Any
 try:
     from openpyxl import load_workbook
 except ImportError:  # pragma: no cover
-    load_workbook = None
+    load_workbook = None  # type: ignore[assignment]
 
 
 from model_prediction.dashboard.backtests import (
@@ -136,15 +136,16 @@ def status() -> dict:
     models = sorted(path.name for path in (ROOT / "config" / "models").glob("*.json"))
     data_counts, last_ingest, data_sources = _data_inventory()
     audit_events = _count_lines(DATA / "events.jsonl")
-    last_event = None
+    last_event: dict[str, Any] | None = None
     events_path = DATA / "events.jsonl"
     if events_path.exists():
+        last_line: str | None = None
         with events_path.open(encoding="utf-8") as handle:
             for line in handle:
                 if line.strip():
-                    last_event = line
+                    last_line = line
         try:
-            last_event = json.loads(last_event) if last_event else None
+            last_event = json.loads(last_line) if last_line else None
         except json.JSONDecodeError:
             last_event = None
     alerts = []
@@ -325,7 +326,7 @@ def _clv_summary(sport: str | None = None) -> dict:
             p for p in picks if str(p.get("sport") or p.get("league") or "").casefold() == sport.casefold()
         ]
 
-    clv_records = []
+    clv_records: list[dict[str, Any]] = []
     for p in picks:
         dec_odds = p.get("decision_american_odds") or p.get("american_odds")
         close_odds = p.get("closing_american_odds")
@@ -352,7 +353,7 @@ def _clv_summary(sport: str | None = None) -> dict:
     if n == 0:
         return {"count": 0, "mean_clv_pct": 0.0, "beat_close_rate": 0.0, "series": []}
 
-    mean_clv = sum(r["clv_pct"] for r in clv_records) / n
+    mean_clv = sum((float(r["clv_pct"]) for r in clv_records), 0.0) / n
     beat_rate = sum(1 for r in clv_records if r["beat_close"]) / n
 
     return {

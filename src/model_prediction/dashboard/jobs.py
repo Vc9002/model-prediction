@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 try:
     from openpyxl import load_workbook
 except ImportError:  # pragma: no cover
-    load_workbook = None
+    load_workbook = None  # type: ignore[assignment]
 
 
 from model_prediction.dashboard.common import (

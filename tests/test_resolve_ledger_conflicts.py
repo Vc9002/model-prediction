@@ -76,14 +76,26 @@ def test_r1_archives_stale_survivor_same_tier(tmp_path) -> None:
     # economics: the older settlement is a stale pre-correction survivor.
     with _store(tmp_path) as store:
         _seed_row(
-            store, tier="flat", pick_id="p-old", event_id="evt-1",
-            result="win", pnl_units=0.4695, units=1.0, market_probability=0.68,
+            store,
+            tier="flat",
+            pick_id="p-old",
+            event_id="evt-1",
+            result="win",
+            pnl_units=0.4695,
+            units=1.0,
+            market_probability=0.68,
             created_at_utc="2026-08-02T19:29:00Z",
             settled_at_utc="2026-08-24T03:19:39Z",
         )
         _seed_row(
-            store, tier="flat", pick_id="p-new", event_id="evt-1",
-            result="win", pnl_units=0.4926, units=1.0, market_probability=0.67,
+            store,
+            tier="flat",
+            pick_id="p-new",
+            event_id="evt-1",
+            result="win",
+            pnl_units=0.4926,
+            units=1.0,
+            market_probability=0.67,
             created_at_utc="2026-08-02T19:29:00Z",
             settled_at_utc="2026-08-24T04:41:41Z",
         )
@@ -101,14 +113,26 @@ def test_r4_benign_sizing_variance_needs_no_mutation(tmp_path) -> None:
     # different sizing) — nothing to correct, nothing to archive.
     with _store(tmp_path) as store:
         _seed_row(
-            store, tier="research", pick_id="p-r", event_id="evt-2",
-            result="loss", pnl_units=-1.25, units=1.25, market_probability=0.59,
+            store,
+            tier="research",
+            pick_id="p-r",
+            event_id="evt-2",
+            result="loss",
+            pnl_units=-1.25,
+            units=1.25,
+            market_probability=0.59,
             created_at_utc="2026-08-10T00:00:00Z",
             settled_at_utc="2026-08-22T12:23:26Z",
         )
         _seed_row(
-            store, tier="gated_research", pick_id="p-g", event_id="evt-2",
-            result="loss", pnl_units=-1.5, units=1.5, market_probability=0.59,
+            store,
+            tier="gated_research",
+            pick_id="p-g",
+            event_id="evt-2",
+            result="loss",
+            pnl_units=-1.5,
+            units=1.5,
+            market_probability=0.59,
             created_at_utc="2026-08-10T00:00:00Z",
             settled_at_utc="2026-08-24T04:50:14Z",
         )
@@ -122,15 +146,27 @@ def test_r2_corrects_post_event_row_to_decision_time_quote(tmp_path) -> None:
     # the event) with a different quote: the post-event economics are wrong.
     with _store(tmp_path) as store:
         _seed_row(
-            store, tier="flat", pick_id="p-pregame", event_id="evt-3",
-            result="win", pnl_units=0.9615, units=1.0, market_probability=0.5098,
+            store,
+            tier="flat",
+            pick_id="p-pregame",
+            event_id="evt-3",
+            result="win",
+            pnl_units=0.9615,
+            units=1.0,
+            market_probability=0.5098,
             created_at_utc="2026-08-02T19:29:00Z",
             settled_at_utc="2026-08-03T22:55:16Z",
             event_start_utc="2026-08-03T01:00:00Z",
         )
         _seed_row(
-            store, tier="main", pick_id="p-posthoc", event_id="evt-3",
-            result="win", pnl_units=2.7, units=1.0, market_probability=0.2703,
+            store,
+            tier="main",
+            pick_id="p-posthoc",
+            event_id="evt-3",
+            result="win",
+            pnl_units=2.7,
+            units=1.0,
+            market_probability=0.2703,
             created_at_utc="2026-08-03T17:07:25Z",
             settled_at_utc="2026-08-03T22:55:14Z",
             event_start_utc="2026-08-03T01:00:00Z",
@@ -150,15 +186,27 @@ def test_r3_lineage_backed_row_outranks_hashless_row(tmp_path) -> None:
     # corrected stake-normalized to the lineage-backed row's economics.
     with _store(tmp_path) as store:
         _seed_row(
-            store, tier="research", pick_id="p-hashless", event_id="evt-4",
-            result="win", pnl_units=0.641, units=1.0, market_probability=0.6093,
+            store,
+            tier="research",
+            pick_id="p-hashless",
+            event_id="evt-4",
+            result="win",
+            pnl_units=0.641,
+            units=1.0,
+            market_probability=0.6093,
             created_at_utc="2026-08-21T00:00:00Z",
             settled_at_utc="2026-08-22T15:39:19Z",
             market_snapshot_hash=None,
         )
         _seed_row(
-            store, tier="gated_research", pick_id="p-lined", event_id="evt-4",
-            result="win", pnl_units=1.0, units=1.25, market_probability=0.5495,
+            store,
+            tier="gated_research",
+            pick_id="p-lined",
+            event_id="evt-4",
+            result="win",
+            pnl_units=1.0,
+            units=1.25,
+            market_probability=0.5495,
             created_at_utc="2026-08-21T00:00:00Z",
             settled_at_utc="2026-08-24T04:50:11Z",
             market_snapshot_hash="abcd1234",
@@ -178,15 +226,27 @@ def test_disagreeing_results_are_never_auto_corrected(tmp_path) -> None:
     # One row says win, the other says loss — no rule may pick a side.
     with _store(tmp_path) as store:
         _seed_row(
-            store, tier="flat", pick_id="p-w", event_id="evt-5",
-            result="win", pnl_units=0.9, units=1.0, market_probability=0.52,
+            store,
+            tier="flat",
+            pick_id="p-w",
+            event_id="evt-5",
+            result="win",
+            pnl_units=0.9,
+            units=1.0,
+            market_probability=0.52,
             created_at_utc="2026-08-02T19:29:00Z",
             settled_at_utc="2026-08-03T22:55:16Z",
             event_start_utc="2026-08-03T01:00:00Z",
         )
         _seed_row(
-            store, tier="main", pick_id="p-l", event_id="evt-5",
-            result="loss", pnl_units=-1.0, units=1.0, market_probability=0.52,
+            store,
+            tier="main",
+            pick_id="p-l",
+            event_id="evt-5",
+            result="loss",
+            pnl_units=-1.0,
+            units=1.0,
+            market_probability=0.52,
             created_at_utc="2026-08-03T17:07:25Z",
             settled_at_utc="2026-08-03T22:55:14Z",
             event_start_utc="2026-08-03T01:00:00Z",

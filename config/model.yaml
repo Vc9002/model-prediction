@@ -41,6 +41,7 @@ team_ban_list:
     NBA: []
     WNBA: []
     NFL: []
+    NCAAF: []
   allowed_reasons:
   - data_quality
   - injury_uncertainty
@@ -327,6 +328,21 @@ models:
     # archive/nfl-spread-baseline-v1.json) as obsolete; the dangling research
     # refs were removed with them. Re-add a real artifact when NFL spread/
     # total research resumes.
+  NCAAF:
+    family: elo_trend_key_number_engine
+    # Demoted 2026-08-30: promoted on a simulated cohort (see production.yaml).
+    status: research
+    origin: statistical_model
+    active_production_version: college-football-v1
+    production_artifact: config/models/college-football-v1.json
+    markets:
+    - moneyline
+    - spread
+    - total
+    min_edge: 0.03
+    spread_sd: 15.0
+    total_sd: 14.5
+    home_field_advantage_points: 3.0
   TENNIS:
     family: surface_blended_elo
     status: shadow_qualified

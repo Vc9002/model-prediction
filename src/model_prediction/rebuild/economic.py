@@ -51,7 +51,7 @@ def edge_scaled_units(
     conservative_prob: float,
     best_ask: float,
     limits: SizeLimits | None = None,
-) -> dict[str, float]:
+) -> dict[str, Any]:
     """Size a trade from the model edge and conservative probability.
 
     Enforces depth, quote age, and exposure caps from SizeLimits.
@@ -167,9 +167,9 @@ def evaluate_portfolio(
 
     pnls = [t.pnl for t in settled]
     pnl_arr = np.array(pnls)
-    wins = [t for t in settled if t.pnl > 0]
-    losses = [t for t in settled if t.pnl < 0]
-    pushes = [t for t in settled if t.pnl == 0]
+    wins = [t for t in settled if t.pnl is not None and t.pnl > 0]
+    losses = [t for t in settled if t.pnl is not None and t.pnl < 0]
+    pushes = [t for t in settled if t.pnl is not None and t.pnl == 0]
 
     cumulative = np.cumsum(pnl_arr)
     peak = np.maximum.accumulate(cumulative)

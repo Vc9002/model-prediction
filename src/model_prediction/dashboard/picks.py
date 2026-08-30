@@ -9,11 +9,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 try:
     from openpyxl import load_workbook
 except ImportError:  # pragma: no cover
-    load_workbook = None
+    load_workbook = None  # type: ignore[assignment]
 
 
 from model_prediction.dashboard.common import (
@@ -126,6 +127,8 @@ def _find_pick_by_id(pick_id: str) -> dict | None:
 def _parse_picks(path: Path) -> list[dict]:
     wb = load_workbook(path, read_only=True, data_only=True)
     sheet = wb["Picks"] if "Picks" in wb.sheetnames else wb.active
+    if sheet is None:
+        return []
     rows = sheet.iter_rows(values_only=True)
     try:
         headers = [str(h) if h is not None else "" for h in next(rows)]
@@ -259,7 +262,7 @@ def _contract_observation_identity(row: dict) -> tuple[str, ...]:
         )
     line = row.get("line")
     try:
-        normalized_line = f"{float(line):g}" if line not in (None, "") else ""
+        normalized_line = f"{float(line):g}" if line is not None and line != "" else ""
     except (TypeError, ValueError):
         normalized_line = str(line or "").strip().casefold()
     return (
@@ -385,7 +388,7 @@ def performance(picks: list[dict]) -> dict:
         return f"{lower:.2f}-{upper:.2f}"
 
     by_bucket = dict(sorted(_performance_breakdown(probability_rows, probability_bucket).items()))
-    by_month = {}
+    by_month: dict[str, dict[str, Any]] = {}
     for row in settled:
         won = row["result"] == "win"
         month = str(row.get("settled_at_utc") or "")[:7]
@@ -489,7 +492,7 @@ def performance(picks: list[dict]) -> dict:
             calibration.append(
                 {
                     "bucket": f"{lo:.1f}-{hi:.1f}",
-                    "mean_p": round(sum(_pick_probability(m) for m in members) / len(members), 4),
+                    "mean_p": round(sum((_pick_probability(m) or 0.0) for m in members) / len(members), 4),
                     "hit_rate": round(sum(1 for m in members if m["result"] == "win") / len(members), 4),
                     "count": len(members),
                 }

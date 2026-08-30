@@ -50,7 +50,8 @@ def _read_state() -> dict[str, Any]:
     if not sp.is_file():
         return {}
     try:
-        return json.loads(sp.read_text(encoding="utf-8"))  # type: ignore[no-any-return]
+        data = json.loads(sp.read_text(encoding="utf-8"))
+        return dict(data) if isinstance(data, dict) else {}
     except (json.JSONDecodeError, OSError):
         return {}
 

@@ -868,7 +868,7 @@ def create_sample_lineup(team_name: str, power_boost: float = 0.0) -> TeamLineup
     """Create a realistic 9-man MLB batting order with talent gradient."""
     batters: list[BatterProfile] = []
     # Realistic batting order quality gradient
-    order_weights = [
+    order_weights: list[dict[str, Any]] = [
         {"name": "Leadoff", "bb": 0.11, "k": 0.18, "single": 0.17, "hr": 0.025},
         {"name": "No. 2", "bb": 0.10, "k": 0.20, "single": 0.16, "hr": 0.045 + power_boost},
         {"name": "No. 3 Slugger", "bb": 0.12, "k": 0.21, "single": 0.15, "hr": 0.055 + power_boost},
@@ -885,10 +885,10 @@ def create_sample_lineup(team_name: str, power_boost: float = 0.0) -> TeamLineup
             BatterProfile(
                 player_id=f"{team_name.lower()}_{idx}",
                 name=f"{team_name} {w['name']}",
-                single_rate=w["single"],
-                hr_rate=w["hr"],
-                bb_rate=w["bb"],
-                k_rate=w["k"],
+                single_rate=float(w["single"]),
+                hr_rate=float(w["hr"]),
+                bb_rate=float(w["bb"]),
+                k_rate=float(w["k"]),
             )
         )
     return TeamLineup(team_name=team_name, batters=batters)

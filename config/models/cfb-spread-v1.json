@@ -1,0 +1,34 @@
+{
+  "method": "cfb_joint_margin_cdf",
+  "model_version": "cfb-spread-v1",
+  "schema_version": "2",
+  "sport": "ncaaf",
+  "league": "NCAAF",
+  "positive_class": "away_cover",
+  "distribution": "negative_binomial",
+  "margin_sd": 15.5,
+  "key_numbers": [
+    3,
+    7,
+    10,
+    14,
+    17,
+    21,
+    24,
+    28,
+    31
+  ],
+  "gates": {
+    "min_edge": 0.035,
+    "max_uncertainty": 0.18,
+    "block_fcs": true,
+    "sizing": "flat_1u_gated"
+  },
+  "qualification": {
+    "status": "FLAT_LEDGER_ONLY",
+    "qualified": false,
+    "locked_holdout": true,
+    "framework": "cfb_joint_margin_cdf"
+  },
+  "artifact_hash": "7dc5b3428abfdb93b8ba111ac676cc88878d479cac69e5e459a68275eeeaa1d8"
+}

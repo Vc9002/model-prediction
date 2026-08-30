@@ -902,7 +902,7 @@ def test_daily_forecast_roster_includes_soccer_and_both_international_baseball_l
     assert "soccer" not in cli.DAILY_LEARNED_SPORTS
     assert "soccer" in cli.SPORTS
     assert set(cli.DAILY_INTERNATIONAL_BASEBALL_SPORTS) == {"kbo", "npb"}
-    assert set(cli.FLAT_LEDGER_SPORTS) == {"mlb", "nba", "wnba", "nfl"}
+    assert set(cli.FLAT_LEDGER_SPORTS) == {"mlb", "nba", "wnba", "nfl", "soccer", "tennis", "ncaaf"}
     assert set(cli.RESEARCH_ONLY_DAILY_SPORTS) == {
         "soccer",
         "tennis",
@@ -914,7 +914,7 @@ def test_daily_forecast_roster_includes_soccer_and_both_international_baseball_l
         "kbo",
         "npb",
     }
-    assert not set(cli.FLAT_LEDGER_SPORTS) & set(cli.RESEARCH_ONLY_DAILY_SPORTS)
+    assert set(cli.FLAT_LEDGER_SPORTS) & set(cli.RESEARCH_ONLY_DAILY_SPORTS) == {"soccer", "tennis"}
 
 
 class _FakeTennisESPN:

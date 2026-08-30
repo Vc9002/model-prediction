@@ -233,7 +233,7 @@ def _drift_check(settled_qualified: list, config: dict) -> dict:
     import math
     from collections import defaultdict
 
-    by_sport = defaultdict(lambda: {"wins": 0, "losses": 0})
+    by_sport: dict[str, dict[str, int]] = defaultdict(lambda: {"wins": 0, "losses": 0})
     for row in settled_qualified:
         sport = str(row.get("league") or row.get("sport") or "?").upper()
         if row.get("result") == "win":
@@ -933,7 +933,7 @@ def cmd_exposure(args, config, registry, bans, ledger, audit, data_root) -> dict
     return output
 
 
-def cmd_ban_team(args, config, registry, bans, ledger, audit, data_root) -> dict:
+def cmd_ban_team(args, config, registry, bans, ledger, audit, data_root) -> object:
     output = _handle_ban(args, bans)
     return output
 

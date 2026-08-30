@@ -886,7 +886,8 @@ class PickLedger:
                     mirror_row["pick_id"],
                     exc_info=True,
                 )
-                _parity_alarm(self.mirror, f"export {event_type} {mirror_row['pick_id']}")
+                if self.mirror is not None:
+                    _parity_alarm(self.mirror, f"export {event_type} {mirror_row['pick_id']}")
             return
         self._write_rows(rows_to_write)
         self._mirror_row(mirror_row, event_type, operation_id)
@@ -1262,7 +1263,9 @@ class PickLedger:
                 except (KeyError, ValueError, TypeError):
                     continue
                 uncertainty_raw = row.get("model_uncertainty")
-                uncertainty = float(uncertainty_raw) if uncertainty_raw not in (None, "") else 0.05
+                uncertainty = (
+                    float(uncertainty_raw) if uncertainty_raw is not None and uncertainty_raw != "" else 0.05
+                )
                 new_units = edge_scaled_units(
                     model_probability,
                     uncertainty or 0.05,
@@ -1557,17 +1560,18 @@ class PickLedger:
             )
             if row.get("research_pnl_units"):
                 row["research_pnl_units"] = "0.000000"
-            corrected = bool(correction_reason and correction_reason.strip())
+            cleaned_correction = correction_reason.strip() if correction_reason else ""
+            corrected = bool(cleaned_correction)
             self.audit.append(
                 "pick_voided_corrected" if corrected else "pick_voided",
                 pick_id,
                 {
                     "reason": reason,
-                    **({"correction_reason": correction_reason.strip()} if corrected else {}),
+                    **({"correction_reason": cleaned_correction} if corrected else {}),
                 },
             )
             operation_suffix = (
-                uuid.uuid5(uuid.NAMESPACE_URL, correction_reason.strip()).hex if corrected else "initial"
+                uuid.uuid5(uuid.NAMESPACE_URL, cleaned_correction).hex if corrected else "initial"
             )
             operation_id = f"op-void-{pick_id}-{operation_suffix}"
             if self.authority == "sqlite":
@@ -1750,7 +1754,7 @@ class PickLedger:
             [float(row["model_probability"]) for row in calibration_rows],
             [1 if row["result"] == "win" else 0 for row in calibration_rows],
         )
-        output = {
+        output: dict[str, Any] = {
             "records": len(rows),
             "qualified_shadow_calls": len(qualified),
             "research_observations": len(research),

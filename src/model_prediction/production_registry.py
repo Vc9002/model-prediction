@@ -47,6 +47,9 @@ IMPLEMENTATION_TYPES = (
 CODE_BACKED_ENTRYPOINTS: dict[str, str] = {
     "soccer-poisson-dc-v1": "model_prediction.models.soccer:soccer_model",
     "tennis-surface-elo-v1": "model_prediction.models.tennis:tennis_model",
+    "college-football-v1": "model_prediction.models.college_football:cfb_model",
+    "cfb-spread-v1": "model_prediction.models.college_football:cfb_model",
+    "cfb-total-v1": "model_prediction.models.college_football:cfb_model",
 }
 
 

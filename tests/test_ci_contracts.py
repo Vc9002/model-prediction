@@ -98,9 +98,15 @@ def test_ci_imports_of_checked_in_config_resolve() -> None:
     from model_prediction.production_registry import ProductionModelRegistry
 
     registry = ProductionModelRegistry.load(Path(__file__).resolve().parents[1])
-    assert len(registry.entries) == 18
+    assert len(registry.entries) == 21
     assert "measured-edge-totals-v3" in registry.entries
     assert "measured-edge-totals-v3" not in registry.blocked_workflows
     assert "mlb-nrfi-v1" in registry.entries
     assert "mlb-nrfi-v1" not in registry.blocked_workflows
-    assert len(registry.problem_entries()) == 0
+    # problem_entries() is "disabled OR failed contract validation", so a
+    # deliberate demotion lands here too. Pin the exact set rather than a bare
+    # count: no entry may fail validation, and only the demoted NCAAF three may
+    # be disabled.
+    problems = {e.model_id for e in registry.problem_entries()}
+    assert problems == {"college-football-v1", "cfb-spread-v1", "cfb-total-v1"}
+    assert all(e.load_error is None for e in registry.problem_entries())

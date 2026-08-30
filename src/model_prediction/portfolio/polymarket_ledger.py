@@ -322,9 +322,9 @@ def settle_polymarket_ledger_rows(
                 if graded_result is PickResult.WIN
                 else ("loss" if graded_result is PickResult.LOSS else "push")
             )
-            row["away_score"] = a_score
-            row["home_score"] = h_score
-            row["pnl_units"] = round(pnl, 4)
+            row["away_score"] = str(a_score)
+            row["home_score"] = str(h_score)
+            row["pnl_units"] = str(round(pnl, 4))
             row["settled_at_utc"] = now_iso
             modified = True
             open_count -= 1

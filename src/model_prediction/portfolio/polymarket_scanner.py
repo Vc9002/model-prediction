@@ -399,8 +399,8 @@ class PolymarketSlateScanner:
         latest_by_market: dict[str, DispatchRequest] = {}
 
         for f_path in target_files:
-            with open(f_path, encoding="utf-8") as f:
-                for line in f:
+            with open(f_path, encoding="utf-8") as fh:
+                for line in fh:
                     req = self.parse_snapshot_line(
                         line,
                         require_model=require_model,

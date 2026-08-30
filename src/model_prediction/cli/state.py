@@ -31,7 +31,7 @@ ESPN_SPORTS = tuple(SPORT_LEAGUES)
 ESPORTS_TITLES = ("lol", "cs2", "dota2", "valorant", "rainbow_six")
 DAILY_LEARNED_SPORTS = ("mlb", "nba", "wnba", "nfl")
 DAILY_INTERNATIONAL_BASEBALL_SPORTS = ("kbo", "npb")
-FLAT_LEDGER_SPORTS = DAILY_LEARNED_SPORTS
+FLAT_LEDGER_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "tennis", "ncaaf")
 # Sports whose _forecast_*_sport function writes BOTH main_ledger and
 # flat_ledger unconditionally whenever log=True, regardless of which command
 # (forecast/log vs. flat-forecast) ran -- every other sport only ever writes
@@ -39,7 +39,7 @@ FLAT_LEDGER_SPORTS = DAILY_LEARNED_SPORTS
 # clear the *other* ledger too for sports in this set, or a second same-day
 # run of the other command duplicates that sport's rows there (see the
 # dual_ledger_sports handling in the forecast/log/flat-forecast dispatch).
-DUAL_LEDGER_SPORTS = frozenset({"soccer", "tennis"})
+DUAL_LEDGER_SPORTS = frozenset({"soccer", "tennis", "ncaaf"})
 RESEARCH_ONLY_DAILY_SPORTS = (
     "soccer",
     "tennis",
@@ -58,6 +58,7 @@ _LEDGER_LEAGUE_TO_ESPN = {
     "NBA": ("NBA",),
     "WNBA": ("WNBA",),
     "NFL": ("NFL",),
+    "NCAAF": ("NCAAF",),
     "SOCCER": (
         "EPL",
         "LA_LIGA",
