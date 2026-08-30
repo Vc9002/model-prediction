@@ -14,7 +14,12 @@ import yaml
 from model_prediction.production_canary import _compute_artifact_hash
 from model_prediction.run_supervisor import RunSupervisor
 from model_prediction.runtime_paths import RuntimePaths
-from model_prediction.system_health import _ledger_economics, _stale_open_rows, system_health
+from model_prediction.system_health import (
+    _degenerate_served_values,
+    _ledger_economics,
+    _stale_open_rows,
+    system_health,
+)
 
 
 def _iso_days_ago(days: float) -> str:
@@ -530,3 +535,102 @@ def test_market_relative_evidence_is_informational_and_cannot_flip_health(
     report = system_health(repo_root=repo, runtime_root=repo / "data")
     assert report["status"] == "HEALTHY", report["reasons"]
     assert report["market_relative"]["status"] == "unavailable"
+
+
+def test_freshness_threshold_exceeds_the_production_interval() -> None:
+    """The checked-in config declares both the production job's cadence and
+    the age at which a stale prediction degrades health. If the threshold is
+    the smaller of the two, health is DEGRADED by arithmetic on every cycle
+    where the last prediction is simply waiting for the next scheduled run --
+    which is what 120min-against-a-180min-interval did until 2026-08-30. An
+    alarm a correctly-running system cannot clear is worse than no alarm."""
+    config = yaml.safe_load((Path(__file__).resolve().parents[1] / "config" / "production.yaml").read_text())
+    interval_minutes = float(config["scheduler"]["production"]["interval_seconds"]) / 60.0
+    assert float(config["health"]["max_data_age_minutes"]) > interval_minutes
+
+
+def test_a_deliberately_disabled_model_is_reported_not_degraded(tmp_path: Path) -> None:
+    """problem_entries() means 'disabled OR failed contract validation'.
+    Reporting both as failures made the 2026-08-30 NCAAF demotion read as a
+    permanent DEGRADED whose reason was the string 'failed: None' -- an alarm
+    nobody can act on. A disabled entry belongs in the report; only a real
+    load_error degrades. The entry stays declared so its artifact keeps being
+    hash-verified, which is exactly why the two must be told apart."""
+    repo = _make_repo(tmp_path)
+    config_path = repo / "config" / "production.yaml"
+    config = yaml.safe_load(config_path.read_text())
+    config["prediction_service"]["models"].append(
+        {
+            "model_id": "demoted-v1",
+            "sport": "NCAAF",
+            "market": "total",
+            "implementation": "json_artifact",
+            "artifact": "config/models/demoted-v1.json",
+            "enabled": False,
+        }
+    )
+    _write_yaml(config_path, config)
+    _write_json(repo / "config/models/demoted-v1.json", _make_artifact("demoted-v1"))
+    for worker in ("daily", "production", "rebuild-shadow"):
+        _seed_successful_run(repo, worker)
+    _seed_prediction_state(repo, minutes_ago=5)
+
+    report = system_health(repo_root=repo, runtime_root=repo / "data")
+
+    assert not any("failed contract validation" in reason for reason in report["reasons"]), report["reasons"]
+    assert report["checks"]["registry"]["models"]["demoted-v1"] == "disabled"
+    assert report["checks"]["registry"]["disabled"] == ["demoted-v1"]
+    assert report["status"] == "HEALTHY", report["reasons"]
+
+
+def _seed_served_prices(paths: RuntimePaths, sport: str, prices: list[float]) -> None:
+    paths.ledgers_db.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(paths.ledgers_db)
+    connection.execute(
+        """CREATE TABLE IF NOT EXISTS ledger_records (
+        ledger_tier TEXT, sport TEXT, pick_id TEXT, status TEXT,
+        market_probability REAL, created_at_utc TEXT)"""
+    )
+    now = datetime.now(UTC).isoformat()
+    connection.executemany(
+        "INSERT INTO ledger_records VALUES (?, ?, ?, ?, ?, ?)",
+        [("main", sport, f"{sport}-{i}", "open", price, now) for i, price in enumerate(prices)],
+    )
+    connection.commit()
+    connection.close()
+
+
+def test_a_constant_served_market_price_is_flagged(tmp_path: Path) -> None:
+    """The 2026-08-29 NCAAF defect in miniature: three market-probability
+    variables were declared and never assigned, so every call priced against
+    a hardcoded 0.50. All 32 rows carried one distinct value where every other
+    sport showed 5-53. Nothing in 2,462 passing tests could see it, because no
+    test asserted anything about the *distribution* of served values -- only
+    their type and range. This is that missing assertion."""
+    repo = _make_repo(tmp_path)
+    paths = RuntimePaths(repo_root=repo, runtime_root=repo / "data")
+    _seed_served_prices(paths, "ncaaf", [0.5] * 12)
+
+    check = _degenerate_served_values(paths, {"ncaaf"})
+
+    assert [f["sport"] for f in check["degenerate"]] == ["ncaaf"]
+    assert check["degenerate"][0]["value"] == 0.5
+    assert check["degenerate"][0]["rows"] == 12
+
+
+def test_a_varying_price_and_a_demoted_sport_are_both_left_alone(tmp_path: Path) -> None:
+    """Two ways to be a non-finding, and both matter. A real market price
+    varies, so it must not fire. And a sport no enabled model still serves is
+    history, not an alarm -- NCAAF's own bad rows stay in the window for two
+    weeks after the demotion that fixed them, and an alarm no action can clear
+    is what trains people to ignore the real one."""
+    repo = _make_repo(tmp_path)
+    paths = RuntimePaths(repo_root=repo, runtime_root=repo / "data")
+    _seed_served_prices(paths, "mlb", [0.51 + i / 100 for i in range(12)])
+    _seed_served_prices(paths, "ncaaf", [0.5] * 12)
+
+    check = _degenerate_served_values(paths, {"mlb"})
+
+    assert check["degenerate"] == []
+    assert check["by_sport"]["ncaaf"] == 1
+    assert check["by_sport"]["mlb"] == 12

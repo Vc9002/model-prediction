@@ -12,12 +12,15 @@ Status rules (most severe wins):
 - **DOWN** — the primary model's contract cannot resolve, or the most
   recent supervisor run for any worker failed (the scheduler path is
   broken until a newer run succeeds).
-- **DEGRADED** — any registered model failed contract validation; the
+- **DEGRADED** — any registered model failed contract validation (a
+  deliberately *disabled* entry is reported, not degraded — see the
+  registry check); the
   latest run of a worker was skipped (overlap) or that worker has never
   run under the supervisor; the last recorded prediction is older than
-  ``health.max_data_age_minutes``; or a sport's source capture stopped
-  (had recent activity, then nothing for 7+ days / 2+ days for market
-  snapshots).
+  ``health.max_data_age_minutes``; a currently-serving sport's market
+  price is a single repeated value (a hardcoded fallback, not a quote);
+  or a sport's source capture stopped (had recent activity, then nothing
+  for 7+ days / 2+ days for market snapshots).
 - **HEALTHY** — none of the above.
 
 Offseason sports (no games for weeks) are informational, not alarms: the
@@ -46,6 +49,8 @@ _MARKET_STALE_DAYS = 2.0
 _RECENT_ACTIVITY_DAYS = 21.0
 _STALE_OPEN_WARN_HOURS = 24.0
 _STALE_OPEN_HARD_HOURS = 72.0
+_SERVED_VALUE_WINDOW_DAYS = 14.0
+_SERVED_VALUE_MIN_ROWS = 10
 
 
 def _stale_open_rows(paths: RuntimePaths) -> dict[str, Any]:
@@ -107,6 +112,74 @@ def _stale_open_rows(paths: RuntimePaths) -> dict[str, Any]:
         "open_over_72h": open_over_72h,
         "by_sport": by_sport,
         "samples": samples,
+    }
+
+
+def _degenerate_served_values(paths: RuntimePaths, serving_sports: set[str] | None = None) -> dict[str, Any]:
+    """Sports whose served market price is a single repeated value.
+
+    This is the check that would have caught the 2026-08-29 NCAAF defect on
+    the first cycle. Three market-probability variables were declared and
+    never assigned, so every call priced against a hardcoded constant instead
+    of a real ask; all 32 rows carried market_probability 0.5 while every
+    other sport showed 5-53 distinct values. The full verification stack was
+    green the entire time -- 2,462 tests, 0 ruff, 0 mypy -- because nothing
+    asserts anything about the *distribution* of served values, only their
+    type and range. A constant where a distribution belongs is invisible to
+    every static check and obvious in one GROUP BY against real output.
+
+    Deliberately narrow: only recent rows (a long-dead sport's frozen history
+    is not news), only sports with enough rows for one value to be meaningful,
+    only sports a currently-enabled model still serves (a demoted sport's bad
+    rows are history, and an alarm that no action can clear is the failure
+    mode this whole check exists to avoid repeating), and only the market
+    price -- a model probability can legitimately repeat, a market price
+    essentially cannot.
+    """
+    if not paths.ledgers_db.is_file():
+        return {"available": False, "degenerate": []}
+    connection = sqlite3.connect(f"file:{paths.ledgers_db}?mode=ro", uri=True, timeout=10.0)
+    connection.row_factory = sqlite3.Row
+    cutoff = (datetime.now(UTC) - timedelta(days=_SERVED_VALUE_WINDOW_DAYS)).isoformat()
+    try:
+        rows = [
+            dict(row)
+            for row in connection.execute(
+                """
+                SELECT sport,
+                       COUNT(market_probability) AS n,
+                       COUNT(DISTINCT market_probability) AS distinct_values,
+                       MIN(market_probability) AS value
+                FROM ledger_records
+                WHERE created_at_utc >= ? AND market_probability IS NOT NULL
+                GROUP BY sport
+                """,
+                (cutoff,),
+            )
+        ]
+    finally:
+        connection.close()
+    degenerate = [
+        {
+            "sport": str(row["sport"]),
+            "rows": int(row["n"]),
+            "distinct_market_probabilities": int(row["distinct_values"]),
+            "value": float(row["value"]),
+        }
+        for row in rows
+        if int(row["n"]) >= _SERVED_VALUE_MIN_ROWS
+        and int(row["distinct_values"]) <= 1
+        and (serving_sports is None or str(row["sport"]).casefold() in serving_sports)
+    ]
+    return {
+        "available": True,
+        "window_days": _SERVED_VALUE_WINDOW_DAYS,
+        "min_rows": _SERVED_VALUE_MIN_ROWS,
+        "by_sport": {
+            str(row["sport"]): int(row["distinct_values"])
+            for row in sorted(rows, key=lambda r: str(r["sport"]))
+        },
+        "degenerate": sorted(degenerate, key=lambda item: item["sport"]),
     }
 
 
@@ -375,17 +448,32 @@ def system_health(
         down(f"production registry failed to load: {exc}")
         report["reasons"] = reasons
         return report
+    # problem_entries() is "disabled OR failed contract validation", and those
+    # are different events: a disabled entry is a deliberate demotion (the
+    # three NCAAF models, 2026-08-30), a failed one is a broken artifact.
+    # Reporting both as failures made a demotion read as permanent DEGRADED
+    # with the reason "failed: None" -- an alarm nobody can act on is an alarm
+    # that trains people to ignore the real one. Entries stay declared while
+    # disabled precisely so their artifacts keep being hash-verified, so a
+    # disabled entry with a load_error is still a genuine failure.
+    failed = [entry for entry in registry.problem_entries() if entry.load_error is not None]
+    disabled = [entry for entry in registry.problem_entries() if entry.load_error is None]
     registry_check: dict[str, Any] = {
         "primary": registry.primary.model_id,
         "models": {
-            entry.model_id: ("ok" if entry.available else f"failed: {entry.load_error}")
+            entry.model_id: (
+                "ok"
+                if entry.available
+                else (f"failed: {entry.load_error}" if entry.load_error else "disabled")
+            )
             for entry in registry.entries.values()
         },
+        "disabled": sorted(entry.model_id for entry in disabled),
         "blocked_workflows": registry.blocked_workflows,
     }
     report["checks"]["registry"] = registry_check
-    if registry.problem_entries():
-        degrade(f"{len(registry.problem_entries())} production model(s) failed contract validation")
+    if failed:
+        degrade(f"{len(failed)} production model(s) failed contract validation")
     if registry.blocked_workflows:
         degrade(
             f"{len(registry.blocked_workflows)} active workflow(s) are explicitly blocked "
@@ -468,6 +556,16 @@ def system_health(
             f"{stale_open['open_over_72h']} open ledger rows are more than 72h past "
             "their scheduled start with no settlement resolution (postponed or "
             "rescheduled events never complete under their original event_id)"
+        )
+    served_values = _degenerate_served_values(
+        paths, {str(entry.sport).casefold() for entry in registry.available_entries()}
+    )
+    report["checks"]["served_values"] = served_values
+    for finding in served_values.get("degenerate", []):
+        degrade(
+            f"{finding['sport']} served {finding['rows']} rows with market_probability "
+            f"constant at {finding['value']:.4f} -- a market price that never varies is a "
+            "hardcoded fallback, not a quote"
         )
     if ledger_economics["semantic_errors"]:
         degrade(

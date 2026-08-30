@@ -15,11 +15,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
 from model_prediction.config import load_config
 from model_prediction.domain import League, MarketType, PickRequest
 from model_prediction.eligibility import EligibilityResult, RecordType
 from model_prediction.entities import CanonicalTeam
-from model_prediction.ledger import FIELDNAMES
+from model_prediction.ledger import FIELDNAMES, PickLedger
 from model_prediction.main_ledgers import MAIN_LEDGER_SPORTS, MultiSportPickLedger, existing_flat_ledgers
 from model_prediction.xlsx_ledger import write_xlsx_rows_atomic
 
@@ -110,3 +112,64 @@ def test_existing_flat_ledgers_honor_sqlite_authority(tmp_path, monkeypatch) -> 
         assert ledger.mirror is not None
     finally:
         ledger.mirror.close()
+
+
+def _ncaaf_request(event_id: str) -> PickRequest:
+    return PickRequest(
+        event_start_utc=(datetime.now(UTC) + timedelta(days=1)).isoformat(),
+        event_id=event_id,
+        league=League.NCAAF,
+        away_team="TEX",
+        home_team="OU",
+        market_type=MarketType.TOTAL,
+        selection="over",
+        line=54.0,
+        sportsbook="espn_consensus",
+        american_odds=-110,
+        model_probability=0.59,
+        model_uncertainty=0.01,
+        model_version="cfb-total-v1",
+        rationale="Test rationale",
+        risks="Test risk",
+    )
+
+
+def test_an_unlisted_sports_rows_are_still_reachable_by_operator_commands(tmp_path, monkeypatch) -> None:
+    """A sport the pipeline writes before MAIN_LEDGER_SPORTS learns about it
+    must still be administrable. NCAAF wrote 9 Main and 19 Flat rows on
+    2026-08-29 while normalize_main_sport("ncaaf") still raised, so void /
+    settle / update-closing -- all of which route through _ledger_for_pick_id
+    -- could not reach a single one of them, even though the daily job had
+    just created them."""
+    monkeypatch.setenv("MODEL_PREDICTION_LEDGER_MIRROR", "0")
+    assert "ncaaf" not in MAIN_LEDGER_SPORTS
+
+    orphan = PickLedger(
+        tmp_path / "main" / "ncaaf.xlsx",
+        audit_path=tmp_path / "events.jsonl",
+        tier="main",
+        sport="ncaaf",
+    )
+    row = orphan.append_evaluated(_ncaaf_request("cfb-1"), _qualified_call(), now=datetime.now(UTC))
+
+    ledger = MultiSportPickLedger(tmp_path)
+    voided = ledger.void(row["pick_id"], "fabricated ask")
+    assert voided["status"] == "settled"
+    assert voided["result"] == "push"
+    assert voided["void_reason"] == "fabricated ask"
+
+    # Routing is deliberately NOT widened: reaching an orphaned row is a
+    # repair, admitting a new sport into Main is a decision.
+    with pytest.raises(ValueError, match="no Main/Flat ledger configured"):
+        ledger.append_evaluated(_ncaaf_request("cfb-2"), _qualified_call(), now=datetime.now(UTC))
+
+
+def test_dashboard_and_ledger_sport_lists_cannot_drift(monkeypatch) -> None:
+    """dashboard/common.py keeps its own copy of the sport tuple on purpose
+    (it avoids importing model_prediction at load time). Two hand-maintained
+    copies of the same list drift silently, and the dashboard reading a
+    different set of workbooks than the ledger writes is invisible until a
+    sport goes missing from the UI -- so pin them equal here."""
+    from model_prediction.dashboard.common import _MAIN_LEDGER_SPORTS
+
+    assert tuple(_MAIN_LEDGER_SPORTS) == MAIN_LEDGER_SPORTS

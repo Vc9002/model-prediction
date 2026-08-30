@@ -172,19 +172,15 @@ class MultiSportPickLedger:
     def __init__(self, data_root: str | Path, *, flat: bool = False, **ledger_kwargs: Any) -> None:
         self.data_root = Path(data_root)
         self._flat = flat
+        self._ledger_kwargs = ledger_kwargs
         self._ledgers: dict[str, PickLedger] = {
-            sport: PickLedger(
-                (flat_ledger_path if flat else main_ledger_path)(self.data_root, sport),
-                audit_path=self.data_root / "events.jsonl",
-                model_ledgers_dir=self.data_root / "model_ledgers",
-                tier="flat" if flat else "main",
-                mirror=ledger_mirror(self.data_root),
-                authority=ledger_authority(),
-                sport=sport,
-                **ledger_kwargs,
-            )
-            for sport in MAIN_LEDGER_SPORTS
+            sport: self._build_ledger(sport) for sport in MAIN_LEDGER_SPORTS
         }
+        # Built on demand by _ledger_for_pick_id for sports that hold rows in
+        # this tier without being listed in MAIN_LEDGER_SPORTS -- see
+        # _unlisted_sports(). Kept out of self._ledgers so routing, exposure
+        # and rows() keep their allowlisted semantics exactly.
+        self._ledgers_for_unlisted: dict[str, PickLedger] = {}
         # Every per-sport ledger already shares the one project-wide audit
         # log (same pattern research_ledgers.py uses) -- expose it directly
         # so any code reading `ledger.audit` still gets the real thing.
@@ -192,6 +188,19 @@ class MultiSportPickLedger:
         # Used only for display (e.g. init-ledger's status output) -- the
         # real per-sport paths are main_ledger_path()/flat_ledger_path().
         self.path = self.data_root / ("flat" if flat else "main")
+
+    def _build_ledger(self, sport: str) -> PickLedger:
+        directory = self.data_root / ("flat" if self._flat else "main")
+        return PickLedger(
+            directory / f"{sport}.xlsx",
+            audit_path=self.data_root / "events.jsonl",
+            model_ledgers_dir=self.data_root / "model_ledgers",
+            tier="flat" if self._flat else "main",
+            mirror=ledger_mirror(self.data_root),
+            authority=ledger_authority(),
+            sport=sport,
+            **self._ledger_kwargs,
+        )
 
     def _ledger_for_league(self, league: Any) -> PickLedger:
         key = str(getattr(league, "value", league)).casefold()
@@ -203,9 +212,38 @@ class MultiSportPickLedger:
                 f"configured sports: {sorted(self._ledgers)}"
             ) from None
 
+    def _unlisted_sports(self) -> list[str]:
+        """Sports holding rows in this tier that MAIN_LEDGER_SPORTS doesn't list.
+
+        The pipeline can start writing a sport before the allowlist here learns
+        about it: NCAAF wrote 9 Main and 19 Flat rows on 2026-08-29 while
+        `normalize_main_sport("ncaaf")` still raised, which left those rows
+        writable by the daily job but unreachable by every operator command
+        (void/settle/update-closing all route through _ledger_for_pick_id).
+        Administration must be able to reach any row that exists, so discovery
+        is by what's actually stored -- the SQLite tier under sqlite authority,
+        plus any per-sport workbook on disk -- not by the allowlist. Routing
+        (exposure/append) deliberately still refuses unlisted sports: reaching
+        an orphaned row is a repair, admitting a new sport is a decision.
+        """
+        found: set[str] = set()
+        directory = self.data_root / ("flat" if self._flat else "main")
+        if directory.exists():
+            found.update(path.stem.casefold() for path in directory.glob("*.xlsx"))
+        mirror = ledger_mirror(self.data_root)
+        if mirror is not None:
+            tier = "flat" if self._flat else "main"
+            found.update(str(record.get("sport") or "").casefold() for record in mirror.records(tier=tier))
+        return sorted(found - set(self._ledgers) - {""})
+
     def _ledger_for_pick_id(self, pick_id: str) -> PickLedger:
         for ledger in self._ledgers.values():
             if any(row["pick_id"] == pick_id for row in ledger.rows()):
+                return ledger
+        for sport in self._unlisted_sports():
+            ledger = self._ledgers_for_unlisted.get(sport) or self._build_ledger(sport)
+            if any(row["pick_id"] == pick_id for row in ledger.rows()):
+                self._ledgers_for_unlisted[sport] = ledger
                 return ledger
         raise KeyError(f"unknown pick id: {pick_id}")
 

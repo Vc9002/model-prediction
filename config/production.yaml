@@ -280,6 +280,12 @@ scheduler:
     interval_seconds: 10800
 
 health:
-  max_data_age_minutes: 120
+  # Must exceed the production job's own interval_seconds above (10800s =
+  # 180min) or health is DEGRADED by arithmetic: at 120 the check fired on
+  # every cycle where the last prediction was simply waiting for the next
+  # scheduled run, which is not a fault. 180min cadence + 60min slack for a
+  # long run or a coalesced skip. Pinned by
+  # test_system_health.py::test_freshness_threshold_exceeds_the_production_interval.
+  max_data_age_minutes: 240
   require_finite_probabilities: true
   require_probability_normalization: true
