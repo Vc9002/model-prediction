@@ -694,7 +694,7 @@ def settle_auto_buyer_ledger(
                 pass
 
         # Check Polymarket US gateway market resolution status fallback
-        if result is None and slug:
+        if result is None and slug and (data_root is None or polymarket_executor is not None):
             try:
                 from ..data_sources.polymarket_us import PolymarketUSClient
 

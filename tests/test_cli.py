@@ -2485,7 +2485,7 @@ def test_wnba_total_fails_closed_without_exact_model_artifact(monkeypatch, tmp_p
 
     assert result["status"] == "blocked"
     assert result["priced_contracts"] == []
-    assert "wnba-total-margin-v1" in result["reason"]
+    assert "wnba-total-margin-v2" in result["reason"]
     assert "model_artifact_hash" not in result
 
 

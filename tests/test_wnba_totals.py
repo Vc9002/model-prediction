@@ -101,7 +101,7 @@ def test_forecast_wnba_total_fails_closed_without_exact_artifact(monkeypatch, tm
     slate = _forecast_wnba_total_slate(data_root, args_date, mock_client)
     assert slate["sport"] == "wnba_total"
     assert slate["status"] == "blocked"
-    assert slate["model_version"] == "wnba-total-margin-v1"
+    assert slate["model_version"] == "wnba-total-margin-v2"
     assert slate["priced_contracts"] == []
     assert "exact serving artifact" in slate["reason"]
     mock_client.scoreboard.assert_not_called()
