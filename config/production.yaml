@@ -266,7 +266,7 @@ prediction_service:
   challengers:
     MLB:
       moneyline: mlb-moneyline-v9-residual
-      spread: measured-edge-margin-v4
+      spread: mlb-structural-runline-v4
       total: mlb-structural-v11-residual
       nrfi: mlb-nrfi-v3
     WNBA:
@@ -334,7 +334,7 @@ prediction_service:
     market: spread
     incumbent: measured-edge-margin-v3
     replacement_priority: medium
-    challenger: measured-edge-margin-v4
+    challenger: mlb-structural-runline-v4
     evidence_status: historical_only
   - sport: WNBA
     market: moneyline

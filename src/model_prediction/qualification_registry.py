@@ -176,7 +176,16 @@ def generate_qualification_registry(
                     if evidence == EvidenceStatus.DEGRADED.value
                     else NextAction.START_NEXT_GENERATION.value
                 )
-            elif chall_id in {"soccer-poisson-dc-v2", "tennis-surface-elo-v2"}:
+            elif chall_id in {
+                "soccer-poisson-dc-v2",
+                "tennis-surface-elo-v2",
+                "cfb-structural-v2",
+                "mlb-structural-runline-v4",
+                "wnba-spread-structural-v3",
+                "wnba-total-possession-v3",
+                "mlb-moneyline-market-residual-v10",
+                "mlb-moneyline-v9-residual",
+            }:
                 build_status = ChallengerBuildStatus.IMPLEMENTED.value
                 verdict = "EVALUATION_READY"
                 next_action = NextAction.RUN_OFFLINE_EVALUATION.value
