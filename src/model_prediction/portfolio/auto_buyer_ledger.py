@@ -418,11 +418,13 @@ def settle_auto_buyer_ledger(
             settled_count += 1
             if result == "win":
                 pnl_usd = round(shares * (1.0 - price), 4)
+                pnl_units = round(float(r.get("units") or 1.0) * ((1.0 - price) / max(price, 0.01)), 4)
             elif result == "loss":
                 pnl_usd = round(-cost, 4)
+                pnl_units = -float(r.get("units") or 1.0)
             else:
                 pnl_usd = 0.0
-            pnl_units = round(pnl_usd / 0.005, 2)
+                pnl_units = 0.0
 
             r["status"] = "settled"
             r["result"] = result

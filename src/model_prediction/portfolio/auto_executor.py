@@ -301,6 +301,9 @@ class AutoPolymarketBuyer:
                 from .auto_buyer_ledger import read_auto_buyer_ledger
 
                 for r in read_auto_buyer_ledger(auto_ledger_file):
+                    status = str(r.get("status") or "").lower()
+                    if status in {"expired", "cancelled", "rejected"}:
+                        continue
                     if r.get("pick_id"):
                         bought_pick_ids.add(str(r["pick_id"]))
                     if r.get("order_id"):
@@ -363,10 +366,30 @@ class AutoPolymarketBuyer:
     ) -> AutoExecutionResult:
         """Scan open picks, apply filters and sizing, and execute live or paper-trade."""
         from model_prediction.dashboard.orders import _decorate_pick
-        from model_prediction.dashboard.picks import read_picks
 
         if picks is None:
-            picks = read_picks()
+            from model_prediction.dashboard.picks import _parse_research_picks, read_flat_picks, read_picks
+
+            main_picks = read_picks()
+            flat_picks = read_flat_picks()
+            gated_picks = _parse_research_picks(gated=True)
+
+            seen_pick_keys: set[Any] = set()
+            combined_picks: list[dict[str, Any]] = []
+
+            for p in main_picks + gated_picks + flat_picks:
+                p_id = str(p.get("pick_id") or "")
+                ev_id = str(p.get("event_id") or f"{p.get('away_team')}@{p.get('home_team')}")
+                sel = str(p.get("selection") or "").lower()
+                m_ver = str(p.get("model_id") or p.get("model_version") or "")
+
+                key = (ev_id, sel, m_ver) if (ev_id and sel) else p_id
+                if key in seen_pick_keys:
+                    continue
+                seen_pick_keys.add(key)
+                combined_picks.append(p)
+
+            picks = combined_picks
 
         result = AutoExecutionResult()
         now = utc_now()
