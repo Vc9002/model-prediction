@@ -19,7 +19,6 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from model_prediction.audit import AuditLog
 from model_prediction.data_sources.polymarket_execute import (
@@ -48,18 +47,23 @@ if _env_file.exists():
         pass
 
 DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
+    "mlb-elo-trend-lr-v8",
     "tennis-surface-elo-v1",
     "soccer-poisson-dc-v1",
     "wnba-elo-trend-lr-v4",
+    "wnba-spread-margin-v2",
+    "wnba-total-margin-v2",
     "cs2-tiered-elo-v6",
     "lol-tiered-elo-v6",
-    "mlb-nrfi-v1",
+    "mlb-nrfi-v2",
     "measured-edge-totals-v3",
 )
 
 EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
     "measured-edge-margin-v3",  # MLB run line (negative EV)
-    "wnba-spread-margin-v1",  # WNBA spread (severe miscalibration)
+    "wnba-spread-margin-v1",  # Legacy WNBA spread (severe miscalibration)
+    "wnba-total-margin-v1",  # Legacy WNBA totals (uncalibrated static SD)
+    "mlb-nrfi-v1",  # Legacy MLB NRFI
     "cfb-total-v1",  # CFB total (uncalibrated)
 )
 
@@ -393,8 +397,6 @@ class AutoPolymarketBuyer:
 
         result = AutoExecutionResult()
         now = utc_now()
-        EASTERN = ZoneInfo("America/New_York")
-        now_et = now.astimezone(EASTERN)
         current_spend = 0.0
         bought_index = self._build_bought_index()
 
@@ -434,9 +436,8 @@ class AutoPolymarketBuyer:
                 result.rejected_started += 1
                 continue
 
-            # Block games scheduled for tomorrow or distant future (enforce today's slate)
-            start_et = event_start.astimezone(EASTERN)
-            if start_et.date() > now_et.date() or (event_start - now).total_seconds() > 14.0 * 3600:
+            # Block games scheduled distant future (enforce current 24h active slate)
+            if (event_start - now).total_seconds() > 24.0 * 3600:
                 result.rejected_future_slate += 1
                 continue
 

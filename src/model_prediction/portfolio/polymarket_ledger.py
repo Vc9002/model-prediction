@@ -7,6 +7,7 @@ renderers, audit logging, and settlement.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import re
 from datetime import datetime
@@ -182,6 +183,7 @@ def record_polymarket_orders(
 def settle_polymarket_ledger_rows(
     data_root: Path | str | None = None,
     espn_client: Any | None = None,
+    resettle_all: bool = False,
 ) -> dict[str, Any]:
     """Settle open rows in the Polymarket Edge Ledger against ESPN and match scores."""
     from ..data_sources.espn import ESPNClient
@@ -227,12 +229,13 @@ def settle_polymarket_ledger_rows(
 
     for row in rows:
         status = str(row.get("status") or "").lower()
-        if status != "open":
+        if not resettle_all and status != "open":
             continue
 
-        open_count += 1
         event_start_str = str(row.get("event_start_utc") or "")
         if not event_start_str:
+            if status == "open":
+                open_count += 1
             continue
 
         try:
@@ -240,12 +243,24 @@ def settle_polymarket_ledger_rows(
             if start_dt.tzinfo is None:
                 start_dt = start_dt.replace(tzinfo=now.tzinfo)
         except (ValueError, TypeError):
+            if status == "open":
+                open_count += 1
             continue
 
-        # Check games that have already started
+        # Check games that have not yet started: keep them open
         if start_dt > now:
+            if status != "open" or row.get("result"):
+                row["status"] = "open"
+                row["result"] = ""
+                row["pnl_units"] = ""
+                row["settled_at_utc"] = ""
+                row["away_score"] = ""
+                row["home_score"] = ""
+                modified = True
+            open_count += 1
             continue
 
+        open_count += 1
         lg = str(row.get("league") or "").upper()
         if lg == "POLYMARKET" or not lg:
             espn_leagues = ("mlb", "wnba", "nba", "nfl", "eng.1", "esp.1", "ger.1", "ita.1", "fra.1", "usa.1")
@@ -255,8 +270,9 @@ def settle_polymarket_ledger_rows(
             check_tennis = lg in ("TENNIS", "WTA", "ATP")
 
         game_day = start_dt.date().isoformat()
-        away_name = str(row.get("away_team") or "").casefold()
-        home_name = str(row.get("home_team") or "").casefold()
+        away_name = str(row.get("away_team") or "").casefold().strip()
+        home_name = str(row.get("home_team") or "").casefold().strip()
+        slug = str(row.get("market_slug") or "")
 
         match_found = None
 
@@ -275,18 +291,32 @@ def settle_polymarket_ledger_rows(
                                 if len(comps) != 2:
                                     continue
                                 c1, c2 = comps[0], comps[1]
-                                n1 = str((c1.get("athlete") or {}).get("displayName", "")).casefold()
-                                n2 = str((c2.get("athlete") or {}).get("displayName", "")).casefold()
+                                n1 = str((c1.get("athlete") or {}).get("displayName", "")).casefold().strip()
+                                n2 = str((c2.get("athlete") or {}).get("displayName", "")).casefold().strip()
+                                if (
+                                    not n1
+                                    or not n2
+                                    or n1 in ("none", "tbd", "unknown")
+                                    or n2 in ("none", "tbd", "unknown")
+                                    or not home_name
+                                    or not away_name
+                                ):
+                                    continue
                                 if (home_name in n1 or n1 in home_name) and (
                                     away_name in n2 or n2 in away_name
                                 ):
-                                    match_found = (1 if c2.get("winner") else 0, 1 if c1.get("winner") else 0)
-                                    break
+                                    home_c, away_c = c1, c2
                                 elif (home_name in n2 or n2 in home_name) and (
                                     away_name in n1 or n1 in away_name
                                 ):
-                                    match_found = (1 if c1.get("winner") else 0, 1 if c2.get("winner") else 0)
-                                    break
+                                    home_c, away_c = c2, c1
+                                else:
+                                    continue
+
+                                a_win = 1 if away_c.get("winner") else 0
+                                h_win = 1 if home_c.get("winner") else 0
+                                match_found = (a_win, h_win)
+                                break
                             if match_found:
                                 break
                         if match_found:
@@ -294,10 +324,7 @@ def settle_polymarket_ledger_rows(
                     if match_found:
                         break
             except Exception:
-                # Best-effort enrichment: this lookup is one of several result
-                # sources tried in turn, so a failure here must fall through to
-                # the ESPN scoreboard pass below rather than abort settlement.
-                logger.warning("polymarket result lookup failed", exc_info=True)
+                logger.warning("polymarket tennis scoreboard lookup failed", exc_info=True)
 
         if match_found is None:
             for espn_lg in espn_leagues:
@@ -314,23 +341,50 @@ def settle_polymarket_ledger_rows(
                         c_home = next((c for c in comps if c.get("homeAway") == "home"), comps[0])
 
                         h_names = {
-                            str(c_home.get("team", {}).get("displayName") or "").casefold(),
-                            str(c_home.get("team", {}).get("name") or "").casefold(),
-                            str(c_home.get("team", {}).get("abbreviation") or "").casefold(),
+                            str(c_home.get("team", {}).get("displayName") or "").casefold().strip(),
+                            str(c_home.get("team", {}).get("name") or "").casefold().strip(),
+                            str(c_home.get("team", {}).get("abbreviation") or "").casefold().strip(),
                         }
                         a_names = {
-                            str(c_away.get("team", {}).get("displayName") or "").casefold(),
-                            str(c_away.get("team", {}).get("name") or "").casefold(),
-                            str(c_away.get("team", {}).get("abbreviation") or "").casefold(),
+                            str(c_away.get("team", {}).get("displayName") or "").casefold().strip(),
+                            str(c_away.get("team", {}).get("name") or "").casefold().strip(),
+                            str(c_away.get("team", {}).get("abbreviation") or "").casefold().strip(),
                         }
+                        for bad in ("", "none", "tbd", "unknown"):
+                            h_names.discard(bad)
+                            a_names.discard(bad)
+                        if not h_names or not a_names or not home_name or not away_name:
+                            continue
 
-                        if (
-                            home_name in h_names or any(hn in home_name for hn in h_names if len(hn) > 3)
-                        ) and (away_name in a_names or any(an in away_name for an in a_names if len(an) > 3)):
+                        h_match_normal = home_name in h_names or any(
+                            (hn in home_name or home_name in hn) for hn in h_names if len(hn) > 3
+                        )
+                        a_match_normal = away_name in a_names or any(
+                            (an in away_name or away_name in an) for an in a_names if len(an) > 3
+                        )
+
+                        h_match_inverted = home_name in a_names or any(
+                            (an in home_name or home_name in an) for an in a_names if len(an) > 3
+                        )
+                        a_match_inverted = away_name in h_names or any(
+                            (hn in away_name or away_name in hn) for hn in h_names if len(hn) > 3
+                        )
+
+                        if h_match_normal and a_match_normal:
                             try:
                                 h_score = int(c_home.get("score", 0))
                                 a_score = int(c_away.get("score", 0))
                                 match_found = (a_score, h_score)
+                                break
+                            except (ValueError, TypeError):
+                                continue
+                        elif h_match_inverted and a_match_inverted:
+                            try:
+                                # When inverted: c_away is the row's home team, c_home is the row's away team
+                                h_score = int(c_away.get("score", 0))
+                                a_score = int(c_home.get("score", 0))
+                                match_found = (a_score, h_score)
+                                break
                             except (ValueError, TypeError):
                                 continue
                     if match_found is not None:
@@ -338,6 +392,41 @@ def settle_polymarket_ledger_rows(
                 except (KeyError, TypeError, ValueError, OSError):
                     logger.debug("Scoreboard lookup failed for %s on %s", espn_lg, game_day, exc_info=True)
                     continue
+
+        if match_found is None and slug:
+            try:
+                from ..data_sources.polymarket_us import PolymarketUSClient
+
+                pm_cli = PolymarketUSClient()
+                m_info = pm_cli.market(slug)
+                if m_info.get("status") == "MARKET_STATUS_RESOLVED":
+                    raw_outs = m_info.get("outcomes")
+                    raw_pxs = m_info.get("outcomePrices")
+                    outcomes = json.loads(raw_outs) if isinstance(raw_outs, str) else (raw_outs or [])
+                    prices = json.loads(raw_pxs) if isinstance(raw_pxs, str) else (raw_pxs or [])
+                    for out_name, out_px in zip(outcomes, prices):
+                        if str(out_px).strip() in ("1", "1.0", "1.00", "1.0000"):
+                            h_win = (
+                                1
+                                if (
+                                    home_name
+                                    and (home_name in out_name.casefold() or out_name.casefold() in home_name)
+                                )
+                                else 0
+                            )
+                            a_win = (
+                                1
+                                if (
+                                    away_name
+                                    and (away_name in out_name.casefold() or out_name.casefold() in away_name)
+                                )
+                                else 0
+                            )
+                            if h_win or a_win:
+                                match_found = (a_win, h_win)
+                            break
+            except (KeyError, TypeError, ValueError, OSError):
+                logger.debug("Polymarket market lookup failed for %s", slug, exc_info=True)
 
         if match_found is not None:
             a_score, h_score = match_found
@@ -347,7 +436,16 @@ def settle_polymarket_ledger_rows(
             except ValueError:
                 mtype = MarketType.MONEYLINE
 
-            sel = str(row.get("selection") or "home").lower()
+            sel_raw = str(row.get("selection") or "").casefold().strip()
+            if sel_raw in ("home", "long", "over", "yes", "nrfi", "away", "short", "under", "no", "yrfi"):
+                sel = sel_raw
+            elif sel_raw == home_name or (home_name and (sel_raw in home_name or home_name in sel_raw)):
+                sel = "home"
+            elif sel_raw == away_name or (away_name and (sel_raw in away_name or away_name in sel_raw)):
+                sel = "away"
+            else:
+                sel = sel_raw
+
             line_val = None
             if row.get("line") not in (None, ""):
                 try:
@@ -403,6 +501,15 @@ def settle_polymarket_ledger_rows(
             row["void_reason"] = "match_unresolved_after_48h"
             modified = True
             open_count -= 1
+        else:
+            if row.get("status") != "open" or row.get("result"):
+                row["status"] = "open"
+                row["result"] = ""
+                row["pnl_units"] = ""
+                row["settled_at_utc"] = ""
+                row["away_score"] = ""
+                row["home_score"] = ""
+                modified = True
 
     if modified:
         write_xlsx_rows_atomic(path, FIELDNAMES, rows)

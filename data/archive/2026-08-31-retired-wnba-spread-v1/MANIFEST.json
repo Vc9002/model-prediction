@@ -1,0 +1,28 @@
+{
+  "created_utc": "2026-08-31T02:08:00Z",
+  "reason": "Retirement of uncalibrated legacy WNBA spread model (wnba-spread-margin-v1) prior to deployment of composite wnba-spread-margin-v2.",
+  "retired_model_versions": [
+    "wnba-spread-margin-v1",
+    "wnba-spread-baseline-v1"
+  ],
+  "results": {
+    "model_ledger": {
+      "source": "data/model_ledgers/wnba-spread-margin.xlsx",
+      "archive_path": "data/archive/2026-08-31-retired-wnba-spread-v1/wnba-spread-margin.xlsx",
+      "archived_rows": 223,
+      "status": "reset_to_empty"
+    },
+    "main_ledger": {
+      "source": "data/main/wnba.xlsx",
+      "archive_path": "data/archive/2026-08-31-retired-wnba-spread-v1/main_wnba_spread_v1_archive.xlsx",
+      "archived_rows": 46,
+      "retained_rows": 93
+    },
+    "flat_ledger": {
+      "source": "data/flat/wnba.xlsx",
+      "archive_path": "data/archive/2026-08-31-retired-wnba-spread-v1/flat_wnba_spread_v1_archive.xlsx",
+      "archived_rows": 48,
+      "retained_rows": 112
+    }
+  }
+}

@@ -819,8 +819,8 @@ def build_first_inning_ledger(
 
         # --- Append this game to the accumulators (strictly-after discipline).
         for sid, opp_runs_key in (
-            (away_sid, "runs_1st_away"),
-            (home_sid, "runs_1st_home"),
+            (away_sid, "runs_1st_home"),
+            (home_sid, "runs_1st_away"),
         ):
             if sid is None:
                 continue

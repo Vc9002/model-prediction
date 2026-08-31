@@ -445,3 +445,58 @@ def test_auto_buyer_ledger_recording_and_backfill(tmp_path: Path):
     assert rows[0]["pick_id"] == "p_test_1"
     assert rows[0]["sportsbook"] == "polymarket_us"
     assert rows[0]["away_team"] == "San Diego Padres"
+
+
+def test_summarize_auto_buyer_performance():
+    from model_prediction.portfolio.auto_buyer_ledger import summarize_auto_buyer_performance
+
+    sample_records = [
+        {
+            "order_id": "1",
+            "status": "settled",
+            "result": "win",
+            "cost_usd": 0.50,
+            "pnl_usd": 0.50,
+            "pnl_units": 1.0,
+            "edge": 0.10,
+        },
+        {
+            "order_id": "2",
+            "status": "settled",
+            "result": "loss",
+            "cost_usd": 0.50,
+            "pnl_usd": -0.50,
+            "pnl_units": -1.0,
+            "edge": 0.08,
+        },
+        {
+            "order_id": "3",
+            "status": "settled",
+            "result": "win",
+            "cost_usd": 0.50,
+            "pnl_usd": 0.50,
+            "pnl_units": 1.0,
+            "edge": 0.06,
+        },
+        {
+            "order_id": "4",
+            "status": "open",
+            "result": "open",
+            "cost_usd": 0.50,
+            "pnl_usd": 0.0,
+            "pnl_units": 0.0,
+            "edge": 0.05,
+        },
+    ]
+
+    summary = summarize_auto_buyer_performance(sample_records)
+    assert summary["total_orders"] == 4
+    assert summary["settled_orders"] == 3
+    assert summary["open_orders"] == 1
+    assert summary["wins"] == 2
+    assert summary["losses"] == 1
+    assert summary["win_rate_pct"] == 66.7
+    assert summary["realized_pnl_usd"] == 0.50
+    assert summary["realized_pnl_units"] == 1.0
+    assert summary["realized_roi_pct"] == 33.3
+    assert summary["avg_edge_pct"] == 8.0

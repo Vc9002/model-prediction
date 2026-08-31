@@ -67,6 +67,8 @@ This document provides an exhaustive, code-verified audit of all identified defe
 - **Finding**: The Odds API credential has failed with `401 Unauthorized` for over 31 days.
 - **Remedy**: [`src/model_prediction/data_sources/api_football.py`](file:///Users/vincentc9002/model-prediction/src/model_prediction/data_sources/api_football.py) is implemented to query API-Football v3 endpoints. It remains dormant until the operator sets `API_FOOTBALL_KEY`.
 
+**Scope corrected 2026-08-30:** soccer *settlement* no longer needs any credential — `cli/settle.py` resolves results from ESPN by the event id already stored on each row (`soccer/all/summary?event=<id>`), taking open soccer rows from 0 to 53-of-57 resolvable. What still awaits `API_FOOTBALL_KEY` is *capture/pricing* for new soccer picks, not settlement.
+
 #### 2. Polymarket Market Coverage Gaps
 - **Finding**: Polymarket US captures executable BBO quotes for major markets (Moneyline, Runline/Spread, Game Totals). However:
   - First-Inning (NRFI/YRFI) quote slugs are absent from the odds tree.
@@ -96,6 +98,37 @@ This document provides an exhaustive, code-verified audit of all identified defe
 - **Finding**: 22 open rows in the ledger are $> 72\text{ hours}$ past their scheduled start time.
 - **Cause**: Polymarket rules maintain open markets for up to two weeks to allow for makeup games, whereas ESPN scoreboards immediately report games as postponed.
 - **Protocol**: Avoid bulk un-audited sweeps; clear stale rows via identity-scoped, operator-approved manual settlement scripts.
+
+**Root-caused 2026-08-31 (KBO/NPB subset).** The earlier working hypothesis — that
+`forecast_international_baseball_slate` was emitting wrong dates or flipped home/away —
+is **wrong**, and was worth disproving before voting to void: had the builder been at
+fault, voiding would have treated the symptom and the next slate would have produced
+the same rows again. It is not. Every one of the 34 open KBO/NPB rows resolves to a
+real scheduled game, on its own date, in its own home/away orientation, that the
+official league source still lists **with no score**: a bare `TeamA vs TeamB` play cell
+with an empty relay (KBO) or a `*` placeholder (NPB). Postponed games are replayed on a
+new date under a new `game_id`; the original calendar row stays scoreless forever. So
+`find_international_baseball_result` correctly returns `None` on every settle run,
+forever, and the pick can never leave `open`.
+
+The parser was not losing data — it was conflating "no result will ever exist" with
+"result not found", which is exactly what made these rows look mysterious. That
+distinction is now first-class: `parse_kbo_unplayed_rows` / `parse_npb_unplayed_calendar`
+and `international_baseball_unplayed_index` report the scheduled-but-scoreless set, so
+the claim can be *proved* against the live source rather than inferred from an absence.
+
+`scripts/void_postponed_international_baseball.py` implements the protocol above:
+identity-scoped, dry-run by default, re-verifies every row against the live source at
+run time, and leaves anything it cannot verify open. It applies a 72h grace window
+because the source draws no distinction between "postponed" and "not played yet" —
+only elapsed time can. First run (2026-08-31, operator authorised): **18 rows voided**
+(15 KBO, 3 NPB) to `settled/push` at 0.0000 units with a `void_reason` naming the
+source evidence, plus a `pick_voided` entry in `data/events.jsonl`; nothing was deleted.
+16 KBO rows (2026-08-28 and 08-30) were held back inside the grace window and are the
+expected next run. NPB is fully clear.
+
+This recurs whenever it rains in Korea or Japan, so the script is the standing
+instrument, not a one-off repair.
 
 #### 2. Retired vs Canonical Ledger Separation
 - **Finding**: Canonical ledger storage is strictly managed via SQLite (`RuntimePaths.ledger_db`). Legacy directories (`data/model_ledgers/`) froze on 2026-08-03 during the ledger migration.

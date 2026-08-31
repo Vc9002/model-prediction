@@ -1,6 +1,62 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
-**Last audited**: 2026-08-27 (see new section directly below)
+**Last audited**: 2026-08-31 (see new section directly below)
+
+## 2026-08-31 — KBO/NPB stale open rows: not a slate-builder bug, a postponement the source never scores
+
+**Symptom.** 34 open KBO/NPB research rows, the oldest 29 days past its start,
+none of which any settle run could ever close. `stale_open_rows` flagged them;
+nothing said why.
+
+**The hypothesis that was wrong, and why disproving it mattered.** The standing
+theory (carried in the 2026-08-31 handoff) was that
+`forecast_international_baseball_slate` was emitting wrong dates or flipped
+home/away — the KBO cache had zero games on 2026-08-05 and `Doosan Bears vs NC
+Dinos` appeared only on 08-18..20. If that had been true, voiding would have
+treated the symptom and the next slate would have regenerated the same rows.
+It is false. Checked against the cache, every one of the 34 rows matches a real
+scheduled game **in its own orientation** — 0 flipped, 0 date-shifted.
+
+**Root cause.** The official sources list a postponed game forever with no
+score: KBO renders a bare `<span>NC</span><em><span>vs</span></em><span>두산</span>`
+play cell with an empty relay, NPB a `*` placeholder. `parse_kbo_rows` correctly
+drops those (they are not results) — but nothing distinguished them from a
+genuine lookup miss, so `find_international_baseball_result` returned `None` on
+every run, forever. Live count for August 2026: **44 of 130 KBO rows** are in
+this state, including *every* game on 08-05..08-09 and on 08-28, which is
+exactly the set of dates the stale rows sit on. Makeup games are replayed under
+a new `game_id` on a new date, so the original row is never scored.
+
+**Fix.** Make "no result will ever exist" first-class rather than inferred from
+an absence: `parse_kbo_unplayed_rows` / `parse_npb_unplayed_calendar` and
+`international_baseball_unplayed_index` report the scheduled-but-scoreless set.
+`OfficialInternationalBaseballClient` grew `_kbo_month_payloads` /
+`_npb_month_pages` so the played and unplayed parses share one fetch loop
+instead of duplicating it.
+
+**Repair.** `scripts/void_postponed_international_baseball.py` — identity-scoped
+per `docs/SYSTEM_DEFECTS_AND_GAPS_AUDIT.md` D.1, dry-run by default,
+re-verifies every row against the live source at run time, leaves anything
+unverified open, and applies a 72h grace window because the source draws no
+distinction between "postponed" and "not played yet". Run 2026-08-31: **18
+voided** (15 kbo, 3 npb) to `settled/push` at 0.0000 units with a `void_reason`
+naming the evidence; 16 held inside the grace window; **0 unverified**. NPB
+fully clear. Backup taken and verified first
+(`ledgers.bak-postponed-intl-20260831T0230Z.db`, 19,206 records).
+
+**Caveat.** A future scheduled game renders identically to a postponed one —
+the source draws no distinction — which is why the grace window is a
+correctness requirement and not a convenience.
+
+```bash
+# prove the claim without mutating anything
+env MODEL_PREDICTION_RUNTIME_ROOT=$HOME/model-prediction-runtime \
+    MODEL_PREDICTION_LEDGER_AUTHORITY=sqlite PYTHONPATH=src:. \
+    .venv/bin/python scripts/void_postponed_international_baseball.py
+# regression tests for the new parsers
+env PYTHONPATH=src:. .venv/bin/python -m pytest tests/test_international_baseball.py -q
+```
+
 
 ## 2026-08-27 — Full-System Defect Audit, Serving Landmine Gating & Weather/Travel Reproduction
 

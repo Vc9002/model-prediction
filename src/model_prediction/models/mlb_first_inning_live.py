@@ -107,8 +107,8 @@ def live_first_inning_features(
         home_name = _starter_name_for(snap["players"], home_sid)
 
         for sid_name, opp_runs_key in (
-            (away_name, "runs_1st_away"),
-            (home_name, "runs_1st_home"),
+            (away_name, "runs_1st_home"),
+            (home_name, "runs_1st_away"),
         ):
             if sid_name is None:
                 continue

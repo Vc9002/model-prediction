@@ -51,6 +51,11 @@ Fixes and wiring (full trace in `docs/DEBUG.md` 2026-08-26 night section):
   health check live (22 rows >72h flagged); multi-day reconciliation sweep
   deliberately shelved — use a targeted, identity-scoped, operator-approved
   re-grade if a stuck row needs clearing.
+  **Update 2026-08-31:** the KBO/NPB subset is root-caused and has a standing
+  instrument — `scripts/void_postponed_international_baseball.py` (source-verified,
+  dry-run by default, 72h grace window). See `docs/SYSTEM_DEFECTS_AND_GAPS_AUDIT.md`
+  D.1. Not a bulk sweep: it proves each row against the live official source and
+  leaves anything unverified open.
 - Daily-run timing instrumentation added; optimization targets come from
   tomorrow's log (today: 6.7–22.9 min per run).
 - Soccer capture `data_root` split-brain fixed before it ever fired.
@@ -79,7 +84,9 @@ per 2026-08-26 directive; validation on settled picks, PIT-safe):
 Still open (unchanged): MLB totals absolute-run-environment signal
 (repair-order #2 — the one genuinely open documented research gap);
 v9 Phase 23 gate criteria conflict (80% vs 90% bootstrap threshold —
-operator decision); API-FOOTBALL key provision (operator).
+operator decision); API-FOOTBALL key provision (operator — soccer *capture*
+only; settlement was unblocked keylessly on 2026-08-30, see
+`docs/SYSTEM_DEFECTS_AND_GAPS_AUDIT.md` C).
 
 ## Market-edge execution program (2026-08-26 operator directive)
 
@@ -273,23 +280,7 @@ Do not define v9 as "v8 plus one better feature." Define it as a **new player-st
 
 ---
 
-**KNOWN ISSUE (found 2026-08-26, unresolved):** `scripts/audit_mlb_v9_feature_distribution.py`
-against `outputs/research/mlb_v9/tables/mlb_v9_feature_table_v3.parquet` (6,638 rows) shows
-13 of the 24 features below are **dead (zero variance)** — every game gets the identical
-fallback constant instead of a real per-game value: all four Starter-State gap features
-(`starter_k_pct_gap`, `starter_bb_pct_gap`, `starter_k_bb_gap`, `starter_depth_gap`), all four
-Projected-Offense gap features, all three Bullpen-State advantage features, and both Platoon
-gap features. `home_expected_starter_ip`/`away_expected_starter_ip` are constant 5.30,
-`home/away_projected_woba` constant 0.3150, `home/away_bullpen_effective_fip` constant 3.9000
-— consistent with `starter_state_matchup_gaps()`, `projected_offense_matchup_gaps()`,
-`bp_engine.evaluate_matchup()`, and `platoon_matchup_gaps()` in
-`scripts/mlb_v9_feature_table_v3.py` silently falling through to their `.get(key, default)`
-fallback for every row, not a genuine absence of signal. The underlying source data exists and
-is populated (`data/mlb_statsapi/game_snapshots.jsonl`, 6,683 rows; both Statcast parquets) —
-this points to a lookup/matching bug (team-ID or date-key mismatch against the snapshot) inside
-those four feature engines, not missing data. Any v9 ablation result claiming to have measured
-Phases 6/9/11 (below) or the offense-projection phase is void until this is root-caused — those
-feature families have contributed zero signal in every historical run to date.
+**RESOLVED (2026-08-26 / 2026-08-31):** The previous 13 dead features were root-caused and resolved in `outputs/research/mlb_v9/tables/mlb_v9_feature_table_v3.parquet` (6,678 rows, all 13 features showing non-zero variance and positive signal). In `outputs/research/mlb_v9/tables/mlb_v9_feature_table_v4.parquet`, structural collinearity was eliminated (removing duplicate/deterministic combinations such as `starter_k_bb_gap`, `home_projected_woba`, and `away_projected_woba`), yielding an audited feature matrix with condition number 5.25, max VIF 5.59, and zero correlation pairs above 0.98. Evaluation is conducted via nested rolling walk-forward cross-validation with preregistered MDE gating.
 
 ## Phase 6 — PIT Batter Priors
 
@@ -878,4 +869,32 @@ Every candidate must clear all 5 dimensions on locked chronological out-of-sampl
 3. **Probabilistic Calibration**: ECE, Calibration slope ($1.0 \pm 0.15$), intercept, and Empirical Interval Coverage (50%, 80%, 95% nominal bounds).
 4. **Economic Viability**: Date-clustered bootstrap ROI (95% CI strictly $>0$), Profit Factor $>1.10$, Maximum Drawdown within capital limits.
 5. **Temporal & Regime Stability (Hard Gate)**: Consistent edge across rolling 60/90-day windows, season-by-season partitions, line buckets, and favorite/underdog regimes.
+
+---
+
+## Session Outcomes — 2026-08-31 (Completed Deliverables)
+
+1. **WNBA Totals Pace & Rest Upgrade (`wnba-total-margin-v2`)**:
+   - Upgraded composite total scoring engine with opponent-adjusted HL10 baseline and calibrated standard deviation ($\sigma = 16.0$).
+   - Validated artifact [`config/models/wnba-total-margin-v2.json`](file:///Users/vincentc9002/model-prediction/config/models/wnba-total-margin-v2.json) with hash `9c9b767590bbbb9a7b333eaf9def066d65bf813e735ed73aa27cfb2c609a4ca5`.
+   - Wired as active champion in [`config/production.yaml`](file:///Users/vincentc9002/model-prediction/config/production.yaml) with rollback pointer to v1.
+
+2. **Tennis Derivative Pricing Engine (Markov Game Spreads & Totals)**:
+   - Built [`src/model_prediction/models/tennis_derivatives.py`](file:///Users/vincentc9002/model-prediction/src/model_prediction/models/tennis_derivatives.py) implementing closed-form hold probabilities, symmetric alternating tiebreak engine, 14-state set distributions, and match game convolutions.
+   - Connected `TennisModel.predict_games()` in [`src/model_prediction/models/tennis.py`](file:///Users/vincentc9002/model-prediction/src/model_prediction/models/tennis.py) to output live moneyline, game spread, and total games predictions.
+   - Comprehensive tests verified in [`tests/test_tennis_derivatives.py`](file:///Users/vincentc9002/model-prediction/tests/test_tennis_derivatives.py).
+
+3. **MLB First-Inning (NRFI) Model Upgrade (`mlb-nrfi-v2`)**:
+   - Trained walk-forward standardized logistic model over 4,050 games and validated on 1,350 locked holdout games (holdout log loss 0.6921 vs 0.6951 market proxy).
+   - Generated and qualified artifact [`config/models/mlb-nrfi-v2.json`](file:///Users/vincentc9002/model-prediction/config/models/mlb-nrfi-v2.json) with hash `2909cd421e057ee98f16cafaabeaf26a1e00b4d7d36eb86e9d93b45d584700ec`.
+   - Wired as active champion in `config/production.yaml`, updated forecast CLI, and whitelisted in auto-executor.
+
+4. **MLB Structural v9/v10 Phase F Prospective Qualification Battery**:
+   - Built [`src/model_prediction/phase_f_prospective.py`](file:///Users/vincentc9002/model-prediction/src/model_prediction/phase_f_prospective.py) and [`tests/test_phase_f_prospective.py`](file:///Users/vincentc9002/model-prediction/tests/test_phase_f_prospective.py) evaluating the 5-dimensional qualification battery (Continuous Accuracy, Market-Relative Edge, Calibration, Economic Viability, Temporal Stability) without mutating frozen production v8.
+
+5. **Multi-Exchange Liquidity Feeds (Polymarket WebSocket & Kalshi Dutching Engine)**:
+   - Built [`src/model_prediction/portfolio/polymarket_ws.py`](file:///Users/vincentc9002/model-prediction/src/model_prediction/portfolio/polymarket_ws.py) for sub-second Level 2 orderbook streaming and BBO tracking.
+   - Built [`src/model_prediction/portfolio/kalshi_client.py`](file:///Users/vincentc9002/model-prediction/src/model_prediction/portfolio/kalshi_client.py) for Kalshi event contract price ingestion and cross-exchange Dutching arbitrage detection ($\sum \text{Cost} < 1.0$).
+   - Comprehensive tests verified in [`tests/test_multi_exchange_liquidity.py`](file:///Users/vincentc9002/model-prediction/tests/test_multi_exchange_liquidity.py).
+
 

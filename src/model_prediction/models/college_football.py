@@ -512,7 +512,7 @@ def build_cfb_slate(
         "game_date": iso_date,
         "sport": "ncaaf",
         "league": "NCAAF",
-        "status": "shadow_qualified",
+        "status": "research",
         "model_version": MODEL_VERSION,
         "model_code_hash": code_hash,
         "priced_contracts": priced_contracts,

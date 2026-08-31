@@ -12,6 +12,7 @@ from typing import Any
 
 from ..features.elo_ratings import expected_win_probability
 from .base import GamePrediction
+from .tennis_derivatives import price_tennis_derivatives
 
 TENNIS_MODEL_VERSION = "tennis-surface-elo-v1"
 DEFAULT_ELO = 1500.0
@@ -49,6 +50,9 @@ class UpcomingMatch:
     player_two: str
     surface: str = "Hard"
     tour: str = "ATP"
+    spread_player_one_line: float | None = None
+    total_games_line: float | None = None
+    best_of: int = 3
 
 
 class TennisModel:
@@ -131,42 +135,109 @@ class TennisModel:
                 overall, by_surface, surface_counts, match.player_one, match.player_two, match.surface
             )
             uncertainty = 0.05  # source of truth: config.TENNIS_MODEL_UNCERTAINTY
+
+            # Base serve point probability estimated from tour and surface Elo differential
+            base_serve = 0.635 if match.tour.upper() == "ATP" else 0.590
+            r1 = by_surface.get((match.player_one, match.surface), DEFAULT_ELO)
+            r2 = by_surface.get((match.player_two, match.surface), DEFAULT_ELO)
+            elo_diff = r1 - r2
+            p_serve_a = max(0.45, min(0.78, base_serve + (elo_diff / 2400.0)))
+            p_serve_b = max(0.45, min(0.78, base_serve - (elo_diff / 2400.0)))
+
+            deriv = price_tennis_derivatives(
+                p_serve_a=p_serve_a,
+                p_serve_b=p_serve_b,
+                spread_line=match.spread_player_one_line,
+                total_line=match.total_games_line,
+                best_of=match.best_of,
+            )
+
+            feature_basis = {
+                "surface": match.surface,
+                "elo_p1_surface": round(by_surface.get((match.player_one, match.surface), DEFAULT_ELO), 1),
+                "elo_p2_surface": round(by_surface.get((match.player_two, match.surface), DEFAULT_ELO), 1),
+                "history_matches": len(matches),
+                "min_player_matches": min(counts.get(match.player_one, 0), counts.get(match.player_two, 0)),
+                "expected_games_p1": deriv.expected_games_a,
+                "expected_games_p2": deriv.expected_games_b,
+                "expected_total_games": deriv.expected_total_games,
+            }
+
+            base_pred = {
+                "event_id": match.event_id,
+                "event_start_utc": match.event_start_utc,
+                "league": match.tour,
+                "away_team": match.player_one,
+                "home_team": match.player_two,
+                "uncertainty": uncertainty,
+                "model_version": self.version,
+                "feature_basis": feature_basis,
+            }
+
+            # 1. Moneyline
             predictions.append(
                 GamePrediction(
-                    event_id=match.event_id,
-                    event_start_utc=match.event_start_utc,
-                    league=match.tour,
-                    away_team=match.player_one,
-                    home_team=match.player_two,
                     market_type="moneyline",
                     line=None,
                     probabilities={
                         "away": round(p_one, 6),  # player_one mapped to "away" slot
                         "home": round(1 - p_one, 6),
                     },
-                    uncertainty=uncertainty,
-                    model_version=self.version,
-                    feature_basis={
-                        "surface": match.surface,
-                        "elo_p1_surface": round(
-                            by_surface.get((match.player_one, match.surface), DEFAULT_ELO), 1
-                        ),
-                        "elo_p2_surface": round(
-                            by_surface.get((match.player_two, match.surface), DEFAULT_ELO), 1
-                        ),
-                        "history_matches": len(matches),
-                        # Real per-player match count -- "known" above only
-                        # means at least one, which is a thin, noisy rating.
-                        "min_player_matches": min(
-                            counts.get(match.player_one, 0), counts.get(match.player_two, 0)
-                        ),
-                    },
                     rationale=(
                         f"Surface-blended Elo on {match.surface}: "
                         f"{match.player_one} p={p_one:.3f} vs {match.player_two}."
                     ),
+                    **base_pred,
                 )
             )
+
+            # 2. Game Spread
+            if (
+                match.spread_player_one_line is not None
+                and deriv.spread_p1_cover is not None
+                and deriv.spread_p2_cover is not None
+            ):
+                predictions.append(
+                    GamePrediction(
+                        market_type="spread",
+                        line=match.spread_player_one_line,
+                        probabilities={
+                            "away": round(deriv.spread_p1_cover, 6),
+                            "home": round(deriv.spread_p2_cover, 6),
+                            "away_cover": round(deriv.spread_p1_cover, 6),
+                            "home_cover": round(deriv.spread_p2_cover, 6),
+                        },
+                        rationale=(
+                            f"Tennis Markov spread line {match.spread_player_one_line:+.1f} games: "
+                            f"{match.player_one} cover {deriv.spread_p1_cover * 100:.1f}% vs {match.player_two}."
+                        ),
+                        **base_pred,
+                    )
+                )
+
+            # 3. Game Total
+            if (
+                match.total_games_line is not None
+                and deriv.total_over is not None
+                and deriv.total_under is not None
+            ):
+                predictions.append(
+                    GamePrediction(
+                        market_type="total",
+                        line=match.total_games_line,
+                        probabilities={
+                            "over": round(deriv.total_over, 6),
+                            "under": round(deriv.total_under, 6),
+                        },
+                        rationale=(
+                            f"Tennis Markov total games {match.total_games_line:.1f}: "
+                            f"Over {deriv.total_over * 100:.1f}%, Under {deriv.total_under * 100:.1f}% "
+                            f"(exp {deriv.expected_total_games:.1f} games)."
+                        ),
+                        **base_pred,
+                    )
+                )
+
         return predictions
 
 

@@ -762,3 +762,20 @@ def test_dashboard_ledger_filter_system_node_execution() -> None:
         capture_output=True,
     )
     assert result.stdout == "OK"
+
+
+def test_auto_buyer_consolidated_tab_markup_and_routing() -> None:
+    html = (ROOT / "dashboard.html").read_text(encoding="utf-8")
+    assert 'data-tab="auto-buyer-ledger"' in html
+    assert '<section id="tab-auto-buyer-ledger"' in html
+    assert 'id="autoBuyerKpis"' in html
+    assert 'id="btnAbsSettled"' in html
+    assert 'id="btnAbsPending"' in html
+    assert 'id="btnAbsAll"' in html
+    assert 'id="absPendingTable"' in html
+    assert 'id="absSettledTable"' in html
+    assert "renderAutoBuyer" in html
+    assert "renderAutoBuyerSettle" in html
+    assert "renderAutoBuyerLedger" in html
+    assert "settleAutoBuyerTrades" in html
+    assert "runAutoBuyerNow" in html

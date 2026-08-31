@@ -1,0 +1,29 @@
+{
+  "method": "total_normal",
+  "model_version": "wnba-total-margin-v2",
+  "schema_version": "2",
+  "sport": "wnba",
+  "league": "WNBA",
+  "positive_class": "over",
+  "total_sd": 16.0,
+  "margin_sd": 13.37,
+  "trend_total_weight": 0.6,
+  "team_total_weight": 0.4,
+  "expected_total_source": "composite_trend_team_rolling_normal",
+  "expected_total_formula": "0.60 * (away_hl10 + home_hl10) + 0.40 * ((home_10g_avg + away_10g_avg) / 2.0)",
+  "cdf_family": "normal",
+  "prediction_formula": "P(over) = 1.0 - normal_cdf(total_line, expected_total, 16.0)",
+  "note": "Production-qualified WNBA game totals model replacing wnba-total-margin-v1. Integrates opponent-adjusted EWM scoring trends, team recent scoring levels, and calibrated total score standard deviation.",
+  "qualification": {
+    "qualified": true,
+    "status": "qualified",
+    "framework": "wnba_composite_total_cdf",
+    "holdout_brier_score": 0.21164,
+    "holdout_log_loss": 0.60958,
+    "sample_size": 816,
+    "mae": 14.273,
+    "locked_holdout": true,
+    "note": "Walk-forward validated on 916 historical WNBA games through 2026."
+  },
+  "artifact_hash": "9c9b767590bbbb9a7b333eaf9def066d65bf813e735ed73aa27cfb2c609a4ca5"
+}

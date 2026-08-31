@@ -348,7 +348,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <div class="rail-label">Polymarket US</div>
       <button data-tab="polymarket">Edge Scanner</button>
       <button data-tab="poly-ledger">Edge Ledger</button>
-      <button data-tab="auto-buyer-ledger">Auto-Buyer Ledger</button>
+      <button data-tab="auto-buyer-ledger">Auto-Buyer</button>
     </div>
     <div class="rail-group">
       <div class="rail-label">System</div>
@@ -655,23 +655,51 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
 
   <section id="tab-auto-buyer-ledger" style="display:none">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
-      <h2 style="margin:0">🤖 Auto-Buyer Ledger — Dedicated Shares & Fills</h2>
-      <span class="chip dim">Live automated Polymarket purchases (0.5¢/U) | Whitelisted models only | Deduplication protected</span>
+      <h2 style="margin:0">🤖 Auto-Buyer — Execution & Realized Settlement</h2>
+      <span class="chip dim">Live automated Polymarket executions (0.5¢/U) · ESPN official outcome settlement · Realized ROI & P&L accounting</span>
       <span style="flex:1"></span>
-      <button onclick="renderAutoBuyerLedger(true)">↻ Refresh</button>
+      <button onclick="renderAutoBuyer(true)">↻ Refresh</button>
       <button onclick="runAutoBuyerNow()" style="background:rgba(51,209,126,0.15);color:var(--green);font-weight:700">⚡ Run Auto-Buyer</button>
-      <button class="primary" onclick="settleAutoBuyerTrades()">Settle Auto-Buyer Trades</button>
+      <button class="primary" id="btnSettleAutoBuyerNow" onclick="settleAutoBuyerTrades(true)" style="font-weight:700">⚖️ Settle Auto-Buyer Positions</button>
     </div>
     <div id="autoBuyerKpis" class="kpis" style="margin-bottom:16px"></div>
-    <div class="card" style="margin-bottom:16px">
+    <div id="autoBuyerSettleKpis" class="kpis" style="display:none"></div>
+
+    <div class="filter-bar" style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="primary" id="btnAbsSettled" onclick="setAbsFilter('settled')">Settled (<span id="absSettledCount">0</span>)</button>
+      <button id="btnAbsPending" onclick="setAbsFilter('pending')">Pending / Open (<span id="absPendingCount">0</span>)</button>
+      <button id="btnAbsAll" onclick="setAbsFilter('all')">All Positions (<span id="absAllCount">0</span>)</button>
+      <span style="width:8px"></span>
+      <select id="fSport_ABS" onchange="onAbsFilterChange()"><option value="">all sports</option></select>
+      <select id="fResult_ABS" onchange="onAbsFilterChange()"><option value="">all results</option><option value="win">win</option><option value="loss">loss</option><option value="push">push</option></select>
+      <input id="fSearch_ABS" placeholder="search team / slug / order ID..." size="26" oninput="onAbsFilterChange()">
+      <input id="fFrom_ABS" type="date" onchange="onAbsFilterChange()">
+      <input id="fTo_ABS" type="date" onchange="onAbsFilterChange()">
+      <button onclick="resetAbsFilters()">Reset</button>
+      <button onclick="exportAbsCsv()">Export CSV</button>
+    </div>
+
+    <div class="card" id="absPendingCard" style="margin-bottom:16px;display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <h3 style="margin:0">Automated Purchases & Positions</h3>
-        <span class="small dim" id="autoBuyerLastRunNotice">Last Run: —</span>
+        <h3 style="margin:0">⏳ Pending Settlement Queue (<span id="absPendingBadge">0</span>)</h3>
+        <span class="small dim">Awaiting match completion or official box score ingest</span>
       </div>
       <div style="overflow-x:auto">
-        <table class="data" id="autoBuyerTable"><tr><td>Loading Auto-Buyer ledger…</td></tr></table>
+        <table class="data" id="absPendingTable"><tr><td>Loading pending settlements…</td></tr></table>
       </div>
     </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <h3 style="margin:0" id="absTableTitle">📜 Settled Positions & Realized Trade Log</h3>
+        <span class="small dim" id="absSettledSummary">Showing settled contracts</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data" id="absSettledTable"><tr><td>Loading auto-buyer trades…</td></tr></table>
+        <table class="data" id="autoBuyerTable" style="display:none"></table>
+      </div>
+    </div>
+
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <h3 style="margin:0">📜 Operational Execution Log (data/logs/auto_buyer.log)</h3>
@@ -680,6 +708,9 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <pre id="autoBuyerLogBox" style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:var(--mono);font-size:11px;max-height:260px;overflow-y:auto;white-space:pre-wrap;color:var(--text)">Loading operational log…</pre>
     </div>
   </section>
+
+  <!-- Legacy Tab Alias Anchor (Maintains Full Routing Parity) -->
+  <section id="tab-auto-buyer-settle" style="display:none"></section>
   <section id="tab-settings" style="display:none">
     <div class="card" style="max-width:560px">
       <h2>Settings</h2>
@@ -884,6 +915,7 @@ $$("#tabs button").forEach(b=>b.onclick=()=>{
   if(b.dataset.tab==="polymarket")loadPolymarketScanner();
   if(b.dataset.tab==="poly-ledger")renderPolyLedger(false);
   if(b.dataset.tab==="auto-buyer-ledger")renderAutoBuyerLedger(false);
+  if(b.dataset.tab==="auto-buyer-settle")renderAutoBuyerSettle(false);
 });
 
 /* ---------- settings ---------- */
@@ -3637,8 +3669,9 @@ async function runAutoBuyerNow(){
   }
 }
 
-/* ---------- Auto-Buyer Dedicated Ledger & Log ---------- */
+/* ---------- Auto-Buyer Consolidated Execution & Settlement ---------- */
 let _autoBuyerLedgerCache = [];
+let _absFilterMode = "settled";
 
 async function loadAutoBuyerLedgerCache(force = false) {
   if (!force && _autoBuyerLedgerCache && _autoBuyerLedgerCache.length) return;
@@ -3653,94 +3686,259 @@ async function loadAutoBuyerLedgerCache(force = false) {
   }
 }
 
-async function renderAutoBuyerLedger(force = false) {
+async function renderAutoBuyer(force = false) {
   await loadAutoBuyerLedgerCache(force);
   await loadAutoBuyerStatus();
-  renderAutoBuyerTable();
+  renderAutoBuyerKpis();
+  populateAbsSportDropdown();
+  renderAutoBuyerTables();
   await loadAutoBuyerLog();
 }
 
-function renderAutoBuyerTable() {
-  const rows = _autoBuyerLedgerCache || [];
-  const active = rows.filter(r => String(r.status || "").toLowerCase() === "open").length;
-  const settled = rows.filter(r => String(r.status || "").toLowerCase() === "settled");
-  const wins = settled.filter(r => r.result === "win").length;
-  const losses = settled.filter(r => r.result === "loss").length;
-  const hasSettled = wins + losses > 0;
-  const totalCostUsd = rows.reduce((s, r) => s + (Number(r.cost_usd) || 0), 0);
-  const totalPnlUsd = rows.reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
-  const totalPnlUnits = rows.reduce((s, r) => s + (Number(r.pnl_units) || 0), 0);
-  const avgEdge = rows.length ? rows.reduce((s, r) => s + (Number(r.edge) || 0), 0) / rows.length : 0;
+const renderAutoBuyerLedger = renderAutoBuyer;
+const renderAutoBuyerSettle = renderAutoBuyer;
 
-  const kpisEl = $("#autoBuyerKpis");
-  if (kpisEl) {
-    kpisEl.innerHTML = `
-      <div class="k"><b>${rows.length}</b><span>shares bought</span></div>
-      <div class="k"><b class="green">${active}</b><span>open positions</span></div>
-      <div class="k"><b>$${totalCostUsd.toFixed(2)}</b><span>total invested</span></div>
-      <div class="k"><b>${hasSettled ? `${wins}-${losses}` : '0-0'}</b><span>record (${hasSettled ? pct(wins/(wins+losses)) : '—'})</span></div>
-      <div class="k"><b class="${totalPnlUsd >= 0 ? 'green' : 'red'}">$${totalPnlUsd >= 0 ? '+' : ''}${totalPnlUsd.toFixed(2)}</b><span>realized P&L (${totalPnlUnits >= 0 ? '+' : ''}${totalPnlUnits.toFixed(1)}U)</span></div>
-      <div class="k"><b class="green">+${(avgEdge * 100).toFixed(1)}%</b><span>avg model edge</span></div>
-    `;
+function populateAbsSportDropdown() {
+  const select = $("#fSport_ABS");
+  if (!select) return;
+  const curr = select.value;
+  const sports = new Set();
+  (_autoBuyerLedgerCache || []).forEach(r => {
+    const sp = (r.sport || "").toUpperCase();
+    if (sp) sports.add(sp);
+  });
+  let html = '<option value="">all sports</option>';
+  Array.from(sports).sort().forEach(sp => {
+    html += `<option value="${esc(sp)}" ${sp === curr ? 'selected' : ''}>${esc(sp)}</option>`;
+  });
+  select.innerHTML = html;
+}
+
+function renderAutoBuyerKpis() {
+  const rows = _autoBuyerLedgerCache || [];
+  const settledRows = rows.filter(r => String(r.status || "").toLowerCase() === "settled" || ["win", "loss", "push"].includes(String(r.result || "").toLowerCase()));
+  const openRows = rows.filter(r => !settledRows.includes(r));
+  const wins = settledRows.filter(r => r.result === "win").length;
+  const losses = settledRows.filter(r => r.result === "loss").length;
+  const pushes = settledRows.filter(r => r.result === "push").length;
+  const settledTotal = wins + losses + pushes;
+
+  const totalCostSettled = settledRows.reduce((s, r) => s + (Number(r.cost_usd) || 0), 0);
+  const totalCostAll = rows.reduce((s, r) => s + (Number(r.cost_usd) || 0), 0);
+  const totalPnlUsd = settledRows.reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
+  const totalPnlUnits = settledRows.reduce((s, r) => s + (Number(r.pnl_units) || 0), 0);
+  const roiPct = totalCostSettled > 0 ? (totalPnlUsd / totalCostSettled) * 100 : 0;
+  const avgEdge = settledRows.length ? (settledRows.reduce((s, r) => s + (Number(r.edge) || 0), 0) / settledRows.length) * 100 : 0;
+
+  if ($("#absSettledCount")) $("#absSettledCount").textContent = settledRows.length;
+  if ($("#absPendingCount")) $("#absPendingCount").textContent = openRows.length;
+  if ($("#absAllCount")) $("#absAllCount").textContent = rows.length;
+  if ($("#absPendingBadge")) $("#absPendingBadge").textContent = openRows.length;
+
+  const kpisHtml = `
+    <div class="k"><b class="${totalPnlUsd >= 0 ? 'green' : 'red'}">$${totalPnlUsd >= 0 ? '+' : ''}${totalPnlUsd.toFixed(2)}</b><span>Realized P&L (${totalPnlUnits >= 0 ? '+' : ''}${totalPnlUnits.toFixed(2)}U)</span></div>
+    <div class="k"><b class="green">${wins}W - ${losses}L${pushes ? ` - ${pushes}P` : ''}</b><span>Settled Record (${settledTotal > 0 ? ((wins / (wins + losses || 1)) * 100).toFixed(1) : 0}%)</span></div>
+    <div class="k"><b class="${roiPct >= 0 ? 'green' : 'red'}">${roiPct >= 0 ? '+' : ''}${roiPct.toFixed(1)}%</b><span>Realized ROI on Staked</span></div>
+    <div class="k"><b>$${totalCostSettled.toFixed(2)}</b><span>Settled Capital ($${totalCostAll.toFixed(2)} total)</span></div>
+    <div class="k"><b class="${openRows.length > 0 ? 'yellow' : 'dim'}">${openRows.length}</b><span>Pending Settlement</span></div>
+    <div class="k"><b class="green">+${avgEdge.toFixed(1)}%</b><span>Avg Settlement Edge</span></div>
+  `;
+
+  if ($("#autoBuyerKpis")) $("#autoBuyerKpis").innerHTML = kpisHtml;
+  if ($("#autoBuyerSettleKpis")) $("#autoBuyerSettleKpis").innerHTML = kpisHtml;
+}
+
+function setAbsFilter(mode) {
+  _absFilterMode = mode;
+  ["settled", "pending", "all"].forEach(m => {
+    const btn = $("#btnAbs" + m.charAt(0).toUpperCase() + m.slice(1));
+    if (btn) {
+      if (m === mode) btn.classList.add("primary");
+      else btn.classList.remove("primary");
+    }
+  });
+  renderAutoBuyerTables();
+}
+
+function onAbsFilterChange() {
+  renderAutoBuyerTables();
+}
+
+function resetAbsFilters() {
+  if ($("#fSport_ABS")) $("#fSport_ABS").value = "";
+  if ($("#fResult_ABS")) $("#fResult_ABS").value = "";
+  if ($("#fSearch_ABS")) $("#fSearch_ABS").value = "";
+  if ($("#fFrom_ABS")) $("#fFrom_ABS").value = "";
+  if ($("#fTo_ABS")) $("#fTo_ABS").value = "";
+  setAbsFilter("settled");
+}
+
+function getFilteredAbsRows() {
+  const rows = _autoBuyerLedgerCache || [];
+  const sport = ($("#fSport_ABS") ? $("#fSport_ABS").value : "").toUpperCase();
+  const resFilter = ($("#fResult_ABS") ? $("#fResult_ABS").value : "").toLowerCase();
+  const search = ($("#fSearch_ABS") ? $("#fSearch_ABS").value : "").toLowerCase().trim();
+  const fromDate = $("#fFrom_ABS") ? $("#fFrom_ABS").value : "";
+  const toDate = $("#fTo_ABS") ? $("#fTo_ABS").value : "";
+
+  return rows.filter(r => {
+    const isSettled = String(r.status || "").toLowerCase() === "settled" || ["win", "loss", "push"].includes(String(r.result || "").toLowerCase());
+    const isOpen = !isSettled;
+
+    if (_absFilterMode === "settled" && !isSettled) return false;
+    if (_absFilterMode === "pending" && !isOpen) return false;
+
+    if (sport && (r.sport || "").toUpperCase() !== sport) return false;
+    if (resFilter) {
+      if (resFilter === "open" && !isOpen) return false;
+      if (resFilter !== "open" && (r.result || "").toLowerCase() !== resFilter) return false;
+    }
+
+    const dateStr = (r.event_start_utc || r.executed_at_utc || "").slice(0, 10);
+    if (fromDate && dateStr < fromDate) return false;
+    if (toDate && dateStr > toDate) return false;
+
+    if (search) {
+      const matchText = `${r.order_id || ''} ${r.pick_id || ''} ${r.home_team || ''} ${r.away_team || ''} ${r.market_slug || ''} ${r.selection || ''} ${r.sport || ''} ${r.model_id || ''}`.toLowerCase();
+      if (!matchText.includes(search)) return false;
+    }
+    return true;
+  });
+}
+
+function renderAutoBuyerTables() {
+  const filtered = getFilteredAbsRows();
+  const openRows = (_autoBuyerLedgerCache || []).filter(r => String(r.status || "").toLowerCase() !== "settled" && !["win", "loss", "push"].includes(String(r.result || "").toLowerCase()));
+
+  const pendingCard = $("#absPendingCard");
+  if (pendingCard) {
+    if (_absFilterMode === "pending" || (openRows.length > 0 && _absFilterMode === "all")) {
+      pendingCard.style.display = "";
+      renderAbsPendingTable(openRows);
+    } else {
+      pendingCard.style.display = "none";
+    }
   }
 
-  const tableEl = $("#autoBuyerTable");
+  const tableTitle = $("#absTableTitle");
+  if (tableTitle) {
+    tableTitle.textContent = _absFilterMode === "pending" ? "⏳ Pending Unsettled Orders" : _absFilterMode === "all" ? "📜 All Auto-Buyer Orders" : "📜 Settled Positions & Realized P&L";
+  }
+
+  const summary = $("#absSettledSummary");
+  if (summary) {
+    summary.textContent = `Showing ${filtered.length} positions`;
+  }
+
+  const tableEl = $("#absSettledTable");
   if (!tableEl) return;
 
   let html = `
     <thead>
       <tr>
+        <th>Date / Time</th>
         <th>Order ID</th>
         <th>Sport</th>
         <th>Matchup</th>
-        <th>Pick / Market</th>
+        <th>Final Score</th>
+        <th>Pick</th>
         <th>Contract Slug</th>
-        <th>Side</th>
         <th>Shares</th>
-        <th>Price</th>
+        <th>Entry Price</th>
         <th>Cost ($)</th>
-        <th>Model (Prob vs Ask)</th>
-        <th>Edge</th>
-        <th>Status</th>
         <th>Result</th>
-        <th>P&L</th>
+        <th>Realized P&L</th>
+        <th>Settled At</th>
       </tr>
     </thead>
     <tbody>
   `;
 
-  if (!rows.length) {
-    html += '<tr><td colspan=14 class="dim" style="text-align:center;padding:24px">No auto-buyer shares recorded yet. Run Auto-Buyer to execute qualifying trades.</td></tr>';
+  if (!filtered.length) {
+    html += '<tr><td colspan=13 class="dim" style="text-align:center;padding:24px">No auto-buyer positions matching the current settlement filter.</td></tr>';
   } else {
-    const sorted = [...rows].reverse();
+    const sorted = [...filtered].reverse();
     sorted.forEach(r => {
       const isWin = r.result === "win";
       const isLoss = r.result === "loss";
-      const isOpen = String(r.status || "").toLowerCase() === "open";
-      const resBadge = isWin ? '<span class="badge green">WIN</span>' : isLoss ? '<span class="badge red">LOSS</span>' : '<span class="badge yellow">OPEN</span>';
-      const edgePct = (Number(r.edge) * 100).toFixed(1);
-      const modelProb = (Number(r.model_probability) * 100).toFixed(1);
-      const askProb = (Number(r.market_probability) * 100).toFixed(1);
+      const isPush = r.result === "push";
+      const isOpen = !isWin && !isLoss && !isPush;
+      const resBadge = isWin ? '<span class="badge green">WIN</span>' : isLoss ? '<span class="badge red">LOSS</span>' : isPush ? '<span class="badge yellow">PUSH</span>' : '<span class="badge yellow">PENDING</span>';
+
       const pnlUsd = Number(r.pnl_usd) || 0;
       const pnlUnits = Number(r.pnl_units) || 0;
-      const pnlStr = isOpen ? '—' : `<span class="${pnlUsd >= 0 ? 'green' : 'red'}">$${pnlUsd >= 0 ? '+' : ''}${pnlUsd.toFixed(2)} (${pnlUnits >= 0 ? '+' : ''}${pnlUnits.toFixed(1)}U)</span>`;
+      const pnlStr = isOpen ? '<span class="dim">—</span>' : `<span class="${pnlUsd >= 0 ? 'green' : 'red'}" style="font-weight:700">$${pnlUsd >= 0 ? '+' : ''}${pnlUsd.toFixed(2)} (${pnlUnits >= 0 ? '+' : ''}${pnlUnits.toFixed(2)}U)</span>`;
+
+      const scoreStr = (r.home_score !== undefined && r.home_score !== null && r.away_score !== undefined && r.away_score !== null)
+        ? `<span class="mono">${r.away_score} - ${r.home_score}</span>`
+        : '<span class="dim">—</span>';
+
+      const dateStr = (r.event_start_utc || r.executed_at_utc || '').slice(0, 16).replace('T', ' ');
+      const settledStr = (r.settled_at_utc || '').slice(0, 16).replace('T', ' ') || '<span class="dim">—</span>';
 
       html += `
         <tr>
+          <td class="mono small dim">${esc(dateStr)}</td>
           <td class="mono font-bold">${esc(r.order_id || '—')}</td>
           <td><span class="chip dim">${esc(r.sport || '')}</span></td>
           <td style="font-weight:600">${esc(r.away_team || '')} @ ${esc(r.home_team || '')}</td>
-          <td><span class="chip">${esc(r.selection || '')}</span> <span class="dim small">(${esc(r.market_type || 'ML')})</span></td>
+          <td>${scoreStr}</td>
+          <td><span class="chip ${r.token_side === 'long' ? 'green' : 'red'}">${esc(r.selection || '')} (${esc(r.market_type || 'ML')})</span></td>
           <td class="mono small dim">${esc(r.market_slug || '')}</td>
-          <td><span class="chip ${r.token_side === 'long' ? 'green' : 'red'}">${esc(String(r.token_side || '').toUpperCase())}</span></td>
           <td class="mono">${Number(r.shares || 1).toFixed(1)}</td>
           <td class="mono">$${Number(r.entry_price || 0).toFixed(2)}</td>
           <td class="mono font-bold">$${Number(r.cost_usd || 0).toFixed(2)}</td>
-          <td><span class="small dim">${esc(r.model_id || '')}</span><br><b>${modelProb}%</b> vs ${askProb}%</td>
-          <td><b class="green">+${edgePct}%</b></td>
-          <td><span class="chip ${isOpen ? 'yellow' : 'green'}">${esc(String(r.status || '').toUpperCase())}</span></td>
           <td>${resBadge}</td>
-          <td class="mono font-bold">${pnlStr}</td>
+          <td class="mono">${pnlStr}</td>
+          <td class="mono small dim">${settledStr}</td>
+        </tr>
+      `;
+    });
+  }
+  html += '</tbody>';
+  tableEl.innerHTML = html;
+}
+
+function renderAbsPendingTable(openRows) {
+  const tableEl = $("#absPendingTable");
+  if (!tableEl) return;
+  let html = `
+    <thead>
+      <tr>
+        <th>Start Time (UTC)</th>
+        <th>Order ID</th>
+        <th>Sport</th>
+        <th>Matchup</th>
+        <th>Pick</th>
+        <th>Contract Slug</th>
+        <th>Shares</th>
+        <th>Entry Price</th>
+        <th>Cost ($)</th>
+        <th>Model Edge</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+  `;
+  if (!openRows.length) {
+    html += '<tr><td colspan=11 class="dim" style="text-align:center;padding:16px">No pending positions awaiting settlement.</td></tr>';
+  } else {
+    openRows.forEach(r => {
+      const dateStr = (r.event_start_utc || '').slice(0, 16).replace('T', ' ');
+      const edgePct = (Number(r.edge) * 100).toFixed(1);
+      html += `
+        <tr>
+          <td class="mono small dim">${esc(dateStr)}</td>
+          <td class="mono font-bold">${esc(r.order_id || '—')}</td>
+          <td><span class="chip dim">${esc(r.sport || '')}</span></td>
+          <td style="font-weight:600">${esc(r.away_team || '')} @ ${esc(r.home_team || '')}</td>
+          <td><span class="chip ${r.token_side === 'long' ? 'green' : 'red'}">${esc(r.selection || '')} (${esc(r.market_type || 'ML')})</span></td>
+          <td class="mono small dim">${esc(r.market_slug || '')}</td>
+          <td class="mono">${Number(r.shares || 1).toFixed(1)}</td>
+          <td class="mono">$${Number(r.entry_price || 0).toFixed(2)}</td>
+          <td class="mono font-bold">$${Number(r.cost_usd || 0).toFixed(2)}</td>
+          <td><b class="green">+${edgePct}%</b></td>
+          <td><span class="badge yellow">AWAITING SCORE</span></td>
         </tr>
       `;
     });
@@ -3770,8 +3968,10 @@ async function loadAutoBuyerLog() {
   }
 }
 
-async function settleAutoBuyerTrades() {
+async function settleAutoBuyerTrades(fromButton = false) {
   if (!confirm("Settle all completed matches in the Auto-Buyer ledger and update realized P&L?")) return;
+  const btn = $("#btnSettleAutoBuyerNow");
+  if (btn) { btn.disabled = true; btn.textContent = "⏳ Settling..."; }
   try {
     const res = await fetch("/api/auto-buyer/settle", {
       method: "POST",
@@ -3783,10 +3983,26 @@ async function settleAutoBuyerTrades() {
     });
     const data = await res.json();
     alert(`Auto-Buyer settlement complete!\n\nSettled: ${data.settled}\nPending: ${data.pending}`);
-    renderAutoBuyerLedger(true);
+    await renderAutoBuyer(true);
   } catch (e) {
     alert("Auto-Buyer settlement failed: " + e);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "⚖️ Settle Auto-Buyer Positions"; }
   }
+}
+
+function exportAbsCsv() {
+  const rows = getFilteredAbsRows();
+  if (!rows.length) { alert("No auto-buyer settlement rows to export."); return; }
+  const cols = Object.keys(rows[0] || {});
+  const csv = [cols.join(",")].concat(rows.map(r => cols.map(c => {
+    let v = r[c] == null ? "" : typeof r[c] === "object" ? JSON.stringify(r[c]) : String(r[c]).replace(/"/g, '""');
+    return /[,"\n]/.test(v) ? `"${v}"` : v;
+  }).join(","))).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  a.download = "autobuyer_settlement_export.csv";
+  a.click();
 }
 
 if(location.protocol==="file:"){

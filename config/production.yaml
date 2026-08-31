@@ -22,20 +22,20 @@ prediction_service:
       artifact: config/models/wnba-elo-trend-lr-v4.json
       enabled: true
       rollback_model: null
-    - model_id: wnba-spread-margin-v1
+    - model_id: wnba-spread-margin-v2
       sport: WNBA
       market: spread
       implementation: json_artifact
-      artifact: config/models/wnba-spread-margin-v1.json
+      artifact: config/models/wnba-spread-margin-v2.json
       enabled: true
-      rollback_model: null
-    - model_id: wnba-total-margin-v1
+      rollback_model: wnba-spread-margin-v1
+    - model_id: wnba-total-margin-v2
       sport: WNBA
       market: total
       implementation: json_artifact
-      artifact: config/models/wnba-total-margin-v1.json
+      artifact: config/models/wnba-total-margin-v2.json
       enabled: true
-      rollback_model: null
+      rollback_model: wnba-total-margin-v1
     - model_id: mlb-elo-trend-lr-v8
       sport: MLB
       market: moneyline
@@ -57,13 +57,13 @@ prediction_service:
       artifact: config/models/measured-edge-totals-v3.json
       enabled: true
       rollback_model: null
-    - model_id: mlb-nrfi-v1
+    - model_id: mlb-nrfi-v2
       sport: MLB
       market: nrfi
       implementation: json_artifact
-      artifact: config/models/mlb-nrfi-v1.json
+      artifact: config/models/mlb-nrfi-v2.json
       enabled: true
-      rollback_model: null
+      rollback_model: mlb-nrfi-v1
     - model_id: nba-elo-trend-lr-v4
       sport: NBA
       market: moneyline
@@ -175,13 +175,13 @@ prediction_service:
   champions:
     WNBA:
       moneyline: wnba-elo-trend-lr-v4
-      spread: wnba-spread-margin-v1
-      total: wnba-total-margin-v1
+      spread: wnba-spread-margin-v2
+      total: wnba-total-margin-v2
     MLB:
       moneyline: mlb-elo-trend-lr-v8
       spread: measured-edge-margin-v3
       total: measured-edge-totals-v3
-      nrfi: mlb-nrfi-v1
+      nrfi: mlb-nrfi-v2
     NBA:
       moneyline: nba-elo-trend-lr-v4
     NFL:
@@ -211,12 +211,12 @@ prediction_service:
   # present; legacy v1/v2 configs derive from these instead.
   allowed_models:
     - wnba-elo-trend-lr-v4
-    - wnba-spread-margin-v1
-    - wnba-total-margin-v1
+    - wnba-spread-margin-v2
+    - wnba-total-margin-v2
     - mlb-elo-trend-lr-v8
     - measured-edge-margin-v3
     - measured-edge-totals-v3
-    - mlb-nrfi-v1
+    - mlb-nrfi-v2
     - nba-elo-trend-lr-v4
     - nfl-elo-trend-lr-v4
     - soccer-poisson-dc-v1
@@ -234,12 +234,12 @@ prediction_service:
 
   artifact_map:
     wnba-elo-trend-lr-v4: config/models/wnba-elo-trend-lr-v4.json
-    wnba-spread-margin-v1: config/models/wnba-spread-margin-v1.json
-    wnba-total-margin-v1: config/models/wnba-total-margin-v1.json
+    wnba-spread-margin-v2: config/models/wnba-spread-margin-v2.json
+    wnba-total-margin-v2: config/models/wnba-total-margin-v2.json
     mlb-elo-trend-lr-v8: config/models/mlb-elo-trend-lr-v8.json
     measured-edge-margin-v3: config/models/measured-edge-margin-v3.json
     measured-edge-totals-v3: config/models/measured-edge-totals-v3.json
-    mlb-nrfi-v1: config/models/mlb-nrfi-v1.json
+    mlb-nrfi-v2: config/models/mlb-nrfi-v2.json
     nba-elo-trend-lr-v4: config/models/nba-elo-trend-lr-v4.json
     nfl-elo-trend-lr-v4: config/models/nfl-elo-trend-lr-v4.json
     college-football-v1: config/models/college-football-v1.json

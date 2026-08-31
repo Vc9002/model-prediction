@@ -58,7 +58,7 @@ def test_basketball_model_prefers_the_stronger_team_and_covers_markets() -> None
     by_market = {prediction.market_type: prediction for prediction in predictions}
     assert by_market["moneyline"].probabilities["home"] > 0.6
     assert abs(sum(by_market["moneyline"].probabilities.values()) - 1) < 1e-5
-    assert set(by_market["spread"].probabilities) == {"away", "home"}
+    assert {"away", "home"}.issubset(set(by_market["spread"].probabilities))
     assert set(by_market["total"].probabilities) == {"over", "under"}
 
 

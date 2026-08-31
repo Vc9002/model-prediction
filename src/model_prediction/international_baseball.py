@@ -17,7 +17,7 @@ import html
 import json
 import logging
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
@@ -235,6 +235,82 @@ def parse_npb_calendar(page: str) -> list[dict[str, Any]]:
     return output
 
 
+def parse_kbo_unplayed_rows(payload: dict[str, Any], year: int) -> list[dict[str, Any]]:
+    """Games the official KBO schedule lists with **no score at all**.
+
+    Confirmed live 2026-08-31: a postponed KBO game keeps its calendar row
+    forever, rendered as a bare ``TeamA vs TeamB`` play cell with an empty
+    relay cell -- no scores, no gameId. ``parse_kbo_rows`` correctly drops
+    those (they are not results), but that leaves a research pick on such a
+    game unsettleable *forever*, indistinguishable from a genuine lookup
+    miss: 44 of August 2026's rows were in this state, including every game
+    on 08-05 through 08-09 and 08-28, which is exactly the set of dates the
+    stale open KBO rows sit on. Surfacing them as their own category is what
+    lets an operator prove "no result will ever exist" before voiding, rather
+    than inferring it from an absence.
+
+    A not-yet-played future game is rendered identically -- the source draws
+    no distinction -- so callers must supply the past-date judgement.
+    """
+    lookup = _team_lookup("kbo")
+    current_date: date | None = None
+    output: list[dict[str, Any]] = []
+    for entry in payload.get("rows", []):
+        cells = entry.get("row") or []
+        if not cells:
+            continue
+        date_cell = next((cell for cell in cells if cell.get("Class") == "day"), None)
+        if date_cell:
+            match = _KBO_DATE_RE.search(_plain_text(str(date_cell.get("Text") or "")))
+            if match:
+                current_date = date(year, int(match.group("month")), int(match.group("day")))
+        play_cell = next((cell for cell in cells if cell.get("Class") == "play"), None)
+        if current_date is None or not play_cell:
+            continue
+        spans = re.findall(r"<span(?:\s+class=\"[^\"]*\")?>(.*?)</span>", str(play_cell["Text"]))
+        values = [_plain_text(value) for value in spans]
+        # Exactly [away, "vs", home] -- a played game carries score spans on
+        # either side of the "vs", so anything longer is a result row (or a
+        # shape this parser does not claim to understand) and not ours.
+        if len(values) != 3 or values[1] != "vs":
+            continue
+        away_id, home_id = lookup.get(values[0]), lookup.get(values[2])
+        if away_id is None or home_id is None:
+            continue
+        output.append(
+            {
+                "league": "kbo",
+                "game_date": current_date.isoformat(),
+                "away_team_id": away_id,
+                "home_team_id": home_id,
+            }
+        )
+    return output
+
+
+def parse_npb_unplayed_calendar(page: str) -> list[dict[str, Any]]:
+    """NPB calendar rows whose score is the ``*`` unplayed placeholder."""
+    output: list[dict[str, Any]] = []
+    for match in _NPB_GAME_RE.finditer(page):
+        if "*" not in {match.group("away_score"), match.group("home_score")}:
+            continue
+        # Same deliberate swap as parse_npb_calendar: the NPB calendar's
+        # shorthand is HOME score - score VISITOR.
+        home_id, away_id = match.group("away").upper(), match.group("home").upper()
+        if away_id not in NPB_TEAMS or home_id not in NPB_TEAMS:
+            continue
+        game_id = match.group("game_id")
+        output.append(
+            {
+                "league": "npb",
+                "game_date": date.fromisoformat(f"{game_id[:4]}-{game_id[4:6]}-{game_id[6:8]}").isoformat(),
+                "away_team_id": away_id,
+                "home_team_id": home_id,
+            }
+        )
+    return output
+
+
 class OfficialInternationalBaseballClient:
     """Read-only client for official KBO and NPB public schedule pages."""
 
@@ -245,10 +321,8 @@ class OfficialInternationalBaseballClient:
             headers={"User-Agent": "model-prediction-research/1.0"},
         )
 
-    def kbo_year(self, year: int) -> tuple[list[dict[str, Any]], int]:
+    def _kbo_month_payloads(self, year: int) -> Iterator[dict[str, Any]]:
         self.client.get(KBO_SCHEDULE_PAGE).raise_for_status()
-        rows: list[dict[str, Any]] = []
-        requests = 1
         for month in range(3, 11):
             response = self.client.post(
                 KBO_RESULTS_ENDPOINT,
@@ -262,20 +336,42 @@ class OfficialInternationalBaseballClient:
                 headers={"Referer": KBO_SCHEDULE_PAGE, "X-Requested-With": "XMLHttpRequest"},
             )
             response.raise_for_status()
-            rows.extend(parse_kbo_rows(response.json(), year))
-            requests += 1
-        return rows, requests
+            yield response.json()
 
-    def npb_year(self, year: int) -> tuple[list[dict[str, Any]], int]:
-        rows: list[dict[str, Any]] = []
+    def _npb_month_pages(self, year: int) -> Iterator[str]:
         # The official October calendar mixes late regular-season games with
         # Climax/Japan Series games without a machine-readable competition
         # field.  Exclude it rather than contaminate the regular-season model.
         for month in range(4, 10):
             response = self.client.get(NPB_CALENDAR_TEMPLATE.format(year=year, month=month))
             response.raise_for_status()
-            rows.extend(parse_npb_calendar(response.text))
+            yield response.text
+
+    def kbo_year(self, year: int) -> tuple[list[dict[str, Any]], int]:
+        rows: list[dict[str, Any]] = []
+        requests = 1
+        for payload in self._kbo_month_payloads(year):
+            rows.extend(parse_kbo_rows(payload, year))
+            requests += 1
+        return rows, requests
+
+    def npb_year(self, year: int) -> tuple[list[dict[str, Any]], int]:
+        rows: list[dict[str, Any]] = []
+        for page in self._npb_month_pages(year):
+            rows.extend(parse_npb_calendar(page))
         return rows, 6
+
+    def kbo_year_unplayed(self, year: int) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for payload in self._kbo_month_payloads(year):
+            rows.extend(parse_kbo_unplayed_rows(payload, year))
+        return rows
+
+    def npb_year_unplayed(self, year: int) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for page in self._npb_month_pages(year):
+            rows.extend(parse_npb_unplayed_calendar(page))
+        return rows
 
 
 def backfill_international_baseball(
@@ -567,6 +663,48 @@ def find_international_baseball_result(
                 client=source,
             )
     return _match()
+
+
+def international_baseball_unplayed_index(
+    league: str,
+    year: int,
+    client: OfficialInternationalBaseballClient | None = None,
+) -> set[tuple[str, str, str]]:
+    """``(game_date, away_team_id, home_team_id)`` for every scheduled game
+    the official source still shows with no score.
+
+    One fetch of the season serves an arbitrary number of lookups, which is
+    why this returns an index rather than answering a single game -- the
+    per-row alternative would re-fetch eight monthly payloads per pick.
+    """
+    league = league.lower()
+    if league not in LEAGUE_SPECS:
+        raise ValueError(f"unsupported international baseball league: {league}")
+    source = client or OfficialInternationalBaseballClient()
+    rows = source.kbo_year_unplayed(year) if league == "kbo" else source.npb_year_unplayed(year)
+    return {(row["game_date"], row["away_team_id"], row["home_team_id"]) for row in rows}
+
+
+def international_baseball_team_id(
+    data_root: str | Path,
+    league: str,
+    team_name: str,
+) -> str | None:
+    """Resolve a Polymarket team-name string to this league's team id.
+
+    Ledger rows carry Polymarket's naming, not the official source's -- the
+    same reason `find_international_baseball_result` matches on team alias.
+    Returns None when the name is unknown or ambiguous; a caller comparing
+    identities must never fall back to a guess.
+    """
+    league = league.lower()
+    teams_path = Path(data_root) / "international_baseball" / league / "teams.json"
+    if not teams_path.exists():
+        return None
+    candidates = _team_alias_index(json.loads(teams_path.read_text(encoding="utf-8"))).get(
+        _identity_key(team_name), set()
+    )
+    return next(iter(candidates)) if len(candidates) == 1 else None
 
 
 @dataclass

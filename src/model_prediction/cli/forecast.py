@@ -636,7 +636,7 @@ def _forecast_mlb_nrfi_flat(
     from ..models.mlb_first_inning_live import live_first_inning_features
     from ..pricing import probability_to_american
 
-    model_version = "mlb-nrfi-v1"
+    model_version = "mlb-nrfi-v2"
     artifact, artifact_error = _load_exact_artifact_contract(model_version)
     if artifact is None:
         return {
@@ -916,7 +916,7 @@ def _forecast_wnba_spread_slate(data_root, args_date: str, client) -> dict:
     from ..models.basketball import BasketballModel, UpcomingGame
 
     observed_at = utc_now()
-    model_version = "wnba-spread-margin-v1"
+    model_version = "wnba-spread-margin-v2"
     artifact, artifact_error = _load_exact_artifact_contract(model_version)
     if artifact is None:
         return {
@@ -933,7 +933,22 @@ def _forecast_wnba_spread_slate(data_root, args_date: str, client) -> dict:
         }
     model_artifact_hash = str(artifact["artifact_hash"])
     model_qualified = artifact.get("qualification", {}).get("qualified") is True
-    model = BasketballModel(sport="wnba", version=model_version, margin_sd=10.5, total_sd=15.0, league="WNBA")
+    margin_sd = float(artifact.get("margin_sd", 13.37))
+    elo_weight = float(artifact.get("elo_weight", 0.52))
+    trend_weight = float(artifact.get("trend_weight", 0.44))
+    rest_weight = float(artifact.get("rest_weight", 0.20))
+    home_court_points = float(artifact.get("home_court_points", 2.26))
+    model = BasketballModel(
+        sport="wnba",
+        version=model_version,
+        margin_sd=margin_sd,
+        total_sd=15.0,
+        league="WNBA",
+        elo_weight=elo_weight,
+        trend_weight=trend_weight,
+        rest_weight=rest_weight,
+        home_court_points=home_court_points,
+    )
     store = FeatureStore(data_root)
     history = store.games_before("wnba", args_date)
 
@@ -1029,7 +1044,7 @@ def _forecast_wnba_spread_slate(data_root, args_date: str, client) -> dict:
 
     return {
         "sport": "wnba_spread",
-        "model_name": "WNBA Spread (margin normal CDF)",
+        "model_name": "WNBA Spread (composite margin normal CDF)",
         "model_version": model_version,
         "model_qualified": model_qualified,
         "game_date": args_date,
@@ -1092,15 +1107,15 @@ def _forecast_wnba_spread_sport(
             model_uncertainty=contract["model_uncertainty"],
             model_version=contract["model_version"],
             rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
-            risks="Research-baseline margin-normal spread model; not yet locked-holdout qualified.",
+            risks="Point-in-time composite Elo + trend + rest margin-normal spread model.",
             model_origin=ModelOrigin.STATISTICAL_MODEL,
-            model_state=ModelState.RESEARCH,
+            model_state=ModelState.PRODUCTION if contract.get("model_qualified") else ModelState.RESEARCH,
             observed_at_utc=contract["observed_at_utc"],
             model_artifact_hash=contract["model_artifact_hash"],
             calibration_method="margin_normal",
             calibration_version=contract["model_version"],
             calibration_artifact_hash=contract["model_artifact_hash"],
-            feature_schema_version="wnba-spread-margin-v1",
+            feature_schema_version=contract["model_version"],
             code_revision=contract["model_artifact_hash"],
             **(contract.get("market_lineage") or {}),
         )
@@ -1185,7 +1200,7 @@ def _forecast_wnba_total_slate(data_root, args_date: str, client) -> dict:
     from ..models.basketball import BasketballModel, UpcomingGame
 
     observed_at = utc_now()
-    model_version = "wnba-total-margin-v1"
+    model_version = "wnba-total-margin-v2"
     artifact, artifact_error = _load_exact_artifact_contract(model_version)
     if artifact is None:
         return {
@@ -1203,7 +1218,15 @@ def _forecast_wnba_total_slate(data_root, args_date: str, client) -> dict:
     model_artifact_hash = str(artifact["artifact_hash"])
     model_qualified = artifact.get("qualification", {}).get("qualified") is True
 
-    model = BasketballModel(sport="wnba", version=model_version, margin_sd=10.5, total_sd=15.0, league="WNBA")
+    model = BasketballModel(
+        sport="wnba",
+        version=model_version,
+        margin_sd=float(artifact.get("margin_sd", 13.37)),
+        total_sd=float(artifact.get("total_sd", 16.0)),
+        league="WNBA",
+        trend_total_weight=float(artifact.get("trend_total_weight", 0.60)),
+        team_total_weight=float(artifact.get("team_total_weight", 0.40)),
+    )
     store = FeatureStore(data_root)
     history = store.games_before("wnba", args_date)
 
@@ -1381,7 +1404,7 @@ def _forecast_wnba_total_sport(
             calibration_method="total_normal",
             calibration_version=contract["model_version"],
             calibration_artifact_hash=contract["model_artifact_hash"],
-            feature_schema_version="wnba-total-margin-v1",
+            feature_schema_version="wnba-total-margin-v2",
             code_revision=contract["model_artifact_hash"],
             **(contract.get("market_lineage") or {}),
         )
@@ -2772,7 +2795,7 @@ def _forecast_cfb_sport(
         return forecast
 
     min_edge = float(model_config.get("min_edge", 0.03))
-    configured_state = str(model_config.get("status", "shadow_qualified"))
+    configured_state = str(model_config.get("status", "research"))
     forecast["status"] = configured_state
     observed_now = utc_now()
     logged = gated = flat_logged = main_logged = 0

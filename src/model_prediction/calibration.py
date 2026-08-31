@@ -254,19 +254,20 @@ class TemperatureCalibrator:
 
 
 class BetaCalibrator:
-    """Beta calibration (Kull et al. 2017): p -> BetaCDF(p; a, b).
+    """Canonical Beta calibration (Kull, Silva Filho, Flach 2017).
 
-    Sports probabilities often distort asymmetrically (a model that is
-    overconfident on favorites only), which logistic calibration cannot
-    bend for — the beta family can. Parameters are fit by minimizing
-    logloss over the Beta CDF, exclusively on out-of-fold predictions
-    (never the locked holdout); falls back to identity below
-    ``minimum_sample`` like the Platt calibrator.
+    Maps probability p to calibrated probability p_cal via bivariate logistic regression:
+        z = a * ln(p) - b * ln(1 - p) + c
+        p_cal = 1 / (1 + exp(-z))
+
+    Parameters a > 0, b > 0, c in Real.
+    Identity mapping: a = 1, b = 1, c = 0 gives p_cal == p.
     """
 
-    def __init__(self, a: float, b: float, metadata: CalibrationMetadata) -> None:
-        self.a = a
-        self.b = b
+    def __init__(self, a: float, b: float, c: float, metadata: CalibrationMetadata) -> None:
+        self.a = float(a)
+        self.b = float(b)
+        self.c = float(c)
         self.metadata = metadata
 
     @classmethod
@@ -275,47 +276,59 @@ class BetaCalibrator:
         probabilities: Sequence[float],
         outcomes: Sequence[int],
         base_model_version: str,
-        version: str = "beta-rolling-v1",
-        minimum_sample: int = 100,
+        version: str = "beta-kull-v1",
+        minimum_sample: int = 50,
     ) -> BetaCalibrator | IdentityCalibrator:
         if len(probabilities) != len(outcomes):
             raise ValueError("probabilities and outcomes must have equal length")
         if len(probabilities) < minimum_sample:
             return IdentityCalibrator(base_model_version, f"{version}-identity-fallback")
-        from scipy.optimize import minimize
-        from scipy.stats import beta as beta_dist
 
-        clipped = [min(1 - 1e-9, max(1e-9, p)) for p in probabilities]
+        from scipy.optimize import minimize
+
+        clipped = [min(1.0 - 1e-9, max(1e-9, float(p))) for p in probabilities]
         outcomes_f = [float(y) for y in outcomes]
+        n = len(clipped)
+
+        log_p = [math.log(p) for p in clipped]
+        log_1mp = [math.log(1.0 - p) for p in clipped]
 
         def loss(params: Any) -> float:
-            a, b = float(params[0]), float(params[1])
+            a, b, c = float(params[0]), float(params[1]), float(params[2])
             if a <= 0 or b <= 0:
                 return 1e12
-            cal_arr: Any = beta_dist.cdf(clipped, a, b)
-            calibrated_list = [min(1 - 1e-9, max(1e-9, float(p))) for p in cal_arr]
-            total_loss = sum(
-                (
-                    y * math.log(p) + (1.0 - y) * math.log(1.0 - p)
-                    for p, y in zip(calibrated_list, outcomes_f, strict=True)
-                ),
-                0.0,
-            )
-            return float(-total_loss / len(clipped))
+            total_ll = 0.0
+            for lp, l1mp, y in zip(log_p, log_1mp, outcomes_f, strict=True):
+                z = a * lp - b * l1mp + c
+                z_clamped = max(-50.0, min(50.0, z))
+                p_cal = 1.0 / (1.0 + math.exp(-z_clamped))
+                p_cal = min(1.0 - 1e-12, max(1e-12, p_cal))
+                total_ll += -(y * math.log(p_cal) + (1.0 - y) * math.log(1.0 - p_cal))
+            reg = 1e-4 * ((a - 1.0) ** 2 + (b - 1.0) ** 2 + c**2)
+            return float((total_ll / n) + reg)
 
         result = minimize(
             loss,
-            x0=np.array([2.0, 2.0]),
-            method="Nelder-Mead",
-            options={"xatol": 1e-4, "fatol": 1e-6, "maxiter": 400},
+            x0=np.array([1.0, 1.0, 0.0]),
+            method="L-BFGS-B",
+            bounds=[(1e-4, 50.0), (1e-4, 50.0), (-50.0, 50.0)],
         )
-        a, b = float(result.x[0]), float(result.x[1])
+        if not result.success:
+            result = minimize(
+                loss,
+                x0=np.array([1.0, 1.0, 0.0]),
+                method="Nelder-Mead",
+                options={"maxiter": 500},
+            )
+
+        a, b, c = float(result.x[0]), float(result.x[1]), float(result.x[2])
         raw = {
-            "method": "beta",
+            "method": "beta_kull",
             "version": version,
             "base_model_version": base_model_version,
             "a": round(a, 6),
             "b": round(b, 6),
+            "c": round(c, 6),
             "sample_size": len(probabilities),
         }
         artifact_hash = hashlib.sha256(
@@ -324,13 +337,124 @@ class BetaCalibrator:
         metadata = CalibrationMetadata(
             "beta", version, base_model_version, None, None, len(probabilities), artifact_hash
         )
-        return cls(a, b, metadata)
+        return cls(a, b, c, metadata)
 
     def transform(self, probability: float) -> float:
-        from scipy.stats import beta as beta_dist
+        p = min(1.0 - 1e-12, max(1e-12, float(probability)))
+        z = self.a * math.log(p) - self.b * math.log1p(-p) + self.c
+        z_clamped = max(-50.0, min(50.0, z))
+        return 1.0 / (1.0 + math.exp(-z_clamped))
 
-        clipped = min(1 - 1e-12, max(1e-12, probability))
-        return float(beta_dist.cdf(clipped, self.a, self.b))
+
+def run_calibration_tournament(
+    probabilities: Sequence[float],
+    outcomes: Sequence[int],
+    base_model_version: str,
+    n_splits: int = 5,
+    minimum_sample: int = 50,
+) -> dict[str, Any]:
+    """Run an Out-Of-Fold tournament across 5 calibration methods:
+    1. Identity
+    2. Temperature
+    3. Platt
+    4. Beta (Kull et al. 2017)
+    5. Isotonic
+
+    Evaluates out-of-fold log loss, Brier score, ECE, calibration slope and intercept,
+    and returns the winning calibrator fit on the full dataset.
+    """
+    n = len(probabilities)
+    if n < minimum_sample:
+        champ = IdentityCalibrator(base_model_version, "tournament-identity-fallback")
+        return {
+            "status": "insufficient_sample",
+            "sample_size": n,
+            "champion_method": "identity",
+            "champion_calibrator": champ,
+            "methods": {},
+        }
+
+    probs_arr = np.array(probabilities, dtype=float)
+    outs_arr = np.array(outcomes, dtype=int)
+
+    # K-fold time / chunk split
+    fold_size = n // n_splits
+    oof_preds: dict[str, list[float]] = {
+        "identity": [float(p) for p in probabilities],
+        "temperature": [0.0] * n,
+        "platt": [0.0] * n,
+        "beta": [0.0] * n,
+        "isotonic": [0.0] * n,
+    }
+
+    for fold in range(n_splits):
+        val_start = fold * fold_size
+        val_end = n if fold == n_splits - 1 else (fold + 1) * fold_size
+        val_idx = list(range(val_start, val_end))
+        train_idx = [i for i in range(n) if i not in val_idx]
+
+        train_p = probs_arr[train_idx]
+        train_y = outs_arr[train_idx]
+        val_p = probs_arr[val_idx]
+
+        # 1. Temperature
+        cal_temp = TemperatureCalibrator.fit(train_p, train_y, base_model_version)
+        for i, idx in enumerate(val_idx):
+            oof_preds["temperature"][idx] = cal_temp.transform(val_p[i])
+
+        # 2. Platt
+        cal_platt = TrainablePlattCalibrator.fit(train_p, train_y, base_model_version)
+        for i, idx in enumerate(val_idx):
+            oof_preds["platt"][idx] = cal_platt.transform(val_p[i])
+
+        # 3. Beta (Kull et al. 2017)
+        cal_beta = BetaCalibrator.fit(train_p, train_y, base_model_version)
+        for i, idx in enumerate(val_idx):
+            oof_preds["beta"][idx] = cal_beta.transform(val_p[i])
+
+        # 4. Isotonic
+        cal_iso = IsotonicCalibrator.fit(train_p, train_y, base_model_version)
+        for i, idx in enumerate(val_idx):
+            oof_preds["isotonic"][idx] = cal_iso.transform(val_p[i])
+
+    # Evaluate all methods on full OOF predictions
+    scorecard: dict[str, dict[str, Any]] = {}
+    for method, preds in oof_preds.items():
+        metrics = calibration_metrics(preds, outcomes)
+        scorecard[method] = {
+            "oof_log_loss": float(metrics["log_loss"]) if metrics.get("status") == "ok" else 1.0,
+            "oof_brier_score": float(metrics["brier_score"]) if metrics.get("status") == "ok" else 0.25,
+            "oof_ece": float(metrics["expected_calibration_error"]) if metrics.get("status") == "ok" else 0.1,
+            "calibration_slope": float(metrics["calibration_slope"])
+            if metrics.get("calibration_slope") is not None
+            else 1.0,
+            "calibration_intercept": float(metrics["calibration_intercept"])
+            if metrics.get("calibration_intercept") is not None
+            else 0.0,
+        }
+
+    # Pick champion by minimum OOF log loss
+    champion_method = min(scorecard.keys(), key=lambda m: scorecard[m]["oof_log_loss"])
+
+    # Fit final champion on full data
+    if champion_method == "identity":
+        champion_calibrator = IdentityCalibrator(base_model_version)
+    elif champion_method == "temperature":
+        champion_calibrator = TemperatureCalibrator.fit(probabilities, outcomes, base_model_version)
+    elif champion_method == "platt":
+        champion_calibrator = TrainablePlattCalibrator.fit(probabilities, outcomes, base_model_version)
+    elif champion_method == "beta":
+        champion_calibrator = BetaCalibrator.fit(probabilities, outcomes, base_model_version)
+    else:
+        champion_calibrator = IsotonicCalibrator.fit(probabilities, outcomes, base_model_version)
+
+    return {
+        "status": "ok",
+        "sample_size": n,
+        "champion_method": champion_method,
+        "champion_calibrator": champion_calibrator,
+        "scorecard": scorecard,
+    }
 
 
 def calibration_metrics(

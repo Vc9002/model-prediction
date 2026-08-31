@@ -96,6 +96,7 @@ from model_prediction.portfolio.auto_buyer_ledger import (
     AUTO_BUYER_LOG_PATH,
     read_auto_buyer_ledger,
     settle_auto_buyer_ledger,
+    summarize_auto_buyer_performance,
 )
 from model_prediction.portfolio.auto_executor import (
     load_auto_buyer_state,
@@ -451,6 +452,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send({"ok": True, "at": datetime.now(UTC).isoformat()[:19]})
             elif route == "/api/auto-buyer/status":
                 self._send(load_auto_buyer_state())
+            elif route == "/api/auto-buyer/summary":
+                self._send(_cached("auto-buyer-summary", 5, summarize_auto_buyer_performance))
             elif route == "/api/auto-buyer/ledger":
                 self._send(_cached("auto-buyer-ledger", 5, read_auto_buyer_ledger))
             elif route == "/api/auto-buyer/log":

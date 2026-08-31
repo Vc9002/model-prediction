@@ -15,8 +15,12 @@ from model_prediction.international_baseball import (
     _metrics,
     find_international_baseball_result,
     forecast_international_baseball_slate,
+    international_baseball_team_id,
+    international_baseball_unplayed_index,
     parse_kbo_rows,
+    parse_kbo_unplayed_rows,
     parse_npb_calendar,
+    parse_npb_unplayed_calendar,
     tie_aware_fair_values,
     validate_international_baseball_baseline,
 )
@@ -886,3 +890,99 @@ def test_refresh_falls_back_to_full_backfill_when_no_history_exists(tmp_path) ->
     assert client.requested_years[0] == 2015
     assert (tmp_path / "international_baseball/kbo/games.jsonl").exists()
     assert result["game_count"] == 1
+
+
+def test_parse_kbo_unplayed_rows_surfaces_the_scoreless_postponed_shape() -> None:
+    """Root-caused 2026-08-31: every stale open KBO row sits on a game the
+    official source lists as a bare "TeamA vs TeamB" with no score spans and
+    an empty relay -- a postponement. `parse_kbo_rows` rightly drops those
+    (they are not results), but that made "postponed forever" and "genuine
+    lookup miss" indistinguishable, so the pick stayed open forever. This
+    parser is what lets an operator prove the former before voiding."""
+    payload = {
+        "rows": [
+            {
+                "row": [
+                    {"Text": "08.05(수)", "Class": "day"},
+                    {"Text": "<b>18:30</b>", "Class": "time"},
+                    {"Text": "<span>NC</span><em><span>vs</span></em><span>두산</span>", "Class": "play"},
+                    {"Text": "", "Class": "relay"},
+                ]
+            },
+            {
+                # A played game on the same day must NOT be reported as unplayed.
+                "row": [
+                    {"Text": "<b>18:30</b>", "Class": "time"},
+                    {
+                        "Text": '<span>한화</span><em><span class="same">4</span>'
+                        '<span>vs</span><span class="same">1</span></em><span>삼성</span>',
+                        "Class": "play",
+                    },
+                    {"Text": "gameId=20260805SSHH0", "Class": "relay"},
+                ]
+            },
+        ]
+    }
+    assert parse_kbo_unplayed_rows(payload, 2026) == [
+        {"league": "kbo", "game_date": "2026-08-05", "away_team_id": "NC", "home_team_id": "DOOSAN"}
+    ]
+
+
+def test_parse_kbo_unplayed_rows_ignores_the_zero_vs_zero_shape() -> None:
+    """The 2026-08-13 "0 vs 0" placeholder carries score spans, so it is a
+    five-value row, not the three-value scoreless one. Claiming it here
+    would let a row be voided on evidence this parser cannot actually see."""
+    payload = {
+        "rows": [
+            {
+                "row": [
+                    {"Text": "08.13(목)", "Class": "day"},
+                    {
+                        "Text": '<span>한화</span><em><span class="same">0</span>'
+                        '<span>vs</span><span class="same">0</span></em><span>두산</span>',
+                        "Class": "play",
+                    },
+                    {"Text": "", "Class": "relay"},
+                ]
+            }
+        ]
+    }
+    assert parse_kbo_unplayed_rows(payload, 2026) == []
+
+
+def test_parse_npb_unplayed_calendar_keeps_only_the_star_placeholder_rows() -> None:
+    page = """
+    <a href="/bis/eng/2026/games/s2026082200119.html">T 6 - 6 DB</a>
+    <a href="/bis/eng/2026/games/s2026082200491.html">E * - * L</a>
+    """
+    rows = parse_npb_unplayed_calendar(page)
+    # Same deliberate away/home swap as parse_npb_calendar: the calendar's
+    # shorthand is HOME score - score VISITOR.
+    assert rows == [{"league": "npb", "game_date": "2026-08-22", "away_team_id": "L", "home_team_id": "E"}]
+
+
+def test_unplayed_index_is_keyed_the_same_way_a_ledger_row_resolves() -> None:
+    class _Source:
+        def kbo_year_unplayed(self, year: int) -> list[dict]:
+            assert year == 2026
+            return [
+                {"league": "kbo", "game_date": "2026-08-05", "away_team_id": "NC", "home_team_id": "DOOSAN"}
+            ]
+
+    assert international_baseball_unplayed_index("kbo", 2026, client=_Source()) == {
+        ("2026-08-05", "NC", "DOOSAN")
+    }
+
+
+def test_international_baseball_team_id_refuses_to_guess_an_unknown_name(tmp_path) -> None:
+    directory = tmp_path / "international_baseball" / "kbo"
+    directory.mkdir(parents=True)
+    (directory / "teams.json").write_text(
+        json.dumps({"NC": {"team_id": "NC", "name": "NC Dinos", "aliases": ["NC", "NC Dinos"]}}),
+        encoding="utf-8",
+    )
+    assert international_baseball_team_id(tmp_path, "kbo", "NC Dinos") == "NC"
+    # A miss must be None, never a fallback: the caller uses this to decide
+    # whether a real ledger row may be voided.
+    assert international_baseball_team_id(tmp_path, "kbo", "Doosan Bears") is None
+    assert international_baseball_team_id(tmp_path, "npb", "NC Dinos") is None
