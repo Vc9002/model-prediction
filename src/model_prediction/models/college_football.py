@@ -367,54 +367,75 @@ def build_cfb_slate(
 
         if odds_list:
             first_odds = odds_list[0]
-            if first_odds.get("overUnder") is not None:
+
+            def _safe_odds_int(val: Any) -> int | None:
+                if val is None:
+                    return None
+                s = str(val).strip()
+                if s.upper() in ("OFF", "N/A", "NONE", ""):
+                    return None
                 try:
-                    total_line = float(first_odds["overUnder"])
-                    # ESPN publishes the line but not the price. Both sides of a
-                    # standard spread/total are laid at -110, so the executable ask
-                    # is that implied probability -- NOT the no-vig 0.50. Using 0.50
-                    # here understates the ask by ~2.4pp, which is pure fictitious
-                    # edge on every single call and is what made 8/8 NCAAF picks
-                    # QUALIFIED at max size on 2026-08-29.
-                    market_total_over_prob = STANDARD_LAY_ASK
-                    market_total_under_prob = STANDARD_LAY_ASK
+                    n = int(s)
+                    return n if (n <= -100 or n >= 100) else None
                 except (ValueError, TypeError):
-                    total_line = CFB_BASELINE_TOTAL
-            if first_odds.get("spread") is not None:
-                try:
-                    spread_home_line = float(first_odds["spread"])
+                    return None
+
+            # Total Line & Odds
+            tot_obj = first_odds.get("total") or {}
+            ov_n = _safe_odds_int((tot_obj.get("over") or {}).get("close", {}).get("odds"))
+            un_n = _safe_odds_int((tot_obj.get("under") or {}).get("close", {}).get("odds"))
+            tot_line_str = (
+                str(
+                    (tot_obj.get("over") or {}).get("close", {}).get("line")
+                    or first_odds.get("overUnder")
+                    or ""
+                )
+                .replace("o", "")
+                .replace("u", "")
+                .strip()
+            )
+            try:
+                if tot_line_str:
+                    total_line = float(tot_line_str)
+            except (ValueError, TypeError):
+                total_line = CFB_BASELINE_TOTAL
+            market_total_over_prob = round(implied_probability(ov_n), 6) if ov_n else STANDARD_LAY_ASK
+            market_total_under_prob = round(implied_probability(un_n), 6) if un_n else STANDARD_LAY_ASK
+
+            # Point Spread Line & Odds
+            ps_obj = first_odds.get("pointSpread") or {}
+            h_ps_n = _safe_odds_int((ps_obj.get("home") or {}).get("close", {}).get("odds"))
+            a_ps_n = _safe_odds_int((ps_obj.get("away") or {}).get("close", {}).get("odds"))
+            h_ps_line_str = str(
+                (ps_obj.get("home") or {}).get("close", {}).get("line") or first_odds.get("spread") or ""
+            ).strip()
+            try:
+                if h_ps_line_str:
+                    spread_home_line = float(h_ps_line_str)
                     spread_away_line = -spread_home_line
-                    market_spread_away_prob = STANDARD_LAY_ASK
-                    market_spread_home_prob = STANDARD_LAY_ASK
-                except (ValueError, TypeError):
-                    spread_home_line = 0.0
-                    spread_away_line = 0.0
+            except (ValueError, TypeError):
+                spread_home_line = 0.0
+                spread_away_line = 0.0
+            market_spread_home_prob = round(implied_probability(h_ps_n), 6) if h_ps_n else STANDARD_LAY_ASK
+            market_spread_away_prob = round(implied_probability(a_ps_n), 6) if a_ps_n else STANDARD_LAY_ASK
 
-            # Moneyline parsing if available from ESPN
-            home_odds_obj = first_odds.get("homeTeamOdds") or {}
-            away_odds_obj = first_odds.get("awayTeamOdds") or {}
-            ml_home_raw = home_odds_obj.get("moneyLine") or (
-                (first_odds.get("moneylineWinner") or {}).get("home") or {}
-            ).get("odds")
-            ml_away_raw = away_odds_obj.get("moneyLine") or (
-                (first_odds.get("moneylineWinner") or {}).get("away") or {}
-            ).get("odds")
+            # Moneyline parsing if available from ESPN (nested moneyline or top-level)
+            ml_obj = first_odds.get("moneyline") or {}
+            h_ml_n = _safe_odds_int(
+                (ml_obj.get("home") or {}).get("close", {}).get("odds")
+                or (first_odds.get("homeTeamOdds") or {}).get("moneyLine")
+                or ((first_odds.get("moneylineWinner") or {}).get("home") or {}).get("odds")
+            )
+            a_ml_n = _safe_odds_int(
+                (ml_obj.get("away") or {}).get("close", {}).get("odds")
+                or (first_odds.get("awayTeamOdds") or {}).get("moneyLine")
+                or ((first_odds.get("moneylineWinner") or {}).get("away") or {}).get("odds")
+            )
 
-            if ml_home_raw is not None:
-                try:
-                    ml_home_val = int(ml_home_raw)
-                    if ml_home_val <= -100 or ml_home_val >= 100:
-                        market_ml_home_prob = round(implied_probability(ml_home_val), 6)
-                except (ValueError, TypeError):
-                    pass
-
-            if ml_away_raw is not None:
-                try:
-                    ml_away_val = int(ml_away_raw)
-                    if ml_away_val <= -100 or ml_away_val >= 100:
-                        market_ml_away_prob = round(implied_probability(ml_away_val), 6)
-                except (ValueError, TypeError):
-                    pass
+            if h_ml_n is not None:
+                market_ml_home_prob = round(implied_probability(h_ml_n), 6)
+            if a_ml_n is not None:
+                market_ml_away_prob = round(implied_probability(a_ml_n), 6)
 
             if market_ml_home_prob is not None and market_ml_away_prob is None:
                 market_ml_away_prob = round(1.0 - market_ml_home_prob, 6)

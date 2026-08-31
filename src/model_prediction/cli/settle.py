@@ -67,7 +67,7 @@ def _settle_all_unsettled(args, config, ledger) -> dict:
         # KBO/NPB: neither ESPN nor Polymarket resolution covers these --
         # settle from the official league schedule instead.
         if row["league"] in ("KBO", "NPB"):
-            result = _settle_international_baseball_pick(row, ledger, config)
+            result = _settle_international_baseball_pick(row, ledger, config, data_root=data_root)
             if result is None:
                 pending.append(row["pick_id"])
             elif result.get("settled"):
@@ -131,31 +131,25 @@ def _settle_all_unsettled(args, config, ledger) -> dict:
             closing_probability = float(quote["decision_probability"])
             if quote.get("line") is not None:
                 closing_line = float(quote["line"])
-        elif (
-            row["league"] == "SOCCER"
-            and row["market_type"] == "moneyline"
-            and row["selection"] in ("home", "away")
-        ):
-            # Soccer never writes into market_store (that's MLB's own
-            # snapshot store) -- its real snapshot history lives in the
-            # generic per-sport-date store the daily slate capture already
-            # writes for every sport. Draw selections are skipped here: the
-            # home/away team-matching helper below doesn't have a
-            # "neither side" case to resolve them against.
+        else:
+            # Fallback to per-sport Polymarket snapshot history (WNBA, Soccer, etc.)
             slug = _extract_market_slug(str(row.get("rationale", "")))
-            if slug is not None:
+            if slug is not None and data_root is not None:
+                sport_dir = str(row.get("league", "")).lower()
                 try:
                     closing_probability, closing_odds = _closing_probability_for_moneyline_pick(
                         data_root,
-                        "soccer",
+                        sport_dir,
                         slug,
                         row["event_start_utc"],
-                        row["home_team"],
-                        row["away_team"],
-                        row["selection"],
+                        row.get("home_team", ""),
+                        row.get("away_team", ""),
+                        row.get("selection", ""),
                     )
                 except (OSError, ValueError):
-                    logger.warning("soccer closing-snapshot lookup failed for slug %s", slug, exc_info=True)
+                    logger.warning(
+                        "%s closing-snapshot lookup failed for slug %s", sport_dir, slug, exc_info=True
+                    )
         try:
             if row.get("market_type") in ("nrfi", "yrfi") and "away_1st" in match and "home_1st" in match:
                 settle_away = int(match["away_1st"])
@@ -269,20 +263,54 @@ def _closing_probability_for_moneyline_pick(
     (None, None) if no matching pregame snapshot was ever captured for this
     market -- CLV is then simply left blank for that row, same as today.
     """
+    from datetime import timedelta
+
     from ..learned_forward import _team_matches
 
-    game_date = parse_utc(event_start_utc).astimezone(EASTERN).date().isoformat()
-    store = PolymarketSnapshotStore.for_sport_date(data_root, sport_dir, game_date)
-    snapshot = store.closing_snapshot(slug, event_start_utc)
+    start = parse_utc(event_start_utc)
+    dates_to_try = [
+        start.astimezone(EASTERN).date().isoformat(),
+        start.date().isoformat(),
+        (start - timedelta(days=1)).date().isoformat(),
+        (start + timedelta(days=1)).date().isoformat(),
+    ]
+    snapshot = None
+    seen_dates = set()
+    for d in dates_to_try:
+        if d in seen_dates:
+            continue
+        seen_dates.add(d)
+        store = PolymarketSnapshotStore.for_sport_date(data_root, sport_dir, d)
+        snapshot = store.closing_snapshot(slug, event_start_utc)
+        if snapshot is not None:
+            break
+
     if snapshot is None:
         return None, None
-    selected_name = home_team if selection == "home" else away_team
     long_desc = str((snapshot.get("long") or {}).get("description", ""))
     short_desc = str((snapshot.get("short") or {}).get("description", ""))
+
+    # Binary Yes/No or Over/Under markets (common in soccer, totals, spreads)
+    if long_desc.strip().lower() in ("yes", "over") or short_desc.strip().lower() in ("no", "under"):
+        sel = str(selection).strip().lower()
+        if sel in ("under", "no", "away") and short_desc.strip().lower() in ("no", "under"):
+            side = snapshot.get("short") or {}
+        else:
+            side = snapshot.get("long") or {}
+        ask = side.get("ask")
+        if ask is not None and 0 < float(ask) < 1:
+            return round(float(ask), 6), probability_to_american(float(ask))
+
+    selected_name = home_team if selection == "home" else away_team
     matches_long = _team_matches(selected_name, long_desc)
     matches_short = _team_matches(selected_name, short_desc)
     if matches_long == matches_short:
-        return None, None  # ambiguous or no match -- never guess
+        # Ambiguous or no match -- never guess. Defaulting to the long side here
+        # attributes a real ask to a row we cannot prove it belongs to, which is
+        # the same fabricated-market-evidence class as the 2026-08-29 NCAAF ask.
+        # A blank CLV is a missing measurement; a guessed one is a wrong
+        # measurement that reads as real.
+        return None, None
     side = snapshot.get("long" if matches_long else "short") or {}
     ask = side.get("ask")
     if ask is None or not 0 < float(ask) < 1:
@@ -291,17 +319,16 @@ def _closing_probability_for_moneyline_pick(
 
 
 def _extract_market_slug(rationale: str) -> str | None:
-    """Recover the Polymarket market slug embedded in a row's rationale text.
-
-    Two formats coexist across this project's history: ``market_slug=xxx``
-    (esports) and the older ``... (xxx).`` trailing-parenthetical (soccer/
-    tennis, and legacy esports rows).
-    """
+    """Recover the Polymarket market slug embedded in a row's rationale text."""
     import re
 
     match = re.search(r"market_slug=([a-z0-9\-]+)", rationale)
-    if match is None:
-        match = re.search(r"\(([a-z0-9\-]+)\)", rationale)
+    if match:
+        return match.group(1)
+    for m in re.findall(r"\(([a-z0-9\-]+)\)", rationale):
+        if "-" in m or m.startswith(("atc", "tsc", "asc", "mkt")):
+            return m
+    match = re.search(r"\(([a-z0-9\-]+)\)", rationale)
     return match.group(1) if match else None
 
 
@@ -400,7 +427,7 @@ def _settle_esports_pick(row: dict, ledger, data_root=None) -> dict | None:
         return {"pick_id": row["pick_id"], "reason": str(error)}
 
 
-def _settle_international_baseball_pick(row: dict, ledger, config) -> dict | None:
+def _settle_international_baseball_pick(row: dict, ledger, config, data_root=None) -> dict | None:
     """Settle a KBO/NPB pick from the official league schedule.
 
     Ledger home/away for these leagues are Polymarket's own team-name
@@ -411,7 +438,8 @@ def _settle_international_baseball_pick(row: dict, ledger, config) -> dict | Non
     """
     from ..international_baseball import find_international_baseball_result
 
-    data_root = Path(ledger_path(config)).parent
+    if data_root is None:
+        data_root = Path(ledger_path(config)).parent
     try:
         start = parse_utc(row["event_start_utc"])
     except ValueError:
@@ -423,6 +451,22 @@ def _settle_international_baseball_pick(row: dict, ledger, config) -> dict | Non
     if result is None:
         return None
     away_score, home_score = result
+    closing_probability = closing_odds = None
+    slug = _extract_market_slug(str(row.get("rationale", "")))
+    if slug is not None and data_root is not None:
+        sport_dir = str(row.get("league", "")).lower()
+        try:
+            closing_probability, closing_odds = _closing_probability_for_moneyline_pick(
+                data_root,
+                sport_dir,
+                slug,
+                row["event_start_utc"],
+                row.get("home_team", ""),
+                row.get("away_team", ""),
+                row.get("selection", ""),
+            )
+        except (OSError, ValueError):
+            logger.warning("%s closing-snapshot lookup failed for slug %s", sport_dir, slug, exc_info=True)
     try:
         settlement_value = 0.5 if away_score == home_score else None
         settled = ledger.settle(
@@ -430,7 +474,8 @@ def _settle_international_baseball_pick(row: dict, ledger, config) -> dict | Non
             away_score,
             home_score,
             None,
-            None,
+            closing_odds,
+            closing_raw_probability=closing_probability,
             binary_contract_settlement_value=settlement_value,
         )
         return {"pick_id": row["pick_id"], "result": settled["result"], "settled": True}

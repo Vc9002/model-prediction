@@ -47,7 +47,18 @@ def _team_matches(team_name: str, side_description: str) -> bool:
         return False
     if team == description:
         return True
+    if team in ("home", "away", "yes", "no", "team a", "team b") or description in (
+        "home",
+        "away",
+        "yes",
+        "no",
+        "team a",
+        "team b",
+    ):
+        return team == description
     shorter, longer = (description, team) if len(description) <= len(team) else (team, description)
+    if len(shorter) < 4:
+        return shorter == longer
     return f" {shorter} " in f" {longer} "
 
 

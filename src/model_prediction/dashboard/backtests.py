@@ -335,15 +335,18 @@ def _pick_quote(row: dict) -> dict | None:
     market_type = row.get("market_type")
     if market_type not in ("moneyline", "spread", "total"):
         return None
-    sport = str(row.get("league") or "").lower()
-    if sport not in SPORTS:
+    sport = str(row.get("league") or row.get("sport") or "").lower()
+    if sport not in SPORTS and sport != "esports":
         return None
     try:
         event_start = datetime.fromisoformat(str(row.get("event_start_utc") or ""))
     except ValueError:
         return None
     day = event_start.astimezone(EASTERN).date().isoformat()
-    path = DATA / "odds" / sport / day / "polymarket_snapshots.jsonl"
+    odds_sport = "esports" if sport in ("cs2", "lol", "dota2", "valorant", "r6", "cod", "ow", "rl") else sport
+    path = DATA / "odds" / odds_sport / day / "polymarket_snapshots.jsonl"
+    if not path.exists():
+        path = DATA / "odds" / sport / day / "polymarket_snapshots.jsonl"
     snapshots = _load_snapshot_file(path)
     if not snapshots:
         return None
