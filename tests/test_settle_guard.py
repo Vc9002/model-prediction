@@ -76,3 +76,85 @@ def test_mapped_league_does_not_trigger_the_guard(monkeypatch, tmp_path) -> None
     # stays pending on the (fake) ESPN lookup, but never reports the
     # no-path failure.
     assert all("no ESPN result path" not in f.get("reason", "") for f in result["failures"])
+
+
+class _FakeSoccerESPN:
+    """Minimal stand-in for ESPNClient.summary over the soccer/all path."""
+
+    def __init__(self, payload: dict | Exception) -> None:
+        self.payload = payload
+        self.calls: list[tuple[str, str]] = []
+
+    def summary(self, league: str, event_id: str) -> dict:
+        self.calls.append((league, event_id))
+        if isinstance(self.payload, Exception):
+            raise self.payload
+        return self.payload
+
+
+def _soccer_summary(status: str, home: str | int, away: str | int) -> dict:
+    return {
+        "header": {
+            "competitions": [
+                {
+                    "status": {"type": {"name": status}},
+                    "competitors": [
+                        {"homeAway": "home", "score": home},
+                        {"homeAway": "away", "score": away},
+                    ],
+                }
+            ]
+        }
+    }
+
+
+def test_a_finished_soccer_match_resolves_by_event_id_without_any_credential() -> None:
+    """Soccer results went 7 days stale to 2026-08-24 because collect_soccer_scores
+    returns no_api_key whenever THE_ODDS_API_KEY / API_FOOTBALL_KEY is unset -- every
+    daily run skipped it and still exited 0. Soccer rows carry ESPN event ids, so the
+    result is resolvable by identity with no credential at all. ESPN spells soccer's
+    terminal state STATUS_FULL_TIME, not STATUS_FINAL; the rest of the settle path
+    only knows the latter, so this must normalise rather than report 'not completed'.
+    """
+    from model_prediction.cli.settle import _find_espn_soccer_result_by_event_id
+
+    espn = _FakeSoccerESPN(_soccer_summary("STATUS_FULL_TIME", 1, 2))
+
+    match = _find_espn_soccer_result_by_event_id(espn, {"event_id": "401905968"})
+
+    assert match == {
+        "status_name": "STATUS_FINAL",
+        "completed": True,
+        "home_score": 1,
+        "away_score": 2,
+    }
+    # Resolved by identity on the cross-league path -- no league guessing.
+    assert espn.calls == [("SOCCER_ALL", "401905968")]
+
+
+def test_an_unfinished_or_unresolvable_soccer_match_never_invents_a_result() -> None:
+    """Three ways this must decline instead of guessing: the match is still in
+    progress, the payload has no usable score, or ESPN itself fails. A settlement
+    invented from a missing score is unrecoverable evidence damage, where a pending
+    row is merely unfinished work."""
+    from model_prediction.cli.settle import _find_espn_soccer_result_by_event_id
+
+    in_progress = _find_espn_soccer_result_by_event_id(
+        _FakeSoccerESPN(_soccer_summary("STATUS_FIRST_HALF", 0, 0)), {"event_id": "1"}
+    )
+    assert in_progress is not None and in_progress["completed"] is False
+
+    no_score = _find_espn_soccer_result_by_event_id(
+        _FakeSoccerESPN(_soccer_summary("STATUS_FULL_TIME", None, None)), {"event_id": "1"}
+    )
+    assert no_score is None
+
+    unreachable = _find_espn_soccer_result_by_event_id(
+        _FakeSoccerESPN(RuntimeError("espn down")), {"event_id": "1"}
+    )
+    assert unreachable is None
+
+    # A row with no event id must not reach the network at all.
+    espn = _FakeSoccerESPN(_soccer_summary("STATUS_FULL_TIME", 1, 0))
+    assert _find_espn_soccer_result_by_event_id(espn, {"event_id": ""}) is None
+    assert espn.calls == []

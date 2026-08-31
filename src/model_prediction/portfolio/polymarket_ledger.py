@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -201,23 +202,28 @@ def settle_polymarket_ledger_rows(
     modified = False
 
     # League to ESPN league mapping
-    league_map = {
-        "MLB": ("mlb",),
-        "NBA": ("nba",),
-        "WNBA": ("wnba",),
-        "NFL": ("nfl",),
-        "SOCCER": (
-            "eng.1",
-            "esp.1",
-            "ger.1",
-            "ita.1",
-            "fra.1",
-            "usa.1",
-            "uefa.champions",
-            "uefa.europa",
-            "mex.1",
-        ),
-    }
+    try:
+        from ..cli.state import _LEDGER_LEAGUE_TO_ESPN
+
+        league_map = _LEDGER_LEAGUE_TO_ESPN
+    except ImportError:
+        league_map = {
+            "MLB": ("mlb",),
+            "NBA": ("nba",),
+            "WNBA": ("wnba",),
+            "NFL": ("nfl",),
+            "SOCCER": (
+                "eng.1",
+                "esp.1",
+                "ger.1",
+                "ita.1",
+                "fra.1",
+                "usa.1",
+                "uefa.champions",
+                "uefa.europa",
+                "mex.1",
+            ),
+        }
 
     for row in rows:
         status = str(row.get("status") or "").lower()
@@ -241,51 +247,97 @@ def settle_polymarket_ledger_rows(
             continue
 
         lg = str(row.get("league") or "").upper()
-        espn_leagues = league_map.get(lg, (lg.lower(),))
-        game_day = start_dt.date().isoformat()
+        if lg == "POLYMARKET" or not lg:
+            espn_leagues = ("mlb", "wnba", "nba", "nfl", "eng.1", "esp.1", "ger.1", "ita.1", "fra.1", "usa.1")
+            check_tennis = True
+        else:
+            espn_leagues = league_map.get(lg, (lg.lower(),))
+            check_tennis = lg in ("TENNIS", "WTA", "ATP")
 
+        game_day = start_dt.date().isoformat()
         away_name = str(row.get("away_team") or "").casefold()
         home_name = str(row.get("home_team") or "").casefold()
 
         match_found = None
-        for espn_lg in espn_leagues:
+
+        if check_tennis:
             try:
-                sb = espn.scoreboard(espn_lg, game_day)
-                for event in sb.get("events", []):
-                    status_type = event.get("status", {}).get("type", {})
-                    if not status_type.get("completed", False):
-                        continue
-                    comps = event.get("competitions", [{}])[0].get("competitors", [])
-                    if len(comps) != 2:
-                        continue
-                    c_away = next((c for c in comps if c.get("homeAway") == "away"), comps[1])
-                    c_home = next((c for c in comps if c.get("homeAway") == "home"), comps[0])
+                from ..tennis_forward import TENNIS_TOURS
 
-                    h_names = {
-                        str(c_home.get("team", {}).get("displayName") or "").casefold(),
-                        str(c_home.get("team", {}).get("name") or "").casefold(),
-                        str(c_home.get("team", {}).get("abbreviation") or "").casefold(),
-                    }
-                    a_names = {
-                        str(c_away.get("team", {}).get("displayName") or "").casefold(),
-                        str(c_away.get("team", {}).get("name") or "").casefold(),
-                        str(c_away.get("team", {}).get("abbreviation") or "").casefold(),
-                    }
+                for tour in TENNIS_TOURS:
+                    sb = espn.scoreboard(tour, start_dt.strftime("%Y%m%d"))
+                    for event in sb.get("events", []):
+                        for grp in event.get("groupings", []):
+                            for comp in grp.get("competitions", []):
+                                if not comp.get("status", {}).get("type", {}).get("completed"):
+                                    continue
+                                comps = comp.get("competitors", [])
+                                if len(comps) != 2:
+                                    continue
+                                c1, c2 = comps[0], comps[1]
+                                n1 = str((c1.get("athlete") or {}).get("displayName", "")).casefold()
+                                n2 = str((c2.get("athlete") or {}).get("displayName", "")).casefold()
+                                if (home_name in n1 or n1 in home_name) and (
+                                    away_name in n2 or n2 in away_name
+                                ):
+                                    match_found = (1 if c2.get("winner") else 0, 1 if c1.get("winner") else 0)
+                                    break
+                                elif (home_name in n2 or n2 in home_name) and (
+                                    away_name in n1 or n1 in away_name
+                                ):
+                                    match_found = (1 if c1.get("winner") else 0, 1 if c2.get("winner") else 0)
+                                    break
+                            if match_found:
+                                break
+                        if match_found:
+                            break
+                    if match_found:
+                        break
+            except Exception:
+                # Best-effort enrichment: this lookup is one of several result
+                # sources tried in turn, so a failure here must fall through to
+                # the ESPN scoreboard pass below rather than abort settlement.
+                logger.warning("polymarket result lookup failed", exc_info=True)
 
-                    if (home_name in h_names or any(hn in home_name for hn in h_names if len(hn) > 3)) and (
-                        away_name in a_names or any(an in away_name for an in a_names if len(an) > 3)
-                    ):
-                        try:
-                            h_score = int(c_home.get("score", 0))
-                            a_score = int(c_away.get("score", 0))
-                            match_found = (a_score, h_score)
-                        except (ValueError, TypeError):
+        if match_found is None:
+            for espn_lg in espn_leagues:
+                try:
+                    sb = espn.scoreboard(espn_lg, game_day)
+                    for event in sb.get("events", []):
+                        status_type = event.get("status", {}).get("type", {})
+                        if not status_type.get("completed", False):
                             continue
-                if match_found is not None:
-                    break
-            except (KeyError, TypeError, ValueError, OSError):
-                logger.debug("Scoreboard lookup failed for %s on %s", espn_lg, game_day, exc_info=True)
-                continue
+                        comps = event.get("competitions", [{}])[0].get("competitors", [])
+                        if len(comps) != 2:
+                            continue
+                        c_away = next((c for c in comps if c.get("homeAway") == "away"), comps[1])
+                        c_home = next((c for c in comps if c.get("homeAway") == "home"), comps[0])
+
+                        h_names = {
+                            str(c_home.get("team", {}).get("displayName") or "").casefold(),
+                            str(c_home.get("team", {}).get("name") or "").casefold(),
+                            str(c_home.get("team", {}).get("abbreviation") or "").casefold(),
+                        }
+                        a_names = {
+                            str(c_away.get("team", {}).get("displayName") or "").casefold(),
+                            str(c_away.get("team", {}).get("name") or "").casefold(),
+                            str(c_away.get("team", {}).get("abbreviation") or "").casefold(),
+                        }
+
+                        if (
+                            home_name in h_names or any(hn in home_name for hn in h_names if len(hn) > 3)
+                        ) and (away_name in a_names or any(an in away_name for an in a_names if len(an) > 3)):
+                            try:
+                                h_score = int(c_home.get("score", 0))
+                                a_score = int(c_away.get("score", 0))
+                                match_found = (a_score, h_score)
+                            except (ValueError, TypeError):
+                                continue
+                    if match_found is not None:
+                        break
+                except (KeyError, TypeError, ValueError, OSError):
+                    logger.debug("Scoreboard lookup failed for %s on %s", espn_lg, game_day, exc_info=True)
+                    continue
 
         if match_found is not None:
             a_score, h_score = match_found
@@ -302,6 +354,19 @@ def settle_polymarket_ledger_rows(
                     line_val = float(row["line"])
                 except (ValueError, TypeError):
                     line_val = None
+            if line_val is None:
+                slug_str = str(row.get("market_slug") or "")
+                m_pt = re.search(r"-(\d+)pt(\d+)", slug_str)
+                if m_pt:
+                    line_val = float(f"{m_pt.group(1)}.{m_pt.group(2)}")
+                else:
+                    m_dot = re.search(r"-(\d+)\.(\d+)", slug_str)
+                    if m_dot:
+                        line_val = float(f"{m_dot.group(1)}.{m_dot.group(2)}")
+                    else:
+                        m_i = re.search(r"-(\d+)(?:$|[a-z])", slug_str)
+                        if m_i:
+                            line_val = float(m_i.group(1))
 
             graded_result = grade_pick(
                 market_type=mtype,
@@ -329,6 +394,15 @@ def settle_polymarket_ledger_rows(
             modified = True
             open_count -= 1
             settled_picks.append({"pick_id": row.get("pick_id"), "result": row["result"], "pnl": pnl})
+
+        elif (now - start_dt).total_seconds() > 48 * 3600:
+            row["status"] = "voided"
+            row["result"] = "push"
+            row["pnl_units"] = "0.0"
+            row["settled_at_utc"] = now_iso
+            row["void_reason"] = "match_unresolved_after_48h"
+            modified = True
+            open_count -= 1
 
     if modified:
         write_xlsx_rows_atomic(path, FIELDNAMES, rows)

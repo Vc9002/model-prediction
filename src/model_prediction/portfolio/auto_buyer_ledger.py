@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import json
 import logging
+import re
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -353,22 +355,33 @@ def settle_auto_buyer_ledger(
                                 comps = comp.get("competitors", [])
                                 if len(comps) != 2:
                                     continue
-                                c_map = {c.get("homeAway"): c for c in comps}
-                                a_c, h_c = c_map.get("away"), c_map.get("home")
-                                a_name = str((a_c.get("athlete") or {}).get("displayName", "")).casefold()
-                                h_name = str((h_c.get("athlete") or {}).get("displayName", "")).casefold()
-                                if away.casefold() in a_name and home.casefold() in h_name:
-                                    away_win = bool(a_c.get("winner"))
-                                    home_win = bool(h_c.get("winner"))
-                                    if (sel in ("away", "short") and away_win) or (
-                                        sel in ("home", "long") and home_win
-                                    ):
-                                        result = "win"
-                                    elif away_win or home_win:
-                                        result = "loss"
-                                    away_score = 1 if away_win else 0
-                                    home_score = 1 if home_win else 0
-                                    break
+                                c1, c2 = comps[0], comps[1]
+                                n1 = str((c1.get("athlete") or {}).get("displayName", "")).casefold()
+                                n2 = str((c2.get("athlete") or {}).get("displayName", "")).casefold()
+                                if (home.casefold() in n1 or n1 in home.casefold()) and (
+                                    away.casefold() in n2 or n2 in away.casefold()
+                                ):
+                                    home_comp, away_comp = c1, c2
+                                elif (home.casefold() in n2 or n2 in home.casefold()) and (
+                                    away.casefold() in n1 or n1 in away.casefold()
+                                ):
+                                    home_comp, away_comp = c2, c1
+                                else:
+                                    continue
+
+                                home_win = bool(home_comp.get("winner"))
+                                away_win = bool(away_comp.get("winner"))
+                                if (sel in ("away", "short") and away_win) or (
+                                    sel in ("home", "long") and home_win
+                                ):
+                                    result = "win"
+                                elif away_win or home_win:
+                                    result = "loss"
+                                else:
+                                    result = "push"
+                                away_score = 1 if away_win else 0
+                                home_score = 1 if home_win else 0
+                                break
             except (OSError, ValueError, KeyError, TypeError, RuntimeError):
                 pass
         elif sport in ("MLB", "WNBA", "NBA", "NFL", "SOCCER", "NCAAF"):
@@ -395,7 +408,24 @@ def settle_auto_buyer_ledger(
                         home_score = int(h_sc)
                         mtype = str(r.get("market_type") or "moneyline").lower()
                         if mtype == "total":
-                            line = float(r.get("line") or 0.0)
+                            raw_line = r.get("line")
+                            line = 0.0
+                            if raw_line not in (None, ""):
+                                with suppress(ValueError, TypeError):
+                                    line = float(raw_line)
+                            if line == 0.0:
+                                slug_str = str(r.get("market_slug") or "")
+                                m_pt = re.search(r"-(\d+)pt(\d+)", slug_str)
+                                if m_pt:
+                                    line = float(f"{m_pt.group(1)}.{m_pt.group(2)}")
+                                else:
+                                    m_dot = re.search(r"-(\d+)\.(\d+)", slug_str)
+                                    if m_dot:
+                                        line = float(f"{m_dot.group(1)}.{m_dot.group(2)}")
+                                    else:
+                                        m_i = re.search(r"-(\d+)(?:$|[a-z])", slug_str)
+                                        if m_i:
+                                            line = float(m_i.group(1))
                             tot = a_sc + h_sc
                             if tot > line:
                                 result = "win" if sel == "over" else "loss"

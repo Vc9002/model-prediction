@@ -109,6 +109,8 @@ def _settle_all_unsettled(args, config, ledger) -> dict:
             # outside ESPN coverage (e.g. Brazil Serie B, K League 1).
             soccer_scores = _load_soccer_scores()
             match = _find_soccer_result(row, soccer_scores)
+            if match is None:
+                match = _find_espn_soccer_result_by_event_id(espn, row)
         if match is None:
             pending.append(row["pick_id"])
             continue
@@ -609,17 +611,40 @@ def _find_tennis_result(espn: ESPNClient, game_day: str, row: dict) -> dict | No
             competitors = competition.get("competitors", [])
             if len(competitors) != 2:
                 continue
-            by_side = {item.get("homeAway"): item for item in competitors}
-            away, home = by_side.get("away"), by_side.get("home")
-            if not away or not home:
-                continue
+            c1, c2 = competitors[0], competitors[1]
+            c1_name = str((c1.get("athlete") or {}).get("displayName", ""))
+            c2_name = str((c2.get("athlete") or {}).get("displayName", ""))
+
             source_result_id = f"{event.get('id')}:{competition.get('id')}"
             identity_match = bool(ledger_event_id) and source_result_id == ledger_event_id
             if identity_only and not identity_match:
                 continue
-            away_name = str((away.get("athlete") or {}).get("displayName", ""))
-            home_name = str((home.get("athlete") or {}).get("displayName", ""))
-            name_match = away_name.casefold() in away_names and home_name.casefold() in home_names
+
+            if (
+                c1_name.casefold() in away_names
+                or any(an in c1_name.casefold() for an in away_names if len(an) > 3)
+            ) and (
+                c2_name.casefold() in home_names
+                or any(hn in c2_name.casefold() for hn in home_names if len(hn) > 3)
+            ):
+                away, home = c1, c2
+                name_match = True
+            elif (
+                c2_name.casefold() in away_names
+                or any(an in c2_name.casefold() for an in away_names if len(an) > 3)
+            ) and (
+                c1_name.casefold() in home_names
+                or any(hn in c1_name.casefold() for hn in home_names if len(hn) > 3)
+            ):
+                away, home = c2, c1
+                name_match = True
+            else:
+                by_side = {item.get("homeAway"): item for item in competitors}
+                away, home = by_side.get("away", c1), by_side.get("home", c2)
+                away_name = str((away.get("athlete") or {}).get("displayName", ""))
+                home_name = str((home.get("athlete") or {}).get("displayName", ""))
+                name_match = away_name.casefold() in away_names and home_name.casefold() in home_names
+
             if not identity_only and not name_match:
                 continue
 
@@ -790,6 +815,56 @@ def _find_soccer_result(
             except (KeyError, TypeError, ValueError):
                 continue
     return None
+
+
+def _find_espn_soccer_result_by_event_id(espn, row: dict) -> dict | None:
+    """Resolve a soccer row from ESPN by the event id already stored on it.
+
+    Soccer picks carry ESPN event ids (nine-digit, e.g. 401906390), so the
+    result can be looked up by identity instead of by competition + date +
+    team name. That matters twice over. It needs no credential -- the
+    Odds API / API-Football path above returns no_api_key and silently
+    skips whenever THE_ODDS_API_KEY or API_FOOTBALL_KEY is unset, which is
+    how soccer results went 7 days stale to 2026-08-24 with every daily run
+    still exiting 0. And it cannot mis-match: team-name matching across ~45
+    soccer competitions is the collision class this codebase has been bitten
+    by before, and an id either resolves or it does not.
+
+    ESPN's "all" path resolves an event without knowing its league, so this
+    covers competitions outside the configured league list too.
+    """
+    event_id = str(row.get("event_id") or "").strip()
+    if not event_id:
+        return None
+    try:
+        summary = espn.summary("SOCCER_ALL", event_id)
+    except Exception:
+        logger.warning("ESPN soccer summary lookup failed for event %s", event_id, exc_info=True)
+        return None
+    competitions = (summary.get("header") or {}).get("competitions") or []
+    if not competitions:
+        return None
+    competition = competitions[0]
+    status_name = str((((competition.get("status") or {}).get("type")) or {}).get("name") or "")
+    scores: dict[str, int] = {}
+    for competitor in competition.get("competitors") or []:
+        side = str(competitor.get("homeAway") or "")
+        try:
+            scores[side] = int(competitor.get("score"))
+        except (TypeError, ValueError):
+            return None
+    if "home" not in scores or "away" not in scores:
+        return None
+    # STATUS_FULL_TIME is soccer's final state; STATUS_FINAL is what the rest
+    # of the settle path expects, so normalise rather than teach every caller
+    # a second spelling of "done".
+    completed = status_name in {"STATUS_FULL_TIME", "STATUS_FINAL"}
+    return {
+        "status_name": "STATUS_FINAL" if completed else status_name,
+        "completed": completed,
+        "away_score": scores["away"],
+        "home_score": scores["home"],
+    }
 
 
 def run_settle(args, config, registry, bans, ledger, audit, data_root) -> dict:

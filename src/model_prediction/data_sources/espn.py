@@ -105,6 +105,13 @@ LEAGUE_PATHS: dict[str, str] = {
     "CFL": "football/cfl",
     "UFL": "football/ufl",
     "COLLEGE_BASEBALL": "baseball/college-baseball",
+    # Cross-league soccer lookup. ESPN resolves any soccer event id under
+    # "all" without knowing which competition it belongs to, which is what
+    # lets settlement resolve a soccer row by the ESPN event id already
+    # stored on it -- no league enumeration, no team-name matching, and no
+    # API-Football / Odds API credential. Deliberately absent from
+    # SPORT_LEAGUES: it is a lookup path, not an ingest source.
+    "SOCCER_ALL": "soccer/all",
     "ATP": "tennis/atp",
     "WTA": "tennis/wta",
 }
