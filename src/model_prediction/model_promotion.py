@@ -177,6 +177,11 @@ def promote(
     svc = config["prediction_service"]
     champions = svc.setdefault("champions", {})
     champions.setdefault(sport.upper(), {})[market] = new_model_id
+    challengers = svc.setdefault("challengers", {})
+    sport_challengers = challengers.get(sport.upper())
+    if isinstance(sport_challengers, dict) and sport_challengers.get(market) == new_model_id:
+        del sport_challengers[market]
+
     candidate_entry = _model_entry(config, new_model_id)
     if candidate_entry is not None:
         # The old champion becomes the rollback pointer on the new entry.
@@ -246,6 +251,88 @@ def promote(
         conn.close()
     record["status"] = "active"
     return record
+
+
+def reject_challenger(
+    *,
+    sport: str,
+    market: str,
+    challenger_model_id: str,
+    reason: str,
+    approved_by: str,
+    repo_root: Path | str | None = None,
+) -> dict[str, Any]:
+    """Reject a prospective challenger candidate without disrupting champion serving.
+
+    Clears the challenger pointer in config/production.yaml and records the
+    rejection audit trail. Champion serving is 100% untouched.
+    """
+    root = Path(repo_root) if repo_root is not None else PROJECT_ROOT
+    registry = ProductionModelRegistry.load(root)
+
+    current_champion = registry.champion(sport, market)
+    if current_champion is None:
+        raise ValueError(f"no active champion serving {sport} {market}")
+
+    config = _load_yaml_dict(root)
+    svc = config.get("prediction_service") or {}
+    challengers = svc.setdefault("challengers", {})
+    sport_challengers = challengers.get(sport.upper()) or challengers.get(sport) or {}
+
+    if market in sport_challengers and sport_challengers[market] == challenger_model_id:
+        del sport_challengers[market]
+
+    now = datetime.now(UTC).isoformat()
+    rejection_id = f"reject-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:6]}"
+    record = {
+        "promotion_id": rejection_id,
+        "sport": sport,
+        "market": market,
+        "old_model_id": current_champion.model_id,
+        "new_model_id": challenger_model_id,
+        "old_artifact_hash": current_champion.artifact_hash,
+        "new_artifact_hash": None,
+        "approved_by": approved_by,
+        "evidence_id": None,
+        "market_evidence_id": None,
+        "market_evidence_unavailable_reason": None,
+        "git_sha": _git_sha(root),
+        "promoted_at_utc": now,
+        "status": "rejected",
+        "note": f"REJECTED: {reason}",
+    }
+
+    conn = _conn(root)
+    try:
+        with conn:
+            conn.execute(
+                "INSERT INTO promotions (promotion_id, sport, market, "
+                "old_model_id, new_model_id, old_artifact_hash, "
+                "new_artifact_hash, approved_by, evidence_id, "
+                "market_evidence_id, market_evidence_unavailable_reason, "
+                "git_sha, promoted_at_utc, status, note) "
+                "VALUES (:promotion_id, :sport, :market, :old_model_id, "
+                ":new_model_id, :old_artifact_hash, :new_artifact_hash, "
+                ":approved_by, :evidence_id, :market_evidence_id, "
+                ":market_evidence_unavailable_reason, :git_sha, "
+                ":promoted_at_utc, :status, :note)",
+                record,
+            )
+    finally:
+        conn.close()
+
+    _atomic_write_yaml(root, config)
+    ProductionModelRegistry.load(root)  # re-validate
+
+    return {
+        "rejection_id": rejection_id,
+        "sport": sport,
+        "market": market,
+        "champion_model_id": current_champion.model_id,
+        "rejected_challenger_id": challenger_model_id,
+        "reason": reason,
+        "rejected_at_utc": now,
+    }
 
 
 def rollback(*, sport: str, market: str, repo_root: Path | str | None = None) -> dict[str, Any]:
@@ -388,6 +475,23 @@ def main(argv: list[str] | None = None) -> int:
             if not (sport and market):
                 raise ValueError("--sport and --market are required")
             print(json.dumps(rollback(sport=sport, market=market), indent=2))
+            return 0
+        if cmd == "reject":
+            challenger_id = _arg(args, "--challenger")
+            sport = _arg(args, "--sport")
+            market = _arg(args, "--market")
+            reason = _arg(args, "--reason") or "evaluation gate failed"
+            approved = _arg(args, "--approved-by") or "operator"
+            if not (challenger_id and sport and market):
+                raise ValueError("--challenger, --sport, and --market are required")
+            record = reject_challenger(
+                sport=sport,
+                market=market,
+                challenger_model_id=challenger_id,
+                reason=reason,
+                approved_by=approved,
+            )
+            print(json.dumps(record, indent=2))
             return 0
         if cmd == "history":
             limit = int(args[1]) if len(args) > 1 and args[1].isdigit() else 20

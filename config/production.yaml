@@ -1,177 +1,232 @@
-schema_version: "3"
-
+schema_version: '3'
 prediction_service:
   enabled: true
   mode: production
-
   primary:
     sport: WNBA
     market: moneyline
     model_id: wnba-elo-trend-lr-v4
-
-  # The registry (src/model_prediction/production_registry.py) is the single
-  # source of truth for production. Every entry below is validated at
-  # startup; a model whose contract cannot resolve is failed closed
-  # (load_error, resolution refused) — never silently served. The primary's
-  # failure is a hard config error.
   models:
-    - model_id: wnba-elo-trend-lr-v4
-      sport: WNBA
-      market: moneyline
-      implementation: json_artifact
-      artifact: config/models/wnba-elo-trend-lr-v4.json
-      enabled: true
-      rollback_model: null
-    - model_id: wnba-spread-margin-v2
-      sport: WNBA
-      market: spread
-      implementation: json_artifact
-      artifact: config/models/wnba-spread-margin-v2.json
-      enabled: true
-      rollback_model: wnba-spread-margin-v1
-    - model_id: wnba-total-margin-v2
-      sport: WNBA
-      market: total
-      implementation: json_artifact
-      artifact: config/models/wnba-total-margin-v2.json
-      enabled: true
-      rollback_model: wnba-total-margin-v1
-    - model_id: mlb-elo-trend-lr-v8
-      sport: MLB
-      market: moneyline
-      implementation: json_artifact
-      artifact: config/models/mlb-elo-trend-lr-v8.json
-      enabled: true
-      rollback_model: mlb-elo-trend-lr-v7
-    - model_id: measured-edge-margin-v3
-      sport: MLB
-      market: spread
-      implementation: json_artifact
-      artifact: config/models/measured-edge-margin-v3.json
-      enabled: true
-      rollback_model: null
-    - model_id: measured-edge-totals-v3
-      sport: MLB
-      market: total
-      implementation: json_artifact
-      artifact: config/models/measured-edge-totals-v3.json
-      enabled: true
-      rollback_model: null
-    - model_id: mlb-nrfi-v2
-      sport: MLB
-      market: nrfi
-      implementation: json_artifact
-      artifact: config/models/mlb-nrfi-v2.json
-      enabled: true
-      rollback_model: mlb-nrfi-v1
-    - model_id: nba-elo-trend-lr-v4
-      sport: NBA
-      market: moneyline
-      implementation: json_artifact
-      artifact: config/models/nba-elo-trend-lr-v4.json
-      enabled: true
-      rollback_model: null
-    - model_id: nfl-elo-trend-lr-v4
-      sport: NFL
-      market: moneyline
-      implementation: json_artifact
-      artifact: config/models/nfl-elo-trend-lr-v4.json
-      enabled: true
-      rollback_model: null
-    - model_id: soccer-poisson-dc-v1
-      sport: SOCCER
-      market: moneyline
-      implementation: code_backed_model
-      entry: model_prediction.models.soccer:soccer_model
-      enabled: true
-      rollback_model: null
-    - model_id: tennis-surface-elo-v1
-      sport: TENNIS
-      market: moneyline
-      implementation: code_backed_model
-      entry: model_prediction.models.tennis:tennis_model
-      enabled: true
-      rollback_model: null
-    # NCAAF disabled 2026-08-30: the qualification evidence was measured on a
-    # simulated cohort whose market line was the model's own target plus noise,
-    # so the reported edge was arithmetic, not skill. Each artifact's own
-    # qualification block now reads qualified: false / FLAT_LEDGER_ONLY.
-    # Re-enable only after a walk-forward run on the real ESPN cohort.
-    - model_id: college-football-v1
-      sport: NCAAF
-      market: moneyline
-      implementation: json_artifact
-      artifact: config/models/college-football-v1.json
-      enabled: false
-      rollback_model: null
-    - model_id: cfb-spread-v1
-      sport: NCAAF
-      market: spread
-      implementation: json_artifact
-      artifact: config/models/cfb-spread-v1.json
-      enabled: false
-      rollback_model: null
-    - model_id: cfb-total-v1
-      sport: NCAAF
-      market: total
-      implementation: json_artifact
-      artifact: config/models/cfb-total-v1.json
-      enabled: false
-      rollback_model: null
-    - model_id: cs2-tiered-elo-v6
-      sport: CS2
-      market: moneyline
-      implementation: json_artifact
-      artifact: config/models/cs2-tiered-elo-v6.json
-      enabled: true
-      rollback_model: null
-    - model_id: dota2-tiered-elo-v6
-      sport: DOTA2
-      market: moneyline
-      implementation: json_artifact
-      artifact: config/models/dota2-tiered-elo-v6.json
-      enabled: true
-      rollback_model: null
-    - model_id: lol-tiered-elo-v6
-      sport: LOL
-      market: moneyline
-      implementation: json_artifact
-      artifact: config/models/lol-tiered-elo-v6.json
-      enabled: true
-      rollback_model: null
-    - model_id: valorant-tiered-elo-v6
-      sport: VALORANT
-      market: moneyline
-      implementation: json_artifact
-      artifact: config/models/valorant-tiered-elo-v6.json
-      enabled: true
-      rollback_model: null
-    - model_id: rainbow_six-tiered-elo-v6
-      sport: RAINBOW_SIX
-      market: moneyline
-      implementation: json_artifact
-      artifact: config/models/rainbow_six-tiered-elo-v6.json
-      enabled: true
-      rollback_model: null
-    - model_id: kbo-tie-aware-elo-v2
-      sport: KBO
-      market: moneyline
-      implementation: json_artifact
-      artifact: config/models/kbo-tie-aware-elo-v2.json
-      enabled: true
-      rollback_model: null
-    - model_id: npb-tie-aware-elo-v2
-      sport: NPB
-      market: moneyline
-      implementation: json_artifact
-      artifact: config/models/npb-tie-aware-elo-v2.json
-      enabled: true
-      rollback_model: null
-
-  # sport -> market -> champion model_id. The champion is what SERVES a
-  # sport/market; the primary above is what the canary predict cycle runs.
-  # Promotion/rollback (model_promotion.py) mutate these pointers
-  # atomically and record every change.
+  - model_id: wnba-elo-trend-lr-v4
+    sport: WNBA
+    market: moneyline
+    implementation: json_artifact
+    artifact: config/models/wnba-elo-trend-lr-v4.json
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: wnba-elo-trend-lr-v3
+  - model_id: wnba-spread-margin-v2
+    sport: WNBA
+    market: spread
+    implementation: json_artifact
+    artifact: config/models/wnba-spread-margin-v2.json
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: medium
+    rollback_model: wnba-spread-margin-v1
+  - model_id: wnba-total-margin-v2
+    sport: WNBA
+    market: total
+    implementation: json_artifact
+    artifact: config/models/wnba-total-margin-v2.json
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: medium
+    rollback_model: wnba-total-margin-v1
+  - model_id: mlb-elo-trend-lr-v8
+    sport: MLB
+    market: moneyline
+    implementation: json_artifact
+    artifact: config/models/mlb-elo-trend-lr-v8.json
+    enabled: true
+    serving_status: production
+    evidence_status: historical_only
+    replacement_priority: high
+    rollback_model: mlb-elo-trend-lr-v7
+  - model_id: measured-edge-margin-v3
+    sport: MLB
+    market: spread
+    implementation: json_artifact
+    artifact: config/models/measured-edge-margin-v3.json
+    enabled: true
+    serving_status: production
+    evidence_status: historical_only
+    replacement_priority: medium
+    rollback_model: measured-edge-margin-v2
+  - model_id: measured-edge-totals-v3
+    sport: MLB
+    market: total
+    implementation: json_artifact
+    artifact: config/models/measured-edge-totals-v3.json
+    enabled: true
+    serving_status: rollback
+    evidence_status: degraded
+    replacement_priority: high
+    rollback_model: measured-edge-totals-v2
+  - model_id: mlb-structural-v10-frozen
+    sport: MLB
+    market: total
+    implementation: json_artifact
+    artifact: config/models/mlb-structural-v10-frozen.json
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: measured-edge-totals-v3
+  - model_id: mlb-nrfi-v2
+    sport: MLB
+    market: nrfi
+    implementation: json_artifact
+    artifact: config/models/mlb-nrfi-v2.json
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: mlb-nrfi-v1
+  - model_id: nba-elo-trend-lr-v4
+    sport: NBA
+    market: moneyline
+    implementation: json_artifact
+    artifact: config/models/nba-elo-trend-lr-v4.json
+    enabled: true
+    serving_status: production
+    evidence_status: historical_only
+    replacement_priority: medium
+    rollback_model: nba-elo-trend-lr-v3
+  - model_id: nfl-elo-trend-lr-v4
+    sport: NFL
+    market: moneyline
+    implementation: json_artifact
+    artifact: config/models/nfl-elo-trend-lr-v4.json
+    enabled: true
+    serving_status: production
+    evidence_status: historical_only
+    replacement_priority: medium
+    rollback_model: nfl-elo-trend-lr-v3
+  - model_id: soccer-poisson-dc-v1
+    sport: SOCCER
+    market: moneyline
+    implementation: code_backed_model
+    entry: model_prediction.models.soccer:soccer_model
+    enabled: true
+    serving_status: production
+    evidence_status: historical_only
+    replacement_priority: medium
+    rollback_model: null
+  - model_id: tennis-surface-elo-v1
+    sport: TENNIS
+    market: moneyline
+    implementation: code_backed_model
+    entry: model_prediction.models.tennis:tennis_model
+    enabled: true
+    serving_status: production
+    evidence_status: historical_only
+    replacement_priority: medium
+    rollback_model: null
+  - model_id: college-football-v1
+    sport: NCAAF
+    market: moneyline
+    implementation: json_artifact
+    artifact: config/models/college-football-v1.json
+    enabled: true
+    serving_status: production
+    evidence_status: degraded
+    replacement_priority: critical
+    rollback_model: null
+  - model_id: cfb-spread-v1
+    sport: NCAAF
+    market: spread
+    implementation: json_artifact
+    artifact: config/models/cfb-spread-v1.json
+    enabled: true
+    serving_status: production
+    evidence_status: degraded
+    replacement_priority: critical
+    rollback_model: null
+  - model_id: cfb-total-v1
+    sport: NCAAF
+    market: total
+    implementation: json_artifact
+    artifact: config/models/cfb-total-v1.json
+    enabled: true
+    serving_status: production
+    evidence_status: degraded
+    replacement_priority: critical
+    rollback_model: null
+  - model_id: cs2-tiered-elo-v6
+    sport: CS2
+    market: moneyline
+    implementation: json_artifact
+    artifact: config/models/cs2-tiered-elo-v6.json
+    enabled: true
+    serving_status: production
+    evidence_status: historical_only
+    replacement_priority: low
+    rollback_model: null
+  - model_id: dota2-tiered-elo-v6
+    sport: DOTA2
+    market: moneyline
+    implementation: json_artifact
+    artifact: config/models/dota2-tiered-elo-v6.json
+    enabled: true
+    serving_status: production
+    evidence_status: historical_only
+    replacement_priority: low
+    rollback_model: null
+  - model_id: lol-tiered-elo-v6
+    sport: LOL
+    market: moneyline
+    implementation: json_artifact
+    artifact: config/models/lol-tiered-elo-v6.json
+    enabled: true
+    serving_status: production
+    evidence_status: historical_only
+    replacement_priority: low
+    rollback_model: null
+  - model_id: valorant-tiered-elo-v6
+    sport: VALORANT
+    market: moneyline
+    implementation: json_artifact
+    artifact: config/models/valorant-tiered-elo-v6.json
+    enabled: true
+    serving_status: production
+    evidence_status: historical_only
+    replacement_priority: low
+    rollback_model: null
+  - model_id: rainbow_six-tiered-elo-v6
+    sport: RAINBOW_SIX
+    market: moneyline
+    implementation: json_artifact
+    artifact: config/models/rainbow_six-tiered-elo-v6.json
+    enabled: true
+    serving_status: production
+    evidence_status: historical_only
+    replacement_priority: low
+    rollback_model: null
+  - model_id: kbo-tie-aware-elo-v2
+    sport: KBO
+    market: moneyline
+    implementation: json_artifact
+    artifact: config/models/kbo-tie-aware-elo-v2.json
+    enabled: true
+    serving_status: production
+    evidence_status: historical_only
+    replacement_priority: low
+    rollback_model: null
+  - model_id: npb-tie-aware-elo-v2
+    sport: NPB
+    market: moneyline
+    implementation: json_artifact
+    artifact: config/models/npb-tie-aware-elo-v2.json
+    enabled: true
+    serving_status: production
+    evidence_status: historical_only
+    replacement_priority: low
+    rollback_model: null
   champions:
     WNBA:
       moneyline: wnba-elo-trend-lr-v4
@@ -180,12 +235,16 @@ prediction_service:
     MLB:
       moneyline: mlb-elo-trend-lr-v8
       spread: measured-edge-margin-v3
-      total: measured-edge-totals-v3
+      total: mlb-structural-v10-frozen
       nrfi: mlb-nrfi-v2
     NBA:
       moneyline: nba-elo-trend-lr-v4
     NFL:
       moneyline: nfl-elo-trend-lr-v4
+    NCAAF:
+      moneyline: college-football-v1
+      spread: cfb-spread-v1
+      total: cfb-total-v1
     SOCCER:
       moneyline: soccer-poisson-dc-v1
     TENNIS:
@@ -204,34 +263,174 @@ prediction_service:
       moneyline: kbo-tie-aware-elo-v2
     NPB:
       moneyline: npb-tie-aware-elo-v2
-
-  # Kept alongside `models` for backward compatibility with the legacy
-  # validator contract and champion_challenger.freeze(), which still reads
-  # these two sections directly. The registry derives from `models` when
-  # present; legacy v1/v2 configs derive from these instead.
+  challengers:
+    MLB:
+      moneyline: mlb-moneyline-v9-residual
+      spread: measured-edge-margin-v4
+      total: mlb-structural-v11-residual
+      nrfi: mlb-nrfi-v3
+    WNBA:
+      moneyline: wnba-moneyline-v5
+      spread: wnba-spread-structural-v3
+      total: wnba-total-possession-v3
+    NCAAF:
+      moneyline: cfb-structural-v2
+      spread: cfb-structural-v2
+      total: cfb-structural-v2
+    NBA:
+      moneyline: nba-structural-v5
+    NFL:
+      moneyline: nfl-structural-v5
+    SOCCER:
+      moneyline: soccer-poisson-dc-v2
+    TENNIS:
+      moneyline: tennis-surface-elo-v2
+    CS2:
+      moneyline: cs2-contextual-v7
+    DOTA2:
+      moneyline: dota2-contextual-v7
+    LOL:
+      moneyline: lol-contextual-v7
+    VALORANT:
+      moneyline: valorant-contextual-v7
+    RAINBOW_SIX:
+      moneyline: r6-contextual-v7
+    KBO:
+      moneyline: kbo-baseball-v3
+    NPB:
+      moneyline: npb-baseball-v3
+  research_queue:
+  - sport: NCAAF
+    market: moneyline
+    incumbent: college-football-v1
+    replacement_priority: critical
+    challenger: cfb-structural-v2
+    evidence_status: degraded
+  - sport: NCAAF
+    market: spread
+    incumbent: cfb-spread-v1
+    replacement_priority: critical
+    challenger: cfb-structural-v2
+    evidence_status: degraded
+  - sport: NCAAF
+    market: total
+    incumbent: cfb-total-v1
+    replacement_priority: critical
+    challenger: cfb-structural-v2
+    evidence_status: degraded
+  - sport: MLB
+    market: total
+    incumbent: mlb-structural-v10-frozen
+    replacement_priority: low
+    challenger: mlb-structural-v11-residual
+    evidence_status: predictively_qualified
+  - sport: MLB
+    market: moneyline
+    incumbent: mlb-elo-trend-lr-v8
+    replacement_priority: high
+    challenger: mlb-moneyline-v9-residual
+    evidence_status: historical_only
+  - sport: MLB
+    market: spread
+    incumbent: measured-edge-margin-v3
+    replacement_priority: medium
+    challenger: measured-edge-margin-v4
+    evidence_status: historical_only
+  - sport: WNBA
+    market: moneyline
+    incumbent: wnba-elo-trend-lr-v4
+    replacement_priority: low
+    challenger: wnba-moneyline-v5
+    evidence_status: predictively_qualified
+  - sport: WNBA
+    market: total
+    incumbent: wnba-total-margin-v2
+    replacement_priority: medium
+    challenger: wnba-total-possession-v3
+    evidence_status: predictively_qualified
+  - sport: WNBA
+    market: spread
+    incumbent: wnba-spread-margin-v2
+    replacement_priority: medium
+    challenger: wnba-spread-structural-v3
+    evidence_status: predictively_qualified
+  - sport: SOCCER
+    market: moneyline
+    incumbent: soccer-poisson-dc-v1
+    replacement_priority: medium
+    challenger: soccer-poisson-dc-v2
+    evidence_status: historical_only
+  - sport: TENNIS
+    market: moneyline
+    incumbent: tennis-surface-elo-v1
+    replacement_priority: medium
+    challenger: tennis-surface-elo-v2
+    evidence_status: historical_only
+  - sport: CS2
+    market: moneyline
+    incumbent: cs2-tiered-elo-v6
+    replacement_priority: low
+    challenger: cs2-contextual-v7
+    evidence_status: historical_only
+  - sport: DOTA2
+    market: moneyline
+    incumbent: dota2-tiered-elo-v6
+    replacement_priority: low
+    challenger: dota2-contextual-v7
+    evidence_status: historical_only
+  - sport: LOL
+    market: moneyline
+    incumbent: lol-tiered-elo-v6
+    replacement_priority: low
+    challenger: lol-contextual-v7
+    evidence_status: historical_only
+  - sport: VALORANT
+    market: moneyline
+    incumbent: valorant-tiered-elo-v6
+    replacement_priority: low
+    challenger: valorant-contextual-v7
+    evidence_status: historical_only
+  - sport: RAINBOW_SIX
+    market: moneyline
+    incumbent: rainbow_six-tiered-elo-v6
+    replacement_priority: low
+    challenger: r6-contextual-v7
+    evidence_status: historical_only
+  - sport: KBO
+    market: moneyline
+    incumbent: kbo-tie-aware-elo-v2
+    replacement_priority: low
+    challenger: kbo-baseball-v3
+    evidence_status: historical_only
+  - sport: NPB
+    market: moneyline
+    incumbent: npb-tie-aware-elo-v2
+    replacement_priority: low
+    challenger: npb-baseball-v3
+    evidence_status: historical_only
   allowed_models:
-    - wnba-elo-trend-lr-v4
-    - wnba-spread-margin-v2
-    - wnba-total-margin-v2
-    - mlb-elo-trend-lr-v8
-    - measured-edge-margin-v3
-    - measured-edge-totals-v3
-    - mlb-nrfi-v2
-    - nba-elo-trend-lr-v4
-    - nfl-elo-trend-lr-v4
-    - soccer-poisson-dc-v1
-    - tennis-surface-elo-v1
-    - college-football-v1
-    - cfb-spread-v1
-    - cfb-total-v1
-    - cs2-tiered-elo-v6
-    - dota2-tiered-elo-v6
-    - lol-tiered-elo-v6
-    - valorant-tiered-elo-v6
-    - rainbow_six-tiered-elo-v6
-    - kbo-tie-aware-elo-v2
-    - npb-tie-aware-elo-v2
-
+  - wnba-elo-trend-lr-v4
+  - wnba-spread-margin-v2
+  - wnba-total-margin-v2
+  - mlb-elo-trend-lr-v8
+  - measured-edge-margin-v3
+  - measured-edge-totals-v3
+  - mlb-structural-v10-frozen
+  - mlb-nrfi-v2
+  - nba-elo-trend-lr-v4
+  - nfl-elo-trend-lr-v4
+  - soccer-poisson-dc-v1
+  - tennis-surface-elo-v1
+  - college-football-v1
+  - cfb-spread-v1
+  - cfb-total-v1
+  - cs2-tiered-elo-v6
+  - dota2-tiered-elo-v6
+  - lol-tiered-elo-v6
+  - valorant-tiered-elo-v6
+  - rainbow_six-tiered-elo-v6
+  - kbo-tie-aware-elo-v2
+  - npb-tie-aware-elo-v2
   artifact_map:
     wnba-elo-trend-lr-v4: config/models/wnba-elo-trend-lr-v4.json
     wnba-spread-margin-v2: config/models/wnba-spread-margin-v2.json
@@ -239,6 +438,7 @@ prediction_service:
     mlb-elo-trend-lr-v8: config/models/mlb-elo-trend-lr-v8.json
     measured-edge-margin-v3: config/models/measured-edge-margin-v3.json
     measured-edge-totals-v3: config/models/measured-edge-totals-v3.json
+    mlb-structural-v10-frozen: config/models/mlb-structural-v10-frozen.json
     mlb-nrfi-v2: config/models/mlb-nrfi-v2.json
     nba-elo-trend-lr-v4: config/models/nba-elo-trend-lr-v4.json
     nfl-elo-trend-lr-v4: config/models/nfl-elo-trend-lr-v4.json
@@ -250,27 +450,15 @@ prediction_service:
     lol-tiered-elo-v6: config/models/lol-tiered-elo-v6.json
     valorant-tiered-elo-v6: config/models/valorant-tiered-elo-v6.json
     rainbow_six-tiered-elo-v6: config/models/rainbow_six-tiered-elo-v6.json
-    # Artifact files renamed to match the embedded model_version
-    # ({league}-tie-aware-elo-v2); they were previously written as
-    # ...-v1.json, so these paths never existed and freeze() mislabeled
-    # kbo/npb as code-backed (audit 2026-08-13).
     kbo-tie-aware-elo-v2: config/models/kbo-tie-aware-elo-v2.json
     npb-tie-aware-elo-v2: config/models/npb-tie-aware-elo-v2.json
-
-  # Daily still evaluates these workflows for Flat/research evidence, but
-  # none has an exact qualified production-serving contract. They must never
-  # reach Main, and health remains DEGRADED while they stay active here.
   blocked_workflows: []
-
   fallback_action: no_prediction
-
 execution:
   automated_orders: false
   manual_orders_only: true
-
 dashboard:
   production_card_enabled: true
-
 scheduler:
   production:
     label: com.modelprediction.production
@@ -278,14 +466,7 @@ scheduler:
   rebuild:
     label: com.modelprediction.rebuild-shadow
     interval_seconds: 10800
-
 health:
-  # Must exceed the production job's own interval_seconds above (10800s =
-  # 180min) or health is DEGRADED by arithmetic: at 120 the check fired on
-  # every cycle where the last prediction was simply waiting for the next
-  # scheduled run, which is not a fault. 180min cadence + 60min slack for a
-  # long run or a coalesced skip. Pinned by
-  # test_system_health.py::test_freshness_threshold_exceeds_the_production_interval.
   max_data_age_minutes: 240
   require_finite_probabilities: true
   require_probability_normalization: true

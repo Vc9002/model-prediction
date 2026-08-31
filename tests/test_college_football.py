@@ -411,8 +411,8 @@ def test_cfb_settlement_grading():
 def test_cfb_production_registry_and_hashes():
     """Verify production registry loads all 3 models with self-verifying hashes.
 
-    The entries stay declared and resolvable (so the artifacts keep being hash-
-    verified) but disabled -- demotion is a routing decision, not a deletion.
+    Under the permanent champion-challenger framework, weak evidence models are
+    active production champions with evidence_status=degraded and replacement_priority=critical.
     """
     root = Path(__file__).resolve().parent.parent
     reg = ProductionModelRegistry.load(root)
@@ -420,7 +420,10 @@ def test_cfb_production_registry_and_hashes():
     for mid in ["college-football-v1", "cfb-spread-v1", "cfb-total-v1"]:
         assert mid in reg.entries
         entry = reg.entries[mid]
-        assert entry.enabled is False
+        assert entry.enabled is True
+        assert entry.serving_status in {"production", "active"}
+        assert entry.evidence_status == "degraded"
+        assert entry.replacement_priority == "critical"
         assert entry.sport == "NCAAF"
         assert entry.load_error is None
 
@@ -503,12 +506,9 @@ def test_cfb_standard_lay_ask_is_vig_inclusive_not_no_vig():
     assert STANDARD_LAY_ASK > 0.50
 
 
-def test_cfb_models_are_demoted_and_not_champions():
-    """NCAAF stays out of production until requalified on the real ESPN cohort.
-
-    The original promotion was measured on a simulated cohort whose market line
-    was the model's own target plus noise, so the edge was arithmetic. Every CFB
-    artifact reports qualified: false; production config must agree with them.
+def test_cfb_models_serving_with_degraded_evidence():
+    """Under the permanent champion-challenger architecture, NCAAF models are
+    production champions marked as degraded evidence with critical replacement priority.
     """
     import yaml
 
@@ -521,9 +521,12 @@ def test_cfb_models_are_demoted_and_not_champions():
 
     enabled = {m["model_id"]: m.get("enabled", True) for m in svc["models"] if m["model_id"] in cfb_ids}
     assert enabled.keys() == cfb_ids, "all three CFB entries must still be declared"
-    assert not any(enabled.values()), f"CFB models must stay disabled: {enabled}"
+    assert all(enabled.values()), f"CFB models must stay enabled: {enabled}"
 
-    assert "NCAAF" not in (svc.get("champions") or {}), "an unqualified model must not be a champion"
+    champions = svc.get("champions", {}).get("NCAAF", {})
+    assert champions.get("moneyline") == "college-football-v1"
+    assert champions.get("spread") == "cfb-spread-v1"
+    assert champions.get("total") == "cfb-total-v1"
 
     with (root / "config/model.yaml").open() as f:
         model_cfg = yaml.safe_load(f)

@@ -1,23 +1,13 @@
 """The single production model registry.
 
 One source of truth for what is in production and how each model's contract
-resolves. This replaces the split personality where
-``config/production.yaml`` listed 13 models in ``allowed_models`` but
-validation, health, and the predict cycle only ever saw the single
-``primary`` canary:
-
-- every entry carries ``model_id``, ``sport``, ``market``, implementation
-  type (``json_artifact`` / ``code_backed_model`` / ``rating_engine``),
-  artifact path, verified hash, feature-schema version, enabled state, and
-  rollback model;
-- loading validates **every enabled entry** and fails *that model* closed
-  (``load_error`` recorded, resolution refused) when its contract cannot
-  resolve — a broken secondary model must never silently look served;
-- the **primary**'s failure is a hard ``ValueError``, matching the
-  canary's fail-closed primary contract;
-- legacy ``schema_version`` 1/2 configs (``allowed_models`` +
-  ``artifact_map``) are still accepted and derive the same entries, so
-  older fixtures and operators' existing files keep validating.
+resolves. Governs the champion-challenger architecture:
+- Every supported sport/market always has exactly one production-serving champion.
+- Challengers, rollbacks, and research queues are tracked explicitly.
+- Weak evidence (degraded) sets high/critical replacement priority but NEVER
+  removes the market from production serving.
+- Loading validates every enabled entry and fails closed per model when its contract
+  cannot resolve.
 """
 
 from __future__ import annotations
@@ -31,6 +21,15 @@ from typing import Any
 
 import yaml
 
+from .model_lifecycle import (
+    SUPPORTED_MARKETS,
+    EvidenceStatus,
+    ModelLifecycleContract,
+    ReplacementPriority,
+    ServingStatus,
+    validate_production_lifecycle,
+)
+
 IMPLEMENTATION_JSON_ARTIFACT = "json_artifact"
 IMPLEMENTATION_CODE_BACKED = "code_backed_model"
 IMPLEMENTATION_RATING_ENGINE = "rating_engine"
@@ -40,10 +39,7 @@ IMPLEMENTATION_TYPES = (
     IMPLEMENTATION_RATING_ENGINE,
 )
 
-# Code-backed production models and their factory entry points. Kept as
-# module data (rather than a per-consumer allowlist) so the registry can
-# resolve them like any other contract; ``config/production.yaml`` v3
-# declares these explicitly and can override the entry.
+# Code-backed production models and their factory entry points.
 CODE_BACKED_ENTRYPOINTS: dict[str, str] = {
     "soccer-poisson-dc-v1": "model_prediction.models.soccer:soccer_model",
     "tennis-surface-elo-v1": "model_prediction.models.tennis:tennis_model",
@@ -54,12 +50,7 @@ CODE_BACKED_ENTRYPOINTS: dict[str, str] = {
 
 
 def compute_artifact_hash(payload: dict[str, Any]) -> str:
-    """SHA-256 of the canonical JSON form, excluding the embedded hash field.
-
-    Matches the convention used in ``total_score._artifact_hash`` and
-    ``international_baseball``: sort keys, compact separators, and skip the
-    ``artifact_hash`` key so the hash isn't self-referential.
-    """
+    """SHA-256 of the canonical JSON form, excluding the embedded hash field."""
     canonical = {k: v for k, v in payload.items() if k != "artifact_hash"}
     return hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
@@ -79,6 +70,10 @@ class ProductionModelEntry:
     rollback_model: str | None = None
     entry: str | None = None
     load_error: str | None = None
+    serving_status: str = ServingStatus.PRODUCTION.value
+    evidence_status: str = EvidenceStatus.HISTORICAL_ONLY.value
+    replacement_priority: str = ReplacementPriority.MEDIUM.value
+    challenger_model_id: str | None = None
 
     @property
     def available(self) -> bool:
@@ -100,6 +95,9 @@ class ProductionModelRegistry:
         manual_orders_only: bool,
         health: dict[str, Any] | None = None,
         champions: dict[str, dict[str, str]] | None = None,
+        challengers: dict[str, dict[str, str]] | None = None,
+        contracts: dict[str, dict[str, ModelLifecycleContract]] | None = None,
+        research_queue: list[dict[str, Any]] | None = None,
         blocked_workflows: dict[str, dict[str, Any]] | None = None,
     ) -> None:
         self.entries = entries
@@ -109,14 +107,15 @@ class ProductionModelRegistry:
         self.automated_orders = automated_orders
         self.manual_orders_only = manual_orders_only
         self.health = health or {}
-        # sport -> market -> champion model_id. The champion is what
-        # SERVES a sport/market; the primary is what the canary predict
-        # cycle runs. They are separate notions on purpose.
+        # sport -> market -> champion model_id
         self.champions = champions or {}
-        # Research/shadow workflows that are invoked by the daily runner but
-        # are deliberately NOT production-serving contracts.  Keeping these
-        # explicit lets health report the gap instead of treating an absent
-        # registry entry as evidence that the workflow does not exist.
+        # sport -> market -> challenger model_id
+        self.challengers = challengers or {}
+        # sport -> market -> ModelLifecycleContract
+        self.contracts = contracts or {}
+        # Structured research queue
+        self.research_queue = research_queue or []
+        # Blocked workflows
         self.blocked_workflows = blocked_workflows or {}
 
     # ------------------------------------------------------------- loading
@@ -175,6 +174,46 @@ class ProductionModelRegistry:
                         f"{entry.sport}/{entry.market}"
                     )
 
+        challengers = svc.get("challengers") or {}
+        if not isinstance(challengers, dict):
+            challengers = {}
+
+        research_queue = svc.get("research_queue") or []
+        if not isinstance(research_queue, list):
+            research_queue = []
+
+        # Construct lifecycle contracts
+        contracts: dict[str, dict[str, ModelLifecycleContract]] = {}
+        for sport, markets in champions.items():
+            sport_key = str(sport).upper()
+            contracts[sport_key] = {}
+            for market, champ_id in markets.items():
+                champ_entry = entries.get(champ_id)
+                chall_id = (challengers.get(sport_key) or {}).get(market)
+                rollback_id = champ_entry.rollback_model if champ_entry else None
+
+                contracts[sport_key][market] = ModelLifecycleContract(
+                    sport=sport_key,
+                    market=market,
+                    champion_model_id=champ_id,
+                    challenger_model_id=chall_id,
+                    rollback_model_id=rollback_id,
+                    serving_status=champ_entry.serving_status
+                    if champ_entry
+                    else ServingStatus.PRODUCTION.value,
+                    evidence_status=champ_entry.evidence_status
+                    if champ_entry
+                    else EvidenceStatus.HISTORICAL_ONLY.value,
+                    replacement_priority=champ_entry.replacement_priority
+                    if champ_entry
+                    else ReplacementPriority.MEDIUM.value,
+                    champion_artifact_hash=champ_entry.artifact_hash if champ_entry else None,
+                    challenger_artifact_hash=entries[chall_id].artifact_hash if chall_id in entries else None,
+                    rollback_artifact_hash=entries[rollback_id].artifact_hash
+                    if rollback_id and rollback_id in entries
+                    else None,
+                )
+
         blocked_workflows = cls._parse_blocked_workflows(svc, entries)
 
         return cls(
@@ -186,18 +225,17 @@ class ProductionModelRegistry:
             manual_orders_only=bool(execution.get("manual_orders_only", True)),
             health=config.get("health") or {},
             champions={str(s): dict(m) for s, m in champions.items()},
+            challengers={str(s): dict(m) for s, m in challengers.items()}
+            if isinstance(challengers, dict)
+            else {},
+            contracts=contracts,
+            research_queue=list(research_queue) if isinstance(research_queue, list) else [],
             blocked_workflows=blocked_workflows,
         )
 
     @staticmethod
     def _validate_explicit_mirrors(svc: dict[str, Any], models: list[Any]) -> None:
-        """Require legacy mirrors, when present, to match ``models`` exactly.
-
-        The v3 list is authoritative, but promotion/freeze compatibility code
-        still reads ``allowed_models`` and ``artifact_map``.  Drift between
-        those views must therefore be a startup error, not a latent routing
-        difference.
-        """
+        """Require legacy mirrors, when present, to match ``models`` exactly."""
         model_ids = [str(raw.get("model_id")) for raw in models if isinstance(raw, dict)]
         if len(model_ids) != len(set(model_ids)):
             raise ValueError("prediction_service.models contains duplicate model_id values")
@@ -279,13 +317,7 @@ class ProductionModelRegistry:
 
     @staticmethod
     def _entries_from_legacy(svc: dict[str, Any], root: Path) -> tuple[dict[str, ProductionModelEntry], str]:
-        """Derive entries from the v1/v2 ``allowed_models`` + ``artifact_map``.
-
-        Legacy configs only declare sport/market for the primary; every
-        other model's identity comes from its own artifact (or the
-        code-backed entrypoint table). Error messages keep the exact
-        wording the canary validator has always raised.
-        """
+        """Derive entries from the v1/v2 ``allowed_models`` + ``artifact_map``."""
         allowed = svc.get("allowed_models")
         if not isinstance(allowed, list) or len(allowed) == 0:
             raise ValueError("prediction_service.allowed_models must be a non-empty list")
@@ -304,10 +336,6 @@ class ProductionModelRegistry:
 
         entries: dict[str, ProductionModelEntry] = {}
         for model_id in allowed:
-            # Legacy configs only declare sport/market for the primary, so
-            # identity comes from each model's own artifact (or the
-            # code-backed entrypoint table) — sport is deliberately NOT
-            # copied from primary_spec here; the artifact's own field wins.
             raw: dict[str, Any] = {"model_id": model_id}
             if model_id == primary_id:
                 raw.update(
@@ -319,8 +347,6 @@ class ProductionModelRegistry:
             elif model_id in artifact_map:
                 raw["artifact"] = artifact_map[model_id]
             else:
-                # No artifact declared: only resolvable when a code-backed
-                # entrypoint exists for this model id.
                 raw["implementation"] = IMPLEMENTATION_CODE_BACKED
             entries[model_id] = ProductionModelRegistry._resolve_entry(raw, root)
         return entries, primary_id
@@ -332,6 +358,16 @@ class ProductionModelRegistry:
         """Resolve + validate one entry; failures land in ``load_error``."""
         model_id = raw["model_id"]
         implementation = raw.get("implementation", IMPLEMENTATION_JSON_ARTIFACT)
+        serving_status = str(
+            raw.get(
+                "serving_status",
+                ServingStatus.PRODUCTION.value if raw.get("enabled", True) else ServingStatus.RETIRED.value,
+            )
+        )
+        evidence_status = str(raw.get("evidence_status", EvidenceStatus.HISTORICAL_ONLY.value))
+        replacement_priority = str(raw.get("replacement_priority", ReplacementPriority.MEDIUM.value))
+        challenger_model_id = raw.get("challenger_model") or raw.get("challenger")
+
         if implementation not in IMPLEMENTATION_TYPES:
             return ProductionModelEntry(
                 model_id=model_id,
@@ -340,6 +376,10 @@ class ProductionModelRegistry:
                 implementation=implementation,
                 enabled=bool(raw.get("enabled", True)),
                 rollback_model=raw.get("rollback_model"),
+                serving_status=serving_status,
+                evidence_status=evidence_status,
+                replacement_priority=replacement_priority,
+                challenger_model_id=challenger_model_id,
                 load_error=(
                     f"unknown implementation type {implementation!r}; expected one of {IMPLEMENTATION_TYPES}"
                 ),
@@ -355,6 +395,10 @@ class ProductionModelRegistry:
                     implementation=implementation,
                     enabled=bool(raw.get("enabled", True)),
                     rollback_model=raw.get("rollback_model"),
+                    serving_status=serving_status,
+                    evidence_status=evidence_status,
+                    replacement_priority=replacement_priority,
+                    challenger_model_id=challenger_model_id,
                     load_error="json_artifact entry has no artifact path",
                 )
             artifact_path = root / artifact_rel
@@ -367,6 +411,10 @@ class ProductionModelRegistry:
                     artifact=str(artifact_rel),
                     enabled=bool(raw.get("enabled", True)),
                     rollback_model=raw.get("rollback_model"),
+                    serving_status=serving_status,
+                    evidence_status=evidence_status,
+                    replacement_priority=replacement_priority,
+                    challenger_model_id=challenger_model_id,
                     load_error=f"artifact file not found at {artifact_path}",
                 )
             try:
@@ -380,6 +428,10 @@ class ProductionModelRegistry:
                     artifact=str(artifact_rel),
                     enabled=bool(raw.get("enabled", True)),
                     rollback_model=raw.get("rollback_model"),
+                    serving_status=serving_status,
+                    evidence_status=evidence_status,
+                    replacement_priority=replacement_priority,
+                    challenger_model_id=challenger_model_id,
                     load_error=f"artifact unreadable: {exc}",
                 )
             embedded_hash = payload.get("artifact_hash")
@@ -393,6 +445,10 @@ class ProductionModelRegistry:
                     artifact=str(artifact_rel),
                     enabled=bool(raw.get("enabled", True)),
                     rollback_model=raw.get("rollback_model"),
+                    serving_status=serving_status,
+                    evidence_status=evidence_status,
+                    replacement_priority=replacement_priority,
+                    challenger_model_id=challenger_model_id,
                     load_error=(
                         f"artifact_hash mismatch: embedded '{embedded_hash}' != computed '{computed_hash}'"
                     ),
@@ -407,6 +463,10 @@ class ProductionModelRegistry:
                     artifact=str(artifact_rel),
                     enabled=bool(raw.get("enabled", True)),
                     rollback_model=raw.get("rollback_model"),
+                    serving_status=serving_status,
+                    evidence_status=evidence_status,
+                    replacement_priority=replacement_priority,
+                    challenger_model_id=challenger_model_id,
                     load_error=(
                         f"model_id mismatch: config says '{model_id}', artifact says '{artifact_model_id}'"
                     ),
@@ -421,10 +481,13 @@ class ProductionModelRegistry:
                 feature_schema_version=str(payload.get("schema_version", "unknown")),
                 enabled=bool(raw.get("enabled", True)),
                 rollback_model=raw.get("rollback_model"),
+                serving_status=serving_status,
+                evidence_status=evidence_status,
+                replacement_priority=replacement_priority,
+                challenger_model_id=challenger_model_id,
             )
 
-        # code_backed_model / rating_engine: the contract is a resolvable
-        # Python entry point ("pkg.mod:attr").
+        # code_backed_model / rating_engine
         entry = raw.get("entry") or CODE_BACKED_ENTRYPOINTS.get(model_id)
         if not entry:
             return ProductionModelEntry(
@@ -434,6 +497,10 @@ class ProductionModelRegistry:
                 implementation=implementation,
                 enabled=bool(raw.get("enabled", True)),
                 rollback_model=raw.get("rollback_model"),
+                serving_status=serving_status,
+                evidence_status=evidence_status,
+                replacement_priority=replacement_priority,
+                challenger_model_id=challenger_model_id,
                 load_error=f"{implementation} entry has no entry point declared",
             )
         try:
@@ -447,6 +514,10 @@ class ProductionModelRegistry:
                 entry=entry,
                 enabled=bool(raw.get("enabled", True)),
                 rollback_model=raw.get("rollback_model"),
+                serving_status=serving_status,
+                evidence_status=evidence_status,
+                replacement_priority=replacement_priority,
+                challenger_model_id=challenger_model_id,
                 load_error=f"entry point {entry!r} does not resolve: {exc}",
             )
         return ProductionModelEntry(
@@ -457,16 +528,16 @@ class ProductionModelRegistry:
             entry=entry,
             enabled=bool(raw.get("enabled", True)),
             rollback_model=raw.get("rollback_model"),
+            serving_status=serving_status,
+            evidence_status=evidence_status,
+            replacement_priority=replacement_priority,
+            challenger_model_id=challenger_model_id,
         )
 
     # -------------------------------------------------------------- access
 
     def resolve(self, sport: str, market: str) -> ProductionModelEntry | None:
-        """Return the enabled, resolved entry for a sport+market, or None.
-
-        Refuses entries that failed validation — resolution is the
-        fail-closed gate, not just a lookup.
-        """
+        """Return the enabled, resolved entry for a sport+market, or None."""
         for entry in self.entries.values():
             if (
                 entry.available
@@ -477,13 +548,7 @@ class ProductionModelRegistry:
         return None
 
     def champion(self, sport: str, market: str) -> ProductionModelEntry | None:
-        """The model that SERVES a sport+market, or None.
-
-        Explicit ``champions`` pointers win; without one, falls back to
-        the unique registered entry (legacy configs). A champion whose
-        contract failed validation resolves to None — fail closed, never
-        silently serve a broken champion.
-        """
+        """The model that SERVES a sport+market, or None."""
         model_id = (self.champions.get(sport.upper()) or {}).get(market)
         if model_id:
             entry = self.entries.get(model_id)
@@ -491,6 +556,44 @@ class ProductionModelRegistry:
                 return entry
             return None
         return self.resolve(sport, market)
+
+    def challenger(self, sport: str, market: str) -> ProductionModelEntry | None:
+        """The frozen prospective challenger model for a sport+market, or None."""
+        model_id = (self.challengers.get(sport.upper()) or {}).get(market)
+        if model_id:
+            entry = self.entries.get(model_id)
+            if entry is not None and entry.available:
+                return entry
+        return None
+
+    def rollback(self, sport: str, market: str) -> ProductionModelEntry | None:
+        """The rollback model for a sport+market's champion, or None."""
+        champ = self.champion(sport, market)
+        if champ is not None and champ.rollback_model:
+            return self.entries.get(champ.rollback_model)
+        return None
+
+    def lifecycle_contract(self, sport: str, market: str) -> ModelLifecycleContract | None:
+        """The lifecycle contract for a sport+market, or None."""
+        return (self.contracts.get(sport.upper()) or {}).get(market)
+
+    def all_lifecycle_contracts(self) -> list[ModelLifecycleContract]:
+        """All registered lifecycle contracts across sports and markets."""
+        result: list[ModelLifecycleContract] = []
+        for sport_contracts in self.contracts.values():
+            result.extend(sport_contracts.values())
+        return result
+
+    def validate_lifecycle_invariants(
+        self,
+        supported_markets: dict[str, set[str]] = SUPPORTED_MARKETS,
+    ) -> list[str]:
+        """Verify that every supported market has an active, valid serving champion."""
+        return validate_production_lifecycle(
+            self.contracts,
+            supported_markets=supported_markets,
+            entries_by_id=self.entries,
+        )
 
     def available_entries(self) -> list[ProductionModelEntry]:
         """Enabled entries whose contract resolved."""

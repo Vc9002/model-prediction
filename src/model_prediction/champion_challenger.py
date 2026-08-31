@@ -407,6 +407,11 @@ def _bootstrap_ci_on_deltas(
     tail = (1 - confidence) / 2
     lower = bootstrapped_deltas[int(tail * n_resamples)]
     upper = bootstrapped_deltas[min(n_resamples - 1, int((1 - tail) * n_resamples))]
+    p_better = (
+        round(sum(1 for d in bootstrapped_deltas if d < 0) / len(bootstrapped_deltas), 4)
+        if bootstrapped_deltas
+        else 0.0
+    )
 
     return {
         "status": "ok",
@@ -415,6 +420,7 @@ def _bootstrap_ci_on_deltas(
         "confidence": confidence,
         "ci_low": round(lower, 6),
         "ci_high": round(upper, 6),
+        "p_better": p_better,
     }
 
 
@@ -607,8 +613,24 @@ class PairedComparison:
         dates = sorted({str(row[self._date_key]) for row in self._champion_rows})
         date_blocks = len(dates)
 
+        # Provenance breakdowns
+        from .model_lifecycle import EvidenceOrigin
+
+        live_prospective_n = sum(
+            1
+            for r in self._challenger_rows
+            if r.get("evidence_origin") == EvidenceOrigin.LIVE_PROSPECTIVE.value
+        )
+        pit_replay_n = sum(
+            1 for r in self._challenger_rows if r.get("evidence_origin") == EvidenceOrigin.PIT_REPLAY.value
+        )
+        historical_n = len(self._challenger_rows)
+
         return {
             "n_events": self._n_events,
+            "historical_n": historical_n,
+            "pit_replay_n": pit_replay_n,
+            "live_prospective_n": live_prospective_n,
             "n_dates": date_blocks,
             "champion": champ_metrics,
             "challenger": chall_metrics,
@@ -618,7 +640,13 @@ class PairedComparison:
 
     # ── promotion gate ───────────────────────────────────────────────────
 
-    def promotion_eligible(self) -> PromotionVerdict:
+    def promotion_eligible(
+        self,
+        *,
+        min_events: int = 50,
+        min_dates: int = 2,
+        required_p_better: float = 0.90,
+    ) -> PromotionVerdict:
         """Check all promotion criteria and return a structured verdict.
 
         Criteria (from the champion/challenger specification):
@@ -632,7 +660,7 @@ class PairedComparison:
         4. Coverage not reduced excessively (Δcoverage ≥ −0.05)
         5. Improvement across multiple date blocks (≥ 2 dates with
            candidate beating champion on Brier)
-        6. Minimum sample: ≥ 50 events
+        6. Minimum sample: ≥ min_events (default 50) and ≥ min_dates (default 2)
         """
         results = self.compute()
         deltas = results["deltas"]
@@ -643,8 +671,8 @@ class PairedComparison:
         failures: list[str] = []
 
         # Minimum sample
-        if n_events < 50:
-            failures.append(f"insufficient events: {n_events} < 50 minimum")
+        if n_events < min_events:
+            failures.append(f"insufficient events: {n_events} < {min_events} minimum")
             return PromotionVerdict(
                 status="needs_more_data",
                 paired_metrics=deltas,
@@ -652,8 +680,18 @@ class PairedComparison:
                 failures=failures,
                 recommendation=(
                     f"Only {n_events} events ({n_dates} dates) available; "
-                    f"need at least 50 events for a reliable comparison."
+                    f"need at least {min_events} events for a reliable comparison."
                 ),
+            )
+
+        if n_dates < min_dates:
+            failures.append(f"insufficient dates: {n_dates} < {min_dates} minimum")
+            return PromotionVerdict(
+                status="needs_more_data",
+                paired_metrics=deltas,
+                bootstrap_ci=cis,
+                failures=failures,
+                recommendation=(f"Only {n_dates} dates available; need at least {min_dates} dates."),
             )
 
         # Criterion 1: ΔLogLoss ≤ 0 (or within CI).
@@ -840,6 +878,7 @@ def load_settled_predictions(
         raise FileNotFoundError(f"settled ledger not found: {ledger_path}")
 
     from .model_ledger import ModelLedger
+    from .model_lifecycle import classify_evidence_origin
 
     rows = ModelLedger(ledger_path).rows()
     settled: list[dict[str, Any]] = []
@@ -853,7 +892,17 @@ def load_settled_predictions(
         prob = row.get("model_probability")
         if prob is None or prob == "":
             continue
-        date = row.get("event_start_utc") or row.get("observed_at_utc") or row.get("settled_at_utc") or ""
+        observed_at = row.get("observed_at_utc")
+        event_start = row.get("event_start_utc")
+        settled_at = row.get("settled_at_utc")
+        date = event_start or observed_at or settled_at or ""
+
+        origin = classify_evidence_origin(
+            prediction_created_at=observed_at,
+            event_start_utc=event_start,
+            outcome_available_at=settled_at,
+        )
+
         settled.append(
             {
                 "event_id": row.get("event_id", ""),
@@ -863,6 +912,10 @@ def load_settled_predictions(
                 "called": True,
                 "selection": row.get("selection", ""),
                 "line": row.get("line", ""),
+                "observed_at_utc": observed_at,
+                "event_start_utc": event_start,
+                "settled_at_utc": settled_at,
+                "evidence_origin": origin.value,
             }
         )
     return settled
@@ -904,3 +957,62 @@ def settled_champion_calibration(
         "wins": sum(outcomes),
         "losses": len(outcomes) - sum(outcomes),
     }
+
+
+def evaluate_challenger_on_settled_picks(
+    sport: str,
+    market: str,
+    challenger_predictions: Sequence[dict[str, Any]],
+    *,
+    min_events: int = 50,
+    min_dates: int = 2,
+    required_p_better: float = 0.90,
+    repo_root: Path | str | None = None,
+    champion_model_version: str | None = None,
+) -> PromotionVerdict:
+    """Evaluate a challenger directly against champion's real settled picks.
+
+    Loads the champion's real settled win/loss picks from the model ledger
+    (no backfill data) and runs a paired comparison across identical events.
+    """
+    from .production_registry import ProductionModelRegistry
+
+    root = Path(repo_root) if repo_root is not None else _repo_root()
+    registry = ProductionModelRegistry.load(root)
+    champ = registry.champion(sport, market)
+    if champ is None:
+        raise ValueError(f"no active champion serving {sport} {market}")
+
+    model_ver = champion_model_version or champ.model_id
+    champ_picks = load_settled_predictions(sport, market, repo_root=root, model_version=model_ver)
+    if not champ_picks:
+        return PromotionVerdict(
+            status="needs_more_data",
+            paired_metrics={},
+            bootstrap_ci={},
+            failures=[f"no settled picks found for champion {model_ver}"],
+            recommendation=f"No settled picks recorded in ledger for champion {model_ver}.",
+        )
+
+    champ_ids = {str(r["event_id"]) for r in champ_picks}
+    chall_by_id = {str(r["event_id"]): r for r in challenger_predictions}
+    common_ids = sorted(champ_ids & set(chall_by_id))
+
+    if not common_ids:
+        return PromotionVerdict(
+            status="needs_more_data",
+            paired_metrics={},
+            bootstrap_ci={},
+            failures=["zero overlapping events between champion settled picks and challenger predictions"],
+            recommendation="Challenger has no predictions on events where champion has settled picks.",
+        )
+
+    champ_common = [r for r in champ_picks if str(r["event_id"]) in set(common_ids)]
+    chall_common = [chall_by_id[eid] for eid in common_ids]
+
+    comparison = PairedComparison(champ_common, chall_common)
+    return comparison.promotion_eligible(
+        min_events=min_events,
+        min_dates=min_dates,
+        required_p_better=required_p_better,
+    )

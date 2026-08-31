@@ -48,6 +48,7 @@ if _env_file.exists():
 
 DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     "mlb-elo-trend-lr-v8",
+    "mlb-structural-v10-frozen",
     "tennis-surface-elo-v1",
     "soccer-poisson-dc-v1",
     "wnba-elo-trend-lr-v4",
@@ -56,10 +57,10 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     "cs2-tiered-elo-v6",
     "lol-tiered-elo-v6",
     "mlb-nrfi-v2",
-    "measured-edge-totals-v3",
 )
 
 EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
+    "measured-edge-totals-v3",  # MLB totals (degraded, negative CLV vs market close)
     "measured-edge-margin-v3",  # MLB run line (negative EV)
     "wnba-spread-margin-v1",  # Legacy WNBA spread (severe miscalibration)
     "wnba-total-margin-v1",  # Legacy WNBA totals (uncalibrated static SD)
