@@ -23,6 +23,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -188,9 +189,28 @@ def classify_evidence_origin(
     frozen_dt = parse_iso_datetime(candidate_frozen_at)
     feat_dt = parse_iso_datetime(feature_snapshot_observed_at)
     mkt_dt = parse_iso_datetime(market_snapshot_observed_at)
-
     if pred_dt is None or start_dt is None:
         return EvidenceOrigin.HISTORICAL_BACKTEST
+
+    # Fail closed: must have explicit freeze timestamp and non-empty artifact hashes
+    if frozen_dt is None:
+        return EvidenceOrigin.PIT_REPLAY
+
+    if not candidate_artifact_hash:
+        return EvidenceOrigin.PIT_REPLAY
+
+    if not frozen_artifact_hash:
+        return EvidenceOrigin.PIT_REPLAY
+
+    if candidate_artifact_hash != frozen_artifact_hash:
+        return EvidenceOrigin.PIT_REPLAY
+
+    # Fail closed: snapshot observation timestamps must exist and precede prediction
+    if feat_dt is None or mkt_dt is None:
+        return EvidenceOrigin.PIT_REPLAY
+
+    if feat_dt > pred_dt or mkt_dt > pred_dt:
+        return EvidenceOrigin.PIT_REPLAY
 
     # If predicted after outcome is known or after event started: NOT live prospective
     if outcome_dt and pred_dt >= outcome_dt:
@@ -205,17 +225,7 @@ def classify_evidence_origin(
             return EvidenceOrigin.PIT_REPLAY
 
     # Candidate freeze time check
-    if frozen_dt and pred_dt < frozen_dt:
-        return EvidenceOrigin.PIT_REPLAY
-
-    # Artifact hash check
-    if candidate_artifact_hash and frozen_artifact_hash and candidate_artifact_hash != frozen_artifact_hash:
-        return EvidenceOrigin.PIT_REPLAY
-
-    # Snapshot observation timestamp checks
-    if feat_dt and feat_dt > pred_dt:
-        return EvidenceOrigin.PIT_REPLAY
-    if mkt_dt and mkt_dt > pred_dt:
+    if pred_dt < frozen_dt:
         return EvidenceOrigin.PIT_REPLAY
 
     return EvidenceOrigin.LIVE_PROSPECTIVE
@@ -231,6 +241,8 @@ class ModelLifecycleContract:
     sport: str
     market: str
     champion_model_id: str
+    prospective_challenger_model_id: str | None = None
+    research_candidates: list[str] = field(default_factory=list)
     challenger_model_id: str | None = None
     rollback_model_id: str | None = None
     serving_status: str = ServingStatus.PRODUCTION.value
@@ -241,13 +253,22 @@ class ModelLifecycleContract:
     challenger_artifact_hash: str | None = None
     rollback_artifact_hash: str | None = None
     promotion_protocol_id: str | None = None
+    promotion_evidence_level: str | None = None
     notes: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.challenger_model_id is None and self.prospective_challenger_model_id is not None:
+            object.__setattr__(self, "challenger_model_id", self.prospective_challenger_model_id)
+        elif self.prospective_challenger_model_id is None and self.challenger_model_id is not None:
+            object.__setattr__(self, "prospective_challenger_model_id", self.challenger_model_id)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "sport": self.sport,
             "market": self.market,
             "champion_model_id": self.champion_model_id,
+            "prospective_challenger_model_id": self.prospective_challenger_model_id,
+            "research_candidates": self.research_candidates,
             "challenger_model_id": self.challenger_model_id,
             "rollback_model_id": self.rollback_model_id,
             "serving_status": self.serving_status,
@@ -258,6 +279,7 @@ class ModelLifecycleContract:
             "challenger_artifact_hash": self.challenger_artifact_hash,
             "rollback_artifact_hash": self.rollback_artifact_hash,
             "promotion_protocol_id": self.promotion_protocol_id,
+            "promotion_evidence_level": self.promotion_evidence_level,
             "notes": self.notes,
         }
 
@@ -267,7 +289,11 @@ class ModelLifecycleContract:
             sport=str(data["sport"]),
             market=str(data["market"]),
             champion_model_id=str(data["champion_model_id"]),
-            challenger_model_id=data.get("challenger_model_id"),
+            prospective_challenger_model_id=data.get("prospective_challenger_model_id")
+            or data.get("challenger_model_id"),
+            research_candidates=list(data.get("research_candidates") or []),
+            challenger_model_id=data.get("challenger_model_id")
+            or data.get("prospective_challenger_model_id"),
             rollback_model_id=data.get("rollback_model_id"),
             serving_status=str(data.get("serving_status", ServingStatus.PRODUCTION.value)),
             evidence_status=str(data.get("evidence_status", EvidenceStatus.HISTORICAL_ONLY.value)),
@@ -279,8 +305,67 @@ class ModelLifecycleContract:
             challenger_artifact_hash=data.get("challenger_artifact_hash"),
             rollback_artifact_hash=data.get("rollback_artifact_hash"),
             promotion_protocol_id=data.get("promotion_protocol_id"),
+            promotion_evidence_level=data.get("promotion_evidence_level"),
             notes=data.get("notes"),
         )
+
+
+def load_challenger_evidence(
+    sport: str,
+    market: str,
+    challenger_model_id: str,
+    candidate_artifact_hash: str | None = None,
+    candidate_frozen_at: str | None = None,
+    repo_root: Path | str | None = None,
+) -> list[dict[str, Any]]:
+    """Load and classify qualifying evidence strictly generated by this exact challenger."""
+    from .champion_challenger import load_settled_predictions
+
+    root = Path(repo_root) if repo_root is not None else Path(".")
+
+    # 1. Load settled outcomes from champion/market ledger
+    settled_outcomes: dict[str, dict[str, Any]] = {}
+    try:
+        settled_rows = load_settled_predictions(sport, market, repo_root=root)
+        for r in settled_rows:
+            ev_id = r.get("event_id") or r.get("game_id")
+            if ev_id and r.get("result") in {"win", "loss", "push"}:
+                settled_outcomes[str(ev_id)] = r
+    except (OSError, ValueError, KeyError, RuntimeError):
+        settled_outcomes = {}
+
+    # 2. Check candidate predictions from shadow/horizon logs
+    challenger_rows: list[dict[str, Any]] = []
+
+    h_path = root / "data" / "horizon_observations.jsonl"
+    if h_path.is_file():
+        for line in h_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                r = json.loads(line)
+                if r.get("sport", "").upper() == sport.upper() and r.get("model_id") == challenger_model_id:
+                    ev_id = str(r.get("event_id", ""))
+                    if ev_id in settled_outcomes:
+                        outcome_row = settled_outcomes[ev_id]
+                        origin = classify_evidence_origin(
+                            prediction_created_at=r.get("observed_at_utc") or r.get("created_at_utc"),
+                            event_start_utc=r.get("event_start_utc") or outcome_row.get("event_start_utc"),
+                            outcome_available_at=outcome_row.get("settled_at_utc"),
+                            candidate_frozen_at=candidate_frozen_at,
+                            candidate_artifact_hash=candidate_artifact_hash,
+                            frozen_artifact_hash=candidate_artifact_hash,
+                            feature_snapshot_observed_at=r.get("observed_at_utc"),
+                            market_snapshot_observed_at=r.get("observed_at_utc"),
+                        )
+                        r_copy = dict(r)
+                        r_copy["result"] = outcome_row.get("result")
+                        r_copy["evidence_origin"] = origin.value
+                        challenger_rows.append(r_copy)
+            except (ValueError, KeyError):
+                continue
+
+    return challenger_rows
 
 
 @dataclass(frozen=True)

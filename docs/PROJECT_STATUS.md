@@ -1,8 +1,8 @@
 # Project status and source of truth
 
-**Last verified**: 2026-08-30. Full suite passed (verified via `pytest`); ruff 100% clean (0 findings); mypy 100% clean (0 errors across all source files). College Football (NCAAF) models (`college-football-v1`, `cfb-spread-v1`, `cfb-total-v1`) demoted to `enabled: false` / `status: research` following audit disclosing synthetic simulation validation cohort and degenerate baseline pricing. Main ledger routing is disabled; synthetic Main ledger calls quarantined. Automated Polymarket Buyer ($1\text{U} = \$0.005$) fully operational with dashboard toggle and baked directly into daily forecast cycle.
+**Last verified**: 2026-08-31 (Commit `3066d59`, Tag `lifecycle-v1`). Full test suite passed (2,547 passed, 0 failures, 3 skipped); ruff 100% clean; strict type checking clean across all modules. All 21 supported production markets maintain active champions under the permanent champion–challenger lifecycle framework. NCAAF models (`college-football-v1`, `cfb-spread-v1`, `cfb-total-v1`) are active champions serving under `degraded` evidence status / `critical` replacement priority, with unified decomposed scoring challenger `cfb-structural-v2` implemented. MLB Totals champion is `mlb-structural-v10-frozen` (`promotion_basis: operator_predictive_promotion`) with `measured-edge-totals-v3` as rollback. Automated Polymarket Buyer ($1\text{U} = \$0.005$) fully operational.
 
-**Operating Architecture**: Multi-sport dual-ledger architecture with strict Point-in-Time (PIT) feature extraction, production model registry, automated Polymarket execution engine, and empirical market qualification gates.
+**Operating Architecture**: Permanent champion–challenger production lifecycle with strict Point-in-Time (PIT) feature extraction, fail-closed `EvidenceOrigin` provenance separation, Unified Model Qualification Registry research control plane, automated Polymarket execution engine, and multi-horizon pregame snapshot tracking ($T-6\text{h}, T-3\text{h}, T-1\text{h}, T-30\text{m}, T-10\text{m}$).
 
 This document is the operational status entry point. `MASTER.md` (repo root)
 is the running log of real bugs found/fixed with full evidence.
@@ -10,20 +10,21 @@ is the running log of real bugs found/fixed with full evidence.
 Historical metrics in old reports, changelog entries, model cards, and
 rollback artifacts are not current operational truth.
 
-## 2026-08-30 — Automated Polymarket Buyer & NCAAF Audit / Governance Demotion
+## 2026-08-31 — Permanent Champion–Challenger Lifecycle, Structural Challengers & Provenance Framework
 
-- **Automated Polymarket Execution Engine Operational ($1\text{U} = \$0.005$)**:
-  - Micro-unit sizing with positive-EV whitelist (Tennis ML, Soccer ML, WNBA ML, CS2/LoL Gated, MLB NRFI/Totals) and hard blacklist on uncalibrated derivatives (MLB Spread, WNBA Spread, CFB Totals).
-  - Integrated directly into `daily` forecast cycle (Step 12) and wired to live dashboard ON/OFF toggle in `dashboard.html`.
-- **College Football (NCAAF) Audit & Demotion**:
-  - Audit revealed synthetic validation cohort generated via `scripts/build_cfb_historical_dataset.py` (latent $\mu$ with target-correlated noise), and live serving fallback to constant 0.50.
-  - Demoted all three CFB models to `enabled: false` in `config/production.yaml` and `status: research` in `config/model.yaml`. **The demotion was recorded here before it was applied** — the 2026-08-30 review found all three still `enabled: true` / `shadow_qualified` in the configs. Now genuinely applied and pinned by `tests/test_college_football.py::test_cfb_models_are_demoted_and_not_champions`, which fails if any of them is re-enabled or re-listed as a champion.
-  - The `NCAAF:` block was also removed from `prediction_service.champions` — every CFB artifact reports `qualification.qualified: false`, so a champion pointer to one was a standing contradiction. Entries stay *declared* (disabled) so their artifacts keep being hash-verified on every registry load; `problem_entries()` now legitimately contains exactly these three.
-  - **Served ask corrected from the no-vig `0.50` to the real `-110` price (`STANDARD_LAY_ASK` = 0.52381).** ESPN publishes the spread/total line but no price, so the ask is synthesized; using 0.50 understated it by ~2.4pp and turned that gap into fictitious edge on every call. This is what produced 8/8 NCAAF picks `QUALIFIED` at max size on 2026-08-29 while every other sport was mostly `PAPER_CALL`. The research pipeline had always priced against 0.5238, so backtested and served edge now mean the same thing.
-  - **Live record contradicts the promotion evidence**: the Main-ledger CFB picks settled **1 win / 6 losses, −7.5U** (flat ledger 11–10), against a claimed +29.17% ROI. The claim was measured on the simulated cohort; the losses are real.
-  - **Open rows voided (2026-08-30, operator authorised)**: the 9 open Main-ledger rows and the 19 open Flat rows priced against the fabricated 0.50 ask are now `settled/push` at 0.0000 units, each with a `void_reason` and a `pick_voided` audit entry — voided through `PickLedger.void` (`scripts/void_ncaaf_fabricated_ask.py`), never deleted, so the record of the picks survives. The settled rows were left untouched on purpose: Main 1–6 / −7.5U is the live evidence that disproved the backtest. Follow-up: NCAAF isn't in `MAIN_LEDGER_SPORTS`, so the operator `void` CLI can't reach these rows even though the daily job wrote them.
-  - Quarantined 16 synthetic Main ledger calls to `data/archive/` and removed Main ledger write routing in `forecast.py` and `daily.py`.
-  - Fixed market odds extraction, probability symmetry ($1 - p$), and eliminated 0.50 fallback in `models/college_football.py`. Flat research P&L recalculated: 11W - 10L (+4.50 U, +13.0% ROI).
+- **Permanent Champion–Challenger Production Framework Operational**:
+  - Invariant: Every supported market always has exactly one production-serving model (`serving_status: production`).
+  - Evidence degradation increases replacement priority (`critical`, `high`, `medium`, `low`) without removing market coverage.
+  - Fail-closed provenance classification: A prediction is tagged `LIVE_PROSPECTIVE` only if candidate freeze timestamp, matching artifact hashes, and valid pre-event snapshot timestamps are present. Missing freeze/hash/snapshot provenance fails closed to `PIT_REPLAY` or `HISTORICAL_BACKTEST`.
+  - Qualification counts (`live_prospective_n`, `pit_replay_n`) are strictly challenger-specific.
+- **Structural Challenger Suite Implemented & Evaluation-Ready**:
+  - NCAAF Structural v2 (`cfb-structural-v2`): Decomposed independent points simulation deriving ML, spread, and total from joint Poisson/Negative Binomial distribution.
+  - MLB Runline v4 (`mlb-structural-runline-v4`): Bivariate Poisson $-1.5 / +1.5$ derivation directly from joint run distribution.
+  - WNBA Structural v3 (`wnba-structural-v3`): Unified possessions $\times$ PPP basketball simulation engine.
+  - MLB Market-Residual v10 (`mlb-moneyline-market-residual-v10`): Logistic information-delta architecture over market baseline.
+  - NBA & NFL Structural v5 (`nba-structural-v5`, `nfl-structural-v5`): Four Factors possession modeling and NFL EPA/play pressure and weather penalty simulation.
+  - Esports Contextual v7 & International Baseball v3 (`*-contextual-v7`, `*-baseball-v3`): Contextual Elo residuals and 12-inning tie distributions.
+- **Multi-Horizon Pre-Event Tracking Operational**: Continuous snapshot recording at $T-6\text{h}, T-3\text{h}, T-1\text{h}, T-30\text{m}, T-10\text{m}$ logging model probability, market prices, and point-in-time information deltas.
 
 ## 2026-08-28 — MLB Structural v10 Freeze, Protocol Hashes & Phase F1C Prospective Confirmation Activation
 

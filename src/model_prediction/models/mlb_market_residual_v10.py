@@ -1,22 +1,23 @@
 """MLB Moneyline Market-Residual Next-Generation Architecture (mlb-moneyline-market-residual-v10).
 
 Architecture:
-    logit(P_true) = logit(P_market) + f(X)
+    logit(P_true) = logit(P_market) + X @ beta
 
-Where P_market is the devigged market probability prior, and f(X) learns the residual mispricing
-across feature families:
-1. Lineup information delta: projected vs confirmed wOBA, ISO, K%, missing regulars gap.
-2. Starter information delta: starter change, velocity delta, CSW%, K-BB%, xwOBA allowed.
-3. Bullpen: high-leverage availability, closer availability, 1d/2d/3d IP workload, freshness gap.
-4. Matchup: platoon advantage, handedness matchup, pitch-mix matchup.
-5. Context: weather change since open, rest disparity, travel fatigue gap.
-6. Market dynamics: open to decision probability drift.
+Where P_market is the devigged market probability prior, and X @ beta learns the residual mispricing
+across feature families with fixed-offset estimation:
+1. Lineup information delta: projected vs confirmed wOBA, missing regulars gap.
+2. Starter information delta: starter change, CSW%, xwOBA allowed.
+3. Bullpen: freshness gap, closer availability, 3d workload.
+4. Context & Weather: temperature drift since open, rest disparity, travel gap.
+5. Market Dynamics: drift from opening probability.
 """
 
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+
+import numpy as np
 
 MLB_RESIDUAL_V10_MODEL_VERSION = "mlb-moneyline-market-residual-v10"
 
@@ -54,7 +55,7 @@ class MLBResidualFeatures:
     closer_available_gap: float = 0.0
     bullpen_workload_3d_gap: float = 0.0
 
-    # 5. Context
+    # 5. Context & Weather
     weather_change_temp: float = 0.0
     rest_gap_days: int = 0
     travel_distance_gap_km: float = 0.0
@@ -73,58 +74,99 @@ class MLBResidualForecast:
 
 
 class MLBMarketResidualV10Model:
-    """Market-residual logistic learning engine."""
+    """Market-residual logistic learning engine with statistical fitting layer."""
 
     version: str = MLB_RESIDUAL_V10_MODEL_VERSION
 
     def __init__(
         self,
-        lineup_weight: float = 0.35,
-        starter_weight: float = 0.40,
-        bullpen_weight: float = 0.25,
-        context_weight: float = 0.15,
+        weights: list[float] | None = None,
+        intercept: float = 0.0,
         l2_shrinkage: float = 0.85,
     ) -> None:
-        self.lineup_weight = lineup_weight
-        self.starter_weight = starter_weight
-        self.bullpen_weight = bullpen_weight
-        self.context_weight = context_weight
+        # Default coefficients (12 features)
+        self.weights = weights or [
+            1.12,  # 0: lineup_woba_delta
+            -0.08,  # 1: missing_regulars_gap
+            1.00,  # 2: starter_csw_delta
+            -1.20,  # 3: starter_xwoba_allowed_delta
+            -0.12,  # 4: starter_changed_net
+            0.05,  # 5: bullpen_freshness_gap
+            0.03,  # 6: closer_available_gap
+            -0.01,  # 7: bullpen_workload_3d_gap
+            0.005,  # 8: weather_change_temp
+            0.02,  # 9: rest_gap_days
+            -0.01,  # 10: travel_distance_gap_km / 1000
+            0.15,  # 11: market_drift
+        ]
+        self.intercept = intercept
         self.l2_shrinkage = l2_shrinkage
 
-    def forecast_matchup(self, features: MLBResidualFeatures) -> MLBResidualForecast:
-        """Compute posterior win probability via market logit + f(X)."""
-        prior_logit = _logit(features.market_fair_prob_home)
-
-        # 1. Lineup contribution
-        lineup_eff = (features.lineup_woba_delta_home - features.lineup_woba_delta_away) * 3.2
-        lineup_eff -= features.missing_regulars_gap * 0.08
-        contrib_lineup = self.lineup_weight * lineup_eff
-
-        # 2. Starter contribution
-        starter_eff = features.starter_csw_delta * 2.5 - features.starter_xwoba_allowed_delta * 3.0
-        if features.starter_changed_home:
-            starter_eff -= 0.12
-        if features.starter_changed_away:
-            starter_eff += 0.12
-        contrib_starter = self.starter_weight * starter_eff
-
-        # 3. Bullpen contribution
-        bp_eff = (
-            features.bullpen_freshness_gap * 0.15
-            + features.closer_available_gap * 0.08
-            - features.bullpen_workload_3d_gap * 0.03
+    @staticmethod
+    def extract_feature_vector(feat: MLBResidualFeatures) -> list[float]:
+        """Convert structured feature dataclass into a normalized 12-element vector."""
+        lineup_woba_delta = feat.lineup_woba_delta_home - feat.lineup_woba_delta_away
+        starter_changed_net = (-1.0 if feat.starter_changed_home else 0.0) + (
+            1.0 if feat.starter_changed_away else 0.0
         )
-        contrib_bullpen = self.bullpen_weight * bp_eff
+        travel_gap_scaled = feat.travel_distance_gap_km / 1000.0
+        market_drift = feat.market_fair_prob_home - feat.market_open_prob_home
 
-        # 4. Context contribution
-        ctx_eff = features.rest_gap_days * 0.04 - (features.travel_distance_gap_km / 1000.0) * 0.02
-        contrib_context = self.context_weight * ctx_eff
+        return [
+            lineup_woba_delta,
+            feat.missing_regulars_gap,
+            feat.starter_csw_delta,
+            feat.starter_xwoba_allowed_delta,
+            starter_changed_net,
+            feat.bullpen_freshness_gap,
+            feat.closer_available_gap,
+            feat.bullpen_workload_3d_gap,
+            feat.weather_change_temp,
+            float(feat.rest_gap_days),
+            travel_gap_scaled,
+            market_drift,
+        ]
 
-        # Net residual logit adjustment with L2 shrinkage
-        raw_residual = contrib_lineup + contrib_starter + contrib_bullpen + contrib_context
+    def fit_from_data(
+        self,
+        features_list: list[MLBResidualFeatures],
+        outcomes: list[int],
+        l2_reg: float = 1.0,
+    ) -> None:
+        """Fit beta weights via ridge logistic regression with market logit offset."""
+        if not features_list or len(features_list) != len(outcomes):
+            return
+
+        X = np.array([self.extract_feature_vector(f) for f in features_list])
+        y = np.array(outcomes)
+
+        # Target residual logit: y_prob - p_market approximation for ridge regression
+        p_market = np.array([f.market_fair_prob_home for f in features_list])
+        residuals = y - p_market  # Score residual
+
+        # Ridge closed-form estimator on feature matrix: beta = (X^T X + lambda I)^-1 X^T res
+        n_feat = X.shape[1]
+        xtx = X.T @ X + l2_reg * np.eye(n_feat)
+        xty = X.T @ residuals
+        fitted_beta = np.linalg.solve(xtx, xty)
+
+        self.weights = fitted_beta.tolist()
+
+    def forecast_matchup(self, features: MLBResidualFeatures) -> MLBResidualForecast:
+        """Compute posterior win probability via market logit + X @ beta."""
+        prior_logit = _logit(features.market_fair_prob_home)
+        vec = np.array(self.extract_feature_vector(features))
+        w = np.array(self.weights[: len(vec)])
+
+        raw_residual = float(np.dot(vec, w)) + self.intercept
         shrunk_residual = raw_residual * self.l2_shrinkage
 
-        # Posterior probability
+        # Group contributions
+        contrib_lineup = float(vec[0] * w[0] + vec[1] * w[1])
+        contrib_starter = float(vec[2] * w[2] + vec[3] * w[3] + vec[4] * w[4])
+        contrib_bullpen = float(vec[5] * w[5] + vec[6] * w[6] + vec[7] * w[7])
+        contrib_context = float(vec[8] * w[8] + vec[9] * w[9] + vec[10] * w[10] + vec[11] * w[11])
+
         posterior_logit = prior_logit + shrunk_residual
         p_home = _expit(posterior_logit)
         p_away = 1.0 - p_home

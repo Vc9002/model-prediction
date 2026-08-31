@@ -389,3 +389,80 @@ def test_pit_replay_and_live_prospective_counts_are_separate() -> None:
     assert results["live_prospective_n"] == 6
     assert results["pit_replay_n"] == 4
     assert results["live_prospective_n"] + results["pit_replay_n"] == results["historical_n"]
+
+
+def test_missing_freeze_time_never_counts_as_live() -> None:
+    """If candidate_frozen_at is None/missing, origin is PIT_REPLAY, never LIVE_PROSPECTIVE."""
+    from model_prediction.model_lifecycle import EvidenceOrigin, classify_evidence_origin
+
+    origin = classify_evidence_origin(
+        prediction_created_at="2026-08-31T22:00:00Z",
+        event_start_utc="2026-08-31T23:00:00Z",
+        candidate_frozen_at=None,
+        candidate_artifact_hash="hash-123",
+        frozen_artifact_hash="hash-123",
+        feature_snapshot_observed_at="2026-08-31T22:00:00Z",
+        market_snapshot_observed_at="2026-08-31T22:00:00Z",
+    )
+    assert origin == EvidenceOrigin.PIT_REPLAY
+
+
+def test_missing_artifact_hash_never_counts_as_live() -> None:
+    """If candidate or frozen artifact hash is missing, origin is PIT_REPLAY."""
+    from model_prediction.model_lifecycle import EvidenceOrigin, classify_evidence_origin
+
+    # Missing candidate hash
+    origin1 = classify_evidence_origin(
+        prediction_created_at="2026-08-31T22:00:00Z",
+        event_start_utc="2026-08-31T23:00:00Z",
+        candidate_frozen_at="2026-08-31T12:00:00Z",
+        candidate_artifact_hash=None,
+        frozen_artifact_hash="hash-123",
+        feature_snapshot_observed_at="2026-08-31T22:00:00Z",
+        market_snapshot_observed_at="2026-08-31T22:00:00Z",
+    )
+    assert origin1 == EvidenceOrigin.PIT_REPLAY
+
+    # Missing frozen hash
+    origin2 = classify_evidence_origin(
+        prediction_created_at="2026-08-31T22:00:00Z",
+        event_start_utc="2026-08-31T23:00:00Z",
+        candidate_frozen_at="2026-08-31T12:00:00Z",
+        candidate_artifact_hash="hash-123",
+        frozen_artifact_hash=None,
+        feature_snapshot_observed_at="2026-08-31T22:00:00Z",
+        market_snapshot_observed_at="2026-08-31T22:00:00Z",
+    )
+    assert origin2 == EvidenceOrigin.PIT_REPLAY
+
+
+def test_missing_snapshot_time_never_counts_as_live() -> None:
+    """If feature or market snapshot observed_at timestamp is missing, origin is PIT_REPLAY."""
+    from model_prediction.model_lifecycle import EvidenceOrigin, classify_evidence_origin
+
+    origin = classify_evidence_origin(
+        prediction_created_at="2026-08-31T22:00:00Z",
+        event_start_utc="2026-08-31T23:00:00Z",
+        candidate_frozen_at="2026-08-31T12:00:00Z",
+        candidate_artifact_hash="hash-123",
+        frozen_artifact_hash="hash-123",
+        feature_snapshot_observed_at=None,
+        market_snapshot_observed_at="2026-08-31T22:00:00Z",
+    )
+    assert origin == EvidenceOrigin.PIT_REPLAY
+
+
+def test_challenger_hash_mismatch_never_counts_as_live() -> None:
+    """If candidate artifact hash differs from frozen artifact hash, origin is PIT_REPLAY."""
+    from model_prediction.model_lifecycle import EvidenceOrigin, classify_evidence_origin
+
+    origin = classify_evidence_origin(
+        prediction_created_at="2026-08-31T22:00:00Z",
+        event_start_utc="2026-08-31T23:00:00Z",
+        candidate_frozen_at="2026-08-31T12:00:00Z",
+        candidate_artifact_hash="hash-candidate-mod",
+        frozen_artifact_hash="hash-candidate-orig",
+        feature_snapshot_observed_at="2026-08-31T22:00:00Z",
+        market_snapshot_observed_at="2026-08-31T22:00:00Z",
+    )
+    assert origin == EvidenceOrigin.PIT_REPLAY

@@ -20,7 +20,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from .champion_challenger import load_settled_predictions
 from .config import PROJECT_ROOT
 from .model_lifecycle import (
     SUPPORTED_MARKETS,
@@ -30,8 +29,42 @@ from .model_lifecycle import (
     NextAction,
     ReplacementPriority,
     ServingStatus,
+    load_challenger_evidence,
 )
 from .production_registry import ProductionModelRegistry
+
+
+def _is_challenger_implemented(chall_id: str | None) -> bool:
+    if not chall_id:
+        return False
+    mappings = {
+        "cfb-structural-v2": "model_prediction.models.cfb_structural_v2",
+        "mlb-structural-runline-v4": "model_prediction.models.mlb_runline_v4",
+        "wnba-spread-structural-v3": "model_prediction.models.wnba_structural_v3",
+        "wnba-total-possession-v3": "model_prediction.models.wnba_structural_v3",
+        "mlb-moneyline-market-residual-v10": "model_prediction.models.mlb_market_residual_v10",
+        "mlb-moneyline-v9-residual": "model_prediction.models.mlb_market_residual_v10",
+        "nba-structural-v5": "model_prediction.models.nba_structural_v5",
+        "nfl-structural-v5": "model_prediction.models.nfl_structural_v5",
+        "cs2-contextual-v7": "model_prediction.models.esports_contextual_v7",
+        "dota2-contextual-v7": "model_prediction.models.esports_contextual_v7",
+        "lol-contextual-v7": "model_prediction.models.esports_contextual_v7",
+        "valorant-contextual-v7": "model_prediction.models.esports_contextual_v7",
+        "r6-contextual-v7": "model_prediction.models.esports_contextual_v7",
+        "kbo-baseball-v3": "model_prediction.models.international_baseball_v3",
+        "npb-baseball-v3": "model_prediction.models.international_baseball_v3",
+        "soccer-poisson-dc-v2": "model_prediction.models.soccer_distribution",
+        "tennis-surface-elo-v2": "model_prediction.tennis_forward",
+    }
+    if chall_id in mappings:
+        try:
+            import importlib
+
+            importlib.import_module(mappings[chall_id])
+            return True
+        except ImportError:
+            return False
+    return False
 
 
 @dataclass(frozen=True)
@@ -141,31 +174,45 @@ def generate_qualification_registry(
             # Preregistered qualification requirements: Initial N >= 300, Full N >= 500
             required_live_prospective_n = 500 if sport in {"MLB", "WNBA", "NCAAF"} else 300
 
-            # Classify settled picks provenance
+            # Classify challenger settled picks provenance
             historical_backtest_n = 0
             pit_replay_n = 0
             live_prospective_n = 0
             synthetic_n = 0
 
-            try:
-                settled = load_settled_predictions(sport, market, repo_root=root, model_version=champ_id)
-                for r in settled:
-                    origin = r.get("evidence_origin")
-                    if origin == EvidenceOrigin.LIVE_PROSPECTIVE.value:
-                        live_prospective_n += 1
-                    elif origin == EvidenceOrigin.HISTORICAL_BACKTEST.value:
-                        historical_backtest_n += 1
-                    elif origin == EvidenceOrigin.SYNTHETIC.value:
-                        synthetic_n += 1
-                    else:
-                        pit_replay_n += 1
-            except (OSError, ValueError, KeyError, RuntimeError):
-                historical_backtest_n = 0
-                pit_replay_n = 0
-                live_prospective_n = 0
-                synthetic_n = 0
+            if chall_id:
+                try:
+                    chall_evidence = load_challenger_evidence(
+                        sport,
+                        market,
+                        challenger_model_id=chall_id,
+                        candidate_artifact_hash=chall_hash,
+                        candidate_frozen_at=getattr(chall_entry, "created_at_utc", None)
+                        if chall_entry
+                        else None,
+                        repo_root=root,
+                    )
+                    for r in chall_evidence:
+                        origin = r.get("evidence_origin")
+                        if origin == EvidenceOrigin.LIVE_PROSPECTIVE.value:
+                            live_prospective_n += 1
+                        elif origin == EvidenceOrigin.HISTORICAL_BACKTEST.value:
+                            historical_backtest_n += 1
+                        elif origin == EvidenceOrigin.SYNTHETIC.value:
+                            synthetic_n += 1
+                        else:
+                            pit_replay_n += 1
+                except (OSError, ValueError, KeyError, RuntimeError):
+                    historical_backtest_n = 0
+                    pit_replay_n = 0
+                    live_prospective_n = 0
+                    synthetic_n = 0
 
             # Determine challenger build status and next action
+            is_frozen_art = (root / "config" / "models" / f"{chall_id}.json").is_file() or (
+                root / "config" / "models" / "research" / f"{chall_id}.json"
+            ).is_file()
+
             if chall_id is None:
                 build_status = ChallengerBuildStatus.PLANNED.value
                 verdict = (
@@ -176,19 +223,6 @@ def generate_qualification_registry(
                     if evidence == EvidenceStatus.DEGRADED.value
                     else NextAction.START_NEXT_GENERATION.value
                 )
-            elif chall_id in {
-                "soccer-poisson-dc-v2",
-                "tennis-surface-elo-v2",
-                "cfb-structural-v2",
-                "mlb-structural-runline-v4",
-                "wnba-spread-structural-v3",
-                "wnba-total-possession-v3",
-                "mlb-moneyline-market-residual-v10",
-                "mlb-moneyline-v9-residual",
-            }:
-                build_status = ChallengerBuildStatus.IMPLEMENTED.value
-                verdict = "EVALUATION_READY"
-                next_action = NextAction.RUN_OFFLINE_EVALUATION.value
             elif chall_id in {"mlb-moneyline-v9-frozen", "wnba-moneyline-v5"}:
                 build_status = ChallengerBuildStatus.CAPTURING_PROSPECTIVE.value
                 if live_prospective_n >= required_live_prospective_n:
@@ -197,12 +231,14 @@ def generate_qualification_registry(
                 else:
                     verdict = "CONTINUE"
                     next_action = NextAction.COLLECT_PROSPECTIVE.value
-            elif (root / "config" / "models" / f"{chall_id}.json").is_file() or (
-                root / "config" / "models" / "research" / f"{chall_id}.json"
-            ).is_file():
+            elif is_frozen_art:
                 build_status = ChallengerBuildStatus.FROZEN.value
                 verdict = "CONTINUE"
                 next_action = NextAction.START_PROSPECTIVE_CAPTURE.value
+            elif _is_challenger_implemented(chall_id):
+                build_status = ChallengerBuildStatus.IMPLEMENTED.value
+                verdict = "EVALUATION_READY"
+                next_action = NextAction.RUN_OFFLINE_EVALUATION.value
             else:
                 build_status = ChallengerBuildStatus.PLANNED.value
                 verdict = "CONTINUE"

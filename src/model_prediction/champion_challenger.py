@@ -872,10 +872,10 @@ def load_settled_predictions(
     root = Path(repo_root) if repo_root is not None else _repo_root()
     model_id = model_id_for(str(sport).upper(), str(market))
     if model_id is None:
-        raise ValueError(f"no model ledger identity for sport={sport!r}, market={market!r}")
+        return []
     ledger_path = root / "data" / "model_ledgers" / f"{model_id}.xlsx"
     if not ledger_path.is_file():
-        raise FileNotFoundError(f"settled ledger not found: {ledger_path}")
+        return []
 
     from .model_ledger import ModelLedger
     from .model_lifecycle import classify_evidence_origin

@@ -166,6 +166,12 @@ MODEL_ID_BY_LEAGUE_AND_MARKET: dict[tuple[str, str], str] = {
     ("RAINBOW_SIX", "moneyline"): "rainbow-six-tiered-elo",
     ("KBO", "moneyline"): "kbo-tie-aware-elo",
     ("NPB", "moneyline"): "npb-tie-aware-elo",
+    ("NCAAF", "moneyline"): "ncaaf-moneyline-baseline",
+    ("NCAAF", "spread"): "ncaaf-spread-baseline",
+    ("NCAAF", "total"): "ncaaf-total-baseline",
+    ("CFB", "moneyline"): "ncaaf-moneyline-baseline",
+    ("CFB", "spread"): "ncaaf-spread-baseline",
+    ("CFB", "total"): "ncaaf-total-baseline",
 }
 
 

@@ -77,6 +77,8 @@ prediction_service:
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: measured-edge-totals-v3
+    promotion_basis: operator_predictive_promotion
+    promotion_evidence_level: predictive_only
   - model_id: mlb-nrfi-v2
     sport: MLB
     market: nrfi
@@ -265,7 +267,10 @@ prediction_service:
       moneyline: npb-tie-aware-elo-v2
   challengers:
     MLB:
-      moneyline: mlb-moneyline-v9-residual
+      moneyline: mlb-moneyline-v9-frozen
+      prospective_challenger: mlb-moneyline-v9-frozen
+      research_candidates:
+      - mlb-moneyline-market-residual-v10
       spread: mlb-structural-runline-v4
       total: mlb-structural-v11-residual
       nrfi: mlb-nrfi-v3
