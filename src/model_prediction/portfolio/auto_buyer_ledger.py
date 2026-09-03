@@ -15,6 +15,8 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
+import httpx
+
 from ..data_sources.espn import ESPNClient
 from ..domain import iso_utc, parse_utc, utc_now
 from ..ledger import FIELDNAMES
@@ -31,6 +33,25 @@ AUTO_BUYER_XLSX_PATH = DATA / "auto_buyer_picks.xlsx"
 AUTO_BUYER_LOG_PATH = LOGS_DIR / "auto_buyer.log"
 
 logger = logging.getLogger("model_prediction.auto_buyer")
+
+AUTO_BUYER_UNIT_VALUE_USD = 0.50  # 1U = 50 cents
+AUTO_BUYER_TERMINAL_RESULTS = frozenset({"win", "loss", "push"})
+
+
+def _usd_to_auto_buyer_units(value_usd: float, unit_value_usd: float = AUTO_BUYER_UNIT_VALUE_USD) -> float:
+    return round(float(value_usd) / float(unit_value_usd), 4)
+
+
+def _is_settled_auto_buyer_record(record: dict[str, Any]) -> bool:
+    return (
+        str(record.get("status") or "").lower() == "settled"
+        or str(record.get("result") or "").lower() in AUTO_BUYER_TERMINAL_RESULTS
+    )
+
+
+def _uses_live_auto_buyer_ledger(path: Path) -> bool:
+    """Return whether a writer targets the production Auto-Buyer ledger."""
+    return path.resolve() == AUTO_BUYER_JSONL_PATH.resolve()
 
 
 def _get_logger() -> logging.Logger:
@@ -123,7 +144,9 @@ def record_auto_buy_execution(
     shares = float(order_payload.get("shares") or pick.get("shares") or 1.0)
     price = float(order_payload.get("limit_price") or pick.get("market_implied_probability") or 0.50)
     cost = float(order_payload.get("cost_usd") or (shares * price))
-    units = float(pick.get("units") or pick.get("display_units") or 1.0)
+    model_units = float(pick.get("units") or pick.get("display_units") or 1.0)
+    unit_value_usd = float(order_payload.get("unit_value_usd") or AUTO_BUYER_UNIT_VALUE_USD)
+    units = _usd_to_auto_buyer_units(cost, unit_value_usd)
     model_id = str(order_payload.get("model_id") or pick.get("model_id") or pick.get("model_version") or "")
     model_p = float(pick.get("model_probability") or 0.0)
     market_p = float(pick.get("market_probability") or pick.get("market_implied_probability") or price)
@@ -152,6 +175,8 @@ def record_auto_buy_execution(
         "entry_price": round(price, 4),
         "cost_usd": round(cost, 4),
         "units": round(units, 2),
+        "model_units": round(model_units, 2),
+        "unit_value_usd": unit_value_usd,
         "model_id": model_id,
         "model_probability": round(model_p, 4),
         "market_probability": round(market_p, 4),
@@ -235,10 +260,11 @@ def record_auto_buy_execution(
         logger.warning(f"Failed to update auto_buyer_picks.xlsx: {err}")
 
     # 3. Write to operational log
-    log_auto_buyer_event(
-        f"EXECUTED [{sport}] {away} @ {home} ({sel}) | Market: {slug} ({side}) | "
-        f"{shares} shares @ ${price:.2f} (Cost: ${cost:.2f}) | Model: {model_id} | Edge: +{edge * 100:.1f}% | OrderID: {oid}"
-    )
+    if _uses_live_auto_buyer_ledger(j_path):
+        log_auto_buyer_event(
+            f"EXECUTED [{sport}] {away} @ {home} ({sel}) | Market: {slug} ({side}) | "
+            f"{shares} shares @ ${price:.2f} (Cost: ${cost:.2f}) | Model: {model_id} | Edge: +{edge * 100:.1f}% | OrderID: {oid}"
+        )
 
     return jsonl_record
 
@@ -261,6 +287,85 @@ def read_auto_buyer_ledger(
             except json.JSONDecodeError:
                 continue
     return records
+
+
+def _exchange_position_resolutions(snapshot: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Index exchange position resolutions by slug with authoritative winner.
+
+    Polymarket supplies the winning LONG/SHORT side in ``positionResolution.side``.
+    Its before/after ``realized`` values can both be zero even for a full loss,
+    so zero realized delta is not evidence of a push.
+    """
+    resolutions: dict[str, dict[str, Any]] = {}
+    for activity in snapshot.get("activities", []):
+        if activity.get("type") != "ACTIVITY_TYPE_POSITION_RESOLUTION":
+            continue
+        details = activity.get("positionResolution") or {}
+        before = details.get("beforePosition") or {}
+        after = details.get("afterPosition") or {}
+        metadata = before.get("marketMetadata") or after.get("marketMetadata") or {}
+        slug = metadata.get("slug") or details.get("marketSlug")
+        if not slug:
+            continue
+
+        def amount(value: Any) -> float | None:
+            if isinstance(value, dict):
+                value = value.get("value")
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+
+        before_realized = amount(before.get("realized"))
+        after_realized = amount(after.get("realized"))
+        realized_delta = after_realized
+        if before_realized is not None and after_realized is not None:
+            realized_delta = round(after_realized - before_realized, 6)
+        resolution_side = str(details.get("side") or "").removeprefix("POSITION_RESOLUTION_SIDE_").lower()
+        resolutions[str(slug)] = {
+            "realized_usd": realized_delta,
+            "winning_side": resolution_side if resolution_side in {"long", "short"} else None,
+            "position_cost_usd": amount(before.get("cost")),
+            "position_quantity": amount(before.get("netPositionDecimal") or before.get("netPosition")),
+            "update_time": details.get("updateTime"),
+            "winning_outcome": metadata.get("outcome"),
+        }
+    return resolutions
+
+
+def _exchange_resolution_result(
+    resolution: dict[str, Any] | None,
+    token_side: str,
+) -> str | None:
+    """Grade a purchased side from an authenticated exchange resolution."""
+    if resolution is None:
+        return None
+    winning_side = str(resolution.get("winning_side") or "").lower()
+    if winning_side in {"long", "short"} and token_side in {"long", "short"}:
+        return "win" if token_side == winning_side else "loss"
+    realized_delta = resolution.get("realized_usd")
+    if realized_delta is not None and abs(float(realized_delta)) > 1e-9:
+        return "win" if float(realized_delta) > 0 else "loss"
+    return None
+
+
+def _exchange_settlement_cost(
+    resolution: dict[str, Any] | None,
+    shares: float,
+    recorded_cost: float,
+) -> float:
+    """Use fee-inclusive exchange cost when it exactly matches this order."""
+    if resolution is None:
+        return recorded_cost
+    position_cost = resolution.get("position_cost_usd")
+    position_quantity = resolution.get("position_quantity")
+    if position_cost is None or position_quantity is None:
+        return recorded_cost
+    if abs(abs(float(position_quantity)) - shares) > 1e-9:
+        # The resolution aggregates more than this one order; do not assign
+        # the full position cost to every ledger row.
+        return recorded_cost
+    return float(position_cost)
 
 
 def backfill_auto_buyer_ledger_from_audit(
@@ -332,6 +437,7 @@ def settle_auto_buyer_ledger(
     data_root: Path | str | None = None,
     espn: ESPNClient | None = None,
     polymarket_executor: Any | None = None,
+    polymarket_client: Any | None = None,
 ) -> dict[str, Any]:
     """Settle completed matches in the Auto-Buyer Ledger and compute realized PnL."""
     root = Path(data_root) if data_root else DATA
@@ -339,11 +445,21 @@ def settle_auto_buyer_ledger(
     x_path = root / "auto_buyer_picks.xlsx"
 
     if not j_path.exists():
-        return {"settled": 0, "pending": 0}
+        return {
+            "settled": 0,
+            "pending": 0,
+            "remaining_pending": 0,
+            "newly_settled": 0,
+            "corrected": 0,
+            "reopened": 0,
+            "changed": 0,
+            "changes": [],
+        }
 
     espn_client = espn or ESPNClient()
     now = utc_now()
     records = read_auto_buyer_ledger(jsonl_path=j_path)
+    before_states = [dict(record) for record in records]
     settled_count = 0
     pending_count = 0
 
@@ -352,21 +468,7 @@ def settle_auto_buyer_ledger(
     pm_resolutions: dict[str, dict[str, Any]] = {}
     if polymarket_executor is not None:
         try:
-            snap = polymarket_executor.portfolio_snapshot()
-            for a in snap.get("activities", []):
-                if a.get("type") == "ACTIVITY_TYPE_POSITION_RESOLUTION":
-                    det = a.get("positionResolution") or {}
-                    before = det.get("beforePosition") or {}
-                    after = det.get("afterPosition") or {}
-                    meta = before.get("marketMetadata") or after.get("marketMetadata") or {}
-                    slug = meta.get("slug") or det.get("marketSlug")
-                    if slug:
-                        realized = (after.get("realized") or {}).get("value")
-                        pm_resolutions[slug] = {
-                            "realized_usd": float(realized) if realized is not None else 0.0,
-                            "update_time": det.get("updateTime"),
-                            "winning_outcome": meta.get("outcome"),
-                        }
+            pm_resolutions.update(_exchange_position_resolutions(polymarket_executor.portfolio_snapshot()))
         except (OSError, ValueError, KeyError, TypeError, RuntimeError):
             pass
     elif data_root is None:
@@ -375,21 +477,7 @@ def settle_auto_buyer_ledger(
             from ..data_sources.polymarket_execute import PolymarketExecutor
 
             executor = PolymarketExecutor(audit=AuditLog(root / "audit.jsonl"))
-            snap = executor.portfolio_snapshot()
-            for a in snap.get("activities", []):
-                if a.get("type") == "ACTIVITY_TYPE_POSITION_RESOLUTION":
-                    det = a.get("positionResolution") or {}
-                    before = det.get("beforePosition") or {}
-                    after = det.get("afterPosition") or {}
-                    meta = before.get("marketMetadata") or after.get("marketMetadata") or {}
-                    slug = meta.get("slug") or det.get("marketSlug")
-                    if slug:
-                        realized = (after.get("realized") or {}).get("value")
-                        pm_resolutions[slug] = {
-                            "realized_usd": float(realized) if realized is not None else 0.0,
-                            "update_time": det.get("updateTime"),
-                            "winning_outcome": meta.get("outcome"),
-                        }
+            pm_resolutions.update(_exchange_position_resolutions(executor.portfolio_snapshot()))
         except (OSError, ValueError, KeyError, TypeError, RuntimeError):
             pass
 
@@ -402,10 +490,59 @@ def settle_auto_buyer_ledger(
         shares = float(r.get("shares") or 1.0)
         cost = float(r.get("cost_usd") or (shares * price))
         units = float(r.get("units") or 1.0)
+        try:
+            unit_value_usd = float(r.get("unit_value_usd") or AUTO_BUYER_UNIT_VALUE_USD)
+        except (TypeError, ValueError):
+            unit_value_usd = AUTO_BUYER_UNIT_VALUE_USD
+        if unit_value_usd <= 0:
+            unit_value_usd = AUTO_BUYER_UNIT_VALUE_USD
         slug = str(r.get("market_slug") or "")
+
+        # Auto-Buyer units are cash units, not the originating model's stake
+        # label. Preserve that label separately while normalizing every old
+        # and new row to its immutable execution-time unit value. The current
+        # Auto-Buyer setting only sizes future orders.
+        if r.get("model_units") is None:
+            r["model_units"] = units
+        r["unit_value_usd"] = unit_value_usd
+        r["units"] = _usd_to_auto_buyer_units(cost, unit_value_usd)
+        units = float(r["units"])
+        if str(r.get("status") or "").lower() == "settled":
+            r["pnl_units"] = _usd_to_auto_buyer_units(float(r.get("pnl_usd") or 0.0), unit_value_usd)
 
         # 1. Re-verify already settled records against reality
         if r.get("status") == "settled":
+            # Exchange resolution is authoritative for positions that have
+            # already left the account. Recheck these first so a prior
+            # zero-realized parsing error can repair a false push.
+            exchange_resolution = pm_resolutions.get(slug)
+            token_side = str(r.get("token_side") or "").lower()
+            corrected_res = _exchange_resolution_result(exchange_resolution, token_side)
+            if corrected_res is not None:
+                settlement_cost = _exchange_settlement_cost(exchange_resolution, shares, cost)
+                expected_pnl_usd = round(
+                    shares - settlement_cost if corrected_res == "win" else -settlement_cost,
+                    4,
+                )
+                if (
+                    corrected_res != r.get("result")
+                    or abs(float(r.get("pnl_usd") or 0.0) - expected_pnl_usd) > 1e-9
+                ):
+                    r["pnl_usd"] = expected_pnl_usd
+                    r["pnl_units"] = _usd_to_auto_buyer_units(expected_pnl_usd, unit_value_usd)
+                    r["result"] = corrected_res
+                    r["settled_at_utc"] = str(exchange_resolution.get("update_time") or iso_utc(now))
+                    logger.warning(
+                        "Corrected exchange settlement for %s (%s): now %s from resolution %s",
+                        r.get("order_id"),
+                        slug,
+                        corrected_res,
+                        exchange_resolution,
+                    )
+                settled_count += 1
+                updated_records.append(r)
+                continue
+
             # Tennis re-verification
             if sport in ("TENNIS", "WTA", "ATP"):
                 try:
@@ -472,12 +609,10 @@ def settle_auto_buyer_ledger(
                                         if corrected_res != r.get("result"):
                                             if corrected_res == "win":
                                                 pnl_usd = round(shares * (1.0 - price), 4)
-                                                pnl_units = round(
-                                                    units * ((1.0 - price) / max(price, 0.01)), 4
-                                                )
+                                                pnl_units = _usd_to_auto_buyer_units(pnl_usd, unit_value_usd)
                                             elif corrected_res == "loss":
                                                 pnl_usd = round(-cost, 4)
-                                                pnl_units = -units
+                                                pnl_units = _usd_to_auto_buyer_units(pnl_usd, unit_value_usd)
                                             else:
                                                 pnl_usd = 0.0
                                                 pnl_units = 0.0
@@ -504,7 +639,7 @@ def settle_auto_buyer_ledger(
                             break
                     if not t_match_found:
                         settled_count += 1
-                except (OSError, ValueError, KeyError, TypeError, RuntimeError):
+                except (httpx.HTTPError, OSError, ValueError, KeyError, TypeError, RuntimeError):
                     settled_count += 1
                 updated_records.append(r)
                 continue
@@ -538,10 +673,10 @@ def settle_auto_buyer_ledger(
                     if corrected_res and corrected_res != r.get("result"):
                         if corrected_res == "win":
                             pnl_usd = round(shares * (1.0 - price), 4)
-                            pnl_units = round(units * ((1.0 - price) / max(price, 0.01)), 4)
+                            pnl_units = _usd_to_auto_buyer_units(pnl_usd, unit_value_usd)
                         elif corrected_res == "loss":
                             pnl_usd = round(-cost, 4)
-                            pnl_units = -units
+                            pnl_units = _usd_to_auto_buyer_units(pnl_usd, unit_value_usd)
                         else:
                             pnl_usd = 0.0
                             pnl_units = 0.0
@@ -581,13 +716,10 @@ def settle_auto_buyer_ledger(
         # Check direct Polymarket exchange position resolution first (for esports & direct resolutions)
         if slug and slug in pm_resolutions:
             pm_res = pm_resolutions[slug]
-            realized_usd = pm_res["realized_usd"]
-            if realized_usd > 0:
-                result = "win"
-            elif realized_usd < 0:
-                result = "loss"
-            else:
-                result = "push"
+            result = _exchange_resolution_result(
+                pm_res,
+                str(r.get("token_side") or "").lower(),
+            )
         elif sport in ("TENNIS", "WTA", "ATP"):
             try:
                 from ..tennis_forward import TENNIS_TOURS
@@ -632,7 +764,7 @@ def settle_auto_buyer_ledger(
                                 away_score = 1 if away_win else 0
                                 home_score = 1 if home_win else 0
                                 break
-            except (OSError, ValueError, KeyError, TypeError, RuntimeError):
+            except (httpx.HTTPError, OSError, ValueError, KeyError, TypeError, RuntimeError):
                 pass
         elif sport in ("MLB", "WNBA", "NBA", "NFL", "SOCCER", "NCAAF"):
             try:
@@ -690,43 +822,43 @@ def settle_auto_buyer_ledger(
                             else:
                                 result = "push"
                         break
-            except (OSError, ValueError, KeyError, TypeError, RuntimeError):
+            except (httpx.HTTPError, OSError, ValueError, KeyError, TypeError, RuntimeError):
                 pass
 
-        # Check Polymarket US gateway market resolution status fallback
-        if result is None and slug and (data_root is None or polymarket_executor is not None):
+        # Check Polymarket US gateway market resolution status fallback. This must
+        # also run for scheduled settlement, which always supplies ``data_root``.
+        # The recorded exchange side is authoritative: binary outcome index 0 is
+        # long and index 1 is short. Team-name matching is unsafe because a model
+        # selection can differ from the side that was actually purchased.
+        if result is None and slug:
             try:
                 from ..data_sources.polymarket_us import PolymarketUSClient
 
-                pm_cli = PolymarketUSClient()
+                pm_cli = polymarket_client or PolymarketUSClient()
                 m_info = pm_cli.market(slug)
                 if m_info.get("status") == "MARKET_STATUS_RESOLVED":
-                    raw_outs = m_info.get("outcomes")
                     raw_pxs = m_info.get("outcomePrices")
-                    outcomes = json.loads(raw_outs) if isinstance(raw_outs, str) else (raw_outs or [])
                     prices = json.loads(raw_pxs) if isinstance(raw_pxs, str) else (raw_pxs or [])
-                    for out_name, out_px in zip(outcomes, prices):
-                        if str(out_px).strip() in ("1", "1.0", "1.00", "1.0000"):
-                            picked_name = home if sel in ("home", "long") else away
-                            if (
-                                picked_name.casefold() in out_name.casefold()
-                                or out_name.casefold() in picked_name.casefold()
-                            ):
-                                result = "win"
-                            else:
-                                result = "loss"
-                            break
-            except (OSError, ValueError, KeyError, TypeError, RuntimeError):
+                    terminal_winners = [
+                        index for index, raw_price in enumerate(prices) if abs(float(raw_price) - 1.0) <= 1e-9
+                    ]
+                    token_side = str(r.get("token_side") or "").lower()
+                    if len(prices) == 2 and len(terminal_winners) == 1 and token_side in {"long", "short"}:
+                        winning_side = "long" if terminal_winners[0] == 0 else "short"
+                        result = "win" if token_side == winning_side else "loss"
+            except (httpx.HTTPError, OSError, ValueError, KeyError, TypeError, RuntimeError):
                 pass
 
         if result is not None:
             settled_count += 1
+            exchange_resolution = pm_resolutions.get(slug)
+            settlement_cost = _exchange_settlement_cost(exchange_resolution, shares, cost)
             if result == "win":
-                pnl_usd = round(shares * (1.0 - price), 4)
-                pnl_units = round(float(r.get("units") or 1.0) * ((1.0 - price) / max(price, 0.01)), 4)
+                pnl_usd = round(shares - settlement_cost, 4)
+                pnl_units = _usd_to_auto_buyer_units(pnl_usd, unit_value_usd)
             elif result == "loss":
-                pnl_usd = round(-cost, 4)
-                pnl_units = -float(r.get("units") or 1.0)
+                pnl_usd = round(-settlement_cost, 4)
+                pnl_units = _usd_to_auto_buyer_units(pnl_usd, unit_value_usd)
             else:
                 pnl_usd = 0.0
                 pnl_units = 0.0
@@ -739,9 +871,10 @@ def settle_auto_buyer_ledger(
             r["away_score"] = away_score
             r["home_score"] = home_score
 
-            log_auto_buyer_event(
-                f"SETTLED [{sport}] {away} @ {home} | Result: {result.upper()} | PnL: ${pnl_usd:+.2f} ({pnl_units:+.1f}U) | Order: {r.get('order_id')}"
-            )
+            if _uses_live_auto_buyer_ledger(j_path):
+                log_auto_buyer_event(
+                    f"SETTLED [{sport}] {away} @ {home} | Result: {result.upper()} | PnL: ${pnl_usd:+.2f} ({pnl_units:+.1f}U) | Order: {r.get('order_id')}"
+                )
         else:
             pending_count += 1
 
@@ -802,7 +935,58 @@ def settle_auto_buyer_ledger(
     except (OSError, ValueError, KeyError, TypeError, RuntimeError) as err:
         logger.warning(f"Failed to update auto_buyer_picks.xlsx: {err}")
 
-    return {"settled": settled_count, "pending": pending_count}
+    changes: list[dict[str, Any]] = []
+    newly_settled = 0
+    corrected = 0
+    reopened = 0
+    for before, after in zip(before_states, updated_records):
+        before_result = str(before.get("result") or "").lower()
+        after_result = str(after.get("result") or "").lower()
+        before_terminal = _is_settled_auto_buyer_record(before)
+        after_terminal = _is_settled_auto_buyer_record(after)
+        state_changed = any(
+            before.get(field) != after.get(field)
+            for field in ("status", "result", "pnl_usd", "settled_at_utc")
+        )
+        if not state_changed:
+            continue
+        if not before_terminal and after_terminal:
+            newly_settled += 1
+        elif before_terminal and not after_terminal:
+            reopened += 1
+        elif before_terminal and after_terminal and before_result != after_result:
+            corrected += 1
+        changes.append(
+            {
+                "order_id": str(after.get("order_id") or ""),
+                "market_slug": str(after.get("market_slug") or ""),
+                "selection": str(after.get("selection") or ""),
+                "from_status": str(before.get("status") or ""),
+                "to_status": str(after.get("status") or ""),
+                "from_result": before_result,
+                "to_result": after_result,
+                "pnl_usd": float(after.get("pnl_usd") or 0.0),
+            }
+        )
+
+    remaining_pending = sum(not _is_settled_auto_buyer_record(record) for record in updated_records)
+    if pending_count != remaining_pending:
+        logger.warning(
+            "Settlement traversal counted %d pending rows; authoritative ledger count is %d",
+            pending_count,
+            remaining_pending,
+        )
+
+    return {
+        "settled": settled_count,
+        "pending": remaining_pending,
+        "remaining_pending": remaining_pending,
+        "newly_settled": newly_settled,
+        "corrected": corrected,
+        "reopened": reopened,
+        "changed": len(changes),
+        "changes": changes,
+    }
 
 
 def summarize_auto_buyer_performance(
@@ -810,12 +994,7 @@ def summarize_auto_buyer_performance(
 ) -> dict[str, Any]:
     """Compute consolidated performance metrics, ROI, and win-rate accounting for Auto-Buyer."""
     rows = records if records is not None else read_auto_buyer_ledger()
-    settled_rows = [
-        r
-        for r in rows
-        if str(r.get("status") or "").lower() == "settled"
-        or str(r.get("result") or "").lower() in ("win", "loss", "push")
-    ]
+    settled_rows = [r for r in rows if _is_settled_auto_buyer_record(r)]
     open_rows = [r for r in rows if r not in settled_rows]
 
     wins = sum(1 for r in settled_rows if r.get("result") == "win")
@@ -825,7 +1004,13 @@ def summarize_auto_buyer_performance(
     total_cost_usd = sum(float(r.get("cost_usd") or 0.0) for r in rows)
     settled_cost_usd = sum(float(r.get("cost_usd") or 0.0) for r in settled_rows)
     realized_pnl_usd = sum(float(r.get("pnl_usd") or 0.0) for r in settled_rows)
-    realized_pnl_units = sum(float(r.get("pnl_units") or 0.0) for r in settled_rows)
+    realized_pnl_units = sum(
+        _usd_to_auto_buyer_units(
+            float(r.get("pnl_usd") or 0.0),
+            float(r.get("unit_value_usd") or AUTO_BUYER_UNIT_VALUE_USD),
+        )
+        for r in settled_rows
+    )
 
     roi_pct = (realized_pnl_usd / settled_cost_usd * 100.0) if settled_cost_usd > 0 else 0.0
     win_rate_pct = (wins / (wins + losses) * 100.0) if (wins + losses) > 0 else 0.0

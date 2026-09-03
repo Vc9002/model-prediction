@@ -774,8 +774,116 @@ def test_auto_buyer_consolidated_tab_markup_and_routing() -> None:
     assert 'id="btnAbsAll"' in html
     assert 'id="absPendingTable"' in html
     assert 'id="absSettledTable"' in html
+    assert 'id="btnAutoBuyerPerformanceView"' in html
+    assert 'id="autoBuyerPerformancePanel"' in html
+    assert 'id="autoBuyerDailyPerformanceTable"' in html
+    assert 'id="autoBuyerUnitValueInput"' in html
+    assert 'id="autoBuyerUnitBadge"' in html
+    assert '"/api/auto-buyer/unit-value"' in html
+    assert "saveAutoBuyerUnitValue" in html
+    assert "historical rows retain their execution-time unit value" in html
+    assert "setAutoBuyerView('performance')" in html
+    assert "MLB cohort = MLB sport or MLB model ID" in html
+    assert 'timeZone: "America/New_York"' in html
+    assert "pending positions excluded" in html
     assert "renderAutoBuyer" in html
     assert "renderAutoBuyerSettle" in html
     assert "renderAutoBuyerLedger" in html
     assert "settleAutoBuyerTrades" in html
     assert "runAutoBuyerNow" in html
+    assert '"No positions changed."' in html
+    assert "Moved from pending: ${newlySettled}" in html
+    assert "if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);" in html
+    assert "const remainingPending = Number(data.remaining_pending);" in html
+    assert "Still pending: ${remainingPending}" in html
+    assert "Still pending: ${Number(data.pending || 0)}" not in html
+    assert "Settled: ${data.settled}" not in html
+
+
+def test_auto_buyer_performance_cohorts_and_et_day_grouping() -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node.js is unavailable")
+    html = (ROOT / "dashboard.html").read_text(encoding="utf-8")
+    match = re.search(
+        r"function isSettledAutoBuyerRow[\s\S]*?(?=function populateAbsSportDropdown)",
+        html,
+    )
+    assert match, "Auto-Buyer performance helpers are missing"
+    rows = [
+        {
+            "status": "settled",
+            "result": "win",
+            "sport": "MLB",
+            "model_id": "mlb-first-inning-v2",
+            "event_start_utc": "2026-09-02T02:00:00Z",
+            "cost_usd": 0.5,
+            "pnl_usd": 0.5,
+            "pnl_units": 1.0,
+        },
+        {
+            "status": "settled",
+            "result": "loss",
+            "sport": "CS2",
+            "model_id": "cs2-tiered-elo-v6",
+            "event_start_utc": "2026-09-02T03:00:00Z",
+            "cost_usd": 0.5,
+            "pnl_usd": -0.5,
+            "pnl_units": -1.0,
+        },
+        {
+            "status": "settled",
+            "result": "win",
+            "sport": "CS2",
+            "model_id": "cs2-tiered-elo-v6",
+            "event_start_utc": "2026-09-02T15:00:00Z",
+            "cost_usd": 0.4,
+            "pnl_usd": 0.6,
+            "pnl_units": 1.2,
+        },
+        {
+            "status": "open",
+            "result": "open",
+            "sport": "MLB",
+            "event_start_utc": "2026-09-02T15:00:00Z",
+            "cost_usd": 10,
+        },
+    ]
+    script = (
+        match.group(0)
+        + "\nconst rows=JSON.parse(process.argv[1]);"
+        + "const settled=rows.filter(isSettledAutoBuyerRow);"
+        + "const output={all:autoBuyerCohortMetrics(settled),"
+        + "mlb:autoBuyerCohortMetrics(settled.filter(isMlbAutoBuyerRow)),"
+        + "without:autoBuyerCohortMetrics(settled.filter(r=>!isMlbAutoBuyerRow(r))),"
+        + "dates:settled.map(autoBuyerEventDateEt)};"
+        + "process.stdout.write(JSON.stringify(output));"
+    )
+    result = subprocess.run(
+        [node, "-e", script, json.dumps(rows)],
+        text=True,
+        check=True,
+        capture_output=True,
+    )
+    output = json.loads(result.stdout)
+    assert output["all"]["settled"] == 3
+    assert output["all"]["wins"] == 2
+    assert output["all"]["losses"] == 1
+    assert output["all"]["pnlUsd"] == pytest.approx(0.6)
+    assert output["mlb"]["settled"] == 1
+    assert output["mlb"]["roiPct"] == pytest.approx(100.0)
+    assert output["without"]["settled"] == 2
+    assert output["without"]["pnlUsd"] == pytest.approx(0.1)
+    assert output["dates"] == ["2026-09-01", "2026-09-01", "2026-09-02"]
+
+
+def test_active_portfolio_tab_is_rendered_during_initial_refresh() -> None:
+    html = (ROOT / "dashboard.html").read_text(encoding="utf-8")
+    assert 'else if(active==="folio") renderFolio();' in html
+
+
+def test_polymarket_edge_navigation_is_pinned_disabled() -> None:
+    html = (ROOT / "dashboard.html").read_text(encoding="utf-8")
+    assert 'data-tab="polymarket" disabled title="Disabled by operator">Edge Scanner — OFF' in html
+    assert 'data-tab="poly-ledger" disabled title="Disabled by operator">Edge Ledger — OFF' in html
+    assert 'data-tab="poly-ledger" disabled title="Disabled by operator">Polymarket — OFF' in html

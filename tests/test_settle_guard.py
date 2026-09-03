@@ -27,6 +27,22 @@ class _FakeESPNClient:
     """Never called for an unmapped league -- instantiation is enough."""
 
 
+class _CountingESPNClient:
+    def __init__(self, scoreboard: dict) -> None:
+        self.payload = scoreboard
+        self.calls: list[tuple[str, str]] = []
+
+    def scoreboard(self, league: str, game_day: str) -> dict:
+        self.calls.append((league, game_day))
+        return self.payload
+
+
+class _FailingESPNClient(_CountingESPNClient):
+    def scoreboard(self, league: str, game_day: str) -> dict:
+        self.calls.append((league, game_day))
+        raise RuntimeError("provider rejected date")
+
+
 class _FakeSnapshotStore:
     def __init__(self, path) -> None:
         self.path = path
@@ -78,6 +94,55 @@ def test_mapped_league_does_not_trigger_the_guard(monkeypatch, tmp_path) -> None
     assert all("no ESPN result path" not in f.get("reason", "") for f in result["failures"])
 
 
+def test_missing_edge_ledger_gate_fails_closed(monkeypatch, tmp_path) -> None:
+    result = _run_settle(monkeypatch, tmp_path, [])
+    assert result["polymarket_edge_settlement"] == {
+        "status": "disabled",
+        "reason": "operator_disabled",
+    }
+
+
+def test_scoreboards_are_cached_across_rows_and_ledgers() -> None:
+    from model_prediction.cli.settle import _find_espn_result
+
+    scoreboard = {
+        "events": [
+            {
+                "id": "ev1",
+                "competitions": [
+                    {
+                        "status": {"type": {"name": "STATUS_FINAL", "completed": True}},
+                        "competitors": [
+                            {"homeAway": "away", "score": "2", "team": {"displayName": "Away"}},
+                            {"homeAway": "home", "score": "3", "team": {"displayName": "Home"}},
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+    espn = _CountingESPNClient(scoreboard)
+    cache: dict[tuple[str, str], dict | Exception] = {}
+    row = _open_row("MLB", "2026-08-31T23:00:00+00:00")
+
+    assert _find_espn_result(espn, ("MLB",), "2026-08-31", row, scoreboard_cache=cache)
+    assert _find_espn_result(espn, ("MLB",), "2026-08-31", row, scoreboard_cache=cache)
+    assert espn.calls == [("MLB", "2026-08-31")]
+
+
+def test_cached_scoreboard_failure_fetches_and_logs_once(caplog) -> None:
+    from model_prediction.cli.settle import _find_espn_result
+
+    espn = _FailingESPNClient({})
+    cache: dict[tuple[str, str], dict | Exception] = {}
+    row = _open_row("MLB", "2026-08-31T23:00:00+00:00")
+
+    assert _find_espn_result(espn, ("MLB",), "2026-08-31", row, scoreboard_cache=cache) is None
+    assert _find_espn_result(espn, ("MLB",), "2026-08-31", row, scoreboard_cache=cache) is None
+    assert espn.calls == [("MLB", "2026-08-31")]
+    assert caplog.text.count("ESPN scoreboard fetch failed for MLB on 2026-08-31") == 1
+
+
 class _FakeSoccerESPN:
     """Minimal stand-in for ESPNClient.summary over the soccer/all path."""
 
@@ -109,9 +174,9 @@ def _soccer_summary(status: str, home: str | int, away: str | int) -> dict:
 
 
 def test_a_finished_soccer_match_resolves_by_event_id_without_any_credential() -> None:
-    """Soccer results went 7 days stale to 2026-08-24 because collect_soccer_scores
-    returns no_api_key whenever THE_ODDS_API_KEY / API_FOOTBALL_KEY is unset -- every
-    daily run skipped it and still exited 0. Soccer rows carry ESPN event ids, so the
+    """Soccer results went 7 days stale to 2026-08-24 because the provider path
+    returns no_api_key whenever API_FOOTBALL_KEY is unset -- every daily run
+    skipped it and still exited 0. Soccer rows carry ESPN event ids, so the
     result is resolvable by identity with no credential at all. ESPN spells soccer's
     terminal state STATUS_FULL_TIME, not STATUS_FINAL; the rest of the settle path
     only knows the latter, so this must normalise rather than report 'not completed'.

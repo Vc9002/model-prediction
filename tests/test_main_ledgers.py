@@ -21,8 +21,13 @@ from model_prediction.config import load_config
 from model_prediction.domain import League, MarketType, PickRequest
 from model_prediction.eligibility import EligibilityResult, RecordType
 from model_prediction.entities import CanonicalTeam
-from model_prediction.ledger import FIELDNAMES, PickLedger
-from model_prediction.main_ledgers import MAIN_LEDGER_SPORTS, MultiSportPickLedger, existing_flat_ledgers
+from model_prediction.ledger import FIELDNAMES, PickLedger, defer_sqlite_xlsx_exports
+from model_prediction.main_ledgers import (
+    MAIN_LEDGER_SPORTS,
+    MultiSportPickLedger,
+    existing_flat_ledgers,
+    main_ledger,
+)
 from model_prediction.xlsx_ledger import write_xlsx_rows_atomic
 
 AWAY = CanonicalTeam("mlb-nyy", League.MLB, "NYY", "NYY", True, None, None, ())
@@ -112,6 +117,38 @@ def test_existing_flat_ledgers_honor_sqlite_authority(tmp_path, monkeypatch) -> 
         assert ledger.mirror is not None
     finally:
         ledger.mirror.close()
+
+
+def test_sqlite_projection_batch_rebuilds_xlsx_once(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("MODEL_PREDICTION_LEDGER_AUTHORITY", "sqlite")
+    monkeypatch.setenv("MODEL_PREDICTION_RUNTIME_ROOT", str(tmp_path / "runtime"))
+    ledger = main_ledger(tmp_path, "mlb")
+    writes = 0
+
+    from model_prediction import ledger as ledger_module
+
+    real_write = ledger_module.write_xlsx_rows_atomic
+
+    def counted_write(*args, **kwargs):
+        nonlocal writes
+        writes += 1
+        return real_write(*args, **kwargs)
+
+    monkeypatch.setattr(ledger_module, "write_xlsx_rows_atomic", counted_write)
+    try:
+        with defer_sqlite_xlsx_exports():
+            for index in range(3):
+                ledger.append_evaluated(
+                    _request(f"event-batched-{index}"),
+                    _qualified_call(),
+                    now=datetime.now(UTC),
+                )
+            assert writes == 0
+        assert writes == 1
+        assert len(ledger.export_rows()) == 3
+    finally:
+        if ledger.mirror is not None:
+            ledger.mirror.close()
 
 
 def _ncaaf_request(event_id: str) -> PickRequest:

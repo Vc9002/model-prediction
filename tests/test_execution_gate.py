@@ -106,6 +106,18 @@ def btts_row(**overrides) -> dict[str, str]:
     return row
 
 
+def nrfi_row(**overrides) -> dict[str, str]:
+    row = {
+        **qualified_row(),
+        "market_type": "nrfi",
+        "selection": "nrfi",
+        "line": "0.5",
+        "event_start_utc": (datetime.now(UTC) + timedelta(hours=3)).isoformat(),
+    }
+    row.update(overrides)
+    return row
+
+
 def spread_quote(**overrides) -> dict:
     # Real shape verified live 2026-08-03 against captured Polymarket
     # contracts: the market's own line/team describe the LONG side (here,
@@ -140,6 +152,18 @@ def total_quote(**overrides) -> dict:
 def btts_quote(**overrides) -> dict:
     quote = {
         "market_slug": "asc-mlb-nyy-bos-2026-07-17-btts",
+        "observed_at_utc": datetime.now(UTC).isoformat(),
+        "market_state": "MARKET_STATE_OPEN",
+        "long": {"description": "Yes"},
+        "short": {"description": "No"},
+    }
+    quote.update(overrides)
+    return quote
+
+
+def nrfi_quote(**overrides) -> dict:
+    quote = {
+        "market_slug": "astatc-mlb-nyy-bos-2026-07-17-yrfi",
         "observed_at_utc": datetime.now(UTC).isoformat(),
         "market_state": "MARKET_STATE_OPEN",
         "long": {"description": "Yes"},
@@ -457,6 +481,25 @@ def test_live_side_check_refuses_a_btts_ticket_on_the_wrong_side(tmp_path) -> No
     row = btts_row(selection="no")
     with pytest.raises(ExecutionGateError, match="does not match the live market side"):
         client.execute(ticket(), row, execute_flag=True, user_command=True)
+
+
+def test_live_side_check_accepts_nrfi_on_the_no_side(tmp_path, monkeypatch) -> None:
+    client = executor(tmp_path, env=US_CREDS, live_quote=lambda slug: nrfi_quote())
+    monkeypatch.setattr(
+        client, "_request", lambda method, path, payload: {"id": "order-1", "state": "ORDER_STATE_NEW"}
+    )
+    base_ticket = ticket()
+    nrfi_ticket = OrderTicket(**{**base_ticket.__dict__, "token_side": "short"})
+
+    result = client.execute(nrfi_ticket, nrfi_row(), execute_flag=True, user_command=True)
+
+    assert result["status"] == "submitted"
+
+
+def test_live_side_check_refuses_nrfi_on_the_yes_side(tmp_path) -> None:
+    client = executor(tmp_path, env=US_CREDS, live_quote=lambda slug: nrfi_quote())
+    with pytest.raises(ExecutionGateError, match="does not match the live market side"):
+        client.execute(ticket(), nrfi_row(), execute_flag=True, user_command=True)
 
 
 def test_config_override_qualified_call_can_submit_without_manual_order(tmp_path, monkeypatch) -> None:

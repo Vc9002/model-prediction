@@ -6,10 +6,16 @@ import json
 from io import BytesIO
 from unittest.mock import Mock
 
+import pytest
+
+import model_prediction.dashboard.routes as dashboard_routes
+from model_prediction.config import load_config, polymarket_edge_enabled
+from model_prediction.dashboard.common import _DASHBOARD_TOKEN
 from model_prediction.dashboard.routes import Handler
 
 
-def test_dashboard_polymarket_scan_endpoint():
+def test_dashboard_polymarket_scan_endpoint(monkeypatch):
+    monkeypatch.setattr(dashboard_routes, "_edge_feature_enabled", lambda component: True)
     handler = Handler.__new__(Handler)
     handler.path = "/api/polymarket/scan?sport=esports&min_edge=0.03&bankroll=1500"
     handler.headers = {}
@@ -170,7 +176,8 @@ def test_polymarket_ledger_settlement(tmp_path):
     assert float(rows[0]["pnl_units"]) > 0
 
 
-def test_dashboard_polymarket_rehearsal_endpoint():
+def test_dashboard_polymarket_rehearsal_endpoint(monkeypatch):
+    monkeypatch.setattr(dashboard_routes, "_edge_feature_enabled", lambda component: True)
     handler = Handler.__new__(Handler)
     handler.path = "/api/polymarket/rehearsal?sport=esports&min_edge=0.03&bankroll=1000"
     handler.headers = {}
@@ -190,3 +197,47 @@ def test_dashboard_polymarket_rehearsal_endpoint():
     assert "pipeline_health" in data
     assert "compliance_checks" in data
     assert "tickets" in data
+
+
+def test_real_config_keeps_polymarket_edge_features_disabled():
+    config = load_config()
+    assert polymarket_edge_enabled(config, "scanner") is False
+    assert polymarket_edge_enabled(config, "ledger") is False
+
+
+def test_dashboard_polymarket_scan_is_disabled_by_real_config():
+    handler = Handler.__new__(Handler)
+    handler.path = "/api/polymarket/scan"
+    handler.headers = {}
+    handler.wfile = BytesIO()
+    handler.send_response = Mock()
+    handler.send_header = Mock()
+    handler.end_headers = Mock()
+
+    handler.do_GET()
+
+    data = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert data == {"status": "disabled", "component": "scanner", "reason": "operator_disabled"}
+    handler.send_response.assert_called_with(503)
+
+
+@pytest.mark.parametrize("route", ["/api/polymarket/record", "/api/polymarket/settle"])
+def test_dashboard_polymarket_ledger_mutations_are_disabled_by_real_config(route: str):
+    body = json.dumps({"confirm": True, "orders": []}).encode()
+    handler = Handler.__new__(Handler)
+    handler.path = route
+    handler.headers = {
+        "Content-Length": str(len(body)),
+        "X-Dashboard-Token": _DASHBOARD_TOKEN,
+    }
+    handler.rfile = BytesIO(body)
+    handler.wfile = BytesIO()
+    handler.send_response = Mock()
+    handler.send_header = Mock()
+    handler.end_headers = Mock()
+
+    handler.do_POST()
+
+    data = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert data == {"status": "disabled", "component": "ledger", "reason": "operator_disabled"}
+    handler.send_response.assert_called_with(403)

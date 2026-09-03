@@ -106,13 +106,6 @@ DEFAULT_SOURCES: dict[str, SourceSpec] = {
         ("npb",),
         "October excluded (mixes regular season and postseason).",
     ),
-    "the_odds_api": SourceSpec(
-        "The Odds API",
-        SourceTier.PAID_OR_KEYED_OPTIONAL,
-        True,
-        ("soccer",),
-        "DORMANT since 2026-08-26 (key 401 for 31+ days; superseded by api_football). Code kept as documented fallback.",
-    ),
     "api_football": SourceSpec(
         "API-Football v3",
         SourceTier.PAID_OR_KEYED_OPTIONAL,

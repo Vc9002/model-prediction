@@ -13,13 +13,14 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from ..config import PROJECT_ROOT, ledger_path
+from ..config import PROJECT_ROOT, ledger_path, polymarket_edge_enabled
 from ..data_sources.espn_probables import capture_probable_starter_snapshot
 from ..data_sources.espn_wnba_injuries import capture_espn_event_injuries
 from ..data_sources.mlb_injuries import (
@@ -31,6 +32,7 @@ from ..data_sources.mlb_lineups import capture_and_store as capture_lineups_and_
 from ..data_sources.wnba_injuries import capture_latest_report
 from ..domain import LEARNED_PRODUCTION_SPORTS, utc_now
 from ..esports import forecast_esports_slate
+from ..ledger import defer_sqlite_xlsx_exports
 from ..main_ledgers import MultiSportPickLedger
 from ..mlb_baseline_refresh import refresh_if_due
 from ..research_ledgers import RESEARCH_LEDGER_SPORTS, existing_research_ledgers, research_ledger
@@ -134,6 +136,18 @@ def _finalize_daily_report(report: dict[str, Any]) -> dict[str, Any]:
     return report
 
 
+def _skip_auto_buyer_for_verification() -> bool:
+    """Return whether this invocation explicitly suppresses live purchases.
+
+    The normal scheduled environment does not set this variable, so production
+    behavior is unchanged.  It exists for full pipeline verification runs that
+    must exercise forecasting and settlement without creating a second set of
+    real-money orders.
+    """
+    return os.environ.get("MODEL_PREDICTION_SKIP_AUTO_BUYER") == "1"
+
+
+@defer_sqlite_xlsx_exports()
 def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     # Wall-clock markers for the daily-run timing report (2026-08-26 perf
     # instrumentation — additive only, no behavior change; the report dict
@@ -141,6 +155,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     # daily log without a profiler).
     _t_start = time.monotonic()
     _t_pool_end = _t_start
+    _t_forecast_end = _t_start
     _t_settle_end = _t_start
     # Self-throttled to weekly (see mlb_baseline_refresh's module
     # docstring) -- safe to call every daily cron cycle since it's a
@@ -855,6 +870,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         result.pop("candidates", None)
     _research_settlement: dict[str, Any]
     _gated_settlement: dict[str, Any]
+    _t_forecast_end = time.monotonic()
     if args.skip_settlement:
         settlement = {"status": "skipped", "reason": "caller_settled_before daily"}
         flat_settlement = settlement
@@ -901,28 +917,31 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     # Step 10 & 11: Automated Polymarket CLOB Edge Scanner & Settlement
     poly_edge_record_result: dict[str, Any] = {"status": "skipped"}
     poly_edge_settle_result: dict[str, Any] = {"status": "skipped"}
-    try:
-        from ..portfolio.polymarket_ledger import (
-            record_polymarket_orders,
-        )
-        from ..portfolio.polymarket_scanner import PolymarketSlateScanner
+    if polymarket_edge_enabled(config, "scanner"):
+        try:
+            from ..portfolio.polymarket_ledger import record_polymarket_orders
+            from ..portfolio.polymarket_scanner import PolymarketSlateScanner
 
-        scanner = PolymarketSlateScanner(min_edge=0.025, bankroll=1000.0)
-        scan_res = scanner.scan_directory(
-            base_dir=data_directory / "odds",
-            require_model=True,
-            pregame_only=True,
-        )
-        if scan_res.actionable_orders:
-            orders_payload = [_polymarket_order_payload(order) for order in scan_res.actionable_orders]
-            poly_edge_record_result = record_polymarket_orders(orders_payload, data_root=data_directory)
-        else:
-            poly_edge_record_result = {"status": "ok", "recorded_count": 0, "actionable_orders": 0}
-    except Exception:
-        logger.warning("Automated Polymarket edge scan/record failed", exc_info=True)
-        poly_edge_record_result = {"status": "error"}
+            scanner = PolymarketSlateScanner(min_edge=0.025, bankroll=1000.0)
+            scan_res = scanner.scan_directory(
+                base_dir=data_directory / "odds",
+                require_model=True,
+                pregame_only=True,
+            )
+            if scan_res.actionable_orders:
+                orders_payload = [_polymarket_order_payload(order) for order in scan_res.actionable_orders]
+                poly_edge_record_result = record_polymarket_orders(orders_payload, data_root=data_directory)
+            else:
+                poly_edge_record_result = {"status": "ok", "recorded_count": 0, "actionable_orders": 0}
+        except Exception:
+            logger.warning("Automated Polymarket edge scan/record failed", exc_info=True)
+            poly_edge_record_result = {"status": "error"}
+    else:
+        poly_edge_record_result = {"status": "disabled", "reason": "operator_disabled"}
 
-    if not args.skip_settlement:
+    if not polymarket_edge_enabled(config, "ledger"):
+        poly_edge_settle_result = {"status": "disabled", "reason": "operator_disabled"}
+    elif not args.skip_settlement:
         try:
             from ..portfolio.polymarket_ledger import settle_polymarket_ledger_rows
 
@@ -936,33 +955,41 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         poly_edge_settle_result = {"status": "skipped"}
 
     # Step 12: Automated Polymarket Buyer (if enabled in dashboard state)
-    auto_buyer_result: dict[str, Any] = {"status": "skipped"}
-    try:
-        from ..portfolio.auto_executor import load_auto_buyer_state, run_auto_buyer_cycle
+    if _skip_auto_buyer_for_verification():
+        logger.info("Auto-Buyer skipped by explicit verification override")
+        auto_buyer_result: dict[str, Any] = {
+            "status": "skipped",
+            "reason": "verification_override",
+        }
+    else:
+        auto_buyer_result = {"status": "skipped"}
+        try:
+            from ..portfolio.auto_executor import load_auto_buyer_state, run_auto_buyer_cycle
 
-        auto_state = load_auto_buyer_state()
-        if auto_state.get("enabled", False):
-            logger.info("Auto-Buyer is ENABLED. Executing automated purchase cycle...")
-            buyer_run = run_auto_buyer_cycle(execute_override=True, forecast_date=args.date)
-            auto_buyer_result = {
-                "status": buyer_run.get("status", "executed"),
-                "mode": buyer_run.get("mode"),
-                "orders_count": buyer_run.get("orders_count", 0),
-                "total_spend_usd": buyer_run.get("total_spend_usd", 0.0),
-                "whitelisted_evaluated": buyer_run.get("whitelisted_count", 0),
-                "reason": buyer_run.get("reason"),
-            }
-        else:
-            auto_buyer_result = {"status": "disabled", "reason": "auto_buyer_disabled"}
-    except Exception:
-        logger.warning("Automated Polymarket buyer cycle failed", exc_info=True)
-        auto_buyer_result = {"status": "error"}
+            auto_state = load_auto_buyer_state()
+            if auto_state.get("enabled", False):
+                logger.info("Auto-Buyer is ENABLED. Executing automated purchase cycle...")
+                buyer_run = run_auto_buyer_cycle(execute_override=True, forecast_date=args.date)
+                auto_buyer_result = {
+                    "status": buyer_run.get("status", "executed"),
+                    "mode": buyer_run.get("mode"),
+                    "orders_count": buyer_run.get("orders_count", 0),
+                    "total_spend_usd": buyer_run.get("total_spend_usd", 0.0),
+                    "whitelisted_evaluated": buyer_run.get("whitelisted_count", 0),
+                    "reason": buyer_run.get("reason"),
+                }
+            else:
+                auto_buyer_result = {"status": "disabled", "reason": "auto_buyer_disabled"}
+        except Exception:
+            logger.warning("Automated Polymarket buyer cycle failed", exc_info=True)
+            auto_buyer_result = {"status": "error"}
 
     report = {
         "timing": {
             "total_seconds": round(time.monotonic() - _t_start, 1),
             "capture_pool_seconds": round(_t_pool_end - _t_start, 1),
-            "settlement_seconds": round(_t_settle_end - _t_pool_end, 1),
+            "forecast_seconds": round(_t_forecast_end - _t_pool_end, 1),
+            "settlement_seconds": round(_t_settle_end - _t_forecast_end, 1),
             "post_settlement_seconds": round(time.monotonic() - _t_settle_end, 1),
         },
         "date": args.date,

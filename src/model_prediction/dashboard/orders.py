@@ -15,6 +15,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote
@@ -727,14 +728,32 @@ def submit_order(payload: dict) -> dict:
     return {**result, "pick_id": ticket["pick_id"]}
 
 
-def _live_bbo(market_slug: str) -> dict | None:
+def _live_bbo(market_slug: str, *, client=None) -> dict | None:
     """Fetch a fresh BBO for one market slug from the public gateway."""
     try:
         from model_prediction.data_sources.polymarket_us import PolymarketUSClient
 
-        return PolymarketUSClient().snapshot(market_slug)
+        return (client or PolymarketUSClient()).snapshot(market_slug)
     except Exception:  # noqa: BLE001 - any failure => no quote, caller handles
         return None
+
+
+def _live_position_bbos(market_slugs: list[str]) -> dict[str, dict]:
+    """Fetch independent position quotes concurrently with one shared client."""
+    if not market_slugs:
+        return {}
+    from model_prediction.data_sources.polymarket_us import PolymarketUSClient
+
+    client = PolymarketUSClient()
+    quotes: dict[str, dict] = {}
+    with ThreadPoolExecutor(max_workers=min(6, len(market_slugs))) as pool:
+        futures = {pool.submit(_live_bbo, slug, client=client): slug for slug in market_slugs}
+        for future in as_completed(futures):
+            slug = futures[future]
+            quote = future.result()
+            if quote is not None:
+                quotes[slug] = quote
+    return quotes
 
 
 def preview_position_sell(payload: dict) -> dict:
@@ -1673,16 +1692,21 @@ def live_portfolio_view() -> dict:
         }
 
     links = _live_model_links()
-    positions = []
+    active_positions: list[tuple[str, dict, float]] = []
     for slug, item in (raw.get("positions") or {}).items():
         net = _number(item.get("netPositionDecimal") or item.get("netPosition"), 0.0)
         if abs(net) < 1e-9:
             continue
+        active_positions.append((str(slug), item, net))
+
+    live_quotes = _live_position_bbos([slug for slug, _, _ in active_positions])
+    positions = []
+    for slug, item, net in active_positions:
         side = "long" if net > 0 else "short"
         metadata = item.get("marketMetadata") or {}
         cost = _amount_value(item.get("cost"))
         cash_value = _amount_value(item.get("cashValue"))
-        quote = _live_bbo(str(slug)) or {}
+        quote = live_quotes.get(slug) or {}
         side_quote = quote.get(side) or {}
         bid = _number(side_quote.get("bid"), None)
         ask = _number(side_quote.get("ask"), None)
@@ -1694,7 +1718,7 @@ def live_portfolio_view() -> dict:
         )
         positions.append(
             {
-                "market_slug": str(slug),
+                "market_slug": slug,
                 "title": str(metadata.get("title") or slug),
                 "market_name": _human_market_name(str(slug), str(metadata.get("title") or "")),
                 "outcome": str(metadata.get("outcome") or ""),
@@ -1714,7 +1738,7 @@ def live_portfolio_view() -> dict:
                 ),
                 "expired": bool(item.get("expired")),
                 "updated_at_utc": str(item.get("updateTime") or ""),
-                "model_pick": links.get((str(slug), side)),
+                "model_pick": links.get((slug, side)),
             }
         )
     positions.sort(key=lambda item: item["updated_at_utc"], reverse=True)

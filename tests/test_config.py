@@ -1,3 +1,4 @@
+import pytest
 import yaml
 
 from model_prediction.config import PROJECT_ROOT, load_config
@@ -99,6 +100,14 @@ def test_validate_config_rejects_non_positive_unit_value() -> None:
         assert "bankroll.unit_value_usd" in str(error)
     else:
         raise AssertionError("a negative unit_value_usd was not rejected")
+
+
+def test_validate_config_rejects_non_boolean_polymarket_edge_gate() -> None:
+    from model_prediction.config import validate_config
+
+    config = _minimal_valid_config(polymarket_edge={"scanner_enabled": "false", "ledger_enabled": False})
+    with pytest.raises(ValueError, match="polymarket_edge.scanner_enabled must be a boolean"):
+        validate_config(config)
 
 
 def test_validate_config_ignores_non_sport_model_entries() -> None:

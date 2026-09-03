@@ -44,7 +44,7 @@ def test_pagination_walks_next_cursor_to_exhaustion() -> None:
 def test_http_status_error_is_normalized_to_http_error_without_crashing() -> None:
     """The key is sent via header, not a URL query param, so it never lands
     in httpx's error message -- but the redaction/reconstruction path
-    (the_odds_api.py's _safe_get pattern) must still not itself raise a
+    The safe-get redaction path must still not itself raise a
     TypeError trying to rebuild HTTPStatusError from a message-only arg."""
 
     def handler(request: httpx.Request) -> httpx.Response:

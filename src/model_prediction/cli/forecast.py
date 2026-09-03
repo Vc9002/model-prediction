@@ -14,7 +14,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import os
 from dataclasses import asdict, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -28,7 +27,6 @@ from ..data_sources.mlb_market_odds import (
     load_verified_mlb_market_snapshot,
 )
 from ..data_sources.polymarket_us import probability_to_american
-from ..data_sources.the_odds_api import TheOddsAPIClient
 from ..domain import (
     EASTERN,
     LEARNED_PRODUCTION_SPORTS,
@@ -175,11 +173,10 @@ def _forecast_mlb(args_date: str, log: bool, config, registry, bans, ledger, aud
     """Legacy Measured Edge research path retained as an explicit rollback."""
     spec = load_formula_spec(PROJECT_ROOT / "config/models/mlb-analyst-poisson-trend-v0.3.yaml")
     observed_at = utc_now()
-    odds_api_key = os.getenv("THE_ODDS_API_KEY")
     odds_feed = MLBMarketOddsFeed(
         registry,
         MarketOddsSnapshotStore(market_odds_snapshot_path(config)),
-        odds_api=TheOddsAPIClient(odds_api_key) if odds_api_key else None,
+        espn=ESPNClient(),
         observed_at=observed_at,
     )
     candidates, skipped, scheduled = build_mlb_slate(
@@ -367,11 +364,10 @@ def _forecast_mlb_totals_flat(
 
     spec = load_formula_spec(PROJECT_ROOT / "config/models/mlb-analyst-poisson-trend-v0.3.yaml")
     observed_at = utc_now()
-    odds_api_key = os.getenv("THE_ODDS_API_KEY")
     odds_feed = MLBMarketOddsFeed(
         registry,
         MarketOddsSnapshotStore(market_odds_snapshot_path(config)),
-        odds_api=TheOddsAPIClient(odds_api_key) if odds_api_key else None,
+        espn=ESPNClient(),
         observed_at=observed_at,
     )
     candidates, skipped, scheduled = build_mlb_slate(

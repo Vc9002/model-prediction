@@ -22,6 +22,7 @@ import pytest
 from model_prediction import cli
 from model_prediction.cli import _clear_today_open, _find_tennis_result, _verify_chain
 from model_prediction.cli import commands as cli_commands
+from model_prediction.cli import daily as cli_daily
 from model_prediction.cli import forecast as cli_forecast
 from model_prediction.domain import (
     League,
@@ -39,6 +40,17 @@ from model_prediction.units import Exposure
 
 AWAY = CanonicalTeam("mlb-bos", League.MLB, "Boston Red Sox", "BOS", True, None, None, ())
 HOME = CanonicalTeam("mlb-nyy", League.MLB, "New York Yankees", "NYY", True, None, None, ())
+
+
+def test_auto_buyer_verification_override_is_explicit(monkeypatch) -> None:
+    monkeypatch.delenv("MODEL_PREDICTION_SKIP_AUTO_BUYER", raising=False)
+    assert cli_daily._skip_auto_buyer_for_verification() is False
+
+    monkeypatch.setenv("MODEL_PREDICTION_SKIP_AUTO_BUYER", "1")
+    assert cli_daily._skip_auto_buyer_for_verification() is True
+
+    monkeypatch.setenv("MODEL_PREDICTION_SKIP_AUTO_BUYER", "true")
+    assert cli_daily._skip_auto_buyer_for_verification() is False
 
 
 def _verified_market_lineage(*_args, **_kwargs) -> dict:

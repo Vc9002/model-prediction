@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import httpx
+
 from model_prediction.models.college_football import build_cfb_slate
 from model_prediction.models.mlb_first_inning import (
     build_first_inning_ledger,
@@ -243,7 +245,245 @@ def test_auto_buyer_totals_and_spreads_settlement_and_line_extraction(tmp_path: 
     assert r["home_score"] == 2
     assert r["line"] == 8.5
     assert r["pnl_usd"] == -0.47
-    assert r["pnl_units"] == -1.0
+    assert r["pnl_units"] == -0.94
+
+
+def test_scheduled_auto_buyer_settlement_uses_resolved_exchange_side(tmp_path: Path):
+    """Explicit data roots must not disable exchange settlement or grade by team name."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    x_path = tmp_path / "auto_buyer_picks.xlsx"
+
+    for order_id, slug, side, selection, price in (
+        ("ORD_SHORT_LOSS", "aec-cs2-alpha-beta-2026-08-30", "short", "Alpha", 0.32),
+        ("ORD_SHORT_WIN", "aec-cs2-gamma-delta-2026-08-30", "short", "Gamma", 0.41),
+        ("ORD_UNREACHABLE", "aec-cs2-unreachable-market-2026-08-30", "long", "Market", 0.50),
+    ):
+        record_auto_buy_execution(
+            order_payload={
+                "order_id": order_id,
+                "pick_id": f"PICK_{order_id}",
+                "market_slug": slug,
+                "selection": selection,
+                "token_side": side,
+                "limit_price": price,
+                "cost_usd": price,
+                "shares": 1.0,
+                "sport": "MLB" if order_id == "ORD_SHORT_WIN" else "CS2",
+                "event_start_utc": "2026-08-30T20:00:00Z",
+            },
+            pick_row={
+                "away_team": "Beta" if "alpha" in slug else "Delta",
+                "home_team": selection,
+                "market_type": "moneyline",
+                "units": 1.0,
+            },
+            jsonl_path=j_path,
+            xlsx_path=x_path,
+        )
+
+    mock_market_client = MagicMock()
+
+    def market(slug: str) -> dict:
+        # The selected team name deliberately matches outcome index 0 in both
+        # markets. Settlement must instead honor the recorded short side.
+        if "unreachable" in slug:
+            raise httpx.ConnectError("simulated connection failure")
+        prices = ["1", "0"] if "alpha-beta" in slug else ["0", "1"]
+        return {
+            "status": "MARKET_STATUS_RESOLVED",
+            "outcomes": ["Alpha" if "alpha-beta" in slug else "Gamma", "Other"],
+            "outcomePrices": prices,
+        }
+
+    mock_market_client.market.side_effect = market
+    mock_espn = MagicMock()
+    mock_espn.scoreboard.side_effect = httpx.ConnectError("simulated ESPN connection failure")
+    result = settle_auto_buyer_ledger(
+        data_root=tmp_path,
+        espn=mock_espn,
+        polymarket_client=mock_market_client,
+    )
+
+    records = {row["order_id"]: row for row in read_auto_buyer_ledger(j_path)}
+    assert result["settled"] == 2
+    assert result["pending"] == 1
+    assert result["newly_settled"] == 2
+    assert result["changed"] == 2
+    assert result["corrected"] == 0
+    assert result["reopened"] == 0
+    assert records["ORD_SHORT_LOSS"]["status"] == "settled"
+    assert records["ORD_SHORT_LOSS"]["result"] == "loss"
+    assert records["ORD_SHORT_LOSS"]["pnl_usd"] == -0.32
+    assert records["ORD_SHORT_WIN"]["status"] == "settled"
+    assert records["ORD_SHORT_WIN"]["result"] == "win"
+    assert records["ORD_SHORT_WIN"]["pnl_usd"] == 0.59
+    assert records["ORD_UNREACHABLE"]["result"] == "open"
+
+    repeated = settle_auto_buyer_ledger(
+        data_root=tmp_path,
+        espn=mock_espn,
+        polymarket_client=mock_market_client,
+    )
+    assert repeated["settled"] == 2
+    assert repeated["pending"] == 1
+    assert repeated["newly_settled"] == 0
+    assert repeated["changed"] == 0
+    assert repeated["changes"] == []
+
+
+def test_auto_buyer_settlement_pending_count_includes_ungradeable_open_rows(tmp_path: Path):
+    """The response count must match the ledger's pending/open table semantics."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    j_path.write_text(
+        json.dumps(
+            {
+                "order_id": "ORD_OPEN_BAD_START",
+                "status": "submitted",
+                "result": "open",
+                "event_start_utc": "",
+                "sport": "CS2",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = settle_auto_buyer_ledger(data_root=tmp_path, espn=MagicMock())
+
+    assert result["pending"] == 1
+    assert result["remaining_pending"] == 1
+    assert result["changed"] == 0
+
+
+def test_auto_buyer_settlement_survives_settled_tennis_scoreboard_failure(tmp_path: Path):
+    """A transient ESPN failure must not abort or rewrite a settled tennis result."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    settled = {
+        "order_id": "ORD_SETTLED_TENNIS",
+        "status": "settled",
+        "result": "win",
+        "event_start_utc": "2026-08-30T20:00:00Z",
+        "sport": "TENNIS",
+        "away_team": "Away Player",
+        "home_team": "Home Player",
+        "selection": "home",
+        "entry_price": 0.5,
+        "shares": 1.0,
+        "cost_usd": 0.5,
+        "units": 1.0,
+        "pnl_usd": 0.5,
+        "pnl_units": 1.0,
+    }
+    j_path.write_text(json.dumps(settled) + "\n", encoding="utf-8")
+    mock_espn = MagicMock()
+    mock_espn.scoreboard.side_effect = httpx.ConnectError("simulated ESPN outage")
+
+    result = settle_auto_buyer_ledger(data_root=tmp_path, espn=mock_espn)
+
+    record = read_auto_buyer_ledger(j_path)[0]
+    assert result["settled"] == 1
+    assert result["remaining_pending"] == 0
+    assert result["changed"] == 0
+    assert record["status"] == "settled"
+    assert record["result"] == "win"
+    assert record["pnl_usd"] == 0.5
+
+
+def test_auto_buyer_settlement_preserves_execution_time_unit_value(tmp_path: Path):
+    """Changing future sizing must not restate historical P&L units."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    settled = {
+        "order_id": "ORD_HISTORICAL_UNIT",
+        "status": "settled",
+        "result": "win",
+        "event_start_utc": "2026-08-30T20:00:00Z",
+        "sport": "CS2",
+        "entry_price": 0.5,
+        "shares": 1.0,
+        "cost_usd": 0.5,
+        "unit_value_usd": 1.25,
+        "units": 0.4,
+        "pnl_usd": 0.5,
+        "pnl_units": 0.4,
+    }
+    j_path.write_text(json.dumps(settled) + "\n", encoding="utf-8")
+
+    result = settle_auto_buyer_ledger(data_root=tmp_path, espn=MagicMock())
+
+    record = read_auto_buyer_ledger(j_path)[0]
+    assert result["changed"] == 0
+    assert record["unit_value_usd"] == 1.25
+    assert record["units"] == 0.4
+    assert record["pnl_units"] == 0.4
+
+
+def test_exchange_resolution_winning_side_repairs_false_push(tmp_path: Path):
+    """Zero realized fields do not override the exchange's winning side."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    x_path = tmp_path / "auto_buyer_picks.xlsx"
+    record_auto_buy_execution(
+        order_payload={
+            "order_id": "ORD_FALSE_PUSH",
+            "pick_id": "PICK_FALSE_PUSH",
+            "market_slug": "aec-cs2-home-away-2026-09-01",
+            "selection": "home",
+            "token_side": "long",
+            "limit_price": 0.41,
+            "cost_usd": 0.41,
+            "shares": 1.0,
+            "sport": "CS2",
+            "event_start_utc": "2026-09-01T10:00:00Z",
+        },
+        pick_row={
+            "away_team": "Away",
+            "home_team": "Home",
+            "market_type": "moneyline",
+            "units": 1.25,
+        },
+        jsonl_path=j_path,
+        xlsx_path=x_path,
+    )
+    row = read_auto_buyer_ledger(j_path)[0]
+    row.update(status="settled", result="push", pnl_usd=0.0, pnl_units=0.0)
+    j_path.write_text(json.dumps(row, sort_keys=True) + "\n", encoding="utf-8")
+
+    executor = MagicMock()
+    executor.portfolio_snapshot.return_value = {
+        "activities": [
+            {
+                "type": "ACTIVITY_TYPE_POSITION_RESOLUTION",
+                "positionResolution": {
+                    "marketSlug": "aec-cs2-home-away-2026-09-01",
+                    "side": "POSITION_RESOLUTION_SIDE_SHORT",
+                    "updateTime": "2026-09-01T12:30:00Z",
+                    "beforePosition": {
+                        "netPositionDecimal": "1.0000",
+                        "cost": {"value": "0.42"},
+                        "realized": {"value": "0.00"},
+                    },
+                    "afterPosition": {"realized": {"value": "0.00"}},
+                },
+            }
+        ]
+    }
+
+    result = settle_auto_buyer_ledger(
+        data_root=tmp_path,
+        espn=MagicMock(),
+        polymarket_executor=executor,
+    )
+
+    repaired = read_auto_buyer_ledger(j_path)[0]
+    assert repaired["status"] == "settled"
+    assert repaired["result"] == "loss"
+    assert repaired["pnl_usd"] == -0.42
+    assert repaired["pnl_units"] == -0.84
+    assert repaired["units"] == 0.82
+    assert repaired["model_units"] == 1.25
+    assert repaired["unit_value_usd"] == 0.50
+    assert repaired["settled_at_utc"] == "2026-09-01T12:30:00Z"
+    assert result["corrected"] == 1
+    assert result["changed"] == 1
 
 
 def test_auto_buyer_tennis_settlement_and_scheduled_reversion(tmp_path: Path):
@@ -347,8 +587,14 @@ def test_auto_buyer_tennis_settlement_and_scheduled_reversion(tmp_path: Path):
         return {"events": []}
 
     mock_espn.scoreboard.side_effect = mock_scoreboard
+    mock_market_client = MagicMock()
+    mock_market_client.market.return_value = {"status": "MARKET_STATUS_OPEN"}
 
-    settle_auto_buyer_ledger(data_root=tmp_path, espn=mock_espn)
+    settle_auto_buyer_ledger(
+        data_root=tmp_path,
+        espn=mock_espn,
+        polymarket_client=mock_market_client,
+    )
 
     records = read_auto_buyer_ledger(j_path)
     assert len(records) == 2

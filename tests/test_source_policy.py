@@ -16,7 +16,7 @@ def test_keyless_official_source_is_compliant() -> None:
 
 
 def test_paid_source_is_not_default_stack_compliant() -> None:
-    assert not is_default_stack_compliant("the_odds_api")
+    assert not is_default_stack_compliant("api_football")
     assert not is_default_stack_compliant("sportsdataio")
 
 
@@ -35,9 +35,9 @@ def test_assert_no_unapproved_paid_source_passes_for_free_sources() -> None:
 
 
 def test_assert_no_unapproved_paid_source_allows_declared_optional_paid() -> None:
-    # the_odds_api is registered AND marked PAID_OR_KEYED_OPTIONAL -- allowed
+    # api_football is registered AND marked PAID_OR_KEYED_OPTIONAL -- allowed
     # when explicitly requested (e.g. soccer's opt-in path), not silently.
-    assert_no_unapproved_paid_source(["the_odds_api"])
+    assert_no_unapproved_paid_source(["api_football"])
 
 
 def test_assert_no_unapproved_paid_source_raises_for_excluded() -> None:

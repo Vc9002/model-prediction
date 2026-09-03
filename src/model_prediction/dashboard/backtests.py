@@ -8,6 +8,7 @@ DD-5 and dashboard/__init__.py for the re-export shim that keeps the old
 from __future__ import annotations
 
 import json
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -165,6 +166,32 @@ def _team_matches(team_name: str, side_description: str) -> bool:
     return f" {shorter} " in f" {longer} "
 
 
+def _tennis_player_matches(player_name: str, exchange_name: str) -> bool:
+    """Match a tennis player when one source includes an omitted middle name."""
+    player_tokens = re.findall(r"\w+", player_name.casefold())
+    exchange_tokens = re.findall(r"\w+", exchange_name.casefold())
+    return (
+        len(player_tokens) >= 2
+        and len(exchange_tokens) >= 2
+        and player_tokens[0] == exchange_tokens[0]
+        and player_tokens[-1] == exchange_tokens[-1]
+    )
+
+
+def _participant_matches(row: dict, participant: str, exchange_name: str) -> bool:
+    if _team_matches(participant, exchange_name):
+        return True
+    sport = str(row.get("league") or row.get("sport") or "").casefold()
+    return sport == "tennis" and _tennis_player_matches(participant, exchange_name)
+
+
+def _event_participant_indexes(row: dict, participant: str, title: str) -> set[int]:
+    sides = re.split(r"\s+(?:vs\.?|@)\s+", title, flags=re.IGNORECASE)
+    if len(sides) < 2:
+        sides = [title]
+    return {index for index, side in enumerate(sides) if _participant_matches(row, participant, side)}
+
+
 def _lines_match(a: float | None, b: float | None) -> bool:
     return a is not None and b is not None and abs(a - b) < 1e-6
 
@@ -203,7 +230,11 @@ def _row_matches_snapshot_event(row: dict, snapshot: dict) -> bool:
     title = str(snapshot.get("event_title") or "")
     away = str(row.get("away_team") or "")
     home = str(row.get("home_team") or "")
-    return bool(away) and bool(home) and _team_matches(away, title) and _team_matches(home, title)
+    if not away or not home:
+        return False
+    away_indexes = _event_participant_indexes(row, away, title)
+    home_indexes = _event_participant_indexes(row, home, title)
+    return any(away_index != home_index for away_index in away_indexes for home_index in home_indexes)
 
 
 def _spread_side_for_row(row: dict, snapshot: dict) -> str | None:
@@ -230,7 +261,7 @@ def _spread_side_for_row(row: dict, snapshot: dict) -> str | None:
     market_line = snapshot.get("line")
     if not selected_team or row_line is None or market_team is None or market_line is None:
         return None
-    is_market_team = _team_matches(selected_team, str(market_team))
+    is_market_team = _participant_matches(row, selected_team, str(market_team))
     if is_market_team and _lines_match(row_line, float(market_line)):
         return "long"
     if not is_market_team and _lines_match(row_line, -float(market_line)):
@@ -333,7 +364,7 @@ def _pick_quote(row: dict) -> dict | None:
     ticket-building stage always refused first.
     """
     market_type = row.get("market_type")
-    if market_type not in ("moneyline", "spread", "total"):
+    if market_type not in ("moneyline", "spread", "total", "nrfi"):
         return None
     sport = str(row.get("league") or row.get("sport") or "").lower()
     if sport not in SPORTS and sport != "esports":
@@ -357,7 +388,11 @@ def _pick_quote(row: dict) -> dict | None:
         snapshot_observed = snapshot.get("_observed_dt")
         if snapshot_observed is not None and snapshot_observed >= event_start:
             continue
-        if snapshot.get("market_type") != market_type:
+        snapshot_market_type = snapshot.get("market_type")
+        if market_type == "moneyline":
+            if snapshot_market_type not in {"moneyline", "team_win"}:
+                continue
+        elif snapshot_market_type != market_type:
             continue
         slug = str(snapshot.get("market_slug") or "")
         if not slug or any(
@@ -365,15 +400,33 @@ def _pick_quote(row: dict) -> dict | None:
         ):
             continue
         if market_type == "moneyline":
-            long_description = str((snapshot.get("long") or {}).get("description") or "")
-            short_description = str((snapshot.get("short") or {}).get("description") or "")
             away = str(row.get("away_team") or "")
             home = str(row.get("home_team") or "")
-            if not (
-                (_team_matches(away, long_description) and _team_matches(home, short_description))
-                or (_team_matches(home, long_description) and _team_matches(away, short_description))
-            ):
-                continue
+            if snapshot_market_type == "team_win":
+                selected_team = _row_selected_team(row)
+                market_team = str(snapshot.get("team") or "")
+                if (
+                    sport != "soccer"
+                    or not selected_team
+                    or not market_team
+                    or not _row_matches_snapshot_event(row, snapshot)
+                    or not _participant_matches(row, selected_team, market_team)
+                ):
+                    continue
+            else:
+                long_description = str((snapshot.get("long") or {}).get("description") or "")
+                short_description = str((snapshot.get("short") or {}).get("description") or "")
+                if not (
+                    (
+                        _participant_matches(row, away, long_description)
+                        and _participant_matches(row, home, short_description)
+                    )
+                    or (
+                        _participant_matches(row, home, long_description)
+                        and _participant_matches(row, away, short_description)
+                    )
+                ):
+                    continue
         elif market_type == "spread":
             # Multiple alternate-line markets exist per event -- this
             # must match the row's exact team+line, not just the game,
@@ -381,8 +434,19 @@ def _pick_quote(row: dict) -> dict | None:
             # the doubleheader guard below.
             if _spread_side_for_row(row, snapshot) is None:
                 continue
-        else:  # total
+        elif market_type == "total":
             if _total_side_for_row(row, snapshot) is None:
+                continue
+        else:  # NRFI/YRFI are opposite sides of one Yes/No run contract.
+            if not _row_matches_snapshot_event(row, snapshot):
+                continue
+            selection = str(row.get("selection") or "").casefold().strip()
+            expected_description = {"nrfi": "no", "yrfi": "yes"}.get(selection)
+            if expected_description is None:
+                continue
+            long_desc = str((snapshot.get("long") or {}).get("description") or "").casefold().strip()
+            short_desc = str((snapshot.get("short") or {}).get("description") or "").casefold().strip()
+            if (long_desc == expected_description) == (short_desc == expected_description):
                 continue
         latest[slug] = snapshot
     if not latest:
@@ -392,24 +456,41 @@ def _pick_quote(row: dict) -> dict | None:
     snapshot = max(latest.values(), key=lambda item: str(item.get("observed_at_utc") or ""))
     side_name: str | None = None
     if market_type == "moneyline":
-        selected_team = (
-            str(row.get("home_team") or "")
-            if str(row.get("selection") or "").casefold() == "home"
-            else str(row.get("away_team") or "")
-        )
-        matches_long = _team_matches(
-            selected_team, str((snapshot.get("long") or {}).get("description") or "")
-        )
-        matches_short = _team_matches(
-            selected_team, str((snapshot.get("short") or {}).get("description") or "")
-        )
-        if matches_long == matches_short:
-            return None  # ambiguous side (same-city names) — never default to long
-        side_name = "long" if matches_long else "short"
+        if snapshot.get("market_type") == "team_win":
+            side_name = "long"
+        else:
+            selected_team = (
+                str(row.get("home_team") or "")
+                if str(row.get("selection") or "").casefold() == "home"
+                else str(row.get("away_team") or "")
+            )
+            matches_long = _participant_matches(
+                row,
+                selected_team,
+                str((snapshot.get("long") or {}).get("description") or ""),
+            )
+            matches_short = _participant_matches(
+                row,
+                selected_team,
+                str((snapshot.get("short") or {}).get("description") or ""),
+            )
+            if matches_long == matches_short:
+                return None  # ambiguous side (same-city names) — never default to long
+            side_name = "long" if matches_long else "short"
     elif market_type == "spread":
         side_name = _spread_side_for_row(row, snapshot)
-    else:  # total
+    elif market_type == "total":
         side_name = _total_side_for_row(row, snapshot)
+    else:  # nrfi
+        selection = str(row.get("selection") or "").casefold().strip()
+        expected_description = {"nrfi": "no", "yrfi": "yes"}.get(selection)
+        if expected_description is None:
+            return None
+        long_desc = str((snapshot.get("long") or {}).get("description") or "").casefold().strip()
+        short_desc = str((snapshot.get("short") or {}).get("description") or "").casefold().strip()
+        if (long_desc == expected_description) == (short_desc == expected_description):
+            return None
+        side_name = "long" if long_desc == expected_description else "short"
     if side_name is None:
         return None
     side = snapshot.get(side_name) or {}

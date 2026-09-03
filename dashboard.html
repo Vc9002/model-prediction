@@ -299,7 +299,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <button class="status-health-link" onclick="gotoTab('health')" aria-label="Open full system health details">Health details</button>
   <label class="chip unit-control" title="Changes future dollar displays and order sizing; historical unit records stay unchanged">1U = $<input id="unitValueInput" aria-label="Dollar value of one unit" type="number" min="0.01" max="100000" step="0.01" value="7.50" onkeydown="if(event.key==='Enter')saveUnitValue()"><button onclick="saveUnitValue()">Set</button><input id="autoPctInput" aria-label="Bankroll percentage for one unit" type="number" min="1" max="50" step="0.5" value="10" style="width:42px;padding:1px 2px" title="Percentage of bankroll">%<button onclick="autoUnitValue()" title="Set 1U to this percentage of the live balance; adjusts up or down">Apply</button></label>
   <div id="autoBuyerTopControl" style="display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:3px 8px;font-family:var(--mono);font-size:11px">
-    <span>Auto-Buyer (0.5¢/U):</span>
+    <span>Auto-Buyer (<span id="autoBuyerUnitBadge">50¢/U</span>):</span>
     <button id="autoBuyerToggleBtn" onclick="toggleAutoBuyer()" style="font-weight:700;padding:2px 8px;border-radius:5px;font-size:11px;background:rgba(255,92,92,0.2);color:var(--red)">OFF</button>
     <button onclick="runAutoBuyerNow()" title="Trigger Auto-Buyer check now" style="padding:2px 6px;font-size:11px">⚡ Run</button>
   </div>
@@ -330,7 +330,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
        <button data-tab="v9-ledger">MLB v9</button>
        <button data-tab="research">Flat Research</button>
        <button data-tab="gated-research">Gated Research</button>
-       <button data-tab="poly-ledger">Polymarket</button>
+       <button data-tab="poly-ledger" disabled title="Disabled by operator">Polymarket — OFF</button>
      </div>
      <div class="rail-group">
        <div class="rail-label">Performance</div>
@@ -346,8 +346,8 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     </div>
     <div class="rail-group">
       <div class="rail-label">Polymarket US</div>
-      <button data-tab="polymarket">Edge Scanner</button>
-      <button data-tab="poly-ledger">Edge Ledger</button>
+      <button data-tab="polymarket" disabled title="Disabled by operator">Edge Scanner — OFF</button>
+      <button data-tab="poly-ledger" disabled title="Disabled by operator">Edge Ledger — OFF</button>
       <button data-tab="auto-buyer-ledger">Auto-Buyer</button>
     </div>
     <div class="rail-group">
@@ -656,14 +656,23 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <section id="tab-auto-buyer-ledger" style="display:none">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
       <h2 style="margin:0">🤖 Auto-Buyer — Execution & Realized Settlement</h2>
-      <span class="chip dim">Live automated Polymarket executions (0.5¢/U) · ESPN official outcome settlement · Realized ROI & P&L accounting</span>
+      <span class="chip dim">Live automated Polymarket executions · configurable future-order unit value · ESPN official outcome settlement · Realized ROI & P&L accounting</span>
       <span style="flex:1"></span>
+      <label class="chip" title="Changes future Auto-Buyer sizing only; historical rows retain their execution-time unit value">Auto-Buyer 1U = $<input id="autoBuyerUnitValueInput" aria-label="Auto-Buyer dollar value of one unit" type="number" min="0.01" max="100000" step="0.01" value="0.50" style="width:68px;padding:2px 4px" onkeydown="if(event.key==='Enter')saveAutoBuyerUnitValue()"><button onclick="saveAutoBuyerUnitValue()" style="padding:2px 7px">Set</button></label>
       <button onclick="renderAutoBuyer(true)">↻ Refresh</button>
       <button onclick="runAutoBuyerNow()" style="background:rgba(51,209,126,0.15);color:var(--green);font-weight:700">⚡ Run Auto-Buyer</button>
       <button class="primary" id="btnSettleAutoBuyerNow" onclick="settleAutoBuyerTrades(true)" style="font-weight:700">⚖️ Settle Auto-Buyer Positions</button>
     </div>
     <div id="autoBuyerKpis" class="kpis" style="margin-bottom:16px"></div>
     <div id="autoBuyerSettleKpis" class="kpis" style="display:none"></div>
+
+    <div class="filter-bar" style="margin-bottom:14px;display:flex;gap:8px;align-items:center">
+      <button class="primary" id="btnAutoBuyerLedgerView" onclick="setAutoBuyerView('ledger')">Ledger</button>
+      <button id="btnAutoBuyerPerformanceView" onclick="setAutoBuyerView('performance')">Performance</button>
+      <span class="small dim">Settled-only performance · event dates in America/New_York</span>
+    </div>
+
+    <div id="autoBuyerLedgerPanel">
 
     <div class="filter-bar" style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <button class="primary" id="btnAbsSettled" onclick="setAbsFilter('settled')">Settled (<span id="absSettledCount">0</span>)</button>
@@ -706,6 +715,20 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
         <button onclick="loadAutoBuyerLog()" style="padding:2px 8px;font-size:11px">↻ Refresh Log</button>
       </div>
       <pre id="autoBuyerLogBox" style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:var(--mono);font-size:11px;max-height:260px;overflow-y:auto;white-space:pre-wrap;color:var(--text)">Loading operational log…</pre>
+    </div>
+    </div>
+
+    <div id="autoBuyerPerformancePanel" style="display:none">
+      <div id="autoBuyerPerformanceCohorts" class="kpis" style="margin-bottom:16px"></div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+          <h3 style="margin:0">Day-by-Day Settled Performance</h3>
+          <span class="small dim">MLB cohort = MLB sport or MLB model ID · pending positions excluded</span>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data" id="autoBuyerDailyPerformanceTable"><tr><td>Loading settled performance…</td></tr></table>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -3468,6 +3491,7 @@ async function refreshAll(){
   else if(active==="perf") performanceControlChanged(false);
   else if(active==="today") renderToday();
   else if(active==="market") loadMarket();
+  else if(active==="folio") renderFolio();
   else if(active==="polymarket") loadPolymarketScanner();
 
   if($("#tab-today") && $("#tab-today").style.display!=="none" && active!=="today") renderToday();
@@ -3602,6 +3626,7 @@ function copyPolymarketOrdersJson() {
 }
 
 /* ---------- Auto-Buyer Controls ---------- */
+let _autoBuyerStatusCache = {};
 async function loadAutoBuyerStatus(){
   try{
     const res=await fetch("/api/auto-buyer/status",{headers:{"X-Dashboard-Token":window._DASHBOARD_TOKEN||""}});
@@ -3611,13 +3636,19 @@ async function loadAutoBuyerStatus(){
   }catch(e){}
 }
 function updateAutoBuyerUI(data){
+  _autoBuyerStatusCache=data||{};
   const btn=$("#autoBuyerToggleBtn");
   if(!btn)return;
+  const unitValue=Number(data.unit_value_usd||0.50);
+  const unitBadge=$("#autoBuyerUnitBadge");
+  const unitInput=$("#autoBuyerUnitValueInput");
+  if(unitBadge)unitBadge.textContent=unitValue<1?`${Math.round(unitValue*100)}¢/U`:`$${unitValue.toFixed(2)}/U`;
+  if(unitInput&&document.activeElement!==unitInput)unitInput.value=unitValue.toFixed(2);
   if(data.enabled){
     btn.textContent="ON (LIVE)";
     btn.style.background="var(--green)";
     btn.style.color="#000";
-    btn.title="Auto-Buyer is LIVE and ACTIVE (1U=0.5¢). Click to turn OFF.";
+    btn.title=`Auto-Buyer is LIVE and ACTIVE (1U=$${unitValue.toFixed(2)}). Click to turn OFF.`;
   }else{
     btn.textContent="OFF";
     btn.style.background="rgba(255,92,92,0.2)";
@@ -3629,8 +3660,9 @@ async function toggleAutoBuyer(){
   const btn=$("#autoBuyerToggleBtn");
   const currentlyOn=btn&&btn.textContent.includes("ON");
   const nextState=!currentlyOn;
+  const unitValue=Number(_autoBuyerStatusCache.unit_value_usd||0.50);
   const msg=nextState
-    ?"Enable LIVE Polymarket Auto-Buyer?\n\n- Sizing: 1U = $0.005 (0.5¢/U)\n- Whitelisted models only (Tennis, Soccer, WNBA ML, CS2/LoL Gated, MLB NRFI/Totals)\n- Blacklisted negative-EV derivatives blocked\n- Limit IOC orders placed on Polymarket US API"
+    ?`Enable LIVE Polymarket Auto-Buyer?\n\n- Sizing: 1U = $${unitValue.toFixed(2)}\n- Whitelisted models only (Tennis, Soccer, WNBA ML, CS2/LoL Gated, MLB NRFI/Totals)\n- Blacklisted negative-EV derivatives blocked\n- Limit IOC orders placed on Polymarket US API`
     :"Disable Polymarket Auto-Buyer?";
   if(!confirm(msg))return;
   try{
@@ -3645,6 +3677,27 @@ async function toggleAutoBuyer(){
     alert("Failed to toggle Auto-Buyer: "+e);
   }
 }
+async function saveAutoBuyerUnitValue(){
+  const input=$("#autoBuyerUnitValueInput"),value=Number(input&&input.value);
+  if(!Number.isFinite(value)||value<0.01||value>100000){
+    showModal('<h2 class="red">Invalid Auto-Buyer unit value</h2><p>Enter a dollar amount from $0.01 to $100,000.00.</p>');return;
+  }
+  const gameCap=Number(_autoBuyerStatusCache.max_game_stake_usd||2.50);
+  const dailyCap=Number(_autoBuyerStatusCache.max_daily_spend_usd||25.00);
+  if(!window.confirm(`Set Auto-Buyer 1U to $${value.toFixed(2)}?\n\nThis changes future automated order sizing only. Existing orders and historical P&L units will not change. The $${gameCap.toFixed(2)} per-game and $${dailyCap.toFixed(2)} daily caps still apply.`))return;
+  const response=await fetch("/api/auto-buyer/unit-value",{
+    method:"POST",
+    headers:{"Content-Type":"application/json","X-Dashboard-Token":window._DASHBOARD_TOKEN||""},
+    body:JSON.stringify({confirm:true,unit_value_usd:value})
+  });
+  const result=await response.json();
+  if(!response.ok||result.status!=="ok"){
+    showModal(`<h2 class="red">Auto-Buyer unit value not changed</h2><pre>${esc(result.error||JSON.stringify(result))}</pre>`);return;
+  }
+  await loadAutoBuyerStatus();
+  showModal(`<h2 class="green">Auto-Buyer 1U = $${Number(result.unit_value_usd).toFixed(2)}</h2><p>Future Auto-Buyer sizing uses this value. Historical rows retain their execution-time unit value.</p>`);
+}
+window.saveAutoBuyerUnitValue=saveAutoBuyerUnitValue;
 async function runAutoBuyerNow(){
   const btn=$("#autoBuyerToggleBtn");
   const isLive=btn&&btn.textContent.includes("ON");
@@ -3672,6 +3725,7 @@ async function runAutoBuyerNow(){
 /* ---------- Auto-Buyer Consolidated Execution & Settlement ---------- */
 let _autoBuyerLedgerCache = [];
 let _absFilterMode = "settled";
+let _autoBuyerView = "ledger";
 
 async function loadAutoBuyerLedgerCache(force = false) {
   if (!force && _autoBuyerLedgerCache && _autoBuyerLedgerCache.length) return;
@@ -3690,6 +3744,7 @@ async function renderAutoBuyer(force = false) {
   await loadAutoBuyerLedgerCache(force);
   await loadAutoBuyerStatus();
   renderAutoBuyerKpis();
+  renderAutoBuyerPerformance();
   populateAbsSportDropdown();
   renderAutoBuyerTables();
   await loadAutoBuyerLog();
@@ -3697,6 +3752,136 @@ async function renderAutoBuyer(force = false) {
 
 const renderAutoBuyerLedger = renderAutoBuyer;
 const renderAutoBuyerSettle = renderAutoBuyer;
+
+function setAutoBuyerView(view) {
+  _autoBuyerView = view === "performance" ? "performance" : "ledger";
+  const showingPerformance = _autoBuyerView === "performance";
+  const ledgerPanel = $("#autoBuyerLedgerPanel");
+  const performancePanel = $("#autoBuyerPerformancePanel");
+  const ledgerButton = $("#btnAutoBuyerLedgerView");
+  const performanceButton = $("#btnAutoBuyerPerformanceView");
+  if (ledgerPanel) ledgerPanel.style.display = showingPerformance ? "none" : "";
+  if (performancePanel) performancePanel.style.display = showingPerformance ? "" : "none";
+  if (ledgerButton) ledgerButton.classList.toggle("primary", !showingPerformance);
+  if (performanceButton) performanceButton.classList.toggle("primary", showingPerformance);
+  if (showingPerformance) renderAutoBuyerPerformance();
+}
+
+function isSettledAutoBuyerRow(row) {
+  return String(row.status || "").toLowerCase() === "settled" ||
+    ["win", "loss", "push"].includes(String(row.result || "").toLowerCase());
+}
+
+function isMlbAutoBuyerRow(row) {
+  const sport = String(row.sport || "").toUpperCase();
+  const modelId = String(row.model_id || "").toLowerCase();
+  return sport === "MLB" || modelId.startsWith("mlb-") || modelId.includes("-mlb-");
+}
+
+function autoBuyerEventDateEt(row) {
+  const raw = row.event_start_utc || row.executed_at_utc || "";
+  const date = new Date(raw);
+  if (!raw || Number.isNaN(date.getTime())) return "Unknown";
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function autoBuyerCohortMetrics(rows) {
+  const settled = rows.filter(isSettledAutoBuyerRow);
+  const wins = settled.filter(row => String(row.result || "").toLowerCase() === "win").length;
+  const losses = settled.filter(row => String(row.result || "").toLowerCase() === "loss").length;
+  const pushes = settled.filter(row => String(row.result || "").toLowerCase() === "push").length;
+  const stakeUsd = settled.reduce((sum, row) => sum + (Number(row.cost_usd) || 0), 0);
+  const pnlUsd = settled.reduce((sum, row) => sum + (Number(row.pnl_usd) || 0), 0);
+  const pnlUnits = settled.reduce((sum, row) => {
+    const stored = row.pnl_units;
+    const unitValue = Number(row.unit_value_usd) > 0 ? Number(row.unit_value_usd) : 0.50;
+    return sum + (stored === null || stored === undefined || stored === "" ? (Number(row.pnl_usd) || 0) / unitValue : Number(stored) || 0);
+  }, 0);
+  return {
+    settled: settled.length,
+    wins,
+    losses,
+    pushes,
+    stakeUsd,
+    pnlUsd,
+    pnlUnits,
+    winRatePct: wins + losses ? wins / (wins + losses) * 100 : null,
+    roiPct: stakeUsd > 0 ? pnlUsd / stakeUsd * 100 : null
+  };
+}
+
+function autoBuyerRecordText(metrics) {
+  return `${metrics.wins}W - ${metrics.losses}L${metrics.pushes ? ` - ${metrics.pushes}P` : ""}`;
+}
+
+function autoBuyerPct(value) {
+  return value === null ? "—" : `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
+}
+
+function autoBuyerPerformanceCell(metrics) {
+  if (!metrics.settled) return '<td class="dim">—</td><td class="dim">—</td><td class="dim">—</td>';
+  return `
+    <td class="mono">${autoBuyerRecordText(metrics)}</td>
+    <td class="mono ${metrics.pnlUsd >= 0 ? 'green' : 'red'}">$${metrics.pnlUsd >= 0 ? '+' : ''}${metrics.pnlUsd.toFixed(2)}</td>
+    <td class="mono ${metrics.roiPct >= 0 ? 'green' : 'red'}">${autoBuyerPct(metrics.roiPct)}</td>
+  `;
+}
+
+function renderAutoBuyerPerformance() {
+  const settled = (_autoBuyerLedgerCache || []).filter(isSettledAutoBuyerRow);
+  const cohorts = [
+    ["All Auto-Buys", settled],
+    ["MLB Models", settled.filter(isMlbAutoBuyerRow)],
+    ["Without MLB", settled.filter(row => !isMlbAutoBuyerRow(row))]
+  ];
+  const cohortEl = $("#autoBuyerPerformanceCohorts");
+  if (cohortEl) {
+    cohortEl.innerHTML = cohorts.map(([label, rows]) => {
+      const metrics = autoBuyerCohortMetrics(rows);
+      const pnlClass = metrics.pnlUsd >= 0 ? "green" : "red";
+      return `<div class="k">
+        <b class="${pnlClass}">$${metrics.pnlUsd >= 0 ? '+' : ''}${metrics.pnlUsd.toFixed(2)}</b>
+        <span>${esc(label)} · ${autoBuyerRecordText(metrics)} · ${autoBuyerPct(metrics.roiPct)} ROI · ${metrics.pnlUnits >= 0 ? '+' : ''}${metrics.pnlUnits.toFixed(2)}U</span>
+      </div>`;
+    }).join("");
+  }
+
+  const dates = Array.from(new Set(settled.map(autoBuyerEventDateEt))).sort((a, b) => {
+    if (a === "Unknown") return 1;
+    if (b === "Unknown") return -1;
+    return b.localeCompare(a);
+  });
+  const tableEl = $("#autoBuyerDailyPerformanceTable");
+  if (!tableEl) return;
+  let html = `<thead>
+    <tr>
+      <th rowspan="2">Event Date (ET)</th>
+      <th colspan="3">All Auto-Buys</th>
+      <th colspan="3">MLB Models</th>
+      <th colspan="3">Without MLB</th>
+    </tr>
+    <tr><th>Record</th><th>P&amp;L</th><th>ROI</th><th>Record</th><th>P&amp;L</th><th>ROI</th><th>Record</th><th>P&amp;L</th><th>ROI</th></tr>
+  </thead><tbody>`;
+  if (!dates.length) {
+    html += '<tr><td colspan="10" class="dim" style="text-align:center;padding:24px">No settled Auto-Buyer positions.</td></tr>';
+  } else {
+    dates.forEach(date => {
+      const daily = settled.filter(row => autoBuyerEventDateEt(row) === date);
+      const allMetrics = autoBuyerCohortMetrics(daily);
+      const mlbMetrics = autoBuyerCohortMetrics(daily.filter(isMlbAutoBuyerRow));
+      const withoutMlbMetrics = autoBuyerCohortMetrics(daily.filter(row => !isMlbAutoBuyerRow(row)));
+      html += `<tr><td class="mono font-bold">${esc(date)}</td>${autoBuyerPerformanceCell(allMetrics)}${autoBuyerPerformanceCell(mlbMetrics)}${autoBuyerPerformanceCell(withoutMlbMetrics)}</tr>`;
+    });
+  }
+  tableEl.innerHTML = html + "</tbody>";
+}
 
 function populateAbsSportDropdown() {
   const select = $("#fSport_ABS");
@@ -3981,8 +4166,36 @@ async function settleAutoBuyerTrades(fromButton = false) {
       },
       body: JSON.stringify({ confirm: true })
     });
-    const data = await res.json();
-    alert(`Auto-Buyer settlement complete!\n\nSettled: ${data.settled}\nPending: ${data.pending}`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    const remainingPending = Number(data.remaining_pending);
+    if (!Number.isFinite(remainingPending) || remainingPending < 0) {
+      throw new Error("Settlement response is missing the authoritative remaining-pending count");
+    }
+    const changedRows = Array.isArray(data.changes) ? data.changes : [];
+    const newlySettled = Number(data.newly_settled ?? data.settled ?? 0);
+    const corrected = Number(data.corrected ?? 0);
+    const reopened = Number(data.reopened ?? 0);
+    const headline = changedRows.length
+      ? `${changedRows.length} position${changedRows.length === 1 ? "" : "s"} changed.`
+      : "No positions changed.";
+    const summary = [headline];
+    if(newlySettled) summary.push(`Moved from pending: ${newlySettled}`);
+    if(corrected) summary.push(`Corrected: ${corrected}`);
+    if(reopened) summary.push(`Reopened: ${reopened}`);
+    summary.push(`Still pending: ${remainingPending}`);
+    const details = changedRows.slice(0, 8).map(row => {
+      const result = String(row.to_result || row.to_status || "updated").toUpperCase();
+      const pnl = Number(row.pnl_usd || 0);
+      return `${result} · ${row.market_slug || row.order_id || "position"} · ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}`;
+    });
+    const more = changedRows.length > details.length ? [`…and ${changedRows.length - details.length} more`] : [];
+    alert([
+      "Settlement update",
+      "",
+      ...summary,
+      ...(details.length ? ["", "Changed positions:", ...details, ...more] : []),
+    ].join("\n"));
     await renderAutoBuyer(true);
   } catch (e) {
     alert("Auto-Buyer settlement failed: " + e);

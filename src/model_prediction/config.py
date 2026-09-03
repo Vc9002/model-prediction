@@ -102,6 +102,15 @@ def validate_config(config: dict[str, Any]) -> None:
 
     require_section("execution")
 
+    polymarket_edge = config.get("polymarket_edge")
+    if polymarket_edge is not None:
+        if not isinstance(polymarket_edge, dict):
+            errors.append("'polymarket_edge' section must be a mapping when present")
+        else:
+            for key in ("scanner_enabled", "ledger_enabled"):
+                if not isinstance(polymarket_edge.get(key), bool):
+                    errors.append(f"polymarket_edge.{key} must be a boolean")
+
     models = require_section("models")
     for name, spec in models.items():
         if not isinstance(spec, dict) or "status" not in spec:
@@ -137,6 +146,16 @@ def load_config() -> dict[str, Any]:
     config["model_iteration_policy"] = CONTINUOUS_MODEL_ITERATION_POLICY.copy()
     validate_config(config)
     return config
+
+
+def polymarket_edge_enabled(config: dict[str, Any], component: str) -> bool:
+    """Return the explicit operator gate for an edge scanner/ledger component."""
+    if component not in {"scanner", "ledger"}:
+        raise ValueError(f"unknown Polymarket edge component: {component}")
+    section = config.get("polymarket_edge")
+    if not isinstance(section, dict):
+        return False
+    return section.get(f"{component}_enabled") is True
 
 
 def config_path() -> Path:

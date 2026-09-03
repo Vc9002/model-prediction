@@ -55,7 +55,7 @@ class BallDontLieClient:
             )
             response.raise_for_status()
             return response
-        except Exception as exc:  # noqa: BLE001 -- both transport and HTTP errors may embed the key in the request repr; redact before re-raising (same pattern as the_odds_api.py's _safe_get)
+        except Exception as exc:  # noqa: BLE001 -- transport and HTTP errors may embed the key in the request repr; redact before re-raising
             msg = str(exc).replace(self.api_key, "[REDACTED]")
             raise httpx.HTTPError(msg) from None
 

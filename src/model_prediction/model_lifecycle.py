@@ -93,6 +93,7 @@ class ChallengerBuildStatus(StrEnum):
 
     PLANNED = "planned"
     IMPLEMENTED = "implemented"
+    MECHANICS_VALIDATED = "mechanics_validated"
     VALIDATED_OFFLINE = "validated_offline"
     FROZEN = "frozen"
     CAPTURING_PROSPECTIVE = "capturing_prospective"
@@ -348,15 +349,18 @@ def load_challenger_evidence(
                     ev_id = str(r.get("event_id", ""))
                     if ev_id in settled_outcomes:
                         outcome_row = settled_outcomes[ev_id]
+                        row_art_hash = r.get("model_artifact_hash")
                         origin = classify_evidence_origin(
-                            prediction_created_at=r.get("observed_at_utc") or r.get("created_at_utc"),
+                            prediction_created_at=r.get("prediction_created_at")
+                            or r.get("observed_at_utc")
+                            or r.get("created_at_utc"),
                             event_start_utc=r.get("event_start_utc") or outcome_row.get("event_start_utc"),
                             outcome_available_at=outcome_row.get("settled_at_utc"),
-                            candidate_frozen_at=candidate_frozen_at,
-                            candidate_artifact_hash=candidate_artifact_hash,
+                            candidate_frozen_at=candidate_frozen_at or r.get("candidate_frozen_at"),
+                            candidate_artifact_hash=row_art_hash,
                             frozen_artifact_hash=candidate_artifact_hash,
-                            feature_snapshot_observed_at=r.get("observed_at_utc"),
-                            market_snapshot_observed_at=r.get("observed_at_utc"),
+                            feature_snapshot_observed_at=r.get("feature_snapshot_observed_at"),
+                            market_snapshot_observed_at=r.get("market_snapshot_observed_at"),
                         )
                         r_copy = dict(r)
                         r_copy["result"] = outcome_row.get("result")

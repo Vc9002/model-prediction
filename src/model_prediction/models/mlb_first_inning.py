@@ -890,10 +890,12 @@ def build_first_inning_ledger(
 def market_proxy_probabilities(base_rate: float, *, vig: float = 0.04) -> tuple[float, float]:
     """Two-way no-vig fair prices around ``base_rate`` with a fixed overround.
 
-    No real NRFI market quotes are captured anywhere in this repo (the
-    ledger's ``market_probability`` column for mlb-nrfi-v1 is the model's own
-    fair price, ``sportsbook="model_fair"``), so holdout CLV/P&L is measured
-    against this explicit proxy: implied NRFI = (base + vig/2)/(1+vig).
+    The historical training/holdout cohort has no decision-time NRFI quotes
+    (the ledger's ``market_probability`` column for mlb-nrfi-v1 is the
+    model's own fair price, ``sportsbook="model_fair"``). Prospective live
+    capture began on 2026-09-01, but cannot retroactively price that cohort,
+    so holdout CLV/P&L remains measured against this explicit proxy:
+    implied NRFI = (base + vig/2)/(1+vig).
     """
     if not 0.0 < base_rate < 1.0:
         raise ValueError("base_rate must be in (0, 1)")

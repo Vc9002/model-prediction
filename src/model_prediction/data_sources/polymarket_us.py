@@ -216,6 +216,12 @@ MARKET_TYPES = {
     # string here with the date it was first observed.
     "SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME": "team_win",
     "soccer_team_full_time_winner": "team_win",
+    # Live-verified 2026-09-01 from GET /v1/events/slug/<mlb-event>.
+    # The contract asks whether any run is scored in the first inning:
+    # Yes is YRFI and No is NRFI. The V2 field is only the generic
+    # SPORTS_MARKET_TYPE_PROP, so classification must fall through to this
+    # specific legacy field rather than treating every prop as interchangeable.
+    "baseball_team_first_inning_run": "nrfi",
 }
 
 logger = logging.getLogger(__name__)
@@ -339,12 +345,33 @@ class PolymarketUSClient:
         timezone_name: str = "America/New_York",
     ) -> list[dict[str, Any]]:
         timezone = ZoneInfo(timezone_name)
-        slate = []
+        matching_events = []
         for event in self.events(league):
             start = event.get("startTime")
             if not start or parse_utc(start).astimezone(timezone).date() != game_date:
                 continue
-            slate.append(self._normalize_event(event, league.upper(), timezone_name))
+            matching_events.append(event)
+
+        # MLB's league endpoint is a summary/general feed. Hydrate only the
+        # already date-filtered games so innings markets are captured without
+        # turning every sport into a large detail crawl. A failed detail fetch
+        # retains the general event; no missing contract is ever invented.
+        if league.upper() == "MLB" and matching_events:
+
+            def _hydrate(event: dict[str, Any]) -> dict[str, Any]:
+                slug = str(event.get("slug") or "")
+                if not slug:
+                    return event
+                try:
+                    return self.event(slug)
+                except (httpx.HTTPError, KeyError, TypeError):
+                    logger.warning("Polymarket MLB event-detail hydration failed for %s", slug, exc_info=True)
+                    return event
+
+            with ThreadPoolExecutor(max_workers=min(8, len(matching_events))) as pool:
+                matching_events = list(pool.map(_hydrate, matching_events))
+
+        slate = [self._normalize_event(event, league.upper(), timezone_name) for event in matching_events]
         return slate
 
     def sport_slate(
@@ -386,6 +413,10 @@ class PolymarketUSClient:
 
     def market(self, slug: str) -> dict[str, Any]:
         return self._get(f"/v1/market/slug/{slug}")["market"]
+
+    def event(self, slug: str) -> dict[str, Any]:
+        """Fetch the complete market inventory used by the game-detail page."""
+        return self._get(f"/v1/events/slug/{slug}")["event"]
 
     def book(self, slug: str) -> dict[str, Any]:
         return self._get(f"/v1/markets/{slug}/book")["marketData"]
@@ -458,10 +489,11 @@ class PolymarketUSClient:
         start = parse_utc(event["startTime"])
         markets = []
         for market in event.get("markets", []):
-            raw_type = market.get("sportsMarketTypeV2") or market.get("sportsMarketType")
-            market_type = MARKET_TYPES.get(raw_type)
+            raw_type_v2 = market.get("sportsMarketTypeV2")
+            raw_type_legacy = market.get("sportsMarketType")
+            market_type = MARKET_TYPES.get(raw_type_v2) or MARKET_TYPES.get(raw_type_legacy)
             if market_type is None:
-                _log_unknown_market_type(raw_type, league)
+                _log_unknown_market_type(raw_type_v2 or raw_type_legacy, league)
                 continue
             sides = []
             for side in market.get("marketSides", []):

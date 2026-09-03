@@ -26,7 +26,7 @@ This document provides an exhaustive, code-verified audit of all identified defe
 - **Finding (original)**: A new first-inning model was fitted and frozen into `config/models/mlb-nrfi-v1.json` with holdout logloss of **0.690572** (reproducing the 0.6910 baseline). However, the live forecast path `_forecast_mlb_nrfi_flat` in `forecast.py` instantiates `MLBNRFIModel()` from `mlb_nrfi.py`, which is an old, unfitted model with hand-set weights (`0.0424`, `-0.045`).
 - **Landmine**: If `mlb-nrfi-v1` were registered in `config/production.yaml` without updating `_forecast_mlb_nrfi_flat`, the registry would report `mlb-nrfi-v1` as active, while the live pipeline would execute the uncalibrated hand-set model and stamp picks with the validated model's version string.
 - **Resolution**: The pre-game point-in-time feature accumulator `mlb_first_inning_live.py` was built (same 19-feature formulas as the batch ledger, keyed by starter name — the accepted risk pattern `features/starter_history.py` already uses; exact-match verified vs the batch ledger on 7 real games across 3 seasons, parity test 1e-4 tolerance). `_forecast_mlb_nrfi_flat` now fails closed on a missing/hash-invalid artifact and predicts via `MLBFirstInningModel.from_dict()`. `mlb-nrfi-v1` registered and promoted as champion `MLB.nrfi`; `blocked_workflows` now empty.
-- **Remaining caveat**: Polymarket has no NRFI/YRFI market — shadow rows have no market-side CLV/ROI grading. The legacy `MLBNRFIModel` class still exists (legacy tests) with `model_version="mlb-nrfi-v1"` as its default string — anyone re-wiring it would reopen this exact trap.
+- **Remaining caveat (updated 2026-09-01)**: Exact NRFI/YRFI quotes now come from Polymarket US game-detail `baseball_team_first_inning_run` contracts; the earlier no-market conclusion came from the incomplete league summary feed. The legacy `MLBNRFIModel` class still exists (legacy tests) with `model_version="mlb-nrfi-v1"` as its default string — anyone re-wiring it would reopen this exact trap.
 
 #### 2. WNBA Totals Serving Path Absence
 - **Location**: [`src/model_prediction/cli/forecast.py`](file:///Users/vincentc9002/model-prediction/src/model_prediction/cli/forecast.py), [`src/model_prediction/total_score.py`](file:///Users/vincentc9002/model-prediction/src/model_prediction/total_score.py).
@@ -53,9 +53,9 @@ This document provides an exhaustive, code-verified audit of all identified defe
 ├────────────────────────┬───────────────────┬────────────────────────────┤
 │ Data Feed              │ Status            │ Operational Detail         │
 ├────────────────────────┼───────────────────┼────────────────────────────┤
-│ The Odds API           │ ❌ 401 Outage     │ Outage ≥31 days.           │
+│ The Odds API           │ 🗑️ Removed        │ Removed 2026-09-02.        │
 │ API-Football v3        │ ⚠️ Pending Secret │ Implemented; needs API key │
-│ Polymarket US Quotes   │ ⚠️ Partial        │ Missing NRFI/YRFI/F5 lines │
+│ Polymarket US Quotes   │ ⚠️ Partial        │ NRFI/YRFI live; F5 gap     │
 │ Open-Meteo Weather     │ ⚙️ Research-Only  │ Verified honest null       │
 │ Statcast Daily Ingest  │ ✅ Automated      │ Wired into step5e daily    │
 │ WNBA Injury Snapshots  │ ✅ Resolved       │ 81/81 morning PDFs parse   │
@@ -63,15 +63,15 @@ This document provides an exhaustive, code-verified audit of all identified defe
 └────────────────────────┴───────────────────┴────────────────────────────┘
 ```
 
-#### 1. Soccer Upstream Outage & API-Football Key Dependency
-- **Finding**: The Odds API credential has failed with `401 Unauthorized` for over 31 days.
+#### 1. Soccer Historical-Capture Gap & API-Football Key Dependency
+- **Finding (updated 2026-09-02)**: The dead Odds API client and credential dependency were removed. Soccer historical capture remains stale because API-Football is implemented but not provisioned.
 - **Remedy**: [`src/model_prediction/data_sources/api_football.py`](file:///Users/vincentc9002/model-prediction/src/model_prediction/data_sources/api_football.py) is implemented to query API-Football v3 endpoints. It remains dormant until the operator sets `API_FOOTBALL_KEY`.
 
 **Scope corrected 2026-08-30:** soccer *settlement* no longer needs any credential — `cli/settle.py` resolves results from ESPN by the event id already stored on each row (`soccer/all/summary?event=<id>`), taking open soccer rows from 0 to 53-of-57 resolvable. What still awaits `API_FOOTBALL_KEY` is *capture/pricing* for new soccer picks, not settlement.
 
 #### 2. Polymarket Market Coverage Gaps
 - **Finding**: Polymarket US captures executable BBO quotes for major markets (Moneyline, Runline/Spread, Game Totals). However:
-  - First-Inning (NRFI/YRFI) quote slugs are absent from the odds tree.
+  - First-Inning (NRFI/YRFI) quotes are captured through game-detail hydration, not the incomplete league summary tree.
   - First 5 Innings (F5) runs markets are not captured.
 
 #### 3. Offseason Feed Dormancy (NBA / NFL)

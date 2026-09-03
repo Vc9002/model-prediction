@@ -108,7 +108,7 @@ def test_client_fixtures_queries_documented_shape() -> None:
 def test_client_transport_error_is_redacted() -> None:
     # The key travels in a header (never a URL query param), so HTTP status
     # errors cannot embed it -- the leak path is a transport error whose
-    # message carries the request (same shape test_the_odds_api.py pins).
+    # message carries the request, so the reconstructed error must stay redacted.
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError(f"connection refused for key secret-key-123 at {request.url}")
 

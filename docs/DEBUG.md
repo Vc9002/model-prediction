@@ -1,6 +1,154 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
-**Last audited**: 2026-08-31 (see new section directly below)
+**Last audited**: 2026-09-02 (see new section directly below)
+
+## 2026-09-02 — Auto-Buyer settlement resilience and performance cohorts
+
+**Settlement audit.** A read-only rehearsal copied the 102-row live ledger to
+an isolated temporary directory and ran the real settlement function with
+authenticated exchange positions plus ESPN/Polymarket market resolution. The
+first pass changed three rows: one newly resolved CS2 position and two
+already-settled cost-basis normalizations whose win/loss results did not
+change. It ended at 82 settled / 20 pending. An immediate second pass returned
+`changed: 0` at the same counts, proving idempotency for that snapshot. The
+production ledger was not targeted by either pass.
+
+**Failure found and fixed.** The first sandbox rehearsal exposed an uncaught
+`httpx.ConnectError` in the already-settled tennis re-verification branch. A
+transient ESPN/DNS outage could therefore abort the entire settlement request.
+That branch now treats `httpx.HTTPError` like the other per-row source failures:
+the settled record remains unchanged and the pass continues. A regression
+pins the fail-closed behavior.
+
+**Performance view.** The Auto-Buyer page now has Ledger and Performance
+sub-tabs. Performance uses only terminal win/loss/push rows, groups event dates
+in `America/New_York`, and shows day-by-day All Auto-Buys, MLB Models, and
+Without MLB cohorts. Empty cohorts render unavailable ROI instead of a false
+zero. MLB membership is based on MLB sport or an MLB model ID; pending exposure
+never enters record, P&L, stake, win-rate, or ROI denominators.
+
+**Unit control.** Auto-Buyer now has its own persisted `1U = $` control rather
+than silently sharing the dashboard's general unit value. This separation is
+intentional: the current general unit is $5.00 while live Auto-Buyer sizing is
+$0.50, so coupling them would have raised automated sizing tenfold. A confirmed
+change updates `auto_buyer_state.json` and future Auto-Buyer cycles read that
+value; per-game and daily dollar caps still apply. Settlement uses each row's
+recorded `unit_value_usd`, so existing orders and historical P&L units are not
+restated after a settings change.
+
+**Snapshot review (2026-09-02 15:40 ET).** Across 85 settled rows, All was
+47-38, +$4.82 (+9.64U), +10.6% ROI. MLB was 6-8, -$1.00 (-2.01U), -14.4% ROI;
+Without MLB was 41-30, +$5.82 (+11.65U), +15.2% ROI. The damaging MLB subset
+was moneyline (1-5, -$2.215, -69.4% ROI); MLB non-moneyline was 5-3, +$1.21,
++32.0% ROI. This supports the categorical MLB moneyline Auto-Buyer block while
+not supporting a blanket block of all MLB markets. This is a small observational
+sample, not promotion-grade evidence.
+
+## 2026-09-02 — Auto-Buyer settlement dialog false `Still pending: 0`
+
+**Symptom.** The settlement dialog reported `No positions changed` and
+`Still pending: 0` while the same rendered Auto-Buyer ledger showed 28 pending
+positions. The dialog was not using the table's authoritative post-settlement
+classification.
+
+**Root causes.** The backend returned a traversal counter that could omit open
+records on early-exit branches such as an invalid/missing event start. The
+frontend then compounded this by never checking `res.ok` and rendering
+`Number(data.pending || 0)`. Any HTTP 500 or response without `pending` was
+therefore converted into a confident but false zero.
+
+**Fix.** Settlement now computes `remaining_pending` from the fully rewritten
+post-settlement ledger using the same shared terminal-record predicate as the
+performance summary. The compatibility `pending` field carries that same
+authoritative value. The dialog requires `remaining_pending` to be a valid
+non-negative number and surfaces HTTP/backend errors instead of substituting
+zero.
+
+**Verification.** Revert-verified regressions cover an ungradeable open row and
+the frontend response contract. The three affected test files produced 42
+passes in the sandbox; their sole unrelated CFB live-ESPN test passed when
+rerun with network access. Ruff and `git diff --check` passed. After restarting
+the dashboard, Dia showed the live Auto-Buyer KPI and Pending/Open tab agreeing
+at 25 pending positions. No settlement POST was issued during verification.
+
+## 2026-09-02 — MLB moneyline categorically removed from Auto-Buyer
+
+**Risk found.** Removing MLB model IDs from the default whitelist was not a
+complete execution control. The persisted live state still contained
+`mlb-elo-trend-lr-v8`, `mlb-structural-v10-frozen`, and `mlb-nrfi-v2`, and a
+future renamed MLB model could be whitelisted again. A model-ID-only block
+therefore did not express the operator's actual instruction: do not auto-buy
+the MLB moneyline market.
+
+**Fix.** `portfolio/auto_executor.py` now enforces an operator-level
+`("mlb", "moneyline")` block after model-whitelist admission and before quote
+lookup or order construction. The same predicate excludes blocked rows from
+live snapshot preflight. It normalizes case and the `ml` alias, and infers MLB
+from an `mlb-` model ID if a malformed row omits its sport. The status payload
+exposes `disabled_sport_markets: ["mlb:moneyline"]`; run summaries count these
+rows separately as `rejected_disabled_sport_market`.
+
+**Scope.** This does not remove MLB moneyline forecasts from research or ledger
+views, does not cancel existing exchange orders or positions, and does not
+block MLB NRFI or another sport's moneyline. No Auto-Buyer cycle was triggered
+during deployment.
+
+**Verification.** A regression test proves that an explicitly whitelisted,
+previously unseen MLB moneyline model is rejected before quote lookup while a
+whitelisted tennis moneyline in the same batch proceeds. The existing MLB NRFI
+test remains green. The complete Auto-Buyer test file passed (`16 passed`),
+Ruff passed on both touched Python files, the dashboard LaunchAgent was
+restarted, `/api/health` returned `ok: true`, and the read-only Auto-Buyer
+status endpoint reported the categorical block with Auto-Buyer still enabled.
+
+The broader parallel suite executed 2,538 tests but did not produce a clean
+exit: it reported 2,524 passed, 3 skipped, and 11 failed before the remaining
+worker stalled and was interrupted. All 11 failures passed on an exact rerun
+with sandbox network/socket restrictions lifted. Two CFB tests make live ESPN
+requests and nine dashboard tests bind loopback sockets; this is test-isolation
+debt, not evidence of a product regression. The 2026-08-31 full-suite baseline
+therefore remains the latest clean full-suite verification.
+
+## 2026-09-02 — The Odds API removed; MLB market-odds fallback moved to keyless ESPN pickcenter
+
+**Symptom.** `THE_ODDS_API_KEY` had been 401 for 30+ days (documented since
+2026-08-27 in `SYSTEM_DEFECTS_AND_GAPS_AUDIT.md` B), but the client was still
+being constructed and called live every day: `_forecast_mlb` (the function
+behind the live `measured-edge-margin-v3` MLB spread champion) built a
+`TheOddsAPIClient` and called `.odds("MLB")` for the whole slate on every
+forecast run. Every game that didn't get an exact Polymarket BBO match fell
+through to this dead fallback, appended `the_odds_api:HTTPError` to its load
+errors, and (if Polymarket also had no match) surfaced as
+`NO_CALL_MARKET_UNAVAILABLE (...,the_odds_api:HTTPError)` — a recurring,
+user-visible noise source with no real capability behind it.
+
+**Fix.** `MLBMarketOddsFeed` (`data_sources/mlb_market_odds.py`) no longer
+takes an `odds_api` client at all. Its fallback is now
+`_from_espn_market()`, which calls `ESPNClient.summary("MLB", event_id)` —
+keyless, no quota, and resolvable directly by `event_id` (already threaded
+through `build_mlb_slate`), so the old day-batch fetch + team-name-matching
+step is gone entirely. ESPN's `pickcenter` odds were already parsed
+elsewhere in this codebase (`parse_pregame_and_closing_markets`, used for
+historical market ingest in `ingest.py`) — this just reuses that parser live.
+Provider tag renamed `draftkings_via_the_odds_api` → `espn_market_consensus`.
+
+**Removed entirely** (not just disconnected): `data_sources/the_odds_api.py`,
+`data_sources/odds_soccer_scores.py` (the soccer scores path was already
+DORMANT since 2026-08-26, superseded by `api_football.py`, and not called
+from the live daily pipeline — confirmed via `grep` before deletion), their
+two test files, the `the_odds_api` entry in `source_policy.py`, and the
+`THE_ODDS_API_KEY` export from `data_sources/__init__.py`. `config/model.yaml`'s
+`odds_fallback` block updated to describe the new ESPN path instead of the
+dead one.
+
+**Closes two standing repair-order items**: "rotate The Odds API key" and
+"Odds API key-tier check + operator decision on paid historical access" are
+now moot — there is no code left that reads `THE_ODDS_API_KEY`.
+
+```bash
+env PYTHONPATH=src:. .venv/bin/python -m pytest tests/test_mlb_market_odds.py -q
+.venv/bin/ruff check src/ tests/
+```
 
 ## 2026-08-31 — KBO/NPB stale open rows: not a slate-builder bug, a postponement the source never scores
 
@@ -87,9 +235,9 @@ env PYTHONPATH=src:. .venv/bin/python -m pytest tests/test_international_basebal
   - `config/models/mlb-nrfi-v1.json` reproduces `0.690572` holdout logloss via `MLBFirstInningModel`.
   - At audit time `_forecast_mlb_nrfi_flat` in `src/model_prediction/cli/forecast.py` still invoked the legacy hand-set `MLBNRFIModel()` — whose default `model_version` is the SAME string the validated artifact must use, so a registry-only promotion would have silently served the wrong model to Main.
   - Fixed: live point-in-time feature accumulator `models/mlb_first_inning_live.py` (starter-name-keyed, exact-match verified against the batch ledger on 7 real games across 3 seasons; parity test `tests/test_mlb_first_inning_live.py`, 1e-4 tolerance for one documented floating-point rounding-boundary artifact). Serving now fails closed on a missing/hash-invalid artifact and predicts with `MLBFirstInningModel.from_dict(artifact)`. Champion `MLB.nrfi` set; `blocked_workflows` now empty.
-  - Remaining caveat: Polymarket has no NRFI/YRFI market, so these rows have no market-side CLV/ROI grading.
+  - Updated 2026-09-01: Polymarket US does list a tradeable first-inning-run Yes/No market. The league summary endpoint omits it; `/v1/events/slug/<event>` exposes `baseball_team_first_inning_run` (Yes=YRFI, No=NRFI). The slate client now hydrates MLB game details and captures exact live quotes.
 - **MLB Weather & Travel Research (backfill state)**: Open-Meteo archive raw hourly observations for ~5,800/5,899 venue-days live in `data/weather/mlb_historical.jsonl` (untracked operational output; script `scripts/backfill_mlb_weather.py` is idempotent/resumable). 52 venue-days were still HTTP-429 after two retry passes — one more `--workers 2` resume run clears most. Feature wiring lives behind `total_score.py`'s `real_mlb_context` flag (default OFF = byte-identical incumbent); verdict NO_PROMOTION (see commands above). Venue table: `features/mlb_venue_geocoding.py` (venue-name keyed, relocation-correct; one-off exhibition venues deliberately excluded).
-- **The Odds API — historical access audit**: `data_sources/the_odds_api.py` implements in-season endpoints only (`odds`/`scores`/`tennis_odds`); no `/v4/historical/` client and no quota monitoring (the `x-requests-remaining` header is never read). Historical snapshots are a paid tier — whether the existing `THE_ODDS_API_KEY` can reach them was NOT tested (the live call was blocked by the configured `Read(.env)` deny rule; do not work around it). Operator decision needed before any historical-market warehouse work. Cheap win regardless of tier: log `x-requests-remaining` in `_safe_get`.
+- **The Odds API — historical access audit (superseded 2026-09-02)**: At this audit snapshot, `data_sources/the_odds_api.py` implemented in-season endpoints only and historical-tier access was unresolved. The client and key dependency have since been removed entirely; see the 2026-09-02 entry above. There is no longer an Odds API key or paid-tier decision to make.
 - **WNBA Totals Pipeline Absence**:
   - No serving execution path wired in `cli/forecast.py` (`total_research_artifact` read only for dashboard strings). Model underperforms market lines due to limited boxscore history (MAE 13.12 vs 20.92).
 - **Soccer Odds API Outage**:
@@ -158,10 +306,11 @@ policy unchanged — none pushed):
   only team_win/spread/total) stays documented until a live string appears.
   NBA/NFL: PM gateway leagues are operational and `BBO_CAPTURE_SPORTS`
   already includes them — capture flows automatically when seasons start;
-  the gap is consumer-side. NRFI: no NRFI/YRFI markets exist on PM US; the
-  closest real market is the first-5-innings (f5) spread/total, already
-  captured (290 f5 rows on 08-26) but distinguishable only via the
-  `-f5-` slug pattern, not market_type.
+  the gap is consumer-side. NRFI correction (2026-09-01): the earlier claim
+  was based on the incomplete league summary feed. The game-detail endpoint
+  exposes `baseball_team_first_inning_run`; exact Yes/No quotes are now
+  captured as YRFI/NRFI. First-5-innings contracts remain distinct and must
+  never be substituted for them.
 - **World Cup settle-stall guard.** A league with no `_LEDGER_LEAGUE_TO_ESPN`
   entry now reports a failure ("no ESPN result path for league X") instead
   of pending forever (the 07-27 WORLD_CUP stall class). Regression tests in

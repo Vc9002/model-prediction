@@ -65,7 +65,7 @@ Run these checks regularly. Pinned to the repo root for discovery.
 - [x] `production` + `rebuild-shadow` launchd jobs disabled/unloaded (37h stall) — operator approved re-enable 2026-08-26; both loaded and completed exit 0.
 - [ ] NBA/NFL spread/total: 0 snapshots and zero odds sources wired (offseason — will resolve when seasons start; TheRundown evaluated as the candidate second-book source)
 - [ ] WNBA total baseline 78.3% suspiciously high — needs investigation with more data
-- [ ] Soccer results capture: The Odds API 401 for ≥31 days; API-FOOTBALL client implemented + wired 2026-08-26 (`data_sources/api_football.py`, step1b, `cmd_collect_scores`, source policy) — awaiting operator API key (`API_FOOTBALL_KEY`) and a live verification pass (league IDs, AET/PEN goal shape, rate pacing)
+- [ ] Soccer historical capture: dead Odds API dependency removed 2026-09-02; API-FOOTBALL client implemented + wired 2026-08-26 (`data_sources/api_football.py`, step1b, `cmd_collect_scores`, source policy) — awaiting operator API key (`API_FOOTBALL_KEY`) and a live verification pass (league IDs, AET/PEN goal shape, rate pacing). Settlement is independently keyless via ESPN.
 - [x] v9 feature collinearity (platoon/projected r≈0.9997; bullpen freshness/hl r=1.0) — documented as construction-collinear in `audit_mlb_v9_feature_distribution.py` `KNOWN_COLLINEAR_PAIRS` (2026-08-26); revisit when a pitch-level or roster-role source lands
 - [ ] Market-snapshot lineage absent for 7,263 esports/soccer/KBO/NPB ledger rows
 - [x] NRFI model tracked market prices with no edge — root-caused (2x league run-rate constant + hand-set weights), new fitted first-inning model lands 2026-08-26; next step: capture real Polymarket NRFI quotes for true CLV measurement

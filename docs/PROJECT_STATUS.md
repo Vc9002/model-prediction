@@ -1,6 +1,6 @@
 # Project status and source of truth
 
-**Last verified**: 2026-08-31 (Commit `3066d59`, Tag `lifecycle-v1`). Full test suite passed (2,547 passed, 0 failures, 3 skipped); ruff 100% clean; strict type checking clean across all modules. All 21 supported production markets maintain active champions under the permanent champion–challenger lifecycle framework. NCAAF models (`college-football-v1`, `cfb-spread-v1`, `cfb-total-v1`) are active champions serving under `degraded` evidence status / `critical` replacement priority, with unified decomposed scoring challenger `cfb-structural-v2` implemented. MLB Totals champion is `mlb-structural-v10-frozen` (`promotion_basis: operator_predictive_promotion`) with `measured-edge-totals-v3` as rollback. Automated Polymarket Buyer ($1\text{U} = \$0.005$) fully operational.
+**Last full-suite verification**: 2026-08-31 (Commit `3066d59`, Tag `lifecycle-v1`). Full test suite passed (2,547 passed, 0 failures, 3 skipped); ruff 100% clean; strict type checking clean across all modules. All 21 supported production markets maintain active champions under the permanent champion–challenger lifecycle framework. NCAAF models (`college-football-v1`, `cfb-spread-v1`, `cfb-total-v1`) are active champions serving under `degraded` evidence status / `critical` replacement priority, with unified decomposed scoring challenger `cfb-structural-v2` implemented. MLB Totals champion is `mlb-structural-v10-frozen` (`promotion_basis: operator_predictive_promotion`) with `measured-edge-totals-v3` as rollback. Automated Polymarket Buyer uses $1\text{U} = \$0.50$.
 
 **Operating Architecture**: Permanent champion–challenger production lifecycle with strict Point-in-Time (PIT) feature extraction, fail-closed `EvidenceOrigin` provenance separation, Unified Model Qualification Registry research control plane, automated Polymarket execution engine, and multi-horizon pregame snapshot tracking ($T-6\text{h}, T-3\text{h}, T-1\text{h}, T-30\text{m}, T-10\text{m}$).
 
@@ -9,6 +9,46 @@ is the running log of real bugs found/fixed with full evidence.
 
 Historical metrics in old reports, changelog entries, model cards, and
 rollback artifacts are not current operational truth.
+
+## 2026-09-02 — Auto-Buyer MLB moneyline execution disabled
+
+- **Performance view added**: Auto-Buyer now has a settled-only Performance
+  sub-tab with daily ET grouping and side-by-side All, MLB, and Without MLB
+  cohorts. At the 15:40 ET snapshot, MLB was 6-8 / -$1.00 / -14.4% ROI versus
+  41-30 / +$5.82 / +15.2% without MLB. MLB moneyline specifically was 1-5 /
+  -$2.215 / -69.4%; MLB non-moneyline was 5-3 / +$1.21 / +32.0%. These samples
+  are descriptive, not qualification evidence.
+- **Auto-Buyer unit value is configurable independently**: the Auto-Buyer page
+  has a confirmed, persisted `1U = $` control for future automated order
+  sizing. It remains $0.50 until changed. Historical rows retain their recorded
+  unit value, and the $2.50 per-game / $25 daily dollar caps remain binding.
+  It is deliberately not coupled to the current $5.00 general dashboard unit,
+  which would otherwise create an unreviewed 10x sizing jump.
+- **Settlement resilience verified**: an isolated copied-ledger rehearsal
+  produced one new settlement and two cost-basis normalizations, then an
+  immediate second pass returned `changed: 0`. Transient ESPN HTTP failures in
+  settled-tennis re-verification are now contained per row rather than
+  aborting the entire workflow.
+- **Settlement reporting repaired**: the settlement response now derives
+  `remaining_pending` from the post-settlement ledger's authoritative
+  terminal/open predicate. The dialog rejects HTTP errors and malformed
+  responses instead of displaying a false zero. Live Dia verification showed
+  the KPI and Pending/Open tab agreeing; no settlement run was triggered for
+  verification.
+- MLB moneylines are blocked by the categorical sport/market policy
+  `mlb:moneyline`, independently of model whitelist entries. This prevents a
+  persisted override, renamed model, or replacement model from silently
+  restoring execution.
+- The block occurs before quote lookup and order construction and is visible in
+  status/run telemetry as `disabled_sport_markets` and
+  `rejected_disabled_sport_market`.
+- MLB NRFI and other sports' moneylines are outside this block. Forecast and
+  ledger visibility are unchanged; existing exchange orders/positions were not
+  canceled.
+- Deployment verification: `tests/test_auto_polymarket_buyer.py` passed
+  (`16 passed`), touched-file Ruff passed, dashboard health returned OK, and
+  the live read-only status reported `disabled_sport_markets:
+  ["mlb:moneyline"]`. No Auto-Buyer execution cycle was run for verification.
 
 ## 2026-08-31 — Permanent Champion–Challenger Lifecycle, Structural Challengers & Provenance Framework
 
@@ -600,7 +640,7 @@ state. They require separate authorization appropriate to the risk.
 1. ~~Give cross-file ledger-mutation-plus-audit-append real transactional recovery (retry/failure-injection tests)~~ — turned out to already exist (`tests/test_ledger_hardening.py::test_ledger_write_crash_leaves_a_recoverable_audit_event_not_a_silent_gap`, `test_audit_append_happens_while_the_ledger_lock_is_still_held`), this doc's own claim was stale; verified 2026-08-04 and extended to also confirm `_verify_chain` itself (not just raw data inspection) detects the orphaned-audit-event case. True cross-file atomicity across separate files (ledger + audit as one physical transaction) still doesn't exist — that's a real, distinct, lower-severity architectural gap from "no recovery tests," which is now closed.
 2. Build a real absolute-run-environment signal for MLB totals (P1-17/F-62's own next step: `totals_specific_market_residual` or `branched_absolute_run_intensity_head`, per `config/model.yaml`'s `problem_cohorts.totals`) — a relative-elasticity refit was tried 2026-08-04 and honestly did not help.
 3. ~~Add confidence discount / inactivity decay to the esports `NeutralElo` model.~~ Done 2026-08-04, see F-63.
-4. Rotate The Odds API key.
+4. ~~Rotate The Odds API key.~~ Moot 2026-09-02: The Odds API removed entirely (`docs/DEBUG.md` 2026-09-02 entry) — no code left reads `THE_ODDS_API_KEY`. MLB market-odds fallback moved to keyless ESPN pickcenter; soccer already used `api_football` exclusively.
 5. ~~Move `data/mlb_statsapi/game_snapshots.jsonl` and `data/events.jsonl` to Git LFS before either crosses GitHub's 100MB hard cap.~~ Done 2026-08-05, forward-only (see F-65).
 6. Split `cli.py` and `dashboard_server.py` into packages (both remain large, growing files).
 7. ~~Migrate ledger storage to SQLite for ACID guarantees~~ — done and verified live 2026-08-16: all four scheduled jobs run `MODEL_PREDICTION_LEDGER_AUTHORITY=sqlite`; the runtime-root `ledgers/ledgers.db` is canonical (real rows across main/flat/research/gated_research, all sports), main/flat/research xlsx are now a best-effort export only. `data/main/mlb.xlsx`'s Picks sheet row count matched sqlite's open+settled count exactly on spot check (97 = 31+66); archived rows live under `data/archive/`.

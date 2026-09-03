@@ -147,6 +147,51 @@ def test_slate_normalizes_executable_side_prices_and_lines() -> None:
     assert sides[1]["american_odds"] == -122
 
 
+def test_mlb_slate_hydrates_game_detail_and_captures_live_nrfi_yrfi_contract() -> None:
+    summary = {
+        "id": "95706",
+        "slug": "mlb-phi-az-2026-09-01",
+        "title": "Philadelphia Phillies vs. Arizona Diamondbacks",
+        "startTime": "2026-09-02T01:40:00Z",
+        "markets": [],
+    }
+    detail = {
+        **summary,
+        "markets": [
+            {
+                "id": "584529",
+                "slug": "astatc-mlb-phi-az-2026-09-01-yrfi",
+                "question": "Will any run be scored in the 1st inning of PHI vs AZ?",
+                "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_PROP",
+                "sportsMarketType": "baseball_team_first_inning_run",
+                "line": 1,
+                "marketSides": [
+                    {"id": "yes", "description": "Yes", "long": True, "quote": {"value": "0.45"}},
+                    {"id": "no", "description": "No", "long": False, "quote": {"value": "0.56"}},
+                ],
+            }
+        ],
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v2/leagues/mlb/events":
+            return httpx.Response(200, json={"events": [summary]})
+        assert request.url.path == "/v1/events/slug/mlb-phi-az-2026-09-01"
+        return httpx.Response(200, json={"event": detail})
+
+    client = PolymarketUSClient("https://example.test", httpx.Client(transport=httpx.MockTransport(handler)))
+    slate = client.slate("MLB", date(2026, 9, 1))
+
+    assert len(slate) == 1
+    market = slate[0]["markets"][0]
+    assert market["market_type"] == "nrfi"
+    assert market["market_slug"] == "astatc-mlb-phi-az-2026-09-01-yrfi"
+    assert [(side["selection"], side["is_long"]) for side in market["sides"]] == [
+        ("yes", True),
+        ("no", False),
+    ]
+
+
 def test_slate_skips_market_with_boundary_probability_instead_of_aborting() -> None:
     event = {
         "id": "event-boundary",

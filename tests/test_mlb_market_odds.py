@@ -38,13 +38,13 @@ class FakePolymarket:
         }
 
 
-class FakeOddsAPI:
-    def __init__(self, events):
-        self.events = events
+class FakeESPN:
+    def __init__(self, summaries):
+        self.summaries = summaries
 
-    def odds(self, league):
+    def summary(self, league, event_id):
         assert league == "MLB"
-        return self.events
+        return self.summaries[event_id]
 
 
 def polymarket_event():
@@ -99,39 +99,39 @@ def polymarket_event():
     }
 
 
-def draftkings_event():
+def espn_summary():
+    """Real-shaped ESPN `pickcenter` payload (parsed by
+    `parse_pregame_and_closing_markets`)."""
     return {
-        "id": "odds-1",
-        "away_team": "New York Yankees",
-        "home_team": "Boston Red Sox",
-        "bookmakers": [
+        "pickcenter": [
             {
-                "key": "draftkings",
-                "markets": [
-                    {
-                        "key": "h2h",
-                        "outcomes": [
-                            {"name": "New York Yankees", "price": -105},
-                            {"name": "Boston Red Sox", "price": -115},
-                        ],
+                "provider": {"name": "ESPN BET"},
+                "moneyline": {
+                    "away": {"open": {"odds": "-105"}, "close": {"odds": "-105"}},
+                    "home": {"open": {"odds": "-115"}, "close": {"odds": "-115"}},
+                },
+                "pointSpread": {
+                    "away": {
+                        "open": {"line": "1.5", "odds": "-110"},
+                        "close": {"line": "1.5", "odds": "-110"},
                     },
-                    {
-                        "key": "spreads",
-                        "outcomes": [
-                            {"name": "New York Yankees", "price": -110, "point": 1.5},
-                            {"name": "Boston Red Sox", "price": -110, "point": -1.5},
-                        ],
+                    "home": {
+                        "open": {"line": "-1.5", "odds": "-110"},
+                        "close": {"line": "-1.5", "odds": "-110"},
                     },
-                    {
-                        "key": "totals",
-                        "outcomes": [
-                            {"name": "Over", "price": -108, "point": 8.5},
-                            {"name": "Under", "price": -112, "point": 8.5},
-                        ],
+                },
+                "total": {
+                    "over": {
+                        "open": {"line": "o8.5", "odds": "-108"},
+                        "close": {"line": "o8.5", "odds": "-108"},
                     },
-                ],
+                    "under": {
+                        "open": {"line": "u8.5", "odds": "-112"},
+                        "close": {"line": "u8.5", "odds": "-112"},
+                    },
+                },
             }
-        ],
+        ]
     }
 
 
@@ -141,7 +141,7 @@ def test_feed_prices_polymarket_at_executable_ask_and_stores_raw_snapshot(tmp_pa
         registry,
         store,
         polymarket=FakePolymarket([polymarket_event()]),
-        odds_api=FakeOddsAPI([draftkings_event()]),
+        espn=FakeESPN({"espn-1": espn_summary()}),
         observed_at=OBSERVED,
     )
     feed.load("2026-07-17")
@@ -210,7 +210,7 @@ def test_feed_prices_polymarket_at_executable_ask_and_stores_raw_snapshot(tmp_pa
     assert stale_benchmark_decision["quote"]["decision_probability"] == 0.44
 
 
-def test_feed_falls_back_to_draftkings_when_polymarket_event_is_unavailable(
+def test_feed_falls_back_to_espn_market_when_polymarket_event_is_unavailable(
     tmp_path,
     registry,
 ) -> None:
@@ -218,7 +218,7 @@ def test_feed_falls_back_to_draftkings_when_polymarket_event_is_unavailable(
         registry,
         MarketOddsSnapshotStore(tmp_path / "market.jsonl"),
         polymarket=FakePolymarket([]),
-        odds_api=FakeOddsAPI([draftkings_event()]),
+        espn=FakeESPN({"espn-1": espn_summary()}),
         observed_at=OBSERVED,
     )
     feed.load("2026-07-17")
@@ -229,6 +229,6 @@ def test_feed_falls_back_to_draftkings_when_polymarket_event_is_unavailable(
         "Boston Red Sox",
     )
 
-    assert odds.provider == "draftkings_via_the_odds_api"
+    assert odds.provider == "espn_market_consensus"
     assert odds.markets["moneyline"]["away"].american_odds == -105
     assert odds.markets["total"]["under"].line == 8.5

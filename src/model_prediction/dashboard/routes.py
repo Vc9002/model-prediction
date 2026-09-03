@@ -23,6 +23,7 @@ except ImportError:  # pragma: no cover
 
 from http.server import BaseHTTPRequestHandler
 
+from model_prediction.config import load_config, polymarket_edge_enabled
 from model_prediction.dashboard.backtests import (
     backtests,
     market_snapshots,
@@ -101,9 +102,26 @@ from model_prediction.portfolio.auto_buyer_ledger import (
 from model_prediction.portfolio.auto_executor import (
     load_auto_buyer_state,
     run_auto_buyer_cycle,
+    set_auto_buyer_unit_value,
     toggle_auto_buyer,
 )
 from model_prediction.portfolio.polymarket_scanner import PolymarketSlateScanner
+
+
+def _edge_feature_enabled(component: str) -> bool:
+    """Read the persistent operator gate; configuration errors fail closed."""
+    try:
+        return polymarket_edge_enabled(load_config(), component)
+    except (OSError, ValueError, TypeError, yaml.YAMLError):
+        return False
+
+
+def _edge_disabled_payload(component: str) -> dict[str, str]:
+    return {
+        "status": "disabled",
+        "component": component,
+        "reason": "operator_disabled",
+    }
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -319,6 +337,9 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/capture_health":
                 self._send(_cached("capture_health", 60, _capture_health_summary))
             elif route == "/api/polymarket/scan":
+                if not _edge_feature_enabled("scanner"):
+                    self._send(_edge_disabled_payload("scanner"), code=503)
+                    return
                 sport_param = query.get("sport")
                 sport_filter = None if not sport_param or sport_param == "all" else sport_param
                 date_filter = query.get("date")
@@ -428,6 +449,9 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     self._send(_cached(cache_key, 10, _do_scan))
             elif route == "/api/polymarket/rehearsal":
+                if not _edge_feature_enabled("scanner"):
+                    self._send(_edge_disabled_payload("scanner"), code=503)
+                    return
                 from dataclasses import asdict
 
                 from model_prediction.portfolio.execution_rehearsal import ExecutionRehearsalRunner
@@ -599,19 +623,30 @@ class Handler(BaseHTTPRequestHandler):
             pct = float(payload.get("pct", 10))
             self._send(_auto_adjust_unit_value(pct))
         elif parsed.path == "/api/polymarket/record":
-            from model_prediction.portfolio.polymarket_ledger import record_polymarket_orders
+            if not _edge_feature_enabled("ledger"):
+                self._send(_edge_disabled_payload("ledger"), code=403)
+            else:
+                from model_prediction.portfolio.polymarket_ledger import record_polymarket_orders
 
-            orders = payload.get("orders") or []
-            res = record_polymarket_orders(orders)
-            self._send(res)
+                orders = payload.get("orders") or []
+                res = record_polymarket_orders(orders)
+                self._send(res)
         elif parsed.path == "/api/polymarket/settle":
-            from model_prediction.portfolio.polymarket_ledger import settle_polymarket_ledger_rows
+            if not _edge_feature_enabled("ledger"):
+                self._send(_edge_disabled_payload("ledger"), code=403)
+            else:
+                from model_prediction.portfolio.polymarket_ledger import settle_polymarket_ledger_rows
 
-            res = settle_polymarket_ledger_rows()
-            self._send(res)
+                res = settle_polymarket_ledger_rows()
+                self._send(res)
         elif parsed.path == "/api/auto-buyer/toggle":
             enabled = payload.get("enabled")
             self._send(toggle_auto_buyer(enabled))
+        elif parsed.path == "/api/auto-buyer/unit-value":
+            try:
+                self._send(set_auto_buyer_unit_value(payload.get("unit_value_usd")))
+            except (OSError, RuntimeError, TypeError, ValueError) as error:
+                self._send({"status": "refused", "error": str(error)}, code=400)
         elif parsed.path == "/api/auto-buyer/run":
             exec_override = payload.get("execute")
             self._send(run_auto_buyer_cycle(execute_override=exec_override, force=True))

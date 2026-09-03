@@ -6,13 +6,21 @@ import json
 from datetime import timedelta
 from pathlib import Path
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
+
+import httpx
+import pytest
 
 from model_prediction.audit import AuditLog
 from model_prediction.domain import iso_utc, utc_now
 from model_prediction.portfolio.auto_executor import (
     AutoExecutionConfig,
+    AutoExecutionResult,
     AutoPolymarketBuyer,
+    _capture_missing_active_snapshot_slates,
     load_auto_buyer_state,
+    run_auto_buyer_cycle,
+    set_auto_buyer_unit_value,
     toggle_auto_buyer,
 )
 
@@ -41,6 +49,51 @@ def test_buyer_filters_blacklist_models():
     res = buyer.evaluate_and_execute(picks)
     assert res.rejected_blacklist == 1
     assert len(res.dry_run_orders) == 0
+
+
+def test_buyer_categorically_rejects_mlb_moneyline_even_when_model_is_whitelisted():
+    quote_calls = []
+
+    def quote_lookup(slug):
+        quote_calls.append(slug)
+        return {"ask": 0.50, "market_slug": slug, "side": "long"}
+
+    buyer = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(
+            whitelisted_models=("mlb-moneyline-v99", "tennis-surface-elo-v1"),
+            blacklisted_models=(),
+        ),
+        live_quote_fn=quote_lookup,
+    )
+    event_start = iso_utc(utc_now() + timedelta(hours=2))
+    result = buyer.evaluate_and_execute(
+        [
+            {
+                "pick_id": "mlb-ml-disabled",
+                "model_id": "mlb-moneyline-v99",
+                "status": "open",
+                "league": "MLB",
+                "market_type": "moneyline",
+                "event_start_utc": event_start,
+                "model_probability": 0.70,
+                "market_probability": 0.50,
+            },
+            {
+                "pick_id": "tennis-ml-allowed",
+                "model_id": "tennis-surface-elo-v1",
+                "status": "open",
+                "league": "TENNIS",
+                "market_type": "moneyline",
+                "event_start_utc": event_start,
+                "model_probability": 0.70,
+                "market_probability": 0.50,
+            },
+        ]
+    )
+
+    assert result.rejected_disabled_sport_market == 1
+    assert quote_calls == ["slug-tennis-ml-allowed"]
+    assert [order["pick_id"] for order in result.dry_run_orders] == ["tennis-ml-allowed"]
 
 
 def test_buyer_filters_low_edge_and_past_games():
@@ -131,12 +184,139 @@ def test_buyer_rejects_stale_quotes_and_closed_markets():
     assert len(res.dry_run_orders) == 0
 
 
+def test_buyer_fails_closed_when_stale_quote_refresh_has_network_error():
+    buyer = AutoPolymarketBuyer()
+    stale_quote = {
+        "quote": {
+            "market_slug": "aec-tennis-example",
+            "side": "long",
+            "ask": 0.50,
+            "fresh": False,
+            "age_seconds": 600,
+            "market_state": "MARKET_STATE_OPEN",
+        }
+    }
+    with (
+        patch("model_prediction.dashboard.orders._decorate_pick", return_value=stale_quote),
+        patch(
+            "model_prediction.data_sources.polymarket_us.PolymarketUSClient.snapshot",
+            side_effect=httpx.ConnectError("offline"),
+        ),
+    ):
+        result = buyer.evaluate_and_execute(
+            [
+                {
+                    "pick_id": "stale-network",
+                    "model_id": "tennis-surface-elo-v1",
+                    "status": "open",
+                    "market_type": "moneyline",
+                    "event_start_utc": iso_utc(utc_now() + timedelta(hours=2)),
+                }
+            ]
+        )
+
+    assert result.rejected_stale_quote == 1
+    assert result.dry_run_orders == []
+
+
+def test_buyer_allows_nrfi_to_reach_exact_quote_lookup():
+    calls = []
+
+    def quote_lookup(slug):
+        calls.append(slug)
+        return {"market_slug": slug, "side": "short", "ask": 0.50}
+
+    # NRFI market_type routing is being exercised here, independent of the
+    # live production whitelist (MLB models pulled 2026-09-02 pending
+    # qualification review) -- inject an explicit config that whitelists
+    # this model so the test still isolates NRFI-slug quote lookup.
+    buyer = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(whitelisted_models=("mlb-nrfi-v2",), blacklisted_models=()),
+        live_quote_fn=quote_lookup,
+    )
+    result = buyer.evaluate_and_execute(
+        [
+            {
+                "pick_id": "nrfi-supported",
+                "model_id": "mlb-nrfi-v2",
+                "status": "open",
+                "league": "MLB",
+                "market_type": "nrfi",
+                "selection": "nrfi",
+                "event_start_utc": iso_utc(utc_now() + timedelta(hours=2)),
+                "model_probability": 0.60,
+                "market_probability": 0.50,
+                "units": 1.0,
+                "market_slug": "astatc-mlb-example-yrfi",
+            }
+        ]
+    )
+
+    assert result.rejected_unsupported_market == 0
+    assert result.rejected_unmapped_market == 0
+    assert calls == ["astatc-mlb-example-yrfi"]
+    assert len(result.dry_run_orders) == 1
+
+
+def test_live_buyer_preflight_captures_missing_next_day_slate(tmp_path: Path):
+    class FakeSlate:
+        def __init__(self):
+            self.events = {"CS2": [{"markets": []}]}
+            self.errors = {}
+
+    class FakeClient:
+        def __init__(self):
+            self.requests = []
+
+        def sport_slate(self, sport, game_date, timezone_name="America/New_York"):
+            self.requests.append((sport, game_date.isoformat(), timezone_name))
+            return FakeSlate()
+
+    client = FakeClient()
+    captures = []
+
+    def capture(_client, events, data_root, game_date):
+        captures.append((events, Path(data_root), game_date))
+        return {"status": "ok", "captured": 2}
+
+    now = utc_now()
+    event_start = now + timedelta(hours=14)
+    result = _capture_missing_active_snapshot_slates(
+        [
+            {
+                "model_id": "cs2-tiered-elo-v6",
+                "status": "open",
+                "league": "CS2",
+                "market_type": "moneyline",
+                "event_start_utc": iso_utc(event_start),
+            }
+        ],
+        config=AutoExecutionConfig(execute_live=True),
+        now=now,
+        data_root=tmp_path,
+        client=client,
+        capture_fn=capture,
+    )
+
+    assert result == [
+        {
+            "sport": "esports",
+            "game_date": event_start.astimezone(ZoneInfo("America/New_York")).date().isoformat(),
+            "status": "ok",
+            "captured": 2,
+            "league_errors": {},
+        }
+    ]
+    assert len(client.requests) == 1
+    assert len(captures) == 1
+
+
 def test_buyer_sizes_fractional_units():
     now = utc_now()
     today_start = iso_utc(now + timedelta(hours=2))
-    # 1U = $0.005 (0.5 cent)
+    # 1U = $0.50 (50 cents)
     config = AutoExecutionConfig(
-        unit_value_usd=0.005,
+        unit_value_usd=0.50,
         min_edge=0.03,
         whitelisted_models=("tennis-surface-elo-v1",),
     )
@@ -154,7 +334,7 @@ def test_buyer_sizes_fractional_units():
             "event_start_utc": today_start,
             "model_probability": 0.65,
             "market_probability": 0.55,
-            "units": 1.5,  # 1.5 U = $0.0075 -> at $0.55 min 1 share = $0.55
+            "units": 1.5,  # 1.5U = $0.75 -> 1.36 shares at a $0.55 ask
         }
     ]
     res = buyer.evaluate_and_execute(picks)
@@ -162,8 +342,8 @@ def test_buyer_sizes_fractional_units():
     order = res.dry_run_orders[0]
     assert order["pick_id"] == "p_qual"
     assert order["limit_price"] == 0.55
-    assert order["shares"] == 1.0
-    assert order["cost_usd"] == 0.55
+    assert order["shares"] == 1.36
+    assert order["cost_usd"] == 0.75
     assert order["edge"] == 0.10
 
 
@@ -206,11 +386,14 @@ def test_buyer_respects_daily_budget():
 
 def test_auto_buyer_toggle_state(tmp_path: Path):
     test_state_file = tmp_path / "auto_buyer_state.json"
-    with patch("model_prediction.portfolio.auto_executor.AUTO_BUYER_STATE_FILE", test_state_file):
+    with (
+        patch("model_prediction.portfolio.auto_executor.AUTO_BUYER_STATE_FILE", test_state_file),
+        patch("model_prediction.portfolio.auto_executor.DATA", tmp_path),
+    ):
         # Initial state should be disabled
         st = load_auto_buyer_state()
         assert st["enabled"] is False
-        assert st["unit_value_usd"] == 0.005
+        assert st["unit_value_usd"] == 0.50
 
         # Toggle to True
         toggled = toggle_auto_buyer(True)
@@ -223,6 +406,36 @@ def test_auto_buyer_toggle_state(tmp_path: Path):
         assert load_auto_buyer_state()["enabled"] is False
 
 
+def test_auto_buyer_unit_value_is_persisted_and_used_by_future_cycles(tmp_path: Path):
+    test_state_file = tmp_path / "auto_buyer_state.json"
+    buyer_result = AutoExecutionResult()
+    with (
+        patch("model_prediction.portfolio.auto_executor.AUTO_BUYER_STATE_FILE", test_state_file),
+        patch("model_prediction.portfolio.auto_executor.DATA", tmp_path),
+        patch("model_prediction.portfolio.auto_executor.AutoPolymarketBuyer") as buyer_class,
+    ):
+        buyer_class.return_value.evaluate_and_execute.return_value = buyer_result
+
+        updated = set_auto_buyer_unit_value(1.25)
+        run_auto_buyer_cycle(execute_override=False)
+
+    assert updated["status"] == "ok"
+    assert updated["previous_unit_value_usd"] == 0.50
+    assert updated["unit_value_usd"] == 1.25
+    saved = json.loads(test_state_file.read_text(encoding="utf-8"))
+    assert saved["unit_value_usd"] == 1.25
+    assert buyer_class.call_args.kwargs["config"].unit_value_usd == 1.25
+
+
+def test_auto_buyer_unit_value_rejects_invalid_amount(tmp_path: Path):
+    test_state_file = tmp_path / "auto_buyer_state.json"
+    with (
+        patch("model_prediction.portfolio.auto_executor.AUTO_BUYER_STATE_FILE", test_state_file),
+        pytest.raises(ValueError, match="between"),
+    ):
+        set_auto_buyer_unit_value(0)
+
+
 def test_auto_buyer_dashboard_routes(tmp_path: Path):
     from io import BytesIO
     from unittest.mock import Mock
@@ -231,7 +444,10 @@ def test_auto_buyer_dashboard_routes(tmp_path: Path):
     from model_prediction.dashboard.routes import Handler
 
     test_state_file = tmp_path / "auto_buyer_state.json"
-    with patch("model_prediction.portfolio.auto_executor.AUTO_BUYER_STATE_FILE", test_state_file):
+    with (
+        patch("model_prediction.portfolio.auto_executor.AUTO_BUYER_STATE_FILE", test_state_file),
+        patch("model_prediction.portfolio.auto_executor.DATA", tmp_path),
+    ):
         # 1. Test GET /api/auto-buyer/status
         handler_get = Handler.__new__(Handler)
         handler_get.path = "/api/auto-buyer/status"
@@ -244,7 +460,7 @@ def test_auto_buyer_dashboard_routes(tmp_path: Path):
         handler_get.do_GET()
         res_get = json.loads(handler_get.wfile.getvalue().decode("utf-8"))
         assert res_get["enabled"] is False
-        assert res_get["unit_value_usd"] == 0.005
+        assert res_get["unit_value_usd"] == 0.50
 
         # 2. Test POST /api/auto-buyer/toggle
         payload = json.dumps({"confirm": True, "enabled": True}).encode("utf-8")
@@ -263,6 +479,26 @@ def test_auto_buyer_dashboard_routes(tmp_path: Path):
         handler_post.do_POST()
         res_post = json.loads(handler_post.wfile.getvalue().decode("utf-8"))
         assert res_post["enabled"] is True
+
+        # 3. Test POST /api/auto-buyer/unit-value
+        unit_payload = json.dumps({"confirm": True, "unit_value_usd": 1.25}).encode("utf-8")
+        handler_unit = Handler.__new__(Handler)
+        handler_unit.path = "/api/auto-buyer/unit-value"
+        handler_unit.headers = {
+            "Content-Length": str(len(unit_payload)),
+            "X-Dashboard-Token": _DASHBOARD_TOKEN,
+        }
+        handler_unit.rfile = BytesIO(unit_payload)
+        handler_unit.wfile = BytesIO()
+        handler_unit.send_response = Mock()
+        handler_unit.send_header = Mock()
+        handler_unit.end_headers = Mock()
+
+        handler_unit.do_POST()
+        res_unit = json.loads(handler_unit.wfile.getvalue().decode("utf-8"))
+        assert res_unit["status"] == "ok"
+        assert res_unit["unit_value_usd"] == 1.25
+        assert load_auto_buyer_state()["unit_value_usd"] == 1.25
 
 
 def test_auto_buyer_multi_source_deduplication(tmp_path: Path):
@@ -420,18 +656,23 @@ def test_auto_buyer_ledger_recording_and_backfill(tmp_path: Path):
         "market_implied_probability": 0.47,
     }
 
-    rec = record_auto_buy_execution(
-        order_payload=payload,
-        order_id="ORD_TEST_1",
-        order_state="FILLED",
-        pick_row=pick_row,
-        jsonl_path=test_jsonl,
-        xlsx_path=test_xlsx,
-    )
+    with patch("model_prediction.portfolio.auto_buyer_ledger.log_auto_buyer_event") as log_event:
+        rec = record_auto_buy_execution(
+            order_payload=payload,
+            order_id="ORD_TEST_1",
+            order_state="FILLED",
+            pick_row=pick_row,
+            jsonl_path=test_jsonl,
+            xlsx_path=test_xlsx,
+        )
+    log_event.assert_not_called()
 
     assert rec["order_id"] == "ORD_TEST_1"
     assert rec["shares"] == 1.0
     assert rec["cost_usd"] == 0.47
+    assert rec["units"] == 0.94
+    assert rec["model_units"] == 1.0
+    assert rec["unit_value_usd"] == 0.50
 
     # Verify JSONL
     entries = read_auto_buyer_ledger(jsonl_path=test_jsonl)

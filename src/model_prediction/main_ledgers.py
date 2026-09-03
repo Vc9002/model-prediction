@@ -181,6 +181,7 @@ class MultiSportPickLedger:
         # _unlisted_sports(). Kept out of self._ledgers so routing, exposure
         # and rows() keep their allowlisted semantics exactly.
         self._ledgers_for_unlisted: dict[str, PickLedger] = {}
+        self._pick_id_to_ledger: dict[str, PickLedger] = {}
         # Every per-sport ledger already shares the one project-wide audit
         # log (same pattern research_ledgers.py uses) -- expose it directly
         # so any code reading `ledger.audit` still gets the real thing.
@@ -237,13 +238,18 @@ class MultiSportPickLedger:
         return sorted(found - set(self._ledgers) - {""})
 
     def _ledger_for_pick_id(self, pick_id: str) -> PickLedger:
+        cached = self._pick_id_to_ledger.get(pick_id)
+        if cached is not None:
+            return cached
         for ledger in self._ledgers.values():
             if any(row["pick_id"] == pick_id for row in ledger.rows()):
+                self._pick_id_to_ledger[pick_id] = ledger
                 return ledger
         for sport in self._unlisted_sports():
             ledger = self._ledgers_for_unlisted.get(sport) or self._build_ledger(sport)
             if any(row["pick_id"] == pick_id for row in ledger.rows()):
                 self._ledgers_for_unlisted[sport] = ledger
+                self._pick_id_to_ledger[pick_id] = ledger
                 return ledger
         raise KeyError(f"unknown pick id: {pick_id}")
 
@@ -252,7 +258,11 @@ class MultiSportPickLedger:
             ledger.initialize()
 
     def rows(self, filters: dict[str, str] | None = None) -> list[dict[str, str]]:
-        combined = [row for ledger in self._ledgers.values() for row in ledger.rows(filters)]
+        combined = []
+        for ledger in self._ledgers.values():
+            for row in ledger.rows(filters):
+                combined.append(row)
+                self._pick_id_to_ledger[row["pick_id"]] = ledger
         combined.sort(key=lambda row: row.get("created_at_utc") or "")
         return combined
 
@@ -267,7 +277,11 @@ class MultiSportPickLedger:
     def append_evaluated(
         self, request: PickRequest, eligibility: EligibilityResult, now: datetime | None = None
     ) -> dict[str, str]:
-        return self._ledger_for_league(request.league).append_evaluated(request, eligibility, now)
+        ledger = self._ledger_for_league(request.league)
+        row = ledger.append_evaluated(request, eligibility, now)
+        if row.get("pick_id"):
+            self._pick_id_to_ledger[row["pick_id"]] = ledger
+        return row
 
     def settle(self, pick_id: str, *args: Any, **kwargs: Any) -> dict[str, str]:
         return self._ledger_for_pick_id(pick_id).settle(pick_id, *args, **kwargs)

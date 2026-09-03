@@ -171,6 +171,16 @@ def _resolve_btts_side(pick_row: dict[str, str], snapshot: dict[str, Any]) -> st
     return _resolve_exact_description_side(selection, snapshot)
 
 
+def _resolve_nrfi_side(pick_row: dict[str, str], snapshot: dict[str, Any]) -> str:
+    selection = str(pick_row.get("selection", "")).casefold().strip()
+    expected_description = {"nrfi": "no", "yrfi": "yes"}.get(selection)
+    if expected_description is None:
+        raise ExecutionGateError(
+            f"REFUSED: unrecognized selection {pick_row.get('selection')!r} for an NRFI/YRFI market."
+        )
+    return _resolve_exact_description_side(expected_description, snapshot)
+
+
 def _resolve_exact_description_side(selection: str, snapshot: dict[str, Any]) -> str:
     long_desc = str(snapshot["long"]["description"]).casefold().strip()
     short_desc = str(snapshot["short"]["description"]).casefold().strip()
@@ -442,6 +452,7 @@ class PolymarketExecutor:
             "spread": _resolve_spread_side,
             "total": _resolve_total_side,
             "btts": _resolve_btts_side,
+            "nrfi": _resolve_nrfi_side,
         }.get(str(market_type))
         if resolver is None:
             raise ExecutionGateError(f"REFUSED: no live side resolver for market_type {market_type!r}.")

@@ -12,8 +12,8 @@ import httpx
 from ..domain import League, iso_utc, parse_utc, utc_now
 from ..entities import EntityRegistry, EntityResolutionError
 from ..pricing import implied_probability
+from .espn import ESPNClient, parse_pregame_and_closing_markets
 from .polymarket_us import PolymarketUSClient, probability_to_american
-from .the_odds_api import TheOddsAPIClient
 
 
 class MarketUnavailableError(ValueError):
@@ -49,7 +49,7 @@ class MLBGameOdds:
         return asdict(self)
 
 
-_CLOSING_PROVIDERS = {"polymarket_us", "draftkings_via_the_odds_api"}
+_CLOSING_PROVIDERS = {"polymarket_us", "espn_market_consensus"}
 
 
 class MarketOddsSnapshotStore:
@@ -163,23 +163,31 @@ class MarketOddsSnapshotStore:
 
 
 class MLBMarketOddsFeed:
-    """Polymarket executable-ask feed with a DraftKings/The Odds API fallback."""
+    """Polymarket executable-ask feed with a keyless ESPN pickcenter fallback.
+
+    The Odds API/DraftKings fallback was removed 2026-09-02: THE_ODDS_API_KEY
+    had been 401 for 30+ days (see docs/SYSTEM_DEFECTS_AND_GAPS_AUDIT.md),
+    so this path silently produced a load error on every single MLB game,
+    every day, for a month. ESPN's own pickcenter odds (already parsed by
+    `parse_pregame_and_closing_markets`, used for historical market ingest)
+    require no key, no quota, and are resolved per-event by `event_id` --
+    no day-batch fetch or team-name matching needed.
+    """
 
     def __init__(
         self,
         registry: EntityRegistry,
         snapshot_store: MarketOddsSnapshotStore,
         polymarket: PolymarketUSClient | None = None,
-        odds_api: TheOddsAPIClient | None = None,
+        espn: ESPNClient | None = None,
         observed_at: datetime | None = None,
     ) -> None:
         self.registry = registry
         self.snapshot_store = snapshot_store
         self.polymarket = polymarket or PolymarketUSClient()
-        self.odds_api = odds_api
+        self.espn = espn or ESPNClient()
         self.observed_at = observed_at or utc_now()
         self._polymarket_events: list[dict[str, Any]] | None = None
-        self._odds_api_events: list[dict[str, Any]] | None = None
         self._load_errors: list[str] = []
 
     def load(self, game_date: str) -> None:
@@ -189,15 +197,6 @@ class MLBMarketOddsFeed:
         except (httpx.HTTPError, KeyError, TypeError, ValueError) as error:
             self._polymarket_events = []
             self._load_errors.append(f"polymarket_us:{type(error).__name__}")
-        if self.odds_api is None:
-            self._odds_api_events = []
-            self._load_errors.append("the_odds_api:not_configured")
-            return
-        try:
-            self._odds_api_events = self.odds_api.odds("MLB")
-        except (httpx.HTTPError, KeyError, TypeError, ValueError) as error:
-            self._odds_api_events = []
-            self._load_errors.append(f"the_odds_api:{type(error).__name__}")
 
     def for_game(
         self,
@@ -206,15 +205,10 @@ class MLBMarketOddsFeed:
         away_team: str,
         home_team: str,
     ) -> MLBGameOdds:
-        if self._polymarket_events is None or self._odds_api_events is None:
+        if self._polymarket_events is None:
             raise RuntimeError("market odds feed must be loaded once before resolving games")
         errors = list(self._load_errors)
-        polymarket_event = self._match_event(
-            self._polymarket_events,
-            away_team,
-            home_team,
-            source="polymarket",
-        )
+        polymarket_event = self._match_event(self._polymarket_events, away_team, home_team)
         if polymarket_event is not None:
             try:
                 snapshot = self._from_polymarket(
@@ -227,24 +221,11 @@ class MLBMarketOddsFeed:
                 return self.snapshot_store.append(snapshot)  # type: ignore[return-value]
             except (httpx.HTTPError, KeyError, StopIteration, TypeError, ValueError) as error:
                 errors.append(f"polymarket_us_exact_bbo:{type(error).__name__}")
-        draftkings_event = self._match_event(
-            self._odds_api_events,
-            away_team,
-            home_team,
-            source="odds_api",
-        )
-        if draftkings_event is not None:
-            try:
-                snapshot = self._from_draftkings(
-                    event_id,
-                    event_start_utc,
-                    away_team,
-                    home_team,
-                    draftkings_event,
-                )
-                return self.snapshot_store.append(snapshot)  # type: ignore[return-value]
-            except (KeyError, StopIteration, TypeError, ValueError) as error:
-                errors.append(f"draftkings_exact_market:{type(error).__name__}")
+        try:
+            snapshot = self._from_espn_market(event_id, event_start_utc, away_team, home_team)
+            return self.snapshot_store.append(snapshot)  # type: ignore[return-value]
+        except (httpx.HTTPError, KeyError, TypeError, ValueError, MarketUnavailableError) as error:
+            errors.append(f"espn_market:{type(error).__name__}")
         detail = ",".join(errors) if errors else "no_matching_event"
         raise MarketUnavailableError(f"NO_CALL_MARKET_UNAVAILABLE ({detail})")
 
@@ -253,15 +234,11 @@ class MLBMarketOddsFeed:
         events: list[dict[str, Any]],
         away_team: str,
         home_team: str,
-        source: str,
     ) -> dict[str, Any] | None:
         target = self._canonical_pair(away_team, home_team)
         for event in events:
             try:
-                if source == "odds_api":
-                    pair = self._canonical_pair(event["away_team"], event["home_team"])
-                else:
-                    pair = self._polymarket_pair(event)
+                pair = self._polymarket_pair(event)
                 if pair == target:
                     return event
             except (EntityResolutionError, KeyError, StopIteration, TypeError, ValueError):
@@ -355,21 +332,58 @@ class MLBMarketOddsFeed:
         away_id, home_id = self._canonical_pair(away_team, home_team)
         return "away" if side_team == away_id else "home" if side_team == home_id else selection
 
-    def _from_draftkings(
+    def _from_espn_market(
         self,
         event_id: str,
         event_start_utc: str,
         away_team: str,
         home_team: str,
-        event: dict[str, Any],
     ) -> MLBGameOdds:
-        bookmaker = next(item for item in event["bookmakers"] if item.get("key") == "draftkings")
-        source_markets = {item["key"]: item for item in bookmaker["markets"]}
-        markets = {
-            "moneyline": self._draftkings_sides(source_markets["h2h"], "moneyline", away_team, home_team),
-            "spread": self._draftkings_sides(source_markets["spreads"], "spread", away_team, home_team),
-            "total": self._draftkings_sides(source_markets["totals"], "total", away_team, home_team),
-        }
+        """Fetch ESPN's own pickcenter consensus odds directly by event_id.
+
+        No day-batch fetch or team-name matching needed -- `event_id` is
+        already ESPN's own id (threaded through from `build_mlb_slate`).
+        """
+        summary = self.espn.summary("MLB", event_id)
+        parsed = parse_pregame_and_closing_markets(summary)
+        if not parsed:
+            raise MarketUnavailableError("espn_market_no_pickcenter")
+        markets: dict[str, dict[str, MarketSideQuote]] = {}
+        moneyline = parsed.get("moneyline") or {}
+        if _espn_side_complete(moneyline, "away", "home", needs_line=False):
+            markets["moneyline"] = {
+                side: MarketSideQuote(
+                    selection=side,
+                    line=None,
+                    american_odds=int(moneyline[side]["decision_odds"]),
+                    decision_probability=implied_probability(int(moneyline[side]["decision_odds"])),
+                )
+                for side in ("away", "home")
+            }
+        spread = parsed.get("spread") or {}
+        if _espn_side_complete(spread, "away", "home", needs_line=True):
+            markets["spread"] = {
+                side: MarketSideQuote(
+                    selection=side,
+                    line=float(spread[side]["decision_line"]),
+                    american_odds=int(spread[side]["decision_odds"]),
+                    decision_probability=implied_probability(int(spread[side]["decision_odds"])),
+                )
+                for side in ("away", "home")
+            }
+        total = parsed.get("total") or {}
+        if _espn_side_complete(total, "over", "under", needs_line=True):
+            markets["total"] = {
+                side: MarketSideQuote(
+                    selection=side,
+                    line=float(total[side]["decision_line"]),
+                    american_odds=int(total[side]["decision_odds"]),
+                    decision_probability=implied_probability(int(total[side]["decision_odds"])),
+                )
+                for side in ("over", "under")
+            }
+        if not markets:
+            raise MarketUnavailableError("espn_market_no_usable_sides")
         for market_type, sides in markets.items():
             _validate_lines(market_type, sides)
         return _snapshot(
@@ -377,36 +391,21 @@ class MLBMarketOddsFeed:
             event_start_utc,
             away_team,
             home_team,
-            "draftkings_via_the_odds_api",
+            "espn_market_consensus",
             self.observed_at,
             markets,
-            {"event": event, "bookmaker": bookmaker},
+            {"pickcenter": parsed},
         )
 
-    def _draftkings_sides(
-        self,
-        market: dict[str, Any],
-        market_type: str,
-        away_team: str,
-        home_team: str,
-    ) -> dict[str, MarketSideQuote]:
-        away_id, home_id = self._canonical_pair(away_team, home_team)
-        output: dict[str, MarketSideQuote] = {}
-        for outcome in market["outcomes"]:
-            name = str(outcome["name"])
-            if market_type == "total":
-                selection = name.casefold()
-            else:
-                team_id = self.registry.resolve(League.MLB, name).canonical_team_id
-                selection = "away" if team_id == away_id else "home" if team_id == home_id else name
-            american_odds = int(outcome["price"])
-            output[selection] = MarketSideQuote(
-                selection=selection,
-                line=None if market_type == "moneyline" else float(outcome["point"]),
-                american_odds=american_odds,
-                decision_probability=implied_probability(american_odds),
-            )
-        return output
+
+def _espn_side_complete(market: dict[str, Any], side_a: str, side_b: str, *, needs_line: bool) -> bool:
+    for side in (side_a, side_b):
+        entry = market.get(side) or {}
+        if entry.get("decision_odds") is None:
+            return False
+        if needs_line and entry.get("decision_line") is None:
+            return False
+    return True
 
 
 # Slug fragments that mark partial-game or derivative contracts. A Polymarket

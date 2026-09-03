@@ -31,6 +31,10 @@ def test_mlb_nrfi_v2_artifact_hash_and_registry():
     assert len(model.scaler_mean) == len(model.feature_names)
     assert model.train_nrfi_rate > 0.40
 
-    # 4. Whitelist / Blacklist
-    assert "mlb-nrfi-v2" in DEFAULT_WHITELIST_MODELS
+    # 4. Whitelist / Blacklist -- all MLB pulled from Auto-Buyer 2026-09-02
+    # pending qualification review (see auto_executor.py's blacklist comment
+    # and docs/DEBUG.md); mlb-nrfi-v2 stays a valid production champion for
+    # MLB.nrfi (asserted above), just not live-staked by Auto-Buyer for now.
+    assert "mlb-nrfi-v2" not in DEFAULT_WHITELIST_MODELS
+    assert "mlb-nrfi-v2" in EXPLICIT_BLACKLIST_MODELS
     assert "mlb-nrfi-v1" in EXPLICIT_BLACKLIST_MODELS

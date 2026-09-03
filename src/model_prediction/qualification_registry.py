@@ -15,6 +15,7 @@ Exposes explicit, non-positional provenance fields:
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -65,6 +66,27 @@ def _is_challenger_implemented(chall_id: str | None) -> bool:
         except ImportError:
             return False
     return False
+
+
+def _load_verified_offline_evaluation(chall_id: str | None, repo_root: Path) -> dict[str, Any] | None:
+    if not chall_id:
+        return None
+    candidates = [
+        repo_root / "outputs" / "research" / f"{chall_id}_offline_evaluation.json",
+        repo_root / "outputs" / "research" / f"{chall_id.replace('-', '_')}_offline_evaluation.json",
+    ]
+    for p in candidates:
+        if p.is_file():
+            try:
+                data = json.loads(p.read_text(encoding="utf-8"))
+                # Strictly reject synthetic evaluations
+                if data.get("dataset_source") == "synthetic" or data.get("evidence_origin") == "synthetic":
+                    continue
+                if data.get("verdict") == "VALIDATED_OFFLINE" and data.get("n_evaluated", 0) >= 50:
+                    return data
+            except (json.JSONDecodeError, OSError):
+                continue
+    return None
 
 
 @dataclass(frozen=True)
@@ -212,6 +234,7 @@ def generate_qualification_registry(
             is_frozen_art = (root / "config" / "models" / f"{chall_id}.json").is_file() or (
                 root / "config" / "models" / "research" / f"{chall_id}.json"
             ).is_file()
+            verified_eval = _load_verified_offline_evaluation(chall_id, root)
 
             if chall_id is None:
                 build_status = ChallengerBuildStatus.PLANNED.value
@@ -235,8 +258,12 @@ def generate_qualification_registry(
                 build_status = ChallengerBuildStatus.FROZEN.value
                 verdict = "CONTINUE"
                 next_action = NextAction.START_PROSPECTIVE_CAPTURE.value
+            elif verified_eval is not None:
+                build_status = ChallengerBuildStatus.VALIDATED_OFFLINE.value
+                verdict = "EVALUATION_READY"
+                next_action = NextAction.FREEZE_CHALLENGER.value
             elif _is_challenger_implemented(chall_id):
-                build_status = ChallengerBuildStatus.IMPLEMENTED.value
+                build_status = ChallengerBuildStatus.MECHANICS_VALIDATED.value
                 verdict = "EVALUATION_READY"
                 next_action = NextAction.RUN_OFFLINE_EVALUATION.value
             else:

@@ -32,6 +32,7 @@ import fcntl
 import json
 import logging
 import shutil
+import threading
 import time
 import uuid
 from collections.abc import Iterator
@@ -73,6 +74,58 @@ LOCK_TIMEOUT_SECONDS = 30
 LOCK_POLL_INTERVAL_SECONDS = 0.1
 
 PREDICTION_MARKET_SPORTSBOOKS = frozenset({"kalshi", "polymarket", "polymarket_us", "prediction_market"})
+
+
+_DEFERRED_XLSX_EXPORTS_LOCK = threading.RLock()
+_DEFERRED_XLSX_EXPORTS_DEPTH = 0
+_DEFERRED_XLSX_EXPORTS: dict[Path, PickLedger] = {}
+
+
+@contextmanager
+def defer_sqlite_xlsx_exports() -> Iterator[None]:
+    """Batch disposable XLSX projections while SQLite remains canonical.
+
+    Daily settlement and forecasting can mutate the same sport ledger hundreds
+    of times. Rebuilding the complete workbook after every canonical SQLite
+    commit makes that workload quadratic in ledger size. While this context is
+    active, each dirty projection is registered and rebuilt once on exit.
+
+    The registry is process-wide rather than context-local because the daily
+    forecast fans work out through ``ThreadPoolExecutor`` workers. Canonical
+    SQLite commits and audit events are still performed synchronously for every
+    mutation; only the disposable XLSX export is deferred.
+    """
+    global _DEFERRED_XLSX_EXPORTS_DEPTH
+    with _DEFERRED_XLSX_EXPORTS_LOCK:
+        _DEFERRED_XLSX_EXPORTS_DEPTH += 1
+    try:
+        yield
+    finally:
+        ledgers: list[PickLedger] = []
+        with _DEFERRED_XLSX_EXPORTS_LOCK:
+            _DEFERRED_XLSX_EXPORTS_DEPTH -= 1
+            if _DEFERRED_XLSX_EXPORTS_DEPTH == 0:
+                ledgers = list(_DEFERRED_XLSX_EXPORTS.values())
+                _DEFERRED_XLSX_EXPORTS.clear()
+        for ledger in ledgers:
+            try:
+                ledger.rebuild_xlsx_projection()
+            except Exception:
+                logging.getLogger(__name__).warning(
+                    "deferred xlsx projection rebuild failed for %s",
+                    ledger.path,
+                    exc_info=True,
+                )
+                if ledger.mirror is not None:
+                    _parity_alarm(ledger.mirror, f"deferred export write {ledger.path}")
+
+
+def _defer_sqlite_xlsx_export(ledger: PickLedger) -> bool:
+    with _DEFERRED_XLSX_EXPORTS_LOCK:
+        if _DEFERRED_XLSX_EXPORTS_DEPTH <= 0:
+            return False
+        _DEFERRED_XLSX_EXPORTS[ledger.path.resolve()] = ledger
+        return True
 
 
 class LedgerLockTimeout(TimeoutError):
@@ -1873,6 +1926,8 @@ class PickLedger:
 
     def _write_rows(self, rows: list[dict[str, str]]) -> None:
         if self.authority == "sqlite":
+            if _defer_sqlite_xlsx_export(self):
+                return
             # The XLSX is a best-effort EXPORT under sqlite authority —
             # its failure is an alarm, never a mutation failure (the
             # canonical store already committed).

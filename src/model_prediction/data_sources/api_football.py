@@ -1,8 +1,9 @@
 """API-FOOTBALL (api-football.com / api-sports.io v3) soccer results client + capture.
 
 Primary soccer results source for the daily pipeline's step1b_soccer_scores
-since 2026-08-26, replacing The Odds API ``/scores`` endpoint (401 for 31+
-days; ``odds_soccer_scores.py`` is kept as a dormant, still-tested fallback).
+since 2026-08-26, replacing The Odds API ``/scores`` endpoint after that
+provider failed with 401s for 31+ days. The dormant Odds API fallback was
+removed on 2026-09-02; ESPN event-ID settlement remains the keyless fallback.
 
 Contract verified against public docs 2026-08-26 (api-football.com
 documentation-v3 / news guides, dltHub source docs, openpublicapis listing —
@@ -74,8 +75,8 @@ DEFAULT_KEY_HEADER = "x-apisports-key"
 FINAL_STATUSES: frozenset[str] = frozenset({"FT", "AET", "PEN"})
 
 # League key -> api-football v3 league id. Keys reuse the repo's existing
-# soccer league labels (the dormant odds_soccer_scores.ODDS_SOCCER_KEYS
-# names plus the leagues ESPN does not cover from the ledger's SOCCER list)
+# soccer league labels (the legacy Odds API keys plus the leagues ESPN does
+# not cover from the ledger's SOCCER list)
 # so historical records keep stable ``league`` field values.
 #
 # IDs marked "doc-confirmed" were verified 2026-08-26 against api-football
@@ -170,7 +171,7 @@ class APIFootballClient:
             )
             response.raise_for_status()
             return response
-        except Exception as exc:  # noqa: BLE001 -- same redaction/reconstruction path as the_odds_api.py: transport and HTTP errors both embed the URL (and possibly the header repr); re-raise as httpx.HTTPError so every caller can catch one base class
+        except Exception as exc:  # noqa: BLE001 -- transport and HTTP errors may embed the URL or header repr; redact and re-raise as one catchable base class
             msg = str(exc).replace(self.api_key, "[REDACTED]")
             raise httpx.HTTPError(msg) from None
 

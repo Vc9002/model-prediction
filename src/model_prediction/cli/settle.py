@@ -18,6 +18,7 @@ from ..config import (
     PROJECT_ROOT,
     ledger_path,
     market_odds_snapshot_path,
+    polymarket_edge_enabled,
 )
 from ..data_sources.espn import ESPNClient
 from ..data_sources.mlb_market_odds import MarketOddsSnapshotStore
@@ -26,6 +27,7 @@ from ..data_sources.polymarket_us import (
     probability_to_american,
 )
 from ..domain import EASTERN, parse_utc, utc_now
+from ..ledger import defer_sqlite_xlsx_exports
 from ..main_ledgers import MultiSportPickLedger
 from ..research_ledgers import existing_research_ledgers
 from ..tennis_forward import TENNIS_TOURS, _is_tennis_subperiod_slug
@@ -34,10 +36,51 @@ from .state import _LEDGER_LEAGUE_TO_ESPN, _TERMINAL_MARKET_STATES
 logger = logging.getLogger("model_prediction.cli")
 
 
-def _settle_all_unsettled(args, config, ledger) -> dict:
+class _ScoreboardFetchError(RuntimeError):
+    """Normalized provider error already logged by the scoreboard cache."""
+
+
+def _cached_scoreboard(
+    espn: ESPNClient,
+    league: str,
+    game_day: str,
+    cache: dict[tuple[str, str], dict | Exception] | None,
+) -> dict:
+    key = (league, game_day)
+    cached = cache.get(key) if cache is not None else None
+    if cached is not None:
+        if isinstance(cached, Exception):
+            raise cached
+        return cached
+    try:
+        cached = espn.scoreboard(league, game_day)
+    except Exception as error:
+        logger.warning(
+            "ESPN scoreboard fetch failed for %s on %s; settlement skipping this league",
+            league,
+            game_day,
+            exc_info=True,
+        )
+        failure = _ScoreboardFetchError(str(error))
+        if cache is not None:
+            cache[key] = failure
+        raise failure from error
+    if cache is not None:
+        cache[key] = cached
+    return cached
+
+
+def _settle_all_unsettled(
+    args,
+    config,
+    ledger,
+    *,
+    espn: ESPNClient | None = None,
+    scoreboard_cache: dict[tuple[str, str], dict | Exception] | None = None,
+) -> dict:
     """Grade every started open pick from ESPN scoreboards or Polymarket resolution."""
     now = utc_now()
-    espn = ESPNClient()
+    espn = espn or ESPNClient()
     market_store = MarketOddsSnapshotStore(market_odds_snapshot_path(config))
     data_root = Path(ledger_path(config)).parent
     settled, voided, pending, failures = [], [], [], []
@@ -79,7 +122,13 @@ def _settle_all_unsettled(args, config, ledger) -> dict:
         # scoreboard shape doesn't fit `_find_espn_result` at all (see
         # `_find_tennis_result`).
         if row["league"] == "TENNIS":
-            result = _settle_tennis_pick(row, ledger, espn, data_root=data_root)
+            result = _settle_tennis_pick(
+                row,
+                ledger,
+                espn,
+                data_root=data_root,
+                scoreboard_cache=scoreboard_cache,
+            )
             if result is None:
                 pending.append(row["pick_id"])
             elif result.get("settled"):
@@ -103,7 +152,13 @@ def _settle_all_unsettled(args, config, ledger) -> dict:
             )
             continue
         game_day = start.astimezone(EASTERN).date().isoformat()
-        match = _find_espn_result(espn, leagues, game_day, row)
+        match = _find_espn_result(
+            espn,
+            leagues,
+            game_day,
+            row,
+            scoreboard_cache=scoreboard_cache,
+        )
         if match is None and row["league"] == "SOCCER":
             # Soccer: try collected scores from The Odds API for leagues
             # outside ESPN coverage (e.g. Brazil Serie B, K League 1).
@@ -173,13 +228,16 @@ def _settle_all_unsettled(args, config, ledger) -> dict:
         except (KeyError, ValueError) as error:
             failures.append({"pick_id": row["pick_id"], "reason": str(error)})
 
-    try:
-        from ..portfolio.polymarket_ledger import settle_polymarket_ledger_rows
+    if polymarket_edge_enabled(config, "ledger"):
+        try:
+            from ..portfolio.polymarket_ledger import settle_polymarket_ledger_rows
 
-        poly_settle_res = settle_polymarket_ledger_rows(data_root=data_root, espn_client=espn)
-    except Exception:
-        logger.warning("Polymarket edge ledger settlement failed", exc_info=True)
-        poly_settle_res = {"status": "error"}
+            poly_settle_res = settle_polymarket_ledger_rows(data_root=data_root, espn_client=espn)
+        except Exception:
+            logger.warning("Polymarket edge ledger settlement failed", exc_info=True)
+            poly_settle_res = {"status": "error"}
+    else:
+        poly_settle_res = {"status": "disabled", "reason": "operator_disabled"}
 
     return {
         "settled": settled,
@@ -191,20 +249,21 @@ def _settle_all_unsettled(args, config, ledger) -> dict:
     }
 
 
-def _find_espn_result(espn: ESPNClient, leagues, game_day: str, row) -> dict | None:
+def _find_espn_result(
+    espn: ESPNClient,
+    leagues,
+    game_day: str,
+    row,
+    *,
+    scoreboard_cache: dict[tuple[str, str], dict | Exception] | None = None,
+) -> dict | None:
     """Find a completed-game record matching a ledger row by id or team names."""
     away_names = {row["away_team"].casefold(), row["original_away_team"].casefold()}
     home_names = {row["home_team"].casefold(), row["original_home_team"].casefold()}
     for league in leagues:
         try:
-            scoreboard = espn.scoreboard(league, game_day)
-        except Exception:
-            logger.warning(
-                "ESPN scoreboard fetch failed for %s on %s; settlement skipping this league",
-                league,
-                game_day,
-                exc_info=True,
-            )
+            scoreboard = _cached_scoreboard(espn, league, game_day, scoreboard_cache)
+        except _ScoreboardFetchError:
             continue
         for event in scoreboard.get("events", []):
             competition = (event.get("competitions") or [{}])[0]
@@ -564,7 +623,13 @@ def _tennis_completed_game_totals(away: dict, home: dict) -> tuple[int, int] | s
     return sum(away_games), sum(home_games)
 
 
-def _find_tennis_result(espn: ESPNClient, game_day: str, row: dict) -> dict | None:
+def _find_tennis_result(
+    espn: ESPNClient,
+    game_day: str,
+    row: dict,
+    *,
+    scoreboard_cache: dict[tuple[str, str], dict | Exception] | None = None,
+) -> dict | None:
     """Match a ledger row to a completed WTA or ATP singles match by player name.
 
     ESPN's tennis scoreboard nests matches under `groupings` with
@@ -588,14 +653,8 @@ def _find_tennis_result(espn: ESPNClient, game_day: str, row: dict) -> dict | No
     competitions: list[tuple[dict, dict]] = []
     for tour in TENNIS_TOURS:
         try:
-            scoreboard = espn.scoreboard(tour, game_day)
-        except Exception:
-            logger.warning(
-                "ESPN %s scoreboard fetch failed for %s; tennis settlement skipping this tour",
-                tour,
-                game_day,
-                exc_info=True,
-            )
+            scoreboard = _cached_scoreboard(espn, tour, game_day, scoreboard_cache)
+        except _ScoreboardFetchError:
             continue
         for event in scoreboard.get("events", []):
             for grouping in event.get("groupings", []):
@@ -676,13 +735,20 @@ def _find_tennis_result(espn: ESPNClient, game_day: str, row: dict) -> dict | No
     return None
 
 
-def _settle_tennis_pick(row: dict, ledger, espn: ESPNClient, data_root=None) -> dict | None:
+def _settle_tennis_pick(
+    row: dict,
+    ledger,
+    espn: ESPNClient,
+    data_root=None,
+    *,
+    scoreboard_cache: dict[tuple[str, str], dict | Exception] | None = None,
+) -> dict | None:
     try:
         start = parse_utc(row["event_start_utc"])
     except ValueError:
         return {"pick_id": row["pick_id"], "reason": "bad event_start_utc"}
     game_day = start.astimezone(EASTERN).date().isoformat()
-    match = _find_tennis_result(espn, game_day, row)
+    match = _find_tennis_result(espn, game_day, row, scoreboard_cache=scoreboard_cache)
     if match is None or not match.get("completed"):
         return None
     market_type = str(row.get("market_type") or "").casefold()
@@ -823,10 +889,10 @@ def _find_espn_soccer_result_by_event_id(espn, row: dict) -> dict | None:
     Soccer picks carry ESPN event ids (nine-digit, e.g. 401906390), so the
     result can be looked up by identity instead of by competition + date +
     team name. That matters twice over. It needs no credential -- the
-    Odds API / API-Football path above returns no_api_key and silently
-    skips whenever THE_ODDS_API_KEY or API_FOOTBALL_KEY is unset, which is
-    how soccer results went 7 days stale to 2026-08-24 with every daily run
-    still exiting 0. And it cannot mis-match: team-name matching across ~45
+    API-Football path above returns no_api_key and silently skips whenever
+    API_FOOTBALL_KEY is unset, which is how soccer results went 7 days stale
+    to 2026-08-24 with every daily run still exiting 0. And it cannot
+    mis-match: team-name matching across ~45
     soccer competitions is the collision class this codebase has been bitten
     by before, and an id either resolves or it does not.
 
@@ -867,12 +933,27 @@ def _find_espn_soccer_result_by_event_id(espn, row: dict) -> dict | None:
     }
 
 
+@defer_sqlite_xlsx_exports()
 def run_settle(args, config, registry, bans, ledger, audit, data_root) -> dict:
     if args.all_unsettled:
-        output = _settle_all_unsettled(args, config, ledger)
+        espn = ESPNClient()
+        scoreboard_cache: dict[tuple[str, str], dict | Exception] = {}
+        output = _settle_all_unsettled(
+            args,
+            config,
+            ledger,
+            espn=espn,
+            scoreboard_cache=scoreboard_cache,
+        )
         # Also settle the flat ledger
         flat_ledger = MultiSportPickLedger(data_root, flat=True)
-        output["flat_settlement"] = _settle_all_unsettled(args, config, flat_ledger)
+        output["flat_settlement"] = _settle_all_unsettled(
+            args,
+            config,
+            flat_ledger,
+            espn=espn,
+            scoreboard_cache=scoreboard_cache,
+        )
         data_directory = Path(ledger_path(config)).parent
         research_settlement = {}
         for sport_ledger in existing_research_ledgers(data_directory):
@@ -880,6 +961,8 @@ def run_settle(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 args,
                 config,
                 sport_ledger,
+                espn=espn,
+                scoreboard_cache=scoreboard_cache,
             )
         if research_settlement:
             output["research_settlement"] = research_settlement
@@ -892,6 +975,8 @@ def run_settle(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 args,
                 config,
                 sport_ledger,
+                espn=espn,
+                scoreboard_cache=scoreboard_cache,
             )
         if gated_settlement:
             output["gated_research_settlement"] = gated_settlement

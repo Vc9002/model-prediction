@@ -80,12 +80,14 @@ data_sources:
       status: deferred
       reason: requires US residency (CFTC-regulated)
   odds_fallback:
-    provider: the_odds_api
-    base_url: https://api.the-odds-api.com/v4
-    requires: THE_ODDS_API_KEY
-    # Superseded 2026-08-26: soccer results now come from api_football
-    # (requires API_FOOTBALL_KEY). Nothing reads this block; kept as the
-    # documented fallback record.
+    # Removed 2026-09-02: The Odds API's fallback role (MLB DraftKings-style
+    # closing odds + a dormant soccer scores path) is gone -- the key had
+    # been 401 for 30+ days, silently producing a load error on every MLB
+    # game every day. MLB now falls back to ESPN's own keyless pickcenter
+    # odds (mlb_market_odds.py::MLBMarketOddsFeed._from_espn_market); soccer
+    # results already moved to api_football (requires API_FOOTBALL_KEY).
+    provider: espn_public
+    requires: null
   sport_data:
     provider: espn_public
     mlb_deep: mlb_statsapi
@@ -116,6 +118,11 @@ execution:
     research row
   - unit engine caps still apply
   - audit chain entry for every order
+polymarket_edge:
+  # Disabled by explicit operator directive. These flags gate the unattended
+  # daily scanner, edge-ledger settlement, and dashboard mutation endpoints.
+  scanner_enabled: false
+  ledger_enabled: false
 model_iteration_policy:
   status: continuous
   parameter_freezes_allowed: true

@@ -1,9 +1,9 @@
 """Automated Polymarket Execution Engine.
 
 Executes forecast picks with strict safety gates:
-1. Whitelist of empirical positive-EV models (Tennis, Soccer, WNBA ML, CS2/LoL Gated, MLB NRFI/Totals).
-2. Explicit blacklist blocking uncalibrated or negative-EV derivatives (MLB Spread, WNBA Spread, CFB Totals).
-3. Configurable unit value sizing (default 1U = $0.005 / 0.5 cent).
+1. Whitelist of empirical positive-EV models (Tennis, Soccer, WNBA ML, CS2/LoL Gated).
+2. Explicit model and sport/market blocks, including all MLB moneylines.
+3. Configurable unit value sizing (default 1U = $0.50 / 50 cents).
 4. Point-in-time pregame verification (now < event_start_utc) and live quote freshness (< 5 min).
 5. Hard daily spending limit and per-game exposure caps.
 6. Single-order deduplication per pick_id against the append-only audit log.
@@ -13,12 +13,17 @@ Executes forecast picks with strict safety gates:
 from __future__ import annotations
 
 import json
+import math
 import os
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
+
+import httpx
 
 from model_prediction.audit import AuditLog
 from model_prediction.data_sources.polymarket_execute import (
@@ -47,8 +52,6 @@ if _env_file.exists():
         pass
 
 DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
-    "mlb-elo-trend-lr-v8",
-    "mlb-structural-v10-frozen",
     "tennis-surface-elo-v1",
     "soccer-poisson-dc-v1",
     "wnba-elo-trend-lr-v4",
@@ -56,7 +59,6 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     "wnba-total-margin-v2",
     "cs2-tiered-elo-v6",
     "lol-tiered-elo-v6",
-    "mlb-nrfi-v2",
 )
 
 EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
@@ -66,14 +68,28 @@ EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
     "wnba-total-margin-v1",  # Legacy WNBA totals (uncalibrated static SD)
     "mlb-nrfi-v1",  # Legacy MLB NRFI
     "cfb-total-v1",  # CFB total (uncalibrated)
+    # All MLB pulled 2026-09-02: mlb-elo-trend-lr-v8 shipped via operator
+    # override despite qualified:false and a documented validation-Brier
+    # regression vs its own incumbent (holdout number that promoted it was
+    # exactly the "peeking at holdout" pattern docs/AGENTS.md warns against).
+    # Live Auto-Buyer record confirmed it: 43% win rate / -$1.00 vs a claimed
+    # 60.8% holdout hit rate. v7 also never cleared the qualification gate.
+    # mlb-structural-v10-frozen and mlb-nrfi-v2 pulled alongside it pending
+    # the same qualification review, not because they were shown bad live.
+    "mlb-elo-trend-lr-v8",
+    "mlb-structural-v10-frozen",
+    "mlb-nrfi-v2",
 )
 
 AUTO_BUYER_STATE_FILE = DATA / "auto_buyer_state.json"
+EXECUTABLE_AUTO_BUYER_MARKET_TYPES = frozenset({"moneyline", "spread", "total", "nrfi"})
+ESPORTS_LEAGUES = frozenset({"cs2", "lol", "dota2", "valorant", "r6", "cod", "ow", "rl"})
+DISABLED_AUTO_BUYER_SPORT_MARKETS = frozenset({("mlb", "moneyline")})
 
 
 @dataclass(frozen=True)
 class AutoExecutionConfig:
-    unit_value_usd: float = 0.005  # 1U = 0.5 cent default ($0.005)
+    unit_value_usd: float = 0.50  # 1U = 50 cents default
     min_edge: float = 0.035  # Minimum +3.5% edge over market ask
     max_daily_spend_usd: float = 25.0  # Daily budget cap
     max_game_stake_usd: float = 2.50  # Max dollars per game/pick
@@ -92,6 +108,8 @@ class AutoExecutionResult:
     rejected_started: int = 0
     rejected_stale_quote: int = 0
     rejected_unmapped_market: int = 0
+    rejected_unsupported_market: int = 0
+    rejected_disabled_sport_market: int = 0
     rejected_closed_market: int = 0
     rejected_low_edge: int = 0
     rejected_budget: int = 0
@@ -99,18 +117,129 @@ class AutoExecutionResult:
     submitted_orders: list[dict[str, Any]] = field(default_factory=list)
     dry_run_orders: list[dict[str, Any]] = field(default_factory=list)
     total_spend_usd: float = 0.0
+    snapshot_captures: list[dict[str, Any]] = field(default_factory=list)
+
+
+def _auto_buyer_sport_market(row: dict[str, Any]) -> tuple[str, str]:
+    """Return a normalized sport/market pair for categorical execution gates."""
+    model_id = str(row.get("model_id") or row.get("model_version") or "").lower()
+    sport = str(row.get("league") or row.get("sport") or "").strip().lower()
+    if not sport and model_id.startswith("mlb-"):
+        sport = "mlb"
+
+    market_type = str(row.get("market_type") or "").strip().lower().replace("_", "")
+    if market_type == "ml":
+        market_type = "moneyline"
+    return sport, market_type
+
+
+def _is_disabled_auto_buyer_sport_market(row: dict[str, Any]) -> bool:
+    return _auto_buyer_sport_market(row) in DISABLED_AUTO_BUYER_SPORT_MARKETS
+
+
+def _capture_missing_active_snapshot_slates(
+    picks: list[dict[str, Any]],
+    *,
+    config: AutoExecutionConfig,
+    now: datetime,
+    data_root: Path | str = DATA,
+    client: Any | None = None,
+    capture_fn: Callable[..., dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """Capture absent sport/date snapshot files needed by the active 24-hour slate.
+
+    The daily forecast captures its requested calendar date, while esports forecasts
+    can legitimately include games after midnight Eastern. A live Auto-Buyer cycle
+    must discover those next-day contracts before calling the local fail-closed
+    mapper. Existing files are never rewritten or broadly refreshed here.
+    """
+    if not config.execute_live:
+        return []
+
+    root = Path(data_root)
+    eastern = ZoneInfo("America/New_York")
+    missing: set[tuple[str, str]] = set()
+    for row in picks:
+        model_id = str(row.get("model_id") or row.get("model_version") or "")
+        if model_id in config.blacklisted_models or model_id not in config.whitelisted_models:
+            continue
+        if _is_disabled_auto_buyer_sport_market(row):
+            continue
+        if row.get("status") != "open":
+            continue
+        market_type = str(row.get("market_type") or "").lower()
+        if market_type and market_type not in EXECUTABLE_AUTO_BUYER_MARKET_TYPES:
+            continue
+        try:
+            event_start = parse_utc(str(row.get("event_start_utc") or ""))
+        except (TypeError, ValueError):
+            continue
+        seconds_until_start = (event_start - now).total_seconds()
+        if seconds_until_start <= 0 or seconds_until_start > 24 * 3600:
+            continue
+        raw_sport = str(row.get("league") or row.get("sport") or "").lower()
+        sport = "esports" if raw_sport in ESPORTS_LEAGUES else raw_sport
+        if not sport:
+            continue
+        game_date = event_start.astimezone(eastern).date().isoformat()
+        snapshot_path = root / "odds" / sport / game_date / "polymarket_snapshots.jsonl"
+        if not snapshot_path.exists() or snapshot_path.stat().st_size == 0:
+            missing.add((sport, game_date))
+
+    if not missing:
+        return []
+
+    from model_prediction.data_sources.polymarket_us import (
+        PolymarketUSClient,
+        capture_slate_snapshots,
+    )
+
+    market_client = client or PolymarketUSClient()
+    capture = capture_fn or capture_slate_snapshots
+    results: list[dict[str, Any]] = []
+    for sport, game_date in sorted(missing):
+        try:
+            slate = market_client.sport_slate(
+                sport,
+                date.fromisoformat(game_date),
+                "America/New_York",
+            )
+            capture_result = capture(market_client, slate.events, root, game_date)
+            results.append(
+                {
+                    "sport": sport,
+                    "game_date": game_date,
+                    "status": capture_result.get("status"),
+                    "captured": int(capture_result.get("captured") or 0),
+                    "league_errors": dict(slate.errors),
+                }
+            )
+        except (httpx.HTTPError, OSError, RuntimeError, TypeError, ValueError) as error:
+            results.append(
+                {
+                    "sport": sport,
+                    "game_date": game_date,
+                    "status": "error",
+                    "captured": 0,
+                    "error": str(error)[:200],
+                }
+            )
+    return results
 
 
 def load_auto_buyer_state() -> dict[str, Any]:
     """Load persistent auto-buyer configuration and runtime toggle state."""
     default_state = {
         "enabled": False,
-        "unit_value_usd": 0.005,
+        "unit_value_usd": 0.50,
         "min_edge": 0.035,
         "max_daily_spend_usd": 25.0,
         "max_game_stake_usd": 2.50,
         "whitelist_models": list(DEFAULT_WHITELIST_MODELS),
         "blacklist_models": list(EXPLICIT_BLACKLIST_MODELS),
+        "disabled_sport_markets": [
+            f"{sport}:{market}" for sport, market in sorted(DISABLED_AUTO_BUYER_SPORT_MARKETS)
+        ],
         "last_run": None,
         "last_daily_date": None,
     }
@@ -143,6 +272,42 @@ def toggle_auto_buyer(enabled: bool | None = None) -> dict[str, Any]:
     return state
 
 
+def set_auto_buyer_unit_value(raw_value: Any) -> dict[str, Any]:
+    """Persist the dollar value used for future Auto-Buyer order sizing."""
+    try:
+        value = float(raw_value)
+    except (TypeError, ValueError) as error:
+        raise ValueError("Auto-Buyer 1U must be a dollar amount") from error
+    if not math.isfinite(value) or not 0.01 <= value <= 100_000:
+        raise ValueError("Auto-Buyer 1U must be between $0.01 and $100,000.00")
+
+    state = load_auto_buyer_state()
+    previous = float(state.get("unit_value_usd") or 0.50)
+    state["unit_value_usd"] = round(value, 2)
+    state["updated_at_utc"] = iso_utc(utc_now())
+    save_auto_buyer_state(state)
+    try:
+        AuditLog(DATA / "audit.jsonl").append(
+            "auto_buyer_unit_value_updated",
+            "auto_buyer.unit_value_usd",
+            {
+                "previous_usd": previous,
+                "unit_value_usd": state["unit_value_usd"],
+                "source": "dashboard",
+            },
+        )
+    except (OSError, RuntimeError, TypeError, ValueError):
+        pass
+    return {
+        "status": "ok",
+        "previous_unit_value_usd": previous,
+        "unit_value_usd": state["unit_value_usd"],
+        "max_game_stake_usd": float(state.get("max_game_stake_usd") or 2.50),
+        "max_daily_spend_usd": float(state.get("max_daily_spend_usd") or 25.0),
+        "note": "Applies only to future Auto-Buyer orders; historical rows retain their recorded unit value.",
+    }
+
+
 def run_auto_buyer_cycle(
     execute_override: bool | None = None,
     forecast_date: str | None = None,
@@ -158,7 +323,7 @@ def run_auto_buyer_cycle(
     should_execute = state.get("enabled", False) if execute_override is None else bool(execute_override)
 
     config = AutoExecutionConfig(
-        unit_value_usd=float(state.get("unit_value_usd", 0.005)),
+        unit_value_usd=float(state.get("unit_value_usd", 0.50)),
         min_edge=float(state.get("min_edge", 0.035)),
         max_daily_spend_usd=float(state.get("max_daily_spend_usd", 25.0)),
         max_game_stake_usd=float(state.get("max_game_stake_usd", 2.50)),
@@ -179,6 +344,8 @@ def run_auto_buyer_cycle(
         "rejected_started": res.rejected_started,
         "rejected_stale_quote": res.rejected_stale_quote,
         "rejected_unmapped_market": res.rejected_unmapped_market,
+        "rejected_unsupported_market": res.rejected_unsupported_market,
+        "rejected_disabled_sport_market": res.rejected_disabled_sport_market,
         "rejected_closed_market": res.rejected_closed_market,
         "rejected_low_edge": res.rejected_low_edge,
         "rejected_budget": res.rejected_budget,
@@ -186,6 +353,7 @@ def run_auto_buyer_cycle(
         "total_spend_usd": res.total_spend_usd,
         "orders_count": len(res.submitted_orders) if should_execute else len(res.dry_run_orders),
         "orders": res.submitted_orders if should_execute else res.dry_run_orders,
+        "snapshot_captures": res.snapshot_captures,
     }
 
     state["last_run"] = run_summary
@@ -396,8 +564,14 @@ class AutoPolymarketBuyer:
 
             picks = combined_picks
 
-        result = AutoExecutionResult()
         now = utc_now()
+        result = AutoExecutionResult()
+        if self._live_quote_fn is None:
+            result.snapshot_captures = _capture_missing_active_snapshot_slates(
+                picks,
+                config=self.config,
+                now=now,
+            )
         current_spend = 0.0
         bought_index = self._build_bought_index()
 
@@ -419,8 +593,24 @@ class AutoPolymarketBuyer:
 
             result.whitelisted_count += 1
 
+            # Operator-level categorical block. This deliberately takes precedence
+            # over persisted model whitelists so renamed or replacement MLB models
+            # cannot restore moneyline execution without a reviewed code change.
+            if _is_disabled_auto_buyer_sport_market(row):
+                result.rejected_disabled_sport_market += 1
+                continue
+
             # 3. Status filter (must be open)
             if row.get("status") != "open":
+                continue
+
+            # Only markets with a proven contract representation may reach mapping.
+            # In particular, an NRFI/YRFI model must never be attached to a full-game
+            # total merely to increase volume when the exchange exposes no first-inning
+            # contract for the event.
+            market_type = str(row.get("market_type") or "").lower()
+            if market_type and market_type not in EXECUTABLE_AUTO_BUYER_MARKET_TYPES:
+                result.rejected_unsupported_market += 1
                 continue
 
             # 4. Timing & Slate Date Check:
@@ -496,7 +686,15 @@ class AutoPolymarketBuyer:
                             "age_seconds": 0,
                             "market_state": live_snap.get("market_state", "MARKET_STATE_OPEN"),
                         }
-                except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError):
+                except (
+                    httpx.HTTPError,
+                    OSError,
+                    ValueError,
+                    KeyError,
+                    TypeError,
+                    RuntimeError,
+                    ExecutionGateError,
+                ):
                     pass
 
             if not quote.get("fresh", False) and quote.get("age_seconds", 999999) > 300:
@@ -569,6 +767,7 @@ class AutoPolymarketBuyer:
                 "limit_price": limit_price,
                 "shares": shares,
                 "cost_usd": actual_cost,
+                "unit_value_usd": self.config.unit_value_usd,
                 "edge": round(edge, 4),
                 "event_start_utc": event_start_str,
                 "timestamp_utc": iso_utc(now),

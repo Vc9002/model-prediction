@@ -63,7 +63,7 @@ Fixes and wiring (full trace in `docs/DEBUG.md` 2026-08-26 night section):
 ## Session outcomes — 2026-08-27 (system audit & ablation gate pass)
 
 - **Comprehensive System Audit**: Cataloged in [`docs/SYSTEM_DEFECTS_AND_GAPS_AUDIT.md`](SYSTEM_DEFECTS_AND_GAPS_AUDIT.md).
-- **MLB NRFI live serving landmine identified AND resolved**: `config/models/mlb-nrfi-v1.json` frozen with `0.690572` holdout logloss; the live forecast path in `cli/forecast.py` had been invoking the unfitted `MLBNRFIModel()` under the same model_version string. Resolved same session (commit `693744b`): live pre-game feature builder (`models/mlb_first_inning_live.py`, starter-name-keyed, exact-match verified vs the batch ledger) + artifact-backed prediction + champion `MLB.nrfi` promotion; `blocked_workflows` is now empty. Caveat: Polymarket has no NRFI market, so no market-side CLV/ROI grading exists for these rows.
+- **MLB NRFI live serving landmine identified AND resolved**: `config/models/mlb-nrfi-v1.json` frozen with `0.690572` holdout logloss; the live forecast path in `cli/forecast.py` had been invoking the unfitted `MLBNRFIModel()` under the same model_version string. Resolved same session (commit `693744b`): live pre-game feature builder (`models/mlb_first_inning_live.py`, starter-name-keyed, exact-match verified vs the batch ledger) + artifact-backed prediction + champion `MLB.nrfi` promotion; `blocked_workflows` is now empty. Updated 2026-09-01: Polymarket US game-detail payloads expose exact `baseball_team_first_inning_run` Yes/No contracts, now captured as YRFI/NRFI; the earlier no-market claim came from the incomplete league summary feed.
 - **MLB Weather & Travel ablation completed**: Tested via `scripts/mlb_weather_travel_ablation.py` (gain +0.005484 MAE, 95% CI `[-0.000215, +0.011088]`) $\rightarrow$ `NO_PROMOTION` verdict under the reproduction gate.
 - **Static type audit**: 0 Ruff findings; 220 Mypy findings cataloged for progressive type hardening.
 - **Full suite verified**: 2,414 tests pass, 3 skipped, 0 fail.
@@ -81,12 +81,13 @@ per 2026-08-26 directive; validation on settled picks, PIT-safe):
    Markov engine, walk-forward on settled picks (derivative pricing was
    removed 08-24 as unsupported; this rebuilds it as validated research).
 
-Still open (unchanged): MLB totals absolute-run-environment signal
-(repair-order #2 — the one genuinely open documented research gap);
-v9 Phase 23 gate criteria conflict (80% vs 90% bootstrap threshold —
-operator decision); API-FOOTBALL key provision (operator — soccer *capture*
-only; settlement was unblocked keylessly on 2026-08-30, see
+Still open: MLB totals absolute-run-environment signal (repair-order #2 —
+the one genuinely open documented research gap); API-FOOTBALL key provision
+(operator — soccer *capture* only; settlement was unblocked keylessly on 2026-08-30, see
 `docs/SYSTEM_DEFECTS_AND_GAPS_AUDIT.md` C).
+
+Resolved documentation conflict: Phase 23's 80%/90% bootstrap threshold was
+settled in favor of 80% under Phase D; it is not awaiting an operator decision.
 
 ## Market-edge execution program (2026-08-26 operator directive)
 
@@ -110,9 +111,11 @@ against live state before execution. Key reconciliations:
   stability slices) and demoting hit-rate targets to diagnostics.
 - **Market data reality.** Polymarket US snapshot JSONL (executable
   BBOs) exists for mlb/wnba/esports/kbo/npb/soccer/tennis from
-  2026-07-17; NRFI/YRFI slugs are **absent** from the odds tree;
-  NBA/NFL have zero sources wired (offseason); soccer is stale
-  (Odds API 401 ≥31 days, API-Football awaiting operator key).
+  2026-07-17; NRFI/YRFI contracts are available through MLB game-detail
+  hydration and captured as `baseball_team_first_inning_run` Yes/No;
+  NBA/NFL have zero sources wired (offseason); soccer historical capture is
+  stale and API-Football still awaits an operator key. The dead Odds API
+  dependency was removed 2026-09-02.
 
 Execution phases (research track only; v8 frozen invariant unchanged):
 
@@ -134,9 +137,10 @@ Execution phases (research track only; v8 frozen invariant unchanged):
   decomposition (+0.0003 logloss, CI straddles zero) and plate-umpire
   features (direction negative) both honest nulls on the locked
   holdout; reproduction gate PASS (0.690434 vs 0.6910). **Blocked
-  (data):** real NRFI/YRFI quotes — Polymarket US lists no first-inning
-  markets (F5 only, 40k rows); TTO1 — no Statcast split ingestion; F5
-  targets — no innings-1-5 runs in any captured source.
+  (data, updated 2026-09-01):** real NRFI/YRFI quote capture is now resolved
+  through the MLB game-detail endpoint. TTO1 remains blocked by no Statcast
+  split ingestion; F5 targets remain blocked by no innings-1-5 runs in any
+  captured result source.
 - **D — Qualification governance rewrite** ✅ (this commit): Phase 23
   gates rewritten (market-relative predictive gate, full economic
   battery, stability slices, hit-rate diagnostic-only, beta
@@ -896,5 +900,3 @@ Every candidate must clear all 5 dimensions on locked chronological out-of-sampl
    - Built [`src/model_prediction/portfolio/polymarket_ws.py`](file:///Users/vincentc9002/model-prediction/src/model_prediction/portfolio/polymarket_ws.py) for sub-second Level 2 orderbook streaming and BBO tracking.
    - Built [`src/model_prediction/portfolio/kalshi_client.py`](file:///Users/vincentc9002/model-prediction/src/model_prediction/portfolio/kalshi_client.py) for Kalshi event contract price ingestion and cross-exchange Dutching arbitrage detection ($\sum \text{Cost} < 1.0$).
    - Comprehensive tests verified in [`tests/test_multi_exchange_liquidity.py`](file:///Users/vincentc9002/model-prediction/tests/test_multi_exchange_liquidity.py).
-
-

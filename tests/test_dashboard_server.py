@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import json
 import subprocess
+import threading
 from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
 
 import dashboard_server
+import model_prediction.dashboard.orders as dashboard_orders
 
 
 def _configure_archive(monkeypatch, tmp_path: Path, rows: list[dict], patch_dash) -> Path:
@@ -1103,6 +1105,35 @@ def test_portfolio_uses_only_exchange_confirmed_positions_and_persists_activity(
     assert history_file.exists()
 
 
+def test_live_position_quotes_are_fetched_concurrently(monkeypatch) -> None:
+    lock = threading.Lock()
+    both_running = threading.Event()
+    active = 0
+    maximum_active = 0
+
+    def quote(slug: str, *, client=None) -> dict:
+        nonlocal active, maximum_active
+        with lock:
+            active += 1
+            maximum_active = max(maximum_active, active)
+            if active >= 2:
+                both_running.set()
+        assert both_running.wait(timeout=1)
+        with lock:
+            active -= 1
+        return {"market_slug": slug}
+
+    monkeypatch.setattr(dashboard_orders, "_live_bbo", quote)
+
+    result = dashboard_orders._live_position_bbos(["market-1", "market-2"])
+
+    assert maximum_active == 2
+    assert result == {
+        "market-1": {"market_slug": "market-1"},
+        "market-2": {"market_slug": "market-2"},
+    }
+
+
 def test_live_balance_unwraps_the_same_value_currency_envelope_as_every_other_amount(
     monkeypatch, tmp_path: Path, patch_dash
 ) -> None:
@@ -1479,6 +1510,39 @@ def test_pick_quote_matches_the_exact_total_line_and_game(monkeypatch, tmp_path:
     assert quote["ask"] == 0.44
 
 
+def test_pick_quote_maps_nrfi_and_yrfi_to_exact_no_yes_sides(monkeypatch, tmp_path: Path, patch_dash) -> None:
+    data = tmp_path / "data"
+    path = data / "odds" / "mlb" / "2026-09-01" / "polymarket_snapshots.jsonl"
+    path.parent.mkdir(parents=True)
+    snapshot = {
+        "event_title": "Philadelphia Phillies vs. Arizona Diamondbacks",
+        "event_start_utc": "2026-09-02T01:40:00Z",
+        "observed_at_utc": "2026-09-01T21:00:00Z",
+        "timestamp_valid": True,
+        "market_state": "MARKET_STATE_OPEN",
+        "market_type": "nrfi",
+        "market_slug": "astatc-mlb-phi-az-2026-09-01-yrfi",
+        "line": 1,
+        "long": {"description": "Yes", "ask": 0.45},
+        "short": {"description": "No", "ask": 0.56},
+    }
+    path.write_text(json.dumps(snapshot) + "\n", encoding="utf-8")
+    patch_dash("DATA", data)
+    base_row = {
+        "league": "MLB",
+        "market_type": "nrfi",
+        "away_team": "Philadelphia Phillies",
+        "home_team": "Arizona Diamondbacks",
+        "event_start_utc": "2026-09-02T01:40:00Z",
+    }
+
+    nrfi = dashboard_server._pick_quote({**base_row, "selection": "nrfi", "line": "0.5"})
+    yrfi = dashboard_server._pick_quote({**base_row, "selection": "yrfi", "line": "0.5"})
+
+    assert nrfi is not None and nrfi["side"] == "short" and nrfi["ask"] == 0.56
+    assert yrfi is not None and yrfi["side"] == "long" and yrfi["ask"] == 0.45
+
+
 def test_pick_quote_never_cross_matches_another_games_spread_line(
     monkeypatch, tmp_path: Path, patch_dash
 ) -> None:
@@ -1508,6 +1572,85 @@ def test_pick_quote_never_cross_matches_another_games_spread_line(
     }
 
     assert dashboard_server._pick_quote(row) is None
+
+
+def test_pick_quote_maps_soccer_moneyline_to_exact_team_win_contract(
+    monkeypatch, tmp_path: Path, patch_dash
+) -> None:
+    data = tmp_path / "data"
+    path = data / "odds" / "soccer" / "2026-09-01" / "polymarket_snapshots.jsonl"
+    path.parent.mkdir(parents=True)
+    base = {
+        "event_title": "Londrina EC vs. EC Juventude",
+        "event_start_utc": "2026-09-01T22:30:00Z",
+        "observed_at_utc": "2026-09-01T19:30:00Z",
+        "timestamp_valid": True,
+        "market_state": "MARKET_STATE_OPEN",
+        "market_type": "team_win",
+        "line": None,
+        "long": {"description": "Yes", "ask": 0.31},
+        "short": {"description": "No", "ask": 0.71},
+    }
+    snapshots = [
+        {**base, "market_slug": "atc-brb-lon-juv-2026-09-01-lon", "team": "Londrina EC"},
+        {**base, "market_slug": "atc-brb-lon-juv-2026-09-01-draw", "team": None},
+        {**base, "market_slug": "atc-brb-lon-juv-2026-09-01-juv", "team": "EC Juventude"},
+    ]
+    path.write_text("\n".join(json.dumps(item) for item in snapshots) + "\n", encoding="utf-8")
+    patch_dash("DATA", data)
+
+    quote = dashboard_server._pick_quote(
+        {
+            "league": "SOCCER",
+            "market_type": "moneyline",
+            "away_team": "Juventude",
+            "home_team": "Londrina",
+            "selection": "home",
+            "event_start_utc": "2026-09-01T22:30:00Z",
+        }
+    )
+
+    assert quote is not None
+    assert quote["market_slug"] == "atc-brb-lon-juv-2026-09-01-lon"
+    assert quote["side"] == "long"
+    assert quote["ask"] == 0.31
+
+
+def test_pick_quote_matches_tennis_player_when_exchange_omits_middle_name(
+    monkeypatch, tmp_path: Path, patch_dash
+) -> None:
+    data = tmp_path / "data"
+    path = data / "odds" / "tennis" / "2026-09-01" / "polymarket_snapshots.jsonl"
+    path.parent.mkdir(parents=True)
+    snapshot = {
+        "event_title": "Adolfo Vallejo vs. Gael Monfils",
+        "event_start_utc": "2026-09-01T23:00:00Z",
+        "observed_at_utc": "2026-09-01T19:30:00Z",
+        "timestamp_valid": True,
+        "market_state": "MARKET_STATE_OPEN",
+        "market_type": "moneyline",
+        "market_slug": "aec-atp-adoval-gaemon-2026-08-30",
+        "long": {"description": "Adolfo Vallejo", "ask": 0.44},
+        "short": {"description": "Gael Monfils", "ask": 0.58},
+    }
+    path.write_text(json.dumps(snapshot) + "\n", encoding="utf-8")
+    patch_dash("DATA", data)
+
+    quote = dashboard_server._pick_quote(
+        {
+            "league": "TENNIS",
+            "market_type": "moneyline",
+            "away_team": "Gael Monfils",
+            "home_team": "Adolfo Daniel Vallejo",
+            "selection": "home",
+            "event_start_utc": "2026-09-01T23:00:00Z",
+        }
+    )
+
+    assert quote is not None
+    assert quote["market_slug"] == "aec-atp-adoval-gaemon-2026-08-30"
+    assert quote["side"] == "long"
+    assert quote["ask"] == 0.44
 
 
 def test_filled_entry_uses_selected_side_exchange_fill(monkeypatch, patch_dash) -> None:

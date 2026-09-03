@@ -44,6 +44,14 @@ class HorizonObservation:
     lineup_woba_delta: float
     starter_csw_delta: float
     market_move_from_open: float
+    model_artifact_hash: str | None = None
+    feature_schema_hash: str | None = None
+    feature_snapshot_observed_at: str | None = None
+    feature_snapshot_hash: str | None = None
+    market_snapshot_observed_at: str | None = None
+    market_snapshot_hash: str | None = None
+    candidate_frozen_at: str | None = None
+    prediction_created_at: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -66,6 +74,14 @@ class HorizonObservation:
             "lineup_woba_delta": round(self.lineup_woba_delta, 4),
             "starter_csw_delta": round(self.starter_csw_delta, 4),
             "market_move_from_open": round(self.market_move_from_open, 4),
+            "model_artifact_hash": self.model_artifact_hash,
+            "feature_schema_hash": self.feature_schema_hash,
+            "feature_snapshot_observed_at": self.feature_snapshot_observed_at or self.observed_at_utc,
+            "feature_snapshot_hash": self.feature_snapshot_hash,
+            "market_snapshot_observed_at": self.market_snapshot_observed_at or self.observed_at_utc,
+            "market_snapshot_hash": self.market_snapshot_hash,
+            "candidate_frozen_at": self.candidate_frozen_at,
+            "prediction_created_at": self.prediction_created_at or self.observed_at_utc,
         }
 
 
