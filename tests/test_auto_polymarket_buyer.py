@@ -13,6 +13,11 @@ import pytest
 
 from model_prediction.audit import AuditLog
 from model_prediction.domain import iso_utc, utc_now
+from model_prediction.portfolio.auto_buyer_ledger import (
+    read_auto_buyer_ledger,
+    reconcile_pending_auto_buyer_fallbacks,
+    record_auto_buy_execution,
+)
 from model_prediction.portfolio.auto_executor import (
     AutoExecutionConfig,
     AutoExecutionResult,
@@ -345,6 +350,96 @@ def test_buyer_sizes_fractional_units():
     assert order["shares"] == 1.36
     assert order["cost_usd"] == 0.75
     assert order["edge"] == 0.10
+
+
+def test_live_buyer_sets_resting_fallback_and_records_actual_fill(monkeypatch, tmp_path):
+    now = utc_now()
+    captured = {}
+
+    class FakeExecutor:
+        def __init__(self, **_kwargs):
+            pass
+
+        def execute(self, ticket, **_kwargs):
+            captured["ticket"] = ticket
+            return {
+                "status": "submitted",
+                "order_id": "primary-partial",
+                "order_ids": ["primary-partial", "resting-remainder"],
+                "order_state": "ORDER_STATE_PARTIALLY_FILLED",
+                "filled_size_shares": 0.88,
+                "estimated_filled_cost_usd": 0.4488,
+                "fallback_order_id": "resting-remainder",
+                "fallback_status": "resting",
+                "fallback_resting_shares": 11.37,
+            }
+
+    recorded = []
+    monkeypatch.setattr(
+        AutoPolymarketBuyer,
+        "_build_bought_index",
+        lambda _self: {
+            "pick_ids": set(),
+            "market_sides": set(),
+            "event_selections": set(),
+            "held_slugs": set(),
+        },
+    )
+    monkeypatch.setattr("model_prediction.portfolio.auto_executor.PolymarketExecutor", FakeExecutor)
+    monkeypatch.setattr(
+        "model_prediction.portfolio.auto_buyer_ledger.record_auto_buy_execution",
+        lambda **kwargs: recorded.append(kwargs),
+    )
+    monkeypatch.setattr("model_prediction.portfolio.auto_executor.time.sleep", lambda _seconds: None)
+    buyer = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(
+            unit_value_usd=5.0,
+            min_edge=0.035,
+            max_game_stake_usd=25.0,
+            max_daily_spend_usd=250.0,
+            execute_live=True,
+            whitelisted_models=("lol-tiered-elo-v6",),
+        ),
+        audit=AuditLog(tmp_path / "audit.jsonl"),
+        live_quote_fn=lambda _slug: {
+            "ask": 0.51,
+            "market_slug": "aec-lol-lds-dv1-2026-09-03",
+            "side": "long",
+        },
+    )
+
+    result = buyer.evaluate_and_execute(
+        [
+            {
+                "pick_id": "lodis",
+                "model_id": "lol-tiered-elo-v6",
+                "sport": "lol",
+                "market_type": "moneyline",
+                "selection": "home",
+                "home_team": "Lodis",
+                "away_team": "devils.one inStreamly",
+                "status": "open",
+                "event_start_utc": iso_utc(now + timedelta(hours=12)),
+                "model_probability": 0.58,
+                "market_probability": 0.51,
+                "units": 1.25,
+            }
+        ]
+    )
+
+    # Every auto-buyer IOC ticket opts into the resting fallback.
+    assert captured["ticket"].ioc_fallback_resting is True
+    assert captured["ticket"].estimated_cost_usd == 6.25
+    # Only the confirmed fill counts toward spend/ledger -- the resting
+    # remainder isn't assumed complete.
+    assert result.total_spend_usd == 0.45
+    assert result.submitted_orders[0]["requested_cost_usd"] == 6.25
+    assert result.submitted_orders[0]["cost_usd"] == 0.4488
+    assert result.submitted_orders[0]["shares"] == 0.88
+    assert result.submitted_orders[0]["fallback_order_id"] == "resting-remainder"
+    assert result.submitted_orders[0]["order_ids"] == ["primary-partial", "resting-remainder"]
+    assert recorded[0]["order_payload"]["cost_usd"] == 0.4488
+    assert recorded[0]["order_payload"]["shares"] == 0.88
 
 
 def test_buyer_respects_daily_budget():
@@ -775,3 +870,115 @@ def test_summarize_auto_buyer_performance():
     assert summary["realized_pnl_units"] == 1.0
     assert summary["realized_roi_pct"] == 33.3
     assert summary["avg_edge_pct"] == 8.0
+
+
+def _record_pending_fallback(tmp_path, event_start_utc, fallback_resting_shares=11.37):
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    x_path = tmp_path / "auto_buyer_picks.xlsx"
+    record_auto_buy_execution(
+        order_payload={
+            "order_id": "primary-partial",
+            "order_ids": ["primary-partial", "resting-remainder"],
+            "pick_id": "PICK_LODIS",
+            "market_slug": "aec-lol-lds-dv1-2026-09-03",
+            "selection": "home",
+            "token_side": "long",
+            "limit_price": 0.51,
+            "cost_usd": 0.4488,
+            "shares": 0.88,
+            "sport": "LOL",
+            "event_start_utc": event_start_utc,
+            "fallback_order_id": "resting-remainder",
+            "fallback_resting_shares": fallback_resting_shares,
+        },
+        pick_row={
+            "away_team": "devils.one inStreamly",
+            "home_team": "Lodis",
+            "market_type": "moneyline",
+            "units": 1.25,
+        },
+        jsonl_path=j_path,
+        xlsx_path=x_path,
+    )
+    return j_path, x_path
+
+
+def test_reconcile_adds_fallback_fill_on_top_of_primary_baseline(tmp_path):
+    j_path, _ = _record_pending_fallback(tmp_path, event_start_utc=iso_utc(utc_now() + timedelta(hours=12)))
+
+    class FakeExecutor:
+        def order_snapshots(self, order_ids):
+            assert order_ids == ["resting-remainder"]
+            return {
+                "status": "live",
+                "orders": [
+                    {
+                        "order_id": "resting-remainder",
+                        "order_state": "ORDER_STATE_PARTIALLY_FILLED",
+                        "cum_quantity": 1.56,
+                    }
+                ],
+            }
+
+    result = reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=FakeExecutor())
+
+    assert result == {"reconciled_filled": 0, "cancelled_expired": 0, "still_pending": 1, "errors": 0}
+    records = read_auto_buyer_ledger(j_path)
+    assert records[0]["shares"] == 2.44
+    assert records[0]["cost_usd"] == round(0.4488 + 1.56 * 0.51, 4)
+    assert records[0]["fallback_reconciled"] is False
+
+
+def test_reconcile_marks_terminal_fill_and_stops_reconciling(tmp_path):
+    j_path, _ = _record_pending_fallback(tmp_path, event_start_utc=iso_utc(utc_now() + timedelta(hours=12)))
+
+    class FakeExecutor:
+        def order_snapshots(self, order_ids):
+            return {
+                "status": "live",
+                "orders": [
+                    {
+                        "order_id": "resting-remainder",
+                        "order_state": "ORDER_STATE_FILLED",
+                        "cum_quantity": 11.37,
+                    }
+                ],
+            }
+
+    result = reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=FakeExecutor())
+
+    assert result["reconciled_filled"] == 1
+    records = read_auto_buyer_ledger(j_path)
+    assert records[0]["shares"] == round(0.88 + 11.37, 4)
+    assert records[0]["fallback_reconciled"] is True
+
+    # Idempotent: a second run should not touch an already-reconciled row.
+    result_again = reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=FakeExecutor())
+    assert result_again == {"reconciled_filled": 0, "cancelled_expired": 0, "still_pending": 0, "errors": 0}
+
+
+def test_reconcile_cancels_resting_order_once_event_has_started(tmp_path):
+    j_path, _ = _record_pending_fallback(tmp_path, event_start_utc=iso_utc(utc_now() - timedelta(minutes=5)))
+    cancelled = []
+
+    class FakeExecutor:
+        def order_snapshots(self, order_ids):
+            return {
+                "status": "live",
+                "orders": [
+                    {"order_id": "resting-remainder", "order_state": "ORDER_STATE_NEW", "cum_quantity": 0.0}
+                ],
+            }
+
+        def cancel(self, order_id, user_command):
+            assert user_command is True
+            cancelled.append(order_id)
+            return {"status": "cancelled", "order_id": order_id}
+
+    result = reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=FakeExecutor())
+
+    assert cancelled == ["resting-remainder"]
+    assert result["cancelled_expired"] == 1
+    records = read_auto_buyer_ledger(j_path)
+    assert records[0]["fallback_reconciled"] is True
+    assert records[0]["shares"] == 0.88

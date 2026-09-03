@@ -18,6 +18,7 @@ from typing import Any
 import httpx
 
 from ..data_sources.espn import ESPNClient
+from ..data_sources.polymarket_execute import ExecutionGateError
 from ..domain import iso_utc, parse_utc, utc_now
 from ..ledger import FIELDNAMES
 from ..pricing import american_to_decimal
@@ -157,9 +158,20 @@ def record_auto_buy_execution(
     if line_val is None:
         line_val = _extract_line_from_record({"market_slug": slug})
 
+    # A resting fallback order (see polymarket_execute.py's
+    # ioc_fallback_resting) hasn't filled yet at record time -- shares/cost
+    # here are only the confirmed primary IOC fill. fallback_order_id lets
+    # reconcile_pending_auto_buyer_fallbacks() find this row later and add
+    # in whatever the resting order actually fills; primary_filled_shares/
+    # _cost_usd are the immutable baseline that reconciliation adds on top
+    # of, so repeated reconciliation runs stay idempotent.
+    fallback_order_id = order_payload.get("fallback_order_id") or None
+    fallback_resting_shares = round(float(order_payload.get("fallback_resting_shares") or 0.0), 4)
+
     # JSONL specific record
     jsonl_record = {
         "order_id": oid,
+        "order_ids": order_payload.get("order_ids") or [oid],
         "pick_id": pid,
         "executed_at_utc": exec_utc,
         "event_start_utc": start_utc,
@@ -190,6 +202,11 @@ def record_auto_buy_execution(
         "home_score": None,
         "settled_at_utc": "",
         "rationale": f"Auto-Buyer order {oid} on {slug} ({side})",
+        "fallback_order_id": fallback_order_id,
+        "fallback_resting_shares": fallback_resting_shares,
+        "fallback_reconciled": not bool(fallback_order_id),
+        "primary_filled_shares": round(shares, 4),
+        "primary_filled_cost_usd": round(cost, 4),
     }
 
     # 1. Append to JSONL log
@@ -267,6 +284,150 @@ def record_auto_buy_execution(
         )
 
     return jsonl_record
+
+
+def reconcile_pending_auto_buyer_fallbacks(
+    data_root: Path | str | None = None,
+    executor: Any | None = None,
+) -> dict[str, Any]:
+    """Resolve resting IOC-fallback orders left open by record_auto_buy_execution.
+
+    A resting fallback (see polymarket_execute.py's ``ioc_fallback_resting``)
+    isn't reconciled synchronously -- it may sit on the book for a while
+    before it fills, gets cancelled, or expires. This walks every ledger row
+    with an unreconciled ``fallback_order_id``, reads the exchange's
+    authoritative order state via ``order_snapshots``, and:
+
+    - adds whatever the resting order has filled (at its own recorded price,
+      since a GTC fallback never chases -- it only ever rests at the
+      original ticket price) on top of the immutable
+      ``primary_filled_shares``/``primary_filled_cost_usd`` baseline, so
+      repeated runs stay idempotent rather than double-counting;
+    - marks the row reconciled once the exchange reports a terminal state
+      (filled/canceled/expired/rejected);
+    - cancels the resting order once its event has started and it is still
+      open -- a stale resting limit has no business filling after pregame
+      information is void, and a game that already started only becomes
+      more so as it progresses.
+    """
+    root = Path(data_root) if data_root else DATA
+    j_path = root / "auto_buyer_ledger.jsonl"
+    x_path = root / "auto_buyer_picks.xlsx"
+    empty = {"reconciled_filled": 0, "cancelled_expired": 0, "still_pending": 0, "errors": 0}
+    if not j_path.exists():
+        return empty
+
+    records = read_auto_buyer_ledger(jsonl_path=j_path)
+    pending = [r for r in records if r.get("fallback_order_id") and not r.get("fallback_reconciled")]
+    if not pending:
+        return empty
+
+    live_executor = executor
+    if live_executor is None:
+        try:
+            from ..audit import AuditLog
+            from ..data_sources.polymarket_execute import PolymarketExecutor
+
+            live_executor = PolymarketExecutor(audit=AuditLog(root / "audit.jsonl"))
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError):
+            return empty
+
+    order_ids = sorted({str(r["fallback_order_id"]) for r in pending})
+    try:
+        snapshot = live_executor.order_snapshots(order_ids)
+    except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError):
+        return {**empty, "still_pending": len(pending), "errors": len(pending)}
+    if snapshot.get("status") != "live":
+        return {**empty, "still_pending": len(pending)}
+    by_id = {str(item.get("order_id")): item for item in snapshot.get("orders", [])}
+
+    now = utc_now()
+    terminal_states = {
+        "ORDER_STATE_FILLED",
+        "ORDER_STATE_CANCELED",
+        "ORDER_STATE_EXPIRED",
+        "ORDER_STATE_REJECTED",
+    }
+    reconciled_filled = cancelled_expired = still_pending = errors = 0
+    changed = False
+
+    for r in records:
+        fid = r.get("fallback_order_id")
+        if not fid or r.get("fallback_reconciled"):
+            continue
+        fid = str(fid)
+        order = by_id.get(fid)
+        if order is None:
+            still_pending += 1
+            continue
+
+        state = str(order.get("order_state") or "").upper()
+        try:
+            fallback_filled = max(0.0, float(order.get("cum_quantity") or 0.0))
+        except (TypeError, ValueError):
+            fallback_filled = 0.0
+        fallback_filled = min(fallback_filled, float(r.get("fallback_resting_shares") or 0.0))
+
+        primary_shares = float(r.get("primary_filled_shares") or 0.0)
+        primary_cost = float(r.get("primary_filled_cost_usd") or 0.0)
+        entry_price = float(r.get("entry_price") or 0.0)
+        new_shares = round(primary_shares + fallback_filled, 4)
+        new_cost = round(primary_cost + fallback_filled * entry_price, 4)
+        if new_shares != r.get("shares") or new_cost != r.get("cost_usd"):
+            r["shares"] = new_shares
+            r["cost_usd"] = new_cost
+            changed = True
+
+        is_terminal = state in terminal_states
+        try:
+            started = parse_utc(str(r.get("event_start_utc") or "")) <= now
+        except ValueError:
+            started = False
+
+        if not is_terminal and started:
+            try:
+                live_executor.cancel(fid, user_command=True)
+                is_terminal = True
+                state = state or "ORDER_STATE_CANCELED"
+            except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError):
+                errors += 1
+
+        if is_terminal:
+            r["fallback_reconciled"] = True
+            r["order_state"] = "ORDER_STATE_PARTIALLY_FILLED" if new_shares > 0 else state
+            changed = True
+            if fallback_filled > 0:
+                reconciled_filled += 1
+            else:
+                cancelled_expired += 1
+        else:
+            still_pending += 1
+
+    if changed:
+        try:
+            with j_path.open("w", encoding="utf-8") as f:
+                for r in records:
+                    f.write(json.dumps(r, sort_keys=True) + "\n")
+        except OSError as err:
+            logger.warning(f"Failed to rewrite auto_buyer_ledger.jsonl during fallback reconciliation: {err}")
+        try:
+            if x_path.exists():
+                _, existing_rows = read_xlsx_rows(x_path)
+                by_pick = {str(row.get("pick_id")): row for row in existing_rows}
+                for r in records:
+                    row = by_pick.get(str(r.get("pick_id")))
+                    if row is not None:
+                        row["units"] = f"{float(r.get('units') or 1.0):.2f}"
+                write_xlsx_rows_atomic(x_path, FIELDNAMES, list(by_pick.values()))
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError) as err:
+            logger.warning(f"Failed to update auto_buyer_picks.xlsx during fallback reconciliation: {err}")
+
+    return {
+        "reconciled_filled": reconciled_filled,
+        "cancelled_expired": cancelled_expired,
+        "still_pending": still_pending,
+        "errors": errors,
+    }
 
 
 def read_auto_buyer_ledger(

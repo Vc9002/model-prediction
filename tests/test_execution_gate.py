@@ -667,6 +667,114 @@ def test_marketable_limit_uses_ioc_and_can_take_liquidity(tmp_path, monkeypatch)
     assert payloads[-1]["synchronousExecution"] is True
 
 
+def test_ioc_partial_fill_rests_remainder_at_same_price_not_chased(tmp_path, monkeypatch) -> None:
+    client = executor(tmp_path, answer="y", env=US_CREDS)
+    post_payloads = []
+
+    def fake_request(method, path, payload=None):
+        assert path == "/v1/orders"
+        post_payloads.append(payload)
+        if len(post_payloads) == 1:
+            return {"id": "primary-partial", "state": "ORDER_STATE_PARTIALLY_FILLED", "cumQuantity": 0.88}
+        return {"id": "resting-remainder", "state": "ORDER_STATE_NEW", "cumQuantity": 0.0}
+
+    monkeypatch.setattr(client, "_request", fake_request)
+    partial_ticket = OrderTicket(
+        **{
+            **ticket().__dict__,
+            "order_type": "limit_ioc",
+            "price": 0.51,
+            "size_shares": 12.25,
+            "estimated_cost_usd": 6.25,
+            "maximum_cost_usd": 6.35,
+            "ioc_fallback_resting": True,
+        }
+    )
+
+    result = client.execute(partial_ticket, qualified_row(), execute_flag=True, user_command=True)
+
+    assert len(post_payloads) == 2
+    # The fallback must rest at the SAME price as the original IOC -- never
+    # a higher, "chased" price.
+    assert post_payloads[0]["price"]["value"] == "0.51"
+    assert post_payloads[1]["price"]["value"] == "0.51"
+    assert post_payloads[1]["quantity"] == 11.37
+    assert post_payloads[1]["tif"] == "TIME_IN_FORCE_GOOD_TILL_CANCEL"
+    assert post_payloads[1]["participateDontInitiate"] is True
+    assert post_payloads[1]["synchronousExecution"] is False
+    assert result["order_ids"] == ["primary-partial", "resting-remainder"]
+    assert result["fallback_order_id"] == "resting-remainder"
+    assert result["fallback_status"] == "resting"
+    assert result["fallback_resting_shares"] == 11.37
+    # Only the confirmed primary fill counts toward filled shares/cost --
+    # the resting order hasn't filled yet.
+    assert result["filled_size_shares"] == 0.88
+    assert result["estimated_filled_cost_usd"] == 0.4488
+    assert result["order_state"] == "ORDER_STATE_PARTIALLY_FILLED"
+
+
+def test_ioc_zero_fill_rests_full_remainder(tmp_path, monkeypatch) -> None:
+    client = executor(tmp_path, answer="y", env=US_CREDS)
+    post_payloads = []
+
+    def fake_request(method, path, payload=None):
+        post_payloads.append(payload)
+        if len(post_payloads) == 1:
+            return {"id": "primary-expired", "state": "ORDER_STATE_EXPIRED"}
+        return {"id": "resting-full", "state": "ORDER_STATE_NEW", "cumQuantity": 0.0}
+
+    monkeypatch.setattr(client, "_request", fake_request)
+    zero_fill_ticket = OrderTicket(
+        **{
+            **ticket().__dict__,
+            "order_type": "limit_ioc",
+            "price": 0.43,
+            "size_shares": 14.88,
+            "estimated_cost_usd": 6.4,
+            "maximum_cost_usd": 6.5,
+            "ioc_fallback_resting": True,
+        }
+    )
+
+    result = client.execute(zero_fill_ticket, qualified_row(), execute_flag=True, user_command=True)
+
+    assert result["fallback_order_id"] == "resting-full"
+    assert result["fallback_resting_shares"] == 14.88
+    assert result["filled_size_shares"] == 0.0
+    assert result["estimated_filled_cost_usd"] == 0.0
+    assert result["order_state"] == "ORDER_STATE_PARTIALLY_FILLED"
+
+
+def test_ioc_partial_fill_without_resting_flag_leaves_remainder_unfilled(tmp_path, monkeypatch) -> None:
+    """Opt-in only: a ticket that doesn't set ioc_fallback_resting never
+    submits a second order, matching plain historical IOC behavior."""
+    client = executor(tmp_path, answer="y", env=US_CREDS)
+    post_payloads = []
+
+    def fake_request(method, path, payload=None):
+        post_payloads.append(payload)
+        return {"id": "primary-partial", "state": "ORDER_STATE_PARTIALLY_FILLED", "cumQuantity": 0.88}
+
+    monkeypatch.setattr(client, "_request", fake_request)
+    partial_ticket = OrderTicket(
+        **{
+            **ticket().__dict__,
+            "order_type": "limit_ioc",
+            "price": 0.51,
+            "size_shares": 12.25,
+            "estimated_cost_usd": 6.25,
+            "maximum_cost_usd": 6.35,
+        }
+    )
+
+    result = client.execute(partial_ticket, qualified_row(), execute_flag=True, user_command=True)
+
+    assert len(post_payloads) == 1
+    assert result["order_ids"] == ["primary-partial"]
+    assert result["fallback_order_id"] is None
+    assert result["filled_size_shares"] == 0.88
+
+
 def test_portfolio_snapshot_uses_exchange_positions_and_activity_endpoints(tmp_path, monkeypatch) -> None:
     client = executor(tmp_path, env=US_CREDS)
     responses = {

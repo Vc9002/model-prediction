@@ -30,6 +30,7 @@ use the international Polymarket CLOB or a wallet private key.
 from __future__ import annotations
 
 import base64
+import math
 import os
 import re
 import time
@@ -215,13 +216,21 @@ class OrderTicket:
     estimated_cost_usd: float
     maximum_cost_usd: float | None = None
     authorization_type: str = "qualified_model"
+    ioc_fallback_resting: bool = False
 
     def describe(self) -> str:
+        fallback = (
+            " If the IOC only partially fills, the unfilled remainder is "
+            "placed as a resting GTC order at this same price (never a "
+            "higher/chased price)."
+            if self.ioc_fallback_resting
+            else ""
+        )
         return (
             f"Order: {self.action.upper()} {self.size_shares:g} shares "
             f"[{self.token_side}] of {self.market_slug} @ ${self.price:.4f} "
             f"({self.order_type}). Estimated cost: ${self.estimated_cost_usd:.2f}. "
-            f"Authorization: {self.authorization_type}. Pick: {self.pick_id}."
+            f"Authorization: {self.authorization_type}. Pick: {self.pick_id}.{fallback}"
         )
 
 
@@ -383,6 +392,8 @@ class PolymarketExecutor:
             raise ExecutionGateError(
                 "REFUSED: supported order types are post-only GTC and marketable IOC limits."
             )
+        if ticket.ioc_fallback_resting and (ticket.order_type != "limit_ioc" or ticket.action != "buy"):
+            raise ExecutionGateError("REFUSED: the resting fallback is valid only for IOC buy orders.")
         # Live side/pregame/freshness verification, independent of whatever
         # the caller already checked. dashboard_server.py's preview/submit
         # flow derives token_side from the row's own quote before ever
@@ -425,6 +436,13 @@ class PolymarketExecutor:
                 "source_reason_code": pick_row.get("reason_code"),
                 "source_artifact_qualified": artifact_qualified,
                 "transaction_hash": submission.get("transaction_hash"),
+                "order_ids": submission.get("order_ids") or [submission.get("order_id")],
+                "filled_size_shares": submission.get("filled_size_shares"),
+                "estimated_filled_cost_usd": submission.get("estimated_filled_cost_usd"),
+                "ioc_fallback_resting": ticket.ioc_fallback_resting,
+                "fallback_order_id": submission.get("fallback_order_id"),
+                "fallback_status": submission.get("fallback_status"),
+                "fallback_resting_shares": submission.get("fallback_resting_shares"),
                 "submitted_at_utc": iso_utc(utc_now()),
             },
         )
@@ -560,7 +578,12 @@ class PolymarketExecutor:
 
         Polymarket US always expects ``price.value`` in the market's long/YES
         coordinate, even for a short/NO intent. ``OrderTicket.price`` remains
-        the exact user-confirmed price of the selected outcome.
+        the exact user-confirmed price of the selected outcome. When an IOC
+        buy only partially (or never) fills and ``ioc_fallback_resting`` is
+        set, the unfilled remainder is placed as a second order -- but that
+        second order is a GTC resting limit AT THE SAME PRICE, never a
+        marketable order at a higher price. It waits on the book for a
+        seller rather than paying up to force an immediate fill.
         """
         intent = {
             ("buy", "long"): "ORDER_INTENT_BUY_LONG",
@@ -571,33 +594,112 @@ class PolymarketExecutor:
         if intent is None:
             raise ExecutionGateError("REFUSED: unsupported order action/side.")
         exchange_price = ticket.price if ticket.token_side == "long" else 1.0 - ticket.price
-        marketable = ticket.order_type == "limit_ioc"
-        response = self._request(
-            "POST",
-            "/v1/orders",
-            {
-                "marketSlug": ticket.market_slug,
-                "intent": intent,
-                "type": "ORDER_TYPE_LIMIT",
-                "price": {"value": f"{exchange_price:.2f}", "currency": "USD"},
-                "quantity": ticket.size_shares,
-                "tif": (
-                    "TIME_IN_FORCE_IMMEDIATE_OR_CANCEL" if marketable else "TIME_IN_FORCE_GOOD_TILL_CANCEL"
-                ),
-                "participateDontInitiate": not marketable,
-                "manualOrderIndicator": "MANUAL_ORDER_INDICATOR_MANUAL",
-                "synchronousExecution": marketable,
-            },
-        )
-        order_id = response.get("id") or (response.get("order") or {}).get("id")
-        if not order_id:
-            raise ExecutionGateError(
-                "REFUSED: Polymarket US did not return an order ID; no submitted state was recorded."
+
+        def submit_order(order_type: str, quantity: float) -> tuple[dict[str, Any], str]:
+            marketable_order = order_type == "limit_ioc"
+            response = self._request(
+                "POST",
+                "/v1/orders",
+                {
+                    "marketSlug": ticket.market_slug,
+                    "intent": intent,
+                    "type": "ORDER_TYPE_LIMIT",
+                    "price": {"value": f"{exchange_price:.2f}", "currency": "USD"},
+                    "quantity": quantity,
+                    "tif": (
+                        "TIME_IN_FORCE_IMMEDIATE_OR_CANCEL"
+                        if marketable_order
+                        else "TIME_IN_FORCE_GOOD_TILL_CANCEL"
+                    ),
+                    "participateDontInitiate": not marketable_order,
+                    "manualOrderIndicator": "MANUAL_ORDER_INDICATOR_MANUAL",
+                    "synchronousExecution": marketable_order,
+                },
             )
+            order_id = response.get("id") or (response.get("order") or {}).get("id")
+            if not order_id:
+                raise ExecutionGateError(
+                    "REFUSED: Polymarket US did not return an order ID; no submitted state was recorded."
+                )
+            return response, str(order_id)
+
+        def order_from(response: dict[str, Any]) -> dict[str, Any]:
+            nested = response.get("order")
+            return nested if isinstance(nested, dict) else response
+
+        def fill_quantity(order: dict[str, Any], requested: float) -> float | None:
+            raw = order.get("cumQuantity")
+            try:
+                value = float(raw)
+            except (TypeError, ValueError):
+                state = str(order.get("state") or "").upper()
+                if state == "ORDER_STATE_FILLED":
+                    return requested
+                if state in {"ORDER_STATE_CANCELED", "ORDER_STATE_EXPIRED", "ORDER_STATE_REJECTED"}:
+                    return 0.0
+                return None
+            if not math.isfinite(value):
+                return None
+            return max(0.0, min(requested, value))
+
+        marketable = ticket.order_type == "limit_ioc"
+        response, order_id = submit_order(ticket.order_type, ticket.size_shares)
+        order = order_from(response)
+        primary_filled = fill_quantity(order, ticket.size_shares)
+        if marketable and primary_filled is None:
+            try:
+                refreshed = self._request("GET", f"/v1/order/{order_id}", None)
+                order = order_from(refreshed)
+                primary_filled = fill_quantity(order, ticket.size_shares)
+            except ExecutionGateError:
+                pass
+
+        order_ids = [order_id]
+        fallback_order_id: str | None = None
+        fallback_status = "not_authorized"
+        fallback_resting_shares = 0.0
+
+        can_fallback = (
+            marketable
+            and ticket.action == "buy"
+            and ticket.ioc_fallback_resting
+            and primary_filled is not None
+            and primary_filled + 1e-9 < ticket.size_shares
+        )
+        if can_fallback:
+            fallback_resting_shares = round(ticket.size_shares - primary_filled, 4)
+            if fallback_resting_shares >= 0.01:
+                _fallback_response, fallback_order_id = submit_order("limit_gtc", fallback_resting_shares)
+                order_ids.append(fallback_order_id)
+                fallback_status = "resting"
+            else:
+                fallback_status = "no_remainder"
+
+        known_primary_filled = (
+            primary_filled if primary_filled is not None else (0.0 if marketable else ticket.size_shares)
+        )
+        total_filled = round(known_primary_filled, 4)
+        estimated_filled_cost = round(known_primary_filled * ticket.price, 4)
+
+        if not marketable:
+            final_state = str(order.get("state") or "ORDER_STATE_NEW")
+        elif total_filled + 1e-9 >= ticket.size_shares:
+            final_state = "ORDER_STATE_FILLED"
+        elif total_filled > 0 or fallback_order_id is not None:
+            final_state = "ORDER_STATE_PARTIALLY_FILLED"
+        else:
+            final_state = str(order.get("state") or "ORDER_STATE_EXPIRED")
+
         return {
-            "order_id": str(order_id),
-            "order_state": response.get("state") or (response.get("order") or {}).get("state"),
+            "order_id": order_id,
+            "order_ids": order_ids,
+            "order_state": final_state,
             "exchange_price": round(exchange_price, 2),
+            "filled_size_shares": total_filled,
+            "estimated_filled_cost_usd": estimated_filled_cost,
+            "fallback_order_id": fallback_order_id,
+            "fallback_status": fallback_status,
+            "fallback_resting_shares": fallback_resting_shares,
             "raw_response": response,
         }
 

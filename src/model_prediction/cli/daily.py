@@ -984,6 +984,23 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             logger.warning("Automated Polymarket buyer cycle failed", exc_info=True)
             auto_buyer_result = {"status": "error"}
 
+    # Step 12b: reconcile any resting Auto-Buyer fallback orders (IOC
+    # partial/zero fills left resting at the same price -- see DEBUG.md's
+    # 2026-09-03 entry) against live exchange state, and cancel any that
+    # are still open once their event has started.
+    fallback_reconcile_result: dict[str, Any] = {"status": "skipped"}
+    if not _skip_auto_buyer_for_verification():
+        try:
+            from ..portfolio.auto_buyer_ledger import reconcile_pending_auto_buyer_fallbacks
+
+            fallback_reconcile_result = {
+                "status": "ok",
+                **reconcile_pending_auto_buyer_fallbacks(),
+            }
+        except Exception:
+            logger.warning("Auto-Buyer fallback reconciliation failed", exc_info=True)
+            fallback_reconcile_result = {"status": "error"}
+
     report = {
         "timing": {
             "total_seconds": round(time.monotonic() - _t_start, 1),
@@ -1024,5 +1041,6 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         "step10_polymarket_edge_record": poly_edge_record_result,
         "step11_polymarket_edge_settle": poly_edge_settle_result,
         "step12_auto_polymarket_buyer": auto_buyer_result,
+        "step12b_auto_buyer_fallback_reconcile": fallback_reconcile_result,
     }
     return _finalize_daily_report(report)

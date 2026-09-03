@@ -980,10 +980,18 @@ def run_settle(args, config, registry, bans, ledger, audit, data_root) -> dict:
             )
         if gated_settlement:
             output["gated_research_settlement"] = gated_settlement
-        # Also settle the dedicated Auto-Buyer ledger
+        # Resolve any resting IOC-fallback orders before settlement, so a
+        # fallback that filled overnight is reflected in today's shares/cost
+        # rather than waiting for the next cycle.
         try:
-            from ..portfolio.auto_buyer_ledger import settle_auto_buyer_ledger
+            from ..portfolio.auto_buyer_ledger import (
+                reconcile_pending_auto_buyer_fallbacks,
+                settle_auto_buyer_ledger,
+            )
 
+            output["auto_buyer_fallback_reconciliation"] = reconcile_pending_auto_buyer_fallbacks(
+                data_directory
+            )
             output["auto_buyer_settlement"] = settle_auto_buyer_ledger(data_directory)
         except (OSError, ValueError, KeyError, TypeError, RuntimeError) as err:
             logger.warning("Auto-buyer settlement failed: %s", err)

@@ -1,21 +1,21 @@
 {
-  "last_refreshed_utc": "2026-08-27T00:43:19.695512+00:00",
+  "last_refreshed_utc": "2026-09-03T04:34:35.063721+00:00",
   "league_rates": {
     "date_range": [
       "2024-03-20",
       "2026-09-22"
     ],
-    "league_relief_era": 4.0532,
-    "league_runs_per_team_game": 4.5373,
-    "league_starter_era": 4.1921,
-    "league_strikeout_rate": 0.219,
-    "league_walk_rate": 0.0788,
-    "n_games": 6685
+    "league_relief_era": 4.0625,
+    "league_runs_per_team_game": 4.5399,
+    "league_starter_era": 4.1938,
+    "league_strikeout_rate": 0.2189,
+    "league_walk_rate": 0.0789,
+    "n_games": 6776
   },
   "park_factors": {
     "date_range": [
       "2024-02-22",
-      "2026-08-26"
+      "2026-09-03"
     ],
     "n_teams": 30
   }

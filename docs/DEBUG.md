@@ -1,6 +1,36 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
-**Last audited**: 2026-09-02 (see new section directly below)
+**Last audited**: 2026-09-03 (see new section directly below)
+
+## 2026-09-03 — Auto-Buyer IOC partial-fill: rest the remainder, don't chase price
+
+The LODIS order `C8SAMAA24MVP` requested 12.25 shares at $0.51 for a $6.25
+target, but the live exchange order expired after filling only 0.88 shares.
+The authenticated portfolio reported $0.4488 base cost plus $0.0090 fees,
+explaining the roughly $0.46 position visible in Polymarket. The old
+Auto-Buyer ledger incorrectly recorded the requested quantity and cost as if
+they had filled — confirmed live across the same 04:38 UTC batch: two other
+orders (`aec-atp-benbon-ignbus`, `aec-cs2-ntr-ef`) filled 0% while their
+ledger rows showed full requested cost, and one (`aec-cs2-vexar-bge`) filled
+~52% while its ledger row showed 100%.
+
+An earlier version of this fix chased the ask with a second marketable IOC
+up to 3 cents above the original price. That is the wrong design and was
+reverted (2026-09-03, same day) — a fallback should never pay more than the
+user-confirmed price to force an immediate fill.
+
+**Current design.** Auto-Buyer IOC orders now reconcile actual fill quantity
+via the exchange's `cumQuantity`/order state (with a GET refresh if the
+synchronous response doesn't carry a fill count). If a buy order partially
+or entirely fails to fill, the unfilled remainder is placed as a *second*
+order — but that order is a resting **GTC limit at the exact same price**,
+never a marketable order or a chased/higher price. It waits on the book for
+a seller instead of paying up. This is opt-in per ticket
+(`OrderTicket.ioc_fallback_resting`); Auto-Buyer always sets it, a plain
+manual `execute` does not unless asked. Ledgers and daily-spend accounting
+use the confirmed *filled* quantity/cost from the primary order only — the
+resting remainder isn't assumed complete and is tracked separately
+(`fallback_order_id`) for later reconciliation once it actually fills.
 
 ## 2026-09-02 — Auto-Buyer settlement resilience and performance cohorts
 

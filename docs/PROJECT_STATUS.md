@@ -10,6 +10,22 @@ is the running log of real bugs found/fixed with full evidence.
 Historical metrics in old reports, changelog entries, model cards, and
 rollback artifacts are not current operational truth.
 
+## 2026-09-03 — Auto-Buyer IOC fill reconciliation + resting-order fallback
+
+- Auto-Buyer marketable orders now reconcile actual IOC fills via the
+  exchange's `cumQuantity`/order state instead of assuming the requested
+  quantity filled. A partially- or zero-filled buy gets its unfilled
+  remainder placed as a second, **resting GTC order at the same price** —
+  never a marketable/chased order at a higher price.
+- Filled quantity/cost — not requested quantity/cost — now drive the
+  dedicated ledger and daily-spend accounting. Fixes the failure exposed by
+  the LODIS order (`$6.25` requested, only `~$0.46` actually filled) and
+  three siblings from the same batch (two 0%-filled orders, one ~52%-filled
+  order) that were all recorded as fully filled.
+- See `docs/DEBUG.md`'s 2026-09-03 entry for the full trace, including why
+  an earlier same-day version (chase the ask up to 3 cents) was reverted in
+  favor of resting the remainder.
+
 ## 2026-09-02 — Auto-Buyer MLB moneyline execution disabled
 
 - **Performance view added**: Auto-Buyer now has a settled-only Performance

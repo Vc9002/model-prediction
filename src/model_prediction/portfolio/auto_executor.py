@@ -804,6 +804,7 @@ class AutoPolymarketBuyer:
                 estimated_cost_usd=actual_cost,
                 maximum_cost_usd=actual_cost + 0.10,
                 authorization_type="auto_whitelisted_model",
+                ioc_fallback_resting=True,
             )
 
             order_payload = {
@@ -861,28 +862,47 @@ class AutoPolymarketBuyer:
                     artifact_qualified=True,
                 )
                 oid = sub.get("order_id")
+                filled_shares = float(sub.get("filled_size_shares") or 0.0)
+                filled_cost = float(sub.get("estimated_filled_cost_usd") or 0.0)
+                executed_payload = {
+                    **order_payload,
+                    "requested_shares": shares,
+                    "requested_cost_usd": actual_cost,
+                    "shares": filled_shares,
+                    "cost_usd": filled_cost,
+                    "order_ids": sub.get("order_ids") or [oid],
+                    "fallback_order_id": sub.get("fallback_order_id"),
+                    "fallback_status": sub.get("fallback_status"),
+                    "fallback_resting_shares": sub.get("fallback_resting_shares"),
+                }
                 result.submitted_orders.append(
                     {
                         "status": sub.get("status", "submitted"),
                         "order_id": oid,
-                        **order_payload,
+                        "order_state": sub.get("order_state"),
+                        **executed_payload,
                     }
                 )
-                current_spend += actual_cost
+                current_spend += filled_cost
                 result.total_spend_usd = round(current_spend, 2)
 
                 # Record directly to dedicated Auto-Buyer Ledger and Logger
+                # -- the confirmed *filled* quantity/cost, not the requested
+                # ones: an IOC can partially or never fill, and any
+                # unfilled remainder is now resting separately (see
+                # ioc_fallback_resting) rather than assumed complete here.
                 try:
                     from model_prediction.portfolio.auto_buyer_ledger import (
                         record_auto_buy_execution,
                     )
 
-                    record_auto_buy_execution(
-                        order_payload=order_payload,
-                        order_id=oid,
-                        order_state=str(sub.get("status", "FILLED")).upper(),
-                        pick_row=row,
-                    )
+                    if filled_shares > 0:
+                        record_auto_buy_execution(
+                            order_payload=executed_payload,
+                            order_id=oid,
+                            order_state=str(sub.get("order_state") or "FILLED").upper(),
+                            pick_row=row,
+                        )
                 except (OSError, ValueError, KeyError, TypeError, RuntimeError):
                     pass
 
