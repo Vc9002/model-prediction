@@ -85,11 +85,14 @@ AUTO_BUYER_STATE_FILE = DATA / "auto_buyer_state.json"
 EXECUTABLE_AUTO_BUYER_MARKET_TYPES = frozenset({"moneyline", "spread", "total", "nrfi"})
 ESPORTS_LEAGUES = frozenset({"cs2", "lol", "dota2", "valorant", "r6", "cod", "ow", "rl"})
 DISABLED_AUTO_BUYER_SPORT_MARKETS = frozenset({("mlb", "moneyline")})
+DEFAULT_AUTO_BUYER_UNIT_VALUE_USD = 0.50
+DEFAULT_MAX_DAILY_SPEND_UNITS = 50.0
+DEFAULT_MAX_GAME_STAKE_UNITS = 5.0
 
 
 @dataclass(frozen=True)
 class AutoExecutionConfig:
-    unit_value_usd: float = 0.50  # 1U = 50 cents default
+    unit_value_usd: float = DEFAULT_AUTO_BUYER_UNIT_VALUE_USD
     min_edge: float = 0.035  # Minimum +3.5% edge over market ask
     max_daily_spend_usd: float = 25.0  # Daily budget cap
     max_game_stake_usd: float = 2.50  # Max dollars per game/pick
@@ -231,10 +234,10 @@ def load_auto_buyer_state() -> dict[str, Any]:
     """Load persistent auto-buyer configuration and runtime toggle state."""
     default_state = {
         "enabled": False,
-        "unit_value_usd": 0.50,
+        "unit_value_usd": DEFAULT_AUTO_BUYER_UNIT_VALUE_USD,
         "min_edge": 0.035,
-        "max_daily_spend_usd": 25.0,
-        "max_game_stake_usd": 2.50,
+        "max_daily_spend_units": DEFAULT_MAX_DAILY_SPEND_UNITS,
+        "max_game_stake_units": DEFAULT_MAX_GAME_STAKE_UNITS,
         "whitelist_models": list(DEFAULT_WHITELIST_MODELS),
         "blacklist_models": list(EXPLICIT_BLACKLIST_MODELS),
         "disabled_sport_markets": [
@@ -243,13 +246,49 @@ def load_auto_buyer_state() -> dict[str, Any]:
         "last_run": None,
         "last_daily_date": None,
     }
-    if not AUTO_BUYER_STATE_FILE.exists():
-        return default_state
+    data: dict[str, Any] = {}
+    if AUTO_BUYER_STATE_FILE.exists():
+        try:
+            data = json.loads(AUTO_BUYER_STATE_FILE.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            data = {}
+    state = {**default_state, **data}
     try:
-        data = json.loads(AUTO_BUYER_STATE_FILE.read_text(encoding="utf-8"))
-        return {**default_state, **data}
-    except (json.JSONDecodeError, OSError):
-        return default_state
+        unit_value = float(state.get("unit_value_usd") or DEFAULT_AUTO_BUYER_UNIT_VALUE_USD)
+    except (TypeError, ValueError):
+        unit_value = DEFAULT_AUTO_BUYER_UNIT_VALUE_USD
+    if not math.isfinite(unit_value) or unit_value <= 0:
+        unit_value = DEFAULT_AUTO_BUYER_UNIT_VALUE_USD
+
+    def _unit_limit(unit_key: str, legacy_usd_key: str, default_units: float) -> float:
+        raw_units = data.get(unit_key)
+        if raw_units is None and data.get(legacy_usd_key) is not None:
+            try:
+                raw_units = float(data[legacy_usd_key]) / unit_value
+            except (TypeError, ValueError, ZeroDivisionError):
+                raw_units = None
+        try:
+            parsed = float(raw_units if raw_units is not None else default_units)
+        except (TypeError, ValueError):
+            parsed = default_units
+        return parsed if math.isfinite(parsed) and parsed > 0 else default_units
+
+    daily_units = _unit_limit(
+        "max_daily_spend_units",
+        "max_daily_spend_usd",
+        DEFAULT_MAX_DAILY_SPEND_UNITS,
+    )
+    game_units = _unit_limit(
+        "max_game_stake_units",
+        "max_game_stake_usd",
+        DEFAULT_MAX_GAME_STAKE_UNITS,
+    )
+    state["unit_value_usd"] = unit_value
+    state["max_daily_spend_units"] = daily_units
+    state["max_game_stake_units"] = game_units
+    state["max_daily_spend_usd"] = round(daily_units * unit_value, 2)
+    state["max_game_stake_usd"] = round(game_units * unit_value, 2)
+    return state
 
 
 def save_auto_buyer_state(state: dict[str, Any]) -> None:
@@ -282,8 +321,12 @@ def set_auto_buyer_unit_value(raw_value: Any) -> dict[str, Any]:
         raise ValueError("Auto-Buyer 1U must be between $0.01 and $100,000.00")
 
     state = load_auto_buyer_state()
-    previous = float(state.get("unit_value_usd") or 0.50)
+    previous = float(state.get("unit_value_usd") or DEFAULT_AUTO_BUYER_UNIT_VALUE_USD)
     state["unit_value_usd"] = round(value, 2)
+    daily_units = float(state.get("max_daily_spend_units") or DEFAULT_MAX_DAILY_SPEND_UNITS)
+    game_units = float(state.get("max_game_stake_units") or DEFAULT_MAX_GAME_STAKE_UNITS)
+    state["max_daily_spend_usd"] = round(daily_units * state["unit_value_usd"], 2)
+    state["max_game_stake_usd"] = round(game_units * state["unit_value_usd"], 2)
     state["updated_at_utc"] = iso_utc(utc_now())
     save_auto_buyer_state(state)
     try:
@@ -293,6 +336,10 @@ def set_auto_buyer_unit_value(raw_value: Any) -> dict[str, Any]:
             {
                 "previous_usd": previous,
                 "unit_value_usd": state["unit_value_usd"],
+                "max_game_stake_units": game_units,
+                "max_game_stake_usd": state["max_game_stake_usd"],
+                "max_daily_spend_units": daily_units,
+                "max_daily_spend_usd": state["max_daily_spend_usd"],
                 "source": "dashboard",
             },
         )
@@ -302,9 +349,11 @@ def set_auto_buyer_unit_value(raw_value: Any) -> dict[str, Any]:
         "status": "ok",
         "previous_unit_value_usd": previous,
         "unit_value_usd": state["unit_value_usd"],
-        "max_game_stake_usd": float(state.get("max_game_stake_usd") or 2.50),
-        "max_daily_spend_usd": float(state.get("max_daily_spend_usd") or 25.0),
-        "note": "Applies only to future Auto-Buyer orders; historical rows retain their recorded unit value.",
+        "max_game_stake_units": game_units,
+        "max_game_stake_usd": state["max_game_stake_usd"],
+        "max_daily_spend_units": daily_units,
+        "max_daily_spend_usd": state["max_daily_spend_usd"],
+        "note": "Applies only to future Auto-Buyer orders; unit-based game/day caps scale with it and historical rows retain their recorded unit value.",
     }
 
 

@@ -20,10 +20,11 @@ rollback artifacts are not current operational truth.
   are descriptive, not qualification evidence.
 - **Auto-Buyer unit value is configurable independently**: the Auto-Buyer page
   has a confirmed, persisted `1U = $` control for future automated order
-  sizing. It remains $0.50 until changed. Historical rows retain their recorded
-  unit value, and the $2.50 per-game / $25 daily dollar caps remain binding.
-  It is deliberately not coupled to the current $5.00 general dashboard unit,
-  which would otherwise create an unreviewed 10x sizing jump.
+  sizing. Vincent changed it from $0.50 to $5.00 on 2026-09-02. Historical rows
+  retain their recorded unit value. Risk caps now follow the unit setting at
+  5U per game and 50U per day, currently $25 and $250 respectively; the
+  confirmation dialog previews both dollar equivalents before applying a
+  change. It remains deliberately independent from the general dashboard unit.
 - **Settlement resilience verified**: an isolated copied-ledger rehearsal
   produced one new settlement and two cost-basis normalizations, then an
   immediate second pass returned `changed: 0`. Transient ESPN HTTP failures in

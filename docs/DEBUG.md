@@ -29,12 +29,14 @@ never enters record, P&L, stake, win-rate, or ROI denominators.
 
 **Unit control.** Auto-Buyer now has its own persisted `1U = $` control rather
 than silently sharing the dashboard's general unit value. This separation is
-intentional: the current general unit is $5.00 while live Auto-Buyer sizing is
-$0.50, so coupling them would have raised automated sizing tenfold. A confirmed
-change updates `auto_buyer_state.json` and future Auto-Buyer cycles read that
-value; per-game and daily dollar caps still apply. Settlement uses each row's
-recorded `unit_value_usd`, so existing orders and historical P&L units are not
-restated after a settings change.
+intentional even though both values are currently $5.00: changing either one
+does not silently change the other. A confirmed Auto-Buyer change updates
+`auto_buyer_state.json` and future Auto-Buyer cycles read that value. Risk
+limits are expressed as 5U per game and 50U per day, so their
+dollar equivalents scale with `1U`: at the current $5.00 setting they are
+$25/game and $250/day. The confirmation dialog shows both unit and resulting
+dollar limits before applying a change. Settlement uses each row's recorded
+`unit_value_usd`, so existing orders and historical P&L units are not restated.
 
 **Snapshot review (2026-09-02 15:40 ET).** Across 85 settled rows, All was
 47-38, +$4.82 (+9.64U), +10.6% ROI. MLB was 6-8, -$1.00 (-2.01U), -14.4% ROI;

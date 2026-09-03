@@ -782,6 +782,9 @@ def test_auto_buyer_consolidated_tab_markup_and_routing() -> None:
     assert '"/api/auto-buyer/unit-value"' in html
     assert "saveAutoBuyerUnitValue" in html
     assert "historical rows retain their execution-time unit value" in html
+    assert "Future automated sizing and unit-based risk caps will become" in html
+    assert "max_game_stake_units" in html
+    assert "max_daily_spend_units" in html
     assert "setAutoBuyerView('performance')" in html
     assert "MLB cohort = MLB sport or MLB model ID" in html
     assert 'timeZone: "America/New_York"' in html

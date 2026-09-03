@@ -3661,8 +3661,10 @@ async function toggleAutoBuyer(){
   const currentlyOn=btn&&btn.textContent.includes("ON");
   const nextState=!currentlyOn;
   const unitValue=Number(_autoBuyerStatusCache.unit_value_usd||0.50);
+  const gameCapUnits=Number(_autoBuyerStatusCache.max_game_stake_units||5);
+  const dailyCapUnits=Number(_autoBuyerStatusCache.max_daily_spend_units||50);
   const msg=nextState
-    ?`Enable LIVE Polymarket Auto-Buyer?\n\n- Sizing: 1U = $${unitValue.toFixed(2)}\n- Whitelisted models only (Tennis, Soccer, WNBA ML, CS2/LoL Gated, MLB NRFI/Totals)\n- Blacklisted negative-EV derivatives blocked\n- Limit IOC orders placed on Polymarket US API`
+    ?`Enable LIVE Polymarket Auto-Buyer?\n\n- Sizing: 1U = $${unitValue.toFixed(2)}\n- Per-game cap: ${gameCapUnits.toFixed(1)}U = $${(gameCapUnits*unitValue).toFixed(2)}\n- Daily cap: ${dailyCapUnits.toFixed(1)}U = $${(dailyCapUnits*unitValue).toFixed(2)}\n- Whitelisted models only (Tennis, Soccer, WNBA ML, CS2/LoL Gated, MLB NRFI/Totals)\n- Blacklisted negative-EV derivatives blocked\n- Limit IOC orders placed on Polymarket US API`
     :"Disable Polymarket Auto-Buyer?";
   if(!confirm(msg))return;
   try{
@@ -3682,9 +3684,12 @@ async function saveAutoBuyerUnitValue(){
   if(!Number.isFinite(value)||value<0.01||value>100000){
     showModal('<h2 class="red">Invalid Auto-Buyer unit value</h2><p>Enter a dollar amount from $0.01 to $100,000.00.</p>');return;
   }
-  const gameCap=Number(_autoBuyerStatusCache.max_game_stake_usd||2.50);
-  const dailyCap=Number(_autoBuyerStatusCache.max_daily_spend_usd||25.00);
-  if(!window.confirm(`Set Auto-Buyer 1U to $${value.toFixed(2)}?\n\nThis changes future automated order sizing only. Existing orders and historical P&L units will not change. The $${gameCap.toFixed(2)} per-game and $${dailyCap.toFixed(2)} daily caps still apply.`))return;
+  const currentUnit=Number(_autoBuyerStatusCache.unit_value_usd||0.50);
+  const gameCapUnits=Number(_autoBuyerStatusCache.max_game_stake_units||Number(_autoBuyerStatusCache.max_game_stake_usd||2.50)/currentUnit);
+  const dailyCapUnits=Number(_autoBuyerStatusCache.max_daily_spend_units||Number(_autoBuyerStatusCache.max_daily_spend_usd||25.00)/currentUnit);
+  const gameCapUsd=gameCapUnits*value;
+  const dailyCapUsd=dailyCapUnits*value;
+  if(!window.confirm(`Set Auto-Buyer 1U to $${value.toFixed(2)}?\n\nFuture automated sizing and unit-based risk caps will become:\n- Per game: ${gameCapUnits.toFixed(1)}U = $${gameCapUsd.toFixed(2)}\n- Per day: ${dailyCapUnits.toFixed(1)}U = $${dailyCapUsd.toFixed(2)}\n\nExisting orders and historical P&L units will not change.`))return;
   const response=await fetch("/api/auto-buyer/unit-value",{
     method:"POST",
     headers:{"Content-Type":"application/json","X-Dashboard-Token":window._DASHBOARD_TOKEN||""},
@@ -3695,7 +3700,7 @@ async function saveAutoBuyerUnitValue(){
     showModal(`<h2 class="red">Auto-Buyer unit value not changed</h2><pre>${esc(result.error||JSON.stringify(result))}</pre>`);return;
   }
   await loadAutoBuyerStatus();
-  showModal(`<h2 class="green">Auto-Buyer 1U = $${Number(result.unit_value_usd).toFixed(2)}</h2><p>Future Auto-Buyer sizing uses this value. Historical rows retain their execution-time unit value.</p>`);
+  showModal(`<h2 class="green">Auto-Buyer 1U = $${Number(result.unit_value_usd).toFixed(2)}</h2><p>Future sizing uses this value. Risk caps are now ${Number(result.max_game_stake_units).toFixed(1)}U / $${Number(result.max_game_stake_usd).toFixed(2)} per game and ${Number(result.max_daily_spend_units).toFixed(1)}U / $${Number(result.max_daily_spend_usd).toFixed(2)} per day. Historical rows are unchanged.</p>`);
 }
 window.saveAutoBuyerUnitValue=saveAutoBuyerUnitValue;
 async function runAutoBuyerNow(){

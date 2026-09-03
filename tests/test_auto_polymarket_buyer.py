@@ -422,9 +422,39 @@ def test_auto_buyer_unit_value_is_persisted_and_used_by_future_cycles(tmp_path: 
     assert updated["status"] == "ok"
     assert updated["previous_unit_value_usd"] == 0.50
     assert updated["unit_value_usd"] == 1.25
+    assert updated["max_game_stake_units"] == 5.0
+    assert updated["max_game_stake_usd"] == 6.25
+    assert updated["max_daily_spend_units"] == 50.0
+    assert updated["max_daily_spend_usd"] == 62.5
     saved = json.loads(test_state_file.read_text(encoding="utf-8"))
     assert saved["unit_value_usd"] == 1.25
+    assert saved["max_game_stake_usd"] == 6.25
+    assert saved["max_daily_spend_usd"] == 62.5
     assert buyer_class.call_args.kwargs["config"].unit_value_usd == 1.25
+    assert buyer_class.call_args.kwargs["config"].max_game_stake_usd == 6.25
+    assert buyer_class.call_args.kwargs["config"].max_daily_spend_usd == 62.5
+
+
+def test_auto_buyer_legacy_dollar_caps_migrate_to_unit_caps(tmp_path: Path):
+    test_state_file = tmp_path / "auto_buyer_state.json"
+    test_state_file.write_text(
+        json.dumps(
+            {
+                "enabled": True,
+                "unit_value_usd": 0.50,
+                "max_game_stake_usd": 2.50,
+                "max_daily_spend_usd": 25.0,
+            }
+        ),
+        encoding="utf-8",
+    )
+    with patch("model_prediction.portfolio.auto_executor.AUTO_BUYER_STATE_FILE", test_state_file):
+        state = load_auto_buyer_state()
+
+    assert state["max_game_stake_units"] == 5.0
+    assert state["max_daily_spend_units"] == 50.0
+    assert state["max_game_stake_usd"] == 2.50
+    assert state["max_daily_spend_usd"] == 25.0
 
 
 def test_auto_buyer_unit_value_rejects_invalid_amount(tmp_path: Path):
@@ -498,6 +528,10 @@ def test_auto_buyer_dashboard_routes(tmp_path: Path):
         res_unit = json.loads(handler_unit.wfile.getvalue().decode("utf-8"))
         assert res_unit["status"] == "ok"
         assert res_unit["unit_value_usd"] == 1.25
+        assert res_unit["max_game_stake_units"] == 5.0
+        assert res_unit["max_game_stake_usd"] == 6.25
+        assert res_unit["max_daily_spend_units"] == 50.0
+        assert res_unit["max_daily_spend_usd"] == 62.5
         assert load_auto_buyer_state()["unit_value_usd"] == 1.25
 
 
