@@ -12,10 +12,12 @@
   <key>WorkingDirectory</key><string>/Users/vincentc9002/model-prediction</string>
   <key>StartCalendarInterval</key>
   <array>
-    <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>0</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>0</integer></dict>
     <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>0</integer></dict>
   </array>
-  <key>TimeOut</key><integer>1800</integer>
+  <key>TimeOut</key><integer>3600</integer>
   <key>StandardOutPath</key><string>/Users/vincentc9002/model-prediction-runtime/logs/collectors/launchd.log</string>
   <key>StandardErrorPath</key><string>/Users/vincentc9002/model-prediction-runtime/logs/collectors/launchd.err</string>
   <key>EnvironmentVariables</key>

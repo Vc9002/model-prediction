@@ -79,7 +79,7 @@ def _extract_line_from_record(r: dict[str, Any]) -> float | None:
     raw_line = r.get("line")
     if raw_line not in (None, ""):
         with suppress(ValueError, TypeError):
-            return float(raw_line)
+            return float(str(raw_line))
     slug = str(r.get("market_slug") or "")
     if not slug:
         return None
@@ -142,9 +142,17 @@ def record_auto_buy_execution(
     sel = str(order_payload.get("selection") or pick.get("selection") or "")
     slug = str(order_payload.get("market_slug") or pick.get("market_slug") or "")
     side = str(order_payload.get("token_side") or pick.get("token_side") or "long").lower()
-    shares = float(order_payload.get("shares") or pick.get("shares") or 1.0)
+    # `or`-chained defaulting treats a genuine 0.0 fill as falsy and falls
+    # through to the pick's requested shares -- that would fabricate
+    # phantom filled shares for a zero-fill primary order, so shares/cost
+    # must check for presence explicitly instead.
+    _shares_raw = order_payload.get("shares")
+    if _shares_raw is None:
+        _shares_raw = pick.get("shares")
+    shares = float(_shares_raw) if _shares_raw is not None else 1.0
     price = float(order_payload.get("limit_price") or pick.get("market_implied_probability") or 0.50)
-    cost = float(order_payload.get("cost_usd") or (shares * price))
+    _cost_raw = order_payload.get("cost_usd")
+    cost = float(_cost_raw) if _cost_raw is not None else shares * price
     model_units = float(pick.get("units") or pick.get("display_units") or 1.0)
     unit_value_usd = float(order_payload.get("unit_value_usd") or AUTO_BUYER_UNIT_VALUE_USD)
     units = _usd_to_auto_buyer_units(cost, unit_value_usd)
@@ -205,6 +213,7 @@ def record_auto_buy_execution(
         "fallback_order_id": fallback_order_id,
         "fallback_resting_shares": fallback_resting_shares,
         "fallback_reconciled": not bool(fallback_order_id),
+        "fill_known": bool(order_payload.get("fill_known", True)),
         "primary_filled_shares": round(shares, 4),
         "primary_filled_cost_usd": round(cost, 4),
     }
@@ -318,7 +327,12 @@ def reconcile_pending_auto_buyer_fallbacks(
         return empty
 
     records = read_auto_buyer_ledger(jsonl_path=j_path)
-    pending = [r for r in records if r.get("fallback_order_id") and not r.get("fallback_reconciled")]
+    pending = [
+        r
+        for r in records
+        if (r.get("fallback_order_id") and not r.get("fallback_reconciled"))
+        or (str(r.get("status", "")).lower() == "open" and r.get("fill_known") is False)
+    ]
     if not pending:
         return empty
 
@@ -332,7 +346,20 @@ def reconcile_pending_auto_buyer_fallbacks(
         except (OSError, ValueError, KeyError, TypeError, RuntimeError):
             return empty
 
-    order_ids = sorted({str(r["fallback_order_id"]) for r in pending})
+    order_ids = sorted(
+        {
+            str(r["fallback_order_id"])
+            for r in pending
+            if r.get("fallback_order_id") and not r.get("fallback_reconciled")
+        }
+        | {
+            str(r["order_id"])
+            for r in pending
+            if str(r.get("status", "")).lower() == "open"
+            and r.get("fill_known") is False
+            and r.get("order_id")
+        }
+    )
     try:
         snapshot = live_executor.order_snapshots(order_ids)
     except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError):
@@ -352,8 +379,10 @@ def reconcile_pending_auto_buyer_fallbacks(
     changed = False
 
     for r in records:
-        fid = r.get("fallback_order_id")
-        if not fid or r.get("fallback_reconciled"):
+        fid = r.get("fallback_order_id") or (r.get("order_id") if r.get("fill_known") is False else None)
+        if not fid:
+            continue
+        if r.get("fallback_reconciled") and r.get("fill_known") is not False:
             continue
         fid = str(fid)
         order = by_id.get(fid)
@@ -366,16 +395,33 @@ def reconcile_pending_auto_buyer_fallbacks(
             fallback_filled = max(0.0, float(order.get("cum_quantity") or 0.0))
         except (TypeError, ValueError):
             fallback_filled = 0.0
-        fallback_filled = min(fallback_filled, float(r.get("fallback_resting_shares") or 0.0))
+
+        # If resting fallback was placed with capped resting shares
+        if r.get("fallback_resting_shares") is not None and r.get("fallback_order_id") != r.get("order_id"):
+            fallback_filled = min(fallback_filled, float(r.get("fallback_resting_shares") or 0.0))
 
         primary_shares = float(r.get("primary_filled_shares") or 0.0)
         primary_cost = float(r.get("primary_filled_cost_usd") or 0.0)
         entry_price = float(r.get("entry_price") or 0.0)
-        new_shares = round(primary_shares + fallback_filled, 4)
-        new_cost = round(primary_cost + fallback_filled * entry_price, 4)
+
+        if r.get("fill_known") is False and r.get("fallback_order_id") == r.get("order_id"):
+            new_shares = round(fallback_filled, 4)
+            new_cost = round(fallback_filled * entry_price, 4)
+        else:
+            new_shares = round(primary_shares + fallback_filled, 4)
+            new_cost = round(primary_cost + fallback_filled * entry_price, 4)
+
         if new_shares != r.get("shares") or new_cost != r.get("cost_usd"):
             r["shares"] = new_shares
             r["cost_usd"] = new_cost
+            r["primary_filled_shares"] = new_shares
+            r["primary_filled_cost_usd"] = new_cost
+            try:
+                unit_value = float(r.get("unit_value_usd") or AUTO_BUYER_UNIT_VALUE_USD)
+            except (TypeError, ValueError):
+                unit_value = AUTO_BUYER_UNIT_VALUE_USD
+            if unit_value > 0:
+                r["units"] = _usd_to_auto_buyer_units(new_cost, unit_value)
             changed = True
 
         is_terminal = state in terminal_states
@@ -384,7 +430,7 @@ def reconcile_pending_auto_buyer_fallbacks(
         except ValueError:
             started = False
 
-        if not is_terminal and started:
+        if not is_terminal and started and r.get("fallback_order_id") != r.get("order_id"):
             try:
                 live_executor.cancel(fid, user_command=True)
                 is_terminal = True
@@ -394,7 +440,26 @@ def reconcile_pending_auto_buyer_fallbacks(
 
         if is_terminal:
             r["fallback_reconciled"] = True
-            r["order_state"] = "ORDER_STATE_PARTIALLY_FILLED" if new_shares > 0 else state
+            r["fill_known"] = True
+            is_unknown_primary = r.get("fallback_order_id") == r.get("order_id")
+            if is_unknown_primary:
+                requested_total = float(r.get("fallback_resting_shares") or 0.0)
+            else:
+                requested_total = round(
+                    primary_shares + float(r.get("fallback_resting_shares") or 0.0),
+                    4,
+                )
+            if state == "ORDER_STATE_FILLED" or (new_shares + 1e-9 >= requested_total and new_shares > 0):
+                r["order_state"] = "ORDER_STATE_FILLED"
+            elif new_shares > 0:
+                r["order_state"] = "ORDER_STATE_PARTIALLY_FILLED"
+            else:
+                r["order_state"] = state
+                r["status"] = "settled"
+                r["result"] = "void"
+                r["pnl_usd"] = 0.0
+                r["pnl_units"] = 0.0
+                r["settled_at_utc"] = iso_utc(now)
             changed = True
             if fallback_filled > 0:
                 reconciled_filled += 1
@@ -648,8 +713,14 @@ def settle_auto_buyer_ledger(
         home = str(r.get("home_team") or "")
         sel = str(r.get("selection") or "").lower()
         price = float(r.get("entry_price") or 0.50)
-        shares = float(r.get("shares") or 1.0)
-        cost = float(r.get("cost_usd") or (shares * price))
+        # `or`-chained defaulting treats a genuine 0.0 (voided/zero-fill) row
+        # as falsy and substitutes 1.0 -- that resurrects a phantom position
+        # (and phantom P&L) on the very next settle cycle for a row that was
+        # deliberately voided, so presence must be checked explicitly.
+        _raw_shares = r.get("shares")
+        shares = float(_raw_shares) if _raw_shares is not None else 1.0
+        _raw_cost = r.get("cost_usd")
+        cost = float(_raw_cost) if _raw_cost is not None else shares * price
         units = float(r.get("units") or 1.0)
         try:
             unit_value_usd = float(r.get("unit_value_usd") or AUTO_BUYER_UNIT_VALUE_USD)
@@ -671,6 +742,23 @@ def settle_auto_buyer_ledger(
         if str(r.get("status") or "").lower() == "settled":
             r["pnl_units"] = _usd_to_auto_buyer_units(float(r.get("pnl_usd") or 0.0), unit_value_usd)
 
+        # 0. Void / Zero-share guard: A voided row or a settled row with 0 shares has 0 PnL
+        if r.get("result") == "void" or (
+            _raw_shares is not None and shares <= 0.0 and str(r.get("status", "")).lower() == "settled"
+        ):
+            r["shares"] = 0.0
+            r["cost_usd"] = 0.0
+            r["units"] = 0.0
+            r["status"] = "settled"
+            r["result"] = "void"
+            r["pnl_usd"] = 0.0
+            r["pnl_units"] = 0.0
+            if not r.get("settled_at_utc"):
+                r["settled_at_utc"] = iso_utc(now)
+            settled_count += 1
+            updated_records.append(r)
+            continue
+
         # 1. Re-verify already settled records against reality
         if r.get("status") == "settled":
             # Exchange resolution is authoritative for positions that have
@@ -680,6 +768,7 @@ def settle_auto_buyer_ledger(
             token_side = str(r.get("token_side") or "").lower()
             corrected_res = _exchange_resolution_result(exchange_resolution, token_side)
             if corrected_res is not None:
+                assert exchange_resolution is not None
                 settlement_cost = _exchange_settlement_cost(exchange_resolution, shares, cost)
                 expected_pnl_usd = round(
                     shares - settlement_cost if corrected_res == "win" else -settlement_cost,
@@ -865,6 +954,22 @@ def settle_auto_buyer_ledger(
             continue
 
         if start_dt > now:
+            pending_count += 1
+            updated_records.append(r)
+            continue
+
+        # An unreconciled fallback (resting order, or an IOC fill we could
+        # not observe) means `shares`/`cost_usd` are still provisional --
+        # settling now would compute real win/loss P&L against a phantom
+        # position. reconcile_pending_auto_buyer_fallbacks() runs before
+        # this function in the daily settle path, but this guard is the
+        # last line of defense if that ordering is ever violated or the
+        # exchange order hasn't reached a terminal state yet.
+        if r.get("fallback_order_id") and not r.get("fallback_reconciled"):
+            pending_count += 1
+            updated_records.append(r)
+            continue
+        if r.get("fill_known") is False:
             pending_count += 1
             updated_records.append(r)
             continue
@@ -1055,7 +1160,8 @@ def settle_auto_buyer_ledger(
         for r in updated_records:
             american = _probability_to_american(float(r.get("entry_price") or 0.50))
             decimal_odds = american_to_decimal(american)
-            line_str = f"{float(r.get('line')):.2f}" if r.get("line") not in (None, "") else ""
+            line_val = r.get("line")
+            line_str = f"{float(str(line_val)):.2f}" if line_val not in (None, "") else ""
             x_row = {f: "" for f in FIELDNAMES}
             x_row.update(
                 {

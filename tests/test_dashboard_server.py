@@ -1510,6 +1510,55 @@ def test_pick_quote_matches_the_exact_total_line_and_game(monkeypatch, tmp_path:
     assert quote["ask"] == 0.44
 
 
+def test_pick_quote_ignores_soccer_half_time_totals_for_full_match_total(
+    monkeypatch, tmp_path: Path, patch_dash
+) -> None:
+    day = "2026-09-04"
+    event_start = "2026-09-04T23:30:00Z"
+    path = tmp_path / "data" / "odds" / "soccer" / day / "polymarket_snapshots.jsonl"
+    path.parent.mkdir(parents=True)
+    full_snap = {
+        "market_slug": "tsc-mls-nyc-nas-2026-09-04-2pt5",
+        "market_type": "total",
+        "league": "SOCCER",
+        "line": 2.5,
+        "event_title": "New York City FC vs. Nashville SC",
+        "event_start_utc": event_start,
+        "observed_at_utc": "2026-09-04T04:35:00Z",
+        "timestamp_valid": True,
+        "long": {"description": "Over", "ask": 0.54},
+        "short": {"description": "Under", "ask": 0.47},
+    }
+    fh_snap = {
+        "market_slug": "tsc-mls-nyc-nas-2026-09-04-fh-2pt5",
+        "market_type": "total",
+        "league": "SOCCER",
+        "line": 2.5,
+        "event_title": "New York City FC vs. Nashville SC",
+        "event_start_utc": event_start,
+        "observed_at_utc": "2026-09-04T04:35:00Z",
+        "timestamp_valid": True,
+        "long": {"description": "Over", "ask": 0.20},
+        "short": {"description": "Under", "ask": 0.80},
+    }
+    path.write_text(f"{json.dumps(full_snap)}\n{json.dumps(fh_snap)}\n", encoding="utf-8")
+    patch_dash("DATA", tmp_path / "data")
+    row = {
+        "league": "soccer",
+        "market_type": "total",
+        "away_team": "Nashville SC",
+        "home_team": "New York City FC",
+        "selection": "over",
+        "line": "2.5",
+        "event_start_utc": event_start,
+    }
+    quote = dashboard_server._pick_quote(row)
+    assert quote is not None
+    assert quote["market_slug"] == "tsc-mls-nyc-nas-2026-09-04-2pt5"
+    assert quote["side"] == "long"
+    assert quote["ask"] == 0.54
+
+
 def test_pick_quote_maps_nrfi_and_yrfi_to_exact_no_yes_sides(monkeypatch, tmp_path: Path, patch_dash) -> None:
     data = tmp_path / "data"
     path = data / "odds" / "mlb" / "2026-09-01" / "polymarket_snapshots.jsonl"
@@ -2186,3 +2235,68 @@ def test_post_loss_review_alerts():
     assert len(res["alerts"]) == 1
     assert res["alerts"][0]["sport"] == "MLB"
     assert res["alerts"][0]["consecutive_losses"] == 3
+
+
+def test_pick_quote_resolves_inverted_tennis_player_names(tmp_path: Path, patch_dash) -> None:
+    from model_prediction.dashboard.backtests import _pick_quote
+
+    day = "2026-09-04"
+    event_start = "2026-09-04T17:00:00Z"
+    path = tmp_path / "data" / "odds" / "tennis" / day / "polymarket_snapshots.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    snapshot = {
+        "event_title": "Yibing Wu vs. Carlos Alcaraz",
+        "market_slug": "aec-atp-yibwu-caralc-2026-09-04",
+        "market_type": "moneyline",
+        "long": {"description": "Yibing Wu", "ask": 0.08},
+        "short": {"description": "Carlos Alcaraz", "ask": 0.93},
+        "observed_at_utc": "2026-09-04T05:00:00Z",
+    }
+    path.write_text(json.dumps(snapshot) + "\n", encoding="utf-8")
+
+    row = {
+        "pick_id": "test_tennis_invert",
+        "sport": "tennis",
+        "market_type": "moneyline",
+        "event_start_utc": event_start,
+        "away_team": "Carlos Alcaraz",
+        "home_team": "Wu Yibing",
+        "selection": "away",
+    }
+    quote = _pick_quote(row)
+    assert quote is not None
+    assert quote["market_slug"] == "aec-atp-yibwu-caralc-2026-09-04"
+    assert quote["side"] == "short"
+
+
+def test_pick_quote_resolves_parenthesized_soccer_team_names(tmp_path: Path, patch_dash) -> None:
+    from model_prediction.dashboard.backtests import _pick_quote
+
+    day = "2026-09-04"
+    event_start = "2026-09-04T23:00:00Z"
+    path = tmp_path / "data" / "odds" / "soccer" / day / "polymarket_snapshots.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    snapshot = {
+        "event_title": "Ferro Carril Oeste vs. Mitre Santiago del Estero",
+        "market_slug": "atc-arg2-fco-cam-2026-09-05-cam",
+        "market_type": "team_win",
+        "team": "Mitre Santiago del Estero",
+        "long": {"description": "Yes", "ask": 0.59},
+        "short": {"description": "No", "ask": 0.43},
+        "observed_at_utc": "2026-09-04T05:00:00Z",
+    }
+    path.write_text(json.dumps(snapshot) + "\n", encoding="utf-8")
+
+    row = {
+        "pick_id": "test_soccer_paren",
+        "sport": "soccer",
+        "market_type": "moneyline",
+        "event_start_utc": event_start,
+        "away_team": "Mitre (Santiago del Estero)",
+        "home_team": "Ferro Carril Oeste",
+        "selection": "away",
+    }
+    quote = _pick_quote(row)
+    assert quote is not None
+    assert quote["market_slug"] == "atc-arg2-fco-cam-2026-09-05-cam"
+    assert quote["side"] == "long"

@@ -745,6 +745,49 @@ def test_ioc_zero_fill_rests_full_remainder(tmp_path, monkeypatch) -> None:
     assert result["order_state"] == "ORDER_STATE_PARTIALLY_FILLED"
 
 
+def test_ioc_unknown_fill_is_tracked_not_fabricated(tmp_path, monkeypatch) -> None:
+    """When neither the synchronous response nor a follow-up read reports a
+    fill quantity, do not fabricate a zero/full fill and do not submit a second
+    order (which would risk a double buy). Track the primary order for later
+    reconciliation instead."""
+    client = executor(tmp_path, answer="y", env=US_CREDS)
+    calls = []
+
+    def fake_request(method, path, payload=None):
+        calls.append((method, path, payload))
+        if method == "POST":
+            # Synchronous IOC response carries no fill quantity and no terminal
+            # state -- the exact race that produced untracked live positions.
+            return {"id": "primary-unknown", "state": "ORDER_STATE_NEW"}
+        # GET /v1/order/{id} refresh also reports nothing useful.
+        return {"order": {"id": "primary-unknown", "state": "ORDER_STATE_NEW"}}
+
+    monkeypatch.setattr(client, "_request", fake_request)
+    unknown_ticket = OrderTicket(
+        **{
+            **ticket().__dict__,
+            "order_type": "limit_ioc",
+            "price": 0.69,
+            "size_shares": 7.25,
+            "estimated_cost_usd": 5.0,
+            "maximum_cost_usd": 5.10,
+            "ioc_fallback_resting": True,
+        }
+    )
+
+    result = client.execute(unknown_ticket, qualified_row(), execute_flag=True, user_command=True)
+
+    post_calls = [c for c in calls if c[0] == "POST"]
+    assert len(post_calls) == 1
+    assert result["fill_known"] is False
+    assert result["order_state"] == "ORDER_STATE_UNKNOWN"
+    assert result["fallback_order_id"] == "primary-unknown"
+    assert result["fallback_status"] == "unknown_fill"
+    assert result["fallback_resting_shares"] == 7.25
+    assert result["filled_size_shares"] == 0.0
+    assert result["order_ids"] == ["primary-unknown"]
+
+
 def test_ioc_partial_fill_without_resting_flag_leaves_remainder_unfilled(tmp_path, monkeypatch) -> None:
     """Opt-in only: a ticket that doesn't set ioc_fallback_resting never
     submits a second order, matching plain historical IOC behavior."""
@@ -825,3 +868,101 @@ def test_order_snapshots_read_authoritative_exchange_state(tmp_path, monkeypatch
     assert called == [("GET", "/v1/order/order-canceled-1", None)]
     assert result["orders"][0]["order_state"] == "ORDER_STATE_CANCELED"
     assert result["orders"][0]["leaves_quantity"] == 0
+
+
+def test_order_snapshots_isolates_one_unreachable_order_from_the_rest(tmp_path, monkeypatch) -> None:
+    """One order_id the exchange can't answer for (purged, rate-limited past
+    retries, transient 5xx) must not prevent every other order_id in the same
+    batch from being read -- an unattended daily reconciliation cycle that
+    processes many pending fallback orders in one call would otherwise stall
+    entirely on a single bad id."""
+    client = executor(tmp_path, env=US_CREDS)
+
+    def fake_request(method, path, payload=None):
+        if path == "/v1/order/order-bad":
+            raise ExecutionGateError("REFUSED: order not found")
+        return {
+            "order": {
+                "id": "order-good",
+                "state": "ORDER_STATE_FILLED",
+                "marketSlug": "wnba-example",
+                "cumQuantity": 5.0,
+                "leavesQuantity": 0,
+            }
+        }
+
+    monkeypatch.setattr(client, "_request", fake_request)
+
+    result = client.order_snapshots(["order-bad", "order-good"])
+
+    assert result["status"] == "live"
+    assert [o["order_id"] for o in result["orders"]] == ["order-good"]
+    assert result["unavailable_order_ids"] == ["order-bad"]
+
+
+def test_moneyline_resolves_binary_team_win_market() -> None:
+    from model_prediction.data_sources.polymarket_execute import _resolve_moneyline_side
+
+    pick_row = {
+        "league": "soccer",
+        "home_team": "Ipswich Town",
+        "away_team": "Liverpool",
+        "selection": "home",
+    }
+    snapshot = {
+        "team": "Ipswich Town FC",
+        "long": {"description": "Yes"},
+        "short": {"description": "No"},
+    }
+    assert _resolve_moneyline_side(pick_row, snapshot) == "long"
+
+
+def test_moneyline_resolves_tennis_player_middle_name() -> None:
+    from model_prediction.data_sources.polymarket_execute import _resolve_moneyline_side
+
+    pick_row = {
+        "league": "tennis",
+        "home_team": "Tomas Martin Etcheverry",
+        "away_team": "Mariano Navone",
+        "selection": "home",
+    }
+    snapshot = {
+        "team": "Tomas Etcheverry",
+        "long": {"description": "Tomas Etcheverry"},
+        "short": {"description": "Mariano Navone"},
+    }
+    assert _resolve_moneyline_side(pick_row, snapshot) == "long"
+
+
+def test_moneyline_resolves_inverted_tennis_player_name() -> None:
+    from model_prediction.data_sources.polymarket_execute import _resolve_moneyline_side
+
+    pick_row = {
+        "league": "tennis",
+        "home_team": "Wu Yibing",
+        "away_team": "Carlos Alcaraz",
+        "selection": "away",
+    }
+    snapshot = {
+        "team": "Carlos Alcaraz",
+        "long": {"description": "Yibing Wu"},
+        "short": {"description": "Carlos Alcaraz"},
+    }
+    assert _resolve_moneyline_side(pick_row, snapshot) == "short"
+
+
+def test_moneyline_resolves_parenthesized_soccer_team_name() -> None:
+    from model_prediction.data_sources.polymarket_execute import _resolve_moneyline_side
+
+    pick_row = {
+        "league": "soccer",
+        "home_team": "Ferro Carril Oeste",
+        "away_team": "Mitre (Santiago del Estero)",
+        "selection": "away",
+    }
+    snapshot = {
+        "team": "Mitre Santiago del Estero",
+        "long": {"description": "Yes"},
+        "short": {"description": "No"},
+    }
+    assert _resolve_moneyline_side(pick_row, snapshot) == "long"

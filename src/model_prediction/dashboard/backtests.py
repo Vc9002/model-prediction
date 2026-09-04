@@ -155,9 +155,14 @@ def market_snapshots(sport: str, day: str) -> dict:
     return {"sport": sport, "date": day, "markets": rows, "count": len(rows)}
 
 
+def _normalize_name_tokens(name: str) -> str:
+    cleaned = re.sub(r"[(),.\-_]", " ", name)
+    return " ".join(cleaned.casefold().split())
+
+
 def _team_matches(team_name: str, side_description: str) -> bool:
-    team = " ".join(team_name.casefold().split())
-    description = " ".join(side_description.casefold().split())
+    team = _normalize_name_tokens(team_name)
+    description = _normalize_name_tokens(side_description)
     if not team or not description:
         return False
     if team == description:
@@ -167,14 +172,16 @@ def _team_matches(team_name: str, side_description: str) -> bool:
 
 
 def _tennis_player_matches(player_name: str, exchange_name: str) -> bool:
-    """Match a tennis player when one source includes an omitted middle name."""
+    """Match a tennis player when one source includes an omitted middle name or inverted names."""
     player_tokens = re.findall(r"\w+", player_name.casefold())
     exchange_tokens = re.findall(r"\w+", exchange_name.casefold())
     return (
         len(player_tokens) >= 2
         and len(exchange_tokens) >= 2
-        and player_tokens[0] == exchange_tokens[0]
-        and player_tokens[-1] == exchange_tokens[-1]
+        and (
+            (player_tokens[0] == exchange_tokens[0] and player_tokens[-1] == exchange_tokens[-1])
+            or set(player_tokens) == set(exchange_tokens)
+        )
     )
 
 
@@ -396,7 +403,8 @@ def _pick_quote(row: dict) -> dict | None:
             continue
         slug = str(snapshot.get("market_slug") or "")
         if not slug or any(
-            marker in slug.casefold() for marker in ("-f5-", "-f3-", "-f7-", "-1st-", "-h1-", "-h2-")
+            marker in slug.casefold()
+            for marker in ("-f5-", "-f3-", "-f7-", "-1st-", "-h1-", "-h2-", "-fh-", "-sh-")
         ):
             continue
         if market_type == "moneyline":

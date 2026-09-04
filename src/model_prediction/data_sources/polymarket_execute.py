@@ -64,19 +64,45 @@ _MARKET_SLUG_LEGACY_RE = re.compile(r"\(([a-z0-9\-]+)\)\.?\s*$")
 _LIVE_QUOTE_MAXIMUM_AGE_SECONDS = 300
 
 
+def _normalize_name_tokens(name: str) -> str:
+    cleaned = re.sub(r"[(),.\-_]", " ", name)
+    return " ".join(cleaned.casefold().split())
+
+
 def _team_name_matches(team_name: str, side_description: str) -> bool:
     """Same loose match dashboard_server.py's _pick_quote already uses to
     resolve a row's home/away team to a market side's long/short
     description -- duplicated rather than imported because dashboard_server
     deliberately has zero imports from this package (see DEBUG.md)."""
-    team = " ".join(team_name.casefold().split())
-    description = " ".join(side_description.casefold().split())
+    team = _normalize_name_tokens(team_name)
+    description = _normalize_name_tokens(side_description)
     if not team or not description:
         return False
     if team == description:
         return True
     shorter, longer = (description, team) if len(description) <= len(team) else (team, description)
     return f" {shorter} " in f" {longer} "
+
+
+def _tennis_player_matches(player_name: str, exchange_name: str) -> bool:
+    """Match a tennis player when one source includes an omitted middle name or inverted names."""
+    player_tokens = re.findall(r"\w+", player_name.casefold())
+    exchange_tokens = re.findall(r"\w+", exchange_name.casefold())
+    return (
+        len(player_tokens) >= 2
+        and len(exchange_tokens) >= 2
+        and (
+            (player_tokens[0] == exchange_tokens[0] and player_tokens[-1] == exchange_tokens[-1])
+            or set(player_tokens) == set(exchange_tokens)
+        )
+    )
+
+
+def _participant_matches(pick_row: dict[str, Any], participant: str, side_description: str) -> bool:
+    if _team_name_matches(participant, side_description):
+        return True
+    sport = str(pick_row.get("league") or pick_row.get("sport") or "").casefold()
+    return sport == "tennis" and _tennis_player_matches(participant, side_description)
 
 
 def _lines_match(a: float, b: float) -> bool:
@@ -103,8 +129,20 @@ def _resolve_moneyline_side(pick_row: dict[str, str], snapshot: dict[str, Any]) 
         raise ExecutionGateError(
             f"REFUSED: unrecognized selection {pick_row.get('selection')!r} for live side verification."
         )
-    matches_long = _team_name_matches(selected_team, str(snapshot["long"]["description"]))
-    matches_short = _team_name_matches(selected_team, str(snapshot["short"]["description"]))
+
+    # Binary team-win markets (e.g. soccer "Will X win?" where long="Yes", short="No" and team=target_team)
+    market_team = snapshot.get("team")
+    long_desc = str((snapshot.get("long") or {}).get("description") or "").strip()
+    short_desc = str((snapshot.get("short") or {}).get("description") or "").strip()
+    if market_team and long_desc.casefold() == "yes" and short_desc.casefold() == "no":
+        if _participant_matches(pick_row, selected_team, str(market_team)):
+            return "long"
+        raise ExecutionGateError(
+            f"REFUSED: live market is a team-win contract for {market_team!r}, cannot match opposite pick {selected_team!r}."
+        )
+
+    matches_long = _participant_matches(pick_row, selected_team, long_desc)
+    matches_short = _participant_matches(pick_row, selected_team, short_desc)
     if matches_long == matches_short:
         raise ExecutionGateError(
             "REFUSED: could not unambiguously resolve the picked team to a live market side."
@@ -137,7 +175,7 @@ def _resolve_spread_side(pick_row: dict[str, str], snapshot: dict[str, Any]) -> 
     market_line = snapshot.get("line")
     if market_team is None or market_line is None:
         raise ExecutionGateError("REFUSED: live spread market has no team/line to verify against.")
-    is_market_team = _team_name_matches(selected_team, str(market_team))
+    is_market_team = _participant_matches(pick_row, selected_team, str(market_team))
     if is_market_team and _lines_match(row_line, float(market_line)):
         return "long"
     if not is_market_team and _lines_match(row_line, -float(market_line)):
@@ -539,12 +577,16 @@ class PolymarketExecutor:
     ) -> dict[str, Any]:
         max_retries = 3
         backoff = 0.5
+        # The Ed25519 request signature covers the path WITHOUT the query
+        # string (Polymarket US signature spec), while the request URL keeps
+        # the full path including any pagination cursor/query parameters.
+        request_path = path.split("?", 1)[0]
         for attempt in range(max_retries):
             try:
                 response = httpx.request(
                     method,
                     f"{API_HOST}{path}",
-                    headers=self._auth_headers(method, path),
+                    headers=self._auth_headers(method, request_path),
                     json=payload,
                     timeout=15,
                 )
@@ -629,9 +671,14 @@ class PolymarketExecutor:
 
         def fill_quantity(order: dict[str, Any], requested: float) -> float | None:
             raw = order.get("cumQuantity")
-            try:
-                value = float(raw)
-            except (TypeError, ValueError):
+            if raw is None:
+                value = None
+            else:
+                try:
+                    value = float(raw)
+                except (TypeError, ValueError):
+                    value = None
+            if value is None:
                 state = str(order.get("state") or "").upper()
                 if state == "ORDER_STATE_FILLED":
                     return requested
@@ -640,24 +687,37 @@ class PolymarketExecutor:
                 return None
             if not math.isfinite(value):
                 return None
-            return max(0.0, min(requested, value))
+            return max(0.0, min(requested, float(value)))
 
         marketable = ticket.order_type == "limit_ioc"
         response, order_id = submit_order(ticket.order_type, ticket.size_shares)
         order = order_from(response)
         primary_filled = fill_quantity(order, ticket.size_shares)
         if marketable and primary_filled is None:
-            try:
-                refreshed = self._request("GET", f"/v1/order/{order_id}", None)
-                order = order_from(refreshed)
-                primary_filled = fill_quantity(order, ticket.size_shares)
-            except ExecutionGateError:
-                pass
+            # The synchronous IOC response can omit the fill quantity while the
+            # order is still being processed. Poll the authoritative order
+            # endpoint before giving up: a fill we fail to observe here becomes
+            # an untracked live position, and a full/partial fill we assume away
+            # becomes a phantom ledger row. Neither is acceptable.
+            for attempt in range(3):
+                try:
+                    refreshed = self._request("GET", f"/v1/order/{order_id}", None)
+                    order = order_from(refreshed)
+                    primary_filled = fill_quantity(order, ticket.size_shares)
+                    if primary_filled is not None:
+                        break
+                except ExecutionGateError:
+                    pass
+                time.sleep(0.5 * (attempt + 1))
 
         order_ids = [order_id]
         fallback_order_id: str | None = None
         fallback_status = "not_authorized"
         fallback_resting_shares = 0.0
+        # A resting GTC order is legitimately "not yet filled", so unknown-fill
+        # tracking only applies to marketable IOC orders whose fill we could not
+        # observe at all.
+        fill_known = (not marketable) or (primary_filled is not None)
 
         can_fallback = (
             marketable
@@ -666,7 +726,7 @@ class PolymarketExecutor:
             and primary_filled is not None
             and primary_filled + 1e-9 < ticket.size_shares
         )
-        if can_fallback:
+        if can_fallback and primary_filled is not None:
             fallback_resting_shares = round(ticket.size_shares - primary_filled, 4)
             if fallback_resting_shares >= 0.01:
                 _fallback_response, fallback_order_id = submit_order("limit_gtc", fallback_resting_shares)
@@ -674,6 +734,18 @@ class PolymarketExecutor:
                 fallback_status = "resting"
             else:
                 fallback_status = "no_remainder"
+
+        if not fill_known:
+            # We could not determine whether the primary IOC filled. Do NOT
+            # fabricate a zero fill or a full fill. Track the primary order as
+            # a pending reconciliation target (reusing the fallback fields so
+            # reconcile_pending_auto_buyer_fallbacks() restates shares/cost from
+            # the exchange once the order reaches a terminal state) and place no
+            # second order, which would risk a double buy.
+            fallback_order_id = order_id
+            fallback_resting_shares = round(ticket.size_shares, 4)
+            fallback_status = "unknown_fill"
+            order_ids = [order_id]
 
         known_primary_filled = (
             primary_filled if primary_filled is not None else (0.0 if marketable else ticket.size_shares)
@@ -683,6 +755,8 @@ class PolymarketExecutor:
 
         if not marketable:
             final_state = str(order.get("state") or "ORDER_STATE_NEW")
+        elif not fill_known:
+            final_state = "ORDER_STATE_UNKNOWN"
         elif total_filled + 1e-9 >= ticket.size_shares:
             final_state = "ORDER_STATE_FILLED"
         elif total_filled > 0 or fallback_order_id is not None:
@@ -700,40 +774,90 @@ class PolymarketExecutor:
             "fallback_order_id": fallback_order_id,
             "fallback_status": fallback_status,
             "fallback_resting_shares": fallback_resting_shares,
+            "fill_known": fill_known,
             "raw_response": response,
         }
 
     # --------------------------------------------------------- portfolio read
+
+    def _paginate(self, path: str, item_key: str, *, max_pages: int = 50) -> tuple[Any, bool]:
+        """Walk a cursor-paginated Polymarket US endpoint until EOF.
+
+        Returns ``(items, eof)``. When the endpoint's item container is a dict
+        (e.g. ``positions`` keyed by slug) the result is a merged dict; when it
+        is a list (e.g. ``activities``) the result is a concatenated list.
+        ``max_pages`` bounds runaway pagination.
+        """
+        list_items: list[dict[str, Any]] = []
+        dict_items: dict[str, Any] = {}
+        saw_dict = False
+        cursor: str | None = None
+        eof = False
+        for _ in range(max_pages):
+            request_path = path if cursor is None else f"{path}?cursor={cursor}"
+            response = self._request("GET", request_path)
+            page = response.get(item_key)
+            if isinstance(page, dict):
+                saw_dict = True
+                dict_items.update(page)
+            elif isinstance(page, list):
+                list_items.extend(page)
+            eof = bool(response.get("eof", True))
+            if eof:
+                break
+            next_cursor = response.get("nextCursor") or response.get("next_cursor")
+            if not next_cursor or next_cursor == cursor:
+                break
+            cursor = str(next_cursor)
+            # Be polite between pages: the endpoint is Cloudflare-protected and
+            # bursts of back-to-back cursor requests trigger 429 blocks.
+            time.sleep(0.25)
+        return (dict_items if saw_dict else list_items), eof
 
     def portfolio_snapshot(self) -> dict[str, Any]:
         """Read the authenticated live account without inferring fills.
 
         Submitted orders are deliberately not treated as positions. The
         exchange positions and activity endpoints are the source of truth for
-        filled exposure, trades, and market resolutions.
+        filled exposure, trades, and market resolutions. Both endpoints are
+        cursor-paginated and are walked to EOF so older resolutions (which
+        drive settlement) are not silently dropped past page one.
         """
-        positions = self._request("GET", "/v1/portfolio/positions")
-        activities = self._request("GET", "/v1/portfolio/activities")
+        positions, positions_eof = self._paginate("/v1/portfolio/positions", "positions")
+        activities, activities_eof = self._paginate("/v1/portfolio/activities", "activities")
         balances = self._request("GET", "/v1/account/balances")
         return {
             "status": "live",
             "source": "polymarket_us_authenticated_portfolio",
-            "positions": positions.get("positions") or {},
-            "activities": activities.get("activities") or [],
+            "positions": positions,
+            "activities": activities,
             "balances": balances.get("balances") or [],
-            "positions_eof": positions.get("eof"),
-            "activities_eof": activities.get("eof"),
+            "positions_eof": positions_eof,
+            "activities_eof": activities_eof,
             "observed_at_utc": iso_utc(utc_now()),
         }
 
     def order_snapshots(self, order_ids: list[str]) -> dict[str, Any]:
-        """Read authoritative exchange state for previously submitted orders."""
+        """Read authoritative exchange state for previously submitted orders.
+
+        Each order_id is looked up independently: one stale/purged/rate-
+        limited order_id must not prevent every other order_id in the same
+        batch from being reconciled. A failed lookup is reported in
+        ``unavailable_order_ids`` rather than raising, so a caller
+        reconciling many pending rows in one batch (e.g. the daily
+        unattended settle cycle) can still make progress on the rest.
+        """
         missing = [name for name in (KEY_ID_ENV, SECRET_KEY_ENV) if not self.environ.get(name)]
         if missing:
             raise ExecutionGateError(f"REFUSED: {', '.join(missing)} is not set.")
         orders = []
+        unavailable: list[str] = []
         for order_id in dict.fromkeys(str(value) for value in order_ids if value):
-            response = self._request("GET", f"/v1/order/{order_id}")
+            try:
+                response = self._request("GET", f"/v1/order/{order_id}")
+            except ExecutionGateError:
+                unavailable.append(order_id)
+                continue
             order = response.get("order") or response
             if not isinstance(order, dict):
                 continue
@@ -749,6 +873,7 @@ class PolymarketExecutor:
         return {
             "status": "live",
             "orders": orders,
+            "unavailable_order_ids": unavailable,
             "observed_at_utc": iso_utc(utc_now()),
         }
 

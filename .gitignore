@@ -105,6 +105,7 @@ backups/split-brain-quarantine-*/*
 !backups/split-brain-quarantine-*/*.md
 backups/archive-*/*
 !backups/archive-*/*.md
+data/backups/
 data/experiments/
 data/ledgers/
 outputs/research/

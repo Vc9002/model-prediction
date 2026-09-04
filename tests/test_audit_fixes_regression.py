@@ -719,3 +719,189 @@ def test_wnba_total_margin_v2_model_and_forecast():
     # 4. Auto-buyer Whitelist/Blacklist
     assert "wnba-total-margin-v2" in DEFAULT_WHITELIST_MODELS
     assert "wnba-total-margin-v1" in EXPLICIT_BLACKLIST_MODELS
+
+
+def test_settlement_skips_rows_with_unreconciled_fallback_or_unknown_fill(tmp_path: Path):
+    """Rows whose real fill hasn't been confirmed must not be settled on their
+    provisional `shares`/`cost_usd`, even when the underlying game is complete --
+    settling early would compute real win/loss P&L against a phantom position."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    x_path = tmp_path / "auto_buyer_picks.xlsx"
+
+    record_auto_buy_execution(
+        order_payload={
+            "order_id": "ORD_UNRECONCILED_FALLBACK",
+            "pick_id": "PICK_UNRECONCILED",
+            "market_slug": "tsc-mlb-away-home-2026-08-30",
+            "selection": "home",
+            "token_side": "long",
+            "limit_price": 0.50,
+            "cost_usd": 0.44,
+            "shares": 0.88,
+            "sport": "MLB",
+            "event_start_utc": "2026-08-30T20:07:00Z",
+            "fallback_order_id": "RESTING_ORDER_1",
+            "fallback_resting_shares": 0.12,
+        },
+        pick_row={"away_team": "Away", "home_team": "Home", "market_type": "moneyline", "units": 1.0},
+        jsonl_path=j_path,
+        xlsx_path=x_path,
+    )
+    record_auto_buy_execution(
+        order_payload={
+            "order_id": "ORD_UNKNOWN_FILL",
+            "pick_id": "PICK_UNKNOWN",
+            "market_slug": "tsc-mlb-away-home-2026-08-30-b",
+            "selection": "away",
+            "token_side": "short",
+            "limit_price": 0.50,
+            "cost_usd": 0.50,
+            "shares": 1.0,
+            "sport": "MLB",
+            "event_start_utc": "2026-08-30T20:07:00Z",
+            "fill_known": False,
+        },
+        pick_row={"away_team": "Away", "home_team": "Home", "market_type": "moneyline", "units": 1.0},
+        jsonl_path=j_path,
+        xlsx_path=x_path,
+    )
+
+    mock_espn = MagicMock()
+    mock_espn.scoreboard.return_value = {
+        "events": [
+            {
+                "competitions": [
+                    {
+                        "status": {"type": {"completed": True}},
+                        "competitors": [
+                            {"homeAway": "away", "team": {"displayName": "Away"}, "score": "1"},
+                            {"homeAway": "home", "team": {"displayName": "Home"}, "score": "3"},
+                        ],
+                    }
+                ]
+            }
+        ]
+    }
+
+    result = settle_auto_buyer_ledger(data_root=tmp_path, espn=mock_espn)
+
+    records = {r["order_id"]: r for r in read_auto_buyer_ledger(j_path)}
+    assert records["ORD_UNRECONCILED_FALLBACK"]["status"] == "open"
+    assert records["ORD_UNRECONCILED_FALLBACK"]["result"] == "open"
+    assert records["ORD_UNKNOWN_FILL"]["status"] == "open"
+    assert records["ORD_UNKNOWN_FILL"]["result"] == "open"
+    assert result["settled"] == 0
+    assert result["pending"] == 2
+
+
+def test_settlement_does_not_resurrect_voided_zero_fill_rows(tmp_path: Path):
+    """A voided row (confirmed zero-fill primary) must never be re-graded from
+    a completed game's score -- there was never a real position to grade, and
+    the falsy-zero `shares`/`cost_usd` defaulting previously fabricated a
+    phantom win/loss on the very next settle cycle."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    x_path = tmp_path / "auto_buyer_picks.xlsx"
+
+    record_auto_buy_execution(
+        order_payload={
+            "order_id": "ORD_VOIDED",
+            "pick_id": "PICK_VOIDED",
+            "market_slug": "tsc-mlb-away-home-2026-08-30-c",
+            "selection": "home",
+            "token_side": "long",
+            "limit_price": 0.42,
+            "cost_usd": 0.0,
+            "shares": 0.0,
+            "sport": "MLB",
+            "event_start_utc": "2026-08-30T20:07:00Z",
+        },
+        pick_row={"away_team": "Away", "home_team": "Home", "market_type": "moneyline", "units": 1.0},
+        jsonl_path=j_path,
+        xlsx_path=x_path,
+    )
+    records = read_auto_buyer_ledger(j_path)
+    records[0]["status"] = "settled"
+    records[0]["result"] = "void"
+    with j_path.open("w", encoding="utf-8") as f:
+        for r in records:
+            f.write(json.dumps(r, sort_keys=True) + "\n")
+
+    mock_espn = MagicMock()
+    mock_espn.scoreboard.return_value = {
+        "events": [
+            {
+                "competitions": [
+                    {
+                        "status": {"type": {"completed": True}},
+                        "competitors": [
+                            {"homeAway": "away", "team": {"displayName": "Away"}, "score": "1"},
+                            {"homeAway": "home", "team": {"displayName": "Home"}, "score": "3"},
+                        ],
+                    }
+                ]
+            }
+        ]
+    }
+
+    settle_auto_buyer_ledger(data_root=tmp_path, espn=mock_espn)
+
+    record = read_auto_buyer_ledger(j_path)[0]
+    assert record["result"] == "void"
+    assert record["shares"] == 0.0
+    assert record["cost_usd"] == 0.0
+    assert record["pnl_usd"] == 0.0
+
+
+def test_settlement_falsy_zero_shares_not_treated_as_default(tmp_path: Path):
+    """`shares == 0.0` on a settled record must stay 0.0 in settlement math,
+    not silently become 1.0 via `or`-chained defaulting."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    x_path = tmp_path / "auto_buyer_picks.xlsx"
+
+    record_auto_buy_execution(
+        order_payload={
+            "order_id": "ORD_ZERO_SHARES",
+            "pick_id": "PICK_ZERO",
+            "market_slug": "tsc-mlb-away-home-2026-08-30-d",
+            "selection": "home",
+            "token_side": "long",
+            "limit_price": 0.42,
+            "cost_usd": 0.0,
+            "shares": 0.0,
+            "sport": "MLB",
+            "event_start_utc": "2026-08-30T20:07:00Z",
+        },
+        pick_row={"away_team": "Away", "home_team": "Home", "market_type": "moneyline", "units": 1.0},
+        jsonl_path=j_path,
+        xlsx_path=x_path,
+    )
+    records = read_auto_buyer_ledger(j_path)
+    records[0]["status"] = "settled"
+    records[0]["result"] = "win"
+    with j_path.open("w", encoding="utf-8") as f:
+        for r in records:
+            f.write(json.dumps(r, sort_keys=True) + "\n")
+
+    mock_espn = MagicMock()
+    mock_espn.scoreboard.return_value = {
+        "events": [
+            {
+                "competitions": [
+                    {
+                        "status": {"type": {"completed": True}},
+                        "competitors": [
+                            {"homeAway": "away", "team": {"displayName": "Away"}, "score": "1"},
+                            {"homeAway": "home", "team": {"displayName": "Home"}, "score": "3"},
+                        ],
+                    }
+                ]
+            }
+        ]
+    }
+
+    settle_auto_buyer_ledger(data_root=tmp_path, espn=mock_espn)
+
+    record = read_auto_buyer_ledger(j_path)[0]
+    # With genuinely 0 shares, a "win" can only ever be worth $0 -- never the
+    # $0.58 that `shares=1.0` (the falsy-zero default) would fabricate.
+    assert record["pnl_usd"] == 0.0

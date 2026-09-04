@@ -371,12 +371,16 @@ def run_auto_buyer_cycle(
     state = load_auto_buyer_state()
     should_execute = state.get("enabled", False) if execute_override is None else bool(execute_override)
 
+    whitelisted = state.get("whitelist_models")
+    blacklisted = state.get("blacklist_models")
     config = AutoExecutionConfig(
         unit_value_usd=float(state.get("unit_value_usd", 0.50)),
         min_edge=float(state.get("min_edge", 0.035)),
         max_daily_spend_usd=float(state.get("max_daily_spend_usd", 25.0)),
         max_game_stake_usd=float(state.get("max_game_stake_usd", 2.50)),
         execute_live=should_execute,
+        whitelisted_models=tuple(whitelisted) if whitelisted is not None else DEFAULT_WHITELIST_MODELS,
+        blacklisted_models=tuple(blacklisted) if blacklisted is not None else EXPLICIT_BLACKLIST_MODELS,
     )
 
     buyer = AutoPolymarketBuyer(config=config)
@@ -715,11 +719,8 @@ class AutoPolymarketBuyer:
                 continue
 
             # 7. Quote Staleness & Market State Check (with live refresh fallback)
-            if (
-                not quote.get("fresh", False)
-                and quote.get("age_seconds", 999999) > 300
-                and self._live_quote_fn is None
-            ):
+            age_sec = float(quote.get("age_seconds") or 999999)
+            if not quote.get("fresh", False) and age_sec > 300 and self._live_quote_fn is None:
                 try:
                     from model_prediction.data_sources.polymarket_us import PolymarketUSClient
 
@@ -735,6 +736,7 @@ class AutoPolymarketBuyer:
                             "age_seconds": 0,
                             "market_state": live_snap.get("market_state", "MARKET_STATE_OPEN"),
                         }
+                        age_sec = 0.0
                 except (
                     httpx.HTTPError,
                     OSError,
@@ -746,7 +748,7 @@ class AutoPolymarketBuyer:
                 ):
                     pass
 
-            if not quote.get("fresh", False) and quote.get("age_seconds", 999999) > 300:
+            if not quote.get("fresh", False) and age_sec > 300:
                 result.rejected_stale_quote += 1
                 continue
 
@@ -864,6 +866,7 @@ class AutoPolymarketBuyer:
                 oid = sub.get("order_id")
                 filled_shares = float(sub.get("filled_size_shares") or 0.0)
                 filled_cost = float(sub.get("estimated_filled_cost_usd") or 0.0)
+                fill_known = bool(sub.get("fill_known", True))
                 executed_payload = {
                     **order_payload,
                     "requested_shares": shares,
@@ -874,6 +877,7 @@ class AutoPolymarketBuyer:
                     "fallback_order_id": sub.get("fallback_order_id"),
                     "fallback_status": sub.get("fallback_status"),
                     "fallback_resting_shares": sub.get("fallback_resting_shares"),
+                    "fill_known": fill_known,
                 }
                 result.submitted_orders.append(
                     {
@@ -891,12 +895,17 @@ class AutoPolymarketBuyer:
                 # ones: an IOC can partially or never fill, and any
                 # unfilled remainder is now resting separately (see
                 # ioc_fallback_resting) rather than assumed complete here.
+                # Record a zero-fill primary when a fallback order is resting,
+                # or when the primary fill is unknown, so a later
+                # reconcile_pending_auto_buyer_fallbacks() pass can restate it
+                # from the exchange instead of leaving a fully untracked live
+                # position.
                 try:
                     from model_prediction.portfolio.auto_buyer_ledger import (
                         record_auto_buy_execution,
                     )
 
-                    if filled_shares > 0:
+                    if filled_shares > 0 or executed_payload.get("fallback_order_id") or not fill_known:
                         record_auto_buy_execution(
                             order_payload=executed_payload,
                             order_id=oid,

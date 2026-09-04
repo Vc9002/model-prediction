@@ -250,6 +250,17 @@ new working contracts — don't regress them:
   a coalesced skip, never a failed job. The dashboard service
   (`com.vc.model-dashboard`) is the only owner of port 8765 and carries
   `MODEL_PREDICTION_LEDGER_AUTHORITY=sqlite` like the other jobs.
+  "One scheduler" means no competing schedulers, not run-once-per-day:
+  **`com.modelprediction.daily` runs 4x/day since 2026-09-04** (00:30,
+  06:00, 12:00, 18:00 — operator directive, to catch markets/games that
+  don't open until later in the day). This is safe because
+  `run_daily.sh`'s forecast step explicitly clears and replaces today's
+  picks on every run, settlement/ingestion are idempotent, and the
+  auto-buyer's bought-index cross-references the audit log to refuse a
+  double-buy on an already-bought pick_id/market_side. Checked-in copy:
+  `ops/launchd/com.modelprediction.daily.plist` — keep it byte-synced
+  with the live `~/Library/LaunchAgents` copy when changing the schedule
+  again.
 - **ProductionPredictionStore** (`production_store.py`) is the ONLY
   writer to `production/production.db` (narrow API, identity key
   event_id+model_id+market_type+horizon+decision_time_utc, decisions +

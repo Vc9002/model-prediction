@@ -442,6 +442,130 @@ def test_live_buyer_sets_resting_fallback_and_records_actual_fill(monkeypatch, t
     assert recorded[0]["order_payload"]["shares"] == 0.88
 
 
+def test_live_buyer_records_zero_fill_primary_with_resting_fallback(monkeypatch, tmp_path):
+    """A primary IOC that fills 0 shares still records a ledger row if a
+    fallback order is resting, so reconcile_pending_auto_buyer_fallbacks()
+    can find it later instead of it becoming an untracked live order."""
+    now = utc_now()
+
+    class FakeExecutor:
+        def __init__(self, **_kwargs):
+            pass
+
+        def execute(self, ticket, **_kwargs):
+            return {
+                "status": "submitted",
+                "order_id": "primary-zero",
+                "order_ids": ["primary-zero", "resting-full"],
+                "order_state": "ORDER_STATE_PARTIALLY_FILLED",
+                "filled_size_shares": 0.0,
+                "estimated_filled_cost_usd": 0.0,
+                "fallback_order_id": "resting-full",
+                "fallback_status": "resting",
+                "fallback_resting_shares": 12.25,
+            }
+
+    recorded = []
+    monkeypatch.setattr(
+        AutoPolymarketBuyer,
+        "_build_bought_index",
+        lambda _self: {
+            "pick_ids": set(),
+            "market_sides": set(),
+            "event_selections": set(),
+            "held_slugs": set(),
+        },
+    )
+    monkeypatch.setattr("model_prediction.portfolio.auto_executor.PolymarketExecutor", FakeExecutor)
+    monkeypatch.setattr(
+        "model_prediction.portfolio.auto_buyer_ledger.record_auto_buy_execution",
+        lambda **kwargs: recorded.append(kwargs),
+    )
+    monkeypatch.setattr("model_prediction.portfolio.auto_executor.time.sleep", lambda _seconds: None)
+    buyer = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(
+            unit_value_usd=5.0,
+            min_edge=0.035,
+            max_game_stake_usd=25.0,
+            max_daily_spend_usd=250.0,
+            execute_live=True,
+            whitelisted_models=("lol-tiered-elo-v6",),
+        ),
+        audit=AuditLog(tmp_path / "audit.jsonl"),
+        live_quote_fn=lambda _slug: {
+            "ask": 0.51,
+            "market_slug": "aec-lol-lds-dv1-2026-09-03",
+            "side": "long",
+        },
+    )
+
+    result = buyer.evaluate_and_execute(
+        [
+            {
+                "pick_id": "lodis_zero",
+                "model_id": "lol-tiered-elo-v6",
+                "sport": "lol",
+                "market_type": "moneyline",
+                "selection": "home",
+                "home_team": "Lodis",
+                "away_team": "devils.one inStreamly",
+                "status": "open",
+                "event_start_utc": iso_utc(now + timedelta(hours=12)),
+                "model_probability": 0.58,
+                "market_probability": 0.51,
+                "units": 1.25,
+            }
+        ]
+    )
+
+    # A zero-fill primary contributes nothing to spend, but the fallback
+    # order must still be recorded so it can be reconciled later.
+    assert result.total_spend_usd == 0.0
+    assert len(recorded) == 1
+    assert recorded[0]["order_payload"]["shares"] == 0.0
+    assert recorded[0]["order_payload"]["cost_usd"] == 0.0
+    assert recorded[0]["order_payload"]["fallback_order_id"] == "resting-full"
+
+
+def test_record_auto_buy_execution_does_not_fabricate_shares_on_zero_fill(tmp_path):
+    """`shares`/`cost_usd` of 0.0 must not be treated as falsy and replaced
+    with the pick's requested shares -- that would fabricate a fill that
+    never happened."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    x_path = tmp_path / "auto_buyer_picks.xlsx"
+    record = record_auto_buy_execution(
+        order_payload={
+            "order_id": "primary-zero",
+            "order_ids": ["primary-zero", "resting-full"],
+            "pick_id": "PICK_ZERO",
+            "market_slug": "aec-lol-lds-dv1-2026-09-03",
+            "selection": "home",
+            "token_side": "long",
+            "limit_price": 0.51,
+            "cost_usd": 0.0,
+            "shares": 0.0,
+            "sport": "LOL",
+            "event_start_utc": iso_utc(utc_now() + timedelta(hours=12)),
+            "fallback_order_id": "resting-full",
+            "fallback_resting_shares": 12.25,
+        },
+        pick_row={
+            "away_team": "devils.one inStreamly",
+            "home_team": "Lodis",
+            "market_type": "moneyline",
+            "units": 1.25,
+            "shares": 12.25,  # requested shares -- must not leak into the record
+        },
+        jsonl_path=j_path,
+        xlsx_path=x_path,
+    )
+
+    assert record["shares"] == 0.0
+    assert record["cost_usd"] == 0.0
+    assert record["primary_filled_shares"] == 0.0
+    assert record["fallback_resting_shares"] == 12.25
+
+
 def test_buyer_respects_daily_budget():
     now = utc_now()
     today_start = iso_utc(now + timedelta(hours=2))
@@ -903,6 +1027,62 @@ def _record_pending_fallback(tmp_path, event_start_utc, fallback_resting_shares=
     return j_path, x_path
 
 
+def test_reconcile_restates_unknown_primary_fill(tmp_path):
+    """An IOC whose fill was unknown at submit time is restated from the
+    exchange's terminal order state, never left as a 0-share phantom."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    x_path = tmp_path / "auto_buyer_picks.xlsx"
+    record_auto_buy_execution(
+        order_payload={
+            "order_id": "primary-unknown",
+            "order_ids": ["primary-unknown"],
+            "pick_id": "PICK_UNKNOWN",
+            "market_slug": "aec-cs2-inf-ntr-2026-09-04",
+            "selection": "away",
+            "token_side": "short",
+            "limit_price": 0.69,
+            "cost_usd": 0.0,
+            "shares": 0.0,
+            "sport": "CS2",
+            "event_start_utc": iso_utc(utc_now() + timedelta(hours=12)),
+            "fallback_order_id": "primary-unknown",
+            "fallback_resting_shares": 7.25,
+            "fill_known": False,
+        },
+        pick_row={
+            "away_team": "Nuclear TigeRES",
+            "home_team": "Infinite",
+            "market_type": "moneyline",
+            "units": 1.0,
+        },
+        jsonl_path=j_path,
+        xlsx_path=x_path,
+    )
+
+    class FakeExecutor:
+        def order_snapshots(self, order_ids):
+            assert order_ids == ["primary-unknown"]
+            return {
+                "status": "live",
+                "orders": [
+                    {
+                        "order_id": "primary-unknown",
+                        "order_state": "ORDER_STATE_FILLED",
+                        "cum_quantity": 7.25,
+                    }
+                ],
+            }
+
+    result = reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=FakeExecutor())
+
+    assert result["reconciled_filled"] == 1
+    records = read_auto_buyer_ledger(j_path)
+    assert records[0]["shares"] == 7.25
+    assert records[0]["cost_usd"] == round(7.25 * 0.69, 4)
+    assert records[0]["fallback_reconciled"] is True
+    assert records[0]["order_state"] == "ORDER_STATE_FILLED"
+
+
 def test_reconcile_adds_fallback_fill_on_top_of_primary_baseline(tmp_path):
     j_path, _ = _record_pending_fallback(tmp_path, event_start_utc=iso_utc(utc_now() + timedelta(hours=12)))
 
@@ -982,3 +1162,63 @@ def test_reconcile_cancels_resting_order_once_event_has_started(tmp_path):
     records = read_auto_buyer_ledger(j_path)
     assert records[0]["fallback_reconciled"] is True
     assert records[0]["shares"] == 0.88
+
+
+def test_reconcile_one_unreachable_order_does_not_block_other_pending_rows(tmp_path):
+    """A single order_id the exchange can't answer for (stale/purged/rate-
+    limited past retries) must not stall reconciliation of every other
+    pending fallback -- for unattended daily operation, one bad row blocking
+    the whole batch would leave every other real position unreconciled
+    indefinitely. PolymarketExecutor.order_snapshots() isolates per-id
+    failures into `unavailable_order_ids` rather than raising, so this
+    FakeExecutor mirrors that real contract."""
+    j_path, _ = _record_pending_fallback(tmp_path, event_start_utc=iso_utc(utc_now() + timedelta(hours=12)))
+    record_auto_buy_execution(
+        order_payload={
+            "order_id": "primary-healthy",
+            "order_ids": ["primary-healthy", "resting-healthy"],
+            "pick_id": "PICK_HEALTHY",
+            "market_slug": "aec-cs2-alpha-beta-2026-09-04",
+            "selection": "home",
+            "token_side": "long",
+            "limit_price": 0.50,
+            "cost_usd": 0.0,
+            "shares": 0.0,
+            "sport": "CS2",
+            "event_start_utc": iso_utc(utc_now() + timedelta(hours=12)),
+            "fallback_order_id": "resting-healthy",
+            "fallback_resting_shares": 5.0,
+        },
+        pick_row={
+            "away_team": "Beta",
+            "home_team": "Alpha",
+            "market_type": "moneyline",
+            "units": 1.0,
+        },
+        jsonl_path=j_path,
+        xlsx_path=None,
+    )
+
+    class FlakyExecutor:
+        """Mirrors PolymarketExecutor.order_snapshots' real contract: a bad
+        id is reported via `unavailable_order_ids`, never raised, so the
+        rest of the batch is still returned."""
+
+        def order_snapshots(self, order_ids):
+            return {
+                "status": "live",
+                "orders": [
+                    {"order_id": "resting-healthy", "order_state": "ORDER_STATE_FILLED", "cum_quantity": 5.0}
+                ],
+                "unavailable_order_ids": ["resting-remainder"],
+            }
+
+    result = reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=FlakyExecutor())
+
+    records = {r["pick_id"]: r for r in read_auto_buyer_ledger(j_path)}
+    # The unreachable order's own row stays pending (correct -- we don't know
+    # its state), but the healthy sibling row must still get reconciled.
+    assert records["PICK_HEALTHY"]["fallback_reconciled"] is True
+    assert records["PICK_LODIS"]["fallback_reconciled"] is False
+    assert result["reconciled_filled"] == 1
+    assert result["still_pending"] == 1

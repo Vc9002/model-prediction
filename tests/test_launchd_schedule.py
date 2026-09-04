@@ -13,6 +13,8 @@ def test_daily_worker_runs_once_without_run_at_load() -> None:
 
     assert "RunAtLoad" not in config
     assert config["StartCalendarInterval"] == [
-        {"Hour": 8, "Minute": 30},
+        {"Hour": 0, "Minute": 30},
+        {"Hour": 6, "Minute": 0},
         {"Hour": 12, "Minute": 0},
+        {"Hour": 18, "Minute": 0},
     ]
