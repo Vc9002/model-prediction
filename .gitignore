@@ -22,6 +22,15 @@ data/*.pre-fix-*
 data/logs/
 dashboard/server.log
 data/events.jsonl
+# Mutable operator state and ledger projections. A final tracked snapshot is
+# preserved in commit 133af05; local files remain in place for live services.
+data/audit.jsonl
+data/auto_buyer_ledger.jsonl
+data/auto_buyer_picks.xlsx
+data/auto_buyer_state.json
+data/manual_bets.xlsx
+data/manual_bets_state.json
+data/paper_auto_buyer/
 # Operational capture output (bet_better provider snapshots, 2026-08-26
 # night continuation) — same policy as the other untracked data trees.
 data/providers/
