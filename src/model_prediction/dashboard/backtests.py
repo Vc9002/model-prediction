@@ -381,7 +381,11 @@ def _pick_quote(row: dict) -> dict | None:
     except ValueError:
         return None
     day = event_start.astimezone(EASTERN).date().isoformat()
-    odds_sport = "esports" if sport in ("cs2", "lol", "dota2", "valorant", "r6", "cod", "ow", "rl") else sport
+    odds_sport = (
+        "esports"
+        if sport in ("cs2", "lol", "dota2", "valorant", "r6", "cod", "ow", "rl")
+        else ("ncaaf" if sport == "cfb" else sport)
+    )
     path = DATA / "odds" / odds_sport / day / "polymarket_snapshots.jsonl"
     if not path.exists():
         path = DATA / "odds" / sport / day / "polymarket_snapshots.jsonl"

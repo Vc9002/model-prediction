@@ -17,6 +17,7 @@ import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
+from functools import wraps
 from pathlib import Path
 from typing import Any
 
@@ -147,7 +148,25 @@ def _skip_auto_buyer_for_verification() -> bool:
     return os.environ.get("MODEL_PREDICTION_SKIP_AUTO_BUYER") == "1"
 
 
-@defer_sqlite_xlsx_exports()
+def _with_timed_exports(function):
+    """Include deferred workbook rebuilding in the reported daily duration."""
+
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        started = time.monotonic()
+        with defer_sqlite_xlsx_exports():
+            report = function(*args, **kwargs)
+            export_started = time.monotonic()
+        finished = time.monotonic()
+        timing = report.setdefault("timing", {})
+        timing["xlsx_export_seconds"] = round(finished - export_started, 1)
+        timing["total_seconds"] = round(finished - started, 1)
+        return report
+
+    return wrapped
+
+
+@_with_timed_exports
 def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     # Wall-clock markers for the daily-run timing report (2026-08-26 perf
     # instrumentation — additive only, no behavior change; the report dict
@@ -696,8 +715,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 data_root=data_directory,
                 args_date=args.date,
                 config=config,
+                main_ledger=ledger,
                 flat_ledger=flat_ledger,
-                main_ledger=None,
             )
             _priced_cfb = forecast_result["ncaaf"].get("priced_contracts") or []
             if _priced_cfb and not forecast_result["ncaaf"].get("logged"):
@@ -954,6 +973,40 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         # explicit; the record failure remains independently material.
         poly_edge_settle_result = {"status": "skipped"}
 
+    # Step 11b: Automated Auto-Buyer Settlement & Pre-Cycle Fallback Reconciliation
+    #
+    # run_auto_buyer_cycle() (step 12) performs its own pre-cycle reconcile +
+    # settle pass immediately before evaluating picks, whenever the buyer is
+    # actually going to run. Doing that same live-order reconciliation here
+    # too -- with no state change in between -- doubles the live exchange
+    # calls (order-status lookups, cancel-eligibility checks) for zero
+    # benefit. So this step is the *only* reconciliation pass when the buyer
+    # cycle won't run this invocation (disabled, or verification override),
+    # and defers to step 12's internal pass otherwise.
+    from ..portfolio.auto_executor import load_auto_buyer_state
+
+    _auto_buyer_will_run = not _skip_auto_buyer_for_verification() and load_auto_buyer_state().get(
+        "enabled", False
+    )
+
+    auto_buyer_settle_result: dict[str, Any] = (
+        {"status": "deferred_to_cycle", "reason": "auto_buyer_cycle_runs_own_reconcile_and_settle"}
+        if _auto_buyer_will_run
+        else {"status": "skipped"}
+    )
+    if not args.skip_settlement and not _auto_buyer_will_run and not _skip_auto_buyer_for_verification():
+        try:
+            from ..portfolio.auto_buyer_ledger import (
+                reconcile_pending_auto_buyer_fallbacks,
+                settle_auto_buyer_ledger,
+            )
+
+            reconcile_pending_auto_buyer_fallbacks(data_directory)
+            auto_buyer_settle_result = settle_auto_buyer_ledger(data_directory)
+        except Exception:
+            logger.warning("Automated Auto-Buyer settlement failed", exc_info=True)
+            auto_buyer_settle_result = {"status": "error"}
+
     # Step 12: Automated Polymarket Buyer (if enabled in dashboard state)
     if _skip_auto_buyer_for_verification():
         logger.info("Auto-Buyer skipped by explicit verification override")
@@ -964,18 +1017,48 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     else:
         auto_buyer_result = {"status": "skipped"}
         try:
-            from ..portfolio.auto_executor import load_auto_buyer_state, run_auto_buyer_cycle
+            from ..portfolio.auto_executor import run_auto_buyer_cycle
 
             auto_state = load_auto_buyer_state()
             if auto_state.get("enabled", False):
-                logger.info("Auto-Buyer is ENABLED. Executing automated purchase cycle...")
-                buyer_run = run_auto_buyer_cycle(execute_override=True, forecast_date=args.date)
+                logger.info(
+                    "Auto-Buyer is ENABLED (mode=%s). Executing automated purchase cycle...",
+                    auto_state.get("mode", "paper"),
+                )
+                # No execute_override here -- real order placement must be
+                # gated by the persisted enabled+mode state, never forced,
+                # so a scheduled run can never place real orders while the
+                # dashboard is set to paper mode.
+                buyer_run = run_auto_buyer_cycle(forecast_date=args.date)
+                # Surface the full rejection breakdown, not just the headline
+                # counts -- without this, `whitelisted_evaluated` looks like
+                # "candidates the buyer had a real shot at" when it actually
+                # includes every already-settled historical row still sitting
+                # in the picks files for a whitelisted model. Investigating
+                # "why did the buyer skip so much" is impossible after the
+                # fact without these per-reason counts on record.
                 auto_buyer_result = {
                     "status": buyer_run.get("status", "executed"),
                     "mode": buyer_run.get("mode"),
                     "orders_count": buyer_run.get("orders_count", 0),
                     "total_spend_usd": buyer_run.get("total_spend_usd", 0.0),
+                    "total_evaluated": buyer_run.get("total_evaluated", 0),
+                    "rejected_not_open": buyer_run.get("rejected_not_open", 0),
                     "whitelisted_evaluated": buyer_run.get("whitelisted_count", 0),
+                    "rejected_not_whitelisted": buyer_run.get("rejected_not_whitelisted", 0),
+                    "rejected_blacklist": buyer_run.get("rejected_blacklist", 0),
+                    "rejected_disabled_sport_market": buyer_run.get("rejected_disabled_sport_market", 0),
+                    "rejected_unsupported_market": buyer_run.get("rejected_unsupported_market", 0),
+                    "rejected_started": buyer_run.get("rejected_started", 0),
+                    "rejected_future_slate": buyer_run.get("rejected_future_slate", 0),
+                    "rejected_dedup": buyer_run.get("rejected_dedup", 0),
+                    "rejected_min_topup": buyer_run.get("rejected_min_topup", 0),
+                    "rejected_unmapped_market": buyer_run.get("rejected_unmapped_market", 0),
+                    "rejected_stale_quote": buyer_run.get("rejected_stale_quote", 0),
+                    "rejected_closed_market": buyer_run.get("rejected_closed_market", 0),
+                    "rejected_low_edge": buyer_run.get("rejected_low_edge", 0),
+                    "rejected_unrealistic_edge": buyer_run.get("rejected_unrealistic_edge", 0),
+                    "rejected_budget": buyer_run.get("rejected_budget", 0),
                     "reason": buyer_run.get("reason"),
                 }
             else:
@@ -995,7 +1078,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
 
             fallback_reconcile_result = {
                 "status": "ok",
-                **reconcile_pending_auto_buyer_fallbacks(),
+                **reconcile_pending_auto_buyer_fallbacks(data_directory),
             }
         except Exception:
             logger.warning("Auto-Buyer fallback reconciliation failed", exc_info=True)
@@ -1040,6 +1123,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         "step9_gated_research_settlement": _gated_settlement,
         "step10_polymarket_edge_record": poly_edge_record_result,
         "step11_polymarket_edge_settle": poly_edge_settle_result,
+        "step11b_auto_buyer_settle": auto_buyer_settle_result,
         "step12_auto_polymarket_buyer": auto_buyer_result,
         "step12b_auto_buyer_fallback_reconcile": fallback_reconcile_result,
     }

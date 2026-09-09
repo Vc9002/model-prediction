@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +14,7 @@ from model_prediction.data_sources.cfb_data import (
     calculate_timezone_difference,
     resolve_team,
 )
-from model_prediction.data_sources.espn import ESPNClient
+from model_prediction.data_sources.espn import SITE_API, ESPNClient
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ def ingest_real_espn_cfb_dataset(
 ) -> list[dict[str, Any]]:
     """Fetch real completed FBS games from ESPN, compute PIT features, and write JSONL."""
     if seasons is None:
-        seasons = [2019, 2020, 2021, 2022, 2023, 2024]
+        seasons = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026]
 
     client = ESPNClient()
     teams_data = client.teams("NCAAF")
@@ -41,61 +42,89 @@ def ingest_real_espn_cfb_dataset(
                     espn_teams[matched.canonical_name] = tid
 
     print(f"Matched {len(espn_teams)} FBS programs to ESPN API.")
-    raw_games_by_id: dict[str, dict[str, Any]] = {}
-
+    tasks = []
     for t_id in espn_teams.values():
         for season in seasons:
-            try:
-                sched = client.team_schedule("NCAAF", t_id, season)
-                for ev in sched.get("events", []):
-                    eid = str(ev.get("id"))
-                    if eid in raw_games_by_id:
-                        continue
-                    comp = (ev.get("competitions") or [{}])[0]
-                    status = comp.get("status", {}).get("type", {}).get("completed", False)
-                    if not status:
-                        continue
-                    comps = comp.get("competitors", [])
-                    if len(comps) != 2:
-                        continue
-                    c_home = next((c for c in comps if c.get("homeAway") == "home"), None)
-                    c_away = next((c for c in comps if c.get("homeAway") == "away"), None)
-                    if not c_home or not c_away:
-                        continue
+            tasks.append((t_id, season, 2))  # Regular Season
+            tasks.append((t_id, season, 3))  # Postseason (Bowls & CFP)
 
-                    h_raw_name = (c_home.get("team") or {}).get("displayName", "")
-                    a_raw_name = (c_away.get("team") or {}).get("displayName", "")
-                    h_team = resolve_team(h_raw_name)
-                    a_team = resolve_team(a_raw_name)
-                    if not h_team or not a_team:
-                        continue
+    def _fetch_schedule(args: tuple[str, int, int]) -> list[dict[str, Any]]:
+        tid, season, st = args
+        try:
+            res = client._get(
+                f"{SITE_API}/football/college-football/teams/{tid}/schedule",
+                {"season": season, "seasontype": st},
+            )
+            return res.get("events", [])
+        except (KeyError, ValueError, TypeError, OSError, RuntimeError) as err:
+            logger.debug("Failed to fetch schedule for team %s season %s type %s: %s", tid, season, st, err)
+            return []
 
-                    h_score = (c_home.get("score") or {}).get("value")
-                    a_score = (c_away.get("score") or {}).get("value")
-                    if h_score is None or a_score is None:
-                        continue
+    print(f"Fetching {len(tasks)} team-season schedules via ThreadPoolExecutor...")
+    raw_games_by_id: dict[str, dict[str, Any]] = {}
 
-                    date_str = str(ev.get("date") or "")
-                    venue = comp.get("venue", {})
-                    is_neutral = bool(comp.get("neutralSite", False))
+    with ThreadPoolExecutor(max_workers=20) as pool:
+        for events in pool.map(_fetch_schedule, tasks):
+            for ev in events:
+                eid = str(ev.get("id"))
+                if eid in raw_games_by_id:
+                    continue
+                comp = (ev.get("competitions") or [{}])[0]
+                status = comp.get("status", {}).get("type", {}).get("completed", False)
+                if not status:
+                    continue
+                comps = comp.get("competitors", [])
+                if len(comps) != 2:
+                    continue
+                c_home = next((c for c in comps if c.get("homeAway") == "home"), None)
+                c_away = next((c for c in comps if c.get("homeAway") == "away"), None)
+                if not c_home or not c_away:
+                    continue
 
-                    raw_games_by_id[eid] = {
-                        "event_id": eid,
-                        "event_start_utc": date_str,
-                        "season_year": season,
-                        "home_team": h_team.canonical_name,
-                        "away_team": a_team.canonical_name,
-                        "home_score": int(h_score),
-                        "away_score": int(a_score),
-                        "is_neutral_site": is_neutral,
-                        "venue_name": venue.get("fullName", h_team.stadium_name),
-                        "venue_city": venue.get("address", {}).get("city", h_team.city),
-                        "venue_state": venue.get("address", {}).get("state", h_team.state),
-                        "elevation_ft": h_team.elevation_ft,
-                        "is_dome": h_team.is_dome,
-                    }
-            except (KeyError, ValueError, TypeError, OSError) as err:
-                logger.debug("Failed to ingest schedule for team %s season %s: %s", t_id, season, err)
+                h_raw_name = (c_home.get("team") or {}).get("displayName", "")
+                a_raw_name = (c_away.get("team") or {}).get("displayName", "")
+                h_team = resolve_team(h_raw_name)
+                a_team = resolve_team(a_raw_name)
+                if not h_team or not a_team:
+                    continue
+
+                h_score = (c_home.get("score") or {}).get("value")
+                a_score = (c_away.get("score") or {}).get("value")
+                if h_score is None or a_score is None:
+                    continue
+
+                date_str = str(ev.get("date") or "")
+                venue = comp.get("venue", {})
+                is_neutral = bool(comp.get("neutralSite", False))
+
+                season_year = int(ev.get("season", {}).get("year") or 2024)
+                season_type_id = str(ev.get("seasonType", {}).get("id") or "2")
+                week_info = ev.get("week", {})
+                raw_week = week_info.get("number")
+
+                if season_type_id == "3" or week_info.get("text") == "Bowls":
+                    week = 15
+                elif raw_week is not None:
+                    week = max(1, min(14, int(raw_week)))
+                else:
+                    week = 1
+
+                raw_games_by_id[eid] = {
+                    "event_id": eid,
+                    "event_start_utc": date_str,
+                    "season_year": season_year,
+                    "week": week,
+                    "home_team": h_team.canonical_name,
+                    "away_team": a_team.canonical_name,
+                    "home_score": int(h_score),
+                    "away_score": int(a_score),
+                    "is_neutral_site": is_neutral,
+                    "venue_name": venue.get("fullName", h_team.stadium_name),
+                    "venue_city": venue.get("address", {}).get("city", h_team.city),
+                    "venue_state": venue.get("address", {}).get("state", h_team.state),
+                    "elevation_ft": h_team.elevation_ft,
+                    "is_dome": h_team.is_dome,
+                }
 
     print(f"Ingested {len(raw_games_by_id)} unique real completed FBS games.")
 
@@ -141,7 +170,7 @@ def ingest_real_espn_cfb_dataset(
             "event_id": game["event_id"],
             "event_start_utc": game["event_start_utc"],
             "season_year": game["season_year"],
-            "week": 1,
+            "week": game["week"],
             "home_team": h_name,
             "away_team": a_name,
             "home_score": game["home_score"],

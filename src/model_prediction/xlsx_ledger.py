@@ -3,9 +3,11 @@ from __future__ import annotations
 import os
 import tempfile
 from collections.abc import Iterable
+from copy import copy
 from pathlib import Path
 
 from openpyxl import Workbook, load_workbook
+from openpyxl.cell.cell import Cell
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.styles.numbers import FORMAT_TEXT
 from openpyxl.utils import get_column_letter
@@ -147,6 +149,20 @@ def _build_workbook(fieldnames: list[str], rows: list[dict[str, str]]) -> Workbo
     header_fill = PatternFill("solid", fgColor="1F4E78")
     header_font = Font(name="Aptos", size=10, bold=True, color="FFFFFF")
     body_font = Font(name="Aptos", size=10, color="1F2937")
+    # Register each column's style once. Per-cell font/alignment assignments
+    # repeatedly hash the same styles and dominate large projection exports.
+    # Copy the compact style array so later cell edits cannot alter neighbours.
+    body_styles = []
+    for field in fieldnames:
+        prototype = Cell(sheet, row=1, column=1)
+        prototype.font = body_font
+        prototype.alignment = Alignment(
+            horizontal="right" if _is_numeric(field) and field not in _NARRATIVE_FIELDS else "left",
+            vertical="top",
+            wrap_text=field in _NARRATIVE_FIELDS,
+        )
+        prototype.number_format = _number_format(field)
+        body_styles.append(prototype._style)  # type: ignore[attr-defined]  # openpyxl compact style array
 
     for column_index, field in enumerate(fieldnames, start=1):
         cell = sheet.cell(row=1, column=column_index, value=field)
@@ -163,17 +179,7 @@ def _build_workbook(fieldnames: list[str], rows: list[dict[str, str]]) -> Workbo
             cell.value = _excel_value(text, field)
             if isinstance(cell.value, str) and cell.value.startswith("="):
                 cell.data_type = "s"
-            cell.font = body_font
-            cell.alignment = Alignment(
-                horizontal="left"
-                if field in _NARRATIVE_FIELDS
-                else "right"
-                if _is_numeric(field)
-                else "left",
-                vertical="top",
-                wrap_text=field in _NARRATIVE_FIELDS,
-            )
-            cell.number_format = _number_format(field)
+            cell._style = copy(body_styles[column_index - 1])
         sheet.row_dimensions[row_index].height = 36 if any(row.get(f) for f in _NARRATIVE_FIELDS) else 18
 
     last_column = get_column_letter(len(fieldnames))

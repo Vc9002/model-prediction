@@ -83,6 +83,8 @@ CREATE INDEX IF NOT EXISTS idx_ledger_records_event
     ON ledger_records (event_id, ledger_tier);
 CREATE INDEX IF NOT EXISTS idx_ledger_records_operation
     ON ledger_records (operation_id);
+CREATE INDEX IF NOT EXISTS idx_ledger_records_page
+    ON ledger_records (created_at_utc DESC, pick_id DESC, ledger_tier DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS ux_ledger_active_contract_model
     ON ledger_records (
         ledger_tier,

@@ -1105,7 +1105,9 @@ def _forecast_wnba_spread_sport(
             rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
             risks="Point-in-time composite Elo + trend + rest margin-normal spread model.",
             model_origin=ModelOrigin.STATISTICAL_MODEL,
-            model_state=ModelState.PRODUCTION if contract.get("model_qualified") else ModelState.RESEARCH,
+            model_state=ModelState.SHADOW_QUALIFIED
+            if contract.get("model_qualified")
+            else ModelState.RESEARCH,
             observed_at_utc=contract["observed_at_utc"],
             model_artifact_hash=contract["model_artifact_hash"],
             calibration_method="margin_normal",
@@ -2785,7 +2787,7 @@ def _forecast_cfb_sport(
         game_date=args_date,
         observed_at=utc_now(),
     )
-    exposure_source = main_ledger or flat_ledger or research_ledger
+    exposure_source = flat_ledger or research_ledger or main_ledger
     if exposure_source is None:
         forecast["logged"] = 0
         return forecast
@@ -2809,10 +2811,9 @@ def _forecast_cfb_sport(
             m_version = "college-football-v1"
 
         try:
-            start_dt = parse_utc(str(contract["event_start_utc"]))
-            effective_now = (
-                (start_dt - timedelta(minutes=15)) if (force or observed_now >= start_dt) else observed_now
-            )
+            # A forced refresh cannot manufacture a pregame decision time.
+            # validate() below rejects started events using the actual clock.
+            effective_now = observed_now
             request = PickRequest(
                 event_start_utc=str(contract["event_start_utc"]),
                 event_id=str(contract["event_id"]),
@@ -2886,9 +2887,7 @@ def _forecast_cfb_sport(
                         flat_logged += 1
                     else:
                         flat_duplicates += 1
-                # NCAAF is research-only with synthetic baseline; never routes to Main Ledger
-                is_market_qualified = False
-                if main_ledger is not None and genuinely_eligible and is_market_qualified:
+                if main_ledger is not None and genuinely_eligible:
                     if (
                         _append_secondary_ledger(
                             main_ledger, request, eligibility, effective_now, "ncaaf:main_ledger"
@@ -2980,6 +2979,9 @@ def _append_secondary_ledger(
     except DuplicatePickError as error:
         logger.debug("%s: duplicate suppressed for existing pick %s", ledger_name, error.pick_id)
         return error.pick_id
+    except ValueError as error:
+        logger.debug("%s: secondary append skipped (%s)", ledger_name, error)
+        return None
 
 
 def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict:

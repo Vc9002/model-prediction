@@ -966,3 +966,27 @@ def test_moneyline_resolves_parenthesized_soccer_team_name() -> None:
         "short": {"description": "No"},
     }
     assert _resolve_moneyline_side(pick_row, snapshot) == "long"
+
+
+def test_cancel_sends_market_slug_payload(tmp_path, monkeypatch) -> None:
+    client = executor(tmp_path, env=US_CREDS)
+    calls = []
+
+    def fake_request(method, path, payload=None):
+        calls.append((method, path, payload))
+        if method == "GET":
+            return {"order": {"id": "order-to-cancel", "marketSlug": "slug-auto-lookup"}}
+        return {}
+
+    monkeypatch.setattr(client, "_request", fake_request)
+
+    # 1. Explicit market_slug
+    res1 = client.cancel("order-1", user_command=True, market_slug="explicit-slug")
+    assert res1["status"] == "cancelled"
+    assert calls[-1] == ("POST", "/v1/order/order-1/cancel", {"marketSlug": "explicit-slug"})
+
+    # 2. Looked-up market_slug
+    res2 = client.cancel("order-to-cancel", user_command=True)
+    assert res2["status"] == "cancelled"
+    assert ("GET", "/v1/order/order-to-cancel", None) in calls
+    assert calls[-1] == ("POST", "/v1/order/order-to-cancel/cancel", {"marketSlug": "slug-auto-lookup"})

@@ -35,6 +35,7 @@ import os
 import re
 import time
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
 
@@ -879,12 +880,25 @@ class PolymarketExecutor:
 
     # ---------------------------------------------------------------- cancel
 
-    def cancel(self, order_id: str, user_command: bool) -> dict[str, Any]:
+    def cancel(
+        self,
+        order_id: str,
+        user_command: bool,
+        market_slug: str | None = None,
+    ) -> dict[str, Any]:
         if not user_command:
             raise ExecutionGateError("REFUSED: cancellation also requires an explicit user command.")
         missing = [name for name in (KEY_ID_ENV, SECRET_KEY_ENV) if not self.environ.get(name)]
         if missing:
             raise ExecutionGateError(f"REFUSED: {', '.join(missing)} is not set.")
-        response = self._request("POST", f"/v1/order/{order_id}/cancel", {})
+        payload: dict[str, Any] = {}
+        if market_slug:
+            payload["marketSlug"] = market_slug
+        else:
+            with suppress(httpx.HTTPError, KeyError, TypeError, ValueError, OSError, ExecutionGateError):
+                order_info = self._request("GET", f"/v1/order/{order_id}").get("order", {})
+                if order_info.get("marketSlug"):
+                    payload["marketSlug"] = order_info["marketSlug"]
+        response = self._request("POST", f"/v1/order/{order_id}/cancel", payload)
         self.audit.append("order_cancelled", order_id, {"raw_response": str(response)[:500]})
         return {"status": "cancelled", "order_id": order_id}

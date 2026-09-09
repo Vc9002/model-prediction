@@ -393,8 +393,8 @@ def run_calibration_tournament(
         val_idx = list(range(val_start, val_end))
         train_idx = [i for i in range(n) if i not in val_idx]
 
-        train_p = probs_arr[train_idx]
-        train_y = outs_arr[train_idx]
+        train_p = probs_arr[train_idx].tolist()
+        train_y = outs_arr[train_idx].tolist()
         val_p = probs_arr[val_idx]
 
         # 1. Temperature
@@ -420,7 +420,7 @@ def run_calibration_tournament(
     # Evaluate all methods on full OOF predictions
     scorecard: dict[str, dict[str, Any]] = {}
     for method, preds in oof_preds.items():
-        metrics = calibration_metrics(preds, outcomes)
+        metrics: dict[str, Any] = calibration_metrics(preds, outcomes)
         scorecard[method] = {
             "oof_log_loss": float(metrics["log_loss"]) if metrics.get("status") == "ok" else 1.0,
             "oof_brier_score": float(metrics["brier_score"]) if metrics.get("status") == "ok" else 0.25,
@@ -437,6 +437,7 @@ def run_calibration_tournament(
     champion_method = min(scorecard.keys(), key=lambda m: scorecard[m]["oof_log_loss"])
 
     # Fit final champion on full data
+    champion_calibrator: Calibrator
     if champion_method == "identity":
         champion_calibrator = IdentityCalibrator(base_model_version)
     elif champion_method == "temperature":

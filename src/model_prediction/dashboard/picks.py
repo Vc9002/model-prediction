@@ -36,7 +36,13 @@ def _main_ledger_paths() -> list[Path]:
 
 
 def _flat_ledger_paths() -> list[Path]:
-    return [DATA / "flat" / f"{sport}.xlsx" for sport in _MAIN_LEDGER_SPORTS]
+    flat_dir = DATA / "flat"
+    paths = [flat_dir / f"{sport}.xlsx" for sport in _MAIN_LEDGER_SPORTS]
+    if flat_dir.exists():
+        for path in sorted(flat_dir.glob("*.xlsx")):
+            if not path.name.startswith(".") and path not in paths:
+                paths.append(path)
+    return paths
 
 
 def _read_split_picks(paths: list[Path], cache: dict[str, object]) -> list[dict]:

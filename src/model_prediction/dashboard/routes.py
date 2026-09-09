@@ -102,8 +102,18 @@ from model_prediction.portfolio.auto_buyer_ledger import (
 from model_prediction.portfolio.auto_executor import (
     load_auto_buyer_state,
     run_auto_buyer_cycle,
+    set_auto_buyer_mode,
     set_auto_buyer_unit_value,
     toggle_auto_buyer,
+)
+from model_prediction.portfolio.manual_bet_ledger import (
+    get_manual_bankroll,
+    mark_manual_bet_result,
+    read_manual_bets,
+    record_manual_bet,
+    set_manual_bankroll,
+    settle_manual_bets,
+    sync_manual_bets_from_polymarket,
 )
 from model_prediction.portfolio.polymarket_scanner import PolymarketSlateScanner
 
@@ -214,6 +224,32 @@ class Handler(BaseHTTPRequestHandler):
                     ]
 
                 self._send(_cached("polymarket-picks", 10, _poly_picks_decorated))
+            elif route == "/api/manual-bets":
+
+                def _manual_bets_summary():
+                    rows = read_manual_bets()
+                    bankroll = get_manual_bankroll()
+                    open_rows = [r for r in rows if str(r.get("status")).lower() == "open"]
+                    settled_rows = [r for r in rows if str(r.get("status")).lower() == "settled"]
+                    open_exposure = sum(float(r.get("units") or 0.0) for r in open_rows)
+                    largest_open = max((float(r.get("units") or 0.0) for r in open_rows), default=0.0)
+                    wins = sum(1 for r in settled_rows if r.get("result") == "win")
+                    losses = sum(1 for r in settled_rows if r.get("result") == "loss")
+                    total_pnl_usd = sum(float(r.get("pnl_units") or 0.0) for r in settled_rows)
+                    decided = wins + losses
+                    return {
+                        "rows": rows,
+                        "bankroll_usd": bankroll,
+                        "open_exposure_usd": round(open_exposure, 2),
+                        "open_exposure_pct": round(100.0 * open_exposure / bankroll, 2) if bankroll else 0.0,
+                        "largest_open_usd": round(largest_open, 2),
+                        "largest_open_pct": round(100.0 * largest_open / bankroll, 2) if bankroll else 0.0,
+                        "settled_count": len(settled_rows),
+                        "win_rate": round(wins / decided, 4) if decided else None,
+                        "total_pnl_usd": round(total_pnl_usd, 2),
+                    }
+
+                self._send(_cached("manual-bets", 10, _manual_bets_summary))
             elif route == "/api/performance":
                 sport = str(query.get("sport") or "").strip()
                 archived = set(_load_archive().get("pick_ids", []))
@@ -639,12 +675,40 @@ class Handler(BaseHTTPRequestHandler):
 
                 res = settle_polymarket_ledger_rows()
                 self._send(res)
+        elif parsed.path == "/api/manual-bets/record":
+            try:
+                self._send(record_manual_bet(payload.get("bet") or {}))
+            except ValueError as error:
+                self._send({"status": "refused", "error": str(error)}, code=400)
+        elif parsed.path == "/api/manual-bets/settle":
+            self._send(settle_manual_bets())
+        elif parsed.path == "/api/manual-bets/sync":
+            self._send(sync_manual_bets_from_polymarket())
+        elif parsed.path == "/api/manual-bets/mark-result":
+            try:
+                self._send(
+                    mark_manual_bet_result(
+                        str(payload.get("pick_id") or ""), str(payload.get("result") or "")
+                    )
+                )
+            except ValueError as error:
+                self._send({"status": "refused", "error": str(error)}, code=400)
+        elif parsed.path == "/api/manual-bets/bankroll":
+            try:
+                self._send(set_manual_bankroll(payload.get("bankroll_usd")))
+            except ValueError as error:
+                self._send({"status": "refused", "error": str(error)}, code=400)
         elif parsed.path == "/api/auto-buyer/toggle":
             enabled = payload.get("enabled")
             self._send(toggle_auto_buyer(enabled))
         elif parsed.path == "/api/auto-buyer/unit-value":
             try:
                 self._send(set_auto_buyer_unit_value(payload.get("unit_value_usd")))
+            except (OSError, RuntimeError, TypeError, ValueError) as error:
+                self._send({"status": "refused", "error": str(error)}, code=400)
+        elif parsed.path == "/api/auto-buyer/mode":
+            try:
+                self._send(set_auto_buyer_mode(payload.get("mode")))
             except (OSError, RuntimeError, TypeError, ValueError) as error:
                 self._send({"status": "refused", "error": str(error)}, code=400)
         elif parsed.path == "/api/auto-buyer/run":

@@ -520,3 +520,57 @@ def test_moneyline_refuses_ambiguous_derby_match_against_opponent_snapshot(tmp_p
             contract["home_team"] == "AC Milan"
             and contract["market_slug"] == "tw-serie-a-inter-milan-2026-07-27"
         )
+
+
+def test_soccer_model_league_isolation_prevents_lower_division_distortion() -> None:
+    from model_prediction.features.base import GameRecord
+    from model_prediction.models.soccer import SoccerModel, UpcomingMatch
+
+    history: list[GameRecord] = []
+    # 60 Championship games where Promoted FC dominates lower division teams (scoring 4 goals/game)
+    for i in range(60):
+        history.append(
+            GameRecord(
+                event_id=f"champ-{i}",
+                event_start_utc=f"2026-04-{i % 28 + 1:02d}T12:00:00Z",
+                league="CHAMPIONSHIP",
+                away_team="Rotherham",
+                home_team="Promoted FC",
+                away_score=0,
+                home_score=4,
+            )
+        )
+    # 60 EPL games where Liverpool dominates top-flight teams (scoring 3 goals/game)
+    for i in range(60):
+        history.append(
+            GameRecord(
+                event_id=f"epl-{i}",
+                event_start_utc=f"2026-04-{i % 28 + 1:02d}T12:00:00Z",
+                league="EPL",
+                away_team="Everton",
+                home_team="Liverpool",
+                away_score=0,
+                home_score=3,
+            )
+        )
+
+    model = SoccerModel()
+
+    # Predict an EPL match between Liverpool (home) and Promoted FC (away)
+    predictions = model.predict_games(
+        history=history,
+        upcoming=[
+            UpcomingMatch(
+                event_id="epl-test-1",
+                event_start_utc="2026-09-04T19:00:00Z",
+                away_team="Promoted FC",
+                home_team="Liverpool",
+                league="EPL",
+            )
+        ],
+    )
+    ml_pred = next(p for p in predictions if p.market_type == "moneyline")
+    # Under EPL league isolation, Promoted FC does not carry Championship attack into the EPL.
+    # Liverpool must be heavily favored.
+    assert ml_pred.probabilities["home"] > 0.60
+    assert ml_pred.probabilities["away"] < 0.20

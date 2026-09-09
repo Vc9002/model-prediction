@@ -299,11 +299,12 @@ models:
       +44.2 units at -110, every qualifying month positive. Operator
       approved wiring research_confidence_gate below from that real result.'
     model_type: multinomial_3way
+    active_production_version: soccer-poisson-dc-v1
     active_research_version: soccer-poisson-dc-v1
     legacy_binary_research_version: soccer-elo-trend-lr-v2
     legacy_binary_research_artifact: config/models/soccer-elo-trend-lr-v2.json
-    min_edge: 0.05
-    research_confidence_gate: 0.230157
+    min_edge: 0.035
+    research_confidence_gate: 0.0
     leagues:
     - EPL
     - LA_LIGA
@@ -324,6 +325,7 @@ models:
     - FRIENDLIES
     - CLUB_FRIENDLIES
     markets:
+    - moneyline
     - full_game_total_2_5
   NFL:
     family: elo_trend_normal_approximation
@@ -337,8 +339,8 @@ models:
     # total research resumes.
   NCAAF:
     family: elo_trend_key_number_engine
-    # Demoted 2026-08-30: promoted on a simulated cohort (see production.yaml).
-    status: research
+    # Promoted 2026-09-07 to shadow_qualified with multi-market wire (ML, Spread, Total) into Main and Flat ledgers.
+    status: shadow_qualified
     origin: statistical_model
     active_production_version: college-football-v1
     production_artifact: config/models/college-football-v1.json

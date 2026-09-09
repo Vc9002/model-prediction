@@ -265,3 +265,87 @@ def test_dashboard_equivalence_sql_matches_xlsx_for_the_same_tier(tmp_path: Path
     # The dashboard's SQL view carries the same status/result the XLSX has.
     assert sql_view["records"][0]["status"] == "settled"
     assert sql_view["records"][0]["result"] == "loss"
+
+
+def test_ledger_pagination_tracks_timestamp_and_tier_not_random_ids(tmp_path, monkeypatch):
+    from model_prediction.dashboard import data_service
+    from model_prediction.runtime_ledger_store import RuntimeLedgerStore
+
+    paths = RuntimePaths.for_test(tmp_path)
+    monkeypatch.setattr(data_service, "_paths", lambda: paths)
+    expected = [("a", "main"), ("z", "research"), ("z", "main"), ("m", "main")]
+    with RuntimeLedgerStore(paths) as store:
+        for i, (pick_id, tier) in enumerate(expected):
+            _seed_ledger_record(
+                store,
+                pick_id=pick_id,
+                ledger_tier=tier,
+                operation_id=f"op-{i}",
+                event_id=f"event-{i}",
+                created_at_utc=f"2026-08-14T12:00:0{3 if i == 0 else 2 if i < 3 else 1}+00:00",
+            )
+        found = []
+        query = {"limit": ["1"]}
+        for _ in range(6):
+            page = data_service.handle("ledger", query)
+            found.extend((r["pick_id"], r["ledger_tier"]) for r in page["records"])
+            if page["next_cursor"] is None:
+                break
+            query["cursor"] = [page["next_cursor"]]
+        assert found == expected
+
+
+@pytest.mark.parametrize(
+    "route,key", [("ledger", "records"), ("predictions", "predictions"), ("runs", "runs")]
+)
+@pytest.mark.parametrize("limit", ["-2", "0", "bad", "999999999"])
+def test_data_service_limits_are_bounded(tmp_path, monkeypatch, route, key, limit):
+    from model_prediction.dashboard import data_service
+    from model_prediction.runtime_ledger_store import RuntimeLedgerStore
+
+    paths = RuntimePaths.for_test(tmp_path)
+    monkeypatch.setattr(data_service, "_paths", lambda: paths)
+    with RuntimeLedgerStore(paths) as store:
+        for i in range(3):
+            _seed_ledger_record(store, event_id=f"e{i}")
+    with ProductionPredictionStore(paths) as store:
+        run_id = store.start_run()
+        for i in range(3):
+            store.append_prediction(
+                run_id=run_id,
+                prediction_id=f"p{i}",
+                event_id=f"e{i}",
+                sport="MLB",
+                market="moneyline",
+                market_type="moneyline",
+                model_id="test",
+                probabilities={"home": 0.6},
+                decision_time_utc="2026-08-14T12:00:00+00:00",
+            )
+    import sqlite3
+
+    with sqlite3.connect(paths.runs_db) as conn:
+        conn.execute(
+            "CREATE TABLE runs (run_id, worker, status, started_at_utc, finished_at_utc, exit_code, note)"
+        )
+        conn.executemany(
+            "INSERT INTO runs VALUES (?, 'daily', 'completed', ?, NULL, 0, NULL)",
+            [(str(i), f"2030-01-01T00:00:0{i}Z") for i in range(3)],
+        )
+    result = data_service.handle(route, {"limit": [limit]})
+    assert 1 <= len(result[key]) <= 3
+    if limit in {"-2", "0"}:
+        assert len(result[key]) == 1
+
+
+def test_ledger_page_index_avoids_full_sort(tmp_path):
+    from model_prediction.runtime_ledger_store import RuntimeLedgerStore
+
+    with RuntimeLedgerStore(RuntimePaths.for_test(tmp_path)) as store:
+        plan = store._conn.execute(
+            "EXPLAIN QUERY PLAN SELECT pick_id,ledger_tier,created_at_utc FROM ledger_records "
+            "ORDER BY created_at_utc DESC,pick_id DESC,ledger_tier DESC LIMIT 101"
+        ).fetchall()
+        details = " ".join(str(row[3]) for row in plan)
+        assert "idx_ledger_records_page" in details
+        assert "TEMP B-TREE" not in details

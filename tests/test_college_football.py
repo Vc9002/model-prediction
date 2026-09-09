@@ -19,6 +19,7 @@ Verifies:
 """
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -438,29 +439,85 @@ def test_cfb_production_registry_and_hashes():
 # -------------------------------------------------------------
 # 9. Flat Ledger All-Game Inclusion & Main Ledger Gating Tests
 # -------------------------------------------------------------
-def test_cfb_flat_ledger_all_game_inclusion(tmp_path):
-    """Verify Flat Ledger receives all candidate games across all 3 markets without edge gates."""
-    from model_prediction.cli.forecast import _forecast_cfb_sport
-    from model_prediction.ledger import PickLedger
-
-    flat_path = tmp_path / "flat_ncaaf.xlsx"
-    flat_ledger = PickLedger(flat_path, audit_path=tmp_path / "events.jsonl", tier="flat", sport="ncaaf")
-
-    config = {
-        "models": {"NCAAF": {"min_edge": 0.035, "status": "shadow_qualified"}},
-        "project": {"maximum_data_age_hours": 24},
+def _cfb_logging_fixture(event_start):
+    return {
+        "status": "research",
+        "model_code_hash": "fixture-hash",
+        "priced_contracts": [
+            {
+                "event_id": "fixture-game",
+                "event_start_utc": event_start,
+                "away_team": "Alabama Crimson Tide",
+                "home_team": "Georgia Bulldogs",
+                "market_type": market,
+                "selection": selection,
+                "line": line,
+                "executable_ask": 0.55,
+                "model_probability": 0.56,
+                "model_uncertainty": 0.10,
+                "rationale": "deterministic test fixture",
+            }
+            for market, selection, line in [
+                ("moneyline", "home", None),
+                ("spread", "home", -3.5),
+                ("total", "over", 48.5),
+            ]
+        ],
     }
 
-    res = _forecast_cfb_sport(
-        data_root="data",
-        args_date="2024-09-07",
-        config=config,
-        flat_ledger=flat_ledger,
-        main_ledger=None,
-        force=True,
+
+def test_cfb_flat_ledger_all_game_inclusion(tmp_path, monkeypatch):
+    """Every priced market reaches Flat even below the configured edge gate."""
+    from model_prediction.cli import forecast
+    from model_prediction.ledger import PickLedger
+    from model_prediction.models import college_football
+
+    monkeypatch.setattr(
+        college_football, "build_cfb_slate", lambda **kwargs: _cfb_logging_fixture("2030-09-07T20:00:00Z")
     )
-    assert res["status"] == "shadow_qualified"
-    assert res["flat_logged"] >= 0  # Processed and attempted writes
+    monkeypatch.setattr(forecast, "utc_now", lambda: datetime(2030, 9, 7, 18, tzinfo=UTC))
+    flat = PickLedger(
+        tmp_path / "flat_ncaaf.xlsx", audit_path=tmp_path / "events.jsonl", tier="flat", sport="ncaaf"
+    )
+    result = forecast._forecast_cfb_sport(
+        data_root=tmp_path,
+        args_date="2030-09-07",
+        config={
+            "models": {"NCAAF": {"min_edge": 0.035, "status": "shadow_qualified"}},
+            "project": {"maximum_data_age_hours": 24},
+            "bankroll": {},
+        },
+        flat_ledger=flat,
+    )
+    assert result["status"] == "shadow_qualified"
+    assert result["flat_logged"] == 3
+    assert not result["errors"]
+    assert {row["market_type"] for row in flat.rows()} == {"moneyline", "spread", "total"}
+
+
+@pytest.mark.parametrize("force", [False, True])
+def test_cfb_started_games_cannot_be_logged_by_backdating(tmp_path, monkeypatch, force):
+    from model_prediction.cli import forecast
+    from model_prediction.ledger import PickLedger
+    from model_prediction.models import college_football
+
+    monkeypatch.setattr(
+        college_football, "build_cfb_slate", lambda **kwargs: _cfb_logging_fixture("2030-09-07T17:00:00Z")
+    )
+    monkeypatch.setattr(forecast, "utc_now", lambda: datetime(2030, 9, 7, 18, tzinfo=UTC))
+    flat = PickLedger(
+        tmp_path / "flat_ncaaf.xlsx", audit_path=tmp_path / "events.jsonl", tier="flat", sport="ncaaf"
+    )
+    result = forecast._forecast_cfb_sport(
+        data_root=tmp_path,
+        args_date="2030-09-07",
+        config={"models": {"NCAAF": {"status": "research"}}, "project": {}, "bankroll": {}},
+        flat_ledger=flat,
+        force=force,
+    )
+    assert result["flat_logged"] == 0
+    assert len(result["errors"]) == 3
+    assert flat.rows() == []
 
 
 def test_cfb_main_ledger_gating_qualification():
@@ -530,4 +587,4 @@ def test_cfb_models_serving_with_degraded_evidence():
 
     with (root / "config/model.yaml").open() as f:
         model_cfg = yaml.safe_load(f)
-    assert model_cfg["models"]["NCAAF"]["status"] == "research"
+    assert model_cfg["models"]["NCAAF"]["status"] == "shadow_qualified"

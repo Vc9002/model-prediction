@@ -51,7 +51,7 @@ OUTPUTS = ROOT / "outputs" / "latest"
 # mirrors -- duplicated here as a plain tuple rather than importing that
 # module at load time, matching this file's existing pattern of keeping
 # model_prediction imports lazy/local to the functions that need them).
-_MAIN_LEDGER_SPORTS = ("mlb", "wnba", "soccer", "tennis")
+_MAIN_LEDGER_SPORTS = ("mlb", "wnba", "soccer", "tennis", "ncaaf")
 DASH_DIR = ROOT / "dashboard"
 PID_FILE = DASH_DIR / "server.pid"
 LOG_FILE = DASH_DIR / "server.log"
@@ -82,6 +82,8 @@ SPORTS = (
     "nba",
     "wnba",
     "nfl",
+    "ncaaf",
+    "cfb",
     "soccer",
     "tennis",
     "lol",
@@ -96,6 +98,7 @@ GATEWAY = "https://gateway.polymarket.us"
 
 _CACHE: dict[str, tuple[float, object]] = {}
 _CACHE_LOCK = threading.Lock()
+_CACHE_BUILD_LOCKS: dict[str, threading.RLock] = {}
 _CONFIG_LOCK = threading.Lock()
 _ACTION_LOCK = threading.Lock()
 _LAST_ACTION: dict[str, object] = {}
@@ -212,15 +215,23 @@ def _runner_env() -> dict[str, str]:
 
 
 def _cached(key: str, ttl: float, builder):
-    now = time.time()
+    now = time.monotonic()
     with _CACHE_LOCK:
         hit = _CACHE.get(key)
         if hit and now - hit[0] < ttl:
             return hit[1]
-    value = builder()
-    with _CACHE_LOCK:
-        _CACHE[key] = (time.time(), value)
-    return value
+        build_lock = _CACHE_BUILD_LOCKS.setdefault(key, threading.RLock())
+    # Collapse simultaneous misses for the same endpoint. Separate keys stay
+    # independent; a slow report must not hold the global cache lock.
+    with build_lock:
+        with _CACHE_LOCK:
+            hit = _CACHE.get(key)
+            if hit and time.monotonic() - hit[0] < ttl:
+                return hit[1]
+        value = builder()
+        with _CACHE_LOCK:
+            _CACHE[key] = (time.monotonic(), value)
+        return value
 
 
 # ---------------------------------------------------------------------------
@@ -445,7 +456,8 @@ def _manual_research_eligibility(row: dict) -> tuple[bool, str]:
     if not execution.get("allow_manual_research_orders", False):
         return False, "manual research orders are disabled"
     league = str(row.get("league") or "").upper()
-    active_version = (config.get("models", {}).get(league, {}) or {}).get("active_production_version")
+    model_cfg = config.get("models", {}).get(league, {}) or {}
+    active_version = model_cfg.get("active_production_version") or model_cfg.get("active_research_version")
     if execution.get("manual_research_require_active_model", True) and (
         not active_version or row.get("model_version") != active_version
     ):

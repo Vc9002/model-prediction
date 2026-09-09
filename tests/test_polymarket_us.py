@@ -423,6 +423,29 @@ def test_slate_capture_skips_sports_outside_qualification_scope(tmp_path) -> Non
     assert result["skipped_nonqualification_contracts"] == 0
 
 
+def test_slate_capture_includes_ncaaf_college_football(tmp_path) -> None:
+    class FakeClient:
+        def snapshot(self, slug: str) -> dict:
+            return {
+                "market_slug": slug,
+                "event_start_utc": "2026-09-05T19:00:00Z",
+                "observed_at_utc": "2026-09-05T18:00:00Z",
+                "long": {"description": "home", "ask": 0.55, "bid": 0.50},
+                "short": {"description": "away", "ask": 0.50, "bid": 0.45},
+            }
+
+    result = capture_slate_snapshots(
+        FakeClient(),
+        {"NCAAF": [{"event_id": "cfb-1", "markets": [{"market_slug": "asc-cfb-test"}]}]},
+        tmp_path,
+        "2026-09-05",
+    )
+
+    assert result["captured"] == 1
+    assert result["skipped_nonqualification_contracts"] == 0
+    assert (tmp_path / "odds" / "ncaaf" / "2026-09-05" / "polymarket_snapshots.jsonl").exists()
+
+
 def test_ledger_price_refresh_deduplicates_and_never_discovers_a_broad_slate(tmp_path) -> None:
     class FakeClient:
         def __init__(self) -> None:

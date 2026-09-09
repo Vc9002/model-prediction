@@ -174,11 +174,13 @@ def test_v10_prospective_shadow_record() -> None:
     assert d["prediction_hash"] == rec.prediction_hash
 
 
-def test_v10_daily_operational_audit() -> None:
+def test_v10_daily_operational_audit(tmp_path, monkeypatch) -> None:
+    from scripts import mlb_v10_daily_operational_audit as audit
     from scripts.mlb_v10_daily_operational_audit import run_daily_operational_audit
 
-    rep = run_daily_operational_audit()
-    assert rep.operational_status == "PASS"
+    monkeypatch.setattr(audit, "AUDIT_OUTPUT_PATH", tmp_path / "audit.json")
+    rep = run_daily_operational_audit(ledger_path=tmp_path / "missing.jsonl")
+    assert rep.operational_status == "NO_DATA"
     assert rep.pit_violations_count == 0
     assert rep.duplicate_predictions_count == 0
     assert rep.late_predictions_count == 0

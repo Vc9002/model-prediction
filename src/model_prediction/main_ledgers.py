@@ -29,7 +29,7 @@ from .eligibility import EligibilityResult
 from .ledger import PickLedger
 from .runtime_ledger_store import RuntimeLedgerStore
 
-MAIN_LEDGER_SPORTS: tuple[str, ...] = ("mlb", "wnba", "soccer", "tennis")
+MAIN_LEDGER_SPORTS: tuple[str, ...] = ("mlb", "wnba", "soccer", "tennis", "ncaaf")
 
 
 def normalize_main_sport(sport: str) -> str:

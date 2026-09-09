@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>MODEL_PREDICTION_LEDGER_AUTHORITY</key>
+		<string>sqlite</string>
+		<key>MODEL_PREDICTION_OPERATOR_NOTIFICATIONS</key>
+		<string>0</string>
+		<key>MODEL_PREDICTION_REPO_ROOT</key>
+		<string>/Users/vincentc9002/model-prediction</string>
+		<key>MODEL_PREDICTION_RUNTIME_ROOT</key>
+		<string>/Users/vincentc9002/model-prediction-runtime</string>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+		<key>PYTHONPATH</key>
+		<string>/Users/vincentc9002/model-prediction/src</string>
+	</dict>
+	<key>Label</key>
+	<string>com.modelprediction.manual-bet-sync</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Users/vincentc9002/model-prediction/.venv/bin/python</string>
+		<string>-m</string>
+		<string>model_prediction.run_supervisor</string>
+		<string>run</string>
+		<string>manual-bet-sync</string>
+	</array>
+	<key>StandardErrorPath</key>
+	<string>/Users/vincentc9002/model-prediction-runtime/logs/collectors/manual-bet-sync.err</string>
+	<key>StandardOutPath</key>
+	<string>/Users/vincentc9002/model-prediction-runtime/logs/collectors/manual-bet-sync.log</string>
+	<key>StartInterval</key>
+	<integer>21600</integer>
+	<key>TimeOut</key>
+	<integer>600</integer>
+	<key>WorkingDirectory</key>
+	<string>/Users/vincentc9002/model-prediction</string>
+</dict>
+</plist>

@@ -12,7 +12,7 @@ from typing import Any
 import yaml
 
 from model_prediction.production_canary import _compute_artifact_hash
-from model_prediction.run_supervisor import RunSupervisor
+from model_prediction.run_supervisor import WORKERS, RunSupervisor
 from model_prediction.runtime_paths import RuntimePaths
 from model_prediction.system_health import (
     _degenerate_served_values,
@@ -144,7 +144,7 @@ def _seed_market(repo: Path, sport: str, days_ago: float) -> None:
 
 def test_fully_healthy_system_is_healthy(tmp_path: Path) -> None:
     repo = _make_repo(tmp_path)
-    for worker in ("daily", "production", "rebuild-shadow"):
+    for worker in WORKERS:
         _seed_successful_run(repo, worker)
     _seed_prediction_state(repo, minutes_ago=5)
     _seed_game(repo, "mlb", days_ago=1)
@@ -505,7 +505,7 @@ def test_market_relative_evidence_is_informational_and_cannot_flip_health(
     import model_prediction.system_health as system_health_module
 
     repo = _make_repo(tmp_path)
-    for worker in ("daily", "production", "rebuild-shadow"):
+    for worker in WORKERS:
         _seed_successful_run(repo, worker)
     _seed_prediction_state(repo, minutes_ago=5)
     _seed_game(repo, "mlb", days_ago=1)
@@ -571,7 +571,7 @@ def test_a_deliberately_disabled_model_is_reported_not_degraded(tmp_path: Path) 
     )
     _write_yaml(config_path, config)
     _write_json(repo / "config/models/demoted-v1.json", _make_artifact("demoted-v1"))
-    for worker in ("daily", "production", "rebuild-shadow"):
+    for worker in WORKERS:
         _seed_successful_run(repo, worker)
     _seed_prediction_state(repo, minutes_ago=5)
 

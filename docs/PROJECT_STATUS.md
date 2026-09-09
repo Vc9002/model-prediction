@@ -10,6 +10,19 @@ is the running log of real bugs found/fixed with full evidence.
 Historical metrics in old reports, changelog entries, model cards, and
 rollback artifacts are not current operational truth.
 
+## 2026-09-08 — Shared performance and integrity improvements
+
+- Shared workbook export: 4.36x faster on the reproducible 1,000-row benchmark.
+- Dashboard: indexed ledger pagination with complete cursors; same-key cache
+  misses share one build; page sizes are bounded.
+- Pipeline: deferred exports included in timing, CFB backdating removed,
+  qualified WNBA spread state fixed, and PAPER mode cannot be overridden live.
+- Verification: full sandbox suite 2,660 passed / 9 socket failures / 3 skipped;
+  complete HTTP file 23 passed with localhost access; final execution regressions
+  171 passed. Ruff and mypy (344 files) clean. All failures resolved by reruns.
+- No new predictive accuracy or profitability claim; frozen artifacts unchanged.
+- Full detail: [optimization report](PROJECT_OPTIMIZATION_2026-09-08.md).
+
 ## 2026-09-03 — Auto-Buyer IOC fill reconciliation + resting-order fallback
 
 - Auto-Buyer marketable orders now reconcile actual IOC fills via the

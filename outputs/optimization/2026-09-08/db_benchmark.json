@@ -1,0 +1,33 @@
+{
+  "rows": 25872,
+  "method": "25 repetitions; copied real ordering keys only; in-memory SQLite",
+  "before": {
+    "median_ms": 12.088000075891614,
+    "plan": [
+      [
+        4,
+        0,
+        216,
+        "SCAN ledger_records"
+      ],
+      [
+        17,
+        0,
+        0,
+        "USE TEMP B-TREE FOR ORDER BY"
+      ]
+    ]
+  },
+  "after": {
+    "median_ms": 0.06220804061740637,
+    "plan": [
+      [
+        4,
+        0,
+        216,
+        "SCAN ledger_records USING COVERING INDEX idx_ledger_records_page"
+      ]
+    ]
+  },
+  "identical_rows": true
+}

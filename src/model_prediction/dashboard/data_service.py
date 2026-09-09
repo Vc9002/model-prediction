@@ -52,6 +52,15 @@ def _paths() -> RuntimePaths:
     return RuntimePaths.resolve(repo_root=PROJECT_ROOT, require_external_runtime=True)
 
 
+def _page_limit(query: dict[str, list[str]], default: int, maximum: int) -> int:
+    values = query.get("limit") or [str(default)]
+    try:
+        requested = int(values[0])
+    except (ValueError, TypeError):
+        requested = default
+    return max(1, min(requested, maximum))
+
+
 def _predictions(query: dict[str, list[str]]) -> dict[str, Any]:
     conn = _ro_conn(_paths().production_db)
     if conn is None:
@@ -60,7 +69,7 @@ def _predictions(query: dict[str, list[str]]) -> dict[str, Any]:
         sport = query.get("sport", [None])[0]
         market_type = query.get("market_type", [None])[0]
         status = query.get("status", [None])[0]
-        limit = min(int(query.get("limit", ["100"])[0]), 500)
+        limit = _page_limit(query, 100, 500)
         cursor = query.get("cursor", [None])[0]
 
         clauses: list[str] = []
@@ -121,7 +130,7 @@ def _runs(query: dict[str, list[str]]) -> dict[str, Any]:
     if conn is None:
         return {"runs": [], "note": "no run-state database yet"}
     try:
-        limit = min(int(query.get("limit", ["20"])[0]), 200)
+        limit = _page_limit(query, 20, 200)
         rows = conn.execute(
             "SELECT run_id, worker, status, started_at_utc, finished_at_utc, "
             "exit_code, note FROM runs ORDER BY started_at_utc DESC LIMIT ?",
@@ -218,7 +227,7 @@ def _ledger(query: dict[str, list[str]]) -> dict[str, Any]:
         tier = query.get("tier", [None])[0]
         sport = query.get("sport", [None])[0]
         status = query.get("status", [None])[0]
-        limit = min(int(query.get("limit", ["100"])[0]), 500)
+        limit = _page_limit(query, 100, 500)
         cursor = query.get("cursor", [None])[0]
 
         clauses: list[str] = []
@@ -233,16 +242,39 @@ def _ledger(query: dict[str, list[str]]) -> dict[str, Any]:
             clauses.append("status = ?")
             params.append(status)
         if cursor:
-            clauses.append("pick_id < ?")
-            params.append(cursor)
+            if cursor.startswith("v1:"):
+                try:
+                    boundary = json.loads(cursor[3:])
+                except json.JSONDecodeError as exc:
+                    raise ValueError("invalid ledger cursor") from exc
+                if (
+                    not isinstance(boundary, list)
+                    or len(boundary) != 3
+                    or not all(isinstance(value, str) and value for value in boundary)
+                ):
+                    raise ValueError("invalid ledger cursor")
+            else:
+                # Accept old pick-ID cursors only when they identify one row.
+                # A pick can exist in multiple tiers, so ambiguity must not
+                # silently skip records at a page boundary.
+                cursor_where = clauses + ["pick_id = ?"]
+                matches = conn.execute(
+                    "SELECT created_at_utc, pick_id, ledger_tier FROM ledger_records WHERE "
+                    + " AND ".join(cursor_where)
+                    + " LIMIT 2",
+                    [*params, cursor],
+                ).fetchall()
+                if len(matches) != 1:
+                    raise ValueError("unknown or ambiguous ledger cursor; restart pagination")
+                boundary = list(matches[0])
+            clauses.append("(created_at_utc, pick_id, ledger_tier) < (?, ?, ?)")
+            params.extend(boundary)
         where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
-        # pick_id has no natural chronology across tiers, so order by the
-        # row's real timestamp and keyset-page on (created_at_utc, pick_id)
-        # would be the general form; created_at_utc DESC with a pick_id
-        # tie-break keeps pagination stable without a composite cursor.
+        # Cursor and ordering must match, including the tier component of
+        # the primary key when the same pick appears in multiple ledgers.
         sql = (
             f"SELECT {_LEDGER_COLUMNS} FROM ledger_records{where} "
-            "ORDER BY created_at_utc DESC, pick_id DESC LIMIT ?"
+            "ORDER BY created_at_utc DESC, pick_id DESC, ledger_tier DESC LIMIT ?"
         )
         params.append(limit + 1)
         rows = conn.execute(sql, params).fetchall()
@@ -250,7 +282,15 @@ def _ledger(query: dict[str, list[str]]) -> dict[str, Any]:
         rows = rows[:limit]
         return {
             "records": [dict(r) for r in rows],
-            "next_cursor": rows[-1]["pick_id"] if has_more and rows else None,
+            "next_cursor": (
+                "v1:"
+                + json.dumps(
+                    [rows[-1][key] for key in ("created_at_utc", "pick_id", "ledger_tier")],
+                    separators=(",", ":"),
+                )
+                if has_more and rows
+                else None
+            ),
         }
     finally:
         conn.close()

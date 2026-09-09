@@ -133,3 +133,26 @@ def test_negative_and_zero_values_round_trip_correctly(tmp_path) -> None:
     assert row["american_odds"] == "150"
     assert row["pnl_units"] == "-1.5000"
     assert row["line"] == "0"
+
+
+def test_export_preserves_styles_and_literal_formula_text(tmp_path) -> None:
+    from openpyxl import load_workbook
+
+    path = tmp_path / "picks.xlsx"
+    write_xlsx_rows_atomic(path, FIELDNAMES, [_row(rationale="=1+1"), _row(pick_id="second")])
+    workbook = load_workbook(path)
+    try:
+        sheet = workbook["Picks"]
+        probability = sheet.cell(2, FIELDNAMES.index("model_probability") + 1)
+        narrative = sheet.cell(2, FIELDNAMES.index("rationale") + 1)
+        assert probability.number_format == "0.00%"
+        assert probability.alignment.horizontal == "right"
+        assert narrative.alignment.wrap_text
+        assert narrative.alignment.vertical == "top"
+        assert narrative.font.name == "Aptos"
+        assert narrative.data_type == "s" and narrative.value == "=1+1"
+        assert sheet.freeze_panes == "A2"
+        assert sheet.tables["PicksLedger"].ref == "A1:DP3"
+        assert any(cell.data_type == "f" for row in workbook["Summary"] for cell in row)
+    finally:
+        workbook.close()

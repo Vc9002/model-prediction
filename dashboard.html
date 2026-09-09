@@ -301,6 +301,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <div id="autoBuyerTopControl" style="display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:3px 8px;font-family:var(--mono);font-size:11px">
     <span>Auto-Buyer (<span id="autoBuyerUnitBadge">50¢/U</span>):</span>
     <button id="autoBuyerToggleBtn" onclick="toggleAutoBuyer()" style="font-weight:700;padding:2px 8px;border-radius:5px;font-size:11px;background:rgba(255,92,92,0.2);color:var(--red)">OFF</button>
+    <button id="autoBuyerModeBtn" onclick="toggleAutoBuyerMode()" title="PAPER: simulated fills only, recorded for tracking, no real orders. LIVE: places real Polymarket orders." style="font-weight:700;padding:2px 8px;border-radius:5px;font-size:11px;background:rgba(120,170,255,0.2);color:#78aaff">PAPER</button>
     <button onclick="runAutoBuyerNow()" title="Trigger Auto-Buyer check now" style="padding:2px 6px;font-size:11px">⚡ Run</button>
   </div>
   <span style="flex:1"></span>
@@ -349,6 +350,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <button data-tab="polymarket" disabled title="Disabled by operator">Edge Scanner — OFF</button>
       <button data-tab="poly-ledger" disabled title="Disabled by operator">Edge Ledger — OFF</button>
       <button data-tab="auto-buyer-ledger">Auto-Buyer</button>
+      <button data-tab="manual-bets">Manual Bets</button>
     </div>
     <div class="rail-group">
       <div class="rail-label">System</div>
@@ -720,10 +722,26 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
 
     <div id="autoBuyerPerformancePanel" style="display:none">
       <div id="autoBuyerPerformanceCohorts" class="kpis" style="margin-bottom:16px"></div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
+        <div class="card" style="flex:2;min-width:320px">
+          <h3 style="margin:0 0 8px">Cumulative Realized P&amp;L</h3>
+          <canvas id="autoBuyerCumulativePnl" height="180"></canvas>
+        </div>
+        <div class="card" style="flex:1;min-width:220px">
+          <h3 style="margin:0 0 8px">P&amp;L by Sport</h3>
+          <canvas id="autoBuyerSportPnl" height="180"></canvas>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <h3 style="margin:0 0 10px">By Sport</h3>
+        <div style="overflow-x:auto">
+          <table class="data" id="autoBuyerSportTable"><tr><td>Loading sport breakdown…</td></tr></table>
+        </div>
+      </div>
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px">
           <h3 style="margin:0">Day-by-Day Settled Performance</h3>
-          <span class="small dim">MLB cohort = MLB sport or MLB model ID · pending positions excluded</span>
+          <span class="small dim">Pending positions excluded</span>
         </div>
         <div style="overflow-x:auto">
           <table class="data" id="autoBuyerDailyPerformanceTable"><tr><td>Loading settled performance…</td></tr></table>
@@ -734,6 +752,47 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
 
   <!-- Legacy Tab Alias Anchor (Maintains Full Routing Parity) -->
   <section id="tab-auto-buyer-settle" style="display:none"></section>
+
+  <section id="tab-manual-bets" style="display:none">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+      <h2 style="margin:0">✍️ Manual Bets</h2>
+      <span class="chip dim">Bets you place by hand on any book/exchange — tracked separately from Auto-Buyer</span>
+      <span style="flex:1"></span>
+      <label class="chip" title="Used to compute exposure % below; does not affect Auto-Buyer">Bankroll $<input id="manualBankrollInput" type="number" min="1" step="1" value="350" style="width:72px;padding:2px 4px" onkeydown="if(event.key==='Enter')saveManualBankroll()"><button onclick="saveManualBankroll()" style="padding:2px 7px">Set</button></label>
+      <button onclick="renderManualBets(true)">↻ Refresh</button>
+      <button class="primary" onclick="settleManualBetsNow()" style="font-weight:700">⚖️ Settle Manual Bets</button>
+    </div>
+    <div id="manualBetsKpis" class="kpis" style="margin-bottom:16px"></div>
+
+    <div class="card" style="margin-bottom:16px">
+      <h3 style="margin:0 0 10px">Log a New Bet</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input id="mbLeague" placeholder="League (e.g. MLB)" size="10">
+        <input id="mbAway" placeholder="Away team" size="16">
+        <input id="mbHome" placeholder="Home team" size="16">
+        <select id="mbMarketType"><option value="moneyline">moneyline</option><option value="spread">spread</option><option value="total">total</option></select>
+        <input id="mbSelection" placeholder="Selection (home/away/over/under)" size="16">
+        <input id="mbLine" placeholder="Line (optional)" size="8">
+        <input id="mbPrice" type="number" min="0.01" max="0.99" step="0.01" placeholder="Entry price (0-1)" size="8" style="width:110px">
+        <input id="mbStake" type="number" min="0.01" step="0.01" placeholder="Stake $" style="width:90px">
+        <input id="mbBook" placeholder="Sportsbook" value="polymarket" size="12">
+        <input id="mbEventStart" type="datetime-local" style="width:180px">
+        <input id="mbNote" placeholder="Note (optional)" size="24">
+        <button class="primary" onclick="submitManualBet()">+ Log Bet</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <h3 style="margin:0">Manual Bet Log</h3>
+        <span class="small dim">Manual overrides available for markets ESPN can't grade</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data" id="manualBetsTable"><tr><td>Loading manual bets…</td></tr></table>
+      </div>
+    </div>
+  </section>
+
   <section id="tab-settings" style="display:none">
     <div class="card" style="max-width:560px">
       <h2>Settings</h2>
@@ -939,6 +998,7 @@ $$("#tabs button").forEach(b=>b.onclick=()=>{
   if(b.dataset.tab==="poly-ledger")renderPolyLedger(false);
   if(b.dataset.tab==="auto-buyer-ledger")renderAutoBuyerLedger(false);
   if(b.dataset.tab==="auto-buyer-settle")renderAutoBuyerSettle(false);
+  if(b.dataset.tab==="manual-bets")renderManualBets(false);
 });
 
 /* ---------- settings ---------- */
@@ -3642,18 +3702,29 @@ function updateAutoBuyerUI(data){
   const unitValue=Number(data.unit_value_usd||0.50);
   const unitBadge=$("#autoBuyerUnitBadge");
   const unitInput=$("#autoBuyerUnitValueInput");
+  const mode=(data.mode||"paper").toLowerCase();
+  const isLive=mode==="live";
   if(unitBadge)unitBadge.textContent=unitValue<1?`${Math.round(unitValue*100)}¢/U`:`$${unitValue.toFixed(2)}/U`;
   if(unitInput&&document.activeElement!==unitInput)unitInput.value=unitValue.toFixed(2);
   if(data.enabled){
-    btn.textContent="ON (LIVE)";
-    btn.style.background="var(--green)";
-    btn.style.color="#000";
-    btn.title=`Auto-Buyer is LIVE and ACTIVE (1U=$${unitValue.toFixed(2)}). Click to turn OFF.`;
+    btn.textContent=isLive?"ON (LIVE)":"ON (PAPER)";
+    btn.style.background=isLive?"var(--green)":"rgba(120,170,255,0.35)";
+    btn.style.color=isLive?"#000":"#78aaff";
+    btn.title=`Auto-Buyer is ACTIVE in ${isLive?"LIVE":"PAPER"} mode (1U=$${unitValue.toFixed(2)}). Click to turn OFF.`;
   }else{
     btn.textContent="OFF";
     btn.style.background="rgba(255,92,92,0.2)";
     btn.style.color="var(--red)";
     btn.title="Auto-Buyer is DISABLED. Click to turn ON.";
+  }
+  const modeBtn=$("#autoBuyerModeBtn");
+  if(modeBtn){
+    modeBtn.textContent=isLive?"LIVE":"PAPER";
+    modeBtn.style.background=isLive?"rgba(255,92,92,0.2)":"rgba(120,170,255,0.2)";
+    modeBtn.style.color=isLive?"var(--red)":"#78aaff";
+    modeBtn.title=isLive
+      ?"Auto-Buyer places REAL Polymarket orders. Click to switch to PAPER (simulated, no real money)."
+      :"Auto-Buyer is in PAPER mode: simulated fills only, recorded for tracking, no real orders. Click to switch to LIVE.";
   }
 }
 async function toggleAutoBuyer(){
@@ -3663,8 +3734,9 @@ async function toggleAutoBuyer(){
   const unitValue=Number(_autoBuyerStatusCache.unit_value_usd||0.50);
   const gameCapUnits=Number(_autoBuyerStatusCache.max_game_stake_units||5);
   const dailyCapUnits=Number(_autoBuyerStatusCache.max_daily_spend_units||50);
+  const modeLabel=((_autoBuyerStatusCache.mode||"paper").toLowerCase()==="live")?"LIVE":"PAPER";
   const msg=nextState
-    ?`Enable LIVE Polymarket Auto-Buyer?\n\n- Sizing: 1U = $${unitValue.toFixed(2)}\n- Per-game cap: ${gameCapUnits.toFixed(1)}U = $${(gameCapUnits*unitValue).toFixed(2)}\n- Daily cap: ${dailyCapUnits.toFixed(1)}U = $${(dailyCapUnits*unitValue).toFixed(2)}\n- Whitelisted models only (Tennis, Soccer, WNBA ML, CS2/LoL Gated, MLB NRFI/Totals)\n- Blacklisted negative-EV derivatives blocked\n- Limit IOC orders placed on Polymarket US API`
+    ?`Enable Polymarket Auto-Buyer in ${modeLabel} mode?\n\n- Sizing: 1U = $${unitValue.toFixed(2)}\n- Per-game cap: ${gameCapUnits.toFixed(1)}U = $${(gameCapUnits*unitValue).toFixed(2)}\n- Daily cap: ${dailyCapUnits.toFixed(1)}U = $${(dailyCapUnits*unitValue).toFixed(2)}\n- Whitelisted models only (Tennis, Soccer, WNBA ML, CS2/LoL Gated, MLB NRFI/Totals)\n- Blacklisted negative-EV derivatives blocked\n${modeLabel==="LIVE"?"- Limit IOC orders placed on Polymarket US API (REAL MONEY)":"- Simulated fills recorded to the paper ledger only, no real orders"}`
     :"Disable Polymarket Auto-Buyer?";
   if(!confirm(msg))return;
   try{
@@ -3677,6 +3749,25 @@ async function toggleAutoBuyer(){
     updateAutoBuyerUI(data);
   }catch(e){
     alert("Failed to toggle Auto-Buyer: "+e);
+  }
+}
+async function toggleAutoBuyerMode(){
+  const currentMode=(_autoBuyerStatusCache.mode||"paper").toLowerCase();
+  const nextMode=currentMode==="live"?"paper":"live";
+  const msg=nextMode==="live"
+    ?"Switch Auto-Buyer to LIVE mode?\n\nFuture cycles will place REAL Polymarket orders with real money whenever Auto-Buyer is ON."
+    :"Switch Auto-Buyer to PAPER mode?\n\nFuture cycles will only simulate fills and record them for tracking -- no real orders will be placed.";
+  if(!confirm(msg))return;
+  try{
+    const res=await fetch("/api/auto-buyer/mode",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","X-Dashboard-Token":window._DASHBOARD_TOKEN||""},
+      body:JSON.stringify({confirm:true,mode:nextMode})
+    });
+    const data=await res.json();
+    updateAutoBuyerUI(data);
+  }catch(e){
+    alert("Failed to switch Auto-Buyer mode: "+e);
   }
 }
 async function saveAutoBuyerUnitValue(){
@@ -3703,18 +3794,135 @@ async function saveAutoBuyerUnitValue(){
   showModal(`<h2 class="green">Auto-Buyer 1U = $${Number(result.unit_value_usd).toFixed(2)}</h2><p>Future sizing uses this value. Risk caps are now ${Number(result.max_game_stake_units).toFixed(1)}U / $${Number(result.max_game_stake_usd).toFixed(2)} per game and ${Number(result.max_daily_spend_units).toFixed(1)}U / $${Number(result.max_daily_spend_usd).toFixed(2)} per day. Historical rows are unchanged.</p>`);
 }
 window.saveAutoBuyerUnitValue=saveAutoBuyerUnitValue;
+
+/* ---------- manual bets ---------- */
+async function apiGetJSON(url){
+  const res=await fetch(url,{headers:{"X-Dashboard-Token":window._DASHBOARD_TOKEN||""}});
+  return res.json();
+}
+async function apiPostJSON(url,body){
+  const res=await fetch(url,{
+    method:"POST",
+    headers:{"Content-Type":"application/json","X-Dashboard-Token":window._DASHBOARD_TOKEN||""},
+    body:JSON.stringify({confirm:true,...body})
+  });
+  return {ok:res.ok,data:await res.json()};
+}
+async function renderManualBets(force){
+  const data=await apiGetJSON("/api/manual-bets"+(force?("?_="+Date.now()):""));
+  const bankrollInput=$("#manualBankrollInput");
+  if(bankrollInput&&document.activeElement!==bankrollInput)bankrollInput.value=Number(data.bankroll_usd||350).toFixed(0);
+
+  const kpis=$("#manualBetsKpis");
+  if(kpis){
+    const winRate=data.win_rate==null?"—":(Number(data.win_rate)*100).toFixed(1)+"%";
+    const openPct=Number(data.open_exposure_pct||0);
+    const largestPct=Number(data.largest_open_pct||0);
+    const pnl=Number(data.total_pnl_usd||0);
+    kpis.innerHTML=`
+      <div class="k"><b>$${Number(data.bankroll_usd||0).toFixed(2)}</b><span>Bankroll</span></div>
+      <div class="k"><b class="${openPct>50?'red':(openPct>20?'yellow':'green')}">$${Number(data.open_exposure_usd||0).toFixed(2)} (${openPct.toFixed(1)}%)</b><span>Open Exposure</span></div>
+      <div class="k"><b class="${largestPct>15?'red':(largestPct>5?'yellow':'green')}">$${Number(data.largest_open_usd||0).toFixed(2)} (${largestPct.toFixed(1)}%)</b><span>Largest Open Position</span></div>
+      <div class="k"><b>${winRate}</b><span>Settled Win Rate (n=${data.settled_count||0})</span></div>
+      <div class="k"><b class="${pnl>=0?'green':'red'}">$${pnl>=0?'+':''}${pnl.toFixed(2)}</b><span>Realized P&amp;L</span></div>
+    `;
+  }
+
+  const rows=data.rows||[];
+  const table=$("#manualBetsTable");
+  if(!table)return;
+  if(!rows.length){table.innerHTML="<tr><td>No manual bets logged yet.</td></tr>";return;}
+  const sorted=[...rows].sort((a,b)=>String(b.event_start_utc||"").localeCompare(String(a.event_start_utc||"")));
+  const head=`<tr><th>Event</th><th>League</th><th>Selection</th><th>Price</th><th>Stake</th><th>Book</th><th>Status</th><th>Result</th><th>P&amp;L</th><th>Note</th><th>Override</th></tr>`;
+  const body=sorted.map(r=>{
+    const status=String(r.status||"");
+    const result=String(r.result||"");
+    const pnl=r.pnl_units===""||r.pnl_units==null?"—":Number(r.pnl_units).toFixed(2);
+    const overrideCell=status==="open"
+      ? `<button onclick="markManualBet('${esc(r.pick_id)}','win')" style="padding:1px 6px;font-size:11px">Win</button> `+
+        `<button onclick="markManualBet('${esc(r.pick_id)}','loss')" style="padding:1px 6px;font-size:11px">Loss</button> `+
+        `<button onclick="markManualBet('${esc(r.pick_id)}','push')" style="padding:1px 6px;font-size:11px">Push</button>`
+      : "—";
+    return `<tr>
+      <td>${esc(r.away_team||"")} @ ${esc(r.home_team||"")}<br><span class="small dim">${esc((r.event_start_utc||"").replace("T"," ").replace("Z"," UTC"))}</span></td>
+      <td>${esc(r.league||"")}</td>
+      <td>${esc(r.selection||"")}${r.line?" "+esc(r.line):""}</td>
+      <td>${r.market_implied_probability?Number(r.market_implied_probability).toFixed(2):""}</td>
+      <td>$${Number(r.units||0).toFixed(2)}</td>
+      <td>${esc(r.sportsbook||"")}</td>
+      <td>${esc(status)}</td>
+      <td class="${result==='win'?'green':(result==='loss'?'red':'')}">${esc(result)}</td>
+      <td class="${Number(pnl)>0?'green':(Number(pnl)<0?'red':'')}">${pnl}</td>
+      <td class="small dim">${esc(r.rationale||"")}</td>
+      <td>${overrideCell}</td>
+    </tr>`;
+  }).join("");
+  table.innerHTML=head+body;
+}
+window.renderManualBets=renderManualBets;
+async function submitManualBet(){
+  const bet={
+    league:$("#mbLeague").value.trim(),
+    away_team:$("#mbAway").value.trim(),
+    home_team:$("#mbHome").value.trim(),
+    market_type:$("#mbMarketType").value,
+    selection:$("#mbSelection").value.trim().toLowerCase(),
+    line:$("#mbLine").value.trim(),
+    entry_price:Number($("#mbPrice").value),
+    stake_usd:Number($("#mbStake").value),
+    sportsbook:$("#mbBook").value.trim()||"polymarket",
+    event_start_utc:$("#mbEventStart").value?new Date($("#mbEventStart").value).toISOString():"",
+    note:$("#mbNote").value.trim(),
+  };
+  const {ok,data}=await apiPostJSON("/api/manual-bets/record",{bet});
+  if(!ok||data.status==="refused"){alert("Could not log bet: "+(data.error||JSON.stringify(data)));return;}
+  if(data.status==="duplicate"){alert("An identical open bet already exists for this event/selection.");return;}
+  ["mbLeague","mbAway","mbHome","mbSelection","mbLine","mbPrice","mbStake","mbEventStart","mbNote"].forEach(id=>{const el=$("#"+id);if(el)el.value="";});
+  await renderManualBets(true);
+}
+window.submitManualBet=submitManualBet;
+async function markManualBet(pickId,result){
+  if(!confirm(`Mark this bet as ${result.toUpperCase()}? This bypasses ESPN grading.`))return;
+  const {ok,data}=await apiPostJSON("/api/manual-bets/mark-result",{pick_id:pickId,result});
+  if(!ok||data.status==="refused"){alert("Could not mark result: "+(data.error||JSON.stringify(data)));return;}
+  await renderManualBets(true);
+}
+window.markManualBet=markManualBet;
+async function settleManualBetsNow(){
+  if(!confirm("Settle open manual bets against official ESPN scores?"))return;
+  const {ok,data}=await apiPostJSON("/api/manual-bets/settle",{});
+  if(!ok){alert("Settlement failed: "+JSON.stringify(data));return;}
+  alert(`Settled ${data.settled_count||0} bet(s). ${data.open_count||0} still open.`);
+  await renderManualBets(true);
+}
+window.settleManualBetsNow=settleManualBetsNow;
+async function saveManualBankroll(){
+  const input=$("#manualBankrollInput"),value=Number(input&&input.value);
+  if(!Number.isFinite(value)||value<=0){alert("Enter a positive bankroll amount.");return;}
+  const {ok,data}=await apiPostJSON("/api/manual-bets/bankroll",{bankroll_usd:value});
+  if(!ok||data.status==="refused"){alert("Could not set bankroll: "+(data.error||JSON.stringify(data)));return;}
+  await renderManualBets(true);
+}
+window.saveManualBankroll=saveManualBankroll;
+
 async function runAutoBuyerNow(){
   const btn=$("#autoBuyerToggleBtn");
-  const isLive=btn&&btn.textContent.includes("ON");
+  const isOn=btn&&btn.textContent.includes("ON");
+  const isLive=isOn&&(_autoBuyerStatusCache.mode||"paper").toLowerCase()==="live";
   const msg=isLive
     ?"Trigger LIVE Auto-Buyer execution cycle now against current open model picks?"
-    :"Auto-Buyer is currently OFF. Run in paper/dry-run check mode?";
+    :isOn
+      ?"Trigger Auto-Buyer check now in PAPER mode (simulated fills only, no real orders)?"
+      :"Auto-Buyer is currently OFF. Run in paper/dry-run check mode?";
   if(!confirm(msg))return;
   try{
+    // No explicit execute override here -- the cycle derives should_execute from
+    // saved enabled+mode state itself, same as a scheduled run, so this button
+    // can never force real execution while the dashboard shows PAPER mode.
     const res=await fetch("/api/auto-buyer/run",{
       method:"POST",
       headers:{"Content-Type":"application/json","X-Dashboard-Token":window._DASHBOARD_TOKEN||""},
-      body:JSON.stringify({confirm:true,execute:isLive})
+      body:JSON.stringify({confirm:true})
     });
     const data=await res.json();
     alert(`Auto-Buyer run completed!\n\nMode: ${data.mode}\nPicks Evaluated: ${data.total_evaluated}\nWhitelisted: ${data.whitelisted_count}\nOrders: ${data.orders_count}\nTotal Spend: $${Number(data.total_spend_usd).toFixed(2)}`);
@@ -3777,12 +3985,6 @@ function isSettledAutoBuyerRow(row) {
     ["win", "loss", "push"].includes(String(row.result || "").toLowerCase());
 }
 
-function isMlbAutoBuyerRow(row) {
-  const sport = String(row.sport || "").toUpperCase();
-  const modelId = String(row.model_id || "").toLowerCase();
-  return sport === "MLB" || modelId.startsWith("mlb-") || modelId.includes("-mlb-");
-}
-
 function autoBuyerEventDateEt(row) {
   const raw = row.event_start_utc || row.executed_at_utc || "";
   const date = new Date(raw);
@@ -3809,6 +4011,10 @@ function autoBuyerCohortMetrics(rows) {
     const unitValue = Number(row.unit_value_usd) > 0 ? Number(row.unit_value_usd) : 0.50;
     return sum + (stored === null || stored === undefined || stored === "" ? (Number(row.pnl_usd) || 0) / unitValue : Number(stored) || 0);
   }, 0);
+  const grossWinUsd = settled.filter(row => String(row.result || "").toLowerCase() === "win")
+    .reduce((sum, row) => sum + (Number(row.pnl_usd) || 0), 0);
+  const grossLossUsd = settled.filter(row => String(row.result || "").toLowerCase() === "loss")
+    .reduce((sum, row) => sum + (Number(row.pnl_usd) || 0), 0);
   return {
     settled: settled.length,
     wins,
@@ -3818,7 +4024,10 @@ function autoBuyerCohortMetrics(rows) {
     pnlUsd,
     pnlUnits,
     winRatePct: wins + losses ? wins / (wins + losses) * 100 : null,
-    roiPct: stakeUsd > 0 ? pnlUsd / stakeUsd * 100 : null
+    roiPct: stakeUsd > 0 ? pnlUsd / stakeUsd * 100 : null,
+    profitFactor: grossLossUsd < 0 ? grossWinUsd / Math.abs(grossLossUsd) : (grossWinUsd > 0 ? null : 0),
+    avgWinUsd: wins ? grossWinUsd / wins : null,
+    avgLossUsd: losses ? grossLossUsd / losses : null
   };
 }
 
@@ -3839,12 +4048,49 @@ function autoBuyerPerformanceCell(metrics) {
   `;
 }
 
+function autoBuyerCurrentStreak(rows) {
+  const sorted = [...rows].sort((a, b) => autoBuyerEventDateEt(b).localeCompare(autoBuyerEventDateEt(a)));
+  let result = null;
+  let streak = 0;
+  for (const row of sorted) {
+    const r = String(row.result || "").toLowerCase();
+    if (r !== "win" && r !== "loss") continue;
+    if (result === null) result = r;
+    if (r !== result) break;
+    streak++;
+  }
+  return result ? { result, streak } : null;
+}
+
+function autoBuyerBestWorstDay(rows) {
+  const byDate = {};
+  rows.forEach(row => {
+    const d = autoBuyerEventDateEt(row);
+    byDate[d] = (byDate[d] || 0) + (Number(row.pnl_usd) || 0);
+  });
+  const entries = Object.entries(byDate).sort((a, b) => b[1] - a[1]);
+  if (!entries.length) return { best: null, worst: null };
+  return { best: entries[0], worst: entries[entries.length - 1] };
+}
+
+function autoBuyerPnlFormat(value) {
+  return value === null || value === undefined ? "—" : `$${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
+}
+
+function autoBuyerProfitFactorText(value) {
+  if (value === null) return "∞";
+  if (value === 0) return "—";
+  return value.toFixed(2);
+}
+
 function renderAutoBuyerPerformance() {
   const settled = (_autoBuyerLedgerCache || []).filter(isSettledAutoBuyerRow);
+
+  const sportOf = row => (row.sport || "Unknown").toString().toUpperCase();
+  const sports = Array.from(new Set(settled.map(sportOf))).sort();
   const cohorts = [
     ["All Auto-Buys", settled],
-    ["MLB Models", settled.filter(isMlbAutoBuyerRow)],
-    ["Without MLB", settled.filter(row => !isMlbAutoBuyerRow(row))]
+    ...sports.map(sp => [sp, settled.filter(row => sportOf(row) === sp)])
   ];
   const cohortEl = $("#autoBuyerPerformanceCohorts");
   if (cohortEl) {
@@ -3863,26 +4109,64 @@ function renderAutoBuyerPerformance() {
     if (b === "Unknown") return -1;
     return b.localeCompare(a);
   });
+  const datesAsc = dates.filter(d => d !== "Unknown").slice().reverse();
+
+  // Cumulative realized P&L curve, oldest to newest.
+  let running = 0;
+  const curve = datesAsc.map(date => {
+    const dayPnl = settled.filter(row => autoBuyerEventDateEt(row) === date)
+      .reduce((sum, row) => sum + (Number(row.pnl_usd) || 0), 0);
+    running += dayPnl;
+    return { x: date, pnl: running };
+  });
+  if ($("#autoBuyerCumulativePnl")) lineChart("#autoBuyerCumulativePnl", curve);
+
+  // P&L by sport bar chart, largest magnitude first.
+  const sportBars = sports.map(sp => [sp, autoBuyerCohortMetrics(settled.filter(row => sportOf(row) === sp)).pnlUsd])
+    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+  if ($("#autoBuyerSportPnl")) barChart("#autoBuyerSportPnl", sportBars.map(s => s[0]), sportBars.map(s => s[1]), { signed: true });
+
+  // By-sport detail table.
+  const sportTableEl = $("#autoBuyerSportTable");
+  if (sportTableEl) {
+    let sportHtml = `<thead><tr><th>Sport</th><th>Settled</th><th>Record</th><th>Stake</th><th>P&amp;L</th><th>ROI</th><th>Profit Factor</th><th>Avg Win</th><th>Avg Loss</th></tr></thead><tbody>`;
+    if (!sports.length) {
+      sportHtml += '<tr><td colspan="9" class="dim" style="text-align:center;padding:24px">No settled Auto-Buyer positions.</td></tr>';
+    } else {
+      sports.slice().sort((a, b) => {
+        const ma = autoBuyerCohortMetrics(settled.filter(row => sportOf(row) === a));
+        const mb = autoBuyerCohortMetrics(settled.filter(row => sportOf(row) === b));
+        return mb.pnlUsd - ma.pnlUsd;
+      }).forEach(sp => {
+        const m = autoBuyerCohortMetrics(settled.filter(row => sportOf(row) === sp));
+        sportHtml += `<tr>
+          <td class="mono font-bold">${esc(sp)}</td>
+          <td class="mono">${m.settled}</td>
+          <td class="mono">${autoBuyerRecordText(m)}</td>
+          <td class="mono">$${m.stakeUsd.toFixed(2)}</td>
+          <td class="mono ${m.pnlUsd >= 0 ? 'green' : 'red'}">${autoBuyerPnlFormat(m.pnlUsd)}</td>
+          <td class="mono ${m.roiPct >= 0 ? 'green' : 'red'}">${autoBuyerPct(m.roiPct)}</td>
+          <td class="mono">${autoBuyerProfitFactorText(m.profitFactor)}</td>
+          <td class="mono green">${autoBuyerPnlFormat(m.avgWinUsd)}</td>
+          <td class="mono red">${autoBuyerPnlFormat(m.avgLossUsd)}</td>
+        </tr>`;
+      });
+    }
+    sportTableEl.innerHTML = sportHtml + "</tbody>";
+  }
+
   const tableEl = $("#autoBuyerDailyPerformanceTable");
   if (!tableEl) return;
   let html = `<thead>
-    <tr>
-      <th rowspan="2">Event Date (ET)</th>
-      <th colspan="3">All Auto-Buys</th>
-      <th colspan="3">MLB Models</th>
-      <th colspan="3">Without MLB</th>
-    </tr>
-    <tr><th>Record</th><th>P&amp;L</th><th>ROI</th><th>Record</th><th>P&amp;L</th><th>ROI</th><th>Record</th><th>P&amp;L</th><th>ROI</th></tr>
+    <tr><th>Event Date (ET)</th><th>Record</th><th>P&amp;L</th><th>ROI</th></tr>
   </thead><tbody>`;
   if (!dates.length) {
-    html += '<tr><td colspan="10" class="dim" style="text-align:center;padding:24px">No settled Auto-Buyer positions.</td></tr>';
+    html += '<tr><td colspan="4" class="dim" style="text-align:center;padding:24px">No settled Auto-Buyer positions.</td></tr>';
   } else {
     dates.forEach(date => {
       const daily = settled.filter(row => autoBuyerEventDateEt(row) === date);
       const allMetrics = autoBuyerCohortMetrics(daily);
-      const mlbMetrics = autoBuyerCohortMetrics(daily.filter(isMlbAutoBuyerRow));
-      const withoutMlbMetrics = autoBuyerCohortMetrics(daily.filter(row => !isMlbAutoBuyerRow(row)));
-      html += `<tr><td class="mono font-bold">${esc(date)}</td>${autoBuyerPerformanceCell(allMetrics)}${autoBuyerPerformanceCell(mlbMetrics)}${autoBuyerPerformanceCell(withoutMlbMetrics)}</tr>`;
+      html += `<tr><td class="mono font-bold">${esc(date)}</td>${autoBuyerPerformanceCell(allMetrics)}</tr>`;
     });
   }
   tableEl.innerHTML = html + "</tbody>";
@@ -3919,6 +4203,12 @@ function renderAutoBuyerKpis() {
   const totalPnlUnits = settledRows.reduce((s, r) => s + (Number(r.pnl_units) || 0), 0);
   const roiPct = totalCostSettled > 0 ? (totalPnlUsd / totalCostSettled) * 100 : 0;
   const avgEdge = settledRows.length ? (settledRows.reduce((s, r) => s + (Number(r.edge) || 0), 0) / settledRows.length) * 100 : 0;
+  const avgStakeUsd = settledTotal > 0 ? totalCostSettled / settledTotal : 0;
+  const streak = autoBuyerCurrentStreak(settledRows);
+  const { best, worst } = autoBuyerBestWorstDay(settledRows);
+  const grossWinUsd = settledRows.filter(r => r.result === "win").reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
+  const grossLossUsd = settledRows.filter(r => r.result === "loss").reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
+  const profitFactor = grossLossUsd < 0 ? grossWinUsd / Math.abs(grossLossUsd) : (grossWinUsd > 0 ? null : 0);
 
   if ($("#absSettledCount")) $("#absSettledCount").textContent = settledRows.length;
   if ($("#absPendingCount")) $("#absPendingCount").textContent = openRows.length;
@@ -3932,6 +4222,11 @@ function renderAutoBuyerKpis() {
     <div class="k"><b>$${totalCostSettled.toFixed(2)}</b><span>Settled Capital ($${totalCostAll.toFixed(2)} total)</span></div>
     <div class="k"><b class="${openRows.length > 0 ? 'yellow' : 'dim'}">${openRows.length}</b><span>Pending Settlement</span></div>
     <div class="k"><b class="green">+${avgEdge.toFixed(1)}%</b><span>Avg Settlement Edge</span></div>
+    <div class="k"><b>$${avgStakeUsd.toFixed(2)}</b><span>Avg Stake / Bet</span></div>
+    <div class="k"><b class="${streak ? (streak.result === 'win' ? 'green' : 'red') : 'dim'}">${streak ? `${streak.streak}${streak.result === 'win' ? 'W' : 'L'}` : '—'}</b><span>Current Streak</span></div>
+    <div class="k"><b class="green">${best ? `$+${best[1].toFixed(2)}` : '—'}</b><span>Best Day${best ? ` (${esc(best[0])})` : ''}</span></div>
+    <div class="k"><b class="${worst && worst[1] < 0 ? 'red' : 'dim'}">${worst ? `$${worst[1] >= 0 ? '+' : ''}${worst[1].toFixed(2)}` : '—'}</b><span>Worst Day${worst ? ` (${esc(worst[0])})` : ''}</span></div>
+    <div class="k"><b class="${profitFactor === null || profitFactor >= 1 ? 'green' : 'red'}">${profitFactor === null ? '∞' : profitFactor.toFixed(2)}</b><span>Profit Factor (gross win / gross loss)</span></div>
   `;
 
   if ($("#autoBuyerKpis")) $("#autoBuyerKpis").innerHTML = kpisHtml;

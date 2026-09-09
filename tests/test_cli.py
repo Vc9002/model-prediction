@@ -2599,3 +2599,24 @@ def test_research_models_dir_prefers_rolling_over_frozen(monkeypatch, tmp_path) 
 
     assert cli._research_models_dir() == rolling
     assert cli._research_models_dir() != cli.PROJECT_ROOT / "config" / "models"
+
+
+def test_qualified_wnba_spread_uses_valid_shadow_state(monkeypatch, registry, ban_list):
+    from model_prediction.domain import ModelState
+
+    forecast = _wnba_spread_forecast(selection="home", line=10.5)
+    forecast["priced_contracts"][0]["model_qualified"] = True
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 8, 13, 18, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "_forecast_wnba_spread_slate", lambda *a, **k: forecast)
+    flat = _CaptureLedger()
+    result = cli._forecast_wnba_spread_sport(
+        data_root="unused",
+        args_date="2026-08-13",
+        config=_wnba_spread_config(),
+        registry=registry,
+        bans=ban_list,
+        flat_ledger=flat,
+        main_ledger=None,
+    )
+    assert result["logged"] == 1
+    assert flat.appended[0][0].model_state is ModelState.SHADOW_QUALIFIED

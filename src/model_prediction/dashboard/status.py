@@ -244,6 +244,10 @@ def status() -> dict:
                 }
             )
 
+    auto_buyer_alert = _auto_buyer_daily_loss_alert()
+    if auto_buyer_alert:
+        alerts.append(auto_buyer_alert)
+
     return {
         "generated_at": datetime.now(UTC).isoformat(),
         "models_loaded": len(models),
@@ -312,6 +316,40 @@ def _post_loss_review_alerts(picks: list[dict] | None = None) -> dict[str, Any]:
     return {
         "pending_reviews_count": sum(a["consecutive_losses"] for a in alerts),
         "alerts": alerts,
+    }
+
+
+def _auto_buyer_daily_loss_alert() -> dict[str, Any] | None:
+    """Surface today's Auto-Buyer realized P&L once it's a meaningfully bad day.
+
+    Warns at half the configured drawdown circuit-breaker threshold, escalates to
+    error once the breaker has actually tripped (auto_executor.py blocks new buys
+    at that point; this just makes the fact visible without requiring someone to
+    ask). Returns None on a normal or profitable day.
+    """
+    from model_prediction.portfolio.auto_executor import _today_auto_buyer_totals, load_auto_buyer_state
+
+    state = load_auto_buyer_state()
+    threshold = state.get("max_daily_loss_usd")
+    if threshold is None:
+        threshold = round(float(state.get("max_daily_spend_usd") or 250.0) * 0.5, 2)
+    threshold = abs(float(threshold))
+    if threshold <= 0:
+        return None
+
+    _, realized_pnl_today = _today_auto_buyer_totals()
+    if realized_pnl_today >= -threshold * 0.5:
+        return None
+
+    level = "error" if realized_pnl_today <= -threshold else "warn"
+    return {
+        "level": level,
+        "kind": "auto_buyer_daily_drawdown",
+        "text": (
+            f"Auto-Buyer realized P&L today: ${realized_pnl_today:+.2f} "
+            f"({'breaker tripped, no new buys' if level == 'error' else 'approaching'} "
+            f"-${threshold:.2f} drawdown limit)"
+        ),
     }
 
 

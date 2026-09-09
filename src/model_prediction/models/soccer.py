@@ -125,9 +125,26 @@ class SoccerModel:
         history: Sequence[GameRecord],
         upcoming: Sequence[UpcomingMatch],
     ) -> list[GamePrediction]:
-        strengths, baseline = self._strengths(history)
+        global_strengths, global_baseline = self._strengths(history)
+        league_cache: dict[str, tuple[dict[str, dict[str, float]], float]] = {}
+
+        def _get_strengths(league_name: str) -> tuple[dict[str, dict[str, float]], float]:
+            norm_lg = str(league_name or "").strip().upper()
+            if not norm_lg or norm_lg in {"SOCCER", "UNKNOWN"}:
+                return global_strengths, global_baseline
+            if norm_lg not in league_cache:
+                lg_history = [g for g in history if getattr(g, "league", "").strip().upper() == norm_lg]
+                # Require at least 50 games in the specific league to build isolated ratings,
+                # preventing cross-tier distortion from lower divisions.
+                if len(lg_history) >= 50:
+                    league_cache[norm_lg] = self._strengths(lg_history)
+                else:
+                    league_cache[norm_lg] = (global_strengths, global_baseline)
+            return league_cache[norm_lg]
+
         predictions: list[GamePrediction] = []
         for match in upcoming:
+            strengths, baseline = _get_strengths(getattr(match, "league", "SOCCER"))
             home = strengths.get(match.home_team, {"attack": 1.0, "defense": 1.0, "games": 0.0})
             away = strengths.get(match.away_team, {"attack": 1.0, "defense": 1.0, "games": 0.0})
             home_rate = baseline * home["attack"] * away["defense"] * HOME_GOAL_BOOST

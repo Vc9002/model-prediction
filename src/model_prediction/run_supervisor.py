@@ -50,6 +50,11 @@ WORKERS: dict[str, list[str]] = {
         "predict",
     ],
     "rebuild-shadow": ["bash", "scripts/run_rebuild.sh"],
+    "manual-bet-sync": [
+        ".venv/bin/python",
+        "-m",
+        "model_prediction.portfolio.manual_bet_ledger",
+    ],
 }
 
 _RUN_STATUSES = ("started", "completed", "failed", "skipped")

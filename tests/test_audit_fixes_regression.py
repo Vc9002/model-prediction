@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -167,9 +167,12 @@ def test_starter_opponent_runs_mapping_correctness(tmp_path: Path):
 
 def test_cfb_slate_default_status_is_research(tmp_path: Path):
     """Verify build_cfb_slate returns status 'research'."""
+    from types import SimpleNamespace
+
     slate = build_cfb_slate(
         data_root=tmp_path,
         game_date="2026-09-01",
+        client=SimpleNamespace(scoreboard=lambda *args: {"events": []}),
         observed_at=datetime.now(UTC),
     )
     assert slate["status"] == "research"
@@ -484,6 +487,146 @@ def test_exchange_resolution_winning_side_repairs_false_push(tmp_path: Path):
     assert repaired["settled_at_utc"] == "2026-09-01T12:30:00Z"
     assert result["corrected"] == 1
     assert result["changed"] == 1
+
+
+def test_neutral_resolution_side_settles_via_winning_outcome_team_name(tmp_path: Path):
+    """POSITION_RESOLUTION_SIDE_NEUTRAL (observed on single-team esports tile
+    markets) has no usable winning_side and a zero realized delta -- neither of
+    the two existing grading checks can resolve it, so the row would stay
+    pending forever without falling back to the resolution's named winning
+    team (winning_outcome) compared against the row's own home/away teams."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    x_path = tmp_path / "auto_buyer_picks.xlsx"
+    record_auto_buy_execution(
+        order_payload={
+            "order_id": "ORD_NEUTRAL",
+            "pick_id": "PICK_NEUTRAL",
+            "market_slug": "aec-cs2-ent-phtmac-2026-09-05",
+            "selection": "home",
+            "token_side": "long",
+            "limit_price": 0.56,
+            "cost_usd": 2.87,
+            "shares": 5.0,
+            "sport": "CS2",
+            "event_start_utc": "2026-09-05T04:51:00Z",
+        },
+        pick_row={
+            "away_team": "Phantom Academy",
+            "home_team": "Entropy",
+            "market_type": "moneyline",
+            "units": 1.0,
+        },
+        jsonl_path=j_path,
+        xlsx_path=x_path,
+    )
+
+    executor = MagicMock()
+    executor.portfolio_snapshot.return_value = {
+        "activities": [
+            {
+                "type": "ACTIVITY_TYPE_POSITION_RESOLUTION",
+                "positionResolution": {
+                    "marketSlug": "aec-cs2-ent-phtmac-2026-09-05",
+                    "side": "POSITION_RESOLUTION_SIDE_NEUTRAL",
+                    "updateTime": "2026-09-06T00:46:56Z",
+                    "beforePosition": {
+                        "netPositionDecimal": "5.0000",
+                        "cost": {"value": "2.87"},
+                        "realized": {"value": "0.00"},
+                        "marketMetadata": {
+                            "slug": "aec-cs2-ent-phtmac-2026-09-05",
+                            "outcome": "Entropy",
+                        },
+                    },
+                    "afterPosition": {"realized": {"value": "0.00"}},
+                },
+            }
+        ]
+    }
+
+    result = settle_auto_buyer_ledger(
+        data_root=tmp_path,
+        espn=MagicMock(),
+        polymarket_executor=executor,
+    )
+
+    settled = read_auto_buyer_ledger(j_path)[0]
+    assert settled["status"] == "settled"
+    assert settled["result"] == "win"
+    assert settled["pnl_usd"] == 2.13
+    assert result["newly_settled"] == 1
+
+
+def test_manual_sell_trade_settles_pending_position(tmp_path: Path):
+    """A position closed by a manual SELL before the market resolves never
+    produces a POSITION_RESOLUTION activity -- it just stops existing as an
+    open position. Without reading the sell trade's own authoritative
+    realizedPnl, the row would stay pending forever."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    x_path = tmp_path / "auto_buyer_picks.xlsx"
+    future_event_start = (datetime.now(UTC) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:00Z")
+    record_auto_buy_execution(
+        order_payload={
+            "order_id": "CA2K6GXQPMVP",
+            "pick_id": "PICK_SOLD",
+            "market_slug": "tsc-mls-fcc-dcu-2026-09-05-2pt5",
+            "selection": "over",
+            "token_side": "long",
+            "limit_price": 0.70,
+            "cost_usd": 8.75,
+            "shares": 12.5,
+            "sport": "SOCCER",
+            "event_start_utc": future_event_start,
+        },
+        pick_row={
+            "away_team": "D.C. United",
+            "home_team": "FC Cincinnati",
+            "market_type": "total",
+            "units": 1.75,
+        },
+        jsonl_path=j_path,
+        xlsx_path=x_path,
+    )
+
+    executor = MagicMock()
+    executor.portfolio_snapshot.return_value = {
+        "activities": [
+            {
+                "type": "ACTIVITY_TYPE_TRADE",
+                "trade": {
+                    "marketSlug": "tsc-mls-fcc-dcu-2026-09-05-2pt5",
+                    "updateTime": "2026-09-06T05:55:53Z",
+                    "qtyDecimal": "12.5000",
+                    "realizedPnl": {"value": "-4.73", "currency": "USD"},
+                    "aggressorExecution": {
+                        "order": {
+                            "side": "ORDER_SIDE_SELL",
+                            "price": {"value": "0.32"},
+                            "marketMetadata": {"slug": "tsc-mls-fcc-dcu-2026-09-05-2pt5"},
+                        }
+                    },
+                },
+            }
+        ]
+    }
+
+    # Not-yet-started (event_start is in the future relative to "now" in this
+    # test), and no exchange market resolution exists either -- proving the
+    # sell trade alone is enough to settle it, bypassing the usual
+    # not-started pending gate.
+    result = settle_auto_buyer_ledger(
+        data_root=tmp_path,
+        espn=MagicMock(),
+        polymarket_executor=executor,
+    )
+
+    settled = read_auto_buyer_ledger(j_path)[0]
+    assert settled["status"] == "settled"
+    assert settled["result"] == "loss"
+    assert settled["pnl_usd"] == -4.73
+    assert settled["settlement_source"] == "manual_sell"
+    assert result["newly_settled"] == 1
+    assert result["pending"] == 0
 
 
 def test_auto_buyer_tennis_settlement_and_scheduled_reversion(tmp_path: Path):

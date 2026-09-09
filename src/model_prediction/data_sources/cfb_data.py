@@ -10,6 +10,7 @@ Provides:
 from __future__ import annotations
 
 import math
+import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -1435,7 +1436,7 @@ CFB_TEAMS: dict[str, CFBTeam] = {
         -81.6856,
         3333,
         False,
-        aliases=("Appalachian State", "App State"),
+        aliases=("Appalachian State", "App State", "App State Mountaineers"),
     ),
     "James Madison Dukes": CFBTeam(
         "James Madison Dukes",
@@ -2042,7 +2043,54 @@ CFB_TEAMS: dict[str, CFBTeam] = {
         False,
         aliases=("Villanova",),
     ),
+    "Delaware Blue Hens": CFBTeam(
+        "Delaware Blue Hens",
+        "DEL",
+        "Conference USA",
+        "G6",
+        "Delaware Stadium",
+        "Newark",
+        "DE",
+        39.6644,
+        -75.7533,
+        90,
+        False,
+        aliases=("Delaware", "UD"),
+    ),
+    "Massachusetts Minutemen": CFBTeam(
+        "Massachusetts Minutemen",
+        "MASS",
+        "Mid-American",
+        "G6",
+        "Warren McGuirk Alumni Stadium",
+        "Amherst",
+        "MA",
+        42.3774,
+        -72.5361,
+        230,
+        False,
+        aliases=("UMass", "Massachusetts", "UMass Minutemen"),
+    ),
+    "UConn Huskies": CFBTeam(
+        "UConn Huskies",
+        "CONN",
+        "FBS Independents",
+        "G6",
+        "Pratt & Whitney Stadium at Rentschler Field",
+        "East Hartford",
+        "CT",
+        41.7597,
+        -72.6189,
+        43,
+        False,
+        aliases=("Connecticut", "UConn", "Connecticut Huskies"),
+    ),
 }
+
+
+def _norm_cfb_name(s: str) -> str:
+    s = unicodedata.normalize("NFKD", s).encode("ASCII", "ignore").decode("utf-8").casefold()
+    return s.replace("'", "").replace("’", "").replace(".", "").replace("-", " ").strip()
 
 
 def resolve_team(name: str) -> CFBTeam | None:
@@ -2050,12 +2098,12 @@ def resolve_team(name: str) -> CFBTeam | None:
     if not name:
         return None
     cleaned = name.strip()
-    norm = cleaned.casefold()
+    norm = _norm_cfb_name(cleaned)
     for team in CFB_TEAMS.values():
-        if norm == team.canonical_name.casefold() or norm == team.abbreviation.casefold():
+        if norm == _norm_cfb_name(team.canonical_name) or norm == _norm_cfb_name(team.abbreviation):
             return team
         for alias in team.aliases:
-            if norm == alias.casefold():
+            if norm == _norm_cfb_name(alias):
                 return team
     return None
 

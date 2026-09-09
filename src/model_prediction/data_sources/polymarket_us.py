@@ -24,11 +24,18 @@ LEAGUE_SLUGS = {
     "WNBA": "wnba",
     "NFL": "nfl",
     "NCAAF": "cfb",
+    "CFB": "cfb",
     "NHL": "nhl",
     "EPL": "epl",
     "LA_LIGA": "lal",
     "BUNDESLIGA": "bun",
     "SERIE_A": "sea",
+    "LIGUE_1": "lg1",
+    "PRIMEIRA_LIGA": "ligpor",
+    "CHAMPIONSHIP": "eflch",
+    "USL_CHAMPIONSHIP": "uslc",
+    "NORWEGIAN_ELITE": "nor1",
+    "LIGA_EXPANSION_MX": "lexp",
     "UCL": "ucl",
     "UEFA": "uefa",
     "MLS": "mls",
@@ -92,9 +99,8 @@ LEAGUE_SLUGS = {
     "RAINBOW_SIX": "r6",
 }
 
-# Gateway coverage per sport key. Ligue 1, Eredivisie, Primeira Liga, and
-# Championship have no Polymarket US league as of 2026-07-16. ATP was added
-# to the gateway after that date -- re-verified operational 2026-08-03.
+# Gateway coverage per sport key. Ligue 1, Primeira Liga, and Championship
+# were activated on the Polymarket US gateway in 2026-08.
 POLYMARKET_SPORT_LEAGUES: dict[str, tuple[str, ...]] = {
     "mlb": ("MLB",),
     "nba": ("NBA",),
@@ -107,6 +113,12 @@ POLYMARKET_SPORT_LEAGUES: dict[str, tuple[str, ...]] = {
         "LA_LIGA",
         "BUNDESLIGA",
         "SERIE_A",
+        "LIGUE_1",
+        "PRIMEIRA_LIGA",
+        "CHAMPIONSHIP",
+        "USL_CHAMPIONSHIP",
+        "NORWEGIAN_ELITE",
+        "LIGA_EXPANSION_MX",
         "UCL",
         "UEFA",
         "MLS",
@@ -191,7 +203,7 @@ CAPTURED_UNPRICED_ESPORTS_LEAGUES: frozenset[str] = frozenset({"COD", "ROCKET_LE
 # ATP market, and ITF has no matching ESPN scoreboard to build a prediction
 # from (see tennis_forward.py) -- but ITF/WTA snapshots are still captured
 # here in case that coverage gap closes later.
-BBO_CAPTURE_SPORTS = {"mlb", "nba", "wnba", "nfl", "soccer", "esports", "kbo", "npb", "tennis"}
+BBO_CAPTURE_SPORTS = {"mlb", "nba", "wnba", "nfl", "ncaaf", "soccer", "esports", "kbo", "npb", "tennis"}
 
 MARKET_TYPES = {
     "SPORTS_MARKET_TYPE_MONEYLINE": "moneyline",
@@ -387,7 +399,8 @@ class PolymarketUSClient:
         unmodified), but the failure is also recorded in ``.errors`` so it
         stays distinguishable from a genuinely empty day.
         """
-        leagues = POLYMARKET_SPORT_LEAGUES.get(sport.lower())
+        sport_key = "ncaaf" if sport.lower() == "cfb" else sport.lower()
+        leagues = POLYMARKET_SPORT_LEAGUES.get(sport_key)
         if leagues is None:
             raise ValueError(f"unknown sport: {sport}; expected one of {sorted(POLYMARKET_SPORT_LEAGUES)}")
         events: dict[str, list[dict[str, Any]]] = {}

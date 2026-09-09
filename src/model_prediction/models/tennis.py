@@ -163,7 +163,7 @@ class TennisModel:
                 "expected_total_games": deriv.expected_total_games,
             }
 
-            base_pred = {
+            base_pred: dict[str, Any] = {
                 "event_id": match.event_id,
                 "event_start_utc": match.event_start_utc,
                 "league": match.tour,

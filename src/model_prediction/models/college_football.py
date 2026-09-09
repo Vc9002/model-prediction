@@ -20,7 +20,6 @@ from ..domain import parse_utc, utc_now
 from ..features.base import GameRecord
 from ..features.cfb_features import (
     CFB_BASELINE_MARGIN_SD,
-    CFB_BASELINE_TOTAL,
     CFB_BASELINE_TOTAL_SD,
     CFB_DEFAULT_HOME_ADVANTAGE_POINTS,
     CFBFeatureExtractor,
@@ -355,9 +354,9 @@ def build_cfb_slate(
 
         # Extract market odds if available from ESPN or odds sources
         odds_list = competition.get("odds", [])
-        spread_away_line = 0.0
-        spread_home_line = 0.0
-        total_line = CFB_BASELINE_TOTAL
+        spread_away_line = None
+        spread_home_line = None
+        total_line = None
         market_ml_home_prob = None
         market_ml_away_prob = None
         market_spread_away_prob = None
@@ -398,9 +397,19 @@ def build_cfb_slate(
                 if tot_line_str:
                     total_line = float(tot_line_str)
             except (ValueError, TypeError):
-                total_line = CFB_BASELINE_TOTAL
-            market_total_over_prob = round(implied_probability(ov_n), 6) if ov_n else STANDARD_LAY_ASK
-            market_total_under_prob = round(implied_probability(un_n), 6) if un_n else STANDARD_LAY_ASK
+                total_line = None
+
+            if total_line is not None:
+                market_total_over_prob = (
+                    round(implied_probability(ov_n), 6)
+                    if ov_n
+                    else (round(1.0 - implied_probability(un_n), 6) if un_n else STANDARD_LAY_ASK)
+                )
+                market_total_under_prob = (
+                    round(implied_probability(un_n), 6)
+                    if un_n
+                    else (round(1.0 - implied_probability(ov_n), 6) if ov_n else STANDARD_LAY_ASK)
+                )
 
             # Point Spread Line & Odds
             ps_obj = first_odds.get("pointSpread") or {}
@@ -414,10 +423,20 @@ def build_cfb_slate(
                     spread_home_line = float(h_ps_line_str)
                     spread_away_line = -spread_home_line
             except (ValueError, TypeError):
-                spread_home_line = 0.0
-                spread_away_line = 0.0
-            market_spread_home_prob = round(implied_probability(h_ps_n), 6) if h_ps_n else STANDARD_LAY_ASK
-            market_spread_away_prob = round(implied_probability(a_ps_n), 6) if a_ps_n else STANDARD_LAY_ASK
+                spread_home_line = None
+                spread_away_line = None
+
+            if spread_home_line is not None:
+                market_spread_home_prob = (
+                    round(implied_probability(h_ps_n), 6)
+                    if h_ps_n
+                    else (round(1.0 - implied_probability(a_ps_n), 6) if a_ps_n else STANDARD_LAY_ASK)
+                )
+                market_spread_away_prob = (
+                    round(implied_probability(a_ps_n), 6)
+                    if a_ps_n
+                    else (round(1.0 - implied_probability(h_ps_n), 6) if h_ps_n else STANDARD_LAY_ASK)
+                )
 
             # Moneyline parsing if available from ESPN (nested moneyline or top-level)
             ml_obj = first_odds.get("moneyline") or {}
@@ -442,6 +461,9 @@ def build_cfb_slate(
             elif market_ml_away_prob is not None and market_ml_home_prob is None:
                 market_ml_home_prob = round(1.0 - market_ml_away_prob, 6)
 
+        ev_season = int((ev.get("season") or {}).get("year") or iso_date[:4])
+        ev_week = int((ev.get("week") or {}).get("number") or 1)
+
         upcoming = UpcomingCFBGame(
             event_id=event_id,
             event_start_utc=event_start_utc,
@@ -451,6 +473,8 @@ def build_cfb_slate(
             spread_home_line=spread_home_line,
             total_line=total_line,
             is_neutral_site=is_neutral,
+            season_year=ev_season,
+            week=ev_week,
         )
 
         preds = model.predict_matchup(history, upcoming)
@@ -458,6 +482,8 @@ def build_cfb_slate(
         for p in preds:
             mtype = p.market_type
             if mtype == "moneyline":
+                if market_ml_home_prob is None and market_ml_away_prob is None:
+                    continue
                 selection = "home" if p.probabilities["home"] >= 0.5 else "away"
                 prob = p.probabilities[selection]
                 line_val = None
@@ -465,6 +491,8 @@ def build_cfb_slate(
                 slug = f"ncaaf-ml-{event_id}-{selection}"
                 m_ver = MODEL_VERSION
             elif mtype == "spread":
+                if spread_away_line is None or spread_home_line is None:
+                    continue
                 selection = "away" if p.probabilities["away"] >= p.probabilities["home"] else "home"
                 prob = p.probabilities[selection]
                 line_val = spread_away_line if selection == "away" else spread_home_line
@@ -472,6 +500,8 @@ def build_cfb_slate(
                 slug = f"ncaaf-spread-{event_id}-{selection}"
                 m_ver = CFB_SPREAD_MODEL_VERSION
             else:  # total
+                if total_line is None:
+                    continue
                 selection = "over" if p.probabilities["over"] >= p.probabilities["under"] else "under"
                 prob = p.probabilities[selection]
                 line_val = total_line

@@ -23,11 +23,30 @@ from model_prediction.portfolio.auto_executor import (
     AutoExecutionResult,
     AutoPolymarketBuyer,
     _capture_missing_active_snapshot_slates,
+    _today_auto_buyer_totals,
     load_auto_buyer_state,
     run_auto_buyer_cycle,
     set_auto_buyer_unit_value,
     toggle_auto_buyer,
 )
+
+
+@pytest.fixture(autouse=True)
+def _isolate_auto_buyer_daily_totals(monkeypatch):
+    """Prevent tests from silently reading the real production ledger's 'today' totals.
+
+    evaluate_and_execute() seeds current_spend and checks the drawdown circuit
+    breaker from _today_auto_buyer_totals(self.data_root), which defaults to the
+    real repo data/ dir when a test doesn't pass data_root=tmp_path. Without this
+    isolation, a bad real-money day (e.g. the 09-05 drawdown) could make unrelated
+    unit tests fail unpredictably depending on when they happen to run. Tests that
+    specifically exercise the seeding/breaker behavior override this locally via
+    monkeypatch within their own test body.
+    """
+    monkeypatch.setattr(
+        "model_prediction.portfolio.auto_executor._today_auto_buyer_totals",
+        lambda *_a, **_k: (0.0, 0.0),
+    )
 
 
 def test_buyer_filters_blacklist_models():
@@ -131,6 +150,38 @@ def test_buyer_filters_low_edge_and_past_games():
     assert res.rejected_low_edge == 1
     assert res.rejected_started == 1
     assert len(res.dry_run_orders) == 0
+
+
+def test_buyer_rejects_unrealistic_edge_outliers():
+    today_start = iso_utc(utc_now() + timedelta(hours=2))
+    config = AutoExecutionConfig(min_edge=0.035, max_edge=0.20)
+    buyer = AutoPolymarketBuyer(
+        config=config,
+        live_quote_fn=lambda _slug: {"ask": 0.16, "market_slug": "test-slug", "side": "long"},
+    )
+    # Model claims 55.1% win prob against 16.0% ask (39.1% edge, like Ipswich Town anomaly)
+    picks = [
+        {
+            "pick_id": "p_anomalous_outlier",
+            "model_id": "soccer-poisson-dc-v2",
+            "status": "open",
+            "event_start_utc": today_start,
+            "model_probability": 0.5514,
+            "market_probability": 0.16,  # 39.14% edge > 20% max_edge
+        },
+        {
+            "pick_id": "p_valid_edge",
+            "model_id": "soccer-poisson-dc-v2",
+            "status": "open",
+            "event_start_utc": today_start,
+            "model_probability": 0.28,
+            "market_probability": 0.16,  # 12.0% edge (between 3.5% and 20%)
+        },
+    ]
+    res = buyer.evaluate_and_execute(picks)
+    assert res.rejected_unrealistic_edge == 1
+    assert len(res.dry_run_orders) == 1
+    assert res.dry_run_orders[0]["pick_id"] == "p_valid_edge"
 
 
 def test_buyer_rejects_tomorrow_and_future_games():
@@ -316,7 +367,7 @@ def test_live_buyer_preflight_captures_missing_next_day_slate(tmp_path: Path):
     assert len(captures) == 1
 
 
-def test_buyer_sizes_fractional_units():
+def test_buyer_sizes_fractional_units(tmp_path: Path):
     now = utc_now()
     today_start = iso_utc(now + timedelta(hours=2))
     # 1U = $0.50 (50 cents)
@@ -328,6 +379,7 @@ def test_buyer_sizes_fractional_units():
     buyer = AutoPolymarketBuyer(
         config=config,
         live_quote_fn=lambda _slug: {"ask": 0.55, "market_slug": "test-slug", "side": "long"},
+        data_root=tmp_path,
     )
     picks = [
         {
@@ -406,6 +458,7 @@ def test_live_buyer_sets_resting_fallback_and_records_actual_fill(monkeypatch, t
             "market_slug": "aec-lol-lds-dv1-2026-09-03",
             "side": "long",
         },
+        data_root=tmp_path,
     )
 
     result = buyer.evaluate_and_execute(
@@ -497,6 +550,7 @@ def test_live_buyer_records_zero_fill_primary_with_resting_fallback(monkeypatch,
             "market_slug": "aec-lol-lds-dv1-2026-09-03",
             "side": "long",
         },
+        data_root=tmp_path,
     )
 
     result = buyer.evaluate_and_execute(
@@ -566,7 +620,7 @@ def test_record_auto_buy_execution_does_not_fabricate_shares_on_zero_fill(tmp_pa
     assert record["fallback_resting_shares"] == 12.25
 
 
-def test_buyer_respects_daily_budget():
+def test_buyer_respects_daily_budget(tmp_path: Path):
     now = utc_now()
     today_start = iso_utc(now + timedelta(hours=2))
     config = AutoExecutionConfig(
@@ -576,6 +630,7 @@ def test_buyer_respects_daily_budget():
     buyer = AutoPolymarketBuyer(
         config=config,
         live_quote_fn=lambda slug: {"ask": 0.50, "market_slug": slug, "side": "long"},
+        data_root=tmp_path,
     )
     picks = [
         {
@@ -601,6 +656,360 @@ def test_buyer_respects_daily_budget():
     assert len(res.dry_run_orders) == 1
     assert res.rejected_budget == 1
     assert res.total_spend_usd == 0.50
+
+
+def test_buyer_default_lookahead_window_is_24_hours():
+    now = utc_now()
+    config = AutoExecutionConfig(whitelisted_models=("tennis-surface-elo-v1",))
+    buyer = AutoPolymarketBuyer(
+        config=config,
+        live_quote_fn=lambda slug: {"ask": 0.50, "market_slug": slug, "side": "long"},
+    )
+    picks = [
+        {
+            "pick_id": "p_within_24h",
+            "model_id": "tennis-surface-elo-v1",
+            "status": "open",
+            "event_start_utc": iso_utc(now + timedelta(hours=20)),
+            "model_probability": 0.65,
+            "market_probability": 0.50,
+        },
+        {
+            "pick_id": "p_beyond_24h",
+            "model_id": "tennis-surface-elo-v1",
+            "status": "open",
+            "event_start_utc": iso_utc(now + timedelta(hours=30)),
+            "model_probability": 0.65,
+            "market_probability": 0.50,
+        },
+    ]
+    res = buyer.evaluate_and_execute(picks)
+    assert len(res.dry_run_orders) == 1
+    assert res.dry_run_orders[0]["pick_id"] == "p_within_24h"
+    assert res.rejected_future_slate == 1
+
+
+def test_buyer_rejects_events_beyond_configured_lookahead_window():
+    now = utc_now()
+    config = AutoExecutionConfig(
+        whitelisted_models=("tennis-surface-elo-v1",),
+        max_event_lookahead_hours=6.0,
+    )
+    buyer = AutoPolymarketBuyer(
+        config=config,
+        live_quote_fn=lambda slug: {"ask": 0.50, "market_slug": slug, "side": "long"},
+    )
+    picks = [
+        {
+            "pick_id": "p_within_6h",
+            "model_id": "tennis-surface-elo-v1",
+            "status": "open",
+            "event_start_utc": iso_utc(now + timedelta(hours=5)),
+            "model_probability": 0.65,
+            "market_probability": 0.50,
+        },
+        {
+            "pick_id": "p_beyond_6h",
+            "model_id": "tennis-surface-elo-v1",
+            "status": "open",
+            "event_start_utc": iso_utc(now + timedelta(hours=7)),
+            "model_probability": 0.65,
+            "market_probability": 0.50,
+        },
+    ]
+    res = buyer.evaluate_and_execute(picks)
+    assert len(res.dry_run_orders) == 1
+    assert res.dry_run_orders[0]["pick_id"] == "p_within_6h"
+    assert res.rejected_future_slate == 1
+
+
+def test_run_auto_buyer_cycle_defaults_lookahead_to_six_hours_from_state(tmp_path: Path):
+    test_state_file = tmp_path / "auto_buyer_state.json"
+    buyer_result = AutoExecutionResult()
+    with (
+        patch("model_prediction.portfolio.auto_executor.AUTO_BUYER_STATE_FILE", test_state_file),
+        patch("model_prediction.portfolio.auto_executor.DATA", tmp_path),
+        patch("model_prediction.portfolio.auto_executor.AutoPolymarketBuyer") as buyer_class,
+    ):
+        buyer_class.return_value.evaluate_and_execute.return_value = buyer_result
+        run_auto_buyer_cycle(execute_override=False)
+
+    assert buyer_class.call_args.kwargs["config"].max_event_lookahead_hours == 6.0
+
+
+def test_run_auto_buyer_cycle_honors_state_lookahead_override(tmp_path: Path):
+    test_state_file = tmp_path / "auto_buyer_state.json"
+    test_state_file.write_text(json.dumps({"max_event_lookahead_hours": 12.0}), encoding="utf-8")
+    buyer_result = AutoExecutionResult()
+    with (
+        patch("model_prediction.portfolio.auto_executor.AUTO_BUYER_STATE_FILE", test_state_file),
+        patch("model_prediction.portfolio.auto_executor.DATA", tmp_path),
+        patch("model_prediction.portfolio.auto_executor.AutoPolymarketBuyer") as buyer_class,
+    ):
+        buyer_class.return_value.evaluate_and_execute.return_value = buyer_result
+        run_auto_buyer_cycle(execute_override=False)
+
+    assert buyer_class.call_args.kwargs["config"].max_event_lookahead_hours == 12.0
+
+
+def test_today_auto_buyer_totals_sums_only_todays_rows(tmp_path: Path):
+    now = utc_now()
+    ledger_path = tmp_path / "auto_buyer_ledger.jsonl"
+    rows = [
+        # Executed and settled today -> counts toward both totals.
+        {
+            "executed_at_utc": iso_utc(now),
+            "settled_at_utc": iso_utc(now),
+            "result": "loss",
+            "cost_usd": 10.0,
+            "pnl_usd": -10.0,
+        },
+        # Executed today, still open -> counts toward spend only.
+        {
+            "executed_at_utc": iso_utc(now),
+            "settled_at_utc": None,
+            "result": None,
+            "cost_usd": 5.0,
+            "pnl_usd": 0.0,
+        },
+        # Executed and settled yesterday -> excluded from both.
+        {
+            "executed_at_utc": iso_utc(now - timedelta(days=1)),
+            "settled_at_utc": iso_utc(now - timedelta(days=1)),
+            "result": "win",
+            "cost_usd": 100.0,
+            "pnl_usd": 50.0,
+        },
+    ]
+    with ledger_path.open("w", encoding="utf-8") as f:
+        for row in rows:
+            f.write(json.dumps(row) + "\n")
+
+    spend, realized_pnl = _today_auto_buyer_totals(tmp_path)
+    assert spend == 15.0
+    assert realized_pnl == -10.0
+
+
+def test_evaluate_and_execute_seeds_daily_cap_from_ledger(monkeypatch):
+    now = utc_now()
+    # Seeded close enough to the 250 cap that the first $0.50 pick still fits,
+    # but a second $0.50 pick in the same cycle pushes it over -- proving the
+    # seed (not a fresh 0.0) is what's actually being enforced.
+    monkeypatch.setattr(
+        "model_prediction.portfolio.auto_executor._today_auto_buyer_totals",
+        lambda *_a, **_k: (249.30, 0.0),
+    )
+    config = AutoExecutionConfig(
+        max_daily_spend_usd=250.0,
+        whitelisted_models=("tennis-surface-elo-v1",),
+    )
+    buyer = AutoPolymarketBuyer(
+        config=config,
+        live_quote_fn=lambda slug: {"ask": 0.50, "market_slug": slug, "side": "long"},
+    )
+    picks = [
+        {
+            "pick_id": "p_1",
+            "model_id": "tennis-surface-elo-v1",
+            "status": "open",
+            "event_start_utc": iso_utc(now + timedelta(hours=2)),
+            "model_probability": 0.65,
+            "market_probability": 0.50,  # cost $0.50 -> 249.30 + 0.50 <= 250, should pass
+        },
+        {
+            "pick_id": "p_2",
+            "model_id": "tennis-surface-elo-v1",
+            "status": "open",
+            "event_start_utc": iso_utc(now + timedelta(hours=2)),
+            "model_probability": 0.65,
+            "market_probability": 0.50,  # cost $0.50 -> 249.80 + 0.50 > 250, must reject
+        },
+    ]
+    res = buyer.evaluate_and_execute(picks)
+    assert len(res.dry_run_orders) == 1
+    assert res.dry_run_orders[0]["pick_id"] == "p_1"
+    assert res.rejected_budget == 1
+    assert res.total_spend_usd == pytest.approx(249.80, abs=0.01)
+
+
+def test_daily_loss_circuit_breaker_blocks_new_buys(monkeypatch):
+    now = utc_now()
+    monkeypatch.setattr(
+        "model_prediction.portfolio.auto_executor._today_auto_buyer_totals",
+        lambda *_a, **_k: (50.0, -130.0),  # realized loss already past the 125 threshold
+    )
+    config = AutoExecutionConfig(
+        whitelisted_models=("tennis-surface-elo-v1",),
+        max_daily_loss_usd=125.0,
+    )
+    buyer = AutoPolymarketBuyer(
+        config=config,
+        live_quote_fn=lambda slug: {"ask": 0.50, "market_slug": slug, "side": "long"},
+    )
+    picks = [
+        {
+            "pick_id": "p_1",
+            "model_id": "tennis-surface-elo-v1",
+            "status": "open",
+            "event_start_utc": iso_utc(now + timedelta(hours=2)),
+            "model_probability": 0.65,
+            "market_probability": 0.50,
+        },
+    ]
+    res = buyer.evaluate_and_execute(picks)
+    assert len(res.dry_run_orders) == 0
+    assert res.rejected_daily_loss_breaker == 1
+    assert res.total_evaluated == 1
+
+
+def test_daily_loss_circuit_breaker_disabled_by_default(monkeypatch, tmp_path: Path):
+    now = utc_now()
+    monkeypatch.setattr(
+        "model_prediction.portfolio.auto_executor._today_auto_buyer_totals",
+        lambda *_a, **_k: (50.0, -10_000.0),  # catastrophic loss, but breaker is off (None)
+    )
+    config = AutoExecutionConfig(
+        whitelisted_models=("tennis-surface-elo-v1",),
+        max_daily_loss_usd=None,
+        max_daily_spend_usd=1000.0,  # generous, so the unrelated spend cap can't interfere
+    )
+    buyer = AutoPolymarketBuyer(
+        config=config,
+        live_quote_fn=lambda slug: {"ask": 0.50, "market_slug": slug, "side": "long"},
+        data_root=tmp_path,
+    )
+    picks = [
+        {
+            "pick_id": "p_1",
+            "model_id": "tennis-surface-elo-v1",
+            "status": "open",
+            "event_start_utc": iso_utc(now + timedelta(hours=2)),
+            "model_probability": 0.65,
+            "market_probability": 0.50,
+        },
+    ]
+    res = buyer.evaluate_and_execute(picks)
+    assert len(res.dry_run_orders) == 1
+    assert res.rejected_daily_loss_breaker == 0
+
+
+def test_edge_scaled_sizing_disabled_by_default_uses_full_stake(tmp_path: Path):
+    now = utc_now()
+    config = AutoExecutionConfig(
+        whitelisted_models=("tennis-surface-elo-v1",),
+        min_edge=0.035,
+        max_edge=0.20,
+        unit_value_usd=10.0,
+        max_game_stake_usd=25.0,
+    )
+    buyer = AutoPolymarketBuyer(
+        config=config,
+        live_quote_fn=lambda slug: {"ask": 0.50, "market_slug": slug, "side": "long"},
+        data_root=tmp_path,
+    )
+    # Edge just above the minimum -- with scaling disabled this should still size
+    # at the full (capped) stake, not a reduced fraction of it.
+    picks = [
+        {
+            "pick_id": "p_1",
+            "model_id": "tennis-surface-elo-v1",
+            "status": "open",
+            "event_start_utc": iso_utc(now + timedelta(hours=2)),
+            "model_probability": 0.54,
+            "market_probability": 0.50,  # edge ~0.04, just above min_edge
+            "units": 5.0,  # 5 * $10 = $50, capped to $25
+        },
+    ]
+    res = buyer.evaluate_and_execute(picks)
+    assert len(res.dry_run_orders) == 1
+    assert res.dry_run_orders[0]["cost_usd"] == pytest.approx(25.0, abs=0.5)
+
+
+def test_edge_scaled_sizing_enabled_scales_stake_by_edge(tmp_path: Path):
+    now = utc_now()
+    config = AutoExecutionConfig(
+        whitelisted_models=("tennis-surface-elo-v1",),
+        min_edge=0.035,
+        max_edge=0.20,
+        unit_value_usd=10.0,
+        max_game_stake_usd=25.0,
+        edge_scaled_sizing_enabled=True,
+        edge_scaling_min_fraction=0.5,
+    )
+
+    def make_pick(model_probability: float) -> dict:
+        return {
+            "pick_id": "p_1",
+            "model_id": "tennis-surface-elo-v1",
+            "status": "open",
+            "event_start_utc": iso_utc(now + timedelta(hours=2)),
+            "model_probability": model_probability,
+            "market_probability": 0.50,
+            "units": 5.0,  # 5 * $10 = $50, capped to $25 before edge scaling
+        }
+
+    # Near-minimum edge (~0.04) should size close to the 0.5 floor fraction (~$12.50).
+    near_min_buyer = AutoPolymarketBuyer(
+        config=config,
+        live_quote_fn=lambda slug: {"ask": 0.50, "market_slug": slug, "side": "long"},
+        data_root=tmp_path / "near_min",
+    )
+    near_min_res = near_min_buyer.evaluate_and_execute([make_pick(0.54)])
+    assert len(near_min_res.dry_run_orders) == 1
+    near_min_cost = near_min_res.dry_run_orders[0]["cost_usd"]
+
+    # Near-maximum edge (~0.19) should size close to the full $25 cap.
+    near_max_buyer = AutoPolymarketBuyer(
+        config=config,
+        live_quote_fn=lambda slug: {"ask": 0.50, "market_slug": slug, "side": "long"},
+        data_root=tmp_path / "near_max",
+    )
+    near_max_res = near_max_buyer.evaluate_and_execute([make_pick(0.69)])
+    assert len(near_max_res.dry_run_orders) == 1
+    near_max_cost = near_max_res.dry_run_orders[0]["cost_usd"]
+
+    assert near_min_cost < near_max_cost
+    assert near_min_cost == pytest.approx(12.5, abs=1.0)
+    assert near_max_cost == pytest.approx(25.0, abs=1.0)
+
+
+def test_buyer_fallback_constructor_honors_disabled_sport_markets(tmp_path: Path):
+    test_state_file = tmp_path / "auto_buyer_state.json"
+    test_state_file.write_text(
+        json.dumps(
+            {
+                "whitelist_models": ["soccer-poisson-dc-v2"],
+                "disabled_sport_markets": ["soccer:moneyline", "soccer:total"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with (
+        patch("model_prediction.portfolio.auto_executor.AUTO_BUYER_STATE_FILE", test_state_file),
+        patch("model_prediction.portfolio.auto_executor.DATA", tmp_path),
+    ):
+        # No explicit config passed -> exercises the __init__ fallback config-builder,
+        # not run_auto_buyer_cycle's. Both must apply the same categorical block.
+        buyer = AutoPolymarketBuyer(
+            live_quote_fn=lambda slug: {"ask": 0.50, "market_slug": slug, "side": "long"},
+        )
+
+    now = utc_now()
+    picks = [
+        {
+            "pick_id": "p_soccer",
+            "model_id": "soccer-poisson-dc-v2",
+            "sport": "soccer",
+            "market_type": "moneyline",
+            "status": "open",
+            "event_start_utc": iso_utc(now + timedelta(hours=2)),
+            "model_probability": 0.65,
+            "market_probability": 0.50,
+        },
+    ]
+    res = buyer.evaluate_and_execute(picks)
+    assert res.rejected_disabled_sport_market == 1
+    assert len(res.dry_run_orders) == 0
 
 
 def test_auto_buyer_toggle_state(tmp_path: Path):
@@ -864,15 +1273,38 @@ def test_auto_buyer_cycle_tracking(tmp_path: Path):
     )
 
     test_state_file = tmp_path / "auto_buyer_state.json"
-    with patch("model_prediction.portfolio.auto_executor.AUTO_BUYER_STATE_FILE", test_state_file):
+    with (
+        patch("model_prediction.portfolio.auto_executor.AUTO_BUYER_STATE_FILE", test_state_file),
+        patch("model_prediction.portfolio.auto_executor.DATA", tmp_path),
+    ):
         toggle_auto_buyer(True)
+        from model_prediction.portfolio.auto_executor import set_auto_buyer_mode
 
-        # Run cycle for 2026-08-30
-        run1 = run_auto_buyer_cycle(forecast_date="2026-08-30")
-        assert run1.get("mode") == "LIVE_EXECUTION"
-        assert run1.get("forecast_date") == "2026-08-30"
-        assert load_auto_buyer_state()["last_daily_date"] == "2026-08-30"
-        assert "executed_at_utc" in run1
+        set_auto_buyer_mode("live")
+
+        with (
+            patch(
+                "model_prediction.portfolio.auto_executor.AutoPolymarketBuyer.evaluate_and_execute"
+            ) as mock_eval,
+            patch(
+                "model_prediction.portfolio.auto_buyer_ledger.reconcile_pending_auto_buyer_fallbacks"
+            ) as mock_rec,
+        ):
+            mock_eval.return_value = AutoExecutionResult(total_evaluated=5, whitelisted_count=2)
+            mock_rec.return_value = {
+                "reconciled_filled": 0,
+                "cancelled_expired": 0,
+                "still_pending": 0,
+                "errors": 0,
+            }
+
+            # Run cycle for 2026-08-30
+            run1 = run_auto_buyer_cycle(forecast_date="2026-08-30")
+            assert run1.get("mode") == "LIVE_EXECUTION"
+            assert run1.get("forecast_date") == "2026-08-30"
+            assert load_auto_buyer_state()["last_daily_date"] == "2026-08-30"
+            assert "executed_at_utc" in run1
+            assert "reconciliation" in run1
 
 
 def test_auto_buyer_ledger_recording_and_backfill(tmp_path: Path):
@@ -1222,3 +1654,474 @@ def test_reconcile_one_unreachable_order_does_not_block_other_pending_rows(tmp_p
     assert records["PICK_LODIS"]["fallback_reconciled"] is False
     assert result["reconciled_filled"] == 1
     assert result["still_pending"] == 1
+
+
+def test_reconcile_cancels_resting_order_when_edge_drops_below_min(tmp_path):
+    j_path, _ = _record_pending_fallback(tmp_path, event_start_utc=iso_utc(utc_now() + timedelta(hours=12)))
+    # Seed model probability of 0.52 and entry price 0.51
+    records = read_auto_buyer_ledger(j_path)
+    records[0]["model_probability"] = 0.52
+    records[0]["entry_price"] = 0.51
+    with j_path.open("w", encoding="utf-8") as f:
+        for r in records:
+            f.write(json.dumps(r) + "\n")
+
+    cancelled = []
+
+    class FakeExecutor:
+        def order_snapshots(self, order_ids):
+            return {
+                "status": "live",
+                "orders": [
+                    {"order_id": "resting-remainder", "order_state": "ORDER_STATE_NEW", "cum_quantity": 0.0}
+                ],
+            }
+
+        def cancel(self, order_id, user_command, market_slug=None):
+            assert user_command is True
+            assert market_slug == "aec-lol-lds-dv1-2026-09-03"
+            cancelled.append(order_id)
+            return {"status": "cancelled", "order_id": order_id}
+
+    # Market ask moves up to 0.55: edge at ask is 0.52 - 0.55 = -0.03 (< min_edge 0.035)
+    quote_fn = lambda _slug: {
+        "market_state": "MARKET_STATE_OPEN",
+        "long": {"ask": 0.55, "bid": 0.53},
+    }
+
+    result = reconcile_pending_auto_buyer_fallbacks(
+        data_root=tmp_path,
+        executor=FakeExecutor(),
+        quote_fn=quote_fn,
+    )
+
+    assert cancelled == ["resting-remainder"]
+    assert result["cancelled_expired"] == 1
+    recs = read_auto_buyer_ledger(j_path)
+    assert recs[0]["fallback_reconciled"] is True
+    assert "edge_degraded" in recs[0].get("cancellation_reason", "")
+
+
+def test_reconcile_preserves_resting_order_when_edge_remains_strong(tmp_path):
+    j_path, _ = _record_pending_fallback(tmp_path, event_start_utc=iso_utc(utc_now() + timedelta(hours=12)))
+    records = read_auto_buyer_ledger(j_path)
+    records[0]["model_probability"] = 0.65
+    records[0]["entry_price"] = 0.51
+    with j_path.open("w", encoding="utf-8") as f:
+        for r in records:
+            f.write(json.dumps(r) + "\n")
+
+    cancelled = []
+
+    class FakeExecutor:
+        def order_snapshots(self, order_ids):
+            return {
+                "status": "live",
+                "orders": [
+                    {"order_id": "resting-remainder", "order_state": "ORDER_STATE_NEW", "cum_quantity": 0.0}
+                ],
+            }
+
+        def cancel(self, order_id, user_command, market_slug=None):
+            cancelled.append(order_id)
+            return {"status": "cancelled", "order_id": order_id}
+
+    # Market is 0.51 bid / 0.52 ask: edge at ask is 0.65 - 0.52 = 0.13 (> 0.035), market near resting price
+    quote_fn = lambda _slug: {
+        "market_state": "MARKET_STATE_OPEN",
+        "long": {"ask": 0.52, "bid": 0.51},
+    }
+
+    result = reconcile_pending_auto_buyer_fallbacks(
+        data_root=tmp_path,
+        executor=FakeExecutor(),
+        quote_fn=quote_fn,
+    )
+
+    assert cancelled == []
+    assert result["still_pending"] == 1
+    recs = read_auto_buyer_ledger(j_path)
+    assert recs[0]["fallback_reconciled"] is False
+
+
+def test_reconcile_cancels_resting_order_when_market_moves_up_significantly(tmp_path):
+    j_path, _ = _record_pending_fallback(tmp_path, event_start_utc=iso_utc(utc_now() + timedelta(hours=12)))
+    records = read_auto_buyer_ledger(j_path)
+    records[0]["model_probability"] = 0.70
+    records[0]["entry_price"] = 0.50
+    with j_path.open("w", encoding="utf-8") as f:
+        for r in records:
+            f.write(json.dumps(r) + "\n")
+
+    cancelled = []
+
+    class FakeExecutor:
+        def order_snapshots(self, order_ids):
+            return {
+                "status": "live",
+                "orders": [
+                    {"order_id": "resting-remainder", "order_state": "ORDER_STATE_NEW", "cum_quantity": 0.0}
+                ],
+            }
+
+        def cancel(self, order_id, user_command, market_slug=None):
+            cancelled.append(order_id)
+            return {"status": "cancelled", "order_id": order_id}
+
+    # Market moved to 0.55 bid / 0.56 ask: bid is 5 cents above limit price 0.50
+    quote_fn = lambda _slug: {
+        "market_state": "MARKET_STATE_OPEN",
+        "long": {"ask": 0.56, "bid": 0.55},
+    }
+
+    result = reconcile_pending_auto_buyer_fallbacks(
+        data_root=tmp_path,
+        executor=FakeExecutor(),
+        quote_fn=quote_fn,
+    )
+
+    assert cancelled == ["resting-remainder"]
+    assert result["cancelled_expired"] == 1
+    recs = read_auto_buyer_ledger(j_path)
+    assert "market_moved_up" in recs[0].get("cancellation_reason", "")
+
+
+def test_reconcile_cancels_resting_order_when_market_closed(tmp_path):
+    j_path, _ = _record_pending_fallback(tmp_path, event_start_utc=iso_utc(utc_now() + timedelta(hours=12)))
+    cancelled = []
+
+    class FakeExecutor:
+        def order_snapshots(self, order_ids):
+            return {
+                "status": "live",
+                "orders": [
+                    {"order_id": "resting-remainder", "order_state": "ORDER_STATE_NEW", "cum_quantity": 0.0}
+                ],
+            }
+
+        def cancel(self, order_id, user_command, market_slug=None):
+            cancelled.append(order_id)
+            return {"status": "cancelled", "order_id": order_id}
+
+    quote_fn = lambda _slug: {
+        "market_state": "MARKET_STATE_CLOSED",
+        "long": {"ask": 0.50, "bid": 0.49},
+    }
+
+    result = reconcile_pending_auto_buyer_fallbacks(
+        data_root=tmp_path,
+        executor=FakeExecutor(),
+        quote_fn=quote_fn,
+    )
+
+    assert cancelled == ["resting-remainder"]
+    assert result["cancelled_expired"] == 1
+    recs = read_auto_buyer_ledger(j_path)
+    assert "market_state_MARKET_STATE_CLOSED" in recs[0].get("cancellation_reason", "")
+
+
+def test_partial_fill_topup_sizes_exact_remainder(tmp_path):
+    """When an earlier order partially filled and its resting order expired/cancelled,
+    the auto buyer sizes the remainder order for (target_spend - filled_cost) instead
+    of rejecting as a duplicate."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    x_path = tmp_path / "auto_buyer_picks.xlsx"
+
+    # Seed an earlier partial fill: 5 shares @ 0.55 = $2.75, target was 1.25U ($6.25)
+    record_auto_buy_execution(
+        order_payload={
+            "order_id": "ORD_INITIAL",
+            "order_ids": ["ORD_INITIAL"],
+            "pick_id": "PICK_PARTIAL_1",
+            "market_slug": "aec-cs2-team-a-b-2026-09-05",
+            "selection": "home",
+            "token_side": "long",
+            "limit_price": 0.55,
+            "cost_usd": 2.75,
+            "shares": 5.0,
+            "sport": "CS2",
+            "unit_value_usd": 5.0,
+            "event_start_utc": iso_utc(utc_now() + timedelta(hours=6)),
+            "fallback_order_id": None,
+            "fallback_resting_shares": 0.0,
+        },
+        order_state="ORDER_STATE_PARTIALLY_FILLED",
+        pick_row={
+            "away_team": "Team B",
+            "home_team": "Team A",
+            "market_type": "moneyline",
+            "units": 1.25,
+            "model_id": "cs2-tiered-elo-v6",
+            "model_probability": 0.65,
+            "market_probability": 0.50,
+        },
+        jsonl_path=j_path,
+        xlsx_path=x_path,
+    )
+
+    records = read_auto_buyer_ledger(j_path)
+    assert len(records) == 1
+    assert records[0]["order_state"] == "ORDER_STATE_PARTIALLY_FILLED"
+    assert records[0]["cost_usd"] == 2.75
+    assert records[0]["shares"] == 5.0
+
+    buyer = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(
+            whitelisted_models=("cs2-tiered-elo-v6",),
+            blacklisted_models=(),
+            unit_value_usd=5.0,
+            max_game_stake_usd=25.0,
+            max_daily_spend_usd=250.0,
+            execute_live=False,
+        ),
+        data_root=tmp_path,
+        live_quote_fn=lambda _slug: {
+            "ask": 0.50,
+            "market_slug": "aec-cs2-team-a-b-2026-09-05",
+            "side": "long",
+        },
+    )
+
+    picks = [
+        {
+            "pick_id": "PICK_PARTIAL_1",
+            "model_id": "cs2-tiered-elo-v6",
+            "status": "open",
+            "sport": "CS2",
+            "away_team": "Team B",
+            "home_team": "Team A",
+            "selection": "home",
+            "token_side": "long",
+            "market_slug": "aec-cs2-team-a-b-2026-09-05",
+            "event_start_utc": iso_utc(utc_now() + timedelta(hours=6)),
+            "model_probability": 0.65,
+            "market_probability": 0.50,
+            "units": 1.25,
+        }
+    ]
+
+    res = buyer.evaluate_and_execute(picks)
+    assert res.rejected_dedup == 0
+    assert len(res.dry_run_orders) == 1
+    order = res.dry_run_orders[0]
+    assert order["is_topup"] is True
+    # Target was 1.25 * 5.0 = $6.25. Remaining spend = $6.25 - $2.75 = $3.50.
+    # At ask $0.50: 3.50 / 0.50 = 7.0 shares.
+    assert order["shares"] == 7.0
+    assert order["cost_usd"] == 3.50
+    assert order["ticket_pick_id"] == "PICK_PARTIAL_1_topup"
+
+
+def test_partial_fill_topup_updates_ledger_in_place(tmp_path):
+    """When a top-up executes, record_auto_buy_execution updates the existing row
+    in auto_buyer_ledger.jsonl and auto_buyer_picks.xlsx rather than appending a duplicate row."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    x_path = tmp_path / "auto_buyer_picks.xlsx"
+
+    record_auto_buy_execution(
+        order_payload={
+            "order_id": "ORD_INITIAL",
+            "order_ids": ["ORD_INITIAL"],
+            "pick_id": "PICK_TOPUP_2",
+            "market_slug": "aec-cs2-alpha-beta-2026-09-05",
+            "selection": "home",
+            "token_side": "long",
+            "limit_price": 0.55,
+            "cost_usd": 2.75,
+            "shares": 5.0,
+            "sport": "CS2",
+            "unit_value_usd": 5.0,
+            "event_start_utc": iso_utc(utc_now() + timedelta(hours=6)),
+            "fallback_order_id": None,
+            "fallback_resting_shares": 0.0,
+        },
+        order_state="ORDER_STATE_PARTIALLY_FILLED",
+        pick_row={
+            "away_team": "Team Beta",
+            "home_team": "Team Alpha",
+            "market_type": "moneyline",
+            "units": 1.25,
+            "model_id": "cs2-tiered-elo-v6",
+            "model_probability": 0.65,
+            "market_probability": 0.50,
+        },
+        jsonl_path=j_path,
+        xlsx_path=x_path,
+    )
+
+    # Now execute top-up of 7 shares @ 0.50 = $3.50
+    record_auto_buy_execution(
+        order_payload={
+            "order_id": "ORD_TOPUP",
+            "order_ids": ["ORD_TOPUP"],
+            "pick_id": "PICK_TOPUP_2",
+            "ticket_pick_id": "PICK_TOPUP_2_topup",
+            "is_topup": True,
+            "target_spend": 6.25,
+            "market_slug": "aec-cs2-alpha-beta-2026-09-05",
+            "selection": "home",
+            "token_side": "long",
+            "limit_price": 0.50,
+            "cost_usd": 3.50,
+            "shares": 7.0,
+            "sport": "CS2",
+            "unit_value_usd": 5.0,
+        },
+        order_id="ORD_TOPUP",
+        order_state="ORDER_STATE_FILLED",
+        pick_row={"pick_id": "PICK_TOPUP_2", "units": 1.25},
+        jsonl_path=j_path,
+        xlsx_path=x_path,
+    )
+
+    records = read_auto_buyer_ledger(j_path)
+    assert len(records) == 1
+    rec = records[0]
+    assert rec["pick_id"] == "PICK_TOPUP_2"
+    assert rec["shares"] == 12.0
+    assert rec["cost_usd"] == 6.25
+    assert rec["units"] == 1.25
+    assert rec["order_state"] == "ORDER_STATE_FILLED"
+    assert rec["order_ids"] == ["ORD_INITIAL", "ORD_TOPUP"]
+    assert rec["entry_price"] == round(6.25 / 12.0, 4)
+
+
+def test_partial_fill_skipped_when_resting_order_still_active(tmp_path):
+    """When a partial fill has an unreconciled resting fallback order (fallback_reconciled=False),
+    it is NOT eligible for top-up (to prevent duplicate orders while resting)."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+
+    record_auto_buy_execution(
+        order_payload={
+            "order_id": "ORD_RESTING_1",
+            "order_ids": ["ORD_RESTING_1"],
+            "pick_id": "PICK_STILL_RESTING",
+            "market_slug": "aec-cs2-live-game-2026-09-05",
+            "selection": "home",
+            "token_side": "long",
+            "limit_price": 0.50,
+            "cost_usd": 2.50,
+            "shares": 5.0,
+            "sport": "CS2",
+            "unit_value_usd": 5.0,
+            "event_start_utc": iso_utc(utc_now() + timedelta(hours=6)),
+            "fallback_order_id": "resting-order-abc",
+            "fallback_resting_shares": 5.0,
+        },
+        order_state="ORDER_STATE_PARTIALLY_FILLED",
+        pick_row={
+            "away_team": "Team B",
+            "home_team": "Team A",
+            "market_type": "moneyline",
+            "units": 2.0,
+            "model_id": "cs2-tiered-elo-v6",
+        },
+        jsonl_path=j_path,
+    )
+
+    buyer = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(
+            whitelisted_models=("cs2-tiered-elo-v6",),
+            blacklisted_models=(),
+            unit_value_usd=5.0,
+            execute_live=False,
+        ),
+        data_root=tmp_path,
+        live_quote_fn=lambda _slug: {
+            "ask": 0.50,
+            "market_slug": "aec-cs2-live-game-2026-09-05",
+            "side": "long",
+        },
+    )
+
+    picks = [
+        {
+            "pick_id": "PICK_STILL_RESTING",
+            "model_id": "cs2-tiered-elo-v6",
+            "status": "open",
+            "sport": "CS2",
+            "away_team": "Team B",
+            "home_team": "Team A",
+            "selection": "home",
+            "token_side": "long",
+            "market_slug": "aec-cs2-live-game-2026-09-05",
+            "event_start_utc": iso_utc(utc_now() + timedelta(hours=6)),
+            "model_probability": 0.65,
+            "market_probability": 0.50,
+            "units": 2.0,
+        }
+    ]
+
+    res = buyer.evaluate_and_execute(picks)
+    assert res.rejected_dedup == 1
+    assert len(res.dry_run_orders) == 0
+
+
+def test_partial_fill_skipped_when_remaining_spend_under_50_cents(tmp_path):
+    """When the remaining spend is less than $0.50 (e.g. $0.20), no micro-dust top-up is placed."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+
+    record_auto_buy_execution(
+        order_payload={
+            "order_id": "ORD_ALMOST_FULL",
+            "order_ids": ["ORD_ALMOST_FULL"],
+            "pick_id": "PICK_ALMOST_FULL",
+            "market_slug": "aec-cs2-dust-game-2026-09-05",
+            "selection": "home",
+            "token_side": "long",
+            "limit_price": 0.50,
+            "cost_usd": 4.80,
+            "shares": 9.6,
+            "sport": "CS2",
+            "unit_value_usd": 5.0,
+            "event_start_utc": iso_utc(utc_now() + timedelta(hours=6)),
+            "fallback_order_id": None,
+            "fallback_resting_shares": 0.0,
+        },
+        order_state="ORDER_STATE_PARTIALLY_FILLED",
+        pick_row={
+            "away_team": "Team B",
+            "home_team": "Team A",
+            "market_type": "moneyline",
+            "units": 1.0,
+            "model_id": "cs2-tiered-elo-v6",
+        },
+        jsonl_path=j_path,
+    )
+
+    buyer = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(
+            whitelisted_models=("cs2-tiered-elo-v6",),
+            blacklisted_models=(),
+            unit_value_usd=5.0,
+            execute_live=False,
+        ),
+        data_root=tmp_path,
+        live_quote_fn=lambda _slug: {
+            "ask": 0.50,
+            "market_slug": "aec-cs2-dust-game-2026-09-05",
+            "side": "long",
+        },
+    )
+
+    picks = [
+        {
+            "pick_id": "PICK_ALMOST_FULL",
+            "model_id": "cs2-tiered-elo-v6",
+            "status": "open",
+            "sport": "CS2",
+            "away_team": "Team B",
+            "home_team": "Team A",
+            "selection": "home",
+            "token_side": "long",
+            "market_slug": "aec-cs2-dust-game-2026-09-05",
+            "event_start_utc": iso_utc(utc_now() + timedelta(hours=6)),
+            "model_probability": 0.65,
+            "market_probability": 0.50,
+            "units": 1.0,
+        }
+    ]
+
+    res = buyer.evaluate_and_execute(picks)
+    assert res.rejected_min_topup == 1
+    assert len(res.dry_run_orders) == 0

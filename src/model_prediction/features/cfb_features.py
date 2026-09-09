@@ -469,14 +469,37 @@ class CFBFeatureExtractor:
         away_qb_adj = (1.0 - qb_starter_prob_away) * -4.5
         home_qb_adj = (1.0 - qb_starter_prob_home) * -4.5
 
-        proj_away_pts = max(0.0, proj_possessions * exp_away_ppp + away_qb_adj)
-        proj_home_pts = max(0.0, proj_possessions * exp_home_ppp + home_qb_adj)
-        proj_margin = proj_home_pts - proj_away_pts
-        proj_total = proj_home_pts + proj_away_pts
-
         # Elo Win Probability
         elo_diff = home_state.elo_rating - away_state.elo_rating + (0.0 if is_neutral_site else 65.0)
         elo_home_prob = 1.0 / (1.0 + 10.0 ** (-elo_diff / 400.0))
+
+        # Expected Margin & Total Projections
+        # 1. Base margin from Elo (24.5 rating points per point of spread)
+        elo_margin = elo_diff / 24.5
+
+        # 2. Structural efficiency margin (PPP differential adjusted for situational factors)
+        raw_eff_margin = proj_possessions * (exp_home_ppp - exp_away_ppp) + home_qb_adj - away_qb_adj
+
+        # 3. Dynamic shrinkage between Elo prior and in-season sample efficiency
+        n_games_min = min(away_state.games_played, home_state.games_played)
+        eff_weight = min(0.35, 0.04 * n_games_min)
+        proj_margin = (
+            (1.0 - eff_weight) * elo_margin
+            + eff_weight * raw_eff_margin
+            + (home_qb_adj - away_qb_adj) * (1.0 - eff_weight)
+        )
+
+        # 4. Total points expectation calibrated to empirical FBS average (54.5)
+        epa_total_adj = (home_state.adj_offense_epa + away_state.adj_offense_epa) * 12.0
+        proj_total = max(
+            30.0,
+            CFB_BASELINE_TOTAL + weather_total_adj + (proj_possessions - 12.4) * 2.25 + epa_total_adj,
+        )
+
+        proj_home_pts = max(3.0, (proj_total + proj_margin) / 2.0)
+        proj_away_pts = max(3.0, (proj_total - proj_margin) / 2.0)
+        proj_margin = proj_home_pts - proj_away_pts
+        proj_total = proj_home_pts + proj_away_pts
 
         # Uncertainty quantification
         sample_games = min(away_state.games_played, home_state.games_played)

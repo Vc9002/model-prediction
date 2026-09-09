@@ -786,9 +786,11 @@ def test_auto_buyer_consolidated_tab_markup_and_routing() -> None:
     assert "max_game_stake_units" in html
     assert "max_daily_spend_units" in html
     assert "setAutoBuyerView('performance')" in html
-    assert "MLB cohort = MLB sport or MLB model ID" in html
+    assert 'id="autoBuyerCumulativePnl"' in html
+    assert 'id="autoBuyerSportPnl"' in html
+    assert 'id="autoBuyerSportTable"' in html
     assert 'timeZone: "America/New_York"' in html
-    assert "pending positions excluded" in html
+    assert "Pending positions excluded" in html
     assert "renderAutoBuyer" in html
     assert "renderAutoBuyerSettle" in html
     assert "renderAutoBuyerLedger" in html
@@ -856,9 +858,10 @@ def test_auto_buyer_performance_cohorts_and_et_day_grouping() -> None:
         match.group(0)
         + "\nconst rows=JSON.parse(process.argv[1]);"
         + "const settled=rows.filter(isSettledAutoBuyerRow);"
+        + 'const sportOf=row=>(row.sport||"Unknown").toString().toUpperCase();'
+        + "const sports=Array.from(new Set(settled.map(sportOf))).sort();"
         + "const output={all:autoBuyerCohortMetrics(settled),"
-        + "mlb:autoBuyerCohortMetrics(settled.filter(isMlbAutoBuyerRow)),"
-        + "without:autoBuyerCohortMetrics(settled.filter(r=>!isMlbAutoBuyerRow(r))),"
+        + "bySport:Object.fromEntries(sports.map(sp=>[sp,autoBuyerCohortMetrics(settled.filter(r=>sportOf(r)===sp))])),"
         + "dates:settled.map(autoBuyerEventDateEt)};"
         + "process.stdout.write(JSON.stringify(output));"
     )
@@ -873,10 +876,10 @@ def test_auto_buyer_performance_cohorts_and_et_day_grouping() -> None:
     assert output["all"]["wins"] == 2
     assert output["all"]["losses"] == 1
     assert output["all"]["pnlUsd"] == pytest.approx(0.6)
-    assert output["mlb"]["settled"] == 1
-    assert output["mlb"]["roiPct"] == pytest.approx(100.0)
-    assert output["without"]["settled"] == 2
-    assert output["without"]["pnlUsd"] == pytest.approx(0.1)
+    assert output["bySport"]["MLB"]["settled"] == 1
+    assert output["bySport"]["MLB"]["roiPct"] == pytest.approx(100.0)
+    assert output["bySport"]["CS2"]["settled"] == 2
+    assert output["bySport"]["CS2"]["pnlUsd"] == pytest.approx(0.1)
     assert output["dates"] == ["2026-09-01", "2026-09-01", "2026-09-02"]
 
 

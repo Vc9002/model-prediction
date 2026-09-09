@@ -1,6 +1,32 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
-**Last audited**: 2026-09-03 (see new section directly below)
+**Last audited**: 2026-09-08 (see new section directly below)
+
+## 2026-09-08 — Project-wide optimization and integration
+
+Shared XLSX exports are 4.36x faster in a three-run 1,000-row benchmark
+(4.135s median -> 0.949s), with identical values and formatting. Ledger page
+queries now have a matching sort index and a complete timestamp/pick/tier
+cursor; concurrent same-key dashboard cache misses share one build. Daily
+timing includes deferred exports. CFB cannot backdate started games, qualified
+WNBA spread logging no longer references a nonexistent enum, and PAPER mode
+cannot be overridden into live orders. Frozen artifacts were not retuned.
+
+Verification on the combined checkout: 2,660 passed / 9 socket-restricted
+failures / 3 skipped in the full sandbox run (336.36s). All 23 tests in the
+HTTP integration file passed with localhost access afterward. The final
+execution-boundary changes passed 171 focused tests. Ruff passes; mypy reports
+no issues in 344 source files. No outstanding test failures remain after those
+reruns. No live daily cycle or trading-service restart was used for validation.
+
+The operator requested committing all existing work and cleaning Git. The
+snapshot includes the pre-existing Auto-Buyer/manual-bet/soccer/CFB changes;
+a follow-up cleanup removes mutable operational records from tracking while
+preserving the files on disk and the snapshot in Git history. A verified local
+backup also exists under model-prediction-runtime/backups/git-clean-20260909T000757Z/.
+
+See [the optimization report](PROJECT_OPTIMIZATION_2026-09-08.md) and
+outputs/optimization/2026-09-08/ for methodology and practical limits.
 
 ## 2026-09-03 — Auto-Buyer IOC partial-fill: rest the remainder, don't chase price
 

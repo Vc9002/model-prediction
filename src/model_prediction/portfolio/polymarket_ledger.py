@@ -186,11 +186,25 @@ def settle_polymarket_ledger_rows(
     resettle_all: bool = False,
 ) -> dict[str, Any]:
     """Settle open rows in the Polymarket Edge Ledger against ESPN and match scores."""
+    return settle_ledger_rows_against_espn(
+        _get_ledger_path(data_root), espn_client=espn_client, resettle_all=resettle_all
+    )
+
+
+def settle_ledger_rows_against_espn(
+    path: Path,
+    espn_client: Any | None = None,
+    resettle_all: bool = False,
+) -> dict[str, Any]:
+    """Grade every open row at ``path`` (shared FIELDNAMES xlsx schema) against ESPN/tennis/
+    Polymarket-resolution scores. Shared by the Polymarket Edge Ledger and the manual bet
+    ledger -- the score-matching logic (team-name matching, tennis draws, line parsing) is
+    schema-generic, not specific to how a row was recorded.
+    """
     from ..data_sources.espn import ESPNClient
     from ..domain import MarketType, PickResult
     from ..pricing import grade_pick, profit_units
 
-    path = _get_ledger_path(data_root)
     if not path.exists():
         return {"settled_count": 0, "open_count": 0, "total_rows": 0, "settled_picks": []}
 
@@ -262,6 +276,7 @@ def settle_polymarket_ledger_rows(
 
         open_count += 1
         lg = str(row.get("league") or "").upper()
+        espn_leagues: tuple[str, ...]
         if lg == "POLYMARKET" or not lg:
             espn_leagues = ("mlb", "wnba", "nba", "nfl", "eng.1", "esp.1", "ger.1", "ita.1", "fra.1", "usa.1")
             check_tennis = True

@@ -204,9 +204,18 @@ def build_soccer_total_slate(
     # config/model.yaml's SOCCER.leagues) -- independent reads, fetch
     # concurrently instead of one league at a time.
     if leagues:
+
+        def _fetch_league_events(league_name: str) -> list[dict[str, Any]]:
+            sb = client.scoreboard(league_name, game_date)
+            evs = sb.get("events", [])
+            for ev in evs:
+                if "league" not in ev:
+                    ev["league"] = league_name
+            return evs
+
         with ThreadPoolExecutor(max_workers=min(18, len(leagues))) as pool:
-            for scoreboard in pool.map(lambda league: client.scoreboard(league, game_date), leagues):
-                events.extend(scoreboard.get("events", []))
+            for ev_list in pool.map(_fetch_league_events, leagues):
+                events.extend(ev_list)
     # Some competitions (e.g. a continental/cup fixture also listed under a
     # domestic league endpoint) return the SAME event from more than one of
     # the leagues above -- deduped by event_id, same as tennis_forward.py's
@@ -240,6 +249,7 @@ def build_soccer_total_slate(
                     event_start_utc=str(event["date"]),
                     away_team=away,
                     home_team=home,
+                    league=str(event.get("league") or "SOCCER"),
                 )
             )
         except (KeyError, TypeError, ValueError) as error:

@@ -55,7 +55,7 @@ class DailyOperationalAuditReport:
     orphaned_settlements_count: int
 
     # Overall Audit Status
-    operational_status: str  # PASS / FAIL_INTEGRITY
+    operational_status: str  # PASS / NO_DATA / FAIL_INTEGRITY
     reasons: list[str]
 
     def to_dict(self) -> dict[str, Any]:
@@ -75,14 +75,27 @@ def run_daily_operational_audit(
     expected_prob_h = artifact.get("hashes", {}).get("v10_probability_model_hash", "")
 
     records: list[dict[str, Any]] = []
+    reasons: list[str] = []
+    invalid_records = 0
     if ledger_path.exists():
         with ledger_path.open("r", encoding="utf-8") as f:
-            for line in f:
+            for line_number, line in enumerate(f, start=1):
                 if line.strip():
                     try:
-                        records.append(json.loads(line))
+                        record = json.loads(line)
                     except json.JSONDecodeError:
+                        invalid_records += 1
+                        reasons.append(f"Malformed JSON at ledger line {line_number}")
                         continue
+                    if not isinstance(record, dict) or record.get("record_type") not in {
+                        "PREDICTION",
+                        "SETTLEMENT",
+                        "CLOSING_MARKET",
+                    }:
+                        invalid_records += 1
+                        reasons.append(f"Invalid record type at ledger line {line_number}")
+                        continue
+                    records.append(record)
 
     predictions = [r for r in records if r.get("record_type") == "PREDICTION"]
     settlements = [r for r in records if r.get("record_type") == "SETTLEMENT"]
@@ -94,7 +107,6 @@ def run_daily_operational_audit(
     late_predictions = 0
     hash_failures = 0
     orphaned_settlements = 0
-    reasons: list[str] = []
 
     seen_pred_slugs: set[str] = set()
     pred_hashes: set[str] = set()
@@ -153,8 +165,19 @@ def run_daily_operational_audit(
     n_unique_games = len(seen_pred_slugs)
     n_unique_dates = len(pred_dates)
 
-    status = "PASS"
-    if pit_violations > 0 or duplicate_predictions > 0 or late_predictions > 0 or hash_failures > 0:
+    status = "PASS" if predictions else "NO_DATA"
+    if not predictions:
+        reasons.append("No prospective predictions available; capture health is unverified")
+    if any(
+        (
+            pit_violations,
+            duplicate_predictions,
+            late_predictions,
+            hash_failures,
+            orphaned_settlements,
+            invalid_records,
+        )
+    ):
         status = "FAIL_INTEGRITY"
 
     rep = DailyOperationalAuditReport(
