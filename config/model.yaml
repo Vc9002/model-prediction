@@ -304,7 +304,13 @@ models:
     legacy_binary_research_version: soccer-elo-trend-lr-v2
     legacy_binary_research_artifact: config/models/soccer-elo-trend-lr-v2.json
     min_edge: 0.035
-    research_confidence_gate: 0.0
+    # Restored 2026-09-09: 0.0 (no gate) contradicted this section's own
+    # comment above ("wiring research_confidence_gate ... from that real
+    # result") and the live Auto-Buyer's actual moneyline record on this
+    # model (19 settled bets, 31.6% actual vs 60.3% claimed win prob.,
+    # -$49.23 -- see EXPLICIT_BLACKLIST_MODELS in auto_executor.py).
+    # Restoring the pre-2026-09-08 value pending a real derived threshold.
+    research_confidence_gate: 0.230157
     leagues:
     - EPL
     - LA_LIGA
@@ -325,7 +331,10 @@ models:
     - FRIENDLIES
     - CLUB_FRIENDLIES
     markets:
-    - moneyline
+    # moneyline removed 2026-09-09: only totals was ever run through
+    # validation.qualify_soccer_total_model (see comment above); moneyline
+    # was never validated and is the exact market where the live Auto-Buyer
+    # lost -$49.23 on this model at 31.6% actual vs 60.3% claimed win prob.
     - full_game_total_2_5
   NFL:
     family: elo_trend_normal_approximation
