@@ -671,6 +671,10 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     <div class="filter-bar" style="margin-bottom:14px;display:flex;gap:8px;align-items:center">
       <button class="primary" id="btnAutoBuyerLedgerView" onclick="setAutoBuyerView('ledger')">Ledger</button>
       <button id="btnAutoBuyerPerformanceView" onclick="setAutoBuyerView('performance')">Performance</button>
+      <span style="flex:1"></span>
+      <span class="small dim">Source:</span>
+      <button class="primary" id="btnAutoBuyerSourceLive" onclick="setAutoBuyerLedgerSource('live')" title="Real Polymarket executions">Live</button>
+      <button id="btnAutoBuyerSourcePaper" onclick="setAutoBuyerLedgerSource('paper')" title="Simulated paper fills, no real orders">Paper</button>
       <span class="small dim">Settled-only performance · event dates in America/New_York</span>
     </div>
 
@@ -3939,11 +3943,22 @@ async function runAutoBuyerNow(){
 let _autoBuyerLedgerCache = [];
 let _absFilterMode = "settled";
 let _autoBuyerView = "ledger";
+let _autoBuyerLedgerSource = "live"; // "live" (real orders) or "paper" (simulated fills)
+
+function setAutoBuyerLedgerSource(source){
+  _autoBuyerLedgerSource = source === "paper" ? "paper" : "live";
+  const liveBtn=$("#btnAutoBuyerSourceLive"), paperBtn=$("#btnAutoBuyerSourcePaper");
+  if(liveBtn)liveBtn.className=_autoBuyerLedgerSource==="live"?"primary":"";
+  if(paperBtn)paperBtn.className=_autoBuyerLedgerSource==="paper"?"primary":"";
+  renderAutoBuyer(true);
+}
+window.setAutoBuyerLedgerSource=setAutoBuyerLedgerSource;
 
 async function loadAutoBuyerLedgerCache(force = false) {
   if (!force && _autoBuyerLedgerCache && _autoBuyerLedgerCache.length) return;
+  const endpoint = _autoBuyerLedgerSource === "paper" ? "/api/auto-buyer/paper-ledger" : "/api/auto-buyer/ledger";
   try {
-    const res = await fetch("/api/auto-buyer/ledger", {
+    const res = await fetch(endpoint, {
       headers: { "X-Dashboard-Token": window._DASHBOARD_TOKEN || "" }
     });
     if (!res.ok) throw new Error("HTTP " + res.status);

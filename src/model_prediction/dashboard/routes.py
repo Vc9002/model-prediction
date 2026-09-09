@@ -100,6 +100,7 @@ from model_prediction.portfolio.auto_buyer_ledger import (
     summarize_auto_buyer_performance,
 )
 from model_prediction.portfolio.auto_executor import (
+    PAPER_AUTO_BUYER_DATA_ROOT,
     load_auto_buyer_state,
     run_auto_buyer_cycle,
     set_auto_buyer_mode,
@@ -132,6 +133,13 @@ def _edge_disabled_payload(component: str) -> dict[str, str]:
         "component": component,
         "reason": "operator_disabled",
     }
+
+
+def _read_paper_auto_buyer_ledger() -> list[dict]:
+    path = PAPER_AUTO_BUYER_DATA_ROOT / "auto_buyer_ledger.jsonl"
+    if not path.exists():
+        return []
+    return read_auto_buyer_ledger(jsonl_path=path)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -516,6 +524,16 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(_cached("auto-buyer-summary", 5, summarize_auto_buyer_performance))
             elif route == "/api/auto-buyer/ledger":
                 self._send(_cached("auto-buyer-ledger", 5, read_auto_buyer_ledger))
+            elif route == "/api/auto-buyer/paper-ledger":
+                self._send(_cached("auto-buyer-paper-ledger", 5, _read_paper_auto_buyer_ledger))
+            elif route == "/api/auto-buyer/paper-summary":
+                self._send(
+                    _cached(
+                        "auto-buyer-paper-summary",
+                        5,
+                        lambda: summarize_auto_buyer_performance(_read_paper_auto_buyer_ledger()),
+                    )
+                )
             elif route == "/api/auto-buyer/log":
                 if AUTO_BUYER_LOG_PATH.exists():
                     try:
