@@ -723,7 +723,7 @@ def test_buyer_rejects_events_beyond_configured_lookahead_window():
     assert res.rejected_future_slate == 1
 
 
-def test_run_auto_buyer_cycle_defaults_lookahead_to_six_hours_from_state(tmp_path: Path):
+def test_run_auto_buyer_cycle_defaults_lookahead_to_24_hours_from_state(tmp_path: Path):
     test_state_file = tmp_path / "auto_buyer_state.json"
     buyer_result = AutoExecutionResult()
     with (
@@ -734,7 +734,7 @@ def test_run_auto_buyer_cycle_defaults_lookahead_to_six_hours_from_state(tmp_pat
         buyer_class.return_value.evaluate_and_execute.return_value = buyer_result
         run_auto_buyer_cycle(execute_override=False)
 
-    assert buyer_class.call_args.kwargs["config"].max_event_lookahead_hours == 6.0
+    assert buyer_class.call_args.kwargs["config"].max_event_lookahead_hours == 24.0
 
 
 def test_run_auto_buyer_cycle_honors_state_lookahead_override(tmp_path: Path):

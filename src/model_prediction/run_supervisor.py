@@ -49,6 +49,11 @@ WORKERS: dict[str, list[str]] = {
         "model_prediction.cli_production",
         "predict",
     ],
+    "auto-buyer": [
+        ".venv/bin/python",
+        "-m",
+        "model_prediction.auto_buyer_worker",
+    ],
     "rebuild-shadow": ["bash", "scripts/run_rebuild.sh"],
     "manual-bet-sync": [
         ".venv/bin/python",

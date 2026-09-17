@@ -113,6 +113,8 @@ DEFAULT_AUTO_BUYER_UNIT_VALUE_USD = 0.50
 DEFAULT_AUTO_BUYER_MAX_EDGE = 0.20
 DEFAULT_MAX_DAILY_SPEND_UNITS = 50.0
 DEFAULT_MAX_GAME_STAKE_UNITS = 5.0
+DEFAULT_MAX_EVENT_LOOKAHEAD_HOURS = 24.0
+DEFAULT_MAX_MODEL_AGE_MINUTES = 12 * 60
 
 
 @dataclass(frozen=True)
@@ -128,7 +130,9 @@ class AutoExecutionConfig:
     disabled_sport_markets: tuple[tuple[str, str], ...] = ()
     execute_live: bool = False  # Dry-run by default unless enabled/requested
     mode: str = DEFAULT_AUTO_BUYER_MODE  # "paper" (simulated fills, recorded) or "live" (real orders)
-    max_event_lookahead_hours: float = 24.0  # How far out an event may start and still be buyable
+    max_event_lookahead_hours: float = DEFAULT_MAX_EVENT_LOOKAHEAD_HOURS
+    max_model_age_minutes: float = DEFAULT_MAX_MODEL_AGE_MINUTES
+    require_model_timestamp: bool = False
     max_daily_loss_usd: float | None = None  # Drawdown circuit breaker; None = disabled
     edge_scaled_sizing_enabled: bool = False  # Off by default: scales stake by edge within the per-game cap
     edge_scaling_min_fraction: float = (
@@ -145,6 +149,8 @@ class AutoExecutionResult:
     rejected_blacklist: int = 0
     rejected_future_slate: int = 0
     rejected_started: int = 0
+    rejected_stale_open: int = 0
+    rejected_stale_model: int = 0
     rejected_stale_quote: int = 0
     rejected_unmapped_market: int = 0
     rejected_unsupported_market: int = 0
@@ -201,7 +207,9 @@ def _capture_missing_active_snapshot_slates(
     must discover those next-day contracts before calling the local fail-closed
     mapper. Existing files are never rewritten or broadly refreshed here.
     """
-    if not config.execute_live:
+    # Paper mode must capture quotes too. This function snapshots market data
+    # only; it never submits an order.
+    if config.mode not in AUTO_BUYER_MODES:
         return []
 
     root = Path(data_root)
@@ -223,7 +231,7 @@ def _capture_missing_active_snapshot_slates(
         except (TypeError, ValueError):
             continue
         seconds_until_start = (event_start - now).total_seconds()
-        if seconds_until_start <= 0 or seconds_until_start > 24 * 3600:
+        if seconds_until_start <= 0 or seconds_until_start > config.max_event_lookahead_hours * 3600:
             continue
         raw_sport = str(row.get("league") or row.get("sport") or "").lower()
         sport = "esports" if raw_sport in ESPORTS_LEAGUES else raw_sport
@@ -360,6 +368,8 @@ def load_auto_buyer_state() -> dict[str, Any]:
         "max_edge": DEFAULT_AUTO_BUYER_MAX_EDGE,
         "max_daily_spend_units": DEFAULT_MAX_DAILY_SPEND_UNITS,
         "max_game_stake_units": DEFAULT_MAX_GAME_STAKE_UNITS,
+        "max_event_lookahead_hours": DEFAULT_MAX_EVENT_LOOKAHEAD_HOURS,
+        "max_model_age_minutes": DEFAULT_MAX_MODEL_AGE_MINUTES,
         "whitelist_models": list(DEFAULT_WHITELIST_MODELS),
         "blacklist_models": list(EXPLICIT_BLACKLIST_MODELS),
         "disabled_sport_markets": [
@@ -420,6 +430,20 @@ def load_auto_buyer_state() -> dict[str, Any]:
     state["max_game_stake_units"] = game_units
     state["max_daily_spend_usd"] = round(daily_units * unit_value, 2)
     state["max_game_stake_usd"] = round(game_units * unit_value, 2)
+    try:
+        lookahead = float(state.get("max_event_lookahead_hours") or DEFAULT_MAX_EVENT_LOOKAHEAD_HOURS)
+    except (TypeError, ValueError):
+        lookahead = DEFAULT_MAX_EVENT_LOOKAHEAD_HOURS
+    state["max_event_lookahead_hours"] = (
+        lookahead if math.isfinite(lookahead) and lookahead > 0 else DEFAULT_MAX_EVENT_LOOKAHEAD_HOURS
+    )
+    try:
+        model_age = float(state.get("max_model_age_minutes") or DEFAULT_MAX_MODEL_AGE_MINUTES)
+    except (TypeError, ValueError):
+        model_age = DEFAULT_MAX_MODEL_AGE_MINUTES
+    state["max_model_age_minutes"] = (
+        model_age if math.isfinite(model_age) and model_age > 0 else DEFAULT_MAX_MODEL_AGE_MINUTES
+    )
     return state
 
 
@@ -566,7 +590,11 @@ def run_auto_buyer_cycle(
         max_edge=float(state.get("max_edge", DEFAULT_AUTO_BUYER_MAX_EDGE)),
         max_daily_spend_usd=float(state.get("max_daily_spend_usd", 250.0)),
         max_game_stake_usd=float(state.get("max_game_stake_usd", 25.0)),
-        max_event_lookahead_hours=float(state.get("max_event_lookahead_hours", 6.0)),
+        max_event_lookahead_hours=float(
+            state.get("max_event_lookahead_hours", DEFAULT_MAX_EVENT_LOOKAHEAD_HOURS)
+        ),
+        max_model_age_minutes=float(state.get("max_model_age_minutes", DEFAULT_MAX_MODEL_AGE_MINUTES)),
+        require_model_timestamp=True,
         execute_live=should_execute,
         mode=mode,
         whitelisted_models=tuple(whitelisted) if whitelisted is not None else DEFAULT_WHITELIST_MODELS,
@@ -633,6 +661,8 @@ def run_auto_buyer_cycle(
         "rejected_blacklist": res.rejected_blacklist,
         "rejected_future_slate": res.rejected_future_slate,
         "rejected_started": res.rejected_started,
+        "rejected_stale_open": res.rejected_stale_open,
+        "rejected_stale_model": res.rejected_stale_model,
         "rejected_stale_quote": res.rejected_stale_quote,
         "rejected_unmapped_market": res.rejected_unmapped_market,
         "rejected_unsupported_market": res.rejected_unsupported_market,
@@ -686,7 +716,12 @@ class AutoPolymarketBuyer:
                 max_edge=float(state.get("max_edge") or DEFAULT_AUTO_BUYER_MAX_EDGE),
                 max_daily_spend_usd=float(state.get("max_daily_spend_usd") or 250.0),
                 max_game_stake_usd=float(state.get("max_game_stake_usd") or 25.0),
-                max_event_lookahead_hours=float(state.get("max_event_lookahead_hours") or 6.0),
+                max_event_lookahead_hours=float(
+                    state.get("max_event_lookahead_hours") or DEFAULT_MAX_EVENT_LOOKAHEAD_HOURS
+                ),
+                max_model_age_minutes=float(
+                    state.get("max_model_age_minutes") or DEFAULT_MAX_MODEL_AGE_MINUTES
+                ),
                 execute_live=state_should_execute,
                 mode=state_mode,
                 whitelisted_models=tuple(whitelisted)
@@ -1052,6 +1087,18 @@ class AutoPolymarketBuyer:
                 result.rejected_not_open += 1
                 continue
 
+            # Append-only forecast files retain open rows after an event starts.
+            # Label those rows as stale before quote/mapping work so old rows do
+            # not consume the same evaluation path as actionable candidates.
+            try:
+                row_event_start = parse_utc(str(row.get("event_start_utc") or ""))
+            except (TypeError, ValueError):
+                row_event_start = None
+            if row_event_start is not None and now >= row_event_start:
+                result.rejected_stale_open += 1
+                result.rejected_started += 1
+                continue
+
             # 2. Blacklist filter
             if model_id in self.config.blacklisted_models:
                 result.rejected_blacklist += 1
@@ -1101,6 +1148,19 @@ class AutoPolymarketBuyer:
             # range on every cycle before it started.
             if (event_start - now).total_seconds() > self.config.max_event_lookahead_hours * 3600:
                 result.rejected_future_slate += 1
+                continue
+
+            # A wider candidate horizon is safe only when the model output is
+            # still recent at purchase time. Missing timestamps fail closed.
+            model_timestamp = row.get("created_at_utc") or row.get("observed_at_utc")
+            try:
+                model_age_seconds = (now - parse_utc(str(model_timestamp))).total_seconds()
+            except (TypeError, ValueError):
+                model_age_seconds = float("inf")
+            if self.config.require_model_timestamp and (
+                model_age_seconds < 0 or model_age_seconds > self.config.max_model_age_minutes * 60
+            ):
+                result.rejected_stale_model += 1
                 continue
 
             # 5. Fast Deduplication check (pick_id or event_id + selection)

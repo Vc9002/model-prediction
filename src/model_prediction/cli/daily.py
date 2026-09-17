@@ -148,6 +148,11 @@ def _skip_auto_buyer_for_verification() -> bool:
     return os.environ.get("MODEL_PREDICTION_SKIP_AUTO_BUYER") == "1"
 
 
+def _auto_buyer_is_decoupled() -> bool:
+    """Whether the independent short-cycle worker owns purchase evaluation."""
+    return os.environ.get("MODEL_PREDICTION_AUTO_BUYER_DECOUPLED") == "1"
+
+
 def _with_timed_exports(function):
     """Include deferred workbook rebuilding in the reported daily duration."""
 
@@ -1008,7 +1013,13 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             auto_buyer_settle_result = {"status": "error"}
 
     # Step 12: Automated Polymarket Buyer (if enabled in dashboard state)
-    if _skip_auto_buyer_for_verification():
+    if _auto_buyer_is_decoupled():
+        logger.info("Auto-Buyer purchase cycle delegated to independent worker")
+        auto_buyer_result: dict[str, Any] = {
+            "status": "skipped",
+            "reason": "independent_auto_buyer_worker",
+        }
+    elif _skip_auto_buyer_for_verification():
         logger.info("Auto-Buyer skipped by explicit verification override")
         auto_buyer_result: dict[str, Any] = {
             "status": "skipped",

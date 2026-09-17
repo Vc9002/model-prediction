@@ -733,7 +733,9 @@ class Handler(BaseHTTPRequestHandler):
             exec_override = payload.get("execute")
             self._send(run_auto_buyer_cycle(execute_override=exec_override, force=True))
         elif parsed.path == "/api/auto-buyer/settle":
-            self._send(settle_auto_buyer_ledger())
+            state = load_auto_buyer_state()
+            root = PAPER_AUTO_BUYER_DATA_ROOT if str(state.get("mode")) == "paper" else None
+            self._send(settle_auto_buyer_ledger(data_root=root))
         else:
             self._send({"error": "unknown route"}, code=404)
 
