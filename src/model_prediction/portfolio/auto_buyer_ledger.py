@@ -13,6 +13,7 @@ import logging
 import re
 from collections.abc import Callable
 from contextlib import suppress
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -21,10 +22,20 @@ import httpx
 from ..data_sources.espn import ESPNClient
 from ..data_sources.polymarket_execute import ExecutionGateError
 from ..domain import iso_utc, parse_utc, utc_now
+from ..esports import TITLE_SPECS as _ESPORTS_TITLE_SPECS
+from ..esports import Bo3EsportsClient, _fuzzy_match_team, _load_manual_aliases, _team_alias_index
 from ..ledger import FIELDNAMES
 from ..pricing import american_to_decimal
+from ..research_io import identity_key as _identity_key
 from ..runtime_paths import RuntimePaths
 from ..xlsx_ledger import read_xlsx_rows, write_xlsx_rows_atomic
+
+# Reverse of esports.TITLE_SPECS[title]["polymarket_league"] -- the Auto-Buyer
+# ledger's own `sport` field is written as that league string (e.g. "CS2",
+# "LOL"), not the BO3 title key `finished_matches`/`teams` expect ("cs2", "lol").
+ESPORTS_TITLE_BY_SPORT: dict[str, str] = {
+    str(spec["polymarket_league"]): title for title, spec in _ESPORTS_TITLE_SPECS.items()
+}
 
 _paths = RuntimePaths.resolve()
 DATA = _paths.repo_root / "data"
@@ -42,6 +53,23 @@ AUTO_BUYER_TERMINAL_RESULTS = frozenset({"win", "loss", "push"})
 
 def _usd_to_auto_buyer_units(value_usd: float, unit_value_usd: float = AUTO_BUYER_UNIT_VALUE_USD) -> float:
     return round(float(value_usd) / float(unit_value_usd), 4)
+
+
+def _resolve_esports_team(
+    name: str,
+    teams: dict[str, dict[str, Any]],
+    team_index: dict[str, set[str]],
+    manual_aliases: dict[str, str],
+) -> str | None:
+    key = _identity_key(name)
+    if key in manual_aliases:
+        alias_candidates = team_index.get(_identity_key(manual_aliases[key]))
+        if alias_candidates and len(alias_candidates) == 1:
+            return next(iter(alias_candidates))
+    exact_candidates = team_index.get(key)
+    if exact_candidates and len(exact_candidates) == 1:
+        return next(iter(exact_candidates))
+    return _fuzzy_match_team(name, teams, team_index)
 
 
 def _is_settled_auto_buyer_record(record: dict[str, Any]) -> bool:
@@ -918,16 +946,125 @@ def backfill_auto_buyer_ledger_from_audit(
     return count
 
 
+def manually_settle_auto_buyer_order(
+    result: str,
+    data_root: Path | str | None = None,
+    order_id: str | None = None,
+    pick_id: str | None = None,
+    home_score: float | None = None,
+    away_score: float | None = None,
+    reason: str = "",
+    settlement_type: str | None = None,
+    settlement_price: float | None = None,
+) -> dict[str, Any]:
+    """Operator override for a position no automated source can grade.
+
+    Reserved for markets confirmed outside every automated settlement path's
+    coverage -- e.g. ESPN's tennis scoreboard only covers the ATP/WTA main
+    tours, never ITF/challenger-level events (confirmed live 2026-09-14
+    against a stuck Auto-Buyer position: neither player name appeared in
+    ESPN's WTA/ATP scoreboards for any nearby date). There is no free,
+    already-integrated data source for that tier, so such a position would
+    otherwise stay `open` forever with `settle_auto_buyer_ledger` never able
+    to resolve it. This function never infers or guesses a result -- the
+    caller must have independently verified the real-world outcome (e.g. from
+    Polymarket's own resolved market page) before calling it, and the reason
+    is recorded on the row for audit.
+    """
+    if result not in ("win", "loss", "push"):
+        raise ValueError(f"result must be one of win/loss/push, got {result!r}")
+    if not order_id and not pick_id:
+        raise ValueError("must supply order_id or pick_id to identify the order")
+    if not reason.strip():
+        raise ValueError("reason is required -- record how the real-world result was verified")
+    if settlement_type not in (None, "binary", "fair_value"):
+        raise ValueError("settlement_type must be binary or fair_value")
+    if settlement_type == "fair_value" and settlement_price is None:
+        raise ValueError("settlement_price is required for fair_value settlement")
+    if settlement_price is not None and not 0.0 <= float(settlement_price) <= 1.0:
+        raise ValueError("settlement_price must be between 0 and 1")
+
+    root = Path(data_root) if data_root else DATA
+    j_path = root / "auto_buyer_ledger.jsonl"
+    records = read_auto_buyer_ledger(jsonl_path=j_path)
+    target = None
+    for r in records:
+        if (order_id and r.get("order_id") == order_id) or (pick_id and r.get("pick_id") == pick_id):
+            target = r
+            break
+    if target is None:
+        raise KeyError(f"no matching Auto-Buyer order (order_id={order_id!r}, pick_id={pick_id!r})")
+    if str(target.get("status") or "").lower() == "settled":
+        raise ValueError(
+            f"order {target.get('order_id')} is already settled -- "
+            "manual override is only for permanently ungradeable open positions"
+        )
+
+    shares = float(target.get("shares") or 0.0)
+    cost = float(target.get("cost_usd") or 0.0)
+    unit_value_usd = float(target.get("unit_value_usd") or AUTO_BUYER_UNIT_VALUE_USD)
+    if settlement_type == "fair_value":
+        if result != "push":
+            raise ValueError("fair_value settlement must use result='push'")
+        pnl_usd = round((float(settlement_price) - float(target.get("entry_price") or 0.0)) * shares, 4)
+    elif result == "win":
+        pnl_usd = round(shares - cost, 4)
+    elif result == "loss":
+        pnl_usd = round(-cost, 4)
+    else:
+        pnl_usd = 0.0
+
+    target["status"] = "settled"
+    target["result"] = result
+    target["pnl_usd"] = pnl_usd
+    target["pnl_units"] = _usd_to_auto_buyer_units(pnl_usd, unit_value_usd)
+    target["home_score"] = home_score
+    target["away_score"] = away_score
+    target["settled_at_utc"] = iso_utc(utc_now())
+    target["settlement_source"] = "manual_operator"
+    target["manual_settlement_reason"] = reason
+    if settlement_type is not None:
+        target["settlement_type"] = settlement_type
+    if settlement_price is not None:
+        target["settlement_price"] = float(settlement_price)
+
+    try:
+        with j_path.open("w", encoding="utf-8") as f:
+            for r in records:
+                f.write(json.dumps(r, sort_keys=True) + "\n")
+    except OSError as err:
+        logger.warning(f"Failed to rewrite auto_buyer_ledger.jsonl: {err}")
+        raise
+
+    # Reuse the settlement pass to rebuild the derived xlsx export from the
+    # now-updated jsonl -- it re-verifies this row against ESPN (a harmless,
+    # already-tolerant no-op for a record with no matching ESPN event) rather
+    # than duplicating the xlsx-writing logic here.
+    settle_auto_buyer_ledger(data_root=root)
+
+    return {
+        "order_id": target.get("order_id"),
+        "pick_id": target.get("pick_id"),
+        "result": result,
+        "pnl_usd": pnl_usd,
+        "settlement_source": "manual_operator",
+    }
+
+
 def settle_auto_buyer_ledger(
     data_root: Path | str | None = None,
     espn: ESPNClient | None = None,
     polymarket_executor: Any | None = None,
     polymarket_client: Any | None = None,
+    esports_client: Any | None = None,
 ) -> dict[str, Any]:
     """Settle completed matches in the Auto-Buyer Ledger and compute realized PnL."""
     root = Path(data_root) if data_root else DATA
     j_path = root / "auto_buyer_ledger.jsonl"
     x_path = root / "auto_buyer_picks.xlsx"
+    _esports_cache: dict[str, dict[str, Any]] = {}
+    _polymarket_market_cache: dict[str, dict[str, Any]] = {}
+    _polymarket_market_client: Any | None = polymarket_client
 
     if not j_path.exists():
         return {
@@ -1252,6 +1389,44 @@ def settle_auto_buyer_ledger(
         home_score = None
         sell_pnl_usd: float | None = None
 
+        # Resolve terminal gateway markets before calling slower sport-specific
+        # providers. This is essential for paper rows: a resolved walkover or
+        # cancellation has a final fair price, and waiting on BO3/ESPN first
+        # used to leave the row open indefinitely when that provider was down.
+        if slug and sell_pnl_usd is None:
+            try:
+                from ..data_sources.polymarket_us import PolymarketUSClient
+
+                if _polymarket_market_client is None:
+                    _polymarket_market_client = PolymarketUSClient()
+                m_info = _polymarket_market_cache.get(slug)
+                if m_info is None:
+                    m_info = _polymarket_market_client.market(slug)
+                    _polymarket_market_cache[slug] = m_info
+                if m_info.get("status") == "MARKET_STATUS_RESOLVED":
+                    raw_pxs = m_info.get("outcomePrices")
+                    prices = json.loads(raw_pxs) if isinstance(raw_pxs, str) else (raw_pxs or [])
+                    token_side = str(r.get("token_side") or "").lower()
+                    terminal_winners = [
+                        index for index, raw_price in enumerate(prices) if abs(float(raw_price) - 1.0) <= 1e-9
+                    ]
+                    if len(prices) == 2 and len(terminal_winners) == 1 and token_side in {"long", "short"}:
+                        winning_side = "long" if terminal_winners[0] == 0 else "short"
+                        result = "win" if token_side == winning_side else "loss"
+                    elif (
+                        len(prices) == 2
+                        and token_side in {"long", "short"}
+                        and sport not in ESPORTS_TITLE_BY_SPORT
+                        and "last fair market price" in str(m_info.get("description") or "").lower()
+                    ):
+                        settlement_index = 0 if token_side == "long" else 1
+                        r["settlement_type"] = "fair_value"
+                        r["settlement_price"] = float(prices[settlement_index])
+                        r["settlement_source"] = "polymarket_resolved_fair_price"
+                        result = "push"
+            except (httpx.HTTPError, OSError, ValueError, KeyError, TypeError, RuntimeError):
+                pass
+
         # A sell trade means the position no longer exists to be graded by the
         # market's eventual outcome -- it must take priority over any later
         # resolution/score check, and its own realizedPnl is authoritative.
@@ -1260,6 +1435,8 @@ def settle_auto_buyer_ledger(
             if sell_pnl_usd is not None:
                 result = "win" if sell_pnl_usd > 0 else ("loss" if sell_pnl_usd < 0 else "push")
         # Check direct Polymarket exchange position resolution first (for esports & direct resolutions)
+        elif result is not None:
+            pass
         elif slug and slug in pm_resolutions:
             pm_res = pm_resolutions[slug]
             result = _exchange_resolution_result(
@@ -1269,7 +1446,7 @@ def settle_auto_buyer_ledger(
                 away_team=r.get("away_team"),
                 selection=str(r.get("selection") or "").lower(),
             )
-        elif sport in ("TENNIS", "WTA", "ATP"):
+        elif result is None and sport in ("TENNIS", "WTA", "ATP"):
             try:
                 from ..tennis_forward import TENNIS_TOURS
 
@@ -1315,7 +1492,55 @@ def settle_auto_buyer_ledger(
                                 break
             except (httpx.HTTPError, OSError, ValueError, KeyError, TypeError, RuntimeError):
                 pass
-        elif sport in ("MLB", "WNBA", "NBA", "NFL", "SOCCER", "NCAAF", "CFB"):
+        elif result is None and sport in ESPORTS_TITLE_BY_SPORT:
+            # Polymarket US's exchange resolution field (`outcomePrices`) does
+            # not reliably snap to 0/1 for esports moneylines the way it does
+            # for other sports -- observed live 2026-09-14, six CS2 paper
+            # positions stuck `open` for 2-5 days past event start with the
+            # market genuinely `MARKET_STATUS_RESOLVED` but outcomePrices
+            # still showing pre-close trading prices. BO3 (bo3.gg) is the
+            # actual results source behind these markets (see the
+            # PROVIDER_PANDASCORE team id on the market's own metadata, and
+            # this codebase's existing esports baseline, which is trained
+            # from BO3 match history) and exposes a real, explicit
+            # `winner_team_id` per finished match with no API key required.
+            try:
+                title = ESPORTS_TITLE_BY_SPORT[sport]
+                cache = _esports_cache.setdefault(title, {"client": esports_client or Bo3EsportsClient()})
+                if "teams" not in cache:
+                    cache["teams"], _ = cache["client"].teams(title)
+                window_start = (start_dt - timedelta(days=2)).date()
+                window_end = now.date()
+                matches_key = (window_start, window_end)
+                if cache.get("matches_key") != matches_key:
+                    cache["matches"], _ = cache["client"].finished_matches(title, window_start, window_end)
+                    cache["matches_key"] = matches_key
+                teams = cache["teams"]
+                matches = cache["matches"]
+                team_index = _team_alias_index(teams)
+                manual_aliases = _load_manual_aliases(root).get(title, {})
+
+                home_id = _resolve_esports_team(home, teams, team_index, manual_aliases)
+                away_id = _resolve_esports_team(away, teams, team_index, manual_aliases)
+                if home_id and away_id:
+                    for m in matches:
+                        match_teams = {m["team1_id"], m["team2_id"]}
+                        if match_teams != {home_id, away_id}:
+                            continue
+                        home_win = m["winner_id"] == home_id
+                        away_win = m["winner_id"] == away_id
+                        if (sel in ("away", "short") and away_win) or (sel in ("home", "long") and home_win):
+                            result = "win"
+                        elif away_win or home_win:
+                            result = "loss"
+                        else:
+                            continue
+                        home_score = m["team1_score"] if m["team1_id"] == home_id else m["team2_score"]
+                        away_score = m["team2_score"] if m["team2_id"] == away_id else m["team1_score"]
+                        break
+            except (httpx.HTTPError, OSError, ValueError, KeyError, TypeError, RuntimeError):
+                pass
+        elif result is None and sport in ("MLB", "WNBA", "NBA", "NFL", "SOCCER", "NCAAF", "CFB"):
             try:
                 game_day = start_dt.strftime("%Y%m%d")
                 espn_lg = (
@@ -1393,8 +1618,12 @@ def settle_auto_buyer_ledger(
             try:
                 from ..data_sources.polymarket_us import PolymarketUSClient
 
-                pm_cli = polymarket_client or PolymarketUSClient()
-                m_info = pm_cli.market(slug)
+                if _polymarket_market_client is None:
+                    _polymarket_market_client = PolymarketUSClient()
+                m_info = _polymarket_market_cache.get(slug)
+                if m_info is None:
+                    m_info = _polymarket_market_client.market(slug)
+                    _polymarket_market_cache[slug] = m_info
                 if m_info.get("status") == "MARKET_STATUS_RESOLVED":
                     raw_pxs = m_info.get("outcomePrices")
                     prices = json.loads(raw_pxs) if isinstance(raw_pxs, str) else (raw_pxs or [])
@@ -1405,6 +1634,23 @@ def settle_auto_buyer_ledger(
                     if len(prices) == 2 and len(terminal_winners) == 1 and token_side in {"long", "short"}:
                         winning_side = "long" if terminal_winners[0] == 0 else "short"
                         result = "win" if token_side == winning_side else "loss"
+                    elif (
+                        m_info.get("status") == "MARKET_STATUS_RESOLVED"
+                        and len(prices) == 2
+                        and token_side in {"long", "short"}
+                        and "last fair market price" in str(m_info.get("description") or "").lower()
+                    ):
+                        # Sports markets explicitly use the final fair price
+                        # for walkovers, cancellations, forfeits, and other
+                        # non-binary outcomes. Treat this as a settled push for
+                        # win-rate accounting, but preserve the actual mark-to-
+                        # fair P&L instead of leaving the position open or
+                        # pretending it was a binary win/loss.
+                        settlement_index = 0 if token_side == "long" else 1
+                        r["settlement_type"] = "fair_value"
+                        r["settlement_price"] = float(prices[settlement_index])
+                        r["settlement_source"] = "polymarket_resolved_fair_price"
+                        result = "push"
             except (httpx.HTTPError, OSError, ValueError, KeyError, TypeError, RuntimeError):
                 pass
 
@@ -1425,6 +1671,10 @@ def settle_auto_buyer_ledger(
                     pnl_units = _usd_to_auto_buyer_units(pnl_usd, unit_value_usd)
                 elif result == "loss":
                     pnl_usd = round(-settlement_cost, 4)
+                    pnl_units = _usd_to_auto_buyer_units(pnl_usd, unit_value_usd)
+                elif result == "push" and r.get("settlement_type") == "fair_value":
+                    settlement_price = float(r.get("settlement_price") or 0.0)
+                    pnl_usd = round((settlement_price - price) * shares, 4)
                     pnl_units = _usd_to_auto_buyer_units(pnl_usd, unit_value_usd)
                 else:
                     pnl_usd = 0.0

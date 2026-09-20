@@ -299,6 +299,17 @@ repair of known execution-binding and ledger/audit transaction defects. None
 of the workflows above ever touch real money — Main, Flat, Research, and
 Gated Research are shadow/paper-trading only.
 
+### 8. Native Polymarket Combos
+
+The repository now contains a fail-closed combo planner in
+`model_prediction.portfolio.polymarket_combos`. It validates unique native
+combo position IDs, supported sports markets, an explicit joint probability,
+quote expiry, acceptance, and terminal fill status. It is deliberately not
+wired into the existing Auto-Buyer CLOB path: Polymarket Combos use the
+authenticated Combo RFQ workflow in the official `polymarket` SDK, not
+independent `/order` submissions. Until an authenticated Builder API key and
+an audited combo ledger are configured, combo execution remains disabled.
+
 ## Quick start
 
 ```bash

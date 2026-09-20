@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import httpx
+import pytest
 
 from model_prediction.models.college_football import build_cfb_slate
 from model_prediction.models.mlb_first_inning import (
@@ -15,6 +16,7 @@ from model_prediction.models.mlb_first_inning import (
 )
 from model_prediction.models.mlb_first_inning_live import live_first_inning_features
 from model_prediction.portfolio.auto_buyer_ledger import (
+    manually_settle_auto_buyer_order,
     read_auto_buyer_ledger,
     record_auto_buy_execution,
     settle_auto_buyer_ledger,
@@ -752,6 +754,248 @@ def test_auto_buyer_tennis_settlement_and_scheduled_reversion(tmp_path: Path):
     assert r_birrell["status"] in ("open", "submitted", "filled")
     assert r_birrell["result"] == "open"
     assert r_birrell["pnl_usd"] == 0.0
+
+
+def test_auto_buyer_esports_settlement_via_bo3(tmp_path: Path):
+    """CS2/LOL paper positions settle from BO3 finished-match results.
+
+    Polymarket US's own `outcomePrices` field does not reliably snap to 0/1
+    for esports moneylines (observed live 2026-09-14: markets genuinely
+    `MARKET_STATUS_RESOLVED` but still showing pre-close trading prices), and
+    the exchange-portfolio resolution path never populates in PAPER mode --
+    so before this fix, esports paper trades had no path to settle at all.
+    """
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    x_path = tmp_path / "auto_buyer_picks.xlsx"
+
+    record_auto_buy_execution(
+        order_payload={
+            "order_id": "ORD_TEST_CS2_WIN",
+            "pick_id": "PICK_TEST_CS2_WIN",
+            "market_slug": "aec-cs2-ent-ence-2026-09-09",
+            "selection": "home",
+            "token_side": "long",
+            "limit_price": 0.46,
+            "cost_usd": 4.60,
+            "shares": 10.0,
+            "sport": "CS2",
+            "event_start_utc": "2026-09-09T08:00:00Z",
+        },
+        pick_row={
+            "away_team": "ENCE",
+            "home_team": "Entropy",
+            "market_type": "moneyline",
+            "units": 1.0,
+        },
+        jsonl_path=j_path,
+        xlsx_path=x_path,
+    )
+    record_auto_buy_execution(
+        order_payload={
+            "order_id": "ORD_TEST_CS2_LOSS",
+            "pick_id": "PICK_TEST_CS2_LOSS",
+            "market_slug": "aec-cs2-astra-nova-2026-09-10",
+            "selection": "away",
+            "token_side": "short",
+            "limit_price": 0.50,
+            "cost_usd": 5.00,
+            "shares": 10.0,
+            "sport": "CS2",
+            "event_start_utc": "2026-09-10T09:00:00Z",
+        },
+        pick_row={
+            "away_team": "Nova Squad",
+            "home_team": "Astra",
+            "market_type": "moneyline",
+            "units": 1.0,
+        },
+        jsonl_path=j_path,
+        xlsx_path=x_path,
+    )
+
+    fake_teams = {
+        "bo3:1:1": {"team_id": "bo3:1:1", "name": "Entropy", "slug": "entropy", "acronym": None},
+        "bo3:1:2": {"team_id": "bo3:1:2", "name": "ENCE", "slug": "ence", "acronym": None},
+        "bo3:1:3": {"team_id": "bo3:1:3", "name": "Astra", "slug": "astra", "acronym": None},
+        "bo3:1:4": {"team_id": "bo3:1:4", "name": "Nova Squad", "slug": "nova-squad", "acronym": None},
+    }
+    fake_matches = [
+        {
+            "team1_id": "bo3:1:1",
+            "team2_id": "bo3:1:2",
+            "winner_id": "bo3:1:1",
+            "team1_score": 2,
+            "team2_score": 0,
+        },
+        {
+            "team1_id": "bo3:1:3",
+            "team2_id": "bo3:1:4",
+            "winner_id": "bo3:1:3",
+            "team1_score": 2,
+            "team2_score": 0,
+        },
+    ]
+
+    class FakeBo3Client:
+        def teams(self, title):
+            assert title == "cs2"
+            return fake_teams, 1
+
+        def finished_matches(self, title, from_date, to_date):
+            assert title == "cs2"
+            return fake_matches, 1
+
+    result = settle_auto_buyer_ledger(
+        data_root=tmp_path,
+        espn=MagicMock(),
+        polymarket_client=MagicMock(market=MagicMock(return_value={"status": "MARKET_STATUS_OPEN"})),
+        esports_client=FakeBo3Client(),
+    )
+
+    records = read_auto_buyer_ledger(j_path)
+    r_win = next(r for r in records if r["order_id"] == "ORD_TEST_CS2_WIN")
+    assert r_win["status"] == "settled"
+    assert r_win["result"] == "win"
+    assert r_win["home_score"] == 2
+    assert r_win["away_score"] == 0
+    assert r_win["pnl_usd"] == round(10.0 - 4.60, 4)
+
+    r_loss = next(r for r in records if r["order_id"] == "ORD_TEST_CS2_LOSS")
+    assert r_loss["status"] == "settled"
+    assert r_loss["result"] == "loss"
+    assert r_loss["pnl_usd"] == -5.00
+
+    assert result["newly_settled"] == 2
+
+
+def test_auto_buyer_settles_resolved_fair_price_market(tmp_path: Path):
+    """Expired walkovers/cancellations settle at the gateway's fair price.
+
+    Sports markets do not always resolve to binary 0/1 prices: their rules
+    explicitly use the final fair price for a forfeit or cancellation. The
+    paper ledger must close those rows and mark the actual mark-to-fair P&L.
+    """
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    record_auto_buy_execution(
+        order_payload={
+            "order_id": "ORD_TEST_FAIR_PRICE",
+            "pick_id": "PICK_TEST_FAIR_PRICE",
+            "market_slug": "aec-cs2-ff-sinqu-2026-09-09",
+            "selection": "home",
+            "token_side": "long",
+            "limit_price": 0.53,
+            "cost_usd": 6.25,
+            "shares": 11.79,
+            "sport": "CS2",
+            "event_start_utc": "2026-09-09T08:00:00Z",
+        },
+        pick_row={"away_team": "SINQU", "home_team": "Fire Flux Esports", "market_type": "moneyline"},
+        jsonl_path=j_path,
+    )
+
+    class FakePolymarket:
+        def market(self, slug):
+            assert slug == "aec-cs2-ff-sinqu-2026-09-09"
+            return {
+                "status": "MARKET_STATUS_RESOLVED",
+                "outcomePrices": '["0.54", "0.46"]',
+                "description": "If the match does not begin due to a forfeit, the market will settle to the last fair market price.",
+            }
+
+    class NoMatchBo3:
+        def teams(self, title):
+            return {}, 0
+
+        def finished_matches(self, title, from_date, to_date):
+            return [], 0
+
+    result = settle_auto_buyer_ledger(
+        data_root=tmp_path,
+        espn=MagicMock(),
+        polymarket_client=FakePolymarket(),
+        esports_client=NoMatchBo3(),
+    )
+
+    row = read_auto_buyer_ledger(j_path)[0]
+    assert result["newly_settled"] == 1
+    assert row["status"] == "settled"
+    assert row["result"] == "push"
+    assert row["settlement_type"] == "fair_value"
+    assert row["settlement_price"] == 0.54
+    assert row["settlement_source"] == "polymarket_resolved_fair_price"
+    assert row["pnl_usd"] == pytest.approx(round((0.54 - 0.53) * 11.79, 4))
+
+
+def test_manual_settlement_closes_ungradeable_tennis_position(tmp_path: Path):
+    """An ITF/challenger-tier tennis match ESPN's scoreboard never carries
+    stays `open` forever via the automated path -- confirmed live 2026-09-14
+    against a real stuck position (neither player found in ESPN's WTA/ATP
+    scoreboards for any nearby date). The manual override is the only path
+    to close it out, and requires an explicit reason and non-settled state.
+    """
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    x_path = tmp_path / "auto_buyer_picks.xlsx"
+    record_auto_buy_execution(
+        order_payload={
+            "order_id": "ORD_ITF_TENNIS",
+            "pick_id": "PICK_ITF_TENNIS",
+            "market_slug": "aec-wta-alasmi-anatik-2026-09-12",
+            "selection": "home",
+            "token_side": "long",
+            "limit_price": 0.39,
+            "cost_usd": 8.75,
+            "shares": 22.44,
+            "sport": "TENNIS",
+            "event_start_utc": "2026-09-12T16:00:00Z",
+        },
+        pick_row={
+            "away_team": "Anastasia Tikhonova",
+            "home_team": "Alana Smith",
+            "market_type": "moneyline",
+            "units": 1.75,
+        },
+        jsonl_path=j_path,
+        xlsx_path=x_path,
+    )
+
+    result = manually_settle_auto_buyer_order(
+        result="win",
+        data_root=tmp_path,
+        order_id="ORD_ITF_TENNIS",
+        home_score=2,
+        away_score=0,
+        reason="Verified resolved on Polymarket's own market page: Alana Smith won.",
+    )
+    assert result["result"] == "win"
+    assert result["pnl_usd"] == round(22.44 - 8.75, 4)
+
+    records = read_auto_buyer_ledger(j_path)
+    row = next(r for r in records if r["order_id"] == "ORD_ITF_TENNIS")
+    assert row["status"] == "settled"
+    assert row["result"] == "win"
+    assert row["settlement_source"] == "manual_operator"
+    assert row["manual_settlement_reason"]
+
+    # Guardrails: no reason, no target, and already-settled all refuse.
+    try:
+        manually_settle_auto_buyer_order(
+            result="win", data_root=tmp_path, order_id="ORD_ITF_TENNIS", reason=""
+        )
+        raise AssertionError("expected ValueError for missing reason")
+    except ValueError:
+        pass
+    try:
+        manually_settle_auto_buyer_order(result="win", data_root=tmp_path, order_id="NOPE", reason="x")
+        raise AssertionError("expected KeyError for unknown order")
+    except KeyError:
+        pass
+    try:
+        manually_settle_auto_buyer_order(
+            result="win", data_root=tmp_path, order_id="ORD_ITF_TENNIS", reason="already settled, try again"
+        )
+        raise AssertionError("expected ValueError for already-settled order")
+    except ValueError:
+        pass
 
 
 def test_wnba_spread_margin_v2_model_and_forecast(tmp_path: Path):
