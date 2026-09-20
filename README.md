@@ -309,6 +309,10 @@ wired into the existing Auto-Buyer CLOB path: Polymarket Combos use the
 authenticated Combo RFQ workflow in the official `polymarket` SDK, not
 independent `/order` submissions. Until an authenticated Builder API key and
 an audited combo ledger are configured, combo execution remains disabled.
+This repository's live execution integration targets Polymarket US. The
+international Builder RFQ client is optional and must not be used with a US
+account; Polymarket US is a separate product with separate accounts and
+support channels.
 
 ## Quick start
 

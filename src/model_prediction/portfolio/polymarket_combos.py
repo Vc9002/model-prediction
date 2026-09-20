@@ -38,6 +38,12 @@ def create_combo_client_from_env() -> ComboRFQClient:
     ``POLYMARKET_KEY_ID``/``POLYMARKET_SECRET_KEY`` pair. This function never
     falls back to those variables and never logs secret values.
     """
+    platform = os.getenv("POLYMARKET_PLATFORM", "us").strip().casefold()
+    if platform in {"us", "polymarket_us", "polymarket-us"}:
+        raise ComboExecutionError(
+            "native international Combo RFQ is not available through the Polymarket US product; "
+            "use the Polymarket US API/support channel for any US combo capability"
+        )
     private_key = os.getenv("POLYMARKET_PRIVATE_KEY", "").strip()
     builder_key = os.getenv("POLYMARKET_BUILDER_API_KEY", "").strip()
     builder_secret = os.getenv("POLYMARKET_BUILDER_SECRET", "").strip()

@@ -60,6 +60,7 @@ def test_combo_rows_require_native_position_ids():
 
 
 def test_combo_client_does_not_use_legacy_credentials(monkeypatch):
+    monkeypatch.setenv("POLYMARKET_PLATFORM", "international")
     monkeypatch.delenv("POLYMARKET_PRIVATE_KEY", raising=False)
     monkeypatch.delenv("POLYMARKET_BUILDER_API_KEY", raising=False)
     monkeypatch.delenv("POLYMARKET_BUILDER_SECRET", raising=False)
