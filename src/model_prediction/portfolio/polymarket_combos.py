@@ -9,6 +9,7 @@ turn into independent leg orders.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -19,6 +20,51 @@ SUPPORTED_COMBO_MARKETS = frozenset({"moneyline", "spread", "total"})
 
 class ComboExecutionError(RuntimeError):
     """Raised when a combo cannot be proven safe to request or accept."""
+
+
+def combo_sdk_available() -> bool:
+    """Return whether the official Combo RFQ SDK is installed."""
+    try:
+        import polymarket  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def create_combo_client_from_env() -> ComboRFQClient:
+    """Create the authenticated official client from dedicated Builder secrets.
+
+    Combo RFQ credentials are intentionally separate from the legacy retail
+    ``POLYMARKET_KEY_ID``/``POLYMARKET_SECRET_KEY`` pair. This function never
+    falls back to those variables and never logs secret values.
+    """
+    private_key = os.getenv("POLYMARKET_PRIVATE_KEY", "").strip()
+    builder_key = os.getenv("POLYMARKET_BUILDER_API_KEY", "").strip()
+    builder_secret = os.getenv("POLYMARKET_BUILDER_SECRET", "").strip()
+    builder_passphrase = os.getenv("POLYMARKET_BUILDER_PASSPHRASE", "").strip()
+    if not combo_sdk_available():
+        raise ComboExecutionError("official polymarket-client SDK is not installed")
+    missing = [
+        name
+        for name, value in (
+            ("POLYMARKET_PRIVATE_KEY", private_key),
+            ("POLYMARKET_BUILDER_API_KEY", builder_key),
+            ("POLYMARKET_BUILDER_SECRET", builder_secret),
+            ("POLYMARKET_BUILDER_PASSPHRASE", builder_passphrase),
+        )
+        if not value
+    ]
+    if missing:
+        raise ComboExecutionError(f"missing dedicated Combo RFQ credentials: {', '.join(missing)}")
+    from polymarket.auth import BuilderApiKey
+    from polymarket.clients.secure import SecureClient
+
+    wallet = os.getenv("POLYMARKET_WALLET_ADDRESS", "").strip() or None
+    return SecureClient.create(
+        private_key=private_key,
+        wallet=wallet,
+        api_key=BuilderApiKey(builder_key, builder_secret, builder_passphrase),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +90,30 @@ class ComboPlan:
     @property
     def leg_position_ids(self) -> tuple[str, ...]:
         return tuple(leg.position_id for leg in self.legs)
+
+
+def combo_legs_from_pick_rows(rows: list[dict[str, Any]]) -> list[ComboLeg]:
+    """Convert explicitly annotated forecast rows into native combo legs.
+
+    A normal market slug is not a combo position ID. Requiring the dedicated
+    ``combo_position_id`` field prevents accidentally passing CLOB token IDs or
+    market slugs into the RFQ API.
+    """
+    legs: list[ComboLeg] = []
+    for row in rows:
+        position_id = str(row.get("combo_position_id") or "").strip()
+        if not position_id:
+            raise ComboExecutionError("combo candidate is missing combo_position_id")
+        legs.append(
+            ComboLeg(
+                position_id=position_id,
+                market_slug=str(row.get("market_slug") or ""),
+                market_type=str(row.get("market_type") or "").lower(),
+                model_probability=float(row.get("model_probability")),
+                event_start_utc=str(row.get("event_start_utc") or ""),
+            )
+        )
+    return legs
 
 
 class ComboRFQClient(Protocol):

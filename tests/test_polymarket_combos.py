@@ -9,6 +9,8 @@ from model_prediction.portfolio.polymarket_combos import (
     ComboLeg,
     accept_combo_quote,
     build_combo_plan,
+    combo_legs_from_pick_rows,
+    create_combo_client_from_env,
     request_combo_quote,
     wait_for_combo_fill,
 )
@@ -36,6 +38,35 @@ def test_combo_rejects_duplicate_and_unsupported_legs():
         build_combo_plan(
             [_leg("a"), ComboLeg("b", "b", "nrfi", 0.5, "x")], amount_usd=5, joint_probability=0.4
         )
+
+
+def test_combo_rows_require_native_position_ids():
+    with pytest.raises(ComboExecutionError, match="combo_position_id"):
+        combo_legs_from_pick_rows(
+            [{"market_slug": "m", "market_type": "moneyline", "model_probability": 0.6}]
+        )
+    legs = combo_legs_from_pick_rows(
+        [
+            {
+                "combo_position_id": "native-a",
+                "market_slug": "m-a",
+                "market_type": "moneyline",
+                "model_probability": 0.6,
+                "event_start_utc": "2026-10-01T00:00:00Z",
+            }
+        ]
+    )
+    assert legs[0].position_id == "native-a"
+
+
+def test_combo_client_does_not_use_legacy_credentials(monkeypatch):
+    monkeypatch.delenv("POLYMARKET_PRIVATE_KEY", raising=False)
+    monkeypatch.delenv("POLYMARKET_BUILDER_API_KEY", raising=False)
+    monkeypatch.delenv("POLYMARKET_BUILDER_SECRET", raising=False)
+    monkeypatch.delenv("POLYMARKET_BUILDER_PASSPHRASE", raising=False)
+    monkeypatch.setenv("POLYMARKET_KEY_ID", "legacy")
+    with pytest.raises(ComboExecutionError, match="POLYMARKET_PRIVATE_KEY"):
+        create_combo_client_from_env()
 
 
 @dataclass
