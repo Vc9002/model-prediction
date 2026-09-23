@@ -35,10 +35,11 @@ new runtime dependency.
 1. When `max_drawdown` (already computed via `economic_gate.py`) crosses the configured threshold, the system stops entering new positions across the entire portfolio — not just one sport or market.
 2. The circuit breaker's tripped state is visible to an operator (dashboard, log, or API) without needing to infer it from an absence of trades.
 3. Once tripped, the system stays halted until a human explicitly performs a reset action — no code path silently auto-resumes trading.
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 01-01: TBD
+- [ ] 01-01-PLAN.md — Core breaker: portfolio drawdown trip, persisted state, automated-path gate, human-only CLI reset (wave 1)
+- [ ] 01-02-PLAN.md — Operator surface: status alert, dashboard status/reset routes, dashboard BUY gate (wave 2)
 
 ### Phase 2: KBO/NPB Postponement Settlement
 **Goal**: Postponed or unplayed KBO/NPB games no longer leave picks stuck open — they settle to void automatically, and the existing backlog is cleared.
