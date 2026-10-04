@@ -13,7 +13,7 @@ def test_daily_lock_refuses_a_second_process(tmp_path) -> None:
     assert first is not None
     try:
         env = dict(os.environ)
-        env["PYTHONPATH"] = "src:."
+        env["PYTHONPATH"] = os.pathsep.join(["src", "."])
         result = subprocess.run(
             [
                 sys.executable,
@@ -22,7 +22,9 @@ def test_daily_lock_refuses_a_second_process(tmp_path) -> None:
                 "--lock",
                 str(path),
                 "--",
-                "true",
+                sys.executable,
+                "-c",
+                "pass",
             ],
             cwd=os.getcwd(),
             env=env,
@@ -40,7 +42,7 @@ def test_daily_lock_refuses_a_second_process(tmp_path) -> None:
 def test_daily_lock_propagates_child_exit_code(tmp_path) -> None:
     path = tmp_path / "daily.lock"
     env = dict(os.environ)
-    env["PYTHONPATH"] = "src:."
+    env["PYTHONPATH"] = os.pathsep.join(["src", "."])
     result = subprocess.run(
         [
             sys.executable,
@@ -49,9 +51,9 @@ def test_daily_lock_propagates_child_exit_code(tmp_path) -> None:
             "--lock",
             str(path),
             "--",
-            "bash",
+            sys.executable,
             "-c",
-            "exit 7",
+            "import sys; sys.exit(7)",
         ],
         cwd=os.getcwd(),
         env=env,

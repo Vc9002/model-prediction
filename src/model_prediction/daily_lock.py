@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import argparse
-import fcntl
 import json
 import os
+import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import IO
+
+from model_prediction.filelock import lock_exclusive
 
 LOCK_BUSY_EXIT = 75
 
@@ -19,7 +22,7 @@ def acquire_lock(path: str | Path) -> IO[str] | None:
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     handle = lock_path.open("a+", encoding="utf-8")
     try:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        lock_exclusive(handle.fileno(), blocking=False)
     except BlockingIOError:
         handle.close()
         return None
@@ -64,6 +67,12 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
         return LOCK_BUSY_EXIT
+    if sys.platform == "win32":
+        # os.execvpe is not reliable on Windows; use subprocess so the parent
+        # holds the lock while the child runs and we propagate its exit code.
+        result = subprocess.run(command, env=os.environ, check=False)
+        handle.close()
+        return result.returncode
     # Python opens files close-on-exec by default. Make this descriptor
     # inheritable so bash and every child keep the lock until the workflow exits.
     os.set_inheritable(handle.fileno(), True)

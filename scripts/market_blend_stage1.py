@@ -386,7 +386,7 @@ def _implementation_manifest(spec_path: Path) -> tuple[list[dict[str, str]], str
     """Hash every Stage 1 production-path file and make the manifest explicit."""
     resolved_spec = spec_path.resolve()
     try:
-        spec_relative = str(resolved_spec.relative_to(PROJECT_ROOT.resolve()))
+        spec_relative = resolved_spec.relative_to(PROJECT_ROOT.resolve()).as_posix()
     except ValueError as exc:
         raise ValueError("experiment spec must live inside the repository") from exc
     relative_paths = (*IMPLEMENTATION_RELATIVE_PATHS, spec_relative)

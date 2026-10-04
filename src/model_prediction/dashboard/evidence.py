@@ -938,7 +938,7 @@ def production_evidence() -> dict:
         *_flat_ledger_paths(),
         *_research_ledger_paths(),
     )
-    rows_by_source = {str(path.relative_to(ROOT)): _read_evidence_ledger(path) for path in ledger_paths}
+    rows_by_source = {path.relative_to(ROOT).as_posix(): _read_evidence_ledger(path) for path in ledger_paths}
     feature_registry = _feature_registry_evidence()
     registry_by_name = {str(item.get("name")): item for item in feature_registry["features"]}
     ablation_by_identity = {

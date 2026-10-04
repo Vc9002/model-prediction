@@ -188,8 +188,24 @@ def test_auto_executor_initialization():
     assert res.total_evaluated == 0
 
 
-def test_auto_buyer_totals_and_spreads_settlement_and_line_extraction(tmp_path: Path):
+def test_auto_buyer_totals_and_spreads_settlement_and_line_extraction(monkeypatch, tmp_path: Path):
     """Verify totals and spreads are graded accurately against extracted lines."""
+    # Block real HTTP calls to PolymarketUSClient so the ESPN branch actually runs.
+    # Without this, the real resolved market on Polymarket short-circuits before
+    # ESPN is consulted, leaving away_score/home_score as None.
+    monkeypatch.setattr(
+        "model_prediction.portfolio.auto_buyer_ledger.PolymarketUSClient",
+        None,
+        raising=False,
+    )
+    import model_prediction.data_sources.polymarket_us as _pm_mod
+
+    monkeypatch.setattr(
+        _pm_mod,
+        "PolymarketUSClient",
+        type("_Raise", (), {"__init__": lambda self: (_ for _ in ()).throw(RuntimeError("mocked offline"))}),
+    )
+
     j_path = tmp_path / "auto_buyer_ledger.jsonl"
     x_path = tmp_path / "auto_buyer_picks.xlsx"
 

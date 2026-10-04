@@ -134,17 +134,33 @@ def _inject_dashboard_token(html: bytes) -> bytes:
     back to serving the page unmodified (POSTs then need the token supplied
     some other way) if the expected <script> opening isn't found, rather
     than raising and breaking the whole page load over a missing feature."""
-    marker = b'<script>\n"use strict";'
+    # Accept both LF and CRLF line endings (CRLF on Windows from text-mode writes)
+    marker_lf = b'<script>\n"use strict";'
+    marker_crlf = b'<script>\r\n"use strict";'
+    marker = marker_crlf if marker_crlf in html else marker_lf
+    nl = b"\r\n" if marker is marker_crlf else b"\n"
     injected = (
-        b'<script>\n"use strict";\nwindow._DASHBOARD_TOKEN=window.__DASH_TOKEN__='
+        b"<script>"
+        + nl
+        + b'"use strict";'
+        + nl
+        + b"window._DASHBOARD_TOKEN=window.__DASH_TOKEN__="
         + json.dumps(_DASHBOARD_TOKEN).encode()
-        + b";\nconst __nativeFetch__=window.fetch.bind(window);"
-        b"\nwindow.fetch=(input,init)=>{"
-        b'\n  if(init&&init.method==="POST"){'
-        b"\n    init={...init,headers:{...(init.headers||{}),'X-Dashboard-Token':window.__DASH_TOKEN__}};"
-        b"\n  }"
-        b"\n  return __nativeFetch__(input,init);"
-        b"\n};"
+        + b";"
+        + nl
+        + b"const __nativeFetch__=window.fetch.bind(window);"
+        + nl
+        + b"window.fetch=(input,init)=>{"
+        + nl
+        + b'  if(init&&init.method==="POST"){'
+        + nl
+        + b"    init={...init,headers:{...(init.headers||{}),'X-Dashboard-Token':window.__DASH_TOKEN__}};"
+        + nl
+        + b"  }"
+        + nl
+        + b"  return __nativeFetch__(input,init);"
+        + nl
+        + b"};"
     )
     if marker not in html:
         return html

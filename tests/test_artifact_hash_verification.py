@@ -47,7 +47,7 @@ def _artifacts():
     for path in sorted(MODELS.rglob("*.json")):
         payload = json.loads(path.read_text(encoding="utf-8"))
         if isinstance(payload, dict) and payload.get("artifact_hash"):
-            yield str(path.relative_to(ROOT)), payload
+            yield path.relative_to(ROOT).as_posix(), payload
 
 
 def test_canonical_hash_convention_is_pinned_on_a_live_artifact() -> None:

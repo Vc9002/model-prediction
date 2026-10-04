@@ -198,6 +198,10 @@ class TestTrueResumeSkipsCompletedResumableStages:
         assert completed.get("collect") == r1["stages"]["collect"]["status"]
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="symlink creation requires elevated privileges or Developer Mode on Windows",
+)
 def test_symlinked_repo_local_data_root_is_rejected(tmp_path):
     """A research worktree shares the canonical checkout's data/ tree via a
     symlink; a data_root supplied THROUGH that symlink resolves into the

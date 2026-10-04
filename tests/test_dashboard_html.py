@@ -31,6 +31,7 @@ def _render_production_evidence(payload: dict) -> str:
     result = subprocess.run(
         [node, "-e", script, json.dumps(payload)],
         text=True,
+        encoding="utf-8",
         check=True,
         capture_output=True,
     )
@@ -57,6 +58,7 @@ def _render_feature_registry(payload: dict) -> str:
     result = subprocess.run(
         [node, "-e", script, json.dumps(payload)],
         text=True,
+        encoding="utf-8",
         check=True,
         capture_output=True,
     )
@@ -81,6 +83,7 @@ def test_dashboard_inline_javascript_parses() -> None:
             [node, "-e", checker],
             input=script,
             text=True,
+            encoding="utf-8",
             check=True,
             capture_output=True,
         )
@@ -282,6 +285,7 @@ def test_v9_kpis_exclude_unpriced_no_calls_from_betting_performance() -> None:
     result = subprocess.run(
         [node, "-e", script, json.dumps(scored + unpriced)],
         text=True,
+        encoding="utf-8",
         check=True,
         capture_output=True,
     )
@@ -758,6 +762,7 @@ def test_dashboard_ledger_filter_system_node_execution() -> None:
     result = subprocess.run(
         [node, "-e", script],
         text=True,
+        encoding="utf-8",
         check=True,
         capture_output=True,
     )
@@ -868,6 +873,7 @@ def test_auto_buyer_performance_cohorts_and_et_day_grouping() -> None:
     result = subprocess.run(
         [node, "-e", script, json.dumps(rows)],
         text=True,
+        encoding="utf-8",
         check=True,
         capture_output=True,
     )

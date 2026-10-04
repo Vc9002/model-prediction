@@ -123,7 +123,7 @@ def _data_inventory() -> tuple[dict[str, int], dict[str, str | None], dict[str, 
             raw_dir = DATA / "raw" / sport
             dates = sorted(d.name for d in raw_dir.iterdir() if d.is_dir()) if raw_dir.exists() else []
             last_ingest[sport] = dates[-1] if dates else None
-        data_sources[sport] = str(data_path.relative_to(ROOT))
+        data_sources[sport] = data_path.relative_to(ROOT).as_posix()
     return data_counts, last_ingest, data_sources
 
 

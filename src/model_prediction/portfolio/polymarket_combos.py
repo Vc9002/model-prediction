@@ -49,8 +49,6 @@ def create_combo_client_from_env() -> ComboRFQClient:
     builder_key = os.getenv("POLYMARKET_BUILDER_API_KEY", "").strip()
     builder_secret = os.getenv("POLYMARKET_BUILDER_SECRET", "").strip()
     builder_passphrase = os.getenv("POLYMARKET_BUILDER_PASSPHRASE", "").strip()
-    if not combo_sdk_available():
-        raise ComboExecutionError("official polymarket-client SDK is not installed")
     missing = [
         name
         for name, value in (
@@ -63,6 +61,8 @@ def create_combo_client_from_env() -> ComboRFQClient:
     ]
     if missing:
         raise ComboExecutionError(f"missing dedicated Combo RFQ credentials: {', '.join(missing)}")
+    if not combo_sdk_available():
+        raise ComboExecutionError("official polymarket-client SDK is not installed")
     from polymarket.auth import BuilderApiKey
     from polymarket.clients.secure import SecureClient
 

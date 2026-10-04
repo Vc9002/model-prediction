@@ -10,6 +10,18 @@ from model_prediction.entities import EntityRegistry
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
+@pytest.fixture(autouse=True)
+def _clear_runtime_root_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Clear MODEL_PREDICTION_RUNTIME_ROOT for all tests.
+
+    Tests that need the env var set use monkeypatch.setenv() themselves, which
+    overrides this autouse clear.  Without this, tests assume a repo-local
+    data/ fallback but the env var points to the real runtime on E:, causing
+    path-mismatch failures.
+    """
+    monkeypatch.delenv("MODEL_PREDICTION_RUNTIME_ROOT", raising=False)
+
+
 @pytest.fixture
 def patch_dash(monkeypatch):
     """Patch a dashboard_server attribute everywhere it's bound.
