@@ -219,6 +219,36 @@ from model_prediction.dashboard.status import (  # noqa: F401 -- re-export for c
 
 __all__ = ["main"]
 
+import threading as _threading
+from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
+
+
+def _warm_caches() -> None:
+    """Pre-compute all expensive endpoints in parallel background threads.
+
+    Runs once after server bind so the first browser request hits the cache
+    instead of blocking on cold Excel/JSONL reads.
+    """
+    warmers = [
+        ("status", 30, status),
+        ("matrix", 60, matrix),
+        ("production-evidence", 30, production_evidence),
+        ("model-ledgers", 30, model_ledger_comparison),
+        ("picks", 30, read_picks),
+        ("flat-picks", 30, read_flat_picks),
+        ("performance", 60, performance),
+    ]
+
+    def _warm(item):
+        key, ttl, builder = item
+        try:
+            _cached(key, ttl, builder)
+        except Exception:  # noqa: BLE001
+            _log(f"cache warmer: {key} failed (non-fatal)")
+
+    with _ThreadPoolExecutor(max_workers=len(warmers)) as pool:
+        list(pool.map(_warm, warmers))
+
 
 def main() -> None:
     arguments = argparse.ArgumentParser()
@@ -234,6 +264,7 @@ def main() -> None:
         ThreadingHTTPServer.allow_reuse_address = True
         server = ThreadingHTTPServer(("127.0.0.1", options.port), Handler)
         PID_FILE.write_text(str(my_pid))  # Write only after successful bind
+        _threading.Thread(target=_warm_caches, daemon=True, name="cache-warmer").start()
         print(f"dashboard: http://127.0.0.1:{options.port}/  (Ctrl-C to stop)")
         print(f"dashboard: session token (for direct API calls): {_DASHBOARD_TOKEN}")
         server.serve_forever()

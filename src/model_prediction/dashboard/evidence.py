@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -938,7 +939,13 @@ def production_evidence() -> dict:
         *_flat_ledger_paths(),
         *_research_ledger_paths(),
     )
-    rows_by_source = {path.relative_to(ROOT).as_posix(): _read_evidence_ledger(path) for path in ledger_paths}
+    with ThreadPoolExecutor(max_workers=max(1, min(len(ledger_paths), 8))) as _pool:
+        rows_by_source = dict(
+            _pool.map(
+                lambda p: (p.relative_to(ROOT).as_posix(), _read_evidence_ledger(p)),
+                ledger_paths,
+            )
+        )
     feature_registry = _feature_registry_evidence()
     registry_by_name = {str(item.get("name")): item for item in feature_registry["features"]}
     ablation_by_identity = {
@@ -949,10 +956,11 @@ def production_evidence() -> dict:
         ): item
         for item in feature_registry["production_ablation_summary"]
     }
-    models = []
-    for sport, model_config in configured_models.items():
+
+    def _build_model(item: tuple) -> dict | None:
+        sport, model_config = item
         if not isinstance(model_config, dict) or not model_config.get("production_artifact"):
-            continue
+            return None
         version = str(model_config.get("active_production_version") or "")
         configured_path = Path(str(model_config["production_artifact"]))
         artifact_path = configured_path if configured_path.is_absolute() else ROOT / configured_path
@@ -1119,35 +1127,37 @@ def production_evidence() -> dict:
             "flat_ledger_claim_allowed": flat_ledger["profitability_claim"]["allowed"],
         }
 
-        models.append(
-            {
-                "sport": str(sport).lower(),
-                "model_version": version or None,
-                "status": model_config.get("status"),
-                "features": spec.get("features") or [],
-                "feature_registry": registry_features,
-                "backfill": locked,
+        return {
+            "sport": str(sport).lower(),
+            "model_version": version or None,
+            "status": model_config.get("status"),
+            "features": spec.get("features") or [],
+            "feature_registry": registry_features,
+            "backfill": locked,
+            "main_ledger": main_ledger,
+            "flat_ledger": flat_ledger,
+            "research_ledger": research_ledger,
+            "profitability": profitability,
+            "warnings": warnings,
+            "configured_status": model_config.get("status"),
+            "active_model_version": version or None,
+            "production_artifact": str(model_config["production_artifact"]),
+            "artifact": artifact,
+            "model_spec": spec,
+            "locked_backfill": locked,
+            "ledger_evidence": {
                 "main_ledger": main_ledger,
                 "flat_ledger": flat_ledger,
-                "research_ledger": research_ledger,
-                "profitability": profitability,
-                "warnings": warnings,
-                "configured_status": model_config.get("status"),
-                "active_model_version": version or None,
-                "production_artifact": str(model_config["production_artifact"]),
-                "artifact": artifact,
-                "model_spec": spec,
-                "locked_backfill": locked,
-                "ledger_evidence": {
-                    "main_ledger": main_ledger,
-                    "flat_ledger": flat_ledger,
-                },
-                "model_definition_and_backfill_valid": definition_valid,
-                "production_performance_evidence_complete": performance_complete,
-                "evidence_valid": definition_valid and performance_complete,
-                "issues": warnings,
-            }
-        )
+            },
+            "model_definition_and_backfill_valid": definition_valid,
+            "production_performance_evidence_complete": performance_complete,
+            "evidence_valid": definition_valid and performance_complete,
+            "issues": warnings,
+        }
+
+    _workers = max(1, min(len(configured_models), 8))
+    with ThreadPoolExecutor(max_workers=_workers) as _pool:
+        models = [m for m in _pool.map(_build_model, configured_models.items()) if m is not None]
 
     generated_at = datetime.now(UTC).isoformat()
     return {
