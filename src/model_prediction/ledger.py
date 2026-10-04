@@ -28,7 +28,6 @@ ordering addresses.
 
 from __future__ import annotations
 
-import fcntl
 import json
 import logging
 import shutil
@@ -40,6 +39,8 @@ from contextlib import contextmanager, suppress
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from model_prediction.filelock import lock_exclusive, unlock
 
 from .audit import AuditLog
 from .calibration import calibration_metrics
@@ -170,7 +171,7 @@ def _acquire_exclusive_lock(fileno: int, path: Path, timeout: float = LOCK_TIMEO
     deadline = time.monotonic() + timeout
     while True:
         try:
-            fcntl.flock(fileno, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            lock_exclusive(fileno, blocking=False)
             return
         except BlockingIOError:
             if time.monotonic() >= deadline:
@@ -582,7 +583,7 @@ class PickLedger:
             try:
                 yield
             finally:
-                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+                unlock(lock.fileno())
 
     def initialize(self) -> None:
         # Known residual gap in the audit-first ordering this module

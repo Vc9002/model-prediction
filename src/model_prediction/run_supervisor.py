@@ -22,7 +22,6 @@ instead of file mtimes.
 
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import sqlite3
@@ -35,28 +34,42 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from model_prediction.filelock import lock_exclusive, unlock
+
 from .config import PROJECT_ROOT
 from .runtime_paths import RuntimePaths, migrate_legacy_state
+
+# Interpreter and launcher paths differ per OS: the venv puts python under
+# Scripts on Windows and bin/ elsewhere; scheduled daily/rebuild jobs are
+# bash scripts on POSIX and PowerShell scripts on Windows.
+_VENV_PYTHON = ".venv/Scripts/python.exe" if sys.platform == "win32" else ".venv/bin/python"
+
+
+def _launcher(name: str) -> list[str]:
+    if sys.platform == "win32":
+        return ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", f"scripts/{name}.ps1"]
+    return ["bash", f"scripts/{name}.sh"]
+
 
 # Worker name -> command. The launchd plists call the supervisor with the
 # worker name; the command mapping lives HERE, not in three separate plists
 # and scripts that each re-decide what "run" means.
 WORKERS: dict[str, list[str]] = {
-    "daily": ["bash", "scripts/run_daily.sh"],
+    "daily": _launcher("run_daily"),
     "production": [
-        ".venv/bin/python",
+        _VENV_PYTHON,
         "-m",
         "model_prediction.cli_production",
         "predict",
     ],
     "auto-buyer": [
-        ".venv/bin/python",
+        _VENV_PYTHON,
         "-m",
         "model_prediction.auto_buyer_worker",
     ],
-    "rebuild-shadow": ["bash", "scripts/run_rebuild.sh"],
+    "rebuild-shadow": _launcher("run_rebuild"),
     "manual-bet-sync": [
-        ".venv/bin/python",
+        _VENV_PYTHON,
         "-m",
         "model_prediction.portfolio.manual_bet_ledger",
     ],
@@ -183,7 +196,7 @@ class RunSupervisor:
         # the whole run, so the handle must outlive this scope.
         handle = open(self._lease_path(worker), "w", encoding="utf-8")  # noqa: SIM115
         try:
-            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            lock_exclusive(handle, blocking=False)
         except OSError:
             handle.close()
             return None
@@ -313,7 +326,7 @@ class RunSupervisor:
             )
             return exit_code
         finally:
-            fcntl.flock(lease, fcntl.LOCK_UN)
+            unlock(lease)
             lease.close()
 
     # -------------------------------------------------------------- helpers

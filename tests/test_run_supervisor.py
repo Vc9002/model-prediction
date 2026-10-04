@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import fcntl
 import sys
 import time
+from pathlib import Path
 
 import pytest
 
+from model_prediction.filelock import lock_exclusive, unlock
 from model_prediction.run_supervisor import WORKERS, RunSupervisor
 
 
@@ -66,7 +67,7 @@ def test_lease_contention_skips_and_records_the_skip(tmp_path) -> None:
     lock_path = sup._lease_path("daily")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with open(lock_path, "w", encoding="utf-8") as handle:
-        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        lock_exclusive(handle, blocking=False)
 
         code = sup.run_worker("daily", command=[sys.executable, "-c", "print('never')"])
 
@@ -75,7 +76,7 @@ def test_lease_contention_skips_and_records_the_skip(tmp_path) -> None:
         assert row["status"] == "skipped"
         assert "lease held" in row["note"]
         assert row["exit_code"] is None
-        fcntl.flock(handle, fcntl.LOCK_UN)
+        unlock(handle)
     sup.close()
 
 
@@ -146,13 +147,20 @@ def test_leases_live_under_the_runtime_root(tmp_path, monkeypatch) -> None:
     sup.close()
 
 
-def test_worker_registry_commands_exist_on_disk(tmp_path) -> None:
-    """The three real workers must map to commands that exist in the repo."""
-    repo = tmp_path / "repo"
-    (repo / "scripts").mkdir(parents=True)
+def test_worker_registry_commands_exist_on_disk() -> None:
+    """The three real workers must map to launchers that exist in the repo, per platform."""
+    repo = Path(__file__).resolve().parents[1]
+    launcher_shells = {"win32": "powershell", "other": "bash"}
+    shell = launcher_shells["win32" if sys.platform == "win32" else "other"]
     for worker in ("daily", "production", "rebuild-shadow"):
         assert worker in WORKERS
-        assert WORKERS[worker][0] in ("bash", ".venv/bin/python")
+        command = WORKERS[worker]
+        if worker == "production":
+            assert command[0] in (".venv/bin/python", ".venv/Scripts/python.exe")
+            continue
+        assert command[0] == shell
+        script = command[-1]
+        assert (repo / script).is_file(), f"{worker} launcher missing: {script}"
 
 
 def test_unknown_worker_rejected(tmp_path) -> None:

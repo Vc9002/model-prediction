@@ -41,7 +41,6 @@ than from the first sighting -- a lineup seen at 18:10 and reconfirmed at
 
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import json
 import subprocess
@@ -51,6 +50,8 @@ from collections.abc import Iterable
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
+
+from model_prediction.filelock import lock_exclusive, unlock
 
 STATS_API_BASE = "https://statsapi.mlb.com/api"
 LINEUP_SCHEMA_VERSION = "mlb-lineup-v1"
@@ -377,7 +378,7 @@ class LineupStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         lock_path = self.path.with_suffix(self.path.suffix + ".lock")
         with lock_path.open("w") as lock_handle:
-            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+            lock_exclusive(lock_handle.fileno())
             try:
                 rows = self.rows()
                 by_hash = {self._identity(row): row for row in rows}
@@ -408,4 +409,4 @@ class LineupStore:
                 temporary.replace(self.path)
                 return {"written": written, "confirmed": confirmed}
             finally:
-                fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+                unlock(lock_handle.fileno())

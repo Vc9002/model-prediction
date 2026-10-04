@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import json
 import subprocess
@@ -12,6 +11,8 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
+
+from model_prediction.filelock import lock_exclusive, unlock
 
 STATS_API_BASE = "https://statsapi.mlb.com/api"
 SNAPSHOT_SCHEMA_VERSION = "mlb-statsapi-game-v1"
@@ -198,7 +199,7 @@ class MLBGameSnapshotStore:
     def merge(self, snapshots: Iterable[dict[str, Any]]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+") as lock:
-            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            lock_exclusive(lock.fileno())
             try:
                 existing = {int(row["game_pk"]): row for row in self.rows()}
                 for snapshot in snapshots:
@@ -210,7 +211,7 @@ class MLBGameSnapshotStore:
                         handle.write(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n")
                 temporary.replace(self.path)
             finally:
-                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+                unlock(lock.fileno())
 
 
 def compact_game_snapshot(payload: dict[str, Any], *, snapshot_type: str) -> dict[str, Any]:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import json
 import os
@@ -11,6 +10,8 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from model_prediction.filelock import lock_exclusive, unlock
 
 from .domain import iso_utc, utc_now
 
@@ -31,7 +32,7 @@ def _acquire_exclusive_lock(fileno: int, path: Path, timeout: float = LOCK_TIMEO
     deadline = time.monotonic() + timeout
     while True:
         try:
-            fcntl.flock(fileno, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            lock_exclusive(fileno, blocking=False)
             return
         except BlockingIOError:
             if time.monotonic() >= deadline:
@@ -55,7 +56,7 @@ class AuditLog:
             try:
                 yield
             finally:
-                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+                unlock(lock.fileno())
 
     def events(self) -> list[dict[str, Any]]:
         if not self.path.exists():

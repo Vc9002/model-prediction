@@ -123,7 +123,7 @@ def write_xlsx_rows_atomic(
     os.close(descriptor)
     try:
         workbook.save(temporary)
-        with open(temporary, "rb") as handle:
+        with open(temporary, "r+b") as handle:
             os.fsync(handle.fileno())
         os.replace(temporary, destination)
     except Exception:

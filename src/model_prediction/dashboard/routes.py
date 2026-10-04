@@ -152,8 +152,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(body)
-        except (BrokenPipeError, ConnectionResetError):
-            pass  # client disconnected — nothing to do
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
+            pass  # client disconnected — nothing to do (incl. WinError 10053 on Windows)
 
     def _send_head(self, payload, content_type="application/json", code=200) -> None:
         body = payload if isinstance(payload, bytes) else json.dumps(payload, default=str).encode()
@@ -179,6 +179,8 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(_inject_dashboard_token(page.read_bytes()), "text/html; charset=utf-8")
                 else:
                     self._send({"error": "dashboard.html missing"}, code=404)
+            elif route == "/api/ping":
+                self._send({"ok": True})
             elif route == "/api/status":
                 self._send(_cached("status", 30, status))
             elif route.startswith("/api/data/"):
@@ -591,6 +593,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send({"error": "unknown route"}, code=404)
         except InvalidSportError as error:
             self._send({"error": str(error)}, code=400)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
+            pass  # client disconnected mid-request — WinError 10053 on Windows
         except Exception as error:  # noqa: BLE001 - route handler boundary, always returns a response
             self._send({"error": f"{type(error).__name__}: {error}"}, code=500)
 

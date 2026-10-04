@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import fcntl
 import os
 import tempfile
 from dataclasses import dataclass
@@ -8,6 +7,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
+from model_prediction.filelock import lock_exclusive, unlock
 
 from .audit import AuditLog
 from .domain import League
@@ -140,7 +141,7 @@ class TeamBanList:
         )
         self.config_path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+") as lock:
-            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            lock_exclusive(lock.fileno())
             try:
                 config = self._load()
                 section = config.setdefault("team_ban_list", {"enabled": True, "teams": {}})
@@ -219,7 +220,7 @@ class TeamBanList:
                     )
                 return entry, changed
             finally:
-                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+                unlock(lock.fileno())
 
     def _atomic_write(self, config: dict[str, Any]) -> None:
         descriptor, temporary = tempfile.mkstemp(prefix="model-", suffix=".yaml", dir=self.config_path.parent)

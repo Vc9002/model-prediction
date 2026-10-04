@@ -1,9 +1,9 @@
-import fcntl
 from datetime import UTC, datetime
 
 import pytest
 from openpyxl import Workbook, load_workbook
 
+from model_prediction import filelock
 from model_prediction.domain import (
     League,
     MarketType,
@@ -351,15 +351,18 @@ def test_audit_append_happens_while_the_ledger_lock_is_still_held(
     lock_depth = 0
     audit_calls_while_locked: list[bool] = []
 
-    real_flock = fcntl.flock
+    real_try_lock = filelock._try_lock
+    real_unlock = filelock._unlock
 
-    def tracking_flock(fd, cmd):
+    def tracking_try_lock(fd):
         nonlocal lock_depth
-        real_flock(fd, cmd)
-        if cmd & fcntl.LOCK_EX:
-            lock_depth += 1
-        elif cmd == fcntl.LOCK_UN:
-            lock_depth -= 1
+        real_try_lock(fd)
+        lock_depth += 1
+
+    def tracking_unlock(fd):
+        nonlocal lock_depth
+        real_unlock(fd)
+        lock_depth -= 1
 
     real_append = AuditLog.append
 
@@ -367,7 +370,8 @@ def test_audit_append_happens_while_the_ledger_lock_is_still_held(
         audit_calls_while_locked.append(lock_depth > 0)
         return real_append(self, *args, **kwargs)
 
-    monkeypatch.setattr(fcntl, "flock", tracking_flock)
+    monkeypatch.setattr(filelock, "_try_lock", tracking_try_lock)
+    monkeypatch.setattr(filelock, "_unlock", tracking_unlock)
     monkeypatch.setattr(AuditLog, "append", tracking_append)
 
     ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")

@@ -18,7 +18,6 @@ write here are separate, later steps -- see DEBUG.md/docs for status.
 
 from __future__ import annotations
 
-import fcntl
 import os
 import tempfile
 import time
@@ -32,6 +31,8 @@ from typing import Any
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
+
+from model_prediction.filelock import lock_exclusive, unlock
 
 from .domain import iso_utc, utc_now
 
@@ -54,7 +55,7 @@ def _acquire_exclusive_lock(fileno: int, path: Path, timeout: float = LOCK_TIMEO
     deadline = time.monotonic() + timeout
     while True:
         try:
-            fcntl.flock(fileno, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            lock_exclusive(fileno, blocking=False)
             return
         except BlockingIOError:
             if time.monotonic() >= deadline:
@@ -416,7 +417,7 @@ class ModelLedger:
             try:
                 yield
             finally:
-                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+                unlock(lock.fileno())
 
     def _read_unlocked(self) -> list[dict[str, str]]:
         if not self.path.exists():

@@ -14,6 +14,7 @@ import json
 import pytest
 
 from model_prediction.audit import AuditLockTimeout, AuditLog, _acquire_exclusive_lock
+from model_prediction.filelock import lock_exclusive, unlock
 
 
 def _recompute_hash(event: dict) -> str:
@@ -96,13 +97,11 @@ def test_append_flushes_and_fsyncs_so_a_reader_sees_it_immediately(tmp_path) -> 
 def test_lock_acquire_times_out_when_another_holder_never_releases(tmp_path) -> None:
     lock_path = tmp_path / "held.lock"
     holder = lock_path.open("a+")
-    import fcntl
-
-    fcntl.flock(holder.fileno(), fcntl.LOCK_EX)
+    lock_exclusive(holder.fileno())
     try:
         waiter = lock_path.open("a+")
         with pytest.raises(AuditLockTimeout):
             _acquire_exclusive_lock(waiter.fileno(), lock_path, timeout=0.3)
     finally:
-        fcntl.flock(holder.fileno(), fcntl.LOCK_UN)
+        unlock(holder.fileno())
         holder.close()
