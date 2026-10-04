@@ -1,0 +1,46 @@
+{
+  "dataset_name": "mlb_v9_feature_table_v4",
+  "schema_version": "4.0.0",
+  "n_games": 6678,
+  "feature_count": 14,
+  "features": [
+    "elo_probability",
+    "trend_gap",
+    "park_factor_pit",
+    "rest_disparity",
+    "back_to_back_gap",
+    "starter_k_pct_gap",
+    "starter_bb_pct_gap",
+    "starter_depth_gap",
+    "projected_woba_gap",
+    "projected_iso_gap",
+    "projected_k_pct_gap",
+    "projected_bb_pct_gap",
+    "bullpen_fip_advantage",
+    "bullpen_freshness_advantage"
+  ],
+  "meta_columns": [
+    "event_id",
+    "game_start_utc",
+    "decision_time_utc",
+    "date_et",
+    "home_team_id",
+    "away_team_id",
+    "home_score",
+    "away_score",
+    "home_win",
+    "split",
+    "starter_available",
+    "projected_offense_available",
+    "bullpen_available",
+    "platoon_available"
+  ],
+  "sha256": "afaef3d2a6645d8bfe922bd307b2a9fec0f83f7d9bcacb0572e58fba44be4e1d",
+  "statistical_audit": {
+    "passed": true,
+    "condition_number": 5.25,
+    "max_vif": 5.59,
+    "high_correlation_pairs": [],
+    "zero_variance_features": []
+  }
+}

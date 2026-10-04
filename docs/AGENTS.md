@@ -1,5 +1,14 @@
 # Agent Execution Guidelines
 
+## 2026-09-09 OPERATOR RESEARCH RESET
+
+Vincent explicitly declared all previous frozen research protocols obsolete
+for the all-model accuracy and profitability rebuild. Old Phase F locks and
+the v11 prohibition are historical, not binding on new research. Preserve
+earlier artifacts for comparison, label reused historical data honestly, and
+keep research separate from live champion changes and orders. See the current
+repo-root `AGENTS.md`, `GENERATION_2026-09-09.md`, and `ROADMAP.md`.
+
 ## PRE-CHANGE CHECKLIST
 1. State the theory. 2. State the evidence. 3. State the test.
 4. State the failure mode. 5. State the rollback.

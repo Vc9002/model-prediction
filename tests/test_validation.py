@@ -292,14 +292,10 @@ def test_bullpen_weakness_gap_requires_two_prior_games_and_uses_pit_history(tmp_
         credibility = 6 / (6 + BULLPEN_PRIOR_INNINGS)
         home_weakness = (credibility * 9.0 + (1 - credibility) * LEAGUE_RELIEF_ERA) / LEAGUE_RELIEF_ERA
         away_weakness = (credibility * 0.0 + (1 - credibility) * LEAGUE_RELIEF_ERA) / LEAGUE_RELIEF_ERA
-        # The pipeline rounds the weakness index to 6 decimals INSIDE
-        # bullpen_profile and this closed form rounds at the END, so the
-        # two can differ by 1e-6 purely from rounding order. That was
-        # masked while LEAGUE_RELIEF_ERA was 4.059 and surfaced when the
-        # 2026-08-19 daily refresh recomputed the prior to 4.0598. Compare
-        # with a 1e-6 tolerance: it still catches real drift in the
-        # shrinkage math, but stops failing on rounding-order noise.
-        assert abs(gap2 - round(home_weakness - away_weakness, 6)) <= 1e-6
+        # Each team's published weakness is rounded before subtraction.
+        # Check that exact contract instead of comparing a differently rounded
+        # closed form at a binary-float tolerance boundary.
+        assert gap2 == round(round(home_weakness, 6) - round(away_weakness, 6), 6)
     finally:
         validation_module._BULLPEN_MAP = None
 

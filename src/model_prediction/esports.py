@@ -14,13 +14,13 @@ import math
 from collections.abc import Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import httpx
 
-from .domain import eastern_today
+from .domain import eastern_today, parse_utc
 from .features.elo_ratings import expected_win_probability
 from .research_io import atomic_write as _atomic_write
 from .research_io import backup_before_overwrite as _backup_before_overwrite
@@ -1029,6 +1029,86 @@ def _team_alias_index(teams: dict[str, dict[str, Any]]) -> dict[str, set[str]]:
     return index
 
 
+def _resolve_bo3_team_id(
+    name: str,
+    teams: dict[str, dict[str, Any]],
+    team_index: dict[str, set[str]],
+    manual_aliases: dict[str, str],
+) -> str | None:
+    key = _identity_key(name)
+    if key in manual_aliases:
+        alias_candidates = team_index.get(_identity_key(manual_aliases[key]))
+        if alias_candidates and len(alias_candidates) == 1:
+            return next(iter(alias_candidates))
+    exact_candidates = team_index.get(key)
+    if exact_candidates and len(exact_candidates) == 1:
+        return next(iter(exact_candidates))
+    return _fuzzy_match_team(name, teams, team_index)
+
+
+LEAGUE_TO_ESPORTS_TITLE: dict[str, str] = {
+    str(spec["polymarket_league"]): title for title, spec in TITLE_SPECS.items()
+}
+
+
+def resolve_esports_match_result(
+    league: str,
+    home_team: str,
+    away_team: str,
+    event_start_utc: str,
+    data_root: str | Path,
+    client: Bo3EsportsClient | None = None,
+) -> dict[str, Any] | None:
+    """Look up a finished esports match's real result from BO3 by team name.
+
+    Exists because Polymarket US's own esports moneyline markets do not
+    reliably report a terminal binary [0.0, 1.0] settlement price even once
+    genuinely resolved (confirmed live 2026-09-14 against real CS2 markets
+    stuck `MARKET_STATUS_RESOLVED`/`MARKET_STATE_EXPIRED` with pre-close
+    trading prices still showing) -- so callers that treat "not binary" as
+    "not settled" either leave a real result open forever, or (worse) treat
+    it as a void/forfeit. BO3 (bo3.gg) is the actual results provider behind
+    these markets and is already this codebase's own esports training data
+    source, with an explicit `winner_team_id` per finished match.
+
+    Returns ``None`` -- never a guess -- when the match cannot be identified
+    unambiguously (unknown/ambiguous team name, or no finished-match row in
+    BO3 covering this fixture, e.g. an unlisted lower-tier forfeit). Returns
+    ``{"home_win", "away_win", "home_score", "away_score"}`` otherwise.
+    """
+    title = LEAGUE_TO_ESPORTS_TITLE.get(league.upper())
+    if title is None:
+        return None
+    client = client or Bo3EsportsClient()
+    start_dt = parse_utc(event_start_utc) if isinstance(event_start_utc, str) else event_start_utc
+    window_start = (start_dt - timedelta(days=2)).date()
+    window_end = max(datetime.now(UTC).date(), window_start)
+    teams, _ = client.teams(title)
+    matches, _ = client.finished_matches(title, window_start, window_end)
+    manual_aliases = _load_manual_aliases(data_root).get(title, {})
+    team_index = _team_alias_index(teams)
+    home_id = _resolve_bo3_team_id(home_team, teams, team_index, manual_aliases)
+    away_id = _resolve_bo3_team_id(away_team, teams, team_index, manual_aliases)
+    if not home_id or not away_id:
+        return None
+    for match in matches:
+        if {match["team1_id"], match["team2_id"]} != {home_id, away_id}:
+            continue
+        home_win = match["winner_id"] == home_id
+        away_win = match["winner_id"] == away_id
+        if not (home_win or away_win):
+            continue
+        home_score = match["team1_score"] if match["team1_id"] == home_id else match["team2_score"]
+        away_score = match["team2_score"] if match["team2_id"] == away_id else match["team1_score"]
+        return {
+            "home_win": home_win,
+            "away_win": away_win,
+            "home_score": home_score,
+            "away_score": away_score,
+        }
+    return None
+
+
 def forecast_esports_slate(
     data_root: str | Path,
     artifact_dir: str | Path,
@@ -1153,6 +1233,9 @@ def forecast_esports_slate(
             source_teams_resolved = all(not team_id.startswith("unknown:") for team_id in team_ids)
             source_teams_trained = source_teams_resolved and all(team_id in ratings for team_id in team_ids)
             probability1 = book.probability(team_ids[0], team_ids[1], observed_now)
+            from .esports_replay import capture_inputs
+
+            inference_inputs = capture_inputs(book, team_ids, observed_now)
             probabilities_by_name = {
                 _identity_key(descriptions[0]): probability1,
                 _identity_key(descriptions[1]): 1 - probability1,
@@ -1197,6 +1280,7 @@ def forecast_esports_slate(
                     **base,
                     "title": title,
                     "source_team_ids": team_ids,
+                    "inference_inputs": inference_inputs,
                     "source_teams_resolved": source_teams_resolved,
                     "source_teams_trained": source_teams_trained,
                     "gated_research_eligible": source_teams_trained,

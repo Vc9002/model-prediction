@@ -149,6 +149,9 @@ class SoccerModel:
             away = strengths.get(match.away_team, {"attack": 1.0, "defense": 1.0, "games": 0.0})
             home_rate = baseline * home["attack"] * away["defense"] * HOME_GOAL_BOOST
             away_rate = baseline * away["attack"] * home["defense"] / HOME_GOAL_BOOST
+            from ..coded_market_replay import capture_inputs
+
+            inference_inputs = capture_inputs("SOCCER", {"home_rate": home_rate, "away_rate": away_rate})
             matrix = self.score_matrix(home_rate, away_rate)
             home_win = sum(matrix[h][a] for h in range(MAX_GOALS + 1) for a in range(h))
             away_win = sum(matrix[h][a] for a in range(MAX_GOALS + 1) for h in range(a))
@@ -188,6 +191,7 @@ class SoccerModel:
             predictions.append(
                 GamePrediction(
                     market_type="moneyline",
+                    inference_inputs=inference_inputs,
                     line=None,
                     probabilities={
                         "home": round(home_win, 6),

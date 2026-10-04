@@ -1,5 +1,160 @@
 # Roadmap & Operating Architecture
 
+## 2026-09-14 evening — Consolidate the existing platform
+
+Use [the verified P0/P1/P2 queue](CONTROL_PLANE_CONSOLIDATION_2026-09-14.md)
+for the next work. Initial fixes remove false challenger status claims, bind
+evidence by model/artifact/market, preserve operator-promotion metadata, and
+package the missing CI fixture. Registration of the 21 rebuilt candidates,
+capital authorization, supervised capture and canonical evidence aggregation
+remain required. These are integration tasks around the existing generation;
+model profitability is not established.
+
+## 2026-09-14 — Research pricing support complete across current model families
+
+All 21 candidates have current artifact/inference verification. The added
+prospective pricing path handles NRFI, CFB, WNBA derivatives, soccer and
+KBO/NPB alongside existing paired quote adapters. It preserves earlier forecast
+times, later price times, exact payout tables and pregame choices through scoring.
+
+The performance objective remains unproven: September 13 clean NRFI scored
+7/15 and lost $9.75 on two simulated calls. No candidate is qualified for
+replacement. Further progress requires valid future priced cohorts and fixed-policy
+evaluation, with unsupported integer/void terms and conflicting provider
+metadata remaining unavailable. See [current rebuild evidence](REBUILD_STATUS_2026-09-14.md).
+
+## 2026-09-12 — Corrected NRFI generation and first scored paired returns
+
+The current 21-model research generation is
+`outputs/research/generation_20260912_clean_update/`. The new NRFI version fixes
+invalid labels, mixed opponent batter pools and train/serve history timing.
+Its probability scores do not improve; no promotion is supported. Fourteen
+new pregame forecasts rebuild from source.
+
+All 49 prior paired forecasts now have independent outcomes. Their canonical
+rows were removed, so the archived pregame decisions and choices are evaluated
+without restoring them. On 24 verified quote opportunities the candidate loses
+$13.925 versus the incumbent's $26.130; both are losing simulations on one game
+date. The observer is terminal: 49 captures, 19 unavailable, no pending work.
+Full suite: 2,897 passed, 3 skipped. All 21 candidate inference checks pass.
+See [NRFI corrections, results and remaining scope](NRFI_AND_SETTLED_REBUILD_2026-09-12.md).
+
+
+## 2026-09-11 midday — Recency iteration tested; captured quote economics ready
+
+A 17-market recency experiment is fitted and reproducible: ten select weighting,
+seven retain equivalent original fits, and none clears the required improvement
+threshold. WNBA spread becomes worse; LoL has a small gain below the minimum
+meaningful effect. The three MLB recency models have 39 new pregame forecasts.
+
+The existing observer has 49 exact candidate/incumbent pairs across 18 games.
+Twenty-four event-market opportunities across 14 MLB games have verified quotes
+for identical fee-aware policies. P&L remains null before settlement. The spread
+archive adapter and a late-arriving ledger-mirror pairing bug are fixed.
+118 focused tests, scoped Ruff and mypy pass. No champions or orders changed.
+See [recency and quote evidence](RECENCY_AND_QUOTE_ITERATION_2026-09-11.md).
+
+
+## 2026-09-11 UTC — Joint CFB generation fitted and integrated
+
+Three new CFB research versions now use fitted joint-score means and empirical
+calibration residual pairs. Exact v1 research reproduction passes on all 878
+comparison games. Moneyline accuracy improves 1.14 percentage points, but
+proper-score improvement remains uncertain; no profitability is established.
+Nine actual future contracts replay; six lack team history. The current
+21-model research generation retains 18 previous candidates and updates CFB.
+
+The corrected bounded observer is active at
+`outputs/research/paired_observer_20260911_v2/report.json`. Next: verify actual
+paired captures/outcomes, bind derivative prices to verified settlement rules,
+and continue sport-specific fits. Details:
+[CFB joint iteration](CFB_JOINT_ITERATION_2026-09-11.md).
+
+## 2026-09-10 evening — Exact pairing and first prospective outcomes
+
+All 41 captured forecasts are scored, covering 11 events. The market-aware
+paired evaluator and explicit payout-table policy are implemented; exact
+capture requires preparation before the incumbent and execution before start.
+The real comparison still has zero eligible pairs and today's later capture
+was rejected after all starts. Next priorities are pregame capture integration,
+verified nonbinary contract rules/quotes, and sport-specific fitted iterations.
+No reliable accuracy/profit improvement is established. See
+[paired rebuild checkpoint](PAIRED_REBUILD_2026-09-10.md).
+The bounded observer is now active for 68 September 11 MLB/NCAAF contracts.
+It polls every 30 seconds and retains first valid pregame captures; verify
+`outputs/research/paired_observer_20260911_v1/report.json` before reporting
+actual captured coverage. Next: verified nonbinary economics and fitted
+sport-specific improvements while prospective outcomes accumulate.
+
+## 2026-09-10 — All 21 candidate and incumbent paths are replayable
+
+All 21 fitted candidates have target-free fixture inference and archived source
+rebuild support. All 21 incumbent market paths now capture the exact inputs or
+inference state needed for replay; MLB v10 uses its separate shadow runner.
+Historical missing state remains missing. The legacy comparison command now
+uses canonical SQLite and exact decision contexts with a reproduction gate.
+Market-aware paired economics beyond learned moneyline and sport-specific
+iterations remain open. No reliable accuracy/profit improvement is established.
+See [current rebuild evidence and limitations](FORWARD_REBUILD_2026-09-09.md).
+
+
+## 2026-09-09 — All-model accuracy and profitability rebuild
+
+**Current operator direction supersedes the frozen research restrictions
+below.** Vincent requested new improved versions of every existing model,
+with BOTH predictive accuracy and profitability as goals, then explicitly
+declared all frozen protocols obsolete. The old Phase F state is historical;
+it is not an authorization gate for this new program.
+
+First generation: 21 separate fitted research candidates across all 14
+registered sports. Training, model selection, calibration, and evaluation use
+separate complete-date periods. No candidate has established superiority to
+its exact incumbent or executable profitability. Results and limitations:
+[Generation report](GENERATION_2026-09-09.md).
+
+The first comparison is complete:
+[incumbent and economics report](INCUMBENT_COMPARISON_2026-09-09.md).
+MLB reproduces but the new candidate does not establish an improvement; both
+simulated policies lose. WNBA has replay failures, five current incumbents have
+no settled decision records, and fourteen other markets lack historical stored
+inputs. Capture/replay adapters are now implemented for all 21 markets. The isolated new evaluator replaces the legacy runner for
+this generation. Future moneyline logging now hashes the actual archive record.
+
+Remaining work, in dependency order:
+
+Second iteration complete: [replay recording and MLB residual v2](MODEL_ITERATION_2026-09-09.md).
+Full learned-model inputs and WNBA transforms are now captured for future
+moneyline decisions, and player-prior versions are preserved. Historical
+WNBA gaps remain unresolved. MLB residual v2 retains incumbent information
+but still shows no reliable gain or positive hypothetical return.
+
+1. Collect newly captured incumbent state and same-context candidate decisions.
+   All 21 capture/replay adapters are implemented. Historical WNBA still has
+   two probability mismatches and 22 incomplete contexts; five incumbent
+   cohorts remain empty. The repaired legacy command pairs exact contexts and
+   enforces replay, but market-aware paired economics remain incomplete.
+   CFB's raw-Elo reference is not its shipped score-distribution champion;
+   evaluate moneyline, spread, and total separately.
+2. Extend the exact archive linkage established for 194 MLB moneyline events
+   to other market families. Reconcile scoreboard, StatsAPI, and market IDs;
+   bind actual contracts, horizons, lines, timestamps, fees, and depth.
+   Legacy projection hashes must map uniquely to a full record. Capture full
+   raw hashes prospectively and recover independent closing quotes for CLV.
+3. Improve sport-specific information, starting with CFB (all three incumbents
+   marked degraded/critical), MLB moneyline, and weak MLB/KBO/NPB benchmark
+   candidates. Fit the explanatory features from training data instead of
+   promoting existing hand-weighted structural prototypes.
+4. Separately audit and capture actual pregame observations for each candidate.
+   Historical scoreboard ordering is not historical observation provenance.
+5. Evaluate a preregistered policy on executable prices after fees and
+   conservative fills; compare both absolute return and paired incremental
+   return to the incumbent at the same risk budget. Set effect sizes and
+   uncertainty criteria before consuming fresh confirmation outcomes.
+6. Promote only explicitly selected, supported replacements. An unsuccessful
+   experiment remains a negative result; no blanket 21-model replacement.
+
+The old research records below remain available for context and failure history.
+
 **Recompiled 2026-08-23.** MLB v8 remains the permanent production champion, completely untouched, until the complete v9 candidate is fully built, validated, calibrated, prospectively evaluated on untouched future games, and explicitly promoted.
 
 ---
@@ -900,3 +1055,13 @@ Every candidate must clear all 5 dimensions on locked chronological out-of-sampl
    - Built [`src/model_prediction/portfolio/polymarket_ws.py`](file:///Users/vincentc9002/model-prediction/src/model_prediction/portfolio/polymarket_ws.py) for sub-second Level 2 orderbook streaming and BBO tracking.
    - Built [`src/model_prediction/portfolio/kalshi_client.py`](file:///Users/vincentc9002/model-prediction/src/model_prediction/portfolio/kalshi_client.py) for Kalshi event contract price ingestion and cross-exchange Dutching arbitrage detection ($\sum \text{Cost} < 1.0$).
    - Comprehensive tests verified in [`tests/test_multi_exchange_liquidity.py`](file:///Users/vincentc9002/model-prediction/tests/test_multi_exchange_liquidity.py).
+# 2026-09-10 continuing all-model rebuild
+
+Completed fixture inference/source capture and outcome scoring for all 21 new
+research candidates, plus exact incumbent state adapters for all 21 markets.
+See `FORWARD_REBUILD_2026-09-09.md`. Next: collect same-context prospective
+pairs, complete family-specific economic comparisons, and continue fitted
+sport-specific iterations. The legacy command's schema/context repair is
+complete; the older lifecycle loader is still separate technical debt.
+Negative or inconclusive results remain visible. No candidate has established
+a reliable profitable improvement.

@@ -39,6 +39,7 @@ from .features.schedule_load import matchup_schedule_load
 from .features.starter_history import starter_era_gap_live, starter_fip_gap_live, starter_kbb_gap_live
 from .features.team_runs import pitcher_era_gap_from_history
 from .features.trends import TrendEngine
+from .learned_replay import build_snapshot
 from .models.learned_market import LearnedMarketArtifact
 from .wnba_availability_evaluation import adjust_home_probability, historical_margin_sigma
 
@@ -413,6 +414,7 @@ class LearnedForwardCandidate:
     feature_basis: dict[str, float | int]
     feature_snapshot_hash: str
     unavailable_features: tuple[str, ...] = ()
+    model_input_snapshot: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -543,6 +545,9 @@ def build_learned_moneyline_slate(
                 away_starter_name=away_starter_name,
             )
             home_probability = artifact.probability("moneyline", features)
+            base_home_probability = home_probability
+            model_features = dict(features)
+            adjustment: dict[str, Any] = {"method": "identity", "applied": False, "reason": "not_applicable"}
             confidence_threshold = (
                 artifact.raw.get("market_models", {}).get("moneyline", {}).get("confidence_threshold", 0.50)
             )
@@ -571,6 +576,14 @@ def build_learned_moneyline_slate(
                     sigma = cache[sigma_key]
                     adjusted_home = adjust_home_probability(home_probability, points_gap, sigma)
                     delta = abs(adjusted_home - home_probability)
+                    adjustment = {
+                        "method": "wnba_probit_v1",
+                        "applied": delta >= 0.05,
+                        "points_gap": points_gap,
+                        "margin_sigma": sigma,
+                        "minimum_delta": 0.05,
+                        "availability": avail,
+                    }
                     if int(avail.get("availability_source_conflict_count", 0)) > 0:
                         availability_notes.append("wnba_availability_source_conflict")
                     if delta >= 0.05:
@@ -579,6 +592,11 @@ def build_learned_moneyline_slate(
                         home_probability = adjusted_home
                 except (ValueError, KeyError, TypeError) as exc:
                     warning_code = str(exc).split(":", 1)[0].strip()
+                    adjustment = {
+                        "method": "identity",
+                        "applied": False,
+                        "reason": warning_code or "unavailable",
+                    }
                     availability_notes.append(warning_code or "wnba_availability_unavailable")
                     logger.warning(
                         "WNBA availability context unavailable for %s @ %s on %s; "
@@ -637,6 +655,16 @@ def build_learned_moneyline_slate(
                     feature_basis=basis,
                     feature_snapshot_hash=_feature_hash(key, game_date, event_id, basis),
                     unavailable_features=unavailable_features,
+                    model_input_snapshot=build_snapshot(
+                        artifact,
+                        model_features,
+                        event_id=event_id,
+                        observed_at_utc=observed_at.isoformat(),
+                        event_start_utc=start.isoformat(),
+                        base_home_probability=base_home_probability,
+                        served_home_probability=home_probability,
+                        adjustment=adjustment,
+                    ),
                 )
             )
         except (KeyError, TypeError, ValueError) as error:
@@ -735,6 +763,10 @@ def match_executable_quote(
             no_vig = round(float(ask) / total, 6)
     return {
         "market_slug": best.get("market_slug"),
+        # Preserve the exact archived record for lineage hashing. The public
+        # projection below omits contract identity and depth and is not itself
+        # an archived JSON line.
+        "_archive_record": best,
         "side": side_key,
         "executable_ask": round(float(ask), 6),
         "midpoint_reference": side.get("midpoint"),

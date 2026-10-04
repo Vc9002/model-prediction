@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 
@@ -25,8 +26,9 @@ def test_v4_feature_audit_detects_collinearity():
 
 
 def test_v4_table_and_manifest_integrity():
-    tbl_path = Path("outputs/research/mlb_v9/tables/mlb_v9_feature_table_v4.parquet")
-    man_path = Path("outputs/research/mlb_v9/manifests/mlb_v9_feature_table_v4.json")
+    fixture_root = Path(__file__).parent / "fixtures" / "mlb_v9_v4"
+    tbl_path = fixture_root / "mlb_v9_feature_table_v4.parquet"
+    man_path = fixture_root / "mlb_v9_feature_table_v4.json"
 
     assert tbl_path.exists()
     assert man_path.exists()
@@ -35,6 +37,13 @@ def test_v4_table_and_manifest_integrity():
     assert len(df) >= 6000
 
     manifest = json.loads(man_path.read_text(encoding="utf-8"))
+    assert hashlib.sha256(tbl_path.read_bytes()).hexdigest() == manifest["sha256"]
+    assert len(df) == manifest["n_games"]
+    assert len(manifest["features"]) == manifest["feature_count"]
+    audit = audit_v9_features(df.select(manifest["features"]).to_numpy(), manifest["features"])
+    assert audit.passed_audit == manifest["statistical_audit"]["passed"]
+    assert audit.condition_number == manifest["statistical_audit"]["condition_number"]
+    assert audit.max_vif == manifest["statistical_audit"]["max_vif"]
     assert manifest["dataset_name"] == "mlb_v9_feature_table_v4"
     assert manifest["statistical_audit"]["passed"] is True
     assert manifest["statistical_audit"]["condition_number"] < 10.0

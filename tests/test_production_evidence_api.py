@@ -793,9 +793,13 @@ def test_post_with_correct_dashboard_token_passes_auth(monkeypatch, patch_dash) 
         thread.join(timeout=5)
 
 
-def test_get_requests_do_not_require_the_dashboard_token() -> None:
+def test_get_requests_do_not_require_the_dashboard_token(patch_dash) -> None:
     """Only state-changing POST routes are gated -- read-only GET endpoints
     stay open, matching this project's existing read-only dashboard API."""
+    # Exercise real HTTP authorization without depending on the live status
+    # inventory's I/O time or a status cached by an earlier test.
+    patch_dash("status", lambda: {"status": "fixture"})
+    patch_dash("_cached", lambda key, ttl, build: build())
     server = dashboard_server.ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -803,7 +807,7 @@ def test_get_requests_do_not_require_the_dashboard_token() -> None:
     try:
         connection.request("GET", "/api/status")
         response = connection.getresponse()
-        response.read()
+        assert json.loads(response.read()) == {"status": "fixture"}
         assert response.status == 200
     finally:
         connection.close()

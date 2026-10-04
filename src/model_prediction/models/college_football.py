@@ -22,6 +22,7 @@ from ..features.cfb_features import (
     CFB_BASELINE_MARGIN_SD,
     CFB_BASELINE_TOTAL_SD,
     CFB_DEFAULT_HOME_ADVANTAGE_POINTS,
+    CFB_UNCERTAINTY_FLOOR,
     CFBFeatureExtractor,
     CFBMatchupFeatures,
 )
@@ -36,6 +37,22 @@ from .cfb_distribution import (
 MODEL_VERSION = "college-football-v1"
 CFB_SPREAD_MODEL_VERSION = "cfb-spread-v1"
 CFB_TOTAL_MODEL_VERSION = "cfb-total-v1"
+
+# feat.uncertainty (0.04 floor -- established teams, no FBS/FCS mismatch,
+# confirmed starters) previously reached the ledger only as sizing metadata;
+# the margin distribution itself always used the same constant margin_sd
+# regardless. Live Main/Flat NCAAF spread picks were losing at 41-43%
+# (worse than a coin flip) while averaging ~68-79% claimed model probability
+# and ~16-26% claimed edge -- most concentrated in FBS-vs-FCS mismatches and
+# thin-sample-size teams. A chronological walk-forward residual check against
+# 2,434 real 2023-2024 games (uncertainty.py::extract_features's own
+# is_fbs_vs_fcs/sample_games signals) confirms this empirically: realized
+# margin residual SD is ~16.7 for established matchups vs ~19.2 for
+# FBS-vs-FCS/thin-sample ones -- about 15% wider, not the ~55% the raw
+# uncertainty range would suggest if scaled 1:1. Total-points residual SD
+# showed no comparable pattern by the same buckets (14.8-16.9 across all),
+# so this scale intentionally widens margin_sd only, not total_sd.
+CFB_UNCERTAINTY_MARGIN_SD_SCALE = 2.0
 
 # Executable ask for a side laid at the standard -110 spread/total price.
 # Matches the 0.5238 constant the research pipeline prices against, so a
@@ -127,13 +144,40 @@ class CollegeFootballModel:
 
         tot_line = float(game.total_line) if game.total_line is not None else feat.projected_total
 
-        # 3. Derive Coherent Joint Probabilities
-        joint_probs: CFBJointMarketProbabilities = self.distribution_engine.compute_market_probabilities(
-            mu_home=feat.projected_home_points,
-            mu_away=feat.projected_away_points,
-            spread_home_line=sp_home_line,
-            total_line=tot_line,
+        # Preserve state before the engine advances it. A seed alone cannot
+        # reproduce the second and later games in a slate.
+        from ..cfb_replay import capture_inputs
+
+        # Widen the margin distribution for exactly the games feat.uncertainty
+        # flags as least reliable (FBS-vs-FCS mismatches, thin sample size) --
+        # see CFB_UNCERTAINTY_MARGIN_SD_SCALE's docstring for the empirical
+        # residual-SD evidence. Mutate-then-restore on the shared engine
+        # (rather than a fresh per-call engine) so the RNG stream stays a
+        # single advancing sequence across a slate, matching the seed pin
+        # test in test_mlb_distribution_methods.py's stated invariant for
+        # the analogous MLB engine. Captured BEFORE compute so the replay
+        # record reflects the margin_sd actually used, not the baseline.
+        effective_margin_sd = self.margin_sd * (
+            1.0 + CFB_UNCERTAINTY_MARGIN_SD_SCALE * (feat.uncertainty - CFB_UNCERTAINTY_FLOOR)
         )
+        self.distribution_engine.margin_sd = effective_margin_sd
+        try:
+            inference_inputs = capture_inputs(
+                self.distribution_engine,
+                mu_home=feat.projected_home_points,
+                mu_away=feat.projected_away_points,
+                spread_home_line=sp_home_line,
+                total_line=tot_line,
+            )
+            # 3. Derive Coherent Joint Probabilities
+            joint_probs: CFBJointMarketProbabilities = self.distribution_engine.compute_market_probabilities(
+                mu_home=feat.projected_home_points,
+                mu_away=feat.projected_away_points,
+                spread_home_line=sp_home_line,
+                total_line=tot_line,
+            )
+        finally:
+            self.distribution_engine.margin_sd = self.margin_sd
 
         predictions: list[GamePrediction] = []
 
@@ -156,6 +200,7 @@ class CollegeFootballModel:
                 uncertainty=feat.uncertainty,
                 model_version=self.version,
                 feature_basis=feat.to_dict(),
+                inference_inputs=inference_inputs,
                 rationale=(
                     f"CFB Joint Model ({self.distribution_type.value}): "
                     f"proj score {game.away_team} {feat.projected_away_points:.1f} @ "
@@ -183,6 +228,7 @@ class CollegeFootballModel:
                 uncertainty=feat.uncertainty,
                 model_version=CFB_SPREAD_MODEL_VERSION,
                 feature_basis=feat.to_dict(),
+                inference_inputs=inference_inputs,
                 rationale=(
                     f"Projected home margin {feat.projected_margin_home:+.1f} pts. "
                     f"Spread: Home {sp_home_line:+.1f} / Away {sp_away_line:+.1f} -> "
@@ -209,6 +255,7 @@ class CollegeFootballModel:
                 uncertainty=feat.uncertainty,
                 model_version=CFB_TOTAL_MODEL_VERSION,
                 feature_basis=feat.to_dict(),
+                inference_inputs=inference_inputs,
                 rationale=(
                     f"Projected total {feat.projected_total:.1f} pts (Weather adj: {feat.weather_total_adjustment:+.1f} pts). "
                     f"Total line {tot_line:.1f} -> "
@@ -527,6 +574,7 @@ def build_cfb_slate(
                     "model_uncertainty": p.uncertainty,
                     "model_version": m_ver,
                     "feature_basis": p.feature_basis,
+                    "inference_inputs": p.inference_inputs,
                     "rationale": p.rationale,
                     "market_slug": slug,
                     "executable_ask": float(ask),

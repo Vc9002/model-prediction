@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import os
 
+from openpyxl.utils import get_column_letter
+
 from model_prediction.ledger import FIELDNAMES
 from model_prediction.xlsx_ledger import read_xlsx_rows, write_xlsx_rows_atomic
 
@@ -152,7 +154,7 @@ def test_export_preserves_styles_and_literal_formula_text(tmp_path) -> None:
         assert narrative.font.name == "Aptos"
         assert narrative.data_type == "s" and narrative.value == "=1+1"
         assert sheet.freeze_panes == "A2"
-        assert sheet.tables["PicksLedger"].ref == "A1:DP3"
+        assert sheet.tables["PicksLedger"].ref == f"A1:{get_column_letter(len(FIELDNAMES))}3"
         assert any(cell.data_type == "f" for row in workbook["Summary"] for cell in row)
     finally:
         workbook.close()

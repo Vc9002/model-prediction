@@ -1386,6 +1386,9 @@ def forecast_international_baseball_slate(
                 no_calls.append({**base, "reason": "NO_CALL_MODEL_UNVALIDATED_NEW_TEAM"})
                 continue
             game_tie_p = _game_tie_probability(away_id, home_id, book, tie_method, tie_probability)
+            from .international_replay import capture_inputs
+
+            inference_inputs = capture_inputs(book, away_id, home_id, tie_method, tie_probability)
             away_fair, home_fair = tie_aware_fair_values(
                 book.decisive_home_probability(away_id, home_id), game_tie_p
             )
@@ -1426,6 +1429,8 @@ def forecast_international_baseball_slate(
                     **base,
                     "league": league,
                     "source_team_ids": team_ids,
+                    "inference_inputs": inference_inputs,
+                    "model_inputs_observed_at_utc": observed_now.isoformat(),
                     "model_version": artifact["model_version"],
                     "model_state": "research",
                     "artifact_hash": artifact["artifact_hash"],

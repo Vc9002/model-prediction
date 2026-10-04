@@ -223,3 +223,29 @@ def test_an_unfinished_or_unresolvable_soccer_match_never_invents_a_result() -> 
     espn = _FakeSoccerESPN(_soccer_summary("STATUS_FULL_TIME", 1, 0))
     assert _find_espn_soccer_result_by_event_id(espn, {"event_id": ""}) is None
     assert espn.calls == []
+
+
+def test_nrfi_missing_innings_does_not_fall_back_to_full_game_scores(monkeypatch, tmp_path):
+    past = (datetime.now(UTC) - timedelta(hours=3)).isoformat()
+    row = _open_row("MLB", past) | {"market_type": "nrfi"}
+    monkeypatch.setattr(
+        settle_module,
+        "_find_espn_result",
+        lambda *a, **k: {"completed": True, "status_name": "STATUS_FINAL", "away_score": 6, "home_score": 4},
+    )
+    result = _run_settle(monkeypatch, tmp_path, [row])
+    assert result["still_open"] == [row["pick_id"]]
+    assert not result["settled"]
+
+
+def test_missing_first_inning_value_is_not_fabricated_as_zero():
+    from tests.test_research_outcomes import board
+
+    raw = board()
+    raw["events"][0]["id"] = "ev1"
+    competition = raw["events"][0]["competitions"][0]
+    competition["competitors"][0]["linescores"][0].pop("value")
+    row = _open_row("MLB", "2026-09-09T12:00:00Z")
+    result = settle_module._find_espn_result(_CountingESPNClient(raw), ("MLB",), "2026-09-09", row)
+    assert result["completed"] is True
+    assert "home_1st" not in result and "away_1st" not in result

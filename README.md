@@ -299,20 +299,22 @@ repair of known execution-binding and ledger/audit transaction defects. None
 of the workflows above ever touch real money — Main, Flat, Research, and
 Gated Research are shadow/paper-trading only.
 
-### 8. Native Polymarket Combos
+### 8. Polymarket US API and combo support
 
-The repository now contains a fail-closed combo planner in
-`model_prediction.portfolio.polymarket_combos`. It validates unique native
-combo position IDs, supported sports markets, an explicit joint probability,
-quote expiry, acceptance, and terminal fill status. It is deliberately not
-wired into the existing Auto-Buyer CLOB path: Polymarket Combos use the
-authenticated Combo RFQ workflow in the official `polymarket` SDK, not
-independent `/order` submissions. Until an authenticated Builder API key and
-an audited combo ledger are configured, combo execution remains disabled.
-This repository's live execution integration targets Polymarket US. The
-international Builder RFQ client is optional and must not be used with a US
-account; Polymarket US is a separate product with separate accounts and
-support channels.
+The live integration in this repository targets **Polymarket US**. The
+official US SDK currently documents individual market order operations only
+(create, preview, modify, cancel, and close position). It does not document a
+combo, bundle, RFQ, or atomic multi-leg order endpoint. See
+[`docs/POLYMARKET_US_API.md`](docs/POLYMARKET_US_API.md) for the verified API
+boundary and credential guidance.
+
+The international Polymarket product has a separate Combo RFQ workflow. The
+optional `combo-international` dependency and
+`model_prediction.portfolio.polymarket_combos` adapter are retained only for
+that separate product and are fail-closed when `POLYMARKET_PLATFORM=us`.
+They must not be used with Polymarket US credentials. The Auto-Buyer does not
+place synthetic multi-leg orders: submitting separate US legs is not an
+atomic combo and creates partial-fill and legging risk.
 
 ## Quick start
 

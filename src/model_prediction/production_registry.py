@@ -15,7 +15,7 @@ from __future__ import annotations
 import hashlib
 import importlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -74,6 +74,10 @@ class ProductionModelEntry:
     evidence_status: str = EvidenceStatus.HISTORICAL_ONLY.value
     replacement_priority: str = ReplacementPriority.MEDIUM.value
     challenger_model_id: str | None = None
+    frozen_at_utc: str | None = None
+    promotion_protocol_hash: str | None = None
+    promotion_basis: str | None = None
+    promotion_evidence_level: str | None = None
 
     @property
     def available(self) -> bool:
@@ -212,6 +216,7 @@ class ProductionModelRegistry:
                     rollback_artifact_hash=entries[rollback_id].artifact_hash
                     if rollback_id and rollback_id in entries
                     else None,
+                    promotion_evidence_level=champ_entry.promotion_evidence_level if champ_entry else None,
                 )
 
         blocked_workflows = cls._parse_blocked_workflows(svc, entries)
@@ -306,7 +311,11 @@ class ProductionModelRegistry:
                 raise ValueError("production model entry missing model_id")
             if model_id in entries:
                 raise ValueError(f"duplicate production model entry '{model_id}'")
-            entries[model_id] = ProductionModelRegistry._resolve_entry(raw, root)
+            entries[model_id] = replace(
+                ProductionModelRegistry._resolve_entry(raw, root),
+                promotion_basis=raw.get("promotion_basis"),
+                promotion_evidence_level=raw.get("promotion_evidence_level"),
+            )
         if not entries:
             raise ValueError("prediction_service.models must contain at least one model")
         if primary_id not in entries:
@@ -479,6 +488,8 @@ class ProductionModelRegistry:
                 artifact=str(artifact_rel),
                 artifact_hash=computed_hash,
                 feature_schema_version=str(payload.get("schema_version", "unknown")),
+                frozen_at_utc=payload.get("frozen_at_utc"),
+                promotion_protocol_hash=payload.get("promotion_protocol_hash"),
                 enabled=bool(raw.get("enabled", True)),
                 rollback_model=raw.get("rollback_model"),
                 serving_status=serving_status,

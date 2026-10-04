@@ -395,6 +395,8 @@ def build_tennis_slate(
                         "model_uncertainty": prediction.uncertainty,
                         "model_version": prediction.model_version,
                         "feature_basis": prediction.feature_basis,
+                        "inference_inputs": prediction.inference_inputs,
+                        "model_inputs_observed_at_utc": observed_at.isoformat(),
                         "rationale": prediction.rationale,
                         "market_slug": slug,
                         "executable_ask": float(ask),

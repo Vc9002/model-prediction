@@ -264,6 +264,10 @@ def test_soccer_forward_prices_moneyline_matching_side_by_team_name(tmp_path) ->
     contract = moneyline_contracts[0]
     assert contract["line"] is None
     assert contract["selection"] in {"home", "away"}
+    from model_prediction.coded_market_replay import build_snapshot, replay_inputs
+
+    evidence = build_snapshot(contract, result["model_code_hash"], contract["model_inputs_observed_at_utc"])
+    assert replay_inputs(evidence["inference_inputs"])[contract["selection"]] == contract["model_probability"]
     # Whichever side the model favors, the priced ask must come from the
     # snapshot side matching that team's name, not a fixed slot.
     expected_ask = 0.58 if contract["selection"] == "home" else 0.4

@@ -7,6 +7,7 @@ player and an official report snapshot that existed at decision time.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import unicodedata
@@ -80,7 +81,7 @@ def _load_priors(
 ) -> dict[str, Any]:
     root = data_root / "player_priors" / "wnba"
     eligible: list[tuple[datetime, Path, dict[str, Any]]] = []
-    for path in root.glob("*.json"):
+    for path in [*root.glob("*.json"), *root.glob("snapshots/*/*.json")]:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
             as_of = parse_utc(str(payload["observed_at_utc"]))
@@ -98,7 +99,11 @@ def _load_priors(
             eligible.append((as_of, path, payload))
     if not eligible:
         raise ValueError("NO_CALL_AVAILABILITY_PRIORS_UNAVAILABLE: no pregame WNBA minutes/impact priors")
-    return max(eligible, key=lambda item: (item[0], str(item[1])))[2]
+    latest_time = max(item[0] for item in eligible)
+    latest = [item for item in eligible if item[0] == latest_time]
+    if len({json.dumps(item[2], sort_keys=True) for item in latest}) != 1:
+        raise ValueError("NO_CALL_AVAILABILITY_PRIORS_CONFLICT: multiple priors at the same observation time")
+    return latest[0][2]
 
 
 def _latest_espn_snapshot(data_root: Path, event_id: str, observed_at: datetime) -> dict[str, Any]:
@@ -288,6 +293,15 @@ def matchup_player_availability(
         raise ValueError("NO_CALL_AVAILABILITY_INVALID_TIME: observation is not pregame")
     root = Path(data_root)
     snapshot = _latest_snapshot(root, observed, game_date)
+
+    def content_hash(payload: Mapping[str, Any]) -> str:
+        return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+    source_evidence = {
+        "official_snapshot_hash": content_hash(snapshot),
+        "official_observed_at_utc": snapshot.get("observed_at_utc"),
+        "official_report_at_utc": snapshot.get("report_at_utc"),
+    }
     if event_id is not None:
         espn_snapshot: dict[str, Any] | None = None
         with suppress(ValueError, KeyError, TypeError, OSError):
@@ -302,8 +316,12 @@ def matchup_player_availability(
             # fail-closed NO_CALL this function's docstring promises.
             espn_snapshot = _latest_espn_snapshot(root, event_id, observed)
         if espn_snapshot is not None:
+            source_evidence["espn_snapshot_hash"] = content_hash(espn_snapshot)
+            source_evidence["espn_observed_at_utc"] = espn_snapshot.get("observed_at_utc")
             snapshot = merge_availability_sources(snapshot, espn_snapshot, game_date=game_date)
     priors = _load_priors(root, game_date, observed, maximum_age_hours=maximum_prior_age_hours)
+    source_evidence["prior_hash"] = content_hash(priors)
+    source_evidence["prior_observed_at_utc"] = priors.get("observed_at_utc")
     result = matchup_player_availability_from_payloads(
         snapshot=snapshot,
         priors=priors,
@@ -317,6 +335,7 @@ def matchup_player_availability(
     conflicts = list(snapshot.get("source_conflicts", []))
     result["availability_source_conflict_count"] = len(conflicts)
     result["availability_source_conflicts"] = conflicts
+    result["source_evidence"] = source_evidence
     return result
 
 

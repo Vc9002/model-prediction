@@ -1,10 +1,11 @@
 """Fail-closed planning and execution adapter for Polymarket Combos.
 
-Combos are not CLOB orders. Polymarket's current API exposes them through an
-authenticated RFQ flow in the official ``polymarket`` SDK. This module keeps
-that flow isolated from the existing single-market executor so a missing SDK,
-missing Builder API key, stale quote, or partial RFQ result cannot silently
-turn into independent leg orders.
+Combos are not CLOB orders. The separate international Polymarket product
+exposes them through an authenticated RFQ flow in the official
+``polymarket`` SDK. Polymarket US has no documented combo/RFQ endpoint. This
+module keeps the international flow isolated from the existing single-market
+executor so a missing SDK, missing Builder API key, stale quote, or partial
+RFQ result cannot silently turn into independent US leg orders.
 """
 
 from __future__ import annotations

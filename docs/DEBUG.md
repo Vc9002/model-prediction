@@ -1,5 +1,69 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
+## 2026-09-09 — Complete learned replay inputs and immutable WNBA priors
+
+Root cause found in the recording path: WNBA probabilities can change after
+the fitted artifact via player-availability adjustment, but the row omitted
+its points gap, margin sigma, and transform state. `learned_replay.py` now
+captures and validates the complete artifact, dynamically named inputs, base
+probability, served probability, and transformation. `PickRequest` and the
+ledger preserve a JSON snapshot; feature payload v2 retains it through
+settlement and export. The incumbent evaluator replays it when present.
+
+`build_and_save_priors` previously overwrote each day's player-prior file.
+Retained August 23/24 files are later than the mismatched decisions, so exact
+historical recovery remains blocked. Future writes preserve old/new versions
+by content hash and atomically update the compatibility view. The as-of loader
+reads those snapshots and rejects same-timestamp conflicts. All 22 other
+incomplete WNBA contexts lack `defensive_trend_gap` during July 28–August 3.
+
+Also fitted the new incumbent-anchored MLB residual v2; it has no reliable
+gain and is not promoted. Verification: 203 focused tests; scoped Ruff/mypy;
+repeat training reproduces model bytes and results. See
+`docs/MODEL_ITERATION_2026-09-09.md`. No historical ledger repair was applied.
+
+## 2026-09-09 — Incumbent replay and quote lineage follow-up
+
+The canonical source is `model-prediction-runtime/ledgers/ledgers.db`, opened
+read-only. New `evaluate_research_incumbents.py` collapses mirror decisions,
+rejects conflicting contexts, replays exact stored features, and gates paired
+comparisons before ranking. Probability zero is valid; null is not 0.5.
+Quotes require unique archive linkage, exact participants/start/horizon,
+fresh pregame timestamps, actual asks/depth, and supported historical fees.
+
+Found and fixed: learned moneyline quote matching returned a reduced object,
+which forecast lineage hashed even though the archive held the full record.
+The matcher now carries `_archive_record`; lineage hashes the archived object.
+The regression checks the actual archive hash. Old hashes are reconciled only
+through the exact known projection and only when one full record matches.
+
+WNBA's two distinct probability mismatches remain unresolved and block its
+comparison. MLB replay passes but its candidate offers no reliable predictive
+gain; both common-policy simulations lose money. Five incumbent cohorts have
+no decisions; fourteen need replay inputs/state and adapters. See
+`docs/INCUMBENT_COMPARISON_2026-09-09.md` and the verified output directory.
+Final focused verification: 126 passed; scoped Ruff and mypy passed; existing
+production artifacts/config hashes unchanged. No full-suite or profit claim.
+
+## 2026-09-09 — Isolated all-market research generation
+
+Added `research_generation.py` and `train_research_generation.py`, fitting 21
+research artifacts with independent chronological train/select/calibrate/test
+periods. The first attempt stopped NRFI before fitting because `parse_utc`
+correctly rejected a date-only prior cutoff. Adding explicit UTC midnight fixed
+the timestamp; the clean rerun completed all 21 with identical predictive
+metrics to each first successful attempt. Previous attempts were preserved.
+
+Tests cover two-day result embargo, future-result perturbation, outcome-neutral
+tennis orientation, conflicting duplicates, complete-date split isolation,
+calibration independence from test labels, artifact corruption, output overwrite
+refusal, signed home spreads, and push handling. Final focused verification:
+24 passed; scoped Ruff and mypy clean. Existing production config/artifacts
+hash unchanged. No full-suite, PIT, incumbent-superiority, or profit claim.
+
+See `docs/GENERATION_2026-09-09.md` and
+`outputs/research/generation_20260909_v1_verified/{manifest,verification}.json`.
+
 **Last audited**: 2026-09-08 (see new section directly below)
 
 ## 2026-09-08 — Project-wide optimization and integration

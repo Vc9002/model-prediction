@@ -414,3 +414,7 @@ def test_forecast_requires_exact_identity_and_remains_zero_unit(tmp_path) -> Non
     assert result["priced_contracts"][0]["source_teams_resolved"] is True
     assert result["priced_contracts"][0]["source_teams_trained"] is True
     assert result["priced_contracts"][0]["gated_research_eligible"] is True
+    from model_prediction.esports_replay import build_snapshot, replay_inputs
+
+    evidence = build_snapshot(result["priced_contracts"][0])
+    assert replay_inputs(evidence["inference_inputs"]) == evidence["probabilities"]

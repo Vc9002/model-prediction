@@ -26,6 +26,7 @@ Welcome to the unified documentation directory for the `model-prediction` platfo
 | [`CFB_PREDICTION_SYSTEM.md`](CFB_PREDICTION_SYSTEM.md) | Complete College Football (NCAAF) Prediction System: joint scoring, priors, weather, ablations, market validation, and dual-ledger gating. |
 | [`LEDGER_ROUTING.md`](LEDGER_ROUTING.md) | Multi-tier ledger topology (Main, Flat, Research, Gated Research) and workbook separation. |
 | [`PRODUCTION.md`](PRODUCTION.md) | Production canary, run supervisor, launchd scheduling, and fail-closed safety gates. |
+| [`POLYMARKET_US_API.md`](POLYMARKET_US_API.md) | Verified Polymarket US API surface, credential guidance, and the current combo/RFQ boundary. |
 | [`FEATURE_REGISTRY.md`](FEATURE_REGISTRY.md) | Canonical registry of engineered features and their strict Point-in-Time (PIT) contracts. |
 | [`CHAMPION_CHALLENGER.md`](CHAMPION_CHALLENGER.md) | Promotion gating, bootstrap confidence intervals, and shadow evaluation framework. |
 | [`CONSOLIDATION.md`](CONSOLIDATION.md) | Record of the runtime consolidation and external runtime root migration. |

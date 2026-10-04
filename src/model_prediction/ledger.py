@@ -329,6 +329,7 @@ FIELDNAMES = [
     "blend_experiment_spec_hash",
     "blend_config_hash",
     "serving_policy_block_reason",
+    "model_input_snapshot_json",
 ]
 FEATURE_PAYLOAD_SCHEMA_VERSION = "ledger-row-features-v1"
 FEATURE_VALUE_FIELDS = (
@@ -420,6 +421,7 @@ DECISION_FIELDS = {
     "blend_experiment_spec_hash",
     "blend_config_hash",
     "serving_policy_block_reason",
+    "model_input_snapshot_json",
 }
 
 
@@ -1032,14 +1034,36 @@ class PickLedger:
             pnl_units=_num(row.get("pnl_units")),
             settled_at_utc=row.get("settled_at_utc") or None,
             decision_payload=dict(row),
-            feature_payload=self._feature_payload(row),
+            feature_payload=self._feature_payload(row, event_type=event_type),
             note=note,
         )
 
     @staticmethod
-    def _feature_payload(row: dict[str, str]) -> dict[str, Any]:
-        """Build an auditable feature snapshot without synthesizing values."""
+    def _feature_payload(row: dict[str, str], *, event_type: str = "append") -> dict[str, Any]:
+        """Build an auditable feature snapshot without synthesizing values.
+
+        ``event_type == "remove"`` skips the replay-reproducibility
+        assertion: removal discards a stale open row (e.g. daily
+        re-forecast clearing yesterday's unsettled picks) without asserting
+        any new fact about it, so it must never become permanently blocked
+        by a later, unrelated code change invalidating an old capture's
+        replay hash. Found live 2026-09-14: an additive esports.py change
+        changed that file's hash, which made every already-open esports
+        pick's mirror removal raise `esports_replay_code_mismatch` --
+        uncaught above `remove_open_rows`, this aborted the entire
+        multi-sport daily pipeline, not just esports. The feature values
+        themselves are still recorded from the snapshot's own history,
+        independent of whether replay still reproduces them.
+        """
         features = {field: row[field] for field in FEATURE_VALUE_FIELDS if row.get(field) not in (None, "")}
+        snapshot = None
+        if row.get("model_input_snapshot_json"):
+            from .learned_replay import validate_decision_snapshot
+
+            snapshot = json.loads(row["model_input_snapshot_json"])
+            if event_type != "remove":
+                validate_decision_snapshot(snapshot, row)
+            features.update({name: str(value) for name, value in snapshot["features"].items()})
         unavailable_features = row.get("unavailable_features") or None
         if not features:
             availability_status = "unavailable_not_recorded"
@@ -1047,8 +1071,10 @@ class PickLedger:
             availability_status = "partial_with_unavailable_features"
         else:
             availability_status = "available"
-        return {
-            "feature_payload_schema_version": FEATURE_PAYLOAD_SCHEMA_VERSION,
+        payload = {
+            "feature_payload_schema_version": "ledger-row-features-v2"
+            if snapshot
+            else FEATURE_PAYLOAD_SCHEMA_VERSION,
             "feature_schema_version": row.get("feature_schema_version") or None,
             "model_version": row.get("model_version") or None,
             "model_artifact_hash": row.get("model_artifact_hash") or None,
@@ -1057,6 +1083,9 @@ class PickLedger:
             "unavailable_features": unavailable_features,
             "features": features,
         }
+        if snapshot is not None:
+            payload["model_input_snapshot"] = snapshot
+        return payload
 
     def settle(
         self,

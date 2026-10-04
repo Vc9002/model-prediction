@@ -10,9 +10,12 @@ requires a locally-defined logger.
 from __future__ import annotations
 
 import logging
+import math
 import unicodedata
 from pathlib import Path
 from typing import Any
+
+import httpx
 
 from ..config import (
     PROJECT_ROOT,
@@ -179,6 +182,14 @@ def _settle_all_unsettled(
         if not match.get("completed"):
             pending.append(row["pick_id"])
             continue
+        if row.get("market_type") in ("nrfi", "yrfi") and not all(
+            key in match for key in ("away_1st", "home_1st")
+        ):
+            pending.append(row["pick_id"])
+            logger.warning(
+                "NRFI settlement pending for %s: explicit first-inning scores unavailable", row["pick_id"]
+            )
+            continue
         closing_line = closing_odds = closing_probability = None
         quote = market_store.closing_quote(
             row["event_id"], row["event_start_utc"], row["market_type"], row["selection"]
@@ -297,8 +308,18 @@ def _find_espn_result(
                     away_lines = away.get("linescores", [])
                     home_lines = home.get("linescores", [])
                     if away_lines and home_lines:
-                        record["away_1st"] = int(float(away_lines[0].get("value", 0) or 0))
-                        record["home_1st"] = int(float(home_lines[0].get("value", 0) or 0))
+                        firsts = (away_lines[0], home_lines[0])
+                        values = [inning.get("value") for inning in firsts]
+                        if all(
+                            inning.get("period", 1) == 1
+                            and not isinstance(value, bool)
+                            and isinstance(value, (int, float))
+                            and math.isfinite(value)
+                            and value >= 0
+                            and value == int(value)
+                            for inning, value in zip(firsts, values, strict=True)
+                        ):
+                            record["away_1st"], record["home_1st"] = (int(value) for value in values)
                 except (TypeError, ValueError):
                     record["completed"] = False
             return record
@@ -431,18 +452,45 @@ def _settle_esports_pick(row: dict, ledger, data_root=None) -> dict | None:
             return None
         prices[str(side.get("description") or "")] = price
     if len(prices) != 2 or sorted(prices.values()) != [0.0, 1.0]:
-        # A terminal book with a non-binary settlement price is not "still
-        # pending" -- Polymarket's stats.settlementPx confirms this already
-        # IS the market's final, official settlement value; it's just not a
-        # clean win/loss. Per these contracts' own resolution rules (forfeit,
-        # disqualification, or a postponement never rescheduled within two
-        # weeks all "settle to the last fair market price"), this means the
-        # match never definitively completed as scheduled. Void rather than
-        # leave the pick open forever with no path to resolution.
+        # A non-binary terminal price on a resolved esports market is NOT
+        # reliably a forfeit/postponement signal -- confirmed live
+        # 2026-09-14: real, cleanly-decided CS2 matches (verified against
+        # BO3's own `winner_team_id`) still come back from Polymarket US
+        # showing pre-close trading prices instead of a clean [0.0, 1.0],
+        # for reasons on Polymarket's side, not the match's. Voiding on this
+        # signal alone silently mis-records real wins/losses as pushes (see
+        # the ~260 esports picks voided this way since 2026-07-26). Check
+        # BO3's actual match result before assuming forfeit/postponement.
+        from ..esports import resolve_esports_match_result
+
+        bo3_result = None
+        try:
+            bo3_result = resolve_esports_match_result(
+                row["league"],
+                str(row["home_team"]),
+                str(row["away_team"]),
+                str(row["event_start_utc"]),
+                data_root or PROJECT_ROOT / "data",
+            )
+        except (httpx.HTTPError, OSError, ValueError, KeyError, TypeError, RuntimeError):
+            logger.warning("BO3 esports result lookup failed for slug %s", slug, exc_info=True)
+        if bo3_result is not None:
+            away_score = 1 if bo3_result["away_win"] else 0
+            home_score = 1 if bo3_result["home_win"] else 0
+            try:
+                result = ledger.settle(row["pick_id"], away_score, home_score, None, None)
+                return {"pick_id": row["pick_id"], "result": result["result"], "settled": True}
+            except (KeyError, ValueError) as error:
+                return {"pick_id": row["pick_id"], "reason": str(error)}
+        # BO3 has no unambiguous result either -- this genuinely is an
+        # unresolvable fixture (forfeit, disqualification, or a
+        # postponement never rescheduled within two weeks all "settle to
+        # the last fair market price" per these contracts' own rules).
         try:
             voided = ledger.void(
                 row["pick_id"],
-                "esports market settled to a non-binary price (forfeit/postponement per market rules)",
+                "esports market settled to a non-binary price (forfeit/postponement per market rules); "
+                "BO3 has no confirming finished-match result either",
             )
             return {"pick_id": row["pick_id"], "voided": True, "result": voided["result"]}
         except (KeyError, ValueError) as error:

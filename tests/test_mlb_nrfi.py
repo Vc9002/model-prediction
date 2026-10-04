@@ -198,8 +198,11 @@ class TestMLBNRFIModel:
 
 
 class TestNRFIForecastAndLedgerWiring:
-    def test_forecast_mlb_nrfi_flat_and_main_ledger(self, tmp_path: Path) -> None:
+    def test_forecast_mlb_nrfi_flat_and_main_ledger(self, tmp_path: Path, monkeypatch) -> None:
+        import model_prediction.cli.forecast as forecast_module
         from model_prediction.cli.forecast import _forecast_mlb_nrfi_flat
+
+        monkeypatch.setattr(forecast_module, "utc_now", lambda: datetime(2026, 5, 20, 21, tzinfo=UTC))
         from model_prediction.domain import MarketType
         from model_prediction.ledger import PickLedger
 
@@ -248,6 +251,9 @@ class TestNRFIForecastAndLedgerWiring:
         assert len(flat_rows) == 1
         row = flat_rows[0]
         assert row["event_id"] == "mlb_1001"
+        evidence = json.loads(row["model_input_snapshot_json"])
+        assert evidence["schema"] == "scalar-artifact-replay-v1"
+        assert evidence["observed_at_utc"] == "2026-05-20T21:00:00+00:00"
         assert row["market_type"] == MarketType.NRFI.value
         assert row["selection"] in ("nrfi", "yrfi")
         assert float(row["line"]) == 0.5

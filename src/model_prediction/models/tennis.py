@@ -174,10 +174,24 @@ class TennisModel:
                 "feature_basis": feature_basis,
             }
 
+            from ..coded_market_replay import capture_inputs
+
+            players = [match.player_one, match.player_two]
+            inference_inputs = capture_inputs(
+                "TENNIS",
+                {
+                    "players": players,
+                    "surface": match.surface,
+                    "overall_ratings": [overall[p] for p in players],
+                    "surface_ratings": [by_surface.get((p, match.surface), DEFAULT_ELO) for p in players],
+                    "surface_counts": [surface_counts.get((p, match.surface), 0) for p in players],
+                },
+            )
             # 1. Moneyline
             predictions.append(
                 GamePrediction(
                     market_type="moneyline",
+                    inference_inputs=inference_inputs,
                     line=None,
                     probabilities={
                         "away": round(p_one, 6),  # player_one mapped to "away" slot

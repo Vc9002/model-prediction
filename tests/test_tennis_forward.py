@@ -221,6 +221,10 @@ def test_tennis_forward_prices_singles_moneyline_and_excludes_doubles(tmp_path) 
     assert contract["away_team"] == "Alpha Player"
     assert contract["home_team"] == "Beta Player"
     assert contract["selection"] in {"away", "home"}
+    from model_prediction.coded_market_replay import build_snapshot, replay_inputs
+
+    evidence = build_snapshot(contract, result["model_code_hash"], contract["model_inputs_observed_at_utc"])
+    assert replay_inputs(evidence["inference_inputs"])[contract["selection"]] == contract["model_probability"]
     expected_ask = 0.42 if contract["selection"] == "away" else 0.6
     assert contract["executable_ask"] == expected_ask
     snapshot_path = tmp_path / "odds" / "tennis" / "2026-07-27" / "polymarket_snapshots.jsonl"

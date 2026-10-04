@@ -1,5 +1,173 @@
 # Project status and source of truth
 
+## 2026-09-14 evening — Control-plane audit and initial consolidation fixes
+
+The current checkout is September 9 HEAD `8b713cd` plus uncommitted work.
+All 21 configured challenger lanes lack registered artifacts; the registry now
+reports that failure rather than claiming prospective capture from model names.
+Implementation, artifact freeze and validation are distinguished, evidence is
+filtered by exact artifact/market, and v10's operator predictive-only serving
+basis is retained in reports. The missing CI v4 artifact is packaged as a
+hash-checked regression fixture, with its statistics independently recomputed.
+
+Auto-Buyer is currently enabled in **paper mode**, but its code still does not
+consume the global production execution flags. Phase F capture still lacks a
+canonical supervised worker. Those gaps are not resolved by passing tests.
+See [verified findings and P0/P1/P2 implementation queue](CONTROL_PLANE_CONSOLIDATION_2026-09-14.md).
+Test logs and exact source snapshots are under
+`outputs/research/control_plane_verification_20260914/`.
+Full suite: **2,990 passed, 3 skipped**. The affected 65-test suite passed after
+the final synthetic-evidence safeguard; Ruff passed on 102 Python files and
+scoped mypy passed on three modules. Lifecycle integrity remains FAIL because
+the configured challenger registrations are missing. Remote CI is unverified.
+
+## 2026-09-14 — All-model pricing support and newly settled evidence
+
+The 21-model research generation remains
+`outputs/research/generation_20260912_clean_update/`; all artifacts pass fresh
+inference checks. New later-price capture and scoring support NRFI, CFB, WNBA
+derivatives, soccer's three outcomes and KBO/NPB ties alongside the existing
+paired binary and MLB derivative adapters. Exact rules, fees, book times and
+source/model identities are verified; missing or inconsistent quotes stay null.
+
+Clean NRFI scored 7/15 on September 13. Its two simulated calls both lost,
+for -$9.75 including fees. Soccer scored 1/1 with one unavailable forecast;
+it has no bound price. Three September 17 CFB forecasts are archived, with one
+verified moneyline quote and no settled result. No rebuilt candidate establishes
+reliable accuracy and profit improvement; no replacement is qualified.
+At the earlier saved source snapshot: 2,964 passed, 3 skipped. The final pricing
+CLI check passed 139 focused tests and six scoped type checks. Additional local
+edits arrived afterward; the evening receipt above supersedes this snapshot for
+current-tree verification.
+See [complete per-model results and evidence](REBUILD_STATUS_2026-09-14.md).
+
+## 2026-09-12 — Corrected NRFI generation and first scored paired returns
+
+The current 21-model research generation is
+`outputs/research/generation_20260912_clean_update/`. The new NRFI version fixes
+invalid labels, mixed opponent batter pools and train/serve history timing.
+Its probability scores do not improve; no promotion is supported. Fourteen
+new pregame forecasts rebuild from source.
+
+All 49 prior paired forecasts now have independent outcomes. Their canonical
+rows were removed, so the archived pregame decisions and choices are evaluated
+without restoring them. On 24 verified quote opportunities the candidate loses
+$13.925 versus the incumbent's $26.130; both are losing simulations on one game
+date. The observer is terminal: 49 captures, 19 unavailable, no pending work.
+Full suite: 2,897 passed, 3 skipped. All 21 candidate inference checks pass.
+See [NRFI corrections, results and remaining scope](NRFI_AND_SETTLED_REBUILD_2026-09-12.md).
+
+
+## 2026-09-11 midday — Recency iteration tested; captured quote economics ready
+
+A 17-market recency experiment is fitted and reproducible: ten select weighting,
+seven retain equivalent original fits, and none clears the required improvement
+threshold. WNBA spread becomes worse; LoL has a small gain below the minimum
+meaningful effect. The three MLB recency models have 39 new pregame forecasts.
+
+The existing observer has 49 exact candidate/incumbent pairs across 18 games.
+Twenty-four event-market opportunities across 14 MLB games have verified quotes
+for identical fee-aware policies. P&L remains null before settlement. The spread
+archive adapter and a late-arriving ledger-mirror pairing bug are fixed.
+118 focused tests, scoped Ruff and mypy pass. No champions or orders changed.
+See [recency and quote evidence](RECENCY_AND_QUOTE_ITERATION_2026-09-11.md).
+
+
+## 2026-09-11 UTC — Three fitted CFB updates, shared inference, active observer
+
+The updated research generation contains three new joint-score CFB models and
+18 retained first-generation candidates. On the same 878 historical research
+evaluation games, CFB moneyline accuracy rises from 68.56% to 69.70%, but the
+Brier-gain interval crosses zero; margin/total errors are essentially unchanged.
+This does not establish production-incumbent superiority or profitability.
+Nine actual pregame forecasts rebuild exactly; six contracts lack participant
+history. Exact legacy-name/provider-ID mapping is now enforced.
+
+The old observer was stopped before any capture. The corrected 24-hour observer
+is `outputs/research/paired_observer_20260911_v2/report.json`, monitoring 68
+prepared MLB/NCAAF contracts. Its live counts are authoritative. See
+[CFB fitted iteration and verification](CFB_JOINT_ITERATION_2026-09-11.md).
+
+## 2026-09-10 evening — Outcomes scored; paired capture implemented
+
+All 41 archived pregame forecasts now have outcomes: MLB moneyline 5/10,
+spread 8/10, total 3/10, NRFI 6/10, and NFL moneyline 1/1. These cover only
+11 events; no reliable accuracy or profitability improvement is established.
+The market-aware comparison has zero eligible same-context pairs. A new
+prepare/capture runner binds future candidate forecasts to an exact incumbent
+decision and refuses captures after event start. Today's later capture missed
+all 13 starts and was rejected; pregame automation remains necessary.
+The bounded observer now checks every 30 seconds for 68 prepared September 11
+contracts across 20 MLB/NCAAF games, with a 24-hour limit. Its live output is
+`outputs/research/paired_observer_20260911_v1/report.json`; captured counts must
+be checked there, not inferred from preparation.
+NRFI settlement now stays pending when first-inning scores are missing.
+Broad tests plus focused failure resolutions pass; full evidence and exact
+limitations: [paired rebuild checkpoint](PAIRED_REBUILD_2026-09-10.md).
+
+## 2026-09-10 — All 21 candidate and incumbent paths are replayable
+
+All 21 fitted candidates have target-free fixture inference and archived source
+rebuild support. All 21 incumbent market paths now capture the exact inputs or
+inference state needed for replay; MLB v10 uses its separate shadow runner.
+Historical missing state remains missing. The legacy comparison command now
+uses canonical SQLite and exact decision contexts with a reproduction gate.
+Market-aware paired economics beyond learned moneyline and sport-specific
+iterations remain open. No reliable accuracy/profit improvement is established.
+See [current rebuild evidence and limitations](FORWARD_REBUILD_2026-09-09.md).
+Final complete-suite verification: 2,821 passed, 3 skipped, no failures.
+All 57 changed/new Python files pass Ruff; 20 rebuild modules pass mypy.
+
+
+## 2026-09-09 — Replay recording repaired; MLB residual v2 evaluated
+
+New learned moneyline decisions now preserve full artifacts, dynamic model
+inputs, and any WNBA availability transform through logging and settlement.
+WNBA player priors retain immutable versions instead of losing earlier
+observations on daily-file refresh. These fixes do not restore the two
+historical mismatches or 22 missing legacy defensive-trend inputs.
+
+MLB residual v2 is fitted and reloadable: on 77 reused historical evaluation
+games, Brier/log loss improve slightly but accuracy falls to 57.14% vs 61.04%.
+The improvement interval crosses zero. On 68 archived quote opportunities,
+the common-policy simulation loses $16.065 vs the incumbent's $14.335.
+No reliable predictive or profitable upgrade is established. 203 focused tests
+pass; scoped Ruff/mypy pass. No new-model promotion or order submission.
+See [second iteration](MODEL_ITERATION_2026-09-09.md).
+
+## 2026-09-09 — Incumbent comparison completed; no replacement supported
+
+The follow-up audited all 21 markets from the canonical runtime SQLite ledger.
+MLB has 378 exactly replayed current-artifact contexts and 371 paired games:
+candidate accuracy 52.56% vs incumbent 56.33%; Brier/log loss are also worse in
+point estimate, with no reliable improvement. On 194 archived quote
+opportunities, the same fee-aware hypothetical policy returns -9.56% ROI for
+the candidate and -14.27% for the incumbent; both lose and their difference is
+uncertain. These are simulated returns, not actual trading performance.
+
+WNBA fails replay (two mismatches, 22 incomplete contexts). Five incumbents
+have no settled current-model records; fourteen other markets need stored
+inputs/model state and replay adapters. Future moneyline quote hashes now bind
+the full archived record. 126 focused tests, scoped Ruff/mypy pass. Production
+artifacts and champion registration are unchanged; no orders or promotions.
+See [comparison report](INCUMBENT_COMPARISON_2026-09-09.md).
+
+## 2026-09-09 — First all-market fitted research generation
+
+Vincent declared prior frozen research protocols obsolete and requested both
+greater predictive accuracy and profitability across every existing market.
+The isolated new runner has trained 21 candidate artifacts across 14 sports.
+These are historical research benchmarks, not qualified replacements:
+exact-incumbent superiority, source PIT provenance, and executable profitability
+remain unverified. No champions, existing model artifacts, or trading state
+were changed. All 21 repeated-run metrics match, serialization predictions
+match, 24 focused tests pass, and scoped Ruff/mypy pass. This is not a new
+full-suite verification.
+
+See [generation results and limitations](GENERATION_2026-09-09.md) and the
+current [rebuild queue](ROADMAP.md). Older freeze restrictions below are
+historical context; current operator authorization is recorded in `AGENTS.md`.
+
 **Last full-suite verification**: 2026-08-31 (Commit `3066d59`, Tag `lifecycle-v1`). Full test suite passed (2,547 passed, 0 failures, 3 skipped); ruff 100% clean; strict type checking clean across all modules. All 21 supported production markets maintain active champions under the permanent champion–challenger lifecycle framework. NCAAF models (`college-football-v1`, `cfb-spread-v1`, `cfb-total-v1`) are active champions serving under `degraded` evidence status / `critical` replacement priority, with unified decomposed scoring challenger `cfb-structural-v2` implemented. MLB Totals champion is `mlb-structural-v10-frozen` (`promotion_basis: operator_predictive_promotion`) with `measured-edge-totals-v3` as rollback. Automated Polymarket Buyer uses $1\text{U} = \$0.50$.
 
 **Operating Architecture**: Permanent champion–challenger production lifecycle with strict Point-in-Time (PIT) feature extraction, fail-closed `EvidenceOrigin` provenance separation, Unified Model Qualification Registry research control plane, automated Polymarket execution engine, and multi-horizon pregame snapshot tracking ($T-6\text{h}, T-3\text{h}, T-1\text{h}, T-30\text{m}, T-10\text{m}$).
@@ -680,3 +848,13 @@ state. They require separate authorization appropriate to the risk.
 11. Regenerate `outputs/rebuild/verification.json` (gitignored CI evidence; `/api/rebuild/status` reports degraded while absent) — CI regenerates on push, or run the `generate_rebuild_verification.py` recipe locally.
 12. ~~`dashboard/server.log` tracked in git~~ — untracked 2026-08-13, added to `.gitignore`.
 13. ~~NBA/NFL dangling `spread/total_research_artifact` config refs~~ — removed 2026-08-13 (archived artifacts, zero consumers).
+# 2026-09-09 all-model forward capture update
+
+All 21 first-generation candidates now support target-free upcoming-fixture
+inference and replay. Forty-one pregame MLB/NFL forecasts were captured from
+local cached schedules and independently rebuilt from archived sources.
+NCAAF's three incumbent markets now preserve their advancing simulator RNG
+state through ledger settlement. The initial 7/21 incumbent coverage was
+completed to 21/21 on September 10; see the latest entry and linked report.
+No accuracy/profit superiority or promotion is established.
+Details and exact evidence: `FORWARD_REBUILD_2026-09-09.md`.

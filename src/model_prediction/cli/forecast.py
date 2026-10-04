@@ -122,6 +122,9 @@ def _downgrade_unserved(eligibility: Any, reason_code: str = "PAPER_CALL_MODEL_U
 
 def _canonical_market_snapshot_lineage(row: dict[str, Any], archive_path: Path) -> dict[str, Any] | None:
     """Bind a parsed prospective quote to its exact archived JSON record."""
+    row = row.get("_archive_record", row)
+    if not isinstance(row, dict):
+        return None
     observed_at = str(row.get("observed_at_utc") or "")
     source = str(row.get("provider") or "")
     reconstructed = row.get("reconstructed")
@@ -229,6 +232,11 @@ def _forecast_mlb(args_date: str, log: bool, config, registry, bans, ledger, aud
                 entity_map_version=registry.version,
                 code_revision="measured-edge-paired-v1",
                 decision_no_vig_probability=candidate.no_vig_probability,
+                model_input_snapshot_json=(
+                    json.dumps(candidate.model_input_snapshot, sort_keys=True, allow_nan=False)
+                    if candidate.model_input_snapshot
+                    else None
+                ),
             )
             request.validate(now=observed_at)
             away = registry.resolve(request.league, request.away_team, request.event_start_utc)
@@ -518,6 +526,11 @@ def _forecast_mlb_totals_flat(
                 entity_map_version=registry.version,
                 code_revision="measured-edge-paired-v1",
                 decision_no_vig_probability=candidate.no_vig_probability,
+                model_input_snapshot_json=(
+                    json.dumps(candidate.model_input_snapshot, sort_keys=True, allow_nan=False)
+                    if candidate.model_input_snapshot
+                    else None
+                ),
                 config_hash=stage1_config_hash,
                 config_byte_sha256=stage1_config_byte_sha256,
                 config_path=str(stage1_config_path),
@@ -685,15 +698,15 @@ def _forecast_mlb_nrfi_flat(
         away_sp_name = away_probables[0].get("athlete", {}).get("displayName", "") if away_probables else ""
 
         event_decision_dt = decision_dt
-        if event_start_utc:
-            try:
-                from ..domain import parse_utc
+        try:
+            from ..domain import parse_utc
 
-                start_dt = parse_utc(event_start_utc)
-                if event_decision_dt >= start_dt:
-                    event_decision_dt = start_dt - timedelta(hours=2)
-            except (ValueError, TypeError):
-                pass
+            if not event_start_utc or event_decision_dt >= parse_utc(event_start_utc):
+                logger.warning("Skipping NRFI event %s: missing start or already started", event_id)
+                continue
+        except (ValueError, TypeError):
+            logger.warning("Skipping NRFI event %s: invalid event start", event_id)
+            continue
 
         venue_name = comps.get("venue", {}).get("fullName", "") or ""
         try:
@@ -731,19 +744,25 @@ def _forecast_mlb_nrfi_flat(
                 pick_selection = "yrfi"
                 pick_prob = p_yrfi
                 pick_odds = fair_american_yrfi
-                pick_rationale = (
-                    f"MLB 1st Inning YRFI: p={p_yrfi:.3f} (mlb-nrfi-v1, {model.fit_n_games} training games)"
-                )
+                pick_rationale = f"MLB 1st Inning YRFI: p={p_yrfi:.3f} ({model_version}, {model.fit_n_games} training games)"
             else:
                 pick_selection = "nrfi"
                 pick_prob = p_nrfi
                 pick_odds = fair_american_nrfi
-                pick_rationale = (
-                    f"MLB 1st Inning NRFI: p={p_nrfi:.3f} (mlb-nrfi-v1, {model.fit_n_games} training games)"
-                )
+                pick_rationale = f"MLB 1st Inning NRFI: p={p_nrfi:.3f} ({model_version}, {model.fit_n_games} training games)"
 
+            from ..scalar_artifact_replay import build_snapshot as build_scalar_snapshot
+
+            nrfi_snapshot = build_scalar_snapshot(
+                artifact,
+                live_features,
+                {},
+                event_id=event_id,
+                event_start_utc=event_start_utc,
+                observed_at_utc=event_decision_dt.isoformat(),
+            )
             req_nrfi = PickRequest(
-                event_start_utc=event_start_utc or (event_decision_dt + timedelta(hours=2)).isoformat(),
+                event_start_utc=event_start_utc,
                 event_id=event_id,
                 league=League.MLB,
                 away_team=away_team,
@@ -761,6 +780,8 @@ def _forecast_mlb_nrfi_flat(
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
                 model_state=ModelState.SHADOW_QUALIFIED,
                 observed_at_utc=event_decision_dt.isoformat(),
+                model_artifact_hash=artifact["artifact_hash"],
+                model_input_snapshot_json=json.dumps(nrfi_snapshot, sort_keys=True, allow_nan=False),
             )
 
             # Build EligibilityResult
@@ -1012,6 +1033,20 @@ def _forecast_wnba_spread_slate(data_root, args_date: str, client) -> dict:
             line = -float(market["line"])
         if ask is None or not 0 < float(ask) < 1:
             continue
+        from ..scalar_artifact_replay import build_snapshot as build_scalar_snapshot
+
+        model_snapshot = (
+            build_scalar_snapshot(
+                artifact,
+                prediction.feature_basis,
+                prediction.inference_inputs,
+                event_id=prediction.event_id,
+                event_start_utc=prediction.event_start_utc,
+                observed_at_utc=observed_at.isoformat(),
+            )
+            if prediction.inference_inputs is not None
+            else None
+        )
         priced_contracts.append(
             {
                 "event_id": prediction.event_id,
@@ -1035,6 +1070,7 @@ def _forecast_wnba_spread_slate(data_root, args_date: str, client) -> dict:
                     else observed_at.isoformat()
                 ),
                 "market_lineage": market_lineage,
+                "model_input_snapshot": model_snapshot,
             }
         )
 
@@ -1115,6 +1151,11 @@ def _forecast_wnba_spread_sport(
             calibration_artifact_hash=contract["model_artifact_hash"],
             feature_schema_version=contract["model_version"],
             code_revision=contract["model_artifact_hash"],
+            model_input_snapshot_json=json.dumps(
+                contract["model_input_snapshot"], sort_keys=True, allow_nan=False
+            )
+            if contract.get("model_input_snapshot") is not None
+            else None,
             **(contract.get("market_lineage") or {}),
         )
         try:
@@ -1313,6 +1354,20 @@ def _forecast_wnba_total_slate(data_root, args_date: str, client) -> dict:
             line = float(market["line"])
         if ask is None or not 0 < float(ask) < 1:
             continue
+        from ..scalar_artifact_replay import build_snapshot as build_scalar_snapshot
+
+        model_snapshot = (
+            build_scalar_snapshot(
+                artifact,
+                prediction.feature_basis,
+                prediction.inference_inputs,
+                event_id=prediction.event_id,
+                event_start_utc=prediction.event_start_utc,
+                observed_at_utc=observed_at.isoformat(),
+            )
+            if prediction.inference_inputs is not None
+            else None
+        )
         priced_contracts.append(
             {
                 "event_id": prediction.event_id,
@@ -1336,6 +1391,7 @@ def _forecast_wnba_total_slate(data_root, args_date: str, client) -> dict:
                     else observed_at.isoformat()
                 ),
                 "market_lineage": market_lineage,
+                "model_input_snapshot": model_snapshot,
             }
         )
 
@@ -1404,6 +1460,11 @@ def _forecast_wnba_total_sport(
             calibration_artifact_hash=contract["model_artifact_hash"],
             feature_schema_version="wnba-total-margin-v2",
             code_revision=contract["model_artifact_hash"],
+            model_input_snapshot_json=json.dumps(
+                contract["model_input_snapshot"], sort_keys=True, allow_nan=False
+            )
+            if contract.get("model_input_snapshot") is not None
+            else None,
             **(contract.get("market_lineage") or {}),
         )
         try:
@@ -1784,6 +1845,11 @@ def _forecast_learned_sport(
                 bullpen_weakness_gap=candidate.feature_basis.get("bullpen_weakness_gap"),
                 starter_era_gap=candidate.feature_basis.get("starter_era_gap"),
                 market_residual_probability=market_residual_probability,
+                model_input_snapshot_json=(
+                    json.dumps(candidate.model_input_snapshot, sort_keys=True, allow_nan=False)
+                    if getattr(candidate, "model_input_snapshot", None) is not None
+                    else None
+                ),
                 unavailable_features=(
                     ",".join(row_unavailable_features) if row_unavailable_features else None
                 ),
@@ -2009,6 +2075,17 @@ def _log_esports_forecast(
         pick_is_home = selected_team == home_team
 
         american_odds = probability_to_american(ask)
+        from ..esports_replay import build_snapshot as build_esports_snapshot
+
+        try:
+            esports_snapshot_json = (
+                json.dumps(build_esports_snapshot(contract), sort_keys=True, allow_nan=False)
+                if contract.get("inference_inputs") is not None
+                else None
+            )
+        except (ValueError, KeyError, TypeError) as error:
+            errors.append({"event_id": contract.get("event_id"), "reason": f"Invalid replay inputs: {error}"})
+            continue
         request = PickRequest(
             event_start_utc=str(contract["event_start_utc"]),
             event_id=str(contract["event_id"]),
@@ -2032,6 +2109,7 @@ def _log_esports_forecast(
             observed_at_utc=str(contract.get("observed_at_utc") or "") or None,
             model_artifact_hash=str(contract.get("artifact_hash", "")),
             calibration_method="neutral_elo",
+            model_input_snapshot_json=esports_snapshot_json,
             calibration_version=str(forecast["model_version"]),
             calibration_artifact_hash=str(contract.get("artifact_hash", "")),
             code_revision=str(forecast["model_version"]),
@@ -2217,6 +2295,21 @@ def _forecast_international_sport(
                 away_team = selected_team if selected_team != home_team else ""
         pick_is_home = selected_team == home_team
         american_odds = probability_to_american(ask)
+        from ..international_replay import build_snapshot as build_international_snapshot
+
+        try:
+            international_snapshot_json = (
+                json.dumps(
+                    build_international_snapshot(contract, contract["model_inputs_observed_at_utc"]),
+                    sort_keys=True,
+                    allow_nan=False,
+                )
+                if contract.get("inference_inputs") is not None
+                else None
+            )
+        except (ValueError, KeyError, TypeError) as error:
+            errors.append({"event_id": contract.get("event_id"), "reason": f"Invalid replay inputs: {error}"})
+            continue
         request = PickRequest(
             event_start_utc=str(contract["event_start_utc"]),
             event_id=str(contract["event_id"]),
@@ -2242,6 +2335,7 @@ def _forecast_international_sport(
             observed_at_utc=str(contract.get("observed_at_utc") or "") or None,
             model_artifact_hash=str(contract.get("artifact_hash", "")),
             calibration_method="tie_aware_elo",
+            model_input_snapshot_json=international_snapshot_json,
             calibration_version=str(forecast["model_version"]),
             calibration_artifact_hash=str(contract.get("artifact_hash", "")),
             code_revision=str(forecast["model_version"]),
@@ -2419,6 +2513,23 @@ def _forecast_soccer_sport(
         ask = float(contract["executable_ask"])
         min_team_games = float((contract.get("feature_basis") or {}).get("min_team_games", 0.0))
         model_inputs_valid = min_team_games >= MINIMUM_TEAM_GAMES
+        coded_snapshot_json = None
+        if contract.get("inference_inputs") and contract["market_type"] == "moneyline":
+            from ..coded_market_replay import build_snapshot as build_coded_snapshot
+
+            try:
+                coded_snapshot_json = json.dumps(
+                    build_coded_snapshot(
+                        contract,
+                        str(forecast["model_code_hash"]),
+                        contract["model_inputs_observed_at_utc"],
+                    ),
+                    sort_keys=True,
+                    allow_nan=False,
+                )
+            except (KeyError, ValueError, TypeError) as exc:
+                errors.append({"event_id": contract["event_id"], "error": str(exc)})
+                continue
         request = PickRequest(
             event_start_utc=str(contract["event_start_utc"]),
             event_id=str(contract["event_id"]),
@@ -2444,6 +2555,7 @@ def _forecast_soccer_sport(
             calibration_artifact_hash=str(forecast["model_code_hash"]),
             feature_schema_version="soccer-poisson-dc-v1",
             code_revision=str(forecast["model_code_hash"]),
+            model_input_snapshot_json=coded_snapshot_json,
         )
         try:
             request.validate(now=observed_now)
@@ -2618,6 +2730,23 @@ def _forecast_tennis_sport(
         ask = float(contract["executable_ask"])
         min_player_matches = float((contract.get("feature_basis") or {}).get("min_player_matches", 0.0))
         model_inputs_valid = min_player_matches >= MINIMUM_PLAYER_MATCHES
+        coded_snapshot_json = None
+        if contract.get("inference_inputs") and contract["market_type"] == "moneyline":
+            from ..coded_market_replay import build_snapshot as build_coded_snapshot
+
+            try:
+                coded_snapshot_json = json.dumps(
+                    build_coded_snapshot(
+                        contract,
+                        str(forecast["model_code_hash"]),
+                        contract["model_inputs_observed_at_utc"],
+                    ),
+                    sort_keys=True,
+                    allow_nan=False,
+                )
+            except (KeyError, ValueError, TypeError) as exc:
+                errors.append({"event_id": contract["event_id"], "error": str(exc)})
+                continue
         request = PickRequest(
             event_start_utc=str(contract["event_start_utc"]),
             event_id=str(contract["event_id"]),
@@ -2647,6 +2776,7 @@ def _forecast_tennis_sport(
             calibration_artifact_hash=str(forecast["model_code_hash"]),
             feature_schema_version="tennis-surface-elo-v1",
             code_revision=str(forecast["model_code_hash"]),
+            model_input_snapshot_json=coded_snapshot_json,
             market_quote_observed_at_utc=contract.get("market_quote_observed_at_utc"),
             market_quote_timestamp_valid=contract.get("market_quote_timestamp_valid"),
             market_quote_source=contract.get("market_quote_source"),
@@ -2814,6 +2944,21 @@ def _forecast_cfb_sport(
             # A forced refresh cannot manufacture a pregame decision time.
             # validate() below rejects started events using the actual clock.
             effective_now = observed_now
+            from ..cfb_replay import build_snapshot as build_cfb_snapshot
+
+            cfb_snapshot_json = (
+                json.dumps(
+                    build_cfb_snapshot(
+                        contract,
+                        model_hash=str(forecast["model_code_hash"]),
+                        observed_at_utc=effective_now.isoformat(),
+                    ),
+                    sort_keys=True,
+                    allow_nan=False,
+                )
+                if contract.get("inference_inputs") is not None
+                else None
+            )
             request = PickRequest(
                 event_start_utc=str(contract["event_start_utc"]),
                 event_id=str(contract["event_id"]),
@@ -2839,6 +2984,7 @@ def _forecast_cfb_sport(
                 calibration_artifact_hash=str(forecast["model_code_hash"]),
                 feature_schema_version="cfb-v1",
                 code_revision=str(forecast["model_code_hash"]),
+                model_input_snapshot_json=cfb_snapshot_json,
             )
             request.validate(now=effective_now)
             with _LEDGER_LOCK:

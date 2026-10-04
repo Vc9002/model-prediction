@@ -16,7 +16,7 @@ Exposes explicit, non-positional provenance fields:
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -30,6 +30,7 @@ from .model_lifecycle import (
     NextAction,
     ReplacementPriority,
     ServingStatus,
+    challenger_identity_errors,
     load_challenger_evidence,
 )
 from .production_registry import ProductionModelRegistry
@@ -68,8 +69,10 @@ def _is_challenger_implemented(chall_id: str | None) -> bool:
     return False
 
 
-def _load_verified_offline_evaluation(chall_id: str | None, repo_root: Path) -> dict[str, Any] | None:
-    if not chall_id:
+def _load_verified_offline_evaluation(
+    chall_id: str | None, repo_root: Path, artifact_hash: str | None = None
+) -> dict[str, Any] | None:
+    if not chall_id or not artifact_hash:
         return None
     candidates = [
         repo_root / "outputs" / "research" / f"{chall_id}_offline_evaluation.json",
@@ -79,10 +82,20 @@ def _load_verified_offline_evaluation(chall_id: str | None, repo_root: Path) -> 
         if p.is_file():
             try:
                 data = json.loads(p.read_text(encoding="utf-8"))
+                if not isinstance(data, dict):
+                    continue
+                if data.get("model_id") != chall_id or data.get("artifact_hash") != artifact_hash:
+                    continue
                 # Strictly reject synthetic evaluations
                 if data.get("dataset_source") == "synthetic" or data.get("evidence_origin") == "synthetic":
                     continue
-                if data.get("verdict") == "VALIDATED_OFFLINE" and data.get("n_evaluated", 0) >= 50:
+                n = data.get("n_evaluated")
+                if (
+                    data.get("verdict") == "VALIDATED_OFFLINE"
+                    and type(n) is int
+                    and n >= 50
+                    and data.get("evidence_origin") in {"historical_backtest", "pit_replay"}
+                ):
                     return data
             except (json.JSONDecodeError, OSError):
                 continue
@@ -116,6 +129,9 @@ class MarketQualificationSummary:
     verdict: str  # PROMOTE | CONTINUE | REJECT | SERVING_HEALTHY | REQUIRES_REPLACEMENT | EVALUATION_READY
     next_action: str  # BUILD_CHALLENGER | RUN_OFFLINE_EVALUATION | FREEZE_CHALLENGER | START_PROSPECTIVE_CAPTURE | COLLECT_PROSPECTIVE | RUN_FINAL_GATE | START_NEXT_GENERATION
     last_evaluated_utc: str
+    qualification_errors: list[str] = field(default_factory=list)
+    champion_promotion_basis: str | None = None
+    champion_promotion_evidence_level: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -142,6 +158,9 @@ class MarketQualificationSummary:
             "verdict": self.verdict,
             "next_action": self.next_action,
             "last_evaluated_utc": self.last_evaluated_utc,
+            "qualification_errors": list(self.qualification_errors),
+            "champion_promotion_basis": self.champion_promotion_basis,
+            "champion_promotion_evidence_level": self.champion_promotion_evidence_level,
         }
 
 
@@ -192,6 +211,11 @@ def generate_qualification_registry(
 
             champ_hash = champ_entry.artifact_hash if champ_entry else None
             chall_hash = chall_entry.artifact_hash if chall_entry else None
+            identity_errors = challenger_identity_errors(chall_id, chall_entry, sport, market)
+            freeze_errors = challenger_identity_errors(
+                chall_id, chall_entry, sport, market, require_freeze=True
+            )
+            qualification_errors = list(freeze_errors)
 
             # Preregistered qualification requirements: Initial N >= 300, Full N >= 500
             required_live_prospective_n = 500 if sport in {"MLB", "WNBA", "NCAAF"} else 300
@@ -202,15 +226,15 @@ def generate_qualification_registry(
             live_prospective_n = 0
             synthetic_n = 0
 
-            if chall_id:
+            if chall_id and not identity_errors:
                 try:
                     chall_evidence = load_challenger_evidence(
                         sport,
                         market,
                         challenger_model_id=chall_id,
                         candidate_artifact_hash=chall_hash,
-                        candidate_frozen_at=getattr(chall_entry, "created_at_utc", None)
-                        if chall_entry
+                        candidate_frozen_at=chall_entry.frozen_at_utc
+                        if chall_entry and not freeze_errors
                         else None,
                         repo_root=root,
                     )
@@ -225,16 +249,17 @@ def generate_qualification_registry(
                         else:
                             pit_replay_n += 1
                 except (OSError, ValueError, KeyError, RuntimeError):
+                    qualification_errors.append("challenger evidence could not be loaded")
                     historical_backtest_n = 0
                     pit_replay_n = 0
                     live_prospective_n = 0
                     synthetic_n = 0
 
             # Determine challenger build status and next action
-            is_frozen_art = (root / "config" / "models" / f"{chall_id}.json").is_file() or (
-                root / "config" / "models" / "research" / f"{chall_id}.json"
-            ).is_file()
-            verified_eval = _load_verified_offline_evaluation(chall_id, root)
+            is_frozen_art = bool(chall_id and not freeze_errors)
+            verified_eval = _load_verified_offline_evaluation(
+                chall_id, root, chall_hash if not identity_errors else None
+            )
 
             if chall_id is None:
                 build_status = ChallengerBuildStatus.PLANNED.value
@@ -246,7 +271,7 @@ def generate_qualification_registry(
                     if evidence == EvidenceStatus.DEGRADED.value
                     else NextAction.START_NEXT_GENERATION.value
                 )
-            elif chall_id in {"mlb-moneyline-v9-frozen", "wnba-moneyline-v5"}:
+            elif is_frozen_art and live_prospective_n > 0:
                 build_status = ChallengerBuildStatus.CAPTURING_PROSPECTIVE.value
                 if live_prospective_n >= required_live_prospective_n:
                     verdict = "EVALUATION_READY"
@@ -263,8 +288,8 @@ def generate_qualification_registry(
                 verdict = "EVALUATION_READY"
                 next_action = NextAction.FREEZE_CHALLENGER.value
             elif _is_challenger_implemented(chall_id):
-                build_status = ChallengerBuildStatus.MECHANICS_VALIDATED.value
-                verdict = "EVALUATION_READY"
+                build_status = ChallengerBuildStatus.IMPLEMENTED.value
+                verdict = "CONTINUE"
                 next_action = NextAction.RUN_OFFLINE_EVALUATION.value
             else:
                 build_status = ChallengerBuildStatus.PLANNED.value
@@ -295,6 +320,11 @@ def generate_qualification_registry(
                 verdict=verdict,
                 next_action=next_action,
                 last_evaluated_utc=now_utc,
+                qualification_errors=qualification_errors,
+                champion_promotion_basis=champ_entry.promotion_basis if champ_entry else None,
+                champion_promotion_evidence_level=champ_entry.promotion_evidence_level
+                if champ_entry
+                else None,
             )
             summaries.append(summary)
 
@@ -314,7 +344,9 @@ def format_qualification_markdown_table(
         "PIT Replay N",
         "Live Prosp N",
         "Req Prosp N",
-        "Evidence Status",
+        "Champion Evidence",
+        "Serving Basis",
+        "Challenger Integrity",
         "Priority",
         "Verdict",
         "Next Action",
@@ -336,6 +368,8 @@ def format_qualification_markdown_table(
             str(s.live_prospective_n),
             str(s.required_live_prospective_n),
             s.evidence_status.upper(),
+            s.champion_promotion_basis or "configured",
+            "; ".join(s.qualification_errors) if s.qualification_errors else "PASS",
             s.replacement_priority.upper(),
             f"**{s.verdict}**",
             f"`{s.next_action}`",

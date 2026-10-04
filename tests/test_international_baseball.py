@@ -338,6 +338,10 @@ def test_forecast_uses_home_away_and_current_asks_but_stays_zero_unit(tmp_path) 
     assert contract["qualification"] == "NO_CALL_MODEL_UNVALIDATED"
     assert sum(side["model_fair_settlement_value"] for side in contract["sides"]) == pytest.approx(1.0)
     assert all(side["executable_ask"] is not None for side in contract["sides"])
+    from model_prediction.international_replay import build_snapshot, replay_inputs
+
+    evidence = build_snapshot(contract, contract["model_inputs_observed_at_utc"])
+    assert replay_inputs(evidence["inference_inputs"])["settlement_values"] == evidence["settlement_values"]
 
 
 class _RecordingMarketClient:

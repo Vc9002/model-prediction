@@ -192,6 +192,11 @@ class BasketballModel:
                 predictions.append(
                     GamePrediction(
                         market_type="spread",
+                        inference_inputs={
+                            "mean": expected_margin,
+                            "sd": self.margin_sd,
+                            "line": game.spread_away_line,
+                        },
                         line=game.spread_away_line,
                         probabilities={
                             "away": round(away_cover, 6),
@@ -210,6 +215,11 @@ class BasketballModel:
                 predictions.append(
                     GamePrediction(
                         market_type="total",
+                        inference_inputs={
+                            "mean": expected_total,
+                            "sd": self.total_sd,
+                            "line": game.total_line,
+                        },
                         line=game.total_line,
                         probabilities={"over": round(over, 6), "under": round(1 - over, 6)},
                         rationale=f"Projected total {expected_total:.1f}, sd {self.total_sd:.1f}.",

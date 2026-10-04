@@ -45,6 +45,7 @@ class MLBForwardCandidate:
     model_artifact_hash: str
     calibration_version: str
     feature_schema_version: str
+    model_input_snapshot: dict | None = None
     market_snapshot_hash: str | None = None
     market_snapshot_archive_path: str | None = None
     market_snapshot_record_id: str | None = None
@@ -138,6 +139,7 @@ def build_mlb_slate(
                     margin_model,
                     totals_model,
                     observed_at,
+                    features=features,
                 )
             )
         except (KeyError, TypeError, ValueError, httpx.HTTPError) as error:
@@ -153,6 +155,8 @@ def _paired_event_candidates(
     margin_model,
     totals_model,
     observed_at,
+    *,
+    features: MLBGameFeatures | None = None,
 ):
     away_team, home_team = _teams(event)
     definitions = (
@@ -217,6 +221,18 @@ def _paired_event_candidates(
             if odds_snapshot.provider == "polymarket_us"
             else "decision_time_sportsbook_quote"
         )
+        model_input_snapshot = None
+        if features is not None and market_type is MarketType.SPREAD:
+            from .mlb_margin_replay import build_snapshot
+
+            model_input_snapshot = build_snapshot(
+                features,
+                model.formula_spec,
+                model.raw,
+                margin_output.away_spread_line,
+                distribution,
+                observed_at.isoformat(),
+            )
         output.append(
             MLBForwardCandidate(
                 event_id=str(event["id"]),
@@ -248,6 +264,7 @@ def _paired_event_candidates(
                 model_artifact_hash=str(model.raw["artifact_hash"]),
                 calibration_version=str(model.raw["calibration_version"]),
                 feature_schema_version=estimate.feature_schema_version,
+                model_input_snapshot=model_input_snapshot,
                 market_snapshot_hash=odds_snapshot.snapshot_hash,
                 market_snapshot_archive_path=odds_snapshot.snapshot_archive_path,
                 market_snapshot_record_id=odds_snapshot.snapshot_record_id,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from enum import StrEnum
@@ -275,6 +276,9 @@ class PickRequest:
     # specific game (e.g. ESPN hasn't posted both starters yet) — surfaced as
     # a visible dashboard badge, not just buried in the rationale text.
     unavailable_features: str | None = None
+    # Complete learned-model inputs and serving transform, serialized as JSON
+    # so the generic string-valued ledger cannot turn it into a Python repr.
+    model_input_snapshot_json: str | None = None
     # Stage 1 prospective evidence lineage. These are audit-only fields and
     # never change the forecast itself. Unknown provenance remains None.
     config_hash: str | None = None
@@ -354,6 +358,13 @@ class PickRequest:
             raise ValueError("baseline identifier is valid only for market_baseline origin")
         if self.observed_at_utc is not None and parse_utc(self.observed_at_utc) > current:
             raise ValueError("observation timestamp cannot be in the future")
+        if self.model_input_snapshot_json is not None:
+            from .learned_replay import validate_decision_snapshot
+
+            snapshot = json.loads(self.model_input_snapshot_json)
+            validate_decision_snapshot(snapshot, self.as_dict())
+            if parse_utc(snapshot["observed_at_utc"]) > current:
+                raise ValueError("model input snapshot timestamp cannot be in the future")
         for name, probability in (
             ("decision_no_vig_probability", self.decision_no_vig_probability),
             ("decision_consensus_probability", self.decision_consensus_probability),
@@ -407,6 +418,7 @@ class PickRequest:
             "starter_era_gap": self.starter_era_gap,
             "market_residual_probability": self.market_residual_probability,
             "unavailable_features": self.unavailable_features,
+            "model_input_snapshot_json": self.model_input_snapshot_json,
             "config_hash": self.config_hash,
             "config_byte_sha256": self.config_byte_sha256,
             "config_path": self.config_path,

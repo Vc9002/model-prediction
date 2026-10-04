@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from model_prediction import esports as esports_module
 from model_prediction import learned_forward
 from model_prediction.audit import AuditLog
 from model_prediction.cli import _settle_esports_pick
@@ -253,6 +254,63 @@ def test_esports_settlement_stays_pending_until_terminal_state(tmp_path, monkeyp
 
     monkeypatch.setattr(polymarket_us, "PolymarketUSClient", lambda: _OpenClient("Team Home", "Team Away"))
     assert _settle_esports_pick(row, ledger) is None
+
+
+class _NonBinaryClient(_ResolvedClient):
+    """Mirrors a real, live-confirmed 2026-09-14 quirk: a genuinely resolved
+    esports market whose reported side prices never snap to [0.0, 1.0]."""
+
+    def __init__(self, side_a: str, side_b: str, price_a: float, price_b: float):
+        self._sides = [
+            {"description": side_a, "price": str(price_a)},
+            {"description": side_b, "price": str(price_b)},
+        ]
+
+
+def test_esports_settlement_uses_bo3_result_instead_of_voiding_on_non_binary_price(tmp_path, monkeypatch):
+    """A non-binary settlement price must not be assumed forfeit/postponement
+    when BO3 has a real, confirmed finished-match result -- this is exactly
+    the bug that silently mis-recorded ~260 real esports picks as voided
+    pushes since 2026-07-26 (found live 2026-09-14)."""
+    ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
+    row = ledger.append_call(_future_request(selection="home", event_id="nonbinary-real-result"), 0, 10)
+    monkeypatch.setattr(
+        polymarket_us,
+        "PolymarketUSClient",
+        lambda: _NonBinaryClient("Team Home", "Team Away", 0.41, 0.59),
+    )
+    monkeypatch.setattr(
+        esports_module,
+        "resolve_esports_match_result",
+        lambda *a, **k: {"home_win": True, "away_win": False, "home_score": 2, "away_score": 0},
+    )
+    result = _settle_esports_pick(row, ledger)
+    assert result is not None
+    assert result.get("settled") is True
+    assert result["result"] == "win"
+    settled_row = next(r for r in ledger.rows() if r["pick_id"] == row["pick_id"])
+    assert settled_row["status"] == "settled"
+    assert settled_row["result"] == "win"
+
+
+def test_esports_settlement_still_voids_when_bo3_also_has_no_result(tmp_path, monkeypatch):
+    """When neither Polymarket's price nor BO3 can confirm a real result,
+    voiding remains the correct, fail-closed behavior."""
+    ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
+    row = ledger.append_call(_future_request(selection="home", event_id="nonbinary-no-bo3"), 0, 10)
+    monkeypatch.setattr(
+        polymarket_us,
+        "PolymarketUSClient",
+        lambda: _NonBinaryClient("Team Home", "Team Away", 0.41, 0.59),
+    )
+    monkeypatch.setattr(esports_module, "resolve_esports_match_result", lambda *a, **k: None)
+    result = _settle_esports_pick(row, ledger)
+    assert result is not None
+    assert result.get("voided") is True
+    settled_row = next(r for r in ledger.rows() if r["pick_id"] == row["pick_id"])
+    assert settled_row["status"] == "settled"
+    assert settled_row["result"] == "push"
+    assert "BO3" in settled_row["void_reason"]
 
 
 # ------------------------------------------------------ esports eligibility
@@ -517,6 +575,7 @@ def test_match_executable_quote_output_passes_archive_lineage_check(tmp_path):
             {
                 "market_type": "moneyline",
                 "market_slug": "aec-mlb-nyy-nym-1",
+                "provider": "polymarket_us",
                 "long": {"description": "Yankees", "ask": 0.55},
                 "short": {"description": "Mets", "ask": 0.47},
                 "observed_at_utc": "2026-07-17T12:00:00Z",
@@ -539,3 +598,11 @@ def test_match_executable_quote_output_passes_archive_lineage_check(tmp_path):
     assert quote is not None
     lineage = cli_forecast._canonical_market_snapshot_lineage(quote, snapshot_path)
     assert lineage is not None
+    import hashlib
+
+    archived = json.loads(snapshot_path.read_text())
+    expected = hashlib.sha256(
+        json.dumps(archived, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    assert lineage["market_snapshot_hash"] == expected
+    assert lineage["market_snapshot_record_id"] == expected

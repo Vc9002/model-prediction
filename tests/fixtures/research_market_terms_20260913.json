@@ -1,0 +1,517 @@
+{
+  "provenance": {
+    "purpose": "Public provider contract metadata only. Tests synthesize books and probabilities; not trading evidence.",
+    "captured_report_sha256": "cd58d3c2a68667285bc766ac4d397f9658c7f0c81037ced83a77ea4986df3783"
+  },
+  "events": {
+    "NCAAF": {
+      "id": "102328",
+      "slug": "cfb-syra-pitt-2026-09-17",
+      "startTime": "2026-09-17T23:30:00Z",
+      "active": true,
+      "closed": false,
+      "teams": [
+        {
+          "id": 1091,
+          "name": "Orange",
+          "safeName": "Syracuse",
+          "league": "cfb"
+        },
+        {
+          "id": 1089,
+          "name": "Panthers",
+          "safeName": "Pittsburgh",
+          "league": "cfb"
+        }
+      ],
+      "markets": [
+        {
+          "id": "668830",
+          "slug": "aec-cfb-syra-pitt-2026-09-17",
+          "sportsMarketType": "football_team_full_game_winner",
+          "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+          "gameStartTime": "2026-09-17T23:30:00Z",
+          "description": "This market will settle to the winner of the Syracuse vs Pittsburgh College Football game scheduled for Sep 17, 2026. Overtime is included if played. If a tied final score is reported and no official winner is declared, this market will not resolve automatically and will be reviewed against the official governing-body result. If the game is delayed, postponed, or suspended and not rescheduled to a date within two weeks of the originally scheduled date, the market will settle to the last fair market price. Outcome sourced from the relevant governing body.",
+          "question": "Who will win in the upcoming football event Syracuse vs Pittsburgh scheduled for September 17, 2026 at 11:30 PM UTC?",
+          "active": true,
+          "closed": false,
+          "archived": false,
+          "status": "MARKET_STATUS_OPEN",
+          "feeCoefficient": 0.06,
+          "minimumTradeQty": 0.01,
+          "marketSides": [
+            {
+              "id": "1337154",
+              "description": "Orange",
+              "long": true,
+              "marketId": 668830,
+              "identifier": "aec-cfb-syra-pitt-2026-09-17",
+              "tradable": true,
+              "team": {
+                "id": 1091,
+                "name": "Orange"
+              }
+            },
+            {
+              "id": "1337155",
+              "description": "Panthers",
+              "long": false,
+              "marketId": 668830,
+              "identifier": "aec-cfb-syra-pitt-2026-09-17",
+              "tradable": true,
+              "team": {
+                "id": 1089,
+                "name": "Panthers"
+              }
+            }
+          ]
+        },
+        {
+          "id": "668866",
+          "slug": "asc-cfb-syra-pitt-2026-09-17-neg-0pt5",
+          "sportsMarketType": "football_team_full_game_spread",
+          "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_SPREAD",
+          "gameStartTime": "2026-09-17T23:30:00Z",
+          "line": -0.5,
+          "description": "This market will settle to Yes if Syracuse wins by more than 0.5 in the Syracuse vs Pittsburgh College Football game scheduled for Sep 17, 2026. Overtime is included if played. If the game is delayed, postponed, or suspended and not rescheduled to a date within two weeks of the originally scheduled date, the market will settle to the last fair market price. Outcome sourced from the relevant governing body.",
+          "question": "Will the Syracuse cover -0.5 vs the Pittsburgh in Syracuse vs. Pittsburgh?",
+          "active": true,
+          "closed": false,
+          "archived": false,
+          "status": "MARKET_STATUS_OPEN",
+          "feeCoefficient": 0.06,
+          "minimumTradeQty": 0.01,
+          "marketSides": [
+            {
+              "id": "1337226",
+              "description": "-0.50",
+              "long": true,
+              "marketId": 668866,
+              "identifier": "asc-cfb-syra-pitt-2026-09-17-neg-0pt5",
+              "tradable": true,
+              "team": {
+                "id": 1091,
+                "name": "Orange"
+              }
+            },
+            {
+              "id": "1337227",
+              "description": "+0.50",
+              "long": false,
+              "marketId": 668866,
+              "identifier": "asc-cfb-syra-pitt-2026-09-17-neg-0pt5",
+              "tradable": true,
+              "team": {
+                "id": 1089,
+                "name": "Panthers"
+              }
+            }
+          ]
+        },
+        {
+          "id": "668887",
+          "slug": "tsc-cfb-syra-pitt-2026-09-17-total-35pt5",
+          "sportsMarketType": "football_team_full_game_total",
+          "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_TOTAL",
+          "gameStartTime": "2026-09-17T23:30:00Z",
+          "line": 35.5,
+          "description": "This market will settle to Yes if Syracuse and Pittsburgh combine for over 35.5 points in the Syracuse vs Pittsburgh College Football game scheduled for Sep 17, 2026. Overtime is included if played. If the game is delayed, postponed, or suspended and not rescheduled to a date within two weeks of the originally scheduled date, the market will settle to the last fair market price. Outcome sourced from the relevant governing body.",
+          "question": "Will the total in Syracuse vs. Pittsburgh be more than 35.5?",
+          "active": true,
+          "closed": false,
+          "archived": false,
+          "status": "MARKET_STATUS_OPEN",
+          "feeCoefficient": 0.06,
+          "minimumTradeQty": 0.01,
+          "marketSides": [
+            {
+              "id": "1337268",
+              "description": "Over",
+              "long": true,
+              "marketId": 668887,
+              "identifier": "tsc-cfb-syra-pitt-2026-09-17-total-35pt5",
+              "tradable": true
+            },
+            {
+              "id": "1337269",
+              "description": "Under",
+              "long": false,
+              "marketId": 668887,
+              "identifier": "tsc-cfb-syra-pitt-2026-09-17-total-35pt5",
+              "tradable": true
+            }
+          ]
+        }
+      ]
+    },
+    "KBO": {
+      "id": "108699",
+      "slug": "kbo-sla-ltg-2026-09-13",
+      "startTime": "2026-09-13T08:00:00Z",
+      "active": true,
+      "closed": false,
+      "teams": [
+        {
+          "id": 11377,
+          "name": "Samsung Lions",
+          "safeName": "",
+          "league": "kbo"
+        },
+        {
+          "id": 11374,
+          "name": "LG Twins",
+          "safeName": "",
+          "league": "kbo"
+        }
+      ],
+      "markets": [
+        {
+          "id": "780438",
+          "slug": "aec-kbo-sla-ltg-2026-09-13",
+          "sportsMarketType": "baseball_team_full_game_winner",
+          "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+          "gameStartTime": "2026-09-13T08:00:00Z",
+          "description": "This market will settle to the winner of the Samsung Lions vs LG Twins KBO game scheduled for Sep 13, 2026. Extra innings are included if played. If the game ends in a tie, the market will settle to $0.50. If the game is delayed, postponed, or suspended and not rescheduled to a date within two days of the originally scheduled date, the market will settle to the last fair market price. Outcome sourced from KBO.",
+          "question": "Who will win in the upcoming baseball event Samsung Lions vs LG Twins scheduled for September 13, 2026 at 8:00 AM UTC?",
+          "active": true,
+          "closed": false,
+          "archived": false,
+          "status": "MARKET_STATUS_OPEN",
+          "feeCoefficient": 0.06,
+          "minimumTradeQty": 0.01,
+          "marketSides": [
+            {
+              "id": "1560364",
+              "description": "Samsung Lions",
+              "long": true,
+              "marketId": 780438,
+              "identifier": "aec-kbo-sla-ltg-2026-09-13",
+              "tradable": true,
+              "team": {
+                "id": 11377,
+                "name": "Samsung Lions"
+              }
+            },
+            {
+              "id": "1560365",
+              "description": "LG Twins",
+              "long": false,
+              "marketId": 780438,
+              "identifier": "aec-kbo-sla-ltg-2026-09-13",
+              "tradable": true,
+              "team": {
+                "id": 11374,
+                "name": "LG Twins"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "NPB": {
+      "id": "108703",
+      "slug": "npb-ssl-nhf-2026-09-13",
+      "startTime": "2026-09-13T08:00:00Z",
+      "active": true,
+      "closed": false,
+      "teams": [
+        {
+          "id": 11391,
+          "name": "Saitama Seibu Lions",
+          "safeName": "",
+          "league": "npb"
+        },
+        {
+          "id": 11386,
+          "name": "Nippon Ham Fighters",
+          "safeName": "",
+          "league": "npb"
+        }
+      ],
+      "markets": [
+        {
+          "id": "780443",
+          "slug": "aec-npb-ssl-nhf-2026-09-13",
+          "sportsMarketType": "baseball_team_full_game_winner",
+          "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+          "gameStartTime": "2026-09-13T08:00:00Z",
+          "description": "This market will settle to the winner of the Saitama Seibu Lions vs Nippon Ham Fighters NPB game scheduled for Sep 13, 2026. Extra innings are included if played. If the game ends in a tie, the market will settle to $0.50. If the game is delayed, postponed, or suspended and not rescheduled to a date within two days of the originally scheduled date, the market will settle to the last fair market price. Outcome sourced from NPB.",
+          "question": "Who will win in the upcoming baseball event Saitama Seibu Lions vs Nippon Ham Fighters scheduled for September 13, 2026 at 8:00 AM UTC?",
+          "active": true,
+          "closed": false,
+          "archived": false,
+          "status": "MARKET_STATUS_OPEN",
+          "feeCoefficient": 0.06,
+          "minimumTradeQty": 0.01,
+          "marketSides": [
+            {
+              "id": "1560374",
+              "description": "Saitama Seibu Lions",
+              "long": true,
+              "marketId": 780443,
+              "identifier": "aec-npb-ssl-nhf-2026-09-13",
+              "tradable": true,
+              "team": {
+                "id": 11391,
+                "name": "Saitama Seibu Lions"
+              }
+            },
+            {
+              "id": "1560375",
+              "description": "Nippon Ham Fighters",
+              "long": false,
+              "marketId": 780443,
+              "identifier": "aec-npb-ssl-nhf-2026-09-13",
+              "tradable": true,
+              "team": {
+                "id": 11386,
+                "name": "Nippon Ham Fighters"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "SOCCER": {
+      "id": "103230",
+      "slug": "epl-cov-bha-2026-09-13",
+      "startTime": "2026-09-13T13:00:00Z",
+      "active": true,
+      "closed": false,
+      "teams": [
+        {
+          "id": 9012,
+          "name": "Coventry City FC",
+          "safeName": "",
+          "league": "epl",
+          "abbreviation": "cov"
+        },
+        {
+          "id": 2708,
+          "name": "Brighton & Hove Albion FC",
+          "safeName": "Brighton & Hove Albion",
+          "league": "epl",
+          "abbreviation": "bha"
+        }
+      ],
+      "markets": [
+        {
+          "id": "684561",
+          "slug": "atc-epl-cov-bha-2026-09-13-cov",
+          "sportsMarketType": "soccer_team_full_time_winner",
+          "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME",
+          "gameStartTime": "2026-09-13T13:00:00Z",
+          "description": "This market will settle to the winner at the end of 90 minutes plus stoppage time in the Coventry City FC vs Brighton & Hove Albion FC Premier League match scheduled for 2026-09-13 9:00AM ET. If the match is tied following 90 minutes plus stoppage time, the market will settle to Tie. If the match is delayed, postponed, or suspended and not rescheduled to a date within two weeks of the originally scheduled date, the market will settle to the last fair market price. Outcome sourced from Premier League.",
+          "question": "Will Coventry City FC win against Brighton & Hove Albion FC in the Premier League match scheduled for Sep 13, 2026?",
+          "active": true,
+          "closed": false,
+          "archived": false,
+          "status": "MARKET_STATUS_OPEN",
+          "feeCoefficient": 0.06,
+          "minimumTradeQty": 0.01,
+          "marketSides": [
+            {
+              "id": "1368614",
+              "description": "Yes",
+              "long": true,
+              "marketId": 684561,
+              "identifier": "atc-epl-cov-bha-2026-09-13-cov",
+              "tradable": true,
+              "team": {
+                "id": 9012,
+                "name": "Coventry City FC"
+              }
+            },
+            {
+              "id": "1368615",
+              "description": "No",
+              "long": false,
+              "marketId": 684561,
+              "identifier": "atc-epl-cov-bha-2026-09-13-cov",
+              "tradable": true,
+              "team": {
+                "id": 9012,
+                "name": "Coventry City FC"
+              }
+            }
+          ]
+        },
+        {
+          "id": "684563",
+          "slug": "atc-epl-cov-bha-2026-09-13-draw",
+          "sportsMarketType": "soccer_team_full_time_winner",
+          "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME",
+          "gameStartTime": "2026-09-13T13:00:00Z",
+          "description": "This market will settle to the winner at the end of 90 minutes plus stoppage time in the Coventry City FC vs Brighton & Hove Albion FC Premier League match scheduled for 2026-09-13 9:00AM ET. If the match is tied following 90 minutes plus stoppage time, the market will settle to Tie. If the match is delayed, postponed, or suspended and not rescheduled to a date within two weeks of the originally scheduled date, the market will settle to the last fair market price. Outcome sourced from Premier League.",
+          "question": "Will the Premier League match Coventry City FC vs Brighton & Hove Albion FC scheduled for Sep 13, 2026 end in a draw?",
+          "active": true,
+          "closed": false,
+          "archived": false,
+          "status": "MARKET_STATUS_OPEN",
+          "feeCoefficient": 0.06,
+          "minimumTradeQty": 0.01,
+          "marketSides": [
+            {
+              "id": "1368618",
+              "description": "Yes",
+              "long": true,
+              "marketId": 684563,
+              "identifier": "atc-epl-cov-bha-2026-09-13-draw",
+              "tradable": true
+            },
+            {
+              "id": "1368619",
+              "description": "No",
+              "long": false,
+              "marketId": 684563,
+              "identifier": "atc-epl-cov-bha-2026-09-13-draw",
+              "tradable": true
+            }
+          ]
+        },
+        {
+          "id": "684565",
+          "slug": "atc-epl-cov-bha-2026-09-13-bha",
+          "sportsMarketType": "soccer_team_full_time_winner",
+          "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME",
+          "gameStartTime": "2026-09-13T13:00:00Z",
+          "description": "This market will settle to the winner at the end of 90 minutes plus stoppage time in the Coventry City FC vs Brighton & Hove Albion FC Premier League match scheduled for 2026-09-13 9:00AM ET. If the match is tied following 90 minutes plus stoppage time, the market will settle to Tie. If the match is delayed, postponed, or suspended and not rescheduled to a date within two weeks of the originally scheduled date, the market will settle to the last fair market price. Outcome sourced from Premier League.",
+          "question": "Will Brighton & Hove Albion FC win against Coventry City FC in the Premier League match scheduled for Sep 13, 2026?",
+          "active": true,
+          "closed": false,
+          "archived": false,
+          "status": "MARKET_STATUS_OPEN",
+          "feeCoefficient": 0.06,
+          "minimumTradeQty": 0.01,
+          "marketSides": [
+            {
+              "id": "1368622",
+              "description": "Yes",
+              "long": true,
+              "marketId": 684565,
+              "identifier": "atc-epl-cov-bha-2026-09-13-bha",
+              "tradable": true,
+              "team": {
+                "id": 2708,
+                "name": "Brighton & Hove Albion FC"
+              }
+            },
+            {
+              "id": "1368623",
+              "description": "No",
+              "long": false,
+              "marketId": 684565,
+              "identifier": "atc-epl-cov-bha-2026-09-13-bha",
+              "tradable": true,
+              "team": {
+                "id": 2708,
+                "name": "Brighton & Hove Albion FC"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "WNBA": {
+      "id": "94120",
+      "slug": "wnba-min-atl-2026-08-30",
+      "startTime": "2026-08-30T19:00:00Z",
+      "active": true,
+      "closed": true,
+      "teams": [
+        {
+          "id": 6,
+          "name": "Minnesota",
+          "safeName": "Minnesota",
+          "league": "wnba",
+          "alias": "Lynx"
+        },
+        {
+          "id": 11,
+          "name": "Atlanta",
+          "safeName": "Atlanta",
+          "league": "wnba",
+          "alias": "Dream"
+        }
+      ],
+      "markets": [
+        {
+          "id": "555109",
+          "slug": "asc-wnba-min-atl-2026-08-30-neg-10pt5",
+          "sportsMarketType": "basketball_team_full_game_spread",
+          "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_SPREAD",
+          "gameStartTime": "2026-08-30T19:00:00Z",
+          "line": -10.5,
+          "description": "This market will settle to Yes if Minnesota wins by more than 10.5 points in the Minnesota vs Atlanta WNBA game scheduled for 2026-08-30 at 3:00PM ET. Overtime is included if played. If the game is delayed, postponed, or suspended and not rescheduled to a date within two weeks of the originally scheduled date, the market will settle to the last fair market price. Outcome sourced from WNBA.",
+          "question": "Will the Minnesota cover -10.5 vs the Atlanta in MIN vs ATL?",
+          "active": true,
+          "closed": true,
+          "archived": false,
+          "status": "MARKET_STATUS_RESOLVED",
+          "feeCoefficient": 0.06,
+          "minimumTradeQty": 0.01,
+          "marketSides": [
+            {
+              "id": "1109730",
+              "description": "-10.50",
+              "long": true,
+              "marketId": 555109,
+              "identifier": "asc-wnba-min-atl-2026-08-30-neg-10pt5",
+              "tradable": true,
+              "team": {
+                "id": 6,
+                "name": "Minnesota"
+              }
+            },
+            {
+              "id": "1109731",
+              "description": "+10.50",
+              "long": false,
+              "marketId": 555109,
+              "identifier": "asc-wnba-min-atl-2026-08-30-neg-10pt5",
+              "tradable": true,
+              "team": {
+                "id": 11,
+                "name": "Atlanta"
+              }
+            }
+          ]
+        },
+        {
+          "id": "555136",
+          "slug": "tsc-wnba-min-atl-2026-08-30-166pt5",
+          "sportsMarketType": "basketball_team_full_game_total",
+          "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_TOTAL",
+          "gameStartTime": "2026-08-30T19:00:00Z",
+          "line": 166.5,
+          "description": "This market will settle to Yes if Minnesota and Atlanta combine for over 166.5 points in the Minnesota vs Atlanta WNBA game scheduled for 2026-08-30 at 3:00PM ET. Overtime is included if played. If the game is delayed, postponed, or suspended and not rescheduled to a date within two weeks of the originally scheduled date, the market will settle to the last fair market price. Outcome sourced from WNBA.",
+          "question": "Will the total in MIN vs ATL be more than 166.5?",
+          "active": true,
+          "closed": true,
+          "archived": false,
+          "status": "MARKET_STATUS_RESOLVED",
+          "feeCoefficient": 0.06,
+          "minimumTradeQty": 0.01,
+          "marketSides": [
+            {
+              "id": "1109784",
+              "description": "Over",
+              "long": true,
+              "marketId": 555136,
+              "identifier": "tsc-wnba-min-atl-2026-08-30-166pt5",
+              "tradable": true
+            },
+            {
+              "id": "1109785",
+              "description": "Under",
+              "long": false,
+              "marketId": 555136,
+              "identifier": "tsc-wnba-min-atl-2026-08-30-166pt5",
+              "tradable": true
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

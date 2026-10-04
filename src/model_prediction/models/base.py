@@ -62,6 +62,7 @@ class GamePrediction:
     model_version: str
     feature_basis: dict[str, object]
     rationale: str
+    inference_inputs: dict[str, object] | None = None
 
     def probability(self, selection: str) -> float:
         return self.probabilities[selection.lower()]

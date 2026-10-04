@@ -8,8 +8,11 @@ report bytes were retrieved retrospectively, so results are diagnostic only.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
+import os
+import tempfile
 from collections import defaultdict
 from collections.abc import Mapping
 from datetime import UTC, datetime
@@ -316,7 +319,36 @@ def build_and_save_priors(
         "players": all_players,
     }
     prior_path = prior_dir / f"{game_date}.json"
-    prior_path.write_text(_json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    snapshots = prior_dir / "snapshots" / game_date
+    snapshots.mkdir(parents=True, exist_ok=True)
+
+    def archive(content: bytes) -> Path:
+        # Content addressing preserves every refresh, including the previous
+        # legacy file on the first upgraded write. Never replace an archive.
+        destination = snapshots / (hashlib.sha256(content).hexdigest() + ".json")
+        try:
+            with destination.open("xb") as handle:
+                handle.write(content)
+        except FileExistsError:
+            if destination.read_bytes() != content:
+                raise ValueError("prior_snapshot_content_conflict")
+        return destination
+
+    if prior_path.exists():
+        archive(prior_path.read_bytes())
+    content = (_json.dumps(payload, indent=2, sort_keys=True) + "\n").encode()
+    archived_path = archive(content)
+    # Keep the daily file as an atomic compatibility view. PIT loading below
+    # reads the immutable snapshots as well, so late refreshes cannot erase
+    # the earlier information set.
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{game_date}-", dir=prior_dir)
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(content)
+        os.replace(temporary, prior_path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
     results["prior_path"] = str(prior_path)
+    results["prior_snapshot_path"] = str(archived_path)
     results["total_players"] = len(all_players)
     return results

@@ -30,6 +30,8 @@ CFB_BASELINE_TOTAL = 54.0
 CFB_BASELINE_MARGIN_SD = 15.5
 CFB_BASELINE_TOTAL_SD = 14.8
 CFB_DEFAULT_HOME_ADVANTAGE_POINTS = 2.8
+CFB_UNCERTAINTY_FLOOR = 0.04
+CFB_UNCERTAINTY_CEILING = 0.25
 
 # Conference Tier Baseline Offsets (Points relative to FBS average)
 CONFERENCE_TIER_OFFSETS: dict[str, float] = {
@@ -508,7 +510,7 @@ class CFBFeatureExtractor:
             base_unc += 0.08
         if qb_starter_prob_away < 0.9 or qb_starter_prob_home < 0.9:
             base_unc += 0.04
-        uncertainty = max(0.04, min(0.25, base_unc))
+        uncertainty = max(CFB_UNCERTAINTY_FLOOR, min(CFB_UNCERTAINTY_CEILING, base_unc))
 
         eff_gap = (home_state.adj_offense_ppp - home_state.adj_defense_ppp) - (
             away_state.adj_offense_ppp - away_state.adj_defense_ppp

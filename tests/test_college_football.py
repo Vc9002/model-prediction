@@ -18,6 +18,7 @@ Verifies:
 15. Settlement grading for ML, Spread (cover/loss/push), Total (over/under/push), and OT
 """
 
+import dataclasses
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -35,6 +36,8 @@ from model_prediction.domain import (
 )
 from model_prediction.features.base import GameRecord
 from model_prediction.features.cfb_features import (
+    CFB_UNCERTAINTY_CEILING,
+    CFB_UNCERTAINTY_FLOOR,
     CFBFeatureExtractor,
 )
 from model_prediction.models.cfb_distribution import (
@@ -44,6 +47,7 @@ from model_prediction.models.cfb_distribution import (
 from model_prediction.models.college_football import (
     CFB_SPREAD_MODEL_VERSION,
     CFB_TOTAL_MODEL_VERSION,
+    CFB_UNCERTAINTY_MARGIN_SD_SCALE,
     MODEL_VERSION,
     CollegeFootballModel,
     UpcomingCFBGame,
@@ -370,6 +374,76 @@ def test_cfb_model_slate_predictions(sample_cfb_history):
     assert markets["moneyline"].model_version == MODEL_VERSION
     assert markets["spread"].model_version == CFB_SPREAD_MODEL_VERSION
     assert markets["total"].model_version == CFB_TOTAL_MODEL_VERSION
+
+
+def test_cfb_uncertainty_widens_margin_sd_and_restores_baseline(sample_cfb_history, monkeypatch):
+    """2026-09-14 fix: feat.uncertainty (sample size / FBS-vs-FCS / backup-QB
+    signal) previously reached the ledger only as bet-sizing metadata -- the
+    margin distribution itself always used the same constant margin_sd
+    regardless, producing e.g. 92-99% claimed spread confidence on real
+    mismatch games that settled at a 41% win rate. High uncertainty must now
+    widen the effective margin_sd used for that game's probabilities; the
+    shared engine's baseline margin_sd must be restored after every call so
+    a slate's later games aren't affected by an earlier game's widening."""
+    model = CollegeFootballModel()
+    upcoming = UpcomingCFBGame(
+        event_id="601",
+        event_start_utc="2024-10-12T16:00:00Z",
+        away_team="Texas Longhorns",
+        home_team="Oklahoma Sooners",
+        spread_home_line=-3.5,
+        total_line=54.5,
+    )
+    baseline_margin_sd = model.margin_sd
+    real_feat = model.extractor.extract_features(
+        history=sample_cfb_history,
+        away_team=upcoming.away_team,
+        home_team=upcoming.home_team,
+        event_id=upcoming.event_id,
+        game_start_utc=upcoming.event_start_utc,
+        season_year=2024,
+        week=7,
+    )
+
+    captured_margin_sd = {}
+
+    def _fake_extract(*_args, uncertainty, **_kwargs):
+        feat = dataclasses.replace(real_feat, uncertainty=uncertainty)
+        return feat
+
+    for uncertainty, label in ((CFB_UNCERTAINTY_FLOOR, "floor"), (CFB_UNCERTAINTY_CEILING, "ceiling")):
+        monkeypatch.setattr(
+            model.extractor,
+            "extract_features",
+            lambda *a, _u=uncertainty, **k: _fake_extract(*a, uncertainty=_u, **k),
+        )
+        model.predict_matchup(sample_cfb_history, upcoming)
+        # margin_sd must always be restored after the call -- read it back
+        # via a second predict_matchup capturing inference_inputs directly.
+        captured_margin_sd[label] = model.distribution_engine.margin_sd
+
+    assert captured_margin_sd["floor"] == pytest.approx(baseline_margin_sd)
+    assert captured_margin_sd["ceiling"] == pytest.approx(baseline_margin_sd)
+
+    # Now check the WIDENED value actually reached the captured replay inputs.
+    monkeypatch.setattr(
+        model.extractor,
+        "extract_features",
+        lambda *a, **k: _fake_extract(*a, uncertainty=CFB_UNCERTAINTY_CEILING, **k),
+    )
+    preds = model.predict_matchup(sample_cfb_history, upcoming)
+    inference_inputs = preds[0].inference_inputs
+    assert inference_inputs is not None
+    parameters = inference_inputs["parameters"]
+    assert isinstance(parameters, dict)
+    used_margin_sd = parameters["margin_sd"]
+    expected = baseline_margin_sd * (
+        1.0 + CFB_UNCERTAINTY_MARGIN_SD_SCALE * (CFB_UNCERTAINTY_CEILING - CFB_UNCERTAINTY_FLOOR)
+    )
+    assert used_margin_sd == pytest.approx(expected)
+    assert used_margin_sd > baseline_margin_sd
+    # Restored again after this call too.
+    assert model.distribution_engine.margin_sd == pytest.approx(baseline_margin_sd)
 
 
 # -------------------------------------------------------------

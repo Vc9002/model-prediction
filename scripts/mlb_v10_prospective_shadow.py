@@ -75,6 +75,7 @@ class ProspectivePredictionRecord:
     feature_snapshot_hash: str
     probability_model_hash: str
     prediction_hash: str
+    model_input_snapshot: dict[str, Any] | None = None
 
     def compute_prediction_hash(self) -> str:
         payload = f"{self.event_id}:{self.decision_utc}:{self.market_line}:{self.v10_pred_total}:{self.m4_1_v10_prediction}:{self.p_over}:{self.model_spec_hash}:{self.feature_snapshot_hash}"
@@ -149,34 +150,9 @@ class MLBPersistentShadowRunner:
         self.vector_builder = MarketStateVectorBuilder(warehouse=self.warehouse, stale_cutoff_hours=24.0)
 
     def compute_empirical_probabilities(self, market_line: float, delta: float) -> tuple[float, float, float]:
-        """Compute pregame outcome probabilities from the frozen empirical OOF error distribution."""
-        mu_star = self.m4_1_alpha + (self.m4_1_beta * delta)
-        r_star = mu_star + self.oof_errors
+        from model_prediction.mlb_v10_replay import empirical_probabilities
 
-        is_integer = float(market_line).is_integer()
-        if is_integer:
-            p_push = float(np.mean((r_star >= -0.5) & (r_star < 0.5)))
-            p_over = float(np.mean(r_star >= 0.5))
-            p_under = float(np.mean(r_star < -0.5))
-        else:
-            p_push = 0.0
-            p_over = float(np.mean(r_star > 0.0))
-            p_under = float(np.mean(r_star < 0.0))
-
-        # Normalize and clip
-        total_p = p_over + p_under + p_push
-        if total_p > 0:
-            p_over = round(float(np.clip(p_over / total_p, 0.001, 0.999)), 4)
-            p_under = round(float(np.clip(p_under / total_p, 0.001, 0.999)), 4)
-            p_push = round(float(np.clip(p_push / total_p, 0.0, 0.999)), 4) if is_integer else 0.0
-            s = p_over + p_under + p_push
-            p_over = round(p_over / s, 4)
-            p_under = round(p_under / s, 4)
-            p_push = round(1.0 - p_over - p_under, 4) if is_integer else 0.0
-        else:
-            p_over, p_under, p_push = 0.50, 0.50, 0.0
-
-        return p_over, p_under, p_push
+        return empirical_probabilities(market_line, delta, self.m4_1_alpha, self.m4_1_beta, self.oof_errors)
 
     def generate_pregame_prediction(
         self,
@@ -189,6 +165,9 @@ class MLBPersistentShadowRunner:
         """Generate immutable pregame prediction record at T-30m decision timestamp."""
         start_dt = parse_utc(game_start_utc)
         dec_dt = start_dt - timedelta(minutes=30)
+        observed_at = utc_now()
+        if not dec_dt <= observed_at < start_dt:
+            return None
 
         vec = self.vector_builder.build_state_vector(
             event_id=event_id,
@@ -252,6 +231,18 @@ class MLBPersistentShadowRunner:
             probability_model_hash=self.probability_model_hash,
             prediction_hash="",
         )
+        from model_prediction.mlb_v10_replay import build_snapshot, replay_snapshot
+
+        rec.model_input_snapshot = build_snapshot(self.artifact, feat, m_line, observed_at.isoformat())
+        replayed = replay_snapshot(rec.model_input_snapshot)
+        if replayed["structural_prediction"] != asdict(pred) or replayed["probabilities"] != {
+            "over": p_over,
+            "under": p_under,
+            "push": p_push,
+        }:
+            raise ValueError("v10 serving probability replay mismatch")
+        if utc_now() >= start_dt:
+            return None
         rec.prediction_hash = rec.compute_prediction_hash()
         return rec
 
