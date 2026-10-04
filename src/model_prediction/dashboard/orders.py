@@ -365,7 +365,9 @@ def _decorate_pick(
     portfolio_history: dict | None = None,
     archived_ids: set[str] | None = None,
 ) -> dict:
-    quote = _pick_quote(row)
+    # Settled picks can never be executed — skip the expensive snapshot scan.
+    settled = str(row.get("status") or "").lower() == "settled"
+    quote = None if settled else _pick_quote(row)
     ready, reason = _order_readiness(row, quote)
     order = _latest_order_for_pick(row, quote, orders)
     manual, _ = _manual_research_eligibility(row)

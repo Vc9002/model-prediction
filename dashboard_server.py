@@ -234,8 +234,8 @@ def _warm_caches() -> None:
         ("matrix", 60, matrix),
         ("production-evidence", 30, production_evidence),
         ("model-ledgers", 30, model_ledger_comparison),
-        ("picks", 30, read_picks),
-        ("flat-picks", 30, read_flat_picks),
+        ("picks", 120, dashboard_picks),
+        ("flat-picks", 120, read_flat_picks),
         ("performance", 60, performance),
     ]
 

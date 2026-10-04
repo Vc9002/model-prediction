@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import re
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
 
 try:
@@ -155,9 +156,13 @@ def market_snapshots(sport: str, day: str) -> dict:
     return {"sport": sport, "date": day, "markets": rows, "count": len(rows)}
 
 
+_RE_NAME_PUNCT = re.compile(r"[(),.\-_]")
+_RE_VS_SPLIT = re.compile(r"\s+(?:vs\.?|@)\s+", re.IGNORECASE)
+
+
+@lru_cache(maxsize=4096)
 def _normalize_name_tokens(name: str) -> str:
-    cleaned = re.sub(r"[(),.\-_]", " ", name)
-    return " ".join(cleaned.casefold().split())
+    return " ".join(_RE_NAME_PUNCT.sub(" ", name).casefold().split())
 
 
 def _team_matches(team_name: str, side_description: str) -> bool:
@@ -171,10 +176,13 @@ def _team_matches(team_name: str, side_description: str) -> bool:
     return f" {shorter} " in f" {longer} "
 
 
+_RE_WORD = re.compile(r"\w+")
+
+
 def _tennis_player_matches(player_name: str, exchange_name: str) -> bool:
     """Match a tennis player when one source includes an omitted middle name or inverted names."""
-    player_tokens = re.findall(r"\w+", player_name.casefold())
-    exchange_tokens = re.findall(r"\w+", exchange_name.casefold())
+    player_tokens = _RE_WORD.findall(player_name.casefold())
+    exchange_tokens = _RE_WORD.findall(exchange_name.casefold())
     return (
         len(player_tokens) >= 2
         and len(exchange_tokens) >= 2
@@ -193,7 +201,7 @@ def _participant_matches(row: dict, participant: str, exchange_name: str) -> boo
 
 
 def _event_participant_indexes(row: dict, participant: str, title: str) -> set[int]:
-    sides = re.split(r"\s+(?:vs\.?|@)\s+", title, flags=re.IGNORECASE)
+    sides = _RE_VS_SPLIT.split(title)
     if len(sides) < 2:
         sides = [title]
     return {index for index, side in enumerate(sides) if _participant_matches(row, participant, side)}
@@ -306,6 +314,9 @@ import threading
 
 _SNAPSHOT_FILE_CACHE: dict[Path, tuple[float, list[dict]]] = {}
 _SNAPSHOT_FILE_CACHE_LOCK = threading.Lock()
+# Negative-existence cache: paths confirmed absent on first check are stored here
+# so bulk decoration (4000+ picks) avoids repeated expensive Windows stat() calls.
+_MISSING_PATHS: set[Path] = set()
 
 
 def _load_snapshot_file(path: Path) -> list[dict]:
@@ -314,7 +325,10 @@ def _load_snapshot_file(path: Path) -> list[dict]:
     Avoids re-opening and parsing large JSON Lines files thousands of times
     during bulk ledger decoration.
     """
+    if path in _MISSING_PATHS:
+        return []
     if not path.exists():
+        _MISSING_PATHS.add(path)
         return []
     try:
         mtime = path.stat().st_mtime
@@ -387,7 +401,9 @@ def _pick_quote(row: dict) -> dict | None:
         else ("ncaaf" if sport == "cfb" else sport)
     )
     path = DATA / "odds" / odds_sport / day / "polymarket_snapshots.jsonl"
-    if not path.exists():
+    if path in _MISSING_PATHS or not path.exists():
+        if path not in _MISSING_PATHS:
+            _MISSING_PATHS.add(path)
         path = DATA / "odds" / sport / day / "polymarket_snapshots.jsonl"
     snapshots = _load_snapshot_file(path)
     if not snapshots:
