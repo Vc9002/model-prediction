@@ -18,7 +18,7 @@ from pathlib import Path
 from model_prediction.tennis_derivatives_research import main
 
 DEFAULT_DATA_ROOT = Path(__file__).resolve().parents[1] / "data"
-DEFAULT_LEDGER_DB = Path.home() / "model-prediction-runtime" / "ledgers" / "ledgers.db"
+DEFAULT_LEDGER_DB = DEFAULT_DATA_ROOT / "ledgers" / "ledgers.db"
 DEFAULT_OUT = Path(__file__).resolve().parents[1] / "tmp" / "tennis_derivatives_walkforward.json"
 
 

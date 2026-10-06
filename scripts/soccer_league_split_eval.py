@@ -44,7 +44,7 @@ from model_prediction.config import PROJECT_ROOT
 from model_prediction.models.soccer import SoccerModel, UpcomingMatch
 from model_prediction.soccer.registry import model_for, named_league_codes
 
-GAMES_PATH = Path("/Users/vincentc9002/model-prediction/data/processed/soccer/games.jsonl")
+GAMES_PATH = PROJECT_ROOT / "data" / "processed" / "soccer" / "games.jsonl"
 LEAGUES = named_league_codes()
 
 

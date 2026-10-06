@@ -5,7 +5,7 @@
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot = if ($env:MODEL_PREDICTION_REPO_ROOT) { $env:MODEL_PREDICTION_REPO_ROOT } else { Split-Path -Parent $PSScriptRoot }
-$RuntimeRoot = if ($env:MODEL_PREDICTION_RUNTIME_ROOT) { $env:MODEL_PREDICTION_RUNTIME_ROOT } else { Join-Path $env:USERPROFILE 'model-prediction-runtime' }
+$RuntimeRoot = if ($env:MODEL_PREDICTION_RUNTIME_ROOT) { $env:MODEL_PREDICTION_RUNTIME_ROOT } else { Join-Path $RepoRoot 'data' }
 
 New-Item -ItemType Directory -Force -Path (Join-Path $RuntimeRoot 'logs') | Out-Null
 

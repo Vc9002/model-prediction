@@ -7,7 +7,7 @@
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
-$RuntimeRoot = if ($env:MODEL_PREDICTION_RUNTIME_ROOT) { $env:MODEL_PREDICTION_RUNTIME_ROOT } else { Join-Path $env:USERPROFILE 'model-prediction-runtime' }
+$RuntimeRoot = if ($env:MODEL_PREDICTION_RUNTIME_ROOT) { $env:MODEL_PREDICTION_RUNTIME_ROOT } else { Join-Path $RepoRoot 'data' }
 $LocalBackupDir = Join-Path $RuntimeRoot 'backups'
 $OffsiteDir = Join-Path $env:USERPROFILE 'OneDrive\model-prediction-offsite-backups'
 $Py = Join-Path $RepoRoot '.venv\Scripts\python.exe'

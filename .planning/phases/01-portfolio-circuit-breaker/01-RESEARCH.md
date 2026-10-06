@@ -188,7 +188,9 @@ def _drawdown_summary(sport: str | None = None) -> dict:
 
     picks = read_picks() or read_flat_picks()
     if sport:
-        picks = [p for p in picks if str(p.get("sport") or p.get("league") or "").casefold() == sport.casefold()]
+        picks = [
+            p for p in picks if str(p.get("sport") or p.get("league") or "").casefold() == sport.casefold()
+        ]
 
     settled_picks = [p for p in picks if str(p.get("status") or "").lower() == "settled"]
     settled_picks.sort(key=lambda p: str(p.get("event_start_utc") or p.get("created_at_utc") or ""))

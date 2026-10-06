@@ -2300,3 +2300,28 @@ def test_pick_quote_resolves_parenthesized_soccer_team_names(tmp_path: Path, pat
     assert quote is not None
     assert quote["market_slug"] == "atc-arg2-fco-cam-2026-09-05-cam"
     assert quote["side"] == "long"
+
+
+def test_cache_warmer_builds_every_entry_without_failures(monkeypatch):
+    # performance() takes a picks list, so warming it bare failed on every
+    # dashboard start; this runs each warmer entry against stub readers.
+    messages: list[str] = []
+    monkeypatch.setattr(dashboard_server, "_log", messages.append)
+    dashboard_server._CACHE.clear()
+    for name in (
+        "status",
+        "matrix",
+        "production_evidence",
+        "model_ledger_comparison",
+        "dashboard_picks",
+        "read_flat_picks",
+    ):
+        monkeypatch.setattr(dashboard_server, name, dict)
+    monkeypatch.setattr(dashboard_server, "read_picks", list)
+    monkeypatch.setattr(dashboard_server, "_load_archive", lambda: {"pick_ids": []})
+
+    dashboard_server._warm_caches()
+
+    assert messages == []
+    assert "performance:all" in dashboard_server._CACHE
+    dashboard_server._CACHE.clear()

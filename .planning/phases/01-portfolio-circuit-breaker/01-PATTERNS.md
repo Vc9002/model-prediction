@@ -153,7 +153,7 @@ State shape should be minimal and explicit:
     "tripped_reason": str | None,
     "max_drawdown_units_at_trip": float | None,
     "reset_at_utc": str | None,
-    "reset_by": str | None,   # operator identity, mirrors approved_by in model_promotion.py
+    "reset_by": str | None,  # operator identity, mirrors approved_by in model_promotion.py
 }
 ```
 
@@ -296,18 +296,16 @@ def _auto_buyer_daily_loss_alert() -> dict[str, Any] | None:
 **Auth/guard pattern** (`routes.py` lines 636-641, applies to the new
 reset route):
 ```python
-        if not self._local_origin_ok():
-            self._send({"status": "refused", "error": "cross-origin request rejected"}, code=403)
-            return
-        if not secrets.compare_digest(str(self.headers.get("X-Dashboard-Token") or ""), _DASHBOARD_TOKEN):
-            self._send({"status": "refused", "error": "missing or invalid dashboard session token"}, code=401)
-            return
-        ...
-        if payload.get("confirm") is not True:
-            self._send(
-                {"status": "refused", "error": "confirmation required: resend with confirm=true"}, code=400
-            )
-            return
+if not self._local_origin_ok():
+    self._send({"status": "refused", "error": "cross-origin request rejected"}, code=403)
+    return
+if not secrets.compare_digest(str(self.headers.get("X-Dashboard-Token") or ""), _DASHBOARD_TOKEN):
+    self._send({"status": "refused", "error": "missing or invalid dashboard session token"}, code=401)
+    return
+...
+if payload.get("confirm") is not True:
+    self._send({"status": "refused", "error": "confirmation required: resend with confirm=true"}, code=400)
+    return
 ```
 
 ---

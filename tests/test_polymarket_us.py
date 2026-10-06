@@ -531,3 +531,27 @@ def test_ledger_price_refresh_skips_unmapped_contract_without_network_call(tmp_p
     assert result["refreshed"] == 0
     assert result["failures"] == 1
     assert "broad discovery was not attempted" in result["failure_details"][0]["reason"]
+
+
+def test_get_honors_retry_after_and_backs_off_with_jitter(monkeypatch) -> None:
+    """A numeric Retry-After is used as-is (capped at 10s); without it the
+    delay grows with attempts instead of retrying every worker in lockstep."""
+    sleeps: list[float] = []
+    monkeypatch.setattr("model_prediction.data_sources.polymarket_us.time.sleep", sleeps.append)
+
+    attempts = {"count": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            return httpx.Response(429, headers={"Retry-After": "3"})
+        if attempts["count"] == 2:
+            return httpx.Response(429)
+        return httpx.Response(200, json={"ok": True})
+
+    http_client = httpx.Client(transport=httpx.MockTransport(handler))
+    client = PolymarketUSClient("https://example.test", http_client)
+
+    assert client._get("/v1/markets/x/book") == {"ok": True}
+    assert sleeps[0] == 3.0
+    assert 1.0 <= sleeps[1] <= 1.25

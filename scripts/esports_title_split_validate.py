@@ -35,8 +35,8 @@ from model_prediction import esports as shared_esports
 from model_prediction.config import PROJECT_ROOT
 from model_prediction.esports_titles.registry import TitleEloEngine, resolve
 
-DATA_ROOT = Path("/Users/vincentc9002/model-prediction/data")
-ARTIFACT_ROOT = Path("/Users/vincentc9002/model-prediction-runtime/models")
+DATA_ROOT = PROJECT_ROOT / "data"
+ARTIFACT_ROOT = PROJECT_ROOT / "data" / "models"
 TITLES = ("cs2", "valorant", "lol", "dota2", "rainbow_six")
 
 

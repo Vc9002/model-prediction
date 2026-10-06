@@ -34,7 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from model_prediction.config import PROJECT_ROOT
 
-DATA_ROOT = Path("/Users/vincentc9002/model-prediction/data")
+DATA_ROOT = PROJECT_ROOT / "data"
 TIERS = ("main", "flat")
 VARIANCE_LEANING = {"bad_luck", "missing_information"}
 SIGNAL_LEANING = {"model_error", "market_or_rule_error", "process_error", "bad_data"}

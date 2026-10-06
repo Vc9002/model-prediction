@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = $PSScriptRoot
 Set-Location $RepoRoot
-$RuntimeRoot = if ($env:MODEL_PREDICTION_RUNTIME_ROOT) { $env:MODEL_PREDICTION_RUNTIME_ROOT } else { Join-Path $env:USERPROFILE 'model-prediction-runtime' }
+$RuntimeRoot = if ($env:MODEL_PREDICTION_RUNTIME_ROOT) { $env:MODEL_PREDICTION_RUNTIME_ROOT } else { Join-Path $RepoRoot 'data' }
 $env:MODEL_PREDICTION_RUNTIME_ROOT = $RuntimeRoot
 $env:PYTHONPATH = 'src'
 
@@ -14,11 +14,18 @@ $Port = 8765
 $Url = "http://localhost:$Port/"
 
 if (Test-Path $PidFile) {
-    $existing = [int](Get-Content $PidFile -Raw)
-    if (Get-Process -Id $existing -ErrorAction SilentlyContinue) {
-        Write-Output "Dashboard already running (PID $existing): $Url"
-        exit 0
-    }
+    try {
+        $existing = [int]((Get-Content $PidFile -Raw).Trim())
+        $p = Get-Process -Id $existing -ErrorAction SilentlyContinue
+        if ($p -and $p.ProcessName -match 'python') {
+            try {
+                Invoke-WebRequest -Uri "${Url}api/ping" -UseBasicParsing -TimeoutSec 2 | Out-Null
+                Write-Output "Dashboard already running (PID $existing): $Url"
+                exit 0
+            } catch {}
+        }
+    } catch {}
+    Remove-Item $PidFile -Force -ErrorAction SilentlyContinue
 }
 
 $Python = Join-Path $RepoRoot '.venv\Scripts\python.exe'

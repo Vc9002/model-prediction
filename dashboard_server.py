@@ -236,15 +236,23 @@ def _warm_caches() -> None:
         ("model-ledgers", 30, model_ledger_comparison),
         ("picks", 120, dashboard_picks),
         ("flat-picks", 120, read_flat_picks),
-        ("performance", 60, performance),
+        # Same key and builder as /api/performance (routes.py); performance()
+        # itself needs a picks list, so the bare function can never be warmed.
+        (
+            "performance:all",
+            30,
+            lambda: performance_for_sport(
+                read_picks(), "", archived_ids=set(_load_archive().get("pick_ids", []))
+            ),
+        ),
     ]
 
     def _warm(item):
         key, ttl, builder = item
         try:
             _cached(key, ttl, builder)
-        except Exception:  # noqa: BLE001
-            _log(f"cache warmer: {key} failed (non-fatal)")
+        except Exception as exc:  # noqa: BLE001
+            _log(f"cache warmer: {key} failed (non-fatal): {exc!r}")
 
     with _ThreadPoolExecutor(max_workers=len(warmers)) as pool:
         list(pool.map(_warm, warmers))
@@ -269,7 +277,7 @@ def main() -> None:
         print(f"dashboard: session token (for direct API calls): {_DASHBOARD_TOKEN}")
         server.serve_forever()
     except OSError as exc:
-        if exc.errno == 48:
+        if exc.errno == 48 or getattr(exc, "winerror", None) == 10048 or exc.errno == 10048:
             print(f"dashboard: port {options.port} busy — is another instance running?", file=sys.stderr)
         else:
             raise

@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $TaskName = 'ModelPredictionDashboard'
 $Py = Join-Path $RepoRoot '.venv\Scripts\python.exe'
-$RuntimeRoot = if ($env:MODEL_PREDICTION_RUNTIME_ROOT) { $env:MODEL_PREDICTION_RUNTIME_ROOT } else { Join-Path $env:USERPROFILE 'model-prediction-runtime' }
+$RuntimeRoot = if ($env:MODEL_PREDICTION_RUNTIME_ROOT) { $env:MODEL_PREDICTION_RUNTIME_ROOT } else { Join-Path $RepoRoot 'data' }
 $LogDir = Join-Path $RepoRoot 'dashboard'
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 

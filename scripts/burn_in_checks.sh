@@ -30,10 +30,11 @@ repo = Path("$TMP") / "repo"; (repo / "data").mkdir(parents=True)
 # scheduled run), then verify the local invocation is SKIPPED, not run.
 holder = subprocess.Popen(
     [sys.executable, "-c",
-     "import fcntl, pathlib, sys, time;"
+     "import pathlib, sys, time;"
      "p = pathlib.Path(sys.argv[1]); p.parent.mkdir(parents=True, exist_ok=True);"
      "h = open(p, 'w');"
-     "fcntl.flock(h, fcntl.LOCK_EX | fcntl.LOCK_NB);"
+     "from model_prediction.filelock import lock_exclusive;"
+     "lock_exclusive(h, blocking=False);"
      "time.sleep(3)",
      str(repo / "data" / "locks" / "supervisor-daily.lock")],
 )

@@ -32,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from model_prediction.config import PROJECT_ROOT
 from scripts.mlb_v9_calibration_xgb import _safe_metrics
 
-DEFAULT_LEDGER_DB = Path("/Users/vincentc9002/model-prediction-runtime/ledgers/ledgers.db")
+DEFAULT_LEDGER_DB = PROJECT_ROOT / "data" / "ledgers" / "ledgers.db"
 
 
 def _fetch_settled(db_path: Path, tier: str) -> list[dict]:

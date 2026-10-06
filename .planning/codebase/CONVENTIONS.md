@@ -117,10 +117,10 @@ Example from `audit.py`:
 class AuditLockTimeout(TimeoutError):
     """Raised when the audit log lock can't be acquired within the timeout."""
 
+
 if time.monotonic() >= deadline:
     raise AuditLockTimeout(
-        f"could not acquire lock on {path} within {timeout}s -- "
-        "another process may be hung while holding it"
+        f"could not acquire lock on {path} within {timeout}s -- another process may be hung while holding it"
     ) from None
 ```
 
@@ -162,7 +162,6 @@ _logger.warning(
 Example from `domain.py`:
 
 ```python
-
 # This US sports-market project: "today" forecasting, searching, backfill defaults
 
 # always mean US-Eastern calendar day, never host machine's local timezone or UTC

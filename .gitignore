@@ -94,6 +94,9 @@ data/flat_v9/
 data/research/
 data/gated_research/
 data/model_ledgers/
+data/models/
+data/system_health_last_status.txt
+data/MIGRATION_MANIFEST.json
 outputs/latest/
 dashboard/jobs.json
 dashboard/archive.json

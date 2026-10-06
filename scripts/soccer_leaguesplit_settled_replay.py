@@ -32,15 +32,15 @@ from model_prediction.config import PROJECT_ROOT
 from model_prediction.soccer.league_model import LeagueSoccerModel
 from model_prediction.soccer.registry import resolve
 
-DEFAULT_LEDGER_DB = Path("/Users/vincentc9002/model-prediction-runtime/ledgers/ledgers.db")
+DEFAULT_LEDGER_DB = PROJECT_ROOT / "data" / "ledgers" / "ledgers.db"
 # Both local soccer history files are checked -- the processed file feeds
 # FeatureStore (what soccer_forward.py's serving path actually reads) and the
 # historical file is the Odds API-sourced accumulation. Verified 2026-08-18:
 # ESPN-sourced soccer rows stop ~2026-07-19 in both, so late-July/August
 # settled-pick events match NEITHER (see the replay script's own finding).
 GAMES_PATHS = (
-    Path("/Users/vincentc9002/model-prediction/data/processed/soccer/games.jsonl"),
-    Path("/Users/vincentc9002/model-prediction/data/historical/soccer_games_all.jsonl"),
+    PROJECT_ROOT / "data" / "processed" / "soccer" / "games.jsonl",
+    PROJECT_ROOT / "data" / "historical" / "soccer_games_all.jsonl",
 )
 
 

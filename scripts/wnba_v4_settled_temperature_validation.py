@@ -32,7 +32,7 @@ from model_prediction.calibration import TemperatureCalibrator
 from model_prediction.config import PROJECT_ROOT
 from scripts.mlb_v9_calibration_xgb import _safe_metrics
 
-DEFAULT_LEDGER_DB = Path("/Users/vincentc9002/model-prediction-runtime/ledgers/ledgers.db")
+DEFAULT_LEDGER_DB = PROJECT_ROOT / "data" / "ledgers" / "ledgers.db"
 MODEL_ID = "wnba-elo-trend-lr-v4"
 TEMPERATURE = 0.8
 

@@ -176,6 +176,7 @@ def registry() -> EntityRegistry:
     """Load canonical team registry for tests."""
     return EntityRegistry.from_json(PROJECT_ROOT / "data/entities/teams.json")
 
+
 @pytest.fixture
 def bans(tmp_path: Path, registry: EntityRegistry, monkeypatch) -> TeamBanList:
     """Create an in-memory ban list for testing."""

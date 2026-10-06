@@ -23,13 +23,14 @@ writes the new file via temp+rename.
 from __future__ import annotations
 
 import contextlib
-import fcntl
 import hashlib
 import json
 import os
 import sys
 import tempfile
 from pathlib import Path
+
+from model_prediction.filelock import lock_exclusive, unlock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
@@ -73,7 +74,7 @@ def main() -> int:
     lock_path_parent = LOCK_PATH.parent
     lock_path_parent.mkdir(parents=True, exist_ok=True)
     lock = LOCK_PATH.open("a+", encoding="utf-8")
-    fcntl.flock(lock, fcntl.LOCK_EX)  # block until the daily cycle is done
+    lock_exclusive(lock)  # block until the daily cycle is done
     try:
         index = _snapshot_index()
         print(f"snapshot index: {len(index)} events")
@@ -118,7 +119,7 @@ def main() -> int:
         print(f"wrote {GAMES_PATH}")
         return 0
     finally:
-        fcntl.flock(lock, fcntl.LOCK_UN)
+        unlock(lock)
         lock.close()
 
 

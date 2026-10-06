@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import random
 import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
@@ -285,6 +286,15 @@ class SportSlateResult:
     errors: dict[str, str]
 
 
+def _retry_delay_seconds(response: httpx.Response, attempt: int) -> float:
+    """Seconds to wait before retrying a 429: Retry-After when numeric, else jittered exponential backoff."""
+    retry_after = response.headers.get("Retry-After", "")
+    if retry_after.strip().isdigit():
+        return min(float(retry_after), 10.0)
+    base = min(8.0, 0.5 * (2**attempt))
+    return base + random.uniform(0.0, base / 4)
+
+
 class PolymarketUSClient:
     """Read-only client for the unauthenticated Polymarket US public gateway."""
 
@@ -303,11 +313,15 @@ class PolymarketUSClient:
         # the market's book snapshot for the day (2026-08-24, ~1,700/day
         # dropped book fetches -- concentrated in ITF tennis and esports,
         # the highest-market-count leagues).
-        max_attempts = 4
+        # 2026-10-04: 1,686 throttled responses in one daily run; the old
+        # 4-attempt ~3.5s budget ran out while the pool was still bursting.
+        # Honor Retry-After when given, otherwise back off with jitter so the
+        # 16 workers stop retrying in lockstep.
+        max_attempts = 6
         for attempt in range(max_attempts):
             response = self.client.get(f"{self.base_url}{path}", params=params)
             if response.status_code == 429 and attempt < max_attempts - 1:
-                time.sleep(0.5 * (2**attempt))
+                time.sleep(_retry_delay_seconds(response, attempt))
                 continue
             response.raise_for_status()
             return response.json()

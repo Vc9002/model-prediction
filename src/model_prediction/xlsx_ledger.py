@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+import time
 from collections.abc import Iterable
 from copy import copy
 from pathlib import Path
@@ -125,13 +126,27 @@ def write_xlsx_rows_atomic(
         workbook.save(temporary)
         with open(temporary, "r+b") as handle:
             os.fsync(handle.fileno())
-        os.replace(temporary, destination)
+        _replace_with_retry(temporary, destination)
     except Exception:
         if os.path.exists(temporary):
             os.unlink(temporary)
         raise
     finally:
         workbook.close()
+
+
+def _replace_with_retry(temporary: str, destination: Path, attempts: int = 6) -> None:
+    # On Windows a briefly open handle (antivirus scan, OneDrive/indexer read)
+    # makes os.replace fail with WinError 5 even though the file is free moments
+    # later. 2026-10-04 settlement lost a whole run to one such failure.
+    for attempt in range(attempts):
+        try:
+            os.replace(temporary, destination)
+            return
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(0.5 * (attempt + 1))
 
 
 def _build_workbook(fieldnames: list[str], rows: list[dict[str, str]]) -> Workbook:
