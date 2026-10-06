@@ -70,6 +70,10 @@ def ledger_mirror(data_root: str | Path) -> RuntimeLedgerStore | None:
 
 def main_ledger_path(data_root: str | Path, sport: str) -> Path:
     normalized = normalize_main_sport(sport)
+    sport_dir = Path(data_root) / "sports" / normalized
+    new_path = sport_dir / "main.xlsx"
+    if new_path.exists() or sport_dir.exists():
+        return new_path
     return Path(data_root) / "main" / f"{normalized}.xlsx"
 
 
@@ -88,26 +92,33 @@ def main_ledger(data_root: str | Path, sport: str) -> PickLedger:
 
 
 def existing_main_ledgers(data_root: str | Path) -> list[PickLedger]:
-    directory = Path(data_root) / "main"
-    if not directory.exists():
-        return []
-    return [
-        PickLedger(
-            path,
-            audit_path=Path(data_root) / "events.jsonl",
-            model_ledgers_dir=Path(data_root) / "model_ledgers",
-            tier="main",
-            mirror=ledger_mirror(Path(data_root)),
-            authority=ledger_authority(),
-            sport=path.stem.casefold(),
-        )
-        for path in sorted(directory.glob("*.xlsx"))
-        if path.stem.casefold() in MAIN_LEDGER_SPORTS
-    ]
+    ledgers: list[PickLedger] = []
+    seen: set[str] = set()
+    root = Path(data_root)
+    for sport in MAIN_LEDGER_SPORTS:
+        path = main_ledger_path(root, sport)
+        if path.exists() and sport not in seen:
+            seen.add(sport)
+            ledgers.append(
+                PickLedger(
+                    path,
+                    audit_path=root / "events.jsonl",
+                    model_ledgers_dir=root / "model_ledgers",
+                    tier="main",
+                    mirror=ledger_mirror(root),
+                    authority=ledger_authority(),
+                    sport=sport,
+                )
+            )
+    return ledgers
 
 
 def flat_ledger_path(data_root: str | Path, sport: str) -> Path:
     normalized = normalize_main_sport(sport)
+    sport_dir = Path(data_root) / "sports" / normalized
+    new_path = sport_dir / "flat.xlsx"
+    if new_path.exists() or sport_dir.exists():
+        return new_path
     return Path(data_root) / "flat" / f"{normalized}.xlsx"
 
 
@@ -126,22 +137,25 @@ def flat_ledger(data_root: str | Path, sport: str) -> PickLedger:
 
 
 def existing_flat_ledgers(data_root: str | Path) -> list[PickLedger]:
-    directory = Path(data_root) / "flat"
-    if not directory.exists():
-        return []
-    return [
-        PickLedger(
-            path,
-            audit_path=Path(data_root) / "events.jsonl",
-            model_ledgers_dir=Path(data_root) / "model_ledgers",
-            tier="flat",
-            mirror=ledger_mirror(Path(data_root)),
-            authority=ledger_authority(),
-            sport=path.stem.casefold(),
-        )
-        for path in sorted(directory.glob("*.xlsx"))
-        if path.stem.casefold() in MAIN_LEDGER_SPORTS
-    ]
+    ledgers: list[PickLedger] = []
+    seen: set[str] = set()
+    root = Path(data_root)
+    for sport in MAIN_LEDGER_SPORTS:
+        path = flat_ledger_path(root, sport)
+        if path.exists() and sport not in seen:
+            seen.add(sport)
+            ledgers.append(
+                PickLedger(
+                    path,
+                    audit_path=root / "events.jsonl",
+                    model_ledgers_dir=root / "model_ledgers",
+                    tier="flat",
+                    mirror=ledger_mirror(root),
+                    authority=ledger_authority(),
+                    sport=sport,
+                )
+            )
+    return ledgers
 
 
 class MultiSportPickLedger:
@@ -191,9 +205,11 @@ class MultiSportPickLedger:
         self.path = self.data_root / ("flat" if flat else "main")
 
     def _build_ledger(self, sport: str) -> PickLedger:
-        directory = self.data_root / ("flat" if self._flat else "main")
+        path = (
+            flat_ledger_path(self.data_root, sport) if self._flat else main_ledger_path(self.data_root, sport)
+        )
         return PickLedger(
-            directory / f"{sport}.xlsx",
+            path,
             audit_path=self.data_root / "events.jsonl",
             model_ledgers_dir=self.data_root / "model_ledgers",
             tier="flat" if self._flat else "main",
@@ -228,6 +244,12 @@ class MultiSportPickLedger:
         an orphaned row is a repair, admitting a new sport is a decision.
         """
         found: set[str] = set()
+        filename = "flat.xlsx" if self._flat else "main.xlsx"
+        sports_dir = self.data_root / "sports"
+        if sports_dir.exists():
+            for sdir in sports_dir.iterdir():
+                if sdir.is_dir() and (sdir / filename).exists():
+                    found.add(sdir.name.casefold())
         directory = self.data_root / ("flat" if self._flat else "main")
         if directory.exists():
             found.update(path.stem.casefold() for path in directory.glob("*.xlsx"))

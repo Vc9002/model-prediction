@@ -32,12 +32,25 @@ from model_prediction.dashboard.common import (
 
 
 def _main_ledger_paths() -> list[Path]:
-    return [DATA / "main" / f"{sport}.xlsx" for sport in _MAIN_LEDGER_SPORTS]
+    paths: list[Path] = []
+    for sport in _MAIN_LEDGER_SPORTS:
+        new_path = DATA / "sports" / sport / "main.xlsx"
+        if new_path.exists() or (DATA / "sports" / sport).exists():
+            paths.append(new_path)
+        else:
+            paths.append(DATA / "main" / f"{sport}.xlsx")
+    return paths
 
 
 def _flat_ledger_paths() -> list[Path]:
+    paths: list[Path] = []
+    for sport in _MAIN_LEDGER_SPORTS:
+        new_path = DATA / "sports" / sport / "flat.xlsx"
+        if new_path.exists() or (DATA / "sports" / sport).exists():
+            paths.append(new_path)
+        else:
+            paths.append(DATA / "flat" / f"{sport}.xlsx")
     flat_dir = DATA / "flat"
-    paths = [flat_dir / f"{sport}.xlsx" for sport in _MAIN_LEDGER_SPORTS]
     if flat_dir.exists():
         for path in sorted(flat_dir.glob("*.xlsx")):
             if not path.name.startswith(".") and path not in paths:
@@ -60,7 +73,15 @@ def _read_split_picks(paths: list[Path], cache: dict[str, object]) -> list[dict]
 
     # Try SQLite cache first if paths are under the standard repo data root
     canonical_tiers = {"main", "flat", "research", "gated_research"}
-    tier = paths[0].parent.name if paths else None
+    tier = None
+    if paths:
+        first = paths[0]
+        if first.stem in canonical_tiers:
+            tier = first.stem
+        elif first.stem == "gated":
+            tier = "gated_research"
+        elif first.parent.name in canonical_tiers:
+            tier = first.parent.name
     if dc is not None and paths and str(paths[0]).startswith(str(ROOT / "data")) and tier in canonical_tiers:
         try:
             dc.refresh()  # no-op if mtimes unchanged, fast SQLite otherwise
@@ -201,6 +222,15 @@ def _parse_picks(path: Path) -> list[dict]:
 
 
 def _research_ledger_paths(*, gated: bool = False) -> list[Path]:
+    filename = "gated.xlsx" if gated else "research.xlsx"
+    sports_dir = DATA / "sports"
+    paths: list[Path] = []
+    if sports_dir.exists():
+        for sdir in sorted(sports_dir.iterdir()):
+            if sdir.is_dir() and (sdir / filename).exists():
+                paths.append(sdir / filename)
+    if paths:
+        return paths
     directory = DATA / ("gated_research" if gated else "research")
     paths = sorted(directory.glob("*.xlsx")) if directory.exists() else []
     if paths:

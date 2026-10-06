@@ -1,0 +1,8 @@
+{
+  "artifact_hash": "340b50fd13c3dc5ea28b0f5a93bec2a876b7bb40470c99ed34a7c94d76d68a66",
+  "coefficients": null,
+  "minimum_sample": 100,
+  "model_version": "market-residual-logistic-v1-identity-fallback",
+  "rolling_window_days": 90,
+  "sample_size": 51
+}

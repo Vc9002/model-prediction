@@ -254,19 +254,39 @@ class DashboardCache:
         research_dir = self.data_root / "research"
         gated_dir = self.data_root / "gated_research"
         model_dir = self.data_root / "model_ledgers"
+        sports_dir = self.data_root / "sports"
 
         tiers: dict[str, list[Path]] = {}
 
-        if main_dir.exists():
-            tiers["main"] = sorted(main_dir.glob("*.xlsx"))
+        main_paths = sorted(sports_dir.glob("*/main.xlsx")) if sports_dir.exists() else []
+        if not main_paths and main_dir.exists():
+            main_paths = sorted(main_dir.glob("*.xlsx"))
+        if main_paths:
+            tiers["main"] = main_paths
+
+        flat_paths = sorted(sports_dir.glob("*/flat.xlsx")) if sports_dir.exists() else []
         if flat_dir.exists():
-            tiers["flat"] = sorted(flat_dir.glob("*.xlsx"))
+            for p in sorted(flat_dir.glob("*.xlsx")):
+                if p not in flat_paths:
+                    flat_paths.append(p)
+        if flat_paths:
+            tiers["flat"] = flat_paths
+
         if flat_v9_dir.exists():
             tiers["flat_v9"] = sorted(flat_v9_dir.glob("*.xlsx"))
-        if research_dir.exists():
-            tiers["research"] = sorted(research_dir.glob("*.xlsx"))
-        if gated_dir.exists():
-            tiers["gated_research"] = sorted(gated_dir.glob("*.xlsx"))
+
+        research_paths = sorted(sports_dir.glob("*/research.xlsx")) if sports_dir.exists() else []
+        if not research_paths and research_dir.exists():
+            research_paths = sorted(research_dir.glob("*.xlsx"))
+        if research_paths:
+            tiers["research"] = research_paths
+
+        gated_paths = sorted(sports_dir.glob("*/gated.xlsx")) if sports_dir.exists() else []
+        if not gated_paths and gated_dir.exists():
+            gated_paths = sorted(gated_dir.glob("*.xlsx"))
+        if gated_paths:
+            tiers["gated_research"] = gated_paths
+
         if model_dir.exists():
             for path in sorted(model_dir.glob("*.xlsx")):
                 model_id = path.stem

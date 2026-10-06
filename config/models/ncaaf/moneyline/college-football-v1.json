@@ -1,0 +1,53 @@
+{
+  "method": "cfb_joint_scoring_model",
+  "model_version": "college-football-v1",
+  "schema_version": "2",
+  "sport": "ncaaf",
+  "league": "NCAAF",
+  "positive_class": "home_win",
+  "distribution": "negative_binomial",
+  "home_advantage_points": 2.8,
+  "margin_sd": 15.5,
+  "total_sd": 14.8,
+  "features": [
+    "elo_away",
+    "elo_home",
+    "elo_home_win_prob",
+    "away_offense_ppp",
+    "home_offense_ppp",
+    "away_defense_ppp",
+    "home_defense_ppp",
+    "projected_possessions",
+    "efficiency_gap",
+    "travel_distance_miles",
+    "stadium_elevation_ft",
+    "altitude_fatigue_penalty",
+    "home_field_advantage_points",
+    "weather_total_adjustment",
+    "is_dome",
+    "away_preseason_prior_weight",
+    "home_preseason_prior_weight",
+    "away_qb_value_adjustment",
+    "home_qb_value_adjustment"
+  ],
+  "gates": {
+    "min_edge": 0.035,
+    "max_uncertainty": 0.18,
+    "block_fcs": true,
+    "sizing": "quarter_kelly"
+  },
+  "calibration": {
+    "method": "joint_distribution_ot_mixture",
+    "slope": 1.002,
+    "intercept": -0.001,
+    "brier_holdout": 0.11581,
+    "logloss_holdout": 0.37128
+  },
+  "qualification": {
+    "status": "FLAT_LEDGER_ONLY",
+    "qualified": false,
+    "locked_holdout": true,
+    "framework": "cfb_joint_scoring_model"
+  },
+  "artifact_hash": "f5b95acd6676fe7a7121b6045aa92ecca2ff3d252689802836e65f003f607786"
+}

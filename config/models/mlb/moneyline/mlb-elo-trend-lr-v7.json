@@ -1,0 +1,138 @@
+{
+  "artifact_hash": "464eef695bfbbdaa819ec6f5e4c5bd1068ed20b92915fb2677220ae91e20d8b6",
+  "market_models": {
+    "moneyline": {
+      "coefficients": [
+        3.1443597062,
+        -0.0210515984,
+        -1.1607647351,
+        -0.2118466153,
+        0.018531737,
+        0.0728779785
+      ],
+      "confidence_threshold": 0.62419081,
+      "feature_names": [
+        "elo_probability",
+        "trend_gap",
+        "park_factor",
+        "weather_factor",
+        "pitcher_era_gap",
+        "bullpen_weakness_gap"
+      ],
+      "intercept": -0.168050136,
+      "positive_class": "home"
+    }
+  },
+  "method": "logistic_regression",
+  "model_version": "mlb-elo-trend-lr-v7",
+  "qualification": {
+    "brier_score": 0.246456,
+    "calibration": {
+      "brier_score": 0.24645617995721666,
+      "calibration_intercept": -0.7404792703842961,
+      "calibration_slope": 1.64500958337115,
+      "expected_calibration_error": 0.07408975466720147,
+      "log_loss": 0.6864702122112417,
+      "reliability_buckets": [
+        {
+          "count": 108,
+          "hit_rate": 0.5740740740740741,
+          "lower": 0.6,
+          "mean_p": 0.6535387144738053,
+          "upper": 0.7
+        },
+        {
+          "count": 10,
+          "hit_rate": 0.7,
+          "lower": 0.7,
+          "mean_p": 0.7160409887558801,
+          "upper": 0.8
+        }
+      ],
+      "sample_size": 118,
+      "status": "ok"
+    },
+    "called_rate": 0.084831,
+    "calls": 118,
+    "every_called_month_positive_at_minus_110": false,
+    "every_qualifying_month_positive_at_minus_110": false,
+    "failures": [
+      "selective hit rate 58.47% below required 60.00%",
+      "non-positive qualifying months at -110: 2026-04"
+    ],
+    "framework": "locked_complete_date_60_20_20",
+    "hit_rate": 0.584746,
+    "hits": 69,
+    "locked_holdout": true,
+    "market_type": "moneyline",
+    "meets_primary_holdout_metrics": false,
+    "minimum_calls": 50,
+    "minimum_hit_rate": 0.6,
+    "monthly_at_minus_110": [
+      {
+        "calls": 29,
+        "hit_rate": 0.482759,
+        "hits": 14,
+        "month": "2026-04",
+        "qualification_status": "qualifying",
+        "units_at_minus_110": -2.272727
+      },
+      {
+        "calls": 38,
+        "hit_rate": 0.631579,
+        "hits": 24,
+        "month": "2026-05",
+        "qualification_status": "qualifying",
+        "units_at_minus_110": 7.818182
+      },
+      {
+        "calls": 32,
+        "hit_rate": 0.59375,
+        "hits": 19,
+        "month": "2026-06",
+        "qualification_status": "qualifying",
+        "units_at_minus_110": 4.272727
+      },
+      {
+        "calls": 19,
+        "hit_rate": 0.631579,
+        "hits": 12,
+        "month": "2026-07",
+        "qualification_status": "partial_month",
+        "units_at_minus_110": 3.909091
+      }
+    ],
+    "monthly_minimum_calls": 10,
+    "price_diagnostics": null,
+    "qualification_eligible": true,
+    "qualified": false,
+    "roi": null,
+    "secondary_reporting_complete": true,
+    "selectivity": 0.084831,
+    "total_predictions": 1391,
+    "units_at_minus_110": 13.727273
+  },
+  "schema_version": "1",
+  "sport": "mlb",
+  "training": {
+    "coefficient_fit": {
+      "end": "2025-07-22",
+      "observations": 3814,
+      "start": "2024-04-06"
+    },
+    "locked_holdout": {
+      "end": "2026-07-29",
+      "observations": 1391,
+      "start": "2026-04-11"
+    },
+    "market_inputs_used": false,
+    "note": "Rebuilt 2026-07-30 via the project's own standard walk-forward pipeline (validation.py run_sport_validation/build_production_artifact pattern), replacing v6's ad-hoc 90-day/242-call operator experiment (retired -- self-documented contaminated probable_starter_era_gap, never cleared this project's own bar). Uses the full real historical dataset: 3814 train / 1082 validation / 1391 locked-holdout games (2024-04-06 through 2026-07-29), all point-in-time-safe features (pitcher_era_gap: real rolling runs-allowed; bullpen_weakness_gap: real MLB Stats API snapshots, credibility-shrunk; park_factor: real empirical factors; weather_factor: real Open-Meteo). While building this, found and fixed a real bug in ingest.py: raw score caches for 2026-07-26..29 were captured mid-day (before that evening's games finished) and were never re-fetched afterward, so data/processed/mlb/games.jsonl -- which every live Elo/trend feature reads -- was silently missing 57 real completed games. Recovered before this final fit. Chose elo_trend_park_weather_pitcher_bullpen over the raw-best variant with bullpen_fatigue added: fatigue's own live feature provider didn't exist in learned_forward.py at all (confirmed live: every real game failed to forecast), and its marginal contribution was small. bullpen_weakness_gap's live provider was added in this same change (features/bullpen.py's team_recent_relief_lines/bullpen_profile, same real functions Measured Edge already uses live). Platt recalibration was tested and explicitly rejected: folding a validation-fit Platt scale/offset into the coefficients did not reliably improve locked-holdout calibration or hit rate across variants (consistent with within-season non-stationarity -- confirmed further by this variant's own calibration slope shifting from 0.97 to 1.65 after just 57 more real games were added, i.e. real sampling instability, not a fixed miscalibration a static recalibration could correct). Does not use probable_starter_era_gap (ESPN live probables) -- the honest point-in-time replacement (point_in_time_pitcher_era_gap) exists in code but its real archive only covers 6 days so far, too little to fit or trust yet.",
+    "threshold_selection": {
+      "end": "2026-04-10",
+      "observations": 1082,
+      "start": "2025-07-23"
+    },
+    "threshold_source": "later validation cohort; never locked holdout",
+    "walk_forward_features": true
+  }
+}

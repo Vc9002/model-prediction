@@ -1,0 +1,64 @@
+{
+  "alpha": 10.0,
+  "artifact_hash": "113e1744e564570dce943be22f4609ea073b2c634f9429475f4ee76e24e2f9c8",
+  "coefficients": [
+    -2.5837087858,
+    -0.0061901708,
+    0.4631894474,
+    0.1611363328,
+    0.4193866039,
+    -0.2212975484,
+    0.8280771825,
+    -0.2712464838,
+    1.0557180234
+  ],
+  "feature_names": [
+    "league_total_mean",
+    "away_scored_5",
+    "away_scored_10",
+    "away_allowed_5",
+    "away_allowed_10",
+    "home_scored_5",
+    "home_scored_10",
+    "home_allowed_5",
+    "home_allowed_10"
+  ],
+  "intercept": 387.3600114837,
+  "locked_holdout": {
+    "baseline_mae": 17.918592,
+    "baseline_rmse": 23.085377,
+    "beats_baseline_mae": false,
+    "mae": 19.868038,
+    "mae_gain_95pct_interval": [
+      -3.387878,
+      -0.393392
+    ],
+    "mae_gain_vs_rolling_league_mean": -1.949446,
+    "mean_error": -12.102628,
+    "rmse": 25.299849,
+    "statistically_clear_mae_gain": false
+  },
+  "market_qualification": {
+    "eligible": false,
+    "note": "Timestamp-valid total lines available (2123 snapshots, >= 50 minimum). Score MAE/RMSE do not directly prove over-under accuracy, but a contract-level backtest against these historical lines is now feasible.",
+    "reason": "DATA_READY_PENDING_OVER_UNDER_EVALUATION",
+    "total_snapshots": 2123
+  },
+  "method": "ridge_regression",
+  "model_version": "wnba-total-margin-v1",
+  "schema_version": "1",
+  "sport": "wnba",
+  "status": "research_score_model_candidate",
+  "training": {
+    "holdout_end": "2026-07-19",
+    "holdout_rows": 142,
+    "point_in_time": true,
+    "total_games": 813,
+    "train_end": "2025-08-15",
+    "train_rows": 424,
+    "usable_rows": 708,
+    "validation_end": "2026-05-27",
+    "validation_rows": 142
+  },
+  "validation_residual_sd": 16.554472
+}

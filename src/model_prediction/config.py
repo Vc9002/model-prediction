@@ -159,7 +159,8 @@ def polymarket_edge_enabled(config: dict[str, Any], component: str) -> bool:
 
 
 def config_path() -> Path:
-    return Path(os.getenv("MODEL_PREDICTION_CONFIG", PROJECT_ROOT / "config/model.yaml"))
+    path = Path(os.getenv("MODEL_PREDICTION_CONFIG", "config/model.yaml"))
+    return path if path.is_absolute() else PROJECT_ROOT / path
 
 
 def ledger_path(config: dict[str, Any]) -> Path:

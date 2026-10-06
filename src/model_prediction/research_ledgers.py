@@ -30,6 +30,11 @@ def research_ledger_path(
     gated: bool = False,
 ) -> Path:
     normalized = normalize_research_sport(sport)
+    filename = "gated.xlsx" if gated else "research.xlsx"
+    sport_dir = Path(data_root) / "sports" / normalized
+    new_path = sport_dir / filename
+    if new_path.exists() or sport_dir.exists():
+        return new_path
     directory = "gated_research" if gated else "research"
     return Path(data_root) / directory / f"{normalized}.xlsx"
 
@@ -86,19 +91,22 @@ def existing_research_ledgers(
     *,
     gated: bool = False,
 ) -> list[PickLedger]:
-    directory = Path(data_root) / ("gated_research" if gated else "research")
-    if not directory.exists():
-        return []
-    return [
-        PickLedger(
-            path,
-            audit_path=Path(data_root) / "events.jsonl",
-            model_ledgers_dir=Path(data_root) / "model_ledgers",
-            tier="gated_research" if gated else "research",
-            mirror=ledger_mirror(Path(data_root)),
-            authority=ledger_authority(),
-            sport=path.stem.casefold(),
-        )
-        for path in sorted(directory.glob("*.xlsx"))
-        if path.stem.casefold() in RESEARCH_LEDGER_SPORTS
-    ]
+    root = Path(data_root)
+    ledgers: list[PickLedger] = []
+    seen: set[str] = set()
+    for sport in RESEARCH_LEDGER_SPORTS:
+        path = research_ledger_path(root, sport, gated=gated)
+        if path.exists() and sport not in seen:
+            seen.add(sport)
+            ledgers.append(
+                PickLedger(
+                    path,
+                    audit_path=root / "events.jsonl",
+                    model_ledgers_dir=root / "model_ledgers",
+                    tier="gated_research" if gated else "research",
+                    mirror=ledger_mirror(root),
+                    authority=ledger_authority(),
+                    sport=sport,
+                )
+            )
+    return ledgers

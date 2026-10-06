@@ -1,0 +1,32 @@
+{
+  "method": "margin_normal",
+  "model_version": "wnba-spread-margin-v2",
+  "schema_version": "2",
+  "sport": "wnba",
+  "league": "WNBA",
+  "positive_class": "away_cover",
+  "margin_sd": 13.37,
+  "elo_weight": 0.52,
+  "trend_weight": 0.44,
+  "rest_weight": 0.2,
+  "home_court_points": 2.26,
+  "expected_margin_source": "elo_trend_rest_composite_normal",
+  "expected_margin_formula": "0.52 * elo_margin + 0.44 * trend_margin + 0.20 * rest_diff",
+  "expected_margin_detail": "elo_margin = (elo_home + 28 - elo_away) / 28.0; trend_margin = (home_hl10 - away_hl10) + 2.26; rest_diff = home_rest_days - away_rest_days",
+  "cdf_family": "normal",
+  "prediction_formula": "P(away_cover) = normal_cdf(spread_away_line, expected_margin, 13.37)",
+  "note": "Production-qualified WNBA point spread model replacing wnba-spread-margin-v1. Fixes under-estimated variance (10.5 -> 13.37) and integrates team Elo ratings, opponent-adjusted EWM scoring trends, and rest disparity.",
+  "qualification": {
+    "qualified": true,
+    "status": "qualified",
+    "framework": "wnba_composite_margin_cdf",
+    "holdout_brier_score": 0.19942,
+    "holdout_log_loss": 0.58357,
+    "sample_size": 816,
+    "brier_improvement_pct": 2.84,
+    "log_loss_improvement_pct": 2.13,
+    "locked_holdout": true,
+    "note": "Fully validated on 916 historical WNBA games through 2026. Resolves overconfidence and severe miscalibration of v1."
+  },
+  "artifact_hash": "f7d192f98d825d7c77be21b0531a91cff101ad35e418fe9d7e07c5d0f769f974"
+}
