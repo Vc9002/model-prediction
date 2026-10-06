@@ -342,6 +342,9 @@ models:
     origin: statistical_model
     active_production_version: nfl-elo-trend-lr-v4
     production_artifact: config/models/nfl-elo-trend-lr-v4.json
+    min_edge: 0.05
+    protected_versions:
+    - nfl-elo-trend-lr-v4
     # Spread/total baselines for NFL were archived 2026-08-13 (config/models/
     # archive/nfl-spread-baseline-v1.json) as obsolete; the dangling research
     # refs were removed with them. Re-add a real artifact when NFL spread/

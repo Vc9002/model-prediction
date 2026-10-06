@@ -1639,7 +1639,7 @@ def _forecast_learned_sport(
         # the same validate() call as "in the future" relative to that
         # frozen instant. Each game gets its own effective decision time
         # instead (just before ITS OWN first pitch) — see effective_now below.
-        # Main ledger: ONLY production sports (MLB, WNBA) — everything else goes to flat/research.
+        # Main ledger: ONLY production sports (MLB, WNBA, NFL) — everything else goes to flat/research.
         # Flat ledger: every game gets diagnostic edge-scaled units.
         research_routed = False
         if not flat_mode and sport not in PRODUCTION_SPORTS:

@@ -1707,7 +1707,7 @@ const pickPnl=p=>{
   if(!Number.isFinite(u))return null;
   const book=String(p.sportsbook||"").trim().toLowerCase();
   if(["kalshi","polymarket","polymarket_us","prediction_market"].includes(book)){
-    const entryProb=Number(p.decision_raw_implied_probability??p.market_implied_probability??p.filled_entry?.price);
+    const entryProb=Number(p.decision_raw_implied_probability||p.market_implied_probability||p.filled_entry?.price);
     if(!(entryProb>0&&entryProb<1))return null;
     return p.result==="win"?Number((u*(1.0/entryProb-1.0)).toFixed(4)):-u;
   }
@@ -1761,7 +1761,7 @@ function quoteStateBadge(value,staleMinutes=15){
   if(age.minutes==null)return '<span class="state-badge bad" aria-label="Quote timestamp unavailable">! no timestamp</span>';
   return `<span class="state-badge ${age.stale?"warn":"ok"}" aria-label="Quote ${age.stale?"stale":"current"}; ${age.label}">${age.stale?"! stale":"✓ current"} · ${age.label}</span>`;
 }
-const pregamePrice=p=>Number(p.market_probability_at_decision??p.market_implied_probability)||null;
+const pregamePrice=p=>{const raw=(p.market_probability_at_decision&&p.market_probability_at_decision!=="")?p.market_probability_at_decision:(p.market_implied_probability||p.decision_raw_implied_probability||p.closing_implied_probability);const n=Number(raw);return Number.isFinite(n)&&n>0?n:null;};
 const entryPrice=p=>Number(p.filled_entry?.price)||null;
 const cents=value=>{if(value==null)return "—";const c=Number(value)*100;return `${Number.isInteger(c)?c.toFixed(0):c.toFixed(1)}¢`;};
 const edgePoints=p=>{if(p.economics_status==="unscored_no_price"||p.reason_code==="NO_CALL_MARKET_PRICE_UNAVAILABLE")return null;
