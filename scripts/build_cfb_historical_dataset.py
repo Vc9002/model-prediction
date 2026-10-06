@@ -19,13 +19,18 @@ from model_prediction.data_sources.espn import SITE_API, ESPNClient
 logger = logging.getLogger(__name__)
 
 
+ROOT = Path(__file__).resolve().parent.parent
+
+
 def ingest_real_espn_cfb_dataset(
     seasons: list[int] | None = None,
-    output_path: Path | str = "data/historical/ncaaf_games_all.jsonl",
+    output_path: Path | str | None = None,
 ) -> list[dict[str, Any]]:
     """Fetch real completed FBS games from ESPN, compute PIT features, and write JSONL."""
+    if output_path is None:
+        output_path = ROOT / "data/historical/ncaaf_games_all.jsonl"
     if seasons is None:
-        seasons = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026]
+        seasons = [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026]
 
     client = ESPNClient()
     teams_data = client.teams("NCAAF")
@@ -213,7 +218,7 @@ def ingest_real_espn_cfb_dataset(
             f.write(json.dumps(r) + "\n")
 
     # Also sync to processed/ncaaf/games.jsonl
-    proc_file = Path("data/processed/ncaaf/games.jsonl")
+    proc_file = ROOT / "data/processed/ncaaf/games.jsonl"
     proc_file.parent.mkdir(parents=True, exist_ok=True)
     with proc_file.open("w", encoding="utf-8") as f:
         for r in enriched_records:

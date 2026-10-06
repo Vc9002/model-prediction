@@ -531,28 +531,73 @@ def build_cfb_slate(
             if mtype == "moneyline":
                 if market_ml_home_prob is None and market_ml_away_prob is None:
                     continue
-                selection = "home" if p.probabilities["home"] >= 0.5 else "away"
-                prob = p.probabilities[selection]
+                p_home = p.probabilities.get("home", 0.0)
+                p_away = p.probabilities.get("away", 0.0)
+                ask_home = market_ml_home_prob
+                ask_away = market_ml_away_prob
+                edge_home = (p_home - ask_home) if (ask_home is not None and 0.0 < ask_home < 1.0) else -999.0
+                edge_away = (p_away - ask_away) if (ask_away is not None and 0.0 < ask_away < 1.0) else -999.0
+
+                if edge_home >= edge_away and ask_home is not None:
+                    selection = "home"
+                    prob = p_home
+                    ask = ask_home
+                elif ask_away is not None:
+                    selection = "away"
+                    prob = p_away
+                    ask = ask_away
+                else:
+                    continue
                 line_val = None
-                ask = market_ml_home_prob if selection == "home" else market_ml_away_prob
                 slug = f"ncaaf-ml-{event_id}-{selection}"
                 m_ver = MODEL_VERSION
             elif mtype == "spread":
                 if spread_away_line is None or spread_home_line is None:
                     continue
-                selection = "away" if p.probabilities["away"] >= p.probabilities["home"] else "home"
-                prob = p.probabilities[selection]
-                line_val = spread_away_line if selection == "away" else spread_home_line
-                ask = market_spread_away_prob if selection == "away" else market_spread_home_prob
+                p_away = p.probabilities.get("away", 0.0)
+                p_home = p.probabilities.get("home", 0.0)
+                ask_away = market_spread_away_prob
+                ask_home = market_spread_home_prob
+                edge_away = (p_away - ask_away) if (ask_away is not None and 0.0 < ask_away < 1.0) else -999.0
+                edge_home = (p_home - ask_home) if (ask_home is not None and 0.0 < ask_home < 1.0) else -999.0
+
+                if edge_away >= edge_home and ask_away is not None:
+                    selection = "away"
+                    prob = p_away
+                    line_val = spread_away_line
+                    ask = ask_away
+                elif ask_home is not None:
+                    selection = "home"
+                    prob = p_home
+                    line_val = spread_home_line
+                    ask = ask_home
+                else:
+                    continue
                 slug = f"ncaaf-spread-{event_id}-{selection}"
                 m_ver = CFB_SPREAD_MODEL_VERSION
             else:  # total
                 if total_line is None:
                     continue
-                selection = "over" if p.probabilities["over"] >= p.probabilities["under"] else "under"
-                prob = p.probabilities[selection]
+                p_over = p.probabilities.get("over", 0.0)
+                p_under = p.probabilities.get("under", 0.0)
+                ask_over = market_total_over_prob
+                ask_under = market_total_under_prob
+                edge_over = (p_over - ask_over) if (ask_over is not None and 0.0 < ask_over < 1.0) else -999.0
+                edge_under = (
+                    (p_under - ask_under) if (ask_under is not None and 0.0 < ask_under < 1.0) else -999.0
+                )
+
+                if edge_over >= edge_under and ask_over is not None:
+                    selection = "over"
+                    prob = p_over
+                    ask = ask_over
+                elif ask_under is not None:
+                    selection = "under"
+                    prob = p_under
+                    ask = ask_under
+                else:
+                    continue
                 line_val = total_line
-                ask = market_total_over_prob if selection == "over" else market_total_under_prob
                 slug = f"ncaaf-total-{event_id}-{selection}"
                 m_ver = CFB_TOTAL_MODEL_VERSION
 

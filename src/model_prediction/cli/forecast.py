@@ -3004,7 +3004,13 @@ def _forecast_cfb_sport(
                         )
                     ),
                 )
-                genuinely_eligible = eligibility.decision == "CALL"
+                contract_edge = float(contract.get("edge_vs_executable_ask", 0.0))
+                genuinely_eligible = eligibility.decision == "CALL" and contract_edge >= min_edge
+                is_qualified_call = (
+                    genuinely_eligible
+                    and eligibility.record_type == RecordType.QUALIFIED_CALL
+                    and not eligibility.reason_code.startswith("PAPER_CALL_")
+                )
                 if (
                     research_ledger is not None
                     and _append_secondary_ledger(
@@ -3033,7 +3039,7 @@ def _forecast_cfb_sport(
                         flat_logged += 1
                     else:
                         flat_duplicates += 1
-                if main_ledger is not None and genuinely_eligible:
+                if main_ledger is not None and is_qualified_call:
                     if (
                         _append_secondary_ledger(
                             main_ledger, request, eligibility, effective_now, "ncaaf:main_ledger"
