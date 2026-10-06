@@ -212,6 +212,13 @@ def evaluate_gated_research_eligibility(
             NoCallReason.MODEL_UNVALIDATED.value,
             policy,
         )
+    if request.model_probability < 0.50:
+        return _downgrade_research_call(
+            request,
+            eligibility,
+            "PAPER_CALL_UNDERDOG_BELOW_WIN_PROBABILITY",
+            policy,
+        )
     executable_edge = request.model_probability - implied_probability(request.american_odds)
     if executable_edge < minimum_edge:
         return _downgrade_research_call(

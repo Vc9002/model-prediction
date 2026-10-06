@@ -120,6 +120,7 @@ DEFAULT_MAX_MODEL_AGE_MINUTES = 12 * 60
 @dataclass(frozen=True)
 class AutoExecutionConfig:
     unit_value_usd: float = DEFAULT_AUTO_BUYER_UNIT_VALUE_USD
+    min_model_probability: float = 0.50  # Must be favored outcome (>= 50% win probability)
     min_edge: float = 0.035  # Minimum +3.5% edge over market ask
     max_edge: float = DEFAULT_AUTO_BUYER_MAX_EDGE  # Maximum +20.0% edge (outlier/anomaly sanity ceiling)
     max_daily_spend_usd: float = 25.0  # Daily budget cap
@@ -156,6 +157,7 @@ class AutoExecutionResult:
     rejected_unsupported_market: int = 0
     rejected_disabled_sport_market: int = 0
     rejected_closed_market: int = 0
+    rejected_below_win_probability: int = 0
     rejected_low_edge: int = 0
     rejected_unrealistic_edge: int = 0
     rejected_budget: int = 0
@@ -364,6 +366,7 @@ def load_auto_buyer_state() -> dict[str, Any]:
         "enabled": False,
         "mode": DEFAULT_AUTO_BUYER_MODE,
         "unit_value_usd": DEFAULT_AUTO_BUYER_UNIT_VALUE_USD,
+        "min_model_probability": 0.50,
         "min_edge": 0.035,
         "max_edge": DEFAULT_AUTO_BUYER_MAX_EDGE,
         "max_daily_spend_units": DEFAULT_MAX_DAILY_SPEND_UNITS,
@@ -586,6 +589,7 @@ def run_auto_buyer_cycle(
 
     config = AutoExecutionConfig(
         unit_value_usd=float(state.get("unit_value_usd", 0.50)),
+        min_model_probability=float(state.get("min_model_probability", 0.50)),
         min_edge=float(state.get("min_edge", 0.035)),
         max_edge=float(state.get("max_edge", DEFAULT_AUTO_BUYER_MAX_EDGE)),
         max_daily_spend_usd=float(state.get("max_daily_spend_usd", 250.0)),
@@ -668,6 +672,7 @@ def run_auto_buyer_cycle(
         "rejected_unsupported_market": res.rejected_unsupported_market,
         "rejected_disabled_sport_market": res.rejected_disabled_sport_market,
         "rejected_closed_market": res.rejected_closed_market,
+        "rejected_below_win_probability": res.rejected_below_win_probability,
         "rejected_low_edge": res.rejected_low_edge,
         "rejected_unrealistic_edge": res.rejected_unrealistic_edge,
         "rejected_budget": res.rejected_budget,
@@ -1250,8 +1255,13 @@ class AutoPolymarketBuyer:
                 result.rejected_dedup += 1
                 continue
 
-            # 9. Sizing & Edge check against real Polymarket CLOB ask
+            # 9. Win probability gate: Outcome must be favored by the model (>= min_model_probability)
             model_prob = float(row.get("model_probability") or 0.0)
+            if model_prob < self.config.min_model_probability:
+                result.rejected_below_win_probability += 1
+                continue
+
+            # 10. Sizing & Edge check against real Polymarket CLOB ask
             edge = model_prob - clob_ask
             if edge < self.config.min_edge:
                 result.rejected_low_edge += 1

@@ -129,16 +129,16 @@ prediction_service:
     evidence_status: historical_only
     replacement_priority: medium
     rollback_model: null
-  - model_id: college-football-v1
+  - model_id: cfb-structural-v2
     sport: NCAAF
     market: moneyline
     implementation: json_artifact
-    artifact: config/models/college-football-v1.json
+    artifact: config/models/cfb-structural-v2.json
     enabled: true
     serving_status: production
-    evidence_status: degraded
-    replacement_priority: critical
-    rollback_model: null
+    evidence_status: shadow_qualified
+    replacement_priority: medium
+    rollback_model: college-football-v1
   - model_id: cfb-spread-v1
     sport: NCAAF
     market: spread
@@ -244,7 +244,7 @@ prediction_service:
     NFL:
       moneyline: nfl-elo-trend-lr-v4
     NCAAF:
-      moneyline: college-football-v1
+      moneyline: cfb-structural-v2
       spread: cfb-spread-v1
       total: cfb-total-v1
     SOCCER:
@@ -279,7 +279,7 @@ prediction_service:
       spread: wnba-spread-structural-v3
       total: wnba-total-possession-v3
     NCAAF:
-      moneyline: cfb-structural-v2
+      moneyline: null
       spread: cfb-structural-v2
       total: cfb-structural-v2
     NBA:
@@ -426,7 +426,7 @@ prediction_service:
   - nfl-elo-trend-lr-v4
   - soccer-poisson-dc-v1
   - tennis-surface-elo-v1
-  - college-football-v1
+  - cfb-structural-v2
   - cfb-spread-v1
   - cfb-total-v1
   - cs2-tiered-elo-v6
@@ -447,7 +447,7 @@ prediction_service:
     mlb-nrfi-v2: config/models/mlb-nrfi-v2.json
     nba-elo-trend-lr-v4: config/models/nba-elo-trend-lr-v4.json
     nfl-elo-trend-lr-v4: config/models/nfl-elo-trend-lr-v4.json
-    college-football-v1: config/models/college-football-v1.json
+    cfb-structural-v2: config/models/cfb-structural-v2.json
     cfb-spread-v1: config/models/cfb-spread-v1.json
     cfb-total-v1: config/models/cfb-total-v1.json
     cs2-tiered-elo-v6: config/models/cs2-tiered-elo-v6.json

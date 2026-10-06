@@ -141,9 +141,78 @@ class PolymarketKellyEngine:
         )
         effective_min_edge = max(self.min_edge, 0.035) if is_spread else self.min_edge
 
-        # Determine if YES, NO, or NO_ORDER qualifies
-        if edge_yes >= effective_min_edge and edge_yes >= edge_no:
-            if is_spread and price_yes > 0.60:
+        # Determine favored side by highest predicted win percentage (model's predicted winner)
+        favors_yes = (p_effective > p_effective_no) or (p_effective == p_effective_no and edge_yes >= edge_no)
+
+        if favors_yes:
+            # Model predicts YES to win (p_effective >= 0.50)
+            if edge_yes >= effective_min_edge:
+                if is_spread and price_yes > 0.60:
+                    return PolymarketOrderDecision(
+                        market_id=quote.market_id,
+                        side="NO_ORDER",
+                        is_maker=False,
+                        order_price=0.0,
+                        model_probability=round(p_effective, 4),
+                        market_price=round(ask, 4),
+                        edge=round(edge_yes, 4),
+                        expected_value_pct=round(ev_yes, 2),
+                        kelly_fraction_full=0.0,
+                        kelly_fraction_recommended=0.0,
+                        stake_units=0.0,
+                        reason=f"Spread price {price_yes * 100:.1f}¢ exceeds 60¢ cap (edge +{edge_yes:.1%})",
+                        question=quote.question,
+                        target_selection=home or "YES",
+                        target_side="YES",
+                        home_team=home,
+                        away_team=away,
+                        selection_label="NO_ORDER",
+                        event_start_utc=quote.event_start_utc,
+                        observed_at_utc=quote.observed_at_utc,
+                        depth_imbalance=round(quote.depth_imbalance, 3),
+                        spread_cents=round((ask - bid) * 100.0, 1),
+                    )
+                # Full Kelly for YES: (P - Price) / (1 - Price)
+                full_k = (p_effective - price_yes) / (1.0 - price_yes) if price_yes < 1.0 else 0.0
+                rec_k = min(self.max_position_pct, max(0.0, full_k * self.kelly_fraction))
+                stake = round(self.bankroll * rec_k, 2)
+                is_maker = prefer_maker and (price_yes < ask)
+                target = home or "YES"
+                sel_lbl = f"{home} (BUY YES)" if home else "BUY YES"
+
+                spread_c = round((ask - bid) * 100.0, 1)
+                return PolymarketOrderDecision(
+                    market_id=quote.market_id,
+                    side="BUY_YES",
+                    is_maker=is_maker,
+                    order_price=round(price_yes, 4),
+                    model_probability=round(p_effective, 4),
+                    market_price=round(ask, 4),
+                    edge=round(edge_yes, 4),
+                    expected_value_pct=round(ev_yes, 2),
+                    kelly_fraction_full=round(full_k, 4),
+                    kelly_fraction_recommended=round(rec_k, 4),
+                    stake_units=stake,
+                    reason=f"BUY YES on {target}: Edge +{edge_yes:.1%} (Model {p_effective:.1%} vs Ask {price_yes * 100:.1f}¢, EV +{ev_yes:.1f}%)",
+                    question=quote.question,
+                    target_selection=target,
+                    target_side="YES",
+                    home_team=home,
+                    away_team=away,
+                    selection_label=sel_lbl,
+                    event_start_utc=quote.event_start_utc,
+                    observed_at_utc=quote.observed_at_utc,
+                    depth_imbalance=round(quote.depth_imbalance, 3),
+                    spread_cents=spread_c,
+                )
+            else:
+                side_candidate = f"YES ({home})" if home else "YES"
+                underdog_note = (
+                    f" (underdog NO {p_effective_no:.1%} rejected despite edge +{edge_no:.1%})"
+                    if edge_no >= effective_min_edge
+                    else ""
+                )
+                spread_c = round((ask - bid) * 100.0, 1)
                 return PolymarketOrderDecision(
                     market_id=quote.market_id,
                     side="NO_ORDER",
@@ -156,54 +225,87 @@ class PolymarketKellyEngine:
                     kelly_fraction_full=0.0,
                     kelly_fraction_recommended=0.0,
                     stake_units=0.0,
-                    reason=f"Spread price {price_yes * 100:.1f}¢ exceeds 60¢ cap (edge +{edge_yes:.1%})",
+                    reason=f"Edge +{edge_yes:.1%} on favored {side_candidate} below min threshold {effective_min_edge:.1%}{underdog_note}",
                     question=quote.question,
-                    target_selection=home or "YES",
-                    target_side="YES",
+                    target_selection="",
+                    target_side="",
                     home_team=home,
                     away_team=away,
-                    selection_label="NO_ORDER",
+                    selection_label="",
                     event_start_utc=quote.event_start_utc,
                     observed_at_utc=quote.observed_at_utc,
                     depth_imbalance=round(quote.depth_imbalance, 3),
-                    spread_cents=round((ask - bid) * 100.0, 1),
+                    spread_cents=spread_c,
                 )
-            # Full Kelly for YES: (P - Price) / (1 - Price)
-            full_k = (p_effective - price_yes) / (1.0 - price_yes) if price_yes < 1.0 else 0.0
-            rec_k = min(self.max_position_pct, max(0.0, full_k * self.kelly_fraction))
-            stake = round(self.bankroll * rec_k, 2)
-            is_maker = prefer_maker and (price_yes < ask)
-            target = home or "YES"
-            sel_lbl = f"{home} (BUY YES)" if home else "BUY YES"
+        else:
+            # Model predicts NO to win (p_effective_no > 0.50)
+            if edge_no >= effective_min_edge:
+                if is_spread and price_no > 0.60:
+                    return PolymarketOrderDecision(
+                        market_id=quote.market_id,
+                        side="NO_ORDER",
+                        is_maker=False,
+                        order_price=0.0,
+                        model_probability=round(p_effective_no, 4),
+                        market_price=round(cost_no_taker, 4),
+                        edge=round(edge_no, 4),
+                        expected_value_pct=round(ev_no, 2),
+                        kelly_fraction_full=0.0,
+                        kelly_fraction_recommended=0.0,
+                        stake_units=0.0,
+                        reason=f"Spread price {price_no * 100:.1f}¢ exceeds 60¢ cap (edge +{edge_no:.1%})",
+                        question=quote.question,
+                        target_selection=away or "NO",
+                        target_side="NO",
+                        home_team=home,
+                        away_team=away,
+                        selection_label="NO_ORDER",
+                        event_start_utc=quote.event_start_utc,
+                        observed_at_utc=quote.observed_at_utc,
+                        depth_imbalance=round(quote.depth_imbalance, 3),
+                        spread_cents=round((ask - bid) * 100.0, 1),
+                    )
+                # Full Kelly for NO: (P_no - Price_no) / (1 - Price_no)
+                full_k = (p_effective_no - price_no) / (1.0 - price_no) if price_no < 1.0 else 0.0
+                rec_k = min(self.max_position_pct, max(0.0, full_k * self.kelly_fraction))
+                stake = round(self.bankroll * rec_k, 2)
+                is_maker = prefer_maker and (price_no < cost_no_taker)
+                target = away or "NO"
+                sel_lbl = f"{away} (BUY NO)" if away else "BUY NO"
+                spread_c = round((ask - bid) * 100.0, 1)
 
-            spread_c = round((ask - bid) * 100.0, 1)
-            return PolymarketOrderDecision(
-                market_id=quote.market_id,
-                side="BUY_YES",
-                is_maker=is_maker,
-                order_price=round(price_yes, 4),
-                model_probability=round(p_effective, 4),
-                market_price=round(ask, 4),
-                edge=round(edge_yes, 4),
-                expected_value_pct=round(ev_yes, 2),
-                kelly_fraction_full=round(full_k, 4),
-                kelly_fraction_recommended=round(rec_k, 4),
-                stake_units=stake,
-                reason=f"BUY YES on {target}: Edge +{edge_yes:.1%} (Model {p_effective:.1%} vs Ask {price_yes * 100:.1f}¢, EV +{ev_yes:.1f}%)",
-                question=quote.question,
-                target_selection=target,
-                target_side="YES",
-                home_team=home,
-                away_team=away,
-                selection_label=sel_lbl,
-                event_start_utc=quote.event_start_utc,
-                observed_at_utc=quote.observed_at_utc,
-                depth_imbalance=round(quote.depth_imbalance, 3),
-                spread_cents=spread_c,
-            )
-
-        elif edge_no >= effective_min_edge:
-            if is_spread and price_no > 0.60:
+                return PolymarketOrderDecision(
+                    market_id=quote.market_id,
+                    side="BUY_NO",
+                    is_maker=is_maker,
+                    order_price=round(price_no, 4),
+                    model_probability=round(p_effective_no, 4),
+                    market_price=round(cost_no_taker, 4),
+                    edge=round(edge_no, 4),
+                    expected_value_pct=round(ev_no, 2),
+                    kelly_fraction_full=round(full_k, 4),
+                    kelly_fraction_recommended=round(rec_k, 4),
+                    stake_units=stake,
+                    reason=f"BUY NO on {target}: Edge +{edge_no:.1%} (Model {p_effective_no:.1%} vs Ask {price_no * 100:.1f}¢, EV +{ev_no:.1f}%)",
+                    question=quote.question,
+                    target_selection=target,
+                    target_side="NO",
+                    home_team=home,
+                    away_team=away,
+                    selection_label=sel_lbl,
+                    event_start_utc=quote.event_start_utc,
+                    observed_at_utc=quote.observed_at_utc,
+                    depth_imbalance=round(quote.depth_imbalance, 3),
+                    spread_cents=spread_c,
+                )
+            else:
+                side_candidate = f"NO ({away})" if away else "NO"
+                underdog_note = (
+                    f" (underdog YES {p_effective:.1%} rejected despite edge +{edge_yes:.1%})"
+                    if edge_yes >= effective_min_edge
+                    else ""
+                )
+                spread_c = round((ask - bid) * 100.0, 1)
                 return PolymarketOrderDecision(
                     market_id=quote.market_id,
                     side="NO_ORDER",
@@ -216,84 +318,18 @@ class PolymarketKellyEngine:
                     kelly_fraction_full=0.0,
                     kelly_fraction_recommended=0.0,
                     stake_units=0.0,
-                    reason=f"Spread price {price_no * 100:.1f}¢ exceeds 60¢ cap (edge +{edge_no:.1%})",
+                    reason=f"Edge +{edge_no:.1%} on favored {side_candidate} below min threshold {effective_min_edge:.1%}{underdog_note}",
                     question=quote.question,
-                    target_selection=away or "NO",
-                    target_side="NO",
+                    target_selection="",
+                    target_side="",
                     home_team=home,
                     away_team=away,
-                    selection_label="NO_ORDER",
+                    selection_label="",
                     event_start_utc=quote.event_start_utc,
                     observed_at_utc=quote.observed_at_utc,
                     depth_imbalance=round(quote.depth_imbalance, 3),
-                    spread_cents=round((ask - bid) * 100.0, 1),
+                    spread_cents=spread_c,
                 )
-            # Full Kelly for NO: (P_no - Price_no) / (1 - Price_no)
-            full_k = (p_effective_no - price_no) / (1.0 - price_no) if price_no < 1.0 else 0.0
-            rec_k = min(self.max_position_pct, max(0.0, full_k * self.kelly_fraction))
-            stake = round(self.bankroll * rec_k, 2)
-            is_maker = prefer_maker and (price_no < cost_no_taker)
-            target = away or "NO"
-            sel_lbl = f"{away} (BUY NO)" if away else "BUY NO"
-            spread_c = round((ask - bid) * 100.0, 1)
-
-            return PolymarketOrderDecision(
-                market_id=quote.market_id,
-                side="BUY_NO",
-                is_maker=is_maker,
-                order_price=round(price_no, 4),
-                model_probability=round(p_effective_no, 4),
-                market_price=round(cost_no_taker, 4),
-                edge=round(edge_no, 4),
-                expected_value_pct=round(ev_no, 2),
-                kelly_fraction_full=round(full_k, 4),
-                kelly_fraction_recommended=round(rec_k, 4),
-                stake_units=stake,
-                reason=f"BUY NO on {target}: Edge +{edge_no:.1%} (Model {p_effective_no:.1%} vs Ask {price_no * 100:.1f}¢, EV +{ev_no:.1f}%)",
-                question=quote.question,
-                target_selection=target,
-                target_side="NO",
-                home_team=home,
-                away_team=away,
-                selection_label=sel_lbl,
-                event_start_utc=quote.event_start_utc,
-                observed_at_utc=quote.observed_at_utc,
-                depth_imbalance=round(quote.depth_imbalance, 3),
-                spread_cents=spread_c,
-            )
-
-        else:
-            best_edge = max(edge_yes, edge_no)
-            side_candidate = (
-                f"YES ({home})"
-                if home and edge_yes >= edge_no
-                else ("NO (" + away + ")" if away else ("YES" if edge_yes >= edge_no else "NO"))
-            )
-            spread_c = round((ask - bid) * 100.0, 1)
-            return PolymarketOrderDecision(
-                market_id=quote.market_id,
-                side="NO_ORDER",
-                is_maker=False,
-                order_price=0.0,
-                model_probability=round(p_effective, 4),
-                market_price=round(ask, 4),
-                edge=round(best_edge, 4),
-                expected_value_pct=round(max(ev_yes, ev_no), 2),
-                kelly_fraction_full=0.0,
-                kelly_fraction_recommended=0.0,
-                stake_units=0.0,
-                reason=f"Edge +{best_edge:.1%} on {side_candidate} below min threshold {self.min_edge:.1%}",
-                question=quote.question,
-                target_selection="",
-                target_side="",
-                home_team=home,
-                away_team=away,
-                selection_label="",
-                event_start_utc=quote.event_start_utc,
-                observed_at_utc=quote.observed_at_utc,
-                depth_imbalance=round(quote.depth_imbalance, 3),
-                spread_cents=spread_c,
-            )
 
     def apply_correlation_exposure_caps(
         self,

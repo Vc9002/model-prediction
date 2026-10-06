@@ -339,10 +339,8 @@ class OfficialInternationalBaseballClient:
             yield response.json()
 
     def _npb_month_pages(self, year: int) -> Iterator[str]:
-        # The official October calendar mixes late regular-season games with
-        # Climax/Japan Series games without a machine-readable competition
-        # field.  Exclude it rather than contaminate the regular-season model.
-        for month in range(4, 10):
+        # Scrapes months 4 (April) through 10 (October) for full regular season and series.
+        for month in range(4, 11):
             response = self.client.get(NPB_CALENDAR_TEMPLATE.format(year=year, month=month))
             response.raise_for_status()
             yield response.text
@@ -359,7 +357,7 @@ class OfficialInternationalBaseballClient:
         rows: list[dict[str, Any]] = []
         for page in self._npb_month_pages(year):
             rows.extend(parse_npb_calendar(page))
-        return rows, 6
+        return rows, 7
 
     def kbo_year_unplayed(self, year: int) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []

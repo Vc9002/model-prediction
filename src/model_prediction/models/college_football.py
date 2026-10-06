@@ -34,7 +34,7 @@ from .cfb_distribution import (
     CFBJointMarketProbabilities,
 )
 
-MODEL_VERSION = "college-football-v1"
+MODEL_VERSION = "cfb-structural-v2"
 CFB_SPREAD_MODEL_VERSION = "cfb-spread-v1"
 CFB_TOTAL_MODEL_VERSION = "cfb-total-v1"
 

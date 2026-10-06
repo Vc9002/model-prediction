@@ -1918,15 +1918,14 @@ def _forecast_learned_sport(
                         eligibility = _downgrade_unserved(eligibility)
                     # What's still NO_CALL here is always a hard trust-
                     # boundary reason or the confidence gate just above.
-                    genuinely_eligible = eligibility.decision == "CALL"
-                    # Main ledger (MLB/WNBA, non-flat, non-research-routed) holds
-                    # ONLY genuine qualified calls -- any remaining NO_CALL is a
-                    # structurally-untrustworthy reason, real diagnostic
-                    # information that still belongs in flat_picks.xlsx (which
-                    # already logs every game every day) rather than muddying main.
-                    skip_main_no_call = (
-                        not flat_mode and not research_routed and eligibility.decision != "CALL"
+                    genuinely_eligible = (
+                        eligibility.decision == "CALL"
+                        and eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
                     )
+                    # Main ledger (MLB/WNBA, non-flat, non-research-routed) holds
+                    # ONLY genuine qualified calls -- any remaining NO_CALL or
+                    # research observation belongs in flat rather than muddying main.
+                    skip_main_no_call = not flat_mode and not research_routed and not genuinely_eligible
                     if not skip_main_no_call:
                         logged.append(
                             ledger.append_evaluated(
@@ -2136,7 +2135,10 @@ def _log_esports_forecast(
                         config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
                     ),
                 )
-                genuinely_eligible = eligibility.decision == "CALL"
+                genuinely_eligible = (
+                    eligibility.decision == "CALL"
+                    and eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
+                )
                 ledger.append_evaluated(request, eligibility, now=observed_now)
                 # Flat: every candidate, no edge gate (operator directive 2026-08-03).
                 if (
@@ -2359,7 +2361,10 @@ def _forecast_international_sport(
                         config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
                     ),
                 )
-                genuinely_eligible = eligibility.decision == "CALL"
+                genuinely_eligible = (
+                    eligibility.decision == "CALL"
+                    and eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
+                )
                 research_ledger.append_evaluated(request, eligibility, now=observed_now)
                 # Flat: every candidate, no edge gate (operator directive 2026-08-03).
                 if (
@@ -2578,7 +2583,10 @@ def _forecast_soccer_sport(
                         )
                     ),
                 )
-                genuinely_eligible = eligibility.decision == "CALL"
+                genuinely_eligible = (
+                    eligibility.decision == "CALL"
+                    and eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
+                )
                 if (
                     research_ledger is not None
                     and _append_secondary_ledger(
@@ -2818,7 +2826,10 @@ def _forecast_tennis_sport(
                         eligibility,
                         reason_code="PAPER_CALL_MARKET_UNAVAILABLE",
                     )
-                genuinely_eligible = eligibility.decision == "CALL"
+                genuinely_eligible = (
+                    eligibility.decision == "CALL"
+                    and eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
+                )
                 if (
                     research_ledger is not None
                     and _append_secondary_ledger(
@@ -2938,7 +2949,7 @@ def _forecast_cfb_sport(
         elif mtype == MarketType.TOTAL:
             m_version = "cfb-total-v1"
         else:
-            m_version = "college-football-v1"
+            m_version = str(model_config.get("active_production_version", "cfb-structural-v2"))
 
         try:
             # A forced refresh cannot manufacture a pregame decision time.
@@ -3005,11 +3016,13 @@ def _forecast_cfb_sport(
                     ),
                 )
                 contract_edge = float(contract.get("edge_vs_executable_ask", 0.0))
-                genuinely_eligible = eligibility.decision == "CALL" and contract_edge >= min_edge
-                is_qualified_call = (
-                    genuinely_eligible
-                    and eligibility.record_type == RecordType.QUALIFIED_CALL
-                    and not eligibility.reason_code.startswith("PAPER_CALL_")
+                genuinely_eligible = (
+                    eligibility.decision == "CALL"
+                    and eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
+                    and contract_edge >= min_edge
+                )
+                is_qualified_call = genuinely_eligible and not eligibility.reason_code.startswith(
+                    "PAPER_CALL_"
                 )
                 if (
                     research_ledger is not None

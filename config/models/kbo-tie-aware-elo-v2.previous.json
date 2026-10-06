@@ -1,47 +1,78 @@
 {
-  "artifact_hash": "023d36b0b9dee5a4a33fddd874fb7c7f3c169b7e29910c1c4c2e34a56c001af0",
-  "confidence_threshold": 0.136562626973744,
+  "artifact_hash": "3b9613c6f29165b21dcd7374187c5e0ea23e2c0077a3164a759d2f84e3f38538",
+  "confidence_threshold": 0.12084163004073745,
   "decay_rate": 0.001,
   "games_played": {
-    "DOOSAN": 1529,
-    "HANWHA": 1527,
-    "KIA": 1528,
-    "KIWOOM": 1084,
-    "KT": 1525,
-    "LG": 1529,
-    "LOTTE": 1528,
-    "NC": 1523,
-    "SAMSUNG": 1528,
-    "SSG": 827
+    "DOOSAN": 1566,
+    "HANWHA": 1566,
+    "KIA": 1563,
+    "KIWOOM": 1119,
+    "KT": 1565,
+    "LG": 1564,
+    "LOTTE": 1563,
+    "NC": 1565,
+    "SAMSUNG": 1564,
+    "SSG": 861
   },
-  "games_sha256": "19ef54bf95653c399b69a0f4fae9af2391c528a65a2265f9dffff95d679f0a65",
-  "home_advantage": 0.0,
+  "games_sha256": "62843e4c850a1e8fe0c9529ed17eca8dede94d24492592266ec57ed92f29a056",
+  "home_advantage": 20.0,
   "initial_rating": 1500.0,
   "k": 8.0,
   "league": "kbo",
   "margin_weight": 0.0,
   "model_state": "research",
   "model_version": "kbo-tie-aware-elo-v2",
+  "qualification": {
+    "locked_test": {
+      "accuracy_decisive": 0.553669,
+      "brier_settlement": 0.240434,
+      "calls": 1649,
+      "hits": 913,
+      "mae_settlement": 0.481365,
+      "observations": 1689,
+      "ties": 40,
+      "units_at_minus_110": 94.0
+    },
+    "promotion_rationale": "",
+    "qualified": false
+  },
   "qualified_for_betting": false,
   "ratings": {
-    "DOOSAN": 1531.473666,
-    "HANWHA": 1493.143908,
-    "KIA": 1506.365678,
-    "KIWOOM": 1450.21784,
-    "KT": 1552.031563,
-    "LG": 1502.109302,
-    "LOTTE": 1478.241228,
-    "NC": 1498.111486,
-    "SAMSUNG": 1537.391757,
-    "SSG": 1466.82356
+    "DOOSAN": 1523.924017,
+    "HANWHA": 1438.436026,
+    "KIA": 1524.366838,
+    "KIWOOM": 1440.024074,
+    "KT": 1579.036662,
+    "LG": 1506.794811,
+    "LOTTE": 1482.834576,
+    "NC": 1470.713142,
+    "SAMSUNG": 1543.670103,
+    "SSG": 1509.096592
   },
   "schema_version": "international-baseball-tie-aware-elo-v2",
-  "source_manifest_sha256": "9803290f392f256ec2399aaaef0996262be1d8db84ea4ab94d109e7963960df5",
+  "source_manifest_sha256": "d2ec892b22008e134ca27ef187179e552708163868d8e0822f9d34c3954ccc09",
   "target": "expected moneyline settlement where a tie pays 0.50",
   "tie_method": "flat",
-  "tie_probability": 0.02250849,
-  "trained_through_date": "2026-08-14",
-  "training_observations": 7064,
-  "training_prefix_sha256": "19ef54bf95653c399b69a0f4fae9af2391c528a65a2265f9dffff95d679f0a65",
+  "tie_probability": 0.02262693,
+  "trained_through_date": "2026-10-06",
+  "training": {
+    "coefficient_fit": {
+      "end_date": "2022-05-18",
+      "observations": 3861,
+      "start_date": "2015-03-28"
+    },
+    "locked_holdout": {
+      "end_date": "2026-10-06",
+      "observations": 1689,
+      "start_date": "2024-07-19"
+    },
+    "threshold_selection": {
+      "end_date": "2024-07-18",
+      "observations": 1698,
+      "start_date": "2022-05-19"
+    }
+  },
+  "training_observations": 7248,
+  "training_prefix_sha256": "0badfaffb189f4963547c29b44a98a5e11f442f69acb129c3380dbce5b0fcd51",
   "units": 0
 }

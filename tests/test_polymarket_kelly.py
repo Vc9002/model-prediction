@@ -197,3 +197,57 @@ def test_correlation_exposure_capping():
     total_staked = sum(o.stake_units for o in capped)
     assert round(total_staked, 2) <= 50.01
     assert all("Correlation capped" in o.reason for o in capped)
+
+
+def test_rejection_of_underdog_yes_despite_positive_edge():
+    """If model predicts 40% win prob for YES, but market ask is 24c (edge +16%),
+    the model predicts NO to win (60%). The underdog side (YES) must NEVER be selected.
+    """
+    engine = PolymarketKellyEngine(bankroll=1000.0, min_edge=0.025)
+
+    quote = PolymarketQuote(
+        market_id="m_underdog_yes",
+        question="Will Underdog win?",
+        best_bid=0.20,
+        best_ask=0.24,
+        spread=0.04,
+        home_or_player_a="Underdog A",
+        away_or_player_b="Favorite B",
+    )
+
+    decision = engine.evaluate_binary_opportunity(quote, p_model=0.40)
+
+    # Model predicts Favorite B (NO) with 60% win prob.
+    # Cost for NO taker = 1.0 - 0.20 = 0.80. Edge NO = 0.60 - 0.80 = -0.20.
+    # Edge YES is +0.16, but YES is the underdog (40% < 50%).
+    # Result must be NO_ORDER!
+    assert decision.side == "NO_ORDER"
+    assert decision.stake_units == 0.0
+    assert "underdog YES 40.0% rejected despite edge +16.0%" in decision.reason
+
+
+def test_rejection_of_underdog_no_despite_positive_edge():
+    """If model predicts 60% win prob for YES, but away/NO has a positive edge
+    due to an extreme market price, NO is the underdog (40%) and must NEVER be selected.
+    """
+    engine = PolymarketKellyEngine(bankroll=1000.0, min_edge=0.025)
+
+    quote = PolymarketQuote(
+        market_id="m_underdog_no",
+        question="Will Favorite win?",
+        best_bid=0.75,
+        best_ask=0.80,
+        spread=0.05,
+        home_or_player_a="Favorite A",
+        away_or_player_b="Underdog B",
+    )
+
+    # Model predicts Favorite A (YES) with 60% win prob.
+    # Ask for YES is 0.80 -> Edge YES = 0.60 - 0.80 = -0.20 (no edge on favorite).
+    # Buying NO: Cost is 1.0 - 0.75 = 0.25. Edge NO = 0.40 - 0.25 = +0.15 (underdog has +15% edge).
+    # Since model favors YES (60%), Underdog B (NO, 40%) must NOT be selected!
+    decision = engine.evaluate_binary_opportunity(quote, p_model=0.60)
+
+    assert decision.side == "NO_ORDER"
+    assert decision.stake_units == 0.0
+    assert "underdog NO 40.0% rejected despite edge +15.0%" in decision.reason

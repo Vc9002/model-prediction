@@ -492,13 +492,18 @@ def test_cfb_production_registry_and_hashes():
     root = Path(__file__).resolve().parent.parent
     reg = ProductionModelRegistry.load(root)
 
-    for mid in ["college-football-v1", "cfb-spread-v1", "cfb-total-v1"]:
+    expected_evidence = {
+        "cfb-structural-v2": ("shadow_qualified", "medium"),
+        "cfb-spread-v1": ("degraded", "critical"),
+        "cfb-total-v1": ("degraded", "critical"),
+    }
+    for mid, (exp_ev, exp_prio) in expected_evidence.items():
         assert mid in reg.entries
         entry = reg.entries[mid]
         assert entry.enabled is True
         assert entry.serving_status in {"production", "active"}
-        assert entry.evidence_status == "degraded"
-        assert entry.replacement_priority == "critical"
+        assert entry.evidence_status == exp_ev
+        assert entry.replacement_priority == exp_prio
         assert entry.sport == "NCAAF"
         assert entry.load_error is None
 
@@ -648,14 +653,14 @@ def test_cfb_models_serving_with_degraded_evidence():
         prod = yaml.safe_load(f)
 
     svc = prod["prediction_service"]
-    cfb_ids = {"college-football-v1", "cfb-spread-v1", "cfb-total-v1"}
+    cfb_ids = {"cfb-structural-v2", "cfb-spread-v1", "cfb-total-v1"}
 
     enabled = {m["model_id"]: m.get("enabled", True) for m in svc["models"] if m["model_id"] in cfb_ids}
     assert enabled.keys() == cfb_ids, "all three CFB entries must still be declared"
     assert all(enabled.values()), f"CFB models must stay enabled: {enabled}"
 
     champions = svc.get("champions", {}).get("NCAAF", {})
-    assert champions.get("moneyline") == "college-football-v1"
+    assert champions.get("moneyline") == "cfb-structural-v2"
     assert champions.get("spread") == "cfb-spread-v1"
     assert champions.get("total") == "cfb-total-v1"
 

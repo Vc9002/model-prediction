@@ -87,6 +87,7 @@ def _settle_all_unsettled(
     market_store = MarketOddsSnapshotStore(market_odds_snapshot_path(config))
     data_root = Path(ledger_path(config)).parent
     settled, voided, pending, failures = [], [], [], []
+    bo3_client = None
     for row in ledger.rows():
         if row["status"] != "open":
             continue
@@ -100,7 +101,11 @@ def _settle_all_unsettled(
             continue
         # Esports: settle via Polymarket contract resolution
         if row["league"] in ("LOL", "CS2", "DOTA2", "VALORANT", "RAINBOW_SIX"):
-            result = _settle_esports_pick(row, ledger, data_root=data_root)
+            if bo3_client is None:
+                from ..esports import Bo3EsportsClient
+
+                bo3_client = Bo3EsportsClient()
+            result = _settle_esports_pick(row, ledger, data_root=data_root, bo3_client=bo3_client)
             if result is None:
                 pending.append(row["pick_id"])
             elif result.get("voided"):
@@ -116,6 +121,8 @@ def _settle_all_unsettled(
             result = _settle_international_baseball_pick(row, ledger, config, data_root=data_root)
             if result is None:
                 pending.append(row["pick_id"])
+            elif result.get("voided"):
+                voided.append(result["pick_id"])
             elif result.get("settled"):
                 settled.append(result)
             else:
@@ -133,9 +140,32 @@ def _settle_all_unsettled(
                 scoreboard_cache=scoreboard_cache,
             )
             if result is None:
-                pending.append(row["pick_id"])
+                if (now - start).total_seconds() > 7 * 86400:
+                    try:
+                        v = ledger.void(
+                            row["pick_id"], "tennis match abandoned, unrecorded, or postponed >7 days"
+                        )
+                        voided.append(v["pick_id"])
+                    except (KeyError, ValueError, OSError) as e:
+                        failures.append({"pick_id": row["pick_id"], "reason": str(e)})
+                else:
+                    pending.append(row["pick_id"])
+            elif result.get("voided"):
+                voided.append(result["pick_id"])
             elif result.get("settled"):
                 settled.append(result)
+            elif str(result.get("reason", "")).startswith(
+                (
+                    "UNSUPPORTED_TENNIS_SUBPERIOD_SETTLEMENT",
+                    "UNGRADEABLE_TENNIS_DERIVATIVE",
+                    "UNSUPPORTED_TENNIS_MARKET_TYPE",
+                )
+            ):
+                try:
+                    v = ledger.void(row["pick_id"], result["reason"])
+                    voided.append(v["pick_id"])
+                except (KeyError, ValueError, OSError) as e:
+                    failures.append({"pick_id": row["pick_id"], "reason": str(e)})
             else:
                 failures.append(result)
             continue
@@ -170,17 +200,33 @@ def _settle_all_unsettled(
             if match is None:
                 match = _find_espn_soccer_result_by_event_id(espn, row)
         if match is None:
-            pending.append(row["pick_id"])
+            if (now - start).total_seconds() > 7 * 86400:
+                try:
+                    voided.append(
+                        ledger.void(row["pick_id"], "event unrecorded on ESPN after >7 days")["pick_id"]
+                    )
+                except (KeyError, ValueError, OSError) as error:
+                    failures.append({"pick_id": row["pick_id"], "reason": str(error)})
+            else:
+                pending.append(row["pick_id"])
             continue
         status = match.get("status_name", "")
         if status in {"STATUS_POSTPONED", "STATUS_CANCELED"}:
-            if args.void_postponed:
+            if getattr(args, "void_postponed", False) or (now - start).total_seconds() > 7 * 86400:
                 voided.append(ledger.void(row["pick_id"], f"event {status.lower()}")["pick_id"])
             else:
                 pending.append(row["pick_id"])
             continue
         if not match.get("completed"):
-            pending.append(row["pick_id"])
+            if (now - start).total_seconds() > 7 * 86400:
+                try:
+                    voided.append(
+                        ledger.void(row["pick_id"], f"event uncompleted ({status}) after >7 days")["pick_id"]
+                    )
+                except (KeyError, ValueError, OSError) as error:
+                    failures.append({"pick_id": row["pick_id"], "reason": str(error)})
+            else:
+                pending.append(row["pick_id"])
             continue
         if row.get("market_type") in ("nrfi", "yrfi") and not all(
             key in match for key in ("away_1st", "home_1st")
@@ -414,7 +460,7 @@ def _extract_market_slug(rationale: str) -> str | None:
     return match.group(1) if match else None
 
 
-def _settle_esports_pick(row: dict, ledger, data_root=None) -> dict | None:
+def _settle_esports_pick(row: dict, ledger, data_root=None, bo3_client=None) -> dict | None:
     """Settle an esports pick from the exchange's terminal market state.
 
     A resolved Polymarket market reports a terminal book state (verified live:
@@ -443,14 +489,39 @@ def _settle_esports_pick(row: dict, ledger, data_root=None) -> dict | None:
             exc_info=True,
         )
         return None
-    if str(book.get("state") or "") not in _TERMINAL_MARKET_STATES:
+    book_state = str(book.get("state") or "")
+    if book_state not in _TERMINAL_MARKET_STATES:
+        try:
+            start_dt = parse_utc(row["event_start_utc"])
+            if (utc_now() - start_dt).total_seconds() > 7 * 86400:
+                from ..esports import resolve_esports_match_result
+
+                bo3_res = resolve_esports_match_result(
+                    row["league"],
+                    str(row["home_team"]),
+                    str(row["away_team"]),
+                    str(row["event_start_utc"]),
+                    data_root or PROJECT_ROOT / "data",
+                    client=bo3_client,
+                )
+                if bo3_res is not None:
+                    away_score = 1 if bo3_res["away_win"] else 0
+                    home_score = 1 if bo3_res["home_win"] else 0
+                    result = ledger.settle(row["pick_id"], away_score, home_score, None, None)
+                    return {"pick_id": row["pick_id"], "result": result["result"], "settled": True}
+                voided = ledger.void(
+                    row["pick_id"],
+                    f"esports match >7d old unresolved with book state {book_state}; BO3 has no record",
+                )
+                return {"pick_id": row["pick_id"], "voided": True, "result": voided["result"]}
+        except (KeyError, ValueError, OSError, httpx.HTTPError) as err:
+            logger.debug("Failed checking stale esports pick %s: %s", row["pick_id"], err)
         return None
     prices: dict[str, float] = {}
     for side in market.get("marketSides", []):
         price = _amount(side.get("price"))
-        if price is None:
-            return None
-        prices[str(side.get("description") or "")] = price
+        if price is not None:
+            prices[str(side.get("description") or "")] = price
     if len(prices) != 2 or sorted(prices.values()) != [0.0, 1.0]:
         # A non-binary terminal price on a resolved esports market is NOT
         # reliably a forfeit/postponement signal -- confirmed live
@@ -471,6 +542,7 @@ def _settle_esports_pick(row: dict, ledger, data_root=None) -> dict | None:
                 str(row["away_team"]),
                 str(row["event_start_utc"]),
                 data_root or PROJECT_ROOT / "data",
+                client=bo3_client,
             )
         except (httpx.HTTPError, OSError, ValueError, KeyError, TypeError, RuntimeError):
             logger.warning("BO3 esports result lookup failed for slug %s", slug, exc_info=True)
@@ -489,7 +561,7 @@ def _settle_esports_pick(row: dict, ledger, data_root=None) -> dict | None:
         try:
             voided = ledger.void(
                 row["pick_id"],
-                "esports market settled to a non-binary price (forfeit/postponement per market rules); "
+                f"esports market terminal ({book_state}) with prices {prices}; "
                 "BO3 has no confirming finished-match result either",
             )
             return {"pick_id": row["pick_id"], "voided": True, "result": voided["result"]}
@@ -558,6 +630,15 @@ def _settle_international_baseball_pick(row: dict, ledger, config, data_root=Non
         data_root, row["league"], game_date, row["home_team"], row["away_team"]
     )
     if result is None:
+        try:
+            if (utc_now() - start).total_seconds() > 7 * 86400:
+                voided = ledger.void(
+                    row["pick_id"],
+                    f"{row['league']} game scheduled on {game_date} cancelled/postponed (no final score posted after >7 days)",
+                )
+                return {"pick_id": row["pick_id"], "voided": True, "result": voided["result"]}
+        except (KeyError, ValueError, OSError) as error:
+            return {"pick_id": row["pick_id"], "reason": str(error)}
         return None
     away_score, home_score = result
     closing_probability = closing_odds = None

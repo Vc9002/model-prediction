@@ -154,7 +154,7 @@ def test_buyer_filters_low_edge_and_past_games():
 
 def test_buyer_rejects_unrealistic_edge_outliers():
     today_start = iso_utc(utc_now() + timedelta(hours=2))
-    config = AutoExecutionConfig(min_edge=0.035, max_edge=0.20)
+    config = AutoExecutionConfig(min_edge=0.035, max_edge=0.20, min_model_probability=0.20)
     buyer = AutoPolymarketBuyer(
         config=config,
         live_quote_fn=lambda _slug: {"ask": 0.16, "market_slug": "test-slug", "side": "long"},
@@ -182,6 +182,30 @@ def test_buyer_rejects_unrealistic_edge_outliers():
     assert res.rejected_unrealistic_edge == 1
     assert len(res.dry_run_orders) == 1
     assert res.dry_run_orders[0]["pick_id"] == "p_valid_edge"
+
+
+def test_buyer_rejects_below_win_probability():
+    """Verify that an underdog (< 50% model probability) is rejected even with high positive edge."""
+    today_start = iso_utc(utc_now() + timedelta(hours=2))
+    config = AutoExecutionConfig(min_edge=0.035, min_model_probability=0.50)
+    buyer = AutoPolymarketBuyer(
+        config=config,
+        live_quote_fn=lambda _slug: {"ask": 0.24, "market_slug": "test-slug", "side": "long"},
+    )
+    # Model claims 40% win prob against 24c ask (+16% edge). Underdog must be rejected!
+    picks = [
+        {
+            "pick_id": "p_underdog_positive_edge",
+            "model_id": "soccer-poisson-dc-v2",
+            "status": "open",
+            "event_start_utc": today_start,
+            "model_probability": 0.40,
+            "market_probability": 0.24,
+        },
+    ]
+    res = buyer.evaluate_and_execute(picks)
+    assert res.rejected_below_win_probability == 1
+    assert len(res.dry_run_orders) == 0
 
 
 def test_buyer_rejects_tomorrow_and_future_games():

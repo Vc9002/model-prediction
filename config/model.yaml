@@ -350,20 +350,22 @@ models:
     # refs were removed with them. Re-add a real artifact when NFL spread/
     # total research resumes.
   NCAAF:
-    family: elo_trend_key_number_engine
-    # Promoted 2026-09-07 to shadow_qualified with multi-market wire (ML, Spread, Total) into Main and Flat ledgers.
+    family: cfb_structural_v2_bivariate_engine
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: college-football-v1
-    production_artifact: config/models/college-football-v1.json
+    active_production_version: cfb-structural-v2
+    production_artifact: config/models/cfb-structural-v2.json
     markets:
     - moneyline
     - spread
     - total
-    min_edge: 0.03
-    spread_sd: 15.0
-    total_sd: 14.5
-    home_field_advantage_points: 3.0
+    min_edge: 0.035
+    spread_sd: 14.5
+    total_sd: 14.8
+    home_field_advantage_points: 2.8
+    protected_versions:
+    - college-football-v1
+    - cfb-structural-v2
   TENNIS:
     family: surface_blended_elo
     status: shadow_qualified
