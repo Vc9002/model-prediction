@@ -116,7 +116,7 @@ def parser() -> argparse.ArgumentParser:
     )
 
     flat_forecast = commands.add_parser(
-        "flat-forecast", help="forecast every game with no edge gate → flat_picks.xlsx"
+        "flat-forecast", help="forecast every game with no edge gate -> flat_picks.xlsx"
     )
     flat_forecast.add_argument("--sport", choices=SPORTS + ESPORTS_TITLES)
     flat_forecast.add_argument("--all", action="store_true")
