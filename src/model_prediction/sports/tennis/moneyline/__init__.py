@@ -1,5 +1,6 @@
 """Tennis Moneyline Models."""
 
+from model_prediction.models.tennis import TENNIS_V4_VERSION, TennisModel
 from model_prediction.models.tennis_markov import (
     TennisMarkovEngine,
     TennisMarkovMatchForecast,
@@ -8,9 +9,11 @@ from model_prediction.models.tennis_markov import (
 from model_prediction.models.tennis_v2 import TennisMatchForecast, TennisPlayerProfile, TennisV2Model
 
 __all__ = [
+    "TENNIS_V4_VERSION",
     "TennisMarkovEngine",
     "TennisMarkovMatchForecast",
     "TennisMatchForecast",
+    "TennisModel",
     "TennisPlayerProfile",
     "TennisPlayerStats",
     "TennisV2Model",

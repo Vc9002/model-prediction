@@ -421,7 +421,7 @@ models:
       positive -- the strongest result of any sport checked this session.
       Operator approved wiring research_confidence_gate below from that
       real result.'
-    active_research_version: tennis-learned-v3
+    active_research_version: tennis-surface-elo-v4
     min_edge: 0.05
     research_confidence_gate: 0.037239
     markets:

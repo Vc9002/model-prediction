@@ -6,6 +6,7 @@ Research state until validated through the backtester.
 
 from __future__ import annotations
 
+import contextlib
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -16,10 +17,11 @@ from ..features.elo_ratings import expected_win_probability
 from .base import GamePrediction
 from .tennis_derivatives import price_tennis_derivatives
 
+TENNIS_V4_VERSION = "tennis-surface-elo-v4"
 TENNIS_V3_VERSION = "tennis-learned-v3"
 TENNIS_MARKOV_VERSION = "tennis-markov-hierarchical-v2"
 TENNIS_LEGACY_VERSION = "tennis-surface-elo-v1"
-TENNIS_MODEL_VERSION = TENNIS_V3_VERSION
+TENNIS_MODEL_VERSION = TENNIS_V4_VERSION
 DEFAULT_ELO = 1500.0
 K_FACTOR = 32.0
 
@@ -107,6 +109,7 @@ class TennisModel:
     def __init__(self, version: str = TENNIS_MODEL_VERSION) -> None:
         self.version = version
         self.last_dates: dict[str, datetime] = {}
+        self.recent_form: dict[str, float] = {}
 
     def build_elo(
         self, matches: Sequence[dict[str, Any]]
@@ -121,6 +124,58 @@ class TennisModel:
         counts: dict[str, int] = {}
         surface_counts: dict[tuple[str, str], int] = {}
         self.last_dates = {}
+        self.recent_form = {}
+
+        if self.version == TENNIS_V4_VERSION:
+            for match in sorted(
+                matches, key=lambda item: str(item.get("match_date", "") or item.get("event_start_utc", ""))
+            ):
+                winner = str(match.get("winner", ""))
+                loser = str(match.get("loser", ""))
+                surface = str(match.get("surface", "Hard"))
+                d_str = str(match.get("match_date", "") or match.get("event_start_utc", ""))
+                if not winner or not loser:
+                    continue
+
+                # 1. Base Overall (K=32)
+                rw = overall.get(winner, DEFAULT_ELO)
+                rl = overall.get(loser, DEFAULT_ELO)
+                expected = expected_win_probability(rw, rl)
+                overall[winner] = rw + K_FACTOR * (1.0 - expected)
+                overall[loser] = rl - K_FACTOR * (1.0 - expected)
+
+                # 2. Surface Elo (initialized at current overall Elo)
+                rsw = by_surface.get((winner, surface), rw)
+                rsl = by_surface.get((loser, surface), rl)
+                expected_surf = expected_win_probability(rsw, rsl)
+                by_surface[(winner, surface)] = rsw + K_FACTOR * (1.0 - expected_surf)
+                by_surface[(loser, surface)] = rsl - K_FACTOR * (1.0 - expected_surf)
+
+                # 3. Recent Form Elo (recency momentum K=48)
+                rfw = self.recent_form.get(winner, DEFAULT_ELO)
+                rfl = self.recent_form.get(loser, DEFAULT_ELO)
+                expected_form = expected_win_probability(rfw, rfl)
+                self.recent_form[winner] = rfw + 48.0 * (1.0 - expected_form)
+                self.recent_form[loser] = rfl - 48.0 * (1.0 - expected_form)
+
+                counts[winner] = counts.get(winner, 0) + 1
+                counts[loser] = counts.get(loser, 0) + 1
+                surface_counts[(winner, surface)] = surface_counts.get((winner, surface), 0) + 1
+                surface_counts[(loser, surface)] = surface_counts.get((loser, surface), 0) + 1
+
+                if d_str:
+                    try:
+                        s_clean = d_str.replace("Z", "+00:00")
+                        if "T" in s_clean:
+                            dt = datetime.fromisoformat(s_clean)
+                        else:
+                            dt = datetime.strptime(s_clean.split()[0], "%Y-%m-%d").replace(tzinfo=UTC)
+                        self.last_dates[winner] = dt
+                        self.last_dates[loser] = dt
+                    except (ValueError, TypeError):
+                        self.last_dates.setdefault(winner, datetime(2025, 1, 1, tzinfo=UTC))
+
+            return overall, by_surface, counts, surface_counts
 
         if self.version == TENNIS_LEGACY_VERSION:
             for match in sorted(matches, key=lambda item: str(item.get("match_date", ""))):
@@ -260,6 +315,82 @@ class TennisModel:
         score = V3_INTERCEPT + sum(c * f for c, f in zip(V3_COEFFICIENTS, feat, strict=True))
         return _sigmoid(score)
 
+    def match_probability_v4(
+        self,
+        overall: dict[str, float],
+        by_surface: dict[tuple[str, str], float],
+        surface_counts: dict[tuple[str, str], int],
+        counts: dict[str, int],
+        player_one: str,
+        player_two: str,
+        surface: str,
+        rest_days: dict[str, float] | None = None,
+        best_of: int = 3,
+    ) -> float:
+        """Dual-horizon surface Elo with dynamic shrinkage, rust decay, and format translation."""
+        p1 = player_one
+        p2 = player_two
+        ov1 = overall.get(p1, DEFAULT_ELO)
+        ov2 = overall.get(p2, DEFAULT_ELO)
+        s1 = by_surface.get((p1, surface), ov1)
+        s2 = by_surface.get((p2, surface), ov2)
+        c1 = surface_counts.get((p1, surface), 0)
+        c2 = surface_counts.get((p2, surface), 0)
+
+        # Dynamic Bayesian surface shrinkage
+        s_norm = surface.lower()
+        if "clay" in s_norm or "grass" in s_norm:
+            w_max, c_surf = 0.80, 12.0
+        else:
+            w_max, c_surf = 0.75, 15.0
+
+        w1_s = w_max * (c1 / (c1 + c_surf))
+        w2_s = w_max * (c2 / (c2 + c_surf))
+        base1 = w1_s * s1 + (1.0 - w1_s) * ov1
+        base2 = w2_s * s2 + (1.0 - w2_s) * ov2
+
+        # Inactivity rust decay via rest_days
+        if isinstance(rest_days, dict):
+            rests = rest_days
+        elif isinstance(rest_days, str):
+            rests = {}
+            with contextlib.suppress(ValueError, TypeError):
+                dt = datetime.fromisoformat(rest_days)
+                for p in (p1, p2):
+                    if p in getattr(self, "last_dates", {}):
+                        rests[p] = max(0.0, (dt - self.last_dates[p]).total_seconds() / 86400.0)
+        else:
+            rests = {}
+        days1 = float(rests.get(p1, 14.0))
+        days2 = float(rests.get(p2, 14.0))
+
+        def _apply_rust(elo_val: float, days: float) -> float:
+            if days > 35.0:
+                decay = math.exp(-0.003 * (days - 35.0))
+                return DEFAULT_ELO + (elo_val - DEFAULT_ELO) * decay
+            return elo_val
+
+        eff1 = _apply_rust(base1, days1)
+        eff2 = _apply_rust(base2, days2)
+
+        # Blend with recent form
+        rf1 = getattr(self, "recent_form", {}).get(p1, ov1)
+        rf2 = getattr(self, "recent_form", {}).get(p2, ov2)
+        final1 = 0.82 * eff1 + 0.18 * rf1
+        final2 = 0.82 * eff2 + 0.18 * rf2
+
+        # Expected single set probability
+        p_set = expected_win_probability(final1, final2)
+
+        # Best-of-3 / Best-of-5 transformation
+        if best_of == 5:
+            q = 1.0 - p_set
+            p_match = p_set**3 * (1.0 + 3.0 * q + 6.0 * q * q)
+        else:
+            p_match = p_set * p_set * (3.0 - 2.0 * p_set)
+
+        return max(0.01, min(0.99, p_match))
+
     def predict_games(
         self,
         matches: Sequence[dict[str, Any]],
@@ -291,7 +422,19 @@ class TennisModel:
             rest2 = _get_rest(match.player_two, match.event_start_utc)
             rest_dict = {match.player_one: rest1, match.player_two: rest2}
 
-            if self.version == TENNIS_V3_VERSION:
+            if self.version == TENNIS_V4_VERSION:
+                p_fund = self.match_probability_v4(
+                    overall=overall,
+                    by_surface=by_surface,
+                    surface_counts=surface_counts,
+                    counts=counts,
+                    player_one=match.player_one,
+                    player_two=match.player_two,
+                    surface=match.surface,
+                    rest_days=rest_dict,
+                    best_of=match.best_of,
+                )
+            elif self.version == TENNIS_V3_VERSION:
                 p_fund = self.match_probability_v3(
                     overall=overall,
                     by_surface=by_surface,
@@ -397,17 +540,26 @@ class TennisModel:
                     "surface_ratings": [by_surface.get((p, match.surface), overall[p]) for p in players],
                     "surface_counts": [surface_counts.get((p, match.surface), 0) for p in players],
                     "counts": [counts.get(p, 0) for p in players],
+                    "recent_form_ratings": [self.recent_form.get(p, overall[p]) for p in players],
                     "rest_days": [rest1, rest2],
                     "market_probability": match.market_probability,
                     "p_serve_a": p_serve_a,
                     "p_serve_b": p_serve_b,
                     "best_of": match.best_of,
+                    "event_start_utc": match.event_start_utc,
                     "model_version": self.version,
                 },
             )
 
             # 1. Moneyline
-            if self.version == TENNIS_V3_VERSION:
+            if self.version == TENNIS_V4_VERSION:
+                p_ml_away = p_fund
+                p_ml_home = 1.0 - p_fund
+                ml_rationale = (
+                    f"Tennis Surface Elo v4 Dual-Horizon on {match.surface} (Bo{match.best_of}): "
+                    f"{match.player_one} p={p_ml_away:.3f} vs {match.player_two}."
+                )
+            elif self.version == TENNIS_V3_VERSION:
                 if match.market_probability is not None:
                     p_ml_away = apply_market_residual(p_fund, match.market_probability)
                     p_ml_home = 1.0 - p_ml_away

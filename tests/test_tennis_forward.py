@@ -212,7 +212,7 @@ def test_tennis_forward_prices_singles_moneyline_and_excludes_doubles(tmp_path) 
         observed_at=datetime(2026, 7, 27, 13, tzinfo=UTC),
     )
 
-    assert result["model_version"] == "tennis-learned-v3"
+    assert result["model_version"] == "tennis-surface-elo-v4"
     assert result["scheduled_games"] == 1
     assert result["priced_count"] == 1
     contract = result["priced_contracts"][0]

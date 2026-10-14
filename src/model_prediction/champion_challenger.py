@@ -77,6 +77,7 @@ CODE_BACKED_MODEL_IDS: frozenset[str] = frozenset(
         "tennis-surface-elo-v1",
         "tennis-markov-hierarchical-v2",
         "tennis-learned-v3",
+        "tennis-surface-elo-v4",
     }
 )
 
