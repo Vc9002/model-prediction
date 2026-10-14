@@ -35,7 +35,7 @@ SUPPORTED_MARKETS: dict[str, set[str]] = {
     "WNBA": {"moneyline", "spread", "total"},
     "NCAAF": {"moneyline", "spread", "total"},
     "NBA": {"moneyline"},
-    "NFL": {"moneyline"},
+    "NFL": {"moneyline", "spread", "total"},
     "SOCCER": {"moneyline"},
     "TENNIS": {"moneyline"},
     "CS2": {"moneyline"},
@@ -49,7 +49,6 @@ SUPPORTED_MARKETS: dict[str, set[str]] = {
 
 PLANNED_MARKETS: dict[str, set[str]] = {
     "NBA": {"spread", "total"},
-    "NFL": {"spread", "total"},
     "SOCCER": {"spread", "total"},
     "TENNIS": {"spread", "total"},
 }
@@ -664,7 +663,13 @@ def challenger_identity_errors(
     errors = []
     if entry.model_id != model_id:
         errors.append(f"{prefix} has a different registered model_id")
-    if entry.sport.upper() != sport.upper() or entry.market.lower() != market.lower():
+    entry_markets = (
+        {m.strip().lower() for m in entry.market.split(",")}
+        if "," in entry.market
+        else {entry.market.lower()}
+    )
+    matches_market = market.lower() in entry_markets or entry.market.lower() in ("multi", "all")
+    if entry.sport.upper() != sport.upper() or not matches_market:
         errors.append(f"{prefix} has a different registered sport/market")
     artifact_hash = getattr(entry, "artifact_hash", None)
     if (

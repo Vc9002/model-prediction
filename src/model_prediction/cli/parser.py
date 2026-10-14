@@ -330,6 +330,25 @@ def parser() -> argparse.ArgumentParser:
     )
     total_validate.add_argument("--write-artifacts", action="store_true")
 
+    calibrate_cmd = commands.add_parser(
+        "calibrate",
+        help="evaluate model calibration, detect drift, and run tournament across settled picks",
+    )
+    calibrate_cmd.add_argument("--sport", help="filter by sport (e.g. mlb, wnba, tennis)")
+    calibrate_cmd.add_argument("--market", help="filter by market (e.g. moneyline, spread, total, nrfi)")
+    calibrate_cmd.add_argument(
+        "--all", action="store_true", help="run calibration across all models and markets"
+    )
+    calibrate_cmd.add_argument("--min-sample", type=int, default=20, help="minimum settled games to evaluate")
+    calibrate_cmd.add_argument(
+        "--output", default="outputs/calibration/latest.json", help="destination JSON report path"
+    )
+    calibrate_cmd.add_argument(
+        "--update-artifacts",
+        action="store_true",
+        help="write/update calibrated artifacts under data/calibration",
+    )
+
     reconstruct = commands.add_parser(
         "reconstruct-mlb-markets",
         help="cache postgame ESPN summaries for diagnostic-only historical market testing",

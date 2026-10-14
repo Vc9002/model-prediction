@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from datetime import date, datetime, time
 from pathlib import Path
@@ -32,6 +33,7 @@ from typing import Any
 from .data_sources.espn import _infer_tennis_surface
 from .domain import EASTERN, parse_utc
 from .models.tennis import UpcomingMatch, tennis_model
+from .models.tennis_derivatives import price_tennis_derivatives
 
 _TENNIS_SUBPERIOD_MARKERS = ("fh", "h1", "h2", "1h", "set", "ss", "st")
 
@@ -105,8 +107,8 @@ def _unsupported_tennis_market_reason(market_type: str, slug: str) -> str | None
             "UNSUPPORTED_TENNIS_SUBPERIOD_MARKET: exact set/period identity "
             "and result dimensions are unavailable"
         )
-    if market_type in {"spread", "total"}:
-        return "UNSUPPORTED_TENNIS_DERIVATIVE_PRICING: no validated game-score distribution is available"
+    if market_type not in {"moneyline", "spread", "total"}:
+        return f"UNSUPPORTED_TENNIS_MARKET_TYPE: {market_type} is not priced"
     return None
 
 
@@ -409,6 +411,120 @@ def build_tennis_slate(
                     }
                 )
 
+            elif mtype == "spread":
+                try:
+                    spread_val = float(snapshot["line"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+
+                inf_inputs = prediction.inference_inputs or {}
+                p_serve_a = inf_inputs.get("p_serve_a")
+                p_serve_b = inf_inputs.get("p_serve_b")
+                if p_serve_a is None or p_serve_b is None:
+                    base_serve = 0.635 if prediction.league.upper() == "ATP" else 0.590
+                    diff = 400.0 * math.log10(max(1e-6, p_away) / max(1e-6, 1.0 - p_away))
+                    p_serve_a = max(0.45, min(0.78, base_serve + diff / 2400.0))
+                    p_serve_b = max(0.45, min(0.78, base_serve - diff / 2400.0))
+
+                is_team_away = _name_matches(prediction.away_team, str(snapshot.get("team") or ""))
+                spread_line_p1 = spread_val if is_team_away else -spread_val
+                deriv = price_tennis_derivatives(p_serve_a, p_serve_b, spread_line=spread_line_p1, best_of=3)
+                p_cov_p1 = deriv.spread_p1_cover or 0.5
+                p_cov_p2 = deriv.spread_p2_cover or 0.5
+                selection = "away" if p_cov_p1 >= p_cov_p2 else "home"
+                prob = p_cov_p1 if selection == "away" else p_cov_p2
+
+                side = snapshot.get("long") or {}
+                ask = side.get("ask")
+                if ask is None or not 0.01 <= float(ask) <= 0.99:
+                    side = snapshot.get("short") or {}
+                    ask = side.get("ask")
+                if ask is None or not 0.01 <= float(ask) <= 0.99:
+                    continue
+
+                seen_contract_keys.add(contract_key)
+                priced.append(
+                    {
+                        "event_id": prediction.event_id,
+                        "event_start_utc": prediction.event_start_utc,
+                        "away_team": prediction.away_team,
+                        "home_team": prediction.home_team,
+                        "market_type": "spread",
+                        "selection": selection,
+                        "line": spread_val,
+                        "model_probability": round(prob, 4),
+                        "model_uncertainty": prediction.uncertainty,
+                        "model_version": prediction.model_version,
+                        "feature_basis": prediction.feature_basis,
+                        "inference_inputs": prediction.inference_inputs,
+                        "model_inputs_observed_at_utc": observed_at.isoformat(),
+                        "rationale": f"Tennis Markov game spread {spread_val:+.1f} games: {selection} cover p={prob:.3f}.",
+                        "market_slug": slug,
+                        "executable_ask": float(ask),
+                        "observed_at_utc": snapshot["observed_at_utc"],
+                        "timestamp_valid": True,
+                        "edge_vs_executable_ask": round(prob - float(ask), 6),
+                        "market_snapshot_hash": snapshot["_market_snapshot_hash"],
+                        "market_snapshot_archive_path": snapshot["_market_snapshot_archive_path"],
+                        "market_snapshot_record_id": snapshot["_market_snapshot_record_id"],
+                    }
+                )
+
+            elif mtype == "total":
+                try:
+                    total_val = float(snapshot["line"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+
+                inf_inputs = prediction.inference_inputs or {}
+                p_serve_a = inf_inputs.get("p_serve_a")
+                p_serve_b = inf_inputs.get("p_serve_b")
+                if p_serve_a is None or p_serve_b is None:
+                    base_serve = 0.635 if prediction.league.upper() == "ATP" else 0.590
+                    diff = 400.0 * math.log10(max(1e-6, p_away) / max(1e-6, 1.0 - p_away))
+                    p_serve_a = max(0.45, min(0.78, base_serve + diff / 2400.0))
+                    p_serve_b = max(0.45, min(0.78, base_serve - diff / 2400.0))
+
+                deriv = price_tennis_derivatives(p_serve_a, p_serve_b, total_line=total_val, best_of=3)
+                p_over = deriv.total_over or 0.5
+                p_under = deriv.total_under or 0.5
+                selection = "over" if p_over >= p_under else "under"
+                prob = p_over if selection == "over" else p_under
+
+                side_key = "long" if selection == "over" else "short"
+                side = snapshot.get(side_key) or {}
+                ask = side.get("ask")
+                if ask is None or not 0.01 <= float(ask) <= 0.99:
+                    continue
+
+                seen_contract_keys.add(contract_key)
+                priced.append(
+                    {
+                        "event_id": prediction.event_id,
+                        "event_start_utc": prediction.event_start_utc,
+                        "away_team": prediction.away_team,
+                        "home_team": prediction.home_team,
+                        "market_type": "total",
+                        "selection": selection,
+                        "line": total_val,
+                        "model_probability": round(prob, 4),
+                        "model_uncertainty": prediction.uncertainty,
+                        "model_version": prediction.model_version,
+                        "feature_basis": prediction.feature_basis,
+                        "inference_inputs": prediction.inference_inputs,
+                        "model_inputs_observed_at_utc": observed_at.isoformat(),
+                        "rationale": f"Tennis Markov total games line {total_val:.1f}: {selection} p={prob:.3f}.",
+                        "market_slug": slug,
+                        "executable_ask": float(ask),
+                        "observed_at_utc": snapshot["observed_at_utc"],
+                        "timestamp_valid": True,
+                        "edge_vs_executable_ask": round(prob - float(ask), 6),
+                        "market_snapshot_hash": snapshot["_market_snapshot_hash"],
+                        "market_snapshot_archive_path": snapshot["_market_snapshot_archive_path"],
+                        "market_snapshot_record_id": snapshot["_market_snapshot_record_id"],
+                    }
+                )
+
         if len(priced) == priced_before and not saw_unsupported_market:
             unmatched.append(
                 {
@@ -433,8 +549,7 @@ def build_tennis_slate(
         "unmatched": unmatched,
         "skipped": skipped,
         "note": (
-            "Surface-Elo prices WTA & ATP full-match moneylines only. Tennis spread, "
-            "total, set, and partial-match contracts fail closed until validated score-distribution "
-            "pricing and exact result dimensions are available."
+            "Hierarchical Markov score distribution prices WTA & ATP full-match moneylines, "
+            "game spreads, and game totals. Subperiod and set-specific contracts remain excluded."
         ),
     }

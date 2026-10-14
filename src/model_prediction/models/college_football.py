@@ -35,8 +35,8 @@ from .cfb_distribution import (
 )
 
 MODEL_VERSION = "cfb-structural-v2"
-CFB_SPREAD_MODEL_VERSION = "cfb-spread-v1"
-CFB_TOTAL_MODEL_VERSION = "cfb-total-v1"
+CFB_SPREAD_MODEL_VERSION = "cfb-structural-v2"
+CFB_TOTAL_MODEL_VERSION = "cfb-structural-v2"
 
 # feat.uncertainty (0.04 floor -- established teams, no FBS/FCS mismatch,
 # confirmed starters) previously reached the ledger only as sizing metadata;
@@ -85,12 +85,16 @@ class CollegeFootballModel:
     def __init__(
         self,
         version: str = MODEL_VERSION,
+        spread_version: str | None = None,
+        total_version: str | None = None,
         home_advantage_points: float = CFB_DEFAULT_HOME_ADVANTAGE_POINTS,
         margin_sd: float = CFB_BASELINE_MARGIN_SD,
         total_sd: float = CFB_BASELINE_TOTAL_SD,
         distribution_type: CFBDistributionType = CFBDistributionType.NEGATIVE_BINOMIAL,
     ) -> None:
         self.version = version
+        self.spread_version = spread_version or CFB_SPREAD_MODEL_VERSION
+        self.total_version = total_version or CFB_TOTAL_MODEL_VERSION
         self.home_advantage_points = home_advantage_points
         self.margin_sd = margin_sd
         self.total_sd = total_sd
@@ -226,7 +230,7 @@ class CollegeFootballModel:
                     "push": round(joint_probs.p_push_spread, 6),
                 },
                 uncertainty=feat.uncertainty,
-                model_version=CFB_SPREAD_MODEL_VERSION,
+                model_version=self.spread_version,
                 feature_basis=feat.to_dict(),
                 inference_inputs=inference_inputs,
                 rationale=(
@@ -253,7 +257,7 @@ class CollegeFootballModel:
                     "push": round(joint_probs.p_push_total, 6),
                 },
                 uncertainty=feat.uncertainty,
-                model_version=CFB_TOTAL_MODEL_VERSION,
+                model_version=self.total_version,
                 feature_basis=feat.to_dict(),
                 inference_inputs=inference_inputs,
                 rationale=(
@@ -536,7 +540,7 @@ def build_cfb_slate(
                 line_val = None
                 ask = market_ml_home_prob if selection == "home" else market_ml_away_prob
                 slug = f"ncaaf-ml-{event_id}-{selection}"
-                m_ver = MODEL_VERSION
+                m_ver = p.model_version
             elif mtype == "spread":
                 if spread_away_line is None or spread_home_line is None:
                     continue
@@ -547,7 +551,7 @@ def build_cfb_slate(
                 line_val = spread_away_line if selection == "away" else spread_home_line
                 ask = market_spread_away_prob if selection == "away" else market_spread_home_prob
                 slug = f"ncaaf-spread-{event_id}-{selection}"
-                m_ver = CFB_SPREAD_MODEL_VERSION
+                m_ver = p.model_version
             else:  # total
                 if total_line is None:
                     continue
@@ -560,7 +564,7 @@ def build_cfb_slate(
                 line_val = total_line
                 ask = market_total_over_prob if selection == "over" else market_total_under_prob
                 slug = f"ncaaf-total-{event_id}-{selection}"
-                m_ver = CFB_TOTAL_MODEL_VERSION
+                m_ver = p.model_version
 
             # If no market price/line is available from the source, do NOT fabricate a fake edge
             if ask is None:

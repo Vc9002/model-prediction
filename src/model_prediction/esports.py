@@ -1172,112 +1172,250 @@ def forecast_esports_slate(
     no_calls: list[dict[str, Any]] = []
     for event in events:
         event_start = parse_utc(str(event["event_start_utc"]))
-        for market in event.get("markets", []):
-            if market.get("market_type") != "moneyline" or len(market.get("sides", [])) != 2:
+        ml_market = next(
+            (
+                m
+                for m in event.get("markets", [])
+                if m.get("market_type") == "moneyline" and len(m.get("sides", [])) == 2
+            ),
+            None,
+        )
+        if ml_market is None:
+            continue
+        descriptions = [str(side.get("description") or "") for side in ml_market["sides"]]
+        matches: list[set[str]] = []
+        for description in descriptions:
+            ikey = _identity_key(description)
+            # 1. Exact alias match in BO3 catalog
+            exact = aliases.get(ikey, set())
+            if exact:
+                matches.append(exact)
                 continue
-            descriptions = [str(side.get("description") or "") for side in market["sides"]]
-            matches: list[set[str]] = []
-            for description in descriptions:
-                ikey = _identity_key(description)
-                # 1. Exact alias match in BO3 catalog
-                exact = aliases.get(ikey, set())
-                if exact:
-                    matches.append(exact)
+            # 2. Manual alias override (Polymarket name → BO3 name mapping)
+            manual_name = manual_aliases.get(ikey)
+            if manual_name:
+                manual_key = _identity_key(manual_name)
+                manual_match = aliases.get(manual_key, set())
+                if manual_match:
+                    matches.append(manual_match)
                     continue
-                # 2. Manual alias override (Polymarket name → BO3 name mapping)
-                manual_name = manual_aliases.get(ikey)
-                if manual_name:
-                    manual_key = _identity_key(manual_name)
-                    manual_match = aliases.get(manual_key, set())
-                    if manual_match:
-                        matches.append(manual_match)
-                        continue
-                # 3. Fuzzy match in BO3 catalog
-                fuzzy = _fuzzy_match_team(description, teams, aliases)
-                if fuzzy:
-                    matches.append({fuzzy})
-                    continue
-                # Unknown team: assign a synthetic ID so we can still price
-                # the match using default 1500 Elo rating for the unknown side.
-                synthetic_id = "unknown:" + ikey
-                matches.append({synthetic_id})
-            base = {
+            # 3. Fuzzy match in BO3 catalog
+            fuzzy = _fuzzy_match_team(description, teams, aliases)
+            if fuzzy:
+                matches.append({fuzzy})
+                continue
+            # Unknown team: assign a synthetic ID so we can still price
+            # the match using default 1500 Elo rating for the unknown side.
+            synthetic_id = "unknown:" + ikey
+            matches.append({synthetic_id})
+        event_base = {
+            "event_id": event["event_id"],
+            "event_start_utc": event["event_start_utc"],
+            "market_slug": ml_market["market_slug"],
+            "teams": descriptions,
+        }
+        if event_start <= observed_now:
+            no_calls.append({**event_base, "reason": "NO_CALL_EVENT_STARTED"})
+            continue
+        if event_start <= trained_through:
+            no_calls.append({**event_base, "reason": "NO_CALL_POINT_IN_TIME_MODEL_ARTIFACT"})
+            continue
+        if any(len(candidate_ids) != 1 for candidate_ids in matches):
+            no_calls.append(
+                {
+                    **event_base,
+                    "reason": "NO_CALL_ENTITY_UNRESOLVED",
+                    "candidate_counts": [len(candidate_ids) for candidate_ids in matches],
+                }
+            )
+            continue
+        team_ids = [next(iter(candidate_ids)) for candidate_ids in matches]
+        if team_ids[0] == team_ids[1]:
+            no_calls.append({**event_base, "reason": "NO_CALL_MODEL_UNVALIDATED_NEW_TEAM"})
+            continue
+        # Unknown or newly catalogued teams may still be priced into the
+        # complete research ledger with the neutral 1500 prior. They are
+        # not valid inputs for the curated gated-research ledger until
+        # both identities have learned ratings in the pinned artifact.
+        source_teams_resolved = all(not team_id.startswith("unknown:") for team_id in team_ids)
+        source_teams_trained = source_teams_resolved and all(team_id in ratings for team_id in team_ids)
+        probability1 = book.probability(team_ids[0], team_ids[1], observed_now)
+        from .esports_replay import capture_inputs
+        from .models.esports_derivatives import price_esports_bo3_derivatives
+
+        inference_inputs = capture_inputs(book, team_ids, observed_now)
+        bo3_derivatives = price_esports_bo3_derivatives(probability1)
+
+        for market in event.get("markets", []):
+            m_type = str(market.get("market_type") or "")
+            if m_type not in ("moneyline", "spread", "total") or len(market.get("sides", [])) != 2:
+                continue
+            market_base = {
                 "event_id": event["event_id"],
                 "event_start_utc": event["event_start_utc"],
                 "market_slug": market["market_slug"],
+                "market_type": m_type,
+                "line": market.get("line"),
                 "teams": descriptions,
-            }
-            if event_start <= observed_now:
-                no_calls.append({**base, "reason": "NO_CALL_EVENT_STARTED"})
-                continue
-            if event_start <= trained_through:
-                no_calls.append({**base, "reason": "NO_CALL_POINT_IN_TIME_MODEL_ARTIFACT"})
-                continue
-            if any(len(candidate_ids) != 1 for candidate_ids in matches):
-                no_calls.append(
-                    {
-                        **base,
-                        "reason": "NO_CALL_ENTITY_UNRESOLVED",
-                        "candidate_counts": [len(candidate_ids) for candidate_ids in matches],
-                    }
-                )
-                continue
-            team_ids = [next(iter(candidate_ids)) for candidate_ids in matches]
-            if team_ids[0] == team_ids[1]:
-                no_calls.append({**base, "reason": "NO_CALL_MODEL_UNVALIDATED_NEW_TEAM"})
-                continue
-            # Unknown or newly catalogued teams may still be priced into the
-            # complete research ledger with the neutral 1500 prior. They are
-            # not valid inputs for the curated gated-research ledger until
-            # both identities have learned ratings in the pinned artifact.
-            source_teams_resolved = all(not team_id.startswith("unknown:") for team_id in team_ids)
-            source_teams_trained = source_teams_resolved and all(team_id in ratings for team_id in team_ids)
-            probability1 = book.probability(team_ids[0], team_ids[1], observed_now)
-            from .esports_replay import capture_inputs
-
-            inference_inputs = capture_inputs(book, team_ids, observed_now)
-            probabilities_by_name = {
-                _identity_key(descriptions[0]): probability1,
-                _identity_key(descriptions[1]): 1 - probability1,
             }
             try:
                 snapshot = market_client.snapshot(str(market["market_slug"]))
             except (httpx.HTTPError, KeyError, StopIteration, TypeError, ValueError) as error:
-                no_calls.append({**base, "reason": "NO_CALL_MARKET_UNAVAILABLE", "detail": str(error)[:200]})
+                no_calls.append(
+                    {**market_base, "reason": "NO_CALL_MARKET_UNAVAILABLE", "detail": str(error)[:200]}
+                )
                 continue
+
+            market_model_version = str(artifact["model_version"])
+            probabilities_by_name: dict[str, float] = {}
+
+            if m_type == "moneyline":
+                probabilities_by_name = {
+                    _identity_key(descriptions[0]): probability1,
+                    _identity_key(descriptions[1]): 1.0 - probability1,
+                }
+            elif m_type == "total":
+                raw_line = market.get("line") if market.get("line") is not None else snapshot.get("line")
+                try:
+                    line_val = float(raw_line if raw_line is not None else 2.5)
+                except (ValueError, TypeError):
+                    continue
+                if abs(line_val - 2.5) > 0.1:
+                    continue
+                market_base["line"] = 2.5
+                market_model_version = f"{title}-total-tiered-elo-{ESPORTS_MODEL_LINEAGE}"
+                probabilities_by_name = {
+                    "over": bo3_derivatives.total_maps_over_2pt5,
+                    "under": bo3_derivatives.total_maps_under_2pt5,
+                }
+            elif m_type == "spread":
+                raw_line = market.get("line") if market.get("line") is not None else snapshot.get("line")
+                try:
+                    line_val = float(raw_line if raw_line is not None else -1.5)
+                except (ValueError, TypeError):
+                    continue
+                if abs(abs(line_val) - 1.5) > 0.1:
+                    continue
+                market_base["line"] = line_val
+                market_model_version = f"{title}-spread-tiered-elo-{ESPORTS_MODEL_LINEAGE}"
+
+                anchor_team = snapshot.get("team") or market.get("team")
+                key0 = _identity_key(descriptions[0])
+                key1 = _identity_key(descriptions[1])
+                anchor_is_team1 = True
+                if anchor_team:
+                    anchor_key = _identity_key(str(anchor_team))
+                    if anchor_key == key1 or (anchor_key in key1 and anchor_key not in key0):
+                        anchor_is_team1 = False
+                else:
+                    long_desc = str((snapshot.get("long") or {}).get("description") or "")
+                    long_key = _identity_key(long_desc)
+                    if key1 in long_key:
+                        anchor_is_team1 = False
+
+                if anchor_is_team1:
+                    if line_val < 0:
+                        team_minus, p_minus = descriptions[0], bo3_derivatives.spread_p1_cover_neg_1pt5
+                        team_plus, p_plus = descriptions[1], bo3_derivatives.spread_p2_cover_pos_1pt5
+                    else:
+                        team_plus, p_plus = descriptions[0], bo3_derivatives.spread_p1_cover_pos_1pt5
+                        team_minus, p_minus = descriptions[1], bo3_derivatives.spread_p2_cover_neg_1pt5
+                else:
+                    if line_val < 0:
+                        team_minus, p_minus = descriptions[1], bo3_derivatives.spread_p2_cover_neg_1pt5
+                        team_plus, p_plus = descriptions[0], bo3_derivatives.spread_p1_cover_pos_1pt5
+                    else:
+                        team_plus, p_plus = descriptions[1], bo3_derivatives.spread_p2_cover_pos_1pt5
+                        team_minus, p_minus = descriptions[0], bo3_derivatives.spread_p1_cover_neg_1pt5
+
             sides: list[dict[str, Any]] = []
             for side_name in ("long", "short"):
                 side = snapshot[side_name]
-                model_probability = probabilities_by_name.get(_identity_key(str(side["description"])))
+                desc_str = str(side.get("description") or "").strip()
+                desc_key = _identity_key(desc_str)
                 ask = side.get("ask")
+                model_probability = None
+                side_team = desc_str
+
+                if m_type == "moneyline":
+                    model_probability = probabilities_by_name.get(desc_key)
+                    if model_probability is None:
+                        if _identity_key(descriptions[0]) in desc_key:
+                            model_probability = probability1
+                            side_team = descriptions[0]
+                        elif _identity_key(descriptions[1]) in desc_key:
+                            model_probability = 1.0 - probability1
+                            side_team = descriptions[1]
+                elif m_type == "total":
+                    if desc_key in ("over", "under"):
+                        model_probability = probabilities_by_name.get(desc_key)
+                        side_team = desc_str.capitalize()
+                    elif desc_str.lower().startswith("o"):
+                        model_probability = bo3_derivatives.total_maps_over_2pt5
+                        side_team = "Over"
+                    elif desc_str.lower().startswith("u"):
+                        model_probability = bo3_derivatives.total_maps_under_2pt5
+                        side_team = "Under"
+                    elif side_name == "long":
+                        model_probability = bo3_derivatives.total_maps_over_2pt5
+                        side_team = "Over"
+                    else:
+                        model_probability = bo3_derivatives.total_maps_under_2pt5
+                        side_team = "Under"
+                elif m_type == "spread":
+                    if desc_str.startswith("-") or "-1.5" in desc_str:
+                        model_probability = p_minus
+                        side_team = f"{team_minus} -1.5"
+                    elif desc_str.startswith(("+", "1.5")) or "+1.5" in desc_str:
+                        model_probability = p_plus
+                        side_team = f"{team_plus} +1.5"
+                    elif _identity_key(team_minus) in desc_key:
+                        model_probability = p_minus
+                        side_team = f"{team_minus} -1.5"
+                    elif _identity_key(team_plus) in desc_key:
+                        model_probability = p_plus
+                        side_team = f"{team_plus} +1.5"
+                    elif side_name == "long":
+                        if line_val < 0:
+                            model_probability = p_minus
+                            side_team = f"{team_minus} -1.5"
+                        else:
+                            model_probability = p_plus
+                            side_team = f"{team_plus} +1.5"
+                    else:  # short
+                        if line_val < 0:
+                            model_probability = p_plus
+                            side_team = f"{team_plus} +1.5"
+                        else:
+                            model_probability = p_minus
+                            side_team = f"{team_minus} -1.5"
+
                 if model_probability is None or ask is None:
                     sides = []
                     break
                 sides.append(
                     {
                         "side": side_name,
-                        "team": side["description"],
+                        "team": side_team,
                         "model_probability": round(model_probability, 6),
                         "executable_ask": float(ask),
                         "edge_vs_executable_ask": round(model_probability - float(ask), 6),
                     }
                 )
             if len(sides) != 2:
-                no_calls.append({**base, "reason": "NO_CALL_MARKET_OR_SIDE_UNRESOLVED"})
+                no_calls.append({**market_base, "reason": "NO_CALL_MARKET_OR_SIDE_UNRESOLVED"})
                 continue
             # Reject illiquid/thin markets where the Polymarket pricing is unreliable.
-            # These are typically very small/esoteric esports leagues with extreme
-            # bid-ask spreads and no real two-sided liquidity.
             asks = [float(s["executable_ask"]) for s in sides]
             if any(a < 0.30 or a > 0.70 for a in asks):
-                no_calls.append({**base, "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK", "asks": asks})
+                no_calls.append({**market_base, "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK", "asks": asks})
                 continue
             if asks[0] + asks[1] > 1.10:
-                no_calls.append({**base, "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD", "asks": asks})
+                no_calls.append({**market_base, "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD", "asks": asks})
                 continue
             rows.append(
                 {
-                    **base,
+                    **market_base,
                     "title": title,
                     "source_team_ids": team_ids,
                     "inference_inputs": inference_inputs,
@@ -1287,7 +1425,7 @@ def forecast_esports_slate(
                     "gated_research_ineligibility_reason": (
                         None if source_teams_trained else "NO_CALL_MODEL_UNVALIDATED_NEW_TEAM"
                     ),
-                    "model_version": artifact["model_version"],
+                    "model_version": market_model_version,
                     "model_state": "research",
                     "artifact_hash": artifact["artifact_hash"],
                     "observed_at_utc": snapshot["observed_at_utc"],

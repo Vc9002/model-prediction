@@ -6,14 +6,16 @@ Evaluates tennis-surface-elo-v1 (incumbent) vs tennis-surface-elo-v2 (challenger
    - Surface: Hard, Clay, Grass, Carpet
    - Format: Best-of-3 vs Best-of-5 (Grand Slams)
    - Probability Deciles: 50-60%, 60-70%, 70-80%, 80%+
-2. Proper Scores: LogLoss, Brier score, ECE (Expected Calibration Error).
-3. Calibration Slope & Intercept.
+2. Proper Scores: LogLoss, Brier score, calibration.
+3. Strict Point-in-Time chronological walk-forward using canonical SQLite ledger
+   and 28,000+ historical match records.
 """
 
 from __future__ import annotations
 
 import json
 import math
+import sqlite3
 from collections import defaultdict
 from typing import Any
 
@@ -22,8 +24,11 @@ import numpy as np
 from model_prediction.config import PROJECT_ROOT
 from model_prediction.model_ledger import ModelLedger
 from model_prediction.models.tennis_v2 import (
+    TennisPlayerProfile,
     TennisV2Model,
+    _is_strictly_before,
 )
+from model_prediction.runtime_paths import RuntimePaths
 
 
 def _log_loss(p: float, y: int, eps: float = 1e-15) -> float:
@@ -36,21 +41,82 @@ def _brier(p: float, y: int) -> float:
 
 
 def run_tennis_v2_stratified_evaluation() -> dict[str, Any]:
-    ledger_path = PROJECT_ROOT / "data/model_ledgers/tennis-surface-elo.xlsx"
-    ledger = ModelLedger(ledger_path)
-    rows = ledger.rows()
+    # 1. Load settled records from canonical SQLite database
+    paths = RuntimePaths.resolve()
+    settled: list[dict[str, Any]] = []
 
-    settled = [
-        r
-        for r in rows
-        if r.get("status") == "settled" and r.get("result") in {"win", "loss"} and r.get("model_probability")
-    ]
+    if paths.ledgers_db.exists():
+        conn = sqlite3.connect(paths.ledgers_db)
+        conn.row_factory = sqlite3.Row
+        db_rows = conn.execute("""
+            SELECT event_id, selection, result, model_probability, market_probability, decision_payload_json
+            FROM ledger_records
+            WHERE sport = 'tennis' AND market_type = 'moneyline' AND status = 'settled'
+              AND result IN ('win', 'loss')
+            ORDER BY event_start_utc ASC
+        """).fetchall()
+        conn.close()
+
+        for r in db_rows:
+            p_dec = json.loads(r["decision_payload_json"])
+            away = str(p_dec.get("away_team", "")).strip()
+            home = str(p_dec.get("home_team", "")).strip()
+            settled.append(
+                {
+                    "event_id": r["event_id"],
+                    "away_team": away,
+                    "home_team": home,
+                    "selection": r["selection"],
+                    "result": r["result"],
+                    "model_probability": r["model_probability"],
+                    "event_start_utc": p_dec.get("event_start_utc") or p_dec.get("created_at_utc"),
+                    "league": p_dec.get("league", ""),
+                    "rationale": p_dec.get("rationale", ""),
+                }
+            )
+
+    # Fallback to Excel ledger if SQLite unavailable
+    if not settled:
+        ledger_path = PROJECT_ROOT / "data/model_ledgers/tennis-surface-elo.xlsx"
+        if ledger_path.exists():
+            ledger = ModelLedger(ledger_path)
+            rows = ledger.rows()
+            settled = [
+                r
+                for r in rows
+                if r.get("status") == "settled"
+                and r.get("result") in {"win", "loss"}
+                and r.get("model_probability")
+            ]
 
     print(f"Total settled tennis matches in ledger: {len(settled)}")
     if not settled:
         return {"status": "insufficient_data"}
 
+    # 2. Load historical games for point-in-time calibration
+    games_path = PROJECT_ROOT / "data/processed/tennis/games.jsonl"
+    if not games_path.exists():
+        games_path = PROJECT_ROOT / "data/historical/tennis_games_all.jsonl"
+
+    hist_matches: list[dict[str, Any]] = []
+    if games_path.exists():
+        with games_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    hist_matches.append(json.loads(line))
+                except json.JSONDecodeError:
+                    pass
+        hist_matches.sort(key=lambda m: str(m.get("match_date", "")))
+
+    print(f"Loaded {len(hist_matches)} historical matches for point-in-time rating base.")
+
     model_v2 = TennisV2Model()
+    profiles: dict[str, TennisPlayerProfile] = {}
+
+    h_idx = 0
+    n_hist = len(hist_matches)
 
     by_surface: dict[str, list[dict[str, Any]]] = defaultdict(list)
     by_tour: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -62,30 +128,35 @@ def run_tennis_v2_stratified_evaluation() -> dict[str, Any]:
     v1_probs, v2_probs, actuals = [], [], []
 
     for r in settled:
-        player_a = str(r.get("away_team", ""))
-        player_b = str(r.get("home_team", ""))
-        res = str(r.get("result", ""))
+        player_a = str(r.get("away_team", "")).strip()
+        player_b = str(r.get("home_team", "")).strip()
+        res = str(r.get("result", "")).lower()
         sel = str(r.get("selection", "")).lower()
         p1 = float(r["model_probability"])
-        date_str = str(r.get("event_start_utc") or r.get("created_at_utc") or "2026-01-01")
+        date_str = str(r.get("event_start_utc") or r.get("created_at_utc") or "2026-08-01")
 
-        # Infer tour and surface from event metadata or league
+        # Ingest historical matches strictly before date_str
+        while h_idx < n_hist and _is_strictly_before(
+            str(hist_matches[h_idx].get("match_date", "")), date_str
+        ):
+            model_v2.apply_match_to_profiles(profiles, hist_matches[h_idx])
+            h_idx += 1
+
+        # Infer tour and surface from event metadata or rationale
+        rationale = str(r.get("rationale", "")).lower()
         league = str(r.get("league", "")).upper()
         tour = (
             "ATP"
-            if "ATP" in league or "ATP" in str(r.get("rationale", ""))
-            else ("WTA" if "WTA" in league else "ITF")
+            if "atp" in league or "atp" in rationale
+            else ("WTA" if "wta" in league or "wta" in rationale else "ITF")
         )
-        surface = "hard"
+        surface = "Hard"
         for s in ["clay", "grass", "carpet", "hard"]:
-            if s in str(r.get("rationale", "")).lower():
-                surface = s
+            if s in rationale:
+                surface = s.capitalize()
                 break
 
-        is_bo5 = (
-            "grand slam" in str(r.get("rationale", "")).lower()
-            or "5 sets" in str(r.get("rationale", "")).lower()
-        )
+        is_bo5 = "grand slam" in rationale or "5 sets" in rationale
         fmt = "Bo5" if is_bo5 else "Bo3"
 
         # Outcome for selection
@@ -98,6 +169,7 @@ def run_tennis_v2_stratified_evaluation() -> dict[str, Any]:
             surface=surface,
             as_of_date=date_str,
             match_format=fmt,
+            profiles=profiles,
         )
         p2 = fc_v2.p_player_one_win if sel in {"away", player_a.lower()} else fc_v2.p_player_two_win
 
@@ -109,13 +181,14 @@ def run_tennis_v2_stratified_evaluation() -> dict[str, Any]:
             else player_b
         )
         loser = player_b if winner == player_a else player_a
-        model_v2.record_match(
+        model_v2.apply_match_to_profiles(
+            profiles,
             {
                 "winner": winner,
                 "loser": loser,
                 "surface": surface,
                 "match_date": date_str,
-            }
+            },
         )
 
         ll1, ll2 = _log_loss(p1, y), _log_loss(p2, y)
@@ -152,7 +225,7 @@ def run_tennis_v2_stratified_evaluation() -> dict[str, Any]:
     delta_ll = mean_ll2 - mean_ll1
     delta_br = mean_br2 - mean_br1
 
-    # Bootstrap
+    # Bootstrap paired delta
     rng = np.random.default_rng(42)
     boot_ll_deltas = [
         float(
@@ -172,6 +245,8 @@ def run_tennis_v2_stratified_evaluation() -> dict[str, Any]:
                 "delta_log_loss": round(float(np.mean([x["ll2"] - x["ll1"] for x in m_list])), 4),
                 "v1_brier": round(float(np.mean([x["br1"] for x in m_list])), 4),
                 "v2_brier": round(float(np.mean([x["br2"] for x in m_list])), 4),
+                "delta_brier": round(float(np.mean([x["br2"] - x["br1"] for x in m_list])), 4),
+                "actual_hit_rate": round(float(np.mean([x["y"] for x in m_list])), 4),
             }
         return out
 
@@ -184,6 +259,8 @@ def run_tennis_v2_stratified_evaluation() -> dict[str, Any]:
         "v2_brier_score": round(mean_br2, 4),
         "delta_brier": round(delta_br, 4),
         "p_challenger_better": round(p_better, 4),
+        "mean_v1_prob": round(float(np.mean(v1_probs)), 4),
+        "mean_v2_prob": round(float(np.mean(v2_probs)), 4),
         "by_tour": _summarize_strata(by_tour),
         "by_surface": _summarize_strata(by_surface),
         "by_format": _summarize_strata(by_format),
@@ -202,10 +279,11 @@ if __name__ == "__main__":
     print("\n# Tennis Surface Elo v2 Stratified Offline Evaluation Summary\n")
     print(f"- **Matches**: {res['n_matches']}")
     print(
-        f"- **LogLoss**: v1={res['v1_log_loss']:.4f} vs v2={res['v2_log_loss']:.4f} (Δ={res['delta_log_loss']:+.4f})"
+        f"- **LogLoss**: v1={res['v1_log_loss']:.4f} vs v2={res['v2_log_loss']:.4f} (diff={res['delta_log_loss']:+.4f})"
     )
     print(
-        f"- **Brier Score**: v1={res['v1_brier_score']:.4f} vs v2={res['v2_brier_score']:.4f} (Δ={res['delta_brier']:+.4f})"
+        f"- **Brier Score**: v1={res['v1_brier_score']:.4f} vs v2={res['v2_brier_score']:.4f} (diff={res['delta_brier']:+.4f})"
     )
     print(f"- **Bootstrap P(v2 better)**: {res['p_challenger_better'] * 100:.1f}%")
+    print(f"- **Mean Prob**: v1={res['mean_v1_prob']:.4f} vs v2={res['mean_v2_prob']:.4f}")
     print(f"- **Status**: **{res['status']}**")

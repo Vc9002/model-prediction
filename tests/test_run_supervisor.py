@@ -156,7 +156,8 @@ def test_worker_registry_commands_exist_on_disk() -> None:
         assert worker in WORKERS
         command = WORKERS[worker]
         if worker == "production":
-            assert command[0] in (".venv/bin/python", ".venv/Scripts/python.exe")
+            assert Path(command[0]).as_posix().endswith((".venv/bin/python", ".venv/Scripts/python.exe"))
+            assert Path(command[0]).is_file()
             continue
         assert command[0] == shell
         script = command[-1]

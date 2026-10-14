@@ -42,7 +42,10 @@ IMPLEMENTATION_TYPES = (
 # Code-backed production models and their factory entry points.
 CODE_BACKED_ENTRYPOINTS: dict[str, str] = {
     "soccer-poisson-dc-v1": "model_prediction.models.soccer:soccer_model",
+    "soccer-poisson-dc-v2": "model_prediction.models.soccer:soccer_model_v2",
     "tennis-surface-elo-v1": "model_prediction.models.tennis:tennis_model",
+    "tennis-markov-hierarchical-v2": "model_prediction.models.tennis:tennis_model",
+    "tennis-learned-v3": "model_prediction.models.tennis:tennis_model",
     "college-football-v1": "model_prediction.models.college_football:cfb_model",
     "cfb-spread-v1": "model_prediction.models.college_football:cfb_model",
     "cfb-total-v1": "model_prediction.models.college_football:cfb_model",
@@ -83,6 +86,20 @@ class ProductionModelEntry:
     def available(self) -> bool:
         """Resolvable AND enabled — the only entries that may be served."""
         return self.enabled and self.load_error is None
+
+    @property
+    def standard_name(self) -> str:
+        """Sport- and market-prefixed standardized name (e.g. 'mlb-spread-margin-v3')."""
+        from .sports.naming import standard_model_name
+
+        return standard_model_name(self.model_id)
+
+    @property
+    def display_name(self) -> str:
+        """Human-readable display name (e.g. 'MLB Spread Runline (Margin v3)')."""
+        from .sports.naming import display_model_name
+
+        return display_model_name(self.model_id)
 
 
 class ProductionModelRegistry:
@@ -169,10 +186,16 @@ class ProductionModelRegistry:
                     raise ValueError(f"champions references unknown model '{model_id}' for {sport}")
             for market, model_id in markets.items():
                 entry = entries[model_id]
-                if (
-                    entry.sport.casefold() != str(sport).casefold()
-                    or entry.market.casefold() != str(market).casefold()
-                ):
+                entry_markets = (
+                    {m.strip().casefold() for m in entry.market.split(",")}
+                    if "," in entry.market
+                    else {entry.market.casefold()}
+                )
+                market_matches = str(market).casefold() in entry_markets or entry.market.casefold() in (
+                    "multi",
+                    "all",
+                )
+                if entry.sport.casefold() != str(sport).casefold() or not market_matches:
                     raise ValueError(
                         f"champions[{sport}][{market}] points to '{model_id}' with contract "
                         f"{entry.sport}/{entry.market}"
@@ -195,6 +218,13 @@ class ProductionModelRegistry:
                 champ_entry = entries.get(champ_id)
                 chall_id = (challengers.get(sport_key) or {}).get(market)
                 rollback_id = champ_entry.rollback_model if champ_entry else None
+                if champ_id == "cfb-structural-v2":
+                    if market == "spread":
+                        rollback_id = "cfb-spread-v1"
+                    elif market == "total":
+                        rollback_id = "cfb-total-v1"
+                    elif market == "moneyline":
+                        rollback_id = "college-football-v1"
 
                 contracts[sport_key][market] = ModelLifecycleContract(
                     sport=sport_key,
@@ -547,14 +577,32 @@ class ProductionModelRegistry:
 
     # -------------------------------------------------------------- access
 
+    def get(self, model_id_or_alias: str) -> ProductionModelEntry | None:
+        """Return the entry by canonical model_id or any known alias/standard name."""
+        from .sports.naming import canonical_model_id
+
+        canonical_id = canonical_model_id(model_id_or_alias)
+        return self.entries.get(canonical_id)
+
+    def __getitem__(self, model_id_or_alias: str) -> ProductionModelEntry:
+        entry = self.get(model_id_or_alias)
+        if entry is None:
+            raise KeyError(model_id_or_alias)
+        return entry
+
+    def __contains__(self, model_id_or_alias: str) -> bool:
+        return self.get(model_id_or_alias) is not None
+
     def resolve(self, sport: str, market: str) -> ProductionModelEntry | None:
         """Return the enabled, resolved entry for a sport+market, or None."""
         for entry in self.entries.values():
-            if (
-                entry.available
-                and entry.sport.lower() == sport.lower()
-                and entry.market.lower() == market.lower()
-            ):
+            entry_markets = (
+                {m.strip().lower() for m in entry.market.split(",")}
+                if "," in entry.market
+                else {entry.market.lower()}
+            )
+            matches_market = market.lower() in entry_markets or entry.market.lower() in ("multi", "all")
+            if entry.available and entry.sport.lower() == sport.lower() and matches_market:
                 return entry
         return None
 

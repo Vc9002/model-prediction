@@ -119,3 +119,56 @@ def test_wnba_total_artifact_resolves_under_slate_model_version() -> None:
     assert error is None
     assert artifact is not None
     assert artifact["model_version"] == "wnba-total-margin-v1"
+
+
+def test_basketball_model_availability_adjustments_spread_and_total() -> None:
+    from model_prediction.models.basketball import BasketballModel, UpcomingGame
+
+    model = BasketballModel(
+        sport="wnba",
+        league="WNBA",
+        version="wnba-test-v1",
+        margin_sd=13.37,
+        total_sd=16.0,
+    )
+    base_game = UpcomingGame(
+        event_id="test_game",
+        event_start_utc="2026-07-20T20:00:00Z",
+        away_team="Away",
+        home_team="Home",
+        spread_away_line=2.5,
+        total_line=164.0,
+    )
+    base_preds = {p.market_type: p for p in model.predict_games([], [base_game])}
+
+    # Game with +3.0 availability gap (away loses 3 more points than home -> favors home)
+    # and 5.0 total expected loss
+    adjusted_game = UpcomingGame(
+        event_id="test_game",
+        event_start_utc="2026-07-20T20:00:00Z",
+        away_team="Away",
+        home_team="Home",
+        spread_away_line=2.5,
+        total_line=164.0,
+        availability_points_gap=3.0,
+        availability_total_loss=5.0,
+    )
+    adjusted_preds = {p.market_type: p for p in model.predict_games([], [adjusted_game])}
+
+    # Spread: expected margin should increase by 3.0
+    base_spread = base_preds["spread"]
+    adj_spread = adjusted_preds["spread"]
+    assert adj_spread.inference_inputs["mean"] == base_spread.inference_inputs["mean"] + 3.0
+    assert adj_spread.feature_basis["availability_points_gap"] == 3.0
+    assert "Availability adj: +3.0" in adj_spread.rationale
+    # Home expected margin increased, so P(away covers) should decrease
+    assert adj_spread.probabilities["away_cover"] < base_spread.probabilities["away_cover"]
+
+    # Total: expected total should decrease by 5.0
+    base_total = base_preds["total"]
+    adj_total = adjusted_preds["total"]
+    assert adj_total.inference_inputs["mean"] == base_total.inference_inputs["mean"] - 5.0
+    assert adj_total.feature_basis["availability_total_loss"] == 5.0
+    assert "Availability loss: -5.0" in adj_total.rationale
+    # Projected total decreased, so P(over) should decrease
+    assert adj_total.probabilities["over"] < base_total.probabilities["over"]

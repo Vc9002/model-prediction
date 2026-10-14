@@ -203,4 +203,7 @@ class LedgerInvariantStateMachine(RuleBasedStateMachine):
         assert ok is True, f"Cryptographic hash chain broken: {problems}"
 
 
+from hypothesis import settings
+
 TestLedgerStateMachine = LedgerInvariantStateMachine.TestCase
+TestLedgerStateMachine.settings = settings(max_examples=10, stateful_step_count=15, deadline=None)

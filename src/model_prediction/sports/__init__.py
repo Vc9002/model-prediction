@@ -40,8 +40,27 @@ def get_bet_type_module(sport: str, bet_type: str) -> ModuleType:
     return importlib.import_module(f"model_prediction.sports.{normalized_sport}.{normalized_bet}")
 
 
+from .naming import (
+    MODEL_ALIASES,
+    MODEL_CATALOG,
+    ModelDescriptor,
+    canonical_model_id,
+    display_model_name,
+    get_model_descriptor,
+    list_models_by_sport,
+    standard_model_name,
+)
+
 __all__ = [
+    "MODEL_ALIASES",
+    "MODEL_CATALOG",
     "SUPPORTED_SPORTS",
+    "ModelDescriptor",
+    "canonical_model_id",
+    "display_model_name",
     "get_bet_type_module",
+    "get_model_descriptor",
     "get_sport_module",
+    "list_models_by_sport",
+    "standard_model_name",
 ]

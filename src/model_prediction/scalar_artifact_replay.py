@@ -18,8 +18,12 @@ SCHEMA = "scalar-artifact-replay-v1"
 def engine_hash(method: str) -> str:
     name = {
         "first_inning_logistic": "mlb_first_inning.py",
+        "half_inning_logistic": "mlb_first_inning.py",
+        "half_inning_interaction": "mlb_first_inning.py",
         "margin_normal": "basketball.py",
         "total_normal": "basketball.py",
+        "nfl_structural_v5_margin_engine": "nfl_structural_v5.py",
+        "nfl_structural_v5_total_engine": "nfl_structural_v5.py",
     }.get(method)
     if name is None:
         raise ValueError("unsupported_scalar_replay_method")
@@ -54,20 +58,69 @@ def replay_snapshot(payload: dict[str, Any]) -> dict[str, float]:
             logit += coef * ((value - mean) / scale)
         p = 1 / (1 + math.exp(-max(-20.0, min(20.0, logit))))
         return {"nrfi": round(p, 4), "yrfi": round(1 - p, 4)}
+    if method == "half_inning_logistic":
+        features = payload["features"]
+        logit_away = float(artifact["intercept_away"])
+        for name, coef, mean, scale in zip(
+            artifact["feature_names"],
+            artifact["coef_away"],
+            artifact["scaler_mean"],
+            artifact["scaler_scale"],
+            strict=True,
+        ):
+            value = float(features[name])
+            if not all(math.isfinite(float(x)) for x in (value, coef, mean, scale)) or scale <= 0:
+                raise ValueError("invalid_scalar_replay_feature")
+            logit_away += coef * ((value - mean) / scale)
+        p_away0 = 1.0 / (1.0 + math.exp(-max(-20.0, min(20.0, logit_away))))
+
+        logit_home = float(artifact["intercept_home"])
+        for name, coef, mean, scale in zip(
+            artifact["feature_names"],
+            artifact["coef_home"],
+            artifact["scaler_mean"],
+            artifact["scaler_scale"],
+            strict=True,
+        ):
+            value = float(features[name])
+            if not all(math.isfinite(float(x)) for x in (value, coef, mean, scale)) or scale <= 0:
+                raise ValueError("invalid_scalar_replay_feature")
+            logit_home += coef * ((value - mean) / scale)
+        p_home0 = 1.0 / (1.0 + math.exp(-max(-20.0, min(20.0, logit_home))))
+
+        p = p_away0 * p_home0
+        return {"nrfi": round(p, 4), "yrfi": round(1 - p, 4)}
+    if method == "half_inning_interaction":
+        from .models.mlb_first_inning import FirstInningGameRow, MLBHalfInningInteractionModel
+
+        model = MLBHalfInningInteractionModel.from_dict(artifact)
+        row = FirstInningGameRow(
+            None, payload["event_start_utc"], "Home", "Away", "", payload["features"], 0, 0.0
+        )
+        p = model.predict_p_nrfi(row)
+        return {"nrfi": round(p, 4), "yrfi": round(1 - p, 4)}
     from .models.basketball import _normal_cdf
 
     inputs = payload["inference_inputs"]
     mean, sd, line = (float(inputs[key]) for key in ("mean", "sd", "line"))
     if not math.isfinite(mean + sd + line) or sd <= 0:
         raise ValueError("invalid_scalar_replay_distribution")
-    if sd != float(artifact["margin_sd" if method == "margin_normal" else "total_sd"]):
+    if method == "nfl_structural_v5_margin_engine":
+        from .models.nfl_structural_v5 import discrete_spread_prob
+
+        p_home, p_away, _ = discrete_spread_prob(-line, mean, sd)
+        return {"away": round(p_away, 6), "home": round(p_home, 6)}
+    if method == "nfl_structural_v5_total_engine":
+        from .models.nfl_structural_v5 import discrete_total_prob
+
+        p_over, p_under, _ = discrete_total_prob(line, mean, sd)
+        return {"under": round(p_under, 6), "over": round(p_over, 6)}
+
+    is_margin = method == "margin_normal"
+    if sd != float(artifact["margin_sd" if is_margin else "total_sd"]):
         raise ValueError("scalar_replay_artifact_parameter_mismatch")
     below = _normal_cdf(line, mean, sd)
-    values = (
-        {"away": below, "home": 1 - below}
-        if method == "margin_normal"
-        else {"under": below, "over": 1 - below}
-    )
+    values = {"away": below, "home": 1 - below} if is_margin else {"under": below, "over": 1 - below}
     return {name: round(value, 6) for name, value in values.items()}
 
 
@@ -104,7 +157,15 @@ def validate_decision_snapshot(payload: dict[str, Any], row: dict[str, Any]) -> 
     values = replay_snapshot(payload)
     artifact = payload["artifact"]
     method = artifact["method"]
-    market = {"first_inning_logistic": "nrfi", "margin_normal": "spread", "total_normal": "total"}[method]
+    market = {
+        "first_inning_logistic": "nrfi",
+        "half_inning_logistic": "nrfi",
+        "half_inning_interaction": "nrfi",
+        "margin_normal": "spread",
+        "nfl_structural_v5_margin_engine": "spread",
+        "total_normal": "total",
+        "nfl_structural_v5_total_engine": "total",
+    }[method]
     if (
         row.get("model_version") != artifact["model_version"]
         or payload["model_version"] != artifact["model_version"]

@@ -249,3 +249,100 @@ def test_missing_first_inning_value_is_not_fabricated_as_zero():
     result = settle_module._find_espn_result(_CountingESPNClient(raw), ("MLB",), "2026-09-09", row)
     assert result["completed"] is True
     assert "home_1st" not in result and "away_1st" not in result
+
+
+def test_doubleheader_exact_event_id_matches_correct_game():
+    """When a scoreboard has Game 1 and Game 2 for identical teams,
+    a row with Game 2's event_id must resolve against Game 2, not Game 1."""
+    scoreboard = {
+        "events": [
+            {
+                "id": "game-1-id",
+                "date": "2026-08-31T17:00:00Z",
+                "competitions": [
+                    {
+                        "status": {"type": {"name": "STATUS_FINAL", "completed": True}},
+                        "competitors": [
+                            {"homeAway": "away", "score": "3", "team": {"displayName": "Away"}},
+                            {"homeAway": "home", "score": "5", "team": {"displayName": "Home"}},
+                        ],
+                    }
+                ],
+            },
+            {
+                "id": "game-2-id",
+                "date": "2026-08-31T23:00:00Z",
+                "competitions": [
+                    {
+                        "status": {"type": {"name": "STATUS_FINAL", "completed": True}},
+                        "competitors": [
+                            {"homeAway": "away", "score": "8", "team": {"displayName": "Away"}},
+                            {"homeAway": "home", "score": "1", "team": {"displayName": "Home"}},
+                        ],
+                    }
+                ],
+            },
+        ]
+    }
+    espn = _CountingESPNClient(scoreboard)
+    row_g2 = _open_row("MLB", "2026-08-31T23:00:00+00:00")
+    row_g2["event_id"] = "game-2-id"
+
+    res = settle_module._find_espn_result(espn, ("MLB",), "2026-08-31", row_g2)
+    assert res is not None
+    assert res["completed"] is True
+    assert res["away_score"] == 8
+    assert res["home_score"] == 1
+
+
+def test_doubleheader_fallback_disambiguates_by_start_time():
+    """When event_id is absent/mismatched on a doubleheader day,
+    the matcher falls back to name matching and disambiguates by start time."""
+    scoreboard = {
+        "events": [
+            {
+                "id": "game-1-id",
+                "date": "2026-08-31T17:00:00Z",
+                "competitions": [
+                    {
+                        "status": {"type": {"name": "STATUS_FINAL", "completed": True}},
+                        "competitors": [
+                            {"homeAway": "away", "score": "3", "team": {"displayName": "Away"}},
+                            {"homeAway": "home", "score": "5", "team": {"displayName": "Home"}},
+                        ],
+                    }
+                ],
+            },
+            {
+                "id": "game-2-id",
+                "date": "2026-08-31T23:00:00Z",
+                "competitions": [
+                    {
+                        "status": {"type": {"name": "STATUS_FINAL", "completed": True}},
+                        "competitors": [
+                            {"homeAway": "away", "score": "8", "team": {"displayName": "Away"}},
+                            {"homeAway": "home", "score": "1", "team": {"displayName": "Home"}},
+                        ],
+                    }
+                ],
+            },
+        ]
+    }
+    espn = _CountingESPNClient(scoreboard)
+    # Target Game 2 by start time even with unknown event_id
+    row_evening = _open_row("MLB", "2026-08-31T22:45:00+00:00")
+    row_evening["event_id"] = "non-matching-id"
+
+    res_evening = settle_module._find_espn_result(espn, ("MLB",), "2026-08-31", row_evening)
+    assert res_evening is not None
+    assert res_evening["away_score"] == 8
+    assert res_evening["home_score"] == 1
+
+    # Target Game 1 by start time
+    row_afternoon = _open_row("MLB", "2026-08-31T17:15:00+00:00")
+    row_afternoon["event_id"] = "non-matching-id"
+
+    res_afternoon = settle_module._find_espn_result(espn, ("MLB",), "2026-08-31", row_afternoon)
+    assert res_afternoon is not None
+    assert res_afternoon["away_score"] == 3
+    assert res_afternoon["home_score"] == 5

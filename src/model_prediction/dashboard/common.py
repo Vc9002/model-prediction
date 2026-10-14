@@ -226,13 +226,92 @@ def _runner_env() -> dict[str, str]:
 # ── SECTION: Cache Layer ────────────────────────────────────────────
 
 
+# Server-process-only behaviour, switched on by dashboard_server.main() so the
+# test suite keeps the strict "expired => rebuild synchronously" semantics.
+#   _SWR["on"]      stale-while-revalidate: serve an expired entry immediately and
+#                   refresh it in the background instead of blocking the request.
+#   _TTL_OVERRIDE   keys owned by the cache warmer; it rebuilds them when the
+#                   source files change, so requests treat them as fresh for longer.
+_SWR: dict[str, bool] = {"on": False}
+# True from startup (serving the on-disk snapshot) until every warmed key has been
+# rebuilt once; routes advertise it as X-Data-Warming so the page can say so.
+_WARMING: dict[str, bool] = {"on": False}
+_TTL_OVERRIDE: dict[str, float] = {}
+_REFRESHING: set[str] = set()
+
+
+def _refresh_in_background(key: str, ttl: float, builder) -> None:
+    with _CACHE_LOCK:
+        if key in _REFRESHING:
+            return
+        _REFRESHING.add(key)
+
+    def _run():
+        try:
+            _cache_rebuild(key, builder)
+        except Exception as exc:  # noqa: BLE001
+            _log(f"background refresh: {key} failed (non-fatal): {exc!r}")
+        finally:
+            with _CACHE_LOCK:
+                _REFRESHING.discard(key)
+
+    threading.Thread(target=_run, daemon=True, name=f"swr-{key[:24]}").start()
+
+
+def _cache_rebuild(key: str, builder):
+    """Unconditionally rebuild `key` (single-flight per key) and store it."""
+    with _CACHE_LOCK:
+        build_lock = _CACHE_BUILD_LOCKS.setdefault(key, threading.RLock())
+    with build_lock:
+        value = builder()
+        with _CACHE_LOCK:
+            _CACHE[key] = (time.monotonic(), value)
+        return value
+
+
+_SNAPSHOT_FILE = DASH_DIR / "cache_snapshot.pkl"
+
+
+def _cache_snapshot_save(keys) -> None:
+    """Persist warmed entries so the next start serves them instantly (as stale)."""
+    import pickle
+
+    now_m, now_w = time.monotonic(), time.time()
+    with _CACHE_LOCK:
+        payload = {k: (now_w - (now_m - _CACHE[k][0]), _CACHE[k][1]) for k in keys if k in _CACHE}
+    tmp = _SNAPSHOT_FILE.with_suffix(".tmp")
+    tmp.write_bytes(pickle.dumps(payload, protocol=pickle.HIGHEST_PROTOCOL))
+    os.replace(tmp, _SNAPSHOT_FILE)
+
+
+def _cache_snapshot_load() -> int:
+    import pickle
+
+    try:
+        payload = pickle.loads(_SNAPSHOT_FILE.read_bytes())
+    except (OSError, pickle.UnpicklingError, EOFError, AttributeError, ValueError):
+        return 0
+    now_m, now_w = time.monotonic(), time.time()
+    with _CACHE_LOCK:
+        for key, (saved_at, value) in payload.items():
+            _CACHE.setdefault(key, (now_m - (now_w - saved_at), value))
+    return len(payload)
+
+
 def _cached(key: str, ttl: float, builder):
     now = time.monotonic()
+    if _SWR["on"]:
+        ttl = max(ttl, _TTL_OVERRIDE.get(key, 0))
     with _CACHE_LOCK:
         hit = _CACHE.get(key)
         if hit and now - hit[0] < ttl:
             return hit[1]
-        build_lock = _CACHE_BUILD_LOCKS.setdefault(key, threading.RLock())
+        serve_stale = bool(hit) and _SWR["on"]
+        if not serve_stale:
+            build_lock = _CACHE_BUILD_LOCKS.setdefault(key, threading.RLock())
+    if serve_stale:
+        _refresh_in_background(key, ttl, builder)
+        return hit[1]
     # Collapse simultaneous misses for the same endpoint. Separate keys stay
     # independent; a slow report must not hold the global cache lock.
     with build_lock:

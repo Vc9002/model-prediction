@@ -37,6 +37,8 @@ class UpcomingGame:
     home_team: str
     spread_away_line: float | None = None
     total_line: float | None = None
+    availability_points_gap: float = 0.0
+    availability_total_loss: float = 0.0
 
 
 class BasketballModel:
@@ -127,6 +129,8 @@ class BasketballModel:
             else:
                 expected_margin = trend_margin
 
+            expected_margin += game.availability_points_gap
+
             # Composite total prediction
             raw_trend_total = away_points + home_points
             if self.team_total_weight > 0.0:
@@ -152,6 +156,8 @@ class BasketballModel:
             else:
                 expected_total = raw_trend_total
 
+            expected_total -= game.availability_total_loss
+
             uncertainty = max(0.03, min(0.20, 0.20 - 0.005 * sample))
             base: GamePredictionBase = {
                 "event_id": game.event_id,
@@ -169,6 +175,8 @@ class BasketballModel:
                     "elo_margin": round(elo_margin, 2),
                     "trend_margin": round(trend_margin, 2),
                     "rest_diff": round(rest_diff, 1),
+                    "availability_points_gap": round(game.availability_points_gap, 2),
+                    "availability_total_loss": round(game.availability_total_loss, 2),
                     "expected_margin": round(expected_margin, 2),
                     "expected_total": round(expected_total, 2),
                     "history_games": len(history),
@@ -206,6 +214,11 @@ class BasketballModel:
                         },
                         rationale=(
                             f"Projected margin {expected_margin:+.1f} (home), sd {self.margin_sd:.1f}."
+                            + (
+                                f" Availability adj: {game.availability_points_gap:+.1f}."
+                                if game.availability_points_gap != 0.0
+                                else ""
+                            )
                         ),
                         **base,
                     )
@@ -222,7 +235,14 @@ class BasketballModel:
                         },
                         line=game.total_line,
                         probabilities={"over": round(over, 6), "under": round(1 - over, 6)},
-                        rationale=f"Projected total {expected_total:.1f}, sd {self.total_sd:.1f}.",
+                        rationale=(
+                            f"Projected total {expected_total:.1f}, sd {self.total_sd:.1f}."
+                            + (
+                                f" Availability loss: -{game.availability_total_loss:.1f}."
+                                if game.availability_total_loss != 0.0
+                                else ""
+                            )
+                        ),
                         **base,
                     )
                 )

@@ -71,7 +71,14 @@ class ProductionFreezeViolation(Exception):
 # code-backed, which quietly dropped real artifact champions (kbo/npb v2
 # referenced files that were written under the wrong name) from both the
 # freeze and tamper protection (audit 2026-08-13).
-CODE_BACKED_MODEL_IDS: frozenset[str] = frozenset({"soccer-poisson-dc-v1", "tennis-surface-elo-v1"})
+CODE_BACKED_MODEL_IDS: frozenset[str] = frozenset(
+    {
+        "soccer-poisson-dc-v1",
+        "tennis-surface-elo-v1",
+        "tennis-markov-hierarchical-v2",
+        "tennis-learned-v3",
+    }
+)
 
 
 # ── ChampionSnapshot ────────────────────────────────────────────────────────

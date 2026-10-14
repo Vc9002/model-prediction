@@ -44,6 +44,8 @@ from .forecast import (
     _forecast_learned_sport,
     _forecast_mlb_nrfi_flat,
     _forecast_mlb_totals_flat,
+    _forecast_nfl_spread_sport,
+    _forecast_nfl_total_sport,
     _forecast_soccer_sport,
     _forecast_tennis_sport,
     _forecast_wnba_spread_sport,
@@ -591,6 +593,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 flat_ledger,
                 audit,
                 main_ledger=ledger,
+                data_root=data_directory,
             )
         except Exception as exc:
             logger.warning("MLB NRFI flat forecast failed", exc_info=True)
@@ -685,6 +688,62 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             logger.warning("WNBA total forecast failed", exc_info=True)
             forecast_result["wnba_total"] = {
                 "sport": "wnba_total",
+                "status": "error",
+                "reason": str(exc),
+                "logged": 0,
+            }
+
+    def _nfl_spread_task() -> None:
+        try:
+            forecast_result["nfl_spread"] = _forecast_nfl_spread_sport(
+                data_root=data_directory,
+                args_date=args.date,
+                config=config,
+                registry=registry,
+                bans=bans,
+                main_ledger=ledger,
+                flat_ledger=flat_ledger,
+                observed_at=forecast_observed_at,
+            )
+            _priced_nfl_spread = forecast_result["nfl_spread"].get("priced_contracts") or []
+            if _priced_nfl_spread and not forecast_result["nfl_spread"].get("logged"):
+                logger.warning(
+                    "zero rows logged for nfl_spread despite %d priced contracts; skipped=%s",
+                    len(_priced_nfl_spread),
+                    forecast_result["nfl_spread"].get("skipped"),
+                )
+        except Exception as exc:
+            logger.warning("NFL spread forecast failed", exc_info=True)
+            forecast_result["nfl_spread"] = {
+                "sport": "nfl_spread",
+                "status": "error",
+                "reason": str(exc),
+                "logged": 0,
+            }
+
+    def _nfl_total_task() -> None:
+        try:
+            forecast_result["nfl_total"] = _forecast_nfl_total_sport(
+                data_root=data_directory,
+                args_date=args.date,
+                config=config,
+                registry=registry,
+                bans=bans,
+                main_ledger=ledger,
+                flat_ledger=flat_ledger,
+                observed_at=forecast_observed_at,
+            )
+            _priced_nfl_total = forecast_result["nfl_total"].get("priced_contracts") or []
+            if _priced_nfl_total and not forecast_result["nfl_total"].get("logged"):
+                logger.warning(
+                    "zero rows logged for nfl_total despite %d priced contracts; skipped=%s",
+                    len(_priced_nfl_total),
+                    forecast_result["nfl_total"].get("skipped"),
+                )
+        except Exception as exc:
+            logger.warning("NFL total forecast failed", exc_info=True)
+            forecast_result["nfl_total"] = {
+                "sport": "nfl_total",
                 "status": "error",
                 "reason": str(exc),
                 "logged": 0,
@@ -836,7 +895,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                         "logged": 0,
                     }
 
-    with ThreadPoolExecutor(max_workers=9) as research_pool:
+    with ThreadPoolExecutor(max_workers=11) as research_pool:
         research_futures = [
             research_pool.submit(_mlb_totals_task),
             research_pool.submit(_mlb_nrfi_task),
@@ -845,6 +904,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             research_pool.submit(_cfb_task),
             research_pool.submit(_wnba_spread_task),
             research_pool.submit(_wnba_total_task),
+            research_pool.submit(_nfl_spread_task),
+            research_pool.submit(_nfl_total_task),
             research_pool.submit(_esports_block),
             research_pool.submit(_intl_baseball_block),
         ]
@@ -937,6 +998,29 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             )
         }
     _t_settle_end = time.monotonic()
+
+    # Step 4b: Automated Model Calibration & Drift Monitor
+    calibration_result: dict[str, Any] = {"status": "skipped"}
+    if not args.skip_settlement:
+        try:
+            from ..calibration_pipeline import run_full_calibration_pipeline
+
+            cal_report = run_full_calibration_pipeline(
+                data_root=data_directory,
+                min_sample=20,
+                update_artifacts=True,
+            )
+            calibration_result = {
+                "status": "ok",
+                "system_status": cal_report.get("system_status"),
+                "total_evaluated_models": cal_report.get("total_evaluated_models"),
+                "max_calibration_drift": cal_report.get("max_calibration_drift"),
+                "severe_drift_count": cal_report.get("severe_drift_count"),
+                "moderate_drift_count": cal_report.get("moderate_drift_count"),
+            }
+        except Exception as exc:
+            logger.warning("Automated model calibration failed", exc_info=True)
+            calibration_result = {"status": "error", "reason": str(exc)}
 
     # Step 10 & 11: Automated Polymarket CLOB Edge Scanner & Settlement
     poly_edge_record_result: dict[str, Any] = {"status": "skipped"}
@@ -1114,6 +1198,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         "step2_3_forecast_and_log": forecast_result,
         "step3b_polymarket_odds_snapshots": odds_by_sport,
         "step4_settlement": settlement,
+        "step4b_calibration": calibration_result,
         "step1b_soccer_scores": soccer_collection,
         "step1e_bet_better_models": bet_better_result,
         "step1c_mlb_probable_starters": {

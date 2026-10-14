@@ -97,6 +97,15 @@ rm -rf "$INGEST_TMPDIR"
 echo "Ingestion exit code: $INGEST_EXIT" >> "$LOG"
 echo "Ingestion took: $((SECONDS - STEP_START))s" >> "$LOG"
 
+# ── Step 1d: Automated Model Calibration ─────────────────────────────
+echo "--- Step 1d: Automated Model Calibration ---" >> "$LOG"
+STEP_START=$SECONDS
+PYTHONPATH=src .venv/bin/python -m model_prediction.cli calibrate --all --update-artifacts \
+    >> "$LOG" 2>&1
+CALIBRATE_EXIT=$?
+echo "Calibration exit code: $CALIBRATE_EXIT" >> "$LOG"
+echo "Calibration took: $((SECONDS - STEP_START))s" >> "$LOG"
+
 # ── Step 2: Unified daily forecast ───────────────────────────────────
 echo "--- Step 2: Unified slate + main/flat/research forecasts ---" >> "$LOG"
 STEP_START=$SECONDS
@@ -116,11 +125,11 @@ echo "MLB v9 forecast exit code: $V9_FORECAST_EXIT" >> "$LOG"
 echo "MLB v9 forecast took: $((SECONDS - STEP_START))s" >> "$LOG"
 
 echo "Finished: $(TZ=America/New_York date)" >> "$LOG"
-echo "Exit codes — settle: $SETTLE_EXIT, v9_settle: $V9_SETTLE_EXIT, ingest: $INGEST_EXIT, daily: $DAILY_EXIT, v9_forecast: $V9_FORECAST_EXIT" >> "$LOG"
+echo "Exit codes — settle: $SETTLE_EXIT, v9_settle: $V9_SETTLE_EXIT, ingest: $INGEST_EXIT, calibrate: $CALIBRATE_EXIT, daily: $DAILY_EXIT, v9_forecast: $V9_FORECAST_EXIT" >> "$LOG"
 
 # Cleanup old logs
 find data/logs -name "daily_*.log" -mtime +30 -delete
 
-if [ "$SETTLE_EXIT" -ne 0 ] || [ "$V9_SETTLE_EXIT" -ne 0 ] || [ "$INGEST_EXIT" -ne 0 ] || [ "$DAILY_EXIT" -ne 0 ] || [ "$V9_FORECAST_EXIT" -ne 0 ]; then
+if [ "$SETTLE_EXIT" -ne 0 ] || [ "$V9_SETTLE_EXIT" -ne 0 ] || [ "$INGEST_EXIT" -ne 0 ] || [ "$CALIBRATE_EXIT" -ne 0 ] || [ "$DAILY_EXIT" -ne 0 ] || [ "$V9_FORECAST_EXIT" -ne 0 ]; then
     exit 1
 fi

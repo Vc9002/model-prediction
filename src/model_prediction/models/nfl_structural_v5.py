@@ -30,11 +30,92 @@ NFL_KEY_MARGINS: dict[int, float] = {
     2: 0.025,
 }
 
+NFL_KEY_TOTALS: dict[int, float] = {
+    51: 0.040,
+    44: 0.038,
+    41: 0.035,
+    40: 0.035,
+    43: 0.035,
+    37: 0.034,
+    47: 0.033,
+    33: 0.028,
+    48: 0.027,
+}
+
 
 def _normal_cdf(x: float, mean: float, sd: float) -> float:
     if sd <= 0:
         return 0.5 if x == mean else (1.0 if x > mean else 0.0)
     return 0.5 * (1.0 + math.erf((x - mean) / (sd * math.sqrt(2.0))))
+
+
+def discrete_spread_distribution(exp_margin: float, sd: float = NFL_DEFAULT_SPREAD_SD) -> dict[int, float]:
+    """Compute discrete margin mass distribution over integer margins [-55, 55]."""
+    raw_p: dict[int, float] = {}
+    for m in range(-55, 56):
+        if m == 0:
+            raw_p[m] = 0.003
+            continue
+        p_norm = _normal_cdf(m + 0.5, exp_margin, sd) - _normal_cdf(m - 0.5, exp_margin, sd)
+        abs_m = abs(m)
+        if abs_m in NFL_KEY_MARGINS:
+            emp = NFL_KEY_MARGINS[abs_m]
+            norm_zero = _normal_cdf(abs_m + 0.5, 0.0, sd) - _normal_cdf(abs_m - 0.5, 0.0, sd)
+            boost = emp / max(0.01, norm_zero)
+            p = 0.65 * p_norm + 0.35 * (p_norm * boost)
+        else:
+            p = p_norm * 0.90
+        raw_p[m] = max(0.0, p)
+    total = sum(raw_p.values())
+    if total <= 0:
+        return {0: 1.0}
+    return {m: p / total for m, p in raw_p.items()}
+
+
+def discrete_spread_prob(
+    spread_home_line: float,
+    exp_margin: float,
+    sd: float = NFL_DEFAULT_SPREAD_SD,
+) -> tuple[float, float, float]:
+    """Calculate (p_home_cover, p_away_cover, p_push) under discrete NFL key margins."""
+    cutoff = -spread_home_line
+    probs = discrete_spread_distribution(exp_margin, sd)
+    p_home_cover = sum(p for m, p in probs.items() if m > cutoff)
+    p_away_cover = sum(p for m, p in probs.items() if m < cutoff)
+    p_push = sum(p for m, p in probs.items() if m == cutoff)
+    return p_home_cover, p_away_cover, p_push
+
+
+def discrete_total_distribution(exp_total: float, sd: float = NFL_DEFAULT_TOTAL_SD) -> dict[int, float]:
+    """Compute discrete total mass distribution over integer totals [10, 90]."""
+    raw_p: dict[int, float] = {}
+    for t in range(10, 91):
+        p_norm = _normal_cdf(t + 0.5, exp_total, sd) - _normal_cdf(t - 0.5, exp_total, sd)
+        if t in NFL_KEY_TOTALS:
+            emp = NFL_KEY_TOTALS[t]
+            norm_zero = _normal_cdf(t + 0.5, exp_total, sd) - _normal_cdf(t - 0.5, exp_total, sd)
+            boost = emp / max(0.01, norm_zero)
+            p = 0.70 * p_norm + 0.30 * (p_norm * boost)
+        else:
+            p = p_norm * 0.94
+        raw_p[t] = max(0.0, p)
+    total = sum(raw_p.values())
+    if total <= 0:
+        return {45: 1.0}
+    return {t: p / total for t, p in raw_p.items()}
+
+
+def discrete_total_prob(
+    total_line: float,
+    exp_total: float,
+    sd: float = NFL_DEFAULT_TOTAL_SD,
+) -> tuple[float, float, float]:
+    """Calculate (p_over, p_under, p_push) under discrete NFL key totals."""
+    probs = discrete_total_distribution(exp_total, sd)
+    p_over = sum(p for t, p in probs.items() if t > total_line)
+    p_under = sum(p for t, p in probs.items() if t < total_line)
+    p_push = sum(p for t, p in probs.items() if t == total_line)
+    return p_over, p_under, p_push
 
 
 @dataclass(frozen=True)
@@ -84,6 +165,7 @@ class NFLStructuralV5Engine:
         away_rest_days: int = 7,
         spread_home_line: float = -3.5,
         total_line: float = 44.5,
+        is_neutral_site: bool = False,
     ) -> NFLStructuralForecast:
         base_points_per_side = NFL_LEAGUE_AVG_TOTAL / 2.0  # 22.25 pts
 
@@ -104,22 +186,35 @@ class NFLStructuralV5Engine:
             if temperature_f < 25.0:
                 weather_penalty += 1.5
 
-        pts_home = max(
-            6.0, base_points_per_side + NFL_HFA_POINTS + h_eff_pts + rest_pts - (weather_penalty / 2.0)
-        )
+        hfa = 0.0 if is_neutral_site else NFL_HFA_POINTS
+        pts_home = max(6.0, base_points_per_side + hfa + h_eff_pts + rest_pts - (weather_penalty / 2.0))
         pts_away = max(6.0, base_points_per_side + a_eff_pts - (weather_penalty / 2.0))
-        exp_margin = pts_home - pts_away
-        exp_total = pts_home + pts_away
+        exp_margin = round(pts_home - pts_away, 2)
+        exp_total = round(pts_home + pts_away, 2)
 
-        # 4. Market Distributions
+        # 4. Market Distributions with Discrete Key Margin & Total Modeling
         p_home_win = 1.0 - _normal_cdf(0.0, exp_margin, self.spread_sd)
         p_away_win = 1.0 - p_home_win
 
-        p_home_cover = 1.0 - _normal_cdf(-spread_home_line, exp_margin, self.spread_sd)
-        p_away_cover = 1.0 - p_home_cover
+        p_home_cover, p_away_cover, _ = discrete_spread_prob(
+            spread_home_line=spread_home_line,
+            exp_margin=exp_margin,
+            sd=self.spread_sd,
+        )
+        tot_spread = p_home_cover + p_away_cover
+        if tot_spread > 0:
+            p_home_cover /= tot_spread
+            p_away_cover /= tot_spread
 
-        p_over = 1.0 - _normal_cdf(total_line, exp_total, self.total_sd)
-        p_under = 1.0 - p_over
+        p_over, p_under, _ = discrete_total_prob(
+            total_line=total_line,
+            exp_total=exp_total,
+            sd=self.total_sd,
+        )
+        tot_total = p_over + p_under
+        if tot_total > 0:
+            p_over /= tot_total
+            p_under /= tot_total
 
         return NFLStructuralForecast(
             home_team=home_team,
@@ -128,12 +223,12 @@ class NFLStructuralV5Engine:
             projected_away_points=round(pts_away, 1),
             projected_margin_home=round(exp_margin, 2),
             projected_total=round(exp_total, 2),
-            prob_home_win=round(p_home_win, 4),
-            prob_away_win=round(p_away_win, 4),
-            prob_home_cover=round(p_home_cover, 4),
-            prob_away_cover=round(p_away_cover, 4),
-            prob_over=round(p_over, 4),
-            prob_under=round(p_under, 4),
+            prob_home_win=round(p_home_win, 6),
+            prob_away_win=round(p_away_win, 6),
+            prob_home_cover=round(p_home_cover, 6),
+            prob_away_cover=round(p_away_cover, 6),
+            prob_over=round(p_over, 6),
+            prob_under=round(p_under, 6),
             spread_home_line=spread_home_line,
             total_line=total_line,
             weather_total_penalty=round(weather_penalty, 2),

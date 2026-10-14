@@ -306,6 +306,35 @@ def _settle_all_unsettled(
     }
 
 
+def _extract_espn_record(status: dict, away: dict, home: dict) -> dict:
+    record = {
+        "status_name": status.get("name", ""),
+        "completed": bool(status.get("completed")),
+    }
+    if record["completed"]:
+        try:
+            record["away_score"] = int(float(away.get("score", 0) or 0))
+            record["home_score"] = int(float(home.get("score", 0) or 0))
+            away_lines = away.get("linescores", [])
+            home_lines = home.get("linescores", [])
+            if away_lines and home_lines:
+                firsts = (away_lines[0], home_lines[0])
+                values = [inning.get("value") for inning in firsts]
+                if all(
+                    inning.get("period", 1) == 1
+                    and not isinstance(value, bool)
+                    and isinstance(value, (int, float))
+                    and math.isfinite(value)
+                    and value >= 0
+                    and value == int(value)
+                    for inning, value in zip(firsts, values, strict=True)
+                ):
+                    record["away_1st"], record["home_1st"] = (int(value) for value in values)
+        except (TypeError, ValueError):
+            record["completed"] = False
+    return record
+
+
 def _find_espn_result(
     espn: ESPNClient,
     leagues,
@@ -314,9 +343,17 @@ def _find_espn_result(
     *,
     scoreboard_cache: dict[tuple[str, str], dict | Exception] | None = None,
 ) -> dict | None:
-    """Find a completed-game record matching a ledger row by id or team names."""
+    """Find a completed-game record matching a ledger row by id or team names.
+
+    Prioritizes exact event_id match across all scoreboard events. When no exact
+    id match exists, falls back to name matching. If multiple games share the same
+    team names on the same day (e.g. doubleheaders), disambiguates by start time.
+    """
     away_names = {row["away_team"].casefold(), row["original_away_team"].casefold()}
     home_names = {row["home_team"].casefold(), row["original_home_team"].casefold()}
+    row_event_id = str(row.get("event_id") or "").strip()
+
+    events_to_check: list[tuple[dict, dict, dict, dict]] = []
     for league in leagues:
         try:
             scoreboard = _cached_scoreboard(espn, league, game_day, scoreboard_cache)
@@ -329,48 +366,51 @@ def _find_espn_result(
             away, home = by_side.get("away"), by_side.get("home")
             if not away or not home:
                 continue
-            id_match = str(event.get("id")) == row["event_id"]
-            name_match = (
-                away["team"].get("displayName", "").casefold() in away_names
-                and home["team"].get("displayName", "").casefold() in home_names
-            )
-            # Prefer exact event_id match. When the ledger has a numeric ESPN
-            # event_id that does NOT match any event in the scoreboard (e.g.
-            # re-forecast rows with regenerated IDs), fall back to name matching
-            # with a caution: double-header games sharing the same team names
-            # on the same day may be matched incorrectly.
-            if id_match or name_match:
-                pass
-            else:
-                continue
-            record = {
-                "status_name": status.get("name", ""),
-                "completed": bool(status.get("completed")),
-            }
-            if record["completed"]:
-                try:
-                    record["away_score"] = int(float(away.get("score", 0) or 0))
-                    record["home_score"] = int(float(home.get("score", 0) or 0))
-                    away_lines = away.get("linescores", [])
-                    home_lines = home.get("linescores", [])
-                    if away_lines and home_lines:
-                        firsts = (away_lines[0], home_lines[0])
-                        values = [inning.get("value") for inning in firsts]
-                        if all(
-                            inning.get("period", 1) == 1
-                            and not isinstance(value, bool)
-                            and isinstance(value, (int, float))
-                            and math.isfinite(value)
-                            and value >= 0
-                            and value == int(value)
-                            for inning, value in zip(firsts, values, strict=True)
-                        ):
-                            record["away_1st"], record["home_1st"] = (int(value) for value in values)
-                except (TypeError, ValueError):
-                    record["completed"] = False
-            return record
+            if row_event_id and str(event.get("id")) == row_event_id:
+                return _extract_espn_record(status, away, home)
+            events_to_check.append((event, competition, away, home))
 
-    return None
+    name_matched: list[tuple[dict, dict, dict, dict]] = []
+    for event, competition, away, home in events_to_check:
+        away_team_name = away["team"].get("displayName", "").casefold()
+        home_team_name = home["team"].get("displayName", "").casefold()
+        if away_team_name in away_names and home_team_name in home_names:
+            name_matched.append((event, competition, away, home))
+
+    if not name_matched:
+        return None
+
+    if len(name_matched) == 1:
+        _, chosen_comp, chosen_away, chosen_home = name_matched[0]
+        return _extract_espn_record(chosen_comp.get("status", {}).get("type", {}), chosen_away, chosen_home)
+
+    # Disambiguate multiple matches (e.g. doubleheaders) by start time
+    row_start_raw = row.get("event_start_utc") or row.get("commence_time")
+    row_start_dt = None
+    if row_start_raw:
+        try:
+            row_start_dt = parse_utc(str(row_start_raw))
+        except (ValueError, TypeError):
+            row_start_dt = None
+
+    if row_start_dt is not None:
+
+        def _time_delta(item: tuple[dict, dict, dict, dict]) -> float:
+            ev, comp, _, _ = item
+            ev_date_raw = comp.get("date") or ev.get("date")
+            if not ev_date_raw:
+                return float("inf")
+            try:
+                ev_dt = parse_utc(str(ev_date_raw))
+                return abs((ev_dt - row_start_dt).total_seconds())
+            except (ValueError, TypeError):
+                return float("inf")
+
+        _, chosen_comp, chosen_away, chosen_home = min(name_matched, key=_time_delta)
+    else:
+        _, chosen_comp, chosen_away, chosen_home = name_matched[0]
+
+    return _extract_espn_record(chosen_comp.get("status", {}).get("type", {}), chosen_away, chosen_home)
 
 
 def _closing_probability_for_moneyline_pick(
@@ -505,8 +545,8 @@ def _settle_esports_pick(row: dict, ledger, data_root=None, bo3_client=None) -> 
                     client=bo3_client,
                 )
                 if bo3_res is not None:
-                    away_score = 1 if bo3_res["away_win"] else 0
-                    home_score = 1 if bo3_res["home_win"] else 0
+                    away_score = bo3_res.get("away_score", 1 if bo3_res["away_win"] else 0)
+                    home_score = bo3_res.get("home_score", 1 if bo3_res["home_win"] else 0)
                     result = ledger.settle(row["pick_id"], away_score, home_score, None, None)
                     return {"pick_id": row["pick_id"], "result": result["result"], "settled": True}
                 voided = ledger.void(
@@ -547,8 +587,8 @@ def _settle_esports_pick(row: dict, ledger, data_root=None, bo3_client=None) -> 
         except (httpx.HTTPError, OSError, ValueError, KeyError, TypeError, RuntimeError):
             logger.warning("BO3 esports result lookup failed for slug %s", slug, exc_info=True)
         if bo3_result is not None:
-            away_score = 1 if bo3_result["away_win"] else 0
-            home_score = 1 if bo3_result["home_win"] else 0
+            away_score = bo3_result.get("away_score", 1 if bo3_result["away_win"] else 0)
+            home_score = bo3_result.get("home_score", 1 if bo3_result["home_win"] else 0)
             try:
                 result = ledger.settle(row["pick_id"], away_score, home_score, None, None)
                 return {"pick_id": row["pick_id"], "result": result["result"], "settled": True}
@@ -568,20 +608,77 @@ def _settle_esports_pick(row: dict, ledger, data_root=None, bo3_client=None) -> 
         except (KeyError, ValueError) as error:
             return {"pick_id": row["pick_id"], "reason": str(error)}
     winning_description = next(name for name, price in prices.items() if price == 1.0)
-    home_key = _identity_key(str(row["home_team"]))
-    away_key = _identity_key(str(row["away_team"]))
-    winner_key = _identity_key(winning_description)
-    if winner_key == home_key:
-        away_score, home_score = 0, 1
-    elif winner_key == away_key:
-        away_score, home_score = 1, 0
+    m_type_raw = str(row.get("market_type") or "moneyline").lower()
+    if m_type_raw.startswith("markettype."):
+        m_type_raw = m_type_raw.split(".")[-1]
+
+    if m_type_raw == "total":
+        win_desc_lower = winning_description.lower()
+        if "over" in win_desc_lower or win_desc_lower.startswith("o"):
+            home_score, away_score = 2, 1
+        elif "under" in win_desc_lower or win_desc_lower.startswith("u"):
+            home_score, away_score = 2, 0
+        else:
+            return {
+                "pick_id": row["pick_id"],
+                "reason": f"unrecognized total winning description: {winning_description!r}",
+            }
+    elif m_type_raw == "spread":
+        win_desc_lower = winning_description.lower()
+        home_key = _identity_key(str(row["home_team"]))
+        away_key = _identity_key(str(row["away_team"]))
+        winner_key = _identity_key(winning_description)
+
+        home_in_desc = home_key in winner_key or str(row["home_team"]).lower() in win_desc_lower
+        away_in_desc = away_key in winner_key or str(row["away_team"]).lower() in win_desc_lower
+
+        if not home_in_desc and not away_in_desc:
+            anchor_team = next(
+                (
+                    (side.get("team") or {}).get("name")
+                    for side in market.get("marketSides", [])
+                    if side.get("team")
+                ),
+                None,
+            )
+            long_desc = next(
+                (s.get("description") for s in market.get("marketSides", []) if s.get("long")), None
+            )
+            winning_is_long = winning_description == long_desc
+            anchor_is_home = _identity_key(str(anchor_team or "")) == home_key
+            if (winning_is_long and anchor_is_home) or (not winning_is_long and not anchor_is_home):
+                covering_is_home = True
+            else:
+                covering_is_home = False
+        else:
+            covering_is_home = home_in_desc
+
+        is_minus = "-1.5" in win_desc_lower or win_desc_lower.startswith("-")
+        if covering_is_home:
+            if is_minus:
+                home_score, away_score = 2, 0
+            else:
+                home_score, away_score = 1, 2
+        else:
+            if is_minus:
+                home_score, away_score = 0, 2
+            else:
+                home_score, away_score = 2, 1
     else:
-        return {
-            "pick_id": row["pick_id"],
-            "reason": f"winning side {winning_description!r} matches neither ledger team",
-        }
+        home_key = _identity_key(str(row["home_team"]))
+        away_key = _identity_key(str(row["away_team"]))
+        winner_key = _identity_key(winning_description)
+        if winner_key == home_key:
+            away_score, home_score = 0, 1
+        elif winner_key == away_key:
+            away_score, home_score = 1, 0
+        else:
+            return {
+                "pick_id": row["pick_id"],
+                "reason": f"winning side {winning_description!r} matches neither ledger team",
+            }
     closing_probability = closing_odds = None
-    if data_root is not None:
+    if data_root is not None and m_type_raw == "moneyline":
         try:
             closing_probability, closing_odds = _closing_probability_for_moneyline_pick(
                 data_root,

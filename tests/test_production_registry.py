@@ -99,15 +99,23 @@ def test_real_production_yaml_resolves_every_model() -> None:
     registry = ProductionModelRegistry.load(REPO)
 
     assert registry.schema_version == "3"
-    assert len(registry.entries) == 22
+    assert len(registry.entries) == 27
     # Under the permanent champion-challenger framework, all models
-    # across supported markets are available contracts (21 champions + rollbacks).
+    # across supported markets are available contracts (27 champions + rollbacks).
     # Weak evidence models have evidence_status=degraded and
     # replacement_priority=critical rather than being disabled.
-    assert len(registry.available_entries()) == 22
+    assert len(registry.available_entries()) == 27
     assert len(registry.problem_entries()) == 0
     assert registry.primary.model_id == "wnba-elo-trend-lr-v4"
     assert registry.primary.artifact_hash
+    assert registry.champion("NFL", "spread").model_id == "nfl-spread-structural-v5"
+    assert registry.champion("NFL", "total").model_id == "nfl-total-structural-v5"
+    assert registry.champion("NCAAF", "moneyline").model_id == "cfb-structural-v2"
+    assert registry.champion("NCAAF", "spread").model_id == "cfb-structural-v2"
+    assert registry.lifecycle_contract("NCAAF", "spread").rollback_model_id == "cfb-spread-v1"
+    assert registry.champion("NCAAF", "total").model_id == "cfb-structural-v2"
+    assert registry.lifecycle_contract("NCAAF", "total").rollback_model_id == "cfb-total-v1"
+    assert registry.champion("MLB", "nrfi").model_id == "mlb-nrfi-v4"
     assert registry.champion("MLB", "total").model_id == "mlb-structural-v10-frozen"
     assert registry.champion("MLB", "total").rollback_model == "measured-edge-totals-v3"
 
@@ -125,16 +133,27 @@ def test_real_production_yaml_resolves_every_model() -> None:
     # pointer alone, without that rewiring, would have silently served the
     # wrong model under the validated artifact's model_id.
     assert "wnba-total-margin-v2" not in registry.blocked_workflows
-    assert "mlb-nrfi-v2" not in registry.blocked_workflows
+    assert "mlb-nrfi-v4" not in registry.blocked_workflows
     assert registry.champion("WNBA", "total").model_id == "wnba-total-margin-v2"
-    assert registry.champion("MLB", "nrfi").model_id == "mlb-nrfi-v2"
+    assert registry.champion("MLB", "nrfi").model_id == "mlb-nrfi-v4"
+    assert registry.champion("MLB", "nrfi").rollback_model == "mlb-nrfi-v3"
 
     soccer = registry.entries["soccer-poisson-dc-v1"]
     assert soccer.implementation == IMPLEMENTATION_CODE_BACKED
     assert soccer.entry == "model_prediction.models.soccer:soccer_model"
+    soccer_v2 = registry.entries["soccer-poisson-dc-v2"]
+    assert soccer_v2.implementation == IMPLEMENTATION_CODE_BACKED
+    assert soccer_v2.entry == "model_prediction.models.soccer:soccer_model_v2"
+    assert registry.champion("SOCCER", "moneyline").model_id == "soccer-poisson-dc-v2"
+    assert registry.champion("SOCCER", "moneyline").rollback_model == "soccer-poisson-dc-v1"
     tennis = registry.entries["tennis-surface-elo-v1"]
     assert tennis.implementation == IMPLEMENTATION_CODE_BACKED
     assert tennis.entry == "model_prediction.models.tennis:tennis_model"
+    tennis_v3 = registry.entries["tennis-learned-v3"]
+    assert tennis_v3.implementation == IMPLEMENTATION_CODE_BACKED
+    assert tennis_v3.entry == "model_prediction.models.tennis:tennis_model"
+    assert registry.champion("TENNIS", "moneyline").model_id == "tennis-learned-v3"
+    assert registry.champion("TENNIS", "moneyline").rollback_model == "tennis-surface-elo-v1"
 
     config = yaml.safe_load((REPO / "config/production.yaml").read_text(encoding="utf-8"))
     service = config["prediction_service"]

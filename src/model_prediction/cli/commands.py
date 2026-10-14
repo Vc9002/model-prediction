@@ -768,6 +768,21 @@ def cmd_validate_totals(args, config, registry, bans, ledger, audit, data_root) 
     return output
 
 
+def cmd_calibrate(args, config, registry, bans, ledger, audit, data_root) -> dict:
+    from ..calibration_pipeline import run_full_calibration_pipeline
+
+    out_file = Path(args.output) if args.output else None
+    out_dir = out_file.parent if out_file else None
+    return run_full_calibration_pipeline(
+        data_root=data_root,
+        output_dir=out_dir,
+        sport_filter=getattr(args, "sport", None),
+        market_filter=getattr(args, "market", None),
+        min_sample=getattr(args, "min_sample", 20),
+        update_artifacts=getattr(args, "update_artifacts", False),
+    )
+
+
 def cmd_reconstruct_mlb_markets(args, config, registry, bans, ledger, audit, data_root) -> dict:
     output = Ingestor(data_root, audit=audit).reconstruct_mlb_markets(
         args.start,

@@ -56,15 +56,18 @@ if _env_file.exists():
         pass
 
 DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
-    "tennis-surface-elo-v1",
-    # soccer-poisson-dc-v1 removed 2026-09-07 -- see EXPLICIT_BLACKLIST_MODELS.
+    "cs2-tiered-elo-v6",
+    "cs2-spread-tiered-elo-v6",
+    "cs2-total-tiered-elo-v6",
+    "wnba-elo-trend-lr-v4",
+    "wnba-total-margin-v2",
+    "wnba-spread-margin-v2",
     "soccer-poisson-dc-v2",
     "soccer-total-v1",
-    "wnba-elo-trend-lr-v4",
-    "wnba-spread-margin-v2",
-    "wnba-total-margin-v2",
-    "cs2-tiered-elo-v6",
+    "valorant-tiered-elo-v6",
     "lol-tiered-elo-v6",
+    "rainbow_six-tiered-elo-v6",
+    "dota2-tiered-elo-v6",
 )
 
 EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
@@ -139,6 +142,8 @@ class AutoExecutionConfig:
     edge_scaling_min_fraction: float = (
         0.5  # Stake fraction of the per-game cap used at min_edge, when enabled
     )
+    min_tennis_edge: float | None = None  # Sport-specific tightened edge for Tennis (e.g. 0.08)
+    max_tennis_price: float | None = None  # Sport-specific ceiling on market price for Tennis (e.g. 0.75)
 
 
 @dataclass
@@ -447,6 +452,28 @@ def load_auto_buyer_state() -> dict[str, Any]:
     state["max_model_age_minutes"] = (
         model_age if math.isfinite(model_age) and model_age > 0 else DEFAULT_MAX_MODEL_AGE_MINUTES
     )
+    try:
+        raw_tennis_edge = state.get("min_tennis_edge")
+        min_tennis_edge = float(raw_tennis_edge) if raw_tennis_edge is not None else None
+    except (TypeError, ValueError):
+        min_tennis_edge = None
+    state["min_tennis_edge"] = (
+        min_tennis_edge
+        if (min_tennis_edge is not None and math.isfinite(min_tennis_edge) and min_tennis_edge > 0)
+        else None
+    )
+
+    try:
+        raw_tennis_price = state.get("max_tennis_price")
+        max_tennis_price = float(raw_tennis_price) if raw_tennis_price is not None else None
+    except (TypeError, ValueError):
+        max_tennis_price = None
+    state["max_tennis_price"] = (
+        max_tennis_price
+        if (max_tennis_price is not None and math.isfinite(max_tennis_price) and 0 < max_tennis_price < 1)
+        else None
+    )
+
     return state
 
 
@@ -611,6 +638,8 @@ def run_auto_buyer_cycle(
         ),
         edge_scaled_sizing_enabled=bool(state.get("edge_scaled_sizing_enabled", False)),
         edge_scaling_min_fraction=float(state.get("edge_scaling_min_fraction", 0.5)),
+        min_tennis_edge=state.get("min_tennis_edge"),
+        max_tennis_price=state.get("max_tennis_price"),
     )
 
     buyer = AutoPolymarketBuyer(config=config)
@@ -743,6 +772,8 @@ class AutoPolymarketBuyer:
                 ),
                 edge_scaled_sizing_enabled=bool(state.get("edge_scaled_sizing_enabled", False)),
                 edge_scaling_min_fraction=float(state.get("edge_scaling_min_fraction", 0.5)),
+                min_tennis_edge=state.get("min_tennis_edge"),
+                max_tennis_price=state.get("max_tennis_price"),
             )
         self.data_root = Path(data_root) if data_root else DATA
         self.paper_data_root = self.data_root / "paper_auto_buyer"
@@ -1255,6 +1286,16 @@ class AutoPolymarketBuyer:
                 result.rejected_dedup += 1
                 continue
 
+            # 8b. Sport-specific odds ceiling (e.g. avoid heavy favorites where upside is too narrow)
+            sport_norm = str(row.get("league") or row.get("sport") or "").strip().lower()
+            if (
+                sport_norm == "tennis"
+                and self.config.max_tennis_price is not None
+                and clob_ask > self.config.max_tennis_price
+            ):
+                result.rejected_unrealistic_edge += 1
+                continue
+
             # 9. Win probability gate: Outcome must be favored by the model (>= min_model_probability)
             model_prob = float(row.get("model_probability") or 0.0)
             if model_prob < self.config.min_model_probability:
@@ -1263,7 +1304,12 @@ class AutoPolymarketBuyer:
 
             # 10. Sizing & Edge check against real Polymarket CLOB ask
             edge = model_prob - clob_ask
-            if edge < self.config.min_edge:
+            effective_min_edge = (
+                self.config.min_tennis_edge
+                if sport_norm == "tennis" and self.config.min_tennis_edge is not None
+                else self.config.min_edge
+            )
+            if edge < effective_min_edge:
                 result.rejected_low_edge += 1
                 continue
             if self.config.max_edge is not None and edge > self.config.max_edge:

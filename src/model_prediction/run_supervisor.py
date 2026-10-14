@@ -42,13 +42,24 @@ from .runtime_paths import RuntimePaths, migrate_legacy_state
 # Interpreter and launcher paths differ per OS: the venv puts python under
 # Scripts on Windows and bin/ elsewhere; scheduled daily/rebuild jobs are
 # bash scripts on POSIX and PowerShell scripts on Windows.
-_VENV_PYTHON = ".venv/Scripts/python.exe" if sys.platform == "win32" else ".venv/bin/python"
+_VENV_PYTHON = str(
+    (PROJECT_ROOT / ".venv/Scripts/python.exe")
+    if sys.platform == "win32"
+    else (PROJECT_ROOT / ".venv/bin/python")
+)
 
 
 def _launcher(name: str) -> list[str]:
     if sys.platform == "win32":
-        return ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", f"scripts/{name}.ps1"]
-    return ["bash", f"scripts/{name}.sh"]
+        return [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(PROJECT_ROOT / f"scripts/{name}.ps1"),
+        ]
+    return ["bash", str(PROJECT_ROOT / f"scripts/{name}.sh")]
 
 
 # Worker name -> command. The launchd plists call the supervisor with the
@@ -72,6 +83,13 @@ WORKERS: dict[str, list[str]] = {
         _VENV_PYTHON,
         "-m",
         "model_prediction.portfolio.manual_bet_ledger",
+    ],
+    "calibrate": [
+        _VENV_PYTHON,
+        "-m",
+        "model_prediction.cli",
+        "calibrate",
+        "--all",
     ],
 }
 

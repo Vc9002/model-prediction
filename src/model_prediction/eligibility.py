@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 from .bans import TeamBanList
@@ -356,10 +356,11 @@ def enforce_universal_paper_call(
     eligibility: EligibilityResult,
     policy: UnitPolicy | None = None,
 ) -> EligibilityResult:
-    """Normalize every persisted prediction to CALL + positive paper units.
+    """Normalize every persisted prediction to CALL with positive units.
 
-    The record type is deliberately preserved: research observations remain
-    ineligible for execution even though their paper decision is a CALL.
+    Every candidate is a call pick (operator directive, 2026-10-11). The reason
+    code still records whether the gates qualified it, and the record type is
+    preserved, so research observations stay ineligible for execution.
     """
     units = eligibility.units
     if units <= 0:
@@ -369,15 +370,9 @@ def enforce_universal_paper_call(
             request.american_odds,
             policy or UnitPolicy(),
         )
-    return EligibilityResult(
-        eligibility.record_type,
-        "CALL",
-        _paper_call_reason(eligibility.reason_code),
-        units,
-        eligibility.confidence_score,
-        eligibility.edge,
-        eligibility.adjusted_edge,
-        eligibility.away_team,
-        eligibility.home_team,
-        eligibility.banned_team,
+    return replace(
+        eligibility,
+        decision="CALL",
+        reason_code=_paper_call_reason(eligibility.reason_code),
+        units=units,
     )

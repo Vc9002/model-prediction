@@ -66,22 +66,39 @@ def _poisson_pmf(rate: float, k: int) -> float:
     return result
 
 
-def _dc_adjustment(home_goals: int, away_goals: int, home_rate: float, away_rate: float) -> float:
+def _dc_adjustment(
+    home_goals: int,
+    away_goals: int,
+    home_rate: float,
+    away_rate: float,
+    rho: float = DC_RHO,
+) -> float:
     """Dixon-Coles tau for the four low-score cells."""
     if home_goals == 0 and away_goals == 0:
-        return 1 - home_rate * away_rate * DC_RHO
+        return 1 - home_rate * away_rate * rho
     if home_goals == 0 and away_goals == 1:
-        return 1 + home_rate * DC_RHO
+        return 1 + home_rate * rho
     if home_goals == 1 and away_goals == 0:
-        return 1 + away_rate * DC_RHO
+        return 1 + away_rate * rho
     if home_goals == 1 and away_goals == 1:
-        return 1 - DC_RHO
+        return 1 - rho
     return 1.0
 
 
 class SoccerModel:
-    version = SOCCER_MODEL_VERSION
     sport = "soccer"
+
+    def __init__(
+        self,
+        version: str = SOCCER_MODEL_VERSION,
+        home_boost: float = HOME_GOAL_BOOST,
+        rho: float = DC_RHO,
+        divide_away: bool = True,
+    ) -> None:
+        self.version = version
+        self.home_boost = home_boost
+        self.rho = rho
+        self.divide_away = divide_away
 
     def _strengths(self, history: Sequence[GameRecord]) -> tuple[dict[str, dict[str, float]], float]:
         by_team: dict[str, dict[str, list[float]]] = {}
@@ -113,7 +130,7 @@ class SoccerModel:
                 probability = (
                     _poisson_pmf(home_rate, h)
                     * _poisson_pmf(away_rate, a)
-                    * _dc_adjustment(h, a, home_rate, away_rate)
+                    * _dc_adjustment(h, a, home_rate, away_rate, rho=self.rho)
                 )
                 row.append(max(probability, 0.0))
             matrix.append(row)
@@ -147,8 +164,10 @@ class SoccerModel:
             strengths, baseline = _get_strengths(getattr(match, "league", "SOCCER"))
             home = strengths.get(match.home_team, {"attack": 1.0, "defense": 1.0, "games": 0.0})
             away = strengths.get(match.away_team, {"attack": 1.0, "defense": 1.0, "games": 0.0})
-            home_rate = baseline * home["attack"] * away["defense"] * HOME_GOAL_BOOST
-            away_rate = baseline * away["attack"] * home["defense"] / HOME_GOAL_BOOST
+            home_rate = baseline * home["attack"] * away["defense"] * self.home_boost
+            away_rate = (
+                baseline * away["attack"] * home["defense"] / (self.home_boost if self.divide_away else 1.0)
+            )
             from ..coded_market_replay import capture_inputs
 
             inference_inputs = capture_inputs("SOCCER", {"home_rate": home_rate, "away_rate": away_rate})
@@ -156,9 +175,6 @@ class SoccerModel:
             home_win = sum(matrix[h][a] for h in range(MAX_GOALS + 1) for a in range(h))
             away_win = sum(matrix[h][a] for a in range(MAX_GOALS + 1) for h in range(a))
             draw = 1 - home_win - away_win
-            over25 = sum(
-                matrix[h][a] for h in range(MAX_GOALS + 1) for a in range(MAX_GOALS + 1) if h + a > 2.5
-            )
             raw_btts = sum(matrix[h][a] for h in range(1, MAX_GOALS + 1) for a in range(1, MAX_GOALS + 1))
             btts = _apply_btts_calibration(raw_btts)
             sample = min(home["games"], away["games"])
@@ -202,15 +218,39 @@ class SoccerModel:
                     **base,
                 )
             )
-            predictions.append(
-                GamePrediction(
-                    market_type="total",
-                    line=2.5,
-                    probabilities={"over": round(over25, 6), "under": round(1 - over25, 6)},
-                    rationale=rationale,
-                    **base,
+            # Totals (1.5, 2.5, 3.5)
+            for t_line in (1.5, 2.5, 3.5):
+                over_p = sum(
+                    matrix[h][a] for h in range(MAX_GOALS + 1) for a in range(MAX_GOALS + 1) if h + a > t_line
                 )
-            )
+                predictions.append(
+                    GamePrediction(
+                        market_type="total",
+                        line=t_line,
+                        probabilities={"over": round(over_p, 6), "under": round(1 - over_p, 6)},
+                        rationale=rationale,
+                        **base,
+                    )
+                )
+
+            # Spreads / Handicaps (-1.5, +1.5)
+            for s_line in (-1.5, 1.5):
+                home_cov = sum(
+                    matrix[h][a]
+                    for h in range(MAX_GOALS + 1)
+                    for a in range(MAX_GOALS + 1)
+                    if (h - a) + s_line > 0
+                )
+                predictions.append(
+                    GamePrediction(
+                        market_type="spread",
+                        line=s_line,
+                        probabilities={"home": round(home_cov, 6), "away": round(1 - home_cov, 6)},
+                        rationale=f"Dixon-Coles spread line {s_line:+.1f}: home cover p={home_cov:.3f}.",
+                        **base,
+                    )
+                )
+
             predictions.append(
                 GamePrediction(
                     market_type="btts",
@@ -225,3 +265,12 @@ class SoccerModel:
 
 def soccer_model() -> SoccerModel:
     return SoccerModel()
+
+
+def soccer_model_v2() -> SoccerModel:
+    return SoccerModel(
+        version="soccer-poisson-dc-v2",
+        home_boost=1.18,
+        rho=-0.05,
+        divide_away=False,
+    )

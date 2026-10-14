@@ -44,9 +44,15 @@ class ResidualTrainingRow:
 class MarketResidualModel:
     """coefficients: [intercept, w_model_logit, w_market_logit]."""
 
-    def __init__(self, coefficients: tuple[float, float, float] | None, sample_size: int) -> None:
+    def __init__(
+        self,
+        coefficients: tuple[float, float, float] | None,
+        sample_size: int,
+        version: str = RESIDUAL_VERSION,
+    ) -> None:
         self.coefficients = coefficients
         self.sample_size = sample_size
+        self._version = version
 
     @property
     def is_identity(self) -> bool:
@@ -54,7 +60,7 @@ class MarketResidualModel:
 
     @property
     def version(self) -> str:
-        return RESIDUAL_VERSION if not self.is_identity else f"{RESIDUAL_VERSION}-identity-fallback"
+        return self._version if not self.is_identity else f"{self._version}-identity-fallback"
 
     def calibrated_probability(self, model_probability: float, market_probability: float) -> float:
         if self.coefficients is None:
@@ -134,7 +140,11 @@ class MarketResidualModel:
         if expected != raw.get("artifact_hash"):
             raise ValueError("market residual artifact hash mismatch")
         coefficients = raw.get("coefficients")
-        return cls(tuple(coefficients) if coefficients else None, int(raw.get("sample_size", 0)))
+        return cls(
+            tuple(coefficients) if coefficients else None,
+            int(raw.get("sample_size", 0)),
+            version=str(raw.get("model_version") or RESIDUAL_VERSION),
+        )
 
 
 def _solve_3x3(matrix: list[list[float]], vector: list[float]) -> list[float] | None:

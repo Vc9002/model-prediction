@@ -18,7 +18,7 @@ LOCK_BUSY_EXIT = 75
 
 def acquire_lock(path: str | Path) -> IO[str] | None:
     """Acquire and retain a non-blocking exclusive lock, or return ``None``."""
-    lock_path = Path(path)
+    lock_path = Path(str(path).strip())
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     handle = lock_path.open("a+", encoding="utf-8")
     try:

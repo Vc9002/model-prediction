@@ -9,7 +9,12 @@ import pytest
 from model_prediction.domain import League, MarketType
 from model_prediction.ledger import PickLedger
 from model_prediction.models.basketball import BasketballModel, UpcomingGame
-from model_prediction.models.mlb_first_inning import FirstInningGameRow, MLBFirstInningModel
+from model_prediction.models.mlb_first_inning import (
+    FirstInningGameRow,
+    MLBFirstInningModel,
+    MLBHalfInningInteractionModel,
+    MLBHalfInningModel,
+)
 from model_prediction.research_incumbent_evaluation import replay
 from model_prediction.runtime_ledger_store import RuntimeLedgerStore
 from model_prediction.runtime_paths import RuntimePaths
@@ -126,6 +131,131 @@ def test_nrfi_complete_artifact_features_replay_and_survive_settlement(tmp_path)
             event_start_utc=base.event_start_utc,
             observed_at_utc="2026-09-09T12:00:00Z",
         )
+    store.close()
+
+
+def test_nrfi_v3_half_inning_complete_artifact_features_replay_and_survive_settlement(tmp_path):
+    art = artifact("mlb-nrfi-v3")
+    features = dict(zip(art["feature_names"], art["scaler_mean"], strict=True))
+    features[art["feature_names"][0]] += 0.123456789
+    model = MLBHalfInningModel.from_dict(art)
+    p = model.predict_p_nrfi(
+        FirstInningGameRow(None, request().event_start_utc, "Home", "Away", "Venue", features, 0, 0)
+    )
+    base = request()
+    snap = build_snapshot(
+        art,
+        features,
+        {},
+        event_id="event-1",
+        event_start_utc=base.event_start_utc,
+        observed_at_utc="2026-09-09T12:00:00Z",
+    )
+    assert replay_snapshot(snap) == {"nrfi": round(p, 4), "yrfi": round(1 - p, 4)}
+    req = replace(
+        base,
+        league=League.MLB,
+        market_type=MarketType.NRFI,
+        selection="nrfi",
+        line=0.5,
+        event_id="event-1",
+        model_version=art["model_version"],
+        model_artifact_hash=art["artifact_hash"],
+        model_probability=round(p, 4),
+        model_input_snapshot_json=json.dumps(snap),
+    )
+    store = RuntimeLedgerStore(RuntimePaths.for_test(tmp_path))
+    ledger = PickLedger(tmp_path / "picks.xlsx", tier="flat", mirror=store, authority="sqlite", sport="mlb")
+    logged = ledger.append_call(req, 0.25, 70)
+    [record] = store.records(tier="flat", sport="mlb")
+    assert replay(record, None)["status"] == "PASS"
+    assert json.loads(record["feature_payload_json"])["model_input_snapshot"] == snap
+    ledger.settle(logged["pick_id"], away_score=0, home_score=0)
+    [settled] = store.records(tier="flat", sport="mlb")
+    assert json.loads(settled["feature_payload_json"])["model_input_snapshot"] == snap
+    assert replay(settled, None)["status"] == "PASS"
+    row = {
+        "model_version": art["model_version"],
+        "model_artifact_hash": art["artifact_hash"],
+        "league": "MLB",
+        "event_id": "event-1",
+        "event_start_utc": base.event_start_utc,
+        "market_type": "nrfi",
+        "selection": "nrfi",
+        "line": 0.5,
+        "model_probability": round(p, 4),
+    }
+    assert validate_decision_snapshot(snap, row) == round(p, 4)
+    store.close()
+
+
+def test_nrfi_v4_half_inning_interaction_replay_and_survive_settlement(tmp_path):
+    art = artifact("mlb-nrfi-v4")
+    features = {
+        "away_top3_composite": 0.107,
+        "home_top3_composite": 0.107,
+        "home_starter_opp_1st_runs": 0.516,
+        "away_starter_opp_1st_runs": 0.467,
+        "home_starter_fip": 3.88,
+        "away_starter_fip": 3.88,
+        "home_starter_k_pct": 0.22,
+        "away_starter_k_pct": 0.22,
+        "home_starter_bb_pct": 0.077,
+        "away_starter_bb_pct": 0.077,
+        "park_1st_runs": 1.01,
+        "away_top3_same_hand_share": 0.55,
+        "home_top3_same_hand_share": 0.55,
+        "away_team_1st_scored_away": 0.453,
+        "home_team_1st_scored_home": 0.549,
+    }
+    model = MLBHalfInningInteractionModel.from_dict(art)
+    p = model.predict_p_nrfi(
+        FirstInningGameRow(None, request().event_start_utc, "Home", "Away", "Venue", features, 0, 0)
+    )
+    base = request()
+    snap = build_snapshot(
+        art,
+        features,
+        {},
+        event_id="event-v4",
+        event_start_utc=base.event_start_utc,
+        observed_at_utc="2026-09-09T12:00:00Z",
+    )
+    assert replay_snapshot(snap) == {"nrfi": round(p, 4), "yrfi": round(1 - p, 4)}
+    req = replace(
+        base,
+        league=League.MLB,
+        market_type=MarketType.NRFI,
+        selection="nrfi",
+        line=0.5,
+        event_id="event-v4",
+        model_version=art["model_version"],
+        model_artifact_hash=art["artifact_hash"],
+        model_probability=round(p, 4),
+        model_input_snapshot_json=json.dumps(snap),
+    )
+    store = RuntimeLedgerStore(RuntimePaths.for_test(tmp_path))
+    ledger = PickLedger(tmp_path / "picks.xlsx", tier="flat", mirror=store, authority="sqlite", sport="mlb")
+    logged = ledger.append_call(req, 0.25, 70)
+    [record] = store.records(tier="flat", sport="mlb")
+    assert replay(record, None)["status"] == "PASS"
+    assert json.loads(record["feature_payload_json"])["model_input_snapshot"] == snap
+    ledger.settle(logged["pick_id"], away_score=0, home_score=0)
+    [settled] = store.records(tier="flat", sport="mlb")
+    assert json.loads(settled["feature_payload_json"])["model_input_snapshot"] == snap
+    assert replay(settled, None)["status"] == "PASS"
+    row = {
+        "model_version": art["model_version"],
+        "model_artifact_hash": art["artifact_hash"],
+        "league": "MLB",
+        "event_id": "event-v4",
+        "event_start_utc": base.event_start_utc,
+        "market_type": "nrfi",
+        "selection": "nrfi",
+        "line": 0.5,
+        "model_probability": round(p, 4),
+    }
+    assert validate_decision_snapshot(snap, row) == round(p, 4)
     store.close()
 
 

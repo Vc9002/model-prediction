@@ -106,6 +106,11 @@ class EloBook:
         r_away = self.ratings[away]
         return 1.0 / (1.0 + 10 ** ((r_away - r_home) / 400.0))
 
+    def expected_neutral_win(self, home: str, away: str) -> float:
+        r_home = self.ratings[home]
+        r_away = self.ratings[away]
+        return 1.0 / (1.0 + 10 ** ((r_away - r_home) / 400.0))
+
     def update(self, home: str, away: str, home_score: int, away_score: int) -> None:
         exp_home = self.expected_home_win(home, away)
         if home_score > away_score:

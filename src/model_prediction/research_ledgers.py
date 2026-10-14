@@ -94,7 +94,7 @@ def existing_research_ledgers(
     root = Path(data_root)
     ledgers: list[PickLedger] = []
     seen: set[str] = set()
-    for sport in RESEARCH_LEDGER_SPORTS:
+    for sport in sorted(RESEARCH_LEDGER_SPORTS):
         path = research_ledger_path(root, sport, gated=gated)
         if path.exists() and sport not in seen:
             seen.add(sport)

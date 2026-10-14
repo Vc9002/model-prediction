@@ -92,12 +92,20 @@ def main() -> int:
         sport_l = str(entry.get("sport") or "").lower()
         artifact_rel = entry.get("artifact")
         findings: list[str] = []
+        market = entry.get("market")
+        champ_for_market = (champions.get(entry.get("sport")) or {}).get(market)
+        if champ_for_market is None and market in ("multi", "all"):
+            sport_champs = list((champions.get(entry.get("sport")) or {}).values())
+            if entry.get("model_id") in sport_champs:
+                champ_for_market = entry.get("model_id")
+            elif "moneyline" in (champions.get(entry.get("sport")) or {}):
+                champ_for_market = (champions.get(entry.get("sport")) or {}).get("moneyline")
+
         detail: dict = {
             "status": entry.get("enabled"),
             "kind": entry.get("implementation"),
-            "champion": (champions.get(entry.get("sport")) or {}).get(entry.get("market")),
-            "is_champion": (champions.get(entry.get("sport")) or {}).get(entry.get("market"))
-            == entry.get("model_id"),
+            "champion": champ_for_market,
+            "is_champion": champ_for_market == entry.get("model_id"),
         }
 
         if artifact_rel:
@@ -170,13 +178,17 @@ def main() -> int:
         else:
             detail["model_version"] = entry.get("model_id") or entry.get("code_backed")
 
-        detail["ledger"] = _ledger_stats(conn, str(entry.get("model_id") or ""))
+        model_id = str(entry.get("model_id") or "")
+        detail["model_id"] = model_id
+        detail["sport"] = entry.get("sport")
+        detail["market"] = entry.get("market")
+        detail["ledger"] = _ledger_stats(conn, model_id)
         detail["data_freshness"] = _sport_freshness(sport_l)
         detail["findings"] = findings
-        report["models"][sport_l] = detail
+        report["models"][model_id] = detail
         marker = "OK " if not findings else "GAP"
         print(
-            f"[{marker}] {sport_l:10s} {detail.get('model_version')} "
+            f"[{marker}] {sport_l:10s} {model_id} "
             f"| ledger rows: {detail['ledger']['total']} | " + ("; ".join(findings) if findings else "clean")
         )
 

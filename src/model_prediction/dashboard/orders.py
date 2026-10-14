@@ -451,6 +451,13 @@ def _decorate_pick(
         economics_status = "unscored_no_basis"
     else:
         economics_status = "not_applicable"
+
+    model_identifier = str(row.get("model_version") or row.get("model_id") or row.get("model") or "").strip()
+    from model_prediction.sports.naming import display_model_name, standard_model_name
+
+    model_disp = display_model_name(model_identifier) if model_identifier else ""
+    model_std = standard_model_name(model_identifier) if model_identifier else ""
+
     return {
         **row,
         # Preserve ledger facts in the API. A Research NO_CALL must remain
@@ -468,6 +475,8 @@ def _decorate_pick(
         "buy_block_reason": reason,
         "unit_value_usd": _unit_value_usd(),
         "order_authorization": ("manual_research_override" if manual else "qualified_model"),
+        "model_display_name": model_disp,
+        "model_standard_name": model_std,
         "archived": str(row.get("pick_id") or "")
         in (archived_ids if archived_ids is not None else set(_load_archive().get("pick_ids", []))),
     }

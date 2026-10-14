@@ -17,7 +17,7 @@ $ScriptPath = $MyInvocation.MyCommand.Path
 if ($env:MODEL_PREDICTION_DAILY_LOCK_HELD -ne '1') {
     $env:MODEL_PREDICTION_DAILY_LOCK_HELD = '1'
     $env:PYTHONPATH = 'src' + $(if ($env:PYTHONPATH) { ';' + $env:PYTHONPATH } else { '' })
-    $RuntimeRoot = if ($env:MODEL_PREDICTION_RUNTIME_ROOT) { $env:MODEL_PREDICTION_RUNTIME_ROOT } else { 'data' }
+    $RuntimeRoot = if ($env:MODEL_PREDICTION_RUNTIME_ROOT) { $env:MODEL_PREDICTION_RUNTIME_ROOT.Trim() } else { 'data' }
     & $Py -m model_prediction.daily_lock --lock (Join-Path $RuntimeRoot 'locks\daily.lock') -- `
         powershell -NoProfile -ExecutionPolicy Bypass -File $ScriptPath
     exit $LASTEXITCODE
@@ -112,6 +112,13 @@ Remove-Item -Recurse -Force $IngestTmp
 Write-Log "Ingestion exit code: $IngestExit"
 Write-Log ("Ingestion took: {0}s" -f [int]$Stopwatch.Elapsed.TotalSeconds)
 
+# -- Step 1d: Automated Model Calibration ------------------------------------
+Write-Log '--- Step 1d: Automated Model Calibration ---'
+$Stopwatch.Restart()
+$CalibrateExit = Invoke-Step @('-m', 'model_prediction.cli', 'calibrate', '--all', '--update-artifacts')
+Write-Log "Calibration exit code: $CalibrateExit"
+Write-Log ("Calibration took: {0}s" -f [int]$Stopwatch.Elapsed.TotalSeconds)
+
 # -- Step 2: Unified daily forecast ------------------------------------------
 Write-Log '--- Step 2: Unified slate + main/flat/research forecasts ---'
 $Stopwatch.Restart()
@@ -127,14 +134,14 @@ Write-Log "MLB v9 forecast exit code: $V9ForecastExit"
 Write-Log ("MLB v9 forecast took: {0}s" -f [int]$Stopwatch.Elapsed.TotalSeconds)
 
 Write-Log ("Finished: " + (Get-Date -Format o))
-Write-Log "Exit codes -- settle: $SettleExit, v9_settle: $V9SettleExit, ingest: $IngestExit, daily: $DailyExit, v9_forecast: $V9ForecastExit"
+Write-Log "Exit codes -- settle: $SettleExit, v9_settle: $V9SettleExit, ingest: $IngestExit, calibrate: $CalibrateExit, daily: $DailyExit, v9_forecast: $V9ForecastExit"
 
 # Cleanup old logs
 Get-ChildItem 'data\logs' -Filter 'daily_*.log' -ErrorAction SilentlyContinue |
     Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-30) } |
     Remove-Item -Force
 
-if ($SettleExit -ne 0 -or $V9SettleExit -ne 0 -or $IngestExit -ne 0 -or $DailyExit -ne 0 -or $V9ForecastExit -ne 0) {
+if ($SettleExit -ne 0 -or $V9SettleExit -ne 0 -or $IngestExit -ne 0 -or $CalibrateExit -ne 0 -or $DailyExit -ne 0 -or $V9ForecastExit -ne 0) {
     exit 1
 }
 exit 0

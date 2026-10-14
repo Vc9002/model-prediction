@@ -280,7 +280,7 @@ def _write_tennis_inputs(tmp_path, *, market_type: str, market_slug: str) -> Non
     [
         ("total", "wta-pegula-gauff-st-2pt5", "UNSUPPORTED_TENNIS_SUBPERIOD_MARKET"),
         ("spread", "wta-pegula-gauff-ss-2pt5", "UNSUPPORTED_TENNIS_SUBPERIOD_MARKET"),
-        ("total", "wta-pegula-gauff-total-22pt5", "UNSUPPORTED_TENNIS_DERIVATIVE_PRICING"),
+        ("total", "wta-pegula-gauff-set-2pt5", "UNSUPPORTED_TENNIS_SUBPERIOD_MARKET"),
     ],
 )
 def test_unsupported_tennis_market_never_reaches_pricing(

@@ -127,10 +127,13 @@ GATES.md
 
 # Session scratch: audit reports, one-off repair scripts
 tmp/
+scratch/
 
 # Operational SQLite caches (runtime output, not evidence) -- market_quotes.db
 # is ~339MB and is rebuilt by the warehouse ingest, never hand-authored.
 data/market_quotes.db
+data/ledger.db
+dashboard/cache_snapshot.pkl
 
 # task-observer log; belongs to the agent workspace, not the project
 skill-observations/

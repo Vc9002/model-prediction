@@ -212,7 +212,7 @@ def test_tennis_forward_prices_singles_moneyline_and_excludes_doubles(tmp_path) 
         observed_at=datetime(2026, 7, 27, 13, tzinfo=UTC),
     )
 
-    assert result["model_version"] == "tennis-surface-elo-v1"
+    assert result["model_version"] == "tennis-learned-v3"
     assert result["scheduled_games"] == 1
     assert result["priced_count"] == 1
     contract = result["priced_contracts"][0]
@@ -279,3 +279,56 @@ def test_tennis_forward_infers_surface_from_tournament_name_for_live_matches(tmp
 
     assert result["priced_count"] == 1
     assert result["priced_contracts"][0]["feature_basis"]["surface"] == "Clay"
+
+
+def test_tennis_forward_prices_game_spread_and_total_derivatives(tmp_path) -> None:
+    """Verifies that tennis spread and total markets are priced via the Markov distribution engine."""
+    _write_history(tmp_path)
+    _write_snapshot(tmp_path)  # Moneyline snapshot
+
+    # Spread snapshot (+3.5 / -3.5)
+    _write_snapshot(
+        tmp_path,
+        market_type="spread",
+        market_slug="asc-wta-alpha-beta-2026-07-27-pos-3pt5",
+        event_title="Alpha Player vs. Beta Player",
+        line=3.5,
+        team="Alpha Player",
+        long={"description": "+3.50", "ask": 0.48},
+        short={"description": "-3.50", "ask": 0.55},
+    )
+
+    # Total snapshot (Over/Under 21.5)
+    _write_snapshot(
+        tmp_path,
+        market_type="total",
+        market_slug="tsc-wta-alpha-beta-2026-07-27-tg-21pt5",
+        event_title="Alpha Player vs. Beta Player",
+        line=21.5,
+        long={"description": "Over", "ask": 0.52},
+        short={"description": "Under", "ask": 0.50},
+    )
+
+    result = build_tennis_slate(
+        data_root=tmp_path,
+        game_date="2026-07-27",
+        client=Client(),
+        observed_at=datetime(2026, 7, 27, 13, tzinfo=UTC),
+    )
+
+    # Expect 1 moneyline + 1 spread + 1 total
+    assert result["scheduled_games"] == 1
+    assert result["priced_count"] == 3
+    market_types = {c["market_type"] for c in result["priced_contracts"]}
+    assert market_types == {"moneyline", "spread", "total"}
+
+    spread_c = next(c for c in result["priced_contracts"] if c["market_type"] == "spread")
+    assert spread_c["line"] == 3.5
+    assert 0.0 < spread_c["model_probability"] < 1.0
+    assert spread_c["executable_ask"] > 0.0
+
+    total_c = next(c for c in result["priced_contracts"] if c["market_type"] == "total")
+    assert total_c["line"] == 21.5
+    assert total_c["selection"] in {"over", "under"}
+    assert 0.0 < total_c["model_probability"] < 1.0
+    assert total_c["executable_ask"] > 0.0

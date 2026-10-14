@@ -36,7 +36,18 @@ from model_prediction.config import PROJECT_ROOT
 from model_prediction.soccer.league_model import LeagueSoccerConfig, LeagueSoccerModel
 
 GAMES_PATH = PROJECT_ROOT / "data" / "processed" / "soccer" / "games.jsonl"
-LEAGUES = ("EPL", "LA_LIGA", "BUNDESLIGA", "SERIE_A", "MLS", "UCL")
+LEAGUES = (
+    "EPL",
+    "LA_LIGA",
+    "BUNDESLIGA",
+    "SERIE_A",
+    "MLS",
+    "UCL",
+    "LIGUE_1",
+    "CHAMPIONSHIP",
+    "EREDIVISIE",
+    "PRIMEIRA_LIGA",
+)
 RHO_GRID = (-0.20, -0.15, -0.10, -0.05, 0.0)
 HOME_BOOST_DEFAULT = 1.15  # incumbent's hardcoded value, used only as a sanity comparison print
 

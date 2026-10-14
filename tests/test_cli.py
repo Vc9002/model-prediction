@@ -771,6 +771,57 @@ def test_soccer_main_ledger_mirrors_gated_ledger_exactly(monkeypatch) -> None:
     assert gated.appended[0][0].event_id == main.appended[0][0].event_id == "soccer-1"
 
 
+def test_soccer_moneyline_blocked_from_main_when_markets_restricted_to_totals(monkeypatch) -> None:
+    """When config/model.yaml specifies markets: ['full_game_total_2_5'], moneyline contracts
+    are strictly research-only and must never reach Main or Gated ledgers."""
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 27, 12, tzinfo=UTC))
+    forecast = _soccer_forecast()
+    forecast["priced_contracts"].append(
+        {
+            "event_id": "soccer-ml-1",
+            "event_start_utc": "2026-07-27T20:00:00Z",
+            "away_team": "Away FC",
+            "home_team": "Home FC",
+            "market_type": "moneyline",
+            "selection": "home",
+            "line": None,
+            "executable_ask": 0.40,
+            "model_probability": 0.60,
+            "model_uncertainty": 0.03,
+            "model_version": "soccer-poisson-dc-v1",
+            "rationale": "fixture-moneyline",
+            "market_slug": "soccer-1-ml",
+            "observed_at_utc": "2026-07-27T10:00:00Z",
+            "feature_basis": {"min_team_games": 20},
+        }
+    )
+    monkeypatch.setattr(cli_forecast, "build_soccer_total_slate", lambda **kwargs: forecast)
+    flat = _CaptureLedger()
+    gated = _CaptureLedger()
+    main = _CaptureLedger()
+    cfg = _soccer_config(status="shadow_qualified", min_edge=0.02)
+    cfg["models"]["SOCCER"]["markets"] = ["full_game_total_2_5"]
+
+    result = cli._forecast_soccer_sport(
+        data_root="unused",
+        args_date="2026-07-27",
+        config=cfg,
+        research_ledger=None,
+        gated_ledger=gated,
+        flat_ledger=flat,
+        main_ledger=main,
+    )
+
+    assert result["flat_logged"] == 2
+    assert result["gated_logged"] == 1
+    assert result["main_logged"] == 1
+    assert len(flat.appended) == 2
+    assert len(main.appended) == 1
+    assert main.appended[0][0].market_type.value == "total"
+    assert len(gated.appended) == 1
+    assert gated.appended[0][0].market_type.value == "total"
+
+
 def test_soccer_gated_ledger_duplicate_is_tracked_not_silently_dropped(monkeypatch) -> None:
     """DD-2 (deep debug audit, 2026-08-04): gated_ledger's secondary write
     used to be a bare `with suppress(DuplicatePickError):` -- a genuine
@@ -2357,6 +2408,114 @@ def test_select_wnba_spread_market_returns_none_for_no_candidates() -> None:
     assert cli._select_wnba_spread_market([{"line": 1.5, "long": {}}]) is None
 
 
+def test_select_wnba_spread_market_ignores_partial_game_tokens() -> None:
+    rows = [
+        {
+            "line": 5.5,
+            "long": {"ask": 0.50},
+            "short": {"ask": 0.50},
+            "market_slug": "wnba-spread-lv-ny-1h-5pt5",
+        },
+        {
+            "line": 2.5,
+            "long": {"ask": 0.50},
+            "short": {"ask": 0.50},
+            "market_slug": "wnba-spread-lv-ny-1q-2pt5",
+        },
+        {
+            "line": 10.5,
+            "long": {"ask": 0.52},
+            "short": {"ask": 0.49},
+            "market_slug": "wnba-spread-lv-ny-10pt5",
+        },
+    ]
+    picked = cli._select_wnba_spread_market(rows)
+    assert picked is not None
+    assert picked["line"] == 10.5
+    assert picked["market_slug"] == "wnba-spread-lv-ny-10pt5"
+
+
+def test_select_wnba_total_market_ignores_partial_and_team_totals() -> None:
+    rows = [
+        {
+            "line": 82.5,
+            "long": {"ask": 0.50},
+            "short": {"ask": 0.50},
+            "market_slug": "wnba-total-lv-ny-1h-82pt5",
+        },
+        {
+            "line": 88.5,
+            "long": {"ask": 0.50},
+            "short": {"ask": 0.50},
+            "market_slug": "wnba-total-lv-ny-tt-88pt5",
+        },
+        {
+            "line": 165.5,
+            "long": {"ask": 0.53},
+            "short": {"ask": 0.48},
+            "market_slug": "wnba-total-lv-ny-165pt5",
+        },
+    ]
+    picked = cli._select_wnba_total_market(rows)
+    assert picked is not None
+    assert picked["line"] == 165.5
+    assert picked["market_slug"] == "wnba-total-lv-ny-165pt5"
+
+
+def test_select_nfl_spread_market_ignores_partial_and_team_totals() -> None:
+    rows = [
+        {
+            "line": 1.5,
+            "long": {"ask": 0.50},
+            "short": {"ask": 0.50},
+            "market_slug": "nfl-spread-phi-dal-1h-1pt5",
+        },
+        {
+            "line": 2.5,
+            "long": {"ask": 0.50},
+            "short": {"ask": 0.50},
+            "market_slug": "nfl-spread-phi-dal-tt-2pt5",
+        },
+        {
+            "line": 3.5,
+            "long": {"ask": 0.52},
+            "short": {"ask": 0.48},
+            "market_slug": "nfl-spread-phi-dal-3pt5",
+        },
+    ]
+    picked = cli._select_nfl_spread_market(rows)
+    assert picked is not None
+    assert picked["line"] == 3.5
+    assert picked["market_slug"] == "nfl-spread-phi-dal-3pt5"
+
+
+def test_select_nfl_total_market_ignores_partial_and_team_totals() -> None:
+    rows = [
+        {
+            "line": 23.5,
+            "long": {"ask": 0.50},
+            "short": {"ask": 0.50},
+            "market_slug": "nfl-total-phi-dal-1h-23pt5",
+        },
+        {
+            "line": 24.5,
+            "long": {"ask": 0.50},
+            "short": {"ask": 0.50},
+            "market_slug": "nfl-total-phi-dal-tt-24pt5",
+        },
+        {
+            "line": 47.5,
+            "long": {"ask": 0.53},
+            "short": {"ask": 0.47},
+            "market_slug": "nfl-total-phi-dal-47pt5",
+        },
+    ]
+    picked = cli._select_nfl_total_market(rows)
+    assert picked is not None
+    assert picked["line"] == 47.5
+    assert picked["market_slug"] == "nfl-total-phi-dal-47pt5"
+
+
 def _wnba_spread_forecast(*, selection: str, line: float) -> dict:
     return {
         "sport": "wnba_spread",
@@ -2620,3 +2779,132 @@ def test_qualified_wnba_spread_uses_valid_shadow_state(monkeypatch, registry, ba
     )
     assert result["logged"] == 1
     assert flat.appended[0][0].model_state is ModelState.SHADOW_QUALIFIED
+
+
+def _nfl_spread_forecast(*, selection: str, line: float) -> dict:
+    return {
+        "sport": "nfl_spread",
+        "model_version": "nfl-spread-structural-v5",
+        "priced_contracts": [
+            {
+                "event_id": "nfl-spread-1",
+                "event_start_utc": "2026-09-13T17:00:00Z",
+                "away_team": "Kansas City Chiefs",
+                "home_team": "Buffalo Bills",
+                "market_type": "spread",
+                "selection": selection,
+                "line": line,
+                "executable_ask": 0.51,
+                "model_probability": 0.58,
+                "model_uncertainty": 0.08,
+                "model_version": "nfl-spread-structural-v5",
+                "model_artifact_hash": "4d76d37c4c20eda0eb538f3829c814b2be7119fcf464eb015f309485081c9768",
+                "model_qualified": True,
+                "rationale": "fixture",
+                "market_slug": "nfl-buf-kc-2026-09-13-spread-3pt5",
+                "observed_at_utc": "2026-09-13T12:00:00Z",
+                "market_lineage": {"market_quote_observed_at_utc": "2026-09-13T12:00:00Z"},
+            }
+        ],
+        "unmatched": [],
+    }
+
+
+def _nfl_total_forecast(*, selection: str, line: float) -> dict:
+    return {
+        "sport": "nfl_total",
+        "model_version": "nfl-total-structural-v5",
+        "priced_contracts": [
+            {
+                "event_id": "nfl-total-1",
+                "event_start_utc": "2026-09-13T17:00:00Z",
+                "away_team": "Kansas City Chiefs",
+                "home_team": "Buffalo Bills",
+                "market_type": "total",
+                "selection": selection,
+                "line": line,
+                "executable_ask": 0.51,
+                "model_probability": 0.56,
+                "model_uncertainty": 0.08,
+                "model_version": "nfl-total-structural-v5",
+                "model_artifact_hash": "a03cfa2ff7d92349716c72a20020b896f75c8eccd934a331987754c43f8fe7be",
+                "model_qualified": True,
+                "rationale": "fixture",
+                "market_slug": "nfl-buf-kc-2026-09-13-total-48pt5",
+                "observed_at_utc": "2026-09-13T12:00:00Z",
+                "market_lineage": {"market_quote_observed_at_utc": "2026-09-13T12:00:00Z"},
+            }
+        ],
+        "unmatched": [],
+    }
+
+
+def test_select_nfl_spread_market_picks_the_most_balanced_line() -> None:
+    best = cli_forecast._select_nfl_spread_market(
+        [
+            {"line": 3.5, "long": {"ask": 0.15}},
+            {"line": -3.5, "long": {"ask": 0.52}},
+            {"line": -7.5, "long": {"ask": 0.88}},
+        ]
+    )
+    assert best == {"line": -3.5, "long": {"ask": 0.52}}
+
+
+def test_quotes_known_at_drops_rows_observed_after_the_run() -> None:
+    cutoff = datetime(2026, 10, 11, 10, 0, tzinfo=UTC)
+    early = {"observed_at_utc": "2026-10-11T09:59:00Z"}
+    late = {"observed_at_utc": "2026-10-11T10:01:00Z"}
+    assert cli_forecast._quotes_known_at([early, late], cutoff) == [early]
+
+
+def test_select_nfl_total_market_picks_the_most_balanced_line() -> None:
+    best = cli_forecast._select_nfl_total_market(
+        [
+            {"line": 41.5, "long": {"ask": 0.85}},
+            {"line": 48.5, "long": {"ask": 0.49}},
+            {"line": 54.5, "long": {"ask": 0.18}},
+        ]
+    )
+    assert best == {"line": 48.5, "long": {"ask": 0.49}}
+
+
+def test_nfl_spread_flat_ledger_logs_contract(monkeypatch, registry, ban_list) -> None:
+    from model_prediction.domain import ModelState
+
+    forecast = _nfl_spread_forecast(selection="away", line=-3.5)
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 9, 13, 14, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "_forecast_nfl_spread_slate", lambda *a, **k: forecast)
+    flat = _CaptureLedger()
+    result = cli_forecast._forecast_nfl_spread_sport(
+        data_root="unused",
+        args_date="2026-09-13",
+        config=_wnba_spread_config(),
+        registry=registry,
+        bans=ban_list,
+        flat_ledger=flat,
+        main_ledger=None,
+    )
+    assert result["logged"] == 1
+    assert flat.appended[0][0].model_state is ModelState.SHADOW_QUALIFIED
+    assert flat.appended[0][0].model_version == "nfl-spread-structural-v5"
+
+
+def test_nfl_total_flat_ledger_logs_contract(monkeypatch, registry, ban_list) -> None:
+    from model_prediction.domain import ModelState
+
+    forecast = _nfl_total_forecast(selection="over", line=48.5)
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 9, 13, 14, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "_forecast_nfl_total_slate", lambda *a, **k: forecast)
+    flat = _CaptureLedger()
+    result = cli_forecast._forecast_nfl_total_sport(
+        data_root="unused",
+        args_date="2026-09-13",
+        config=_wnba_spread_config(),
+        registry=registry,
+        bans=ban_list,
+        flat_ledger=flat,
+        main_ledger=None,
+    )
+    assert result["logged"] == 1
+    assert flat.appended[0][0].model_state is ModelState.SHADOW_QUALIFIED
+    assert flat.appended[0][0].model_version == "nfl-total-structural-v5"

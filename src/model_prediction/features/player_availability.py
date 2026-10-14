@@ -387,6 +387,8 @@ def matchup_player_availability_from_payloads(
     return {
         # Positive means the away team loses more value, favoring the home team.
         "availability_points_gap": round(away["expected_loss_points"] - home["expected_loss_points"], 10),
+        "home_expected_loss_points": round(home["expected_loss_points"], 10),
+        "away_expected_loss_points": round(away["expected_loss_points"], 10),
         "home_available_minutes_share": round(home["available_minutes_share"], 10),
         "away_available_minutes_share": round(away["available_minutes_share"], 10),
         "availability_uncertainty": round(

@@ -1,127 +1,155 @@
 {
-  "generated_at_utc": "2026-08-15T07:25:55.276478+00:00",
+  "generated_at_utc": "2026-10-11T02:47:44.238027+00:00",
   "models": {
-    "cs2": {
+    "cs2-tiered-elo-v6": {
       "status": true,
       "kind": "json_artifact",
       "champion": "cs2-tiered-elo-v6",
       "is_champion": true,
       "model_version": "cs2-tiered-elo-v6",
       "hash_valid": true,
-      "qualified": null,
+      "qualified": false,
       "feature_names": [],
       "threshold": null,
-      "training_observations": {},
+      "training_observations": {
+        "coefficient_fit": 24942,
+        "locked_holdout": 8315,
+        "threshold_selection": 8314
+      },
+      "model_id": "cs2-tiered-elo-v6",
+      "sport": "CS2",
+      "market": "moneyline",
       "ledger": {
-        "total": 465,
+        "total": 384,
         "by_status": {
           "open": {
-            "n": 52,
+            "n": 25,
             "last_settled": null
           },
           "removed": {
-            "n": 123,
+            "n": 242,
             "last_settled": null
           },
           "settled": {
-            "n": 290,
-            "last_settled": "2026-08-15T02:11:57.738237Z"
+            "n": 117,
+            "last_settled": "2026-10-08T03:23:21.216318Z"
           }
         }
       },
       "data_freshness": {},
       "findings": []
     },
-    "dota2": {
+    "dota2-tiered-elo-v6": {
       "status": true,
       "kind": "json_artifact",
       "champion": "dota2-tiered-elo-v6",
       "is_champion": true,
       "model_version": "dota2-tiered-elo-v6",
       "hash_valid": true,
-      "qualified": null,
+      "qualified": false,
       "feature_names": [],
       "threshold": null,
-      "training_observations": {},
+      "training_observations": {
+        "coefficient_fit": 6822,
+        "locked_holdout": 2274,
+        "threshold_selection": 2274
+      },
+      "model_id": "dota2-tiered-elo-v6",
+      "sport": "DOTA2",
+      "market": "moneyline",
       "ledger": {
-        "total": 99,
+        "total": 44,
         "by_status": {
           "open": {
-            "n": 8,
+            "n": 6,
             "last_settled": null
           },
           "removed": {
-            "n": 40,
+            "n": 20,
             "last_settled": null
           },
           "settled": {
-            "n": 51,
-            "last_settled": "2026-08-14T17:02:21.770579Z"
+            "n": 18,
+            "last_settled": "2026-10-08T03:22:08.205365Z"
           }
         }
       },
       "data_freshness": {},
       "findings": []
     },
-    "kbo": {
+    "kbo-tie-aware-elo-v2": {
       "status": true,
       "kind": "json_artifact",
       "champion": "kbo-tie-aware-elo-v2",
       "is_champion": true,
       "model_version": "kbo-tie-aware-elo-v2",
       "hash_valid": true,
-      "qualified": null,
+      "qualified": false,
       "feature_names": [],
       "threshold": null,
-      "training_observations": {},
+      "training_observations": {
+        "coefficient_fit": 3871,
+        "locked_holdout": 1693,
+        "threshold_selection": 1695
+      },
+      "model_id": "kbo-tie-aware-elo-v2",
+      "sport": "KBO",
+      "market": "moneyline",
       "ledger": {
-        "total": 34,
+        "total": 64,
         "by_status": {
           "open": {
-            "n": 13,
+            "n": 4,
+            "last_settled": null
+          },
+          "removed": {
+            "n": 30,
             "last_settled": null
           },
           "settled": {
-            "n": 21,
-            "last_settled": "2026-08-14T17:00:38.090862Z"
+            "n": 30,
+            "last_settled": "2026-10-07T16:06:41.351115Z"
           }
         }
       },
       "data_freshness": {},
       "findings": []
     },
-    "lol": {
+    "lol-tiered-elo-v6": {
       "status": true,
       "kind": "json_artifact",
       "champion": "lol-tiered-elo-v6",
       "is_champion": true,
       "model_version": "lol-tiered-elo-v6",
       "hash_valid": true,
-      "qualified": null,
+      "qualified": false,
       "feature_names": [],
       "threshold": null,
-      "training_observations": {},
+      "training_observations": {
+        "coefficient_fit": 7912,
+        "locked_holdout": 2638,
+        "threshold_selection": 2637
+      },
+      "model_id": "lol-tiered-elo-v6",
+      "sport": "LOL",
+      "market": "moneyline",
       "ledger": {
-        "total": 291,
+        "total": 48,
         "by_status": {
-          "open": {
-            "n": 23,
-            "last_settled": null
-          },
           "removed": {
-            "n": 96,
+            "n": 40,
             "last_settled": null
           },
           "settled": {
-            "n": 172,
-            "last_settled": "2026-08-14T20:41:53.704284Z"
+            "n": 8,
+            "last_settled": "2026-10-07T22:04:59.281471Z"
           }
         }
       },
       "data_freshness": {},
       "findings": []
     },
-    "mlb": {
+    "mlb-elo-trend-lr-v8": {
       "status": true,
       "kind": "json_artifact",
       "champion": "mlb-elo-trend-lr-v8",
@@ -144,26 +172,179 @@
         "locked_holdout": 1391,
         "threshold_selection": 1082
       },
+      "model_id": "mlb-elo-trend-lr-v8",
+      "sport": "MLB",
+      "market": "moneyline",
       "ledger": {
-        "total": 150,
+        "total": 499,
         "by_status": {
+          "open": {
+            "n": 2,
+            "last_settled": null
+          },
           "removed": {
-            "n": 28,
+            "n": 20,
             "last_settled": null
           },
           "settled": {
-            "n": 122,
-            "last_settled": "2026-08-14T23:06:42.454764Z"
+            "n": 477,
+            "last_settled": "2026-10-08T03:21:28.298129Z"
           }
         }
       },
       "data_freshness": {
-        "latest_event": "2026-08-15",
-        "days_ago": 0
+        "latest_event": "2026-10-07",
+        "days_ago": 4
       },
       "findings": []
     },
-    "nba": {
+    "measured-edge-margin-v3": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "measured-edge-margin-v3",
+      "is_champion": true,
+      "model_version": "measured-edge-margin-v3",
+      "hash_valid": true,
+      "qualified": null,
+      "feature_names": [],
+      "threshold": null,
+      "training_observations": {},
+      "model_id": "measured-edge-margin-v3",
+      "sport": "MLB",
+      "market": "spread",
+      "ledger": {
+        "total": 599,
+        "by_status": {
+          "open": {
+            "n": 2,
+            "last_settled": null
+          },
+          "removed": {
+            "n": 20,
+            "last_settled": null
+          },
+          "settled": {
+            "n": 577,
+            "last_settled": "2026-10-08T03:21:23.992776Z"
+          }
+        }
+      },
+      "data_freshness": {
+        "latest_event": "2026-10-07",
+        "days_ago": 4
+      },
+      "findings": []
+    },
+    "measured-edge-totals-v3": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "mlb-structural-v10-frozen",
+      "is_champion": false,
+      "model_version": "measured-edge-totals-v3",
+      "hash_valid": true,
+      "qualified": null,
+      "feature_names": [],
+      "threshold": null,
+      "training_observations": {},
+      "model_id": "measured-edge-totals-v3",
+      "sport": "MLB",
+      "market": "total",
+      "ledger": {
+        "total": 597,
+        "by_status": {
+          "open": {
+            "n": 2,
+            "last_settled": null
+          },
+          "removed": {
+            "n": 20,
+            "last_settled": null
+          },
+          "settled": {
+            "n": 575,
+            "last_settled": "2026-10-08T03:21:25.404921Z"
+          }
+        }
+      },
+      "data_freshness": {
+        "latest_event": "2026-10-07",
+        "days_ago": 4
+      },
+      "findings": []
+    },
+    "mlb-structural-v10-frozen": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "mlb-structural-v10-frozen",
+      "is_champion": true,
+      "model_version": "mlb-structural-v10-frozen",
+      "hash_valid": true,
+      "qualified": null,
+      "feature_names": [],
+      "threshold": null,
+      "training_observations": {},
+      "model_id": "mlb-structural-v10-frozen",
+      "sport": "MLB",
+      "market": "total",
+      "ledger": {
+        "total": 0,
+        "by_status": {}
+      },
+      "data_freshness": {
+        "latest_event": "2026-10-07",
+        "days_ago": 4
+      },
+      "findings": []
+    },
+    "mlb-nrfi-v4": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "mlb-nrfi-v4",
+      "is_champion": true,
+      "model_version": "mlb-nrfi-v4",
+      "hash_valid": true,
+      "qualified": true,
+      "feature_names": [],
+      "threshold": null,
+      "training_observations": {},
+      "model_id": "mlb-nrfi-v4",
+      "sport": "MLB",
+      "market": "nrfi",
+      "ledger": {
+        "total": 0,
+        "by_status": {}
+      },
+      "data_freshness": {
+        "latest_event": "2026-10-07",
+        "days_ago": 4
+      },
+      "findings": []
+    },
+    "mlb-nrfi-v3": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "mlb-nrfi-v4",
+      "is_champion": false,
+      "model_version": "mlb-nrfi-v3",
+      "hash_valid": true,
+      "qualified": true,
+      "feature_names": [],
+      "threshold": null,
+      "training_observations": {},
+      "model_id": "mlb-nrfi-v3",
+      "sport": "MLB",
+      "market": "nrfi",
+      "ledger": {
+        "total": 0,
+        "by_status": {}
+      },
+      "data_freshness": {
+        "latest_event": "2026-10-07",
+        "days_ago": 4
+      },
+      "findings": []
+    },
+    "nba-elo-trend-lr-v4": {
       "status": true,
       "kind": "json_artifact",
       "champion": "nba-elo-trend-lr-v4",
@@ -182,17 +363,122 @@
         "locked_holdout": 654,
         "threshold_selection": 753
       },
+      "model_id": "nba-elo-trend-lr-v4",
+      "sport": "NBA",
+      "market": "moneyline",
       "ledger": {
         "total": 0,
         "by_status": {}
       },
       "data_freshness": {
-        "latest_event": "2026-06-14",
-        "days_ago": 62
+        "latest_event": "2026-10-10",
+        "days_ago": 1
       },
       "findings": []
     },
-    "nfl": {
+    "cfb-structural-v2": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "cfb-structural-v2",
+      "is_champion": true,
+      "model_version": "cfb-structural-v2",
+      "hash_valid": true,
+      "qualified": true,
+      "feature_names": [],
+      "threshold": null,
+      "training_observations": {},
+      "model_id": "cfb-structural-v2",
+      "sport": "NCAAF",
+      "market": "multi",
+      "ledger": {
+        "total": 22,
+        "by_status": {
+          "open": {
+            "n": 11,
+            "last_settled": null
+          },
+          "removed": {
+            "n": 9,
+            "last_settled": null
+          },
+          "settled": {
+            "n": 2,
+            "last_settled": "2026-10-08T03:21:53.070570Z"
+          }
+        }
+      },
+      "data_freshness": {},
+      "findings": []
+    },
+    "cfb-spread-v1": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "cfb-structural-v2",
+      "is_champion": false,
+      "model_version": "cfb-spread-v1",
+      "hash_valid": true,
+      "qualified": false,
+      "feature_names": [],
+      "threshold": null,
+      "training_observations": {},
+      "model_id": "cfb-spread-v1",
+      "sport": "NCAAF",
+      "market": "spread",
+      "ledger": {
+        "total": 304,
+        "by_status": {
+          "open": {
+            "n": 1,
+            "last_settled": null
+          },
+          "removed": {
+            "n": 10,
+            "last_settled": null
+          },
+          "settled": {
+            "n": 293,
+            "last_settled": "2026-10-08T03:21:54.159078Z"
+          }
+        }
+      },
+      "data_freshness": {},
+      "findings": []
+    },
+    "cfb-total-v1": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "cfb-structural-v2",
+      "is_champion": false,
+      "model_version": "cfb-total-v1",
+      "hash_valid": true,
+      "qualified": false,
+      "feature_names": [],
+      "threshold": null,
+      "training_observations": {},
+      "model_id": "cfb-total-v1",
+      "sport": "NCAAF",
+      "market": "total",
+      "ledger": {
+        "total": 302,
+        "by_status": {
+          "open": {
+            "n": 1,
+            "last_settled": null
+          },
+          "removed": {
+            "n": 8,
+            "last_settled": null
+          },
+          "settled": {
+            "n": 293,
+            "last_settled": "2026-10-08T03:21:55.690700Z"
+          }
+        }
+      },
+      "data_freshness": {},
+      "findings": []
+    },
+    "nfl-elo-trend-lr-v4": {
       "status": true,
       "kind": "json_artifact",
       "champion": "nfl-elo-trend-lr-v4",
@@ -210,153 +496,268 @@
         "locked_holdout": 122,
         "threshold_selection": 146
       },
+      "model_id": "nfl-elo-trend-lr-v4",
+      "sport": "NFL",
+      "market": "moneyline",
+      "ledger": {
+        "total": 28,
+        "by_status": {
+          "settled": {
+            "n": 28,
+            "last_settled": "2026-10-06T05:45:59.645570Z"
+          }
+        }
+      },
+      "data_freshness": {
+        "latest_event": "2026-10-06",
+        "days_ago": 5
+      },
+      "findings": []
+    },
+    "nfl-spread-structural-v5": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "nfl-spread-structural-v5",
+      "is_champion": true,
+      "model_version": "nfl-spread-structural-v5",
+      "hash_valid": true,
+      "qualified": true,
+      "feature_names": [],
+      "threshold": null,
+      "training_observations": {},
+      "model_id": "nfl-spread-structural-v5",
+      "sport": "NFL",
+      "market": "spread",
       "ledger": {
         "total": 0,
         "by_status": {}
       },
       "data_freshness": {
-        "latest_event": "2026-08-14",
-        "days_ago": 1
+        "latest_event": "2026-10-06",
+        "days_ago": 5
       },
       "findings": []
     },
-    "npb": {
+    "nfl-total-structural-v5": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "nfl-total-structural-v5",
+      "is_champion": true,
+      "model_version": "nfl-total-structural-v5",
+      "hash_valid": true,
+      "qualified": true,
+      "feature_names": [],
+      "threshold": null,
+      "training_observations": {},
+      "model_id": "nfl-total-structural-v5",
+      "sport": "NFL",
+      "market": "total",
+      "ledger": {
+        "total": 0,
+        "by_status": {}
+      },
+      "data_freshness": {
+        "latest_event": "2026-10-06",
+        "days_ago": 5
+      },
+      "findings": []
+    },
+    "npb-tie-aware-elo-v2": {
       "status": true,
       "kind": "json_artifact",
       "champion": "npb-tie-aware-elo-v2",
       "is_champion": true,
       "model_version": "npb-tie-aware-elo-v2",
       "hash_valid": true,
-      "qualified": null,
+      "qualified": false,
       "feature_names": [],
       "threshold": null,
-      "training_observations": {},
+      "training_observations": {
+        "coefficient_fit": 2556,
+        "locked_holdout": 813,
+        "threshold_selection": 861
+      },
+      "model_id": "npb-tie-aware-elo-v2",
+      "sport": "NPB",
+      "market": "moneyline",
       "ledger": {
-        "total": 55,
+        "total": 28,
         "by_status": {
           "open": {
-            "n": 4,
+            "n": 6,
+            "last_settled": null
+          },
+          "removed": {
+            "n": 8,
             "last_settled": null
           },
           "settled": {
-            "n": 51,
-            "last_settled": "2026-08-14T18:41:55.829935Z"
+            "n": 14,
+            "last_settled": "2026-10-07T22:05:00.715618Z"
           }
         }
       },
       "data_freshness": {},
       "findings": []
     },
-    "rainbow_six": {
+    "rainbow_six-tiered-elo-v6": {
       "status": true,
       "kind": "json_artifact",
       "champion": "rainbow_six-tiered-elo-v6",
       "is_champion": true,
       "model_version": "rainbow_six-tiered-elo-v6",
       "hash_valid": true,
-      "qualified": null,
+      "qualified": false,
       "feature_names": [],
       "threshold": null,
-      "training_observations": {},
+      "training_observations": {
+        "coefficient_fit": 1979,
+        "locked_holdout": 660,
+        "threshold_selection": 660
+      },
+      "model_id": "rainbow_six-tiered-elo-v6",
+      "sport": "RAINBOW_SIX",
+      "market": "moneyline",
       "ledger": {
-        "total": 7,
+        "total": 14,
         "by_status": {
+          "open": {
+            "n": 6,
+            "last_settled": null
+          },
           "removed": {
-            "n": 1,
+            "n": 6,
             "last_settled": null
           },
           "settled": {
-            "n": 6,
-            "last_settled": "2026-08-14T17:02:01.124892Z"
+            "n": 2,
+            "last_settled": "2026-10-06T22:05:29.868972Z"
           }
         }
       },
       "data_freshness": {},
       "findings": []
     },
-    "soccer": {
+    "soccer-poisson-dc-v1": {
       "status": true,
       "kind": "code_backed_model",
       "champion": "soccer-poisson-dc-v1",
       "is_champion": true,
       "model_version": "soccer-poisson-dc-v1",
+      "model_id": "soccer-poisson-dc-v1",
+      "sport": "SOCCER",
+      "market": "moneyline",
       "ledger": {
-        "total": 161,
+        "total": 507,
         "by_status": {
           "open": {
-            "n": 3,
+            "n": 2,
             "last_settled": null
           },
           "removed": {
-            "n": 11,
+            "n": 54,
             "last_settled": null
           },
           "settled": {
-            "n": 147,
-            "last_settled": "2026-08-14T20:40:47.602760Z"
+            "n": 451,
+            "last_settled": "2026-10-08T03:21:50.089152Z"
           }
         }
       },
       "data_freshness": {},
       "findings": []
     },
-    "tennis": {
+    "tennis-learned-v3": {
       "status": true,
       "kind": "code_backed_model",
-      "champion": "tennis-surface-elo-v1",
+      "champion": "tennis-learned-v3",
       "is_champion": true,
-      "model_version": "tennis-surface-elo-v1",
+      "model_version": "tennis-learned-v3",
+      "model_id": "tennis-learned-v3",
+      "sport": "TENNIS",
+      "market": "multi",
       "ledger": {
-        "total": 379,
+        "total": 6,
         "by_status": {
-          "removed": {
-            "n": 13,
+          "open": {
+            "n": 6,
             "last_settled": null
-          },
-          "settled": {
-            "n": 366,
-            "last_settled": "2026-08-14T23:06:44.236839Z"
           }
         }
       },
       "data_freshness": {
-        "latest_event": "2026-08-15",
-        "days_ago": 0
+        "latest_event": "2026-10-10",
+        "days_ago": 1
       },
       "findings": []
     },
-    "valorant": {
+    "tennis-surface-elo-v1": {
+      "status": true,
+      "kind": "code_backed_model",
+      "champion": "tennis-learned-v3",
+      "is_champion": false,
+      "model_version": "tennis-surface-elo-v1",
+      "model_id": "tennis-surface-elo-v1",
+      "sport": "TENNIS",
+      "market": "moneyline",
+      "ledger": {
+        "total": 932,
+        "by_status": {
+          "open": {
+            "n": 12,
+            "last_settled": null
+          },
+          "removed": {
+            "n": 84,
+            "last_settled": null
+          },
+          "settled": {
+            "n": 836,
+            "last_settled": "2026-10-07T22:00:26.303752Z"
+          }
+        }
+      },
+      "data_freshness": {
+        "latest_event": "2026-10-10",
+        "days_ago": 1
+      },
+      "findings": []
+    },
+    "valorant-tiered-elo-v6": {
       "status": true,
       "kind": "json_artifact",
       "champion": "valorant-tiered-elo-v6",
       "is_champion": true,
       "model_version": "valorant-tiered-elo-v6",
       "hash_valid": true,
-      "qualified": null,
+      "qualified": false,
       "feature_names": [],
       "threshold": null,
-      "training_observations": {},
+      "training_observations": {
+        "coefficient_fit": 8988,
+        "locked_holdout": 2996,
+        "threshold_selection": 2996
+      },
+      "model_id": "valorant-tiered-elo-v6",
+      "sport": "VALORANT",
+      "market": "moneyline",
       "ledger": {
-        "total": 220,
+        "total": 28,
         "by_status": {
           "open": {
-            "n": 16,
+            "n": 10,
             "last_settled": null
           },
           "removed": {
-            "n": 126,
+            "n": 18,
             "last_settled": null
-          },
-          "settled": {
-            "n": 78,
-            "last_settled": "2026-08-15T05:16:05.060243Z"
           }
         }
       },
       "data_freshness": {},
       "findings": []
     },
-    "wnba": {
+    "wnba-elo-trend-lr-v4": {
       "status": true,
       "kind": "json_artifact",
       "champion": "wnba-elo-trend-lr-v4",
@@ -375,22 +776,103 @@
         "locked_holdout": 163,
         "threshold_selection": 143
       },
+      "model_id": "wnba-elo-trend-lr-v4",
+      "sport": "WNBA",
+      "market": "moneyline",
       "ledger": {
-        "total": 89,
+        "total": 131,
         "by_status": {
+          "open": {
+            "n": 2,
+            "last_settled": null
+          },
           "removed": {
-            "n": 8,
+            "n": 12,
             "last_settled": null
           },
           "settled": {
-            "n": 81,
-            "last_settled": "2026-08-14T04:07:59.125483Z"
+            "n": 117,
+            "last_settled": "2026-10-08T03:21:29.746765Z"
           }
         }
       },
       "data_freshness": {
-        "latest_event": "2026-08-15",
-        "days_ago": 0
+        "latest_event": "2026-10-10",
+        "days_ago": 1
+      },
+      "findings": []
+    },
+    "wnba-spread-margin-v2": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "wnba-spread-margin-v2",
+      "is_champion": true,
+      "model_version": "wnba-spread-margin-v2",
+      "hash_valid": true,
+      "qualified": true,
+      "feature_names": [],
+      "threshold": null,
+      "training_observations": {},
+      "model_id": "wnba-spread-margin-v2",
+      "sport": "WNBA",
+      "market": "spread",
+      "ledger": {
+        "total": 46,
+        "by_status": {
+          "open": {
+            "n": 2,
+            "last_settled": null
+          },
+          "removed": {
+            "n": 12,
+            "last_settled": null
+          },
+          "settled": {
+            "n": 32,
+            "last_settled": "2026-10-08T03:21:31.369333Z"
+          }
+        }
+      },
+      "data_freshness": {
+        "latest_event": "2026-10-10",
+        "days_ago": 1
+      },
+      "findings": []
+    },
+    "wnba-total-margin-v2": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "wnba-total-margin-v2",
+      "is_champion": true,
+      "model_version": "wnba-total-margin-v2",
+      "hash_valid": true,
+      "qualified": true,
+      "feature_names": [],
+      "threshold": null,
+      "training_observations": {},
+      "model_id": "wnba-total-margin-v2",
+      "sport": "WNBA",
+      "market": "total",
+      "ledger": {
+        "total": 49,
+        "by_status": {
+          "open": {
+            "n": 2,
+            "last_settled": null
+          },
+          "removed": {
+            "n": 12,
+            "last_settled": null
+          },
+          "settled": {
+            "n": 35,
+            "last_settled": "2026-10-08T03:21:32.078730Z"
+          }
+        }
+      },
+      "data_freshness": {
+        "latest_event": "2026-10-10",
+        "days_ago": 1
       },
       "findings": []
     }

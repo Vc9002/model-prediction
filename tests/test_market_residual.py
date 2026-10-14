@@ -2,6 +2,7 @@ import random
 
 import pytest
 
+from model_prediction.domain import utc_now
 from model_prediction.models.market_residual import (
     MarketResidualModel,
     ResidualTrainingRow,
@@ -11,6 +12,7 @@ from model_prediction.models.market_residual import (
 def synthetic_rows(count: int) -> list[ResidualTrainingRow]:
     rng = random.Random(7)
     rows = []
+    now_iso = utc_now().isoformat()
     for _ in range(count):
         market = rng.uniform(0.2, 0.8)
         # True probability tracks the market more than the (noisy) model.
@@ -18,7 +20,7 @@ def synthetic_rows(count: int) -> list[ResidualTrainingRow]:
         outcome = 1 if rng.random() < market else 0
         rows.append(
             ResidualTrainingRow(
-                settled_at_utc="2026-07-10T00:00:00Z",
+                settled_at_utc=now_iso,
                 model_probability=model,
                 market_probability=market,
                 outcome=outcome,

@@ -7,6 +7,7 @@ DD-5 and dashboard/__init__.py for the re-export shim that keeps the old
 
 from __future__ import annotations
 
+import gzip
 import json
 import secrets
 from datetime import UTC, datetime
@@ -31,6 +32,7 @@ from model_prediction.dashboard.backtests import (
 )
 from model_prediction.dashboard.common import (
     _DASHBOARD_TOKEN,
+    _WARMING,
     OUTPUTS,
     ROOT,
     _cached,
@@ -144,12 +146,26 @@ def _read_paper_auto_buyer_ledger() -> list[dict]:
 
 class Handler(BaseHTTPRequestHandler):
     def _send(self, payload, content_type="application/json", code=200) -> None:
-        body = payload if isinstance(payload, bytes) else json.dumps(payload, default=str).encode()
+        body = (
+            payload
+            if isinstance(payload, bytes)
+            else json.dumps(payload, default=str, separators=(",", ":")).encode()
+        )
+        # Ledger payloads are multi-MB JSON that compress ~8-10x; gzip any body
+        # worth compressing when the client advertises support.
+        gzipped = len(body) > 1024 and "gzip" in (self.headers.get("Accept-Encoding") or "")
+        if gzipped:
+            body = gzip.compress(body, compresslevel=5)
         try:
             self.send_response(code)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
+            self.send_header("Vary", "Accept-Encoding")
+            if gzipped:
+                self.send_header("Content-Encoding", "gzip")
+            if _WARMING["on"]:
+                self.send_header("X-Data-Warming", "1")
             self.end_headers()
             self.wfile.write(body)
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):

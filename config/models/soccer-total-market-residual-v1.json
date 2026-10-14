@@ -1,0 +1,12 @@
+{
+  "artifact_hash": "8b86c0fae8856d49a8523330a18548838ddb28260199b4aa973c2dc9f5a25f70",
+  "coefficients": [
+    -0.4648,
+    1.1561,
+    0.2068
+  ],
+  "minimum_sample": 100,
+  "model_version": "soccer-total-market-residual-v1",
+  "rolling_window_days": 90,
+  "sample_size": 265
+}

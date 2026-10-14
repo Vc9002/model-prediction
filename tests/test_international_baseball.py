@@ -990,3 +990,110 @@ def test_international_baseball_team_id_refuses_to_guess_an_unknown_name(tmp_pat
     # whether a real ledger row may be voided.
     assert international_baseball_team_id(tmp_path, "kbo", "Doosan Bears") is None
     assert international_baseball_team_id(tmp_path, "npb", "NC Dinos") is None
+
+
+def test_forecast_international_baseball_prices_runline_and_totals_derivatives(tmp_path) -> None:
+    directory = tmp_path / "international_baseball/kbo"
+    directory.mkdir(parents=True)
+    (directory / "teams.json").write_text(
+        json.dumps(
+            {
+                "KIA": {"name": "Kia Tigers", "aliases": ["KIA"]},
+                "LG": {"name": "LG Twins", "aliases": ["LG"]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    models = tmp_path / "models"
+    models.mkdir()
+    (models / "kbo-tie-aware-elo-v2.json").write_text(
+        json.dumps(
+            {
+                "model_version": "kbo-tie-aware-elo-v2",
+                "artifact_hash": "abc",
+                "k": 20,
+                "home_advantage": 50,
+                "tie_probability": 0.04,
+                "trained_through_date": "2099-07-18",
+                "ratings": {"KIA": 1500, "LG": 1520},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class FakeClient:
+        def slate(self, league, game_date, timezone_name):
+            return [
+                {
+                    "event_id": "event-1",
+                    "event_start_utc": "2099-07-20T09:00:00Z",
+                    "markets": [
+                        {
+                            "market_type": "moneyline",
+                            "market_slug": "kbo-ml",
+                            "sides": [
+                                {"description": "Kia Tigers", "selection": "away"},
+                                {"description": "LG Twins", "selection": "home"},
+                            ],
+                        },
+                        {
+                            "market_type": "spread",
+                            "market_slug": "kbo-spread",
+                            "line": -1.5,
+                            "sides": [
+                                {"description": "-1.50"},
+                                {"description": "+1.50"},
+                            ],
+                        },
+                        {
+                            "market_type": "total",
+                            "market_slug": "kbo-total",
+                            "line": 9.5,
+                            "sides": [
+                                {"description": "Over"},
+                                {"description": "Under"},
+                            ],
+                        },
+                    ],
+                }
+            ]
+
+        def snapshot(self, slug):
+            if slug == "kbo-ml":
+                return {
+                    "observed_at_utc": "2099-07-20T08:00:00Z",
+                    "long": {"description": "Kia Tigers", "ask": 0.45},
+                    "short": {"description": "LG Twins", "ask": 0.55},
+                }
+            elif slug == "kbo-spread":
+                return {
+                    "observed_at_utc": "2099-07-20T08:00:00Z",
+                    "long": {"description": "-1.50", "ask": 0.40},
+                    "short": {"description": "+1.50", "ask": 0.60},
+                }
+            elif slug == "kbo-total":
+                return {
+                    "observed_at_utc": "2099-07-20T08:00:00Z",
+                    "long": {"description": "Over", "ask": 0.53},
+                    "short": {"description": "Under", "ask": 0.47},
+                }
+            raise KeyError(slug)
+
+    result = forecast_international_baseball_slate(tmp_path, models, "kbo", "2099-07-20", client=FakeClient())
+    assert result["priced_count"] == 3
+    market_types = {c["market_type"] for c in result["priced_contracts"]}
+    assert market_types == {"moneyline", "spread", "total"}
+
+    spread_contract = next(c for c in result["priced_contracts"] if c["market_type"] == "spread")
+    assert spread_contract["model_version"] == "kbo-spread-tie-aware-elo-v2"
+    assert spread_contract["line"] == -1.5
+    assert len(spread_contract["sides"]) == 2
+
+    total_contract = next(c for c in result["priced_contracts"] if c["market_type"] == "total")
+    assert total_contract["model_version"] == "kbo-total-tie-aware-elo-v2"
+    assert total_contract["line"] == 9.5
+    over_side = next(s for s in total_contract["sides"] if s["side"] == "long")
+    under_side = next(s for s in total_contract["sides"] if s["side"] == "short")
+    assert (
+        round(over_side["model_fair_settlement_value"] + under_side["model_fair_settlement_value"], 4) == 1.0
+    )

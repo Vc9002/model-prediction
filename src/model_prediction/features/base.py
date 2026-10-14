@@ -55,6 +55,8 @@ class GameRecord:
     season_type: str = "unknown"
     season_year: int | None = None
     competition_type: str = "unknown"
+    home_starter_name: str | None = None
+    away_starter_name: str | None = None
 
     @property
     def start(self) -> datetime:
@@ -131,13 +133,35 @@ class FeatureStore:
                     # modeling population to April 1 through October 31.
                     if key == "mlb" and not _is_mlb_modeling_date(event_start.astimezone(EASTERN).date()):
                         continue
+                    # NFL preseason (August) and Pro Bowl exhibition games feature
+                    # backups/vanilla playbooks and must not train regular/postseason models.
+                    if key == "nfl":
+                        if season_type in {"preseason", "all-star", "exhibition"}:
+                            continue
+                        event_date = event_start.astimezone(EASTERN).date()
+                        if event_date.month in {7, 8}:
+                            continue
+                        if str(raw.get("away_team")) in {
+                            "AFC",
+                            "NFC",
+                            "AFC All-Stars",
+                            "NFC All-Stars",
+                        } or str(raw.get("home_team")) in {"AFC", "NFC", "AFC All-Stars", "NFC All-Stars"}:
+                            continue
+                    away_team_name = str(raw["away_team"])
+                    home_team_name = str(raw["home_team"])
+                    if key == "nfl":
+                        if away_team_name == "Washington":
+                            away_team_name = "Washington Commanders"
+                        if home_team_name == "Washington":
+                            home_team_name = "Washington Commanders"
                     games.append(
                         GameRecord(
                             event_id=k,
                             event_start_utc=event_start_utc,
                             league=str(raw.get("league", sport.upper())),
-                            away_team=str(raw["away_team"]),
-                            home_team=str(raw["home_team"]),
+                            away_team=away_team_name,
+                            home_team=home_team_name,
                             away_score=int(raw["away_score"]),
                             home_score=int(raw["home_score"]),
                             season_type=season_type,
@@ -148,6 +172,14 @@ class FeatureStore:
                                 raw.get("competition_type")
                                 or event_metadata.get("competition_type")
                                 or "unknown"
+                            ),
+                            home_starter_name=(
+                                str(raw.get("home_qb_name") or raw.get("home_starter_name") or "").strip()
+                                or None
+                            ),
+                            away_starter_name=(
+                                str(raw.get("away_qb_name") or raw.get("away_starter_name") or "").strip()
+                                or None
                             ),
                         )
                     )

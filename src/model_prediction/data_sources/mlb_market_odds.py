@@ -412,7 +412,19 @@ def _espn_side_complete(market: dict[str, Any], side_a: str, side_b: str, *, nee
 # MLB event lists MANY totals/spreads (first-5-innings "f5" lines, alternate
 # lines); grabbing the first one silently priced an F5 total 2.5 as a
 # full-game market. Only full-game main lines may become decision prices.
-_PARTIAL_GAME_MARKERS = ("-f5-", "-f3-", "-f7-", "-1st-", "-h1-", "-h2-")
+_PARTIAL_GAME_MARKERS = (
+    "-f5-",
+    "-f3-",
+    "-f7-",
+    "-1st-",
+    "-h1-",
+    "-h2-",
+    "-1h-",
+    "-2h-",
+    "-tt-",
+    "-tt1h-",
+    "-tt2h-",
+)
 
 
 def _is_full_game_market(market: dict[str, Any]) -> bool:

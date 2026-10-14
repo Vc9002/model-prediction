@@ -69,7 +69,7 @@ def ledger_mirror(data_root: str | Path) -> RuntimeLedgerStore | None:
 
 
 def main_ledger_path(data_root: str | Path, sport: str) -> Path:
-    normalized = normalize_main_sport(sport)
+    normalized = str(sport).strip().casefold()
     sport_dir = Path(data_root) / "sports" / normalized
     new_path = sport_dir / "main.xlsx"
     if new_path.exists() or sport_dir.exists():
@@ -114,7 +114,7 @@ def existing_main_ledgers(data_root: str | Path) -> list[PickLedger]:
 
 
 def flat_ledger_path(data_root: str | Path, sport: str) -> Path:
-    normalized = normalize_main_sport(sport)
+    normalized = str(sport).strip().casefold()
     sport_dir = Path(data_root) / "sports" / normalized
     new_path = sport_dir / "flat.xlsx"
     if new_path.exists() or sport_dir.exists():

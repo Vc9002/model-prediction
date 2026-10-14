@@ -79,16 +79,26 @@ prediction_service:
     rollback_model: measured-edge-totals-v3
     promotion_basis: operator_predictive_promotion
     promotion_evidence_level: predictive_only
-  - model_id: mlb-nrfi-v2
+  - model_id: mlb-nrfi-v4
     sport: MLB
     market: nrfi
     implementation: json_artifact
-    artifact: config/models/mlb-nrfi-v2.json
+    artifact: config/models/mlb-nrfi-v4.json
     enabled: true
     serving_status: production
     evidence_status: predictively_qualified
     replacement_priority: low
-    rollback_model: mlb-nrfi-v1
+    rollback_model: mlb-nrfi-v3
+  - model_id: mlb-nrfi-v3
+    sport: MLB
+    market: nrfi
+    implementation: json_artifact
+    artifact: config/models/mlb-nrfi-v3.json
+    enabled: true
+    serving_status: shadow
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: mlb-nrfi-v2
   - model_id: nba-elo-trend-lr-v4
     sport: NBA
     market: moneyline
@@ -109,29 +119,68 @@ prediction_service:
     evidence_status: historical_only
     replacement_priority: medium
     rollback_model: nfl-elo-trend-lr-v3
+  - model_id: nfl-spread-structural-v5
+    sport: NFL
+    market: spread
+    implementation: json_artifact
+    artifact: config/models/nfl-spread-structural-v5.json
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: null
+  - model_id: nfl-total-structural-v5
+    sport: NFL
+    market: total
+    implementation: json_artifact
+    artifact: config/models/nfl-total-structural-v5.json
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+  - model_id: soccer-poisson-dc-v2
+    sport: SOCCER
+    market: moneyline
+    implementation: code_backed_model
+    entry: model_prediction.models.soccer:soccer_model_v2
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: soccer-poisson-dc-v1
   - model_id: soccer-poisson-dc-v1
     sport: SOCCER
     market: moneyline
     implementation: code_backed_model
     entry: model_prediction.models.soccer:soccer_model
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: historical_only
-    replacement_priority: medium
+    replacement_priority: low
     rollback_model: null
+  - model_id: tennis-learned-v3
+    sport: TENNIS
+    market: multi
+    implementation: code_backed_model
+    entry: model_prediction.models.tennis:tennis_model
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: tennis-surface-elo-v1
   - model_id: tennis-surface-elo-v1
     sport: TENNIS
     market: moneyline
     implementation: code_backed_model
     entry: model_prediction.models.tennis:tennis_model
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: historical_only
-    replacement_priority: medium
+    replacement_priority: low
     rollback_model: null
   - model_id: cfb-structural-v2
     sport: NCAAF
-    market: moneyline
+    market: multi
     implementation: json_artifact
     artifact: config/models/cfb-structural-v2.json
     enabled: true
@@ -145,9 +194,9 @@ prediction_service:
     implementation: json_artifact
     artifact: config/models/cfb-spread-v1.json
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: degraded
-    replacement_priority: critical
+    replacement_priority: low
     rollback_model: null
   - model_id: cfb-total-v1
     sport: NCAAF
@@ -155,9 +204,9 @@ prediction_service:
     implementation: json_artifact
     artifact: config/models/cfb-total-v1.json
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: degraded
-    replacement_priority: critical
+    replacement_priority: low
     rollback_model: null
   - model_id: cs2-tiered-elo-v6
     sport: CS2
@@ -238,19 +287,21 @@ prediction_service:
       moneyline: mlb-elo-trend-lr-v8
       spread: measured-edge-margin-v3
       total: mlb-structural-v10-frozen
-      nrfi: mlb-nrfi-v2
+      nrfi: mlb-nrfi-v4
     NBA:
       moneyline: nba-elo-trend-lr-v4
     NFL:
       moneyline: nfl-elo-trend-lr-v4
+      spread: nfl-spread-structural-v5
+      total: nfl-total-structural-v5
     NCAAF:
       moneyline: cfb-structural-v2
-      spread: cfb-spread-v1
-      total: cfb-total-v1
+      spread: cfb-structural-v2
+      total: cfb-structural-v2
     SOCCER:
-      moneyline: soccer-poisson-dc-v1
+      moneyline: soccer-poisson-dc-v2
     TENNIS:
-      moneyline: tennis-surface-elo-v1
+      moneyline: tennis-learned-v3
     CS2:
       moneyline: cs2-tiered-elo-v6
     DOTA2:
@@ -273,23 +324,25 @@ prediction_service:
       - mlb-moneyline-market-residual-v10
       spread: mlb-structural-runline-v4
       total: mlb-structural-v11-residual
-      nrfi: mlb-nrfi-v3
+      nrfi: null
     WNBA:
       moneyline: wnba-moneyline-v5
       spread: wnba-spread-structural-v3
       total: wnba-total-possession-v3
     NCAAF:
       moneyline: null
-      spread: cfb-structural-v2
-      total: cfb-structural-v2
+      spread: null
+      total: null
     NBA:
       moneyline: nba-structural-v5
     NFL:
-      moneyline: nfl-structural-v5
+      moneyline: null
+      spread: null
+      total: null
     SOCCER:
-      moneyline: soccer-poisson-dc-v2
+      moneyline: null
     TENNIS:
-      moneyline: tennis-surface-elo-v2
+      moneyline: null
     CS2:
       moneyline: cs2-contextual-v7
     DOTA2:
@@ -307,22 +360,22 @@ prediction_service:
   research_queue:
   - sport: NCAAF
     market: moneyline
-    incumbent: college-football-v1
-    replacement_priority: critical
-    challenger: cfb-structural-v2
-    evidence_status: degraded
+    incumbent: cfb-structural-v2
+    replacement_priority: medium
+    challenger: null
+    evidence_status: shadow_qualified
   - sport: NCAAF
     market: spread
-    incumbent: cfb-spread-v1
-    replacement_priority: critical
-    challenger: cfb-structural-v2
-    evidence_status: degraded
+    incumbent: cfb-structural-v2
+    replacement_priority: medium
+    challenger: null
+    evidence_status: shadow_qualified
   - sport: NCAAF
     market: total
-    incumbent: cfb-total-v1
-    replacement_priority: critical
-    challenger: cfb-structural-v2
-    evidence_status: degraded
+    incumbent: cfb-structural-v2
+    replacement_priority: medium
+    challenger: null
+    evidence_status: shadow_qualified
   - sport: MLB
     market: total
     incumbent: mlb-structural-v10-frozen
@@ -361,16 +414,16 @@ prediction_service:
     evidence_status: predictively_qualified
   - sport: SOCCER
     market: moneyline
-    incumbent: soccer-poisson-dc-v1
-    replacement_priority: medium
-    challenger: soccer-poisson-dc-v2
-    evidence_status: historical_only
+    incumbent: soccer-poisson-dc-v2
+    replacement_priority: low
+    challenger: null
+    evidence_status: predictively_qualified
   - sport: TENNIS
     market: moneyline
-    incumbent: tennis-surface-elo-v1
-    replacement_priority: medium
-    challenger: tennis-surface-elo-v2
-    evidence_status: historical_only
+    incumbent: tennis-learned-v3
+    replacement_priority: low
+    challenger: null
+    evidence_status: predictively_qualified
   - sport: CS2
     market: moneyline
     incumbent: cs2-tiered-elo-v6
@@ -421,10 +474,15 @@ prediction_service:
   - measured-edge-margin-v3
   - measured-edge-totals-v3
   - mlb-structural-v10-frozen
-  - mlb-nrfi-v2
+  - mlb-nrfi-v4
+  - mlb-nrfi-v3
   - nba-elo-trend-lr-v4
   - nfl-elo-trend-lr-v4
+  - nfl-spread-structural-v5
+  - nfl-total-structural-v5
+  - soccer-poisson-dc-v2
   - soccer-poisson-dc-v1
+  - tennis-learned-v3
   - tennis-surface-elo-v1
   - cfb-structural-v2
   - cfb-spread-v1
@@ -444,9 +502,12 @@ prediction_service:
     measured-edge-margin-v3: config/models/measured-edge-margin-v3.json
     measured-edge-totals-v3: config/models/measured-edge-totals-v3.json
     mlb-structural-v10-frozen: config/models/mlb-structural-v10-frozen.json
-    mlb-nrfi-v2: config/models/mlb-nrfi-v2.json
+    mlb-nrfi-v4: config/models/mlb-nrfi-v4.json
+    mlb-nrfi-v3: config/models/mlb-nrfi-v3.json
     nba-elo-trend-lr-v4: config/models/nba-elo-trend-lr-v4.json
     nfl-elo-trend-lr-v4: config/models/nfl-elo-trend-lr-v4.json
+    nfl-spread-structural-v5: config/models/nfl-spread-structural-v5.json
+    nfl-total-structural-v5: config/models/nfl-total-structural-v5.json
     cfb-structural-v2: config/models/cfb-structural-v2.json
     cfb-spread-v1: config/models/cfb-spread-v1.json
     cfb-total-v1: config/models/cfb-total-v1.json

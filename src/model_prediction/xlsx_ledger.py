@@ -126,6 +126,7 @@ def write_xlsx_rows_atomic(
         workbook.save(temporary)
         with open(temporary, "r+b") as handle:
             os.fsync(handle.fileno())
+        workbook.close()
         _replace_with_retry(temporary, destination)
     except Exception:
         if os.path.exists(temporary):
@@ -135,7 +136,7 @@ def write_xlsx_rows_atomic(
         workbook.close()
 
 
-def _replace_with_retry(temporary: str, destination: Path, attempts: int = 6) -> None:
+def _replace_with_retry(temporary: str, destination: Path, attempts: int = 10) -> None:
     # On Windows a briefly open handle (antivirus scan, OneDrive/indexer read)
     # makes os.replace fail with WinError 5 even though the file is free moments
     # later. 2026-10-04 settlement lost a whole run to one such failure.
@@ -146,7 +147,7 @@ def _replace_with_retry(temporary: str, destination: Path, attempts: int = 6) ->
         except PermissionError:
             if attempt == attempts - 1:
                 raise
-            time.sleep(0.5 * (attempt + 1))
+            time.sleep(min(3.0, 0.5 * (attempt + 1)))
 
 
 def _build_workbook(fieldnames: list[str], rows: list[dict[str, str]]) -> Workbook:

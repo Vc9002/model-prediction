@@ -418,3 +418,337 @@ def test_forecast_requires_exact_identity_and_remains_zero_unit(tmp_path) -> Non
 
     evidence = build_snapshot(result["priced_contracts"][0])
     assert replay_inputs(evidence["inference_inputs"]) == evidence["probabilities"]
+
+
+def test_forecast_esports_prices_map_spread_and_totals_derivatives(tmp_path) -> None:
+    data = tmp_path / "data/esports/lol"
+    artifacts = tmp_path / "artifacts"
+    data.mkdir(parents=True)
+    artifacts.mkdir()
+    (data / "teams.json").write_text(
+        json.dumps(
+            {
+                "a": {"name": "Alpha Esports", "slug": "alpha-esports", "acronym": "ALP"},
+                "b": {"name": "Beta Gaming", "slug": "beta-gaming", "acronym": "BET"},
+            }
+        )
+    )
+    (artifacts / "lol-tiered-elo-v6.json").write_text(
+        json.dumps(
+            {
+                "model_version": "lol-tiered-elo-v6",
+                "trained_through_utc": "2026-07-18T00:00:00Z",
+                "artifact_hash": "hash",
+                "k": 20,
+                "ratings": {"a": 1600, "b": 1400},
+                "platt_intercept": None,
+                "platt_slope": None,
+                "confidence_threshold": 0.10,
+            }
+        )
+    )
+
+    class FakeClient:
+        def slate(self, league, game_date, timezone_name):
+            return [
+                {
+                    "event_id": "event-1",
+                    "event_start_utc": "2099-01-01T12:00:00Z",
+                    "markets": [
+                        {
+                            "market_type": "moneyline",
+                            "market_slug": "market-ml",
+                            "sides": [
+                                {"description": "Alpha Esports"},
+                                {"description": "Beta Gaming"},
+                            ],
+                        },
+                        {
+                            "market_type": "spread",
+                            "market_slug": "market-spread",
+                            "line": -1.5,
+                            "sides": [
+                                {"description": "-1.50"},
+                                {"description": "+1.50"},
+                            ],
+                        },
+                        {
+                            "market_type": "total",
+                            "market_slug": "market-total",
+                            "line": 2.5,
+                            "sides": [
+                                {"description": "Over"},
+                                {"description": "Under"},
+                            ],
+                        },
+                    ],
+                }
+            ]
+
+        def snapshot(self, slug):
+            if slug == "market-ml":
+                return {
+                    "observed_at_utc": "2026-07-18T01:00:00Z",
+                    "long": {"description": "Alpha Esports", "ask": 0.70},
+                    "short": {"description": "Beta Gaming", "ask": 0.31},
+                }
+            elif slug == "market-spread":
+                return {
+                    "observed_at_utc": "2026-07-18T01:00:00Z",
+                    "long": {"description": "-1.50", "ask": 0.45},
+                    "short": {"description": "+1.50", "ask": 0.58},
+                }
+            elif slug == "market-total":
+                return {
+                    "observed_at_utc": "2026-07-18T01:00:00Z",
+                    "long": {"description": "Over", "ask": 0.52},
+                    "short": {"description": "Under", "ask": 0.50},
+                }
+            raise KeyError(slug)
+
+    result = forecast_esports_slate(tmp_path / "data", artifacts, "lol", "2099-01-01", client=FakeClient())
+    assert result["priced_count"] == 3
+    market_types = {c["market_type"] for c in result["priced_contracts"]}
+    assert market_types == {"moneyline", "spread", "total"}
+
+    # Check spread contract
+    spread_contract = next(c for c in result["priced_contracts"] if c["market_type"] == "spread")
+    assert spread_contract["model_version"] == "lol-spread-tiered-elo-v6"
+    assert spread_contract["line"] == -1.5
+    assert len(spread_contract["sides"]) == 2
+    long_side = next(s for s in spread_contract["sides"] if s["side"] == "long")
+    assert long_side["model_probability"] > 0
+
+    # Check total contract
+    total_contract = next(c for c in result["priced_contracts"] if c["market_type"] == "total")
+    assert total_contract["model_version"] == "lol-total-tiered-elo-v6"
+    assert total_contract["line"] == 2.5
+    over_side = next(s for s in total_contract["sides"] if s["side"] == "long")
+    under_side = next(s for s in total_contract["sides"] if s["side"] == "short")
+    assert round(over_side["model_probability"] + under_side["model_probability"], 4) == 1.0
+
+
+def test_forecast_esports_prices_map_spread_anchored_to_team2(tmp_path) -> None:
+    data = tmp_path / "data/esports/lol"
+    artifacts = tmp_path / "artifacts"
+    data.mkdir(parents=True)
+    artifacts.mkdir()
+    (data / "teams.json").write_text(
+        json.dumps(
+            {
+                "a": {"name": "Alpha Esports", "slug": "alpha-esports", "acronym": "ALP"},
+                "b": {"name": "Beta Gaming", "slug": "beta-gaming", "acronym": "BET"},
+            }
+        )
+    )
+    (artifacts / "lol-tiered-elo-v6.json").write_text(
+        json.dumps(
+            {
+                "model_version": "lol-tiered-elo-v6",
+                "trained_through_utc": "2026-07-18T00:00:00Z",
+                "artifact_hash": "hash",
+                "k": 20,
+                "ratings": {"a": 1600, "b": 1400},
+                "platt_intercept": None,
+                "platt_slope": None,
+                "confidence_threshold": 0.10,
+            }
+        )
+    )
+
+    class FakeClient:
+        def slate(self, league, game_date, timezone_name):
+            return [
+                {
+                    "event_id": "event-1",
+                    "event_start_utc": "2099-01-01T12:00:00Z",
+                    "markets": [
+                        {
+                            "market_type": "moneyline",
+                            "market_slug": "market-ml",
+                            "sides": [
+                                {"description": "Alpha Esports"},
+                                {"description": "Beta Gaming"},
+                            ],
+                        },
+                        {
+                            "market_type": "spread",
+                            "market_slug": "market-spread-t2-pos",
+                            "line": 1.5,
+                            "sides": [
+                                {"description": "+1.50"},
+                                {"description": "-1.50"},
+                            ],
+                        },
+                        {
+                            "market_type": "spread",
+                            "market_slug": "market-spread-t2-neg",
+                            "line": -1.5,
+                            "sides": [
+                                {"description": "-1.50"},
+                                {"description": "+1.50"},
+                            ],
+                        },
+                    ],
+                }
+            ]
+
+        def snapshot(self, slug):
+            if slug == "market-ml":
+                return {
+                    "observed_at_utc": "2026-07-18T01:00:00Z",
+                    "long": {"description": "Alpha Esports", "ask": 0.70},
+                    "short": {"description": "Beta Gaming", "ask": 0.31},
+                }
+            elif slug == "market-spread-t2-pos":
+                return {
+                    "observed_at_utc": "2026-07-18T01:00:00Z",
+                    "team": "Beta Gaming",
+                    "line": 1.5,
+                    "long": {"description": "+1.50", "ask": 0.55},
+                    "short": {"description": "-1.50", "ask": 0.48},
+                }
+            elif slug == "market-spread-t2-neg":
+                return {
+                    "observed_at_utc": "2026-07-18T01:00:00Z",
+                    "team": "Beta Gaming",
+                    "line": -1.5,
+                    "long": {"description": "-1.50", "ask": 0.35},
+                    "short": {"description": "+1.50", "ask": 0.68},
+                }
+            raise KeyError(slug)
+
+    result = forecast_esports_slate(tmp_path / "data", artifacts, "lol", "2099-01-01", client=FakeClient())
+    assert result["priced_count"] == 3
+
+    # Beta +1.5 market
+    c_pos = next(c for c in result["priced_contracts"] if c["market_slug"] == "market-spread-t2-pos")
+    long_pos = next(s for s in c_pos["sides"] if s["side"] == "long")
+    short_pos = next(s for s in c_pos["sides"] if s["side"] == "short")
+    assert "Beta Gaming +1.5" in long_pos["team"]
+    assert "Alpha Esports -1.5" in short_pos["team"]
+    assert round(long_pos["model_probability"] + short_pos["model_probability"], 4) == 1.0
+
+    # Beta -1.5 market
+    c_neg = next(c for c in result["priced_contracts"] if c["market_slug"] == "market-spread-t2-neg")
+    long_neg = next(s for s in c_neg["sides"] if s["side"] == "long")
+    short_neg = next(s for s in c_neg["sides"] if s["side"] == "short")
+    assert "Beta Gaming -1.5" in long_neg["team"]
+    assert "Alpha Esports +1.5" in short_neg["team"]
+    assert round(long_neg["model_probability"] + short_neg["model_probability"], 4) == 1.0
+
+
+def test_log_and_settle_esports_derivatives(tmp_path, monkeypatch) -> None:
+    from model_prediction.cli import _log_esports_forecast, _settle_esports_pick
+    from model_prediction.data_sources import polymarket_us
+    from model_prediction.ledger import PickLedger
+
+    ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
+    config = {
+        "models": {
+            "LOL": {
+                "status": "research",
+                "min_edge": 0.02,
+                "research_confidence_gate": 0.0,
+            }
+        },
+        "project": {"maximum_data_age_hours": 24, "maximum_unreviewed_market_disagreement": 0.50},
+        "bankroll": {"base_unit_dollars": 10.0},
+    }
+
+    forecast = {
+        "title": "lol",
+        "model_version": "lol-tiered-elo-v6",
+        "priced_contracts": [
+            {
+                "event_id": "event-1",
+                "event_start_utc": "2099-01-01T12:00:00Z",
+                "market_slug": "lol-spread-1",
+                "market_type": "spread",
+                "line": -1.5,
+                "teams": ["Alpha Esports", "Beta Gaming"],
+                "model_version": "lol-spread-tiered-elo-v6",
+                "artifact_hash": "hash1",
+                "gated_research_eligible": True,
+                "observed_at_utc": "2026-07-18T01:00:00Z",
+                "sides": [
+                    {
+                        "side": "long",
+                        "team": "Alpha Esports -1.5",
+                        "model_probability": 0.65,
+                        "executable_ask": 0.50,
+                    },
+                    {
+                        "side": "short",
+                        "team": "Beta Gaming +1.5",
+                        "model_probability": 0.35,
+                        "executable_ask": 0.55,
+                    },
+                ],
+            },
+            {
+                "event_id": "event-1",
+                "event_start_utc": "2099-01-01T12:00:00Z",
+                "market_slug": "lol-total-1",
+                "market_type": "total",
+                "line": 2.5,
+                "teams": ["Alpha Esports", "Beta Gaming"],
+                "model_version": "lol-total-tiered-elo-v6",
+                "artifact_hash": "hash1",
+                "gated_research_eligible": True,
+                "observed_at_utc": "2026-07-18T01:00:00Z",
+                "sides": [
+                    {"side": "long", "team": "Over", "model_probability": 0.60, "executable_ask": 0.45},
+                    {"side": "short", "team": "Under", "model_probability": 0.40, "executable_ask": 0.60},
+                ],
+            },
+        ],
+    }
+
+    logged = _log_esports_forecast(forecast, config, ledger)
+    assert logged == 2
+
+    rows = ledger.rows()
+    spread_row = next(r for r in rows if r["market_type"] == "spread")
+    assert spread_row["selection"] == "home"
+    assert float(spread_row["line"]) == -1.5
+    assert spread_row["home_team"] == "Alpha Esports"
+    assert spread_row["away_team"] == "Beta Gaming"
+
+    total_row = next(r for r in rows if r["market_type"] == "total")
+    assert total_row["selection"] == "over"
+    assert float(total_row["line"]) == 2.5
+
+    # Test settlement with binary prices [0.0, 1.0]
+    class MockResolvedClient:
+        def __init__(self, winner_desc, loser_desc):
+            self._sides = [
+                {"description": winner_desc, "price": "1.0"},
+                {"description": loser_desc, "price": "0.0"},
+            ]
+
+        def market(self, slug):
+            return {"marketSides": self._sides}
+
+        def book(self, slug):
+            return {"state": "MARKET_STATE_EXPIRED"}
+
+    # Settle spread: Alpha Esports -1.5 wins (home sweeps 2-0)
+    monkeypatch.setattr(
+        polymarket_us,
+        "PolymarketUSClient",
+        lambda: MockResolvedClient("Alpha Esports -1.5", "Beta Gaming +1.5"),
+    )
+    res_spread = _settle_esports_pick(spread_row, ledger)
+    assert res_spread is not None and res_spread.get("settled") is True
+    assert res_spread["result"] == "win"
+
+    # Settle total: Over wins (series went 2-1)
+    monkeypatch.setattr(
+        polymarket_us,
+        "PolymarketUSClient",
+        lambda: MockResolvedClient("Over", "Under"),
+    )
+    res_total = _settle_esports_pick(total_row, ledger)
+    assert res_total is not None and res_total.get("settled") is True
+    assert res_total["result"] == "win"

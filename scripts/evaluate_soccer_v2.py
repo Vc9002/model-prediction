@@ -195,10 +195,10 @@ if __name__ == "__main__":
     print("\n# Soccer Dixon-Coles v2 Offline Evaluation Summary\n")
     print(f"- **Matches**: {res['n_matches']}")
     print(
-        f"- **3-Way LogLoss**: v1={res['v1_multiclass_log_loss']:.4f} vs v2={res['v2_multiclass_log_loss']:.4f} (Δ={res['delta_log_loss']:+.4f})"
+        f"- **3-Way LogLoss**: v1={res['v1_multiclass_log_loss']:.4f} vs v2={res['v2_multiclass_log_loss']:.4f} (Delta={res['delta_log_loss']:+.4f})"
     )
     print(
-        f"- **Brier Score**: v1={res['v1_brier_score']:.4f} vs v2={res['v2_brier_score']:.4f} (Δ={res['delta_brier']:+.4f})"
+        f"- **Brier Score**: v1={res['v1_brier_score']:.4f} vs v2={res['v2_brier_score']:.4f} (Delta={res['delta_brier']:+.4f})"
     )
     print(
         f"- **Draw Rate Calibration**: Actual={res['draw_calibration']['actual_draw_rate']:.4f} | v1={res['draw_calibration']['v1_mean_draw_prob']:.4f} | v2={res['draw_calibration']['v2_mean_draw_prob']:.4f}"

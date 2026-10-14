@@ -1,0 +1,15 @@
+{
+  "baseline_brier": 0.18678,
+  "calibrated_at_utc": "2026-10-14T04:35:57.582803+00:00",
+  "calibrated_oof_brier": 0.18609146618199754,
+  "champion_method": "beta",
+  "market": "moneyline",
+  "model_version": "wnba-elo-trend-lr-v4",
+  "parameters": {
+    "a": 2.0507,
+    "b": 3.243,
+    "c": -1.5821
+  },
+  "sample_size": 117,
+  "sport": "wnba"
+}

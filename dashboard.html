@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Model Prediction — Dashboard</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='13' font-size='13'%3E%F0%9F%93%88%3C/text%3E%3C/svg%3E">
 <style>
 :root{
   --bg:#0a0c11; --surface:#12151d; --surface-2:#181c27; --border:#242938;
@@ -126,6 +127,18 @@ table.data{border-collapse:collapse;width:100%;font-family:var(--mono);font-size
 table.data th{color:var(--dim);text-align:left;padding:6px;border-bottom:1px solid var(--border);cursor:pointer;white-space:nowrap;font-weight:600}
 table.data td{padding:5px 6px;border-bottom:1px solid rgba(255,255,255,.04);white-space:nowrap}
 table.data tr:hover td{background:var(--surface-2)}
+/* shared ledger look: every ledger uses the same scroll box, sticky header and cell rhythm */
+.ledger-scroll{overflow:auto;max-height:min(70vh,640px);border:1px solid var(--border);border-radius:8px}
+table.ledger{border-collapse:separate;border-spacing:0;width:100%;font-family:var(--mono);font-size:12px}
+table.ledger th{position:sticky;top:0;z-index:2;background:var(--surface-2);color:var(--dim);text-align:left;padding:7px 9px;
+  border-bottom:1px solid var(--border);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+table.ledger th[onclick]{cursor:pointer}
+table.ledger th[onclick]:hover{color:var(--text)}
+table.ledger td{padding:7px 9px;border-bottom:1px solid rgba(255,255,255,.05);white-space:nowrap;vertical-align:middle}
+table.ledger tr.click-row{cursor:pointer}
+table.ledger tr.click-row:hover td{background:var(--surface-2)}
+table.ledger tr.ledger-more td{text-align:center;white-space:normal;padding:12px;background:var(--surface)}
+.section-head{margin:0}
 .pill{padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600}
 .pill.win{background:rgba(51,209,126,.15);color:var(--green)}
 .pill.loss{background:rgba(255,92,92,.15);color:var(--red)}
@@ -145,7 +158,7 @@ input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);ou
 .state-badge.ok{color:var(--green);border-color:rgba(51,209,126,.5)}
 .state-badge.warn{color:var(--yellow);border-color:rgba(242,169,60,.5)}
 .state-badge.bad{color:var(--red);border-color:rgba(255,92,92,.5)}
-.blocked-order{display:flex;max-width:240px;gap:6px;align-items:flex-start;white-space:normal}
+.blocked-order{display:flex;min-width:200px;max-width:260px;gap:6px;align-items:flex-start;white-space:normal}
 .blocked-order .reason{color:var(--dim);font-size:10.5px;line-height:1.35}
 .pager{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:10px;font:11px var(--mono);color:var(--dim)}
 .integrity-list{display:grid;gap:8px}
@@ -301,7 +314,10 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <div id="autoBuyerTopControl" style="display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:3px 8px;font-family:var(--mono);font-size:11px">
     <span>Auto-Buyer (<span id="autoBuyerUnitBadge">50¢/U</span>):</span>
     <button id="autoBuyerToggleBtn" onclick="toggleAutoBuyer()" style="font-weight:700;padding:2px 8px;border-radius:5px;font-size:11px;background:rgba(255,92,92,0.2);color:var(--red)">OFF</button>
-    <button id="autoBuyerModeBtn" onclick="toggleAutoBuyerMode()" title="PAPER: simulated fills only, recorded for tracking, no real orders. LIVE: places real Polymarket orders." style="font-weight:700;padding:2px 8px;border-radius:5px;font-size:11px;background:rgba(120,170,255,0.2);color:#78aaff">PAPER</button>
+    <div id="autoBuyerModeSeg" style="display:inline-flex;border:1px solid var(--border);border-radius:5px;overflow:hidden">
+      <button id="autoBuyerPaperBtn" onclick="setAutoBuyerMode('paper')" style="font-weight:700;padding:2px 8px;font-size:11px;border:0;border-radius:0">PAPER</button>
+      <button id="autoBuyerLiveBtn" onclick="setAutoBuyerMode('live')" style="font-weight:700;padding:2px 8px;font-size:11px;border:0;border-radius:0">LIVE</button>
+    </div>
     <button onclick="runAutoBuyerNow()" title="Trigger Auto-Buyer check now" style="padding:2px 6px;font-size:11px">⚡ Run</button>
   </div>
   <span style="flex:1"></span>
@@ -325,12 +341,12 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
        <button data-tab="market">Market</button>
      </div>
      <div class="rail-group">
-       <div class="rail-label">Ledger</div>
-       <button data-tab="picks">Ledger</button>
-       <button data-tab="flat">Flat</button>
-       <button data-tab="v9-ledger">MLB v9</button>
-       <button data-tab="research">Flat Research</button>
-       <button data-tab="gated-research">Gated Research</button>
+       <div class="rail-label">Ledgers</div>
+       <button data-tab="picks">Model Picks Ledger</button>
+       <button data-tab="flat">Flat Ledger</button>
+       <button data-tab="v9-ledger">MLB v9 Ledger</button>
+       <button data-tab="research">Flat Research Ledger</button>
+       <button data-tab="gated-research">Gated Research Ledger</button>
        <button data-tab="poly-ledger" disabled title="Disabled by operator">Polymarket — OFF</button>
      </div>
      <div class="rail-group">
@@ -349,8 +365,8 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <div class="rail-label">Polymarket US</div>
       <button data-tab="polymarket" disabled title="Disabled by operator">Edge Scanner — OFF</button>
       <button data-tab="poly-ledger" disabled title="Disabled by operator">Edge Ledger — OFF</button>
-      <button data-tab="auto-buyer-ledger">Auto-Buyer</button>
-      <button data-tab="manual-bets">Manual Bets</button>
+      <button data-tab="auto-buyer-ledger">Auto-Buyer Ledger</button>
+      <button data-tab="manual-bets">Manual Bets Ledger</button>
     </div>
     <div class="rail-group">
       <div class="rail-label">System</div>
@@ -361,6 +377,9 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   </nav>
 
   <div class="wrap">
+  <section id="tab-production" style="display:none">
+    <div id="productionPanel"><div class="card dim">Loading production status…</div></div>
+  </section>
   <section id="tab-matrix" style="display:none">
     <div class="card">
       <h2>Model Wiring Matrix</h2>
@@ -412,7 +431,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     </div>
   </section>
 
-  <section id="tab-rebuild">
+  <section id="tab-rebuild" style="display:none">
     <div class="rebuild-banner" role="status">
       <h2>CLEAN-SLATE REBUILD — SHADOW ONLY</h2>
       <div>No rebuild output can submit a live order. <b>NO LIVE EXECUTION</b></div>
@@ -466,14 +485,14 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <section id="tab-picks" style="display:none">
     <div class="card">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
-        <h2 style="margin:0">Model Picks Ledger</h2>
+        <h2 class="section-head">Model Picks Ledger</h2>
         <span style="flex:1"></span>
         <button class="primary" onclick="confirmAction('main_forecast','Run the main forecast for today? MLB/WNBA qualified calls go to this ledger; esports/soccer/nba/nfl route to Research and Gated Research in the same pass.')">Run Main Forecast</button>
       </div>
       <div class="small dim" style="margin-bottom:8px">Paper model forecasts: Size and P&amp;L are hypothetical units. Order shows exchange status only; live positions and dollar P&amp;L appear in Portfolio.</div>
       <div class="filters" id="filters_L" style="margin-bottom:12px"></div>
       <div class="kpis" id="pickKpis"></div>
-      <div style="overflow:auto;max-height:520px"><table class="data" id="pickTable"></table></div>
+      <div class="ledger-scroll"><table class="ledger" id="pickTable"></table></div>
     </div>
   </section>
 
@@ -573,7 +592,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <section id="tab-research" style="display:none">
     <div class="secgrid">
       <div class="card" style="grid-column:1/-1">
-        <h2>Flat Research Picks (per-sport ledgers)</h2>
+        <h2>Flat Research Ledger — Per-Sport Workbooks</h2>
         <div class="small dim" style="margin-bottom:8px">Aggregate view of separate soccer, esports, KBO, and NPB workbooks — every model-favored candidate for every matched game and market, no edge gate. Only the subset that clears the sport's edge/confidence gate is additionally mirrored into Gated Research.</div>
         <div class="filters" id="filters_R" style="margin-bottom:12px"></div>
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
@@ -582,7 +601,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
           <span>Shown: <b id="researchShown">0</b></span>
         </div>
         <div id="researchKpis" class="kpis" style="margin-bottom:16px"></div>
-        <div style="overflow-x:auto"><table class="data" id="researchTable"></table></div>
+        <div class="ledger-scroll"><table class="ledger" id="researchTable"></table></div>
       </div>
       <div class="card">
         <h2>Backtest &amp; validation history (outputs/latest)</h2>
@@ -598,7 +617,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
 
   <section id="tab-gated-research" style="display:none">
     <div class="card">
-      <h2>Gated Research Picks (per-sport ledgers)</h2>
+      <h2>Gated Research Ledger — Per-Sport Workbooks</h2>
       <div class="small dim" style="margin-bottom:8px">Aggregate view of separate soccer, esports, KBO, and NPB ledgers. Only exact-input model calls clearing the sport's executable-edge and confidence gates appear here; no negative-edge or unresolved-team rows.</div>
       <div class="filters" id="filters_G" style="margin-bottom:12px"></div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
@@ -607,13 +626,13 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
         <span>Shown: <b id="gatedResearchShown">0</b></span>
       </div>
       <div id="gatedResearchKpis" class="kpis" style="margin-bottom:16px"></div>
-      <div style="overflow-x:auto"><table class="data" id="gatedResearchTable"></table></div>
+      <div class="ledger-scroll"><table class="ledger" id="gatedResearchTable"></table></div>
     </div>
   </section>
 
   <section id="tab-flat" style="display:none">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
-      <h2 style="margin:0">Flat Forecast — All Games (No Edge Gate)</h2>
+      <h2 class="section-head">Flat Ledger — All Games, No Edge Gate</h2>
       <span class="chip dim">Model run on every game regardless of edge</span>
       <span style="flex:1"></span>
       <button class="primary" onclick="confirmAction('flat_forecast','Run flat forecast on all games for today?')">Run Flat Forecast</button>
@@ -621,13 +640,13 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     <div class="filters" id="filters_F" style="margin-bottom:12px"></div>
     <div id="flatKpis" class="kpis" style="margin-bottom:16px"></div>
     <div class="card">
-      <div style="overflow-x:auto"><table class="data" id="flatTable"><tr><td>Loading…</td></tr></table></div>
+      <div class="ledger-scroll"><table class="ledger" id="flatTable"><tr><td>Loading…</td></tr></table></div>
     </div>
   </section>
 
   <section id="tab-v9-ledger" style="display:none">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
-      <h2 style="margin:0">MLB v9 Flat Forecast — Dedicated Challenger Benchmark (1.0U)</h2>
+      <h2 class="section-head">MLB v9 Ledger — Challenger Benchmark (1.0U)</h2>
       <span class="chip dim">Challenger model run on every MLB game regardless of edge</span>
       <span style="flex:1"></span>
       <button class="primary" onclick="confirmAction('v9_forecast','Run MLB v9 flat forecast for today?')">Run MLB v9 Forecast</button>
@@ -636,13 +655,13 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     <div class="filters" id="filters_V9" style="margin-bottom:12px"></div>
     <div id="v9LedgerKpis" class="kpis" style="margin-bottom:16px"></div>
     <div class="card">
-      <div style="overflow-x:auto"><table class="data" id="v9LedgerTable"><tr><td>Loading…</td></tr></table></div>
+      <div class="ledger-scroll"><table class="ledger" id="v9LedgerTable"><tr><td>Loading…</td></tr></table></div>
     </div>
   </section>
 
   <section id="tab-poly-ledger" style="display:none">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
-      <h2 style="margin:0">Polymarket Edge Ledger — Live Executed & Scanned Trades</h2>
+      <h2 class="section-head">Polymarket Edge Ledger — Executed & Scanned Trades</h2>
       <span class="chip dim">Recorded picks & Quarter-Kelly tickets from Polymarket CLOB Edge Scanner</span>
       <span style="flex:1"></span>
       <button onclick="gotoTab('polymarket')">Back to Edge Scanner</button>
@@ -651,13 +670,13 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     <div class="filters" id="filters_PL" style="margin-bottom:12px"></div>
     <div id="polyLedgerKpis" class="kpis" style="margin-bottom:16px"></div>
     <div class="card">
-      <div style="overflow-x:auto"><table class="data" id="polyLedgerTable"><tr><td>Loading Polymarket trades…</td></tr></table></div>
+      <div class="ledger-scroll"><table class="ledger" id="polyLedgerTable"><tr><td>Loading Polymarket trades…</td></tr></table></div>
     </div>
   </section>
 
   <section id="tab-auto-buyer-ledger" style="display:none">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
-      <h2 style="margin:0">🤖 Auto-Buyer — Execution & Realized Settlement</h2>
+      <h2 class="section-head">Auto-Buyer Ledger — Execution & Realized Settlement</h2>
       <span class="chip dim">Live automated Polymarket executions · configurable future-order unit value · ESPN official outcome settlement · Realized ROI & P&L accounting</span>
       <span style="flex:1"></span>
       <label class="chip" title="Changes future Auto-Buyer sizing only; historical rows retain their execution-time unit value">Auto-Buyer 1U = $<input id="autoBuyerUnitValueInput" aria-label="Auto-Buyer dollar value of one unit" type="number" min="0.01" max="100000" step="0.01" value="0.50" style="width:68px;padding:2px 4px" onkeydown="if(event.key==='Enter')saveAutoBuyerUnitValue()"><button onclick="saveAutoBuyerUnitValue()" style="padding:2px 7px">Set</button></label>
@@ -696,28 +715,28 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
 
     <div class="card" id="absPendingCard" style="margin-bottom:16px;display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <h3 style="margin:0">⏳ Pending Settlement Queue (<span id="absPendingBadge">0</span>)</h3>
+        <h3 style="margin:0">Pending Settlement Queue (<span id="absPendingBadge">0</span>)</h3>
         <span class="small dim">Awaiting match completion or official box score ingest</span>
       </div>
-      <div style="overflow-x:auto">
-        <table class="data" id="absPendingTable"><tr><td>Loading pending settlements…</td></tr></table>
+      <div class="ledger-scroll">
+        <table class="ledger" id="absPendingTable"><tr><td>Loading pending settlements…</td></tr></table>
       </div>
     </div>
 
     <div class="card" style="margin-bottom:16px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <h3 style="margin:0" id="absTableTitle">📜 Settled Positions & Realized Trade Log</h3>
+        <h3 style="margin:0" id="absTableTitle">Settled Positions & Realized Trade Log</h3>
         <span class="small dim" id="absSettledSummary">Showing settled contracts</span>
       </div>
-      <div style="overflow-x:auto">
-        <table class="data" id="absSettledTable"><tr><td>Loading auto-buyer trades…</td></tr></table>
+      <div class="ledger-scroll">
+        <table class="ledger" id="absSettledTable"><tr><td>Loading auto-buyer trades…</td></tr></table>
         <table class="data" id="autoBuyerTable" style="display:none"></table>
       </div>
     </div>
 
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <h3 style="margin:0">📜 Operational Execution Log (data/logs/auto_buyer.log)</h3>
+        <h3 style="margin:0">Operational Execution Log (data/logs/auto_buyer.log)</h3>
         <button onclick="loadAutoBuyerLog()" style="padding:2px 8px;font-size:11px">↻ Refresh Log</button>
       </div>
       <pre id="autoBuyerLogBox" style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:var(--mono);font-size:11px;max-height:260px;overflow-y:auto;white-space:pre-wrap;color:var(--text)">Loading operational log…</pre>
@@ -755,11 +774,10 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   </section>
 
   <!-- Legacy Tab Alias Anchor (Maintains Full Routing Parity) -->
-  <section id="tab-auto-buyer-settle" style="display:none"></section>
 
   <section id="tab-manual-bets" style="display:none">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
-      <h2 style="margin:0">✍️ Manual Bets</h2>
+      <h2 class="section-head">Manual Bets Ledger</h2>
       <span class="chip dim">Bets you place by hand on any book/exchange — tracked separately from Auto-Buyer</span>
       <span style="flex:1"></span>
       <label class="chip" title="Used to compute exposure % below; does not affect Auto-Buyer">Bankroll $<input id="manualBankrollInput" type="number" min="1" step="1" value="350" style="width:72px;padding:2px 4px" onkeydown="if(event.key==='Enter')saveManualBankroll()"><button onclick="saveManualBankroll()" style="padding:2px 7px">Set</button></label>
@@ -791,8 +809,8 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
         <h3 style="margin:0">Manual Bet Log</h3>
         <span class="small dim">Manual overrides available for markets ESPN can't grade</span>
       </div>
-      <div style="overflow-x:auto">
-        <table class="data" id="manualBetsTable"><tr><td>Loading manual bets…</td></tr></table>
+      <div class="ledger-scroll">
+        <table class="ledger" id="manualBetsTable"><tr><td>Loading manual bets…</td></tr></table>
       </div>
     </div>
   </section>
@@ -987,11 +1005,12 @@ $$("#tabs button").forEach(b=>b.onclick=()=>{
   $("#tab-"+b.dataset.tab).style.display=""; 
   setUrlState({tab:b.dataset.tab});
   updateCounts();
-  if(b.dataset.tab==="ledger"||b.dataset.tab==="picks")renderPicks();
-  if(b.dataset.tab==="flat")renderFlat(false);
-  if(b.dataset.tab==="v9-ledger")renderV9Ledger(false);
-  if(b.dataset.tab==="research")renderResearch(false);
-  if(b.dataset.tab==="gated"||b.dataset.tab==="gated-research")renderGatedResearch(false);
+  if(b.dataset.tab==="picks")renderPicks();
+  // Opening a secondary ledger always refetches it: the periodic refresh skips closed tabs.
+  if(b.dataset.tab==="flat")renderFlat(true);
+  if(b.dataset.tab==="v9-ledger")renderV9Ledger(true);
+  if(b.dataset.tab==="research")renderResearch(true);
+  if(b.dataset.tab==="gated-research")renderGatedResearch(true);
   if(b.dataset.tab==="perf")performanceControlChanged(false);
   if(b.dataset.tab==="market")loadMarket();
   if(b.dataset.tab==="today")renderToday();
@@ -999,9 +1018,8 @@ $$("#tabs button").forEach(b=>b.onclick=()=>{
   if(b.dataset.tab==="production")loadProduction();
   if(b.dataset.tab==="rebuild")loadRebuild();
   if(b.dataset.tab==="polymarket")loadPolymarketScanner();
-  if(b.dataset.tab==="poly-ledger")renderPolyLedger(false);
+  if(b.dataset.tab==="poly-ledger")renderPolyLedger(true);
   if(b.dataset.tab==="auto-buyer-ledger")renderAutoBuyerLedger(false);
-  if(b.dataset.tab==="auto-buyer-settle")renderAutoBuyerSettle(false);
   if(b.dataset.tab==="manual-bets")renderManualBets(false);
 });
 
@@ -1039,7 +1057,22 @@ const passesDisplaySettings=p=>{
 };
 
 /* ---------- fetch helpers ---------- */
-async function api(path){const r=await fetch(path);if(!r.ok)throw new Error(path+" -> "+r.status);return r.json();}
+let warmingTimer=null;
+function dataWarming(on){
+  let bar=document.getElementById("warmingBar");
+  if(on){
+    if(!bar){
+      bar=document.createElement("div");bar.id="warmingBar";
+      bar.style.cssText="position:fixed;top:0;left:0;right:0;z-index:9999;padding:4px 10px;font-size:12px;text-align:center;background:#7a5b00;color:#fff";
+      bar.textContent="Showing last saved snapshot — refreshing data…";
+      document.body.appendChild(bar);
+    }
+    if(!warmingTimer)warmingTimer=setInterval(async()=>{
+      try{const r=await fetch("/api/matrix");if(r.headers.get("X-Data-Warming")!=="1"){clearInterval(warmingTimer);warmingTimer=null;location.reload();}}catch(e){}
+    },8000);
+  }else if(bar){bar.remove();}
+}
+async function api(path){const r=await fetch(path);if(!r.ok)throw new Error(path+" -> "+r.status);if(r.headers.get("X-Data-Warming")==="1")dataWarming(true);return r.json();}
 let rebuildLoaded=false,rebuildLoading=null;
 const rebuildValue=value=>value===null||value===undefined||value===""?"—":String(value);
 const rebuildPercent=value=>value===null||value===undefined?"unavailable":`${(Number(value)*100).toFixed(1)}%`;
@@ -1074,23 +1107,41 @@ function renderShadowPicks(shadowPicks){
       <td>${pick.pnl_units==null?"—":Number(pick.pnl_units).toFixed(2)}</td>
     </tr>`).join("")}
   </table></div>`;
+}
 async function loadProduction(){
+  const panel=$("#productionPanel");
   try{
-    let d=await api("/api/production-canary");
+    const d=await api("/api/production-canary");
     renderProduction(d);
-  }catch(e){E("production",e.message||"load failed")}
+  }catch(e){
+    if(panel)panel.innerHTML=`<div class="card"><h2 class="red">Production status unavailable</h2><pre>${esc(e.message||"load failed")}</pre></div>`;
+  }
 }
 function renderProduction(d){
-  let m=d.models||{},status=d.status||"?",health=d.health||d;
-  let rows=Object.entries(m).map(([sport,info])=>{
-    let mkts=info.markets||{},allHealthy=Object.values(mkts).every(x=>x.status==="HEALTHY");
-    let marketList=Object.entries(mkts).map(([mkt,md])=>`<span class="${md.status==="HEALTHY"?"ok":"bad"}">${mkt}:${md.model_id||"?"}</span>`).join(" ");
-    return `<tr><td><b>${sport}</b></td><td>${info.enabled?"✅":"❌"}</td><td>${allHealthy?"🟢":"🔴"}</td><td>${marketList}</td></tr>`
-  }).join("");
-  let h=`<div class=card><h3>Production Models</h3><p>Status: <b>${status}</b> | ${Object.keys(m).length} sports</p><table><tr><th>Sport</th><th>Enabled</th><th>Health</th><th>Markets</th></tr>${rows}</table></div>`;
-  E("production",h)
-}
-
+  const panel=$("#productionPanel");
+  if(!panel)return;
+  const status=String(d.status||"unknown").toUpperCase();
+  const statusClass=status==="HEALTHY"||status==="OK"?"green":status==="DEGRADED"?"yellow":"red";
+  const ageHours=d.last_prediction_utc?(Date.now()-Date.parse(d.last_prediction_utc))/3600000:null;
+  const stale=ageHours!==null&&ageHours>36;
+  const when=v=>v?new Date(v).toLocaleString():"never";
+  const fact=(label,value)=>`<div class="card" style="margin:0;padding:12px 14px"><div class="small dim">${esc(label)}</div><div class="mono" style="margin-top:4px;overflow-wrap:anywhere">${value}</div></div>`;
+  panel.innerHTML=`<div class="card">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+      <h2 class="section-head">Production Canary</h2>
+      <span class="rebuild-state ${statusClass}">${esc(status)}</span>
+      <span class="mono small dim">${esc(d.model_id||"no model")}</span>
+    </div>
+    <div class="grid3">
+      ${fact("Last prediction",`${esc(when(d.last_prediction_utc))}${stale?` <span class="yellow">· ${Math.round(ageHours)}h old</span>`:""}`)}
+      ${fact("Last scheduler run",esc(when(d.last_scheduler_run_utc)))}
+      ${fact("Checked",esc(when(d.checked_at_utc)))}
+      ${fact("Today's events",esc(String(d.today_events??"—")))}
+      ${fact("Today's predictions",esc(String(d.today_predictions??"—")))}
+      ${fact("Automated orders",d.automated_orders?'<span class="green">ON</span>':'<span class="dim">OFF</span>')}
+    </div>
+    <div class="small dim mono" style="margin-top:12px;overflow-wrap:anywhere">artifact ${esc(d.artifact_hash||"—")}</div>
+  </div>`;
 }
 function renderRebuild(status,sports,benchmark,economics,runs,health){
   const reason=[status.reason,sports.reason,benchmark.reason,economics.reason,runs.reason,health.reason].filter(Boolean).join(" · ");
@@ -1773,6 +1824,24 @@ const edgePoints=p=>{if(p.economics_status==="unscored_no_price"||p.reason_code=
 // leading checkbox (bulk-clear/archive, a Ledger-only feature) and clickable
 // sort-header state differ; everything else — data columns, styling, colors
 // — is identical by construction.
+/* ---------- shared ledger rendering: first page of rows, then "show more" ---------- */
+const LEDGER_PAGE_SIZE=200;
+const ledgerLimit={};      // ledger key -> rows currently rendered
+const ledgerRerender={};   // ledger key -> function that re-renders that ledger's table
+function ledgerBody(key,rows,rowHtml,render){
+  ledgerRerender[key]=render;
+  const limit=ledgerLimit[key]||LEDGER_PAGE_SIZE;
+  let html=rows.slice(0,limit).map(rowHtml).join("");
+  const hidden=rows.length-limit;
+  if(hidden>0){
+    const step=Math.min(LEDGER_PAGE_SIZE,hidden);
+    html+=`<tr class="ledger-more"><td colspan="99"><button onclick="ledgerShowMore('${key}')">Show ${step} more</button>
+      <span class="dim small" style="margin-left:8px">${hidden} of ${rows.length} rows hidden · Export CSV includes all rows</span></td></tr>`;
+  }
+  return html;
+}
+function ledgerShowMore(key){ledgerLimit[key]=(ledgerLimit[key]||LEDGER_PAGE_SIZE)+LEDGER_PAGE_SIZE;ledgerRerender[key]?.();}
+function ledgerResetPage(key){delete ledgerLimit[key];}
 function ledgerHeaderRow(showCheckbox,mode="default"){
   const cols=[["event_start_utc","Game (ET)"],["league","Sport"],["market_type","Type"],["selection","Pick"],
     ["model_probability","Model"],["market_implied_probability","Pregame close"],["filled_entry","Bought at"],["edge","Decision edge"],
@@ -1976,6 +2045,7 @@ function filteredPicks(){
 }
 
 function onFilterChange(tab){
+  ledgerResetPage(tab);
   const key=tab.toLowerCase();
   setUrlState({
     [key+"_sport"]:$("#fSport_"+tab)?.value,
@@ -2019,12 +2089,6 @@ function updateCounts(){
     if ($("#restoreBtn_" + tab)) $("#restoreBtn_" + tab).style.display = archCount ? '' : 'none';
   });
 
-  const lArch = (state.picks || []).filter(p => p.archived).length;
-  if ($("#archCount")) $("#archCount").textContent = lArch;
-  if ($("#restoreBtn")) $("#restoreBtn").style.display = lArch ? '' : 'none';
-
-  if ($("#v9Active")) $("#v9Active").textContent = (_v9LedgerCache||[]).filter(p=>!p.archived&&String(p.status||'').toLowerCase()==="open").length;
-  if ($("#v9Settled")) $("#v9Settled").textContent = (_v9LedgerCache||[]).filter(p=>!p.archived&&String(p.status||'').toLowerCase()==="settled").length;
   if ($("#researchActive")) $("#researchActive").textContent = (_researchCache||[]).filter(p=>!p.archived&&String(p.status||'').toLowerCase()==="open").length;
   if ($("#researchSettled")) $("#researchSettled").textContent = (_researchCache||[]).filter(p=>!p.archived&&String(p.status||'').toLowerCase()==="settled").length;
   if ($("#gatedResearchActive")) $("#gatedResearchActive").textContent = (_gatedResearchCache||[]).filter(p=>!p.archived&&String(p.status||'').toLowerCase()==="open").length;
@@ -2061,7 +2125,7 @@ function renderPicks(){
      <div class="k"><b>${streakLabel}</b><span>streak</span></div>`;
   let html=ledgerHeaderRow(true);
   if(!rows.length){html+='<tr><td colspan=12 class="dim" style="text-align:center;padding:24px">No picks match the current filter criteria.</td></tr>';}
-  rows.forEach(p=>{html+=ledgerRowHtml(p,true);});
+  html+=ledgerBody("L",rows,p=>ledgerRowHtml(p,true),renderPicks);
   $("#pickTable").innerHTML=html;
   window.updateSelCount?.();
 }
@@ -2240,7 +2304,7 @@ function renderFlatTable(){
     
     let html=ledgerHeaderRow(false);
     if(!rows.length){html+='<tr><td colspan=12 class="dim" style="text-align:center;padding:24px">No matches found for current filter settings.</td></tr>';}
-    rows.forEach(p=>{html+=ledgerRowHtml(p,false);});
+    html+=ledgerBody("F",rows,p=>ledgerRowHtml(p,false),renderFlatTable);
     document.getElementById('flatTable').innerHTML=html;
   }catch(e){document.getElementById('flatTable').innerHTML='<tr><td colspan=12>Error: '+esc(String(e))+'</td></tr>';}
 }
@@ -2513,7 +2577,7 @@ async function renderToday(){
         <span>model <b>${conf?pct(conf):"—"}</b></span>
         <span>market <b>${noQuote?"no quote":cents(market)}</b> <span class="dim">${noQuote?"":"("+(market?pct(market):"—")+")"}</span></span>
         <span>edge <b class="${edge>0?"green":"red"}">${noQuote?"—":edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</b></span>
-        ${sizing?`<span>${sizing}</span>`:""}${quoteStateBadge(p.quote?.observed_at_utc)}<span class="dim">${p.model_version||p.model_origin||"unknown"}</span>
+        ${sizing?`<span>${sizing}</span>`:""}${quoteStateBadge(p.quote?.observed_at_utc)}<span class="dim" title="${escAttr(p.model_version||'')}">${esc(p.model_display_name||p.model_version||p.model_origin||"unknown")}</span>
         ${p.unavailable_features?`<span class="pill push" title="Fell back to a neutral default for this game — every other feature used normally">⚠ ${esc(p.unavailable_features)} unavailable</span>`:""}</div>
         </div><div class="pick-action">${orderControl(p,true)}</div></div>
         ${noQuote?"":`<div class="edgebar" title="Edge versus market"><i style="background:${edge>=0?"var(--green)":"var(--red)"};width:${Math.min(50,Math.abs(edge||0)*250)}%;${edge>=0?"left:50%":"right:50%;left:auto"}"></i></div>`}`;
@@ -2568,7 +2632,7 @@ async function loadFlatToday(token){
           <span>model <b>${conf?pct(conf):"—"}</b></span>
           <span>market <b>${cents(market)}</b></span>
           <span>edge <b class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</b></span>
-          ${quoteStateBadge(p.quote?.observed_at_utc)}<span class="dim">${p.model_version||p.model_origin||"unknown"}</span>
+          ${quoteStateBadge(p.quote?.observed_at_utc)}<span class="dim" title="${escAttr(p.model_version||'')}">${esc(p.model_display_name||p.model_version||p.model_origin||"unknown")}</span>
           ${p.unavailable_features?`<span class="pill push" title="${escAttr(p.unavailable_features)} unavailable for this game — fell back to a neutral default, every other feature used normally">⚠ ${esc(p.unavailable_features)} unavailable</span>`:""}</div>
         </div></div>`;
         d.tabIndex=0;d.setAttribute("role","button");d.onclick=()=>showPickDrawer(p);
@@ -2625,7 +2689,7 @@ async function loadResearchToday(token){
           <span>model <b>${conf?pct(conf):"—"}</b></span>
           <span>market <b>${cents(market)}</b></span>
           <span>edge <b class="${edge>0?"green":"red"}">${edge!=null?(edge>=0?"+":"")+(edge*100).toFixed(1)+"pp":"—"}</b></span>
-          ${quoteStateBadge(p.quote?.observed_at_utc)}<span class="dim">${p.model_version||p.model_origin||"unknown"}</span>
+          ${quoteStateBadge(p.quote?.observed_at_utc)}<span class="dim" title="${escAttr(p.model_version||'')}">${esc(p.model_display_name||p.model_version||p.model_origin||"unknown")}</span>
           ${p.unavailable_features?`<span class="pill push" title="${escAttr(p.unavailable_features)} unavailable for this game — fell back to a neutral default, every other feature used normally">⚠ ${esc(p.unavailable_features)} unavailable</span>`:""}</div>
           </div></div>`;
         d.tabIndex=0;d.setAttribute("role","button");d.onclick=()=>showPickDrawer(p);
@@ -3085,7 +3149,7 @@ function renderResearchTable(){
       <div class="k"><b>${rHasSettled&&rRisked>0?pct(rPnl/rRisked):'—'}</b><span>ROI</span></div>`;
     let html=ledgerHeaderRow(false,"research");
     if(!rows.length)html+='<tr><td colspan=12 class="dim" style="text-align:center;padding:24px">No research picks match the current filter criteria.</td></tr>';
-    rows.forEach(p=>{html+=ledgerRowHtml(p,false,"research");});
+    html+=ledgerBody("R",rows,p=>ledgerRowHtml(p,false,"research"),renderResearchTable);
     $("#researchTable").innerHTML=html;
   }catch(e){$("#researchTable").innerHTML='<tr><td colspan=12 class="dim">No research picks loaded.</td></tr>';}
 }
@@ -3160,7 +3224,7 @@ function renderGatedResearchTable(){
       <div class="k"><b>${gHasSettled&&gRisked>0?pct(gPnl/gRisked):'—'}</b><span>ROI</span></div>`;
     let html=ledgerHeaderRow(false,"gated");
     if(!rows.length)html+='<tr><td colspan=12 class="dim" style="text-align:center;padding:24px">No gated research picks match the current filter criteria.</td></tr>';
-    rows.forEach(p=>{html+=ledgerRowHtml(p,false,"gated");});
+    html+=ledgerBody("G",rows,p=>ledgerRowHtml(p,false,"gated"),renderGatedResearchTable);
     $("#gatedResearchTable").innerHTML=html;
   }catch(e){$("#gatedResearchTable").innerHTML='<tr><td colspan=12 class="dim">No gated research picks loaded.</td></tr>';}
 }
@@ -3222,7 +3286,7 @@ function renderV9LedgerTable(){
     
     let html=ledgerHeaderRow(false);
     if(!rows.length){html+='<tr><td colspan=12 class="dim" style="text-align:center;padding:24px">No matches found for current filter settings.</td></tr>';}
-    rows.forEach(p=>{html+=ledgerRowHtml(p,false);});
+    html+=ledgerBody("V9",rows,p=>ledgerRowHtml(p,false),renderV9LedgerTable);
     document.getElementById('v9LedgerTable').innerHTML=html;
   }catch(e){document.getElementById('v9LedgerTable').innerHTML='<tr><td colspan=12>Error: '+esc(String(e))+'</td></tr>';}
 }
@@ -3274,7 +3338,7 @@ function renderPolyLedgerTable(){
 
     let html = ledgerHeaderRow(false, "poly");
     if(!rows.length) html += '<tr><td colspan=12 class="dim" style="text-align:center;padding:24px">No Polymarket edge trades match the current filter criteria.</td></tr>';
-    rows.forEach(p=>{ html += ledgerRowHtml(p, false, "poly"); });
+    html += ledgerBody("PL", rows, p=>ledgerRowHtml(p, false, "poly"), renderPolyLedgerTable);
     $("#polyLedgerTable").innerHTML = html;
   }catch(e){ $("#polyLedgerTable").innerHTML = '<tr><td colspan=12 class="dim">Error rendering Polymarket ledger: ' + esc(String(e)) + '</td></tr>'; }
 }
@@ -3399,17 +3463,21 @@ function closeDrawer(){
 }
 function showPickDrawer(p){
   if(!p)return;
-  const edge=edgePoints(p),quoteAge=ageInfo(p.quote?.observed_at_utc);
+  const noQuote=p.sportsbook==="model_opinion_no_executable_quote"||p.reason_code==="PAPER_CALL_MARKET_UNAVAILABLE";
+  const edge=noQuote?null:edgePoints(p);
+  const quoteTimestamp=p.quote?.observed_at_utc;
+  const quoteAge=quoteTimestamp?ageInfo(quoteTimestamp):null;
+  const ask=noQuote?null:pregamePrice(p);
   showDrawer(`${p.away_team||"Away"} @ ${p.home_team||"Home"}`,detailGrid([
     ["Sport",String(p.league||"").toUpperCase()],["Market",marketLabel(p.market_type)],["Selection",pickLabel(p)],
     ["Game time",`${gameTimeET(p.event_start_utc)} · ${timeToStart(p.event_start_utc)}`],
     ["State",p.status||"unknown"],["Result",p.result||"—"],["Model probability",p.model_probability==null?"—":pct(p.model_probability)],
-    ["Decision ask",cents(pregamePrice(p))],["Decision edge",edge==null?"—":`${edge>=0?"+":""}${(edge*100).toFixed(1)}pp`],
-    ["Quote age",quoteAge.label],["Quote state",quoteAge.stale?"STALE":"CURRENT"],
+    ["Decision ask",noQuote?"no quote":cents(ask)],["Decision edge",noQuote?"—":edge==null?"—":`${edge>=0?"+":""}${(edge*100).toFixed(1)}pp`],
+    ["Quote age",quoteAge?quoteAge.label:"no quote"],["Quote state",noQuote?"NO QUOTE":quoteAge?(quoteAge.stale?"STALE":"CURRENT"):"NO QUOTE"],
     ["Size",p.status==="settled"||Number(p.units)>0?`${fmt(p.display_units??p.units)}U`:"—"],
     ["P&L",p.status==="settled"?`${fmt(pickPnl(p))}U`:"—"],
     ["Purchase state",p.buy_ready===true?"Ready":`Blocked — ${p.buy_block_reason||"not authorized"}`],
-    ["Model version",p.model_version||"—"],["Pick ID",p.pick_id||"—"],
+    ["Model",p.model_display_name?`${p.model_display_name} (${p.model_version})`:(p.model_version||"—")],["Pick ID",p.pick_id||"—"],
     ["Rationale",p.rationale||"—"],["Risks",p.risks||"—"]
   ]));
 }
@@ -3490,15 +3558,20 @@ function currentActiveTab(){
 }
 
 async function refreshAll(){
+  // Each ledger's count badges only show on its own tab, so the periodic refresh
+  // fetches a secondary ledger only while its tab is open. Opening the tab forces
+  // a fresh load (see the tab router), so nothing shown is older than one visit.
+  const openTab = currentActiveTab();
+  const whenOpen = (tab, path) => openTab === tab ? api(path) : Promise.reject({ skipped: true });
   const [coreResults, flatRes, v9Res, researchRes, gatedRes, polyRes] = await Promise.allSettled([
     Promise.allSettled([
       api("/api/status"),api("/api/matrix"),api("/api/picks"),api("/api/performance"),api("/api/production-evidence"),api("/api/model-ledgers")
     ]),
-    api("/api/flat-picks"),
-    api("/api/v9-picks"),
-    api("/api/research-picks"),
-    api("/api/gated-research-picks"),
-    api("/api/polymarket-picks")
+    whenOpen("flat", "/api/flat-picks"),
+    whenOpen("v9-ledger", "/api/v9-picks"),
+    whenOpen("research", "/api/research-picks"),
+    whenOpen("gated-research", "/api/gated-research-picks"),
+    whenOpen("poly-ledger", "/api/polymarket-picks")
   ]);
 
   const core = coreResults.status === "fulfilled" ? coreResults.value : [];
@@ -3546,11 +3619,11 @@ async function refreshAll(){
 
   // Render the currently active tab & visible panels
   const active = currentActiveTab();
-  if(active==="ledger"||active==="picks") renderPicks();
+  if(active==="picks") renderPicks();
   else if(active==="flat") renderFlatTable();
   else if(active==="v9-ledger") renderV9LedgerTable();
   else if(active==="research") renderResearchTable();
-  else if(active==="gated"||active==="gated-research") renderGatedResearchTable();
+  else if(active==="gated-research") renderGatedResearchTable();
   else if(active==="poly-ledger") renderPolyLedgerTable();
   else if(active==="perf") performanceControlChanged(false);
   else if(active==="today") renderToday();
@@ -3562,8 +3635,8 @@ async function refreshAll(){
   if($("#tab-folio") && $("#tab-folio").style.display!=="none" && active!=="folio") renderFolio();
 
   loadAutoBuyerStatus();
-  const allRequests = [...(core||[]), flatRes, researchRes, gatedRes, polyRes];
-  const failures = allRequests.filter(result => result.status === "rejected").length;
+  const allRequests = [...(core||[]), flatRes, v9Res, researchRes, gatedRes, polyRes];
+  const failures = allRequests.filter(result => result.status === "rejected" && !result.reason?.skipped).length;
   $("#updatedTxt").innerHTML=failures
     ?`<span class="yellow">Updated with ${failures} panel error${failures===1?"":"s"}</span>`
     :`Updated: ${new Date().toLocaleTimeString()}`;
@@ -3721,14 +3794,16 @@ function updateAutoBuyerUI(data){
     btn.style.color="var(--red)";
     btn.title="Auto-Buyer is DISABLED. Click to turn ON.";
   }
-  const modeBtn=$("#autoBuyerModeBtn");
-  if(modeBtn){
-    modeBtn.textContent=isLive?"LIVE":"PAPER";
-    modeBtn.style.background=isLive?"rgba(255,92,92,0.2)":"rgba(120,170,255,0.2)";
-    modeBtn.style.color=isLive?"var(--red)":"#78aaff";
-    modeBtn.title=isLive
-      ?"Auto-Buyer places REAL Polymarket orders. Click to switch to PAPER (simulated, no real money)."
-      :"Auto-Buyer is in PAPER mode: simulated fills only, recorded for tracking, no real orders. Click to switch to LIVE.";
+  for(const [id,target] of [["autoBuyerPaperBtn","paper"],["autoBuyerLiveBtn","live"]]){
+    const modeBtn=$("#"+id);
+    if(!modeBtn)continue;
+    const active=mode===target;
+    const isLiveBtn=target==="live";
+    modeBtn.style.background=active?(isLiveBtn?"var(--red)":"rgba(120,170,255,0.35)"):"transparent";
+    modeBtn.style.color=active?(isLiveBtn?"#000":"#78aaff"):"#888";
+    modeBtn.title=isLiveBtn
+      ?"LIVE: Auto-Buyer places REAL Polymarket orders when ON."
+      :"PAPER: simulated fills only, recorded for tracking, no real orders.";
   }
 }
 async function toggleAutoBuyer(){
@@ -3755,9 +3830,9 @@ async function toggleAutoBuyer(){
     alert("Failed to toggle Auto-Buyer: "+e);
   }
 }
-async function toggleAutoBuyerMode(){
+async function setAutoBuyerMode(nextMode){
   const currentMode=(_autoBuyerStatusCache.mode||"paper").toLowerCase();
-  const nextMode=currentMode==="live"?"paper":"live";
+  if(nextMode===currentMode)return;
   const msg=nextMode==="live"
     ?"Switch Auto-Buyer to LIVE mode?\n\nFuture cycles will place REAL Polymarket orders with real money whenever Auto-Buyer is ON."
     :"Switch Auto-Buyer to PAPER mode?\n\nFuture cycles will only simulate fills and record them for tracking -- no real orders will be placed.";
@@ -4322,7 +4397,7 @@ function renderAutoBuyerTables() {
 
   const tableTitle = $("#absTableTitle");
   if (tableTitle) {
-    tableTitle.textContent = _absFilterMode === "pending" ? "⏳ Pending Unsettled Orders" : _absFilterMode === "all" ? "📜 All Auto-Buyer Orders" : "📜 Settled Positions & Realized P&L";
+    tableTitle.textContent = _absFilterMode === "pending" ? "Pending Unsettled Orders" : _absFilterMode === "all" ? "All Auto-Buyer Orders" : "Settled Positions & Realized P&L";
   }
 
   const summary = $("#absSettledSummary");
@@ -4555,7 +4630,7 @@ setControlFromUrl("folioType","folio_type");setControlFromUrl("folioAttribution"
 setControlFromUrl("folioPageSize","folio_rows");
 const requestedTab=initialUrlState.get("tab");
 if(requestedTab&&$("#tab-"+requestedTab))gotoTab(requestedTab);
-else loadProduction();
+else gotoTab("production");
 refreshAll();resetTimer();
 </script>
 </body>

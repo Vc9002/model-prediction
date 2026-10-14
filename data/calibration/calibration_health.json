@@ -1,0 +1,39 @@
+{
+  "calibration_drift": 1.7223,
+  "last_checked_utc": "2026-10-14T04:35:57.582803+00:00",
+  "models_count": 30,
+  "moderate_drift_models": [
+    "tennis:moneyline:tennis-surface-elo-v1",
+    "soccer:moneyline:soccer-poisson-dc-v1",
+    "wnba:spread:wnba-spread-margin-v2"
+  ],
+  "severe_drift_models": [
+    "tennis:moneyline:tennis-surface-elo-v1",
+    "mlb:spread:measured-edge-margin-v3",
+    "mlb:total:measured-edge-totals-v3",
+    "mlb:moneyline:mlb-elo-trend-lr-v8",
+    "lol:moneyline:lol-tiered-elo-v6",
+    "ncaaf:total:cfb-total-v1",
+    "ncaaf:spread:cfb-spread-v1",
+    "ncaaf:moneyline:college-football-v1",
+    "npb:moneyline:npb-tie-aware-elo-v2",
+    "valorant:moneyline:valorant-tiered-elo-v6",
+    "kbo:moneyline:kbo-tie-aware-elo-v2",
+    "wnba:moneyline:wnba-elo-trend-lr-v4",
+    "mlb:nrfi:mlb-nrfi-v1",
+    "soccer:total:soccer-poisson-dc-v1",
+    "cs2:moneyline:cs2-tiered-elo-v6",
+    "tennis:moneyline:tennis-learned-v3",
+    "tennis:moneyline:tennis-learned-v3",
+    "tennis:spread:tennis-learned-v3",
+    "tennis:spread:tennis-learned-v3",
+    "tennis:total:tennis-learned-v3",
+    "tennis:total:tennis-learned-v3",
+    "rainbow_six:moneyline:rainbow_six-tiered-elo-v6",
+    "wnba:spread:wnba-spread-margin-v1",
+    "wnba:total:wnba-total-margin-v2",
+    "nfl:moneyline:nfl-elo-trend-lr-v4",
+    "nfl:moneyline:nfl-elo-trend-lr-v4"
+  ],
+  "status": "SEVERE_DRIFT"
+}

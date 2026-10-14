@@ -126,3 +126,55 @@ def test_tennis_model_predict_derivatives():
     assert total_p.probabilities["over"] > 0
     assert total_p.probabilities["under"] > 0
     assert round(total_p.probabilities["over"] + total_p.probabilities["under"], 5) == 1.0
+
+
+def test_tennis_model_predict_derivatives_with_player_form():
+    from model_prediction.models.tennis import TennisPlayerForm
+
+    matches = [
+        {
+            "winner": "Carlos Alcaraz",
+            "loser": "Daniil Medvedev",
+            "surface": "Hard",
+            "match_date": "2026-08-01",
+        },
+    ]
+    model = TennisModel()
+    form_alcaraz = TennisPlayerForm(
+        player_id="alcaraz",
+        name="Carlos Alcaraz",
+        serve_points_won=0.68,
+        serve_points=1000,
+        return_points_won=0.42,
+        return_points=1000,
+        surface_elo=1700.0,
+        overall_elo=1700.0,
+    )
+    form_medvedev = TennisPlayerForm(
+        player_id="medvedev",
+        name="Daniil Medvedev",
+        serve_points_won=0.64,
+        serve_points=1000,
+        return_points_won=0.38,
+        return_points=1000,
+        surface_elo=1650.0,
+        overall_elo=1650.0,
+    )
+    upcoming = [
+        UpcomingMatch(
+            event_id="match_with_form",
+            event_start_utc="2026-09-01T18:00:00Z",
+            player_one="Carlos Alcaraz",
+            player_two="Daniil Medvedev",
+            surface="Hard",
+            tour="ATP",
+            spread_player_one_line=-3.5,
+            total_games_line=22.5,
+            player_one_form=form_alcaraz,
+            player_two_form=form_medvedev,
+        )
+    ]
+    preds = model.predict_games(matches, upcoming)
+    assert len(preds) == 3
+    spread_p = next(p for p in preds if p.market_type == "spread")
+    assert spread_p.probabilities["away"] > spread_p.probabilities["home"]

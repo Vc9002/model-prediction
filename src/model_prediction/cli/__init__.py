@@ -36,7 +36,10 @@ from .forecast import (  # noqa: F401 -- re-export for compat
     _log_esports_forecast,
     _refresh_esports_ratings,
     _refresh_international_baseball_ratings,
+    _select_nfl_spread_market,
+    _select_nfl_total_market,
     _select_wnba_spread_market,
+    _select_wnba_total_market,
 )
 from .main import _fail as _fail
 from .main import main

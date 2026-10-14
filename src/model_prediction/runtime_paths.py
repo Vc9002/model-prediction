@@ -94,8 +94,8 @@ class RuntimePaths:
     runtime_root: Path
 
     def __post_init__(self) -> None:
-        repo_root = self.repo_root.resolve()
-        runtime_root = self.runtime_root.resolve()
+        repo_root = Path(str(self.repo_root).strip()).resolve()
+        runtime_root = Path(str(self.runtime_root).strip()).resolve()
         object.__setattr__(self, "repo_root", repo_root)
         object.__setattr__(self, "runtime_root", runtime_root)
         if runtime_root == repo_root / "src" / "model_prediction":
@@ -242,8 +242,8 @@ class RuntimePaths:
         """
         resolved_repo_root = Path(repo_root) if repo_root is not None else _default_repo_root()
         runtime_root_env = os.environ.get("MODEL_PREDICTION_RUNTIME_ROOT")
-        if runtime_root_env:
-            runtime_root = Path(runtime_root_env)
+        if runtime_root_env and runtime_root_env.strip():
+            runtime_root = Path(runtime_root_env.strip())
         elif require_external_runtime:
             raise RuntimeError(
                 "MODEL_PREDICTION_RUNTIME_ROOT is required for operational "

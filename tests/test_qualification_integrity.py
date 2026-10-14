@@ -74,7 +74,7 @@ def test_module_import_is_implementation_not_validation(monkeypatch):
     summary = next(
         s
         for s in qualification.generate_qualification_registry(root)
-        if s.challenger_model_id == "cfb-structural-v2"
+        if s.challenger_model_id == "mlb-structural-runline-v4"
     )
     assert summary.build_status == "implemented"
     assert summary.verdict == "CONTINUE"

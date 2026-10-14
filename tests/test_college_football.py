@@ -494,14 +494,14 @@ def test_cfb_production_registry_and_hashes():
 
     expected_evidence = {
         "cfb-structural-v2": ("shadow_qualified", "medium"),
-        "cfb-spread-v1": ("degraded", "critical"),
-        "cfb-total-v1": ("degraded", "critical"),
+        "cfb-spread-v1": ("degraded", "low"),
+        "cfb-total-v1": ("degraded", "low"),
     }
     for mid, (exp_ev, exp_prio) in expected_evidence.items():
         assert mid in reg.entries
         entry = reg.entries[mid]
         assert entry.enabled is True
-        assert entry.serving_status in {"production", "active"}
+        assert entry.serving_status in {"production", "active", "rollback"}
         assert entry.evidence_status == exp_ev
         assert entry.replacement_priority == exp_prio
         assert entry.sport == "NCAAF"
@@ -518,7 +518,7 @@ def test_cfb_production_registry_and_hashes():
 # -------------------------------------------------------------
 # 9. Flat Ledger All-Game Inclusion & Main Ledger Gating Tests
 # -------------------------------------------------------------
-def _cfb_logging_fixture(event_start):
+def _cfb_logging_fixture(event_start, model_version="cfb-structural-v2"):
     return {
         "status": "research",
         "model_code_hash": "fixture-hash",
@@ -532,8 +532,10 @@ def _cfb_logging_fixture(event_start):
                 "selection": selection,
                 "line": line,
                 "executable_ask": 0.55,
-                "model_probability": 0.56,
+                "model_probability": 0.60,
                 "model_uncertainty": 0.10,
+                "edge_vs_executable_ask": 0.05,
+                "model_version": model_version,
                 "rationale": "deterministic test fixture",
             }
             for market, selection, line in [
@@ -572,6 +574,81 @@ def test_cfb_flat_ledger_all_game_inclusion(tmp_path, monkeypatch):
     assert result["flat_logged"] == 3
     assert not result["errors"]
     assert {row["market_type"] for row in flat.rows()} == {"moneyline", "spread", "total"}
+
+
+def test_cfb_spread_and_total_blocked_from_main_ledger(tmp_path, monkeypatch):
+    """Unified cfb-structural-v2 reaches Main across all 3 markets when qualified;
+    legacy cfb-spread-v1 and cfb-total-v1 are blocked from Main.
+    """
+    from model_prediction.cli import forecast
+    from model_prediction.ledger import PickLedger
+    from model_prediction.models import college_football
+
+    # 1. Unified cfb-structural-v2: all 3 markets reach Main
+    monkeypatch.setattr(
+        college_football, "build_cfb_slate", lambda **kwargs: _cfb_logging_fixture("2030-09-07T20:00:00Z")
+    )
+    monkeypatch.setattr(forecast, "utc_now", lambda: datetime(2030, 9, 7, 18, tzinfo=UTC))
+    flat = PickLedger(
+        tmp_path / "flat_ncaaf.xlsx", audit_path=tmp_path / "events_flat.jsonl", tier="flat", sport="ncaaf"
+    )
+    main = PickLedger(
+        tmp_path / "main_ncaaf.xlsx", audit_path=tmp_path / "events_main.jsonl", tier="main", sport="ncaaf"
+    )
+    result = forecast._forecast_cfb_sport(
+        data_root=tmp_path,
+        args_date="2030-09-07",
+        config={
+            "models": {"NCAAF": {"min_edge": 0.005, "status": "shadow_qualified"}},
+            "project": {"maximum_data_age_hours": 24},
+            "bankroll": {},
+        },
+        flat_ledger=flat,
+        main_ledger=main,
+    )
+    assert result["flat_logged"] == 3
+    assert result["main_logged"] == 3
+    assert {row["market_type"] for row in flat.rows()} == {"moneyline", "spread", "total"}
+    main_rows = main.rows()
+    assert len(main_rows) == 3
+    assert {row["market_type"] for row in main_rows} == {"moneyline", "spread", "total"}
+    for row in main_rows:
+        assert row["model_version"] == "cfb-structural-v2"
+
+    # 2. Legacy models (cfb-spread-v1, cfb-total-v1) are blocked from Main
+    flat_legacy = PickLedger(
+        tmp_path / "flat_legacy.xlsx",
+        audit_path=tmp_path / "events_flat_leg.jsonl",
+        tier="flat",
+        sport="ncaaf",
+    )
+    main_legacy = PickLedger(
+        tmp_path / "main_legacy.xlsx",
+        audit_path=tmp_path / "events_main_leg.jsonl",
+        tier="main",
+        sport="ncaaf",
+    )
+    legacy_fixture = _cfb_logging_fixture("2030-09-07T20:00:00Z")
+    for c in legacy_fixture["priced_contracts"]:
+        if c["market_type"] == "spread":
+            c["model_version"] = "cfb-spread-v1"
+        elif c["market_type"] == "total":
+            c["model_version"] = "cfb-total-v1"
+    monkeypatch.setattr(college_football, "build_cfb_slate", lambda **kwargs: legacy_fixture)
+    result_leg = forecast._forecast_cfb_sport(
+        data_root=tmp_path,
+        args_date="2030-09-07",
+        config={
+            "models": {"NCAAF": {"min_edge": 0.005, "status": "shadow_qualified"}},
+            "project": {"maximum_data_age_hours": 24},
+            "bankroll": {},
+        },
+        flat_ledger=flat_legacy,
+        main_ledger=main_legacy,
+    )
+    assert result_leg["flat_logged"] == 3
+    assert result_leg["main_logged"] == 1
+    assert [r["market_type"] for r in main_legacy.rows()] == ["moneyline"]
 
 
 @pytest.mark.parametrize("force", [False, True])
@@ -661,8 +738,8 @@ def test_cfb_models_serving_with_degraded_evidence():
 
     champions = svc.get("champions", {}).get("NCAAF", {})
     assert champions.get("moneyline") == "cfb-structural-v2"
-    assert champions.get("spread") == "cfb-spread-v1"
-    assert champions.get("total") == "cfb-total-v1"
+    assert champions.get("spread") == "cfb-structural-v2"
+    assert champions.get("total") == "cfb-structural-v2"
 
     with (root / "config/model.yaml").open() as f:
         model_cfg = yaml.safe_load(f)

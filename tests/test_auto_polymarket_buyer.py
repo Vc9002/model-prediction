@@ -131,7 +131,7 @@ def test_buyer_filters_low_edge_and_past_games():
     picks = [
         {
             "pick_id": "p_low_edge",
-            "model_id": "tennis-surface-elo-v1",
+            "model_id": "wnba-elo-trend-lr-v4",
             "status": "open",
             "event_start_utc": today_start,
             "model_probability": 0.53,
@@ -139,7 +139,7 @@ def test_buyer_filters_low_edge_and_past_games():
         },
         {
             "pick_id": "p_past",
-            "model_id": "tennis-surface-elo-v1",
+            "model_id": "wnba-elo-trend-lr-v4",
             "status": "open",
             "event_start_utc": "2020-01-01T00:00:00Z",  # already started
             "model_probability": 0.70,
@@ -220,7 +220,7 @@ def test_buyer_rejects_tomorrow_and_future_games():
     picks = [
         {
             "pick_id": "p_tmr",
-            "model_id": "tennis-surface-elo-v1",
+            "model_id": "wnba-elo-trend-lr-v4",
             "status": "open",
             "event_start_utc": tomorrow_start,
             "model_probability": 0.70,
@@ -228,7 +228,7 @@ def test_buyer_rejects_tomorrow_and_future_games():
         },
         {
             "pick_id": "p_next_week",
-            "model_id": "tennis-surface-elo-v1",
+            "model_id": "wnba-elo-trend-lr-v4",
             "status": "open",
             "event_start_utc": next_week_start,
             "model_probability": 0.70,
@@ -252,7 +252,7 @@ def test_buyer_rejects_stale_quotes_and_closed_markets():
     picks = [
         {
             "pick_id": "p_unmapped",
-            "model_id": "tennis-surface-elo-v1",
+            "model_id": "wnba-elo-trend-lr-v4",
             "status": "open",
             "event_start_utc": today_start,
             "model_probability": 0.70,
@@ -268,7 +268,7 @@ def test_buyer_fails_closed_when_stale_quote_refresh_has_network_error():
     buyer = AutoPolymarketBuyer()
     stale_quote = {
         "quote": {
-            "market_slug": "aec-tennis-example",
+            "market_slug": "aec-example",
             "side": "long",
             "ask": 0.50,
             "fresh": False,
@@ -287,7 +287,7 @@ def test_buyer_fails_closed_when_stale_quote_refresh_has_network_error():
             [
                 {
                     "pick_id": "stale-network",
-                    "model_id": "tennis-surface-elo-v1",
+                    "model_id": "wnba-elo-trend-lr-v4",
                     "status": "open",
                     "market_type": "moneyline",
                     "event_start_utc": iso_utc(utc_now() + timedelta(hours=2)),

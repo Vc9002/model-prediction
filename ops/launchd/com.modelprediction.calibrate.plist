@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.modelprediction.calibrate</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/vincentc9002/model-prediction/.venv/bin/python</string>
+    <string>-m</string><string>model_prediction.run_supervisor</string>
+    <string>run</string><string>calibrate</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/vincentc9002/model-prediction</string>
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Hour</key><integer>1</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>7</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
+  <key>TimeOut</key><integer>1800</integer>
+  <key>StandardOutPath</key><string>/Users/vincentc9002/model-prediction-runtime/logs/collectors/calibrate.log</string>
+  <key>StandardErrorPath</key><string>/Users/vincentc9002/model-prediction-runtime/logs/collectors/calibrate.err</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>PYTHONPATH</key><string>/Users/vincentc9002/model-prediction/src</string>
+    <key>MODEL_PREDICTION_REPO_ROOT</key><string>/Users/vincentc9002/model-prediction</string>
+    <key>MODEL_PREDICTION_RUNTIME_ROOT</key><string>/Users/vincentc9002/model-prediction-runtime</string>
+    <key>MODEL_PREDICTION_LEDGER_AUTHORITY</key><string>sqlite</string>
+  </dict>
+</dict>
+</plist>

@@ -80,20 +80,36 @@ def test_evidence_status_does_not_control_serving_status() -> None:
     """Invariant 3: Weak/degraded evidence increases replacement priority; it does NOT disable the model."""
     registry = ProductionModelRegistry.load(PROJECT_ROOT)
 
-    # NCAAF models have degraded evidence status, but are active production serving champions
+    # MLB moneyline has historical_only evidence status and high replacement priority, but is an active production serving champion
+    mlb_champ = registry.champion("MLB", "moneyline")
+    assert mlb_champ is not None
+    assert mlb_champ.available is True
+    assert mlb_champ.serving_status in {"production", "active"}
+    assert mlb_champ.evidence_status == "historical_only"
+    assert mlb_champ.replacement_priority == ReplacementPriority.HIGH.value
+
+    # SOCCER moneyline was promoted to soccer-poisson-dc-v2 (predictively_qualified)
+    soccer_champ = registry.champion("SOCCER", "moneyline")
+    assert soccer_champ is not None
+    assert soccer_champ.available is True
+    assert soccer_champ.serving_status in {"production", "active"}
+    assert soccer_champ.evidence_status == EvidenceStatus.PREDICTIVELY_QUALIFIED.value
+    assert soccer_champ.replacement_priority == ReplacementPriority.LOW.value
+
+    contract = registry.lifecycle_contract("SOCCER", "moneyline")
+    assert contract is not None
+    assert contract.serving_status in {"production", "active"}
+    assert contract.evidence_status == EvidenceStatus.PREDICTIVELY_QUALIFIED.value
+    assert contract.replacement_priority == ReplacementPriority.LOW.value
+
+    # NCAAF was unified under cfb-structural-v2 (shadow_qualified with medium replacement priority)
     for market in ("moneyline", "spread", "total"):
         champion = registry.champion("NCAAF", market)
         assert champion is not None
         assert champion.available is True
         assert champion.serving_status in {"production", "active"}
-        assert champion.evidence_status == EvidenceStatus.DEGRADED.value
-        assert champion.replacement_priority == ReplacementPriority.CRITICAL.value
-
-        contract = registry.lifecycle_contract("NCAAF", market)
-        assert contract is not None
-        assert contract.serving_status in {"production", "active"}
-        assert contract.evidence_status == EvidenceStatus.DEGRADED.value
-        assert contract.replacement_priority == ReplacementPriority.CRITICAL.value
+        assert champion.evidence_status == "shadow_qualified"
+        assert champion.replacement_priority == ReplacementPriority.MEDIUM.value
 
 
 def test_challenger_failure_does_not_disable_champion() -> None:

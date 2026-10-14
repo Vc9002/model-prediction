@@ -6,7 +6,7 @@ Computed chronologically from cached completed games only — zero look-ahead.
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from math import log
 from typing import Any
@@ -47,6 +47,8 @@ class EloBook:
     ratings: dict[str, float]
     k: float
     home_advantage: float
+    qb_ratings: dict[str, float] = field(default_factory=dict)
+    qb_starts: dict[str, int] = field(default_factory=dict)
 
     def rating(self, team: str) -> float:
         return self.ratings.get(team, DEFAULT_ELO)
@@ -57,6 +59,39 @@ class EloBook:
     def expected_neutral_win(self, first_team: str, second_team: str) -> float:
         """Venue-neutral win probability from the same point-in-time ratings."""
         return expected_win_probability(self.rating(first_team), self.rating(second_team))
+
+    def expected_qb_adjusted_win(
+        self,
+        home: str,
+        away: str,
+        home_qb: str | None = None,
+        away_qb: str | None = None,
+        is_neutral: bool = False,
+        qb_weight: float = 0.20,
+        backup_penalty: float = 45.0,
+    ) -> float:
+        """Calculate venue-aware and starter-aware win probability."""
+        r_home = self.rating(home)
+        r_away = self.rating(away)
+
+        if home_qb:
+            q_home = self.qb_ratings.get(home_qb, DEFAULT_ELO)
+            starts_home = self.qb_starts.get(home_qb, 0)
+            pen_home = -backup_penalty if (starts_home < 3 or q_home < (DEFAULT_ELO - 60.0)) else 0.0
+            eff_home = r_home + qb_weight * (q_home - DEFAULT_ELO) + pen_home
+        else:
+            eff_home = r_home
+
+        if away_qb:
+            q_away = self.qb_ratings.get(away_qb, DEFAULT_ELO)
+            starts_away = self.qb_starts.get(away_qb, 0)
+            pen_away = -backup_penalty if (starts_away < 3 or q_away < (DEFAULT_ELO - 60.0)) else 0.0
+            eff_away = r_away + qb_weight * (q_away - DEFAULT_ELO) + pen_away
+        else:
+            eff_away = r_away
+
+        adv = 0.0 if is_neutral else self.home_advantage
+        return expected_win_probability(eff_home, eff_away, adv)
 
     def update(self, game: GameRecord) -> None:
         expected = self.expected_home_win(game.home_team, game.away_team)
@@ -71,6 +106,18 @@ class EloBook:
         delta = self.k * multiplier * (outcome - expected)
         self.ratings[game.home_team] = self.rating(game.home_team) + delta
         self.ratings[game.away_team] = self.rating(game.away_team) - delta
+
+        h_qb = getattr(game, "home_starter_name", None)
+        a_qb = getattr(game, "away_starter_name", None)
+        if h_qb and a_qb and h_qb != "Unknown" and a_qb != "Unknown":
+            r_hqb = self.qb_ratings.get(h_qb, DEFAULT_ELO)
+            r_aqb = self.qb_ratings.get(a_qb, DEFAULT_ELO)
+            exp_qb = 1.0 / (1.0 + 10.0 ** (-(r_hqb - r_aqb) / 400.0))
+            delta_qb = 16.0 * (multiplier * 0.7) * (outcome - exp_qb)
+            self.qb_ratings[h_qb] = r_hqb + delta_qb
+            self.qb_ratings[a_qb] = r_aqb - delta_qb
+            self.qb_starts[h_qb] = self.qb_starts.get(h_qb, 0) + 1
+            self.qb_starts[a_qb] = self.qb_starts.get(a_qb, 0) + 1
 
 
 def build_elo(
@@ -126,13 +173,15 @@ def _parse_game_date(game: GameRecord) -> datetime | None:
 
 
 def _apply_offseason_regression(book: EloBook, regression: float) -> None:
-    """Regress all team ratings toward DEFAULT_ELO by the given fraction."""
+    """Regress all team and QB ratings toward DEFAULT_ELO by the given fraction."""
     if regression <= 0 or not book.ratings:
         return
     target = DEFAULT_ELO
     factor = 1.0 - regression
     for team in list(book.ratings.keys()):
         book.ratings[team] = target * regression + book.ratings[team] * factor
+    for qb in list(book.qb_ratings.keys()):
+        book.qb_ratings[qb] = target * regression + book.qb_ratings[qb] * factor
 
 
 @register_feature("ratings")

@@ -71,10 +71,25 @@ def _compute_features(
     observed_at: datetime,
     home_starter_name: str | None = None,
     away_starter_name: str | None = None,
+    is_neutral_site: bool = False,
 ) -> tuple[dict[str, float], tuple[str, ...]]:
     unavailable: list[str] = []
+    if hasattr(elo, "expected_qb_adjusted_win") and (home_starter_name or away_starter_name):
+        elo_prob = elo.expected_qb_adjusted_win(
+            home=home_team,
+            away=away_team,
+            home_qb=home_starter_name,
+            away_qb=away_starter_name,
+            is_neutral=is_neutral_site,
+        )
+    else:
+        elo_prob = (
+            elo.expected_neutral_win(home_team, away_team)
+            if is_neutral_site and hasattr(elo, "expected_neutral_win")
+            else elo.expected_home_win(home_team, away_team)
+        )
     features: dict[str, float] = {
-        "elo_probability": elo.expected_home_win(home_team, away_team),
+        "elo_probability": elo_prob,
         "trend_gap": home_trend.offensive_momentum - away_trend.offensive_momentum,
         "defensive_trend_gap": home_trend.defensive_momentum - away_trend.defensive_momentum,
     }
@@ -382,12 +397,17 @@ def _init_providers() -> None:
 
 
 def _build_basis(
-    features: dict[str, float], home_trend: Any, away_trend: Any, history_games: int
+    features: dict[str, float],
+    home_trend: Any,
+    away_trend: Any,
+    history_games: int,
+    is_neutral_site: bool = False,
 ) -> dict[str, float | int]:
     basis: dict[str, float | int] = {
         "history_games": history_games,
         "home_history_games": home_trend.games_played,
         "away_history_games": away_trend.games_played,
+        "is_neutral_site": 1 if is_neutral_site else 0,
     }
     for k, v in features.items():
         basis[k] = round(v, 10)
@@ -518,6 +538,59 @@ def build_learned_moneyline_slate(
                     raise ValueError(f"event {event_id} has an unresolved probable starter")
                 away_starter_name = (away_probable.get("athlete") or {}).get("displayName")
                 home_starter_name = (home_probable.get("athlete") or {}).get("displayName")
+            elif key == "nfl":
+                competitors = {
+                    item.get("homeAway"): item
+                    for item in (event.get("competitions") or [{}])[0].get("competitors", [])
+                }
+                home_comp = competitors.get("home") or {}
+                away_comp = competitors.get("away") or {}
+                for l in home_comp.get("leaders", []):
+                    if (
+                        "pass" in str(l.get("name") or "").lower()
+                        or "pass" in str(l.get("displayName") or "").lower()
+                    ):
+                        ldr = (l.get("leaders") or [{}])[0]
+                        home_starter_name = (ldr.get("athlete") or {}).get("displayName")
+                        break
+                for l in away_comp.get("leaders", []):
+                    if (
+                        "pass" in str(l.get("name") or "").lower()
+                        or "pass" in str(l.get("displayName") or "").lower()
+                    ):
+                        ldr = (l.get("leaders") or [{}])[0]
+                        away_starter_name = (ldr.get("athlete") or {}).get("displayName")
+                        break
+            comp = (event.get("competitions") or [{}])[0]
+            is_neutral_site = bool(comp.get("neutralSite", False))
+            if not is_neutral_site and key in ("nfl", "mlb", "nba", "wnba", "cfb", "ncaaf"):
+                venue = comp.get("venue") or {}
+                address = venue.get("address") or {}
+                country = str(address.get("country") or "").strip().upper()
+                city = str(address.get("city") or "").strip().lower()
+                venue_name = str(venue.get("fullName") or "").strip().lower()
+                if (
+                    country
+                    and country not in ("USA", "US", "UNITED STATES")
+                    or any(
+                        kw in city
+                        for kw in ("london", "munich", "frankfurt", "são paulo", "sao paulo", "mexico city")
+                    )
+                    or any(
+                        kw in venue_name
+                        for kw in (
+                            "tottenham",
+                            "wembley",
+                            "twickenham",
+                            "allianz arena",
+                            "deutsche bank park",
+                            "arena corinthians",
+                            "estadio azteca",
+                        )
+                    )
+                ):
+                    is_neutral_site = True
+
             home_trend = trends.team_trend(home_team)
             away_trend = trends.team_trend(away_team)
             if min(home_trend.games_played, away_trend.games_played) < minimum_team_history_games:
@@ -543,6 +616,7 @@ def build_learned_moneyline_slate(
                 observed_at,
                 home_starter_name=home_starter_name,
                 away_starter_name=away_starter_name,
+                is_neutral_site=is_neutral_site,
             )
             home_probability = artifact.probability("moneyline", features)
             base_home_probability = home_probability
@@ -628,7 +702,9 @@ def build_learned_moneyline_slate(
                 if cleared_confidence_threshold
                 else "CALL_BELOW_LEARNED_CONFIDENCE_OPERATOR_REVIEW"
             )
-            basis = _build_basis(features, home_trend, away_trend, len(history))
+            basis = _build_basis(
+                features, home_trend, away_trend, len(history), is_neutral_site=is_neutral_site
+            )
             snap_hash = _feature_hash(key, game_date, event_id, basis)
 
             # Deduplication: skip if this exact feature snapshot was already logged
@@ -706,7 +782,26 @@ def match_executable_quote(
             if snap.get("market_type") != "moneyline":
                 continue
             slug = str(snap.get("market_slug") or "").casefold()
-            if any(marker in slug for marker in ("-f5-", "-f3-", "-f7-", "-1st-", "-h1-", "-h2-")):
+            if any(
+                marker in slug
+                for marker in (
+                    "-f5-",
+                    "-f3-",
+                    "-f7-",
+                    "-1st-",
+                    "-h1-",
+                    "-h2-",
+                    "-1h-",
+                    "-2h-",
+                    "-1q-",
+                    "-2q-",
+                    "-3q-",
+                    "-4q-",
+                    "-tt-",
+                    "-tt1h-",
+                    "-tt2h-",
+                )
+            ):
                 continue  # partial-game contracts never price a full-game pick
             long_desc = str((snap.get("long") or {}).get("description", ""))
             short_desc = str((snap.get("short") or {}).get("description", ""))

@@ -622,6 +622,26 @@ def _forecast_mlb_totals_flat(
     }
 
 
+def _select_mlb_nrfi_market(rows: list[dict]) -> dict | None:
+    """Select the latest prospective executable Polymarket NRFI market."""
+    valid = [
+        row
+        for row in rows
+        if isinstance(row.get("short"), dict)
+        and row["short"].get("ask") is not None
+        and isinstance(row.get("long"), dict)
+        and row["long"].get("ask") is not None
+        and 0 < float(row["short"]["ask"]) < 1
+        and 0 < float(row["long"]["ask"]) < 1
+    ]
+    if not valid:
+        return None
+    return max(
+        valid,
+        key=lambda row: str(row.get("observed_at_utc") or row.get("transact_time_utc") or ""),
+    )
+
+
 def _forecast_mlb_nrfi_flat(
     args_date: str,
     log: bool,
@@ -633,33 +653,53 @@ def _forecast_mlb_nrfi_flat(
     main_ledger=None,
     *,
     client=None,
+    data_root=None,
 ) -> dict:
     """MLB NRFI / YRFI 1st-inning component run model into Flat and Main ledgers.
 
-    Evaluates Poisson/Logit blended 1st-inning run probabilities for every
-    scheduled MLB game on `args_date`. Generates PickRequests for NRFI (under 0.5 runs).
+    Evaluates decomposed 1st-inning run probabilities for every scheduled MLB game
+    on `args_date`. Generates PickRequests for NRFI (under 0.5 runs) or YRFI, priced
+    against prospective executable quotes from Polymarket US where available.
     Logs unconditionally to Flat Ledger, and to Main Ledger when eligible.
     """
     from ..data_sources.espn import ESPNClient
-    from ..models.mlb_first_inning import FirstInningGameRow, MLBFirstInningModel
+    from ..data_sources.polymarket_us import probability_to_american
+    from ..learned_forward import _team_matches
+    from ..models.mlb_first_inning import (
+        FirstInningGameRow,
+        MLBFirstInningModel,
+        MLBHalfInningInteractionModel,
+        MLBHalfInningModel,
+    )
     from ..models.mlb_first_inning_live import live_first_inning_features
-    from ..pricing import probability_to_american
 
-    model_version = "mlb-nrfi-v2"
+    champion = None
+    try:
+        champion = ProductionModelRegistry.load(PROJECT_ROOT).champion("MLB", "nrfi")
+    except (KeyError, ValueError, OSError):
+        pass
+    model_version = champion.model_id if champion is not None else "mlb-nrfi-v4"
     artifact, artifact_error = _load_exact_artifact_contract(model_version)
     if artifact is None:
-        return {
-            "status": "blocked",
-            "reason": artifact_error,
-            "sport": "mlb_nrfi",
-            "model_version": model_version,
-            "game_date": args_date,
-            "scheduled_events": 0,
-            "nrfi_candidates": 0,
-            "logged": 0,
-            "duplicate_pick_ids": [],
-            "main_duplicates": [],
-        }
+        artifact, artifact_error = _load_exact_artifact_contract("mlb-nrfi-v3")
+        if artifact is None:
+            artifact, artifact_error = _load_exact_artifact_contract("mlb-nrfi-v2")
+            if artifact is None:
+                return {
+                    "status": "blocked",
+                    "reason": artifact_error,
+                    "sport": "mlb_nrfi",
+                    "model_version": model_version,
+                    "game_date": args_date,
+                    "scheduled_events": 0,
+                    "nrfi_candidates": 0,
+                    "logged": 0,
+                    "duplicate_pick_ids": [],
+                    "main_duplicates": [],
+                }
+            model_version = "mlb-nrfi-v2"
+        else:
+            model_version = "mlb-nrfi-v3"
 
     espn_client = client or ESPNClient()
     try:
@@ -669,7 +709,25 @@ def _forecast_mlb_nrfi_flat(
         logger.warning("Failed to fetch ESPN MLB scoreboard for NRFI on %s: %s", args_date, exc)
         events = []
 
-    model = MLBFirstInningModel.from_dict(artifact)
+    if artifact.get("method") == "half_inning_interaction":
+        model = MLBHalfInningInteractionModel.from_dict(artifact)
+    elif artifact.get("method") == "half_inning_logistic":
+        model = MLBHalfInningModel.from_dict(artifact)
+    else:
+        model = MLBFirstInningModel.from_dict(artifact)
+
+    try:
+        data_dir = (
+            Path(data_root)
+            if data_root is not None
+            else (Path(ledger_path(config)).parent if config else PROJECT_ROOT / "data")
+        )
+    except (KeyError, TypeError, ValueError):
+        data_dir = PROJECT_ROOT / "data"
+    snapshot_path = data_dir / "odds" / "mlb" / args_date / "polymarket_snapshots.jsonl"
+    snapshot_rows = _read_polymarket_snapshot_rows(snapshot_path)
+    nrfi_snapshot_rows = [row for row in snapshot_rows if row.get("market_type") == "nrfi"]
+
     logged, duplicates, main_duplicates = [], [], []
     nrfi_candidates = 0
     decision_dt = utc_now()
@@ -731,8 +789,6 @@ def _forecast_mlb_nrfi_flat(
             p_nrfi = model.predict_p_nrfi(row)
             p_yrfi = round(1.0 - p_nrfi, 4)
             p_nrfi = round(p_nrfi, 4)
-            fair_american_nrfi = probability_to_american(p_nrfi)
-            fair_american_yrfi = probability_to_american(p_yrfi)
         except Exception as exc:  # noqa: BLE001
             logger.warning("NRFI prediction failed for %s @ %s: %s", away_team, home_team, exc)
             continue
@@ -740,16 +796,74 @@ def _forecast_mlb_nrfi_flat(
         nrfi_candidates += 1
 
         if log:
-            if p_yrfi >= 0.50:
-                pick_selection = "yrfi"
-                pick_prob = p_yrfi
-                pick_odds = fair_american_yrfi
-                pick_rationale = f"MLB 1st Inning YRFI: p={p_yrfi:.3f} ({model_version}, {model.fit_n_games} training games)"
+            market_candidates = [
+                row
+                for row in nrfi_snapshot_rows
+                if (
+                    _team_matches(away_team, str(row.get("team") or ""))
+                    or _team_matches(home_team, str(row.get("team") or ""))
+                    or (
+                        any(
+                            w in str(row.get("event_title") or "").casefold()
+                            or w in str(row.get("event_slug") or "").casefold()
+                            or w in str(row.get("market_slug") or "").casefold()
+                            for w in [w for w in away_team.casefold().split() if len(w) > 2]
+                        )
+                        and any(
+                            w in str(row.get("event_title") or "").casefold()
+                            or w in str(row.get("event_slug") or "").casefold()
+                            or w in str(row.get("market_slug") or "").casefold()
+                            for w in [w for w in home_team.casefold().split() if len(w) > 2]
+                        )
+                    )
+                )
+                and str(row.get("event_start_utc") or "")[:10] == str(event_start_utc)[:10]
+            ]
+            market = _select_mlb_nrfi_market(market_candidates)
+            market_lineage = market.get("_lineage") if market else None
+
+            if market is not None:
+                short_ask = float(market["short"]["ask"])
+                long_ask = float(market["long"]["ask"])
+                edge_nrfi = p_nrfi - short_ask
+                edge_yrfi = p_yrfi - long_ask
+                if edge_nrfi >= edge_yrfi:
+                    pick_selection = "nrfi"
+                    pick_prob = p_nrfi
+                    ask = short_ask
+                    pick_edge = edge_nrfi
+                else:
+                    pick_selection = "yrfi"
+                    pick_prob = p_yrfi
+                    ask = long_ask
+                    pick_edge = edge_yrfi
+
+                pick_odds = probability_to_american(ask)
+                sportsbook = "polymarket_us"
+                observed_at_str = (
+                    market_lineage["market_quote_observed_at_utc"]
+                    if market_lineage is not None
+                    else str(market.get("observed_at_utc") or event_decision_dt.isoformat())
+                )
+                pick_rationale = (
+                    f"MLB 1st Inning {pick_selection.upper()}: p={pick_prob:.3f} "
+                    f"vs ask {ask:.3f} ({market.get('market_slug')}; edge {pick_edge:+.4f}) "
+                    f"({model_version}, {getattr(model, 'fit_n_games', 0)} training games)"
+                )
             else:
-                pick_selection = "nrfi"
-                pick_prob = p_nrfi
-                pick_odds = fair_american_nrfi
-                pick_rationale = f"MLB 1st Inning NRFI: p={p_nrfi:.3f} ({model_version}, {model.fit_n_games} training games)"
+                if p_yrfi >= 0.50:
+                    pick_selection = "yrfi"
+                    pick_prob = p_yrfi
+                else:
+                    pick_selection = "nrfi"
+                    pick_prob = p_nrfi
+                pick_odds = -110
+                sportsbook = "espn"
+                observed_at_str = event_decision_dt.isoformat()
+                pick_rationale = (
+                    f"MLB 1st Inning {pick_selection.upper()}: p={pick_prob:.3f}; "
+                    f"no Polymarket quote available — using -110 default odds ({model_version})"
+                )
 
             from ..scalar_artifact_replay import build_snapshot as build_scalar_snapshot
 
@@ -770,7 +884,7 @@ def _forecast_mlb_nrfi_flat(
                 market_type=MarketType.NRFI,
                 selection=pick_selection,
                 line=0.5,
-                sportsbook="model_fair",
+                sportsbook=sportsbook,
                 american_odds=pick_odds,
                 model_probability=pick_prob,
                 model_uncertainty=0.04,
@@ -779,9 +893,14 @@ def _forecast_mlb_nrfi_flat(
                 risks="1st inning variance, leadoff home run risk",
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
                 model_state=ModelState.SHADOW_QUALIFIED,
-                observed_at_utc=event_decision_dt.isoformat(),
+                observed_at_utc=observed_at_str,
                 model_artifact_hash=artifact["artifact_hash"],
+                calibration_method=artifact.get("method", "first_inning_logistic"),
+                calibration_version=model_version,
+                calibration_artifact_hash=artifact["artifact_hash"],
+                code_revision="scalar-artifact-replay-v1",
                 model_input_snapshot_json=json.dumps(nrfi_snapshot, sort_keys=True, allow_nan=False),
+                **(market_lineage or {}),
             )
 
             # Build EligibilityResult
@@ -856,14 +975,24 @@ def _forecast_mlb_nrfi_flat(
                     home_team=home_team_obj,
                 )
 
-            if not _is_registered_serving_model(
-                req_nrfi.model_version,
-                req_nrfi.league.value,
-                req_nrfi.market_type.value,
+            if (
+                market is None
+                or market_lineage is None
+                or not _is_registered_serving_model(
+                    req_nrfi.model_version,
+                    req_nrfi.league.value,
+                    req_nrfi.market_type.value,
+                )
             ):
                 eligibility = _downgrade_unserved(eligibility)
 
-            # Log to Flat Ledger
+            # Conviction gating: require max(p_nrfi, p_yrfi) >= 0.555 (|p - 0.50| >= 0.055)
+            # and pick_edge >= 0.020 when executable quotes exist.
+            is_conviction = (max(p_nrfi, p_yrfi) >= 0.555) and (
+                pick_edge >= 0.020 if market is not None else True
+            )
+
+            # Log to Flat Ledger: records every candidate for research/flat evidence
             if flat_ledger is not None:
                 with _LEDGER_LOCK:
                     if (
@@ -877,7 +1006,11 @@ def _forecast_mlb_nrfi_flat(
                         logged.append(req_nrfi)
 
             # Log to Main Ledger
-            if main_ledger is not None and eligibility.decision == "CALL":
+            is_main_eligible = eligibility.decision == "CALL" and (
+                (market is not None and is_conviction)
+                or (market is None and eligibility.reason_code == "PAPER_CALL_MODEL_UNVALIDATED")
+            )
+            if main_ledger is not None and is_main_eligible:
                 with _LEDGER_LOCK:
                     if (
                         _append_secondary_ledger(
@@ -907,8 +1040,14 @@ def _select_wnba_spread_market(rows: list[dict]) -> dict | None:
     balanced line wins" rule mlb_market_odds._market_balance uses for MLB's
     alternate lines, adapted to this snapshot format's embedded long/short
     asks instead of a two-sided quote list."""
+    partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-")
     candidates = [
-        row for row in rows if isinstance(row.get("long"), dict) and row["long"].get("ask") is not None
+        row
+        for row in rows
+        if isinstance(row.get("long"), dict)
+        and row["long"].get("ask") is not None
+        and row.get("line") is not None
+        and not any(token in str(row.get("market_slug", "")).lower() for token in partial_tokens)
     ]
     if not candidates:
         return None
@@ -976,6 +1115,21 @@ def _forecast_wnba_spread_slate(data_root, args_date: str, client) -> dict:
     snapshot_rows = _read_polymarket_snapshot_rows(snapshot_path)
     spread_rows = [row for row in snapshot_rows if row.get("market_type") == "spread"]
 
+    prior_file = Path(data_root) / "player_priors" / "wnba" / f"{args_date}.json"
+    if not prior_file.exists():
+        try:
+            from ..wnba_availability_evaluation import build_and_save_priors
+
+            build_and_save_priors(
+                store=store,
+                client=client,
+                game_date=args_date,
+                data_root=data_root,
+                observed_at=observed_at,
+            )
+        except (ValueError, KeyError, TypeError, OSError, AttributeError):
+            pass
+
     upcoming: list[UpcomingGame] = []
     market_by_event_id: dict[str, dict] = {}
     unmatched: list[dict[str, str]] = []
@@ -1003,6 +1157,24 @@ def _forecast_wnba_spread_slate(data_root, args_date: str, client) -> dict:
         if market is None:
             unmatched.append({"event_id": event_id, "reason": "no matched spread market"})
             continue
+
+        avail_points_gap = 0.0
+        try:
+            from ..features.player_availability import matchup_player_availability
+
+            avail = matchup_player_availability(
+                data_root=data_root,
+                home_team=home_team,
+                away_team=away_team,
+                game_date=args_date,
+                observed_at=observed_at,
+                event_start=start,
+                event_id=event_id,
+            )
+            avail_points_gap = float(avail.get("availability_points_gap", 0.0))
+        except (ValueError, KeyError, TypeError, OSError, AttributeError):
+            pass
+
         upcoming.append(
             UpcomingGame(
                 event_id=event_id,
@@ -1010,6 +1182,7 @@ def _forecast_wnba_spread_slate(data_root, args_date: str, client) -> dict:
                 away_team=away_team,
                 home_team=home_team,
                 spread_away_line=float(market["line"]),
+                availability_points_gap=avail_points_gap,
             )
         )
         market_by_event_id[event_id] = market
@@ -1218,12 +1391,14 @@ def _forecast_wnba_spread_sport(
 
 def _select_wnba_total_market(rows: list[dict]) -> dict | None:
     """Select the most balanced total market line for a WNBA game."""
+    partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")
     candidates = [
         row
         for row in rows
         if isinstance(row.get("long"), dict)
         and row["long"].get("ask") is not None
         and row.get("line") is not None
+        and not any(token in str(row.get("market_slug", "")).lower() for token in partial_tokens)
     ]
     if not candidates:
         return None
@@ -1282,6 +1457,21 @@ def _forecast_wnba_total_slate(data_root, args_date: str, client) -> dict:
         or "over" in str(row.get("market_slug", "")).lower()
     ]
 
+    prior_file = Path(data_root) / "player_priors" / "wnba" / f"{args_date}.json"
+    if not prior_file.exists():
+        try:
+            from ..wnba_availability_evaluation import build_and_save_priors
+
+            build_and_save_priors(
+                store=store,
+                client=client,
+                game_date=args_date,
+                data_root=data_root,
+                observed_at=observed_at,
+            )
+        except (ValueError, KeyError, TypeError, OSError, AttributeError):
+            pass
+
     upcoming: list[UpcomingGame] = []
     market_by_event_id: dict[str, dict] = {}
     unmatched: list[dict[str, str]] = []
@@ -1326,6 +1516,26 @@ def _forecast_wnba_total_slate(data_root, args_date: str, client) -> dict:
             t_line = float(market["line"])
         except (KeyError, TypeError, ValueError):
             continue
+
+        avail_total_loss = 0.0
+        try:
+            from ..features.player_availability import matchup_player_availability
+
+            avail = matchup_player_availability(
+                data_root=data_root,
+                home_team=home_team,
+                away_team=away_team,
+                game_date=args_date,
+                observed_at=observed_at,
+                event_start=start,
+                event_id=event_id,
+            )
+            home_loss = float(avail.get("home_expected_loss_points", 0.0))
+            away_loss = float(avail.get("away_expected_loss_points", 0.0))
+            avail_total_loss = home_loss + away_loss
+        except (ValueError, KeyError, TypeError, OSError, AttributeError):
+            pass
+
         upcoming.append(
             UpcomingGame(
                 event_id=event_id,
@@ -1333,6 +1543,7 @@ def _forecast_wnba_total_slate(data_root, args_date: str, client) -> dict:
                 away_team=away_team,
                 home_team=home_team,
                 total_line=t_line,
+                availability_total_loss=avail_total_loss,
             )
         )
         market_by_event_id[event_id] = market
@@ -1507,6 +1718,874 @@ def _forecast_wnba_total_sport(
                     and eligibility.decision == "CALL"
                     and _append_secondary_ledger(
                         main_ledger, request, eligibility, observed_now, "wnba_total:main_ledger"
+                    )
+                    is not None
+                ):
+                    main_duplicates.append(contract["event_id"])
+            logged.append(contract["event_id"])
+        except DuplicatePickError as error:
+            duplicates.append(error.pick_id)
+        except (EntityResolutionError, ValueError) as error:
+            skipped.append({"event_id": contract["event_id"], "reason": str(error)[:200]})
+
+    forecast["logged"] = len(logged)
+    forecast["logged_event_ids"] = logged
+    forecast["duplicate_pick_ids"] = duplicates
+    forecast["main_ledger_duplicate_event_ids"] = main_duplicates
+    forecast["skipped"] = forecast.get("unmatched", []) + skipped
+    return forecast
+
+
+def _quotes_known_at(rows: list[dict], cutoff: datetime) -> list[dict]:
+    """Keep only quotes observed at or before ``cutoff``.
+
+    The day's snapshot file keeps growing after a run starts, so rows stamped
+    later than the run would otherwise be priced and then rejected as future.
+    """
+    known = []
+    for row in rows:
+        try:
+            observed = parse_utc(str(row.get("observed_at_utc") or ""))
+        except ValueError:
+            continue
+        if observed <= cutoff:
+            known.append(row)
+    return known
+
+
+def _select_nfl_spread_market(candidates: list[dict]) -> dict | None:
+    """Select the most balanced spread market line for an NFL game."""
+    partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")
+    valid = [
+        row
+        for row in candidates
+        if isinstance(row.get("long"), dict)
+        and row["long"].get("ask") is not None
+        and row.get("line") is not None
+        and not any(token in str(row.get("market_slug", "")).lower() for token in partial_tokens)
+    ]
+    if not valid:
+        return None
+    return min(valid, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
+
+
+def _nfl_is_neutral_site(event: dict) -> bool:
+    """Determine whether an NFL game is played at a neutral site (international series, etc.)."""
+    comp = (event.get("competitions") or [{}])[0]
+    is_neutral_site = bool(comp.get("neutralSite", False))
+    if not is_neutral_site:
+        venue = comp.get("venue") or {}
+        address = venue.get("address") or {}
+        country = str(address.get("country") or "").strip().upper()
+        city = str(address.get("city") or "").strip().lower()
+        venue_name = str(venue.get("fullName") or "").strip().lower()
+        if (
+            country
+            and country not in ("USA", "US", "UNITED STATES")
+            or any(
+                kw in city
+                for kw in ("london", "munich", "frankfurt", "são paulo", "sao paulo", "mexico city")
+            )
+            or any(
+                kw in venue_name
+                for kw in (
+                    "tottenham",
+                    "wembley",
+                    "twickenham",
+                    "allianz arena",
+                    "deutsche bank park",
+                    "arena corinthians",
+                    "estadio azteca",
+                )
+            )
+        ):
+            is_neutral_site = True
+    return is_neutral_site
+
+
+def _nfl_situational_features(
+    history: list,
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """Extract point-in-time last game dates and starting QBs for NFL teams."""
+    team_last_date: dict[str, Any] = {}
+    team_starters: dict[str, str] = {}
+    for g in history:
+        try:
+            g_dt = parse_utc(str(g.event_start_utc)).date()
+            team_last_date[g.home_team] = g_dt
+            team_last_date[g.away_team] = g_dt
+            if getattr(g, "home_starter_name", None) and g.home_starter_name != "Unknown":
+                team_starters[g.home_team] = g.home_starter_name
+            if getattr(g, "away_starter_name", None) and g.away_starter_name != "Unknown":
+                team_starters[g.away_team] = g.away_starter_name
+        except (AttributeError, KeyError, TypeError, ValueError):
+            continue
+    return team_last_date, team_starters
+
+
+def _nfl_venue_weather(event: dict) -> tuple[bool, float, float]:
+    """Extract dome status, wind speed, and temperature from NFL event."""
+    comp = (event.get("competitions") or [{}])[0]
+    venue = comp.get("venue") or {}
+    is_dome = bool(venue.get("indoor", False)) or any(
+        d in str(venue.get("fullName") or "").lower()
+        for d in (
+            "dome",
+            "mercedes-benz",
+            "ford field",
+            "allegiant",
+            "at&t stadium",
+            "lucas oil",
+            "nrg stadium",
+            "u.s. bank",
+            "state farm",
+            "sofi",
+        )
+    )
+    weather = comp.get("weather") or {}
+    wind_mph = float(weather.get("windSpeed") or (0.0 if is_dome else 5.0))
+    temperature_f = float(weather.get("temperature") or (70.0 if is_dome else 65.0))
+    return is_dome, wind_mph, temperature_f
+
+
+NFL_DIVISIONS: dict[str, str] = {
+    "Buffalo Bills": "AFC_East",
+    "Miami Dolphins": "AFC_East",
+    "New England Patriots": "AFC_East",
+    "New York Jets": "AFC_East",
+    "Baltimore Ravens": "AFC_North",
+    "Cincinnati Bengals": "AFC_North",
+    "Cleveland Browns": "AFC_North",
+    "Pittsburgh Steelers": "AFC_North",
+    "Houston Texans": "AFC_South",
+    "Indianapolis Colts": "AFC_South",
+    "Jacksonville Jaguars": "AFC_South",
+    "Tennessee Titans": "AFC_South",
+    "Denver Broncos": "AFC_West",
+    "Kansas City Chiefs": "AFC_West",
+    "Las Vegas Raiders": "AFC_West",
+    "Los Angeles Chargers": "AFC_West",
+    "Dallas Cowboys": "NFC_East",
+    "New York Giants": "NFC_East",
+    "Philadelphia Eagles": "NFC_East",
+    "Washington Commanders": "NFC_East",
+    "Chicago Bears": "NFC_North",
+    "Detroit Lions": "NFC_North",
+    "Green Bay Packers": "NFC_North",
+    "Minnesota Vikings": "NFC_North",
+    "Atlanta Falcons": "NFC_South",
+    "Carolina Panthers": "NFC_South",
+    "New Orleans Saints": "NFC_South",
+    "Tampa Bay Buccaneers": "NFC_South",
+    "Arizona Cardinals": "NFC_West",
+    "Los Angeles Rams": "NFC_West",
+    "San Francisco 49ers": "NFC_West",
+    "Seattle Seahawks": "NFC_West",
+}
+
+
+def _nfl_is_division_game(home_team: str, away_team: str) -> bool:
+    """Return True if both teams belong to the same NFL division."""
+    h_div = NFL_DIVISIONS.get(home_team)
+    a_div = NFL_DIVISIONS.get(away_team)
+    return h_div is not None and h_div == a_div
+
+
+def _forecast_nfl_spread_slate(
+    data_root, args_date: str, client, *, observed_at: datetime | None = None
+) -> dict:
+    """Price NFL spreads using NFLStructuralV5Engine (nfl-spread-structural-v5)."""
+    from ..features.base import FeatureStore
+    from ..features.elo_ratings import build_elo
+    from ..learned_forward import _team_matches, _teams
+    from ..models.nfl_structural_v5 import NFLStructuralV5Engine
+    from ..scalar_artifact_replay import build_snapshot as build_scalar_snapshot
+
+    observed_at = observed_at or utc_now()
+    model_version = "nfl-spread-structural-v5"
+    artifact, artifact_error = _load_exact_artifact_contract(model_version)
+    if artifact is None:
+        return {
+            "status": "blocked",
+            "reason": artifact_error,
+            "sport": "nfl_spread",
+            "model_version": model_version,
+            "game_date": args_date,
+            "scheduled_games": 0,
+            "market_candidates": 0,
+            "priced_contracts": [],
+            "unmatched": [],
+            "observed_at_utc": observed_at.isoformat(),
+        }
+    model_artifact_hash = str(artifact["artifact_hash"])
+    model_qualified = artifact.get("qualification", {}).get("qualified") is True
+    margin_sd = float(artifact.get("margin_sd", 13.8))
+    engine = NFLStructuralV5Engine(spread_sd=margin_sd)
+
+    store = FeatureStore(data_root)
+    history = store.games_before("nfl", args_date)
+    elo_book = build_elo(history, "nfl")
+    team_last_date, team_starters = _nfl_situational_features(history)
+
+    scoreboard = client.scoreboard("NFL", args_date)
+    events = scoreboard.get("events", [])
+
+    snapshot_path = Path(data_root) / "odds" / "nfl" / args_date / "polymarket_snapshots.jsonl"
+    snapshot_rows = _read_polymarket_snapshot_rows(snapshot_path)
+    spread_rows = _quotes_known_at(
+        [
+            row
+            for row in snapshot_rows
+            if row.get("market_type") == "spread" or "spread" in str(row.get("market_slug", "")).lower()
+        ],
+        observed_at,
+    )
+
+    priced_contracts = []
+    unmatched: list[dict[str, str]] = []
+
+    for event in events:
+        try:
+            event_id = str(event["id"])
+            start = parse_utc(str(event["date"]))
+            if start <= observed_at:
+                continue
+            away_team, home_team = _teams(event)
+        except (KeyError, TypeError, ValueError):
+            continue
+
+        candidates = [
+            row
+            for row in spread_rows
+            if (
+                _team_matches(away_team, str(row.get("team") or ""))
+                or _team_matches(home_team, str(row.get("team") or ""))
+            )
+            and str(row.get("event_start_utc") or "")[:16] == str(event["date"])[:16]
+        ]
+        market = _select_nfl_spread_market(candidates)
+        if market is None:
+            unmatched.append({"event_id": event_id, "reason": "no matched spread market"})
+            continue
+
+        market_lineage = market.get("_lineage")
+        anchor_team = str(market.get("team") or "")
+        anchor_line = float(market["line"])
+        anchor_is_away = _team_matches(away_team, anchor_team)
+        spread_home_line = -anchor_line if anchor_is_away else anchor_line
+
+        is_neutral_site = _nfl_is_neutral_site(event)
+        is_dome, wind_mph, temperature_f = _nfl_venue_weather(event)
+        is_division_game = _nfl_is_division_game(home_team, away_team)
+
+        event_date = start.date()
+        h_last = team_last_date.get(home_team)
+        a_last = team_last_date.get(away_team)
+        home_rest_days = max(4, min(14, (event_date - h_last).days)) if h_last else 7
+        away_rest_days = max(4, min(14, (event_date - a_last).days)) if a_last else 7
+
+        h_qb = team_starters.get(home_team)
+        a_qb = team_starters.get(away_team)
+        q_h = elo_book.qb_ratings.get(h_qb, 1500.0) if hasattr(elo_book, "qb_ratings") else 1500.0
+        q_a = elo_book.qb_ratings.get(a_qb, 1500.0) if hasattr(elo_book, "qb_ratings") else 1500.0
+        home_qb_tier_adj = round(0.15 * (q_h - 1500.0) / 25.0, 2)
+        away_qb_tier_adj = round(0.15 * (q_a - 1500.0) / 25.0, 2)
+
+        h_elo = elo_book.rating(home_team)
+        a_elo = elo_book.rating(away_team)
+        elo_margin = (h_elo - a_elo) / 25.0
+        home_off_epa = (elo_margin / 2.0) / 32.0
+        away_off_epa = (-elo_margin / 2.0) / 32.0
+
+        fc = engine.forecast_game(
+            home_team=home_team,
+            away_team=away_team,
+            home_off_epa=home_off_epa,
+            home_def_epa=0.0,
+            away_off_epa=away_off_epa,
+            away_def_epa=0.0,
+            home_qb_tier_adj=home_qb_tier_adj,
+            away_qb_tier_adj=away_qb_tier_adj,
+            wind_mph=wind_mph,
+            temperature_f=temperature_f,
+            is_dome=is_dome,
+            home_rest_days=home_rest_days,
+            away_rest_days=away_rest_days,
+            spread_home_line=spread_home_line,
+            is_neutral_site=is_neutral_site,
+        )
+
+        cover_prob = fc.prob_away_cover if anchor_is_away else fc.prob_home_cover
+        if cover_prob >= 0.5:
+            selection = "away" if anchor_is_away else "home"
+            model_probability = cover_prob
+            ask = market["long"]["ask"]
+            line = anchor_line
+        else:
+            selection = "home" if anchor_is_away else "away"
+            model_probability = 1.0 - cover_prob
+            ask = market["short"]["ask"]
+            line = -anchor_line
+
+        if ask is None or not 0 < float(ask) < 1:
+            continue
+
+        inference_inputs = {
+            "mean": fc.projected_margin_home,
+            "sd": margin_sd,
+            "line": -spread_home_line,
+        }
+        feature_basis = {
+            "home_team": home_team,
+            "away_team": away_team,
+            "spread_home_line": spread_home_line,
+            "home_qb": h_qb or "Unknown",
+            "away_qb": a_qb or "Unknown",
+            "home_rest_days": home_rest_days,
+            "away_rest_days": away_rest_days,
+            "is_dome": is_dome,
+            "is_division_game": is_division_game,
+        }
+        model_snapshot = build_scalar_snapshot(
+            artifact,
+            feature_basis,
+            inference_inputs,
+            event_id=event_id,
+            event_start_utc=str(event["date"]),
+            observed_at_utc=observed_at.isoformat(),
+        )
+
+        priced_contracts.append(
+            {
+                "event_id": event_id,
+                "event_start_utc": str(event["date"]),
+                "away_team": away_team,
+                "home_team": home_team,
+                "market_type": "spread",
+                "selection": selection,
+                "line": line,
+                "executable_ask": float(ask),
+                "model_probability": round(model_probability, 6),
+                "model_uncertainty": 0.08,
+                "model_version": model_version,
+                "model_artifact_hash": model_artifact_hash,
+                "model_qualified": model_qualified,
+                "rationale": (
+                    f"NFL Structural v5 Spread projection. Projected margin {fc.projected_margin_home:+.1f} "
+                    f"(Rest: {home_rest_days}v{away_rest_days}d, Dome: {is_dome})."
+                ),
+                "market_slug": market.get("market_slug"),
+                "observed_at_utc": (
+                    market_lineage["market_quote_observed_at_utc"]
+                    if market_lineage is not None
+                    else observed_at.isoformat()
+                ),
+                "market_lineage": market_lineage,
+                "model_input_snapshot": model_snapshot,
+            }
+        )
+
+    return {
+        "sport": "nfl_spread",
+        "model_name": "NFL Spread (Structural v5)",
+        "model_version": model_version,
+        "model_qualified": model_qualified,
+        "game_date": args_date,
+        "scheduled_games": len(events),
+        "market_candidates": len(priced_contracts),
+        "priced_contracts": priced_contracts,
+        "unmatched": unmatched,
+        "observed_at_utc": observed_at.isoformat(),
+    }
+
+
+def _forecast_nfl_spread_sport(
+    *,
+    data_root,
+    args_date: str,
+    config: dict,
+    registry,
+    bans,
+    main_ledger=None,
+    flat_ledger=None,
+    force: bool = False,
+    observed_at: datetime | None = None,
+) -> dict:
+    """Log NFL spread picks to Main (CALL only) + Flat (every candidate)."""
+    decision_observed_at = observed_at or (
+        utc_now() if not force else datetime.strptime(args_date, "%Y-%m-%d").replace(tzinfo=UTC)
+    )
+    forecast = _forecast_nfl_spread_slate(
+        data_root, args_date, ESPNClient(), observed_at=decision_observed_at
+    )
+    exposure_source = flat_ledger or main_ledger
+    if exposure_source is None:
+        forecast["logged"] = 0
+        return forecast
+
+    observed_now = decision_observed_at
+    logged: list[dict] = []
+    duplicates: list[str] = []
+    main_duplicates: list[str] = []
+    skipped: list[dict] = []
+
+    for contract in forecast["priced_contracts"]:
+        ask = contract["executable_ask"]
+        request = PickRequest(
+            event_start_utc=contract["event_start_utc"],
+            event_id=contract["event_id"],
+            league=League.NFL,
+            away_team=contract["away_team"],
+            home_team=contract["home_team"],
+            market_type=MarketType.SPREAD,
+            selection=contract["selection"],
+            line=contract["line"],
+            sportsbook="polymarket_us",
+            american_odds=probability_to_american(ask),
+            model_probability=contract["model_probability"],
+            model_uncertainty=contract["model_uncertainty"],
+            model_version=contract["model_version"],
+            rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
+            risks="NFL Structural v5 joint distribution spread model.",
+            model_origin=ModelOrigin.STATISTICAL_MODEL,
+            model_state=ModelState.SHADOW_QUALIFIED
+            if contract.get("model_qualified")
+            else ModelState.RESEARCH,
+            observed_at_utc=contract["observed_at_utc"],
+            model_artifact_hash=contract["model_artifact_hash"],
+            calibration_method="margin_normal",
+            calibration_version=contract["model_version"],
+            calibration_artifact_hash=contract["model_artifact_hash"],
+            feature_schema_version="2",
+            code_revision=contract["model_artifact_hash"],
+            model_input_snapshot_json=json.dumps(
+                contract["model_input_snapshot"], sort_keys=True, allow_nan=False
+            )
+            if contract.get("model_input_snapshot") is not None
+            else None,
+            **(contract.get("market_lineage") or {}),
+        )
+        try:
+            request.validate(now=observed_now)
+            away = registry.resolve(request.league, request.away_team, request.event_start_utc)
+            home = registry.resolve(request.league, request.home_team, request.event_start_utc)
+            with _LEDGER_LOCK:
+                eligibility = evaluate_eligibility(
+                    request,
+                    registry,
+                    bans,
+                    exposure_source.exposure(
+                        request,
+                        now=observed_now,
+                        canonical_team_ids=(away.canonical_team_id, home.canonical_team_id),
+                    ),
+                    unit_policy(config),
+                    now=observed_now,
+                )
+                if (
+                    contract.get("model_qualified") is not True
+                    or contract.get("market_lineage") is None
+                    or not _is_registered_serving_model(
+                        request.model_version,
+                        request.league.value,
+                        request.market_type.value,
+                    )
+                ):
+                    eligibility = _downgrade_unserved(eligibility)
+                if (
+                    flat_ledger is not None
+                    and _append_secondary_ledger(
+                        flat_ledger, request, eligibility, observed_now, "nfl_spread:flat_ledger"
+                    )
+                    is not None
+                ):
+                    duplicates.append(contract["event_id"])
+                if (
+                    main_ledger is not None
+                    and eligibility.decision == "CALL"
+                    and _append_secondary_ledger(
+                        main_ledger, request, eligibility, observed_now, "nfl_spread:main_ledger"
+                    )
+                    is not None
+                ):
+                    main_duplicates.append(contract["event_id"])
+            logged.append(contract["event_id"])
+        except DuplicatePickError as error:
+            duplicates.append(error.pick_id)
+        except (EntityResolutionError, ValueError) as error:
+            skipped.append({"event_id": contract["event_id"], "reason": str(error)[:200]})
+
+    forecast["logged"] = len(logged)
+    forecast["logged_event_ids"] = logged
+    forecast["duplicate_pick_ids"] = duplicates
+    forecast["main_ledger_duplicate_event_ids"] = main_duplicates
+    forecast["skipped"] = forecast.get("unmatched", []) + skipped
+    return forecast
+
+
+def _select_nfl_total_market(candidates: list[dict]) -> dict | None:
+    """Select the most balanced total market line for an NFL game."""
+    partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")
+    valid = [
+        row
+        for row in candidates
+        if isinstance(row.get("long"), dict)
+        and row["long"].get("ask") is not None
+        and row.get("line") is not None
+        and not any(token in str(row.get("market_slug", "")).lower() for token in partial_tokens)
+    ]
+    if not valid:
+        return None
+    return min(valid, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
+
+
+def _forecast_nfl_total_slate(
+    data_root, args_date: str, client, *, observed_at: datetime | None = None
+) -> dict:
+    """Price NFL totals using NFLStructuralV5Engine (nfl-total-structural-v5)."""
+    from collections import defaultdict
+
+    from ..features.base import FeatureStore
+    from ..features.elo_ratings import build_elo
+    from ..learned_forward import _team_matches, _teams
+    from ..models.nfl_structural_v5 import NFLStructuralV5Engine
+    from ..scalar_artifact_replay import build_snapshot as build_scalar_snapshot
+
+    observed_at = observed_at or utc_now()
+    model_version = "nfl-total-structural-v5"
+    artifact, artifact_error = _load_exact_artifact_contract(model_version)
+    if artifact is None:
+        return {
+            "status": "blocked",
+            "reason": artifact_error,
+            "sport": "nfl_total",
+            "model_version": model_version,
+            "game_date": args_date,
+            "scheduled_games": 0,
+            "market_candidates": 0,
+            "priced_contracts": [],
+            "unmatched": [],
+            "observed_at_utc": observed_at.isoformat(),
+        }
+    model_artifact_hash = str(artifact["artifact_hash"])
+    model_qualified = artifact.get("qualification", {}).get("qualified") is True
+    total_sd = float(artifact.get("total_sd", 13.5))
+    engine = NFLStructuralV5Engine(total_sd=total_sd)
+
+    store = FeatureStore(data_root)
+    history = store.games_before("nfl", args_date)
+    elo_book = build_elo(history, "nfl")
+    team_last_date, team_starters = _nfl_situational_features(history)
+
+    team_scored: dict[str, list[float]] = defaultdict(list)
+    team_allowed: dict[str, list[float]] = defaultdict(list)
+    all_scores: list[float] = []
+    for g in history[-500:]:
+        team_scored[g.home_team].append(float(g.home_score))
+        team_allowed[g.home_team].append(float(g.away_score))
+        team_scored[g.away_team].append(float(g.away_score))
+        team_allowed[g.away_team].append(float(g.home_score))
+        all_scores.extend([float(g.home_score), float(g.away_score)])
+    lg_avg = sum(all_scores[-500:]) / len(all_scores[-500:]) if all_scores else 23.0
+
+    scoreboard = client.scoreboard("NFL", args_date)
+    events = scoreboard.get("events", [])
+
+    snapshot_path = Path(data_root) / "odds" / "nfl" / args_date / "polymarket_snapshots.jsonl"
+    snapshot_rows = _read_polymarket_snapshot_rows(snapshot_path)
+    total_rows = _quotes_known_at(
+        [
+            row
+            for row in snapshot_rows
+            if row.get("market_type") in ("total", "over_under")
+            or "total" in str(row.get("market_slug", "")).lower()
+            or "over" in str(row.get("market_slug", "")).lower()
+        ],
+        observed_at,
+    )
+
+    priced_contracts = []
+    unmatched: list[dict[str, str]] = []
+
+    for event in events:
+        try:
+            event_id = str(event["id"])
+            start = parse_utc(str(event["date"]))
+            if start <= observed_at:
+                continue
+            away_team, home_team = _teams(event)
+        except (KeyError, TypeError, ValueError):
+            continue
+
+        candidates = [
+            row
+            for row in total_rows
+            if (
+                _team_matches(away_team, str(row.get("team") or ""))
+                or _team_matches(home_team, str(row.get("team") or ""))
+                or any(
+                    w in str(row.get("event_title") or "").casefold()
+                    or w in str(row.get("event_slug") or "").casefold()
+                    or w in str(row.get("market_slug") or "").casefold()
+                    for w in [w for w in away_team.casefold().split() if len(w) > 2]
+                )
+            )
+            and str(row.get("event_start_utc") or "")[:16] == str(event["date"])[:16]
+        ]
+        market = _select_nfl_total_market(candidates)
+        if market is None:
+            unmatched.append({"event_id": event_id, "reason": "no matched total market"})
+            continue
+
+        try:
+            t_line = float(market["line"])
+        except (KeyError, TypeError, ValueError):
+            continue
+
+        market_lineage = market.get("_lineage")
+        is_neutral_site = _nfl_is_neutral_site(event)
+        is_dome, wind_mph, temperature_f = _nfl_venue_weather(event)
+        is_division_game = _nfl_is_division_game(home_team, away_team)
+
+        event_date = start.date()
+        h_last = team_last_date.get(home_team)
+        a_last = team_last_date.get(away_team)
+        home_rest_days = max(4, min(14, (event_date - h_last).days)) if h_last else 7
+        away_rest_days = max(4, min(14, (event_date - a_last).days)) if a_last else 7
+
+        h_qb = team_starters.get(home_team)
+        a_qb = team_starters.get(away_team)
+        q_h = elo_book.qb_ratings.get(h_qb, 1500.0) if hasattr(elo_book, "qb_ratings") else 1500.0
+        q_a = elo_book.qb_ratings.get(a_qb, 1500.0) if hasattr(elo_book, "qb_ratings") else 1500.0
+        home_qb_tier_adj = round(0.15 * (q_h - 1500.0) / 25.0, 2)
+        away_qb_tier_adj = round(0.15 * (q_a - 1500.0) / 25.0, 2)
+
+        hs = team_scored.get(home_team, [])[-6:] or [lg_avg]
+        ha = team_allowed.get(home_team, [])[-6:] or [lg_avg]
+        as_ = team_scored.get(away_team, [])[-6:] or [lg_avg]
+        aa = team_allowed.get(away_team, [])[-6:] or [lg_avg]
+
+        h_rate = (sum(hs) / len(hs)) / lg_avg
+        a_rate = (sum(as_) / len(as_)) / lg_avg
+        h_def_rate = (sum(ha) / len(ha)) / lg_avg
+        a_def_rate = (sum(aa) / len(aa)) / lg_avg
+
+        fund = lg_avg * (h_rate * a_def_rate + a_rate * h_def_rate)
+        proj_total = 0.25 * t_line + 0.75 * fund
+        if is_division_game:
+            proj_total -= 0.5
+
+        hfa = 0.0 if is_neutral_site else 1.8
+        eff_half = (proj_total - 44.5 - hfa) / 2.0
+        home_off_epa = eff_half / 32.0
+        away_off_epa = eff_half / 32.0
+
+        fc = engine.forecast_game(
+            home_team=home_team,
+            away_team=away_team,
+            home_off_epa=home_off_epa,
+            home_def_epa=0.0,
+            away_off_epa=away_off_epa,
+            away_def_epa=0.0,
+            home_qb_tier_adj=home_qb_tier_adj,
+            away_qb_tier_adj=away_qb_tier_adj,
+            wind_mph=wind_mph,
+            temperature_f=temperature_f,
+            is_dome=is_dome,
+            home_rest_days=home_rest_days,
+            away_rest_days=away_rest_days,
+            total_line=t_line,
+            is_neutral_site=is_neutral_site,
+        )
+
+        over_prob = fc.prob_over
+        if over_prob >= 0.5:
+            selection = "over"
+            model_probability = over_prob
+            ask = market["long"]["ask"]
+            line = t_line
+        else:
+            selection = "under"
+            model_probability = 1.0 - over_prob
+            ask = market["short"]["ask"]
+            line = t_line
+
+        if ask is None or not 0 < float(ask) < 1:
+            continue
+
+        inference_inputs = {
+            "mean": fc.projected_total,
+            "sd": total_sd,
+            "line": t_line,
+        }
+        feature_basis = {
+            "home_team": home_team,
+            "away_team": away_team,
+            "total_line": t_line,
+            "home_qb": h_qb or "Unknown",
+            "away_qb": a_qb or "Unknown",
+            "home_rest_days": home_rest_days,
+            "away_rest_days": away_rest_days,
+            "is_dome": is_dome,
+            "is_division_game": is_division_game,
+        }
+        model_snapshot = build_scalar_snapshot(
+            artifact,
+            feature_basis,
+            inference_inputs,
+            event_id=event_id,
+            event_start_utc=str(event["date"]),
+            observed_at_utc=observed_at.isoformat(),
+        )
+
+        priced_contracts.append(
+            {
+                "event_id": event_id,
+                "event_start_utc": str(event["date"]),
+                "away_team": away_team,
+                "home_team": home_team,
+                "market_type": "total",
+                "selection": selection,
+                "line": line,
+                "executable_ask": float(ask),
+                "model_probability": round(model_probability, 6),
+                "model_uncertainty": 0.08,
+                "model_version": model_version,
+                "model_artifact_hash": model_artifact_hash,
+                "model_qualified": model_qualified,
+                "rationale": (
+                    f"NFL Structural v5 Total projection. Projected total {fc.projected_total:.1f} "
+                    f"(Dome: {is_dome}, Weather: {wind_mph:.0f}mph/{temperature_f:.0f}F)."
+                ),
+                "market_slug": market.get("market_slug"),
+                "observed_at_utc": (
+                    market_lineage["market_quote_observed_at_utc"]
+                    if market_lineage is not None
+                    else observed_at.isoformat()
+                ),
+                "market_lineage": market_lineage,
+                "model_input_snapshot": model_snapshot,
+            }
+        )
+
+    return {
+        "sport": "nfl_total",
+        "model_name": "NFL Total (Structural v5)",
+        "model_version": model_version,
+        "model_qualified": model_qualified,
+        "game_date": args_date,
+        "scheduled_games": len(events),
+        "market_candidates": len(priced_contracts),
+        "priced_contracts": priced_contracts,
+        "unmatched": unmatched,
+        "observed_at_utc": observed_at.isoformat(),
+    }
+
+
+def _forecast_nfl_total_sport(
+    *,
+    data_root,
+    args_date: str,
+    config: dict,
+    registry,
+    bans,
+    main_ledger=None,
+    flat_ledger=None,
+    force: bool = False,
+    observed_at: datetime | None = None,
+) -> dict:
+    """Log NFL total picks to Main (CALL only) + Flat (every candidate)."""
+    decision_observed_at = observed_at or (
+        utc_now() if not force else datetime.strptime(args_date, "%Y-%m-%d").replace(tzinfo=UTC)
+    )
+    forecast = _forecast_nfl_total_slate(data_root, args_date, ESPNClient(), observed_at=decision_observed_at)
+    exposure_source = flat_ledger or main_ledger
+    if exposure_source is None:
+        forecast["logged"] = 0
+        return forecast
+
+    observed_now = decision_observed_at
+    logged: list[dict] = []
+    duplicates: list[str] = []
+    main_duplicates: list[str] = []
+    skipped: list[dict] = []
+
+    for contract in forecast["priced_contracts"]:
+        ask = contract["executable_ask"]
+        request = PickRequest(
+            event_start_utc=contract["event_start_utc"],
+            event_id=contract["event_id"],
+            league=League.NFL,
+            away_team=contract["away_team"],
+            home_team=contract["home_team"],
+            market_type=MarketType.TOTAL,
+            selection=contract["selection"],
+            line=contract["line"],
+            sportsbook="polymarket_us",
+            american_odds=probability_to_american(ask),
+            model_probability=contract["model_probability"],
+            model_uncertainty=contract["model_uncertainty"],
+            model_version=contract["model_version"],
+            rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
+            risks="NFL Structural v5 joint distribution total model.",
+            model_origin=ModelOrigin.STATISTICAL_MODEL,
+            model_state=ModelState.SHADOW_QUALIFIED
+            if contract.get("model_qualified")
+            else ModelState.RESEARCH,
+            observed_at_utc=contract["observed_at_utc"],
+            model_artifact_hash=contract["model_artifact_hash"],
+            calibration_method="total_normal",
+            calibration_version=contract["model_version"],
+            calibration_artifact_hash=contract["model_artifact_hash"],
+            feature_schema_version="2",
+            code_revision=contract["model_artifact_hash"],
+            model_input_snapshot_json=json.dumps(
+                contract["model_input_snapshot"], sort_keys=True, allow_nan=False
+            )
+            if contract.get("model_input_snapshot") is not None
+            else None,
+            **(contract.get("market_lineage") or {}),
+        )
+        try:
+            request.validate(now=observed_now)
+            away = registry.resolve(request.league, request.away_team, request.event_start_utc)
+            home = registry.resolve(request.league, request.home_team, request.event_start_utc)
+            with _LEDGER_LOCK:
+                eligibility = evaluate_eligibility(
+                    request,
+                    registry,
+                    bans,
+                    exposure_source.exposure(
+                        request,
+                        now=observed_now,
+                        canonical_team_ids=(away.canonical_team_id, home.canonical_team_id),
+                    ),
+                    unit_policy(config),
+                    now=observed_now,
+                )
+                if (
+                    contract.get("model_qualified") is not True
+                    or contract.get("market_lineage") is None
+                    or not _is_registered_serving_model(
+                        request.model_version,
+                        request.league.value,
+                        request.market_type.value,
+                    )
+                ):
+                    eligibility = _downgrade_unserved(eligibility)
+                if (
+                    flat_ledger is not None
+                    and _append_secondary_ledger(
+                        flat_ledger, request, eligibility, observed_now, "nfl_total:flat_ledger"
+                    )
+                    is not None
+                ):
+                    duplicates.append(contract["event_id"])
+                if (
+                    main_ledger is not None
+                    and eligibility.decision == "CALL"
+                    and _append_secondary_ledger(
+                        main_ledger, request, eligibility, observed_now, "nfl_total:main_ledger"
                     )
                     is not None
                 ):
@@ -1793,8 +2872,6 @@ def _forecast_learned_sport(
                         "but this row is not executable or price-qualified."
                     )
             row_unavailable_features = tuple(candidate.unavailable_features)
-            if quote_warning:
-                row_unavailable_features = tuple(dict.fromkeys((*row_unavailable_features, quote_warning)))
             if row_unavailable_features:
                 # Never a reason to drop the game — just a visible note that
                 # one input defaulted to neutral instead of using its real
@@ -1918,14 +2995,15 @@ def _forecast_learned_sport(
                         eligibility = _downgrade_unserved(eligibility)
                     # What's still NO_CALL here is always a hard trust-
                     # boundary reason or the confidence gate just above.
-                    genuinely_eligible = (
-                        eligibility.decision == "CALL"
-                        and eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
-                    )
+                    genuinely_eligible = eligibility.decision == "CALL"
                     # Main ledger (MLB/WNBA, non-flat, non-research-routed) holds
-                    # ONLY genuine qualified calls -- any remaining NO_CALL or
-                    # research observation belongs in flat rather than muddying main.
-                    skip_main_no_call = not flat_mode and not research_routed and not genuinely_eligible
+                    # ONLY genuine qualified calls -- any remaining NO_CALL is a
+                    # structurally-untrustworthy reason, real diagnostic
+                    # information that still belongs in flat_picks.xlsx (which
+                    # already logs every game every day) rather than muddying main.
+                    skip_main_no_call = (
+                        not flat_mode and not research_routed and eligibility.decision != "CALL"
+                    )
                     if not skip_main_no_call:
                         logged.append(
                             ledger.append_evaluated(
@@ -2064,6 +3142,8 @@ def _log_esports_forecast(
         research_confidence_gate = float(model_config.get("research_confidence_gate", 0.05))
         model_inputs_valid = bool(contract.get("gated_research_eligible", False))
 
+        from ..research_io import identity_key as _identity_key
+
         selected_team = str(best_side["team"])
         # Polymarket side ordering is arbitrary for venue-neutral esports;
         # teams[0]/teams[1] map to ledger home/away consistently with
@@ -2071,7 +3151,36 @@ def _log_esports_forecast(
         teams = list(contract["teams"])
         home_team = teams[0]
         away_team = teams[1]
-        pick_is_home = selected_team == home_team
+        m_type_str = str(contract.get("market_type") or "moneyline")
+        m_type = MarketType(m_type_str)
+
+        if m_type_str == "total":
+            selection = "over" if "over" in selected_team.lower() else "under"
+            m_line = 2.5
+        elif m_type_str == "spread":
+            home_key = _identity_key(home_team)
+            away_key = _identity_key(away_team)
+            sel_key = _identity_key(selected_team)
+            if home_key in sel_key:
+                selection = "home"
+            elif away_key in sel_key:
+                selection = "away"
+            else:
+                selection = "home" if home_team in selected_team else "away"
+
+            if "-1.5" in selected_team:
+                m_line = -1.5
+            elif "+1.5" in selected_team:
+                m_line = 1.5
+            else:
+                raw_line = contract.get("line")
+                m_line = float(raw_line) if raw_line is not None else (-1.5 if selection == "home" else 1.5)
+        else:
+            pick_is_home = selected_team == home_team or _identity_key(selected_team) == _identity_key(
+                home_team
+            )
+            selection = "home" if pick_is_home else "away"
+            m_line = None
 
         american_odds = probability_to_american(ask)
         from ..esports_replay import build_snapshot as build_esports_snapshot
@@ -2079,26 +3188,27 @@ def _log_esports_forecast(
         try:
             esports_snapshot_json = (
                 json.dumps(build_esports_snapshot(contract), sort_keys=True, allow_nan=False)
-                if contract.get("inference_inputs") is not None
+                if contract.get("inference_inputs") is not None and m_type_str == "moneyline"
                 else None
             )
         except (ValueError, KeyError, TypeError) as error:
             errors.append({"event_id": contract.get("event_id"), "reason": f"Invalid replay inputs: {error}"})
             continue
+        contract_model_version = str(contract.get("model_version") or forecast["model_version"])
         request = PickRequest(
             event_start_utc=str(contract["event_start_utc"]),
             event_id=str(contract["event_id"]),
             league=league,
             away_team=away_team,
             home_team=home_team,
-            market_type=MarketType.MONEYLINE,
-            selection="home" if pick_is_home else "away",
-            line=None,
+            market_type=m_type,
+            selection=selection,
+            line=m_line,
             sportsbook="polymarket_us",
             american_odds=american_odds,
             model_probability=round(model_prob, 6),
             model_uncertainty=None,
-            model_version=str(forecast["model_version"]),
+            model_version=contract_model_version,
             rationale=(
                 f"Neutral Elo baseline; executable ask {ask:.4f} (market_slug={contract['market_slug']})."
             ),
@@ -2109,9 +3219,9 @@ def _log_esports_forecast(
             model_artifact_hash=str(contract.get("artifact_hash", "")),
             calibration_method="neutral_elo",
             model_input_snapshot_json=esports_snapshot_json,
-            calibration_version=str(forecast["model_version"]),
+            calibration_version=contract_model_version,
             calibration_artifact_hash=str(contract.get("artifact_hash", "")),
-            code_revision=str(forecast["model_version"]),
+            code_revision=contract_model_version,
         )
         try:
             request.validate(now=observed_now)
@@ -2135,10 +3245,7 @@ def _log_esports_forecast(
                         config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
                     ),
                 )
-                genuinely_eligible = (
-                    eligibility.decision == "CALL"
-                    and eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
-                )
+                genuinely_eligible = eligibility.decision == "CALL"
                 ledger.append_evaluated(request, eligibility, now=observed_now)
                 # Flat: every candidate, no edge gate (operator directive 2026-08-03).
                 if (
@@ -2296,6 +3403,16 @@ def _forecast_international_sport(
                 home_team = teams[0] if len(teams) > 0 else selected_team
                 away_team = selected_team if selected_team != home_team else ""
         pick_is_home = selected_team == home_team
+        m_type_str = str(contract.get("market_type") or "moneyline")
+        m_type = MarketType(m_type_str)
+        m_line = None if contract.get("line") is None else float(contract["line"])
+
+        selection = "home" if pick_is_home else "away"
+        if m_type_str == "total":
+            selection = "over" if "over" in selected_team.lower() else "under"
+        elif m_type_str == "spread":
+            selection = "home" if home_team in selected_team else "away"
+
         american_odds = probability_to_american(ask)
         from ..international_replay import build_snapshot as build_international_snapshot
 
@@ -2306,26 +3423,27 @@ def _forecast_international_sport(
                     sort_keys=True,
                     allow_nan=False,
                 )
-                if contract.get("inference_inputs") is not None
+                if contract.get("inference_inputs") is not None and m_type_str == "moneyline"
                 else None
             )
         except (ValueError, KeyError, TypeError) as error:
             errors.append({"event_id": contract.get("event_id"), "reason": f"Invalid replay inputs: {error}"})
             continue
+        contract_model_version = str(contract.get("model_version") or forecast["model_version"])
         request = PickRequest(
             event_start_utc=str(contract["event_start_utc"]),
             event_id=str(contract["event_id"]),
             league=League(league_upper),
             away_team=away_team,
             home_team=home_team,
-            market_type=MarketType.MONEYLINE,
-            selection="home" if pick_is_home else "away",
-            line=None,
+            market_type=m_type,
+            selection=selection,
+            line=m_line,
             sportsbook="polymarket_us",
             american_odds=american_odds,
             model_probability=round(model_prob, 6),
             model_uncertainty=None,
-            model_version=str(forecast["model_version"]),
+            model_version=contract_model_version,
             rationale=(
                 f"Tie-aware Elo baseline; executable ask {ask:.4f} "
                 f"(market_slug={contract['market_slug']}). "
@@ -2338,9 +3456,9 @@ def _forecast_international_sport(
             model_artifact_hash=str(contract.get("artifact_hash", "")),
             calibration_method="tie_aware_elo",
             model_input_snapshot_json=international_snapshot_json,
-            calibration_version=str(forecast["model_version"]),
+            calibration_version=contract_model_version,
             calibration_artifact_hash=str(contract.get("artifact_hash", "")),
-            code_revision=str(forecast["model_version"]),
+            code_revision=contract_model_version,
         )
         try:
             request.validate(now=observed_now)
@@ -2361,10 +3479,7 @@ def _forecast_international_sport(
                         config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
                     ),
                 )
-                genuinely_eligible = (
-                    eligibility.decision == "CALL"
-                    and eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
-                )
+                genuinely_eligible = eligibility.decision == "CALL"
                 research_ledger.append_evaluated(request, eligibility, now=observed_now)
                 # Flat: every candidate, no edge gate (operator directive 2026-08-03).
                 if (
@@ -2462,12 +3577,23 @@ def _forecast_soccer_sport(
     from ..data_sources.polymarket_us import probability_to_american
 
     model_config = config["models"].get("SOCCER", {})
+    configured_markets = tuple(model_config.get("markets") or ())
+    from ..models.soccer import soccer_model, soccer_model_v2
+
+    model_ver = str(
+        model_config.get("active_production_version")
+        or model_config.get("active_research_version")
+        or "soccer-poisson-dc-v2"
+    )
+    active_model = soccer_model_v2() if "v2" in model_ver else soccer_model()
     forecast = build_soccer_total_slate(
         data_root=data_root,
         game_date=args_date,
         client=ESPNClient(),
         leagues=tuple(model_config.get("leagues") or ()),
         observed_at=utc_now(),
+        include_draw="draw" in configured_markets,
+        model=active_model,
     )
     # research_ledger is the usual exposure/eligibility context; a flat-only
     # call (research_ledger=None, flat_ledger set) still needs somewhere to
@@ -2486,6 +3612,7 @@ def _forecast_soccer_sport(
     # validated value can be set here without another code change; defaults
     # to 0.0 (no gate) until that value is set.
     research_confidence_gate = float(model_config.get("research_confidence_gate", 0.0))
+    configured_markets = tuple(model_config.get("markets") or ())
     # Both teams must have real, observed history (not the neutral
     # attack=defense=1.0 cold-start default SoccerModel._strengths falls
     # back to for a team it's never seen) before a call counts as resting
@@ -2558,7 +3685,7 @@ def _forecast_soccer_sport(
             calibration_method="poisson_dixon_coles",
             calibration_version=str(contract["model_version"]),
             calibration_artifact_hash=str(forecast["model_code_hash"]),
-            feature_schema_version="soccer-poisson-dc-v1",
+            feature_schema_version=str(contract["model_version"]),
             code_revision=str(forecast["model_code_hash"]),
             model_input_snapshot_json=coded_snapshot_json,
         )
@@ -2583,10 +3710,22 @@ def _forecast_soccer_sport(
                         )
                     ),
                 )
-                genuinely_eligible = (
-                    eligibility.decision == "CALL"
-                    and eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
-                )
+                contract_mtype = str(contract.get("market_type", ""))
+                market_allowed = True
+                if configured_markets:
+                    is_allowed_total = contract_mtype == "total" and any(
+                        m in ("full_game_total_2_5", "total") for m in configured_markets
+                    )
+                    is_allowed_ml = contract_mtype == "moneyline" and (
+                        ("moneyline" in configured_markets and contract.get("selection") in ("home", "away"))
+                        or (
+                            ("draw" in configured_markets or "moneyline" in configured_markets)
+                            and contract.get("selection") == "draw"
+                        )
+                    )
+                    is_allowed_btts = contract_mtype == "btts" and "btts" in configured_markets
+                    market_allowed = is_allowed_total or is_allowed_ml or is_allowed_btts
+                genuinely_eligible = eligibility.decision == "CALL" and market_allowed
                 if (
                     research_ledger is not None
                     and _append_secondary_ledger(
@@ -2779,10 +3918,18 @@ def _forecast_tennis_sport(
             model_state=ModelState(configured_state),
             observed_at_utc=str(contract["observed_at_utc"]),
             model_artifact_hash=str(forecast["model_code_hash"]),
-            calibration_method="surface_blended_elo",
+            calibration_method=(
+                "learned_v3"
+                if contract["model_version"] == "tennis-learned-v3"
+                else (
+                    "markov_hierarchical"
+                    if contract["model_version"] == "tennis-markov-hierarchical-v2"
+                    else "surface_blended_elo"
+                )
+            ),
             calibration_version=str(contract["model_version"]),
             calibration_artifact_hash=str(forecast["model_code_hash"]),
-            feature_schema_version="tennis-surface-elo-v1",
+            feature_schema_version=str(contract.get("feature_schema_version") or contract["model_version"]),
             code_revision=str(forecast["model_code_hash"]),
             model_input_snapshot_json=coded_snapshot_json,
             market_quote_observed_at_utc=contract.get("market_quote_observed_at_utc"),
@@ -2826,10 +3973,7 @@ def _forecast_tennis_sport(
                         eligibility,
                         reason_code="PAPER_CALL_MARKET_UNAVAILABLE",
                     )
-                genuinely_eligible = (
-                    eligibility.decision == "CALL"
-                    and eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
-                )
+                genuinely_eligible = eligibility.decision == "CALL"
                 if (
                     research_ledger is not None
                     and _append_secondary_ledger(
@@ -2944,12 +4088,10 @@ def _forecast_cfb_sport(
     for contract in forecast.get("priced_contracts", []):
         ask = float(contract["executable_ask"])
         mtype = MarketType(str(contract["market_type"]))
-        if mtype == MarketType.SPREAD:
-            m_version = "cfb-spread-v1"
-        elif mtype == MarketType.TOTAL:
-            m_version = "cfb-total-v1"
-        else:
-            m_version = str(model_config.get("active_production_version", "cfb-structural-v2"))
+        m_version = str(
+            contract.get("model_version")
+            or model_config.get("active_production_version", "cfb-structural-v2")
+        )
 
         try:
             # A forced refresh cannot manufacture a pregame decision time.
@@ -3021,8 +4163,14 @@ def _forecast_cfb_sport(
                     and eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
                     and contract_edge >= min_edge
                 )
-                is_qualified_call = genuinely_eligible and not eligibility.reason_code.startswith(
-                    "PAPER_CALL_"
+                # CFB spread (cfb-spread-v1) and total (cfb-total-v1) artifacts explicitly declare
+                # "status": "FLAT_LEDGER_ONLY" and "qualified": false. Unified cfb-structural-v2
+                # produces calibrated joint probabilities and is shadow-qualified across moneyline,
+                # spread, and total for main_ledger.
+                is_qualified_call = (
+                    genuinely_eligible
+                    and not eligibility.reason_code.startswith("PAPER_CALL_")
+                    and m_version == "cfb-structural-v2"
                 )
                 if (
                     research_ledger is not None
@@ -3032,7 +4180,7 @@ def _forecast_cfb_sport(
                     is not None
                 ):
                     research_duplicates += 1
-                if gated_ledger is not None and genuinely_eligible:
+                if gated_ledger is not None and genuinely_eligible and is_qualified_call:
                     if (
                         _append_secondary_ledger(
                             gated_ledger, request, eligibility, effective_now, "ncaaf:gated_ledger"
@@ -3311,11 +4459,69 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
                 gated_ledger=None,
                 exposure_ledger=ledger,
             )
-            if is_flat and sport == "mlb":
+            if sport == "mlb":
                 results["mlb_totals"] = _forecast_mlb_totals_flat(
-                    args.date, log, config, registry, bans, flat_ledger, audit
+                    args.date,
+                    log,
+                    config,
+                    registry,
+                    bans,
+                    flat_ledger,
+                    audit,
+                    main_ledger=(ledger if log and not is_flat else None),
+                )
+                results["mlb_nrfi"] = _forecast_mlb_nrfi_flat(
+                    args.date,
+                    log,
+                    config,
+                    registry,
+                    bans,
+                    flat_ledger,
+                    audit,
+                    main_ledger=(ledger if log and not is_flat else None),
+                    data_root=data_directory,
+                )
+            elif sport == "wnba":
+                results["wnba_spread"] = _forecast_wnba_spread_sport(
+                    data_root=data_directory,
+                    args_date=args.date,
+                    config=config,
+                    registry=registry,
+                    bans=bans,
+                    main_ledger=(ledger if log and not is_flat else None),
+                    flat_ledger=(flat_ledger if log else None),
+                )
+                results["wnba_total"] = _forecast_wnba_total_sport(
+                    data_root=data_directory,
+                    args_date=args.date,
+                    config=config,
+                    registry=registry,
+                    bans=bans,
+                    main_ledger=(ledger if log and not is_flat else None),
+                    flat_ledger=(flat_ledger if log else None),
+                )
+            elif sport == "nfl":
+                results["nfl_spread"] = _forecast_nfl_spread_sport(
+                    data_root=data_directory,
+                    args_date=args.date,
+                    config=config,
+                    registry=registry,
+                    bans=bans,
+                    main_ledger=(ledger if log and not is_flat else None),
+                    flat_ledger=(flat_ledger if log else None),
+                    force=getattr(args, "force", False),
+                )
+                results["nfl_total"] = _forecast_nfl_total_sport(
+                    data_root=data_directory,
+                    args_date=args.date,
+                    config=config,
+                    registry=registry,
+                    bans=bans,
+                    main_ledger=(ledger if log and not is_flat else None),
+                    flat_ledger=(flat_ledger if log else None),
+                    force=getattr(args, "force", False),
                 )
         else:
             results[sport] = _forecast_research_sport(sport, args.date, config)
-    output = results[sports[0]] if len(sports) == 1 else results
+    output = results[sports[0]] if len(sports) == 1 and len(results) == 1 else results
     return output

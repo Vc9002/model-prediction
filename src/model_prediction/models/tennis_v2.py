@@ -121,6 +121,40 @@ class TennisV2Model:
         for m in matches:
             self.record_match(m)
 
+    def apply_match_to_profiles(
+        self, profiles: dict[str, TennisPlayerProfile], match: dict[str, Any]
+    ) -> None:
+        """Apply a single completed match to player profiles chronologically."""
+        winner = str(match.get("winner", ""))
+        loser = str(match.get("loser", ""))
+        surface = str(match.get("surface", "Hard"))
+        m_date = str(match.get("match_date", ""))
+        if not winner or not loser:
+            return
+
+        prof_w = profiles.setdefault(winner, TennisPlayerProfile(player_id=winner))
+        prof_l = profiles.setdefault(loser, TennisPlayerProfile(player_id=loser))
+
+        # Overall Elo update
+        exp_w_overall = expected_win_probability(prof_w.overall_elo, prof_l.overall_elo)
+        prof_w.overall_elo += self.k_factor * (1.0 - exp_w_overall)
+        prof_l.overall_elo -= self.k_factor * (1.0 - exp_w_overall)
+
+        # Surface Elo update
+        s_elo_w = prof_w.surface_elo.get(surface, DEFAULT_ELO)
+        s_elo_l = prof_l.surface_elo.get(surface, DEFAULT_ELO)
+        exp_w_surf = expected_win_probability(s_elo_w, s_elo_l)
+        prof_w.surface_elo[surface] = s_elo_w + self.k_factor * (1.0 - exp_w_surf)
+        prof_l.surface_elo[surface] = s_elo_l - self.k_factor * (1.0 - exp_w_surf)
+
+        # Match counts
+        prof_w.surface_match_counts[surface] = prof_w.surface_match_counts.get(surface, 0) + 1
+        prof_l.surface_match_counts[surface] = prof_l.surface_match_counts.get(surface, 0) + 1
+        prof_w.total_matches += 1
+        prof_l.total_matches += 1
+        prof_w.last_match_date = m_date
+        prof_l.last_match_date = m_date
+
     def compute_player_profiles(self, as_of_date: str) -> dict[str, TennisPlayerProfile]:
         """Compute point-in-time player profiles strictly before as_of_date."""
         profiles: dict[str, TennisPlayerProfile] = {}
@@ -130,35 +164,7 @@ class TennisV2Model:
         sorted_matches = sorted(valid_matches, key=lambda item: str(item.get("match_date", "")))
 
         for match in sorted_matches:
-            winner = str(match.get("winner", ""))
-            loser = str(match.get("loser", ""))
-            surface = str(match.get("surface", "Hard"))
-            m_date = str(match.get("match_date", ""))
-            if not winner or not loser:
-                continue
-
-            prof_w = profiles.setdefault(winner, TennisPlayerProfile(player_id=winner))
-            prof_l = profiles.setdefault(loser, TennisPlayerProfile(player_id=loser))
-
-            # Overall Elo update
-            exp_w_overall = expected_win_probability(prof_w.overall_elo, prof_l.overall_elo)
-            prof_w.overall_elo += self.k_factor * (1.0 - exp_w_overall)
-            prof_l.overall_elo -= self.k_factor * (1.0 - exp_w_overall)
-
-            # Surface Elo update
-            s_elo_w = prof_w.surface_elo.get(surface, DEFAULT_ELO)
-            s_elo_l = prof_l.surface_elo.get(surface, DEFAULT_ELO)
-            exp_w_surf = expected_win_probability(s_elo_w, s_elo_l)
-            prof_w.surface_elo[surface] = s_elo_w + self.k_factor * (1.0 - exp_w_surf)
-            prof_l.surface_elo[surface] = s_elo_l - self.k_factor * (1.0 - exp_w_surf)
-
-            # Match counts
-            prof_w.surface_match_counts[surface] = prof_w.surface_match_counts.get(surface, 0) + 1
-            prof_l.surface_match_counts[surface] = prof_l.surface_match_counts.get(surface, 0) + 1
-            prof_w.total_matches += 1
-            prof_l.total_matches += 1
-            prof_w.last_match_date = m_date
-            prof_l.last_match_date = m_date
+            self.apply_match_to_profiles(profiles, match)
 
         return profiles
 
@@ -199,9 +205,11 @@ class TennisV2Model:
         surface: str,
         as_of_date: str,
         match_format: str = "Bo3",
+        profiles: dict[str, TennisPlayerProfile] | None = None,
     ) -> TennisMatchForecast:
         """Generate match forecast using dynamic surface shrinkage & format translation."""
-        profiles = self.compute_player_profiles(as_of_date)
+        if profiles is None:
+            profiles = self.compute_player_profiles(as_of_date)
         prof_1 = profiles.get(player_one)
         prof_2 = profiles.get(player_two)
 

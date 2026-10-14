@@ -79,7 +79,38 @@ def _latest_total_snapshots(
             slug = str(row.get("market_slug") or "")
             if (
                 row.get("market_type") != "total"
-                or line_value != 2.5
+                or line_value not in {0.5, 1.5, 2.5, 3.5, 4.5}
+                or any(marker in slug.casefold() for marker in _PARTIAL_MARKERS)
+                or not bool(row.get("timestamp_valid", False))
+                or not row.get("event_title")
+            ):
+                continue
+            if slug not in latest or str(row.get("observed_at_utc") or "") > str(
+                latest[slug].get("observed_at_utc") or ""
+            ):
+                latest[slug] = row
+    return list(latest.values())
+
+
+def _latest_spread_snapshots(
+    data_root: str | Path,
+    game_date: str,
+) -> list[dict[str, Any]]:
+    path = Path(data_root) / "odds" / "soccer" / game_date / "polymarket_snapshots.jsonl"
+    if not path.exists():
+        return []
+    latest: dict[str, dict[str, Any]] = {}
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            slug = str(row.get("market_slug") or "")
+            if (
+                row.get("market_type") != "spread"
                 or any(marker in slug.casefold() for marker in _PARTIAL_MARKERS)
                 or not bool(row.get("timestamp_valid", False))
                 or not row.get("event_title")
@@ -147,6 +178,8 @@ def _latest_btts_snapshots(
 def _latest_moneyline_snapshots(
     data_root: str | Path,
     game_date: str,
+    *,
+    include_draw: bool = False,
 ) -> list[dict[str, Any]]:
     """Same freshness/dedup logic as `_latest_total_snapshots`, but for
     soccer win markets.
@@ -174,9 +207,51 @@ def _latest_moneyline_snapshots(
             except json.JSONDecodeError:
                 continue
             slug = str(row.get("market_slug") or "")
+            is_draw = "-draw" in slug.casefold() or slug.casefold().endswith("-draw") or not row.get("team")
             if (
                 row.get("market_type") != "team_win"
-                or not row.get("team")
+                or (not include_draw and is_draw)
+                or any(marker in slug.casefold() for marker in _PARTIAL_MARKERS)
+                or not bool(row.get("timestamp_valid", False))
+                or not row.get("event_title")
+            ):
+                continue
+            if slug not in latest or str(row.get("observed_at_utc") or "") > str(
+                latest[slug].get("observed_at_utc") or ""
+            ):
+                latest[slug] = row
+    return list(latest.values())
+
+
+def _latest_draw_snapshots(
+    data_root: str | Path,
+    game_date: str,
+) -> list[dict[str, Any]]:
+    """Same freshness/dedup logic as `_latest_total_snapshots`, but for
+    soccer draw markets.
+
+    Polymarket prices soccer draws as distinct Yes/No binary markets
+    (classified with market_type == 'team_win' and market_slug ending with '-draw',
+    or team is None/empty). Each snapshot carries the draw market's executable
+    ask in the `long` side (Yes).
+    """
+    path = Path(data_root) / "odds" / "soccer" / game_date / "polymarket_snapshots.jsonl"
+    if not path.exists():
+        return []
+    latest: dict[str, dict[str, Any]] = {}
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            slug = str(row.get("market_slug") or "")
+            is_draw = "-draw" in slug.casefold() or slug.casefold().endswith("-draw") or not row.get("team")
+            if (
+                row.get("market_type") != "team_win"
+                or not is_draw
                 or any(marker in slug.casefold() for marker in _PARTIAL_MARKERS)
                 or not bool(row.get("timestamp_valid", False))
                 or not row.get("event_title")
@@ -196,6 +271,8 @@ def build_soccer_total_slate(
     client: Any,
     leagues: tuple[str, ...],
     observed_at: datetime,
+    include_draw: bool = False,
+    model: Any = None,
 ) -> dict[str, Any]:
     store = FeatureStore(data_root)
     history = store.games_before("soccer", game_date)
@@ -255,16 +332,15 @@ def build_soccer_total_slate(
         except (KeyError, TypeError, ValueError) as error:
             skipped.append({"event_id": event_id, "reason": str(error)})
 
-    model = soccer_model()
+    if model is None:
+        model = soccer_model()
     all_predictions = model.predict_games(history, upcoming)
-    totals = [
-        prediction
-        for prediction in all_predictions
-        if str(prediction.market_type) == "total" and prediction.line == 2.5
-    ]
+    totals = [prediction for prediction in all_predictions if str(prediction.market_type) == "total"]
+    spreads = [prediction for prediction in all_predictions if str(prediction.market_type) == "spread"]
     moneylines = [prediction for prediction in all_predictions if str(prediction.market_type) == "moneyline"]
     btts_predictions = [prediction for prediction in all_predictions if str(prediction.market_type) == "btts"]
     snapshots = _latest_total_snapshots(data_root, game_date)
+    spread_snapshots = _latest_spread_snapshots(data_root, game_date)
     moneyline_snapshots = _latest_moneyline_snapshots(data_root, game_date)
     btts_snapshots = _latest_btts_snapshots(data_root, game_date)
     priced: list[dict[str, Any]] = []
@@ -276,11 +352,13 @@ def build_soccer_total_slate(
             try:
                 snapshot_start = parse_utc(str(snapshot["event_start_utc"]))
                 snapshot_at = parse_utc(str(snapshot["observed_at_utc"]))
+                snap_line = float(snapshot.get("line") or 0.0)
             except (KeyError, TypeError, ValueError):
                 continue
             if (
                 abs((snapshot_start - start).total_seconds()) <= 30 * 60
                 and snapshot_at < start
+                and abs(snap_line - float(prediction.line or 0.0)) < 1e-4
                 and _team_matches_title(
                     prediction.away_team,
                     str(snapshot.get("event_title", "")),
@@ -292,12 +370,13 @@ def build_soccer_total_slate(
             ):
                 candidates.append(snapshot)
         if len(candidates) != 1:
-            unmatched.append(
-                {
-                    "event_id": prediction.event_id,
-                    "reason": ("no unique timestamp-valid full-game 2.5 total matched"),
-                }
-            )
+            if prediction.line == 2.5:
+                unmatched.append(
+                    {
+                        "event_id": prediction.event_id,
+                        "reason": ("no unique timestamp-valid full-game 2.5 total matched"),
+                    }
+                )
             continue
         snapshot = candidates[0]
         # Log the model's actual prediction (whichever side it thinks is
@@ -328,7 +407,7 @@ def build_soccer_total_slate(
                 "home_team": prediction.home_team,
                 "market_type": "total",
                 "selection": selection,
-                "line": 2.5,
+                "line": prediction.line,
                 "model_probability": prediction.probabilities[selection],
                 "model_uncertainty": prediction.uncertainty,
                 "model_version": prediction.model_version,
@@ -450,6 +529,76 @@ def build_soccer_total_slate(
             }
         )
 
+    if include_draw:
+        draw_snapshots = _latest_draw_snapshots(data_root, game_date)
+        for prediction in moneylines:
+            start = parse_utc(prediction.event_start_utc)
+            draw_candidates = []
+            for snapshot in draw_snapshots:
+                try:
+                    snapshot_start = parse_utc(str(snapshot["event_start_utc"]))
+                    snapshot_at = parse_utc(str(snapshot["observed_at_utc"]))
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if (
+                    abs((snapshot_start - start).total_seconds()) <= 30 * 60
+                    and snapshot_at < start
+                    and _team_matches_title(
+                        prediction.away_team,
+                        str(snapshot.get("event_title", "")),
+                    )
+                    and _team_matches_title(
+                        prediction.home_team,
+                        str(snapshot.get("event_title", "")),
+                    )
+                ):
+                    draw_candidates.append(snapshot)
+            if len(draw_candidates) != 1:
+                unmatched.append(
+                    {
+                        "event_id": prediction.event_id,
+                        "reason": "no unique timestamp-valid draw market matched",
+                    }
+                )
+                continue
+            snapshot = draw_candidates[0]
+            ask = (snapshot.get("long") or {}).get("ask")
+            if ask is None or not 0 < float(ask) < 1:
+                unmatched.append(
+                    {
+                        "event_id": prediction.event_id,
+                        "reason": "draw side has no executable ask",
+                    }
+                )
+                continue
+            draw_prob = float(prediction.probabilities.get("draw", 0.0))
+            priced.append(
+                {
+                    "event_id": prediction.event_id,
+                    "event_start_utc": prediction.event_start_utc,
+                    "away_team": prediction.away_team,
+                    "home_team": prediction.home_team,
+                    "market_type": "moneyline",
+                    "selection": "draw",
+                    "line": None,
+                    "model_probability": draw_prob,
+                    "model_uncertainty": prediction.uncertainty,
+                    "model_version": prediction.model_version,
+                    "feature_basis": prediction.feature_basis,
+                    "inference_inputs": prediction.inference_inputs,
+                    "model_inputs_observed_at_utc": observed_at.isoformat(),
+                    "rationale": f"Poisson-DC modeled draw probability: {draw_prob:.4f}.",
+                    "market_slug": snapshot["market_slug"],
+                    "executable_ask": float(ask),
+                    "observed_at_utc": snapshot["observed_at_utc"],
+                    "timestamp_valid": True,
+                    "edge_vs_executable_ask": round(
+                        draw_prob - float(ask),
+                        6,
+                    ),
+                }
+            )
+
     # BTTS: same complementary-sides shape as totals (one snapshot, long=yes/
     # short=no), so matching mirrors that loop exactly. In practice this will
     # currently always report "no unique timestamp-valid BTTS market matched"
@@ -528,6 +677,66 @@ def build_soccer_total_slate(
             }
         )
 
+    for prediction in spreads:
+        start = parse_utc(prediction.event_start_utc)
+        candidates = []
+        for snapshot in spread_snapshots:
+            try:
+                snapshot_start = parse_utc(str(snapshot["event_start_utc"]))
+                snapshot_at = parse_utc(str(snapshot["observed_at_utc"]))
+                snap_line = float(snapshot.get("line") or 0.0)
+            except (KeyError, TypeError, ValueError):
+                continue
+            if (
+                abs((snapshot_start - start).total_seconds()) <= 30 * 60
+                and snapshot_at < start
+                and abs(snap_line - float(prediction.line or 0.0)) < 1e-4
+                and _team_matches_title(
+                    prediction.away_team,
+                    str(snapshot.get("event_title", "")),
+                )
+                and _team_matches_title(
+                    prediction.home_team,
+                    str(snapshot.get("event_title", "")),
+                )
+            ):
+                candidates.append(snapshot)
+        if len(candidates) != 1:
+            continue
+        snapshot = candidates[0]
+        selection = max(("home", "away"), key=lambda side: prediction.probabilities[side])
+        side_key = "long" if selection == "home" else "short"
+        side = snapshot.get(side_key) or {}
+        ask = side.get("ask")
+        if ask is None or not 0 < float(ask) < 1:
+            continue
+        priced.append(
+            {
+                "event_id": prediction.event_id,
+                "event_start_utc": prediction.event_start_utc,
+                "away_team": prediction.away_team,
+                "home_team": prediction.home_team,
+                "market_type": "spread",
+                "selection": selection,
+                "line": prediction.line,
+                "model_probability": prediction.probabilities[selection],
+                "model_uncertainty": prediction.uncertainty,
+                "model_version": prediction.model_version,
+                "feature_basis": prediction.feature_basis,
+                "inference_inputs": prediction.inference_inputs,
+                "model_inputs_observed_at_utc": observed_at.isoformat(),
+                "rationale": prediction.rationale,
+                "market_slug": snapshot["market_slug"],
+                "executable_ask": float(ask),
+                "observed_at_utc": snapshot["observed_at_utc"],
+                "timestamp_valid": True,
+                "edge_vs_executable_ask": round(
+                    prediction.probabilities[selection] - float(ask),
+                    6,
+                ),
+            }
+        )
+
     model_source = Path(__file__).with_name("models") / "soccer.py"
     code_hash = hashlib.sha256(model_source.read_bytes()).hexdigest()
     return {
@@ -542,6 +751,6 @@ def build_soccer_total_slate(
         "skipped": skipped,
         "note": (
             "Three-way-aware Poisson/Dixon-Coles score model priced against "
-            "full-game 2.5 totals; research-only pending locked validation."
+            "moneyline, totals (1.5, 2.5, 3.5), spread handicaps, and BTTS."
         ),
     }

@@ -1,0 +1,12 @@
+{
+  "artifact_hash": "122495b96a681477d66de82c0a80609861e13857d1bc9d0cce93994293c2ce9e",
+  "coefficients": [
+    -0.066704,
+    0.223602,
+    0.958379
+  ],
+  "minimum_sample": 100,
+  "model_version": "tennis-market-residual-v1",
+  "rolling_window_days": 90,
+  "sample_size": 806
+}

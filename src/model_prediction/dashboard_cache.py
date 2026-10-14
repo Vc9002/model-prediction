@@ -265,10 +265,12 @@ class DashboardCache:
             tiers["main"] = main_paths
 
         flat_paths = sorted(sports_dir.glob("*/flat.xlsx")) if sports_dir.exists() else []
+        discovered_flat_sports = {sp.parent.name.lower() for sp in flat_paths}
         if flat_dir.exists():
             for p in sorted(flat_dir.glob("*.xlsx")):
-                if p not in flat_paths:
+                if p.stem.lower() not in discovered_flat_sports:
                     flat_paths.append(p)
+                    discovered_flat_sports.add(p.stem.lower())
         if flat_paths:
             tiers["flat"] = flat_paths
 
@@ -344,8 +346,15 @@ class DashboardCache:
     def _parse_all(self, paths: list[Path]) -> list[dict[str, Any]]:
         """Parse all Excel files into rows, keeping only dashboard columns."""
         rows: list[dict[str, Any]] = []
+        seen_pick_ids: set[str] = set()
         for path in paths:
-            rows.extend(self._parse_one(path))
+            for row in self._parse_one(path):
+                pick_id = str(row.get("pick_id") or "")
+                if pick_id:
+                    if pick_id in seen_pick_ids:
+                        continue
+                    seen_pick_ids.add(pick_id)
+                rows.append(row)
         return rows
 
     @staticmethod

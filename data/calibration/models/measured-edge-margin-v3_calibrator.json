@@ -1,0 +1,13 @@
+{
+  "baseline_brier": 0.245724,
+  "calibrated_at_utc": "2026-10-14T04:35:57.582803+00:00",
+  "calibrated_oof_brier": 0.2451209892638341,
+  "champion_method": "temperature",
+  "market": "spread",
+  "model_version": "measured-edge-margin-v3",
+  "parameters": {
+    "temperature": 1.5
+  },
+  "sample_size": 573,
+  "sport": "mlb"
+}

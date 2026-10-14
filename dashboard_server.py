@@ -25,6 +25,7 @@ import argparse
 import os
 import subprocess  # noqa: F401 -- re-export for compat (tests patch dashboard_server.subprocess.run)
 import sys
+import time
 from http.server import ThreadingHTTPServer
 
 import yaml  # noqa: F401 -- re-export for compat (tests read dashboard_server.yaml)
@@ -62,6 +63,9 @@ from model_prediction.dashboard.common import (  # noqa: F401 -- re-export for c
     _ORDER_PREVIEWS,
     _PICKS_CACHE,
     _RUNNER,
+    _SWR,
+    _TTL_OVERRIDE,
+    _WARMING,
     ARCHIVE_FILE,
     CONFIG_FILE,
     DASH_DIR,
@@ -78,6 +82,9 @@ from model_prediction.dashboard.common import (  # noqa: F401 -- re-export for c
     PORTFOLIO_HISTORY_FILE,
     ROOT,
     SPORTS,
+    _cache_rebuild,
+    _cache_snapshot_load,
+    _cache_snapshot_save,
     _cached,
     _config_payload,
     _count_lines,
@@ -223,11 +230,12 @@ import threading as _threading
 from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
 
 
-def _warm_caches() -> None:
+def _warm_caches(forever: bool = False) -> None:
     """Pre-compute all expensive endpoints in parallel background threads.
 
-    Runs once after server bind so the first browser request hits the cache
-    instead of blocking on cold Excel/JSONL reads.
+    One pass by default, so the first browser request hits the cache instead of
+    blocking on cold Excel/JSONL reads. With forever=True (the server) each entry
+    is then kept fresh and snapshotted to disk whenever its source files change.
     """
     warmers = [
         ("status", 30, status),
@@ -247,12 +255,75 @@ def _warm_caches() -> None:
         ),
     ]
 
+    def _fingerprint():
+        """Cheap change detector: (mtime, size) of the ledgers + recent data dirs."""
+        stats = []
+        paths = [
+            *_main_ledger_paths(),
+            *_flat_ledger_paths(),
+            *_research_ledger_paths(),
+            *_research_ledger_paths(gated=True),
+            DASH_DIR / "jobs.json",
+        ]
+        for directory in (DATA / "historical", DATA / "flat"):
+            try:
+                paths.extend(p for p in directory.iterdir() if p.is_file())
+            except OSError:
+                pass
+        for path in paths:
+            try:
+                st = path.stat()
+                stats.append((str(path), st.st_mtime_ns, st.st_size))
+            except OSError:
+                stats.append((str(path), 0, 0))
+        return tuple(stats)
+
+    first_pass: set[str] = set()
+    max_age = 300.0  # safety net for inputs the fingerprint doesn't cover
+    if forever:
+        for key, _ttl, _builder in warmers:
+            _TTL_OVERRIDE[key] = max_age + 60
+
     def _warm(item):
-        key, ttl, builder = item
-        try:
-            _cached(key, ttl, builder)
-        except Exception as exc:  # noqa: BLE001
-            _log(f"cache warmer: {key} failed (non-fatal): {exc!r}")
+        # Rebuild a key only when its source files changed (debounced so a
+        # half-written ledger isn't read) or after max_age. Requests are always
+        # served from the cache (stale-while-revalidate), so opening the
+        # dashboard never waits on a build.
+        key, _ttl, builder = item
+        built_at, built_fp = 0.0, None
+        pending_fp, pending_n = None, 0
+        while True:
+            try:
+                fp = _fingerprint()
+                with _CACHE_LOCK:
+                    present = key in _CACHE
+                if fp != built_fp:
+                    if fp == pending_fp:
+                        pending_n += 1
+                    else:
+                        pending_fp, pending_n = fp, 1
+                changed = fp != built_fp and (built_fp is None or pending_n >= 2)
+                if not present or changed or time.monotonic() - built_at > max_age:
+                    _cache_rebuild(key, builder)
+                    built_at, built_fp = time.monotonic(), fp
+                    pending_fp, pending_n = None, 0
+                    first_pass.add(key)
+                    if forever and len(first_pass) == len(warmers):
+                        _WARMING["on"] = False
+                    if forever:
+                        try:
+                            _cache_snapshot_save([k for k, _t, _b in warmers])
+                        except Exception as exc:  # noqa: BLE001
+                            _log(f"cache snapshot save failed (non-fatal): {exc!r}")
+            except Exception as exc:  # noqa: BLE001
+                _log(f"cache warmer: {key} failed (non-fatal): {exc!r}")
+                built_at = time.monotonic()  # back off instead of hot-looping on errors
+                first_pass.add(key)  # a failing key must not pin the "warming" banner on
+                if forever and len(first_pass) == len(warmers):
+                    _WARMING["on"] = False
+            if not forever:
+                return
+            time.sleep(5)
 
     with _ThreadPoolExecutor(max_workers=len(warmers)) as pool:
         list(pool.map(_warm, warmers))
@@ -272,7 +343,13 @@ def main() -> None:
         ThreadingHTTPServer.allow_reuse_address = True
         server = ThreadingHTTPServer(("127.0.0.1", options.port), Handler)
         PID_FILE.write_text(str(my_pid))  # Write only after successful bind
-        _threading.Thread(target=_warm_caches, daemon=True, name="cache-warmer").start()
+        _SWR["on"] = True  # serve stale + refresh in background (server process only)
+        loaded = _cache_snapshot_load()
+        _WARMING["on"] = loaded > 0  # cleared by the warmer after its first full pass
+        _log(f"cache snapshot: loaded {loaded} entries")
+        _threading.Thread(
+            target=_warm_caches, kwargs={"forever": True}, daemon=True, name="cache-warmer"
+        ).start()
         print(f"dashboard: http://127.0.0.1:{options.port}/  (Ctrl-C to stop)")
         print(f"dashboard: session token (for direct API calls): {_DASHBOARD_TOKEN}")
         server.serve_forever()

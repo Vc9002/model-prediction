@@ -1,0 +1,23 @@
+{
+  "gates": {
+    "max_uncertainty": 0.15,
+    "min_edge": 0.035,
+    "sizing": "flat_1u_gated"
+  },
+  "league": "NFL",
+  "league_avg_total": 44.5,
+  "method": "nfl_structural_v5_total_engine",
+  "model_version": "nfl-total-structural-v5",
+  "positive_class": "over",
+  "qualification": {
+    "framework": "nfl_structural_v5_total_cdf",
+    "locked_holdout": true,
+    "qualified": true,
+    "status": "qualified"
+  },
+  "schema_version": "2",
+  "sport": "nfl",
+  "total_sd": 13.5,
+  "weather_wind_penalty_threshold_mph": 14.0,
+  "artifact_hash": "a03cfa2ff7d92349716c72a20020b896f75c8eccd934a331987754c43f8fe7be"
+}

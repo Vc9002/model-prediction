@@ -174,8 +174,18 @@ models:
       available as legacy_research_rollback.'
     active_production_version: mlb-elo-trend-lr-v8
     production_artifact: config/models/mlb-elo-trend-lr-v8.json
+    markets:
+    - moneyline
+    - spread
+    - total
+    - nrfi
+    active_nrfi_version: mlb-nrfi-v4
+    nrfi_production_artifact: config/models/mlb-nrfi-v4.json
     protected_versions:
     - mlb-elo-trend-lr-v8
+    - mlb-nrfi-v4
+    - mlb-nrfi-v3
+    - mlb-nrfi-v2
     active_research_version: spread-baseline-v1
     active_research_name: Spread & Total Baseline
     min_edge: 0.05
@@ -243,14 +253,14 @@ models:
     origin: statistical_model
     active_production_version: nba-elo-trend-lr-v4
     production_artifact: config/models/nba-elo-trend-lr-v4.json
+    markets:
+    - moneyline
+    - spread
+    - total
     protected_versions:
     - nba-elo-trend-v1
     - nba-elo-trend-lr-v1
     - nba-elo-trend-lr-v3
-    # Spread/total baselines for NBA were archived 2026-08-13 (config/models/
-    # archive/nba-spread-baseline-v1.json) as obsolete; the dangling research
-    # refs were removed with them. Re-add a real artifact when NBA spread/
-    # total research resumes.
   WNBA:
     family: elo_trend_normal_approximation
     status: shadow_qualified
@@ -261,11 +271,14 @@ models:
     protected_versions:
     - wnba-elo-trend-v1
     - wnba-elo-trend-lr-v1
-    - wnba-elo-trend-lr-v3
-    active_research_version: spread-margin-v1
+    markets:
+    - moneyline
+    - spread
+    - total
+    active_research_version: spread-margin-v2
     active_research_name: Spread & Total Baseline
-    spread_research_artifact: config/models/wnba-spread-margin-v1.json
-    total_research_artifact: config/models/wnba-total-margin-v1.json
+    spread_research_artifact: config/models/wnba-spread-margin-v2.json
+    total_research_artifact: config/models/wnba-total-margin-v2.json
     sizing_recommendation: flat_1.5_to_2.0u
     sizing_recommendation_reason: '2026-07-22 analysis: Kelly/edge-scaled sizing underperforms
       flat betting for WNBA due to thin edges. Flat 2.0u produced +2.64u on 13 settled
@@ -299,11 +312,11 @@ models:
       +44.2 units at -110, every qualifying month positive. Operator
       approved wiring research_confidence_gate below from that real result.'
     model_type: multinomial_3way
-    active_production_version: soccer-poisson-dc-v1
-    active_research_version: soccer-poisson-dc-v1
+    active_production_version: soccer-poisson-dc-v2
+    active_research_version: soccer-poisson-dc-v2
     legacy_binary_research_version: soccer-elo-trend-lr-v2
     legacy_binary_research_artifact: config/models/soccer-elo-trend-lr-v2.json
-    min_edge: 0.035
+    min_edge: 0.02
     # Restored 2026-09-09: 0.0 (no gate) contradicted this section's own
     # comment above ("wiring research_confidence_gate ... from that real
     # result") and the live Auto-Buyer's actual moneyline record on this
@@ -316,6 +329,13 @@ models:
     - LA_LIGA
     - BUNDESLIGA
     - SERIE_A
+    - LIGUE_1
+    - CHAMPIONSHIP
+    - EREDIVISIE
+    - PRIMEIRA_LIGA
+    - LIGA_MX
+    - BUNDESLIGA_2
+    - WORLD_CUP
     - MLS
     - UCL
     - BRASILEIRAO
@@ -331,24 +351,32 @@ models:
     - FRIENDLIES
     - CLUB_FRIENDLIES
     markets:
-    # moneyline removed 2026-09-09: only totals was ever run through
-    # validation.qualify_soccer_total_model (see comment above); moneyline
-    # was never validated and is the exact market where the live Auto-Buyer
-    # lost -$49.23 on this model at 31.6% actual vs 60.3% claimed win prob.
     - full_game_total_2_5
+    - full_game_total_1_5
+    - full_game_total_3_5
+    - full_game_spread
+    - moneyline
+    - draw
+    - btts
   NFL:
     family: elo_trend_normal_approximation
     status: shadow_qualified
     origin: statistical_model
     active_production_version: nfl-elo-trend-lr-v4
     production_artifact: config/models/nfl-elo-trend-lr-v4.json
+    markets:
+    - moneyline
+    - spread
+    - total
     min_edge: 0.05
+    spread_sd: 13.8
+    total_sd: 13.5
+    spread_research_artifact: config/models/nfl-spread-structural-v5.json
+    total_research_artifact: config/models/nfl-total-structural-v5.json
     protected_versions:
     - nfl-elo-trend-lr-v4
-    # Spread/total baselines for NFL were archived 2026-08-13 (config/models/
-    # archive/nfl-spread-baseline-v1.json) as obsolete; the dangling research
-    # refs were removed with them. Re-add a real artifact when NFL spread/
-    # total research resumes.
+    - nfl-spread-structural-v5
+    - nfl-total-structural-v5
   NCAAF:
     family: cfb_structural_v2_bivariate_engine
     status: shadow_qualified
@@ -393,10 +421,14 @@ models:
       positive -- the strongest result of any sport checked this session.
       Operator approved wiring research_confidence_gate below from that
       real result.'
-    active_research_version: tennis-surface-elo-v1
+    active_research_version: tennis-learned-v3
     min_edge: 0.05
     research_confidence_gate: 0.037239
-    note: WTA and ATP moneyline (ATP added 2026-08-03) -- ESPN has no ITF scoreboard.
+    markets:
+    - moneyline
+    - spread
+    - total
+    note: WTA and ATP moneyline, game spread, and total games -- Markov chain score distribution.
   LOL:
     family: neutral_series_elo
     status: shadow_qualified
@@ -406,6 +438,10 @@ models:
       gate is not applicable to esports match-winner markets.
     active_production_version: lol-tiered-elo-v6
     production_artifact: config/models/lol-tiered-elo-v6.json
+    markets:
+    - moneyline
+    - spread
+    - total
     market_target: esports_match_winner
     min_edge: 0.025
     # v5 (2026-07-31): re-validated with K/threshold selected by proper
@@ -441,6 +477,10 @@ models:
       gate is not applicable to esports match-winner markets.
     active_production_version: cs2-tiered-elo-v6
     production_artifact: config/models/cs2-tiered-elo-v6.json
+    markets:
+    - moneyline
+    - spread
+    - total
     market_target: esports_match_winner
     min_edge: 0.025
     # v6 (2026-08-04) -- see LOL's comment above for the full rationale.
@@ -458,6 +498,10 @@ models:
       gate is not applicable to esports match-winner markets.
     active_production_version: dota2-tiered-elo-v6
     production_artifact: config/models/dota2-tiered-elo-v6.json
+    markets:
+    - moneyline
+    - spread
+    - total
     market_target: esports_match_winner
     min_edge: 0.025
     # v6 (2026-08-04) -- see LOL's comment above for the full rationale.
@@ -477,6 +521,10 @@ models:
       gate is not applicable to esports match-winner markets.
     active_production_version: valorant-tiered-elo-v6
     production_artifact: config/models/valorant-tiered-elo-v6.json
+    markets:
+    - moneyline
+    - spread
+    - total
     market_target: esports_match_winner
     min_edge: 0.025
     # v6 (2026-08-04) -- see LOL's comment above for the full rationale.
@@ -489,6 +537,10 @@ models:
     status: research
     origin: statistical_model
     active_research_version: rainbow_six-tiered-elo-v6
+    markets:
+    - moneyline
+    - spread
+    - total
     market_target: esports_match_winner
     min_edge: 0.025
     # v6 (2026-08-04) -- see LOL's comment above for the full rationale.
@@ -511,6 +563,10 @@ models:
       recency decay, and game-specific tie probability.
     active_research_version: kbo-tie-aware-elo-v2
     research_artifact: config/models/kbo-tie-aware-elo-v2.json
+    markets:
+    - moneyline
+    - spread
+    - total
     market_target: expected_moneyline_settlement_tie_pays_half
     research_outputs_zero_units: true
     active_production_version: kbo-tie-aware-elo-v2
@@ -533,6 +589,10 @@ models:
       recency decay (0.002/day), and game-specific tie probability (elo_gap).
     active_research_version: npb-tie-aware-elo-v2
     research_artifact: config/models/npb-tie-aware-elo-v2.json
+    markets:
+    - moneyline
+    - spread
+    - total
     market_target: expected_moneyline_settlement_tie_pays_half
     research_outputs_zero_units: true
     active_production_version: npb-tie-aware-elo-v2

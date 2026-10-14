@@ -26,6 +26,7 @@ from .commands import (
     cmd_ban_team,
     cmd_bootstrap,
     cmd_bootstrap_entities,
+    cmd_calibrate,
     cmd_call,
     cmd_collect_scores,
     cmd_compare_champion,
@@ -207,6 +208,8 @@ def main(argv: list[str] | None = None) -> None:
             output = cmd_validate_models(args, config, registry, bans, ledger, audit, data_root)
         elif args.command == "validate-totals":
             output = cmd_validate_totals(args, config, registry, bans, ledger, audit, data_root)
+        elif args.command == "calibrate":
+            output = cmd_calibrate(args, config, registry, bans, ledger, audit, data_root)
         elif args.command == "reconstruct-mlb-markets":
             output = cmd_reconstruct_mlb_markets(args, config, registry, bans, ledger, audit, data_root)
         elif args.command == "refresh-mlb-baselines":

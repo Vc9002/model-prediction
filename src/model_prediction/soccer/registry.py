@@ -23,18 +23,41 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from .brasileirao import BRASILEIRAO_CONFIG
 from .bundesliga import BUNDESLIGA_CONFIG
+from .bundesliga_2 import BUNDESLIGA_2_CONFIG
+from .championship import CHAMPIONSHIP_CONFIG
 from .epl import EPL_CONFIG
+from .eredivisie import EREDIVISIE_CONFIG
 from .la_liga import LA_LIGA_CONFIG
 from .league_model import LeagueSoccerConfig, LeagueSoccerModel
+from .liga_mx import LIGA_MX_CONFIG
+from .ligue_1 import LIGUE_1_CONFIG
 from .mls import MLS_CONFIG
 from .other import OTHER_CONFIG
+from .primeira_liga import PRIMEIRA_LIGA_CONFIG
 from .serie_a import SERIE_A_CONFIG
 from .ucl import UCL_CONFIG
+from .world_cup import WORLD_CUP_CONFIG
 
 _NAMED_CONFIGS: dict[str, LeagueSoccerConfig] = {
     config.league_code: config
-    for config in (EPL_CONFIG, LA_LIGA_CONFIG, BUNDESLIGA_CONFIG, SERIE_A_CONFIG, MLS_CONFIG, UCL_CONFIG)
+    for config in (
+        EPL_CONFIG,
+        LA_LIGA_CONFIG,
+        BUNDESLIGA_CONFIG,
+        SERIE_A_CONFIG,
+        MLS_CONFIG,
+        UCL_CONFIG,
+        LIGUE_1_CONFIG,
+        CHAMPIONSHIP_CONFIG,
+        EREDIVISIE_CONFIG,
+        PRIMEIRA_LIGA_CONFIG,
+        LIGA_MX_CONFIG,
+        BRASILEIRAO_CONFIG,
+        BUNDESLIGA_2_CONFIG,
+        WORLD_CUP_CONFIG,
+    )
 }
 
 

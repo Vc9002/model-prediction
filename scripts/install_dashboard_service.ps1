@@ -8,12 +8,12 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $TaskName = 'ModelPredictionDashboard'
 $Py = Join-Path $RepoRoot '.venv\Scripts\python.exe'
-$RuntimeRoot = if ($env:MODEL_PREDICTION_RUNTIME_ROOT) { $env:MODEL_PREDICTION_RUNTIME_ROOT } else { Join-Path $RepoRoot 'data' }
+$RuntimeRoot = if ($env:MODEL_PREDICTION_RUNTIME_ROOT) { $env:MODEL_PREDICTION_RUNTIME_ROOT.Trim() } else { Join-Path $RepoRoot 'data' }
 $LogDir = Join-Path $RepoRoot 'dashboard'
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
 # The task runs the dashboard through cmd so stdout/stderr land in log files.
-$cmd = "set PYTHONPATH=src && set MODEL_PREDICTION_RUNTIME_ROOT=$RuntimeRoot && " +
+$cmd = "set `"PYTHONPATH=src`" && set `"MODEL_PREDICTION_RUNTIME_ROOT=$RuntimeRoot`" && " +
     "`"$Py`" dashboard_server.py > `"$LogDir\launchd.out.log`" 2> `"$LogDir\launchd.err.log`""
 $action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/c $cmd" -WorkingDirectory $RepoRoot
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME

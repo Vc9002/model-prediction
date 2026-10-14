@@ -76,3 +76,32 @@ def test_league_forecasting():
     assert forecast.prob_home > 0.50
     assert forecast.lambda_home > forecast.lambda_away
     assert forecast.over_under[2.5]["over"] > 0.50
+
+
+def test_named_leagues_coverage():
+    from model_prediction.soccer.registry import named_league_codes, resolve
+
+    expected_leagues = {
+        "EPL",
+        "LA_LIGA",
+        "BUNDESLIGA",
+        "SERIE_A",
+        "MLS",
+        "UCL",
+        "LIGUE_1",
+        "CHAMPIONSHIP",
+        "EREDIVISIE",
+        "PRIMEIRA_LIGA",
+        "LIGA_MX",
+        "BRASILEIRAO",
+        "BUNDESLIGA_2",
+        "WORLD_CUP",
+    }
+    registered = set(named_league_codes())
+    assert expected_leagues.issubset(registered)
+
+    for code in expected_leagues:
+        cfg = resolve(code)
+        assert cfg.league_code == code
+        assert cfg.baseline > 0.0
+        assert cfg.home_advantage > 0.0

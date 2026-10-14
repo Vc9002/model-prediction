@@ -1325,93 +1325,174 @@ def forecast_international_baseball_slate(
     no_calls: list[dict[str, Any]] = []
     for event in events:
         event_start = parse_utc(str(event["event_start_utc"]))
+        ml_market = next(
+            (m for m in event.get("markets", []) if m.get("market_type") == "moneyline"),
+            None,
+        )
+        if ml_market is None:
+            continue
+        descriptions = [str(side.get("description") or "") for side in ml_market.get("sides", [])]
+        base_event = {
+            "event_id": event["event_id"],
+            "event_start_utc": event["event_start_utc"],
+            "market_slug": ml_market.get("market_slug"),
+            "teams": descriptions,
+        }
+        if len(ml_market.get("sides", [])) != 2:
+            no_calls.append({**base_event, "reason": "NO_CALL_MARKET_SIDES_INVALID"})
+            continue
+        matches = [aliases.get(_identity_key(description), set()) for description in descriptions]
+        if event_start <= observed_now:
+            no_calls.append({**base_event, "reason": "NO_CALL_EVENT_STARTED"})
+            continue
+        if event_start <= datetime.combine(trained_through, datetime.min.time(), tzinfo=UTC):
+            no_calls.append({**base_event, "reason": "NO_CALL_POINT_IN_TIME_MODEL_ARTIFACT"})
+            continue
+        if any(len(candidates) != 1 for candidates in matches):
+            no_calls.append(
+                {
+                    **base_event,
+                    "reason": "NO_CALL_ENTITY_UNRESOLVED",
+                    "candidate_counts": [len(value) for value in matches],
+                }
+            )
+            continue
+        team_ids = [next(iter(candidates)) for candidates in matches]
+        if team_ids[0] == team_ids[1]:
+            no_calls.append({**base_event, "reason": "NO_CALL_MODEL_UNVALIDATED_NEW_TEAM"})
+            continue
+        order_to_id = {
+            str(side.get("selection")): team_id
+            for side, team_id in zip(ml_market["sides"], team_ids, strict=True)
+        }
+        away_id, home_id = order_to_id.get("away"), order_to_id.get("home")
+        if not away_id or not home_id:
+            no_calls.append({**base_event, "reason": "NO_CALL_HOME_AWAY_UNRESOLVED"})
+            continue
+        id_to_description = dict(zip(team_ids, descriptions, strict=True))
+        away_team_desc = id_to_description[away_id]
+        home_team_desc = id_to_description[home_id]
+        if any(team_id not in ratings for team_id in team_ids):
+            no_calls.append({**base_event, "reason": "NO_CALL_MODEL_UNVALIDATED_NEW_TEAM"})
+            continue
+        game_tie_p = _game_tie_probability(away_id, home_id, book, tie_method, tie_probability)
+        from .international_replay import capture_inputs
+        from .models.baseball_derivatives import price_international_baseball_derivatives
+
+        inference_inputs = capture_inputs(book, away_id, home_id, tie_method, tie_probability)
+        derivatives = price_international_baseball_derivatives(
+            book.decisive_home_probability(away_id, home_id), game_tie_p, league=league
+        )
+        away_fair, home_fair = tie_aware_fair_values(
+            book.decisive_home_probability(away_id, home_id), game_tie_p
+        )
+
         for market in event.get("markets", []):
-            if market.get("market_type") != "moneyline":
-                continue  # not a moneyline market for this event; not this function's concern
-            descriptions = [str(side.get("description") or "") for side in market.get("sides", [])]
-            base = {
+            m_type = str(market.get("market_type") or "")
+            if m_type not in ("moneyline", "spread", "total") or len(market.get("sides", [])) != 2:
+                continue
+            market_base = {
                 "event_id": event["event_id"],
                 "event_start_utc": event["event_start_utc"],
                 "market_slug": market.get("market_slug"),
+                "market_type": m_type,
+                "line": market.get("line"),
                 "teams": descriptions,
+                "away_team": away_team_desc,
+                "home_team": home_team_desc,
             }
-            if len(market.get("sides", [])) != 2:
-                # A moneyline market exists for this event, but the gateway
-                # dropped a side (e.g. a transient boundary quote -- see
-                # polymarket_us._normalize_event) -- this must be counted as
-                # a no-call, not silently vanish from both priced_contracts
-                # and no_calls.
-                no_calls.append({**base, "reason": "NO_CALL_MARKET_SIDES_INVALID"})
-                continue
-            matches = [aliases.get(_identity_key(description), set()) for description in descriptions]
-            if event_start <= observed_now:
-                no_calls.append({**base, "reason": "NO_CALL_EVENT_STARTED"})
-                continue
-            if event_start <= datetime.combine(trained_through, datetime.min.time(), tzinfo=UTC):
-                no_calls.append({**base, "reason": "NO_CALL_POINT_IN_TIME_MODEL_ARTIFACT"})
-                continue
-            if any(len(candidates) != 1 for candidates in matches):
-                no_calls.append(
-                    {
-                        **base,
-                        "reason": "NO_CALL_ENTITY_UNRESOLVED",
-                        "candidate_counts": [len(value) for value in matches],
-                    }
-                )
-                continue
-            team_ids = [next(iter(candidates)) for candidates in matches]
-            if team_ids[0] == team_ids[1]:
-                no_calls.append({**base, "reason": "NO_CALL_MODEL_UNVALIDATED_NEW_TEAM"})
-                continue
-            order_to_id = {
-                str(side.get("selection")): team_id
-                for side, team_id in zip(market["sides"], team_ids, strict=True)
-            }
-            away_id, home_id = order_to_id.get("away"), order_to_id.get("home")
-            if not away_id or not home_id:
-                no_calls.append({**base, "reason": "NO_CALL_HOME_AWAY_UNRESOLVED"})
-                continue
-            # Resolved by team_id (tag-safe, via order_to_id above), not by
-            # position in `descriptions` -- market["sides"] has no ordering
-            # guarantee (see data_sources.polymarket_us._normalize_event), so
-            # a caller assuming descriptions[0]=away/descriptions[1]=home
-            # would silently swap home/away whenever the raw side order
-            # differs from that assumption.
-            id_to_description = dict(zip(team_ids, descriptions, strict=True))
-            base["away_team"] = id_to_description[away_id]
-            base["home_team"] = id_to_description[home_id]
-            if any(team_id not in ratings for team_id in team_ids):
-                no_calls.append({**base, "reason": "NO_CALL_MODEL_UNVALIDATED_NEW_TEAM"})
-                continue
-            game_tie_p = _game_tie_probability(away_id, home_id, book, tie_method, tie_probability)
-            from .international_replay import capture_inputs
+            market_model_version = str(artifact["model_version"])
+            fair_by_key: dict[str, float] = {}
 
-            inference_inputs = capture_inputs(book, away_id, home_id, tie_method, tie_probability)
-            away_fair, home_fair = tie_aware_fair_values(
-                book.decisive_home_probability(away_id, home_id), game_tie_p
-            )
-            probabilities = {away_id: away_fair, home_id: home_fair}
-            by_name = {
-                _identity_key(description): probabilities[team_id]
-                for description, team_id in zip(descriptions, team_ids, strict=True)
-            }
+            if m_type == "moneyline":
+                probabilities = {away_id: away_fair, home_id: home_fair}
+                fair_by_key = {
+                    _identity_key(descriptions[0]): probabilities[team_ids[0]],
+                    _identity_key(descriptions[1]): probabilities[team_ids[1]],
+                }
+            elif m_type == "spread":
+                market_model_version = f"{league.lower()}-spread-tie-aware-elo-v2"
+                line_val = float(market.get("line") or -1.5)
+                p_home_cover = (
+                    derivatives.runline_home_minus_1pt5
+                    if line_val < 0
+                    else derivatives.runline_home_plus_1pt5
+                )
+                p_away_cover = (
+                    derivatives.runline_away_plus_1pt5
+                    if line_val < 0
+                    else derivatives.runline_away_minus_1pt5
+                )
+            elif m_type == "total":
+                market_model_version = f"{league.lower()}-total-tie-aware-elo-v2"
+                line_val = float(market.get("line") or (9.8 if league.lower() == "kbo" else 7.5))
+                tot_dict = derivatives.totals_prob.get(line_val)
+                if not tot_dict:
+                    # Line not in precomputed grid; compute on the fly
+                    from .models.baseball_derivatives import price_international_baseball_derivatives
+
+                    dyn_deriv = price_international_baseball_derivatives(
+                        book.decisive_home_probability(away_id, home_id),
+                        game_tie_p,
+                        league=league,
+                        lines=(line_val,),
+                    )
+                    tot_dict = dyn_deriv.totals_prob.get(line_val, {"over": 0.5, "under": 0.5})
+                fair_by_key = {
+                    "over": tot_dict["over"],
+                    "under": tot_dict["under"],
+                }
+
             try:
                 snapshot = market_client.snapshot(str(market["market_slug"]))
             except (httpx.HTTPError, KeyError, StopIteration, TypeError, ValueError) as error:
-                no_calls.append({**base, "reason": "NO_CALL_MARKET_UNAVAILABLE", "detail": str(error)[:200]})
+                no_calls.append(
+                    {**market_base, "reason": "NO_CALL_MARKET_UNAVAILABLE", "detail": str(error)[:200]}
+                )
                 continue
+
             sides: list[dict[str, Any]] = []
             for side_name in ("long", "short"):
                 side = snapshot[side_name]
-                fair = by_name.get(_identity_key(str(side["description"])))
+                desc_str = str(side.get("description") or "").strip()
+                desc_key = _identity_key(desc_str)
                 ask = side.get("ask")
+                fair = None
+                side_team = desc_str
+
+                if m_type == "moneyline":
+                    fair = fair_by_key.get(desc_key)
+                elif m_type == "total":
+                    if desc_key in ("over", "under"):
+                        fair = fair_by_key.get(desc_key)
+                        side_team = desc_str.capitalize()
+                    elif desc_str.lower().startswith("o"):
+                        fair = tot_dict["over"]
+                        side_team = "Over"
+                    elif desc_str.lower().startswith("u"):
+                        fair = tot_dict["under"]
+                        side_team = "Under"
+                elif m_type == "spread":
+                    if desc_str.startswith("-") or "-1.5" in desc_str:
+                        fair = p_home_cover if line_val < 0 else p_away_cover
+                        side_team = f"{home_team_desc} -1.5" if line_val < 0 else f"{away_team_desc} -1.5"
+                    elif desc_str.startswith(("+", "1.5")) or "+1.5" in desc_str:
+                        fair = p_away_cover if line_val < 0 else p_home_cover
+                        side_team = f"{away_team_desc} +1.5" if line_val < 0 else f"{home_team_desc} +1.5"
+                    elif desc_key == _identity_key(home_team_desc):
+                        fair = p_home_cover
+                        side_team = f"{home_team_desc} {line_val:+.1f}"
+                    elif desc_key == _identity_key(away_team_desc):
+                        fair = p_away_cover
+                        side_team = f"{away_team_desc} {-line_val:+.1f}"
+
                 if fair is None or ask is None:
                     sides = []
                     break
                 sides.append(
                     {
                         "side": side_name,
-                        "team": side["description"],
+                        "team": side_team,
                         "model_fair_settlement_value": round(fair, 6),
                         "win_probability_component": round(max(0.0, fair - 0.5 * game_tie_p), 6),
                         "tie_probability": round(game_tie_p, 6),
@@ -1420,16 +1501,16 @@ def forecast_international_baseball_slate(
                     }
                 )
             if len(sides) != 2:
-                no_calls.append({**base, "reason": "NO_CALL_MARKET_OR_SIDE_UNRESOLVED"})
+                no_calls.append({**market_base, "reason": "NO_CALL_MARKET_OR_SIDE_UNRESOLVED"})
                 continue
             rows.append(
                 {
-                    **base,
+                    **market_base,
                     "league": league,
                     "source_team_ids": team_ids,
                     "inference_inputs": inference_inputs,
                     "model_inputs_observed_at_utc": observed_now.isoformat(),
-                    "model_version": artifact["model_version"],
+                    "model_version": market_model_version,
                     "model_state": "research",
                     "artifact_hash": artifact["artifact_hash"],
                     "observed_at_utc": snapshot["observed_at_utc"],

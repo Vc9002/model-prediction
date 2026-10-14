@@ -13,7 +13,11 @@ from .learned_replay import snapshot_hash
 from .models.cfb_distribution import CFBDistributionType, CFBJointDistributionEngine
 
 SCHEMA = "cfb-joint-replay-v1"
-VERSIONS = {"moneyline": "college-football-v1", "spread": "cfb-spread-v1", "total": "cfb-total-v1"}
+VERSIONS = {
+    "moneyline": ("cfb-structural-v2", "college-football-v1"),
+    "spread": ("cfb-structural-v2", "cfb-spread-v1"),
+    "total": ("cfb-structural-v2", "cfb-total-v1"),
+}
 
 
 def engine_hash() -> str:
@@ -110,8 +114,9 @@ def validate_decision_snapshot(payload: dict[str, Any], row: dict[str, Any]) -> 
     if payload.get("schema") != SCHEMA or payload.get("snapshot_hash") != snapshot_hash(payload):
         raise ValueError("cfb_replay_snapshot_hash_mismatch")
     market = payload["market_type"]
+    allowed_versions = VERSIONS.get(market, ())
     if (
-        payload["model_version"] != VERSIONS.get(market)
+        payload["model_version"] not in allowed_versions
         or row.get("model_version") != payload["model_version"]
         or row.get("model_artifact_hash") != payload["artifact_hash"]
         or str(row.get("league")).upper() != "NCAAF"

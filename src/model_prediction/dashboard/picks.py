@@ -44,17 +44,21 @@ def _main_ledger_paths() -> list[Path]:
 
 def _flat_ledger_paths() -> list[Path]:
     paths: list[Path] = []
+    seen_sports: set[str] = set()
     for sport in _MAIN_LEDGER_SPORTS:
         new_path = DATA / "sports" / sport / "flat.xlsx"
         if new_path.exists() or (DATA / "sports" / sport).exists():
             paths.append(new_path)
+            seen_sports.add(sport.lower())
         else:
             paths.append(DATA / "flat" / f"{sport}.xlsx")
+            seen_sports.add(sport.lower())
     flat_dir = DATA / "flat"
     if flat_dir.exists():
         for path in sorted(flat_dir.glob("*.xlsx")):
-            if not path.name.startswith(".") and path not in paths:
+            if not path.name.startswith(".") and path.stem.lower() not in seen_sports:
                 paths.append(path)
+                seen_sports.add(path.stem.lower())
     return paths
 
 
@@ -104,7 +108,16 @@ def _read_split_picks(paths: list[Path], cache: dict[str, object]) -> list[dict]
     with _CACHE_LOCK:
         if cache["mtime"] == mtime_key:
             return cache["rows"]  # type: ignore[return-value]
-    rows_out = [row for path in existing for row in _parse_picks(path)]
+    seen_pick_ids: set[str] = set()
+    rows_out: list[dict] = []
+    for path in existing:
+        for row in _parse_picks(path):
+            pick_id = str(row.get("pick_id") or "")
+            if pick_id:
+                if pick_id in seen_pick_ids:
+                    continue
+                seen_pick_ids.add(pick_id)
+            rows_out.append(row)
     with _CACHE_LOCK:
         cache["mtime"] = mtime_key
         cache["rows"] = rows_out

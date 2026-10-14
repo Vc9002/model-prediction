@@ -277,6 +277,212 @@ class MLBHalfInningModel:
     def predict_p_yrfi(self, row: FirstInningGameRow) -> float:
         return 1.0 - self.predict_p_nrfi(row)
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "model_version": "mlb-nrfi-v3",
+            "method": "half_inning_logistic",
+            "schema_version": "2",
+            "sport": "mlb",
+            "league": "MLB",
+            "positive_class": "nrfi",
+            "market_type": "nrfi",
+            "feature_names": self.feature_names,
+            "coef_away": self.coef_away,
+            "intercept_away": self.intercept_away,
+            "coef_home": self.coef_home,
+            "intercept_home": self.intercept_home,
+            "scaler_mean": self.scaler_mean,
+            "scaler_scale": self.scaler_scale,
+            "C": self.C,
+            "random_state": self.random_state,
+            "fit_n_games": self.fit_n_games,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> MLBHalfInningModel:
+        return cls(
+            feature_names=list(data.get("feature_names", FEATURE_NAMES)),
+            coef_away=[float(v) for v in data.get("coef_away", [])],
+            intercept_away=float(data.get("intercept_away", 0.0)),
+            coef_home=[float(v) for v in data.get("coef_home", [])],
+            intercept_home=float(data.get("intercept_home", 0.0)),
+            scaler_mean=[float(v) for v in data.get("scaler_mean", [])],
+            scaler_scale=[float(v) for v in data.get("scaler_scale", [])],
+            C=float(data.get("C", 1.0)),
+            random_state=int(data.get("random_state", 42)),
+            fit_n_games=int(data.get("fit_n_games", 0)),
+        )
+
+
+INTERACTION_FEATURE_NAMES = (
+    "top3_composite",
+    "starter_opp_1st_runs",
+    "starter_fip",
+    "starter_k_pct",
+    "starter_bb_pct",
+    "park_1st_runs",
+    "top3_same_hand_share",
+    "team_1st_scored",
+    "top3_park_interaction",
+    "whiff_power_interaction",
+    "starter_park_interaction",
+    "fip_k_ratio",
+)
+
+
+@dataclass
+class MLBHalfInningInteractionModel:
+    """Decomposed two-half-inning model with non-linear feature interactions (v4).
+
+    Fits two separate half-inning logistic models with interactions:
+    - Park factor interactions
+    - Pitcher strikeout / batter whiff power interaction
+    - Platoon handedness alignment
+    - FIP-to-K ratio
+    Combines predictions as P(NRFI) = P(away=0) * P(home=0).
+    """
+
+    feature_names: list[str] = field(default_factory=lambda: list(INTERACTION_FEATURE_NAMES))
+    coef_away: list[float] = field(default_factory=list)
+    intercept_away: float = 0.0
+    scaler_mean_away: list[float] = field(default_factory=list)
+    scaler_scale_away: list[float] = field(default_factory=list)
+    coef_home: list[float] = field(default_factory=list)
+    intercept_home: float = 0.0
+    scaler_mean_home: list[float] = field(default_factory=list)
+    scaler_scale_home: list[float] = field(default_factory=list)
+    C: float = 1.0
+    random_state: int = 42
+    fit_n_games: int = 0
+
+    @staticmethod
+    def extract_half_features(row: FirstInningGameRow, side: str) -> list[float]:
+        if side == "away":
+            top3 = float(row.features.get("away_top3_composite", 0.107))
+            sp_runs = float(row.features.get("home_starter_opp_1st_runs", 0.516))
+            fip = float(row.features.get("home_starter_fip", 3.88))
+            k = float(row.features.get("home_starter_k_pct", 0.22))
+            bb = float(row.features.get("home_starter_bb_pct", 0.077))
+            park = float(row.features.get("park_1st_runs", 1.01))
+            hand = float(row.features.get("away_top3_same_hand_share", 0.68))
+            scored = float(row.features.get("away_team_1st_scored_away", 0.453))
+        else:
+            top3 = float(row.features.get("home_top3_composite", 0.107))
+            sp_runs = float(row.features.get("away_starter_opp_1st_runs", 0.467))
+            fip = float(row.features.get("away_starter_fip", 3.88))
+            k = float(row.features.get("away_starter_k_pct", 0.22))
+            bb = float(row.features.get("away_starter_bb_pct", 0.077))
+            park = float(row.features.get("park_1st_runs", 1.01))
+            hand = float(row.features.get("home_top3_same_hand_share", 0.68))
+            scored = float(row.features.get("home_team_1st_scored_home", 0.549))
+
+        return [
+            top3,
+            sp_runs,
+            fip,
+            k,
+            bb,
+            park,
+            hand,
+            scored,
+            top3 * park,
+            (1.0 - k) * top3,
+            sp_runs * park,
+            fip / max(0.1, k + 0.1),
+        ]
+
+    def _half_logit(
+        self, feats: list[float], coef: list[float], intercept: float, mean: list[float], scale: list[float]
+    ) -> float:
+        logit = intercept
+        for x, c, m, s in zip(feats, coef, mean, scale, strict=True):
+            logit += c * ((x - m) / (s if s > 0 else 1.0))
+        return 1.0 / (1.0 + math.exp(-max(-20.0, min(20.0, logit))))
+
+    def predict_p_nrfi(self, row: FirstInningGameRow) -> float:
+        f_away = self.extract_half_features(row, "away")
+        f_home = self.extract_half_features(row, "home")
+        p_away0 = self._half_logit(
+            f_away, self.coef_away, self.intercept_away, self.scaler_mean_away, self.scaler_scale_away
+        )
+        p_home0 = self._half_logit(
+            f_home, self.coef_home, self.intercept_home, self.scaler_mean_home, self.scaler_scale_home
+        )
+        return p_away0 * p_home0
+
+    def predict_p_yrfi(self, row: FirstInningGameRow) -> float:
+        return 1.0 - self.predict_p_nrfi(row)
+
+    def fit(self, rows: list[FirstInningGameRow]) -> MLBHalfInningInteractionModel:
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.preprocessing import StandardScaler
+
+        X_away = [self.extract_half_features(r, "away") for r in rows]
+        y_away = [1 if r.runs_1st_away == 0 else 0 for r in rows]
+        X_home = [self.extract_half_features(r, "home") for r in rows]
+        y_home = [1 if r.runs_1st_home == 0 else 0 for r in rows]
+
+        sc_a = StandardScaler().fit(X_away)
+        sc_h = StandardScaler().fit(X_home)
+        self.scaler_mean_away = [float(v) for v in sc_a.mean_]
+        self.scaler_scale_away = [float(v) for v in sc_a.scale_]
+        self.scaler_mean_home = [float(v) for v in sc_h.mean_]
+        self.scaler_scale_home = [float(v) for v in sc_h.scale_]
+
+        lr_a = LogisticRegression(C=self.C, max_iter=2000, random_state=self.random_state).fit(
+            sc_a.transform(X_away), y_away
+        )
+        lr_h = LogisticRegression(C=self.C, max_iter=2000, random_state=self.random_state).fit(
+            sc_h.transform(X_home), y_home
+        )
+
+        self.coef_away = [float(c) for c in lr_a.coef_[0]]
+        self.intercept_away = float(lr_a.intercept_[0])
+        self.coef_home = [float(c) for c in lr_h.coef_[0]]
+        self.intercept_home = float(lr_h.intercept_[0])
+        self.fit_n_games = len(rows)
+        return self
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "model_version": "mlb-nrfi-v4",
+            "method": "half_inning_interaction",
+            "schema_version": "2",
+            "sport": "mlb",
+            "league": "MLB",
+            "positive_class": "nrfi",
+            "market_type": "nrfi",
+            "feature_names": self.feature_names,
+            "coef_away": self.coef_away,
+            "intercept_away": self.intercept_away,
+            "scaler_mean_away": self.scaler_mean_away,
+            "scaler_scale_away": self.scaler_scale_away,
+            "coef_home": self.coef_home,
+            "intercept_home": self.intercept_home,
+            "scaler_mean_home": self.scaler_mean_home,
+            "scaler_scale_home": self.scaler_scale_home,
+            "C": self.C,
+            "random_state": self.random_state,
+            "fit_n_games": self.fit_n_games,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> MLBHalfInningInteractionModel:
+        return cls(
+            feature_names=list(data.get("feature_names", INTERACTION_FEATURE_NAMES)),
+            coef_away=[float(v) for v in data.get("coef_away", [])],
+            intercept_away=float(data.get("intercept_away", 0.0)),
+            scaler_mean_away=[float(v) for v in data.get("scaler_mean_away", [])],
+            scaler_scale_away=[float(v) for v in data.get("scaler_scale_away", [])],
+            coef_home=[float(v) for v in data.get("coef_home", [])],
+            intercept_home=float(data.get("intercept_home", 0.0)),
+            scaler_mean_home=[float(v) for v in data.get("scaler_mean_home", [])],
+            scaler_scale_home=[float(v) for v in data.get("scaler_scale_home", [])],
+            C=float(data.get("C", 1.0)),
+            random_state=int(data.get("random_state", 42)),
+            fit_n_games=int(data.get("fit_n_games", 0)),
+        )
+
 
 def _rows_to_matrix(rows: list[FirstInningGameRow], feature_names: list[str]) -> list[list[float]]:
     return [[float(row.features.get(name, 0.0)) for name in feature_names] for row in rows]

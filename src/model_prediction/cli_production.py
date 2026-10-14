@@ -450,7 +450,7 @@ def _cmd_status() -> int:
     for entry in registry.entries.values():
         mark = "ok" if entry.available else f"FAILED: {entry.load_error}"
         print(
-            f"  {entry.model_id:<28} {entry.sport:<12} {entry.market:<10} {entry.implementation:<16} {mark}"
+            f"  {entry.model_id:<28} {entry.display_name:<38} {entry.sport:<8} {entry.market:<10} {entry.implementation:<16} {mark}"
         )
     print()
     print(f"Last prediction:  {state.get('last_prediction_utc', 'never')}")

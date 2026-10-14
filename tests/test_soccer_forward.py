@@ -273,6 +273,29 @@ def test_soccer_forward_prices_moneyline_matching_side_by_team_name(tmp_path) ->
     expected_ask = 0.58 if contract["selection"] == "home" else 0.4
     assert contract["executable_ask"] == expected_ask
 
+    # With include_draw=True, both the team-win contract and the draw contract are priced.
+    result_with_draw = build_soccer_total_slate(
+        data_root=tmp_path,
+        game_date="2026-07-27",
+        client=Client(),
+        leagues=("MLS",),
+        observed_at=datetime(2026, 7, 27, 13, tzinfo=UTC),
+        include_draw=True,
+    )
+    ml_contracts_with_draw = [
+        c for c in result_with_draw["priced_contracts"] if c["market_type"] == "moneyline"
+    ]
+    assert len(ml_contracts_with_draw) == 2
+    draw_contract = next(c for c in ml_contracts_with_draw if c["selection"] == "draw")
+    assert draw_contract["line"] is None
+    assert draw_contract["market_slug"] == "atc-mls-alpha-beta-2026-07-27-draw"
+    assert draw_contract["executable_ask"] == 0.25
+    assert draw_contract["edge_vs_executable_ask"] == round(draw_contract["model_probability"] - 0.25, 6)
+    evidence_draw = build_snapshot(
+        draw_contract, result_with_draw["model_code_hash"], draw_contract["model_inputs_observed_at_utc"]
+    )
+    assert replay_inputs(evidence_draw["inference_inputs"])["draw"] == draw_contract["model_probability"]
+
 
 def test_soccer_forward_rejects_partial_or_timestamp_invalid_totals(tmp_path) -> None:
     snapshot_path = tmp_path / "odds" / "soccer" / "2026-07-27" / "polymarket_snapshots.jsonl"
@@ -578,3 +601,109 @@ def test_soccer_model_league_isolation_prevents_lower_division_distortion() -> N
     # Liverpool must be heavily favored.
     assert ml_pred.probabilities["home"] > 0.60
     assert ml_pred.probabilities["away"] < 0.20
+
+
+def test_soccer_forward_prices_spread_and_multiple_totals(tmp_path) -> None:
+    history_path = tmp_path / "processed" / "soccer" / "games.jsonl"
+    history_path.parent.mkdir(parents=True)
+    history = []
+    for index in range(60):
+        history.append(
+            {
+                "event_id": f"history-{index}",
+                "event_start_utc": f"2026-05-{index % 28 + 1:02d}T12:00:00Z",
+                "league": "MLS",
+                "away_team": "Alpha FC" if index % 2 else "Beta FC",
+                "home_team": "Beta FC" if index % 2 else "Alpha FC",
+                "away_score": index % 3,
+                "home_score": (index + 1) % 4,
+            }
+        )
+    history_path.write_text("".join(json.dumps(row) + "\n" for row in history), encoding="utf-8")
+
+    snapshot_path = tmp_path / "odds" / "soccer" / "2026-07-27" / "polymarket_snapshots.jsonl"
+    snapshot_path.parent.mkdir(parents=True)
+    snapshots = [
+        # Total 2.5
+        {
+            "event_id": "pm-1",
+            "event_title": "Alpha FC vs Beta FC",
+            "event_start_utc": "2026-07-27T20:00:00Z",
+            "observed_at_utc": "2026-07-27T12:00:00Z",
+            "timestamp_valid": True,
+            "market_type": "total",
+            "line": 2.5,
+            "market_slug": "tsc-mls-alpha-beta-2026-07-27-2pt5",
+            "long": {"description": "Over", "ask": 0.55},
+            "short": {"description": "Under", "ask": 0.46},
+        },
+        # Total 1.5
+        {
+            "event_id": "pm-2",
+            "event_title": "Alpha FC vs Beta FC",
+            "event_start_utc": "2026-07-27T20:00:00Z",
+            "observed_at_utc": "2026-07-27T12:00:00Z",
+            "timestamp_valid": True,
+            "market_type": "total",
+            "line": 1.5,
+            "market_slug": "tsc-mls-alpha-beta-2026-07-27-1pt5",
+            "long": {"description": "Over", "ask": 0.75},
+            "short": {"description": "Under", "ask": 0.28},
+        },
+        # Spread -1.5 / +1.5
+        {
+            "event_id": "pm-3",
+            "event_title": "Alpha FC vs Beta FC",
+            "event_start_utc": "2026-07-27T20:00:00Z",
+            "observed_at_utc": "2026-07-27T12:00:00Z",
+            "timestamp_valid": True,
+            "market_type": "spread",
+            "line": -1.5,
+            "market_slug": "asc-mls-alpha-beta-2026-07-27-neg-1pt5",
+            "long": {"description": "-1.50", "ask": 0.35},
+            "short": {"description": "+1.50", "ask": 0.68},
+        },
+    ]
+    snapshot_path.write_text("".join(json.dumps(row) + "\n" for row in snapshots), encoding="utf-8")
+
+    class Client:
+        @staticmethod
+        def scoreboard(league, game_date):
+            return {
+                "events": [
+                    {
+                        "id": "espn-1",
+                        "date": "2026-07-27T20:00:00Z",
+                        "competitions": [
+                            {
+                                "competitors": [
+                                    {"homeAway": "away", "team": {"displayName": "Alpha FC"}},
+                                    {"homeAway": "home", "team": {"displayName": "Beta FC"}},
+                                ]
+                            }
+                        ],
+                    }
+                ]
+            }
+
+    result = build_soccer_total_slate(
+        data_root=tmp_path,
+        game_date="2026-07-27",
+        client=Client(),
+        leagues=("MLS",),
+        observed_at=datetime(2026, 7, 27, 13, tzinfo=UTC),
+    )
+
+    assert result["scheduled_games"] == 1
+    # 2 totals (1.5, 2.5) + 1 spread (-1.5) = 3 priced contracts
+    assert result["priced_count"] == 3
+    market_types = {c["market_type"] for c in result["priced_contracts"]}
+    assert "total" in market_types
+    assert "spread" in market_types
+
+    spread_c = next(c for c in result["priced_contracts"] if c["market_type"] == "spread")
+    assert spread_c["line"] == -1.5
+    assert 0.0 < spread_c["model_probability"] < 1.0
+
+    lines = {c["line"] for c in result["priced_contracts"] if c["market_type"] == "total"}
+    assert {1.5, 2.5}.issubset(lines)

@@ -116,3 +116,16 @@ def test_full_tennis_forecast():
     assert (
         forecast_bo5.p_player_one_win > forecast_bo3.p_player_one_win
     )  # Grand slam format favors dominant player
+
+
+def test_stratified_evaluation_no_collapse():
+    from scripts.evaluate_tennis_v2 import run_tennis_v2_stratified_evaluation
+
+    res = run_tennis_v2_stratified_evaluation()
+    assert res["n_matches"] >= 800
+    assert res["v2_brier_score"] < 0.24  # Well below 0.25 (which represents 0.5000 collapse)
+    assert res["v2_log_loss"] < 0.65  # Well below 0.6931 (log(2) collapse)
+    assert 0.60 < res["mean_v2_prob"] < 0.75
+    assert len(res["by_tour"]) >= 2  # Has ATP and WTA
+    assert "ATP" in res["by_tour"]
+    assert "WTA" in res["by_tour"]

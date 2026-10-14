@@ -13,11 +13,23 @@ from scripts.score_research_forward import run
 from tests.test_research_forward import evidence, fixture, history, models  # noqa: F401
 
 ROOT = Path(__file__).parents[1]
-MARKETS = [
+_RAW_MARKETS = [
     (m["sport"], m["market"])
     for m in yaml.safe_load((ROOT / "config/production.yaml").read_text())["prediction_service"]["models"]
     if m["enabled"] and m["serving_status"] == "production"
 ]
+MARKETS: list[tuple[str, str]] = []
+for _sport, _market in _RAW_MARKETS:
+    if _market == "multi":
+        if _sport == "NCAAF":
+            MARKETS.extend([(_sport, "moneyline"), (_sport, "spread"), (_sport, "total")])
+        elif _sport == "TENNIS":
+            MARKETS.append((_sport, "moneyline"))
+        else:
+            MARKETS.append((_sport, "moneyline"))
+    else:
+        MARKETS.append((_sport, _market))
+MARKETS = list(dict.fromkeys(MARKETS))
 
 
 def test_ncaaf_legacy_name_namespace_requires_exact_provider_id_and_name():

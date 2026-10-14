@@ -465,18 +465,25 @@ def test_current_configured_artifacts_are_valid_after_rename_and_config_fix(
     test below and by the empty-OUTPUTS rejection at the end of this test.
     """
     patch_dash("_read_evidence_ledger", lambda _path: [])
+    patch_dash("_rolling_declared_hash", lambda _path: None)
     patch_dash("OUTPUTS", tmp_path / "outputs")
     (tmp_path / "outputs").mkdir(parents=True)
 
     esports_titles: dict[str, dict] = {}
     leagues: dict[str, dict] = {}
+    repo_root = Path(__file__).resolve().parents[1]
     for model in (dashboard_server._config_payload().get("models") or {}).values():
         if not isinstance(model, dict):
             continue
         path = model.get("production_artifact")
-        if not path or not Path(path).exists():
+        if not path:
             continue
-        raw = json.loads(Path(path).read_text(encoding="utf-8"))
+        artifact_path = Path(path)
+        if not artifact_path.is_absolute():
+            artifact_path = repo_root / artifact_path
+        if not artifact_path.exists():
+            continue
+        raw = json.loads(artifact_path.read_text(encoding="utf-8"))
         model_version = str(raw.get("model_version") or "")
         entry = {
             "model_version": model_version,
@@ -662,7 +669,9 @@ def test_http_payload_renders_nba_verified_with_missing_ledger_dashes(monkeypatc
     server = dashboard_server.ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+    # Cold production_evidence() reads the real data tree (~15s here), so the
+    # client timeout must outlast it rather than the usual 5s.
+    connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=90)
     try:
         connection.request("GET", "/api/production-evidence")
         response = connection.getresponse()
