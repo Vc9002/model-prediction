@@ -74,7 +74,8 @@ def _compute_features(
     is_neutral_site: bool = False,
 ) -> tuple[dict[str, float], tuple[str, ...]]:
     unavailable: list[str] = []
-    if hasattr(elo, "expected_qb_adjusted_win") and (home_starter_name or away_starter_name):
+    wanted = set(artifact.raw.get("market_models", {}).get("moneyline", {}).get("feature_names", []))
+    if "qb_adjusted_elo_probability" in wanted and hasattr(elo, "expected_qb_adjusted_win"):
         elo_prob = elo.expected_qb_adjusted_win(
             home=home_team,
             away=away_team,
@@ -82,18 +83,16 @@ def _compute_features(
             away_qb=away_starter_name,
             is_neutral=is_neutral_site,
         )
+    elif is_neutral_site and hasattr(elo, "expected_neutral_win"):
+        elo_prob = elo.expected_neutral_win(home_team, away_team)
     else:
-        elo_prob = (
-            elo.expected_neutral_win(home_team, away_team)
-            if is_neutral_site and hasattr(elo, "expected_neutral_win")
-            else elo.expected_home_win(home_team, away_team)
-        )
+        elo_prob = elo.expected_home_win(home_team, away_team)
+
     features: dict[str, float] = {
         "elo_probability": elo_prob,
         "trend_gap": home_trend.offensive_momentum - away_trend.offensive_momentum,
         "defensive_trend_gap": home_trend.defensive_momentum - away_trend.defensive_momentum,
     }
-    wanted = set(artifact.raw.get("market_models", {}).get("moneyline", {}).get("feature_names", []))
     if "consistency_gap" in wanted:
         features["consistency_gap"] = home_trend.consistency - away_trend.consistency
     if "hot_cold_gap" in wanted:

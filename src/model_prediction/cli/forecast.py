@@ -50,6 +50,7 @@ from ..esports import (
     validate_all_esports_baselines,
 )
 from ..features.base import FeatureStore
+from ..features.nfl_efficiency import NFLEfficiencyStore
 from ..forward import build_mlb_slate
 from ..international_baseball import (
     refresh_recent_international_baseball_matches,
@@ -1896,7 +1897,6 @@ def _forecast_nfl_spread_slate(
 ) -> dict:
     """Price NFL spreads using NFLStructuralV5Engine (nfl-spread-structural-v5)."""
     from ..features.base import FeatureStore
-    from ..features.elo_ratings import build_elo
     from ..learned_forward import _team_matches, _teams
     from ..models.nfl_structural_v5 import NFLStructuralV5Engine
     from ..scalar_artifact_replay import build_snapshot as build_scalar_snapshot
@@ -1924,7 +1924,6 @@ def _forecast_nfl_spread_slate(
 
     store = FeatureStore(data_root)
     history = store.games_before("nfl", args_date)
-    elo_book = build_elo(history, "nfl")
     team_last_date, team_starters = _nfl_situational_features(history)
 
     scoreboard = client.scoreboard("NFL", args_date)
@@ -1986,26 +1985,24 @@ def _forecast_nfl_spread_slate(
 
         h_qb = team_starters.get(home_team)
         a_qb = team_starters.get(away_team)
-        q_h = elo_book.qb_ratings.get(h_qb, 1500.0) if hasattr(elo_book, "qb_ratings") else 1500.0
-        q_a = elo_book.qb_ratings.get(a_qb, 1500.0) if hasattr(elo_book, "qb_ratings") else 1500.0
-        home_qb_tier_adj = round(0.15 * (q_h - 1500.0) / 25.0, 2)
-        away_qb_tier_adj = round(0.15 * (q_a - 1500.0) / 25.0, 2)
 
-        h_elo = elo_book.rating(home_team)
-        a_elo = elo_book.rating(away_team)
-        elo_margin = (h_elo - a_elo) / 25.0
-        home_off_epa = (elo_margin / 2.0) / 32.0
-        away_off_epa = (-elo_margin / 2.0) / 32.0
+        eff = NFLEfficiencyStore.get_default(data_root).get_matchup_efficiency(
+            home_team=home_team,
+            away_team=away_team,
+            as_of_date=start,
+            home_qb=h_qb,
+            away_qb=a_qb,
+        )
 
         fc = engine.forecast_game(
             home_team=home_team,
             away_team=away_team,
-            home_off_epa=home_off_epa,
-            home_def_epa=0.0,
-            away_off_epa=away_off_epa,
-            away_def_epa=0.0,
-            home_qb_tier_adj=home_qb_tier_adj,
-            away_qb_tier_adj=away_qb_tier_adj,
+            home_off_epa=eff.home_off_epa,
+            home_def_epa=eff.home_def_epa,
+            away_off_epa=eff.away_off_epa,
+            away_def_epa=eff.away_def_epa,
+            home_qb_tier_adj=eff.home_qb_tier_adj,
+            away_qb_tier_adj=eff.away_qb_tier_adj,
             wind_mph=wind_mph,
             temperature_f=temperature_f,
             is_dome=is_dome,
@@ -2243,10 +2240,8 @@ def _forecast_nfl_total_slate(
     data_root, args_date: str, client, *, observed_at: datetime | None = None
 ) -> dict:
     """Price NFL totals using NFLStructuralV5Engine (nfl-total-structural-v5)."""
-    from collections import defaultdict
 
     from ..features.base import FeatureStore
-    from ..features.elo_ratings import build_elo
     from ..learned_forward import _team_matches, _teams
     from ..models.nfl_structural_v5 import NFLStructuralV5Engine
     from ..scalar_artifact_replay import build_snapshot as build_scalar_snapshot
@@ -2274,19 +2269,7 @@ def _forecast_nfl_total_slate(
 
     store = FeatureStore(data_root)
     history = store.games_before("nfl", args_date)
-    elo_book = build_elo(history, "nfl")
     team_last_date, team_starters = _nfl_situational_features(history)
-
-    team_scored: dict[str, list[float]] = defaultdict(list)
-    team_allowed: dict[str, list[float]] = defaultdict(list)
-    all_scores: list[float] = []
-    for g in history[-500:]:
-        team_scored[g.home_team].append(float(g.home_score))
-        team_allowed[g.home_team].append(float(g.away_score))
-        team_scored[g.away_team].append(float(g.away_score))
-        team_allowed[g.away_team].append(float(g.home_score))
-        all_scores.extend([float(g.home_score), float(g.away_score)])
-    lg_avg = sum(all_scores[-500:]) / len(all_scores[-500:]) if all_scores else 23.0
 
     scoreboard = client.scoreboard("NFL", args_date)
     events = scoreboard.get("events", [])
@@ -2355,40 +2338,24 @@ def _forecast_nfl_total_slate(
 
         h_qb = team_starters.get(home_team)
         a_qb = team_starters.get(away_team)
-        q_h = elo_book.qb_ratings.get(h_qb, 1500.0) if hasattr(elo_book, "qb_ratings") else 1500.0
-        q_a = elo_book.qb_ratings.get(a_qb, 1500.0) if hasattr(elo_book, "qb_ratings") else 1500.0
-        home_qb_tier_adj = round(0.15 * (q_h - 1500.0) / 25.0, 2)
-        away_qb_tier_adj = round(0.15 * (q_a - 1500.0) / 25.0, 2)
 
-        hs = team_scored.get(home_team, [])[-6:] or [lg_avg]
-        ha = team_allowed.get(home_team, [])[-6:] or [lg_avg]
-        as_ = team_scored.get(away_team, [])[-6:] or [lg_avg]
-        aa = team_allowed.get(away_team, [])[-6:] or [lg_avg]
-
-        h_rate = (sum(hs) / len(hs)) / lg_avg
-        a_rate = (sum(as_) / len(as_)) / lg_avg
-        h_def_rate = (sum(ha) / len(ha)) / lg_avg
-        a_def_rate = (sum(aa) / len(aa)) / lg_avg
-
-        fund = lg_avg * (h_rate * a_def_rate + a_rate * h_def_rate)
-        proj_total = 0.25 * t_line + 0.75 * fund
-        if is_division_game:
-            proj_total -= 0.5
-
-        hfa = 0.0 if is_neutral_site else 1.8
-        eff_half = (proj_total - 44.5 - hfa) / 2.0
-        home_off_epa = eff_half / 32.0
-        away_off_epa = eff_half / 32.0
+        eff = NFLEfficiencyStore.get_default(data_root).get_matchup_efficiency(
+            home_team=home_team,
+            away_team=away_team,
+            as_of_date=start,
+            home_qb=h_qb,
+            away_qb=a_qb,
+        )
 
         fc = engine.forecast_game(
             home_team=home_team,
             away_team=away_team,
-            home_off_epa=home_off_epa,
-            home_def_epa=0.0,
-            away_off_epa=away_off_epa,
-            away_def_epa=0.0,
-            home_qb_tier_adj=home_qb_tier_adj,
-            away_qb_tier_adj=away_qb_tier_adj,
+            home_off_epa=eff.home_off_epa,
+            home_def_epa=eff.home_def_epa,
+            away_off_epa=eff.away_off_epa,
+            away_def_epa=eff.away_def_epa,
+            home_qb_tier_adj=eff.home_qb_tier_adj,
+            away_qb_tier_adj=eff.away_qb_tier_adj,
             wind_mph=wind_mph,
             temperature_f=temperature_f,
             is_dome=is_dome,

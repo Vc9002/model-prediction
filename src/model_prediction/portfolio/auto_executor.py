@@ -68,6 +68,10 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     "lol-tiered-elo-v6",
     "rainbow_six-tiered-elo-v6",
     "dota2-tiered-elo-v6",
+    "nfl-elo-trend-lr-v4",
+    "nfl-spread-structural-v5",
+    "nfl-total-structural-v5",
+    "tennis-surface-elo-v4",
 )
 
 EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
@@ -181,6 +185,10 @@ def _auto_buyer_sport_market(row: dict[str, Any]) -> tuple[str, str]:
     sport = str(row.get("league") or row.get("sport") or "").strip().lower()
     if not sport and model_id.startswith("mlb-"):
         sport = "mlb"
+    elif not sport and model_id.startswith("nfl-"):
+        sport = "nfl"
+    elif not sport and model_id.startswith("tennis-"):
+        sport = "tennis"
 
     market_type = str(row.get("market_type") or "").strip().lower().replace("_", "")
     if market_type == "ml":
@@ -1286,8 +1294,9 @@ class AutoPolymarketBuyer:
                 result.rejected_dedup += 1
                 continue
 
-            # 8b. Sport-specific odds ceiling (e.g. avoid heavy favorites where upside is too narrow)
             sport_norm = str(row.get("league") or row.get("sport") or "").strip().lower()
+            if not sport_norm and model_id.startswith("tennis-"):
+                sport_norm = "tennis"
             if (
                 sport_norm == "tennis"
                 and self.config.max_tennis_price is not None
