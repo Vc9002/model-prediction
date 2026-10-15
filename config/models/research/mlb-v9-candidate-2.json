@@ -1,0 +1,126 @@
+{
+  "model_id": "mlb-v9-candidate-2",
+  "model_name": "MLB Point-In-Time Calibrated Logistic Regression v9",
+  "league": "MLB",
+  "version": "9.2.0-rc2",
+  "status": "RESEARCH_CANDIDATE",
+  "created_at_utc": "2026-10-15T05:08:39.830528+00:00",
+  "notes": "Rebuilt on mlb_v9_feature_table_v4.parquet with point-in-time features, non-collinear matrix, and validation Platt calibration.",
+  "dataset_manifest": "tests/fixtures/mlb_v9_v4/mlb_v9_feature_table_v4.json",
+  "dataset_sha256": "afaef3d2a6645d8bfe922bd307b2a9fec0f83f7d9bcacb0572e58fba44be4e1d",
+  "feature_names": [
+    "elo_probability",
+    "trend_gap",
+    "park_factor_pit",
+    "rest_disparity",
+    "back_to_back_gap",
+    "starter_k_pct_gap",
+    "starter_bb_pct_gap",
+    "starter_depth_gap",
+    "projected_woba_gap",
+    "projected_iso_gap",
+    "projected_k_pct_gap",
+    "projected_bb_pct_gap",
+    "bullpen_fip_advantage",
+    "bullpen_freshness_advantage"
+  ],
+  "scaler_mean": [
+    0.5337704509701101,
+    -0.011016570529627682,
+    0.9987294179339276,
+    0.03198741478762454,
+    -0.01546932354483482,
+    -0.0006455165180912428,
+    0.0005583377031987413,
+    -0.01617724174095438,
+    -4.362873623492396e-05,
+    -6.318825380178293e-06,
+    0.0002715259570005244,
+    2.469847928683798e-05,
+    0.0021111693759832202,
+    -0.004532511798636602
+  ],
+  "scaler_std": [
+    0.07403771226118865,
+    1.0418073232771812,
+    0.05726708316922573,
+    0.3678540553389915,
+    0.2748347980265727,
+    0.08573738365519981,
+    0.04606922651099886,
+    0.6441303825372211,
+    0.011755715790357151,
+    0.016829477112292584,
+    0.02713576399133682,
+    0.009310469286416866,
+    0.2685143861705389,
+    0.0750903255222082
+  ],
+  "coefficients": [
+    0.05511520676659775,
+    -0.007895724054026445,
+    -0.027628392934240725,
+    0.004820953091360143,
+    0.014764249824234228,
+    0.035636555636341986,
+    -0.0070382705156884565,
+    0.03368534582725737,
+    0.04091679564191667,
+    0.01785065298708461,
+    -0.034151324303189026,
+    0.025784235012352646,
+    0.0526799645913374,
+    0.004979889324705337
+  ],
+  "intercept": 0.13757193194772196,
+  "hyperparameters": {
+    "C": 0.0005,
+    "penalty": "l2",
+    "solver": "lbfgs"
+  },
+  "calibration": {
+    "method": "platt",
+    "calibration_slope": 1.0416,
+    "calibration_intercept": -0.0,
+    "expected_calibration_error": 0.020325,
+    "calibration_cohort": "validation_1082_games"
+  },
+  "evaluation_metrics": {
+    "test_sample_size": 1782,
+    "test_dates": 134,
+    "log_loss": 0.684007,
+    "brier_score": 0.245458,
+    "accuracy": 0.5685,
+    "auc": 0.5721,
+    "ece": 0.020325,
+    "delta_log_loss_vs_v8": -0.001804,
+    "delta_brier_vs_v8": -0.000875,
+    "p_log_loss_better_vs_v8": 0.821,
+    "p_brier_better_vs_v8": 0.822,
+    "ci_95_delta_log_loss": [
+      -0.005644860743186514,
+      0.0021187511426562873
+    ],
+    "ci_95_delta_brier": [
+      -0.002731725313819807,
+      0.0010277801343391694
+    ]
+  },
+  "promotion_gate_verdict": {
+    "predictive_gate": {
+      "passed": true,
+      "p_better": 0.821
+    },
+    "operational_gate": {
+      "passed": true,
+      "condition_number": 5.25,
+      "max_vif": 5.59
+    },
+    "prospective_gate": {
+      "passed": false,
+      "reason": "Requires untouched prospective shadow period on live games before production promotion."
+    },
+    "overall_verdict": "RESEARCH_CANDIDATE_OFFSEASON_SHADOW"
+  },
+  "artifact_hash": "94b598b3d716657e2a48c0736a50793722885ddbb7c08564ddef2cf2a6fca329"
+}
