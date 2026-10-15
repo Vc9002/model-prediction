@@ -22,6 +22,8 @@ from typing import Any
 
 from .calibration import (
     BetaCalibrator,
+    CalibrationMetadata,
+    IdentityCalibrator,
     IsotonicCalibrator,
     TemperatureCalibrator,
     TrainablePlattCalibrator,
@@ -54,8 +56,16 @@ class ModelCalibrationRecord:
     drift_score: float
     champion_calibrator_method: str
     champion_calibrator_params: dict[str, Any]
-    scorecard: dict[str, Any]
+    scorecard: dict[str, Any] = field(default_factory=dict)
     reliability_buckets: list[dict[str, Any]] = field(default_factory=list)
+    calibrated_brier_score: float = 0.0
+    calibrated_log_loss: float = 0.0
+    calibrated_expected_calibration_error: float = 0.0
+    calibrated_slope: float = 1.0
+    calibrated_intercept: float = 0.0
+    calibrated_drift_score: float = 0.0
+    calibrated_drift_status: str = "HEALTHY"
+    recalibrated: bool = False
 
 
 def extract_settled_model_predictions(
@@ -212,7 +222,34 @@ def evaluate_calibration_for_group(
             "num_thresholds": len(champ_calibrator.thresholds),
             "min_val": round(min(champ_calibrator.values), 4) if champ_calibrator.values else 0.0,
             "max_val": round(max(champ_calibrator.values), 4) if champ_calibrator.values else 1.0,
+            "thresholds": [round(float(t), 6) for t in champ_calibrator.thresholds],
+            "values": [round(float(v), 6) for v in champ_calibrator.values],
         }
+
+    # Evaluate post-calibration metrics under the winning calibrator
+    champ_scorecard = tournament.get("scorecard", {}).get(champ_method, {})
+    cal_slope = float(champ_scorecard.get("calibration_slope", 1.0))
+    cal_intercept = float(champ_scorecard.get("calibration_intercept", 0.0))
+    cal_ece = float(champ_scorecard.get("oof_ece", 0.0))
+    cal_brier = float(champ_scorecard.get("oof_brier_score", brier))
+    cal_log_loss = float(champ_scorecard.get("oof_log_loss", log_loss))
+
+    cal_slope_dev = abs(cal_slope - 1.0)
+    cal_intercept_dev = abs(cal_intercept)
+    cal_drift_score = round(cal_slope_dev * 0.4 + cal_intercept_dev * 0.3 + cal_ece * 3.0, 4)
+
+    if cal_slope_dev > 0.25 or cal_intercept_dev > 0.25 or cal_ece > 0.06:
+        cal_drift_status = "SEVERE_DRIFT"
+    elif cal_slope_dev > 0.12 or cal_intercept_dev > 0.12 or cal_ece > 0.035:
+        cal_drift_status = "MODERATE_DRIFT"
+    else:
+        cal_drift_status = "HEALTHY"
+
+    recalibrated = (
+        champ_method != "identity"
+        and drift_status in ("SEVERE_DRIFT", "MODERATE_DRIFT")
+        and cal_drift_status == "HEALTHY"
+    )
 
     return ModelCalibrationRecord(
         sport=sport,
@@ -231,6 +268,14 @@ def evaluate_calibration_for_group(
         champion_calibrator_params=champ_params,
         scorecard=tournament.get("scorecard", {}),
         reliability_buckets=metrics.get("reliability_buckets", []),
+        calibrated_brier_score=round(cal_brier, 6),
+        calibrated_log_loss=round(cal_log_loss, 6),
+        calibrated_expected_calibration_error=round(cal_ece, 6),
+        calibrated_slope=round(cal_slope, 4),
+        calibrated_intercept=round(cal_intercept, 4),
+        calibrated_drift_score=cal_drift_score,
+        calibrated_drift_status=cal_drift_status,
+        recalibrated=recalibrated,
     )
 
 
@@ -273,31 +318,68 @@ def run_full_calibration_pipeline(
     records.sort(key=lambda r: r.sample_size, reverse=True)
 
     # Compute aggregate system metrics
-    max_drift = max((r.drift_score for r in records), default=0.0)
-    severe_drift_models = [
+    max_raw_drift = max((r.drift_score for r in records), default=0.0)
+    raw_severe_drift_models = [
         f"{r.sport}:{r.market}:{r.model_version}" for r in records if r.drift_status == "SEVERE_DRIFT"
     ]
-    moderate_drift_models = [
+    raw_moderate_drift_models = [
         f"{r.sport}:{r.market}:{r.model_version}" for r in records if r.drift_status == "MODERATE_DRIFT"
     ]
 
-    system_calibration_health = "HEALTHY"
-    if severe_drift_models:
-        system_calibration_health = "SEVERE_DRIFT"
-    elif moderate_drift_models:
-        system_calibration_health = "MODERATE_DRIFT"
+    recalibrated_models = [f"{r.sport}:{r.market}:{r.model_version}" for r in records if r.recalibrated]
+    unresolved_severe = [
+        f"{r.sport}:{r.market}:{r.model_version}"
+        for r in records
+        if r.calibrated_drift_status == "SEVERE_DRIFT"
+    ]
+    unresolved_moderate = [
+        f"{r.sport}:{r.market}:{r.model_version}"
+        for r in records
+        if r.calibrated_drift_status == "MODERATE_DRIFT"
+    ]
+    max_calibrated_drift = max((r.calibrated_drift_score for r in records), default=0.0)
+
+    # When update_artifacts is True (or automated cycle runs), models are re-calibrated.
+    # The effective health status reflects post-recalibration accuracy.
+    if update_artifacts:
+        if not unresolved_severe:
+            system_calibration_health = "MODERATE_DRIFT" if unresolved_moderate else "HEALTHY"
+        else:
+            system_calibration_health = "SEVERE_DRIFT"
+        active_severe_models = unresolved_severe
+        active_moderate_models = unresolved_moderate
+        effective_drift = round(max_calibrated_drift, 4)
+    else:
+        system_calibration_health = (
+            "SEVERE_DRIFT"
+            if raw_severe_drift_models
+            else ("MODERATE_DRIFT" if raw_moderate_drift_models else "HEALTHY")
+        )
+        active_severe_models = raw_severe_drift_models
+        active_moderate_models = raw_moderate_drift_models
+        effective_drift = round(max_raw_drift, 4)
 
     now_iso = datetime.now(UTC).isoformat()
 
     report = {
         "generated_at_utc": now_iso,
         "system_status": system_calibration_health,
+        "raw_system_status": (
+            "SEVERE_DRIFT"
+            if raw_severe_drift_models
+            else ("MODERATE_DRIFT" if raw_moderate_drift_models else "HEALTHY")
+        ),
         "total_evaluated_models": len(records),
-        "max_calibration_drift": round(max_drift, 4),
-        "severe_drift_count": len(severe_drift_models),
-        "moderate_drift_count": len(moderate_drift_models),
-        "severe_drift_models": severe_drift_models,
-        "moderate_drift_models": moderate_drift_models,
+        "max_calibration_drift": effective_drift,
+        "raw_max_calibration_drift": round(max_raw_drift, 4),
+        "severe_drift_count": len(active_severe_models),
+        "moderate_drift_count": len(active_moderate_models),
+        "severe_drift_models": active_severe_models,
+        "moderate_drift_models": active_moderate_models,
+        "raw_severe_drift_models": raw_severe_drift_models,
+        "raw_moderate_drift_models": raw_moderate_drift_models,
+        "recalibrated_count": len(recalibrated_models),
+        "recalibrated_models": recalibrated_models,
         "models": [asdict(r) for r in records],
     }
 
@@ -311,10 +393,13 @@ def run_full_calibration_pipeline(
     # Save lightweight health file for runtime/dashboard
     health_payload = {
         "status": system_calibration_health,
+        "raw_status": report["raw_system_status"],
         "last_checked_utc": now_iso,
-        "calibration_drift": round(max_drift, 4),
-        "severe_drift_models": severe_drift_models,
-        "moderate_drift_models": moderate_drift_models,
+        "calibration_drift": effective_drift,
+        "severe_drift_models": active_severe_models,
+        "moderate_drift_models": active_moderate_models,
+        "recalibrated_models": recalibrated_models,
+        "recalibrated_count": len(recalibrated_models),
         "models_count": len(records),
     }
     health_file = cal_data_dir / "calibration_health.json"
@@ -344,3 +429,68 @@ def run_full_calibration_pipeline(
                 )
 
     return report
+
+
+def load_model_calibrator(
+    model_version: str,
+    data_root: str | Path | None = None,
+) -> Any | None:
+    """Load the automated re-fit calibrator artifact for a given model version.
+
+    Returns the instantiated Calibrator (TemperatureCalibrator, TrainablePlattCalibrator,
+    BetaCalibrator, IsotonicCalibrator, or IdentityCalibrator) or None if absent.
+    """
+    data_path = Path(data_root) if data_root else PROJECT_ROOT / "data"
+    artifact_path = data_path / "calibration" / "models" / f"{model_version}_calibrator.json"
+    if not artifact_path.exists():
+        return None
+
+    try:
+        payload = json.loads(artifact_path.read_text(encoding="utf-8"))
+        method = str(payload.get("champion_method") or "identity").lower()
+        params = payload.get("parameters") or {}
+        metadata = CalibrationMetadata(
+            method=method,
+            version=f"{method}-recalibrated-v1",
+            base_model_version=model_version,
+            window_start=None,
+            window_end=None,
+            sample_size=int(payload.get("sample_size") or 0),
+            artifact_hash="",
+        )
+
+        if method == "temperature":
+            temp = float(params.get("temperature") or 1.0)
+            return TemperatureCalibrator(temp, metadata)
+        elif method == "platt":
+            intercept = float(params.get("intercept") or 0.0)
+            slope = float(params.get("slope") or 1.0)
+            return TrainablePlattCalibrator(intercept, slope, metadata)
+        elif method == "beta":
+            a = float(params.get("a") or 1.0)
+            b = float(params.get("b") or 1.0)
+            c = float(params.get("c") or 0.0)
+            return BetaCalibrator(a, b, c, metadata)
+        elif method == "isotonic":
+            thresholds = [float(t) for t in params.get("thresholds", [])]
+            values = [float(v) for v in params.get("values", [])]
+            if thresholds and values:
+                return IsotonicCalibrator(thresholds, values, metadata)
+            return IdentityCalibrator(model_version, "isotonic-fallback-identity")
+        else:
+            return IdentityCalibrator(model_version, "identity")
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        logger.warning("Failed to load calibrator for %s: %s", model_version, exc)
+        return None
+
+
+def calibrate_model_probability(
+    model_version: str,
+    probability: float,
+    data_root: str | Path | None = None,
+) -> float:
+    """Apply the model's fitted champion calibrator to a raw probability."""
+    cal = load_model_calibrator(model_version, data_root=data_root)
+    if cal is None:
+        return probability
+    return float(cal.transform(probability))
