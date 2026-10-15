@@ -1065,3 +1065,27 @@ sport-specific iterations. The legacy command's schema/context repair is
 complete; the older lifecycle loader is still separate technical debt.
 Negative or inconclusive results remain visible. No candidate has established
 a reliable profitable improvement.
+
+---
+
+## Session Outcomes — 2026-10-15 (MLB v9 Stabilization, Calibration Sentry & Storage Optimization)
+
+1. **MLB v9 Candidate 2 Rebuilt & Calibrated (`mlb-v9-candidate-2`)**:
+   - Invalidation of `mlb-v9-candidate-1` resolved: candidate-1 voided (`VOID_INVALID_FEATURE_PROVENANCE`) and replaced by `mlb-v9-candidate-2` trained on audited PIT `mlb_v9_feature_table_v4.parquet` (6,678 games: 3,814 train, 1,082 val, 1,782 test).
+   - Features: 14 point-in-time features with condition number 5.25 and max VIF 5.59 (zero collinear pairs).
+   - Regularization & Calibration: L2 penalty ($C=0.001$, validation-tuned) and Platt scaling fit on validation cohort (slope 1.0416, intercept 0.0, ECE 0.0203).
+   - Frozen artifact: `config/models/research/mlb-v9-candidate-2.json` with hash `94b598b3d716657e2a48c0736a50793722885ddbb7c08564ddef2cf2a6fca329`.
+   - Chronological holdout evaluation on 1,782 settled 2026 games: LogLoss 0.684007 vs v8's 0.685811 ($\Delta = -0.001815$), Brier 0.245458 vs v8's 0.246333 ($\Delta = -0.000879$), Accuracy 56.85% vs 55.78%.
+   - 2,000-resample date-clustered paired bootstrap: $P(\text{v9} > \text{v8}) = 82.1\%$ on LogLoss and $82.2\%$ on Brier score.
+   - Comprehensive unit tests verified in `tests/test_mlb_v9_candidate_2.py` (3 passed).
+
+2. **Official 2027 MLB Offseason Roadmap (`docs/MLB_OFFSEASON_ROADMAP_2027.md`)**:
+   - Published formal 5-phase transition plan to replace direct logistic modeling with two-head market-residual shrinkage (`mlb-moneyline-market-residual-v10` / `mlb-structural-v10`) ahead of Opening Day 2027.
+   - Preserves v8 as frozen incumbent and keeps MLB unwhitelisted in auto-buyer through remainder of World Series.
+
+3. **Storage Hygiene & Repository Size Optimization (Task C)**:
+   - Untracked 40 daily Excel workbooks in `data/sports/*/*.xlsx` from git tracking (`e5e47f31`) and added `data/sports/**/*.xlsx` to `.gitignore`. All files remain intact on disk for dashboard and live runtime.
+
+4. **Automated Calibration Pipeline & Drift Sentry (Task A)**:
+   - Added automated recalibration and drift health scoring in `src/model_prediction/calibration_pipeline.py` (`7da3c508`). Verified via `pytest tests/test_calibration_pipeline.py` (5 passed).
+
