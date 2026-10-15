@@ -330,16 +330,31 @@ models:
     - BUNDESLIGA
     - SERIE_A
     - LIGUE_1
-    - CHAMPIONSHIP
-    - EREDIVISIE
-    - PRIMEIRA_LIGA
-    - LIGA_MX
-    - BUNDESLIGA_2
-    - WORLD_CUP
-    - MLS
     - UCL
+    - UEL
+    - UECL
+    - LIBERTADORES
+    - SUDAMERICANA
+    - FA_CUP
+    - EFL_CUP
+    - COPA_DEL_REY
+    - DFB_POKAL
+    - COPPA_ITALIA
+    - PRIMEIRA_LIGA
+    - EREDIVISIE
+    - SCOTTISH_PREM
+    - BELGIAN_PRO
+    - TURKISH_SUPER
+    - SAUDI_PRO
+    - SWISS_SUPER
+    - AUSTRIAN_BUND
+    - DANISH_SUPER
+    - ALLSVENSKAN
+    - NORWEGIAN_ELITE
+    - GREEK_SUPER
+    - A_LEAGUE
+    - J_LEAGUE
     - BRASILEIRAO
-    - BRAZIL_SERIE_B
     - ARGENTINA
     - ARGENTINA_2
     - COLOMBIA
@@ -347,9 +362,16 @@ models:
     - URUGUAY
     - ECUADOR
     - PERU
-    - SUDAMERICANA
-    - FRIENDLIES
-    - CLUB_FRIENDLIES
+    - LIGA_MX
+    - MLS
+    - CHAMPIONSHIP
+    - BUNDESLIGA_2
+    - LA_LIGA_2
+    - SERIE_B
+    - LIGUE_2
+    - CONCACAF_CHAMPIONS
+    - UEFA_NATIONS
+    - WORLD_CUP
     markets:
     - full_game_total_2_5
     - full_game_total_1_5
@@ -357,6 +379,7 @@ models:
     - full_game_spread
     - moneyline
     - draw
+    - double_chance
     - btts
   NFL:
     family: elo_trend_normal_approximation

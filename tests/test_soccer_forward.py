@@ -707,3 +707,102 @@ def test_soccer_forward_prices_spread_and_multiple_totals(tmp_path) -> None:
 
     lines = {c["line"] for c in result["priced_contracts"] if c["market_type"] == "total"}
     assert {1.5, 2.5}.issubset(lines)
+
+
+def test_soccer_forward_prices_double_chance_contracts(tmp_path) -> None:
+    history_path = tmp_path / "processed" / "soccer" / "games.jsonl"
+    history_path.parent.mkdir(parents=True)
+    history = [
+        {
+            "event_id": f"history-{index}",
+            "event_start_utc": f"2026-05-{index % 28 + 1:02d}T12:00:00Z",
+            "league": "SOCCER",
+            "away_team": "Alpha FC" if index % 2 else "Beta FC",
+            "home_team": "Beta FC" if index % 2 else "Alpha FC",
+            "away_score": index % 3,
+            "home_score": (index + 1) % 4,
+        }
+        for index in range(60)
+    ]
+    history_path.write_text("".join(json.dumps(row) + "\n" for row in history), encoding="utf-8")
+    snapshot_path = tmp_path / "odds" / "soccer" / "2026-07-27" / "polymarket_snapshots.jsonl"
+    snapshot_path.parent.mkdir(parents=True)
+    rows = [
+        {
+            "event_id": "pm-1",
+            "event_title": "Alpha FC vs Beta FC",
+            "event_start_utc": "2026-07-27T20:00:00Z",
+            "observed_at_utc": "2026-07-27T12:00:00Z",
+            "timestamp_valid": True,
+            "market_type": "team_win",
+            "team": "Alpha FC",
+            "line": None,
+            "market_slug": "atc-mls-alpha-beta-2026-07-27-alpha",
+            "long": {"description": "Yes", "ask": 0.30},
+            "short": {"description": "No", "ask": 0.72},
+        },
+        {
+            "event_id": "pm-1",
+            "event_title": "Alpha FC vs Beta FC",
+            "event_start_utc": "2026-07-27T20:00:00Z",
+            "observed_at_utc": "2026-07-27T12:00:00Z",
+            "timestamp_valid": True,
+            "market_type": "team_win",
+            "team": "Beta FC",
+            "line": None,
+            "market_slug": "atc-mls-alpha-beta-2026-07-27-beta",
+            "long": {"description": "Yes", "ask": 0.45},
+            "short": {"description": "No", "ask": 0.58},
+        },
+        {
+            "event_id": "pm-1",
+            "event_title": "Alpha FC vs Beta FC",
+            "event_start_utc": "2026-07-27T20:00:00Z",
+            "observed_at_utc": "2026-07-27T12:00:00Z",
+            "timestamp_valid": True,
+            "market_type": "team_win",
+            "team": None,
+            "line": None,
+            "market_slug": "atc-mls-alpha-beta-2026-07-27-draw",
+            "long": {"description": "Yes", "ask": 0.28},
+            "short": {"description": "No", "ask": 0.75},
+        },
+    ]
+    snapshot_path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+
+    class Client:
+        @staticmethod
+        def scoreboard(league, game_date):
+            return {
+                "events": [
+                    {
+                        "id": "espn-1",
+                        "date": "2026-07-27T20:00:00Z",
+                        "competitions": [
+                            {
+                                "competitors": [
+                                    {"homeAway": "away", "team": {"displayName": "Alpha FC"}},
+                                    {"homeAway": "home", "team": {"displayName": "Beta FC"}},
+                                ]
+                            }
+                        ],
+                    }
+                ]
+            }
+
+    result = build_soccer_total_slate(
+        data_root=tmp_path,
+        game_date="2026-07-27",
+        client=Client(),
+        leagues=("MLS",),
+        observed_at=datetime(2026, 7, 27, 13, tzinfo=UTC),
+        include_double_chance=True,
+    )
+
+    dc_contracts = [c for c in result["priced_contracts"] if c["market_type"] == "double_chance"]
+    assert len(dc_contracts) == 2
+    selections = {c["selection"] for c in dc_contracts}
+    assert selections == {"1X", "X2"}
+    c_1x = next(c for c in dc_contracts if c["selection"] == "1X")
+    assert 0.0 < c_1x["model_probability"] < 1.0
+    assert 0.0 < c_1x["executable_ask"] < 1.0

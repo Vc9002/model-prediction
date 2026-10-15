@@ -3560,6 +3560,7 @@ def _forecast_soccer_sport(
         leagues=tuple(model_config.get("leagues") or ()),
         observed_at=utc_now(),
         include_draw="draw" in configured_markets,
+        include_double_chance="double_chance" in configured_markets,
         model=active_model,
     )
     # research_ledger is the usual exposure/eligibility context; a flat-only

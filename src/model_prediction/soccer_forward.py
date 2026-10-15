@@ -272,6 +272,7 @@ def build_soccer_total_slate(
     leagues: tuple[str, ...],
     observed_at: datetime,
     include_draw: bool = False,
+    include_double_chance: bool = False,
     model: Any = None,
 ) -> dict[str, Any]:
     store = FeatureStore(data_root)
@@ -461,47 +462,48 @@ def build_soccer_total_slate(
                 }
             )
             continue
-        # Draws aren't tradeable as a distinct outcome across two separate
-        # per-team markets, so this compares only the two win probabilities,
-        # then finds whichever matched team_win market concerns the
-        # model-favored team -- matching by team name, not market ordering.
-        # Same policy as every other sport: log the model's actual
-        # prediction; the min_edge gate downstream decides whether that
-        # call is also good enough value to become a real pick.
-        selection = max(("home", "away"), key=lambda side: prediction.probabilities[side])
-        selected_team = prediction.home_team if selection == "home" else prediction.away_team
-        opponent_team = prediction.away_team if selection == "home" else prediction.home_team
-        matching = [
-            snapshot
-            for snapshot in candidates
-            if _team_matches_title(selected_team, str(snapshot.get("team") or ""))
-            # A same-city/shared-mascot derby pair (e.g. "AC Milan" vs "Inter
-            # Milan", or a short club prefix too short to survive
-            # _team_matches_title's word-length filter) can both fuzzy-match
-            # the same snapshot title. If the OPPONENT also matches this
-            # snapshot, it's ambiguous or actually belongs to the opponent --
-            # never guess; exclude it rather than risk pricing the wrong
-            # team's contract.
-            and not _team_matches_title(opponent_team, str(snapshot.get("team") or ""))
-        ]
-        if len(matching) != 1:
+        # Match team_win market candidates for home and away separately and evaluate executable ask
+        valid_options = []
+        for side in ("home", "away"):
+            target_team = prediction.home_team if side == "home" else prediction.away_team
+            opp_team = prediction.away_team if side == "home" else prediction.home_team
+            matching = [
+                s
+                for s in candidates
+                if _team_matches_title(target_team, str(s.get("team") or ""))
+                and not _team_matches_title(opp_team, str(s.get("team") or ""))
+            ]
+            if len(matching) == 1:
+                snap = matching[0]
+                ask_val = (snap.get("long") or {}).get("ask")
+                if ask_val is not None and 0 < float(ask_val) < 1:
+                    side_prob = float(prediction.probabilities[side])
+                    side_edge = side_prob - float(ask_val)
+                    valid_options.append(
+                        {
+                            "side": side,
+                            "snapshot": snap,
+                            "ask": float(ask_val),
+                            "prob": side_prob,
+                            "edge": side_edge,
+                        }
+                    )
+
+        if not valid_options:
             unmatched.append(
                 {
                     "event_id": prediction.event_id,
-                    "reason": "no unique team_win market for the model-favored team",
+                    "reason": "no unique team_win market with executable ask",
                 }
             )
             continue
-        snapshot = matching[0]
-        ask = (snapshot.get("long") or {}).get("ask")
-        if ask is None or not 0 < float(ask) < 1:
-            unmatched.append(
-                {
-                    "event_id": prediction.event_id,
-                    "reason": "selected team_win side has no executable ask",
-                }
-            )
-            continue
+
+        # Value-based edge selection: choose the side that offers the highest expected value (edge)
+        # over its executable market ask, breaking ties by model probability.
+        best_candidate = max(valid_options, key=lambda opt: (opt["edge"], opt["prob"]))
+        selection = best_candidate["side"]
+        snapshot = best_candidate["snapshot"]
+        ask = best_candidate["ask"]
         priced.append(
             {
                 "event_id": prediction.event_id,
@@ -598,6 +600,121 @@ def build_soccer_total_slate(
                     ),
                 }
             )
+
+    if include_double_chance:
+        draw_snaps_dc = _latest_draw_snapshots(data_root, game_date)
+        for prediction in moneylines:
+            start = parse_utc(prediction.event_start_utc)
+            home_matches = [
+                s
+                for s in moneyline_snapshots
+                if _team_matches_title(prediction.home_team, str(s.get("team") or ""))
+                and not _team_matches_title(prediction.away_team, str(s.get("team") or ""))
+            ]
+            away_matches = [
+                s
+                for s in moneyline_snapshots
+                if _team_matches_title(prediction.away_team, str(s.get("team") or ""))
+                and not _team_matches_title(prediction.home_team, str(s.get("team") or ""))
+            ]
+            draw_matches = [
+                s
+                for s in draw_snaps_dc
+                if _team_matches_title(prediction.away_team, str(s.get("event_title", "")))
+                and _team_matches_title(prediction.home_team, str(s.get("event_title", "")))
+            ]
+            h_snap = home_matches[0] if len(home_matches) == 1 else None
+            a_snap = away_matches[0] if len(away_matches) == 1 else None
+            d_snap = draw_matches[0] if len(draw_matches) == 1 else None
+
+            p_h = float(prediction.probabilities.get("home", 0.0))
+            p_d = float(prediction.probabilities.get("draw", 0.0))
+            p_a = float(prediction.probabilities.get("away", 0.0))
+
+            # 1X (Home or Draw): Single NO on away or Bundle YES on home + YES on draw
+            ask_1x_no = (a_snap.get("short") or {}).get("ask") if a_snap else None
+            ask_h_yes = (h_snap.get("long") or {}).get("ask") if h_snap else None
+            ask_d_yes = (d_snap.get("long") or {}).get("ask") if d_snap else None
+            ask_1x_bundle = (float(ask_h_yes) + float(ask_d_yes)) if (ask_h_yes and ask_d_yes) else None
+            options_1x = []
+            if ask_1x_no and 0 < float(ask_1x_no) < 1:
+                options_1x.append((float(ask_1x_no), str(a_snap["market_slug"]), "no_away"))
+            if ask_1x_bundle and 0 < float(ask_1x_bundle) < 1:
+                options_1x.append(
+                    (
+                        float(ask_1x_bundle),
+                        f"bundle:{h_snap['market_slug']}+{d_snap['market_slug']}",
+                        "bundle_1x",
+                    )
+                )
+            if options_1x:
+                best_ask_1x, slug_1x, route_1x = min(options_1x, key=lambda x: x[0])
+                prob_1x = round(p_h + p_d, 6)
+                priced.append(
+                    {
+                        "event_id": prediction.event_id,
+                        "event_start_utc": prediction.event_start_utc,
+                        "away_team": prediction.away_team,
+                        "home_team": prediction.home_team,
+                        "market_type": "double_chance",
+                        "selection": "1X",
+                        "line": None,
+                        "model_probability": prob_1x,
+                        "model_uncertainty": prediction.uncertainty,
+                        "model_version": prediction.model_version,
+                        "feature_basis": prediction.feature_basis,
+                        "inference_inputs": prediction.inference_inputs,
+                        "model_inputs_observed_at_utc": observed_at.isoformat(),
+                        "rationale": f"Double Chance 1X (Home/Draw) via {route_1x} ask {best_ask_1x:.4f}.",
+                        "market_slug": slug_1x,
+                        "executable_ask": float(best_ask_1x),
+                        "observed_at_utc": observed_at.isoformat(),
+                        "timestamp_valid": True,
+                        "edge_vs_executable_ask": round(prob_1x - float(best_ask_1x), 6),
+                    }
+                )
+
+            # X2 (Away or Draw): Single NO on home or Bundle YES on away + YES on draw
+            ask_x2_no = (h_snap.get("short") or {}).get("ask") if h_snap else None
+            ask_a_yes = (a_snap.get("long") or {}).get("ask") if a_snap else None
+            ask_x2_bundle = (float(ask_a_yes) + float(ask_d_yes)) if (ask_a_yes and ask_d_yes) else None
+            options_x2 = []
+            if ask_x2_no and 0 < float(ask_x2_no) < 1:
+                options_x2.append((float(ask_x2_no), str(h_snap["market_slug"]), "no_home"))
+            if ask_x2_bundle and 0 < float(ask_x2_bundle) < 1:
+                options_x2.append(
+                    (
+                        float(ask_x2_bundle),
+                        f"bundle:{a_snap['market_slug']}+{d_snap['market_slug']}",
+                        "bundle_x2",
+                    )
+                )
+            if options_x2:
+                best_ask_x2, slug_x2, route_x2 = min(options_x2, key=lambda x: x[0])
+                prob_x2 = round(p_a + p_d, 6)
+                priced.append(
+                    {
+                        "event_id": prediction.event_id,
+                        "event_start_utc": prediction.event_start_utc,
+                        "away_team": prediction.away_team,
+                        "home_team": prediction.home_team,
+                        "market_type": "double_chance",
+                        "selection": "X2",
+                        "line": None,
+                        "model_probability": prob_x2,
+                        "model_uncertainty": prediction.uncertainty,
+                        "model_version": prediction.model_version,
+                        "feature_basis": prediction.feature_basis,
+                        "inference_inputs": prediction.inference_inputs,
+                        "model_inputs_observed_at_utc": observed_at.isoformat(),
+                        "rationale": f"Double Chance X2 (Away/Draw) via {route_x2} ask {best_ask_x2:.4f}.",
+                        "market_slug": slug_x2,
+                        "executable_ask": float(best_ask_x2),
+                        "observed_at_utc": observed_at.isoformat(),
+                        "timestamp_valid": True,
+                        "edge_vs_executable_ask": round(prob_x2 - float(best_ask_x2), 6),
+                    }
+                )
 
     # BTTS: same complementary-sides shape as totals (one snapshot, long=yes/
     # short=no), so matching mirrors that loop exactly. In practice this will

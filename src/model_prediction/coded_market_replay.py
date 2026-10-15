@@ -55,7 +55,14 @@ def replay_inputs(inputs: dict[str, Any]) -> dict[str, float]:
         home = sum(matrix[h][a] for h in range(size) for a in range(h))
         away = sum(matrix[h][a] for a in range(size) for h in range(a))
         draw = sum(matrix[i][i] for i in range(size))
-        return {"home": round(home, 6), "away": round(away, 6), "draw": round(draw, 6)}
+        return {
+            "home": round(home, 6),
+            "away": round(away, 6),
+            "draw": round(draw, 6),
+            "1X": round(home + draw, 6),
+            "X2": round(away + draw, 6),
+            "12": round(home + away, 6),
+        }
 
     model_version = inputs.get("model_version")
     if model_version == "tennis-learned-v3":
