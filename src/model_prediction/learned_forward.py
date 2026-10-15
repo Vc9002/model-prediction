@@ -272,21 +272,66 @@ def _compute_features(
         features["trailing_home_games_30d"] = float(len(recent_home_games))
 
     if "bullpen_available" in wanted:
-        features["bullpen_available"] = 1.0 if "bullpen_weakness_gap" in features else 0.0
+        try:
+            home_relief = team_recent_relief_lines(home_team, event_start)
+            away_relief = team_recent_relief_lines(away_team, event_start)
+            features["bullpen_available"] = 1.0 if (bool(home_relief) and bool(away_relief)) else 0.0
+        except (KeyError, TypeError, ValueError, OSError):
+            features["bullpen_available"] = 0.0
     if "bullpen_fatigue_available" in wanted:
-        features["bullpen_fatigue_available"] = 1.0 if "bullpen_fatigue_gap" in features else 0.0
+        try:
+            home_fatigue = team_recent_relief_lines(home_team, event_start, lookback_days=FATIGUE_WINDOW_DAYS)
+            away_fatigue = team_recent_relief_lines(away_team, event_start, lookback_days=FATIGUE_WINDOW_DAYS)
+            features["bullpen_fatigue_available"] = (
+                1.0 if (bool(home_fatigue) and bool(away_fatigue)) else 0.0
+            )
+        except (KeyError, TypeError, ValueError, OSError):
+            features["bullpen_fatigue_available"] = 0.0
     if "offense_pit_available" in wanted:
-        features["offense_pit_available"] = (
-            1.0 if "offense_pit_gap" in features and "offense_pit_gap_unavailable" not in unavailable else 0.0
-        )
+        if "offense_pit_gap" in features:
+            features["offense_pit_available"] = (
+                1.0 if "offense_pit_gap_unavailable" not in unavailable else 0.0
+            )
+        else:
+            try:
+                _, avail = matchup_offense_pit_gap(home_team, away_team, event_start)
+                features["offense_pit_available"] = 1.0 if avail else 0.0
+            except (KeyError, TypeError, ValueError, OSError):
+                features["offense_pit_available"] = 0.0
     if "probable_starter_available" in wanted:
-        features["probable_starter_available"] = 1.0 if (home_starter_name and away_starter_name) else 0.0
+        if home_starter_name and away_starter_name:
+            if "starter_era_gap" in features:
+                features["probable_starter_available"] = (
+                    1.0 if "starter_era_gap_unavailable" not in unavailable else 0.0
+                )
+            else:
+                try:
+                    starter_era_gap_live(home_starter_name, away_starter_name, event_start)
+                    features["probable_starter_available"] = 1.0
+                except (KeyError, TypeError, ValueError, OSError):
+                    features["probable_starter_available"] = 0.0
+        else:
+            features["probable_starter_available"] = 0.0
     if "park_available" in wanted:
-        features["park_available"] = 1.0
+        if sport.lower() == "mlb":
+            try:
+                p_info = park_factor_at(home_team, game_date, games_data=history)
+                features["park_available"] = 1.0 if p_info.get("status") == "available" else 0.0
+            except (KeyError, TypeError, ValueError, OSError):
+                features["park_available"] = 0.0
+        else:
+            features["park_available"] = 0.0
     if "weather_available" in wanted:
-        features["weather_available"] = 1.0
-    if "outcome_3way" in wanted:
-        features["outcome_3way"] = 0.0
+        if sport.lower() == "mlb":
+            try:
+                from .features.weather import live_weather
+
+                w_info = live_weather(home_team, event_start.isoformat())
+                features["weather_available"] = 1.0 if w_info.get("status") in {"available", "dome"} else 0.0
+            except (KeyError, TypeError, ValueError, OSError):
+                features["weather_available"] = 0.0
+        else:
+            features["weather_available"] = 0.0
     if wanted & AVAILABILITY_FEATURE_NAMES:
         if sport != "wnba":
             raise ValueError(

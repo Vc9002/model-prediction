@@ -1,0 +1,281 @@
+{
+  "overall_status": "HEALTHY",
+  "generated_at_utc": "2026-10-15T23:35:30.393379+00:00",
+  "odds_freshness": {
+    "status": "OK",
+    "sports": {
+      "esports": {
+        "status": "STALE",
+        "latest_date": "2026-10-16",
+        "file_count": 90
+      },
+      "kbo": {
+        "status": "STALE",
+        "latest_date": "2026-10-12",
+        "file_count": 50
+      },
+      "mlb": {
+        "status": "FRESH",
+        "latest_date": "2026-10-15",
+        "file_count": 87
+      },
+      "nba": {
+        "status": "FRESH",
+        "latest_date": "2026-10-15",
+        "file_count": 10
+      },
+      "ncaaf": {
+        "status": "FRESH",
+        "latest_date": "2026-10-15",
+        "file_count": 23
+      },
+      "nfl": {
+        "status": "FRESH",
+        "latest_date": "2026-10-15",
+        "file_count": 16
+      },
+      "npb": {
+        "status": "FRESH",
+        "latest_date": "2026-10-15",
+        "file_count": 61
+      },
+      "soccer": {
+        "status": "FRESH",
+        "latest_date": "2026-10-15",
+        "file_count": 80
+      },
+      "tennis": {
+        "status": "STALE",
+        "latest_date": "2026-10-16",
+        "file_count": 81
+      },
+      "wnba": {
+        "status": "STALE",
+        "latest_date": "2026-10-07",
+        "file_count": 54
+      }
+    },
+    "total_snapshot_files": 552
+  },
+  "market_quotes_warehouse": {
+    "status": "HEALTHY",
+    "total_quotes": 2372169,
+    "quotes_with_depth": 1161976,
+    "depth_coverage_pct": 48.98,
+    "sports_covered": {
+      "esports": {
+        "count": 152999,
+        "latest_observed": "2026-10-15T22:11:25.437285Z"
+      },
+      "kbo": {
+        "count": 1298,
+        "latest_observed": "2026-10-12T10:57:10.199909Z"
+      },
+      "mlb": {
+        "count": 1391202,
+        "latest_observed": "2026-10-15T22:09:04.449491Z"
+      },
+      "nba": {
+        "count": 2784,
+        "latest_observed": "2026-10-15T22:09:04.442135Z"
+      },
+      "ncaaf": {
+        "count": 257629,
+        "latest_observed": "2026-10-15T22:09:24.588188Z"
+      },
+      "nfl": {
+        "count": 36789,
+        "latest_observed": "2026-10-15T22:09:04.448202Z"
+      },
+      "npb": {
+        "count": 1300,
+        "latest_observed": "2026-10-15T11:30:06.083616Z"
+      },
+      "soccer": {
+        "count": 137188,
+        "latest_observed": "2026-10-15T22:09:24.600140Z"
+      },
+      "tennis": {
+        "count": 348838,
+        "latest_observed": "2026-10-15T22:11:05.264300Z"
+      },
+      "wnba": {
+        "count": 42142,
+        "latest_observed": "2026-10-07T22:11:27.099850Z"
+      }
+    }
+  },
+  "models_and_ledgers": {
+    "status": "PASS",
+    "hash_mismatches": [],
+    "production_models_audited": 23,
+    "details": {
+      "wnba-elo-trend-lr-v4": {
+        "hash_valid": true,
+        "settled_picks": 119,
+        "open_picks": 0,
+        "removed_picks": 12,
+        "evidence_status": "predictively_qualified"
+      },
+      "wnba-spread-margin-v2": {
+        "hash_valid": true,
+        "settled_picks": 32,
+        "open_picks": 2,
+        "removed_picks": 12,
+        "evidence_status": "predictively_qualified"
+      },
+      "wnba-total-margin-v2": {
+        "hash_valid": true,
+        "settled_picks": 35,
+        "open_picks": 2,
+        "removed_picks": 12,
+        "evidence_status": "predictively_qualified"
+      },
+      "mlb-elo-trend-lr-v8": {
+        "hash_valid": true,
+        "settled_picks": 490,
+        "open_picks": 3,
+        "removed_picks": 48,
+        "evidence_status": "historical_only"
+      },
+      "measured-edge-margin-v3": {
+        "hash_valid": true,
+        "settled_picks": 590,
+        "open_picks": 3,
+        "removed_picks": 48,
+        "evidence_status": "historical_only"
+      },
+      "measured-edge-totals-v3": {
+        "hash_valid": true,
+        "settled_picks": 588,
+        "open_picks": 3,
+        "removed_picks": 48,
+        "evidence_status": "degraded"
+      },
+      "mlb-structural-v10-frozen": {
+        "hash_valid": true,
+        "settled_picks": 0,
+        "open_picks": 0,
+        "removed_picks": 0,
+        "evidence_status": "predictively_qualified"
+      },
+      "mlb-nrfi-v4": {
+        "hash_valid": true,
+        "settled_picks": 7,
+        "open_picks": 2,
+        "removed_picks": 22,
+        "evidence_status": "predictively_qualified"
+      },
+      "mlb-nrfi-v3": {
+        "hash_valid": true,
+        "settled_picks": 0,
+        "open_picks": 0,
+        "removed_picks": 0,
+        "evidence_status": "predictively_qualified"
+      },
+      "nba-elo-trend-lr-v4": {
+        "hash_valid": true,
+        "settled_picks": 0,
+        "open_picks": 0,
+        "removed_picks": 0,
+        "evidence_status": "historical_only"
+      },
+      "nfl-elo-trend-lr-v4": {
+        "hash_valid": true,
+        "settled_picks": 56,
+        "open_picks": 2,
+        "removed_picks": 48,
+        "evidence_status": "historical_only"
+      },
+      "nfl-spread-structural-v5": {
+        "hash_valid": true,
+        "settled_picks": 28,
+        "open_picks": 2,
+        "removed_picks": 14,
+        "evidence_status": "predictively_qualified"
+      },
+      "nfl-total-structural-v5": {
+        "hash_valid": true,
+        "settled_picks": 14,
+        "open_picks": 2,
+        "removed_picks": 14,
+        "evidence_status": "predictively_qualified"
+      },
+      "cfb-structural-v2": {
+        "hash_valid": true,
+        "settled_picks": 35,
+        "open_picks": 13,
+        "removed_picks": 99,
+        "evidence_status": "shadow_qualified"
+      },
+      "cfb-spread-v1": {
+        "hash_valid": true,
+        "settled_picks": 294,
+        "open_picks": 0,
+        "removed_picks": 10,
+        "evidence_status": "degraded"
+      },
+      "cfb-total-v1": {
+        "hash_valid": true,
+        "settled_picks": 294,
+        "open_picks": 0,
+        "removed_picks": 8,
+        "evidence_status": "degraded"
+      },
+      "cs2-tiered-elo-v6": {
+        "hash_valid": true,
+        "settled_picks": 241,
+        "open_picks": 129,
+        "removed_picks": 438,
+        "evidence_status": "historical_only"
+      },
+      "dota2-tiered-elo-v6": {
+        "hash_valid": true,
+        "settled_picks": 54,
+        "open_picks": 18,
+        "removed_picks": 62,
+        "evidence_status": "historical_only"
+      },
+      "lol-tiered-elo-v6": {
+        "hash_valid": true,
+        "settled_picks": 14,
+        "open_picks": 4,
+        "removed_picks": 84,
+        "evidence_status": "historical_only"
+      },
+      "valorant-tiered-elo-v6": {
+        "hash_valid": true,
+        "settled_picks": 0,
+        "open_picks": 14,
+        "removed_picks": 30,
+        "evidence_status": "historical_only"
+      },
+      "rainbow_six-tiered-elo-v6": {
+        "hash_valid": true,
+        "settled_picks": 6,
+        "open_picks": 10,
+        "removed_picks": 24,
+        "evidence_status": "historical_only"
+      },
+      "kbo-tie-aware-elo-v2": {
+        "hash_valid": true,
+        "settled_picks": 36,
+        "open_picks": 6,
+        "removed_picks": 46,
+        "evidence_status": "historical_only"
+      },
+      "npb-tie-aware-elo-v2": {
+        "hash_valid": true,
+        "settled_picks": 20,
+        "open_picks": 14,
+        "removed_picks": 30,
+        "evidence_status": "historical_only"
+      }
+    }
+  },
+  "self_healing": {
+    "status": "skipped",
+    "message": "Auto-heal disabled. Pass --auto-heal to execute write-remediation routines.",
+    "timestamp_utc": "2026-10-15T23:35:30.393379+00:00"
+  }
+}

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from ..domain import MarketQuote, utc_now
-from ..runtime_paths import RuntimePaths
+from ..runtime_paths import RuntimePaths, migrate_legacy_state
 
 _WAREHOUSE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS market_quotes (
@@ -50,15 +50,10 @@ class MarketQuoteWarehouse:
     def __init__(self, db_path: Path | str | None = None, paths: RuntimePaths | None = None) -> None:
         if db_path is not None:
             self.db_path = Path(db_path)
-        elif paths is not None:
-            self.db_path = paths.runtime_root / "market_quotes.db"
-            if not self.db_path.exists() and (paths.repo_root / "data" / "market_quotes.db").exists():
-                self.db_path = paths.repo_root / "data" / "market_quotes.db"
         else:
-            runtime_paths = RuntimePaths.resolve()
-            self.db_path = runtime_paths.runtime_root / "market_quotes.db"
-            if not self.db_path.exists() and (runtime_paths.repo_root / "data" / "market_quotes.db").exists():
-                self.db_path = runtime_paths.repo_root / "data" / "market_quotes.db"
+            runtime_paths = paths or RuntimePaths.resolve()
+            migrate_legacy_state(runtime_paths)
+            self.db_path = runtime_paths.market_quotes_db
 
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self.db_path, timeout=10.0)

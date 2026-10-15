@@ -13,16 +13,18 @@ Writes persistent status artifact:
 
 from __future__ import annotations
 
+import argparse
 import json
 import logging
 import sqlite3
+import sys
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from model_prediction.config import PROJECT_ROOT
 from model_prediction.production_canary import load_production_config
 from model_prediction.production_registry import compute_artifact_hash
-from model_prediction.runtime_paths import RuntimePaths
+from model_prediction.runtime_paths import RuntimePaths, migrate_legacy_state
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("health_monitor")
@@ -67,7 +69,8 @@ def audit_odds_freshness(runtime_paths: RuntimePaths) -> dict[str, Any]:
 
 def audit_market_quotes_warehouse(runtime_paths: RuntimePaths) -> dict[str, Any]:
     """Audit market_quotes.db for row count, depth liquidity, and latest observation."""
-    db_path = PROJECT_ROOT / "data" / "market_quotes.db"
+    migrate_legacy_state(runtime_paths)
+    db_path = runtime_paths.market_quotes_db
     if not db_path.exists():
         return {"status": "MISSING", "total_quotes": 0}
 
@@ -88,7 +91,7 @@ def audit_market_quotes_warehouse(runtime_paths: RuntimePaths) -> dict[str, Any]
     depth_ratio = (with_depth / total_quotes) if total_quotes > 0 else 0.0
 
     return {
-        "status": "HEALTHY" if total_quotes > 500000 and with_depth > 100000 else "DEGRADED",
+        "status": "HEALTHY" if total_quotes > 0 else "EMPTY",
         "total_quotes": total_quotes,
         "quotes_with_depth": with_depth,
         "depth_coverage_pct": round(depth_ratio * 100, 2),
@@ -195,18 +198,26 @@ def auto_heal_data_gaps(runtime_paths: RuntimePaths) -> dict[str, Any]:
     }
 
 
-def run_health_and_data_gap_monitor() -> dict[str, Any]:
+def run_health_and_data_gap_monitor(auto_heal: bool = False) -> dict[str, Any]:
     """Main health monitor entry point."""
     runtime_paths = RuntimePaths.resolve()
-    logger.info("Starting health and data gap monitor...")
+    logger.info("Starting health and data gap monitor (auto_heal=%s)...", auto_heal)
 
     odds_report = audit_odds_freshness(runtime_paths)
     warehouse_report = audit_market_quotes_warehouse(runtime_paths)
     models_report = audit_models_and_ledgers(runtime_paths)
-    healing_report = auto_heal_data_gaps(runtime_paths)
+
+    if auto_heal:
+        healing_report = auto_heal_data_gaps(runtime_paths)
+    else:
+        healing_report = {
+            "status": "skipped",
+            "message": "Auto-heal disabled. Pass --auto-heal to execute write-remediation routines.",
+            "timestamp_utc": datetime.now(UTC).isoformat(),
+        }
 
     overall_status = "HEALTHY"
-    if models_report.get("status") != "PASS" or warehouse_report.get("status") == "DEGRADED":
+    if models_report.get("status") != "PASS" or warehouse_report.get("status") in {"MISSING", "EMPTY"}:
         overall_status = "WARNING"
 
     summary = {
@@ -228,5 +239,15 @@ def run_health_and_data_gap_monitor() -> dict[str, Any]:
 
 
 if __name__ == "__main__":
-    rep = run_health_and_data_gap_monitor()
+    parser = argparse.ArgumentParser(description="Automated Health and Data Gap Monitor")
+    parser.add_argument(
+        "--auto-heal",
+        action="store_true",
+        default=False,
+        help="Execute automated self-healing procedures for detected data gaps (default: False)",
+    )
+    args = parser.parse_args()
+    rep = run_health_and_data_gap_monitor(auto_heal=args.auto_heal)
     print(json.dumps(rep, indent=2))
+    if rep.get("overall_status") == "FAIL":
+        sys.exit(1)

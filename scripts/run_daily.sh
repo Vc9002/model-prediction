@@ -117,7 +117,6 @@ echo "Unified daily exit code: $DAILY_EXIT" >> "$LOG"
 echo "Unified daily took: $((SECONDS - STEP_START))s" >> "$LOG"
 
 # ── Step 2b: MLB v9 Challenger flat forecast ────────────────────────
-# -- Step 2b: MLB v9 Challenger flat forecast --------------------------------
 echo "--- Step 2b: MLB v9 Challenger flat forecast ---" >> "$LOG"
 STEP_START=$SECONDS
 PYTHONPATH=src:. .venv/bin/python scripts/forecast_mlb_v9_benchmark.py >> "$LOG" 2>&1

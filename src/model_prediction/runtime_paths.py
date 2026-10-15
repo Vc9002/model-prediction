@@ -63,6 +63,10 @@ def migrate_legacy_state(paths: RuntimePaths) -> list[str]:
             paths.repo_root / "data" / "production_state.json",
             paths.production_state_file,
         ),
+        (
+            paths.repo_root / "data" / "market_quotes.db",
+            paths.market_quotes_db,
+        ),
     ]
     for legacy, target in legacy_pairs:
         if legacy.is_file() and not target.exists():
@@ -167,6 +171,10 @@ class RuntimePaths:
     @property
     def runs_db(self) -> Path:
         return self.runtime_root / "runs.db"
+
+    @property
+    def market_quotes_db(self) -> Path:
+        return self.runtime_root / "market_quotes.db"
 
     @property
     def production_root(self) -> Path:

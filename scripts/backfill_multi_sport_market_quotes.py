@@ -23,32 +23,32 @@ from model_prediction.data_sources.market_warehouse import MarketQuoteWarehouse
 from model_prediction.domain import MarketQuote
 
 
+def calculate_executable_depth(side: dict[str, Any]) -> float | None:
+    """Calculate true executable top-of-book depth in USD at the actionable price.
+
+    For taking/buying the contract (crossing the spread against the best ask),
+    executable depth is ask * ask_size. If ask is unavailable but bid exists,
+    depth is bid * bid_size. Never sums across both sides or both contracts
+    (which would be total book notional, not fillable depth).
+    """
+    ask = float(side.get("ask") or 0.0)
+    ask_size = float(side.get("ask_size") or 0.0)
+    if ask > 0 and ask_size > 0:
+        return round(ask * ask_size, 2)
+
+    bid = float(side.get("bid") or 0.0)
+    bid_size = float(side.get("bid_size") or 0.0)
+    if bid > 0 and bid_size > 0:
+        return round(bid * bid_size, 2)
+
+    return None
+
+
 def calculate_depth_liquidity(
     long_side: dict[str, Any], short_side: dict[str, Any] | None = None
 ) -> float | None:
-    """Calculate executable top-of-book liquidity in USD."""
-    depth_usd = 0.0
-    bid = float(long_side.get("bid") or 0.0)
-    bid_size = float(long_side.get("bid_size") or 0.0)
-    ask = float(long_side.get("ask") or 0.0)
-    ask_size = float(long_side.get("ask_size") or 0.0)
-
-    if bid > 0 and bid_size > 0:
-        depth_usd += bid * bid_size
-    if ask > 0 and ask_size > 0:
-        depth_usd += ask * ask_size
-
-    if short_side:
-        s_bid = float(short_side.get("bid") or 0.0)
-        s_bid_size = float(short_side.get("bid_size") or 0.0)
-        s_ask = float(short_side.get("ask") or 0.0)
-        s_ask_size = float(short_side.get("ask_size") or 0.0)
-        if s_bid > 0 and s_bid_size > 0:
-            depth_usd += s_bid * s_bid_size
-        if s_ask > 0 and s_ask_size > 0:
-            depth_usd += s_ask * s_ask_size
-
-    return round(depth_usd, 2) if depth_usd > 0 else None
+    """Compatibility alias returning true executable depth for the quoted side."""
+    return calculate_executable_depth(long_side)
 
 
 def backfill_multi_sport_quotes(
@@ -56,8 +56,8 @@ def backfill_multi_sport_quotes(
     batch_size: int = 5000,
     limit_files_per_sport: int | None = None,
 ) -> dict[str, Any]:
-    db_path = PROJECT_ROOT / "data" / "market_quotes.db"
-    warehouse = MarketQuoteWarehouse(db_path=db_path)
+    warehouse = MarketQuoteWarehouse()
+    db_path = warehouse.db_path
 
     odds_root = PROJECT_ROOT / "data" / "odds"
     available_sports = [p.name for p in odds_root.iterdir() if p.is_dir() and p.name not in {"historical"}]
@@ -102,7 +102,7 @@ def backfill_multi_sport_quotes(
                         if long_mid is not None and short_mid is not None and (long_mid + short_mid) > 0:
                             no_vig_prob = round(long_mid / (long_mid + short_mid), 6)
 
-                        depth_liq = calculate_depth_liquidity(long_side, short_side)
+                        depth_liq = calculate_executable_depth(long_side)
                         if depth_liq and depth_liq > 0:
                             sport_stats[sport]["with_depth"] += 1
 
@@ -170,6 +170,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--sports", nargs="*", default=None)
     parser.add_argument("--limit-files", type=int, default=None)
+    parser.add_argument("--batch-size", type=int, default=5000)
     args = parser.parse_args()
 
-    backfill_multi_sport_quotes(sports=args.sports, limit_files_per_sport=args.limit_files)
+    backfill_multi_sport_quotes(
+        sports=args.sports,
+        limit_files_per_sport=args.limit_files,
+        batch_size=args.batch_size,
+    )
