@@ -1,13 +1,13 @@
 {
-  "baseline_brier": 0.243241,
-  "calibrated_at_utc": "2026-10-14T04:35:57.582803+00:00",
-  "calibrated_oof_brier": 0.24303261284425612,
+  "baseline_brier": 0.243385,
+  "calibrated_at_utc": "2026-10-14T22:06:05.466309+00:00",
+  "calibrated_oof_brier": 0.24314770799081065,
   "champion_method": "temperature",
   "market": "moneyline",
   "model_version": "lol-tiered-elo-v6",
   "parameters": {
     "temperature": 1.3
   },
-  "sample_size": 322,
+  "sample_size": 323,
   "sport": "lol"
 }

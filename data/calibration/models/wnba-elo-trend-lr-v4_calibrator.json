@@ -1,6 +1,6 @@
 {
   "baseline_brier": 0.18678,
-  "calibrated_at_utc": "2026-10-14T04:35:57.582803+00:00",
+  "calibrated_at_utc": "2026-10-14T22:06:05.466309+00:00",
   "calibrated_oof_brier": 0.18609146618199754,
   "champion_method": "beta",
   "market": "moneyline",

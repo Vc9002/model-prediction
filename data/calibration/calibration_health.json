@@ -1,7 +1,7 @@
 {
   "calibration_drift": 1.7223,
-  "last_checked_utc": "2026-10-14T04:35:57.582803+00:00",
-  "models_count": 30,
+  "last_checked_utc": "2026-10-14T22:06:05.466309+00:00",
+  "models_count": 31,
   "moderate_drift_models": [
     "tennis:moneyline:tennis-surface-elo-v1",
     "soccer:moneyline:soccer-poisson-dc-v1",
@@ -20,9 +20,9 @@
     "valorant:moneyline:valorant-tiered-elo-v6",
     "kbo:moneyline:kbo-tie-aware-elo-v2",
     "wnba:moneyline:wnba-elo-trend-lr-v4",
+    "cs2:moneyline:cs2-tiered-elo-v6",
     "mlb:nrfi:mlb-nrfi-v1",
     "soccer:total:soccer-poisson-dc-v1",
-    "cs2:moneyline:cs2-tiered-elo-v6",
     "tennis:moneyline:tennis-learned-v3",
     "tennis:moneyline:tennis-learned-v3",
     "tennis:spread:tennis-learned-v3",
@@ -33,7 +33,8 @@
     "wnba:spread:wnba-spread-margin-v1",
     "wnba:total:wnba-total-margin-v2",
     "nfl:moneyline:nfl-elo-trend-lr-v4",
-    "nfl:moneyline:nfl-elo-trend-lr-v4"
+    "nfl:moneyline:nfl-elo-trend-lr-v4",
+    "dota2:moneyline:dota2-tiered-elo-v6"
   ],
   "status": "SEVERE_DRIFT"
 }
