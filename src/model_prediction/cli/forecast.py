@@ -3562,6 +3562,7 @@ def _forecast_soccer_sport(
         include_draw="draw" in configured_markets,
         include_double_chance="double_chance" in configured_markets,
         model=active_model,
+        min_team_games=int(model_config.get("min_team_games", 5)),
     )
     # research_ledger is the usual exposure/eligibility context; a flat-only
     # call (research_ledger=None, flat_ledger set) still needs somewhere to

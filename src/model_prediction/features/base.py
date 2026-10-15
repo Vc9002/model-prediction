@@ -106,7 +106,7 @@ class FeatureStore:
         if key in self._loaded_games_cache and self._loaded_games_mtime.get(key) == mtime:
             return self._loaded_games_cache[key]
         games: list[GameRecord] = []
-        metadata = self._event_metadata(sport)
+        metadata = self._event_metadata(sport) if key in {"mlb", "nfl"} else {}
         seen: set[str] = set()
         with path.open(encoding="utf-8") as handle:
             for line in handle:

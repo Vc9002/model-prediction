@@ -324,6 +324,7 @@ models:
     # -$49.23 -- see EXPLICIT_BLACKLIST_MODELS in auto_executor.py).
     # Restoring the pre-2026-09-08 value pending a real derived threshold.
     research_confidence_gate: 0.230157
+    min_team_games: 8
     leagues:
     - EPL
     - LA_LIGA

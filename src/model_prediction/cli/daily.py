@@ -263,10 +263,29 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             # landed, so no data was written to the wrong tree.
             soccer_collection = collect_soccer_scores(data_root=data_root, days_from=3)
             if soccer_collection.get("status") == "no_api_key":
-                # Fail-soft exactly like the The Odds API 401 era: a missing
-                # key must never abort the daily run, but it must be loudly
-                # visible in the log so the capture gap doesn't go quiet.
-                logger.warning("missing API_FOOTBALL_KEY — soccer results capture skipped")
+                logger.info("missing API_FOOTBALL_KEY — falling back to keyless ESPN soccer ingest")
+                from datetime import date as dt_date
+                from datetime import timedelta as dt_timedelta
+
+                import httpx
+
+                from ..ingest import Ingestor
+
+                ingestor = Ingestor(data_root, rate_limit_seconds=0.0)
+                current_date = dt_date.fromisoformat(args.date)
+                appended_total = 0
+                for offset in range(3, -1, -1):
+                    d_str = (current_date - dt_timedelta(days=offset)).isoformat()
+                    try:
+                        res = ingestor.ingest_scores("soccer", d_str)
+                        appended_total += int(res.get("new_games_appended", 0))
+                    except (OSError, ValueError, httpx.HTTPError) as e:
+                        logger.warning("ESPN soccer ingest failed for %s: %s", d_str, e)
+                soccer_collection = {
+                    "status": "espn_fallback",
+                    "source": "espn",
+                    "new_games_appended": appended_total,
+                }
         except Exception:
             logger.warning("Soccer score collection failed", exc_info=True)
 
