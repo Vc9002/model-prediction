@@ -57,7 +57,8 @@ KNOWN_MISMATCH_ARTIFACTS = frozenset(
 
 def _serving_feature_names() -> set[str]:
     """Every feature learned_forward can produce at prediction time."""
-    src = open(PROJECT_ROOT / "src/model_prediction/learned_forward.py").read()
+    with open(PROJECT_ROOT / "src/model_prediction/learned_forward.py", encoding="utf-8") as f:
+        src = f.read()
     body = src[src.index("def _compute_features") : src.index("def _init_providers")]
     served = set(re.findall(r'features\["([a-z_0-9]+)"\]', body))
     served |= set(re.findall(r'"([a-z_0-9]+)":', body))  # dict-literal keys (elo/trend/defense)
@@ -123,7 +124,7 @@ def main() -> int:
     # model layer: every JSON artifact under config/models/
     models_report = {}
     for path in sorted((PROJECT_ROOT / "config/models").rglob("*.json")):
-        rel = str(path.relative_to(PROJECT_ROOT))
+        rel = path.relative_to(PROJECT_ROOT).as_posix()
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as error:
@@ -132,11 +133,15 @@ def main() -> int:
         stored = payload.get("artifact_hash")
         computed = compute_artifact_hash(payload) if isinstance(payload, dict) else None
         model_version = payload.get("model_version") if isinstance(payload, dict) else None
-        feature_names = (
-            ((payload.get("market_models") or {}).get("moneyline") or {}).get("feature_names")
-            if isinstance(payload, dict)
-            else None
-        ) or []
+        feature_names = payload.get("feature_names") if isinstance(payload, dict) else None
+        if not feature_names and isinstance(payload, dict):
+            market_models = payload.get("market_models")
+            if isinstance(market_models, dict):
+                for mm in market_models.values():
+                    if isinstance(mm, dict) and mm.get("feature_names"):
+                        feature_names = mm["feature_names"]
+                        break
+        feature_names = feature_names or []
         unserved = [f for f in feature_names if f not in served]
         models_report[rel] = {
             "hash_valid": stored == computed,
@@ -150,9 +155,8 @@ def main() -> int:
         }
         if stored is not None and stored != computed and rel not in KNOWN_MISMATCH_ARTIFACTS:
             gaps.append(f"MODEL GAP: {rel} hash mismatch")
-        if unserved:
-            if "rebuild" not in str(model_version):
-                gaps.append(f"MODEL GAP: {rel} ({model_version}) uses unserved features {unserved}")
+        if unserved and "rebuild" not in str(model_version):
+            gaps.append(f"MODEL GAP: {rel} ({model_version}) uses unserved features {unserved}")
 
     config = load_production_config(repo_root=PROJECT_ROOT)
     production_entries = config.get("prediction_service", {}).get("models", [])
@@ -175,13 +179,16 @@ def main() -> int:
         str(e.get("rollback_model")) + ".json" for e in production_entries if e.get("rollback_model")
     }
     for rel in models_report:
+        base_name = Path(rel).name
+        flat_wired = any(Path(p).name == base_name for p in (wired_paths | extra_refs))
         if (
             "challengers/" not in rel
             and "archive/" not in rel
             and not rel.endswith(".previous.json")
             and rel not in wired_paths
             and rel not in extra_refs
-            and Path(rel).name not in rollback_refs
+            and base_name not in rollback_refs
+            and not flat_wired
         ):
             gaps.append(
                 f"MODEL GAP: {rel} is not wired into production.yaml/config/model.yaml and is not a challenger"

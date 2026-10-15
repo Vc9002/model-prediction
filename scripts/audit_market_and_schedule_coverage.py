@@ -98,6 +98,8 @@ def audit_coverage() -> dict[str, Any]:
 
     # 3. Audit SQLite Market Warehouse (market_quotes.db)
     db_path = runtime_paths.runtime_root / "market_quotes.db"
+    if not db_path.exists():
+        db_path = runtime_paths.repo_root / "data" / "market_quotes.db"
     if db_path.exists():
         try:
             conn = sqlite3.connect(db_path)

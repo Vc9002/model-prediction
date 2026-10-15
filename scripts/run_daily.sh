@@ -117,6 +117,7 @@ echo "Unified daily exit code: $DAILY_EXIT" >> "$LOG"
 echo "Unified daily took: $((SECONDS - STEP_START))s" >> "$LOG"
 
 # ── Step 2b: MLB v9 Challenger flat forecast ────────────────────────
+# -- Step 2b: MLB v9 Challenger flat forecast --------------------------------
 echo "--- Step 2b: MLB v9 Challenger flat forecast ---" >> "$LOG"
 STEP_START=$SECONDS
 PYTHONPATH=src:. .venv/bin/python scripts/forecast_mlb_v9_benchmark.py >> "$LOG" 2>&1
@@ -124,12 +125,20 @@ V9_FORECAST_EXIT=$?
 echo "MLB v9 forecast exit code: $V9_FORECAST_EXIT" >> "$LOG"
 echo "MLB v9 forecast took: $((SECONDS - STEP_START))s" >> "$LOG"
 
+# -- Step 2c: Automated Health and Data Gap Monitor ---------------------------
+echo "--- Step 2c: Automated Health and Data Gap Monitor ---" >> "$LOG"
+STEP_START=$SECONDS
+PYTHONPATH=src:. .venv/bin/python scripts/health_and_data_gap_monitor.py >> "$LOG" 2>&1
+HEALTH_EXIT=$?
+echo "Health monitor exit code: $HEALTH_EXIT" >> "$LOG"
+echo "Health monitor took: $((SECONDS - STEP_START))s" >> "$LOG"
+
 echo "Finished: $(TZ=America/New_York date)" >> "$LOG"
-echo "Exit codes — settle: $SETTLE_EXIT, v9_settle: $V9_SETTLE_EXIT, ingest: $INGEST_EXIT, calibrate: $CALIBRATE_EXIT, daily: $DAILY_EXIT, v9_forecast: $V9_FORECAST_EXIT" >> "$LOG"
+echo "Exit codes — settle: $SETTLE_EXIT, v9_settle: $V9_SETTLE_EXIT, ingest: $INGEST_EXIT, calibrate: $CALIBRATE_EXIT, daily: $DAILY_EXIT, v9_forecast: $V9_FORECAST_EXIT, health: $HEALTH_EXIT" >> "$LOG"
 
 # Cleanup old logs
 find data/logs -name "daily_*.log" -mtime +30 -delete
 
-if [ "$SETTLE_EXIT" -ne 0 ] || [ "$V9_SETTLE_EXIT" -ne 0 ] || [ "$INGEST_EXIT" -ne 0 ] || [ "$CALIBRATE_EXIT" -ne 0 ] || [ "$DAILY_EXIT" -ne 0 ] || [ "$V9_FORECAST_EXIT" -ne 0 ]; then
+if [ "$SETTLE_EXIT" -ne 0 ] || [ "$V9_SETTLE_EXIT" -ne 0 ] || [ "$INGEST_EXIT" -ne 0 ] || [ "$CALIBRATE_EXIT" -ne 0 ] || [ "$DAILY_EXIT" -ne 0 ] || [ "$V9_FORECAST_EXIT" -ne 0 ] || [ "$HEALTH_EXIT" -ne 0 ]; then
     exit 1
 fi

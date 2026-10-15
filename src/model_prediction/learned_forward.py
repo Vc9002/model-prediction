@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from collections import defaultdict
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
@@ -232,6 +233,60 @@ def _compute_features(
             )
         if "elo_neutral_probability" in wanted:
             features["elo_neutral_probability"] = elo.expected_neutral_win(home_team, away_team)
+    if "log5_probability" in wanted or "pythagorean_probability" in wanted:
+        from .features.baselines import TeamRecordAccumulator, log5_matchup_probability
+
+        team_recs: dict[str, TeamRecordAccumulator] = defaultdict(TeamRecordAccumulator)
+        for g in history:
+            if g.home_score > g.away_score:
+                team_recs[g.home_team].wins += 1
+                team_recs[g.away_team].losses += 1
+            elif g.home_score < g.away_score:
+                team_recs[g.away_team].wins += 1
+                team_recs[g.home_team].losses += 1
+            team_recs[g.home_team].runs_scored += g.home_score
+            team_recs[g.home_team].runs_allowed += g.away_score
+            team_recs[g.away_team].runs_scored += g.away_score
+            team_recs[g.away_team].runs_allowed += g.home_score
+
+        if "log5_probability" in wanted:
+            home_wr = team_recs[home_team].win_rate(prior_games=10)
+            away_wr = team_recs[away_team].win_rate(prior_games=10)
+            features["log5_probability"] = round(log5_matchup_probability(home_wr, away_wr), 6)
+
+        if "pythagorean_probability" in wanted:
+            home_pyth = team_recs[home_team].pythagorean_expectation(prior_runs=50)
+            away_pyth = team_recs[away_team].pythagorean_expectation(prior_runs=50)
+            features["pythagorean_probability"] = round(log5_matchup_probability(home_pyth, away_pyth), 6)
+
+    if "trailing_home_games_30d" in wanted:
+        cutoff = event_start.astimezone(EASTERN).date() - timedelta(days=30)
+        game_date_dt = event_start.astimezone(EASTERN).date()
+        recent_home_games = [
+            g
+            for g in history
+            if cutoff <= g.start.astimezone(EASTERN).date() < game_date_dt
+            and g.home_score != g.away_score
+            and g.home_team == home_team
+        ]
+        features["trailing_home_games_30d"] = float(len(recent_home_games))
+
+    if "bullpen_available" in wanted:
+        features["bullpen_available"] = 1.0 if "bullpen_weakness_gap" in features else 0.0
+    if "bullpen_fatigue_available" in wanted:
+        features["bullpen_fatigue_available"] = 1.0 if "bullpen_fatigue_gap" in features else 0.0
+    if "offense_pit_available" in wanted:
+        features["offense_pit_available"] = (
+            1.0 if "offense_pit_gap" in features and "offense_pit_gap_unavailable" not in unavailable else 0.0
+        )
+    if "probable_starter_available" in wanted:
+        features["probable_starter_available"] = 1.0 if (home_starter_name and away_starter_name) else 0.0
+    if "park_available" in wanted:
+        features["park_available"] = 1.0
+    if "weather_available" in wanted:
+        features["weather_available"] = 1.0
+    if "outcome_3way" in wanted:
+        features["outcome_3way"] = 0.0
     if wanted & AVAILABILITY_FEATURE_NAMES:
         if sport != "wnba":
             raise ValueError(

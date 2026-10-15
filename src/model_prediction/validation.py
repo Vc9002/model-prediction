@@ -25,6 +25,7 @@ from .config import PROJECT_ROOT
 from .data_sources.espn_probables import point_in_time_pitcher_era_gap
 from .domain import EASTERN
 from .features.base import FeatureStore, GameRecord
+from .features.baselines import TeamRecordAccumulator, log5_matchup_probability
 from .features.bullpen import FATIGUE_WINDOW_DAYS, bullpen_profile
 from .features.elo_ratings import build_elo
 from .features.park_factors import park_factor
@@ -383,6 +384,7 @@ def build_walk_forward_rows(
 
     history: list[GameRecord] = []
     rows: list[ValidationRow] = []
+    team_records: dict[str, TeamRecordAccumulator] = defaultdict(TeamRecordAccumulator)
     for day in sorted(by_date):
         if end_date is not None and day >= end_date:
             break
@@ -498,6 +500,17 @@ def build_walk_forward_rows(
                 # game. Positive = home is over-performing vs Elo's prior.
                 elo_prob = elo.expected_home_win(game.home_team, game.away_team)
                 residual_trend_gap = home_win_rate_30d - elo_prob if home_games_30d >= 10 else 0.0
+
+                # Quantitative baseline models (Bill James log5 and pythagorean expectation)
+                home_rec = team_records[game.home_team]
+                away_rec = team_records[game.away_team]
+                home_wr = home_rec.win_rate(prior_games=10)
+                away_wr = away_rec.win_rate(prior_games=10)
+                log5_p = round(log5_matchup_probability(home_wr, away_wr), 6)
+                home_pyth = home_rec.pythagorean_expectation(prior_runs=50)
+                away_pyth = away_rec.pythagorean_expectation(prior_runs=50)
+                pyth_p = round(log5_matchup_probability(home_pyth, away_pyth), 6)
+
                 rows.append(
                     ValidationRow(
                         date=day,
@@ -533,9 +546,22 @@ def build_walk_forward_rows(
                         elo_neutral_probability=elo.expected_neutral_win(game.home_team, game.away_team),
                         trailing_home_win_rate_30d=home_win_rate_30d,
                         trailing_home_games_30d=home_games_30d,
+                        pythagorean_probability=pyth_p,
+                        log5_probability=log5_p,
                         outcome_3way=outcome_3way,
                     )
                 )
+        for g in day_games:
+            if g.home_score > g.away_score:
+                team_records[g.home_team].wins += 1
+                team_records[g.away_team].losses += 1
+            elif g.home_score < g.away_score:
+                team_records[g.away_team].wins += 1
+                team_records[g.home_team].losses += 1
+            team_records[g.home_team].runs_scored += g.home_score
+            team_records[g.home_team].runs_allowed += g.away_score
+            team_records[g.away_team].runs_scored += g.away_score
+            team_records[g.away_team].runs_allowed += g.home_score
         history.extend(day_games)
     return rows
 

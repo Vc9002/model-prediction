@@ -188,6 +188,10 @@ models:
     - mlb-nrfi-v2
     active_research_version: spread-baseline-v1
     active_research_name: Spread & Total Baseline
+    research_candidate_1_artifact: config/models/research/mlb-v9-candidate-1.json
+    research_candidate_2_artifact: config/models/research/mlb-v9-candidate-2.json
+    nrfi_legacy_artifact: config/models/mlb-nrfi-v1.json
+    structural_v10_frozen_artifact: config/models/research/mlb_structural_v10_frozen.json
     min_edge: 0.05
     legacy_research_rollback: mlb-elo-trend-lr-v7
     iteration_policy:
@@ -316,6 +320,8 @@ models:
     active_research_version: soccer-poisson-dc-v2
     legacy_binary_research_version: soccer-elo-trend-lr-v2
     legacy_binary_research_artifact: config/models/soccer-elo-trend-lr-v2.json
+    market_residual_artifact: config/models/soccer-market-residual-v1.json
+    total_market_residual_artifact: config/models/soccer-total-market-residual-v1.json
     min_edge: 0.02
     # Restored 2026-09-09: 0.0 (no gate) contradicted this section's own
     # comment above ("wiring research_confidence_gate ... from that real
@@ -447,6 +453,7 @@ models:
       real result.'
     active_production_version: tennis-surface-elo-v4
     active_research_version: tennis-surface-elo-v4
+    market_residual_artifact: config/models/tennis-market-residual-v1.json
     min_edge: 0.05
     research_confidence_gate: 0.037239
     markets:

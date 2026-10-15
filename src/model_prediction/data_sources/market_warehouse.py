@@ -52,9 +52,13 @@ class MarketQuoteWarehouse:
             self.db_path = Path(db_path)
         elif paths is not None:
             self.db_path = paths.runtime_root / "market_quotes.db"
+            if not self.db_path.exists() and (paths.repo_root / "data" / "market_quotes.db").exists():
+                self.db_path = paths.repo_root / "data" / "market_quotes.db"
         else:
             runtime_paths = RuntimePaths.resolve()
             self.db_path = runtime_paths.runtime_root / "market_quotes.db"
+            if not self.db_path.exists() and (runtime_paths.repo_root / "data" / "market_quotes.db").exists():
+                self.db_path = runtime_paths.repo_root / "data" / "market_quotes.db"
 
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self.db_path, timeout=10.0)
