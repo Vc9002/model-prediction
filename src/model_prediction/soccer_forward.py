@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import unicodedata
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
@@ -45,7 +46,9 @@ def _teams(event: dict[str, Any]) -> tuple[str, str]:
 
 
 def _words(value: str) -> list[str]:
-    return re.findall(r"[a-z0-9]+", value.casefold())
+    clean = str(value or "").replace(chr(0xFFFD), "e")
+    clean = unicodedata.normalize("NFKD", clean).encode("ascii", "ignore").decode("ascii")
+    return re.findall(r"[a-z0-9]+", clean.casefold())
 
 
 def _team_matches_title(team: str, title: str) -> bool:

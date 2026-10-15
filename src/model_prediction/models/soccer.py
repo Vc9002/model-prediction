@@ -161,13 +161,18 @@ class SoccerModel:
 
         predictions: list[GamePrediction] = []
         for match in upcoming:
-            strengths, baseline = _get_strengths(getattr(match, "league", "SOCCER"))
+            lg_name = getattr(match, "league", "SOCCER")
+            strengths, baseline = _get_strengths(lg_name)
             home = strengths.get(match.home_team, {"attack": 1.0, "defense": 1.0, "games": 0.0})
             away = strengths.get(match.away_team, {"attack": 1.0, "defense": 1.0, "games": 0.0})
-            home_rate = baseline * home["attack"] * away["defense"] * self.home_boost
-            away_rate = (
-                baseline * away["attack"] * home["defense"] / (self.home_boost if self.divide_away else 1.0)
-            )
+
+            # League-specific calibration: MLS has measured home advantage 1.2325 with no away division
+            is_mls = str(lg_name or "").strip().upper() == "MLS"
+            h_boost = 1.2325 if is_mls else self.home_boost
+            div_away = False if is_mls else self.divide_away
+
+            home_rate = baseline * home["attack"] * away["defense"] * h_boost
+            away_rate = baseline * away["attack"] * home["defense"] / (h_boost if div_away else 1.0)
             from ..coded_market_replay import capture_inputs
 
             inference_inputs = capture_inputs("SOCCER", {"home_rate": home_rate, "away_rate": away_rate})
