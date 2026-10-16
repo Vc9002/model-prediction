@@ -433,8 +433,21 @@ def run_calibration_tournament(
             else 0.0,
         }
 
-    # Pick champion by minimum OOF log loss
-    champion_method = min(scorecard.keys(), key=lambda m: scorecard[m]["oof_log_loss"])
+    # Pick champion method: minimum OOF log loss among valid non-pathological methods.
+    # A candidate calibrator is rejected if its calibration slope or intercept deviates
+    # excessively from ideal (slope dev > 0.5 or intercept dev > 0.5 or ECE > 0.15) to prevent
+    # overfitting on small slices. If all candidate calibrators fail this check, fallback to identity.
+    valid_candidates = []
+    for method, sc in scorecard.items():
+        slope_dev = abs(sc["calibration_slope"] - 1.0)
+        intercept_dev = abs(sc["calibration_intercept"])
+        if slope_dev <= 0.5 and intercept_dev <= 0.5 and sc["oof_ece"] <= 0.15:
+            valid_candidates.append(method)
+
+    if not valid_candidates:
+        valid_candidates = ["identity"]
+
+    champion_method = min(valid_candidates, key=lambda m: scorecard[m]["oof_log_loss"])
 
     # Fit final champion on full data
     champion_calibrator: Calibrator

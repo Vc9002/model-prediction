@@ -26,4 +26,5 @@ if ($LASTEXITCODE -ge 8) {
     exit $LASTEXITCODE
 }
 Write-Output "offsite sync complete: $OffsiteDir"
+& $Py scripts/rotate_logs.py --max-age-days 14
 exit 0

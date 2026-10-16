@@ -248,7 +248,11 @@ def evaluate_calibration_for_group(
     recalibrated = (
         champ_method != "identity"
         and drift_status in ("SEVERE_DRIFT", "MODERATE_DRIFT")
-        and cal_drift_status == "HEALTHY"
+        and (
+            cal_drift_status == "HEALTHY"
+            or (drift_status == "SEVERE_DRIFT" and cal_drift_status == "MODERATE_DRIFT")
+            or cal_drift_score < drift_score * 0.75
+        )
     )
 
     return ModelCalibrationRecord(

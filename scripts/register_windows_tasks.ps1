@@ -4,6 +4,11 @@
 # The auto-buyer runs every 30 minutes, matching the launchd plist. It only places
 # real orders when the saved state is mode=live, so this task is paper-safe by default.
 # Re-run safely; existing tasks with these names are replaced.
+param(
+    [ValidateSet('Interactive', 'S4U')]
+    [string]$LogonType = 'Interactive',
+    [string]$User = $env:USERNAME
+)
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
@@ -16,10 +21,11 @@ function Register-WorkerTask([string]$TaskName, [string]$Worker, $Triggers, [str
     # Quoted set: an unquoted `set VAR=x && ...` in cmd.exe keeps the space before && in the value.
     $cmd = "set `"MODEL_PREDICTION_RUNTIME_ROOT=$RuntimeRoot`" && set `"MODEL_PREDICTION_LEDGER_AUTHORITY=sqlite`" && `"$Py`" -m model_prediction.run_supervisor run $Worker"
     $action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/c $cmd" -WorkingDirectory $RepoRoot
+    $principal = New-ScheduledTaskPrincipal -UserId $User -LogonType $LogonType
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
     Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $Triggers -Settings $Settings `
-        -Description $Description | Out-Null
-    Write-Output "registered: $TaskName ($Worker)"
+        -Principal $principal -Description $Description | Out-Null
+    Write-Output "registered: $TaskName ($Worker, $LogonType)"
 }
 
 # Daily picks: 4x/day, matching com.modelprediction.daily.plist.
@@ -41,9 +47,10 @@ $backupAction = New-ScheduledTaskAction -Execute 'powershell.exe' `
     -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$RepoRoot\scripts\backup_offsite_sync.ps1`"" -WorkingDirectory $RepoRoot
 $backupTrigger = New-ScheduledTaskTrigger -Daily -At '03:00'
 Unregister-ScheduledTask -TaskName 'ModelPrediction-BackupOffsite' -Confirm:$false -ErrorAction SilentlyContinue
+$backupPrincipal = New-ScheduledTaskPrincipal -UserId $User -LogonType $LogonType
 Register-ScheduledTask -TaskName 'ModelPrediction-BackupOffsite' -Action $backupAction -Trigger $backupTrigger -Settings $Settings `
-    -Description 'model-prediction runtime DB backup + offsite copy' | Out-Null
-Write-Output 'registered: ModelPrediction-BackupOffsite'
+    -Principal $backupPrincipal -Description 'model-prediction runtime DB backup + offsite copy' | Out-Null
+Write-Output "registered: ModelPrediction-BackupOffsite ($LogonType)"
 
 # Auto-buyer: every 30 minutes, matching com.modelprediction.auto-buyer.plist.
 $autoBuyerTriggers = New-ScheduledTaskTrigger -Once -At (Get-Date).Date.AddMinutes(10) -RepetitionInterval (New-TimeSpan -Minutes 30) -RepetitionDuration (New-TimeSpan -Days 3650)

@@ -140,15 +140,17 @@ $HealthExit = Invoke-Step @('scripts/health_and_data_gap_monitor.py') 'src;.'
 Write-Log "Health monitor exit code: $HealthExit"
 Write-Log ("Health monitor took: {0}s" -f [int]$Stopwatch.Elapsed.TotalSeconds)
 
+# -- Step 3: Automated Log Retention and WAL Checkpointing --------------------
+Write-Log '--- Step 3: Automated Log Retention and WAL Maintenance ---'
+$Stopwatch.Restart()
+$MaintenanceExit = Invoke-Step @('scripts/rotate_logs.py', '--max-age-days', '14') 'src;.'
+Write-Log "Log maintenance exit code: $MaintenanceExit"
+Write-Log ("Log maintenance took: {0}s" -f [int]$Stopwatch.Elapsed.TotalSeconds)
+
 Write-Log ("Finished: " + (Get-Date -Format o))
-Write-Log "Exit codes -- settle: $SettleExit, v9_settle: $V9SettleExit, ingest: $IngestExit, calibrate: $CalibrateExit, daily: $DailyExit, v9_forecast: $V9ForecastExit, health: $HealthExit"
+Write-Log "Exit codes -- settle: $SettleExit, v9_settle: $V9SettleExit, ingest: $IngestExit, calibrate: $CalibrateExit, daily: $DailyExit, v9_forecast: $V9ForecastExit, health: $HealthExit, maintenance: $MaintenanceExit"
 
-# Cleanup old logs
-Get-ChildItem 'data\logs' -Filter 'daily_*.log' -ErrorAction SilentlyContinue |
-    Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-30) } |
-    Remove-Item -Force
-
-if ($SettleExit -ne 0 -or $V9SettleExit -ne 0 -or $IngestExit -ne 0 -or $CalibrateExit -ne 0 -or $DailyExit -ne 0 -or $V9ForecastExit -ne 0 -or $HealthExit -ne 0) {
+if ($SettleExit -ne 0 -or $V9SettleExit -ne 0 -or $IngestExit -ne 0 -or $CalibrateExit -ne 0 -or $DailyExit -ne 0 -or $V9ForecastExit -ne 0 -or $HealthExit -ne 0 -or $MaintenanceExit -ne 0) {
     exit 1
 }
 exit 0
