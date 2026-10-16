@@ -279,12 +279,14 @@ class RunSupervisor:
         note: str | None = None
         try:
             with log_path.open("wb") as log_handle:
+                creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
                 proc = subprocess.Popen(
                     cmd,
                     cwd=self.repo_root,
                     stdout=log_handle,
                     stderr=subprocess.STDOUT,
                     env=self._worker_env(run_id, log_path),
+                    creationflags=creationflags,
                 )
                 self._insert_run(
                     {

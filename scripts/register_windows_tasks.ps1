@@ -15,17 +15,16 @@ $RepoRoot = Split-Path -Parent $PSScriptRoot
 $RuntimeRoot = if ($env:MODEL_PREDICTION_RUNTIME_ROOT) { $env:MODEL_PREDICTION_RUNTIME_ROOT.Trim() } else { Join-Path $RepoRoot 'data' }
 $Py = Join-Path $RepoRoot '.venv\Scripts\python.exe'
 $Settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries `
-    -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Hours 6) -MultipleInstances IgnoreNew
+    -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Hours 6) -MultipleInstances IgnoreNew -Hidden
 
 function Register-WorkerTask([string]$TaskName, [string]$Worker, $Triggers, [string]$Description) {
-    # Quoted set: an unquoted `set VAR=x && ...` in cmd.exe keeps the space before && in the value.
-    $cmd = "set `"MODEL_PREDICTION_RUNTIME_ROOT=$RuntimeRoot`" && set `"MODEL_PREDICTION_LEDGER_AUTHORITY=sqlite`" && `"$Py`" -m model_prediction.run_supervisor run $Worker"
-    $action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/c $cmd" -WorkingDirectory $RepoRoot
+    $psArgs = "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -Command `"& { `$env:MODEL_PREDICTION_RUNTIME_ROOT = '$RuntimeRoot'; `$env:MODEL_PREDICTION_LEDGER_AUTHORITY = 'sqlite'; & '$Py' -m model_prediction.run_supervisor run $Worker }`""
+    $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $psArgs -WorkingDirectory $RepoRoot
     $principal = New-ScheduledTaskPrincipal -UserId $User -LogonType $LogonType
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
     Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $Triggers -Settings $Settings `
         -Principal $principal -Description $Description | Out-Null
-    Write-Output "registered: $TaskName ($Worker, $LogonType)"
+    Write-Output "registered: $TaskName ($Worker, $LogonType, Hidden)"
 }
 
 # Daily picks: 4x/day, matching com.modelprediction.daily.plist.
@@ -44,7 +43,7 @@ Register-WorkerTask 'ModelPrediction-RebuildShadow' 'rebuild-shadow' $threeHourl
 
 # Offsite backup: 03:00 daily, matching com.vc.model-backup-offsite.plist.
 $backupAction = New-ScheduledTaskAction -Execute 'powershell.exe' `
-    -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$RepoRoot\scripts\backup_offsite_sync.ps1`"" -WorkingDirectory $RepoRoot
+    -Argument "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File `"$RepoRoot\scripts\backup_offsite_sync.ps1`"" -WorkingDirectory $RepoRoot
 $backupTrigger = New-ScheduledTaskTrigger -Daily -At '03:00'
 Unregister-ScheduledTask -TaskName 'ModelPrediction-BackupOffsite' -Confirm:$false -ErrorAction SilentlyContinue
 $backupPrincipal = New-ScheduledTaskPrincipal -UserId $User -LogonType $LogonType

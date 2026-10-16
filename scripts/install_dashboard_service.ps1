@@ -12,13 +12,12 @@ $RuntimeRoot = if ($env:MODEL_PREDICTION_RUNTIME_ROOT) { $env:MODEL_PREDICTION_R
 $LogDir = Join-Path $RepoRoot 'dashboard'
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
-# The task runs the dashboard through cmd so stdout/stderr land in log files.
-$cmd = "set `"PYTHONPATH=src`" && set `"MODEL_PREDICTION_RUNTIME_ROOT=$RuntimeRoot`" && " +
-    "`"$Py`" dashboard_server.py > `"$LogDir\launchd.out.log`" 2> `"$LogDir\launchd.err.log`""
-$action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/c $cmd" -WorkingDirectory $RepoRoot
+# The task runs the dashboard hidden via PowerShell with stdout/stderr directed to log files.
+$psArgs = "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -Command `"& { `$env:PYTHONPATH = 'src'; `$env:MODEL_PREDICTION_RUNTIME_ROOT = '$RuntimeRoot'; & '$Py' dashboard_server.py 1> '$LogDir\launchd.out.log' 2> '$LogDir\launchd.err.log' }`""
+$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $psArgs -WorkingDirectory $RepoRoot
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 $settings = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) `
-    -ExecutionTimeLimit (New-TimeSpan -Seconds 0) -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+    -ExecutionTimeLimit (New-TimeSpan -Seconds 0) -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Hidden
 
 Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings `
