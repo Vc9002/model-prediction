@@ -10,12 +10,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 import unicodedata
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from .domain import parse_utc
 from .features.base import FeatureStore
@@ -288,12 +291,21 @@ def build_soccer_total_slate(
     if leagues:
 
         def _fetch_league_events(league_name: str) -> list[dict[str, Any]]:
-            sb = client.scoreboard(league_name, game_date)
-            evs = sb.get("events", [])
-            for ev in evs:
-                if "league" not in ev:
-                    ev["league"] = league_name
-            return evs
+            try:
+                sb = client.scoreboard(league_name, game_date)
+                evs = sb.get("events", [])
+                for ev in evs:
+                    if "league" not in ev:
+                        ev["league"] = league_name
+                return evs
+            except Exception as exc:  # noqa: BLE001 -- external transport boundary
+                logger.warning(
+                    "Failed to fetch soccer scoreboard for %s on %s: %s",
+                    league_name,
+                    game_date,
+                    exc,
+                )
+                return []
 
         with ThreadPoolExecutor(max_workers=min(18, len(leagues))) as pool:
             for ev_list in pool.map(_fetch_league_events, leagues):

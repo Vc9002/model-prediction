@@ -35,6 +35,7 @@ from openpyxl.utils import get_column_letter
 from model_prediction.filelock import lock_exclusive, unlock
 
 from .domain import iso_utc, utc_now
+from .xlsx_ledger import _replace_with_retry
 
 MODEL_LEDGER_SCHEMA_VERSION = "1"
 SHEET_NAME = "Predictions"
@@ -691,11 +692,14 @@ def _write_predictions_atomic(path: Path, rows: list[dict[str, str]]) -> None:
     try:
         workbook.save(temporary)
         os.chmod(temporary, 0o644)
-        os.replace(temporary, path)
+        workbook.close()
+        _replace_with_retry(temporary, path)
     except BaseException:
         with suppress(FileNotFoundError):
             os.unlink(temporary)
         raise
+    finally:
+        workbook.close()
 
 
 def compute_model_evidence(ledger: ModelLedger) -> dict[str, Any]:

@@ -166,72 +166,74 @@ def _find_pick_by_id(pick_id: str) -> dict | None:
 
 def _parse_picks(path: Path) -> list[dict]:
     wb = load_workbook(path, read_only=True, data_only=True)
-    sheet = wb["Picks"] if "Picks" in wb.sheetnames else wb.active
-    if sheet is None:
-        return []
-    rows = sheet.iter_rows(values_only=True)
     try:
-        headers = [str(h) if h is not None else "" for h in next(rows)]
-    except StopIteration:
-        return []
-    keep = [
-        "pick_id",
-        "created_at_utc",
-        "event_start_utc",
-        "event_id",
-        "league",
-        "away_team",
-        "home_team",
-        "market_type",
-        "selection",
-        "line",
-        "american_odds",
-        "market_implied_probability",
-        "market_probability_at_decision",
-        "model_probability",
-        "model_uncertainty",
-        "edge",
-        "trade_candidate",
-        "confidence_score",
-        "units",
-        "model_version",
-        "status",
-        "result",
-        "away_score",
-        "home_score",
-        "probability_clv",
-        "pnl_units",
-        "settled_at_utc",
-        "record_type",
-        "decision",
-        "reason_code",
-        "research_score_units",
-        "research_pnl_units",
-        "sportsbook",
-        "decision_no_vig_probability",
-        "rationale",
-        "risks",
-        "unavailable_features",
-        "elo_probability",
-        "trend_gap",
-        "defensive_trend_gap",
-        "park_factor",
-        "weather_factor",
-        "pitcher_era_gap",
-        "probable_starter_era_gap",
-        "market_residual_probability",
-    ]
-    index = {name: headers.index(name) for name in keep if name in headers}
-    picks = []
-    for values in rows:
-        if values is None or all(value is None for value in values):
-            continue
-        row = {name: values[position] for name, position in index.items()}
-        if not row.get("pick_id"):
-            continue
-        picks.append(row)
-    wb.close()
-    return picks
+        sheet = wb["Picks"] if "Picks" in wb.sheetnames else wb.active
+        if sheet is None:
+            return []
+        rows = sheet.iter_rows(values_only=True)
+        try:
+            headers = [str(h) if h is not None else "" for h in next(rows)]
+        except StopIteration:
+            return []
+        keep = [
+            "pick_id",
+            "created_at_utc",
+            "event_start_utc",
+            "event_id",
+            "league",
+            "away_team",
+            "home_team",
+            "market_type",
+            "selection",
+            "line",
+            "american_odds",
+            "market_implied_probability",
+            "market_probability_at_decision",
+            "model_probability",
+            "model_uncertainty",
+            "edge",
+            "trade_candidate",
+            "confidence_score",
+            "units",
+            "model_version",
+            "status",
+            "result",
+            "away_score",
+            "home_score",
+            "probability_clv",
+            "pnl_units",
+            "settled_at_utc",
+            "record_type",
+            "decision",
+            "reason_code",
+            "research_score_units",
+            "research_pnl_units",
+            "sportsbook",
+            "decision_no_vig_probability",
+            "rationale",
+            "risks",
+            "unavailable_features",
+            "elo_probability",
+            "trend_gap",
+            "defensive_trend_gap",
+            "park_factor",
+            "weather_factor",
+            "pitcher_era_gap",
+            "probable_starter_era_gap",
+            "market_residual_probability",
+        ]
+        index = {name: headers.index(name) for name in keep if name in headers}
+        picks = []
+        for values in rows:
+            if values is None or all(value is None for value in values):
+                continue
+            row = {name: values[position] for name, position in index.items()}
+            if not row.get("pick_id"):
+                continue
+            picks.append(row)
+        return picks
+    finally:
+        wb.close()
 
 
 def _research_ledger_paths(*, gated: bool = False) -> list[Path]:

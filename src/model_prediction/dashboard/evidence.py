@@ -362,25 +362,25 @@ def _read_evidence_ledger(path: Path) -> list[dict]:
     if load_workbook is None or not path.exists():
         return []
     workbook = load_workbook(path, read_only=True, data_only=True)
-    sheet = workbook["Picks"] if "Picks" in workbook.sheetnames else workbook.active
-    if sheet is None:
-        workbook.close()
-        return []
-    values = sheet.iter_rows(values_only=True)
     try:
-        headers = [str(value) if value is not None else "" for value in next(values)]
-    except StopIteration:
+        sheet = workbook["Picks"] if "Picks" in workbook.sheetnames else workbook.active
+        if sheet is None:
+            return []
+        values = sheet.iter_rows(values_only=True)
+        try:
+            headers = [str(value) if value is not None else "" for value in next(values)]
+        except StopIteration:
+            return []
+        rows = []
+        for raw_row in values:
+            if not raw_row or all(value is None for value in raw_row):
+                continue
+            row = {header: raw_row[index] for index, header in enumerate(headers) if header}
+            if row.get("pick_id") or row.get("event_id"):
+                rows.append(row)
+        return rows
+    finally:
         workbook.close()
-        return []
-    rows = []
-    for raw_row in values:
-        if not raw_row or all(value is None for value in raw_row):
-            continue
-        row = {header: raw_row[index] for index, header in enumerate(headers) if header}
-        if row.get("pick_id") or row.get("event_id"):
-            rows.append(row)
-    workbook.close()
-    return rows
 
 
 def _normalized_line(value: Any) -> str:
