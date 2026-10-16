@@ -29,7 +29,15 @@ def test_exact_state_rounding_identity_and_settled_ledger(sport, tmp_path):
         matrix = SoccerModel().score_matrix(inputs["home_rate"], inputs["away_rate"])
         home = sum(matrix[h][a] for h in range(MAX_GOALS + 1) for a in range(h))
         away = sum(matrix[h][a] for a in range(MAX_GOALS + 1) for h in range(a))
-        expected = {"home": round(home, 6), "away": round(away, 6), "draw": round(1 - home - away, 6)}
+        draw = sum(matrix[i][i] for i in range(MAX_GOALS + 1))
+        expected = {
+            "home": round(home, 6),
+            "away": round(away, 6),
+            "draw": round(draw, 6),
+            "1X": round(home + draw, 6),
+            "X2": round(away + draw, 6),
+            "12": round(home + away, 6),
+        }
         version = "soccer-poisson-dc-v1"
     else:
         inputs = capture_inputs(

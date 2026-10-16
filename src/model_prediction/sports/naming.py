@@ -324,6 +324,14 @@ MODEL_CATALOG: dict[str, ModelDescriptor] = {
         display_name="Tennis Moneyline (Surface Elo v1)",
         description="Tennis surface-blended Elo model.",
     ),
+    "tennis-surface-elo-v4": ModelDescriptor(
+        model_id="tennis-surface-elo-v4",
+        sport="TENNIS",
+        market="moneyline",
+        standard_name="tennis-moneyline-surface-elo-v4",
+        display_name="Tennis Moneyline (Surface Elo v4)",
+        description="Tennis dual-horizon surface Elo model v4 with tournament/surface weighting.",
+    ),
     # ── ESPORTS ──
     "cs2-tiered-elo-v6": ModelDescriptor(
         model_id="cs2-tiered-elo-v6",
