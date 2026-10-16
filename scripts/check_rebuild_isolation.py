@@ -14,7 +14,7 @@ REBUILD_SCRIPT_PATTERNS = (
     "rebuild_*.py",
     "mlb_shadow_*.py",
     "mlb_settle_*.py",
-    "train_mlb_*.py",
+    "train_mlb_rebuild*.py",
     "build_mlb_*.py",
     "check_mlb_v2_readiness.py",
     "generate_coverage_report.py",

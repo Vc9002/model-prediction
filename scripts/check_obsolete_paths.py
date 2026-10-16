@@ -34,6 +34,9 @@ def _git_tracked_files(repo: Path) -> list[str]:
 
 
 def _is_allowed(relative_path: str) -> bool:
+    norm = relative_path.replace("\\", "/")
+    if norm.startswith("data/archive/"):
+        return True
     path = Path(relative_path)
     if path.suffix in ALLOWED_SUFFIXES:
         return True

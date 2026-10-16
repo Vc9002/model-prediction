@@ -1,6 +1,6 @@
 {
   "calibration_drift": 1.7223,
-  "last_checked_utc": "2026-10-16T15:25:13.550290+00:00",
+  "last_checked_utc": "2026-10-16T15:36:41.100904+00:00",
   "models_count": 14,
   "moderate_drift_models": [
     "soccer:moneyline:soccer-poisson-dc-v1"
