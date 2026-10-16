@@ -12,9 +12,10 @@ $RuntimeRoot = if ($env:MODEL_PREDICTION_RUNTIME_ROOT) { $env:MODEL_PREDICTION_R
 $LogDir = Join-Path $RepoRoot 'dashboard'
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
-# The task runs the dashboard hidden via PowerShell with stdout/stderr directed to log files.
+# The task runs the dashboard hidden via wscript/run_silent.vbs with stdout/stderr directed to log files.
+$vbs = Join-Path $RepoRoot 'scripts\run_silent.vbs'
 $psArgs = "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -Command `"& { `$env:PYTHONPATH = 'src'; `$env:MODEL_PREDICTION_RUNTIME_ROOT = '$RuntimeRoot'; & '$Py' dashboard_server.py 1> '$LogDir\launchd.out.log' 2> '$LogDir\launchd.err.log' }`""
-$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $psArgs -WorkingDirectory $RepoRoot
+$action = New-ScheduledTaskAction -Execute 'wscript.exe' -Argument "`"$vbs`" powershell.exe $psArgs" -WorkingDirectory $RepoRoot
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 $settings = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) `
     -ExecutionTimeLimit (New-TimeSpan -Seconds 0) -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Hidden

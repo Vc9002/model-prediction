@@ -302,6 +302,18 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             logger.warning("Bet Better model-feed capture failed", exc_info=True)
             bet_better_result = {"status": "error"}
 
+    nfl_injuries_result: dict[str, Any] = {"status": "skipped"}
+
+    def _capture_nfl_injuries():
+        nonlocal nfl_injuries_result
+        try:
+            from ..data_sources.espn_nfl_injuries import capture_espn_nfl_injuries
+
+            nfl_injuries_result = capture_espn_nfl_injuries(data_root)
+        except Exception:
+            logger.warning("NFL injury report capture failed for %s", args.date, exc_info=True)
+            nfl_injuries_result = {"status": "error"}
+
     def _capture_mlb_probables():
         nonlocal mlb_probables_result
         try:
@@ -419,7 +431,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             logger.warning("MLB starter snapshot capture failed for %s", args.date, exc_info=True)
             mlb_starter_snapshot_result = {"status": "error"}
 
-    with ThreadPoolExecutor(max_workers=8) as io_pool:
+    with ThreadPoolExecutor(max_workers=9) as io_pool:
         f0 = io_pool.submit(_polymarket_slate, slate_args, config)
         f1 = io_pool.submit(_capture_wnba)
         f2 = io_pool.submit(_build_priors)
@@ -429,7 +441,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         f6 = io_pool.submit(_capture_mlb_starter_snapshots)
         f7 = io_pool.submit(_capture_mlb_lineups)
         f8 = io_pool.submit(_collect_bet_better)
-        for f in (f1, f2, f3, f4, f5, f6, f7, f8):
+        f9 = io_pool.submit(_capture_nfl_injuries)
+        for f in (f1, f2, f3, f4, f5, f6, f7, f8, f9):
             f.result()  # Wait for all, surface exceptions
         try:
             slate = f0.result()
@@ -1220,6 +1233,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         "step4b_calibration": calibration_result,
         "step1b_soccer_scores": soccer_collection,
         "step1e_bet_better_models": bet_better_result,
+        "step1f_nfl_injuries": nfl_injuries_result,
         "step1c_mlb_probable_starters": {
             "captured_events": len(mlb_probables_result),
             "archive": "data/point_in_time/mlb_probable_starters.jsonl",

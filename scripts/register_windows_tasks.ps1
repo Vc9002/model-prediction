@@ -18,8 +18,9 @@ $Settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatt
     -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Hours 6) -MultipleInstances IgnoreNew -Hidden
 
 function Register-WorkerTask([string]$TaskName, [string]$Worker, $Triggers, [string]$Description) {
+    $vbs = Join-Path $RepoRoot 'scripts\run_silent.vbs'
     $psArgs = "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -Command `"& { `$env:MODEL_PREDICTION_RUNTIME_ROOT = '$RuntimeRoot'; `$env:MODEL_PREDICTION_LEDGER_AUTHORITY = 'sqlite'; & '$Py' -m model_prediction.run_supervisor run $Worker }`""
-    $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $psArgs -WorkingDirectory $RepoRoot
+    $action = New-ScheduledTaskAction -Execute 'wscript.exe' -Argument "`"$vbs`" powershell.exe $psArgs" -WorkingDirectory $RepoRoot
     $principal = New-ScheduledTaskPrincipal -UserId $User -LogonType $LogonType
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
     Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $Triggers -Settings $Settings `
@@ -42,8 +43,9 @@ $threeHourly2 = New-ScheduledTaskTrigger -Once -At (Get-Date).Date.AddMinutes(35
 Register-WorkerTask 'ModelPrediction-RebuildShadow' 'rebuild-shadow' $threeHourly2 'model-prediction rebuild shadow (isolated, no production writes)'
 
 # Offsite backup: 03:00 daily, matching com.vc.model-backup-offsite.plist.
-$backupAction = New-ScheduledTaskAction -Execute 'powershell.exe' `
-    -Argument "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File `"$RepoRoot\scripts\backup_offsite_sync.ps1`"" -WorkingDirectory $RepoRoot
+$vbs = Join-Path $RepoRoot 'scripts\run_silent.vbs'
+$backupAction = New-ScheduledTaskAction -Execute 'wscript.exe' `
+    -Argument "`"$vbs`" powershell.exe -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File `"$RepoRoot\scripts\backup_offsite_sync.ps1`"" -WorkingDirectory $RepoRoot
 $backupTrigger = New-ScheduledTaskTrigger -Daily -At '03:00'
 Unregister-ScheduledTask -TaskName 'ModelPrediction-BackupOffsite' -Confirm:$false -ErrorAction SilentlyContinue
 $backupPrincipal = New-ScheduledTaskPrincipal -UserId $User -LogonType $LogonType

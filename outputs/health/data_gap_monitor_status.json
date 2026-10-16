@@ -1,33 +1,35 @@
 {
   "overall_status": "HEALTHY",
-  "generated_at_utc": "2026-10-15T23:35:30.393379+00:00",
+  "generated_at_utc": "2026-10-16T05:55:49.973350+00:00",
   "odds_freshness": {
     "status": "OK",
+    "stale_active_sports": [],
     "sports": {
       "esports": {
-        "status": "STALE",
+        "status": "FRESH",
         "latest_date": "2026-10-16",
         "file_count": 90
       },
       "kbo": {
-        "status": "STALE",
+        "status": "OFF_SEASON",
         "latest_date": "2026-10-12",
-        "file_count": 50
+        "file_count": 50,
+        "season_state": "Season concluded (resumes Late March / April)"
       },
       "mlb": {
         "status": "FRESH",
-        "latest_date": "2026-10-15",
-        "file_count": 87
+        "latest_date": "2026-10-16",
+        "file_count": 88
       },
       "nba": {
         "status": "FRESH",
-        "latest_date": "2026-10-15",
-        "file_count": 10
+        "latest_date": "2026-10-16",
+        "file_count": 11
       },
       "ncaaf": {
         "status": "FRESH",
-        "latest_date": "2026-10-15",
-        "file_count": 23
+        "latest_date": "2026-10-16",
+        "file_count": 24
       },
       "nfl": {
         "status": "FRESH",
@@ -36,26 +38,27 @@
       },
       "npb": {
         "status": "FRESH",
-        "latest_date": "2026-10-15",
-        "file_count": 61
+        "latest_date": "2026-10-16",
+        "file_count": 62
       },
       "soccer": {
         "status": "FRESH",
-        "latest_date": "2026-10-15",
-        "file_count": 80
+        "latest_date": "2026-10-16",
+        "file_count": 81
       },
       "tennis": {
-        "status": "STALE",
+        "status": "FRESH",
         "latest_date": "2026-10-16",
         "file_count": 81
       },
       "wnba": {
-        "status": "STALE",
+        "status": "OFF_SEASON",
         "latest_date": "2026-10-07",
-        "file_count": 54
+        "file_count": 54,
+        "season_state": "Season concluded (resumes May)"
       }
     },
-    "total_snapshot_files": 552
+    "total_snapshot_files": 557
   },
   "market_quotes_warehouse": {
     "status": "HEALTHY",
@@ -133,22 +136,22 @@
       },
       "mlb-elo-trend-lr-v8": {
         "hash_valid": true,
-        "settled_picks": 490,
-        "open_picks": 3,
+        "settled_picks": 493,
+        "open_picks": 0,
         "removed_picks": 48,
         "evidence_status": "historical_only"
       },
       "measured-edge-margin-v3": {
         "hash_valid": true,
-        "settled_picks": 590,
-        "open_picks": 3,
+        "settled_picks": 593,
+        "open_picks": 0,
         "removed_picks": 48,
         "evidence_status": "historical_only"
       },
       "measured-edge-totals-v3": {
         "hash_valid": true,
-        "settled_picks": 588,
-        "open_picks": 3,
+        "settled_picks": 591,
+        "open_picks": 0,
         "removed_picks": 48,
         "evidence_status": "degraded"
       },
@@ -161,7 +164,7 @@
       },
       "mlb-nrfi-v4": {
         "hash_valid": true,
-        "settled_picks": 7,
+        "settled_picks": 9,
         "open_picks": 2,
         "removed_picks": 22,
         "evidence_status": "predictively_qualified"
@@ -182,29 +185,29 @@
       },
       "nfl-elo-trend-lr-v4": {
         "hash_valid": true,
-        "settled_picks": 56,
-        "open_picks": 2,
+        "settled_picks": 58,
+        "open_picks": 0,
         "removed_picks": 48,
         "evidence_status": "historical_only"
       },
       "nfl-spread-structural-v5": {
         "hash_valid": true,
-        "settled_picks": 28,
-        "open_picks": 2,
+        "settled_picks": 30,
+        "open_picks": 0,
         "removed_picks": 14,
         "evidence_status": "predictively_qualified"
       },
       "nfl-total-structural-v5": {
         "hash_valid": true,
-        "settled_picks": 14,
-        "open_picks": 2,
+        "settled_picks": 16,
+        "open_picks": 0,
         "removed_picks": 14,
         "evidence_status": "predictively_qualified"
       },
       "cfb-structural-v2": {
         "hash_valid": true,
-        "settled_picks": 35,
-        "open_picks": 13,
+        "settled_picks": 48,
+        "open_picks": 15,
         "removed_picks": 99,
         "evidence_status": "shadow_qualified"
       },
@@ -224,22 +227,22 @@
       },
       "cs2-tiered-elo-v6": {
         "hash_valid": true,
-        "settled_picks": 241,
-        "open_picks": 129,
-        "removed_picks": 438,
+        "settled_picks": 307,
+        "open_picks": 77,
+        "removed_picks": 466,
         "evidence_status": "historical_only"
       },
       "dota2-tiered-elo-v6": {
         "hash_valid": true,
-        "settled_picks": 54,
-        "open_picks": 18,
-        "removed_picks": 62,
+        "settled_picks": 60,
+        "open_picks": 14,
+        "removed_picks": 68,
         "evidence_status": "historical_only"
       },
       "lol-tiered-elo-v6": {
         "hash_valid": true,
-        "settled_picks": 14,
-        "open_picks": 4,
+        "settled_picks": 18,
+        "open_picks": 2,
         "removed_picks": 84,
         "evidence_status": "historical_only"
       },
@@ -247,13 +250,13 @@
         "hash_valid": true,
         "settled_picks": 0,
         "open_picks": 14,
-        "removed_picks": 30,
+        "removed_picks": 34,
         "evidence_status": "historical_only"
       },
       "rainbow_six-tiered-elo-v6": {
         "hash_valid": true,
-        "settled_picks": 6,
-        "open_picks": 10,
+        "settled_picks": 10,
+        "open_picks": 6,
         "removed_picks": 24,
         "evidence_status": "historical_only"
       },
@@ -266,9 +269,9 @@
       },
       "npb-tie-aware-elo-v2": {
         "hash_valid": true,
-        "settled_picks": 20,
-        "open_picks": 14,
-        "removed_picks": 30,
+        "settled_picks": 24,
+        "open_picks": 10,
+        "removed_picks": 34,
         "evidence_status": "historical_only"
       }
     }
@@ -276,6 +279,6 @@
   "self_healing": {
     "status": "skipped",
     "message": "Auto-heal disabled. Pass --auto-heal to execute write-remediation routines.",
-    "timestamp_utc": "2026-10-15T23:35:30.393379+00:00"
+    "timestamp_utc": "2026-10-16T05:55:49.973350+00:00"
   }
 }

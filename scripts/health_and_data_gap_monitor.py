@@ -30,11 +30,66 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("health_monitor")
 
 
+OFF_SEASON_CALENDARS: dict[str, dict[str, Any]] = {
+    "wnba": {
+        "active_months": {5, 6, 7, 8, 9, 10},
+        "offseason_after": (10, 10),
+        "resumes": "May",
+    },
+    "kbo": {
+        "active_months": {4, 5, 6, 7, 8, 9, 10},
+        "offseason_after": (10, 14),
+        "resumes": "Late March / April",
+    },
+    "npb": {
+        "active_months": {4, 5, 6, 7, 8, 9, 10, 11},
+        "offseason_after": (11, 5),
+        "resumes": "Late March",
+    },
+    "mlb": {
+        "active_months": {3, 4, 5, 6, 7, 8, 9, 10, 11},
+        "offseason_after": (11, 5),
+        "resumes": "Late March",
+    },
+    "nfl": {
+        "active_months": {9, 10, 11, 12, 1, 2},
+        "offseason_after": (2, 15),
+        "resumes": "September",
+    },
+    "ncaaf": {
+        "active_months": {8, 9, 10, 11, 12, 1},
+        "offseason_after": (1, 15),
+        "resumes": "Late August",
+    },
+    "nba": {
+        "active_months": {10, 11, 12, 1, 2, 3, 4, 5, 6},
+        "offseason_after": (6, 25),
+        "resumes": "October",
+    },
+}
+
+
+def is_sport_off_season(sport: str, reference_date: datetime.date) -> tuple[bool, str]:
+    """Determine if a sport is in natural off-season dormancy."""
+    cal = OFF_SEASON_CALENDARS.get(sport)
+    if not cal:
+        return False, ""
+    month = reference_date.month
+    day = reference_date.day
+    if month not in cal["active_months"]:
+        return True, f"Dormant off-season (resumes {cal['resumes']})"
+    cutoff_month, cutoff_day = cal.get("offseason_after", (0, 0))
+    if cutoff_month and month == cutoff_month and day >= cutoff_day:
+        return True, f"Season concluded (resumes {cal['resumes']})"
+    return False, ""
+
+
 def audit_odds_freshness(runtime_paths: RuntimePaths) -> dict[str, Any]:
     """Check freshness and depth across data/odds/<sport>."""
     odds_root = PROJECT_ROOT / "data" / "odds"
-    today_iso = datetime.now(UTC).date().isoformat()
-    yesterday_iso = (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
+    today = datetime.now(UTC).date()
+    today_iso = today.isoformat()
+    yesterday_iso = (today - timedelta(days=1)).isoformat()
 
     sports_status = {}
     total_snapshots = 0
@@ -52,16 +107,32 @@ def audit_odds_freshness(runtime_paths: RuntimePaths) -> dict[str, Any]:
             latest_file = files[-1]
             latest_date = latest_file.parent.name
             is_fresh = latest_date in {today_iso, yesterday_iso}
+            is_off, reason = is_sport_off_season(sport, today)
 
-            sports_status[sport] = {
-                "status": "FRESH" if is_fresh else "STALE",
+            if is_fresh:
+                sp_status = "FRESH"
+            elif is_off:
+                sp_status = "OFF_SEASON"
+            else:
+                sp_status = "STALE"
+
+            entry: dict[str, Any] = {
+                "status": sp_status,
                 "latest_date": latest_date,
                 "file_count": len(files),
             }
+            if reason:
+                entry["season_state"] = reason
+
+            sports_status[sport] = entry
             total_snapshots += len(files)
 
+    stale_active_sports = [k for k, s in sports_status.items() if s.get("status") == "STALE"]
+    has_fresh = any(s.get("status") == "FRESH" for s in sports_status.values())
+
     return {
-        "status": "OK" if any(s.get("status") == "FRESH" for s in sports_status.values()) else "WARN",
+        "status": "WARN" if stale_active_sports or not has_fresh else "OK",
+        "stale_active_sports": stale_active_sports,
         "sports": sports_status,
         "total_snapshot_files": total_snapshots,
     }
