@@ -135,6 +135,7 @@ class NFLStructuralForecast:
     spread_home_line: float
     total_line: float
     weather_total_penalty: float
+    short_week_penalty: float = 0.0
 
 
 class NFLStructuralV5Engine:
@@ -173,8 +174,13 @@ class NFLStructuralV5Engine:
         h_eff_pts = (home_off_epa - away_def_epa) * 32.0 + home_qb_tier_adj
         a_eff_pts = (away_off_epa - home_def_epa) * 32.0 + away_qb_tier_adj
 
-        # 2. Situational Rest Disparity
+        # 2. Situational Rest Disparity & Short-Week Factor (TNF drag: -3.5 pts on <= 5 days rest)
         rest_pts = (home_rest_days - away_rest_days) * 0.35
+        short_week_drag = 0.0
+        if home_rest_days <= 5 and away_rest_days <= 5:
+            short_week_drag = 3.5  # Full short-week turnaround (e.g. Thursday Night Football)
+        elif home_rest_days <= 5 or away_rest_days <= 5:
+            short_week_drag = 1.75  # Asymmetric short-week turnaround
 
         # 3. Weather Penalties
         weather_penalty = 0.0
@@ -187,8 +193,19 @@ class NFLStructuralV5Engine:
                 weather_penalty += 1.5
 
         hfa = 0.0 if is_neutral_site else NFL_HFA_POINTS
-        pts_home = max(6.0, base_points_per_side + hfa + h_eff_pts + rest_pts - (weather_penalty / 2.0))
-        pts_away = max(6.0, base_points_per_side + a_eff_pts - (weather_penalty / 2.0))
+        pts_home = max(
+            6.0,
+            base_points_per_side
+            + hfa
+            + h_eff_pts
+            + rest_pts
+            - (weather_penalty / 2.0)
+            - (short_week_drag / 2.0),
+        )
+        pts_away = max(
+            6.0,
+            base_points_per_side + a_eff_pts - (weather_penalty / 2.0) - (short_week_drag / 2.0),
+        )
         exp_margin = round(pts_home - pts_away, 2)
         exp_total = round(pts_home + pts_away, 2)
 
@@ -232,4 +249,5 @@ class NFLStructuralV5Engine:
             spread_home_line=spread_home_line,
             total_line=total_line,
             weather_total_penalty=round(weather_penalty, 2),
+            short_week_penalty=round(short_week_drag, 2),
         )

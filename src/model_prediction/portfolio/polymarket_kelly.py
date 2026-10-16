@@ -25,6 +25,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 DEFAULT_MIN_EDGE = 0.025  # 2.5% minimum edge required to trigger an order
+DEFAULT_MAX_EDGE = (
+    0.08  # 8.0% maximum edge cap (roadmap hard edge gate to eliminate extreme-edge hallucinations)
+)
 DEFAULT_KELLY_FRACTION = 0.25  # Quarter-Kelly default
 DEFAULT_MAX_POSITION_PCT = 0.03  # Max 3.0% bankroll per contract
 MIN_CONTRACT_PRICE = 0.01
@@ -85,11 +88,13 @@ class PolymarketKellyEngine:
         self,
         bankroll: float = 1000.0,
         min_edge: float = DEFAULT_MIN_EDGE,
+        max_edge: float = DEFAULT_MAX_EDGE,
         kelly_fraction: float = DEFAULT_KELLY_FRACTION,
         max_position_pct: float = DEFAULT_MAX_POSITION_PCT,
     ) -> None:
         self.bankroll = max(1.0, float(bankroll))
         self.min_edge = float(min_edge)
+        self.max_edge = float(max_edge)
         self.kelly_fraction = float(kelly_fraction)
         self.max_position_pct = float(max_position_pct)
 
@@ -144,8 +149,36 @@ class PolymarketKellyEngine:
         # Determine favored side by highest predicted win percentage (model's predicted winner)
         favors_yes = (p_effective > p_effective_no) or (p_effective == p_effective_no and edge_yes >= edge_no)
 
+        taker_edge_yes = p_effective - ask
+        taker_edge_no = p_effective_no - cost_no_taker
+
         if favors_yes:
             # Model predicts YES to win (p_effective >= 0.50)
+            if taker_edge_yes > self.max_edge:
+                return PolymarketOrderDecision(
+                    market_id=quote.market_id,
+                    side="NO_ORDER",
+                    is_maker=False,
+                    order_price=0.0,
+                    model_probability=round(p_effective, 4),
+                    market_price=round(ask, 4),
+                    edge=round(edge_yes, 4),
+                    expected_value_pct=round(ev_yes, 2),
+                    kelly_fraction_full=0.0,
+                    kelly_fraction_recommended=0.0,
+                    stake_units=0.0,
+                    reason=f"Edge +{taker_edge_yes:.1%} on favored {home or 'YES'} exceeds maximum threshold {self.max_edge:.1%} (extreme edge anomaly protection)",
+                    question=quote.question,
+                    target_selection=home or "YES",
+                    target_side="YES",
+                    home_team=home,
+                    away_team=away,
+                    selection_label="NO_ORDER",
+                    event_start_utc=quote.event_start_utc,
+                    observed_at_utc=quote.observed_at_utc,
+                    depth_imbalance=round(quote.depth_imbalance, 3),
+                    spread_cents=round((ask - bid) * 100.0, 1),
+                )
             if edge_yes >= effective_min_edge:
                 if is_spread and price_yes > 0.60:
                     return PolymarketOrderDecision(
@@ -239,6 +272,32 @@ class PolymarketKellyEngine:
                 )
         else:
             # Model predicts NO to win (p_effective_no > 0.50)
+            if taker_edge_no > self.max_edge:
+                target_no = away or "NO"
+                return PolymarketOrderDecision(
+                    market_id=quote.market_id,
+                    side="NO_ORDER",
+                    is_maker=False,
+                    order_price=0.0,
+                    model_probability=round(p_effective_no, 4),
+                    market_price=round(cost_no_taker, 4),
+                    edge=round(edge_no, 4),
+                    expected_value_pct=round(ev_no, 2),
+                    kelly_fraction_full=0.0,
+                    kelly_fraction_recommended=0.0,
+                    stake_units=0.0,
+                    reason=f"Edge +{taker_edge_no:.1%} on favored {target_no} exceeds maximum threshold {self.max_edge:.1%} (extreme edge anomaly protection)",
+                    question=quote.question,
+                    target_selection=target_no,
+                    target_side="NO",
+                    home_team=home,
+                    away_team=away,
+                    selection_label="NO_ORDER",
+                    event_start_utc=quote.event_start_utc,
+                    observed_at_utc=quote.observed_at_utc,
+                    depth_imbalance=round(quote.depth_imbalance, 3),
+                    spread_cents=round((ask - bid) * 100.0, 1),
+                )
             if edge_no >= effective_min_edge:
                 if is_spread and price_no > 0.60:
                     return PolymarketOrderDecision(

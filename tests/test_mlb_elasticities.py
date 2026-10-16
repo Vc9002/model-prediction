@@ -214,10 +214,9 @@ def test_engine_version_rejects_the_retired_v02_hand_tuned_elasticities() -> Non
     one) locks the rejection in for the retired file so a future edit to
     load_formula_spec's version check can't silently stop enforcing it.
     """
-    from pathlib import Path
+    from model_prediction.config import PROJECT_ROOT
 
-    v02_path = Path("config/models/mlb-analyst-poisson-trend-v0.2.yaml")
-    if not v02_path.exists():
-        pytest.skip("mlb-analyst-poisson-trend-v0.2.yaml not present in this checkout")
+    v02_path = PROJECT_ROOT / "config/models/mlb-analyst-poisson-trend-v0.2.yaml"
+    assert v02_path.exists(), f"Retired spec must exist at {v02_path}"
     with pytest.raises(ValueError, match="does not match the Trend Engine code"):
         load_formula_spec(v02_path)

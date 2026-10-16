@@ -99,7 +99,7 @@ def test_buyer_categorically_rejects_mlb_moneyline_even_when_model_is_whiteliste
                 "league": "MLB",
                 "market_type": "moneyline",
                 "event_start_utc": event_start,
-                "model_probability": 0.70,
+                "model_probability": 0.55,
                 "market_probability": 0.50,
             },
             {
@@ -109,7 +109,7 @@ def test_buyer_categorically_rejects_mlb_moneyline_even_when_model_is_whiteliste
                 "league": "TENNIS",
                 "market_type": "moneyline",
                 "event_start_utc": event_start,
-                "model_probability": 0.70,
+                "model_probability": 0.55,
                 "market_probability": 0.50,
             },
         ]
@@ -324,7 +324,7 @@ def test_buyer_allows_nrfi_to_reach_exact_quote_lookup():
                 "market_type": "nrfi",
                 "selection": "nrfi",
                 "event_start_utc": iso_utc(utc_now() + timedelta(hours=2)),
-                "model_probability": 0.60,
+                "model_probability": 0.55,
                 "market_probability": 0.50,
                 "units": 1.0,
                 "market_slug": "astatc-mlb-example-yrfi",
@@ -398,6 +398,7 @@ def test_buyer_sizes_fractional_units(tmp_path: Path):
     config = AutoExecutionConfig(
         unit_value_usd=0.50,
         min_edge=0.03,
+        max_edge=0.20,
         whitelisted_models=("tennis-surface-elo-v1",),
     )
     buyer = AutoPolymarketBuyer(
@@ -663,7 +664,7 @@ def test_buyer_respects_daily_budget(tmp_path: Path):
             "model_id": "tennis-surface-elo-v1",
             "status": "open",
             "event_start_utc": today_start,
-            "model_probability": 0.65,
+            "model_probability": 0.55,
             "market_probability": 0.50,  # cost $0.50
         },
         {
@@ -672,7 +673,7 @@ def test_buyer_respects_daily_budget(tmp_path: Path):
             "model_id": "tennis-surface-elo-v1",
             "status": "open",
             "event_start_utc": today_start,
-            "model_probability": 0.65,
+            "model_probability": 0.55,
             "market_probability": 0.50,  # cost $0.50 -> exceeds $0.80 budget
         },
     ]
@@ -695,7 +696,7 @@ def test_buyer_default_lookahead_window_is_24_hours():
             "model_id": "tennis-surface-elo-v1",
             "status": "open",
             "event_start_utc": iso_utc(now + timedelta(hours=20)),
-            "model_probability": 0.65,
+            "model_probability": 0.55,
             "market_probability": 0.50,
         },
         {
@@ -703,7 +704,7 @@ def test_buyer_default_lookahead_window_is_24_hours():
             "model_id": "tennis-surface-elo-v1",
             "status": "open",
             "event_start_utc": iso_utc(now + timedelta(hours=30)),
-            "model_probability": 0.65,
+            "model_probability": 0.55,
             "market_probability": 0.50,
         },
     ]
@@ -729,7 +730,7 @@ def test_buyer_rejects_events_beyond_configured_lookahead_window():
             "model_id": "tennis-surface-elo-v1",
             "status": "open",
             "event_start_utc": iso_utc(now + timedelta(hours=5)),
-            "model_probability": 0.65,
+            "model_probability": 0.55,
             "market_probability": 0.50,
         },
         {
@@ -737,7 +738,7 @@ def test_buyer_rejects_events_beyond_configured_lookahead_window():
             "model_id": "tennis-surface-elo-v1",
             "status": "open",
             "event_start_utc": iso_utc(now + timedelta(hours=7)),
-            "model_probability": 0.65,
+            "model_probability": 0.55,
             "market_probability": 0.50,
         },
     ]
@@ -837,7 +838,7 @@ def test_evaluate_and_execute_seeds_daily_cap_from_ledger(monkeypatch):
             "model_id": "tennis-surface-elo-v1",
             "status": "open",
             "event_start_utc": iso_utc(now + timedelta(hours=2)),
-            "model_probability": 0.65,
+            "model_probability": 0.55,
             "market_probability": 0.50,  # cost $0.50 -> 249.30 + 0.50 <= 250, should pass
         },
         {
@@ -845,7 +846,7 @@ def test_evaluate_and_execute_seeds_daily_cap_from_ledger(monkeypatch):
             "model_id": "tennis-surface-elo-v1",
             "status": "open",
             "event_start_utc": iso_utc(now + timedelta(hours=2)),
-            "model_probability": 0.65,
+            "model_probability": 0.55,
             "market_probability": 0.50,  # cost $0.50 -> 249.80 + 0.50 > 250, must reject
         },
     ]
@@ -908,7 +909,7 @@ def test_daily_loss_circuit_breaker_disabled_by_default(monkeypatch, tmp_path: P
             "model_id": "tennis-surface-elo-v1",
             "status": "open",
             "event_start_utc": iso_utc(now + timedelta(hours=2)),
-            "model_probability": 0.65,
+            "model_probability": 0.55,
             "market_probability": 0.50,
         },
     ]
@@ -1226,7 +1227,7 @@ def test_auto_buyer_multi_source_deduplication(tmp_path: Path):
             "model_id": "tennis-surface-elo-v1",
             "status": "open",
             "event_start_utc": today_start,
-            "model_probability": 0.70,
+            "model_probability": 0.55,
             "market_probability": 0.50,
         },
         # 2. Different pick_id, but matches market_slug + token_side in audit log
@@ -1237,7 +1238,7 @@ def test_auto_buyer_multi_source_deduplication(tmp_path: Path):
             "model_id": "tennis-surface-elo-v1",
             "status": "open",
             "event_start_utc": today_start,
-            "model_probability": 0.70,
+            "model_probability": 0.55,
             "market_probability": 0.50,
         },
         # 3. Different pick_id, but matches event_id + selection in audit log
@@ -1248,7 +1249,7 @@ def test_auto_buyer_multi_source_deduplication(tmp_path: Path):
             "model_id": "tennis-surface-elo-v1",
             "status": "open",
             "event_start_utc": today_start,
-            "model_probability": 0.70,
+            "model_probability": 0.55,
             "market_probability": 0.50,
         },
         # 4. Brand new unbought pick
@@ -1261,7 +1262,7 @@ def test_auto_buyer_multi_source_deduplication(tmp_path: Path):
             "model_id": "tennis-surface-elo-v1",
             "status": "open",
             "event_start_utc": today_start,
-            "model_probability": 0.70,
+            "model_probability": 0.55,
             "market_probability": 0.50,
         },
         # 5. Duplicate of pick 4 in the same batch
@@ -1274,7 +1275,7 @@ def test_auto_buyer_multi_source_deduplication(tmp_path: Path):
             "model_id": "tennis-surface-elo-v1",
             "status": "open",
             "event_start_utc": today_start,
-            "model_probability": 0.70,
+            "model_probability": 0.55,
             "market_probability": 0.50,
         },
     ]
@@ -1876,7 +1877,7 @@ def test_partial_fill_topup_sizes_exact_remainder(tmp_path):
             "market_type": "moneyline",
             "units": 1.25,
             "model_id": "cs2-tiered-elo-v6",
-            "model_probability": 0.65,
+            "model_probability": 0.55,
             "market_probability": 0.50,
         },
         jsonl_path=j_path,
@@ -1918,7 +1919,7 @@ def test_partial_fill_topup_sizes_exact_remainder(tmp_path):
             "token_side": "long",
             "market_slug": "aec-cs2-team-a-b-2026-09-05",
             "event_start_utc": iso_utc(utc_now() + timedelta(hours=6)),
-            "model_probability": 0.65,
+            "model_probability": 0.55,
             "market_probability": 0.50,
             "units": 1.25,
         }
@@ -2140,7 +2141,7 @@ def test_partial_fill_skipped_when_remaining_spend_under_50_cents(tmp_path):
             "token_side": "long",
             "market_slug": "aec-cs2-dust-game-2026-09-05",
             "event_start_utc": iso_utc(utc_now() + timedelta(hours=6)),
-            "model_probability": 0.65,
+            "model_probability": 0.55,
             "market_probability": 0.50,
             "units": 1.0,
         }

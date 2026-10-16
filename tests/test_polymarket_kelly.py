@@ -45,7 +45,7 @@ def test_qualifying_taker_yes_opportunity():
 
 
 def test_qualifying_taker_no_opportunity():
-    engine = PolymarketKellyEngine(bankroll=1000.0, min_edge=0.025)
+    engine = PolymarketKellyEngine(bankroll=1000.0, min_edge=0.025, max_edge=0.20)
 
     # Market bid is 0.65, model says 0.50 -> Model believes away/NO is underpriced
     # Buying NO: Cost is 1.0 - 0.65 = 0.35. P_no is 0.50 -> edge = 0.15 (15.0%)
@@ -87,6 +87,28 @@ def test_rejection_below_min_edge():
     assert decision.side == "NO_ORDER"
     assert decision.stake_units == 0.0
     assert "below min threshold" in decision.reason
+
+
+def test_rejection_above_max_edge():
+    """Verify edge > max_edge (default 8.0%) is rejected as extreme-edge anomaly protection."""
+    engine = PolymarketKellyEngine(bankroll=1000.0, min_edge=0.02, max_edge=0.08)
+
+    # Market ask is 0.50, model says 0.65 -> edge = +0.15 (15.0%), exceeds 8% cap
+    quote = PolymarketQuote(
+        market_id="m_max",
+        question="Will NYY win?",
+        best_bid=0.48,
+        best_ask=0.50,
+        spread=0.02,
+        home_or_player_a="New York Yankees",
+        away_or_player_b="Boston Red Sox",
+    )
+
+    decision = engine.evaluate_binary_opportunity(quote, p_model=0.65)
+
+    assert decision.side == "NO_ORDER"
+    assert decision.stake_units == 0.0
+    assert "exceeds maximum threshold" in decision.reason
 
 
 def test_maker_pricing_inside_spread():

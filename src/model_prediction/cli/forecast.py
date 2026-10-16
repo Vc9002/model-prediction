@@ -2197,9 +2197,11 @@ def _forecast_nfl_spread_sport(
                     is not None
                 ):
                     duplicates.append(contract["event_id"])
+                contract_edge = float(contract["model_probability"]) - float(contract["executable_ask"])
                 if (
                     main_ledger is not None
                     and eligibility.decision == "CALL"
+                    and 0.02 <= contract_edge <= 0.08
                     and _append_secondary_ledger(
                         main_ledger, request, eligibility, observed_now, "nfl_spread:main_ledger"
                     )
@@ -2395,6 +2397,7 @@ def _forecast_nfl_total_slate(
             "away_rest_days": away_rest_days,
             "is_dome": is_dome,
             "is_division_game": is_division_game,
+            "short_week_penalty": fc.short_week_penalty,
         }
         model_snapshot = build_scalar_snapshot(
             artifact,
@@ -2405,6 +2408,11 @@ def _forecast_nfl_total_slate(
             observed_at_utc=observed_at.isoformat(),
         )
 
+        tnf_note = (
+            f" TNF short-week drag: -{fc.short_week_penalty:.1f} pts ({home_rest_days}d/{away_rest_days}d rest)."
+            if fc.short_week_penalty > 0
+            else ""
+        )
         priced_contracts.append(
             {
                 "event_id": event_id,
@@ -2422,7 +2430,7 @@ def _forecast_nfl_total_slate(
                 "model_qualified": model_qualified,
                 "rationale": (
                     f"NFL Structural v5 Total projection. Projected total {fc.projected_total:.1f} "
-                    f"(Dome: {is_dome}, Weather: {wind_mph:.0f}mph/{temperature_f:.0f}F)."
+                    f"(Dome: {is_dome}, Weather: {wind_mph:.0f}mph/{temperature_f:.0f}F).{tnf_note}"
                 ),
                 "market_slug": market.get("market_slug"),
                 "observed_at_utc": (
@@ -2548,9 +2556,11 @@ def _forecast_nfl_total_sport(
                     is not None
                 ):
                     duplicates.append(contract["event_id"])
+                contract_edge = float(contract["model_probability"]) - float(contract["executable_ask"])
                 if (
                     main_ledger is not None
                     and eligibility.decision == "CALL"
+                    and 0.02 <= contract_edge <= 0.08
                     and _append_secondary_ledger(
                         main_ledger, request, eligibility, observed_now, "nfl_total:main_ledger"
                     )
@@ -2792,9 +2802,10 @@ def _forecast_learned_sport(
             # purely as a reference: how much the model currently disagrees
             # with the executable market price. Flat mode already bypassed
             # this; now every mode does.
+            min_edge = float(model_config.get("min_edge", 0.02))
+            max_edge = float(model_config.get("max_edge", 0.08))
             model_edge = None
             if quote is not None:
-                min_edge = float(model_config.get("min_edge", 0.02))
                 model_edge = candidate.model_probability - quote["executable_ask"]
                 if model_edge < min_edge:
                     edge_pct = f"{min_edge * 100:.0f}%"
@@ -2802,6 +2813,13 @@ def _forecast_learned_sport(
                         {
                             "event_id": candidate.event_id,
                             "reason": f"model edge {model_edge:.4f} below {edge_pct} minimum over executable ask {quote['executable_ask']:.4f} — logged anyway, operator review",
+                        }
+                    )
+                elif model_edge > max_edge:
+                    edge_blocked.append(
+                        {
+                            "event_id": candidate.event_id,
+                            "reason": f"model edge {model_edge:.4f} above {max_edge * 100:.0f}% maximum over executable ask {quote['executable_ask']:.4f} — extreme edge anomaly protection",
                         }
                     )
             # Convert UTC event time to Eastern for consistent ledger display
@@ -2953,6 +2971,18 @@ def _forecast_learned_sport(
                             record_type=RecordType.RESEARCH_OBSERVATION,
                             decision="CALL",
                             reason_code="PAPER_CALL_BELOW_LEARNED_CONFIDENCE",
+                        )
+                    if (
+                        eligibility.decision == "CALL"
+                        and quote is not None
+                        and model_edge is not None
+                        and not (min_edge <= model_edge <= max_edge)
+                    ):
+                        eligibility = replace(
+                            eligibility,
+                            record_type=RecordType.RESEARCH_OBSERVATION,
+                            decision="NO_CALL" if not flat_mode else "CALL",
+                            reason_code="PAPER_CALL_EDGE_OUT_OF_BOUNDS",
                         )
                     if eligibility.decision == "CALL" and not _is_registered_serving_model(
                         request.model_version,

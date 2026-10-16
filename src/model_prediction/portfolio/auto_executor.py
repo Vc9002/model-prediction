@@ -117,7 +117,7 @@ EXECUTABLE_AUTO_BUYER_MARKET_TYPES = frozenset({"moneyline", "spread", "total", 
 ESPORTS_LEAGUES = frozenset({"cs2", "lol", "dota2", "valorant", "r6", "rainbow_six", "cod", "ow", "rl"})
 DISABLED_AUTO_BUYER_SPORT_MARKETS = frozenset({("mlb", "moneyline")})
 DEFAULT_AUTO_BUYER_UNIT_VALUE_USD = 0.50
-DEFAULT_AUTO_BUYER_MAX_EDGE = 0.20
+DEFAULT_AUTO_BUYER_MAX_EDGE = 0.08
 DEFAULT_MAX_DAILY_SPEND_UNITS = 50.0
 DEFAULT_MAX_GAME_STAKE_UNITS = 5.0
 DEFAULT_MAX_EVENT_LOOKAHEAD_HOURS = 24.0
@@ -129,7 +129,7 @@ class AutoExecutionConfig:
     unit_value_usd: float = DEFAULT_AUTO_BUYER_UNIT_VALUE_USD
     min_model_probability: float = 0.50  # Must be favored outcome (>= 50% win probability)
     min_edge: float = 0.035  # Minimum +3.5% edge over market ask
-    max_edge: float = DEFAULT_AUTO_BUYER_MAX_EDGE  # Maximum +20.0% edge (outlier/anomaly sanity ceiling)
+    max_edge: float = DEFAULT_AUTO_BUYER_MAX_EDGE  # Maximum +8.0% edge (roadmap hard edge ceiling)
     max_daily_spend_usd: float = 25.0  # Daily budget cap
     max_game_stake_usd: float = 2.50  # Max dollars per game/pick
     min_shares: float = 1.0  # Polymarket minimum share size

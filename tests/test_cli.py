@@ -1694,7 +1694,7 @@ def test_below_learned_confidence_threshold_downgraded_and_kept_off_main(monkeyp
         cli_forecast,
         "match_executable_quote",
         lambda *args, **kwargs: {
-            "executable_ask": 0.56,
+            "executable_ask": 0.50,
             "market_slug": "mlb-conf",
             "observed_at_utc": "2026-07-26T11:00:00Z",
             "timestamp_valid": True,
@@ -2001,6 +2001,139 @@ def test_market_residual_probability_none_without_configured_artifact(monkeypatc
     assert result["logged"] == 1
     request, _eligibility = ledger.appended[0]
     assert request.market_residual_probability is None
+
+
+def test_forecast_learned_sport_hard_edge_gate(monkeypatch, tmp_path) -> None:
+    """Enforces strict execution threshold 0.02 <= Edge <= 0.08 on main ledger."""
+    observed = datetime(2026, 7, 26, 12, tzinfo=UTC)
+    candidate = LearnedForwardCandidate(
+        event_id="mlb-edge-test",
+        event_start_utc="2026-07-27T00:00:00Z",
+        away_team="Boston Red Sox",
+        home_team="New York Yankees",
+        market_type="moneyline",
+        selection="home",
+        model_probability=0.55,
+        home_probability=0.55,
+        confidence_threshold=0.50,
+        call=True,
+        action="QUALIFIED_SHADOW_CALL",
+        reason="CALL_QUALIFIED",
+        model_version="mlb-test",
+        model_artifact_hash="artifact-hash",
+        model_qualified=True,
+        feature_basis={"elo_probability": 0.55, "trend_gap": 0.0},
+        feature_snapshot_hash="feature-hash-edge",
+    )
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: observed)
+    monkeypatch.setattr(cli_forecast, "_canonical_market_snapshot_lineage", _verified_market_lineage)
+    monkeypatch.setattr(cli_forecast, "_is_registered_serving_model", lambda *_args: True)
+    monkeypatch.setattr(cli_forecast, "build_learned_moneyline_slate", lambda **kwargs: ([candidate], [], 1))
+
+    class Registry:
+        version = "1"
+
+        @staticmethod
+        def resolve(league, team, event_start):
+            return AWAY if team == "Boston Red Sox" else HOME
+
+    monkeypatch.setattr(
+        cli_forecast,
+        "evaluate_eligibility",
+        lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
+            RecordType.QUALIFIED_SHADOW_CALL,
+            "CALL",
+            "QUALIFIED",
+            1.0,
+            60,
+            0.07,
+            0.02,
+            AWAY,
+            HOME,
+        ),
+    )
+    config = {
+        "models": {
+            "MLB": {
+                "production_artifact": str(tmp_path / "artifact.json"),
+                "status": "shadow_qualified",
+                "min_edge": 0.02,
+                "max_edge": 0.08,
+            }
+        },
+        "project": {
+            "maximum_data_age_hours": 12,
+            "maximum_unreviewed_market_disagreement": 0.10,
+            "ledger_path": str(tmp_path / "picks.xlsx"),
+        },
+        "bankroll": {},
+    }
+
+    # Case 1: Negative edge (ask 0.56 vs prob 0.55 -> edge -0.01) -> blocked from main ledger
+    monkeypatch.setattr(
+        cli_forecast,
+        "match_executable_quote",
+        lambda *args, **kwargs: {
+            "executable_ask": 0.56,
+            "market_slug": "mlb-neg-edge",
+            "observed_at_utc": "2026-07-26T11:00:00Z",
+            "timestamp_valid": True,
+            "no_vig_probability": 0.55,
+        },
+    )
+    main_ledger = _CaptureLedger()
+    res_neg = cli._forecast_learned_sport(
+        "mlb", "2026-07-26", True, config, Registry(), object(), main_ledger
+    )
+    assert res_neg["logged"] == 0
+    assert len(main_ledger.appended) == 0
+
+    # Flat mode records it as diagnostic paper call
+    flat_ledger = _CaptureLedger()
+    res_neg_flat = cli._forecast_learned_sport(
+        "mlb", "2026-07-26", True, config, Registry(), object(), flat_ledger, flat_mode=True
+    )
+    assert res_neg_flat["logged"] == 1
+    assert flat_ledger.appended[0][1].reason_code == "PAPER_CALL_EDGE_OUT_OF_BOUNDS"
+
+    # Case 2: Extreme edge (>0.08, ask 0.40 vs prob 0.55 -> edge 0.15) -> blocked from main ledger
+    monkeypatch.setattr(
+        cli_forecast,
+        "match_executable_quote",
+        lambda *args, **kwargs: {
+            "executable_ask": 0.40,
+            "market_slug": "mlb-extreme-edge",
+            "observed_at_utc": "2026-07-26T11:00:00Z",
+            "timestamp_valid": True,
+            "no_vig_probability": 0.40,
+        },
+    )
+    main_ledger_ext = _CaptureLedger()
+    res_ext = cli._forecast_learned_sport(
+        "mlb", "2026-07-26", True, config, Registry(), object(), main_ledger_ext
+    )
+    assert res_ext["logged"] == 0
+    assert len(main_ledger_ext.appended) == 0
+
+    # Case 3: Golden sweet spot (ask 0.50 vs prob 0.55 -> edge 0.05) -> approved on main ledger
+    monkeypatch.setattr(
+        cli_forecast,
+        "match_executable_quote",
+        lambda *args, **kwargs: {
+            "executable_ask": 0.50,
+            "market_slug": "mlb-good-edge",
+            "observed_at_utc": "2026-07-26T11:00:00Z",
+            "timestamp_valid": True,
+            "no_vig_probability": 0.50,
+        },
+    )
+    main_ledger_good = _CaptureLedger()
+    res_good = cli._forecast_learned_sport(
+        "mlb", "2026-07-26", True, config, Registry(), object(), main_ledger_good
+    )
+    assert res_good["logged"] == 1
+    assert len(main_ledger_good.appended) == 1
+    assert main_ledger_good.appended[0][1].decision == "CALL"
 
 
 def test_international_forecast_preview_never_requires_or_writes_a_ledger(monkeypatch, tmp_path) -> None:
@@ -2908,3 +3041,81 @@ def test_nfl_total_flat_ledger_logs_contract(monkeypatch, registry, ban_list) ->
     assert result["logged"] == 1
     assert flat.appended[0][0].model_state is ModelState.SHADOW_QUALIFIED
     assert flat.appended[0][0].model_version == "nfl-total-structural-v5"
+
+
+def test_nfl_spread_and_total_main_ledger_hard_edge_gate(monkeypatch, registry, ban_list) -> None:
+    # 1. Spread: Test edge bounds [0.02, 0.08]
+    # Out of bounds (< 0.02): ask 0.55, prob 0.56 -> edge 0.01 -> main_ledger NOT appended
+    low_edge_spread = _nfl_spread_forecast(selection="away", line=-3.5)
+    low_edge_spread["priced_contracts"][0]["executable_ask"] = 0.55
+    low_edge_spread["priced_contracts"][0]["model_probability"] = 0.56  # edge 0.01
+
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 9, 13, 14, tzinfo=UTC))
+    monkeypatch.setattr(cli_forecast, "_forecast_nfl_spread_slate", lambda *a, **k: low_edge_spread)
+
+    main_spread_low = _CaptureLedger()
+    cli_forecast._forecast_nfl_spread_sport(
+        data_root="unused",
+        args_date="2026-09-13",
+        config=_wnba_spread_config(),
+        registry=registry,
+        bans=ban_list,
+        flat_ledger=None,
+        main_ledger=main_spread_low,
+    )
+    assert len(main_spread_low.appended) == 0
+
+    # In bounds (0.02 <= edge <= 0.08): ask 0.51, prob 0.56 -> edge 0.05 -> main_ledger appended
+    good_edge_spread = _nfl_spread_forecast(selection="away", line=-3.5)
+    good_edge_spread["priced_contracts"][0]["executable_ask"] = 0.51
+    good_edge_spread["priced_contracts"][0]["model_probability"] = 0.56  # edge 0.05
+    monkeypatch.setattr(cli_forecast, "_forecast_nfl_spread_slate", lambda *a, **k: good_edge_spread)
+
+    main_spread_good = _CaptureLedger()
+    cli_forecast._forecast_nfl_spread_sport(
+        data_root="unused",
+        args_date="2026-09-13",
+        config=_wnba_spread_config(),
+        registry=registry,
+        bans=ban_list,
+        flat_ledger=None,
+        main_ledger=main_spread_good,
+    )
+    assert len(main_spread_good.appended) == 1
+
+    # 2. Total: Test edge bounds [0.02, 0.08]
+    # Extreme edge (> 0.08): ask 0.40, prob 0.56 -> edge 0.16 -> main_ledger NOT appended
+    ext_edge_total = _nfl_total_forecast(selection="over", line=48.5)
+    ext_edge_total["priced_contracts"][0]["executable_ask"] = 0.40
+    ext_edge_total["priced_contracts"][0]["model_probability"] = 0.56  # edge 0.16
+    monkeypatch.setattr(cli_forecast, "_forecast_nfl_total_slate", lambda *a, **k: ext_edge_total)
+
+    main_total_ext = _CaptureLedger()
+    cli_forecast._forecast_nfl_total_sport(
+        data_root="unused",
+        args_date="2026-09-13",
+        config=_wnba_spread_config(),
+        registry=registry,
+        bans=ban_list,
+        flat_ledger=None,
+        main_ledger=main_total_ext,
+    )
+    assert len(main_total_ext.appended) == 0
+
+    # In bounds: ask 0.51, prob 0.56 -> edge 0.05 -> main_ledger appended
+    good_edge_total = _nfl_total_forecast(selection="over", line=48.5)
+    good_edge_total["priced_contracts"][0]["executable_ask"] = 0.51
+    good_edge_total["priced_contracts"][0]["model_probability"] = 0.56  # edge 0.05
+    monkeypatch.setattr(cli_forecast, "_forecast_nfl_total_slate", lambda *a, **k: good_edge_total)
+
+    main_total_good = _CaptureLedger()
+    cli_forecast._forecast_nfl_total_sport(
+        data_root="unused",
+        args_date="2026-09-13",
+        config=_wnba_spread_config(),
+        registry=registry,
+        bans=ban_list,
+        flat_ledger=None,
+        main_ledger=main_total_good,
+    )
+    assert len(main_total_good.appended) == 1
