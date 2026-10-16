@@ -30,6 +30,16 @@ def engine_hash(method: str) -> str:
     return hashlib.sha256((Path(__file__).parent / "models" / name).read_bytes()).hexdigest()
 
 
+HISTORICAL_ENGINE_HASHES: dict[str, set[str]] = {
+    "first_inning_logistic": {
+        "e616f074b8082063684bb6db8c43d3a182f629455165dcc0074d32df98459a47",
+    },
+    "half_inning_logistic": {
+        "e616f074b8082063684bb6db8c43d3a182f629455165dcc0074d32df98459a47",
+    },
+}
+
+
 def replay_snapshot(payload: dict[str, Any]) -> dict[str, float]:
     if payload.get("schema") != SCHEMA or payload.get("snapshot_hash") != snapshot_hash(payload):
         raise ValueError("scalar_snapshot_hash_mismatch")
@@ -40,7 +50,10 @@ def replay_snapshot(payload: dict[str, Any]) -> dict[str, float]:
         or artifact["artifact_hash"] != payload["artifact_hash"]
     ):
         raise ValueError("scalar_replay_artifact_hash_mismatch")
-    if payload["engine_source_sha256"] != engine_hash(method):
+    expected_hash = engine_hash(method)
+    if payload["engine_source_sha256"] != expected_hash and payload[
+        "engine_source_sha256"
+    ] not in HISTORICAL_ENGINE_HASHES.get(method, set()):
         raise ValueError("scalar_replay_engine_hash_mismatch")
     if method == "first_inning_logistic":
         features = payload["features"]

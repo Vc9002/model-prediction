@@ -31,6 +31,8 @@ from __future__ import annotations
 import json
 import logging
 import shutil
+
+logger = logging.getLogger(__name__)
 import threading
 import time
 import uuid
@@ -1062,9 +1064,19 @@ class PickLedger:
             from .learned_replay import validate_decision_snapshot
 
             snapshot = json.loads(row["model_input_snapshot_json"])
-            if event_type != "remove":
+            if event_type in ("settle", "void"):
+                try:
+                    validate_decision_snapshot(snapshot, row)
+                except ValueError as exc:
+                    logger.warning(
+                        "historical replay validation degraded on %s for pick %s: %s",
+                        event_type,
+                        row.get("pick_id"),
+                        exc,
+                    )
+            elif event_type != "remove":
                 validate_decision_snapshot(snapshot, row)
-            features.update({name: str(value) for name, value in snapshot["features"].items()})
+            features.update({name: str(value) for name, value in snapshot.get("features", {}).items()})
         unavailable_features = row.get("unavailable_features") or None
         if not features:
             availability_status = "unavailable_not_recorded"

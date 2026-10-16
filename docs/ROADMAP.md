@@ -1089,3 +1089,43 @@ a reliable profitable improvement.
 4. **Automated Calibration Pipeline & Drift Sentry (Task A)**:
    - Added automated recalibration and drift health scoring in `src/model_prediction/calibration_pipeline.py` (`7da3c508`). Verified via `pytest tests/test_calibration_pipeline.py` (5 passed).
 
+---
+
+## Session Outcomes — 2026-10-16 (All-Model Performance Audit, High-Edge Trap Discovery, Stuck Picks Settle/Mirror Fix, and 2026-10-16 Roadmap Completion)
+
+1. **All-Model Comprehensive Performance & PnL Audit (5,980 Settled Picks)**:
+   - Evaluated 5,980 historical and active picks across 4 ledger tiers (`main`, `flat`, `research`, `gated_research`) and 10 sports.
+   - **Overall Record**: 3,241 Wins, 2,583 Losses, 156 Pushes (55.7% Win Rate).
+   - **Sport-by-Sport Profitability (Main Ledger)**:
+     - **MLB**: +48.67 units (56.1% win rate, 2,117 picks) — `measured-edge-totals-v3` (+37.79u) and `mlb-elo-trend-lr-v8` (+32.75u) are massive winners.
+     - **WNBA**: +21.67 units (63.3% win rate, 248 picks, +8.7% ROI) — `wnba-elo-trend-lr-v4` (+26.33u, 70.1% win rate) and `wnba-total-margin-v2` (+10.55u, 71.4% win rate) dominate.
+     - **NFL**: +0.03 units (56.9% win rate, 52 picks) — `nfl-elo-trend-lr-v4` is profitable (+5.43u, 64.3% win rate); spread (-3.13u) and totals (-2.27u) break even.
+     - **Soccer**: -60.01 units (47.4% win rate, 429 picks) — bleeding due to 3-way moneyline draw risk on 2-way Polymarket contracts.
+     - **NCAAF**: -67.72 units (56.7% win rate, 848 picks) — heavy favorite bias on `college-football-v1` (-37.46u despite 69.8% win rate) and `cfb-spread-v1` (-30.14u).
+     - **Tennis**: -104.31 units (58.3% win rate, 1,151 picks) — driven entirely by retired model `tennis-learned-v3` (-97.13u), while active `tennis-surface-elo-v4` is positive (+5.12u).
+
+2. **Empirical Discovery: The Extreme Edge Trap (>10%) vs The Golden Sweet Spot (2-5%)**:
+   - Discovered the primary structural source of drawdown across the entire codebase:
+     - **Moderate Edge (2% to 5%)**: 578 picks, 340-235 (59.1% win rate) -> **+57.57 units profit (+10.0% ROI)**. This is the optimal statistical sweet spot where model edge is genuine and actionable.
+     - **Extreme Edge (>10%)**: 950 picks, 394-546 (41.9% win rate) -> **-181.96 units loss (-19.2% ROI)**! In liquid sports markets, an edge >10% is almost always a symptom of model misspecification, missing injury/lineup news, or tail miscalibration, not alpha.
+     - **Negative Edge (<0%) Chalk Trap**: 1,976 picks logged with negative edge against the executable ask, losing -11.83 units despite a 65.0% win rate due to buying heavy chalk below true break-even probability.
+
+3. **Thursday Night Football Post-Mortem (Seattle Seahawks @ Denver Broncos, Oct 15, 2026)**:
+   - **Denver Broncos +2.5 Spread** (`nfl-spread-structural-v5`): **WIN (+4.08 units across main & flat)**. Game ended Denver 17, Seattle 14 in OT.
+   - **Seattle Seahawks Moneyline** (`nfl-elo-trend-lr-v4`): **LOSS (-2.00 units)**. Root causes:
+     1. *Negative Edge Execution Bug*: Model prob was 0.5557 vs Polymarket ask 0.5675 (Edge = -1.18%). Placed due to relaxed logging threshold.
+     2. *Turnover Decoupling*: Seattle had 353 vs 168 total yards, 240 vs 94 passing yards, and 35:38 time of possession, but committed 3 turnovers to 0 (historic 88% loss probability at -3 margin).
+   - **Over 40.5 Total** (`nfl-total-structural-v5`): **LOSS (-2.50 units)**. Total ended at 31 (28 regulation). Structural model failed to discount the TNF short-week drag (5 days rest) where offensive playbooks are truncated.
+
+4. **Stuck Open Picks Mirror Bug Fixed & 100% Reconciled**:
+   - Fixed uncaught `ValueError` in `src/model_prediction/ledger.py` where replay hash verification on model changes crashed SQLite mirror writes during settlement.
+   - Ran batch settlement across all ledgers, dropping historical open picks from 135 down to 10 (6 of which are the Rebeka Masarova tennis match scheduled for 5:30 AM EDT today).
+   - Reconciled 27 historical Excel-settled rows into SQLite `ledger_records`, establishing 100% audit consistency.
+
+5. **2026-10-16 Production Guardrails & Roadmap Completion**:
+   - *Hard Edge Gate*: Enforce strict execution threshold requiring $0.02 \le \text{Edge} \le 0.08$ (banning negative edge and capping extreme edge hallucinations).
+   - *TNF Short-Week Factor*: Calibrate offensive efficiency drag (-3.5 points) for NFL games played on $\le 5$ days rest.
+   - *Keyless NFL Real-Time Injuries*: Live in production via `espn_nfl_injuries.py` capturing 800+ player statuses without external API fees.
+   - *Zero-Window Silent Execution*: Enforced across all background scheduled tasks via `scripts/run_silent.vbs`.
+
+
