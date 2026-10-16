@@ -70,7 +70,13 @@ def main(argv: list[str] | None = None) -> int:
     if sys.platform == "win32":
         # os.execvpe is not reliable on Windows; use subprocess so the parent
         # holds the lock while the child runs and we propagate its exit code.
-        result = subprocess.run(command, env=os.environ, check=False)
+        creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+        result = subprocess.run(
+            command,
+            env=os.environ,
+            check=False,
+            creationflags=creationflags,
+        )
         handle.close()
         return result.returncode
     # Python opens files close-on-exec by default. Make this descriptor

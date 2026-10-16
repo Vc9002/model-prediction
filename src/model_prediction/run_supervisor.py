@@ -53,6 +53,8 @@ def _launcher(name: str) -> list[str]:
     if sys.platform == "win32":
         return [
             "powershell",
+            "-WindowStyle",
+            "Hidden",
             "-NoProfile",
             "-ExecutionPolicy",
             "Bypass",
@@ -368,12 +370,14 @@ class RunSupervisor:
 
     def _git_sha(self) -> str:
         try:
+            creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
             out = subprocess.run(
                 ["git", "rev-parse", "HEAD"],
                 capture_output=True,
                 text=True,
                 check=True,
                 cwd=self.repo_root,
+                creationflags=creationflags,
             )
             return out.stdout.strip() or "unknown"
         except (OSError, subprocess.CalledProcessError):

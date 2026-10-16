@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 import threading
 import time
 from datetime import UTC, datetime
@@ -95,6 +96,7 @@ def start_action(name: str, payload: dict) -> dict:
         chunks: list[str] = []
         process = None
         try:
+            creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
             process = subprocess.Popen(
                 command,
                 cwd=ROOT,
@@ -102,6 +104,7 @@ def start_action(name: str, payload: dict) -> dict:
                 stderr=subprocess.STDOUT,
                 text=True,
                 env=_runner_env(),
+                creationflags=creationflags,
             )
             assert process.stdout is not None
             for line in process.stdout:

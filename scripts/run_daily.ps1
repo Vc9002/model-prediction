@@ -19,7 +19,7 @@ if ($env:MODEL_PREDICTION_DAILY_LOCK_HELD -ne '1') {
     $env:PYTHONPATH = 'src' + $(if ($env:PYTHONPATH) { ';' + $env:PYTHONPATH } else { '' })
     $RuntimeRoot = if ($env:MODEL_PREDICTION_RUNTIME_ROOT) { $env:MODEL_PREDICTION_RUNTIME_ROOT.Trim() } else { 'data' }
     & $Py -m model_prediction.daily_lock --lock (Join-Path $RuntimeRoot 'locks\daily.lock') -- `
-        powershell -NoProfile -ExecutionPolicy Bypass -File $ScriptPath
+        powershell -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File $ScriptPath
     exit $LASTEXITCODE
 }
 
