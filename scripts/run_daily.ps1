@@ -81,34 +81,13 @@ Write-Log ("MLB v9 settlement took: {0}s" -f [int]$Stopwatch.Elapsed.TotalSecond
 Write-Log '--- Step 1b: Historical game ingestion ---'
 $Stopwatch.Restart()
 $Sports = @('mlb', 'nba', 'wnba', 'nfl', 'tennis')
-$IngestTmp = Join-Path $env:TEMP ("ingest-" + [guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Force -Path $IngestTmp | Out-Null
-$Jobs = foreach ($sport in $Sports) {
-    Start-Job -ArgumentList $RepoRoot, $Py, $sport, @($Yesterday, $RunDate), $IngestTmp -ScriptBlock {
-        param($Repo, $Python, $Sport, $Dates, $Tmp)
-        Set-Location $Repo
-        $env:PYTHONPATH = 'src'
-        $sportExit = 0
-        foreach ($d in $Dates) {
-            & $Python -m model_prediction.cli ingest --sport $Sport --date $d 2>&1 |
-                Out-File -FilePath (Join-Path $Tmp "$Sport.log") -Append -Encoding utf8
-            if ($LASTEXITCODE -ne 0) { $sportExit = $LASTEXITCODE }
-        }
-        return $sportExit
+$IngestExit = 0
+foreach ($sport in $Sports) {
+    foreach ($d in @($Yesterday, $RunDate)) {
+        $code = Invoke-Step @('-m', 'model_prediction.cli', 'ingest', '--sport', $sport, '--date', $d)
+        if ($code -ne 0) { $IngestExit = $code }
     }
 }
-$IngestExit = 0
-foreach ($job in $Jobs) {
-    $code = Wait-Job $job | Receive-Job
-    if ($code -is [array]) { $code = $code[-1] }
-    if ($code -ne 0) { $IngestExit = [int]$code }
-    Remove-Job $job
-}
-foreach ($sport in $Sports) {
-    $sportLog = Join-Path $IngestTmp "$sport.log"
-    if (Test-Path $sportLog) { Get-Content $sportLog | Add-Content -Path $Log -Encoding utf8 }
-}
-Remove-Item -Recurse -Force $IngestTmp
 Write-Log "Ingestion exit code: $IngestExit"
 Write-Log ("Ingestion took: {0}s" -f [int]$Stopwatch.Elapsed.TotalSeconds)
 

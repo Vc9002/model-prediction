@@ -63,6 +63,7 @@ class MarketType(StrEnum):
     SPREAD = "spread"
     TOTAL = "total"
     BTTS = "btts"  # soccer "both teams to score" -- a binary yes/no, no line
+    DOUBLE_CHANCE = "double_chance"  # soccer double chance (1X, X2, 12)
     NRFI = "nrfi"  # MLB 1st inning: No Run First Inning
     YRFI = "yrfi"  # MLB 1st inning: Yes Run First Inning
 
