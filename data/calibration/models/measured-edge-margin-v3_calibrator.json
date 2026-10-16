@@ -1,13 +1,41 @@
 {
-  "baseline_brier": 0.245576,
-  "calibrated_at_utc": "2026-10-15T04:35:28.837958+00:00",
-  "calibrated_oof_brier": 0.24508536149160565,
-  "champion_method": "temperature",
+  "baseline_brier": 0.245256,
+  "calibrated_at_utc": "2026-10-16T10:03:47.292518+00:00",
+  "calibrated_oof_brier": 0.2529776767050349,
+  "champion_method": "isotonic",
   "market": "spread",
   "model_version": "measured-edge-margin-v3",
   "parameters": {
-    "temperature": 1.5
+    "max_val": 0.6667,
+    "min_val": 0.4286,
+    "num_thresholds": 11,
+    "thresholds": [
+      0.541225,
+      0.54579,
+      0.546403,
+      0.589911,
+      0.603402,
+      0.621323,
+      0.624526,
+      0.645922,
+      0.667795,
+      0.673348,
+      0.705306
+    ],
+    "values": [
+      0.428571,
+      0.5,
+      0.5,
+      0.55,
+      0.565217,
+      0.583333,
+      0.6,
+      0.612903,
+      0.636364,
+      0.666667,
+      0.666667
+    ]
   },
-  "sample_size": 574,
+  "sample_size": 576,
   "sport": "mlb"
 }

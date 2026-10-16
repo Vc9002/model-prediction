@@ -1,14 +1,24 @@
 {
   "baseline_brier": 0.346403,
-  "calibrated_at_utc": "2026-10-15T04:35:28.837958+00:00",
-  "calibrated_oof_brier": 0.25368513996281705,
-  "champion_method": "beta",
+  "calibrated_at_utc": "2026-10-16T10:03:47.292518+00:00",
+  "calibrated_oof_brier": 0.254720339633447,
+  "champion_method": "isotonic",
   "market": "spread",
   "model_version": "cfb-spread-v1",
   "parameters": {
-    "a": 0.2329,
-    "b": 0.0001,
-    "c": 0.0418
+    "max_val": 0.75,
+    "min_val": 0.4965,
+    "num_thresholds": 3,
+    "thresholds": [
+      0.983667,
+      0.989933,
+      0.994533
+    ],
+    "values": [
+      0.496454,
+      0.5,
+      0.75
+    ]
   },
   "sample_size": 288,
   "sport": "ncaaf"

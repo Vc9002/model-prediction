@@ -1,0 +1,13 @@
+{
+  "baseline_brier": 0.242566,
+  "calibrated_at_utc": "2026-10-16T06:27:40.705418+00:00",
+  "calibrated_oof_brier": 0.24515258045279364,
+  "champion_method": "temperature",
+  "market": "moneyline",
+  "model_version": "kbo-tie-aware-elo-v2",
+  "parameters": {
+    "temperature": 0.8
+  },
+  "sample_size": 145,
+  "sport": "kbo"
+}

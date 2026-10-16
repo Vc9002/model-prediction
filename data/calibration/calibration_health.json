@@ -1,28 +1,32 @@
 {
   "calibration_drift": 1.7223,
-  "last_checked_utc": "2026-10-15T05:11:56.773277+00:00",
-  "models_count": 18,
+  "last_checked_utc": "2026-10-16T15:25:13.550290+00:00",
+  "models_count": 14,
   "moderate_drift_models": [
-    "tennis:moneyline:tennis-surface-elo-v1",
     "soccer:moneyline:soccer-poisson-dc-v1"
   ],
   "raw_status": "SEVERE_DRIFT",
-  "recalibrated_count": 0,
-  "recalibrated_models": [],
+  "recalibrated_count": 7,
+  "recalibrated_models": [
+    "mlb:spread:measured-edge-margin-v3",
+    "mlb:total:measured-edge-totals-v3",
+    "ncaaf:total:cfb-total-v1",
+    "ncaaf:spread:cfb-spread-v1",
+    "kbo:moneyline:kbo-tie-aware-elo-v2",
+    "wnba:moneyline:wnba-elo-trend-lr-v4",
+    "soccer:total:soccer-poisson-dc-v1"
+  ],
   "severe_drift_models": [
     "tennis:moneyline:tennis-surface-elo-v1",
     "mlb:spread:measured-edge-margin-v3",
     "mlb:total:measured-edge-totals-v3",
     "mlb:moneyline:mlb-elo-trend-lr-v8",
-    "lol:moneyline:lol-tiered-elo-v6",
     "ncaaf:total:cfb-total-v1",
     "ncaaf:spread:cfb-spread-v1",
     "ncaaf:moneyline:college-football-v1",
-    "npb:moneyline:npb-tie-aware-elo-v2",
-    "valorant:moneyline:valorant-tiered-elo-v6",
     "kbo:moneyline:kbo-tie-aware-elo-v2",
-    "wnba:moneyline:wnba-elo-trend-lr-v4",
     "cs2:moneyline:cs2-tiered-elo-v6",
+    "wnba:moneyline:wnba-elo-trend-lr-v4",
     "mlb:nrfi:mlb-nrfi-v1",
     "soccer:total:soccer-poisson-dc-v1"
   ],
