@@ -59,6 +59,14 @@ def _apply_btts_calibration(raw_probability: float) -> float:
     return 1 / (1 + exp(-calibrated))
 
 
+def _apply_custom_btts_calibration(raw_probability: float, intercept: float, slope: float) -> float:
+    """Platt-scale BTTS probability with league-specific intercept and slope."""
+    clipped = min(1 - 1e-9, max(1e-9, raw_probability))
+    logit = log(clipped / (1 - clipped))
+    calibrated = intercept + slope * logit
+    return 1 / (1 + exp(-calibrated))
+
+
 def _poisson_pmf(rate: float, k: int) -> float:
     result = exp(-rate)
     for i in range(1, k + 1):
@@ -87,6 +95,7 @@ def _dc_adjustment(
 
 class SoccerModel:
     sport = "soccer"
+    version: str = SOCCER_MODEL_VERSION
 
     def __init__(
         self,
@@ -122,7 +131,8 @@ class SoccerModel:
             }
         return strengths, baseline
 
-    def score_matrix(self, home_rate: float, away_rate: float) -> list[list[float]]:
+    def score_matrix(self, home_rate: float, away_rate: float, rho: float | None = None) -> list[list[float]]:
+        use_rho = self.rho if rho is None else rho
         matrix = []
         for h in range(MAX_GOALS + 1):
             row = []
@@ -130,7 +140,7 @@ class SoccerModel:
                 probability = (
                     _poisson_pmf(home_rate, h)
                     * _poisson_pmf(away_rate, a)
-                    * _dc_adjustment(h, a, home_rate, away_rate, rho=self.rho)
+                    * _dc_adjustment(h, a, home_rate, away_rate, rho=use_rho)
                 )
                 row.append(max(probability, 0.0))
             matrix.append(row)
@@ -142,6 +152,8 @@ class SoccerModel:
         history: Sequence[GameRecord],
         upcoming: Sequence[UpcomingMatch],
     ) -> list[GamePrediction]:
+        from ..soccer.registry import resolve
+
         global_strengths, global_baseline = self._strengths(history)
         league_cache: dict[str, tuple[dict[str, dict[str, float]], float]] = {}
 
@@ -151,9 +163,8 @@ class SoccerModel:
                 return global_strengths, global_baseline
             if norm_lg not in league_cache:
                 lg_history = [g for g in history if getattr(g, "league", "").strip().upper() == norm_lg]
-                # Require at least 50 games in the specific league to build isolated ratings,
-                # preventing cross-tier distortion from lower divisions.
-                if len(lg_history) >= 50:
+                # Dedicated per-league fitting: use strictly matches from this league
+                if lg_history:
                     league_cache[norm_lg] = self._strengths(lg_history)
                 else:
                     league_cache[norm_lg] = (global_strengths, global_baseline)
@@ -162,26 +173,55 @@ class SoccerModel:
         predictions: list[GamePrediction] = []
         for match in upcoming:
             lg_name = getattr(match, "league", "SOCCER")
-            strengths, baseline = _get_strengths(lg_name)
+            norm_lg = str(lg_name or "").strip().upper()
+            strengths, hist_baseline = _get_strengths(norm_lg)
             home = strengths.get(match.home_team, {"attack": 1.0, "defense": 1.0, "games": 0.0})
             away = strengths.get(match.away_team, {"attack": 1.0, "defense": 1.0, "games": 0.0})
 
-            # League-specific calibration: MLS has measured home advantage 1.2325 with no away division
-            is_mls = str(lg_name or "").strip().upper() == "MLS"
-            h_boost = 1.2325 if is_mls else self.home_boost
-            div_away = False if is_mls else self.divide_away
+            # League-specific parameters from per-league champion configs
+            lg_cfg = resolve(norm_lg) if norm_lg and norm_lg not in {"SOCCER", "UNKNOWN"} else None
+            if lg_cfg is not None:
+                baseline = lg_cfg.baseline or hist_baseline
+                h_boost = lg_cfg.home_advantage
+                use_rho = lg_cfg.dc_rho
+                is_no_div = norm_lg in {"MLS", "BRASILEIRAO", "LIGA_MX", "ARGENTINA", "COLOMBIA", "CHILE"}
+                div_away = False if is_no_div else self.divide_away
+            else:
+                baseline = hist_baseline
+                is_mls = norm_lg == "MLS"
+                h_boost = 1.2325 if is_mls else self.home_boost
+                use_rho = self.rho
+                div_away = False if is_mls else self.divide_away
 
             home_rate = baseline * home["attack"] * away["defense"] * h_boost
             away_rate = baseline * away["attack"] * home["defense"] / (h_boost if div_away else 1.0)
             from ..coded_market_replay import capture_inputs
 
-            inference_inputs = capture_inputs("SOCCER", {"home_rate": home_rate, "away_rate": away_rate})
-            matrix = self.score_matrix(home_rate, away_rate)
+            inference_inputs = capture_inputs(
+                "SOCCER",
+                {
+                    "home_rate": home_rate,
+                    "away_rate": away_rate,
+                    "rho": use_rho,
+                    "model_version": self.version,
+                },
+            )
+            matrix = self.score_matrix(home_rate, away_rate, rho=use_rho)
             home_win = sum(matrix[h][a] for h in range(MAX_GOALS + 1) for a in range(h))
             away_win = sum(matrix[h][a] for a in range(MAX_GOALS + 1) for h in range(a))
             draw = 1 - home_win - away_win
             raw_btts = sum(matrix[h][a] for h in range(1, MAX_GOALS + 1) for a in range(1, MAX_GOALS + 1))
-            btts = _apply_btts_calibration(raw_btts)
+            if (
+                lg_cfg is not None
+                and lg_cfg.btts_calibration_intercept is not None
+                and lg_cfg.btts_calibration_slope is not None
+            ):
+                btts = _apply_custom_btts_calibration(
+                    raw_btts, lg_cfg.btts_calibration_intercept, lg_cfg.btts_calibration_slope
+                )
+            else:
+                btts = _apply_btts_calibration(raw_btts)
+
             sample = min(home["games"], away["games"])
             uncertainty = max(0.04, min(0.20, 0.20 - 0.01 * sample))
             base: GamePredictionBase = {
@@ -197,11 +237,6 @@ class SoccerModel:
                     "away_goal_rate": round(away_rate, 4),
                     "league_goals_per_team": round(baseline, 4),
                     "history_games": len(history),
-                    # Real per-team observation count (0.0 for a team never
-                    # seen in `history`, i.e. still resting on the neutral
-                    # attack=defense=1.0 cold-start default) -- lets callers
-                    # gate on "both teams have real learned ratings" instead
-                    # of trusting a synthetic-prior matchup silently.
                     "min_team_games": sample,
                 },
             }
@@ -238,7 +273,7 @@ class SoccerModel:
                     )
                 )
 
-            # Spreads / Handicaps (-1.5, +1.5)
+            # Spreads / Handicaps (-1.5, 1.5)
             for s_line in (-1.5, 1.5):
                 home_cov = sum(
                     matrix[h][a]
@@ -268,6 +303,51 @@ class SoccerModel:
         return predictions
 
 
+class DedicatedSoccerLeagueModel:
+    """Dedicated model for an individual soccer league with isolated parameters and ratings."""
+
+    def __init__(self, league_code: str) -> None:
+        from ..soccer.registry import resolve
+
+        self.league_code = str(league_code).strip().upper()
+        self.config = resolve(self.league_code)
+        self.version = self.config.model_version
+        self.sport = "soccer"
+        is_no_div = self.league_code in {"MLS", "BRASILEIRAO", "LIGA_MX", "ARGENTINA", "COLOMBIA", "CHILE"}
+        self._underlying = SoccerModel(
+            version=self.version,
+            home_boost=self.config.home_advantage,
+            rho=self.config.dc_rho,
+            divide_away=not is_no_div,
+        )
+
+    def predict_games(
+        self,
+        history: Sequence[GameRecord],
+        upcoming: Sequence[UpcomingMatch],
+    ) -> list[GamePrediction]:
+        """Predict matches strictly isolated to this league's games."""
+        isolated_history = [
+            g for g in history if getattr(g, "league", "").strip().upper() in (self.league_code, "SOCCER")
+        ]
+        if not isolated_history and history:
+            isolated_history = list(history)
+
+        stamped_upcoming = [
+            UpcomingMatch(
+                event_id=m.event_id,
+                event_start_utc=m.event_start_utc,
+                away_team=m.away_team,
+                home_team=m.home_team,
+                league=self.league_code,
+            )
+            if getattr(m, "league", "SOCCER") != self.league_code
+            else m
+            for m in upcoming
+        ]
+        return self._underlying.predict_games(isolated_history, stamped_upcoming)
+
+
 def soccer_model() -> SoccerModel:
     return SoccerModel()
 
@@ -279,3 +359,184 @@ def soccer_model_v2() -> SoccerModel:
         rho=-0.05,
         divide_away=False,
     )
+
+
+def get_soccer_league_model(league_code: str) -> DedicatedSoccerLeagueModel:
+    """Return dedicated model for any soccer league."""
+    return DedicatedSoccerLeagueModel(league_code)
+
+
+def epl_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("EPL")
+
+
+def la_liga_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("LA_LIGA")
+
+
+def bundesliga_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("BUNDESLIGA")
+
+
+def serie_a_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("SERIE_A")
+
+
+def ligue_1_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("LIGUE_1")
+
+
+def mls_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("MLS")
+
+
+def ucl_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("UCL")
+
+
+def championship_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("CHAMPIONSHIP")
+
+
+def eredivisie_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("EREDIVISIE")
+
+
+def primeira_liga_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("PRIMEIRA_LIGA")
+
+
+def liga_mx_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("LIGA_MX")
+
+
+def brasileirao_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("BRASILEIRAO")
+
+
+def uel_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("UEL")
+
+
+def uecl_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("UECL")
+
+
+def fa_cup_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("FA_CUP")
+
+
+def efl_cup_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("EFL_CUP")
+
+
+def copa_del_rey_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("COPA_DEL_REY")
+
+
+def dfb_pokal_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("DFB_POKAL")
+
+
+def coppa_italia_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("COPPA_ITALIA")
+
+
+def scottish_prem_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("SCOTTISH_PREM")
+
+
+def belgian_pro_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("BELGIAN_PRO")
+
+
+def turkish_super_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("TURKISH_SUPER")
+
+
+def saudi_pro_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("SAUDI_PRO")
+
+
+def swiss_super_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("SWISS_SUPER")
+
+
+def austrian_bund_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("AUSTRIAN_BUND")
+
+
+def danish_super_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("DANISH_SUPER")
+
+
+def allsvenskan_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("ALLSVENSKAN")
+
+
+def norwegian_elite_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("NORWEGIAN_ELITE")
+
+
+def greek_super_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("GREEK_SUPER")
+
+
+def la_liga_2_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("LA_LIGA_2")
+
+
+def segunda_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("SEGUNDA")
+
+
+def serie_b_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("SERIE_B")
+
+
+def ligue_2_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("LIGUE_2")
+
+
+def libertadores_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("LIBERTADORES")
+
+
+def sudamericana_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("SUDAMERICANA")
+
+
+def argentina_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("ARGENTINA")
+
+
+def colombia_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("COLOMBIA")
+
+
+def chile_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("CHILE")
+
+
+def j_league_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("J_LEAGUE")
+
+
+def a_league_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("A_LEAGUE")
+
+
+def csl_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("CSL")
+
+
+def nwsl_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("NWSL")
+
+
+def polish_ekstraklasa_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("POLISH_EKSTRAKLASA")
+
+
+def brazil_serie_b_soccer_model() -> DedicatedSoccerLeagueModel:
+    return DedicatedSoccerLeagueModel("BRAZIL_SERIE_B")

@@ -31,15 +31,15 @@ def test_execution_rehearsal_with_mock_snapshots(tmp_path: Path):
         "league": "MLB",
         "event_title": "Boston Red Sox vs. New York Yankees",
         "long": {
-            "bid": 0.40,
-            "ask": 0.45,
+            "bid": 0.45,
+            "ask": 0.50,
             "description": "New York Yankees",
             "bid_size": 100.0,
             "ask_size": 100.0,
         },
         "short": {
-            "bid": 0.53,
-            "ask": 0.58,
+            "bid": 0.48,
+            "ask": 0.53,
             "description": "Boston Red Sox",
             "bid_size": 100.0,
             "ask_size": 100.0,
@@ -62,6 +62,6 @@ def test_execution_rehearsal_with_mock_snapshots(tmp_path: Path):
     ticket = report.tickets[0]
     assert ticket.market_id == "m_test_1"
     assert ticket.target_side == "YES"
-    assert ticket.order_price == 0.45
+    assert ticket.order_price == 0.50
     assert ticket.validation_status == "VERIFIED_COMPLIANT"
     assert len(ticket.mock_signed_nonce) == 16

@@ -28,9 +28,44 @@ class SoccerLeague(str, Enum):
     LIGA_MX = "LIGA_MX"
     BRASILEIRAO = "BRASILEIRAO"
     BUNDESLIGA_2 = "BUNDESLIGA_2"
-    WORLD_CUP = "WORLD_CUP"
     MLS = "MLS"
     UCL = "UCL"
+    UEL = "UEL"
+    UECL = "UECL"
+    LIBERTADORES = "LIBERTADORES"
+    SUDAMERICANA = "SUDAMERICANA"
+    FA_CUP = "FA_CUP"
+    EFL_CUP = "EFL_CUP"
+    COPA_DEL_REY = "COPA_DEL_REY"
+    DFB_POKAL = "DFB_POKAL"
+    COPPA_ITALIA = "COPPA_ITALIA"
+    SCOTTISH_PREM = "SCOTTISH_PREM"
+    BELGIAN_PRO = "BELGIAN_PRO"
+    TURKISH_SUPER = "TURKISH_SUPER"
+    SAUDI_PRO = "SAUDI_PRO"
+    SWISS_SUPER = "SWISS_SUPER"
+    AUSTRIAN_BUND = "AUSTRIAN_BUND"
+    DANISH_SUPER = "DANISH_SUPER"
+    ALLSVENSKAN = "ALLSVENSKAN"
+    NORWEGIAN_ELITE = "NORWEGIAN_ELITE"
+    GREEK_SUPER = "GREEK_SUPER"
+    A_LEAGUE = "A_LEAGUE"
+    J_LEAGUE = "J_LEAGUE"
+    ARGENTINA = "ARGENTINA"
+    COLOMBIA = "COLOMBIA"
+    CHILE = "CHILE"
+    URUGUAY = "URUGUAY"
+    ECUADOR = "ECUADOR"
+    PERU = "PERU"
+    LA_LIGA_2 = "LA_LIGA_2"
+    SEGUNDA = "SEGUNDA"
+    SERIE_B = "SERIE_B"
+    LIGUE_2 = "LIGUE_2"
+    CSL = "CSL"
+    NWSL = "NWSL"
+    POLISH_EKSTRAKLASA = "POLISH_EKSTRAKLASA"
+    BRAZIL_SERIE_B = "BRAZIL_SERIE_B"
+    CZECH_FIRST = "CZECH_FIRST"
     OTHER = "OTHER"
 
 
@@ -44,8 +79,11 @@ def _is_strictly_before(record_date: str, as_of_date: str) -> bool:
     """Check if record_date is strictly before as_of_date."""
     if record_date == as_of_date:
         return False
-    if ("T" in record_date or " " in record_date) and ("T" in as_of_date or " " in as_of_date):
-        return record_date < as_of_date
+    # Normalize space to 'T' for consistent ISO 8601 lexicographical comparison
+    r_norm = str(record_date).strip().replace(" ", "T")
+    a_norm = str(as_of_date).strip().replace(" ", "T")
+    if "T" in r_norm and "T" in a_norm:
+        return r_norm < a_norm
     return _parse_date(record_date).date() < _parse_date(as_of_date).date()
 
 

@@ -2,6 +2,6 @@
 
 from __future__ import annotations
 
-from . import moneyline, total
+from . import moneyline, spread, total
 
-__all__ = ["moneyline", "total"]
+__all__ = ["moneyline", "spread", "total"]

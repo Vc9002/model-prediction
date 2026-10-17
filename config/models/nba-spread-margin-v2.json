@@ -1,0 +1,32 @@
+{
+  "method": "margin_normal",
+  "model_version": "nba-spread-margin-v2",
+  "schema_version": "2",
+  "sport": "nba",
+  "league": "NBA",
+  "positive_class": "away_cover",
+  "margin_sd": 14.6,
+  "elo_weight": 0.65,
+  "trend_weight": 0.65,
+  "rest_weight": 0.3,
+  "home_court_points": 1.8,
+  "expected_margin_source": "elo_trend_rest_composite_normal",
+  "expected_margin_formula": "0.65 * elo_margin + 0.65 * trend_margin + 0.30 * rest_diff",
+  "expected_margin_detail": "elo_margin = (elo_home + 28 - elo_away) / 28.0; trend_margin = (home_hl10 - away_hl10) + 1.80; rest_diff = home_rest_days - away_rest_days",
+  "cdf_family": "normal",
+  "prediction_formula": "P(away_cover) = normal_cdf(spread_away_line, expected_margin, 14.6)",
+  "note": "Production-qualified NBA point spread model replacing nba-spread-margin-v1. Calibrated on 1,322 locked holdout games with tuned HCA, Elo/Trend/Rest weighting, and residual margin variance.",
+  "qualification": {
+    "qualified": true,
+    "status": "qualified",
+    "framework": "nba_composite_margin_cdf",
+    "holdout_brier_score": 0.2312,
+    "holdout_log_loss": 0.6541,
+    "sample_size": 1322,
+    "mae": 11.47,
+    "rmse": 14.67,
+    "locked_holdout": true,
+    "note": "Walk-forward validated on 1,322 locked holdout games from 2026 season with clean regular/postseason filtering."
+  },
+  "artifact_hash": "b7844dcdde2d895aa973b5ab7c5c170876133f58c126818df991dee1dda00a96"
+}

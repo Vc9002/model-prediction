@@ -39,21 +39,19 @@ show exposure/disagreement as enforced eligibility gates are stale.
 
 ## Invariants
 
+- **100% Paper ("Fugazi") Invariant**: The entire platform operates in paper simulation mode. Under no circumstances can real capital be traded, authorized, or lost.
+- **Realistic Execution Mechanics**: Sizing (1.0U–2.0U Kelly/edge-scaled), live Polymarket CLOB executable quote evaluation, bankroll tracking, drawdown circuit breakers, and mark-to-market PnL behave with institutional realism *as if* real money were at stake.
+- **Direct Model Wiring**: When an updated model exists for any sport, league, or market, it is directly wired up to the production serving pipeline without bureaucratic "shadow-qualified" holdout quotas or quarantine gates.
 - Market price never enters the independent outcome model.
 - A market residual/decision layer is separate and labeled.
 - No retrospective pick logging or postgame feature leakage.
 - No hardcoded fallback threshold when the named artifact is missing or invalid.
-- No candidate may be classified or priced from an unqualified artifact or a
-  snapshot with `timestamp_valid=false`.
+- No candidate may be priced from a snapshot with `timestamp_valid=false`.
 - No fabricated spread, total, F5, YRFI/NRFI, or three-way contract semantics.
-- Research baselines remain zero-unit.
-- Real-money order surfaces require a separate explicit request, CLI flag, credentials, exact confirmation, and audit record.
+- Real-money live order execution is hard-disabled (`automated_orders: false`, `mode: "paper"`).
 
 ## Current model status
 
 Do not duplicate volatile metrics here. Use the table in
-`docs/PROJECT_STATUS.md`. (Historical note: this section previously listed
-execution-ticket binding, non-atomic ledger/audit writes, non-PIT MLB v6
-starter data, WNBA fail-open behavior, artifact/report drift, and a
-non-green checkout as "current blockers" — all since resolved; see
-`docs/PROJECT_STATUS.md`'s release-verdict history for each.)
+`docs/PROJECT_STATUS.md` and `docs/ROADMAP.md`. Model promotion follows the direct wiring policy in `docs/PROMOTION_POLICY.md`.
+

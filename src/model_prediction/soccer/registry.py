@@ -29,6 +29,7 @@ from .bundesliga_2 import BUNDESLIGA_2_CONFIG
 from .championship import CHAMPIONSHIP_CONFIG
 from .epl import EPL_CONFIG
 from .eredivisie import EREDIVISIE_CONFIG
+from .expanded_leagues import EXPANDED_SOCCER_CONFIGS
 from .la_liga import LA_LIGA_CONFIG
 from .league_model import LeagueSoccerConfig, LeagueSoccerModel
 from .liga_mx import LIGA_MX_CONFIG
@@ -57,6 +58,7 @@ _NAMED_CONFIGS: dict[str, LeagueSoccerConfig] = {
         BRASILEIRAO_CONFIG,
         BUNDESLIGA_2_CONFIG,
         WORLD_CUP_CONFIG,
+        *EXPANDED_SOCCER_CONFIGS.values(),
     )
 }
 

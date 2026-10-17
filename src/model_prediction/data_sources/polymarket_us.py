@@ -27,6 +27,29 @@ LEAGUE_SLUGS = {
     "NCAAF": "cfb",
     "CFB": "cfb",
     "NHL": "nhl",
+    "AHL": "ahl",
+    "KHL": "khl",
+    "DEL": "del",
+    "SHL": "shl",
+    "SNHL": "snhl",
+    "CEHL": "cehl",
+    "LIIGA": "liiga",
+    "DARTS_PDC": "pdcdarts",
+    "DARTS_MODUS": "modus",
+    "NCAAB": "cbb",
+    "WNCAAB": "wcbb",
+    "EUROLEAGUE": "eurolg",
+    "LNB": "lnb",
+    "ABA": "aba",
+    "DENBL": "denbl",
+    "AUTBL": "autbl",
+    "SLNBL": "slnbl",
+    "FRA2": "fra2",
+    "ACB": "acb",
+    "BBL": "bbl",
+    "NBL": "nbl",
+    "BCL": "bcl",
+    "EUROCUP": "eurocup",
     "EPL": "epl",
     "LA_LIGA": "lal",
     "BUNDESLIGA": "bun",
@@ -185,6 +208,38 @@ POLYMARKET_SPORT_LEAGUES: dict[str, tuple[str, ...]] = {
     ),
     "kbo": ("KBO",),
     "npb": ("NPB",),
+    "hockey": (
+        "NHL",
+        "AHL",
+        "KHL",
+        "DEL",
+        "SHL",
+        "SNHL",
+        "CEHL",
+        "LIIGA",
+    ),
+    "darts": (
+        "DARTS_PDC",
+        "DARTS_MODUS",
+    ),
+    "basketball": (
+        "NBA",
+        "WNBA",
+        "NCAAB",
+        "WNCAAB",
+        "EUROLEAGUE",
+        "LNB",
+        "ABA",
+        "DENBL",
+        "AUTBL",
+        "SLNBL",
+        "FRA2",
+        "ACB",
+        "BBL",
+        "NBL",
+    ),
+    "ncaab": ("NCAAB",),
+    "wncaab": ("WNCAAB",),
 }
 
 # Esports leagues captured for BBO but priced by no model yet (2026-07-27
@@ -207,7 +262,23 @@ CAPTURED_UNPRICED_ESPORTS_LEAGUES: frozenset[str] = frozenset({"COD", "ROCKET_LE
 # ATP market, and ITF has no matching ESPN scoreboard to build a prediction
 # from (see tennis_forward.py) -- but ITF/WTA snapshots are still captured
 # here in case that coverage gap closes later.
-BBO_CAPTURE_SPORTS = {"mlb", "nba", "wnba", "nfl", "ncaaf", "soccer", "esports", "kbo", "npb", "tennis"}
+BBO_CAPTURE_SPORTS = {
+    "mlb",
+    "nba",
+    "wnba",
+    "nfl",
+    "ncaaf",
+    "soccer",
+    "esports",
+    "kbo",
+    "npb",
+    "tennis",
+    "hockey",
+    "darts",
+    "basketball",
+    "ncaab",
+    "wncaab",
+}
 
 MARKET_TYPES = {
     "SPORTS_MARKET_TYPE_MONEYLINE": "moneyline",
@@ -238,6 +309,15 @@ MARKET_TYPES = {
     # SPORTS_MARKET_TYPE_PROP, so classification must fall through to this
     # specific legacy field rather than treating every prop as interchangeable.
     "baseball_team_first_inning_run": "nrfi",
+    "hockey_team_full_game_winner": "moneyline",
+    "hockey_puck_line": "spread",
+    "hockey_total_goals": "total",
+    "darts_match_winner": "moneyline",
+    "darts_leg_spread": "spread",
+    "darts_total_legs": "total",
+    "basketball_team_full_game_winner": "moneyline",
+    "basketball_point_spread": "spread",
+    "basketball_total_points": "total",
 }
 
 logger = logging.getLogger(__name__)

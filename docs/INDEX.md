@@ -23,6 +23,7 @@ Welcome to the unified documentation directory for the `model-prediction` platfo
 | Document | Purpose |
 | :--- | :--- |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | System design, data ingestion, feature stores, model registry, and order pipelines. |
+| [`PROMOTION_POLICY.md`](PROMOTION_POLICY.md) | **Direct Model Wiring Policy**: 100% paper trading ("fugazi") invariant, realistic Kelly execution mechanics, and elimination of shadow-qualified holdouts. |
 | [`CFB_PREDICTION_SYSTEM.md`](CFB_PREDICTION_SYSTEM.md) | Complete College Football (NCAAF) Prediction System: joint scoring, priors, weather, ablations, market validation, and dual-ledger gating. |
 | [`LEDGER_ROUTING.md`](LEDGER_ROUTING.md) | Multi-tier ledger topology (Main, Flat, Research, Gated Research) and workbook separation. |
 | [`PRODUCTION.md`](PRODUCTION.md) | Production canary, run supervisor, launchd scheduling, and fail-closed safety gates. |

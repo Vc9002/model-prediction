@@ -741,6 +741,7 @@ class HomeElo:
             if days > 0:
                 pull = (self.ratings[team_id] - 1500.0) * (1.0 - (1.0 - self.decay_rate) ** days)
                 self.ratings[team_id] -= pull
+                self._last_active[team_id] = game_date
 
     def _mark_active(self, team_ids: list[str], game_date: str) -> None:
         if self._last_active is None:
@@ -1467,10 +1468,10 @@ def forecast_international_baseball_slate(
                         fair = fair_by_key.get(desc_key)
                         side_team = desc_str.capitalize()
                     elif desc_str.lower().startswith("o"):
-                        fair = tot_dict["over"]
+                        fair = tot_dict["over"] if tot_dict else 0.5
                         side_team = "Over"
                     elif desc_str.lower().startswith("u"):
-                        fair = tot_dict["under"]
+                        fair = tot_dict["under"] if tot_dict else 0.5
                         side_team = "Under"
                 elif m_type == "spread":
                     if desc_str.startswith("-") or "-1.5" in desc_str:

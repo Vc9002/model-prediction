@@ -13,7 +13,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from math import erf, sqrt
+from math import erf, isnan, sqrt
+from typing import Any
 
 from ..domain import parse_utc
 from ..features.base import GameRecord
@@ -23,8 +24,10 @@ from .base import GamePrediction, GamePredictionBase
 
 
 def _normal_cdf(x: float, mean: float, sd: float) -> float:
+    if isnan(x) or isnan(mean) or isnan(sd):
+        raise ValueError(f"NaN passed to _normal_cdf: x={x}, mean={mean}, sd={sd}")
     if sd <= 0:
-        return 0.5
+        return 0.5 if x == mean else (0.9999 if x > mean else 0.0001)
     raw = 0.5 * (1 + erf((x - mean) / (sd * sqrt(2))))
     return max(0.0001, min(0.9999, raw))
 
@@ -39,6 +42,7 @@ class UpcomingGame:
     total_line: float | None = None
     availability_points_gap: float = 0.0
     availability_total_loss: float = 0.0
+    league: str = "NBA"
 
 
 class BasketballModel:
@@ -57,6 +61,7 @@ class BasketballModel:
         home_court_points: float = 2.0,
         trend_total_weight: float = 1.0,
         team_total_weight: float = 0.0,
+        baseline_points_per_team: float | None = None,
     ) -> None:
         self._sport = sport
         self._version = version
@@ -69,6 +74,7 @@ class BasketballModel:
         self.home_court_points = home_court_points
         self.trend_total_weight = trend_total_weight
         self.team_total_weight = team_total_weight
+        self.baseline_points_per_team = baseline_points_per_team
 
     @property
     def version(self) -> str:
@@ -85,7 +91,12 @@ class BasketballModel:
     ) -> list[GamePrediction]:
         elo = build_elo(history, self._sport)
         trend = TrendEngine(history)
-        baseline = trend.league_baseline or 82.0
+        default_baseline = (
+            self.baseline_points_per_team
+            if self.baseline_points_per_team is not None
+            else (114.2 if str(self._sport).lower() == "nba" else 82.0)
+        )
+        baseline = trend.league_baseline or default_baseline
         predictions: list[GamePrediction] = []
         for game in upcoming:
             home_win = elo.expected_home_win(game.home_team, game.away_team)
@@ -104,17 +115,31 @@ class BasketballModel:
 
             # Rest disparity & recent games
             rest_diff = 0.0
+            game_start_dt = None
+            try:
+                game_start_dt = parse_utc(game.event_start_utc)
+            except (ValueError, TypeError):
+                pass
+
             home_prev = [g for g in history if g.home_team == game.home_team or g.away_team == game.home_team]
             away_prev = [g for g in history if g.home_team == game.away_team or g.away_team == game.away_team]
+            if game_start_dt is not None:
+                home_prev = [g for g in home_prev if g.start < game_start_dt]
+                away_prev = [g for g in away_prev if g.start < game_start_dt]
+            home_prev.sort(key=lambda g: g.start)
+            away_prev.sort(key=lambda g: g.start)
 
             if self.rest_weight != 0.0:
                 try:
-                    game_start_dt = parse_utc(game.event_start_utc)
                     home_rest = (
-                        (game_start_dt - home_prev[-1].start).total_seconds() / 86400.0 if home_prev else 3.0
+                        (game_start_dt - home_prev[-1].start).total_seconds() / 86400.0
+                        if (game_start_dt and home_prev)
+                        else 3.0
                     )
                     away_rest = (
-                        (game_start_dt - away_prev[-1].start).total_seconds() / 86400.0 if away_prev else 3.0
+                        (game_start_dt - away_prev[-1].start).total_seconds() / 86400.0
+                        if (game_start_dt and away_prev)
+                        else 3.0
                     )
                     rest_diff = min(5.0, max(-5.0, home_rest - away_rest))
                 except (ValueError, TypeError):
@@ -182,11 +207,13 @@ class BasketballModel:
                     "history_games": len(history),
                 },
             }
+            p_h_clamped = max(0.0001, min(0.9999, home_win))
+            p_a_clamped = max(0.0001, min(0.9999, 1.0 - home_win))
             predictions.append(
                 GamePrediction(
                     market_type="moneyline",
                     line=None,
-                    probabilities={"home": round(home_win, 6), "away": round(1 - home_win, 6)},
+                    probabilities={"home": round(p_h_clamped, 6), "away": round(p_a_clamped, 6)},
                     rationale=(
                         f"Elo {elo.rating(game.home_team):.0f} vs {elo.rating(game.away_team):.0f} "
                         f"with home advantage {elo.home_advantage:.0f}."
@@ -247,3 +274,31 @@ class BasketballModel:
                     )
                 )
         return predictions
+
+
+def __getattr__(name: str) -> Any:
+    if name in {
+        "BasketballLeagueConfig",
+        "BasketballLeagueRegistry",
+        "DedicatedBasketballLeagueModel",
+        "EuroLeagueModel",
+        "NBAModel",
+        "NCAABModel",
+        "WNBAModel",
+        "WNCAABModel",
+        "euroleague_model",
+        "get_basketball_model",
+        "ncaab_model",
+        "wncaab_model",
+    }:
+        import importlib
+
+        mod = importlib.import_module(".basketball_leagues", package=__package__)
+        return getattr(mod, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+__all__ = [
+    "BasketballModel",
+    "UpcomingGame",
+]

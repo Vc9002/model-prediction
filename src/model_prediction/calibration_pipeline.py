@@ -18,7 +18,7 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from .calibration import (
     BetaCalibrator,
@@ -173,11 +173,11 @@ def evaluate_calibration_for_group(
     if metrics.get("status") != "ok":
         return None
 
-    brier = float(metrics["brier_score"])
-    log_loss = float(metrics["log_loss"])
-    ece = float(metrics["expected_calibration_error"])
-    slope = float(metrics.get("calibration_slope") or 1.0)
-    intercept = float(metrics.get("calibration_intercept") or 0.0)
+    brier = float(str(metrics["brier_score"]))
+    log_loss = float(str(metrics["log_loss"]))
+    ece = float(str(metrics["expected_calibration_error"]))
+    slope = float(str(metrics.get("calibration_slope") or 1.0))
+    intercept = float(str(metrics.get("calibration_intercept") or 0.0))
 
     # Drift scoring: deviation from ideal slope (1.0) and intercept (0.0), plus ECE
     slope_dev = abs(slope - 1.0)
@@ -271,7 +271,7 @@ def evaluate_calibration_for_group(
         champion_calibrator_method=champ_method,
         champion_calibrator_params=champ_params,
         scorecard=tournament.get("scorecard", {}),
-        reliability_buckets=metrics.get("reliability_buckets", []),
+        reliability_buckets=cast(list[dict[str, Any]], metrics.get("reliability_buckets") or []),
         calibrated_brier_score=round(cal_brier, 6),
         calibrated_log_loss=round(cal_log_loss, 6),
         calibrated_expected_calibration_error=round(cal_ece, 6),
@@ -454,11 +454,11 @@ def load_model_calibrator(
         method = str(payload.get("champion_method") or "identity").lower()
         params = payload.get("parameters") or {}
         metadata = CalibrationMetadata(
-            method=method,
-            version=f"{method}-recalibrated-v1",
+            calibration_method=method,
+            calibration_version=f"{method}-recalibrated-v1",
             base_model_version=model_version,
-            window_start=None,
-            window_end=None,
+            training_window_start=None,
+            training_window_end=None,
             sample_size=int(payload.get("sample_size") or 0),
             artifact_hash="",
         )

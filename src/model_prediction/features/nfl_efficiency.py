@@ -232,8 +232,10 @@ class NFLEfficiencyStore:
             if count == 0:
                 off_epa = NFL_LEAGUE_AVG_EPA_PLAY
             else:
-                plays = float(off_prior["attempts"].sum() + off_prior["carries"].sum())
-                epa_sum = float(off_prior["passing_epa"].sum() + off_prior["rushing_epa"].sum())
+                plays = float(off_prior["attempts"].sum() or 0.0) + float(off_prior["carries"].sum() or 0.0)
+                epa_sum = float(off_prior["passing_epa"].sum() or 0.0) + float(
+                    off_prior["rushing_epa"].sum() or 0.0
+                )
                 off_epa = (DEFAULT_PRIOR_PLAYS * NFL_LEAGUE_AVG_EPA_PLAY + epa_sum) / (
                     DEFAULT_PRIOR_PLAYS + max(1.0, plays)
                 )
@@ -247,8 +249,12 @@ class NFLEfficiencyStore:
             if len(def_prior) == 0:
                 def_epa = NFL_LEAGUE_AVG_EPA_PLAY
             else:
-                opp_plays = float(def_prior["attempts"].sum() + def_prior["carries"].sum())
-                opp_epa_sum = float(def_prior["passing_epa"].sum() + def_prior["rushing_epa"].sum())
+                opp_plays = float(def_prior["attempts"].sum() or 0.0) + float(
+                    def_prior["carries"].sum() or 0.0
+                )
+                opp_epa_sum = float(def_prior["passing_epa"].sum() or 0.0) + float(
+                    def_prior["rushing_epa"].sum() or 0.0
+                )
                 def_epa = (DEFAULT_PRIOR_PLAYS * NFL_LEAGUE_AVG_EPA_PLAY + opp_epa_sum) / (
                     DEFAULT_PRIOR_PLAYS + max(1.0, opp_plays)
                 )
@@ -274,13 +280,13 @@ class NFLEfficiencyStore:
                 .tail(16)
             )
 
-            dropbacks = float(prior["attempts"].sum() + prior["sacks_suffered"].sum())
+            dropbacks = float(prior["attempts"].sum() or 0.0) + float(prior["sacks_suffered"].sum() or 0.0)
             if dropbacks < 20.0:
                 # Untested or rookie backup penalty (-1.5 to -2.5 pts)
                 return -1.5
 
-            pepa_sum = float(prior["passing_epa"].sum())
-            cpoe_mean = float(prior["passing_cpoe"].mean() or 0.0)
+            pepa_sum = float(prior["passing_epa"].sum() or 0.0)
+            cpoe_mean = float(str(prior["passing_cpoe"].mean() or 0.0))
 
             # Bayesian shrinkage toward league average
             shrunk_epa = (DEFAULT_PRIOR_DROPBACKS * 0.04 + pepa_sum) / (DEFAULT_PRIOR_DROPBACKS + dropbacks)

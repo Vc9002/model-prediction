@@ -13,9 +13,13 @@ Structural, tie-aware baseball scoring engine for KBO (Korea) and NPB (Japan):
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
+
+from .base import GamePrediction
 
 KBO_V3_MODEL_VERSION = "kbo-baseball-v3"
 NPB_V3_MODEL_VERSION = "npb-baseball-v3"
@@ -43,8 +47,9 @@ class InternationalBaseballV3Model:
     def __init__(self, league: str = "NPB", max_runs: int = 15) -> None:
         self.league = league.upper()
         self.max_runs = max_runs
-        # NPB has higher tie rates (~8.5%) due to 12-inning limit with no ghost runner; KBO ~2.5%
-        self.tie_rate_factor = 0.085 if self.league == "NPB" else 0.028
+        # Conditional extra-inning tie probability given game was tied after 9 innings (~14% of games)
+        # Yields overall ~8.1% tie rate for NPB (12-inning cap, no ghost runner) and ~2.5% for KBO
+        self.tie_rate_factor = 0.58 if self.league == "NPB" else 0.18
 
     def forecast_match(
         self,
@@ -98,3 +103,121 @@ class InternationalBaseballV3Model:
             total_line=total_line,
             bivariate_score_matrix=matrix.tolist(),
         )
+
+    def predict_games(
+        self,
+        history: Sequence[Any] | None = None,
+        upcoming: Sequence[Any] | None = None,
+    ) -> list[GamePrediction]:
+        """Generate point-in-time MarketScopedModel-compatible predictions for international baseball."""
+        if upcoming is None and history is not None:
+            upcoming = history
+            history = None
+        if not upcoming:
+            return []
+
+        version = KBO_V3_MODEL_VERSION if self.league == "KBO" else NPB_V3_MODEL_VERSION
+        predictions: list[GamePrediction] = []
+
+        for match in upcoming:
+            event_id = str(getattr(match, "event_id", "") or "match")
+            event_start = str(getattr(match, "event_start_utc", "") or "")
+            home_team = getattr(match, "home_team", "")
+            away_team = getattr(match, "away_team", "")
+            if not home_team or not away_team:
+                continue
+
+            default_lh = 4.8 if self.league == "KBO" else 3.5
+            default_la = 4.4 if self.league == "KBO" else 3.2
+            total_line = getattr(match, "total_line", 8.5) or 8.5
+            forecast = self.forecast_match(
+                home_team=home_team,
+                away_team=away_team,
+                lambda_home=default_lh,
+                lambda_away=default_la,
+                total_line=float(total_line),
+            )
+
+            feature_basis = {
+                "lambda_home": forecast.lambda_home,
+                "lambda_away": forecast.lambda_away,
+                "tie_rate_factor": self.tie_rate_factor,
+                "prob_draw": forecast.prob_draw,
+            }
+
+            # 1. Moneyline
+            predictions.append(
+                GamePrediction(
+                    event_id=event_id,
+                    event_start_utc=event_start,
+                    league=self.league,
+                    away_team=away_team,
+                    home_team=home_team,
+                    market_type="moneyline",
+                    line=None,
+                    probabilities={
+                        "home": forecast.prob_home_win,
+                        "away": forecast.prob_away_win,
+                        "draw": forecast.prob_draw,
+                    },
+                    uncertainty=0.12,
+                    model_version=version,
+                    feature_basis=feature_basis,
+                    rationale=f"{self.league} structural bivariate Poisson with tie-rate {forecast.prob_draw:.1%}",
+                )
+            )
+
+            # 2. Total
+            predictions.append(
+                GamePrediction(
+                    event_id=event_id,
+                    event_start_utc=event_start,
+                    league=self.league,
+                    away_team=away_team,
+                    home_team=home_team,
+                    market_type="total",
+                    line=forecast.total_line,
+                    probabilities={
+                        "over": forecast.prob_over_total,
+                        "under": forecast.prob_under_total,
+                    },
+                    uncertainty=0.15,
+                    model_version=f"{self.league.lower()}-total-v1",
+                    feature_basis=feature_basis,
+                    rationale=f"{self.league} run distribution total {forecast.total_line}",
+                )
+            )
+
+            # 3. Spread (Home -1.5)
+            matrix = np.array(forecast.bivariate_score_matrix)
+            grid_i, grid_j = np.indices(matrix.shape)
+            p_home_cover = float(np.sum(matrix[grid_i - grid_j >= 2]))
+            p_away_cover = max(0.0, 1.0 - p_home_cover)
+            predictions.append(
+                GamePrediction(
+                    event_id=event_id,
+                    event_start_utc=event_start,
+                    league=self.league,
+                    away_team=away_team,
+                    home_team=home_team,
+                    market_type="spread",
+                    line=-1.5,
+                    probabilities={
+                        "home": round(p_home_cover, 4),
+                        "away": round(p_away_cover, 4),
+                    },
+                    uncertainty=0.15,
+                    model_version=f"{self.league.lower()}-spread-v1",
+                    feature_basis=feature_basis,
+                    rationale=f"{self.league} runline -1.5 bivariate Poisson expectation",
+                )
+            )
+
+        return predictions
+
+    def predict_matches(
+        self,
+        history: Sequence[Any] | None = None,
+        upcoming: Sequence[Any] | None = None,
+    ) -> list[GamePrediction]:
+        return self.predict_games(history=history, upcoming=upcoming)

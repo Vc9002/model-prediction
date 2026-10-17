@@ -280,10 +280,14 @@ def _compute_features(
             features["bullpen_available"] = 0.0
     if "bullpen_fatigue_available" in wanted:
         try:
-            home_fatigue = team_recent_relief_lines(home_team, event_start, lookback_days=FATIGUE_WINDOW_DAYS)
-            away_fatigue = team_recent_relief_lines(away_team, event_start, lookback_days=FATIGUE_WINDOW_DAYS)
+            home_fatigue_lines = team_recent_relief_lines(
+                home_team, event_start, lookback_days=FATIGUE_WINDOW_DAYS
+            )
+            away_fatigue_lines = team_recent_relief_lines(
+                away_team, event_start, lookback_days=FATIGUE_WINDOW_DAYS
+            )
             features["bullpen_fatigue_available"] = (
-                1.0 if (bool(home_fatigue) and bool(away_fatigue)) else 0.0
+                1.0 if (bool(home_fatigue_lines) and bool(away_fatigue_lines)) else 0.0
             )
         except (KeyError, TypeError, ValueError, OSError):
             features["bullpen_fatigue_available"] = 0.0

@@ -241,8 +241,19 @@ class CFBFeatureExtractor:
             if g_dt < as_of_dt:
                 past_games.append(g)
 
-        # Current season games
-        curr_season_games = [g for g in past_games if _get_val(g, "season_year", season_year) == season_year]
+        # Current season games: resolve from attribute or timestamp to prevent cross-season leakage
+        def _resolve_game_season(gm: Any) -> int | None:
+            sy = _get_val(gm, "season_year")
+            if sy is not None:
+                return int(sy)
+            s_val = _get_val(gm, "event_start_utc") or _get_val(gm, "start")
+            if s_val:
+                dt = parse_utc(s_val) if isinstance(s_val, str) else s_val
+                if dt:
+                    return dt.year - 1 if dt.month == 1 else dt.year
+            return None
+
+        curr_season_games = [g for g in past_games if _resolve_game_season(g) == season_year]
 
         n_games = len(curr_season_games)
         decay_w = PRESEASON_DECAY_WEIGHTS.get(min(week, 14), 0.10)
@@ -327,7 +338,7 @@ class CFBFeatureExtractor:
         home_team: str,
         event_id: str,
         game_start_utc: str,
-        season_year: int = 2024,
+        season_year: int | None = None,
         week: int = 1,
         wind_mph: float | None = None,
         temperature_f: float | None = None,
@@ -337,13 +348,18 @@ class CFBFeatureExtractor:
         qb_starter_prob_home: float = 1.0,
     ) -> CFBMatchupFeatures:
         start_dt = parse_utc(game_start_utc)
+        resolved_season_year = (
+            season_year
+            if season_year is not None
+            else (start_dt.year - 1 if start_dt.month == 1 else start_dt.year)
+        )
 
         away_obj = resolve_team(away_team)
         home_obj = resolve_team(home_team)
 
         # 1. State Computation
-        away_state = self._compute_team_state(history, away_team, start_dt, season_year, week)
-        home_state = self._compute_team_state(history, home_team, start_dt, season_year, week)
+        away_state = self._compute_team_state(history, away_team, start_dt, resolved_season_year, week)
+        home_state = self._compute_team_state(history, home_team, start_dt, resolved_season_year, week)
 
         is_fbs_fcs = away_state.tier == "FCS" or home_state.tier == "FCS"
 
@@ -401,8 +417,16 @@ class CFBFeatureExtractor:
         away_last_dt = max([_get_dt(g) for g in past_away_games]) if past_away_games else None
         home_last_dt = max([_get_dt(g) for g in past_home_games]) if past_home_games else None
 
-        away_rest = (start_dt - away_last_dt).total_seconds() / 86400.0 if away_last_dt else 7.0
-        home_rest = (start_dt - home_last_dt).total_seconds() / 86400.0 if home_last_dt else 7.0
+        away_rest = (
+            (start_dt - away_last_dt).total_seconds() / 86400.0
+            if (away_last_dt and (start_dt - away_last_dt).total_seconds() / 86400.0 <= 28.0)
+            else 7.0
+        )
+        home_rest = (
+            (start_dt - home_last_dt).total_seconds() / 86400.0
+            if (home_last_dt and (start_dt - home_last_dt).total_seconds() / 86400.0 <= 28.0)
+            else 7.0
+        )
 
         away_rest = min(21.0, max(4.0, away_rest))
         home_rest = min(21.0, max(4.0, home_rest))
@@ -490,6 +514,13 @@ class CFBFeatureExtractor:
             + eff_weight * raw_eff_margin
             + (home_qb_adj - away_qb_adj) * (1.0 - eff_weight)
         )
+
+        # Non-linear talent disparity shrinkage for extreme blowouts (>21.5 pt margins)
+        # In CFB, coaches pull starters and run out the clock in the 4th quarter, suppressing tail blowout margins.
+        if abs(proj_margin) > 21.5:
+            excess = abs(proj_margin) - 21.5
+            sign = 1.0 if proj_margin > 0 else -1.0
+            proj_margin = sign * (21.5 + excess * 0.70)
 
         # 4. Total points expectation calibrated to empirical FBS average (54.5)
         epa_total_adj = (home_state.adj_offense_epa + away_state.adj_offense_epa) * 12.0

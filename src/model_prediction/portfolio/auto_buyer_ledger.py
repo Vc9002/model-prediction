@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from collections.abc import Callable
 from contextlib import suppress
@@ -28,7 +29,7 @@ from ..ledger import FIELDNAMES
 from ..pricing import american_to_decimal
 from ..research_io import identity_key as _identity_key
 from ..runtime_paths import RuntimePaths
-from ..xlsx_ledger import read_xlsx_rows, write_xlsx_rows_atomic
+from ..xlsx_ledger import _replace_with_retry, read_xlsx_rows, write_xlsx_rows_atomic
 
 # Reverse of esports.TITLE_SPECS[title]["polymarket_league"] -- the Auto-Buyer
 # ledger's own `sport` field is written as that league string (e.g. "CS2",
@@ -49,6 +50,17 @@ logger = logging.getLogger("model_prediction.auto_buyer")
 
 AUTO_BUYER_UNIT_VALUE_USD = 0.50  # 1U = 50 cents
 AUTO_BUYER_TERMINAL_RESULTS = frozenset({"win", "loss", "push"})
+
+
+def _write_jsonl_atomic(j_path: Path, records: list[dict[str, Any]]) -> None:
+    """Safely rewrite JSONL file via temporary file + atomic rename to prevent 0-byte truncation."""
+    tmp_path = j_path.with_name(f"{j_path.name}.{os.getpid()}.tmp")
+    with tmp_path.open("w", encoding="utf-8") as f:
+        for r in records:
+            f.write(json.dumps(r, sort_keys=True) + "\n")
+        f.flush()
+        os.fsync(f.fileno())
+    _replace_with_retry(str(tmp_path), j_path)
 
 
 def _usd_to_auto_buyer_units(value_usd: float, unit_value_usd: float = AUTO_BUYER_UNIT_VALUE_USD) -> float:
@@ -261,9 +273,7 @@ def record_auto_buy_execution(
                 rec["order_state"] = order_state
 
             try:
-                with j_path.open("w", encoding="utf-8") as f:
-                    for r in records:
-                        f.write(json.dumps(r, sort_keys=True) + "\n")
+                _write_jsonl_atomic(j_path, records)
             except OSError as err:
                 logger.warning(f"Failed to update auto_buyer_ledger.jsonl on topup: {err}")
 
@@ -551,15 +561,21 @@ def reconcile_pending_auto_buyer_fallbacks(
         if r.get("fill_known") is False and r.get("fallback_order_id") == r.get("order_id"):
             new_shares = round(fallback_filled, 4)
             new_cost = round(fallback_filled * entry_price, 4)
+            update_primary = True
         else:
             new_shares = round(primary_shares + fallback_filled, 4)
             new_cost = round(primary_cost + fallback_filled * entry_price, 4)
+            update_primary = False
 
         if new_shares != r.get("shares") or new_cost != r.get("cost_usd"):
             r["shares"] = new_shares
             r["cost_usd"] = new_cost
-            r["primary_filled_shares"] = new_shares
-            r["primary_filled_cost_usd"] = new_cost
+            if update_primary:
+                r["primary_filled_shares"] = new_shares
+                r["primary_filled_cost_usd"] = new_cost
+            else:
+                r["fallback_filled_shares"] = round(fallback_filled, 4)
+                r["fallback_filled_cost_usd"] = round(fallback_filled * entry_price, 4)
             try:
                 unit_value = float(r.get("unit_value_usd") or AUTO_BUYER_UNIT_VALUE_USD)
             except (TypeError, ValueError):
@@ -690,9 +706,7 @@ def reconcile_pending_auto_buyer_fallbacks(
 
     if changed:
         try:
-            with j_path.open("w", encoding="utf-8") as f:
-                for r in records:
-                    f.write(json.dumps(r, sort_keys=True) + "\n")
+            _write_jsonl_atomic(j_path, records)
         except OSError as err:
             logger.warning(f"Failed to rewrite auto_buyer_ledger.jsonl during fallback reconciliation: {err}")
         try:
@@ -1006,7 +1020,9 @@ def manually_settle_auto_buyer_order(
     if settlement_type == "fair_value":
         if result != "push":
             raise ValueError("fair_value settlement must use result='push'")
-        pnl_usd = round((float(settlement_price) - float(target.get("entry_price") or 0.0)) * shares, 4)
+        pnl_usd = round(
+            (float(settlement_price or 0.0) - float(target.get("entry_price") or 0.0)) * shares, 4
+        )
     elif result == "win":
         pnl_usd = round(shares - cost, 4)
     elif result == "loss":
@@ -1029,9 +1045,7 @@ def manually_settle_auto_buyer_order(
         target["settlement_price"] = float(settlement_price)
 
     try:
-        with j_path.open("w", encoding="utf-8") as f:
-            for r in records:
-                f.write(json.dumps(r, sort_keys=True) + "\n")
+        _write_jsonl_atomic(j_path, records)
     except OSError as err:
         logger.warning(f"Failed to rewrite auto_buyer_ledger.jsonl: {err}")
         raise
@@ -1699,9 +1713,7 @@ def settle_auto_buyer_ledger(
 
     # Rewrite JSONL atomically
     try:
-        with j_path.open("w", encoding="utf-8") as f:
-            for r in updated_records:
-                f.write(json.dumps(r, sort_keys=True) + "\n")
+        _write_jsonl_atomic(j_path, updated_records)
     except OSError as err:
         logger.warning(f"Failed to rewrite auto_buyer_ledger.jsonl: {err}")
 

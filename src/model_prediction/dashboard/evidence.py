@@ -921,7 +921,7 @@ def record_model_ledger_decision(payload: dict) -> dict:
 def _production_canary_status() -> dict:
     """Production canary dashboard card — model health, timestamps, prediction counts."""
     try:
-        from dashboard.production import get_production_status
+        from dashboard.production import get_production_status  # type: ignore[import-not-found]
 
         return get_production_status()
     except Exception as e:  # noqa: BLE001 - any failure surfaces as a DOWN card, not a 500

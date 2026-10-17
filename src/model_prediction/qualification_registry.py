@@ -55,7 +55,7 @@ def _is_challenger_implemented(chall_id: str | None) -> bool:
         "r6-contextual-v7": "model_prediction.models.esports_contextual_v7",
         "kbo-baseball-v3": "model_prediction.models.international_baseball_v3",
         "npb-baseball-v3": "model_prediction.models.international_baseball_v3",
-        "soccer-poisson-dc-v2": "model_prediction.models.soccer_distribution",
+        "soccer-poisson-dc-v2": "model_prediction.models.soccer_dixon_coles_v2",
         "tennis-surface-elo-v2": "model_prediction.tennis_forward",
     }
     if chall_id in mappings:

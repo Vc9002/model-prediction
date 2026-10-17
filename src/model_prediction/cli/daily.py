@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from ..config import PROJECT_ROOT, ledger_path, polymarket_edge_enabled
+from ..daily_lock import acquire_lock, release_lock
 from ..data_sources.espn_probables import capture_probable_starter_snapshot
 from ..data_sources.espn_wnba_injuries import capture_espn_event_injuries
 from ..data_sources.mlb_injuries import (
@@ -44,6 +45,8 @@ from .forecast import (
     _forecast_learned_sport,
     _forecast_mlb_nrfi_flat,
     _forecast_mlb_totals_flat,
+    _forecast_nba_spread_sport,
+    _forecast_nba_total_sport,
     _forecast_nfl_spread_sport,
     _forecast_nfl_total_sport,
     _forecast_soccer_sport,
@@ -173,6 +176,37 @@ def _with_timed_exports(function):
     return wrapped
 
 
+def _with_process_lock(function):
+    """Ensure a non-blocking process lock on daily_pipeline.lock during execution."""
+
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        data_root = kwargs.get("data_root")
+        if data_root is None and len(args) > 6:
+            data_root = args[6]
+        if data_root is None:
+            data_root = Path("data")
+        lock_path = Path(data_root) / "daily_pipeline.lock"
+        lock_handle = acquire_lock(lock_path)
+        if lock_handle is None:
+            logger.warning(
+                "Daily pipeline lock %s is already held by another process; aborting concurrent run.",
+                lock_path,
+            )
+            return {
+                "status": "aborted",
+                "reason": "concurrent_daily_process_locked",
+                "lock_path": str(lock_path),
+            }
+        try:
+            return function(*args, **kwargs)
+        finally:
+            release_lock(lock_handle)
+
+    return wrapped
+
+
+@_with_process_lock
 @_with_timed_exports
 def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     # Wall-clock markers for the daily-run timing report (2026-08-26 perf
@@ -273,14 +307,21 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
 
                 ingestor = Ingestor(data_root, rate_limit_seconds=0.0)
                 current_date = dt_date.fromisoformat(args.date)
-                appended_total = 0
-                for offset in range(3, -1, -1):
-                    d_str = (current_date - dt_timedelta(days=offset)).isoformat()
+                dates = [
+                    (current_date - dt_timedelta(days=offset)).isoformat() for offset in range(3, -1, -1)
+                ]
+
+                def _ingest_date(d_str: str) -> int:
                     try:
                         res = ingestor.ingest_scores("soccer", d_str)
-                        appended_total += int(res.get("new_games_appended", 0))
+                        return int(res.get("new_games_appended", 0))
                     except (OSError, ValueError, httpx.HTTPError) as e:
                         logger.warning("ESPN soccer ingest failed for %s: %s", d_str, e)
+                        return 0
+
+                with ThreadPoolExecutor(max_workers=min(4, len(dates))) as pool:
+                    appended_counts = list(pool.map(_ingest_date, dates))
+                appended_total = sum(appended_counts)
                 soccer_collection = {
                     "status": "espn_fallback",
                     "source": "espn",
@@ -431,7 +472,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             logger.warning("MLB starter snapshot capture failed for %s", args.date, exc_info=True)
             mlb_starter_snapshot_result = {"status": "error"}
 
-    with ThreadPoolExecutor(max_workers=9) as io_pool:
+    with ThreadPoolExecutor(max_workers=12) as io_pool:
         f0 = io_pool.submit(_polymarket_slate, slate_args, config)
         f1 = io_pool.submit(_capture_wnba)
         f2 = io_pool.submit(_build_priors)
@@ -725,6 +766,58 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 "logged": 0,
             }
 
+    def _nba_spread_task() -> None:
+        try:
+            forecast_result["nba_spread"] = _forecast_nba_spread_sport(
+                data_root=data_directory,
+                args_date=args.date,
+                config=config,
+                registry=registry,
+                bans=bans,
+                main_ledger=ledger,
+                flat_ledger=flat_ledger,
+            )
+            _priced_nba_spread = forecast_result["nba_spread"].get("priced_contracts") or []
+            if _priced_nba_spread and not forecast_result["nba_spread"].get("logged"):
+                logger.warning(
+                    "zero rows logged for nba_spread despite %d priced contracts",
+                    len(_priced_nba_spread),
+                )
+        except Exception as exc:
+            logger.warning("NBA spread forecast failed", exc_info=True)
+            forecast_result["nba_spread"] = {
+                "sport": "nba_spread",
+                "status": "error",
+                "reason": str(exc),
+                "logged": 0,
+            }
+
+    def _nba_total_task() -> None:
+        try:
+            forecast_result["nba_total"] = _forecast_nba_total_sport(
+                data_root=data_directory,
+                args_date=args.date,
+                config=config,
+                registry=registry,
+                bans=bans,
+                main_ledger=ledger,
+                flat_ledger=flat_ledger,
+            )
+            _priced_nba_total = forecast_result["nba_total"].get("priced_contracts") or []
+            if _priced_nba_total and not forecast_result["nba_total"].get("logged"):
+                logger.warning(
+                    "zero rows logged for nba_total despite %d priced contracts",
+                    len(_priced_nba_total),
+                )
+        except Exception as exc:
+            logger.warning("NBA total forecast failed", exc_info=True)
+            forecast_result["nba_total"] = {
+                "sport": "nba_total",
+                "status": "error",
+                "reason": str(exc),
+                "logged": 0,
+            }
+
     def _nfl_spread_task() -> None:
         try:
             forecast_result["nfl_spread"] = _forecast_nfl_spread_sport(
@@ -927,7 +1020,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                         "logged": 0,
                     }
 
-    with ThreadPoolExecutor(max_workers=11) as research_pool:
+    with ThreadPoolExecutor(max_workers=13) as research_pool:
         research_futures = [
             research_pool.submit(_mlb_totals_task),
             research_pool.submit(_mlb_nrfi_task),
@@ -936,6 +1029,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             research_pool.submit(_cfb_task),
             research_pool.submit(_wnba_spread_task),
             research_pool.submit(_wnba_total_task),
+            research_pool.submit(_nba_spread_task),
+            research_pool.submit(_nba_total_task),
             research_pool.submit(_nfl_spread_task),
             research_pool.submit(_nfl_total_task),
             research_pool.submit(_esports_block),
@@ -1000,35 +1095,45 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         # affected pick sits "open" forever with no automatic path to
         # resolution; only a manually-run `settle --void-postponed`
         # would ever clear it. Auto-void in the unattended daily run.
+        from ..data_sources.espn import ESPNClient
+
         settle_args = argparse.Namespace(
             all_unsettled=True,
             void_postponed=True,
         )
-        settlement = _settle_all_unsettled(settle_args, config, ledger)
+        espn_settle = ESPNClient()
+        scoreboard_cache: dict[tuple[str, str], dict | Exception] = {}
+        settlement = _settle_all_unsettled(
+            settle_args,
+            config,
+            ledger,
+            espn=espn_settle,
+            scoreboard_cache=scoreboard_cache,
+        )
         flat_settlement = _settle_all_unsettled(
             settle_args,
             config,
             flat_ledger,
+            espn=espn_settle,
+            scoreboard_cache=scoreboard_cache,
         )
-        _research_settlement = {
-            sport_ledger.path.stem: _settle_all_unsettled(
+        research_ledgers_list = list(existing_research_ledgers(data_directory))
+        gated_ledgers_list = list(existing_research_ledgers(data_directory, gated=True))
+
+        def _settle_ledger_entry(sport_ledger):
+            return sport_ledger.path.stem, _settle_all_unsettled(
                 settle_args,
                 config,
                 sport_ledger,
+                espn=espn_settle,
+                scoreboard_cache=scoreboard_cache,
             )
-            for sport_ledger in existing_research_ledgers(data_directory)
-        }
-        _gated_settlement = {
-            sport_ledger.path.stem: _settle_all_unsettled(
-                settle_args,
-                config,
-                sport_ledger,
-            )
-            for sport_ledger in existing_research_ledgers(
-                data_directory,
-                gated=True,
-            )
-        }
+
+        with ThreadPoolExecutor(max_workers=min(8, max(1, len(research_ledgers_list)))) as pool:
+            _research_settlement = dict(pool.map(_settle_ledger_entry, research_ledgers_list))
+
+        with ThreadPoolExecutor(max_workers=min(8, max(1, len(gated_ledgers_list)))) as pool:
+            _gated_settlement = dict(pool.map(_settle_ledger_entry, gated_ledgers_list))
     _t_settle_end = time.monotonic()
 
     # Step 4b: Automated Model Calibration & Drift Monitor
@@ -1129,15 +1234,16 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             auto_buyer_settle_result = {"status": "error"}
 
     # Step 12: Automated Polymarket Buyer (if enabled in dashboard state)
+    auto_buyer_result: dict[str, Any]
     if _auto_buyer_is_decoupled():
         logger.info("Auto-Buyer purchase cycle delegated to independent worker")
-        auto_buyer_result: dict[str, Any] = {
+        auto_buyer_result = {
             "status": "skipped",
             "reason": "independent_auto_buyer_worker",
         }
     elif _skip_auto_buyer_for_verification():
         logger.info("Auto-Buyer skipped by explicit verification override")
-        auto_buyer_result: dict[str, Any] = {
+        auto_buyer_result = {
             "status": "skipped",
             "reason": "verification_override",
         }

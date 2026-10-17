@@ -102,13 +102,13 @@ def test_evidence_status_does_not_control_serving_status() -> None:
     assert contract.evidence_status == EvidenceStatus.PREDICTIVELY_QUALIFIED.value
     assert contract.replacement_priority == ReplacementPriority.LOW.value
 
-    # NCAAF was unified under cfb-structural-v2 (shadow_qualified with medium replacement priority)
+    # NCAAF was unified under cfb-structural-v2 (predictively_qualified with medium replacement priority)
     for market in ("moneyline", "spread", "total"):
         champion = registry.champion("NCAAF", market)
         assert champion is not None
         assert champion.available is True
         assert champion.serving_status in {"production", "active"}
-        assert champion.evidence_status == "shadow_qualified"
+        assert champion.evidence_status == EvidenceStatus.PREDICTIVELY_QUALIFIED.value
         assert champion.replacement_priority == ReplacementPriority.MEDIUM.value
 
 

@@ -122,11 +122,19 @@ def replay_snapshot(payload: dict[str, Any]) -> dict[str, float]:
         from .models.nfl_structural_v5 import discrete_spread_prob
 
         p_home, p_away, _ = discrete_spread_prob(-line, mean, sd)
+        tot_spread = p_home + p_away
+        if tot_spread > 0:
+            p_home /= tot_spread
+            p_away /= tot_spread
         return {"away": round(p_away, 6), "home": round(p_home, 6)}
     if method == "nfl_structural_v5_total_engine":
         from .models.nfl_structural_v5 import discrete_total_prob
 
         p_over, p_under, _ = discrete_total_prob(line, mean, sd)
+        tot_total = p_over + p_under
+        if tot_total > 0:
+            p_over /= tot_total
+            p_under /= tot_total
         return {"under": round(p_under, 6), "over": round(p_over, 6)}
 
     is_margin = method == "margin_normal"

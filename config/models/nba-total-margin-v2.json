@@ -1,0 +1,30 @@
+{
+  "method": "total_normal",
+  "model_version": "nba-total-margin-v2",
+  "schema_version": "2",
+  "sport": "nba",
+  "league": "NBA",
+  "positive_class": "over",
+  "total_sd": 19.2,
+  "margin_sd": 12.0,
+  "trend_total_weight": 0.85,
+  "team_total_weight": 0.15,
+  "expected_total_source": "composite_trend_team_rolling_normal",
+  "expected_total_formula": "0.85 * (away_hl10 + home_hl10) + 0.15 * ((home_10g_avg + away_10g_avg) / 2.0)",
+  "cdf_family": "normal",
+  "prediction_formula": "P(over) = 1.0 - normal_cdf(total_line, expected_total, 19.2)",
+  "note": "Production-qualified NBA game totals model replacing nba-total-margin-v1. Integrates opponent-adjusted EWM scoring trends, 10-game team rolling totals, and calibrated residual variance on clean regular/postseason games.",
+  "qualification": {
+    "qualified": true,
+    "status": "qualified",
+    "framework": "nba_composite_total_cdf",
+    "holdout_brier_score": 0.24536,
+    "holdout_log_loss": 0.6838,
+    "sample_size": 1322,
+    "mae": 15.2538,
+    "rmse": 19.1956,
+    "locked_holdout": true,
+    "note": "Walk-forward validated on 1,322 locked holdout games from 2026 season with clean regular/postseason filtering."
+  },
+  "artifact_hash": "e9c71f3da6a991528621e0d4fe711f4d9cf5298411082aefe3207cbb1b6f8f2c"
+}

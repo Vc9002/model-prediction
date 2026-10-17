@@ -309,7 +309,7 @@ def _cached(key: str, ttl: float, builder):
         serve_stale = bool(hit) and _SWR["on"]
         if not serve_stale:
             build_lock = _CACHE_BUILD_LOCKS.setdefault(key, threading.RLock())
-    if serve_stale:
+    if serve_stale and hit is not None:
         _refresh_in_background(key, ttl, builder)
         return hit[1]
     # Collapse simultaneous misses for the same endpoint. Separate keys stay
@@ -375,7 +375,7 @@ def _runtime_paths():
 
 def rebuild_view(name: str) -> dict:
     """Return one isolated rebuild projection without importing writer classes."""
-    from dashboard.rebuild_status import read_rebuild_view
+    from dashboard.rebuild_status import read_rebuild_view  # type: ignore[import-not-found]
 
     try:
         paths = _runtime_paths()

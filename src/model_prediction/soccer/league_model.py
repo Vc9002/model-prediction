@@ -18,6 +18,7 @@ flagged as a follow-up, not silently assumed to be done.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -49,6 +50,7 @@ class LeagueSoccerConfig:
     # this to blend team strengths toward the neutral 1.0 prior.
     shrinkage_prior_games: float | None = None
     global_baseline: float | None = None  # only used when shrinkage_prior_games is set
+    divide_away: bool = False
 
 
 @dataclass(frozen=True)
@@ -101,8 +103,14 @@ class LeagueSoccerModel:
         cfg = self.config
         home = strengths.get(home_team, {"attack": 1.0, "defense": 1.0, "games": 0.0})
         away = strengths.get(away_team, {"attack": 1.0, "defense": 1.0, "games": 0.0})
-        home_rate = cfg.baseline * home["attack"] * away["defense"] * cfg.home_advantage
-        away_rate = cfg.baseline * away["attack"] * home["defense"] / cfg.home_advantage
+        if getattr(cfg, "divide_away", False):
+            h_mult = math.sqrt(cfg.home_advantage)
+            a_mult = 1.0 / h_mult
+            home_rate = cfg.baseline * home["attack"] * away["defense"] * h_mult
+            away_rate = cfg.baseline * away["attack"] * home["defense"] * a_mult
+        else:
+            home_rate = cfg.baseline * home["attack"] * away["defense"] * cfg.home_advantage
+            away_rate = cfg.baseline * away["attack"] * home["defense"]
         matrix = score_matrix(home_rate, away_rate, cfg.dc_rho, cfg.max_goals)
         home_win, away_win, draw = matrix_outcomes(matrix)
         over25 = matrix_over_under(matrix, 2.5)

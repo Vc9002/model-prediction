@@ -26,7 +26,7 @@ class ComboExecutionError(RuntimeError):
 def combo_sdk_available() -> bool:
     """Return whether the official Combo RFQ SDK is installed."""
     try:
-        import polymarket  # noqa: F401
+        import polymarket  # type: ignore[import-not-found]  # noqa: F401
     except ImportError:
         return False
     return True
@@ -63,8 +63,8 @@ def create_combo_client_from_env() -> ComboRFQClient:
         raise ComboExecutionError(f"missing dedicated Combo RFQ credentials: {', '.join(missing)}")
     if not combo_sdk_available():
         raise ComboExecutionError("official polymarket-client SDK is not installed")
-    from polymarket.auth import BuilderApiKey
-    from polymarket.clients.secure import SecureClient
+    from polymarket.auth import BuilderApiKey  # type: ignore[import-not-found]
+    from polymarket.clients.secure import SecureClient  # type: ignore[import-not-found]
 
     wallet = os.getenv("POLYMARKET_WALLET_ADDRESS", "").strip() or None
     return SecureClient.create(
@@ -116,7 +116,7 @@ def combo_legs_from_pick_rows(rows: list[dict[str, Any]]) -> list[ComboLeg]:
                 position_id=position_id,
                 market_slug=str(row.get("market_slug") or ""),
                 market_type=str(row.get("market_type") or "").lower(),
-                model_probability=float(row.get("model_probability")),
+                model_probability=float(row.get("model_probability") or 0.0),
                 event_start_utc=str(row.get("event_start_utc") or ""),
             )
         )

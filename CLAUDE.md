@@ -39,12 +39,18 @@ shortest_path) is also registered in Claude Code. Refresh with
 
 ## What this project is
 
-A shadow-first, multi-sport prediction/research/ledger/dashboard system with
-Polymarket US integration. Most sports are research/shadow (zero real units,
-logged for track record only); a small number (MLB moneyline, WNBA moneyline)
-are promoted to produce real, sized `QUALIFIED_SHADOW_CALL` rows in the Main
-ledger. Real-money order execution exists behind an explicit, separately
-gated dashboard surface — treat anything touching it as high-stakes.
+A **100% paper trading ("fugazi")** multi-sport quantitative prediction, research,
+ledger, and local dashboard system with Polymarket US CLOB integration.
+
+- **Zero Real Capital**: The entire platform operates in simulated paper mode — no real
+  money can actually be used, and live automated order execution is barred.
+- **Realistic Financial Mechanics**: Despite being paper/fugazi, it functions with full
+  market fidelity as if real capital were at stake: real Polymarket CLOB executable asks,
+  realistic Kelly/edge-scaled unit sizing (1.0U–2.0U), daily bankroll loss caps,
+  mark-to-market settlement, and closing-line-value (CLV) PnL accounting.
+- **Direct Model Wiring**: All models are directly wired up to the most updated model
+  across all sports, leagues, and market types (Moneyline, Spread, Total, NRFI).
+  Bureaucratic "shadow-qualified" hurdles and quarantine holdouts are removed.
 
 ## Read these first, in this order
 

@@ -31,6 +31,21 @@ class League(StrEnum):
     RAINBOW_SIX = "RAINBOW_SIX"
     KBO = "KBO"
     NPB = "NPB"
+    HOCKEY = "HOCKEY"
+    NHL = "NHL"
+    AHL = "AHL"
+    KHL = "KHL"
+    DEL = "DEL"
+    SHL = "SHL"
+    SNHL = "SNHL"
+    CEHL = "CEHL"
+    LIIGA = "LIIGA"
+    DARTS = "DARTS"
+    DARTS_PDC = "DARTS_PDC"
+    DARTS_MODUS = "DARTS_MODUS"
+    NCAAB = "NCAAB"
+    WNCAAB = "WNCAAB"
+    EUROLEAGUE = "EUROLEAGUE"
 
 
 # Canonical sport tuples — single source of truth for iteration and CLI choices.
@@ -55,7 +70,19 @@ LEARNED_PRODUCTION_SPORTS: tuple[str, ...] = (
     "valorant",
     "rainbow_six",
 )
-ALL_SPORTS: tuple[str, ...] = ("mlb", "nba", "wnba", "nfl", "ncaaf", "soccer", "tennis")
+ALL_SPORTS: tuple[str, ...] = (
+    "mlb",
+    "nba",
+    "wnba",
+    "nfl",
+    "ncaaf",
+    "soccer",
+    "tennis",
+    "hockey",
+    "darts",
+    "ncaab",
+    "wncaab",
+)
 
 
 class MarketType(StrEnum):

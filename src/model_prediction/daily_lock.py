@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import IO
 
-from model_prediction.filelock import lock_exclusive
+from model_prediction.filelock import lock_exclusive, unlock
 
 LOCK_BUSY_EXIT = 75
 
@@ -39,6 +39,21 @@ def acquire_lock(path: str | Path) -> IO[str] | None:
     )
     handle.flush()
     return handle
+
+
+def release_lock(handle: IO[str] | None) -> None:
+    """Release and close a lock handle acquired with acquire_lock."""
+    if handle is None:
+        return
+    try:
+        unlock(handle.fileno())
+    except Exception:  # noqa: BLE001, S110
+        pass
+    finally:
+        try:
+            handle.close()
+        except Exception:  # noqa: BLE001, S110
+            pass
 
 
 def parser() -> argparse.ArgumentParser:
@@ -77,7 +92,7 @@ def main(argv: list[str] | None = None) -> int:
             check=False,
             creationflags=creationflags,
         )
-        handle.close()
+        release_lock(handle)
         return result.returncode
     # Python opens files close-on-exec by default. Make this descriptor
     # inheritable so bash and every child keep the lock until the workflow exits.

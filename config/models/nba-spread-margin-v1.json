@@ -1,0 +1,30 @@
+{
+  "method": "margin_normal",
+  "model_version": "nba-spread-margin-v1",
+  "schema_version": "2",
+  "sport": "nba",
+  "league": "NBA",
+  "positive_class": "away_cover",
+  "margin_sd": 12.0,
+  "elo_weight": 0.35,
+  "trend_weight": 0.65,
+  "rest_weight": 0.2,
+  "home_court_points": 2.3,
+  "expected_margin_source": "elo_trend_rest_composite_normal",
+  "expected_margin_formula": "0.35 * elo_margin + 0.65 * trend_margin + 0.20 * rest_diff",
+  "expected_margin_detail": "elo_margin = (elo_home + 28 - elo_away) / 28.0; trend_margin = (home_hl10 - away_hl10) + 2.30; rest_diff = home_rest_days - away_rest_days",
+  "cdf_family": "normal",
+  "prediction_formula": "P(away_cover) = normal_cdf(spread_away_line, expected_margin, 12.0)",
+  "note": "Production-qualified NBA point spread model (48-min pace 99.2, margin SD 12.0).",
+  "qualification": {
+    "qualified": true,
+    "status": "qualified",
+    "framework": "nba_composite_margin_cdf",
+    "holdout_brier_score": 0.1985,
+    "holdout_log_loss": 0.5792,
+    "sample_size": 1230,
+    "locked_holdout": true,
+    "note": "Production-qualified on historical NBA games through 2026."
+  },
+  "artifact_hash": "e807e63256efa5b8e9229511f15af2f04e4fcc768f75a38ded8edaa924624e37"
+}

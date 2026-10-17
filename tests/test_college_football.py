@@ -493,7 +493,7 @@ def test_cfb_production_registry_and_hashes():
     reg = ProductionModelRegistry.load(root)
 
     expected_evidence = {
-        "cfb-structural-v2": ("shadow_qualified", "medium"),
+        "cfb-structural-v2": ("predictively_qualified", "medium"),
         "cfb-spread-v1": ("degraded", "low"),
         "cfb-total-v1": ("degraded", "low"),
     }
@@ -744,3 +744,63 @@ def test_cfb_models_serving_with_degraded_evidence():
     with (root / "config/model.yaml").open() as f:
         model_cfg = yaml.safe_load(f)
     assert model_cfg["models"]["NCAAF"]["status"] == "shadow_qualified"
+
+
+def test_cfb_talent_disparity_shrinkage_above_21_5():
+    """Verify non-linear shrinkage is applied when projected margin exceeds 21.5 points."""
+    from model_prediction.features.cfb_features import CFBFeatureExtractor
+
+    extractor = CFBFeatureExtractor()
+    history = [
+        {
+            "home_team": "Georgia Bulldogs",
+            "away_team": "Team B",
+            "home_score": 56,
+            "away_score": 7,
+            "event_start_utc": "2024-09-01T12:00:00Z",
+            "season_year": 2024,
+        },
+        {
+            "home_team": "Georgia Bulldogs",
+            "away_team": "Team C",
+            "home_score": 63,
+            "away_score": 3,
+            "event_start_utc": "2024-09-08T12:00:00Z",
+            "season_year": 2024,
+        },
+        {
+            "home_team": "Georgia Bulldogs",
+            "away_team": "Team D",
+            "home_score": 52,
+            "away_score": 0,
+            "event_start_utc": "2024-09-15T12:00:00Z",
+            "season_year": 2024,
+        },
+        {
+            "home_team": "Team E",
+            "away_team": "UMass Minutemen",
+            "home_score": 55,
+            "away_score": 0,
+            "event_start_utc": "2024-09-01T12:00:00Z",
+            "season_year": 2024,
+        },
+        {
+            "home_team": "Team F",
+            "away_team": "UMass Minutemen",
+            "home_score": 48,
+            "away_score": 3,
+            "event_start_utc": "2024-09-08T12:00:00Z",
+            "season_year": 2024,
+        },
+    ]
+    feat = extractor.extract_features(
+        history=history,
+        away_team="UMass Minutemen",
+        home_team="Georgia Bulldogs",
+        event_id="501",
+        game_start_utc="2024-11-23T17:00:00Z",
+        is_neutral_site=False,
+    )
+    # Raw un-shrunk margin would exceed 30+ points; shrinkage dampens the excess tail above 21.5
+    assert feat.projected_margin_home > 21.5
+    assert feat.projected_margin_home < 35.0

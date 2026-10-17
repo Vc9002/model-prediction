@@ -15,6 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from ..domain import parse_utc
 from ..features.cfb_features import (
     CFB_BASELINE_TOTAL_SD,
     CFB_DEFAULT_HOME_ADVANTAGE_POINTS,
@@ -132,13 +133,22 @@ class CFBStructuralV2Model:
         game: Any,
     ) -> list[GamePrediction]:
         """Generate standardized GamePrediction objects for Moneyline, Spread, and Total."""
+        game_year = None
+        if getattr(game, "event_start_utc", None):
+            try:
+                dt = parse_utc(game.event_start_utc)
+                game_year = dt.year - 1 if dt.month == 1 else dt.year
+            except Exception:  # noqa: BLE001, S110
+                pass
+        resolved_season_year = getattr(game, "season_year", None) or game_year or 2026
+
         feat: CFBMatchupFeatures = self.extractor.extract_features(
             history=history,
             away_team=game.away_team,
             home_team=game.home_team,
             event_id=game.event_id,
             game_start_utc=game.event_start_utc,
-            season_year=getattr(game, "season_year", 2024),
+            season_year=resolved_season_year,
             week=getattr(game, "week", 1),
             wind_mph=getattr(game, "wind_mph", None),
             temperature_f=getattr(game, "temperature_f", None),
@@ -147,10 +157,11 @@ class CFBStructuralV2Model:
             qb_starter_prob_away=getattr(game, "qb_starter_prob_away", 1.0),
             qb_starter_prob_home=getattr(game, "qb_starter_prob_home", 1.0),
         )
-        spread_line = getattr(game, "spread_home_line", -3.5) or -3.5
+        spread_home_line = getattr(game, "spread_home_line", -3.5) or -3.5
+        sp_away_line = -spread_home_line
         tot_line = getattr(game, "total_line", 52.5) or 52.5
 
-        fc = self.forecast_game(feat, spread_home_line=spread_line, total_line=tot_line)
+        fc = self.forecast_game(feat, spread_home_line=spread_home_line, total_line=tot_line)
 
         predictions: list[GamePrediction] = []
 
@@ -188,7 +199,7 @@ class CFBStructuralV2Model:
                 away_team=game.away_team,
                 home_team=game.home_team,
                 market_type="spread",
-                line=-spread_line,
+                line=sp_away_line,
                 probabilities={
                     "away": round(fc.prob_away_cover, 6),
                     "home": round(fc.prob_home_cover, 6),
@@ -197,7 +208,7 @@ class CFBStructuralV2Model:
                 model_version=self.version,
                 feature_basis=feat.to_dict(),
                 rationale=(
-                    f"CFB Structural v2 Spread: {game.home_team} {spread_line:+.1f} "
+                    f"CFB Structural v2 Spread: Home {spread_home_line:+.1f} / Away {sp_away_line:+.1f} "
                     f"(P(Home cover)={fc.prob_home_cover:.4f}, P(Away cover)={fc.prob_away_cover:.4f}, "
                     f"P(Push)={fc.prob_push_spread:.4f})."
                 ),

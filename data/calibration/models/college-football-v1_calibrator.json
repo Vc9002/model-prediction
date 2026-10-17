@@ -1,14 +1,38 @@
 {
   "baseline_brier": 0.209215,
-  "calibrated_at_utc": "2026-10-16T10:03:47.292518+00:00",
-  "calibrated_oof_brier": 0.2091091951085808,
-  "champion_method": "beta",
+  "calibrated_at_utc": "2026-10-17T04:36:29.409686+00:00",
+  "calibrated_oof_brier": 0.20712529231694143,
+  "champion_method": "isotonic",
   "market": "moneyline",
   "model_version": "college-football-v1",
   "parameters": {
-    "a": 2.0528,
-    "b": 0.0001,
-    "c": 1.7124
+    "max_val": 1.0,
+    "min_val": 0.0,
+    "num_thresholds": 10,
+    "thresholds": [
+      0.503555,
+      0.548475,
+      0.550925,
+      0.558173,
+      0.59096,
+      0.719485,
+      0.934488,
+      0.935347,
+      0.941179,
+      0.952203
+    ],
+    "values": [
+      0.0,
+      0.463415,
+      0.6,
+      0.666667,
+      0.666667,
+      0.719101,
+      0.815789,
+      1.0,
+      1.0,
+      1.0
+    ]
   },
   "sample_size": 245,
   "sport": "ncaaf"

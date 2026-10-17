@@ -145,8 +145,8 @@ class SoccerDixonColesV2Model:
         home_rat = self.team_ratings.get(home_team, SoccerTeamRatings(team_id=home_team))
         away_rat = self.team_ratings.get(away_team, SoccerTeamRatings(team_id=away_team))
 
-        log_lambda_h = params.baseline_mu + params.home_field_advantage + home_rat.attack - away_rat.defense
-        log_lambda_a = params.baseline_mu + away_rat.attack - home_rat.defense
+        log_lambda_h = params.baseline_mu + params.home_field_advantage + home_rat.attack + away_rat.defense
+        log_lambda_a = params.baseline_mu + away_rat.attack + home_rat.defense
 
         lambda_h = max(0.10, math.exp(log_lambda_h))
         lambda_a = max(0.10, math.exp(log_lambda_a))
@@ -158,7 +158,7 @@ class SoccerDixonColesV2Model:
             for j in range(self.max_goals + 1):
                 p_a = (math.exp(-lambda_a) * (lambda_a**j)) / math.factorial(j)
                 adj = _dixon_coles_tau(i, j, lambda_h, lambda_a, params.rho_low_score_dep)
-                matrix[i, j] = p_h * p_a * adj
+                matrix[i, j] = max(0.0, p_h * p_a * adj)
 
         # Normalize matrix
         total_prob = float(np.sum(matrix))

@@ -24,6 +24,9 @@ SUPPORTED_SPORTS: tuple[str, ...] = (
     "rainbow_six",
     "kbo",
     "npb",
+    "hockey",
+    "darts",
+    "basketball",
 )
 
 

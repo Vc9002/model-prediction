@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 NFL_V5_MODEL_VERSION = "nfl-structural-v5"
 NFL_LEAGUE_AVG_TOTAL = 44.5
+NFL_LEAGUE_AVG_EPA_PLAY = 0.04
 NFL_HFA_POINTS = 1.8
 NFL_DEFAULT_SPREAD_SD = 13.8
 NFL_DEFAULT_TOTAL_SD = 13.5
@@ -93,7 +94,9 @@ def discrete_total_distribution(exp_total: float, sd: float = NFL_DEFAULT_TOTAL_
         p_norm = _normal_cdf(t + 0.5, exp_total, sd) - _normal_cdf(t - 0.5, exp_total, sd)
         if t in NFL_KEY_TOTALS:
             emp = NFL_KEY_TOTALS[t]
-            norm_zero = _normal_cdf(t + 0.5, exp_total, sd) - _normal_cdf(t - 0.5, exp_total, sd)
+            norm_zero = _normal_cdf(t + 0.5, NFL_LEAGUE_AVG_TOTAL, sd) - _normal_cdf(
+                t - 0.5, NFL_LEAGUE_AVG_TOTAL, sd
+            )
             boost = emp / max(0.01, norm_zero)
             p = 0.70 * p_norm + 0.30 * (p_norm * boost)
         else:
@@ -153,10 +156,10 @@ class NFLStructuralV5Engine:
         self,
         home_team: str,
         away_team: str,
-        home_off_epa: float = 0.05,
-        home_def_epa: float = 0.00,
-        away_off_epa: float = 0.00,
-        away_def_epa: float = 0.05,
+        home_off_epa: float = 0.04,
+        home_def_epa: float = 0.04,
+        away_off_epa: float = 0.04,
+        away_def_epa: float = 0.04,
         home_qb_tier_adj: float = 0.0,
         away_qb_tier_adj: float = 0.0,
         wind_mph: float = 5.0,
@@ -171,11 +174,15 @@ class NFLStructuralV5Engine:
         base_points_per_side = NFL_LEAGUE_AVG_TOTAL / 2.0  # 22.25 pts
 
         # 1. EPA / Efficiency Points Projection (~ 32.0 pts per 1.0 EPA/play delta across 65 plays)
-        h_eff_pts = (home_off_epa - away_def_epa) * 32.0 + home_qb_tier_adj
-        a_eff_pts = (away_off_epa - home_def_epa) * 32.0 + away_qb_tier_adj
+        # Note: def_epa is opponent EPA allowed (higher = more porous defense).
+        h_eff_epa = (home_off_epa - NFL_LEAGUE_AVG_EPA_PLAY) + (away_def_epa - NFL_LEAGUE_AVG_EPA_PLAY)
+        a_eff_epa = (away_off_epa - NFL_LEAGUE_AVG_EPA_PLAY) + (home_def_epa - NFL_LEAGUE_AVG_EPA_PLAY)
+        h_eff_pts = h_eff_epa * 32.0 + home_qb_tier_adj
+        a_eff_pts = a_eff_epa * 32.0 + away_qb_tier_adj
 
         # 2. Situational Rest Disparity & Short-Week Factor (TNF drag: -3.5 pts on <= 5 days rest)
-        rest_pts = (home_rest_days - away_rest_days) * 0.35
+        h_rest_adj = (home_rest_days - away_rest_days) * 0.175
+        a_rest_adj = (away_rest_days - home_rest_days) * 0.175
         short_week_drag = 0.0
         if home_rest_days <= 5 and away_rest_days <= 5:
             short_week_drag = 3.5  # Full short-week turnaround (e.g. Thursday Night Football)
@@ -198,13 +205,13 @@ class NFLStructuralV5Engine:
             base_points_per_side
             + hfa
             + h_eff_pts
-            + rest_pts
+            + h_rest_adj
             - (weather_penalty / 2.0)
             - (short_week_drag / 2.0),
         )
         pts_away = max(
             6.0,
-            base_points_per_side + a_eff_pts - (weather_penalty / 2.0) - (short_week_drag / 2.0),
+            base_points_per_side + a_eff_pts + a_rest_adj - (weather_penalty / 2.0) - (short_week_drag / 2.0),
         )
         exp_margin = round(pts_home - pts_away, 2)
         exp_total = round(pts_home + pts_away, 2)

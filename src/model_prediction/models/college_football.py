@@ -375,11 +375,16 @@ def build_cfb_slate(
     try:
         scoreboard = espn.scoreboard("NCAAF", norm_date)
         events = scoreboard.get("events", [])
-    except (KeyError, ValueError, OSError, TypeError):
+    except Exception as exc:  # noqa: BLE001
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "Failed to fetch ESPN NCAAF scoreboard for %s: %s", norm_date, exc
+        )
         events = []
 
-    # 2. Load History
-    start_of_day = parse_utc(f"{iso_date}T00:00:00Z")
+    # 2. Load History: cutoff at 09:00:00Z (5:00 AM EDT) captures late Friday Pacific/Mountain games
+    start_of_day = parse_utc(f"{iso_date}T09:00:00Z")
     history = _load_cfb_history(root, cutoff_dt=start_of_day)
 
     model = CollegeFootballModel()
@@ -451,16 +456,8 @@ def build_cfb_slate(
                 total_line = None
 
             if total_line is not None:
-                market_total_over_prob = (
-                    round(implied_probability(ov_n), 6)
-                    if ov_n
-                    else (round(1.0 - implied_probability(un_n), 6) if un_n else STANDARD_LAY_ASK)
-                )
-                market_total_under_prob = (
-                    round(implied_probability(un_n), 6)
-                    if un_n
-                    else (round(1.0 - implied_probability(ov_n), 6) if ov_n else STANDARD_LAY_ASK)
-                )
+                market_total_over_prob = round(implied_probability(ov_n), 6) if ov_n else STANDARD_LAY_ASK
+                market_total_under_prob = round(implied_probability(un_n), 6) if un_n else STANDARD_LAY_ASK
 
             # Point Spread Line & Odds
             ps_obj = first_odds.get("pointSpread") or {}
@@ -479,14 +476,10 @@ def build_cfb_slate(
 
             if spread_home_line is not None:
                 market_spread_home_prob = (
-                    round(implied_probability(h_ps_n), 6)
-                    if h_ps_n
-                    else (round(1.0 - implied_probability(a_ps_n), 6) if a_ps_n else STANDARD_LAY_ASK)
+                    round(implied_probability(h_ps_n), 6) if h_ps_n else STANDARD_LAY_ASK
                 )
                 market_spread_away_prob = (
-                    round(implied_probability(a_ps_n), 6)
-                    if a_ps_n
-                    else (round(1.0 - implied_probability(h_ps_n), 6) if h_ps_n else STANDARD_LAY_ASK)
+                    round(implied_probability(a_ps_n), 6) if a_ps_n else STANDARD_LAY_ASK
                 )
 
             # Moneyline parsing if available from ESPN (nested moneyline or top-level)
@@ -508,9 +501,9 @@ def build_cfb_slate(
                 market_ml_away_prob = round(implied_probability(a_ml_n), 6)
 
             if market_ml_home_prob is not None and market_ml_away_prob is None:
-                market_ml_away_prob = round(1.0 - market_ml_home_prob, 6)
+                market_ml_away_prob = round(min(0.99, max(0.01, (1.0 - market_ml_home_prob) + 0.045)), 6)
             elif market_ml_away_prob is not None and market_ml_home_prob is None:
-                market_ml_home_prob = round(1.0 - market_ml_away_prob, 6)
+                market_ml_home_prob = round(min(0.99, max(0.01, (1.0 - market_ml_away_prob) + 0.045)), 6)
 
         ev_season = int((ev.get("season") or {}).get("year") or iso_date[:4])
         ev_week = int((ev.get("week") or {}).get("number") or 1)

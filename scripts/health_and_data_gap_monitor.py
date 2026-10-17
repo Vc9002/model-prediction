@@ -88,7 +88,6 @@ def audit_odds_freshness(runtime_paths: RuntimePaths) -> dict[str, Any]:
     """Check freshness and depth across data/odds/<sport>."""
     odds_root = PROJECT_ROOT / "data" / "odds"
     today = datetime.now(UTC).date()
-    today_iso = today.isoformat()
     yesterday_iso = (today - timedelta(days=1)).isoformat()
 
     sports_status = {}
@@ -106,7 +105,7 @@ def audit_odds_freshness(runtime_paths: RuntimePaths) -> dict[str, Any]:
 
             latest_file = files[-1]
             latest_date = latest_file.parent.name
-            is_fresh = latest_date in {today_iso, yesterday_iso}
+            is_fresh = latest_date >= yesterday_iso
             is_off, reason = is_sport_off_season(sport, today)
 
             if is_fresh:

@@ -110,7 +110,8 @@ def test_current_cs2_artifact_fails_closed_on_source_data_drift(monkeypatch, tmp
     raise, not degrade silently.
     """
     config = load_config()
-    artifact_path = Path(config["models"]["CS2"]["production_artifact"])
+    repo_root = Path(__file__).resolve().parents[1]
+    artifact_path = repo_root / config["models"]["CS2"]["production_artifact"]
     artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
 
     # Integrity of the shipped artifact itself.

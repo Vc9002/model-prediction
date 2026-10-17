@@ -425,6 +425,9 @@ def build_tennis_slate(
                     diff = 400.0 * math.log10(max(1e-6, p_away) / max(1e-6, 1.0 - p_away))
                     p_serve_a = max(0.45, min(0.78, base_serve + diff / 2400.0))
                     p_serve_b = max(0.45, min(0.78, base_serve - diff / 2400.0))
+                else:
+                    p_serve_a = float(str(p_serve_a))
+                    p_serve_b = float(str(p_serve_b))
 
                 is_team_away = _name_matches(prediction.away_team, str(snapshot.get("team") or ""))
                 spread_line_p1 = spread_val if is_team_away else -spread_val
@@ -434,14 +437,13 @@ def build_tennis_slate(
                 selection = "away" if p_cov_p1 >= p_cov_p2 else "home"
                 prob = p_cov_p1 if selection == "away" else p_cov_p2
 
-                side = snapshot.get("long") or {}
+                side_key = "long" if (selection == "away") == is_team_away else "short"
+                side = snapshot.get(side_key) or {}
                 ask = side.get("ask")
-                if ask is None or not 0.01 <= float(ask) <= 0.99:
-                    side = snapshot.get("short") or {}
-                    ask = side.get("ask")
                 if ask is None or not 0.01 <= float(ask) <= 0.99:
                     continue
 
+                selection_line = spread_val if (selection == "away") == is_team_away else -spread_val
                 seen_contract_keys.add(contract_key)
                 priced.append(
                     {
@@ -451,14 +453,14 @@ def build_tennis_slate(
                         "home_team": prediction.home_team,
                         "market_type": "spread",
                         "selection": selection,
-                        "line": spread_val,
+                        "line": selection_line,
                         "model_probability": round(prob, 4),
                         "model_uncertainty": prediction.uncertainty,
                         "model_version": prediction.model_version,
                         "feature_basis": prediction.feature_basis,
                         "inference_inputs": prediction.inference_inputs,
                         "model_inputs_observed_at_utc": observed_at.isoformat(),
-                        "rationale": f"Tennis Markov game spread {spread_val:+.1f} games: {selection} cover p={prob:.3f}.",
+                        "rationale": f"Tennis Markov game spread {selection_line:+.1f} games: {selection} cover p={prob:.3f}.",
                         "market_slug": slug,
                         "executable_ask": float(ask),
                         "observed_at_utc": snapshot["observed_at_utc"],
@@ -484,6 +486,9 @@ def build_tennis_slate(
                     diff = 400.0 * math.log10(max(1e-6, p_away) / max(1e-6, 1.0 - p_away))
                     p_serve_a = max(0.45, min(0.78, base_serve + diff / 2400.0))
                     p_serve_b = max(0.45, min(0.78, base_serve - diff / 2400.0))
+                else:
+                    p_serve_a = float(str(p_serve_a))
+                    p_serve_b = float(str(p_serve_b))
 
                 deriv = price_tennis_derivatives(p_serve_a, p_serve_b, total_line=total_val, best_of=3)
                 p_over = deriv.total_over or 0.5

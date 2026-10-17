@@ -39,14 +39,14 @@ def test_scan_file_filtering(tmp_path: Path):
 
     f_path = tmp_path / "polymarket_snapshots.jsonl"
     lines = [
-        # Line 1: Ask 0.40, Model 0.50 (Edge +10% -> qualifies)
+        # Line 1: Ask 0.45, Model 0.50 (Edge +5% -> qualifies within 0.02-0.08 gate)
         json.dumps(
             {
                 "event_id": "1",
                 "market_id": "m1",
                 "market_type": "moneyline",
                 "league": "CS2",
-                "long": {"ask": 0.40, "bid": 0.38, "description": "Synthetic Home"},
+                "long": {"ask": 0.45, "bid": 0.43, "description": "Synthetic Home"},
                 "short": {"ask": 0.62, "bid": 0.60, "description": "Synthetic Away"},
                 "event_start_utc": "2026-08-22T10:00:00Z",
             }
@@ -71,7 +71,7 @@ def test_scan_file_filtering(tmp_path: Path):
     assert len(orders) == 1
     assert orders[0].market_id == "m1"
     assert orders[0].side == "BUY_YES"
-    assert orders[0].edge == pytest.approx(0.10, abs=1e-4)
+    assert orders[0].edge == pytest.approx(0.05, abs=1e-4)
 
 
 def test_scan_file_unmodeled_exclusion(tmp_path: Path):

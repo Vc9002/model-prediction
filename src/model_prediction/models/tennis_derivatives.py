@@ -84,10 +84,10 @@ def set_score_distribution(pa_hold: float, pb_hold: float, p_tb_a: float) -> dic
     return final_scores
 
 
-def match_game_distribution(
+def match_state_distribution(
     pa_point: float, pb_point: float, best_of: int = 3
-) -> dict[tuple[int, int], float]:
-    """Computes distribution over match games won (total_games_a, total_games_b)."""
+) -> dict[tuple[int, int, int, int], float]:
+    """Computes distribution over match states (sets_a, sets_b, total_games_a, total_games_b)."""
     pa_hold = hold_game_probability(pa_point)
     pb_hold = hold_game_probability(pb_point)
     p_tb_a = tiebreak_probability(pa_point, pb_point)
@@ -95,13 +95,13 @@ def match_game_distribution(
 
     target_sets = (best_of // 2) + 1
     match_dp: dict[tuple[int, int, int, int], float] = {(0, 0, 0, 0): 1.0}
-    finished_match_games: dict[tuple[int, int], float] = {}
+    finished_states: dict[tuple[int, int, int, int], float] = {}
 
     for _ in range(best_of):
         next_dp: dict[tuple[int, int, int, int], float] = {}
         for (sa, sb, ga, gb), m_prob in match_dp.items():
             if sa == target_sets or sb == target_sets:
-                finished_match_games[(ga, gb)] = finished_match_games.get((ga, gb), 0.0) + m_prob
+                finished_states[(sa, sb, ga, gb)] = finished_states.get((sa, sb, ga, gb), 0.0) + m_prob
                 continue
             for (set_ga, set_gb), set_prob in set_dist.items():
                 new_sa = sa + 1 if set_ga > set_gb else sa
@@ -113,8 +113,19 @@ def match_game_distribution(
         match_dp = next_dp
 
     for (sa, sb, ga, gb), m_prob in match_dp.items():
-        finished_match_games[(ga, gb)] = finished_match_games.get((ga, gb), 0.0) + m_prob
+        finished_states[(sa, sb, ga, gb)] = finished_states.get((sa, sb, ga, gb), 0.0) + m_prob
 
+    return finished_states
+
+
+def match_game_distribution(
+    pa_point: float, pb_point: float, best_of: int = 3
+) -> dict[tuple[int, int], float]:
+    """Computes distribution over match games won (total_games_a, total_games_b)."""
+    states = match_state_distribution(pa_point, pb_point, best_of=best_of)
+    finished_match_games: dict[tuple[int, int], float] = {}
+    for (sa, sb, ga, gb), m_prob in states.items():
+        finished_match_games[(ga, gb)] = finished_match_games.get((ga, gb), 0.0) + m_prob
     return finished_match_games
 
 
@@ -139,25 +150,39 @@ def price_tennis_derivatives(
     best_of: int = 3,
 ) -> TennisDerivativePricing:
     """Prices moneyline, game spread, and total games using exact Markov distribution."""
-    dist = match_game_distribution(p_serve_a, p_serve_b, best_of=best_of)
+    states = match_state_distribution(p_serve_a, p_serve_b, best_of=best_of)
 
-    p_win_a = sum(p for (ga, gb), p in dist.items() if ga > gb)
-    p_win_b = 1.0 - p_win_a
-    exp_ga = sum(ga * p for (ga, gb), p in dist.items())
-    exp_gb = sum(gb * p for (ga, gb), p in dist.items())
+    p_win_a = sum(p for (sa, sb, ga, gb), p in states.items() if sa > sb)
+    p_win_b = sum(p for (sa, sb, ga, gb), p in states.items() if sb > sa)
+    exp_ga = sum(ga * p for (sa, sb, ga, gb), p in states.items())
+    exp_gb = sum(gb * p for (sa, sb, ga, gb), p in states.items())
     exp_total = exp_ga + exp_gb
 
     p1_spread_cov = None
     p2_spread_cov = None
     if spread_line is not None:
-        p1_spread_cov = sum(p for (ga, gb), p in dist.items() if (ga - gb) + spread_line > 0)
-        p2_spread_cov = 1.0 - p1_spread_cov
+        p1_cov = sum(p for (sa, sb, ga, gb), p in states.items() if (ga - gb) + spread_line > 0)
+        p2_cov = sum(p for (sa, sb, ga, gb), p in states.items() if (ga - gb) + spread_line < 0)
+        tot_sp = p1_cov + p2_cov
+        if tot_sp > 0:
+            p1_spread_cov = p1_cov / tot_sp
+            p2_spread_cov = p2_cov / tot_sp
+        else:
+            p1_spread_cov = 0.5
+            p2_spread_cov = 0.5
 
     tot_over = None
     tot_under = None
     if total_line is not None:
-        tot_over = sum(p for (ga, gb), p in dist.items() if (ga + gb) > total_line)
-        tot_under = 1.0 - tot_over
+        p_over = sum(p for (sa, sb, ga, gb), p in states.items() if (ga + gb) > total_line)
+        p_under = sum(p for (sa, sb, ga, gb), p in states.items() if (ga + gb) < total_line)
+        tot_t = p_over + p_under
+        if tot_t > 0:
+            tot_over = p_over / tot_t
+            tot_under = p_under / tot_t
+        else:
+            tot_over = 0.5
+            tot_under = 0.5
 
     return TennisDerivativePricing(
         match_win_a=round(p_win_a, 6),

@@ -92,8 +92,8 @@ class NBAStructuralV5Engine:
 
         # 2. Points Per 100 Possessions (ORtg / DRtg)
         # Net efficiency with HFA and missing player minutes impact (~0.12 pts / missing starter min)
-        h_eff = home_ortg + (NBA_LEAGUE_AVG_ORTG - away_drtg) + (NBA_HFA_POINTS * 100.0 / possessions)
-        a_eff = away_ortg + (NBA_LEAGUE_AVG_ORTG - home_drtg)
+        h_eff = home_ortg + (away_drtg - NBA_LEAGUE_AVG_ORTG) + (NBA_HFA_POINTS * 100.0 / possessions)
+        a_eff = away_ortg + (home_drtg - NBA_LEAGUE_AVG_ORTG)
 
         h_eff -= home_missing_starter_minutes * 0.12
         a_eff -= away_missing_starter_minutes * 0.12

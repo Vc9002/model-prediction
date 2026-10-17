@@ -49,8 +49,15 @@ def replay_inputs(inputs: dict[str, Any]) -> dict[str, float]:
         rates = [float(inputs[k]) for k in ("home_rate", "away_rate")]
         if any(not math.isfinite(rate) or rate <= 0 for rate in rates):
             raise ValueError("coded_replay_invalid_goal_rates")
-        model = soccer_model_v2() if inputs.get("model_version") == "soccer-poisson-dc-v2" else SoccerModel()
-        matrix = model.score_matrix(*rates)
+        rho = float(inputs["rho"]) if "rho" in inputs and inputs["rho"] is not None else None
+        soccer_model = (
+            soccer_model_v2() if inputs.get("model_version") == "soccer-poisson-dc-v2" else SoccerModel()
+        )
+        matrix = (
+            soccer_model.score_matrix(rates[0], rates[1], rho=rho)
+            if rho is not None
+            else soccer_model.score_matrix(rates[0], rates[1])
+        )
         size = len(matrix)
         home = sum(matrix[h][a] for h in range(size) for a in range(h))
         away = sum(matrix[h][a] for a in range(size) for h in range(a))
@@ -106,9 +113,9 @@ def replay_inputs(inputs: dict[str, Any]) -> dict[str, float]:
         )
         rest_days = dict(zip(players, inputs.get("rest_days", [14.0, 14.0]), strict=True))
         best_of = int(inputs.get("best_of", 3))
-        model = TennisModel(version="tennis-surface-elo-v4")
-        model.recent_form = recent_form
-        p = model.match_probability_v4(
+        tennis_model = TennisModel(version="tennis-surface-elo-v4")
+        tennis_model.recent_form = recent_form
+        p = tennis_model.match_probability_v4(
             overall=overall,
             by_surface=by_surface,
             surface_counts=surface_counts,

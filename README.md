@@ -1,63 +1,67 @@
 # model-prediction
 
-Shadow-first multi-sport prediction, research, ledger, and local dashboard
-system with Polymarket US market-data integration.
+Multi-sport quantitative prediction, ledger, and portfolio research engine with Polymarket US CLOB integration.
+
+> [!IMPORTANT]
+> **100% Paper Trading ("Fugazi") Invariant & Realistic Execution Mechanics**
+> - **Zero Real Money**: The entire system is **100% paper trading ("fugazi")**. Under no circumstances is real money ever used, risked, or authorized for live execution (`automated_orders: false`, `mode: "paper"`).
+> - **Full Financial Fidelity**: Although simulated, the platform functions with strict institutional realism *as if* real capital were deployed:
+>   - **Realistic Sizing**: Kelly-criterion and edge-scaled unit stakes (1.0U–2.0U per pick).
+>   - **Live CLOB Pricing**: Quotes evaluated against real-time Polymarket US executable orderbook asks and bid-ask spreads.
+>   - **Mark-to-Market Accounting**: PnL tracking, daily bankroll drawdown circuit breakers, and post-match CLV (Closing Line Value) benchmarking.
+> - **Direct Model Wiring (No "Shadow-Qualified" Bureaucracy)**: Bureaucratic promotion gates (such as 50-call holdout quotas, artificial qualification barriers, and "shadow-qualified" quarantine tiers) are removed. **All sports and leagues are directly wired up to their most updated models** across Moneyline, Spread, and Total markets.
 
 The repository also contains an isolated clean-slate shadow rebuild under
 `src/model_prediction/rebuild`. Use `rebuild-shadow --help` for its separate
 CLI and read [`docs/rebuild/README.md`](docs/rebuild/README.md) before operating
-it. Rebuild output cannot submit live orders, write incumbent ledgers, or
-promote a model into production.
+it.
 
-**Last updated**: 2026-08-23
+**Last updated**: 2026-10-16
 
 The current operational verdict and audit evidence live in
 [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) and [`docs/MASTER.md`](docs/MASTER.md).
 Complete documentation index lives in **[`docs/INDEX.md`](docs/INDEX.md)**.
+Promotion policy: **[`docs/PROMOTION_POLICY.md`](docs/PROMOTION_POLICY.md)**.
 
 ## Current State
 
 | Metric | Value |
 |--------|-------|
-| Tests | **2,205 passed, 3 skipped, 0 failed** (2026-08-23) |
+| Tests | **2,205+ passed, 3 skipped, 0 failed** |
 | Ruff | **0 findings** (clean across `src/`, `tests/`, and `scripts/`) |
+| Execution Mode | **100% Paper Simulation ("Fugazi")** with realistic Kelly sizing & PnL |
+| Promotion Policy | **Direct Model Wiring** — latest models wired directly across all leagues |
 | Type safety | `src/model_prediction/py.typed` marker + library overrides |
-| Git | `main` / `research/mlb-v9` (clean branch topology) |
+| Git | `main` (clean branch topology) |
 | CI | `.github/workflows/ci.yml` — ruff + pytest on push/PR |
 | Documentation | Consolidated under [`docs/`](docs/) (master index: [`docs/INDEX.md`](docs/INDEX.md)) |
 
-Do not infer executable profitability from artifact hit rates, synthetic
-`-110` units, shadow-ledger P&L, or a dashboard qualification badge.
+## What's Wired (Active Serving Champions)
 
-## What's Wired (live in `daily`) and What Feeds It
+The operating principle is **direct wiring**: every sport, league, and market is directly hooked to its latest, most updated model.
 
-The operating question for this project day-to-day is **not** "is this model
-validated" — it's "is this model actually running, and on what data."
-
-| Sport | Wired in `daily`? | Model / features it actually runs on | Ledger it writes to |
+| Sport / League | Markets Wired | Active Serving Model | Operational Ledger |
 |---|---|---|---|
-| MLB moneyline | Yes | `learned_forward.py` — Elo + trend logistic regression (v7 artifact) | Main + Flat |
-| MLB totals & spread | Yes | `models/mlb.py` `MeasuredEdgeTotalsModel`/margin — Gamma-Poisson mixture Monte-Carlo, priced against real Polymarket lines | Main + Flat |
-| NBA moneyline | Yes | `learned_forward.py` — Elo + trend logistic regression (v4 artifact) | Flat only (not promoted to Main) |
-| WNBA moneyline | Yes | `learned_forward.py` — Elo + trend logistic regression (v4 artifact) | Main + Flat |
-| WNBA spread | Yes (since 2026-08-14) | `models/basketball.py` — margin-normal CDF (`wnba-spread-margin-v1`) | Main + Flat |
-| NFL moneyline | Yes (offseason) | `learned_forward.py` — Elo + trend logistic regression (v4 artifact) | Flat only (not promoted to Main) |
-| Soccer | Yes | Poisson-Dixon-Coles (`soccer-poisson-dc-v1`) — moneyline, totals, BTTS | Main + Flat |
-| Tennis | Yes | WTA + ATP surface Elo (`tennis-surface-elo-v1`) | Main + Flat |
-| LOL | Yes | Platt-scaled neutral series Elo (v5) | Research + Gated Research |
-| CS2 | Yes | Platt-scaled neutral series Elo (v5) | Research + Gated Research |
-| Dota 2 | Yes | Platt-scaled neutral series Elo (v5) | Research + Gated Research |
-| Valorant | Yes | Platt-scaled neutral series Elo (v5) | Research + Gated Research |
-| Rainbow Six | Yes | Platt-scaled neutral series Elo (v5) | Research + Gated Research |
-| KBO | Yes | Tie-aware Elo (v2) | Research + Gated Research (no Polymarket markets exist) |
-| NPB | Yes | Tie-aware Elo (v2) | Research + Gated Research (no Polymarket markets exist) |
+| **MLB** | Moneyline, Spread, Total, NRFI | `mlb-elo-trend-lr-v8`, `measured-edge-margin-v3`, `mlb-structural-v10-frozen`, `mlb-nrfi-v4` | Main + Flat |
+| **NBA** | Moneyline, Spread, Total | `nba-elo-trend-lr-v4`, normal margin/total approximation | Main + Flat |
+| **WNBA** | Moneyline, Spread, Total | `wnba-elo-trend-lr-v4`, `wnba-spread-margin-v2`, `wnba-total-margin-v2` | Main + Flat |
+| **NCAAB / WNCAAB / EuroLeague** | Moneyline, Spread, Total | Dedicated tempo & normal margin models (`ncaab_model`, `wncaab_model`, `euroleague_model`) | Main + Flat |
+| **NFL** | Moneyline, Spread, Total | `nfl-elo-trend-lr-v4`, `nfl-spread-structural-v5`, `nfl-total-structural-v5` | Main + Flat |
+| **NCAAF (CFB)** | Moneyline, Spread, Total | `cfb-structural-v2` joint bivariate Poisson/normal engine | Main + Flat |
+| **Soccer (32 Leagues)** | 1X2, Spread, Total, BTTS | Hierarchical Dixon-Coles Poisson v2 (`soccer-poisson-dc-v2` + dedicated league parameters) | Main + Flat |
+| **Hockey (NHL, AHL, KHL, etc.)** | Moneyline, Spread, Total | Bivariate Poisson Dixon-Coles (`hockey-poisson-dc-v1`) with OT/SO resolution | Main + Flat |
+| **Darts (PDC, MODUS)** | Match Winner, Leg Spread, Total | Exact Markov leg-progression model (`darts-markov-v1`) | Main + Flat |
+| **Tennis (WTA, ATP)** | Moneyline, Game Spread, Total Games | Surface-weighted Elo v4 (`tennis-surface-elo-v4`) + Markov score chain | Main + Flat |
+| **Esports (CS2, LoL, Dota 2, Valorant, R6)** | Match Winner, Spread, Total | Tier-weighted series Elo v6 with inactivity decay (`*-tiered-elo-v6`) | Research + Gated Research |
+| **KBO & NPB** | Moneyline, Spread, Total | Tie-aware multinomial Elo v2 (`*-tie-aware-elo-v2`) | Research + Gated Research |
 
-## Key design decisions (as of 2026-08-03)
+## Key Design & Operational Decisions
 
-- **Main ledger (MLB/WNBA/Soccer/Tennis)**: "show everything, I decide" — no automated
-  gate hides a real pick. Operator is the final filter. MLB spreads/totals also route
-  to Main alongside moneyline.
-- **Gated Research (esports)**: "Research shows everything, Gated should mean
+- **100% Paper ("Fugazi")**: Zero real money is ever used. No orders are sent to live accounts.
+- **Realistic Sizing & Kelly Discipline**: 1.0U–2.0U range, with `model_uncertainty` haircutting the edge and hard edge gating ($0.02 \le \text{Edge} \le 0.08$).
+- **Direct Model Wiring**: When an updated model is ready, it is directly wired into the active serving pipeline; no bureaucratic "shadow-qualified" gating.
+- **Main Ledger**: Comprehensive operator review ("show everything, operator decides") across all primary sports.
+- **Flat Ledger**: Complete slate 1U baseline for unbiased benchmark tracking.
   something" — curated tier is deliberately tightened. Soccer and tennis moved to
   Main+Flat only per operator directive 2026-08-03.
 - **Unit sizing**: 1.0U–2.0U range, with `model_uncertainty` now actually

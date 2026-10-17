@@ -307,7 +307,7 @@ def build_soccer_total_slate(
                 )
                 return []
 
-        with ThreadPoolExecutor(max_workers=min(18, len(leagues))) as pool:
+        with ThreadPoolExecutor(max_workers=min(32, len(leagues))) as pool:
             for ev_list in pool.map(_fetch_league_events, leagues):
                 events.extend(ev_list)
     # Some competitions (e.g. a continental/cup fixture also listed under a
@@ -501,20 +501,28 @@ def build_soccer_total_slate(
             continue
         # Match team_win market candidates for home and away separately and evaluate executable ask
         valid_options = []
-        for side in ("home", "away"):
-            target_team = prediction.home_team if side == "home" else prediction.away_team
-            opp_team = prediction.away_team if side == "home" else prediction.home_team
-            matching = [
-                s
-                for s in candidates
-                if _team_matches_title(target_team, str(s.get("team") or ""))
-                and not _team_matches_title(opp_team, str(s.get("team") or ""))
-            ]
+        for side in ("home", "away", "draw"):
+            if side == "draw":
+                matching = [
+                    s
+                    for s in candidates
+                    if str(s.get("team") or "").strip().lower() in ("draw", "tie")
+                    or "draw" in str(s.get("market_slug") or "").lower()
+                ]
+            else:
+                target_team = prediction.home_team if side == "home" else prediction.away_team
+                opp_team = prediction.away_team if side == "home" else prediction.home_team
+                matching = [
+                    s
+                    for s in candidates
+                    if _team_matches_title(target_team, str(s.get("team") or ""))
+                    and not _team_matches_title(opp_team, str(s.get("team") or ""))
+                ]
             if len(matching) == 1:
                 snap = matching[0]
                 ask_val = (snap.get("long") or {}).get("ask")
                 if ask_val is not None and 0 < float(ask_val) < 1:
-                    side_prob = float(prediction.probabilities[side])
+                    side_prob = float(prediction.probabilities.get(side, 0.0))
                     side_edge = side_prob - float(ask_val)
                     valid_options.append(
                         {
@@ -538,9 +546,10 @@ def build_soccer_total_slate(
         # Value-based edge selection: choose the side that offers the highest expected value (edge)
         # over its executable market ask, breaking ties by model probability.
         best_candidate = max(valid_options, key=lambda opt: (opt["edge"], opt["prob"]))
-        selection = best_candidate["side"]
-        snapshot = best_candidate["snapshot"]
-        ask = best_candidate["ask"]
+        selection = str(best_candidate["side"])
+        cand_snapshot = best_candidate["snapshot"]
+        assert isinstance(cand_snapshot, dict)
+        ask = float(str(best_candidate["ask"]))
 
         # Cross-league underdog protection for continental cups:
         # Avoid uncalibrated longshots where team strength comes from lower-tier domestic play
@@ -570,9 +579,9 @@ def build_soccer_total_slate(
                 "inference_inputs": prediction.inference_inputs,
                 "model_inputs_observed_at_utc": observed_at.isoformat(),
                 "rationale": prediction.rationale,
-                "market_slug": snapshot["market_slug"],
+                "market_slug": cand_snapshot["market_slug"],
                 "executable_ask": float(ask),
-                "observed_at_utc": snapshot["observed_at_utc"],
+                "observed_at_utc": cand_snapshot["observed_at_utc"],
                 "timestamp_valid": True,
                 "edge_vs_executable_ask": round(
                     prediction.probabilities[selection] - float(ask),
@@ -677,15 +686,21 @@ def build_soccer_total_slate(
             if min_g < min_team_games:
                 continue
             start = parse_utc(prediction.event_start_utc)
-            home_matches = [
+            match_candidates = [
                 s
                 for s in moneyline_snapshots
+                if _team_matches_title(prediction.away_team, str(s.get("event_title", "")))
+                and _team_matches_title(prediction.home_team, str(s.get("event_title", "")))
+            ]
+            home_matches = [
+                s
+                for s in match_candidates
                 if _team_matches_title(prediction.home_team, str(s.get("team") or ""))
                 and not _team_matches_title(prediction.away_team, str(s.get("team") or ""))
             ]
             away_matches = [
                 s
-                for s in moneyline_snapshots
+                for s in match_candidates
                 if _team_matches_title(prediction.away_team, str(s.get("team") or ""))
                 and not _team_matches_title(prediction.home_team, str(s.get("team") or ""))
             ]
@@ -709,9 +724,9 @@ def build_soccer_total_slate(
             ask_d_yes = (d_snap.get("long") or {}).get("ask") if d_snap else None
             ask_1x_bundle = (float(ask_h_yes) + float(ask_d_yes)) if (ask_h_yes and ask_d_yes) else None
             options_1x = []
-            if ask_1x_no and 0 < float(ask_1x_no) < 1:
+            if ask_1x_no and 0 < float(ask_1x_no) < 1 and a_snap is not None:
                 options_1x.append((float(ask_1x_no), str(a_snap["market_slug"]), "no_away"))
-            if ask_1x_bundle and 0 < float(ask_1x_bundle) < 1:
+            if ask_1x_bundle and 0 < float(ask_1x_bundle) < 1 and h_snap is not None and d_snap is not None:
                 options_1x.append(
                     (
                         float(ask_1x_bundle),
@@ -757,9 +772,9 @@ def build_soccer_total_slate(
             ask_a_yes = (a_snap.get("long") or {}).get("ask") if a_snap else None
             ask_x2_bundle = (float(ask_a_yes) + float(ask_d_yes)) if (ask_a_yes and ask_d_yes) else None
             options_x2 = []
-            if ask_x2_no and 0 < float(ask_x2_no) < 1:
+            if ask_x2_no and 0 < float(ask_x2_no) < 1 and h_snap is not None:
                 options_x2.append((float(ask_x2_no), str(h_snap["market_slug"]), "no_home"))
-            if ask_x2_bundle and 0 < float(ask_x2_bundle) < 1:
+            if ask_x2_bundle and 0 < float(ask_x2_bundle) < 1 and a_snap is not None and d_snap is not None:
                 options_x2.append(
                     (
                         float(ask_x2_bundle),

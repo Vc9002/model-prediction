@@ -148,6 +148,13 @@ class FeatureStore:
                             "NFC All-Stars",
                         } or str(raw.get("home_team")) in {"AFC", "NFC", "AFC All-Stars", "NFC All-Stars"}:
                             continue
+                    # NBA preseason games feature deep bench rotations, and All-Star
+                    # exhibitions feature different rules and zero defense.
+                    if key == "nba":
+                        if season_type in {"preseason", "all-star", "exhibition"}:
+                            continue
+                        if str(raw.get("competition_type")) in {"ALLSTAR", "EXHIBITION"}:
+                            continue
                     away_team_name = str(raw["away_team"])
                     home_team_name = str(raw["home_team"])
                     if key == "nfl":

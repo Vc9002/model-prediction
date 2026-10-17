@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import Any
@@ -218,14 +219,28 @@ class ESPNClient:
         self._cache: dict[str, dict[str, Any]] = {}
         self._cache_keys: list[str] = []
         self._cache_limit: int = 256
+        self._lock = threading.Lock()
+        self._key_locks: dict[str, threading.Lock] = {}
 
     def _get(self, url: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         key = f"{url}?{json.dumps(params or {}, sort_keys=True)}"
-        if key not in self._cache:
+        with self._lock:
+            if key in self._cache:
+                return self._cache[key]
+            if key not in self._key_locks:
+                self._key_locks[key] = threading.Lock()
+            key_lock = self._key_locks[key]
+
+        with key_lock:
+            with self._lock:
+                if key in self._cache:
+                    return self._cache[key]
             response = self.client.get(url, params=params)
             response.raise_for_status()
-            self._cache[key] = response.json()
-        return self._cache[key]
+            payload = response.json()
+            with self._lock:
+                self._cache[key] = payload
+            return payload
 
     @staticmethod
     def _league_path(league: str) -> str:

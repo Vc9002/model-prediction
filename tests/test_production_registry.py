@@ -99,15 +99,19 @@ def test_real_production_yaml_resolves_every_model() -> None:
     registry = ProductionModelRegistry.load(REPO)
 
     assert registry.schema_version == "3"
-    assert len(registry.entries) == 28
+    assert len(registry.entries) == 30
     # Under the permanent champion-challenger framework, all models
-    # across supported markets are available contracts (28 champions + rollbacks).
+    # across supported markets are available contracts (30 champions + rollbacks).
     # Weak evidence models have evidence_status=degraded and
     # replacement_priority=critical rather than being disabled.
-    assert len(registry.available_entries()) == 28
+    assert len(registry.available_entries()) == 30
     assert len(registry.problem_entries()) == 0
     assert registry.primary.model_id == "wnba-elo-trend-lr-v4"
     assert registry.primary.artifact_hash
+    assert registry.champion("NBA", "spread").model_id == "nba-spread-margin-v2"
+    assert registry.champion("NBA", "spread").rollback_model == "nba-spread-margin-v1"
+    assert registry.champion("NBA", "total").model_id == "nba-total-margin-v2"
+    assert registry.champion("NBA", "total").rollback_model == "nba-total-margin-v1"
     assert registry.champion("NFL", "spread").model_id == "nfl-spread-structural-v5"
     assert registry.champion("NFL", "total").model_id == "nfl-total-structural-v5"
     assert registry.champion("NCAAF", "moneyline").model_id == "cfb-structural-v2"

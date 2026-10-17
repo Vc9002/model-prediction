@@ -399,10 +399,36 @@ class PolymarketKellyEngine:
         max_game_dollars = self.bankroll * max_game_exposure_pct
         by_game: dict[str, list[PolymarketOrderDecision]] = {}
 
+        def _clean_game_key(o: PolymarketOrderDecision) -> str:
+            h = (o.home_team or "").strip()
+            a = (o.away_team or "").strip()
+            q = (o.question or "").strip()
+            is_derivative = (
+                not h
+                or not a
+                or any(
+                    str(t).lower().startswith(p)
+                    for t in (h, a)
+                    for p in ("over", "under", "o/u", "total", "yes", "no")
+                )
+                or any(s in h for s in ("+", "-"))
+            )
+            if is_derivative and q:
+                for sep in (" vs. ", " vs ", " at "):
+                    if sep in q:
+                        parts = q.split(sep, 1)
+                        cand_h = parts[0].split(":")[-1].strip()
+                        cand_a = parts[1].split(":")[0].strip()
+                        if cand_h and cand_a:
+                            h, a = cand_h, cand_a
+                            break
+            canonical = sorted([h.lower().strip(), a.lower().strip()])
+            return f"{o.event_start_utc}:{canonical[0]}:{canonical[1]}"
+
         for o in orders:
             if o.side == "NO_ORDER" or o.stake_units <= 0:
                 continue
-            game_key = f"{o.event_start_utc}:{o.home_team}:{o.away_team}"
+            game_key = _clean_game_key(o)
             by_game.setdefault(game_key, []).append(o)
 
         adjusted_orders: list[PolymarketOrderDecision] = []
@@ -411,7 +437,7 @@ class PolymarketKellyEngine:
                 adjusted_orders.append(o)
                 continue
 
-            game_key = f"{o.event_start_utc}:{o.home_team}:{o.away_team}"
+            game_key = _clean_game_key(o)
             game_orders = by_game.get(game_key, [])
             total_game_stake = sum(go.stake_units for go in game_orders)
 

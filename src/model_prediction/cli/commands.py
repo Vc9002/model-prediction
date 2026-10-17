@@ -222,6 +222,20 @@ def _clear_today_open(
         to_remove.append(row["pick_id"])
     if not to_remove:
         return []
+    if hasattr(ledger, "path") and ledger.path and Path(ledger.path).exists():
+        try:
+            import shutil
+
+            target_path = Path(ledger.path)
+            if target_path.is_dir():
+                for f in target_path.iterdir():
+                    if f.is_file() and not f.name.endswith(".pre_clear.bak"):
+                        shutil.copy2(f, f.with_suffix(f.suffix + ".pre_clear.bak"))
+            else:
+                bak_path = target_path.with_suffix(target_path.suffix + ".pre_clear.bak")
+                shutil.copy2(target_path, bak_path)
+        except OSError:
+            pass
     return ledger.remove_open_rows(
         to_remove, reason=f"re-forecast replacement for {date_str}", allow_staked_removal=True
     )

@@ -379,15 +379,15 @@ class TennisModel:
         final1 = 0.82 * eff1 + 0.18 * rf1
         final2 = 0.82 * eff2 + 0.18 * rf2
 
-        # Expected single set probability
-        p_set = expected_win_probability(final1, final2)
+        # Match probability from match-level fitted Elo
+        p_base = expected_win_probability(final1, final2)
 
-        # Best-of-3 / Best-of-5 transformation
+        # In Best-of-5 (Grand Slams), variance is reduced by sqrt(5/3) without double-counting set powers
         if best_of == 5:
-            q = 1.0 - p_set
-            p_match = p_set**3 * (1.0 + 3.0 * q + 6.0 * q * q)
+            diff = final1 - final2
+            p_match = 1.0 / (1.0 + 10.0 ** (-diff * math.sqrt(5.0 / 3.0) / 400.0))
         else:
-            p_match = p_set * p_set * (3.0 - 2.0 * p_set)
+            p_match = p_base
 
         return max(0.01, min(0.99, p_match))
 
@@ -491,8 +491,12 @@ class TennisModel:
                     p_serve_a = max(0.45, min(0.78, base_serve + (implied_elo_diff / 2400.0)))
                     p_serve_b = max(0.45, min(0.78, base_serve - (implied_elo_diff / 2400.0)))
                 else:
-                    r1 = by_surface.get((match.player_one, match.surface), DEFAULT_ELO)
-                    r2 = by_surface.get((match.player_two, match.surface), DEFAULT_ELO)
+                    r1 = by_surface.get(
+                        (match.player_one, match.surface), overall.get(match.player_one, DEFAULT_ELO)
+                    )
+                    r2 = by_surface.get(
+                        (match.player_two, match.surface), overall.get(match.player_two, DEFAULT_ELO)
+                    )
                     elo_diff = r1 - r2
                     p_serve_a = max(0.45, min(0.78, base_serve + (elo_diff / 2400.0)))
                     p_serve_b = max(0.45, min(0.78, base_serve - (elo_diff / 2400.0)))
@@ -507,8 +511,18 @@ class TennisModel:
 
             feature_basis = {
                 "surface": match.surface,
-                "elo_p1_surface": round(by_surface.get((match.player_one, match.surface), DEFAULT_ELO), 1),
-                "elo_p2_surface": round(by_surface.get((match.player_two, match.surface), DEFAULT_ELO), 1),
+                "elo_p1_surface": round(
+                    by_surface.get(
+                        (match.player_one, match.surface), overall.get(match.player_one, DEFAULT_ELO)
+                    ),
+                    1,
+                ),
+                "elo_p2_surface": round(
+                    by_surface.get(
+                        (match.player_two, match.surface), overall.get(match.player_two, DEFAULT_ELO)
+                    ),
+                    1,
+                ),
                 "history_matches": len(matches),
                 "min_player_matches": min(counts.get(match.player_one, 0), counts.get(match.player_two, 0)),
                 "expected_games_p1": deriv.expected_games_a,

@@ -76,7 +76,10 @@ class FixedPlattCalibrator:
             raise ValueError("Platt calibration probability must be between 0 and 1")
         clipped = min(1 - 1e-12, max(1e-12, probability))
         logit = math.log(clipped / (1 - clipped))
-        return 1 / (1 + math.exp(-(self.intercept + self.slope * logit)))
+        z = -(self.intercept + self.slope * logit)
+        z_clamped = max(-50.0, min(50.0, z))
+        prob = 1 / (1 + math.exp(z_clamped))
+        return min(1.0 - 1e-12, max(1e-12, prob))
 
 
 class TrainablePlattCalibrator:
@@ -123,7 +126,10 @@ class TrainablePlattCalibrator:
     def transform(self, probability: float) -> float:
         clipped = min(1 - 1e-12, max(1e-12, probability))
         logit = math.log(clipped / (1 - clipped))
-        return 1 / (1 + math.exp(-(self.intercept + self.slope * logit)))
+        z = -(self.intercept + self.slope * logit)
+        z_clamped = max(-50.0, min(50.0, z))
+        prob = 1 / (1 + math.exp(z_clamped))
+        return min(1.0 - 1e-12, max(1e-12, prob))
 
 
 class IsotonicCalibrator:
@@ -176,18 +182,23 @@ class IsotonicCalibrator:
         return cls(thresholds, values, metadata)
 
     def transform(self, probability: float) -> float:
+        if not math.isfinite(probability) or not 0 <= probability <= 1:
+            return 0.5
         if not self.thresholds:
-            return probability
+            return min(1.0 - 1e-12, max(1e-12, probability))
         if probability <= self.thresholds[0]:
-            return self.values[0]
-        if probability >= self.thresholds[-1]:
-            return self.values[-1]
-        for index in range(1, len(self.thresholds)):
-            if probability <= self.thresholds[index]:
-                left, right = self.thresholds[index - 1], self.thresholds[index]
-                weight = (probability - left) / (right - left) if right > left else 0.0
-                return self.values[index - 1] + weight * (self.values[index] - self.values[index - 1])
-        return self.values[-1]
+            val = self.values[0]
+        elif probability >= self.thresholds[-1]:
+            val = self.values[-1]
+        else:
+            val = self.values[-1]
+            for index in range(1, len(self.thresholds)):
+                if probability <= self.thresholds[index]:
+                    left, right = self.thresholds[index - 1], self.thresholds[index]
+                    weight = (probability - left) / (right - left) if right > left else 0.0
+                    val = self.values[index - 1] + weight * (self.values[index] - self.values[index - 1])
+                    break
+        return min(1.0 - 1e-12, max(1e-12, val))
 
 
 class TemperatureCalibrator:
@@ -250,7 +261,10 @@ class TemperatureCalibrator:
     def transform(self, probability: float) -> float:
         clipped = min(1 - 1e-12, max(1e-12, probability))
         logit = math.log(clipped / (1 - clipped))
-        return 1 / (1 + math.exp(-logit / self.temperature))
+        z = -logit / self.temperature
+        z_clamped = max(-50.0, min(50.0, z))
+        prob = 1 / (1 + math.exp(z_clamped))
+        return min(1.0 - 1e-12, max(1e-12, prob))
 
 
 class BetaCalibrator:
@@ -352,6 +366,7 @@ def run_calibration_tournament(
     base_model_version: str,
     n_splits: int = 5,
     minimum_sample: int = 50,
+    temporal: bool = True,
 ) -> dict[str, Any]:
     """Run an Out-Of-Fold tournament across 5 calibration methods:
     1. Identity
@@ -361,7 +376,8 @@ def run_calibration_tournament(
     5. Isotonic
 
     Evaluates out-of-fold log loss, Brier score, ECE, calibration slope and intercept,
-    and returns the winning calibrator fit on the full dataset.
+    and returns the winning calibrator fit on the full dataset. When temporal=True,
+    uses an expanding-window time-series split to eliminate future lookahead bias.
     """
     n = len(probabilities)
     if n < minimum_sample:
@@ -377,45 +393,81 @@ def run_calibration_tournament(
     probs_arr = np.array(probabilities, dtype=float)
     outs_arr = np.array(outcomes, dtype=int)
 
-    # K-fold time / chunk split
-    fold_size = n // n_splits
     oof_preds: dict[str, list[float]] = {
         "identity": [float(p) for p in probabilities],
-        "temperature": [0.0] * n,
-        "platt": [0.0] * n,
-        "beta": [0.0] * n,
-        "isotonic": [0.0] * n,
+        "temperature": [float(p) for p in probabilities],
+        "platt": [float(p) for p in probabilities],
+        "beta": [float(p) for p in probabilities],
+        "isotonic": [float(p) for p in probabilities],
     }
 
-    for fold in range(n_splits):
-        val_start = fold * fold_size
-        val_end = n if fold == n_splits - 1 else (fold + 1) * fold_size
-        val_idx = list(range(val_start, val_end))
-        train_idx = [i for i in range(n) if i not in val_idx]
+    if temporal and n >= minimum_sample:
+        # Time-series expanding window: evaluate on chunk k using strictly prior chunks 0..k-1
+        warmup = max(minimum_sample // 2, n // (n_splits + 1))
+        remaining = n - warmup
+        step = max(1, remaining // n_splits)
+        for fold in range(n_splits):
+            val_start = warmup + fold * step
+            val_end = n if fold == n_splits - 1 else warmup + (fold + 1) * step
+            if val_start >= n:
+                break
+            val_idx = list(range(val_start, val_end))
+            train_idx = list(range(val_start))
 
-        train_p = probs_arr[train_idx].tolist()
-        train_y = outs_arr[train_idx].tolist()
-        val_p = probs_arr[val_idx]
+            train_p = probs_arr[train_idx].tolist()
+            train_y = outs_arr[train_idx].tolist()
+            val_p = probs_arr[val_idx]
 
-        # 1. Temperature
-        cal_temp = TemperatureCalibrator.fit(train_p, train_y, base_model_version)
-        for i, idx in enumerate(val_idx):
-            oof_preds["temperature"][idx] = cal_temp.transform(val_p[i])
+            # 1. Temperature
+            cal_temp = TemperatureCalibrator.fit(train_p, train_y, base_model_version)
+            for i, idx in enumerate(val_idx):
+                oof_preds["temperature"][idx] = cal_temp.transform(val_p[i])
 
-        # 2. Platt
-        cal_platt = TrainablePlattCalibrator.fit(train_p, train_y, base_model_version)
-        for i, idx in enumerate(val_idx):
-            oof_preds["platt"][idx] = cal_platt.transform(val_p[i])
+            # 2. Platt
+            cal_platt = TrainablePlattCalibrator.fit(train_p, train_y, base_model_version)
+            for i, idx in enumerate(val_idx):
+                oof_preds["platt"][idx] = cal_platt.transform(val_p[i])
 
-        # 3. Beta (Kull et al. 2017)
-        cal_beta = BetaCalibrator.fit(train_p, train_y, base_model_version)
-        for i, idx in enumerate(val_idx):
-            oof_preds["beta"][idx] = cal_beta.transform(val_p[i])
+            # 3. Beta (Kull et al. 2017)
+            cal_beta = BetaCalibrator.fit(train_p, train_y, base_model_version)
+            for i, idx in enumerate(val_idx):
+                oof_preds["beta"][idx] = cal_beta.transform(val_p[i])
 
-        # 4. Isotonic
-        cal_iso = IsotonicCalibrator.fit(train_p, train_y, base_model_version)
-        for i, idx in enumerate(val_idx):
-            oof_preds["isotonic"][idx] = cal_iso.transform(val_p[i])
+            # 4. Isotonic
+            cal_iso = IsotonicCalibrator.fit(train_p, train_y, base_model_version)
+            for i, idx in enumerate(val_idx):
+                oof_preds["isotonic"][idx] = cal_iso.transform(val_p[i])
+    else:
+        fold_size = n // n_splits
+        for fold in range(n_splits):
+            val_start = fold * fold_size
+            val_end = n if fold == n_splits - 1 else (fold + 1) * fold_size
+            val_idx = list(range(val_start, val_end))
+            train_idx = [i for i in range(n) if i not in val_idx]
+
+            train_p = probs_arr[train_idx].tolist()
+            train_y = outs_arr[train_idx].tolist()
+            val_p = probs_arr[val_idx]
+
+            # 1. Temperature
+            cal_temp = TemperatureCalibrator.fit(train_p, train_y, base_model_version)
+            for i, idx in enumerate(val_idx):
+                oof_preds["temperature"][idx] = cal_temp.transform(val_p[i])
+
+            # 2. Platt
+            cal_platt = TrainablePlattCalibrator.fit(train_p, train_y, base_model_version)
+            for i, idx in enumerate(val_idx):
+                oof_preds["platt"][idx] = cal_platt.transform(val_p[i])
+
+            # 3. Beta (Kull et al. 2017)
+            cal_beta = BetaCalibrator.fit(train_p, train_y, base_model_version)
+            for i, idx in enumerate(val_idx):
+                oof_preds["beta"][idx] = cal_beta.transform(val_p[i])
+
+            # 4. Isotonic
+            cal_iso = IsotonicCalibrator.fit(train_p, train_y, base_model_version)
+            for i, idx in enumerate(val_idx):
+                oof_preds["isotonic"][idx] = cal_iso.transform(val_p[i])
 
     # Evaluate all methods on full OOF predictions
     scorecard: dict[str, dict[str, Any]] = {}

@@ -1,17 +1,18 @@
 schema_version: '2'
+# -----------------------------------------------------------------------------
+# 100% Paper Trading ("Fugazi") Invariant & Realistic Execution Mechanics:
+# - This entire project is 100% paper trading ("fugazi"). ZERO real money is ever
+#   used, risked, or executable. Automated live execution is barred.
+# - The system functions with strict institutional realism as if real capital were
+#   at stake: realistic Kelly units (1.0U-2.0U), live Polymarket CLOB executable
+#   quotes, mark-to-market PnL, closing lines (CLV), and drawdown circuit breakers.
+# - Direct Model Wiring: Bureaucratic "shadow-qualified" holdout gates are removed;
+#   all models across all sports and leagues are directly wired to their latest models.
+# -----------------------------------------------------------------------------
 project:
   execution_mode: live_manual
   timezone: UTC
   ledger_path: data/picks.xlsx
-  # Re-enabled true 2026-08-13 by explicit operator directive ("unretire
-  # main ledger"). data/main had been archived 2026-08-11
-  # (data/archive/2026-08-10-main-ledger-archived-shadow-primary/) and the
-  # dashboard's primary display switched to the rebuild shadow ledger.
-  # With false, cli.py constructs the incumbent Main PickLedger with
-  # retired=True (see ledger.py's PickLedger docstring) -- readable but
-  # every write silently no-ops instead of recreating data/main/*.xlsx.
-  # With true, Main is back in the daily write path; the archived
-  # per-sport workbooks were restored to data/main/ on 2026-08-13.
   main_ledger_enabled: true
   audit_path: data/events.jsonl
   polymarket_snapshot_path: data/polymarket_us_snapshots.jsonl
@@ -257,6 +258,8 @@ models:
     origin: statistical_model
     active_production_version: nba-elo-trend-lr-v4
     production_artifact: config/models/nba-elo-trend-lr-v4.json
+    spread_production_artifact: config/models/nba-spread-margin-v2.json
+    total_production_artifact: config/models/nba-total-margin-v2.json
     markets:
     - moneyline
     - spread
@@ -566,25 +569,18 @@ models:
     research_confidence_gate: 0.0
   RAINBOW_SIX:
     family: neutral_series_elo
-    status: research
+    status: shadow_qualified
     origin: statistical_model
+    active_production_version: rainbow_six-tiered-elo-v6
     active_research_version: rainbow_six-tiered-elo-v6
+    production_artifact: config/models/rainbow_six-tiered-elo-v6.json
     markets:
     - moneyline
     - spread
     - total
     market_target: esports_match_winner
     min_edge: 0.025
-    # v6 (2026-08-04) -- see LOL's comment above for the full rationale.
-    # Value matches this artifact's own re-validated confidence_threshold
-    # (re-run search found 0.0 for this title under the new decay/shrink
-    # regime, down from v5's 0.03). Without this key, the code's own
-    # default (0.05) would silently apply instead of this title's real
-    # validated value.
     research_confidence_gate: 0.03
-    note: New 2026-07-27. Unlike LOL/CS2/DOTA2/VALORANT, not yet promoted to
-      shadow_qualified via qualification_override -- that was a deliberate
-      per-title operator review this title hasn't had yet.
   KBO:
     family: tie_aware_home_elo
     status: shadow_qualified
@@ -636,6 +632,62 @@ models:
     # (operator decision, 2026-08-03), not because the evidence supports
     # it as real curation.
     research_confidence_gate: 0.090624
+  HOCKEY:
+    family: poisson_dixon_coles
+    status: shadow_qualified
+    origin: statistical_model
+    model_type: hockey_bivariate_poisson
+    active_production_version: hockey-poisson-dc-v1
+    active_research_version: hockey-poisson-dc-v1
+    min_edge: 0.02
+    research_confidence_gate: 0.0
+    min_team_games: 5
+    markets:
+    - moneyline
+    - spread
+    - total
+    leagues:
+    - NHL
+    - AHL
+    - KHL
+    - DEL
+    - SHL
+    - SNHL
+    - CEHL
+    - LIIGA
+  DARTS:
+    family: exact_markov_leg_progression
+    status: shadow_qualified
+    origin: statistical_model
+    model_type: darts_markov
+    active_production_version: darts-markov-v1
+    active_research_version: darts-markov-v1
+    min_edge: 0.02
+    research_confidence_gate: 0.0
+    min_team_matches: 0
+    markets:
+    - moneyline
+    - spread
+    - total
+    leagues:
+    - DARTS_PDC
+    - DARTS_MODUS
+  NCAAB:
+    family: elo_trend_normal_approximation
+    status: shadow_qualified
+    origin: statistical_model
+    active_production_version: ncaab-tempo-v1
+    active_research_version: ncaab-tempo-v1
+    min_edge: 0.035
+    spread_sd: 10.5
+    total_sd: 14.0
+    home_court_points: 3.6
+    markets:
+    - moneyline
+    - spread
+    - total
+    leagues:
+    - NCAAB
   market_residual:
     method: logistic_regression
     rolling_window_days: 90

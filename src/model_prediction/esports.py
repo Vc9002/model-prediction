@@ -656,6 +656,21 @@ class NeutralElo:
         tier_mult = tier_weights.get(tier, 1.0)
         k_eff *= tier_mult
 
+        # Best-of format weight: Bo1 has higher variance (single-map noise),
+        # whereas Bo3/Bo5 series provide significantly stronger true-strength signal.
+        best_of = row.get("best_of")
+        if best_of is not None:
+            try:
+                bo = int(best_of)
+                if bo == 1:
+                    k_eff *= 0.70  # damp single-map upset volatility
+                elif bo == 3:
+                    k_eff *= 1.00  # standard series baseline
+                elif bo >= 5:
+                    k_eff *= 1.25  # high-confidence multi-map series
+            except (ValueError, TypeError):
+                pass
+
         delta = k_eff * (outcome - probability)
         self.ratings[row["team1_id"]] = self.ratings.get(row["team1_id"], 1500.0) + delta
         self.ratings[row["team2_id"]] = self.ratings.get(row["team2_id"], 1500.0) - delta
@@ -1241,10 +1256,12 @@ def forecast_esports_slate(
         source_teams_trained = source_teams_resolved and all(team_id in ratings for team_id in team_ids)
         probability1 = book.probability(team_ids[0], team_ids[1], observed_now)
         from .esports_replay import capture_inputs
-        from .models.esports_derivatives import price_esports_bo3_derivatives
+        from .models.esports_derivatives import price_esports_bo3_derivatives, price_esports_bo5_derivatives
 
         inference_inputs = capture_inputs(book, team_ids, observed_now)
+        match_bo = int(event.get("best_of") or 0)
         bo3_derivatives = price_esports_bo3_derivatives(probability1)
+        bo5_derivatives = price_esports_bo5_derivatives(probability1)
 
         for market in event.get("markets", []):
             m_type = str(market.get("market_type") or "")
@@ -1280,21 +1297,38 @@ def forecast_esports_slate(
                     line_val = float(raw_line if raw_line is not None else 2.5)
                 except (ValueError, TypeError):
                     continue
-                if abs(line_val - 2.5) > 0.1:
+                if abs(line_val - 2.5) <= 0.1:
+                    market_base["line"] = 2.5
+                    market_model_version = f"{title}-total-tiered-elo-{ESPORTS_MODEL_LINEAGE}"
+                    probabilities_by_name = {
+                        "over": bo3_derivatives.total_maps_over_2pt5,
+                        "under": bo3_derivatives.total_maps_under_2pt5,
+                    }
+                elif abs(line_val - 3.5) <= 0.1:
+                    market_base["line"] = 3.5
+                    market_model_version = f"{title}-total-tiered-elo-{ESPORTS_MODEL_LINEAGE}"
+                    probabilities_by_name = {
+                        "over": bo5_derivatives.total_maps_over_3pt5,
+                        "under": bo5_derivatives.total_maps_under_3pt5,
+                    }
+                elif abs(line_val - 4.5) <= 0.1:
+                    market_base["line"] = 4.5
+                    market_model_version = f"{title}-total-tiered-elo-{ESPORTS_MODEL_LINEAGE}"
+                    probabilities_by_name = {
+                        "over": bo5_derivatives.total_maps_over_4pt5,
+                        "under": bo5_derivatives.total_maps_under_4pt5,
+                    }
+                else:
                     continue
-                market_base["line"] = 2.5
-                market_model_version = f"{title}-total-tiered-elo-{ESPORTS_MODEL_LINEAGE}"
-                probabilities_by_name = {
-                    "over": bo3_derivatives.total_maps_over_2pt5,
-                    "under": bo3_derivatives.total_maps_under_2pt5,
-                }
             elif m_type == "spread":
                 raw_line = market.get("line") if market.get("line") is not None else snapshot.get("line")
                 try:
                     line_val = float(raw_line if raw_line is not None else -1.5)
                 except (ValueError, TypeError):
                     continue
-                if abs(abs(line_val) - 1.5) > 0.1:
+                abs_line = abs(line_val)
+                is_bo5 = match_bo == 5 or abs(abs_line - 2.5) <= 0.1
+                if not (abs(abs_line - 1.5) <= 0.1 or abs(abs_line - 2.5) <= 0.1):
                     continue
                 market_base["line"] = line_val
                 market_model_version = f"{title}-spread-tiered-elo-{ESPORTS_MODEL_LINEAGE}"
@@ -1313,20 +1347,37 @@ def forecast_esports_slate(
                     if key1 in long_key:
                         anchor_is_team1 = False
 
+                if is_bo5:
+                    if abs(abs_line - 2.5) <= 0.1:
+                        p1_neg = bo5_derivatives.spread_p1_cover_neg_2pt5
+                        p2_pos = bo5_derivatives.spread_p2_cover_pos_2pt5
+                        p2_neg = bo5_derivatives.spread_p2_cover_neg_2pt5
+                        p1_pos = bo5_derivatives.spread_p1_cover_pos_2pt5
+                    else:
+                        p1_neg = bo5_derivatives.spread_p1_cover_neg_1pt5
+                        p2_pos = bo5_derivatives.spread_p2_cover_pos_1pt5
+                        p2_neg = bo5_derivatives.spread_p2_cover_neg_1pt5
+                        p1_pos = bo5_derivatives.spread_p1_cover_pos_1pt5
+                else:
+                    p1_neg = bo3_derivatives.spread_p1_cover_neg_1pt5
+                    p2_pos = bo3_derivatives.spread_p2_cover_pos_1pt5
+                    p2_neg = bo3_derivatives.spread_p2_cover_neg_1pt5
+                    p1_pos = bo3_derivatives.spread_p1_cover_pos_1pt5
+
                 if anchor_is_team1:
                     if line_val < 0:
-                        team_minus, p_minus = descriptions[0], bo3_derivatives.spread_p1_cover_neg_1pt5
-                        team_plus, p_plus = descriptions[1], bo3_derivatives.spread_p2_cover_pos_1pt5
+                        team_minus, p_minus = descriptions[0], p1_neg
+                        team_plus, p_plus = descriptions[1], p2_pos
                     else:
-                        team_plus, p_plus = descriptions[0], bo3_derivatives.spread_p1_cover_pos_1pt5
-                        team_minus, p_minus = descriptions[1], bo3_derivatives.spread_p2_cover_neg_1pt5
+                        team_plus, p_plus = descriptions[0], p1_pos
+                        team_minus, p_minus = descriptions[1], p2_neg
                 else:
                     if line_val < 0:
-                        team_minus, p_minus = descriptions[1], bo3_derivatives.spread_p2_cover_neg_1pt5
-                        team_plus, p_plus = descriptions[0], bo3_derivatives.spread_p1_cover_pos_1pt5
+                        team_minus, p_minus = descriptions[1], p2_neg
+                        team_plus, p_plus = descriptions[0], p1_pos
                     else:
-                        team_plus, p_plus = descriptions[1], bo3_derivatives.spread_p2_cover_pos_1pt5
-                        team_minus, p_minus = descriptions[0], bo3_derivatives.spread_p1_cover_neg_1pt5
+                        team_plus, p_plus = descriptions[1], p2_pos
+                        team_minus, p_minus = descriptions[0], p1_neg
 
             sides: list[dict[str, Any]] = []
             for side_name in ("long", "short"):

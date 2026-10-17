@@ -23,6 +23,8 @@ from model_prediction.portfolio.auto_buyer_ledger import (
 )
 from model_prediction.portfolio.auto_executor import AutoExecutionConfig, AutoPolymarketBuyer
 
+REPO = Path(__file__).resolve().parents[1]
+
 
 def test_starter_opponent_runs_mapping_correctness(tmp_path: Path):
     """Verify away starter receives home team 1st inning runs and home starter receives away team runs."""
@@ -1030,7 +1032,7 @@ def test_wnba_spread_margin_v2_model_and_forecast(tmp_path: Path):
     assert artifact["qualification"]["qualified"] is True
 
     # 2. Production Registry Resolution
-    registry = ProductionModelRegistry.load(Path("."))
+    registry = ProductionModelRegistry.load(REPO)
     champ = registry.champion("WNBA", "spread")
     assert champ.model_id == "wnba-spread-margin-v2"
     assert champ.available is True
@@ -1076,7 +1078,7 @@ def test_wnba_total_margin_v2_model_and_forecast():
     from model_prediction.production_registry import ProductionModelRegistry, compute_artifact_hash
 
     # 1. Artifact Hash Verification
-    artifact_path = Path("config/models/wnba-total-margin-v2.json")
+    artifact_path = REPO / "config/models/wnba-total-margin-v2.json"
     assert artifact_path.exists()
     payload = json.loads(artifact_path.read_text(encoding="utf-8"))
     embedded_hash = payload["artifact_hash"]
@@ -1087,7 +1089,7 @@ def test_wnba_total_margin_v2_model_and_forecast():
     assert payload["team_total_weight"] == 0.40
 
     # 2. Production Registry Resolution
-    registry = ProductionModelRegistry.load(Path("."))
+    registry = ProductionModelRegistry.load(REPO)
     champ = registry.champion("WNBA", "total")
     assert champ.model_id == "wnba-total-margin-v2"
     assert champ.available is True
@@ -1122,6 +1124,122 @@ def test_wnba_total_margin_v2_model_and_forecast():
     # 4. Auto-buyer Whitelist/Blacklist
     assert "wnba-total-margin-v2" in DEFAULT_WHITELIST_MODELS
     assert "wnba-total-margin-v1" in EXPLICIT_BLACKLIST_MODELS
+
+
+def test_nba_total_margin_v2_model_and_forecast():
+    """Verify nba-total-margin-v2 artifact hash, production registry, BasketballModel and auto_executor."""
+    from model_prediction.models.basketball import BasketballModel, UpcomingGame
+    from model_prediction.portfolio.auto_executor import DEFAULT_WHITELIST_MODELS, EXPLICIT_BLACKLIST_MODELS
+    from model_prediction.production_registry import ProductionModelRegistry, compute_artifact_hash
+
+    # 1. Artifact Hash Verification
+    artifact_path = REPO / "config/models/nba-total-margin-v2.json"
+    assert artifact_path.exists()
+    payload = json.loads(artifact_path.read_text(encoding="utf-8"))
+    embedded_hash = payload["artifact_hash"]
+    computed_hash = compute_artifact_hash(payload)
+    assert embedded_hash == computed_hash
+    assert payload["total_sd"] == 19.2
+    assert payload["trend_total_weight"] == 0.85
+    assert payload["team_total_weight"] == 0.15
+
+    # 2. Production Registry Resolution
+    registry = ProductionModelRegistry.load(REPO)
+    champ = registry.champion("NBA", "total")
+    assert champ.model_id == "nba-total-margin-v2"
+    assert champ.available is True
+    assert "nba-total-margin-v2" not in registry.blocked_workflows
+    assert champ.rollback_model == "nba-total-margin-v1"
+
+    # 3. BasketballModel Composite Total Forecast
+    model = BasketballModel(
+        sport="nba",
+        version="nba-total-margin-v2",
+        margin_sd=12.0,
+        total_sd=19.2,
+        league="NBA",
+        trend_total_weight=0.85,
+        team_total_weight=0.15,
+    )
+    upcoming = [
+        UpcomingGame(
+            event_id="nba-total-test-1",
+            event_start_utc="2026-10-20T23:00:00Z",
+            away_team="Boston Celtics",
+            home_team="New York Knicks",
+            total_line=228.5,
+        )
+    ]
+    preds = model.predict_games(history=[], upcoming=upcoming)
+    assert len(preds) == 2  # moneyline + total
+    total_p = next(p for p in preds if p.market_type == "total")
+    assert total_p.probabilities["over"] > 0
+    assert total_p.probabilities["under"] > 0
+    assert round(total_p.probabilities["over"] + total_p.probabilities["under"], 5) == 1.0
+
+    # 4. Auto-buyer Whitelist/Blacklist
+    assert "nba-total-margin-v2" in DEFAULT_WHITELIST_MODELS
+    assert "nba-total-margin-v1" in EXPLICIT_BLACKLIST_MODELS
+
+
+def test_nba_spread_margin_v2_model_and_forecast():
+    """Verify nba-spread-margin-v2 artifact hash, production registry, BasketballModel and auto_executor."""
+    from model_prediction.models.basketball import BasketballModel, UpcomingGame
+    from model_prediction.portfolio.auto_executor import DEFAULT_WHITELIST_MODELS, EXPLICIT_BLACKLIST_MODELS
+    from model_prediction.production_registry import ProductionModelRegistry, compute_artifact_hash
+
+    # 1. Artifact Hash Verification
+    artifact_path = REPO / "config/models/nba-spread-margin-v2.json"
+    assert artifact_path.exists()
+    payload = json.loads(artifact_path.read_text(encoding="utf-8"))
+    embedded_hash = payload["artifact_hash"]
+    computed_hash = compute_artifact_hash(payload)
+    assert embedded_hash == computed_hash
+    assert payload["margin_sd"] == 14.6
+    assert payload["elo_weight"] == 0.65
+    assert payload["trend_weight"] == 0.65
+    assert payload["rest_weight"] == 0.3
+    assert payload["home_court_points"] == 1.8
+
+    # 2. Production Registry Resolution
+    registry = ProductionModelRegistry.load(REPO)
+    champ = registry.champion("NBA", "spread")
+    assert champ.model_id == "nba-spread-margin-v2"
+    assert champ.available is True
+    assert "nba-spread-margin-v2" not in registry.blocked_workflows
+    assert champ.rollback_model == "nba-spread-margin-v1"
+
+    # 3. Model Execution
+    model = BasketballModel(
+        sport="nba",
+        version="nba-spread-margin-v2",
+        margin_sd=14.6,
+        total_sd=19.2,
+        league="NBA",
+        elo_weight=0.65,
+        trend_weight=0.65,
+        rest_weight=0.3,
+        home_court_points=1.8,
+    )
+    upcoming = [
+        UpcomingGame(
+            event_id="nba-spread-test-1",
+            event_start_utc="2026-10-20T23:00:00Z",
+            away_team="Boston Celtics",
+            home_team="New York Knicks",
+            spread_away_line=4.5,
+        )
+    ]
+    preds = model.predict_games(history=[], upcoming=upcoming)
+    assert len(preds) == 2  # moneyline + spread
+    spread_p = next(p for p in preds if p.market_type == "spread")
+    assert spread_p.probabilities["away"] > 0
+    assert spread_p.probabilities["home"] > 0
+    assert round(spread_p.probabilities["away"] + spread_p.probabilities["home"], 5) == 1.0
+
+    # 4. Auto-buyer Whitelist/Blacklist
+    assert "nba-spread-margin-v2" in DEFAULT_WHITELIST_MODELS
+    assert "nba-spread-margin-v1" in EXPLICIT_BLACKLIST_MODELS
 
 
 def test_settlement_skips_rows_with_unreconciled_fallback_or_unknown_fill(tmp_path: Path):

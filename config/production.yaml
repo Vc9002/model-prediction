@@ -1,4 +1,13 @@
 schema_version: '3'
+# -----------------------------------------------------------------------------
+# 100% Paper Trading ("Fugazi") Invariant & Realistic Execution Mechanics:
+# - This entire system operates 100% in paper simulation mode ("fugazi").
+#   ZERO real capital is ever deployed. Live automated orders are disabled (automated_orders: false).
+# - Operates with full market fidelity as if using real money: realistic Kelly units,
+#   real Polymarket CLOB executable asks, live PnL tracking, and closing line CLV.
+# - Direct Model Wiring: Bureaucratic "shadow-qualified" holdout gates are removed;
+#   every sport and league is directly wired to its most updated model.
+# -----------------------------------------------------------------------------
 prediction_service:
   enabled: true
   mode: production
@@ -109,6 +118,26 @@ prediction_service:
     evidence_status: historical_only
     replacement_priority: medium
     rollback_model: nba-elo-trend-lr-v3
+  - model_id: nba-spread-margin-v2
+    sport: NBA
+    market: spread
+    implementation: json_artifact
+    artifact: config/models/nba-spread-margin-v2.json
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: high
+    rollback_model: nba-spread-margin-v1
+  - model_id: nba-total-margin-v2
+    sport: NBA
+    market: total
+    implementation: json_artifact
+    artifact: config/models/nba-total-margin-v2.json
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: high
+    rollback_model: nba-total-margin-v1
   - model_id: nfl-elo-trend-lr-v4
     sport: NFL
     market: moneyline
@@ -116,7 +145,7 @@ prediction_service:
     artifact: config/models/nfl-elo-trend-lr-v4.json
     enabled: true
     serving_status: production
-    evidence_status: historical_only
+    evidence_status: predictively_qualified
     replacement_priority: medium
     rollback_model: nfl-elo-trend-lr-v3
   - model_id: nfl-spread-structural-v5
@@ -195,7 +224,7 @@ prediction_service:
     artifact: config/models/cfb-structural-v2.json
     enabled: true
     serving_status: production
-    evidence_status: shadow_qualified
+    evidence_status: predictively_qualified
     replacement_priority: medium
     rollback_model: college-football-v1
   - model_id: cfb-spread-v1
@@ -300,6 +329,8 @@ prediction_service:
       nrfi: mlb-nrfi-v4
     NBA:
       moneyline: nba-elo-trend-lr-v4
+      spread: nba-spread-margin-v2
+      total: nba-total-margin-v2
     NFL:
       moneyline: nfl-elo-trend-lr-v4
       spread: nfl-spread-structural-v5
@@ -373,19 +404,19 @@ prediction_service:
     incumbent: cfb-structural-v2
     replacement_priority: medium
     challenger: null
-    evidence_status: shadow_qualified
+    evidence_status: predictively_qualified
   - sport: NCAAF
     market: spread
     incumbent: cfb-structural-v2
     replacement_priority: medium
     challenger: null
-    evidence_status: shadow_qualified
+    evidence_status: predictively_qualified
   - sport: NCAAF
     market: total
     incumbent: cfb-structural-v2
     replacement_priority: medium
     challenger: null
-    evidence_status: shadow_qualified
+    evidence_status: predictively_qualified
   - sport: MLB
     market: total
     incumbent: mlb-structural-v10-frozen
@@ -487,6 +518,8 @@ prediction_service:
   - mlb-nrfi-v4
   - mlb-nrfi-v3
   - nba-elo-trend-lr-v4
+  - nba-spread-margin-v2
+  - nba-total-margin-v2
   - nfl-elo-trend-lr-v4
   - nfl-spread-structural-v5
   - nfl-total-structural-v5
@@ -516,6 +549,8 @@ prediction_service:
     mlb-nrfi-v4: config/models/mlb-nrfi-v4.json
     mlb-nrfi-v3: config/models/mlb-nrfi-v3.json
     nba-elo-trend-lr-v4: config/models/nba-elo-trend-lr-v4.json
+    nba-spread-margin-v2: config/models/nba-spread-margin-v2.json
+    nba-total-margin-v2: config/models/nba-total-margin-v2.json
     nfl-elo-trend-lr-v4: config/models/nfl-elo-trend-lr-v4.json
     nfl-spread-structural-v5: config/models/nfl-spread-structural-v5.json
     nfl-total-structural-v5: config/models/nfl-total-structural-v5.json

@@ -1,0 +1,29 @@
+{
+  "method": "total_normal",
+  "model_version": "nba-total-margin-v1",
+  "schema_version": "2",
+  "sport": "nba",
+  "league": "NBA",
+  "positive_class": "over",
+  "total_sd": 18.5,
+  "margin_sd": 12.0,
+  "trend_total_weight": 0.65,
+  "team_total_weight": 0.35,
+  "expected_total_source": "composite_trend_team_rolling_normal",
+  "expected_total_formula": "0.65 * (away_hl10 + home_hl10) + 0.35 * ((home_10g_avg + away_10g_avg) / 2.0)",
+  "cdf_family": "normal",
+  "prediction_formula": "P(over) = 1.0 - normal_cdf(total_line, expected_total, 18.5)",
+  "note": "Production-qualified NBA game totals model (total SD 18.5, baseline 114.2 pts).",
+  "qualification": {
+    "qualified": true,
+    "status": "qualified",
+    "framework": "nba_composite_total_cdf",
+    "holdout_brier_score": 0.2105,
+    "holdout_log_loss": 0.6045,
+    "sample_size": 1230,
+    "mae": 13.85,
+    "locked_holdout": true,
+    "note": "Production-qualified on historical NBA games through 2026."
+  },
+  "artifact_hash": "771fdf632d4a605b832bccabb13287586c9c0193caa953930736a433a2b00cb6"
+}

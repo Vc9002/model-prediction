@@ -14,8 +14,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 import time as time_module
 from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
@@ -34,6 +36,8 @@ SPORTS = tuple(SPORT_LEAGUES)
 PARSER_VERSION = "espn-scoreboard-1"
 
 _NONTERMINAL_STATES = {"in", "pre"}
+
+_APPEND_LOCK = threading.Lock()
 
 
 def _has_unfinished_events(scoreboard: dict[str, Any]) -> bool:
@@ -90,7 +94,8 @@ class Ingestor:
         new_games: list[dict[str, Any]] = []
         fetched = skipped = errors = 0
         is_past_date = date.fromisoformat(game_date) < eastern_today()
-        for league in leagues:
+
+        def _ingest_league(league: str) -> tuple[str, list[dict[str, Any]], dict[str, Any] | None]:
             raw_path = raw_dir / f"scores_{league.lower()}.json"
             cached_payload = json.loads(raw_path.read_text(encoding="utf-8")) if raw_path.exists() else None
             # "Immutable" (module docstring) means a genuinely FINAL raw
@@ -138,27 +143,29 @@ class Ingestor:
                 )
             )
             if cached_payload is not None and not cache_is_stale:
-                skipped += 1
+                status = "cached"
                 payload = cached_payload
             else:
                 try:
                     payload = self.client.scoreboard(league, game_date)
                 except (httpx.HTTPError, ValueError) as error:
-                    errors += 1
-                    if self.audit:
-                        self.audit.append(
-                            "ingest_error",
-                            f"{sport_key}:{league}:{game_date}",
-                            {"error": type(error).__name__, "detail": str(error)[:200]},
-                        )
-                    continue
+                    return (
+                        "error",
+                        [],
+                        {
+                            "league": league,
+                            "error": type(error).__name__,
+                            "detail": str(error)[:200],
+                        },
+                    )
                 raw_path.parent.mkdir(parents=True, exist_ok=True)
                 raw_path.write_text(
                     json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
                     encoding="utf-8",
                 )
-                fetched += 1
-                time_module.sleep(self.rate_limit_seconds)
+                status = "fetched"
+                if self.rate_limit_seconds > 0.0:
+                    time_module.sleep(self.rate_limit_seconds)
             # Every normalized row is traceable to the exact raw snapshot
             # it came from (content-addressed provenance, consolidation
             # item 7): source, raw payload hash, and parser version.
@@ -181,7 +188,29 @@ class Ingestor:
                 game["raw_source"] = f"espn:{league}:{game_date}"
                 game["raw_hash"] = raw_hash
                 game["parser_version"] = PARSER_VERSION
-            new_games.extend(fresh)
+            return (status, fresh, None)
+
+        if len(leagues) > 1 and self.rate_limit_seconds == 0.0:
+            with ThreadPoolExecutor(max_workers=min(16, len(leagues))) as pool:
+                league_results = list(pool.map(_ingest_league, leagues))
+        else:
+            league_results = [_ingest_league(league) for league in leagues]
+
+        for status, fresh, err_info in league_results:
+            if status == "error":
+                errors += 1
+                if self.audit and err_info:
+                    self.audit.append(
+                        "ingest_error",
+                        f"{sport_key}:{err_info['league']}:{game_date}",
+                        {"error": err_info["error"], "detail": err_info["detail"]},
+                    )
+            elif status == "cached":
+                skipped += 1
+                new_games.extend(fresh)
+            elif status == "fetched":
+                fetched += 1
+                new_games.extend(fresh)
         appended = self._append_games(sport_key, new_games)
         result = {
             "sport": sport_key,
@@ -211,26 +240,27 @@ class Ingestor:
         return ids
 
     def _append_games(self, sport: str, games: Iterable[dict[str, Any]]) -> int:
-        processed = self.processed_path(sport)
-        historical = self.historical_path(sport)
-        processed.parent.mkdir(parents=True, exist_ok=True)
-        historical.parent.mkdir(parents=True, exist_ok=True)
-        existing = self._existing_event_ids(processed)
-        appended = 0
-        with (
-            processed.open("a", encoding="utf-8") as processed_handle,
-            historical.open("a", encoding="utf-8") as historical_handle,
-        ):
-            for game in games:
-                key = str(game.get("event_id"))
-                if key in existing:
-                    continue
-                line = json.dumps(game, sort_keys=True, separators=(",", ":")) + "\n"
-                processed_handle.write(line)
-                historical_handle.write(line)
-                existing.add(key)
-                appended += 1
-        return appended
+        with _APPEND_LOCK:
+            processed = self.processed_path(sport)
+            historical = self.historical_path(sport)
+            processed.parent.mkdir(parents=True, exist_ok=True)
+            historical.parent.mkdir(parents=True, exist_ok=True)
+            existing = self._existing_event_ids(processed)
+            appended = 0
+            with (
+                processed.open("a", encoding="utf-8") as processed_handle,
+                historical.open("a", encoding="utf-8") as historical_handle,
+            ):
+                for game in games:
+                    key = str(game.get("event_id"))
+                    if key in existing:
+                        continue
+                    line = json.dumps(game, sort_keys=True, separators=(",", ":")) + "\n"
+                    processed_handle.write(line)
+                    historical_handle.write(line)
+                    existing.add(key)
+                    appended += 1
+            return appended
 
     # ------------------------------------------------------------- bootstrap
 

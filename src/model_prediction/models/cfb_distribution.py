@@ -147,18 +147,23 @@ class CFBJointDistributionEngine:
         """Simulate joint (home_scores, away_scores) under the specified distribution."""
         if self.distribution_type == CFBDistributionType.NEGATIVE_BINOMIAL:
             # Overdispersed negative binomial discrete scoring calibrated to margin variance
-            target_var = (self.margin_sd**2) / (2.0 * max(0.01, 1.0 - self.score_correlation))
-            r_home = max(2.0, mu_home**2 / max(1.0, target_var - mu_home))
+            target_var = (self.margin_sd**2) / 2.0
+            r_home = max(0.5, mu_home**2 / max(1.0, target_var - mu_home))
             p_home = r_home / (r_home + mu_home)
             raw_home = self.rng.negative_binomial(r_home, p_home, size=self.n_simulations)
 
-            r_away = max(2.0, mu_away**2 / max(1.0, target_var - mu_away))
+            r_away = max(0.5, mu_away**2 / max(1.0, target_var - mu_away))
             p_away = r_away / (r_away + mu_away)
             raw_away = self.rng.negative_binomial(r_away, p_away, size=self.n_simulations)
 
             # Correlate using common game pace component
             common_noise = self.rng.normal(0.0, 1.0, size=self.n_simulations)
-            noise_scale = math.sqrt(target_var) * math.sqrt(max(0.0, self.score_correlation))
+            if self.total_sd and self.total_sd > self.margin_sd:
+                noise_scale = math.sqrt(max(0.0, (self.total_sd**2 - self.margin_sd**2) / 4.0))
+            else:
+                noise_scale = math.sqrt(
+                    max(0.0, target_var * (self.score_correlation / max(0.01, 1.0 - self.score_correlation)))
+                )
             home_scores = np.maximum(0, np.round(raw_home + noise_scale * common_noise))
             away_scores = np.maximum(0, np.round(raw_away + noise_scale * common_noise))
 

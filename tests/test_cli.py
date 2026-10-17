@@ -1557,11 +1557,25 @@ def test_below_min_edge_vs_market_still_gets_logged_not_skipped(monkeypatch, tmp
         ledger,
     )
 
-    assert result["logged"] == 1  # not skipped, despite failing min_edge
-    assert len(result["edge_blocked"]) == 1  # still noted, just not exclusionary
-    assert "logged anyway" in result["edge_blocked"][0]["reason"]
-    request, _eligibility = ledger.appended[0]
-    assert request.event_id == "mlb-2"
+    assert result["logged"] == 0  # strictly blocked from main ledger by hard edge gate
+    assert len(ledger.appended) == 0
+    assert len(result["edge_blocked"]) == 1  # noted in forecast summary
+    assert "below" in result["edge_blocked"][0]["reason"]
+
+    # Flat mode records it as diagnostic paper call
+    flat_ledger = _CaptureLedger()
+    flat_result = cli._forecast_learned_sport(
+        "mlb",
+        "2026-07-26",
+        True,
+        config,
+        Registry(),
+        object(),
+        flat_ledger,
+        flat_mode=True,
+    )
+    assert flat_result["logged"] == 1
+    assert flat_ledger.appended[0][1].reason_code == "PAPER_CALL_EDGE_OUT_OF_BOUNDS"
 
 
 def test_learned_sport_gated_ledger_duplicate_is_tracked_not_silently_dropped(monkeypatch, tmp_path) -> None:
@@ -2649,6 +2663,76 @@ def test_select_nfl_total_market_ignores_partial_and_team_totals() -> None:
     assert picked["market_slug"] == "nfl-total-phi-dal-47pt5"
 
 
+def test_select_nba_spread_market_picks_the_most_balanced_line() -> None:
+    rows = [
+        {"line": 12.5, "long": {"ask": 0.95}, "short": {"ask": 0.05}},
+        {"line": 5.5, "long": {"ask": 0.51}, "short": {"ask": 0.50}},
+        {"line": -8.5, "long": {"ask": 0.08}, "short": {"ask": 0.92}},
+    ]
+    picked = cli._select_nba_spread_market(rows)
+    assert picked is not None
+    assert picked["line"] == 5.5
+
+
+def test_select_nba_spread_market_returns_none_for_no_candidates() -> None:
+    assert cli._select_nba_spread_market([]) is None
+    assert cli._select_nba_spread_market([{"line": 1.5, "long": {}}]) is None
+
+
+def test_select_nba_spread_market_ignores_partial_game_tokens() -> None:
+    rows = [
+        {
+            "line": 3.5,
+            "long": {"ask": 0.50},
+            "short": {"ask": 0.50},
+            "market_slug": "nba-spread-bos-nyk-1h-3pt5",
+        },
+        {
+            "line": 1.5,
+            "long": {"ask": 0.50},
+            "short": {"ask": 0.50},
+            "market_slug": "nba-spread-bos-nyk-1q-1pt5",
+        },
+        {
+            "line": 6.5,
+            "long": {"ask": 0.52},
+            "short": {"ask": 0.49},
+            "market_slug": "nba-spread-bos-nyk-6pt5",
+        },
+    ]
+    picked = cli._select_nba_spread_market(rows)
+    assert picked is not None
+    assert picked["line"] == 6.5
+    assert picked["market_slug"] == "nba-spread-bos-nyk-6pt5"
+
+
+def test_select_nba_total_market_ignores_partial_and_team_totals() -> None:
+    rows = [
+        {
+            "line": 112.5,
+            "long": {"ask": 0.50},
+            "short": {"ask": 0.50},
+            "market_slug": "nba-total-bos-nyk-1h-112pt5",
+        },
+        {
+            "line": 115.5,
+            "long": {"ask": 0.50},
+            "short": {"ask": 0.50},
+            "market_slug": "nba-total-bos-nyk-tt-115pt5",
+        },
+        {
+            "line": 224.5,
+            "long": {"ask": 0.53},
+            "short": {"ask": 0.48},
+            "market_slug": "nba-total-bos-nyk-224pt5",
+        },
+    ]
+    picked = cli._select_nba_total_market(rows)
+    assert picked is not None
+    assert picked["line"] == 224.5
+    assert picked["market_slug"] == "nba-total-bos-nyk-224pt5"
+
+
 def _wnba_spread_forecast(*, selection: str, line: float) -> dict:
     return {
         "sport": "wnba_spread",
@@ -2791,6 +2875,164 @@ def test_wnba_total_fails_closed_without_exact_model_artifact(monkeypatch, tmp_p
     assert result["priced_contracts"] == []
     assert "wnba-total-margin-v2" in result["reason"]
     assert "model_artifact_hash" not in result
+
+
+def _nba_spread_forecast(*, selection: str, line: float) -> dict:
+    return {
+        "sport": "nba_spread",
+        "model_version": "nba-spread-margin-v2",
+        "model_qualified": True,
+        "priced_contracts": [
+            {
+                "event_id": "nba-spread-1",
+                "event_start_utc": "2026-10-22T23:30:00Z",
+                "away_team": "Boston Celtics",
+                "home_team": "New York Knicks",
+                "market_type": "spread",
+                "selection": selection,
+                "line": line,
+                "executable_ask": 0.51,
+                "model_probability": 0.60,
+                "model_uncertainty": 0.08,
+                "model_version": "nba-spread-margin-v2",
+                "model_artifact_hash": "b7844dcdde2d895aa973b5ab7c5c170876133f58c126818df991dee1dda00a96",
+                "model_qualified": True,
+                "rationale": "fixture",
+                "market_slug": "nba-bos-nyk-2026-10-22-pos-6pt5",
+                "observed_at_utc": "2026-10-16T18:00:00Z",
+                "market_lineage": {
+                    "market_quote_observed_at_utc": "2026-10-16T18:00:00Z",
+                    "market_quote_timestamp_valid": True,
+                    "market_quote_source": "polymarket_us",
+                    "market_quote_provenance": "decision_time_executable_quote",
+                    "market_quote_reconstructed": False,
+                    "market_snapshot_hash": "deadbeef1",
+                    "market_snapshot_archive_path": "odds/nba/2026-10-16/polymarket_snapshots.jsonl",
+                    "market_snapshot_record_id": "rec-1",
+                },
+            }
+        ],
+        "unmatched": [],
+    }
+
+
+def _nba_total_forecast(*, selection: str, line: float) -> dict:
+    return {
+        "sport": "nba_total",
+        "model_version": "nba-total-margin-v2",
+        "model_qualified": True,
+        "priced_contracts": [
+            {
+                "event_id": "nba-total-1",
+                "event_start_utc": "2026-10-22T23:30:00Z",
+                "away_team": "Boston Celtics",
+                "home_team": "New York Knicks",
+                "market_type": "total",
+                "selection": selection,
+                "line": line,
+                "executable_ask": 0.52,
+                "model_probability": 0.58,
+                "model_uncertainty": 0.08,
+                "model_version": "nba-total-margin-v2",
+                "model_artifact_hash": "e9c71f3da6a991528621e0d4fe711f4d9cf5298411082aefe3207cbb1b6f8f2c",
+                "model_qualified": True,
+                "rationale": "fixture",
+                "market_slug": "nba-bos-nyk-2026-10-22-224pt5",
+                "observed_at_utc": "2026-10-16T18:00:00Z",
+                "market_lineage": {
+                    "market_quote_observed_at_utc": "2026-10-16T18:00:00Z",
+                    "market_quote_timestamp_valid": True,
+                    "market_quote_source": "polymarket_us",
+                    "market_quote_provenance": "decision_time_executable_quote",
+                    "market_quote_reconstructed": False,
+                    "market_snapshot_hash": "deadbeef2",
+                    "market_snapshot_archive_path": "odds/nba/2026-10-16/polymarket_snapshots.jsonl",
+                    "market_snapshot_record_id": "rec-2",
+                },
+            }
+        ],
+        "unmatched": [],
+    }
+
+
+def test_nba_spread_flat_ledger_logs_every_contract(monkeypatch, registry, ban_list) -> None:
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 10, 16, 18, tzinfo=UTC))
+    monkeypatch.setattr(
+        cli_forecast,
+        "_forecast_nba_spread_slate",
+        lambda *a, **k: _nba_spread_forecast(selection="away", line=6.5),
+    )
+    flat_ledger = _CaptureLedger()
+    main_ledger = _CaptureLedger()
+
+    result = cli._forecast_nba_spread_sport(
+        data_root="unused",
+        args_date="2026-10-16",
+        config=_wnba_spread_config(),
+        registry=registry,
+        bans=ban_list,
+        main_ledger=main_ledger,
+        flat_ledger=flat_ledger,
+    )
+
+    assert result["logged"] == 1
+    assert len(flat_ledger.appended) == 1
+    request, eligibility = flat_ledger.appended[0]
+    assert request.market_type is MarketType.SPREAD
+    assert request.league is League.NBA
+    assert request.selection == "away"
+    assert request.line == 6.5
+    assert eligibility.decision == "CALL"
+
+
+def test_nba_total_flat_ledger_logs_every_contract(monkeypatch, registry, ban_list) -> None:
+    monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 10, 16, 18, tzinfo=UTC))
+    monkeypatch.setattr(
+        cli_forecast,
+        "_forecast_nba_total_slate",
+        lambda *a, **k: _nba_total_forecast(selection="over", line=224.5),
+    )
+    flat_ledger = _CaptureLedger()
+    main_ledger = _CaptureLedger()
+
+    result = cli._forecast_nba_total_sport(
+        data_root="unused",
+        args_date="2026-10-16",
+        config=_wnba_spread_config(),
+        registry=registry,
+        bans=ban_list,
+        main_ledger=main_ledger,
+        flat_ledger=flat_ledger,
+    )
+
+    assert result["logged"] == 1
+    assert len(flat_ledger.appended) == 1
+    request, eligibility = flat_ledger.appended[0]
+    assert request.market_type is MarketType.TOTAL
+    assert request.league is League.NBA
+    assert request.selection == "over"
+    assert request.line == 224.5
+    assert eligibility.decision == "CALL"
+
+
+def test_nba_spread_total_fails_closed_without_exact_model_artifact(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(
+        cli_forecast,
+        "_load_exact_artifact_contract",
+        lambda model_version: (None, f"exact serving artifact missing for {model_version}"),
+    )
+
+    class UnexpectedClient:
+        def scoreboard(self, *_args, **_kwargs):
+            raise AssertionError("scoreboard must not be read after artifact preflight fails")
+
+    res_spread = cli_forecast._forecast_nba_spread_slate(tmp_path, "2026-10-16", UnexpectedClient())
+    assert res_spread["status"] == "blocked"
+    assert "nba-spread-margin-v2" in res_spread["reason"]
+
+    res_total = cli_forecast._forecast_nba_total_slate(tmp_path, "2026-10-16", UnexpectedClient())
+    assert res_total["status"] == "blocked"
+    assert "nba-total-margin-v2" in res_total["reason"]
 
 
 def test_nrfi_unregistered_model_is_research_only_paper_call_in_both_ledgers(

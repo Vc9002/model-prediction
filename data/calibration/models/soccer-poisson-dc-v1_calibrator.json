@@ -1,15 +1,35 @@
 {
-  "baseline_brier": 0.216695,
-  "calibrated_at_utc": "2026-10-16T10:03:47.292518+00:00",
-  "calibrated_oof_brier": 0.21584116349137586,
-  "champion_method": "beta",
-  "market": "total",
+  "baseline_brier": 0.238334,
+  "calibrated_at_utc": "2026-10-17T04:36:29.409686+00:00",
+  "calibrated_oof_brier": 0.23608445377142642,
+  "champion_method": "isotonic",
+  "market": "moneyline",
   "model_version": "soccer-poisson-dc-v1",
   "parameters": {
-    "a": 4.4933,
-    "b": 0.0001,
-    "c": 2.4428
+    "max_val": 1.0,
+    "min_val": 0.2468,
+    "num_thresholds": 8,
+    "thresholds": [
+      0.456135,
+      0.535916,
+      0.589598,
+      0.619491,
+      0.638552,
+      0.819572,
+      0.890958,
+      0.898833
+    ],
+    "values": [
+      0.246753,
+      0.57,
+      0.576923,
+      0.583333,
+      0.6,
+      0.695652,
+      1.0,
+      1.0
+    ]
   },
-  "sample_size": 106,
+  "sample_size": 322,
   "sport": "soccer"
 }

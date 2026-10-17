@@ -7,6 +7,7 @@ gated call is qualified shadow output or a zero-unit research observation.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
@@ -56,7 +57,7 @@ MODEL_SPECS = {
         "three-way result, O/U 2.5, BTTS",
         "correlated Poisson score matrix",
         ("EWMA attack/defense strength", "home-goal boost", "low-score dependence"),
-        status=ModelState.RESEARCH,
+        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.TENNIS: ModelSpec(
         League.TENNIS,
@@ -64,7 +65,7 @@ MODEL_SPECS = {
         "moneyline win probability, WTA only",
         "chronological Elo updated match-by-match, blended per surface",
         ("overall Elo", "per-surface Elo", "singles-only ESPN match history"),
-        status=ModelState.RESEARCH,
+        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.NFL: ModelSpec(
         League.NFL,
@@ -88,7 +89,7 @@ MODEL_SPECS = {
         "best-of match/series winner probability",
         "binary Elo expectation",
         ("point-in-time team Elo",),
-        status=ModelState.RESEARCH,
+        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.CS2: ModelSpec(
         League.CS2,
@@ -96,7 +97,7 @@ MODEL_SPECS = {
         "best-of match/series winner probability",
         "binary Elo expectation",
         ("point-in-time team Elo",),
-        status=ModelState.RESEARCH,
+        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.KBO: ModelSpec(
         League.KBO,
@@ -104,7 +105,7 @@ MODEL_SPECS = {
         "expected moneyline settlement (tie pays 0.50)",
         "decisive-result Elo plus empirical tie probability",
         ("point-in-time team Elo", "home field", "league tie rate"),
-        status=ModelState.RESEARCH,
+        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.NPB: ModelSpec(
         League.NPB,
@@ -112,7 +113,7 @@ MODEL_SPECS = {
         "expected moneyline settlement (tie pays 0.50)",
         "decisive-result Elo plus empirical tie probability",
         ("point-in-time team Elo", "home field", "league tie rate"),
-        status=ModelState.RESEARCH,
+        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.DOTA2: ModelSpec(
         League.DOTA2,
@@ -120,7 +121,7 @@ MODEL_SPECS = {
         "best-of match/series winner probability",
         "binary Elo expectation",
         ("point-in-time team Elo",),
-        status=ModelState.RESEARCH,
+        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.VALORANT: ModelSpec(
         League.VALORANT,
@@ -128,7 +129,7 @@ MODEL_SPECS = {
         "best-of match/series winner probability",
         "binary Elo expectation",
         ("point-in-time team Elo",),
-        status=ModelState.RESEARCH,
+        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.RAINBOW_SIX: ModelSpec(
         League.RAINBOW_SIX,
@@ -136,7 +137,71 @@ MODEL_SPECS = {
         "best-of match/series winner probability",
         "binary Elo expectation",
         ("point-in-time team Elo",),
-        status=ModelState.RESEARCH,
+        status=ModelState.SHADOW_QUALIFIED,
+    ),
+    League.HOCKEY: ModelSpec(
+        League.HOCKEY,
+        "Poisson goal model with Dixon-Coles low-score correction and OT adjustment",
+        "two-way moneyline, puck line spread, and total goals",
+        "correlated Poisson score matrix with sudden-death OT resolution",
+        ("EWMA attack/defense strength", "home-ice boost", "low-score dependence"),
+        status=ModelState.SHADOW_QUALIFIED,
+    ),
+    League.NHL: ModelSpec(
+        League.NHL,
+        "Poisson goal model with Dixon-Coles low-score correction and OT adjustment",
+        "two-way moneyline, puck line spread, and total goals",
+        "correlated Poisson score matrix with sudden-death OT resolution",
+        ("EWMA attack/defense strength", "home-ice boost", "low-score dependence"),
+        status=ModelState.SHADOW_QUALIFIED,
+    ),
+    League.DARTS: ModelSpec(
+        League.DARTS,
+        "exact Markov leg-progression distribution",
+        "match winner, leg spread, and total legs",
+        "discrete Markov leg-state probability distribution",
+        ("point-in-time player Elo rating", "leg hold expectancy", "break probability"),
+        status=ModelState.SHADOW_QUALIFIED,
+    ),
+    League.DARTS_PDC: ModelSpec(
+        League.DARTS_PDC,
+        "exact Markov leg-progression distribution",
+        "match winner, leg spread, and total legs",
+        "discrete Markov leg-state probability distribution",
+        ("point-in-time player Elo rating", "leg hold expectancy", "break probability"),
+        status=ModelState.SHADOW_QUALIFIED,
+    ),
+    League.DARTS_MODUS: ModelSpec(
+        League.DARTS_MODUS,
+        "exact Markov leg-progression distribution",
+        "match winner, leg spread, and total legs",
+        "discrete Markov leg-state probability distribution",
+        ("point-in-time player Elo rating", "leg hold expectancy", "break probability"),
+        status=ModelState.SHADOW_QUALIFIED,
+    ),
+    League.NCAAB: ModelSpec(
+        League.NCAAB,
+        "independent tempo and possession scoring engine",
+        "moneyline, margin, and total via normal approximation (NCAAB constants)",
+        "Elo win probability; 40-minute college possession margin/total",
+        ("adjusted efficiency", "tempo", "conference strength", "home court advantage"),
+        status=ModelState.SHADOW_QUALIFIED,
+    ),
+    League.WNCAAB: ModelSpec(
+        League.WNCAAB,
+        "independent tempo and possession scoring engine (WNCAAB constants)",
+        "moneyline, margin, and total via normal approximation",
+        "Elo win probability; 40-minute women's college margin/total",
+        ("adjusted efficiency", "tempo", "momentum"),
+        status=ModelState.SHADOW_QUALIFIED,
+    ),
+    League.EUROLEAGUE: ModelSpec(
+        League.EUROLEAGUE,
+        "independent FIBA tempo and possession scoring engine",
+        "moneyline, margin, and total via normal approximation (EuroLeague constants)",
+        "Elo win probability; 40-minute FIBA margin/total",
+        ("adjusted efficiency", "FIBA pace", "European home advantage"),
+        status=ModelState.SHADOW_QUALIFIED,
     ),
 }
 
@@ -192,15 +257,25 @@ def model_spec(league: League) -> ModelSpec:
 def get_model(sport: str) -> Any:
     """Return the unified model object for a sport key."""
     key = sport.lower()
+    from .basketball_leagues import euroleague_model, ncaab_model, wncaab_model
     from .college_football import cfb_model
+    from .darts import darts_model
+    from .hockey import hockey_model
     from .soccer import soccer_model
     from .tennis import tennis_model
 
-    factories = {
+    factories: dict[str, Callable[[], Any]] = {
         "soccer": soccer_model,
         "tennis": tennis_model,
         "ncaaf": cfb_model,
         "cfb": cfb_model,
+        "hockey": hockey_model,
+        "nhl": hockey_model,
+        "darts": darts_model,
+        "ncaab": ncaab_model,
+        "wncaab": wncaab_model,
+        "eurolg": euroleague_model,
+        "euroleague": euroleague_model,
     }
     if key in ("mlb", "nba", "wnba", "nfl"):
         raise ValueError(
@@ -210,3 +285,10 @@ def get_model(sport: str) -> Any:
     if key not in factories:
         raise ValueError(f"no unified model for sport: {sport}")
     return factories[key]()
+
+
+def get_market_model(league_or_sport: str, market: Any) -> Any:
+    """Return a dedicated per-league, per-market model object."""
+    from .market_models import get_market_model as _get_market_model
+
+    return _get_market_model(league_or_sport, market)

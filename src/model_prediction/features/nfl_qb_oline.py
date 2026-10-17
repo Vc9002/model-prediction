@@ -10,6 +10,7 @@ Implements point-in-time feature extraction for NFL:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,3 +156,47 @@ def extract_nfl_matchup_features(
         projected_spread_margin=projected_margin,
         projected_total_points=projected_total,
     )
+
+
+def check_nfl_qb_injury_status(
+    team: str,
+    qb_name: str,
+    injury_entries: list[dict[str, Any]],
+) -> tuple[bool, str, float]:
+    """Check if QB is listed with an active injury designation.
+
+    Returns:
+        (is_out_or_ir, status_label, replacement_penalty_pts)
+        - 'Out' or 'IR': (True, status, 4.5)  # Full backup replacement penalty (-4.5 pts)
+        - 'Doubtful': (False, 'Doubtful', 2.5)  # High probability of backup playing (-2.5 pts)
+        - 'Questionable': (False, 'Questionable', 1.0)  # Minor ding / limited practice (-1.0 pt)
+        - Healthy / Unlisted: (False, 'Healthy', 0.0)
+    """
+    if not qb_name or not injury_entries:
+        return False, "Healthy", 0.0
+
+    qb_clean = qb_name.strip().lower()
+    team_clean = team.strip().lower()
+
+    for item in injury_entries:
+        pos = str(item.get("position") or "").upper()
+        if pos and pos != "QB":
+            continue
+        p_name = str(item.get("player_name") or "").strip().lower()
+        t_name = str(item.get("team") or "").strip().lower()
+        t_abbr = str(item.get("team_abbreviation") or "").strip().lower()
+
+        name_match = (p_name in qb_clean) or (qb_clean in p_name)
+        team_match = (team_clean in t_name) or (t_name in team_clean) or (t_abbr and t_abbr in team_clean)
+
+        if name_match and team_match:
+            status = str(item.get("status") or "")
+            if status in ("Out", "IR"):
+                return True, status, 4.5
+            elif status == "Doubtful":
+                return False, "Doubtful", 2.5
+            elif status == "Questionable":
+                return False, "Questionable", 1.0
+            return False, status, 0.0
+
+    return False, "Healthy", 0.0

@@ -72,6 +72,9 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     "nfl-spread-structural-v5",
     "nfl-total-structural-v5",
     "tennis-surface-elo-v4",
+    "nba-elo-trend-lr-v4",
+    "nba-spread-margin-v2",
+    "nba-total-margin-v2",
 )
 
 EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
@@ -79,8 +82,11 @@ EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
     "measured-edge-margin-v3",  # MLB run line (negative EV)
     "wnba-spread-margin-v1",  # Legacy WNBA spread (severe miscalibration)
     "wnba-total-margin-v1",  # Legacy WNBA totals (uncalibrated static SD)
+    "nba-spread-margin-v1",  # Legacy NBA spread replaced by calibrated v2
+    "nba-total-margin-v1",  # Legacy NBA totals replaced by calibrated v2
     "mlb-nrfi-v1",  # Legacy MLB NRFI
-    "cfb-total-v1",  # CFB total (uncalibrated)
+    "cfb-spread-v1",  # Legacy CFB spread (severe drift / degraded)
+    "cfb-total-v1",  # CFB total (uncalibrated / degraded)
     # All MLB pulled 2026-09-02: mlb-elo-trend-lr-v8 shipped via operator
     # override despite qualified:false and a documented validation-Brier
     # regression vs its own incumbent (holdout number that promoted it was
@@ -148,6 +154,10 @@ class AutoExecutionConfig:
     )
     min_tennis_edge: float | None = None  # Sport-specific tightened edge for Tennis (e.g. 0.08)
     max_tennis_price: float | None = None  # Sport-specific ceiling on market price for Tennis (e.g. 0.75)
+
+    def __post_init__(self) -> None:
+        if self.execute_live and self.mode != "live":
+            object.__setattr__(self, "mode", "live")
 
 
 @dataclass
@@ -1062,7 +1072,11 @@ class AutoPolymarketBuyer:
 
             main_picks = read_picks()
             flat_picks = read_flat_picks()
-            gated_picks = _parse_research_picks(gated=True)
+            gated_picks = (
+                []
+                if (self.config.execute_live or self.config.mode == "live")
+                else _parse_research_picks(gated=True)
+            )
 
             seen_pick_keys: set[Any] = set()
             combined_picks: list[dict[str, Any]] = []
@@ -1461,6 +1475,10 @@ class AutoPolymarketBuyer:
                 continue
 
             # Live Execution
+            assert self.config.mode == "live" and self.config.execute_live is True, (
+                f"FATAL: Live order execution reached under invalid configuration! "
+                f"mode={self.config.mode!r}, execute_live={self.config.execute_live!r}"
+            )
             executor = PolymarketExecutor(
                 audit=self.audit,
                 confirm=lambda _prompt: "Y",

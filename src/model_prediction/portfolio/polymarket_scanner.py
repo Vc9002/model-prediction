@@ -31,6 +31,12 @@ def _normalize_league(lg: str) -> str:
         return "DOTA2"
     if s in ("ATP", "WTA"):
         return "TENNIS"
+    if s in ("ICE_HOCKEY", "NHL", "AHL", "KHL", "DEL", "SHL", "SNHL", "CEHL", "LIIGA", "HOCKEY"):
+        return "HOCKEY"
+    if s in ("DARTS", "PDC", "MODUS", "DARTS_PDC", "DARTS_MODUS"):
+        return "DARTS"
+    if s in ("NCAAB", "CBB", "MENS_COLLEGE_BASKETBALL"):
+        return "NCAAB"
     return s
 
 
@@ -150,12 +156,17 @@ def _lookup_model_prob(
                     sel = str(p.get("selection") or "").lower()
                     if market_type.lower() in ("nrfi", "yrfi"):
                         p_win = val if sel in ("nrfi", "under", "no") else (1.0 - val)
-                    elif match_direct:
-                        # home_desc is p_home
-                        p_win = val if sel == "home" else (1.0 - val)
                     else:
-                        # home_desc is p_away
-                        p_win = (1.0 - val) if sel == "home" else val
+                        sel_is_home = (sel == "home") or _team_matches(p_home, sel)
+                        sel_is_away = (sel == "away") or _team_matches(p_away, sel)
+                        if sel_is_home:
+                            p_home_prob = val
+                        elif sel_is_away:
+                            p_home_prob = 1.0 - val
+                        else:
+                            p_home_prob = val if sel == "home" else (1.0 - val)
+
+                        p_win = p_home_prob if match_direct else (1.0 - p_home_prob)
 
                     score = 0
                     if target_date and p_date == target_date:

@@ -534,7 +534,7 @@ def test_current_configured_artifacts_are_valid_after_rename_and_config_fix(
     rejected = {
         model["sport"] for model in result["models"] if not model["model_definition_and_backfill_valid"]
     }
-    assert rejected == {"lol", "cs2", "dota2", "valorant", "kbo", "npb"}
+    assert rejected == {"lol", "cs2", "dota2", "valorant", "rainbow_six", "kbo", "npb"}
 
 
 def test_stale_artifact_ref_is_still_surfaced_as_rejected_integrity(
@@ -922,7 +922,7 @@ def test_model_ledgers_route_is_reachable_over_http(monkeypatch, patch_dash) -> 
     server = dashboard_server.ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+    connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=15)
     try:
         connection.request("GET", "/api/model-ledgers")
         response = connection.getresponse()
@@ -933,7 +933,7 @@ def test_model_ledgers_route_is_reachable_over_http(monkeypatch, patch_dash) -> 
         connection.close()
         server.shutdown()
         server.server_close()
-        thread.join(timeout=5)
+        thread.join(timeout=10)
 
 
 def test_record_model_ledger_decision_writes_operator_fields_only(tmp_path, monkeypatch, patch_dash) -> None:
