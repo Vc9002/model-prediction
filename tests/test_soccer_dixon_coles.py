@@ -274,7 +274,7 @@ def _generate_synthetic_matches(n_rounds: int = 15) -> list[dict[str, object]]:
     base_date = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
     idx = 0
 
-    for r in range(n_rounds):
+    for _ in range(n_rounds):
         for h in teams:
             for a in teams:
                 if h == a:

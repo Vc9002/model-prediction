@@ -219,7 +219,7 @@ def get_team_bullpen_state(
     freshness_scores: list[float] = []
     hl_availabilities: list[float] = []
 
-    for pid, outings in pitcher_map.items():
+    for outings in pitcher_map.values():
         outings.sort(key=lambda x: x["game_time"])
         total_bf = sum(o["bf"] for o in outings)
         total_ip = sum(o["ip"] for o in outings)

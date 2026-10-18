@@ -1,7 +1,7 @@
 {
-  "baseline_brier": 0.245256,
-  "calibrated_at_utc": "2026-10-17T22:01:41.329856+00:00",
-  "calibrated_oof_brier": 0.25360041261772176,
+  "baseline_brier": 0.245544,
+  "calibrated_at_utc": "2026-10-18T16:11:22.730687+00:00",
+  "calibrated_oof_brier": 0.2537949578968561,
   "champion_method": "isotonic",
   "market": "spread",
   "model_version": "measured-edge-margin-v3",
@@ -30,12 +30,12 @@
       0.565217,
       0.583333,
       0.6,
-      0.612903,
+      0.606383,
       0.636364,
       0.666667,
       0.666667
     ]
   },
-  "sample_size": 576,
+  "sample_size": 577,
   "sport": "mlb"
 }

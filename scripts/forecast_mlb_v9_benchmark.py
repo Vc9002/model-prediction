@@ -300,7 +300,7 @@ def run_v9_flat_forecast(date_str: str | None = None) -> list[dict]:
         (row["event_id"], row["model_version"], row["observed_at_utc"], row["selection"])
         for row in model_ledger.rows()
     }
-    for req, pregame_ts in generated_picks:
+    for req, _pregame_ts in generated_picks:
         key = (req.event_id, req.model_version, req.observed_at_utc or "", req.selection)
         if key in existing_model_keys:
             continue

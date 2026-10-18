@@ -50,7 +50,7 @@ def test_dynamic_surface_shrinkage():
     assert elo > DEFAULT_ELO
 
     # Add 20 more Grass matches
-    for i in range(2, 22):
+    for _ in range(2, 22):
         model.record_match(
             {
                 "winner": "Alcaraz",

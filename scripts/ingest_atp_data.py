@@ -92,7 +92,7 @@ def run_ingest(
     skipped_incomplete = 0
 
     # 3. Fetch and process each file
-    for rel_path, kind in files_to_fetch:
+    for rel_path, _kind in files_to_fetch:
         url = f"https://stats.tennismylife.org/data/{rel_path}"
         try:
             resp = client.get(url)

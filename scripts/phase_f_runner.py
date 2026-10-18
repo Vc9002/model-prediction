@@ -1452,11 +1452,11 @@ def run_full_replication_evaluation(seed: int = 42) -> tuple[dict[str, Any], Pat
 
     report_md = f"""# Phase F1R Replication Report — {exp_id}
 
-**Protocol Hash:** `{F1R_PROTOCOL_HASH}`  
-**Execution Date:** {utc_now().isoformat()}  
-**Git Commit SHA:** `{git_sha}`  
-**Checkpoint Type:** `{checkpoint_type}` (Decision Authority: `{decision_authority}`)  
-**Gate Verdict:** `{gate_verdict}`  
+**Protocol Hash:** `{F1R_PROTOCOL_HASH}`
+**Execution Date:** {utc_now().isoformat()}
+**Git Commit SHA:** `{git_sha}`
+**Checkpoint Type:** `{checkpoint_type}` (Decision Authority: `{decision_authority}`)
+**Gate Verdict:** `{gate_verdict}`
 **Next Action:** {failure_action or "Advance to F2"}
 
 ---

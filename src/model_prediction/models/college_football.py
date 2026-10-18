@@ -355,6 +355,218 @@ def _load_cfb_history(data_root: Path, cutoff_dt: datetime | None = None) -> lis
     return sorted(records, key=lambda r: r.start)
 
 
+def _clean_cfb_school(name: str) -> str:
+    return name.replace("(", "").replace(")", "").strip()
+
+
+def _canonical_market_snapshot_lineage(row: dict[str, Any], archive_path: Path) -> dict[str, Any] | None:
+    """Bind a parsed prospective quote to its exact archived JSON record."""
+    row = row.get("_archive_record", row)
+    if not isinstance(row, dict):
+        return None
+    observed_at = str(row.get("observed_at_utc") or "")
+    source = str(row.get("provider") or "")
+    reconstructed = row.get("reconstructed")
+    prospective_marker = row.get("usage") == "prospective_executable_bbo"
+    if (
+        not archive_path.is_file()
+        or not observed_at
+        or source != "polymarket_us"
+        or row.get("timestamp_valid") is not True
+        or not (reconstructed is False or (reconstructed is None and prospective_marker))
+    ):
+        return None
+    payload = {key: value for key, value in row.items() if not str(key).startswith("_")}
+    digest = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return {
+        "market_quote_observed_at_utc": observed_at,
+        "market_quote_timestamp_valid": True,
+        "market_quote_source": source,
+        "market_quote_provenance": "decision_time_executable_quote",
+        "market_quote_reconstructed": False,
+        "market_snapshot_hash": digest,
+        "market_snapshot_archive_path": str(archive_path.resolve()),
+        "market_snapshot_record_id": digest,
+    }
+
+
+def _match_cfb_moneyline(
+    away_team: str,
+    home_team: str,
+    rows: list[dict[str, Any]],
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Match pregame Polymarket moneyline quote for an ESPN matchup.
+
+    Returns (quote_row, long_side) where long_side is 'home' or 'away'.
+    """
+    from ..data_sources.cfb_data import resolve_team
+    from ..learned_forward import _team_matches
+
+    away_res = resolve_team(_clean_cfb_school(away_team))
+    home_res = resolve_team(_clean_cfb_school(home_team))
+    away_canon = away_res.canonical_name if away_res else away_team
+    home_canon = home_res.canonical_name if home_res else home_team
+
+    for r in rows:
+        if r.get("market_type") != "moneyline":
+            continue
+        long_dict = r.get("long") or {}
+        short_dict = r.get("short") or {}
+        if long_dict.get("ask") is None or short_dict.get("ask") is None:
+            continue
+
+        title = str(r.get("event_title") or "")
+        if " vs. " in title:
+            p1, p2 = title.split(" vs. ", 1)
+        elif " vs " in title:
+            p1, p2 = title.split(" vs ", 1)
+        elif " @ " in title:
+            p1, p2 = title.split(" @ ", 1)
+        else:
+            continue
+
+        p1_res = resolve_team(_clean_cfb_school(p1))
+        p2_res = resolve_team(_clean_cfb_school(p2))
+        p1_c = p1_res.canonical_name if p1_res else p1
+        p2_c = p2_res.canonical_name if p2_res else p2
+
+        h1 = (p1_c == home_canon) or _team_matches(home_team, p1)
+        a2 = (p2_c == away_canon) or _team_matches(away_team, p2)
+        if h1 and a2:
+            team = str(r.get("team") or "")
+            long_desc = str(long_dict.get("description") or "")
+            is_home_long = (
+                (p1_res is not None and resolve_team(_clean_cfb_school(team)) == home_res)
+                or _team_matches(home_team, team)
+                or _team_matches(home_team, long_desc)
+            )
+            return r, ("home" if is_home_long else "away")
+
+        a1 = (p1_c == away_canon) or _team_matches(away_team, p1)
+        h2 = (p2_c == home_canon) or _team_matches(home_team, p2)
+        if a1 and h2:
+            team = str(r.get("team") or "")
+            long_desc = str(long_dict.get("description") or "")
+            is_away_long = (
+                (p1_res is not None and resolve_team(_clean_cfb_school(team)) == away_res)
+                or _team_matches(away_team, team)
+                or _team_matches(away_team, long_desc)
+            )
+            return r, ("away" if is_away_long else "home")
+
+    return None, None
+
+
+def _match_cfb_spread(
+    away_team: str,
+    home_team: str,
+    rows: list[dict[str, Any]],
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Select the most balanced main-game Polymarket spread quote for this matchup."""
+    from ..data_sources.cfb_data import resolve_team
+    from ..learned_forward import _team_matches
+
+    partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-")
+    cands: list[dict[str, Any]] = []
+    away_res = resolve_team(_clean_cfb_school(away_team))
+    home_res = resolve_team(_clean_cfb_school(home_team))
+    away_words = [w for w in away_team.casefold().split() if len(w) > 2]
+    home_words = [w for w in home_team.casefold().split() if len(w) > 2]
+
+    for r in rows:
+        if r.get("market_type") != "spread":
+            continue
+        slug = str(r.get("market_slug", "")).lower()
+        if any(token in slug for token in partial_tokens):
+            continue
+        if r.get("line") is None or (r.get("long") or {}).get("ask") is None:
+            continue
+
+        team = str(r.get("team") or "")
+        title = str(r.get("event_title") or "")
+        team_res = resolve_team(_clean_cfb_school(team)) if team else None
+
+        matched_matchup = bool(
+            (team_res and (team_res == away_res or team_res == home_res))
+            or _team_matches(away_team, team)
+            or _team_matches(home_team, team)
+            or (
+                any(w in title.casefold() or w in slug for w in away_words)
+                and any(w in title.casefold() or w in slug for w in home_words)
+            )
+        )
+
+        if matched_matchup:
+            cands.append(r)
+
+    if not cands:
+        return None, None
+
+    best = min(cands, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
+    anchor_team = str(best.get("team") or "")
+    anchor_res = resolve_team(_clean_cfb_school(anchor_team)) if anchor_team else None
+    if anchor_res and anchor_res == away_res:
+        anchor_side = "away"
+    elif anchor_res and anchor_res == home_res:
+        anchor_side = "home"
+    elif _team_matches(away_team, anchor_team):
+        anchor_side = "away"
+    else:
+        anchor_side = "home"
+
+    return best, anchor_side
+
+
+def _match_cfb_total(
+    away_team: str,
+    home_team: str,
+    rows: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Select the most balanced main-game Polymarket total quote for this matchup."""
+    from ..data_sources.cfb_data import resolve_team
+    from ..learned_forward import _team_matches
+
+    partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")
+    cands: list[dict[str, Any]] = []
+    away_res = resolve_team(_clean_cfb_school(away_team))
+    home_res = resolve_team(_clean_cfb_school(home_team))
+    away_words = [w for w in away_team.casefold().split() if len(w) > 2]
+    home_words = [w for w in home_team.casefold().split() if len(w) > 2]
+
+    for r in rows:
+        if r.get("market_type") not in ("total", "over_under"):
+            continue
+        slug = str(r.get("market_slug", "")).lower()
+        if any(token in slug for token in partial_tokens):
+            continue
+        if r.get("line") is None or (r.get("long") or {}).get("ask") is None:
+            continue
+
+        team = str(r.get("team") or "")
+        title = str(r.get("event_title") or "")
+        team_res = resolve_team(_clean_cfb_school(team)) if team else None
+
+        matched_matchup = bool(
+            (team_res and (team_res == away_res or team_res == home_res))
+            or _team_matches(away_team, team)
+            or _team_matches(home_team, team)
+            or (
+                any(w in title.casefold() or w in slug for w in away_words)
+                and any(w in title.casefold() or w in slug for w in home_words)
+            )
+        )
+
+        if matched_matchup:
+            cands.append(r)
+
+    if not cands:
+        return None
+
+    return min(cands, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
+
+
 def build_cfb_slate(
     data_root: str | Path,
     game_date: str,
@@ -387,6 +599,32 @@ def build_cfb_slate(
     start_of_day = parse_utc(f"{iso_date}T09:00:00Z")
     history = _load_cfb_history(root, cutoff_dt=start_of_day)
 
+    # 3. Load Polymarket Snapshots if available
+    snapshot_path = root / "odds" / "ncaaf" / iso_date / "polymarket_snapshots.jsonl"
+    snapshot_rows: list[dict[str, Any]] = []
+    if snapshot_path.is_file():
+        try:
+            with snapshot_path.open(encoding="utf-8") as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    try:
+                        r = json.loads(line)
+                        if isinstance(r, dict):
+                            obs_str = str(r.get("observed_at_utc") or "")
+                            if obs_str:
+                                try:
+                                    if parse_utc(obs_str) <= obs:
+                                        snapshot_rows.append(r)
+                                except (ValueError, TypeError):
+                                    pass
+                            else:
+                                snapshot_rows.append(r)
+                    except json.JSONDecodeError:
+                        continue
+        except OSError:
+            snapshot_rows = []
+
     model = CollegeFootballModel()
     priced_contracts: list[dict[str, Any]] = []
     unmatched: list[dict[str, Any]] = []
@@ -408,7 +646,51 @@ def build_cfb_slate(
         event_start_utc = str(ev.get("date"))
         is_neutral = bool(competition.get("neutralSite", False))
 
-        # Extract market odds if available from ESPN or odds sources
+        # 3a. Match Polymarket prospective quotes
+        pm_ml, ml_long_side = _match_cfb_moneyline(away_team, home_team, snapshot_rows)
+        pm_sp, sp_anchor_side = _match_cfb_spread(away_team, home_team, snapshot_rows)
+        pm_tot = _match_cfb_total(away_team, home_team, snapshot_rows)
+
+        pm_ml_home_prob = None
+        pm_ml_away_prob = None
+        pm_ml_lineage = None
+        if pm_ml is not None:
+            pm_ml_home_prob = (
+                float(pm_ml["long"]["ask"]) if ml_long_side == "home" else float(pm_ml["short"]["ask"])
+            )
+            pm_ml_away_prob = (
+                float(pm_ml["short"]["ask"]) if ml_long_side == "home" else float(pm_ml["long"]["ask"])
+            )
+            pm_ml_lineage = _canonical_market_snapshot_lineage(pm_ml, snapshot_path)
+
+        pm_spread_away_line = None
+        pm_spread_home_line = None
+        pm_spread_away_prob = None
+        pm_spread_home_prob = None
+        pm_spread_lineage = None
+        if pm_sp is not None:
+            sp_line = float(pm_sp["line"])
+            pm_spread_away_line = sp_line if sp_anchor_side == "away" else -sp_line
+            pm_spread_home_line = -sp_line if sp_anchor_side == "away" else sp_line
+            pm_spread_away_prob = (
+                float(pm_sp["long"]["ask"]) if sp_anchor_side == "away" else float(pm_sp["short"]["ask"])
+            )
+            pm_spread_home_prob = (
+                float(pm_sp["short"]["ask"]) if sp_anchor_side == "away" else float(pm_sp["long"]["ask"])
+            )
+            pm_spread_lineage = _canonical_market_snapshot_lineage(pm_sp, snapshot_path)
+
+        pm_total_line = None
+        pm_total_over_prob = None
+        pm_total_under_prob = None
+        pm_total_lineage = None
+        if pm_tot is not None:
+            pm_total_line = float(pm_tot["line"])
+            pm_total_over_prob = float(pm_tot["long"]["ask"])
+            pm_total_under_prob = float(pm_tot["short"]["ask"])
+            pm_total_lineage = _canonical_market_snapshot_lineage(pm_tot, snapshot_path)
+
+        # 3b. Extract fallback sportsbook odds if available from ESPN
         odds_list = competition.get("odds", [])
         spread_away_line = None
         spread_home_line = None
@@ -505,6 +787,10 @@ def build_cfb_slate(
             elif market_ml_away_prob is not None and market_ml_home_prob is None:
                 market_ml_home_prob = round(min(0.99, max(0.01, (1.0 - market_ml_away_prob) + 0.045)), 6)
 
+        effective_spread_away = pm_spread_away_line if pm_sp is not None else spread_away_line
+        effective_spread_home = pm_spread_home_line if pm_sp is not None else spread_home_line
+        effective_total = pm_total_line if pm_tot is not None else total_line
+
         ev_season = int((ev.get("season") or {}).get("year") or iso_date[:4])
         ev_week = int((ev.get("week") or {}).get("number") or 1)
 
@@ -513,9 +799,9 @@ def build_cfb_slate(
             event_start_utc=event_start_utc,
             away_team=away_team,
             home_team=home_team,
-            spread_away_line=spread_away_line,
-            spread_home_line=spread_home_line,
-            total_line=total_line,
+            spread_away_line=effective_spread_away,
+            spread_home_line=effective_spread_home,
+            total_line=effective_total,
             is_neutral_site=is_neutral,
             season_year=ev_season,
             week=ev_week,
@@ -525,39 +811,89 @@ def build_cfb_slate(
 
         for p in preds:
             mtype = p.market_type
+            sportsbook = "espn_consensus"
+            market_lineage = None
+
             if mtype == "moneyline":
-                if market_ml_home_prob is None and market_ml_away_prob is None:
+                if pm_ml is not None:
+                    selection = "home" if p.probabilities.get("home", 0.0) >= 0.5 else "away"
+                    prob = p.probabilities[selection]
+                    line_val = None
+                    ask = pm_ml_home_prob if selection == "home" else pm_ml_away_prob
+                    slug = str(pm_ml.get("market_slug"))
+                    sportsbook = "polymarket_us"
+                    market_lineage = pm_ml_lineage
+                    m_ver = p.model_version
+                elif market_ml_home_prob is not None or market_ml_away_prob is not None:
+                    selection = "home" if p.probabilities.get("home", 0.0) >= 0.5 else "away"
+                    prob = p.probabilities[selection]
+                    line_val = None
+                    ask = market_ml_home_prob if selection == "home" else market_ml_away_prob
+                    slug = f"ncaaf-ml-{event_id}-{selection}"
+                    sportsbook = "espn_consensus"
+                    market_lineage = None
+                    m_ver = p.model_version
+                else:
+                    # Do not use -110 as standard for moneyline when no quote exists
                     continue
-                selection = "home" if p.probabilities.get("home", 0.0) >= 0.5 else "away"
-                prob = p.probabilities[selection]
-                line_val = None
-                ask = market_ml_home_prob if selection == "home" else market_ml_away_prob
-                slug = f"ncaaf-ml-{event_id}-{selection}"
-                m_ver = p.model_version
             elif mtype == "spread":
-                if spread_away_line is None or spread_home_line is None:
+                if pm_sp is not None:
+                    selection = (
+                        "away"
+                        if p.probabilities.get("away", 0.0) >= p.probabilities.get("home", 0.0)
+                        else "home"
+                    )
+                    prob = p.probabilities[selection]
+                    line_val = pm_spread_away_line if selection == "away" else pm_spread_home_line
+                    ask = pm_spread_away_prob if selection == "away" else pm_spread_home_prob
+                    slug = str(pm_sp.get("market_slug"))
+                    sportsbook = "polymarket_us"
+                    market_lineage = pm_spread_lineage
+                    m_ver = p.model_version
+                elif spread_away_line is not None and spread_home_line is not None:
+                    selection = (
+                        "away"
+                        if p.probabilities.get("away", 0.0) >= p.probabilities.get("home", 0.0)
+                        else "home"
+                    )
+                    prob = p.probabilities[selection]
+                    line_val = spread_away_line if selection == "away" else spread_home_line
+                    ask = market_spread_away_prob if selection == "away" else market_spread_home_prob
+                    slug = f"ncaaf-spread-{event_id}-{selection}"
+                    sportsbook = "espn_consensus"
+                    market_lineage = None
+                    m_ver = p.model_version
+                else:
                     continue
-                selection = (
-                    "away" if p.probabilities.get("away", 0.0) >= p.probabilities.get("home", 0.0) else "home"
-                )
-                prob = p.probabilities[selection]
-                line_val = spread_away_line if selection == "away" else spread_home_line
-                ask = market_spread_away_prob if selection == "away" else market_spread_home_prob
-                slug = f"ncaaf-spread-{event_id}-{selection}"
-                m_ver = p.model_version
             else:  # total
-                if total_line is None:
+                if pm_tot is not None:
+                    selection = (
+                        "over"
+                        if p.probabilities.get("over", 0.0) >= p.probabilities.get("under", 0.0)
+                        else "under"
+                    )
+                    prob = p.probabilities[selection]
+                    line_val = pm_total_line
+                    ask = pm_total_over_prob if selection == "over" else pm_total_under_prob
+                    slug = str(pm_tot.get("market_slug"))
+                    sportsbook = "polymarket_us"
+                    market_lineage = pm_total_lineage
+                    m_ver = p.model_version
+                elif total_line is not None:
+                    selection = (
+                        "over"
+                        if p.probabilities.get("over", 0.0) >= p.probabilities.get("under", 0.0)
+                        else "under"
+                    )
+                    prob = p.probabilities[selection]
+                    line_val = total_line
+                    ask = market_total_over_prob if selection == "over" else market_total_under_prob
+                    slug = f"ncaaf-total-{event_id}-{selection}"
+                    sportsbook = "espn_consensus"
+                    market_lineage = None
+                    m_ver = p.model_version
+                else:
                     continue
-                selection = (
-                    "over"
-                    if p.probabilities.get("over", 0.0) >= p.probabilities.get("under", 0.0)
-                    else "under"
-                )
-                prob = p.probabilities[selection]
-                line_val = total_line
-                ask = market_total_over_prob if selection == "over" else market_total_under_prob
-                slug = f"ncaaf-total-{event_id}-{selection}"
-                m_ver = p.model_version
 
             # If no market price/line is available from the source, do NOT fabricate a fake edge
             if ask is None:
@@ -581,9 +917,15 @@ def build_cfb_slate(
                     "rationale": p.rationale,
                     "market_slug": slug,
                     "executable_ask": float(ask),
-                    "observed_at_utc": obs.isoformat(),
+                    "observed_at_utc": (
+                        market_lineage["market_quote_observed_at_utc"]
+                        if market_lineage is not None and market_lineage.get("market_quote_observed_at_utc")
+                        else obs.isoformat()
+                    ),
                     "timestamp_valid": True,
                     "edge_vs_executable_ask": edge,
+                    "sportsbook": sportsbook,
+                    "market_lineage": market_lineage,
                 }
             )
 

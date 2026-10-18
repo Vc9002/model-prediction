@@ -96,8 +96,8 @@ class CFBJointDistributionEngine:
         self,
         distribution_type: CFBDistributionType = CFBDistributionType.NEGATIVE_BINOMIAL,
         margin_sd: float = 15.5,
-        total_sd: float = 14.8,
-        score_correlation: float = 0.18,
+        total_sd: float = 17.5,
+        score_correlation: float = 0.20,
         nb_dispersion: float = 12.0,  # Negative binomial r parameter
         n_simulations: int = 15000,
         random_seed: int = 42,

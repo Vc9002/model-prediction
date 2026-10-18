@@ -119,7 +119,7 @@ def _polymarket_slate(args, config) -> dict:
                 return sport, league, [], str(exc)[:200]
 
         with ThreadPoolExecutor(max_workers=min(16, len(all_leagues))) as pool:
-            for sport, league, league_events, error in pool.map(_fetch_league_slate, all_leagues):
+            for _sport, league, league_events, error in pool.map(_fetch_league_slate, all_leagues):
                 events[league] = league_events
                 if error is not None:
                     league_errors[league] = error

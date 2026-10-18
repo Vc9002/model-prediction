@@ -66,7 +66,6 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     "soccer-total-v1",
     "valorant-tiered-elo-v6",
     "lol-tiered-elo-v6",
-    "rainbow_six-tiered-elo-v6",
     "dota2-tiered-elo-v6",
     "nfl-elo-trend-lr-v4",
     "nfl-spread-structural-v5",
@@ -75,6 +74,7 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     "nba-elo-trend-lr-v4",
     "nba-spread-margin-v2",
     "nba-total-margin-v2",
+    "cfb-structural-v2",
 )
 
 EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
@@ -87,6 +87,7 @@ EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
     "mlb-nrfi-v1",  # Legacy MLB NRFI
     "cfb-spread-v1",  # Legacy CFB spread (severe drift / degraded)
     "cfb-total-v1",  # CFB total (uncalibrated / degraded)
+    "college-football-v1",  # Legacy CFB moneyline (uncalibrated favorite bias, -37.46U)
     # All MLB pulled 2026-09-02: mlb-elo-trend-lr-v8 shipped via operator
     # override despite qualified:false and a documented validation-Brier
     # regression vs its own incumbent (holdout number that promoted it was
@@ -101,15 +102,10 @@ EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
     # Pulled 2026-09-07: same miscalibration signature as the MLB pull above.
     # Live Auto-Buyer record: 19 settled bets, 6W-13L (31.6% actual) against
     # a claimed average 60.3% win probability -- a 29-point overconfidence
-    # gap. Worse on its own highest-conviction bets (>=65% claimed): 28.6%
-    # actual (2W-5L) vs 78.5% claimed, i.e. confidence is inversely
-    # informative on this model's strongest calls. Realized P&L -$49.23,
-    # the sole reason the whole Auto-Buyer book looked roughly breakeven
-    # instead of solidly profitable (ex-soccer P&L: +$48.30). The other two
-    # whitelisted soccer models (soccer-poisson-dc-v2, soccer-total-v1)
-    # have placed zero live bets, so this is not a soccer-as-a-sport
-    # problem -- it's this one model.
+    # gap. Realized P&L -$49.23.
     "soccer-poisson-dc-v1",
+    # Esports underperformer pulled:
+    "rainbow_six-tiered-elo-v6",  # 2W-8L (-68.1% ROI) in production ledgers
 )
 
 AUTO_BUYER_STATE_FILE = DATA / "auto_buyer_state.json"

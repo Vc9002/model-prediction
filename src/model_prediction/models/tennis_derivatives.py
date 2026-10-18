@@ -124,7 +124,7 @@ def match_game_distribution(
     """Computes distribution over match games won (total_games_a, total_games_b)."""
     states = match_state_distribution(pa_point, pb_point, best_of=best_of)
     finished_match_games: dict[tuple[int, int], float] = {}
-    for (sa, sb, ga, gb), m_prob in states.items():
+    for (_, _, ga, gb), m_prob in states.items():
         finished_match_games[(ga, gb)] = finished_match_games.get((ga, gb), 0.0) + m_prob
     return finished_match_games
 

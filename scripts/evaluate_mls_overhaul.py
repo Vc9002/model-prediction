@@ -20,8 +20,8 @@ def evaluate_mls():
     conn = sqlite3.connect(f"file:{LEDGER_DB}?mode=ro", uri=True)
     c = conn.cursor()
     c.execute("""
-        SELECT pick_id, selection, result, pnl_units, decision_payload_json 
-        FROM ledger_records 
+        SELECT pick_id, selection, result, pnl_units, decision_payload_json
+        FROM ledger_records
         WHERE sport = 'soccer' AND status = 'settled'
     """)
     rows = c.fetchall()

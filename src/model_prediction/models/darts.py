@@ -112,7 +112,7 @@ class DartsLegMarkovEngine:
         dp: dict[tuple[int, int, int], float] = {(0, 0, 0 if first_throw == "A" else 1): 1.0}
         final_scores: dict[tuple[int, int], float] = {}
 
-        for total_legs in range(best_of_legs):
+        for _ in range(best_of_legs):
             next_dp: dict[tuple[int, int, int], float] = {}
             for (i, j, throw), prob in dp.items():
                 if prob <= 0.0:

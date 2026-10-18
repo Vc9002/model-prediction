@@ -27,6 +27,8 @@ data/events.jsonl
 data/audit.jsonl
 data/auto_buyer_ledger.jsonl
 data/auto_buyer_picks.xlsx
+data/picks.xlsx
+data/flat_picks.xlsx
 data/auto_buyer_state.json
 data/manual_bets.xlsx
 data/manual_bets_state.json

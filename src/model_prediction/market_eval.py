@@ -271,7 +271,7 @@ def market_relative_report(
 
     # Stability slices by model disagreement bucket
     buckets: dict[str, dict[str, Any]] = {}
-    for r, p, e in zip(rows, pnls, disagreements, strict=True):
+    for _, p, e in zip(rows, pnls, disagreements, strict=True):
         b = buckets.setdefault(_edge_bucket(e), {"n": 0, "roi": 0.0})
         b["n"] += 1
         b["roi"] += p

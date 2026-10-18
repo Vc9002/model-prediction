@@ -80,6 +80,8 @@ from .state import (
 
 logger = logging.getLogger("model_prediction.cli")
 
+STANDARD_LAY_ASK = round(implied_probability(-110), 6)
+
 
 def _load_exact_artifact_contract(model_version: str) -> tuple[dict[str, Any] | None, str | None]:
     """Load only the artifact whose own identity exactly matches the model.
@@ -2598,15 +2600,34 @@ def _forecast_nfl_spread_slate(
             and str(row.get("event_start_utc") or "")[:16] == str(event["date"])[:16]
         ]
         market = _select_nfl_spread_market(candidates)
+        first_odds: dict[str, Any] = {}
         if market is None:
-            unmatched.append({"event_id": event_id, "reason": "no matched spread market"})
-            continue
-
-        market_lineage = market.get("_lineage")
-        anchor_team = str(market.get("team") or "")
-        anchor_line = float(market["line"])
-        anchor_is_away = _team_matches(away_team, anchor_team)
-        spread_home_line = -anchor_line if anchor_is_away else anchor_line
+            comp = (event.get("competitions") or [{}])[0]
+            odds_list = comp.get("odds") or []
+            first_odds = odds_list[0] if odds_list else {}
+            espn_spread = first_odds.get("spread")
+            if espn_spread is None:
+                unmatched.append({"event_id": event_id, "reason": "no matched spread market"})
+                continue
+            try:
+                spread_home_line = float(espn_spread)
+            except (ValueError, TypeError):
+                unmatched.append({"event_id": event_id, "reason": "invalid espn spread line"})
+                continue
+            anchor_team = home_team
+            anchor_line = spread_home_line
+            anchor_is_away = False
+            market_lineage = None
+            sportsbook = "espn_consensus"
+            market_slug = f"nfl-spread-{event_id}"
+        else:
+            market_lineage = market.get("_lineage")
+            anchor_team = str(market.get("team") or "")
+            anchor_line = float(market["line"])
+            anchor_is_away = _team_matches(away_team, anchor_team)
+            spread_home_line = -anchor_line if anchor_is_away else anchor_line
+            sportsbook = "polymarket_us"
+            market_slug = market.get("market_slug")
 
         is_neutral_site = _nfl_is_neutral_site(event)
         is_dome, wind_mph, temperature_f = _nfl_venue_weather(event)
@@ -2657,12 +2678,38 @@ def _forecast_nfl_spread_slate(
         if cover_prob >= 0.5:
             selection = "away" if anchor_is_away else "home"
             model_probability = cover_prob
-            ask = market["long"]["ask"]
+            if market is not None:
+                ask = market["long"]["ask"]
+            else:
+                ps_obj = first_odds.get("pointSpread") or {}
+                sel_ps = ps_obj.get("away") if selection == "away" else ps_obj.get("home")
+                close_odds = (sel_ps or {}).get("close", {}).get("odds")
+                try:
+                    ask = (
+                        round(implied_probability(int(close_odds)), 6)
+                        if close_odds and str(close_odds).lstrip("-+").isdigit()
+                        else STANDARD_LAY_ASK
+                    )
+                except (ValueError, TypeError):
+                    ask = STANDARD_LAY_ASK
             line = anchor_line
         else:
             selection = "home" if anchor_is_away else "away"
             model_probability = 1.0 - cover_prob
-            ask = market["short"]["ask"]
+            if market is not None:
+                ask = market["short"]["ask"]
+            else:
+                ps_obj = first_odds.get("pointSpread") or {}
+                sel_ps = ps_obj.get("home") if selection == "home" else ps_obj.get("away")
+                close_odds = (sel_ps or {}).get("close", {}).get("odds")
+                try:
+                    ask = (
+                        round(implied_probability(int(close_odds)), 6)
+                        if close_odds and str(close_odds).lstrip("-+").isdigit()
+                        else STANDARD_LAY_ASK
+                    )
+                except (ValueError, TypeError):
+                    ask = STANDARD_LAY_ASK
             line = -anchor_line
 
         if ask is None or not 0 < float(ask) < 1:
@@ -2703,6 +2750,7 @@ def _forecast_nfl_spread_slate(
                 "selection": selection,
                 "line": line,
                 "executable_ask": float(ask),
+                "sportsbook": sportsbook,
                 "model_probability": round(model_probability, 6),
                 "model_uncertainty": 0.08,
                 "model_version": model_version,
@@ -2712,7 +2760,7 @@ def _forecast_nfl_spread_slate(
                     f"NFL Structural v5 Spread projection. Projected margin {fc.projected_margin_home:+.1f} "
                     f"(Rest: {home_rest_days}v{away_rest_days}d, Dome: {is_dome})."
                 ),
-                "market_slug": market.get("market_slug"),
+                "market_slug": market_slug,
                 "observed_at_utc": (
                     market_lineage["market_quote_observed_at_utc"]
                     if market_lineage is not None
@@ -2769,6 +2817,7 @@ def _forecast_nfl_spread_sport(
 
     for contract in forecast["priced_contracts"]:
         ask = contract["executable_ask"]
+        contract_sportsbook = str(contract.get("sportsbook") or "polymarket_us")
         request = PickRequest(
             event_start_utc=contract["event_start_utc"],
             event_id=contract["event_id"],
@@ -2778,7 +2827,7 @@ def _forecast_nfl_spread_sport(
             market_type=MarketType.SPREAD,
             selection=contract["selection"],
             line=contract["line"],
-            sportsbook="polymarket_us",
+            sportsbook=contract_sportsbook,
             american_odds=probability_to_american(ask),
             model_probability=contract["model_probability"],
             model_uncertainty=contract["model_uncertainty"],
@@ -2822,7 +2871,7 @@ def _forecast_nfl_spread_sport(
                 )
                 if (
                     contract.get("model_qualified") is not True
-                    or contract.get("market_lineage") is None
+                    or (contract_sportsbook == "polymarket_us" and contract.get("market_lineage") is None)
                     or not _is_registered_serving_model(
                         request.model_version,
                         request.league.value,
@@ -2961,16 +3010,32 @@ def _forecast_nfl_total_slate(
             and str(row.get("event_start_utc") or "")[:16] == str(event["date"])[:16]
         ]
         market = _select_nfl_total_market(candidates)
+        first_odds: dict[str, Any] = {}
         if market is None:
-            unmatched.append({"event_id": event_id, "reason": "no matched total market"})
-            continue
+            comp = (event.get("competitions") or [{}])[0]
+            odds_list = comp.get("odds") or []
+            first_odds = odds_list[0] if odds_list else {}
+            espn_total = first_odds.get("overUnder")
+            if espn_total is None:
+                unmatched.append({"event_id": event_id, "reason": "no matched total market"})
+                continue
+            try:
+                t_line = float(espn_total)
+            except (ValueError, TypeError):
+                unmatched.append({"event_id": event_id, "reason": "invalid espn overUnder"})
+                continue
+            market_lineage = None
+            sportsbook = "espn_consensus"
+            market_slug = f"nfl-total-{event_id}"
+        else:
+            try:
+                t_line = float(market["line"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            market_lineage = market.get("_lineage")
+            sportsbook = "polymarket_us"
+            market_slug = market.get("market_slug")
 
-        try:
-            t_line = float(market["line"])
-        except (KeyError, TypeError, ValueError):
-            continue
-
-        market_lineage = market.get("_lineage")
         is_neutral_site = _nfl_is_neutral_site(event)
         is_dome, wind_mph, temperature_f = _nfl_venue_weather(event)
         is_division_game = _nfl_is_division_game(home_team, away_team)
@@ -3020,12 +3085,36 @@ def _forecast_nfl_total_slate(
         if over_prob >= 0.5:
             selection = "over"
             model_probability = over_prob
-            ask = market["long"]["ask"]
+            if market is not None:
+                ask = market["long"]["ask"]
+            else:
+                tot_obj = first_odds.get("total") or {}
+                close_odds = (tot_obj.get("over") or {}).get("close", {}).get("odds")
+                try:
+                    ask = (
+                        round(implied_probability(int(close_odds)), 6)
+                        if close_odds and str(close_odds).lstrip("-+").isdigit()
+                        else STANDARD_LAY_ASK
+                    )
+                except (ValueError, TypeError):
+                    ask = STANDARD_LAY_ASK
             line = t_line
         else:
             selection = "under"
             model_probability = 1.0 - over_prob
-            ask = market["short"]["ask"]
+            if market is not None:
+                ask = market["short"]["ask"]
+            else:
+                tot_obj = first_odds.get("total") or {}
+                close_odds = (tot_obj.get("under") or {}).get("close", {}).get("odds")
+                try:
+                    ask = (
+                        round(implied_probability(int(close_odds)), 6)
+                        if close_odds and str(close_odds).lstrip("-+").isdigit()
+                        else STANDARD_LAY_ASK
+                    )
+                except (ValueError, TypeError):
+                    ask = STANDARD_LAY_ASK
             line = t_line
 
         if ask is None or not 0 < float(ask) < 1:
@@ -3072,6 +3161,7 @@ def _forecast_nfl_total_slate(
                 "selection": selection,
                 "line": line,
                 "executable_ask": float(ask),
+                "sportsbook": sportsbook,
                 "model_probability": round(model_probability, 6),
                 "model_uncertainty": 0.08,
                 "model_version": model_version,
@@ -3081,7 +3171,7 @@ def _forecast_nfl_total_slate(
                     f"NFL Structural v5 Total projection. Projected total {fc.projected_total:.1f} "
                     f"(Dome: {is_dome}, Weather: {wind_mph:.0f}mph/{temperature_f:.0f}F).{tnf_note}"
                 ),
-                "market_slug": market.get("market_slug"),
+                "market_slug": market_slug,
                 "observed_at_utc": (
                     market_lineage["market_quote_observed_at_utc"]
                     if market_lineage is not None
@@ -3136,6 +3226,7 @@ def _forecast_nfl_total_sport(
 
     for contract in forecast["priced_contracts"]:
         ask = contract["executable_ask"]
+        contract_sportsbook = str(contract.get("sportsbook") or "polymarket_us")
         request = PickRequest(
             event_start_utc=contract["event_start_utc"],
             event_id=contract["event_id"],
@@ -3145,7 +3236,7 @@ def _forecast_nfl_total_sport(
             market_type=MarketType.TOTAL,
             selection=contract["selection"],
             line=contract["line"],
-            sportsbook="polymarket_us",
+            sportsbook=contract_sportsbook,
             american_odds=probability_to_american(ask),
             model_probability=contract["model_probability"],
             model_uncertainty=contract["model_uncertainty"],
@@ -3189,7 +3280,7 @@ def _forecast_nfl_total_sport(
                 )
                 if (
                     contract.get("model_qualified") is not True
-                    or contract.get("market_lineage") is None
+                    or (contract_sportsbook == "polymarket_us" and contract.get("market_lineage") is None)
                     or not _is_registered_serving_model(
                         request.model_version,
                         request.league.value,
@@ -4760,6 +4851,13 @@ def _forecast_cfb_sport(
                 if contract.get("inference_inputs") is not None
                 else None
             )
+            contract_sportsbook = str(contract.get("sportsbook") or "espn_consensus")
+            contract_slug = str(contract.get("market_slug") or "")
+            contract_obs = str(contract.get("observed_at_utc") or effective_now.isoformat())
+            rationale_text = str(contract.get("rationale") or "")
+            if contract_sportsbook == "polymarket_us" and contract_slug:
+                rationale_text = f"{rationale_text} Executable ask {ask:.4f} ({contract_slug})."
+
             request = PickRequest(
                 event_start_utc=str(contract["event_start_utc"]),
                 event_id=str(contract["event_id"]),
@@ -4769,16 +4867,16 @@ def _forecast_cfb_sport(
                 market_type=mtype,
                 selection=str(contract["selection"]),
                 line=None if contract["line"] is None else float(contract["line"]),
-                sportsbook="espn_consensus",
+                sportsbook=contract_sportsbook,
                 american_odds=probability_to_american(ask),
                 model_probability=float(contract["model_probability"]),
                 model_uncertainty=float(contract["model_uncertainty"]),
                 model_version=m_version,
-                rationale=str(contract["rationale"]),
+                rationale=rationale_text,
                 risks="College football model; multi-market (moneyline, spread, total).",
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
                 model_state=ModelState(configured_state),
-                observed_at_utc=effective_now.isoformat(),
+                observed_at_utc=contract_obs,
                 model_artifact_hash=str(forecast["model_code_hash"]),
                 calibration_method="cfb_key_number_engine",
                 calibration_version=m_version,
@@ -4786,6 +4884,7 @@ def _forecast_cfb_sport(
                 feature_schema_version="cfb-v1",
                 code_revision=str(forecast["model_code_hash"]),
                 model_input_snapshot_json=cfb_snapshot_json,
+                **(contract.get("market_lineage") or {}),
             )
             request.validate(now=effective_now)
             with _LEDGER_LOCK:
@@ -4811,6 +4910,20 @@ def _forecast_cfb_sport(
                     and eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
                     and contract_edge >= min_edge
                 )
+                if (
+                    genuinely_eligible
+                    and mtype == MarketType.TOTAL
+                    and (
+                        contract_edge > 0.10
+                        or float(contract.get("model_probability", 0.0)) > 0.62
+                        or (
+                            str(contract.get("selection", "")).lower() == "under"
+                            and contract.get("line") is not None
+                            and float(contract["line"]) >= 56.5
+                        )
+                    )
+                ):
+                    genuinely_eligible = False
                 # CFB spread (cfb-spread-v1) and total (cfb-total-v1) artifacts explicitly declare
                 # "status": "FLAT_LEDGER_ONLY" and "qualified": false. Unified cfb-structural-v2
                 # produces calibrated joint probabilities and is shadow-qualified across moneyline,

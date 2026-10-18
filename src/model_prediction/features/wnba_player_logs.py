@@ -222,7 +222,7 @@ def team_player_profiles(
 
     profiles: list[Any] = []
     missing: list[str] = []
-    for pid, a in agg.items():
+    for a in agg.values():
         if a["games"] <= 0:
             continue
         mean_minutes = a["minutes"] / a["games"]

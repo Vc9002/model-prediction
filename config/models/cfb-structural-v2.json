@@ -8,7 +8,7 @@
   "distribution": "negative_binomial",
   "home_advantage_points": 2.8,
   "margin_sd": 14.5,
-  "total_sd": 14.8,
+  "total_sd": 17.5,
   "features": [
     "elo_away",
     "elo_home",
@@ -51,5 +51,5 @@
     "locked_holdout": true,
     "framework": "cfb_structural_v2_bivariate_engine"
   },
-  "artifact_hash": "d81a336360efc552505a0ae0d3352b4c9bdee0d5a45135fab324468e8c0a9762"
+  "artifact_hash": "bdd6bd28e4051bad96958a1a332fa8b08a9234953d5e0ba3eb65388b6fd0dde5"
 }

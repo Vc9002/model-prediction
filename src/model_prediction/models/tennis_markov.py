@@ -332,7 +332,7 @@ class MatchGameDistribution:
 
     def total_pmf(self) -> dict[int, float]:
         totals: dict[int, float] = {}
-        for (sa, sb, ga, gb), prob in self.states.items():
+        for (_, _, ga, gb), prob in self.states.items():
             totals[ga + gb] = totals.get(ga + gb, 0.0) + prob
         return totals
 
