@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+pytestmark = pytest.mark.slow
+
 from model_prediction.research_forward import forecast, normalize_fixture
 from model_prediction.research_generation import digest, file_hash, load_games
 from model_prediction.research_scoring import outcome_label, proper_score

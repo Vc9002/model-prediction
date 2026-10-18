@@ -3,6 +3,8 @@ import json
 
 import pytest
 
+pytestmark = pytest.mark.slow
+
 from model_prediction.data_sources.mlb_market_odds import canonical_mlb_market_snapshot_hash
 from model_prediction.research_pairing import simulate_contracts
 from model_prediction.research_quote_contracts import (

@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+pytestmark = pytest.mark.slow
+
 from model_prediction.learned_replay import build_snapshot
 from model_prediction.models.learned_market import LearnedMarketArtifact
 from model_prediction.research_generation import file_hash

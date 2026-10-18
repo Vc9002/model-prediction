@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.slow
+
 from model_prediction.research_generation import file_hash
 from scripts import (
     audit_research_pair_quotes,

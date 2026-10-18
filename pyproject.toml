@@ -55,7 +55,16 @@ packages = ["src/model_prediction"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = [".", "src"]
-addopts = ["-q", "--disable-warnings"]
+addopts = ["-q", "--disable-warnings", "-m", "not slow"]
+norecursedirs = [
+  "rebuild",
+  "archive",
+  "data",
+  "dist",
+  "build",
+  ".venv",
+  ".git",
+]
 filterwarnings = [
   "ignore::DeprecationWarning",
 ]

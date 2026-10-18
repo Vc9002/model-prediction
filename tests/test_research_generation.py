@@ -7,6 +7,8 @@ from datetime import UTC, datetime, timedelta
 import numpy as np
 import pytest
 
+pytestmark = pytest.mark.slow
+
 from model_prediction.research_generation import (
     FEATURE_NAMES,
     Game,

@@ -3,6 +3,8 @@ from decimal import Decimal
 
 import pytest
 
+pytestmark = pytest.mark.slow
+
 from model_prediction.research_forward import forecast
 from model_prediction.research_generation import file_hash, load_games
 from model_prediction.research_incumbent_evaluation import simulate, taker_fee

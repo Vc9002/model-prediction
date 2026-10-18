@@ -4,6 +4,8 @@ from dataclasses import asdict
 import numpy as np
 import pytest
 
+pytestmark = pytest.mark.slow
+
 from model_prediction.research_forward import expected_model_id
 from model_prediction.research_generation import partition, predict_bundle, train_candidate
 from scripts import train_recency_research as runner
