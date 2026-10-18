@@ -280,7 +280,14 @@ def _cache_snapshot_save(keys) -> None:
         payload = {k: (now_w - (now_m - _CACHE[k][0]), _CACHE[k][1]) for k in keys if k in _CACHE}
     tmp = _SNAPSHOT_FILE.with_suffix(".tmp")
     tmp.write_bytes(pickle.dumps(payload, protocol=pickle.HIGHEST_PROTOCOL))
-    os.replace(tmp, _SNAPSHOT_FILE)
+    for attempt in range(5):
+        try:
+            os.replace(tmp, _SNAPSHOT_FILE)
+            break
+        except (PermissionError, OSError):
+            if attempt == 4:
+                raise
+            time.sleep(0.05 * (attempt + 1))
 
 
 def _cache_snapshot_load() -> int:

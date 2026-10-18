@@ -1,180 +1,83 @@
-"""Automated log rotation, retention cleanup, and WAL checkpointing.
+"""Log Maintenance, Compaction & Disk Hygiene.
 
-Prevents unbounded filesystem growth across:
-1. Per-run supervisor logs (<runtime_root>/logs/supervisor/*.log, *.metrics.json)
-2. Daily pipeline logs (data/logs/daily_*.log)
-3. Large JSONL history files (data/logs/auto_buyer_cycle_history.jsonl)
-4. Persistent service logs (dashboard/launchd.out.log, dashboard/launchd.err.log)
-5. Active SQLite WAL files (runs.db-wal, market_quotes.db-wal, etc.)
+Prevents unbounded log growth, disk bloat, and file lock contention during 24/7
+unattended background execution.
 """
 
 from __future__ import annotations
 
-import os
+import logging
 import sqlite3
-import tempfile
 import time
-from contextlib import suppress
-from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from zoneinfo import ZoneInfo
 
-from .config import PROJECT_ROOT
 from .runtime_paths import RuntimePaths
 
+logger = logging.getLogger("model_prediction.maintenance")
+EASTERN = ZoneInfo("America/New_York")
 
-def prune_directory_by_mtime(
-    directory: Path,
+
+def prune_stale_logs(
+    logs_dir: Path | str | None = None,
     max_age_days: int = 14,
-    patterns: tuple[str, ...] = ("*.log", "*.json"),
-) -> list[str]:
-    """Delete files matching patterns in directory older than max_age_days."""
-    if not directory.exists() or not directory.is_dir():
-        return []
+    max_file_size_mb: float = 10.0,
+) -> dict[str, int]:
+    """Prune daily logs older than max_age_days and truncate oversized active log files."""
+    if logs_dir is None:
+        paths = RuntimePaths.resolve(require_external_runtime=False)
+        logs_dir = paths.data_root / "logs"
+    dir_path = Path(logs_dir)
+    if not dir_path.exists():
+        return {"deleted_files": 0, "truncated_files": 0}
 
-    cutoff = time.time() - (max_age_days * 86400)
-    pruned: list[str] = []
+    cutoff_sec = time.time() - (max_age_days * 86400)
+    max_bytes = int(max_file_size_mb * 1024 * 1024)
 
-    for pattern in patterns:
-        for path in directory.glob(pattern):
-            if not path.is_file():
-                continue
-            try:
-                if path.stat().st_mtime < cutoff:
-                    path.unlink()
-                    pruned.append(path.name)
-            except OSError:
-                continue
+    deleted_count = 0
+    truncated_count = 0
 
-    return pruned
-
-
-def truncate_large_text_file(
-    path: Path,
-    max_bytes: int = 10 * 1024 * 1024,
-    keep_lines: int = 20_000,
-) -> bool:
-    """If file exceeds max_bytes, retain only the latest keep_lines."""
-    if not path.exists() or not path.is_file():
-        return False
-
-    try:
-        if path.stat().st_size <= max_bytes:
-            return False
-
-        # Read last keep_lines
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
-            lines = f.readlines()
-
-        if len(lines) <= keep_lines:
-            return False
-
-        retained = lines[-keep_lines:]
-        parent = path.parent
-        descriptor, temp_path = tempfile.mkstemp(prefix=f".{path.name}.", dir=parent)
-        os.close(descriptor)
-
+    for file_path in dir_path.glob("*.log"):
         try:
-            with open(temp_path, "w", encoding="utf-8") as f:
-                f.writelines(retained)
-            os.replace(temp_path, path)
-            return True
-        except BaseException:
-            with suppress(FileNotFoundError):
-                os.unlink(temp_path)
-            raise
-    except OSError:
-        return False
+            stat = file_path.stat()
+            # If older than cutoff and is a dated log (e.g. daily_2026-10-04.log), delete it
+            if stat.st_mtime < cutoff_sec and file_path.name.startswith("daily_"):
+                file_path.unlink()
+                deleted_count += 1
+                continue
+
+            # If oversized, truncate keeping last 5,000 lines
+            if stat.st_size > max_bytes:
+                lines = file_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+                if len(lines) > 5000:
+                    trimmed = lines[-5000:]
+                    file_path.write_text("\n".join(trimmed) + "\n", encoding="utf-8")
+                    truncated_count += 1
+        except (OSError, UnicodeDecodeError) as exc:
+            logger.debug("Failed maintenance for %s: %s", file_path.name, exc)
+
+    return {"deleted_files": deleted_count, "truncated_files": truncated_count}
 
 
-def checkpoint_sqlite_databases(paths: list[Path]) -> list[dict[str, Any]]:
-    """Execute PRAGMA wal_checkpoint(PASSIVE) on SQLite databases to truncate WAL files."""
-    results: list[dict[str, Any]] = []
+def compact_sqlite_databases(data_dir: Path | str | None = None) -> list[str]:
+    """Execute WAL checkpoint and VACUUM on any SQLite stores to recover free pages."""
+    if data_dir is None:
+        paths = RuntimePaths.resolve(require_external_runtime=False)
+        data_dir = paths.data_root
+    data_path = Path(data_dir)
+    compacted: list[str] = []
 
-    for path in paths:
-        if not path.exists() or not path.is_file():
-            continue
+    for db_path in data_path.glob("*.db"):
+        conn = None
         try:
-            conn = sqlite3.connect(path, timeout=5.0)
-            try:
-                row = conn.execute("PRAGMA wal_checkpoint(PASSIVE)").fetchone()
-                results.append(
-                    {
-                        "database": str(path),
-                        "status": "ok",
-                        "busy": row[0] if row else 0,
-                        "log_pages": row[1] if row else 0,
-                        "checkpointed_pages": row[2] if row else 0,
-                    }
-                )
-            finally:
-                conn.close()
+            conn = sqlite3.connect(str(db_path), timeout=5.0)
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+            conn.execute("VACUUM;")
+            compacted.append(db_path.name)
         except (sqlite3.Error, OSError) as exc:
-            results.append(
-                {
-                    "database": str(path),
-                    "status": "skipped_or_busy",
-                    "error": str(exc),
-                }
-            )
+            logger.debug("Compaction skipped for %s: %s", db_path.name, exc)
+        finally:
+            if conn is not None:
+                conn.close()
 
-    return results
-
-
-def run_maintenance(
-    repo_root: Path | str | None = None,
-    paths: RuntimePaths | None = None,
-    max_age_days: int = 14,
-) -> dict[str, Any]:
-    """Execute complete log retention and SQLite maintenance."""
-    root = Path(repo_root) if repo_root else PROJECT_ROOT
-    rt_paths = paths or RuntimePaths.resolve(repo_root=root, require_external_runtime=False)
-
-    report: dict[str, Any] = {
-        "executed_at_utc": datetime.now(UTC).isoformat(),
-        "max_age_days": max_age_days,
-        "pruned_supervisor_logs": [],
-        "pruned_daily_logs": [],
-        "truncated_files": [],
-        "sqlite_checkpoints": [],
-    }
-
-    # 1. Prune supervisor logs
-    if rt_paths.supervisor_log_root.exists():
-        report["pruned_supervisor_logs"] = prune_directory_by_mtime(
-            rt_paths.supervisor_log_root,
-            max_age_days=max_age_days,
-            patterns=("*.log", "*.json"),
-        )
-
-    # 2. Prune daily logs in data/logs/
-    data_logs = root / "data" / "logs"
-    if data_logs.exists():
-        report["pruned_daily_logs"] = prune_directory_by_mtime(
-            data_logs,
-            max_age_days=max_age_days,
-            patterns=("daily_*.log",),
-        )
-
-    # 3. Truncate large continuous log files
-    large_files = [
-        data_logs / "auto_buyer_cycle_history.jsonl",
-        data_logs / "auto_buyer.log",
-        root / "dashboard" / "launchd.out.log",
-        root / "dashboard" / "launchd.err.log",
-    ]
-    for lf in large_files:
-        if truncate_large_text_file(lf, max_bytes=10 * 1024 * 1024, keep_lines=20_000):
-            report["truncated_files"].append(str(lf))
-
-    # 4. Checkpoint SQLite databases
-    databases = [
-        rt_paths.runs_db,
-        rt_paths.market_quotes_db,
-        rt_paths.production_db,
-        rt_paths.ledgers_db,
-        root / "data" / "games.db",
-    ]
-    report["sqlite_checkpoints"] = checkpoint_sqlite_databases(databases)
-
-    return report
+    return compacted

@@ -1,76 +1,54 @@
-"""Tests for automated log maintenance and WAL checkpointing."""
+"""Micro-test for log maintenance and SQLite compaction."""
 
-import os
+from __future__ import annotations
+
 import sqlite3
+import tempfile
 import time
 from pathlib import Path
 
-from model_prediction.log_maintenance import (
-    checkpoint_sqlite_databases,
-    prune_directory_by_mtime,
-    run_maintenance,
-    truncate_large_text_file,
-)
-from model_prediction.runtime_paths import RuntimePaths
+from model_prediction.log_maintenance import compact_sqlite_databases, prune_stale_logs
 
 
-def test_prune_directory_by_mtime(tmp_path: Path):
-    log_dir = tmp_path / "logs"
-    log_dir.mkdir()
+def test_prune_stale_and_oversized_logs():
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        logs_dir = Path(tmp_dir)
 
-    # Create fresh file
-    fresh = log_dir / "fresh.log"
-    fresh.write_text("fresh")
+        # 1. Old daily log (should be pruned)
+        old_log = logs_dir / "daily_2026-08-01.log"
+        old_log.write_text("old logs\n")
+        # Set mtime to 30 days ago
+        old_time = time.time() - (30 * 86400)
+        import os
 
-    # Create old file
-    old = log_dir / "old.log"
-    old.write_text("old")
-    past_mtime = time.time() - (20 * 86400)
-    os.utime(old, (past_mtime, past_mtime))
+        os.utime(old_log, (old_time, old_time))
 
-    # Prune files older than 14 days
-    pruned = prune_directory_by_mtime(log_dir, max_age_days=14, patterns=("*.log",))
-    assert "old.log" in pruned
-    assert not old.exists()
-    assert fresh.exists()
+        # 2. Fresh daily log (should be kept)
+        fresh_log = logs_dir / "daily_2026-10-18.log"
+        fresh_log.write_text("fresh logs\n")
 
+        # 3. Oversized log (should be truncated)
+        oversized = logs_dir / "server.log"
+        oversized.write_text("line\n" * 10000)
 
-def test_truncate_large_text_file(tmp_path: Path):
-    target = tmp_path / "history.jsonl"
-    lines = [f"line {i}\n" for i in range(100)]
-    target.write_text("".join(lines))
-
-    # File size is small, max_bytes higher -> no truncation
-    assert not truncate_large_text_file(target, max_bytes=100_000, keep_lines=10)
-    assert len(target.read_text().splitlines()) == 100
-
-    # max_bytes smaller than file size -> truncate to keep_lines
-    assert truncate_large_text_file(target, max_bytes=50, keep_lines=10)
-    remaining = target.read_text().splitlines()
-    assert len(remaining) == 10
-    assert remaining[-1] == "line 99"
+        res = prune_stale_logs(logs_dir=logs_dir, max_age_days=14, max_file_size_mb=0.01)
+        assert res["deleted_files"] == 1
+        assert res["truncated_files"] == 1
+        assert not old_log.exists()
+        assert fresh_log.exists()
+        assert len(oversized.read_text().splitlines()) <= 5000
 
 
-def test_checkpoint_sqlite_databases(tmp_path: Path):
-    db_path = tmp_path / "test.db"
-    conn = sqlite3.connect(db_path)
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("CREATE TABLE t (x INT)")
-    conn.execute("INSERT INTO t VALUES (1)")
-    conn.commit()
-    conn.close()
+def test_compact_sqlite_databases():
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        db_path = Path(tmp_dir) / "test.db"
+        conn = sqlite3.connect(db_path)
+        try:
+            conn.execute("CREATE TABLE foo (x INTEGER);")
+            conn.executemany("INSERT INTO foo VALUES (?);", [(i,) for i in range(100)])
+            conn.commit()
+        finally:
+            conn.close()
 
-    res = checkpoint_sqlite_databases([db_path])
-    assert len(res) == 1
-    assert res[0]["status"] == "ok"
-
-
-def test_run_maintenance(tmp_path: Path):
-    paths = RuntimePaths(repo_root=tmp_path, runtime_root=tmp_path / "runtime")
-    paths.supervisor_log_root.mkdir(parents=True, exist_ok=True)
-    (tmp_path / "data" / "logs").mkdir(parents=True, exist_ok=True)
-
-    report = run_maintenance(repo_root=tmp_path, paths=paths, max_age_days=14)
-    assert "executed_at_utc" in report
-    assert "pruned_supervisor_logs" in report
-    assert "sqlite_checkpoints" in report
+        compacted = compact_sqlite_databases(data_dir=tmp_dir)
+        assert "test.db" in compacted
