@@ -84,8 +84,9 @@ All sports, leagues, and market types are directly hooked to their latest active
 ```mermaid
 flowchart TD
     subgraph H1["Horizon 1: In-Season Live Priorities (Q4 2026)"]
-        H1A["CFB Upgrades: Dynamic Pace, PPD & Altitude (P1-P3)"]
-        H1B["NBA Spread/Total 2026-27 In-Season Verification"]
+        H1A["CFB Upgrades: Dynamic Pace, PPD & Altitude (P1-P3) - COMPLETE"]
+        H1B["NBA Spread/Total 2026-27 In-Season Verification - ACTIVE"]
+        H1C["Hockey Production Wiring: hockey-poisson-dc-v1 - COMPLETE"]
     end
 
     subgraph H2["Horizon 2: Offseason Rebuilds & Advanced Markets (Q1 2027)"]
@@ -99,6 +100,7 @@ flowchart TD
         H3A["Mypy Static Type Hardening (0 Errors - COMPLETE)"]
         H3B["Hypothesis Property-Based Ledger Fuzzing (ACTIVE)"]
         H3C["Automated Zero-Window Daemon & Scheduler Watchdog"]
+        H3D["Fast Iteration Policy & Test Suite Optimization - COMPLETE"]
     end
 
     H1 --> H2 --> H3
@@ -106,25 +108,19 @@ flowchart TD
 
 ### Horizon 1: In-Season Live Priorities (Q4 2026)
 
-1. **College Football (CFB / NCAAF) Model Refinement & In-Season Priorities**:
-   - **Active Champion**: `cfb-structural-v2` (Bivariate Negative Binomial Joint Score Engine, Hard Edge Gate $0.02 \le \text{Edge} \le 0.08$, $30\%$ blowout disparity shrinkage for spreads $>21.5$).
-   - **Live In-Season Priorities (Q4 2026)**:
-     - **P1: Dynamic Pace & Possessions Engine**:
-       - *Problem*: Current implementation hardcodes `possessions_per_game = 12.4` across all teams (`cfb_features.py#L331`), inflating game totals for clock-chewing, ball-control teams (e.g. BYU, Army, Iowa).
-       - *Solution*: Compute dynamic expected possessions from team seconds-per-play and neutral-situation run/pass ratios, allowing drive estimates to vary naturally between 9.5 and 15.5 possessions.
-     - **P2: Opponent-Adjusted Points Per Drive (PPD)**:
-       - *Problem*: In-season efficiency (`sample_off_ppp`) currently relies on unadjusted raw points scored divided by 12.4 (`cfb_features.py#L294-L306`), causing severe rating inflation for teams with soft non-conference slates.
-       - *Solution*: Replace raw PPG with iterative Ridge-regularized Points Per Drive (PPD) adjusted for opponent defensive efficiency relative to FBS baseline.
-     - **P3: Empirical Altitude & Travel Calibration**:
-       - *Problem*: Current rule-based altitude penalty (`stadium_elev > 4000ft` and `dist > 400mi` $\rightarrow$ up to $-2.5$ pts) mechanically grants high-elevation home dogs (BYU, Utah, Wyoming, Air Force, Colorado) $+3.4$ to $+5.3$ points when combined with HFA.
-       - *Solution*: Backtest altitude differentials against historical walk-forward ATS closing lines to determine true market-clearing residual value.
+1. **College Football (CFB / NCAAF) Model Refinement (P1–P3 COMPLETE)**:
+   - **Active Champion**: `cfb-structural-v2` (Bivariate Negative Binomial Joint Score Engine, Hard Edge Gate $0.02 \le \text{Edge} \le 0.08$, $30\%$ blowout disparity shrinkage for spreads $>21.5$, $\text{total\_sd} = 17.5$).
+   - **Implemented In-Season Upgrades (Q4 2026)**:
+     - **P1: Dynamic Pace & Possessions Engine**: Replaced static $12.4$ possessions with dynamic tempo model varying between $9.5$ and $15.5$ possessions based on team pace and run/pass split.
+     - **P2: Opponent-Adjusted Points Per Drive (PPD)**: Integrated Ridge-regularized PPD adjusted for opponent defensive efficiency, eliminating soft non-conference rating distortion.
+     - **P3: Empirical Altitude & Travel Calibration**: Re-calibrated high-elevation home venue advantages with bounded adjustments.
    - **Forward Enhancements (Horizon 2 / Q1 2027)**:
-     - **P4: High-Usage Non-QB Availability & Key Personnel Model**:
-       - Extend beyond binary `qb_starter_prob` to ingest weekly availability reports for dominant skill players ($>30\%$ touch/target share) and anchor line/secondary defenders, applying empirical replacement-level WAR discounts ($-1.5$ to $-2.5$ points).
-     - **P5: Red Zone & Finishing Drives Efficiency (PPA Inside 40)**:
-       - Deconstruct scoring into drive conversion rates inside the 40 vs. explosive chunk-play rates (IsoPPP) to properly price bend-don't-break defensive matchups.
-2. **NBA 2026-27 In-Season Live Verification**:
-   - Track performance, calibration drift, and execution efficiency of newly deployed `nba-spread-margin-v2` (calibrated holdout MAE 11.470) and `nba-total-margin-v2` across the opening 100 games of the 2026-27 regular season.
+     - **P4: High-Usage Non-QB Availability & Key Personnel Model**: Weekly availability reports for dominant skill players ($>30\%$ touch/target share) and anchor defenders.
+     - **P5: Red Zone & Finishing Drives Efficiency (PPA Inside 40)**: Deconstruct scoring into drive conversion rates inside the 40 vs. explosive chunk-play rates (IsoPPP).
+2. **NBA 2026-27 In-Season Live Verification (ACTIVE)**:
+   - Tracking performance, calibration stability, and execution efficiency of newly deployed `nba-spread-margin-v2` (holdout MAE 11.470) and `nba-total-margin-v2` across the opening 100 games of the 2026-27 regular season.
+3. **Hockey Production Wiring (COMPLETE)**:
+   - Deployed and wired `hockey-poisson-dc-v1` into `config/production.yaml`, `production_registry.py`, and CI contracts across NHL and AHL moneyline slates.
 
 ---
 

@@ -55,7 +55,14 @@ packages = ["src/model_prediction"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = [".", "src"]
-addopts = ["-n", "auto"]
+addopts = ["-q", "--disable-warnings"]
+filterwarnings = [
+  "ignore::DeprecationWarning",
+]
+markers = [
+  "slow: long-running simulation or historical replay",
+  "rebuild: clean-slate rebuild sandbox tests",
+]
 
 [tool.ruff]
 line-length = 110

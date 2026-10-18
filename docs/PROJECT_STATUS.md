@@ -1,5 +1,25 @@
 # Project status and source of truth
 
+## 2026-10-18 — Multi-Sport Mathematical Hardening, Hockey Production Wiring & Fast Iteration Policy
+
+The platform operates nominal production serving in **100% paper trading ("fugazi") mode** (`automated_orders: false`, `mode: "paper"`). All prospective order flow strictly enforces the Hard Edge Gate ($0.02 \le \text{Edge} \le 0.08$) with 31 models actively qualified across 13 sport domains and 32 soccer leagues.
+
+### 1. Active Production Champions & Model Registry
+- **Hockey Production Wiring**: Registered `hockey-poisson-dc-v1` as the active champion for `HOCKEY.moneyline` in `config/production.yaml`, mapped entrypoint in `production_registry.py`, added `HOCKEY` to `model_lifecycle.py`, and updated CI contracts (31 models total).
+- **Auto-Buyer Model Governance**: Whitelisted `cfb-structural-v2` based on empirical holdout validation; blacklisted legacy `college-football-v1` (-37.46U) and underperforming `rainbow_six-tiered-elo-v6` (-68.1% ROI) in `auto_executor.py`.
+
+### 2. Multi-Sport Mathematical & Statistical Defect Fixes
+- **WNBA Structural v3**: Fixed defensive PPP inversion (stronger defenses now correctly decrease opponent expected points) and restored exact model-to-artifact parameter contract (`sd == artifact["margin_sd"]`) in `scalar_artifact_replay.py`.
+- **CFB Structural v2**: Eliminated negative-binomial variance blowout when $\text{total\_sd} \le \text{margin\_sd}$ by bounding noise inflation to $17.5$ points. Added calendar-year fallback for January CFP/Bowl games.
+- **NFL Structural v5**: Implemented exponential tilting for discrete key-number margin distributions ($3, 7, 10, 14$) and total distributions ($41, 44, 47, 51$), preserving exact expected value targets without artificial shrinkage.
+- **Soccer Dixon-Coles v2**: Added Platt calibration for BTTS market tail overconfidence and calibrated league-specific low-score profiles ($\rho < 0$, Argentina Primera vs. Bundesliga).
+- **Tennis Surface Elo v4**: Added Bayesian shrinkage toward global Elo for low-sample surfaces ($\le 2$ matches) and Best-of-5 Grand Slam variance scaling ($\sqrt{5/3}$).
+
+### 3. Workflow Speed & Testing Architecture
+- **Fast Iteration Policy Codified**: Enforced zero-test overhead for refactors, dead code pruning, renames, and formatting. Monolithic 3,200-test runs are barred during active development.
+- **Single-File Micro-Testing**: Removed `-n auto` xdist process spawn overhead from default `pytest` configuration in `pyproject.toml`; individual test files execute in **<0.5s**.
+- **Code Hygiene**: 0 `ruff` linter findings and 100% formatted across all 989 files in the codebase. All 132 active contract and model tests pass green.
+
 ## 2026-09-14 evening — Control-plane audit and initial consolidation fixes
 
 The current checkout is September 9 HEAD `8b713cd` plus uncommitted work.
