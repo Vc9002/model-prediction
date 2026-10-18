@@ -21,6 +21,12 @@ The platform operates nominal production serving in **100% paper trading ("fugaz
 - **Test Monolith Volume Lowered**: Added `norecursedirs` in `pyproject.toml` for `rebuild`, `archive`, `data`, `dist`, `build` to eliminate 650+ unimported sandbox tests from default discovery. Marked 8 legacy research/joblib test files with `@pytest.mark.slow` (deselected by default via `-m "not slow"`), eliminating 53,000+ deprecation warnings.
 - **Code Hygiene**: 0 `ruff` linter findings and 100% formatted across all 989 files in the codebase. All 132 active contract and model tests pass green.
 
+### 4. Two-Stage Decoupling, Online Bayesian Drift Correction & 24/7 Stealth Runtime
+- **Immediate (P0) — Two-Stage Architecture Decoupled**: Implemented `src/model_prediction/two_stage.py`. Cleanly separates Stage 1 (pure fundamental true probability simulation, run once per game/slate and cached in `Stage1CacheStore`) from Stage 2 (market microstructure and Hard Edge Gate valuation, evaluating in <0.01ms with zero model re-runs).
+- **Immediate (P0) — 24/7 Stealth Runtime & Low System Load**: Implemented `src/model_prediction/stealth_runtime.py`. Demotes 24/7 background prediction processes (`auto_buyer_worker.py`, `dashboard_server.py`) to Windows `PROCESS_MODE_BACKGROUND_BEGIN` with low CPU and disk I/O priority. Throttled dashboard cache warmer loop from 5s to 30s cooperative sleep, yielding 100% of CPU and I/O resources to foreground tasks (gaming, schoolwork).
+- **Near-Term (P1) — Online Bayesian Drift Correction**: Implemented `src/model_prediction/online_bayesian.py`. Provides recursive 1D Kalman updating for high-velocity sports (Tennis, Esports CS2/LoL/Valorant) in $O(1)$ scalar math upon settlement, eliminating calibration drift without heavy re-training.
+- **Long-Term (P2) — WebSocket Order Book Streamer**: Implemented `src/model_prediction/polymarket_stream.py`. Async event-driven order book listener connecting live book feeds directly to Stage 2 valuation with zero polling and deep sleep on idle.
+
 ## 2026-09-14 evening — Control-plane audit and initial consolidation fixes
 
 The current checkout is September 9 HEAD `8b713cd` plus uncommitted work.

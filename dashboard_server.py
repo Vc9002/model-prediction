@@ -223,6 +223,7 @@ from model_prediction.dashboard.status import (  # noqa: F401 -- re-export for c
     _data_inventory,
     status,
 )
+from model_prediction.stealth_runtime import cooperative_sleep, enable_background_priority
 
 __all__ = ["main"]
 
@@ -323,13 +324,14 @@ def _warm_caches(forever: bool = False) -> None:
                     _WARMING["on"] = False
             if not forever:
                 return
-            time.sleep(5)
+            cooperative_sleep(30)
 
     with _ThreadPoolExecutor(max_workers=len(warmers)) as pool:
         list(pool.map(_warm, warmers))
 
 
 def main() -> None:
+    enable_background_priority()
     arguments = argparse.ArgumentParser()
     arguments.add_argument("--port", type=int, default=DASHBOARD_PORT)
     options = arguments.parse_args()

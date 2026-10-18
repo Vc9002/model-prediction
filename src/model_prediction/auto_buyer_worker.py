@@ -15,9 +15,11 @@ from .daily_lock import acquire_lock
 from .domain import utc_now
 from .portfolio.auto_executor import run_auto_buyer_cycle
 from .runtime_paths import RuntimePaths
+from .stealth_runtime import enable_background_priority
 
 
 def main() -> int:
+    enable_background_priority()
     paths = RuntimePaths.resolve(require_external_runtime=False)
     lock = acquire_lock(paths.lock_root / "daily.lock")
     if lock is None:
