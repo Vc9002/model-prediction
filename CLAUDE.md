@@ -5,6 +5,13 @@ volatile status belongs in `docs/PROJECT_STATUS.md`, full audit history in
 `docs/DEBUG.md`, and the unified documentation index in `docs/INDEX.md`.
 This file is about *how to work here*, not *what's currently true*.
 
+## Fast Iteration & Workflow Speed (Operator Directive 2026-10-18)
+
+- **Zero Test Overhead for Minor Changes**: NEVER run pytest suites for refactors, dead code cleanup, variable renames, formatting, comments, or documentation. Rely strictly on `ruff check` (runs in < 0.2s).
+- **No Monolithic Test Runs**: NEVER run `pytest tests/` (all 3,200 tests) unless explicitly commanded by Vincent. It takes ~6 minutes and grinds the iteration loop to a halt.
+- **Micro-Targeted Testing Only**: When core mathematical or pricing algorithms change, run ONLY the single directly affected test file with `-o addopts='' -q` (e.g. `pytest tests/test_nba_nfl_v5.py -o addopts='' -q` in < 0.5s).
+- **Batch Before Verifying**: Complete all planned code modifications across all files before running any verification.
+
 ## 2026-08-15 — consolidation K (runtime singularity)
 
 - **Rolling vs frozen model artifacts.** `config/models/*.json` are frozen

@@ -9,12 +9,18 @@ earlier artifacts for comparison, label reused historical data honestly, and
 keep research separate from live champion changes and orders. See the current
 repo-root `AGENTS.md`, `GENERATION_2026-09-09.md`, and `ROADMAP.md`.
 
+## FAST ITERATION & WORKFLOW SPEED (OPERATOR DIRECTIVE 2026-10-18)
+- **Zero Test Overhead for Minor Changes**: NEVER run pytest suites for refactors, dead code cleanup, variable renames, formatting, comments, or documentation. Rely strictly on `ruff check` (runs in < 0.2s).
+- **No Monolithic Test Runs**: NEVER run `pytest tests/` (all 3,200 tests) unless explicitly commanded by Vincent. It takes ~6 minutes and grinds the iteration loop to a halt.
+- **Micro-Targeted Testing Only**: When core mathematical or pricing algorithms change, run ONLY the single directly affected test file with `-o addopts='' -q` (e.g. `pytest tests/test_nba_nfl_v5.py -o addopts='' -q` in < 0.5s).
+- **Batch Before Verifying**: Complete all planned code modifications across all files before running any verification.
+
 ## PRE-CHANGE CHECKLIST
 1. State the theory. 2. State the evidence. 3. State the test.
 4. State the failure mode. 5. State the rollback.
 
 ## CHANGE WORKFLOW
-Diagnose → Test → Implement → Verify (pytest + ruff) → Document
+Diagnose → Implement → Fast Lint (`ruff check` <0.2s) → Targeted Test (ONLY if core math changed) → Commit
 
 ## RULES
 - Walk-forward only. Locked holdout. Never peek.
