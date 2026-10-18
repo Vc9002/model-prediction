@@ -1196,8 +1196,8 @@ def test_nba_spread_margin_v2_model_and_forecast():
     computed_hash = compute_artifact_hash(payload)
     assert embedded_hash == computed_hash
     assert payload["margin_sd"] == 14.6
-    assert payload["elo_weight"] == 0.65
-    assert payload["trend_weight"] == 0.65
+    assert payload["elo_weight"] == 0.5
+    assert payload["trend_weight"] == 0.5
     assert payload["rest_weight"] == 0.3
     assert payload["home_court_points"] == 1.8
 

@@ -332,3 +332,37 @@ def test_tennis_forward_prices_game_spread_and_total_derivatives(tmp_path) -> No
     assert total_c["selection"] in {"over", "under"}
     assert 0.0 < total_c["model_probability"] < 1.0
     assert total_c["executable_ask"] > 0.0
+
+
+def test_tennis_forward_spread_sign_parity_underdog(tmp_path) -> None:
+    """Verifies that an underdog receiving games (+7.5) does not invert into laying games (-7.5)."""
+    _write_history(tmp_path)
+    _write_snapshot(tmp_path)  # Moneyline
+
+    # Negative spread snapshot for Beta Player (-7.5 at 0.38 / +7.5 at 0.99)
+    _write_snapshot(
+        tmp_path,
+        market_type="spread",
+        market_slug="asc-wta-alpha-beta-2026-07-27-gs-neg-7pt5",
+        event_title="Alpha Player vs. Beta Player",
+        line=-7.5,
+        team="Beta Player",
+        long={"description": "-7.50", "ask": 0.38},
+        short={"description": "+7.50", "ask": 0.99},
+    )
+
+    result = build_tennis_slate(
+        data_root=tmp_path,
+        game_date="2026-07-27",
+        client=Client(),
+        observed_at=datetime(2026, 7, 27, 13, tzinfo=UTC),
+    )
+
+    spread_c = next(c for c in result["priced_contracts"] if c["market_type"] == "spread")
+    # Beta Player is home. Long was Beta -7.5 (p < 0.05). Short was Alpha +7.5 (p > 0.95).
+    # If the model selects Alpha, line must be positive +7.5 (getting games), NOT negative -7.5.
+    if spread_c["selection"] == "away":
+        assert spread_c["line"] == 7.5
+    else:
+        assert spread_c["line"] == -7.5
+        assert spread_c["model_probability"] < 0.10  # Can never have 90%+ probability to win by 7.5+ games

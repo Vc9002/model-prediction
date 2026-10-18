@@ -16,7 +16,7 @@
     "14": 0.048
   },
   "league": "NFL",
-  "margin_sd": 13.8,
+  "margin_sd": 14.5,
   "method": "nfl_structural_v5_margin_engine",
   "model_version": "nfl-spread-structural-v5",
   "positive_class": "away_cover",
@@ -28,5 +28,5 @@
   },
   "schema_version": "2",
   "sport": "nfl",
-  "artifact_hash": "4d76d37c4c20eda0eb538f3829c814b2be7119fcf464eb015f309485081c9768"
+  "artifact_hash": "af7e91f423d415cbf2e9c543eb0d2af747713099f73f4ba1df5a11851fed7c89"
 }

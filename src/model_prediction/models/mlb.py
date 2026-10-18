@@ -221,18 +221,26 @@ def estimate_runs(features: MLBGameFeatures, spec: FormulaSpec) -> RunEstimate:
     home_bullpen = _clip(features.home_bullpen_weakness, spec.factor_bounds["bullpen_weakness"])
     park = _clip(features.park_factor, spec.factor_bounds["park"])
     weather = _clip(features.weather_factor, spec.factor_bounds["weather"])
-    # Elasticities (added 2026-07-30) replace the previous implicit
-    # assumption that every factor moves the run estimate exactly
-    # proportionally (exponent 1.0). Fit via a real Poisson regression
-    # against 629 real games spanning 2024-02..2026-07 (the 2026-07-29
-    # backtest's 162-game/12-day window was too narrow to fit this safely).
-    # See mlb-analyst-poisson-trend-v0.2.yaml for the fitted values and the
-    # full rebuild rationale, including why bullpen_elasticity is 0.0.
+
+    # Detect postseason (October or later): starters pitch fewer innings on quick hooks,
+    # requiring bullpen quality to be actively weighted rather than 0.0 elasticity.
+    starter_elasticity = spec.starter_weakness_elasticity
+    bullpen_elasticity = spec.bullpen_elasticity
+    try:
+        from ..domain import parse_utc
+
+        dt = parse_utc(features.event_start_utc)
+        if dt.month >= 10:
+            starter_elasticity = starter_elasticity * 0.60
+            bullpen_elasticity = max(0.25, bullpen_elasticity + 0.35)
+    except (TypeError, ValueError, AttributeError):
+        pass
+
     away_expected = (
         spec.league_runs_per_team_game
         * away_offense**spec.offense_elasticity
-        * home_starter_weakness**spec.starter_weakness_elasticity
-        * home_bullpen**spec.bullpen_elasticity
+        * home_starter_weakness**starter_elasticity
+        * home_bullpen**bullpen_elasticity
         * park**spec.park_elasticity
         * weather**spec.weather_elasticity
         * spec.away_field_run_factor
@@ -240,8 +248,8 @@ def estimate_runs(features: MLBGameFeatures, spec: FormulaSpec) -> RunEstimate:
     home_expected = (
         spec.league_runs_per_team_game
         * home_offense**spec.offense_elasticity
-        * away_starter_weakness**spec.starter_weakness_elasticity
-        * away_bullpen**spec.bullpen_elasticity
+        * away_starter_weakness**starter_elasticity
+        * away_bullpen**bullpen_elasticity
         * park**spec.park_elasticity
         * weather**spec.weather_elasticity
         * spec.home_field_run_factor

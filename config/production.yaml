@@ -56,16 +56,26 @@ prediction_service:
     evidence_status: historical_only
     replacement_priority: high
     rollback_model: mlb-elo-trend-lr-v7
+  - model_id: mlb-structural-runline-v4
+    sport: MLB
+    market: spread
+    implementation: code_backed_model
+    entry: model_prediction.models.mlb_runline_v4:MLBStructuralRunlineV4Model
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: measured-edge-margin-v3
   - model_id: measured-edge-margin-v3
     sport: MLB
     market: spread
     implementation: json_artifact
     artifact: config/models/measured-edge-margin-v3.json
     enabled: true
-    serving_status: production
-    evidence_status: historical_only
-    replacement_priority: medium
-    rollback_model: measured-edge-margin-v2
+    serving_status: rollback
+    evidence_status: degraded
+    replacement_priority: low
+    rollback_model: null
   - model_id: measured-edge-totals-v3
     sport: MLB
     market: total
@@ -334,7 +344,7 @@ prediction_service:
       total: wnba-total-margin-v2
     MLB:
       moneyline: mlb-elo-trend-lr-v8
-      spread: measured-edge-margin-v3
+      spread: mlb-structural-runline-v4
       total: mlb-structural-v10-frozen
       nrfi: mlb-nrfi-v4
     NBA:
@@ -375,7 +385,7 @@ prediction_service:
       prospective_challenger: mlb-moneyline-v9-frozen
       research_candidates:
       - mlb-moneyline-market-residual-v10
-      spread: mlb-structural-runline-v4
+      spread: null
       total: mlb-structural-v11-residual
       nrfi: null
     WNBA:
@@ -445,10 +455,10 @@ prediction_service:
     evidence_status: historical_only
   - sport: MLB
     market: spread
-    incumbent: measured-edge-margin-v3
-    replacement_priority: medium
-    challenger: mlb-structural-runline-v4
-    evidence_status: historical_only
+    incumbent: mlb-structural-runline-v4
+    replacement_priority: low
+    challenger: null
+    evidence_status: predictively_qualified
   - sport: WNBA
     market: moneyline
     incumbent: wnba-elo-trend-lr-v4
@@ -532,6 +542,7 @@ prediction_service:
   - wnba-spread-margin-v2
   - wnba-total-margin-v2
   - mlb-elo-trend-lr-v8
+  - mlb-structural-runline-v4
   - measured-edge-margin-v3
   - measured-edge-totals-v3
   - mlb-structural-v10-frozen

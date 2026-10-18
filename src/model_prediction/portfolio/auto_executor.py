@@ -75,6 +75,7 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     "nba-spread-margin-v2",
     "nba-total-margin-v2",
     "cfb-structural-v2",
+    "mlb-structural-runline-v4",
 )
 
 EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
@@ -150,6 +151,7 @@ class AutoExecutionConfig:
     )
     min_tennis_edge: float | None = None  # Sport-specific tightened edge for Tennis (e.g. 0.08)
     max_tennis_price: float | None = None  # Sport-specific ceiling on market price for Tennis (e.g. 0.75)
+    max_moneyline_price: float | None = 0.72  # Ceiling on moneyline buy price (odds <= -260 / implied > 72%)
 
     def __post_init__(self) -> None:
         if self.execute_live and self.mode != "live":
@@ -1311,6 +1313,15 @@ class AutoPolymarketBuyer:
                 sport_norm == "tennis"
                 and self.config.max_tennis_price is not None
                 and clob_ask > self.config.max_tennis_price
+            ):
+                result.rejected_unrealistic_edge += 1
+                continue
+
+            # Heavy favorite moneyline gate: cap moneyline buying price to prevent negative vig traps (odds <= -260)
+            if (
+                market_type == "moneyline"
+                and self.config.max_moneyline_price is not None
+                and clob_ask > self.config.max_moneyline_price
             ):
                 result.rejected_unrealistic_edge += 1
                 continue

@@ -38,6 +38,14 @@ MODEL_CATALOG: dict[str, ModelDescriptor] = {
         display_name="MLB Moneyline (Elo Trend LR v7)",
         description="MLB Moneyline legacy rollback model.",
     ),
+    "mlb-structural-runline-v4": ModelDescriptor(
+        model_id="mlb-structural-runline-v4",
+        sport="MLB",
+        market="spread",
+        standard_name="mlb-spread-structural-runline-v4",
+        display_name="MLB Spread Runline (Structural v4)",
+        description="MLB Structural Runline (-1.5/+1.5) derived from joint bivariate Poisson run distribution.",
+    ),
     "measured-edge-margin-v3": ModelDescriptor(
         model_id="measured-edge-margin-v3",
         sport="MLB",
@@ -945,6 +953,8 @@ MODEL_ALIASES: dict[str, str] = {
     "hockey-ml-v1": "hockey-poisson-dc-v1",
     "nhl-moneyline-v1": "hockey-poisson-dc-v1",
     # Ambiguous names aliases
+    "mlb-spread-v4": "mlb-structural-runline-v4",
+    "mlb-runline-v4": "mlb-structural-runline-v4",
     "mlb-spread-margin-v3": "measured-edge-margin-v3",
     "mlb-spread-v3": "measured-edge-margin-v3",
     "mlb-runline-v3": "measured-edge-margin-v3",

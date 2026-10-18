@@ -303,25 +303,27 @@ class HockeyModel:
                 )
             )
 
-            # 3. Totals for lines 5.5, 6.0, 6.5
+            # 3. Totals for lines 5.5, 6.0, 6.5 (including OT / shootout settlement)
+            # In regulation, if h == a (tied game), exactly 1 game-winning goal is awarded in OT/SO,
+            # so the realized game total is (h + a + 1). If h != a, the realized total is (h + a).
             for line_val in (5.5, 6.0, 6.5):
                 prob_over = sum(
                     matrix[h][a]
                     for h in range(MAX_GOALS + 1)
                     for a in range(MAX_GOALS + 1)
-                    if (h + a) > line_val
+                    if ((h + a + 1) if h == a else (h + a)) > line_val
                 )
                 prob_under = sum(
                     matrix[h][a]
                     for h in range(MAX_GOALS + 1)
                     for a in range(MAX_GOALS + 1)
-                    if (h + a) < line_val
+                    if ((h + a + 1) if h == a else (h + a)) < line_val
                 )
                 prob_push = sum(
                     matrix[h][a]
                     for h in range(MAX_GOALS + 1)
                     for a in range(MAX_GOALS + 1)
-                    if (h + a) == line_val
+                    if ((h + a + 1) if h == a else (h + a)) == line_val
                 )
                 eff_over = prob_over + 0.5 * prob_push
                 eff_under = prob_under + 0.5 * prob_push

@@ -77,8 +77,8 @@ def test_nba_market_models_v2_canonical_resolution():
     assert NBA_CONFIG.model_version == "nba-spread-margin-v2"
     assert NBA_CONFIG.margin_sd == 14.6
     assert NBA_CONFIG.home_court_points == 1.8
-    assert NBA_CONFIG.elo_weight == 0.65
-    assert NBA_CONFIG.trend_weight == 0.65
+    assert NBA_CONFIG.elo_weight == 0.50
+    assert NBA_CONFIG.trend_weight == 0.50
     assert NBA_CONFIG.rest_weight == 0.30
 
 

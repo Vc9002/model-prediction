@@ -2958,8 +2958,9 @@ def _forecast_nfl_total_slate(
         }
     model_artifact_hash = str(artifact["artifact_hash"])
     model_qualified = artifact.get("qualification", {}).get("qualified") is True
-    total_sd = float(artifact.get("total_sd", 13.5))
-    engine = NFLStructuralV5Engine(total_sd=total_sd)
+    total_sd = float(artifact.get("total_sd", 14.2))
+    league_avg_total = float(artifact.get("league_avg_total", 45.5))
+    engine = NFLStructuralV5Engine(total_sd=total_sd, league_avg_total=league_avg_total)
 
     store = FeatureStore(data_root)
     history = store.games_before("nfl", args_date)

@@ -234,3 +234,30 @@ def test_build_hockey_slate_mocked(tmp_path) -> None:
     assert priced_item["market_type"] == "moneyline"
     assert priced_item["selection"] in ("home", "away")
     assert "edge_vs_executable_ask" in priced_item
+
+
+def test_hockey_totals_account_for_overtime_goal() -> None:
+    """Verify that tied regulation scores (e.g. 2-2 = 4 goals) add +1 goal for full-game totals (5 goals)."""
+    model = hockey_model()
+    upcoming = [
+        UpcomingHockeyMatch(
+            event_id="nhl-ot-test",
+            event_start_utc="2026-10-20T00:00:00Z",
+            away_team="Away",
+            home_team="Home",
+            league="NHL",
+        )
+    ]
+    preds = model.predict_games(history=[], upcoming=upcoming)
+    totals = {p.line: p for p in preds if p.market_type == "total"}
+
+    # Over 5.5 and Under 5.5 probabilities must sum to 1.0
+    t55 = totals[5.5]
+    assert t55.probabilities["over"] + t55.probabilities["under"] == pytest.approx(1.0, abs=1e-5)
+
+    # Monotonicity: Over 5.5 must be strictly greater than Over 6.0, which is > Over 6.5
+    assert (
+        totals[5.5].probabilities["over"]
+        > totals[6.0].probabilities["over"]
+        > totals[6.5].probabilities["over"]
+    )

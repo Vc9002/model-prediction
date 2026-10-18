@@ -5,7 +5,7 @@
     "sizing": "flat_1u_gated"
   },
   "league": "NFL",
-  "league_avg_total": 44.5,
+  "league_avg_total": 45.5,
   "method": "nfl_structural_v5_total_engine",
   "model_version": "nfl-total-structural-v5",
   "positive_class": "over",
@@ -17,7 +17,7 @@
   },
   "schema_version": "2",
   "sport": "nfl",
-  "total_sd": 13.5,
+  "total_sd": 14.2,
   "weather_wind_penalty_threshold_mph": 14.0,
-  "artifact_hash": "a03cfa2ff7d92349716c72a20020b896f75c8eccd934a331987754c43f8fe7be"
+  "artifact_hash": "dd689d8faaffbc84998f5a66bcafa255c89d1891bf4e7f89d0d09e6fb260de07"
 }

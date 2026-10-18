@@ -215,7 +215,16 @@ class CFBStructuralV2Model:
             )
         )
 
-        # 3. Total
+        # 3. Total (with conservative tail shrinkage on extreme probabilities > 0.60)
+        p_over_val = fc.prob_over
+        p_under_val = fc.prob_under
+        if p_over_val > 0.60:
+            p_over_val = 0.60 + 0.35 * (p_over_val - 0.60)
+            p_under_val = 1.0 - p_over_val
+        elif p_under_val > 0.60:
+            p_under_val = 0.60 + 0.35 * (p_under_val - 0.60)
+            p_over_val = 1.0 - p_under_val
+
         predictions.append(
             GamePrediction(
                 event_id=game.event_id,
@@ -226,8 +235,8 @@ class CFBStructuralV2Model:
                 market_type="total",
                 line=tot_line,
                 probabilities={
-                    "over": round(fc.prob_over, 6),
-                    "under": round(fc.prob_under, 6),
+                    "over": round(p_over_val, 6),
+                    "under": round(p_under_val, 6),
                 },
                 uncertainty=feat.uncertainty,
                 model_version=self.version,

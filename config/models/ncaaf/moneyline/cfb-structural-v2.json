@@ -8,7 +8,7 @@
   "distribution": "negative_binomial",
   "home_advantage_points": 2.8,
   "margin_sd": 14.5,
-  "total_sd": 14.8,
+  "total_sd": 19.2,
   "features": [
     "elo_away",
     "elo_home",
@@ -34,7 +34,8 @@
     "min_edge": 0.035,
     "max_uncertainty": 0.18,
     "block_fcs": true,
-    "sizing": "flat_1u_gated"
+    "sizing": "flat_1u_gated",
+    "max_market_total_divergence": 4.5
   },
   "calibration": {
     "method": "bivariate_negative_binomial_joint",
@@ -51,5 +52,5 @@
     "locked_holdout": true,
     "framework": "cfb_structural_v2_bivariate_engine"
   },
-  "artifact_hash": "d81a336360efc552505a0ae0d3352b4c9bdee0d5a45135fab324468e8c0a9762"
+  "artifact_hash": "c70c3abe9e1d302a8d556166ac305ac7311a40302268d3a078d0f5adc6f0a44f"
 }

@@ -84,13 +84,22 @@ def _words(value: str) -> list[str]:
 
 def _name_matches(player: str, text: str) -> bool:
     player_words = [word for word in _words(player) if len(word) >= 2]
-    text_words = set(_words(text))
+    raw_text_words = [word for word in _words(text) if len(word) >= 2]
+    text_words = set(raw_text_words)
     if not player_words or not text_words:
         return False
     if " ".join(player_words) in " ".join(_words(text)):
         return True
     if all(word in text_words for word in player_words):
         return True
+    # If both player and text are distinct names without 'vs', require first names not to conflict
+    if (
+        len(player_words) >= 2
+        and len(raw_text_words) >= 2
+        and not ("vs" in text_words or "v" in text_words)
+        and player_words[0] != raw_text_words[0]
+    ):
+        return False
     # Surname matching with length guard
     return len(player_words) >= 2 and player_words[-1] in text_words and len(player_words[-1]) >= 4
 
@@ -444,20 +453,43 @@ def build_tennis_slate(
                     p_serve_b = float(str(p_serve_b))
 
                 is_team_away = _name_matches(prediction.away_team, str(snapshot.get("team") or ""))
-                spread_line_p1 = spread_val if is_team_away else -spread_val
-                deriv = price_tennis_derivatives(p_serve_a, p_serve_b, spread_line=spread_line_p1, best_of=3)
-                p_cov_p1 = deriv.spread_p1_cover or 0.5
-                p_cov_p2 = deriv.spread_p2_cover or 0.5
-                selection = "away" if p_cov_p1 >= p_cov_p2 else "home"
-                prob = p_cov_p1 if selection == "away" else p_cov_p2
+                c_line = spread_val
+                if is_team_away:
+                    deriv = price_tennis_derivatives(p_serve_a, p_serve_b, spread_line=c_line, best_of=3)
+                    p_long = deriv.spread_p1_cover or 0.5
+                else:
+                    deriv = price_tennis_derivatives(p_serve_a, p_serve_b, spread_line=-c_line, best_of=3)
+                    p_long = deriv.spread_p2_cover or 0.5
 
-                side_key = "long" if (selection == "away") == is_team_away else "short"
-                side = snapshot.get(side_key) or {}
-                ask = side.get("ask")
-                if ask is None or not 0.01 <= float(ask) <= 0.99:
+                p_short = 1.0 - p_long
+                long_ask = (snapshot.get("long") or {}).get("ask")
+                short_ask = (snapshot.get("short") or {}).get("ask")
+
+                edge_long = (
+                    (p_long - float(long_ask))
+                    if (long_ask is not None and 0.01 <= float(long_ask) <= 0.99)
+                    else -999.0
+                )
+                edge_short = (
+                    (p_short - float(short_ask))
+                    if (short_ask is not None and 0.01 <= float(short_ask) <= 0.99)
+                    else -999.0
+                )
+
+                if max(edge_long, edge_short) <= -900.0:
                     continue
 
-                selection_line = spread_val if (selection == "away") == is_team_away else -spread_val
+                if edge_long >= edge_short:
+                    selection = "away" if is_team_away else "home"
+                    selection_line = c_line
+                    prob = p_long
+                    ask = float(long_ask)
+                else:
+                    selection = "home" if is_team_away else "away"
+                    selection_line = -c_line
+                    prob = p_short
+                    ask = float(short_ask)
+
                 seen_contract_keys.add(contract_key)
                 priced.append(
                     {

@@ -17,7 +17,7 @@ from model_prediction.runtime_paths import RuntimePaths
 
 logger = logging.getLogger(__name__)
 
-NFL_LEAGUE_AVG_EPA_PLAY = 0.04
+NFL_LEAGUE_AVG_EPA_PLAY = 0.00
 DEFAULT_PRIOR_PLAYS = 120.0
 DEFAULT_PRIOR_DROPBACKS = 120.0
 

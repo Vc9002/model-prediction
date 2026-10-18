@@ -16,11 +16,11 @@ from dataclasses import dataclass
 import numpy as np
 
 NFL_V5_MODEL_VERSION = "nfl-structural-v5"
-NFL_LEAGUE_AVG_TOTAL = 44.5
-NFL_LEAGUE_AVG_EPA_PLAY = 0.04
+NFL_LEAGUE_AVG_TOTAL = 45.5
+NFL_LEAGUE_AVG_EPA_PLAY = 0.00
 NFL_HFA_POINTS = 1.8
-NFL_DEFAULT_SPREAD_SD = 13.8
-NFL_DEFAULT_TOTAL_SD = 13.5
+NFL_DEFAULT_SPREAD_SD = 14.5
+NFL_DEFAULT_TOTAL_SD = 14.2
 
 NFL_KEY_MARGINS: dict[int, float] = {
     3: 0.152,
@@ -134,15 +134,19 @@ def discrete_spread_prob(
     return p_home_cover, p_away_cover, p_push
 
 
-def discrete_total_distribution(exp_total: float, sd: float = NFL_DEFAULT_TOTAL_SD) -> dict[int, float]:
+def discrete_total_distribution(
+    exp_total: float,
+    sd: float = NFL_DEFAULT_TOTAL_SD,
+    league_avg_total: float = NFL_LEAGUE_AVG_TOTAL,
+) -> dict[int, float]:
     """Compute discrete total mass distribution over integer totals [10, 90] with mean conservation."""
     raw_p: dict[int, float] = {}
     for t in range(10, 91):
         p_norm = _normal_cdf(t + 0.5, exp_total, sd) - _normal_cdf(t - 0.5, exp_total, sd)
         if t in NFL_KEY_TOTALS:
             emp = NFL_KEY_TOTALS[t]
-            norm_zero = _normal_cdf(t + 0.5, NFL_LEAGUE_AVG_TOTAL, sd) - _normal_cdf(
-                t - 0.5, NFL_LEAGUE_AVG_TOTAL, sd
+            norm_zero = _normal_cdf(t + 0.5, league_avg_total, sd) - _normal_cdf(
+                t - 0.5, league_avg_total, sd
             )
             boost = emp / max(0.01, norm_zero)
             p = 0.70 * p_norm + 0.30 * (p_norm * boost)
@@ -156,9 +160,10 @@ def discrete_total_prob(
     total_line: float,
     exp_total: float,
     sd: float = NFL_DEFAULT_TOTAL_SD,
+    league_avg_total: float = NFL_LEAGUE_AVG_TOTAL,
 ) -> tuple[float, float, float]:
     """Calculate (p_over, p_under, p_push) under discrete NFL key totals."""
-    probs = discrete_total_distribution(exp_total, sd)
+    probs = discrete_total_distribution(exp_total, sd, league_avg_total=league_avg_total)
     p_over = sum(p for t, p in probs.items() if t > total_line)
     p_under = sum(p for t, p in probs.items() if t < total_line)
     p_push = sum(p for t, p in probs.items() if t == total_line)
@@ -194,20 +199,24 @@ class NFLStructuralV5Engine:
         self,
         spread_sd: float = NFL_DEFAULT_SPREAD_SD,
         total_sd: float = NFL_DEFAULT_TOTAL_SD,
+        league_avg_total: float = NFL_LEAGUE_AVG_TOTAL,
+        league_avg_epa_play: float = NFL_LEAGUE_AVG_EPA_PLAY,
         short_week_drag: float = 1.0,
     ) -> None:
         self.spread_sd = spread_sd
         self.total_sd = total_sd
+        self.league_avg_total = league_avg_total
+        self.league_avg_epa_play = league_avg_epa_play
         self.short_week_drag = short_week_drag
 
     def forecast_game(
         self,
         home_team: str,
         away_team: str,
-        home_off_epa: float = 0.04,
-        home_def_epa: float = 0.04,
-        away_off_epa: float = 0.04,
-        away_def_epa: float = 0.04,
+        home_off_epa: float = 0.00,
+        home_def_epa: float = 0.00,
+        away_off_epa: float = 0.00,
+        away_def_epa: float = 0.00,
         home_qb_tier_adj: float = 0.0,
         away_qb_tier_adj: float = 0.0,
         wind_mph: float = 5.0,
@@ -216,15 +225,15 @@ class NFLStructuralV5Engine:
         home_rest_days: int = 7,
         away_rest_days: int = 7,
         spread_home_line: float = -3.5,
-        total_line: float = 44.5,
+        total_line: float = 45.5,
         is_neutral_site: bool = False,
     ) -> NFLStructuralForecast:
-        base_points_per_side = NFL_LEAGUE_AVG_TOTAL / 2.0  # 22.25 pts
+        base_points_per_side = self.league_avg_total / 2.0  # 22.75 pts
 
         # 1. EPA / Efficiency Points Projection (~ 32.0 pts per 1.0 EPA/play delta across 65 plays)
         # Note: def_epa is opponent EPA allowed (higher = more porous defense).
-        h_eff_epa = (home_off_epa - NFL_LEAGUE_AVG_EPA_PLAY) + (away_def_epa - NFL_LEAGUE_AVG_EPA_PLAY)
-        a_eff_epa = (away_off_epa - NFL_LEAGUE_AVG_EPA_PLAY) + (home_def_epa - NFL_LEAGUE_AVG_EPA_PLAY)
+        h_eff_epa = (home_off_epa - self.league_avg_epa_play) + (away_def_epa - self.league_avg_epa_play)
+        a_eff_epa = (away_off_epa - self.league_avg_epa_play) + (home_def_epa - self.league_avg_epa_play)
         h_eff_pts = h_eff_epa * 32.0 + home_qb_tier_adj
         a_eff_pts = a_eff_epa * 32.0 + away_qb_tier_adj
 
@@ -287,6 +296,7 @@ class NFLStructuralV5Engine:
             total_line=total_line,
             exp_total=exp_total,
             sd=self.total_sd,
+            league_avg_total=self.league_avg_total,
         )
         tot_total = p_over + p_under
         if tot_total > 0:
