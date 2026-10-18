@@ -24,35 +24,6 @@ from typing import Any
 
 import numpy as np
 
-# Key numbers in College Football
-KEY_MARGINS: dict[int, float] = {
-    3: 0.145,
-    7: 0.138,
-    10: 0.065,
-    14: 0.055,
-    17: 0.042,
-    21: 0.038,
-    4: 0.035,
-    6: 0.032,
-    1: 0.028,
-    2: 0.022,
-    24: 0.025,
-    28: 0.022,
-    31: 0.018,
-    35: 0.015,
-}
-
-KEY_TOTALS: dict[int, float] = {
-    41: 0.038,
-    44: 0.042,
-    47: 0.045,
-    51: 0.048,
-    54: 0.052,
-    58: 0.044,
-    61: 0.039,
-    65: 0.035,
-}
-
 
 class CFBDistributionType(str, Enum):
     NEGATIVE_BINOMIAL = "negative_binomial"
@@ -158,12 +129,17 @@ class CFBJointDistributionEngine:
 
             # Correlate using common game pace component
             common_noise = self.rng.normal(0.0, 1.0, size=self.n_simulations)
-            if self.total_sd and self.total_sd > self.margin_sd:
-                noise_scale = math.sqrt(max(0.0, (self.total_sd**2 - self.margin_sd**2) / 4.0))
+            if self.total_sd is not None:
+                if self.total_sd > self.margin_sd:
+                    noise_scale = 0.5 * math.sqrt(self.total_sd**2 - self.margin_sd**2)
+                else:
+                    # When total_sd <= margin_sd, adding positive common pace noise inflates
+                    # total variance past the target total SD (Var(H+A) = 2*target_var + 4*noise_scale^2).
+                    # We clamp noise_scale to 0.0 to bound the simulated Total SD.
+                    noise_scale = 0.0
             else:
-                noise_scale = math.sqrt(
-                    max(0.0, target_var * (self.score_correlation / max(0.01, 1.0 - self.score_correlation)))
-                )
+                corr = max(0.0, min(0.5, self.score_correlation))
+                noise_scale = math.sqrt(max(0.0, target_var * (corr / max(0.01, 1.0 - corr))))
             home_scores = np.maximum(0, np.round(raw_home + noise_scale * common_noise))
             away_scores = np.maximum(0, np.round(raw_away + noise_scale * common_noise))
 

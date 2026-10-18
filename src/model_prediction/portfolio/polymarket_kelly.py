@@ -422,6 +422,11 @@ class PolymarketKellyEngine:
                         if cand_h and cand_a:
                             h, a = cand_h, cand_a
                             break
+            for sep in (" - ", " (", ":", " ["):
+                if sep in h:
+                    h = h.split(sep)[0].strip()
+                if sep in a:
+                    a = a.split(sep)[0].strip()
             canonical = sorted([h.lower().strip(), a.lower().strip()])
             return f"{o.event_start_utc}:{canonical[0]}:{canonical[1]}"
 

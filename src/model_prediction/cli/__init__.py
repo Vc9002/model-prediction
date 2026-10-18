@@ -16,9 +16,11 @@ from .commands import (  # noqa: F401 -- re-export for compat
     _handle_ban,
     _polymarket_slate,
     _research_models_dir,
+    _rollback_pre_clear,
     _row_artifact_qualified,
     _summary,
     _verify_chain,
+    transactional_ledger_scope,
 )
 from .daily import run_daily
 from .forecast import (  # noqa: F401 -- re-export for compat

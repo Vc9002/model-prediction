@@ -86,6 +86,28 @@ class TennisPlayerForm:
     status: str = "available"
 
 
+def shrink_surface_elo(
+    player: str,
+    surface: str,
+    overall: dict[str, float],
+    by_surface: dict[tuple[str, str], float],
+    surface_counts: dict[tuple[str, str], int],
+) -> float:
+    """Bayesian partial pooling of surface Elo toward overall global Elo.
+
+    When a player has few or zero matches on a given surface, un-shrunk surface
+    ratings can collapse or swing wildly. This partial-pooling estimator blends
+    surface experience toward overall Elo based on surface sample size.
+    """
+    ov = overall.get(player, DEFAULT_ELO)
+    s = by_surface.get((player, surface), ov)
+    c = surface_counts.get((player, surface), 0)
+    s_norm = str(surface or "").lower()
+    w_max, c_surf = (0.80, 12.0) if ("clay" in s_norm or "grass" in s_norm) else (0.75, 15.0)
+    w_s = w_max * (c / (c + c_surf))
+    return w_s * s + (1.0 - w_s) * ov
+
+
 @dataclass(frozen=True)
 class UpcomingMatch:
     event_id: str
@@ -482,6 +504,9 @@ class TennisModel:
                     ),
                 )
 
+            r1 = shrink_surface_elo(match.player_one, match.surface, overall, by_surface, surface_counts)
+            r2 = shrink_surface_elo(match.player_two, match.surface, overall, by_surface, surface_counts)
+
             if p_serve_a is None or p_serve_b is None:
                 base_serve = 0.635 if match.tour.upper() == "ATP" else 0.590
                 if self.version == TENNIS_V3_VERSION:
@@ -491,12 +516,6 @@ class TennisModel:
                     p_serve_a = max(0.45, min(0.78, base_serve + (implied_elo_diff / 2400.0)))
                     p_serve_b = max(0.45, min(0.78, base_serve - (implied_elo_diff / 2400.0)))
                 else:
-                    r1 = by_surface.get(
-                        (match.player_one, match.surface), overall.get(match.player_one, DEFAULT_ELO)
-                    )
-                    r2 = by_surface.get(
-                        (match.player_two, match.surface), overall.get(match.player_two, DEFAULT_ELO)
-                    )
                     elo_diff = r1 - r2
                     p_serve_a = max(0.45, min(0.78, base_serve + (elo_diff / 2400.0)))
                     p_serve_b = max(0.45, min(0.78, base_serve - (elo_diff / 2400.0)))
@@ -511,18 +530,8 @@ class TennisModel:
 
             feature_basis = {
                 "surface": match.surface,
-                "elo_p1_surface": round(
-                    by_surface.get(
-                        (match.player_one, match.surface), overall.get(match.player_one, DEFAULT_ELO)
-                    ),
-                    1,
-                ),
-                "elo_p2_surface": round(
-                    by_surface.get(
-                        (match.player_two, match.surface), overall.get(match.player_two, DEFAULT_ELO)
-                    ),
-                    1,
-                ),
+                "elo_p1_surface": round(r1, 1),
+                "elo_p2_surface": round(r2, 1),
                 "history_matches": len(matches),
                 "min_player_matches": min(counts.get(match.player_one, 0), counts.get(match.player_two, 0)),
                 "expected_games_p1": deriv.expected_games_a,

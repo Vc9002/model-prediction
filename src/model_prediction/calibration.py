@@ -41,9 +41,9 @@ class IdentityCalibrator:
         )
 
     def transform(self, probability: float) -> float:
-        if not 0 <= probability <= 1:
-            raise ValueError("probability must be in [0, 1]")
-        return probability
+        if not math.isfinite(probability):
+            return 0.5
+        return max(0.0, min(1.0, probability))
 
 
 class FixedPlattCalibrator:
@@ -72,9 +72,10 @@ class FixedPlattCalibrator:
         )
 
     def transform(self, probability: float) -> float:
-        if not 0 <= probability <= 1:
-            raise ValueError("Platt calibration probability must be between 0 and 1")
-        clipped = min(1 - 1e-12, max(1e-12, probability))
+        if not math.isfinite(probability):
+            return 0.5
+        clamped_input = max(0.0, min(1.0, probability))
+        clipped = min(1 - 1e-12, max(1e-12, clamped_input))
         logit = math.log(clipped / (1 - clipped))
         z = -(self.intercept + self.slope * logit)
         z_clamped = max(-50.0, min(50.0, z))
@@ -124,7 +125,10 @@ class TrainablePlattCalibrator:
         return cls(intercept, slope, metadata)
 
     def transform(self, probability: float) -> float:
-        clipped = min(1 - 1e-12, max(1e-12, probability))
+        if not math.isfinite(probability):
+            return 0.5
+        clamped_input = max(0.0, min(1.0, probability))
+        clipped = min(1 - 1e-12, max(1e-12, clamped_input))
         logit = math.log(clipped / (1 - clipped))
         z = -(self.intercept + self.slope * logit)
         z_clamped = max(-50.0, min(50.0, z))
@@ -259,7 +263,10 @@ class TemperatureCalibrator:
         return cls(best_t, metadata)
 
     def transform(self, probability: float) -> float:
-        clipped = min(1 - 1e-12, max(1e-12, probability))
+        if not math.isfinite(probability):
+            return 0.5
+        clamped_input = max(0.0, min(1.0, probability))
+        clipped = min(1 - 1e-12, max(1e-12, clamped_input))
         logit = math.log(clipped / (1 - clipped))
         z = -logit / self.temperature
         z_clamped = max(-50.0, min(50.0, z))
@@ -354,10 +361,14 @@ class BetaCalibrator:
         return cls(a, b, c, metadata)
 
     def transform(self, probability: float) -> float:
-        p = min(1.0 - 1e-12, max(1e-12, float(probability)))
+        if not math.isfinite(probability):
+            return 0.5
+        clamped_input = max(0.0, min(1.0, float(probability)))
+        p = min(1.0 - 1e-12, max(1e-12, clamped_input))
         z = self.a * math.log(p) - self.b * math.log1p(-p) + self.c
         z_clamped = max(-50.0, min(50.0, z))
-        return 1.0 / (1.0 + math.exp(-z_clamped))
+        prob = 1.0 / (1.0 + math.exp(-z_clamped))
+        return min(1.0 - 1e-12, max(1e-12, prob))
 
 
 def run_calibration_tournament(

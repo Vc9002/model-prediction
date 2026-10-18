@@ -239,8 +239,12 @@ class DedicatedBasketballLeagueModel:
         # Filter history strictly to this league to prevent cross-league parameter distortion
         allowed_leagues = {norm_lg} if norm_lg not in ("NBA", "BASKETBALL") else {"NBA", "BASKETBALL"}
         isolated_history = [g for g in history if getattr(g, "league", "").strip().upper() in allowed_leagues]
-        if not isolated_history and history and all(not getattr(g, "league", "").strip() for g in history):
-            # If historical records lacked a stamped league, check if all belong here
+        if (
+            not isolated_history
+            and history
+            and all(not getattr(g, "league", "").strip() for g in history)
+            and norm_lg in ("NBA", "BASKETBALL")
+        ):
             isolated_history = list(history)
 
         return self._underlying.predict_games(isolated_history, upcoming)

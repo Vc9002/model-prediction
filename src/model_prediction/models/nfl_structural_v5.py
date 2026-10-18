@@ -13,6 +13,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+import numpy as np
+
 NFL_V5_MODEL_VERSION = "nfl-structural-v5"
 NFL_LEAGUE_AVG_TOTAL = 44.5
 NFL_LEAGUE_AVG_EPA_PLAY = 0.04
@@ -50,8 +52,56 @@ def _normal_cdf(x: float, mean: float, sd: float) -> float:
     return 0.5 * (1.0 + math.erf((x - mean) / (sd * math.sqrt(2.0))))
 
 
+def _tilt_distribution(
+    raw_probs: dict[int, float], target_mean: float, max_iter: int = 10, tol: float = 1e-5
+) -> dict[int, float]:
+    """Exponentially tilt discrete distribution p'[x] = p[x] * exp(theta * (x - target_mean)) / Z
+    so that E_{p'}[X] matches target_mean exactly, eliminating discrete key-number mean shrinkage
+    while preserving exact key-number mass spikes.
+    """
+    total = sum(raw_probs.values())
+    if total <= 0:
+        return {round(target_mean): 1.0}
+    p = {k: v / total for k, v in raw_probs.items()}
+    items = sorted(p.items())
+    xs = np.array([k for k, _ in items], dtype=float)
+    probs = np.array([v for _, v in items], dtype=float)
+
+    current_mean = float(np.sum(xs * probs))
+    if abs(current_mean - target_mean) < tol:
+        return dict(zip([int(x) for x in xs], probs.tolist()))
+
+    theta = 0.0
+    for _ in range(max_iter):
+        shifted_x = xs - target_mean
+        weights = probs * np.exp(np.clip(theta * shifted_x, -50.0, 50.0))
+        z = np.sum(weights)
+        if z <= 0 or not np.isfinite(z):
+            break
+        p_tilt = weights / z
+        m = float(np.sum(shifted_x * p_tilt))  # We want m == 0 (i.e. mean == target_mean)
+        if abs(m) < tol:
+            return dict(zip([int(x) for x in xs], p_tilt.tolist()))
+        var = float(np.sum((shifted_x - m) ** 2 * p_tilt))
+        if var < 1e-9:
+            break
+        step = m / var
+        step = max(-1.0, min(1.0, step))
+        theta -= step
+        if abs(step) < 1e-7:
+            break
+
+    shifted_x = xs - target_mean
+    weights = probs * np.exp(np.clip(theta * shifted_x, -50.0, 50.0))
+    z = np.sum(weights)
+    if z > 0 and np.isfinite(z):
+        p_tilt = weights / z
+        return dict(zip([int(x) for x in xs], p_tilt.tolist()))
+    return p
+
+
 def discrete_spread_distribution(exp_margin: float, sd: float = NFL_DEFAULT_SPREAD_SD) -> dict[int, float]:
-    """Compute discrete margin mass distribution over integer margins [-55, 55]."""
+    """Compute discrete margin mass distribution over integer margins [-55, 55] with mean conservation."""
     raw_p: dict[int, float] = {}
     for m in range(-55, 56):
         if m == 0:
@@ -67,10 +117,7 @@ def discrete_spread_distribution(exp_margin: float, sd: float = NFL_DEFAULT_SPRE
         else:
             p = p_norm * 0.90
         raw_p[m] = max(0.0, p)
-    total = sum(raw_p.values())
-    if total <= 0:
-        return {0: 1.0}
-    return {m: p / total for m, p in raw_p.items()}
+    return _tilt_distribution(raw_p, exp_margin)
 
 
 def discrete_spread_prob(
@@ -88,7 +135,7 @@ def discrete_spread_prob(
 
 
 def discrete_total_distribution(exp_total: float, sd: float = NFL_DEFAULT_TOTAL_SD) -> dict[int, float]:
-    """Compute discrete total mass distribution over integer totals [10, 90]."""
+    """Compute discrete total mass distribution over integer totals [10, 90] with mean conservation."""
     raw_p: dict[int, float] = {}
     for t in range(10, 91):
         p_norm = _normal_cdf(t + 0.5, exp_total, sd) - _normal_cdf(t - 0.5, exp_total, sd)
@@ -102,10 +149,7 @@ def discrete_total_distribution(exp_total: float, sd: float = NFL_DEFAULT_TOTAL_
         else:
             p = p_norm * 0.94
         raw_p[t] = max(0.0, p)
-    total = sum(raw_p.values())
-    if total <= 0:
-        return {45: 1.0}
-    return {t: p / total for t, p in raw_p.items()}
+    return _tilt_distribution(raw_p, exp_total)
 
 
 def discrete_total_prob(
@@ -139,6 +183,8 @@ class NFLStructuralForecast:
     total_line: float
     weather_total_penalty: float
     short_week_penalty: float = 0.0
+    prob_push_spread: float = 0.0
+    prob_push_total: float = 0.0
 
 
 class NFLStructuralV5Engine:
@@ -148,9 +194,11 @@ class NFLStructuralV5Engine:
         self,
         spread_sd: float = NFL_DEFAULT_SPREAD_SD,
         total_sd: float = NFL_DEFAULT_TOTAL_SD,
+        short_week_drag: float = 1.0,
     ) -> None:
         self.spread_sd = spread_sd
         self.total_sd = total_sd
+        self.short_week_drag = short_week_drag
 
     def forecast_game(
         self,
@@ -180,14 +228,16 @@ class NFLStructuralV5Engine:
         h_eff_pts = h_eff_epa * 32.0 + home_qb_tier_adj
         a_eff_pts = a_eff_epa * 32.0 + away_qb_tier_adj
 
-        # 2. Situational Rest Disparity & Short-Week Factor (TNF drag: -3.5 pts on <= 5 days rest)
+        # 2. Situational Rest Disparity & Short-Week Factor (TNF drag calibrated to empirical ~1.0 pt)
         h_rest_adj = (home_rest_days - away_rest_days) * 0.175
         a_rest_adj = (away_rest_days - home_rest_days) * 0.175
         short_week_drag = 0.0
         if home_rest_days <= 5 and away_rest_days <= 5:
-            short_week_drag = 3.5  # Full short-week turnaround (e.g. Thursday Night Football)
+            short_week_drag = (
+                self.short_week_drag
+            )  # Full short-week turnaround (e.g. Thursday Night Football)
         elif home_rest_days <= 5 or away_rest_days <= 5:
-            short_week_drag = 1.75  # Asymmetric short-week turnaround
+            short_week_drag = self.short_week_drag / 2.0  # Asymmetric short-week turnaround
 
         # 3. Weather Penalties
         weather_penalty = 0.0
@@ -220,25 +270,31 @@ class NFLStructuralV5Engine:
         p_home_win = 1.0 - _normal_cdf(0.0, exp_margin, self.spread_sd)
         p_away_win = 1.0 - p_home_win
 
-        p_home_cover, p_away_cover, _ = discrete_spread_prob(
+        p_home_cover, p_away_cover, p_push_spread = discrete_spread_prob(
             spread_home_line=spread_home_line,
             exp_margin=exp_margin,
             sd=self.spread_sd,
         )
         tot_spread = p_home_cover + p_away_cover
         if tot_spread > 0:
-            p_home_cover /= tot_spread
-            p_away_cover /= tot_spread
+            p_home_cover_norm = p_home_cover / tot_spread
+            p_away_cover_norm = p_away_cover / tot_spread
+        else:
+            p_home_cover_norm = p_home_cover
+            p_away_cover_norm = p_away_cover
 
-        p_over, p_under, _ = discrete_total_prob(
+        p_over, p_under, p_push_total = discrete_total_prob(
             total_line=total_line,
             exp_total=exp_total,
             sd=self.total_sd,
         )
         tot_total = p_over + p_under
         if tot_total > 0:
-            p_over /= tot_total
-            p_under /= tot_total
+            p_over_norm = p_over / tot_total
+            p_under_norm = p_under / tot_total
+        else:
+            p_over_norm = p_over
+            p_under_norm = p_under
 
         return NFLStructuralForecast(
             home_team=home_team,
@@ -249,12 +305,14 @@ class NFLStructuralV5Engine:
             projected_total=round(exp_total, 2),
             prob_home_win=round(p_home_win, 6),
             prob_away_win=round(p_away_win, 6),
-            prob_home_cover=round(p_home_cover, 6),
-            prob_away_cover=round(p_away_cover, 6),
-            prob_over=round(p_over, 6),
-            prob_under=round(p_under, 6),
+            prob_home_cover=round(p_home_cover_norm, 6),
+            prob_away_cover=round(p_away_cover_norm, 6),
+            prob_over=round(p_over_norm, 6),
+            prob_under=round(p_under_norm, 6),
             spread_home_line=spread_home_line,
             total_line=total_line,
             weather_total_penalty=round(weather_penalty, 2),
             short_week_penalty=round(short_week_drag, 2),
+            prob_push_spread=round(p_push_spread, 6),
+            prob_push_total=round(p_push_total, 6),
         )

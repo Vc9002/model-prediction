@@ -84,7 +84,7 @@ All sports, leagues, and market types are directly hooked to their latest active
 ```mermaid
 flowchart TD
     subgraph H1["Horizon 1: In-Season Live Priorities (Q4 2026)"]
-        H1A["CFB Favorite Bias & Blowout Shrinkage Monitoring"]
+        H1A["CFB Upgrades: Dynamic Pace, PPD & Altitude (P1-P3)"]
         H1B["NBA Spread/Total 2026-27 In-Season Verification"]
     end
 
@@ -92,6 +92,7 @@ flowchart TD
         H2A["MLB Two-Head Market Residual Architecture (v10)"]
         H2B["High-Resolution Environmental Physics (Open-Meteo)"]
         H2C["Cross-Exchange Dutching Engine (Kalshi: Deferred / Off)"]
+        H2D["CFB Structural Expansions: Personnel & Red Zone (P4/P5)"]
     end
 
     subgraph H3["Horizon 3: Quality Engineering & Platform Hardening"]
@@ -105,9 +106,23 @@ flowchart TD
 
 ### Horizon 1: In-Season Live Priorities (Q4 2026)
 
-1. **College Football (CFB) Favorite Bias Calibration Monitoring**:
-   - Monitor live execution under the hard edge gate ($0.02 \le \text{Edge} \le 0.08$) and verify the $30\%$ blowout disparity shrinkage for spreads $>21.5$ points to ensure negative-edge chalk bets remain eliminated.
-   - Maintain strict suppression of heavy-favorite moneyline traps.
+1. **College Football (CFB / NCAAF) Model Refinement & In-Season Priorities**:
+   - **Active Champion**: `cfb-structural-v2` (Bivariate Negative Binomial Joint Score Engine, Hard Edge Gate $0.02 \le \text{Edge} \le 0.08$, $30\%$ blowout disparity shrinkage for spreads $>21.5$).
+   - **Live In-Season Priorities (Q4 2026)**:
+     - **P1: Dynamic Pace & Possessions Engine**:
+       - *Problem*: Current implementation hardcodes `possessions_per_game = 12.4` across all teams (`cfb_features.py#L331`), inflating game totals for clock-chewing, ball-control teams (e.g. BYU, Army, Iowa).
+       - *Solution*: Compute dynamic expected possessions from team seconds-per-play and neutral-situation run/pass ratios, allowing drive estimates to vary naturally between 9.5 and 15.5 possessions.
+     - **P2: Opponent-Adjusted Points Per Drive (PPD)**:
+       - *Problem*: In-season efficiency (`sample_off_ppp`) currently relies on unadjusted raw points scored divided by 12.4 (`cfb_features.py#L294-L306`), causing severe rating inflation for teams with soft non-conference slates.
+       - *Solution*: Replace raw PPG with iterative Ridge-regularized Points Per Drive (PPD) adjusted for opponent defensive efficiency relative to FBS baseline.
+     - **P3: Empirical Altitude & Travel Calibration**:
+       - *Problem*: Current rule-based altitude penalty (`stadium_elev > 4000ft` and `dist > 400mi` $\rightarrow$ up to $-2.5$ pts) mechanically grants high-elevation home dogs (BYU, Utah, Wyoming, Air Force, Colorado) $+3.4$ to $+5.3$ points when combined with HFA.
+       - *Solution*: Backtest altitude differentials against historical walk-forward ATS closing lines to determine true market-clearing residual value.
+   - **Forward Enhancements (Horizon 2 / Q1 2027)**:
+     - **P4: High-Usage Non-QB Availability & Key Personnel Model**:
+       - Extend beyond binary `qb_starter_prob` to ingest weekly availability reports for dominant skill players ($>30\%$ touch/target share) and anchor line/secondary defenders, applying empirical replacement-level WAR discounts ($-1.5$ to $-2.5$ points).
+     - **P5: Red Zone & Finishing Drives Efficiency (PPA Inside 40)**:
+       - Deconstruct scoring into drive conversion rates inside the 40 vs. explosive chunk-play rates (IsoPPP) to properly price bend-don't-break defensive matchups.
 2. **NBA 2026-27 In-Season Live Verification**:
    - Track performance, calibration drift, and execution efficiency of newly deployed `nba-spread-margin-v2` (calibrated holdout MAE 11.470) and `nba-total-margin-v2` across the opening 100 games of the 2026-27 regular season.
 

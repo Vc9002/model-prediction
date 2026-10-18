@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TypedDict
+from typing import Protocol, TypedDict, runtime_checkable
 
 from ..domain import MarketType
 
@@ -83,3 +83,41 @@ class GamePredictionBase(TypedDict):
     uncertainty: float
     model_version: str
     feature_basis: dict[str, object]
+
+
+@runtime_checkable
+class StructuralDistributionProtocol(Protocol):
+    """Universal structural score distribution contract across all sports.
+
+    Enforces:
+    1. Exact discrete margin mass distribution over integer margins.
+    2. Exact discrete total mass distribution over integer totals.
+    3. Mathematical conservation of probability (sum of PMF == 1.0).
+    4. Coherent moneyline, spread cover, and total over/under derivation.
+    """
+
+    def margin_distribution(self, expected_margin: float, sd: float) -> dict[int, float]:
+        """Compute discrete margin mass PMF over integer margins."""
+        ...
+
+    def total_distribution(self, expected_total: float, sd: float) -> dict[int, float]:
+        """Compute discrete total mass PMF over integer totals."""
+        ...
+
+    def prob_cover(
+        self,
+        spread_home_line: float,
+        expected_margin: float,
+        sd: float,
+    ) -> tuple[float, float, float]:
+        """Derive (p_home_cover, p_away_cover, p_push) from margin distribution."""
+        ...
+
+    def prob_total(
+        self,
+        total_line: float,
+        expected_total: float,
+        sd: float,
+    ) -> tuple[float, float, float]:
+        """Derive (p_over, p_under, p_push) from total distribution."""
+        ...

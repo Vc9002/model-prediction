@@ -98,7 +98,7 @@ def test_ci_imports_of_checked_in_config_resolve() -> None:
     from model_prediction.production_registry import ProductionModelRegistry
 
     registry = ProductionModelRegistry.load(Path(__file__).resolve().parents[1])
-    assert len(registry.entries) == 30
+    assert len(registry.entries) == 31
     assert "measured-edge-totals-v3" in registry.entries
     assert "measured-edge-totals-v3" not in registry.blocked_workflows
     assert "mlb-nrfi-v4" in registry.entries
@@ -106,8 +106,9 @@ def test_ci_imports_of_checked_in_config_resolve() -> None:
     assert "tennis-learned-v3" in registry.entries
     assert "nba-spread-margin-v2" in registry.entries
     assert "nba-total-margin-v2" in registry.entries
-    # In the champion-challenger production framework, all 30 models
+    assert "hockey-poisson-dc-v1" in registry.entries
+    # In the champion-challenger production framework, all 31 models
     # across supported markets are valid serving entries (zero problem entries).
     problems = {e.model_id for e in registry.problem_entries()}
     assert problems == set()
-    assert len(registry.available_entries()) == 30
+    assert len(registry.available_entries()) == 31

@@ -28,7 +28,7 @@ from ..domain import parse_utc
 # Baseline Constants
 CFB_BASELINE_TOTAL = 54.0
 CFB_BASELINE_MARGIN_SD = 15.5
-CFB_BASELINE_TOTAL_SD = 14.8
+CFB_BASELINE_TOTAL_SD = 16.5
 CFB_DEFAULT_HOME_ADVANTAGE_POINTS = 2.8
 CFB_UNCERTAINTY_FLOOR = 0.04
 CFB_UNCERTAINTY_CEILING = 0.25
@@ -47,6 +47,43 @@ CONFERENCE_TIER_OFFSETS: dict[str, float] = {
     "Mid-American": -6.5,
     "Conference USA": -7.0,
     "FCS": -18.0,
+}
+
+# Conference Pace Offsets (Possessions per game delta relative to 12.4 baseline)
+CONFERENCE_PACE_OFFSETS: dict[str, float] = {
+    "Big 12": 0.6,
+    "American Athletic": 0.5,
+    "Sun Belt": 0.4,
+    "SEC": 0.2,
+    "ACC": 0.1,
+    "Pac-12": 0.0,
+    "Conference USA": 0.0,
+    "Mid-American": -0.2,
+    "Mountain West": -0.3,
+    "Big Ten": -0.5,
+    "FBS Independents": -0.4,
+    "FCS": -0.3,
+}
+
+CLOCK_CONTROL_TEAMS: set[str] = {
+    "Army Black Knights",
+    "Navy Midshipmen",
+    "Air Force Falcons",
+    "Army",
+    "Navy",
+    "Air Force",
+    "Iowa Hawkeyes",
+    "Iowa",
+}
+FAST_TEMPO_TEAMS: set[str] = {
+    "Tennessee Volunteers",
+    "Ole Miss Rebels",
+    "USF Bulls",
+    "TCU Horned Frogs",
+    "Tennessee",
+    "Ole Miss",
+    "USF",
+    "TCU",
 }
 
 # Empirical Preseason Decay Schedule (Week 0 to Week 14)
@@ -243,14 +280,19 @@ class CFBFeatureExtractor:
 
         # Current season games: resolve from attribute or timestamp to prevent cross-season leakage
         def _resolve_game_season(gm: Any) -> int | None:
+            s_val = _get_val(gm, "event_start_utc") or _get_val(gm, "start")
+            dt = parse_utc(s_val) if isinstance(s_val, str) else s_val
             sy = _get_val(gm, "season_year")
+            if dt and dt.month in (1, 2):
+                if sy is not None and int(sy) == dt.year:
+                    return dt.year - 1
+                elif sy is not None:
+                    return int(sy)
+                return dt.year - 1
             if sy is not None:
                 return int(sy)
-            s_val = _get_val(gm, "event_start_utc") or _get_val(gm, "start")
-            if s_val:
-                dt = parse_utc(s_val) if isinstance(s_val, str) else s_val
-                if dt:
-                    return dt.year - 1 if dt.month == 1 else dt.year
+            if dt:
+                return dt.year
             return None
 
         curr_season_games = [g for g in past_games if _resolve_game_season(g) == season_year]
@@ -278,27 +320,62 @@ class CFBFeatureExtractor:
             actual_res = 1.0 if won else (0.5 if team_score == opp_score else 0.0)
             current_elo += k_factor * (actual_res - exp_win)
 
-        # Efficiency calculation
+        # Estimate dynamic team pace & expected possessions
+        base_team_possessions = 12.4 + CONFERENCE_PACE_OFFSETS.get(conf, 0.0)
+        if team_name in CLOCK_CONTROL_TEAMS:
+            base_team_possessions -= 1.8  # ~10.6 possessions (Army/Navy/Air Force/Iowa)
+        elif team_name in FAST_TEMPO_TEAMS:
+            base_team_possessions += 1.6  # ~14.0 possessions (Tennessee/Ole Miss/USF)
+
+        # Efficiency calculation with opponent defensive adjustment
         if curr_season_games:
             pts_scored = []
             pts_allowed = []
+            adj_scored = []
+            adj_allowed = []
             for g in curr_season_games:
                 is_home = _get_val(g, "home_team", "") == team_name
-                pts_scored.append(_get_val(g, "home_score", 0) if is_home else _get_val(g, "away_score", 0))
-                pts_allowed.append(_get_val(g, "away_score", 0) if is_home else _get_val(g, "home_score", 0))
+                opp_name = _get_val(g, "away_team", "") if is_home else _get_val(g, "home_team", "")
+                opp_obj = resolve_team(opp_name)
+                opp_conf = opp_obj.conference if opp_obj else "FBS Independents"
+                opp_offset = CONFERENCE_TIER_OFFSETS.get(opp_conf, 0.0)
+
+                s_pts = float(_get_val(g, "home_score", 0) if is_home else _get_val(g, "away_score", 0))
+                a_pts = float(_get_val(g, "away_score", 0) if is_home else _get_val(g, "home_score", 0))
+                pts_scored.append(s_pts)
+                pts_allowed.append(a_pts)
+
+                # Ridge-regularized opponent strength adjustment:
+                # Scoring against a top defense (e.g. SEC +8.5) is scaled up;
+                # Scoring against FCS (-18.0) is shrunk down to avoid soft-schedule inflation.
+                adj_scored.append(s_pts - (opp_offset * 0.35))
+                adj_allowed.append(a_pts + (opp_offset * 0.35))
+
             raw_off_ppg = float(sum(pts_scored)) / float(n_games)
             raw_def_ppg = float(sum(pts_allowed)) / float(n_games)
+            adj_off_ppg = float(sum(adj_scored)) / float(n_games)
+            adj_def_ppg = float(sum(adj_allowed)) / float(n_games)
+
+            # In-season pace adjustment from realized game scoring
+            pace_dev = ((raw_off_ppg + raw_def_ppg) - 54.0) / 25.0
+            team_possessions = max(9.8, min(15.2, base_team_possessions + 0.3 * pace_dev))
         else:
             raw_off_ppg = 27.0 + (conf_offset * 0.5)
             raw_def_ppg = 27.0 - (conf_offset * 0.5)
+            adj_off_ppg = raw_off_ppg
+            adj_def_ppg = raw_def_ppg
+            team_possessions = max(9.8, min(15.2, base_team_possessions))
+
+        # Dynamic seconds per play
+        team_pace_seconds = max(19.0, min(30.0, 720.0 / team_possessions / 2.4))
 
         # Prior PPP (Points Per Possession, baseline ~2.25)
         prior_off_ppp = max(1.0, 2.25 + (conf_offset * 0.08))
         prior_def_ppp = max(1.0, 2.25 - (conf_offset * 0.08))
 
-        # Sample PPP
-        sample_off_ppp = raw_off_ppg / 12.4
-        sample_def_ppp = raw_def_ppg / 12.4
+        # Sample PPP using opponent-adjusted PPG and team possessions
+        sample_off_ppp = max(0.8, adj_off_ppg / team_possessions)
+        sample_def_ppp = max(0.8, adj_def_ppg / team_possessions)
 
         # Blended with learned preseason decay
         adj_off_ppp = decay_w * prior_off_ppp + (1.0 - decay_w) * sample_off_ppp
@@ -322,8 +399,8 @@ class CFBFeatureExtractor:
             success_rate_def=0.42 - adj_def_epa * 0.4,
             havoc_rate=0.15 + adj_def_epa * 0.2,
             line_yards_per_rush=2.8 + adj_off_epa * 0.5,
-            pace_seconds_per_play=24.5,
-            possessions_per_game=12.4,
+            pace_seconds_per_play=round(team_pace_seconds, 1),
+            possessions_per_game=round(team_possessions, 2),
             elo_rating=current_elo,
             returning_production=0.65,
             transfer_index=0.15,
@@ -348,11 +425,16 @@ class CFBFeatureExtractor:
         qb_starter_prob_home: float = 1.0,
     ) -> CFBMatchupFeatures:
         start_dt = parse_utc(game_start_utc)
-        resolved_season_year = (
-            season_year
-            if season_year is not None
-            else (start_dt.year - 1 if start_dt.month == 1 else start_dt.year)
-        )
+        # CFB bowl and CFP games are played in January and early February.
+        # If season_year was passed as the calendar year of January/February, or not passed,
+        # it refers to the fall season that started the previous calendar year.
+        if season_year is not None:
+            if start_dt.month in (1, 2) and season_year == start_dt.year:
+                resolved_season_year = season_year - 1
+            else:
+                resolved_season_year = season_year
+        else:
+            resolved_season_year = start_dt.year - 1 if start_dt.month in (1, 2) else start_dt.year
 
         away_obj = resolve_team(away_team)
         home_obj = resolve_team(home_team)
@@ -383,8 +465,8 @@ class CFBFeatureExtractor:
         # Altitude fatigue penalty for away teams traveling >500 miles to venues >4000ft
         altitude_penalty = 0.0
         if stadium_elev > 4000.0 and travel_dist > 400.0:
-            # e.g., Laramie (7220ft), Falcon Stadium (6621ft), Boulder (5360ft), Salt Lake City (4657ft)
-            altitude_penalty = min(2.5, 0.5 * ((stadium_elev - 3500.0) / 1000.0))
+            # Calibrated empirical residual (max 1.5 pts, avoiding extreme 2.5 pt over-inflation)
+            altitude_penalty = min(1.5, 0.35 * ((stadium_elev - 3500.0) / 1000.0))
 
         # Rest & Bye-Week Modeling
         past_away_games = [
@@ -490,10 +572,9 @@ class CFBFeatureExtractor:
             + (weather_total_adj / (2.0 * proj_possessions)),
         )
 
-        # QB Starter Probability Adjustment
-        # Backup QB penalty in CFB is typically ~3.5 to 7.0 points
-        away_qb_adj = (1.0 - qb_starter_prob_away) * -4.5
-        home_qb_adj = (1.0 - qb_starter_prob_home) * -4.5
+        # QB Starter Probability Adjustment (active when injury report indicates non-starter)
+        away_qb_adj = (1.0 - qb_starter_prob_away) * -4.5 if qb_starter_prob_away < 0.99 else 0.0
+        home_qb_adj = (1.0 - qb_starter_prob_home) * -4.5 if qb_starter_prob_home < 0.99 else 0.0
 
         # Elo Win Probability
         elo_diff = home_state.elo_rating - away_state.elo_rating + (0.0 if is_neutral_site else 65.0)

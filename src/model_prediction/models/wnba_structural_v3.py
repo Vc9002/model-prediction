@@ -113,9 +113,9 @@ class WNBAStructuralV3Engine:
         inj_adj_a = -away_missing_minutes * 0.0035 + away_player_impact_net * 0.015
 
         ppp_home = max(
-            0.65, home_ortg_ppp + (WNBA_LEAGUE_AVG_PPP - away_drtg_ppp) + hfa_ppp + efg_adj_h + inj_adj_h
+            0.65, home_ortg_ppp + (away_drtg_ppp - WNBA_LEAGUE_AVG_PPP) + hfa_ppp + efg_adj_h + inj_adj_h
         )
-        ppp_away = max(0.65, away_ortg_ppp + (WNBA_LEAGUE_AVG_PPP - home_drtg_ppp) + efg_adj_a + inj_adj_a)
+        ppp_away = max(0.65, away_ortg_ppp + (home_drtg_ppp - WNBA_LEAGUE_AVG_PPP) + efg_adj_a + inj_adj_a)
 
         # 3. Expected Points
         pts_home = possessions * ppp_home

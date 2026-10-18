@@ -45,12 +45,14 @@ SUPPORTED_MARKETS: dict[str, set[str]] = {
     "RAINBOW_SIX": {"moneyline"},
     "KBO": {"moneyline"},
     "NPB": {"moneyline"},
+    "HOCKEY": {"moneyline"},
 }
 
 PLANNED_MARKETS: dict[str, set[str]] = {
     "NBA": {"spread", "total"},
     "SOCCER": {"spread", "total"},
     "TENNIS": {"spread", "total"},
+    "HOCKEY": {"spread", "total"},
 }
 
 

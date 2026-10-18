@@ -546,7 +546,7 @@ models:
     # Value matches this artifact's own re-validated confidence_threshold
     # (re-run search found 0.0 -- essentially no confidence floor -- for
     # this title under the new decay/shrink regime).
-    research_confidence_gate: 0.0
+    research_confidence_gate: 0.03
   VALORANT:
     family: neutral_series_elo
     status: shadow_qualified
@@ -566,7 +566,7 @@ models:
     # Value matches this artifact's own re-validated confidence_threshold
     # (re-run search found 0.0 for this title under the new decay/shrink
     # regime, down from v5's 0.03).
-    research_confidence_gate: 0.0
+    research_confidence_gate: 0.03
   RAINBOW_SIX:
     family: neutral_series_elo
     status: shadow_qualified
@@ -580,7 +580,7 @@ models:
     - total
     market_target: esports_match_winner
     min_edge: 0.025
-    research_confidence_gate: 0.03
+    research_confidence_gate: 0.04
   KBO:
     family: tie_aware_home_elo
     status: shadow_qualified

@@ -28,10 +28,11 @@ def price_international_baseball_derivatives(
     tie_prob: float,
     league: str = "kbo",
     lines: tuple[float, ...] = (7.5, 8.5, 9.5, 10.5),
+    expected_total: float | None = None,
 ) -> BaseballDerivativePricing:
     """Calculate runline spread and total runs distributions."""
     is_kbo = str(league).lower() == "kbo"
-    baseline_total = 9.8 if is_kbo else 7.2
+    baseline_total = float(expected_total) if expected_total is not None else (9.8 if is_kbo else 7.2)
     sigma_total = 3.8 if is_kbo else 3.2
     sigma_margin = 3.4
 

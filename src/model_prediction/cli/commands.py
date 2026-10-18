@@ -11,7 +11,9 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from dataclasses import asdict
 from datetime import date
 from pathlib import Path
@@ -239,6 +241,54 @@ def _clear_today_open(
     return ledger.remove_open_rows(
         to_remove, reason=f"re-forecast replacement for {date_str}", allow_staked_removal=True
     )
+
+
+def _rollback_pre_clear(ledger: Any) -> bool:
+    """Restore ledger file(s) from .pre_clear.bak snapshot(s)."""
+    if not hasattr(ledger, "path") or not ledger.path:
+        return False
+    target_path = Path(ledger.path)
+    if not target_path.exists():
+        return False
+    import shutil
+
+    restored = False
+    try:
+        if target_path.is_dir():
+            for f in target_path.iterdir():
+                if f.is_file() and f.name.endswith(".pre_clear.bak"):
+                    orig_name = f.name[: -len(".pre_clear.bak")]
+                    orig_path = f.parent / orig_name
+                    shutil.copy2(f, orig_path)
+                    restored = True
+        else:
+            bak_path = target_path.with_suffix(target_path.suffix + ".pre_clear.bak")
+            if bak_path.exists():
+                shutil.copy2(bak_path, target_path)
+                restored = True
+    except OSError:
+        pass
+    return restored
+
+
+@contextmanager
+def transactional_ledger_scope(ledgers: Sequence[Any], date_str: str):
+    """Context manager ensuring transactional rollback of open picks if an error occurs mid-forecast.
+
+    If an uncaught exception is raised inside the block (e.g. during learned sport forecasting),
+    all supplied ledgers are automatically restored from their pre-clear snapshots.
+    """
+    try:
+        yield
+    except Exception as exc:
+        logging.getLogger("model_prediction.cli").error(
+            "Forecasting aborted mid-flight for %s (%s); rolling back open ledger state from .pre_clear.bak",
+            date_str,
+            exc,
+        )
+        for l in ledgers:
+            _rollback_pre_clear(l)
+        raise
 
 
 def _drift_check(settled_qualified: list, config: dict) -> dict:

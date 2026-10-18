@@ -170,6 +170,17 @@ def _select_one_tennis_line_per_market(
     return [row for _, row in chosen], suppressed
 
 
+GRAND_SLAMS = ("australian open", "roland garros", "french open", "wimbledon", "us open", "u.s. open")
+
+
+def _infer_best_of(tournament: str, tour: str) -> int:
+    """Grand Slam men's singles matches are Best-of-5; all other tour singles are Best-of-3."""
+    t_lower = str(tournament or "").casefold()
+    if str(tour or "").upper() == "ATP" and any(gs in t_lower for gs in GRAND_SLAMS):
+        return 5
+    return 3
+
+
 def _upcoming_singles_matches(scoreboard: dict[str, Any]) -> list[dict[str, Any]]:
     """Same singles/doubles split as the historical parser, for live events
     that have not necessarily finished (or even started) yet.
@@ -205,6 +216,7 @@ def _upcoming_singles_matches(scoreboard: dict[str, Any]) -> list[dict[str, Any]
                 if not away_name or not home_name:
                     continue
                 start = competition.get("date") or event.get("date")
+                best_of = _infer_best_of(tournament, tour)
                 matches.append(
                     {
                         "event_id": f"{event.get('id')}:{competition.get('id')}",
@@ -213,6 +225,7 @@ def _upcoming_singles_matches(scoreboard: dict[str, Any]) -> list[dict[str, Any]
                         "home_player": home_name,
                         "surface": surface,
                         "tour": tour,
+                        "best_of": best_of,
                     }
                 )
     return matches
@@ -301,6 +314,7 @@ def build_tennis_slate(
                     player_two=item["home_player"],
                     surface=str(item.get("surface") or "Hard"),
                     tour=tour,
+                    best_of=int(item.get("best_of", 3)),
                 )
             )
         except (KeyError, TypeError, ValueError) as error:

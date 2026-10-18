@@ -38,7 +38,12 @@ from ..ledger import defer_sqlite_xlsx_exports
 from ..main_ledgers import MultiSportPickLedger
 from ..mlb_baseline_refresh import refresh_if_due
 from ..research_ledgers import RESEARCH_LEDGER_SPORTS, existing_research_ledgers, research_ledger
-from .commands import _clear_today_open, _polymarket_slate, _research_models_dir, _summary
+from .commands import (
+    _clear_today_open,
+    _polymarket_slate,
+    _research_models_dir,
+    _summary,
+)
 from .forecast import (
     _forecast_cfb_sport,
     _forecast_international_sport,
@@ -526,9 +531,11 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         logger.warning("Statcast aggregate rebuild failed", exc_info=True)
         statcast_aggregates_result = {"status": "error"}
 
+    cleared_ledgers: list[Any] = [ledger]
     _clear_today_open(ledger, args.date, by_event_date=True)
     # Also clear and forecast for flat ledger
     flat_ledger = MultiSportPickLedger(data_root, flat=True)
+    cleared_ledgers.append(flat_ledger)
     _clear_today_open(flat_ledger, args.date, by_event_date=True)
     max_data_age = float(config["project"].get("maximum_data_age_hours", 12))
     max_disagreement = float(config["project"].get("maximum_unreviewed_market_disagreement", 0.10))
@@ -539,16 +546,11 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     forecast_observed_at = utc_now()
     data_directory = Path(ledger_path(config)).parent
     for research_sport in RESEARCH_LEDGER_SPORTS:
-        _clear_today_open(
-            research_ledger(data_directory, research_sport),
-            args.date,
-            by_event_date=True,
-        )
-        _clear_today_open(
-            research_ledger(data_directory, research_sport, gated=True),
-            args.date,
-            by_event_date=True,
-        )
+        rl1 = research_ledger(data_directory, research_sport)
+        rl2 = research_ledger(data_directory, research_sport, gated=True)
+        cleared_ledgers.extend([rl1, rl2])
+        _clear_today_open(rl1, args.date, by_event_date=True)
+        _clear_today_open(rl2, args.date, by_event_date=True)
     # Compute forecasts once, log to both ledgers (compute > log main > log research > log flat)
     forecast_result = {}
     workers = min(len(DAILY_LEARNED_SPORTS), 5)
@@ -1042,7 +1044,17 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         # wrapper itself (e.g. a NameError), which should still stop
         # the run loudly rather than be swallowed.
         for rf in as_completed(research_futures):
-            rf.result()
+            try:
+                rf.result()
+            except Exception:
+                logger.exception(
+                    "Forecasting task wrapper failed; rolling back open ledgers from pre-clear snapshots"
+                )
+                from .commands import _rollback_pre_clear
+
+                for cl in cleared_ledgers:
+                    _rollback_pre_clear(cl)
+                raise
     flat_result = {
         sport: forecast_result.get(f"_flat_{sport}", forecast_result.get(sport, {}))
         for sport in DAILY_LEARNED_SPORTS

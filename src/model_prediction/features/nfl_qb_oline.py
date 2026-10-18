@@ -26,6 +26,7 @@ class NFLQuarterbackProfile:
     turnover_worthy_play_pct: float  # TWP% (1.5% ball secure to 5.0% reckless)
     spread_value_pts: float  # Value over replacement backup (0.0 to +6.5 pts)
     sample_dropbacks: int
+    rushing_epa_per_game: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,8 +75,9 @@ def evaluate_qb_profile(
     turnover_worthy_play_pct: float,
     sample_dropbacks: int,
     is_starter: bool = True,
+    rushing_epa_per_game: float = 0.0,
 ) -> NFLQuarterbackProfile:
-    """Compute point-in-time QB profile with Bayesian shrinkage."""
+    """Compute point-in-time QB profile with Bayesian shrinkage and dual-threat rushing impact."""
     if sample_dropbacks <= 0 or not is_starter:
         return NFLQuarterbackProfile(
             qb_name=qb_name,
@@ -87,6 +89,7 @@ def evaluate_qb_profile(
             turnover_worthy_play_pct=0.042,
             spread_value_pts=0.0,  # Baseline replacement level
             sample_dropbacks=sample_dropbacks,
+            rushing_epa_per_game=0.0,
         )
 
     # Shrink toward league average with 150 dropbacks pseudo-prior
@@ -98,8 +101,17 @@ def evaluate_qb_profile(
         PRIOR_DROPBACKS + sample_dropbacks
     )
 
-    # Map EPA + CPOE to point spread value over replacement (0.0 to 6.5 pts)
-    spread_val = max(0.5, min(6.5, 3.0 + (shrunk_epa - LEAGUE_AVG_EPA_DROPBACK) * 15.0 + (shrunk_cpoe / 3.0)))
+    # Map EPA + CPOE + dual-threat rushing EPA to point spread value over replacement (0.0 to 6.5 pts)
+    # Dual-threat QBs (e.g. Lamar Jackson, Josh Allen, Jayden Daniels) generate 1.5 to 4.5 rushing EPA/game,
+    # adding ~0.3 - 0.9 spread points above a pocket passer with identical dropback stats.
+    rush_boost = max(0.0, rushing_epa_per_game * 0.20)
+    spread_val = max(
+        0.5,
+        min(
+            6.5,
+            3.0 + (shrunk_epa - LEAGUE_AVG_EPA_DROPBACK) * 15.0 + (shrunk_cpoe / 3.0) + rush_boost,
+        ),
+    )
 
     return NFLQuarterbackProfile(
         qb_name=qb_name,
@@ -111,6 +123,7 @@ def evaluate_qb_profile(
         turnover_worthy_play_pct=round(turnover_worthy_play_pct, 3),
         spread_value_pts=round(spread_val, 2),
         sample_dropbacks=sample_dropbacks,
+        rushing_epa_per_game=round(rushing_epa_per_game, 2),
     )
 
 

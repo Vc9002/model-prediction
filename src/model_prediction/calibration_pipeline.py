@@ -323,24 +323,34 @@ def run_full_calibration_pipeline(
 
     # Compute aggregate system metrics
     max_raw_drift = max((r.drift_score for r in records), default=0.0)
-    raw_severe_drift_models = [
-        f"{r.sport}:{r.market}:{r.model_version}" for r in records if r.drift_status == "SEVERE_DRIFT"
-    ]
-    raw_moderate_drift_models = [
-        f"{r.sport}:{r.market}:{r.model_version}" for r in records if r.drift_status == "MODERATE_DRIFT"
-    ]
+    raw_severe_drift_models = list(
+        dict.fromkeys(
+            f"{r.sport}:{r.market}:{r.model_version}" for r in records if r.drift_status == "SEVERE_DRIFT"
+        )
+    )
+    raw_moderate_drift_models = list(
+        dict.fromkeys(
+            f"{r.sport}:{r.market}:{r.model_version}" for r in records if r.drift_status == "MODERATE_DRIFT"
+        )
+    )
 
-    recalibrated_models = [f"{r.sport}:{r.market}:{r.model_version}" for r in records if r.recalibrated]
-    unresolved_severe = [
-        f"{r.sport}:{r.market}:{r.model_version}"
-        for r in records
-        if r.calibrated_drift_status == "SEVERE_DRIFT"
-    ]
-    unresolved_moderate = [
-        f"{r.sport}:{r.market}:{r.model_version}"
-        for r in records
-        if r.calibrated_drift_status == "MODERATE_DRIFT"
-    ]
+    recalibrated_models = list(
+        dict.fromkeys(f"{r.sport}:{r.market}:{r.model_version}" for r in records if r.recalibrated)
+    )
+    unresolved_severe = list(
+        dict.fromkeys(
+            f"{r.sport}:{r.market}:{r.model_version}"
+            for r in records
+            if r.calibrated_drift_status == "SEVERE_DRIFT"
+        )
+    )
+    unresolved_moderate = list(
+        dict.fromkeys(
+            f"{r.sport}:{r.market}:{r.model_version}"
+            for r in records
+            if r.calibrated_drift_status == "MODERATE_DRIFT"
+        )
+    )
     max_calibrated_drift = max((r.calibrated_drift_score for r in records), default=0.0)
 
     # When update_artifacts is True (or automated cycle runs), models are re-calibrated.

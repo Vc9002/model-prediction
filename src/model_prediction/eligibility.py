@@ -227,6 +227,13 @@ def evaluate_gated_research_eligibility(
             NoCallReason.LOW_EDGE.value,
             policy,
         )
+    if executable_edge > maximum_unreviewed_disagreement:
+        return _downgrade_research_call(
+            request,
+            eligibility,
+            NoCallReason.LARGE_DISAGREEMENT.value,
+            policy,
+        )
     if abs(request.model_probability - 0.5) < minimum_confidence:
         return _downgrade_research_call(
             request,

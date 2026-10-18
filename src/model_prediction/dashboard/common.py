@@ -83,7 +83,6 @@ SPORTS = (
     "wnba",
     "nfl",
     "ncaaf",
-    "cfb",
     "soccer",
     "tennis",
     "lol",

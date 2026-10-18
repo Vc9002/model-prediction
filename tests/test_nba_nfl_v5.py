@@ -54,7 +54,7 @@ def test_nfl_structural_v5_weather_penalty_and_key_numbers():
 
 
 def test_nfl_structural_v5_short_week_drag():
-    """Verify Thursday Night Football / short-week (<= 5 days rest) applies -3.5 pt total drag."""
+    """Verify Thursday Night Football / short-week (<= 5 days rest) applies calibrated 1.0 pt total drag."""
     engine = NFLStructuralV5Engine()
     fc_standard = engine.forecast_game(
         home_team="Seahawks",
@@ -71,10 +71,10 @@ def test_nfl_structural_v5_short_week_drag():
         total_line=40.5,
     )
 
-    # TNF short week should reduce projected total by exactly 3.5 points
-    assert fc_tnf.short_week_penalty == 3.5
+    # TNF short week should reduce projected total by calibrated empirical 1.0 point
+    assert fc_tnf.short_week_penalty == 1.0
     assert fc_standard.short_week_penalty == 0.0
-    assert round(fc_standard.projected_total - fc_tnf.projected_total, 2) == 3.5
+    assert round(fc_standard.projected_total - fc_tnf.projected_total, 2) == 1.0
     assert fc_tnf.prob_under > fc_standard.prob_under
 
 

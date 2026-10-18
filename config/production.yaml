@@ -317,6 +317,16 @@ prediction_service:
     evidence_status: historical_only
     replacement_priority: low
     rollback_model: null
+  - model_id: hockey-poisson-dc-v1
+    sport: HOCKEY
+    market: moneyline
+    implementation: code_backed_model
+    entry: model_prediction.models.hockey:hockey_model
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: null
   champions:
     WNBA:
       moneyline: wnba-elo-trend-lr-v4
@@ -357,6 +367,8 @@ prediction_service:
       moneyline: kbo-tie-aware-elo-v2
     NPB:
       moneyline: npb-tie-aware-elo-v2
+    HOCKEY:
+      moneyline: hockey-poisson-dc-v1
   challengers:
     MLB:
       moneyline: mlb-moneyline-v9-frozen
@@ -398,6 +410,8 @@ prediction_service:
       moneyline: kbo-baseball-v3
     NPB:
       moneyline: npb-baseball-v3
+    HOCKEY:
+      moneyline: null
   research_queue:
   - sport: NCAAF
     market: moneyline
@@ -507,6 +521,12 @@ prediction_service:
     replacement_priority: low
     challenger: npb-baseball-v3
     evidence_status: historical_only
+  - sport: HOCKEY
+    market: moneyline
+    incumbent: hockey-poisson-dc-v1
+    replacement_priority: low
+    challenger: null
+    evidence_status: predictively_qualified
   allowed_models:
   - wnba-elo-trend-lr-v4
   - wnba-spread-margin-v2
@@ -538,6 +558,7 @@ prediction_service:
   - rainbow_six-tiered-elo-v6
   - kbo-tie-aware-elo-v2
   - npb-tie-aware-elo-v2
+  - hockey-poisson-dc-v1
   artifact_map:
     wnba-elo-trend-lr-v4: config/models/wnba-elo-trend-lr-v4.json
     wnba-spread-margin-v2: config/models/wnba-spread-margin-v2.json

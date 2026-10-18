@@ -74,7 +74,7 @@ INGEST_EXIT=0
 # import/startup cost that used to be paid 10x serially (5 sports x 2
 # dates) down to 5 parallel payments.
 INGEST_TMPDIR=$(mktemp -d)
-for sport in mlb nba wnba nfl tennis; do
+for sport in mlb nba wnba nfl ncaaf tennis; do
     (
         sport_exit=0
         for d in "$YESTERDAY" "$RUN_DATE"; do

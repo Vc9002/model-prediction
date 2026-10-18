@@ -127,14 +127,36 @@ class InternationalBaseballV3Model:
             if not home_team or not away_team:
                 continue
 
-            default_lh = 4.8 if self.league == "KBO" else 3.5
-            default_la = 4.4 if self.league == "KBO" else 3.2
+            # Derive dynamic lambdas from match attributes or fall back to league priors
+            lh = getattr(match, "lambda_home", None)
+            la = getattr(match, "lambda_away", None)
+            if lh is None or la is None:
+                exp_h = getattr(match, "expected_runs_home", None)
+                exp_a = getattr(match, "expected_runs_away", None)
+                if exp_h is not None and exp_a is not None:
+                    lh = float(exp_h)
+                    la = float(exp_a)
+                else:
+                    default_lh = 4.8 if self.league == "KBO" else 3.5
+                    default_la = 4.4 if self.league == "KBO" else 3.2
+                    sp_fip_h = getattr(match, "home_starter_fip", None)
+                    sp_fip_a = getattr(match, "away_starter_fip", None)
+                    league_fip = 4.20 if self.league == "KBO" else 3.40
+                    if sp_fip_a is not None and league_fip > 0:
+                        lh = default_lh * (float(sp_fip_a) / league_fip)
+                    else:
+                        lh = default_lh
+                    if sp_fip_h is not None and league_fip > 0:
+                        la = default_la * (float(sp_fip_h) / league_fip)
+                    else:
+                        la = default_la
+
             total_line = getattr(match, "total_line", 8.5) or 8.5
             forecast = self.forecast_match(
                 home_team=home_team,
                 away_team=away_team,
-                lambda_home=default_lh,
-                lambda_away=default_la,
+                lambda_home=float(lh),
+                lambda_away=float(la),
                 total_line=float(total_line),
             )
 

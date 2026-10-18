@@ -1,22 +1,22 @@
 {
-  "artifact_hash": "149ea18370b0021f3ebf511fbcffa29c7994d00b8a43b71bc55014e2f5e81c3e",
+  "artifact_hash": "a0159d76d533d70258372ebe503b8727bc2c3ed11a5901d65116d27ac13ee718",
   "confidence_threshold": null,
   "decay_rate": 0.0,
   "games_played": {
     "B": 702,
     "C": 707,
     "D": 708,
-    "DB": 707,
+    "DB": 708,
     "E": 699,
-    "F": 711,
+    "F": 712,
     "G": 710,
-    "H": 705,
+    "H": 706,
     "L": 707,
     "M": 702,
     "S": 704,
-    "T": 712
+    "T": 713
   },
-  "games_sha256": "27a7628d2bbba99074cd9b9deabf5bcecc72274e46ddc58dae6a1fb6f483d32e",
+  "games_sha256": "3b0b30f10c22c4f2e5c1cddbbc31313ddf7224ae5feba1bb6aa16554ec2321c1",
   "home_advantage": 35.0,
   "initial_rating": 1500.0,
   "k": 8.0,
@@ -26,14 +26,14 @@
   "model_version": "npb-tie-aware-elo-v2",
   "qualification": {
     "locked_test": {
-      "accuracy_decisive": 0.590038,
-      "brier_settlement": 0.239031,
-      "calls": 783,
-      "hits": 462,
-      "mae_settlement": 0.475604,
-      "observations": 798,
+      "accuracy_decisive": 0.589809,
+      "brier_settlement": 0.238934,
+      "calls": 785,
+      "hits": 463,
+      "mae_settlement": 0.475514,
+      "observations": 800,
       "ties": 15,
-      "units_at_minus_110": 99.0
+      "units_at_minus_110": 98.909091
     },
     "promotion_rationale": "",
     "qualified": false
@@ -43,22 +43,22 @@
     "B": 1475.953661,
     "C": 1456.716237,
     "D": 1449.85898,
-    "DB": 1529.733344,
+    "DB": 1533.921071,
     "E": 1473.714758,
-    "F": 1554.46972,
+    "F": 1551.647816,
     "G": 1495.642562,
-    "H": 1624.92085,
+    "H": 1627.742754,
     "L": 1534.793842,
     "M": 1471.44313,
     "S": 1421.701846,
-    "T": 1511.05107
+    "T": 1506.863344
   },
   "schema_version": "international-baseball-tie-aware-elo-v2",
-  "source_manifest_sha256": "61c413644929ac5217edfb430f4ff3e2ebf6f92757b2009570fe6a92ea37f893",
+  "source_manifest_sha256": "3ecbdae30c611e078940996712db95d2723e51e44697814118ac362ded4680c4",
   "target": "expected moneyline settlement where a tie pays 0.50",
   "tie_method": "flat",
-  "tie_probability": 0.02383762,
-  "trained_through_date": "2026-10-15",
+  "tie_probability": 0.02382637,
+  "trained_through_date": "2026-10-16",
   "training": {
     "coefficient_fit": {
       "end_date": "2025-04-06",
@@ -66,8 +66,8 @@
       "start_date": "2022-03-25"
     },
     "locked_holdout": {
-      "end_date": "2026-10-15",
-      "observations": 798,
+      "end_date": "2026-10-16",
+      "observations": 800,
       "start_date": "2026-04-10"
     },
     "threshold_selection": {
@@ -76,7 +76,7 @@
       "start_date": "2025-04-08"
     }
   },
-  "training_observations": 4237,
-  "training_prefix_sha256": "1765dc119df0e6ba86fd3fd00790a4c369c7b586814dbb6a89661ea5ffa07a8a",
+  "training_observations": 4239,
+  "training_prefix_sha256": "92eabca30a4b4f8a746de5f4ff44b57749d0a3fa9060939382a95852c99c7c15",
   "units": 0
 }

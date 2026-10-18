@@ -1260,6 +1260,14 @@ def forecast_esports_slate(
 
         inference_inputs = capture_inputs(book, team_ids, observed_now)
         match_bo = int(event.get("best_of") or 0)
+        if match_bo == 1:
+            from .models.esports_contextual_v7 import _expit, _logit
+
+            probability1 = _expit(_logit(probability1) * 0.75)
+        elif match_bo == 5:
+            from .models.esports_contextual_v7 import _expit, _logit
+
+            probability1 = _expit(_logit(probability1) * 1.30)
         bo3_derivatives = price_esports_bo3_derivatives(probability1)
         bo5_derivatives = price_esports_bo5_derivatives(probability1)
 
@@ -1398,20 +1406,25 @@ def forecast_esports_slate(
                             model_probability = 1.0 - probability1
                             side_team = descriptions[1]
                 elif m_type == "total":
-                    if desc_key in ("over", "under"):
-                        model_probability = probabilities_by_name.get(desc_key)
-                        side_team = desc_str.capitalize()
-                    elif desc_str.lower().startswith("o"):
-                        model_probability = bo3_derivatives.total_maps_over_2pt5
+                    if "over" in desc_key or desc_str.lower().startswith("o"):
+                        model_probability = probabilities_by_name.get(
+                            "over", bo3_derivatives.total_maps_over_2pt5
+                        )
                         side_team = "Over"
-                    elif desc_str.lower().startswith("u"):
-                        model_probability = bo3_derivatives.total_maps_under_2pt5
+                    elif "under" in desc_key or desc_str.lower().startswith("u"):
+                        model_probability = probabilities_by_name.get(
+                            "under", bo3_derivatives.total_maps_under_2pt5
+                        )
                         side_team = "Under"
                     elif side_name == "long":
-                        model_probability = bo3_derivatives.total_maps_over_2pt5
+                        model_probability = probabilities_by_name.get(
+                            "over", bo3_derivatives.total_maps_over_2pt5
+                        )
                         side_team = "Over"
                     else:
-                        model_probability = bo3_derivatives.total_maps_under_2pt5
+                        model_probability = probabilities_by_name.get(
+                            "under", bo3_derivatives.total_maps_under_2pt5
+                        )
                         side_team = "Under"
                 elif m_type == "spread":
                     if desc_str.startswith("-") or "-1.5" in desc_str:

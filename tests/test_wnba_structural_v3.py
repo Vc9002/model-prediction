@@ -61,3 +61,13 @@ def test_wnba_structural_v3_missing_player_minutes_impact():
 
     assert fc_injured.projected_home_points < fc_full.projected_home_points
     assert fc_injured.prob_home_win < fc_full.prob_home_win
+
+
+def test_wnba_structural_v3_defense_monotonicity():
+    """Verify facing a more porous defense (higher drtg) increases projected scoring."""
+    engine = WNBAStructuralV3Engine()
+    fc_vs_elite = engine.forecast_game("Liberty", "Aces", away_drtg_ppp=0.95)
+    fc_vs_bad = engine.forecast_game("Liberty", "Aces", away_drtg_ppp=1.12)
+
+    assert fc_vs_bad.projected_home_points > fc_vs_elite.projected_home_points
+    assert fc_vs_bad.prob_home_win > fc_vs_elite.prob_home_win

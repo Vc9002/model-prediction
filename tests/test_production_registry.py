@@ -99,12 +99,12 @@ def test_real_production_yaml_resolves_every_model() -> None:
     registry = ProductionModelRegistry.load(REPO)
 
     assert registry.schema_version == "3"
-    assert len(registry.entries) == 30
+    assert len(registry.entries) == 31
     # Under the permanent champion-challenger framework, all models
-    # across supported markets are available contracts (30 champions + rollbacks).
+    # across supported markets are available contracts (31 champions + rollbacks).
     # Weak evidence models have evidence_status=degraded and
     # replacement_priority=critical rather than being disabled.
-    assert len(registry.available_entries()) == 30
+    assert len(registry.available_entries()) == 31
     assert len(registry.problem_entries()) == 0
     assert registry.primary.model_id == "wnba-elo-trend-lr-v4"
     assert registry.primary.artifact_hash
@@ -161,6 +161,11 @@ def test_real_production_yaml_resolves_every_model() -> None:
     assert tennis_v4.entry == "model_prediction.models.tennis:tennis_model"
     assert registry.champion("TENNIS", "moneyline").model_id == "tennis-surface-elo-v4"
     assert registry.champion("TENNIS", "moneyline").rollback_model == "tennis-surface-elo-v1"
+
+    hockey = registry.entries["hockey-poisson-dc-v1"]
+    assert hockey.implementation == IMPLEMENTATION_CODE_BACKED
+    assert hockey.entry == "model_prediction.models.hockey:hockey_model"
+    assert registry.champion("HOCKEY", "moneyline").model_id == "hockey-poisson-dc-v1"
 
     config = yaml.safe_load((REPO / "config/production.yaml").read_text(encoding="utf-8"))
     service = config["prediction_service"]

@@ -50,6 +50,20 @@ CODE_BACKED_ENTRYPOINTS: dict[str, str] = {
     "college-football-v1": "model_prediction.models.college_football:cfb_model",
     "cfb-spread-v1": "model_prediction.models.college_football:cfb_model",
     "cfb-total-v1": "model_prediction.models.college_football:cfb_model",
+    "hockey-poisson-dc-v1": "model_prediction.models.hockey:hockey_model",
+    # Local Challenger & Extended Models
+    "nba-structural-v5": "model_prediction.models.nba_structural_v5:NBAStructuralV5Engine",
+    "mlb-structural-runline-v4": "model_prediction.models.mlb_runline_v4:MLBStructuralRunlineV4Model",
+    "mlb-moneyline-market-residual-v10": "model_prediction.models.mlb_market_residual_v10:MLBMarketResidualV10Model",
+    "wnba-spread-structural-v3": "model_prediction.models.wnba_structural_v3:WNBAStructuralV3Engine",
+    "wnba-total-possession-v3": "model_prediction.models.wnba_structural_v3:WNBAStructuralV3Engine",
+    "cs2-contextual-v7": "model_prediction.models.esports_contextual_v7:EsportsContextualV7Model",
+    "dota2-contextual-v7": "model_prediction.models.esports_contextual_v7:EsportsContextualV7Model",
+    "lol-contextual-v7": "model_prediction.models.esports_contextual_v7:EsportsContextualV7Model",
+    "valorant-contextual-v7": "model_prediction.models.esports_contextual_v7:EsportsContextualV7Model",
+    "r6-contextual-v7": "model_prediction.models.esports_contextual_v7:EsportsContextualV7Model",
+    "kbo-baseball-v3": "model_prediction.models.international_baseball_v3:InternationalBaseballV3Model",
+    "npb-baseball-v3": "model_prediction.models.international_baseball_v3:InternationalBaseballV3Model",
 }
 
 

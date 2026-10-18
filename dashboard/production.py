@@ -30,16 +30,19 @@ _STATE_FILE_NAME = "production_state.json"
 
 
 def _resolve_runtime_root() -> Path:
-    """Incumbent-side production data root: always the repo's data/.
+    r"""Resolve production runtime root with fallback to repo data/.
 
-    Deliberately NOT env-var-aware — matches cli_production._resolve_data_root.
-    The runtime root is rebuild-scoped only (MIGRATION_MANIFEST.json); the
-    production canary's state file, ledger, and FeatureStore history are
-    incumbent-side and live under repo ``data/``. Env-aware resolution here
-    split the state in two (2026-08-13: the scheduled run wrote a second
-    state file under the runtime root while this reader followed the env
-    var or fallback depending on how the dashboard was started).
+    Checks RuntimePaths first so scheduled runs writing under an external
+    runtime root (e.g. E:\model-prediction-runtime) are recognized.
     """
+    try:
+        from model_prediction.runtime_paths import RuntimePaths
+
+        rt = RuntimePaths.resolve(repo_root=PROJECT_ROOT).runtime_root
+        if (rt / _STATE_FILE_NAME).is_file() or (rt / "production" / "production.db").is_file():
+            return rt
+    except (ImportError, OSError, RuntimeError):
+        pass
     return PROJECT_ROOT / "data"
 
 

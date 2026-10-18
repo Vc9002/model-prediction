@@ -28,6 +28,44 @@ class SoccerCompetitionParams:
     shrinkage_tau: float = 10.0  # partial pooling sample size
 
 
+# BTTS Platt Calibration constants (empirically fit on holdout to correct raw joint Poisson overconfidence)
+BTTS_PLATT_INTERCEPT = 0.1393
+BTTS_PLATT_SLOPE = 0.4205
+
+
+def platt_scale_btts(
+    raw_prob: float, intercept: float = BTTS_PLATT_INTERCEPT, slope: float = BTTS_PLATT_SLOPE
+) -> float:
+    """Platt-scale the raw joint-matrix BTTS probability to correct overconfidence."""
+    clipped = min(1.0 - 1e-9, max(1e-9, raw_prob))
+    logit = math.log(clipped / (1.0 - clipped))
+    calibrated = intercept + slope * logit
+    return 1.0 / (1.0 + math.exp(-calibrated))
+
+
+# Competition-specific baseline parameters and Dixon-Coles rho
+# Low-scoring leagues (e.g. Greek Super League, Argentine Primera, Serie B) have lower mu and stronger negative rho.
+# High-scoring leagues (e.g. Bundesliga, Eredivisie) have higher mu and milder rho.
+DEFAULT_COMPETITION_PROFILES: dict[str, dict[str, float]] = {
+    # Low-scoring defensive leagues
+    "ARG_LIGA": {"baseline_mu": 0.08, "home_field_advantage": 0.22, "rho_low_score_dep": -0.13},
+    "GRE_SUPER": {"baseline_mu": 0.10, "home_field_advantage": 0.24, "rho_low_score_dep": -0.12},
+    "ITA_SERIE_B": {"baseline_mu": 0.12, "home_field_advantage": 0.20, "rho_low_score_dep": -0.11},
+    "FRA_LIGUE_2": {"baseline_mu": 0.11, "home_field_advantage": 0.18, "rho_low_score_dep": -0.11},
+    "ESP_SEGUNDA": {"baseline_mu": 0.09, "home_field_advantage": 0.22, "rho_low_score_dep": -0.12},
+    # High-scoring open leagues
+    "GER_BUNDESLIGA": {"baseline_mu": 0.42, "home_field_advantage": 0.16, "rho_low_score_dep": -0.03},
+    "NED_EREDIVISIE": {"baseline_mu": 0.40, "home_field_advantage": 0.18, "rho_low_score_dep": -0.03},
+    "NOR_ELITESERIEN": {"baseline_mu": 0.38, "home_field_advantage": 0.20, "rho_low_score_dep": -0.04},
+    # Standard top leagues
+    "ENG_PREMIER": {"baseline_mu": 0.32, "home_field_advantage": 0.18, "rho_low_score_dep": -0.06},
+    "ESP_LALIGA": {"baseline_mu": 0.22, "home_field_advantage": 0.22, "rho_low_score_dep": -0.08},
+    "ITA_SERIE_A": {"baseline_mu": 0.24, "home_field_advantage": 0.19, "rho_low_score_dep": -0.07},
+    "FRA_LIGUE_1": {"baseline_mu": 0.23, "home_field_advantage": 0.20, "rho_low_score_dep": -0.07},
+    "USA_MLS": {"baseline_mu": 0.35, "home_field_advantage": 0.26, "rho_low_score_dep": -0.05},
+}
+
+
 @dataclass(frozen=True)
 class SoccerTeamRatings:
     """Empirical Bayes shrunk attack and defense parameters."""
@@ -87,9 +125,18 @@ class SoccerDixonColesV2Model:
         self.team_ratings: dict[str, SoccerTeamRatings] = {}
 
     def get_competition_params(self, competition_id: str) -> SoccerCompetitionParams:
-        return self.competition_params.get(
-            competition_id, SoccerCompetitionParams(competition_id=competition_id)
-        )
+        if competition_id in self.competition_params:
+            return self.competition_params[competition_id]
+        norm = str(competition_id or "").strip().upper().replace(" ", "_").replace("-", "_")
+        if norm in DEFAULT_COMPETITION_PROFILES:
+            profile = DEFAULT_COMPETITION_PROFILES[norm]
+            return SoccerCompetitionParams(
+                competition_id=competition_id,
+                baseline_mu=profile["baseline_mu"],
+                home_field_advantage=profile["home_field_advantage"],
+                rho_low_score_dep=profile["rho_low_score_dep"],
+            )
+        return SoccerCompetitionParams(competition_id=competition_id)
 
     def fit_team_ratings(
         self,
@@ -170,8 +217,9 @@ class SoccerDixonColesV2Model:
         prob_draw = float(np.sum(np.diag(matrix)))
         prob_away = float(np.sum(np.triu(matrix, 1)))
 
-        # BTTS: Both Teams To Score (i >= 1 and j >= 1)
-        prob_btts_yes = float(np.sum(matrix[1:, 1:]))
+        # BTTS: Both Teams To Score (i >= 1 and j >= 1) with Platt calibration
+        raw_btts_yes = float(np.sum(matrix[1:, 1:]))
+        prob_btts_yes = platt_scale_btts(raw_btts_yes)
         prob_btts_no = 1.0 - prob_btts_yes
 
         # Totals

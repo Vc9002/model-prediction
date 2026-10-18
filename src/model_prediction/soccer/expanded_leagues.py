@@ -188,7 +188,7 @@ LIBERTADORES_CONFIG = LeagueSoccerConfig(
     model_version="soccer-libertadores-poisson-dc-v1",
     baseline=1.2450,
     home_advantage=1.4500,
-    dc_rho=0.02,
+    dc_rho=-0.04,
 )
 
 SUDAMERICANA_CONFIG = LeagueSoccerConfig(
@@ -196,7 +196,7 @@ SUDAMERICANA_CONFIG = LeagueSoccerConfig(
     model_version="soccer-sudamericana-poisson-dc-v1",
     baseline=1.2650,
     home_advantage=1.4200,
-    dc_rho=0.02,
+    dc_rho=-0.04,
 )
 
 ARGENTINA_CONFIG = LeagueSoccerConfig(
@@ -204,7 +204,7 @@ ARGENTINA_CONFIG = LeagueSoccerConfig(
     model_version="soccer-argentina-poisson-dc-v1",
     baseline=1.0550,
     home_advantage=1.3000,
-    dc_rho=0.05,
+    dc_rho=-0.06,
 )
 
 COLOMBIA_CONFIG = LeagueSoccerConfig(
@@ -212,7 +212,7 @@ COLOMBIA_CONFIG = LeagueSoccerConfig(
     model_version="soccer-colombia-poisson-dc-v1",
     baseline=1.1550,
     home_advantage=1.3500,
-    dc_rho=0.04,
+    dc_rho=-0.05,
 )
 
 CHILE_CONFIG = LeagueSoccerConfig(
@@ -220,7 +220,7 @@ CHILE_CONFIG = LeagueSoccerConfig(
     model_version="soccer-chile-poisson-dc-v1",
     baseline=1.2850,
     home_advantage=1.2600,
-    dc_rho=0.00,
+    dc_rho=-0.04,
 )
 
 J_LEAGUE_CONFIG = LeagueSoccerConfig(
@@ -268,7 +268,7 @@ BRAZIL_SERIE_B_CONFIG = LeagueSoccerConfig(
     model_version="soccer-brazilserieb-poisson-dc-v1",
     baseline=1.0450,
     home_advantage=1.3200,
-    dc_rho=0.06,
+    dc_rho=-0.06,
 )
 
 EXPANDED_SOCCER_CONFIGS: dict[str, LeagueSoccerConfig] = {
