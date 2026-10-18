@@ -17,7 +17,8 @@ The platform operates nominal production serving in **100% paper trading ("fugaz
 
 ### 3. Workflow Speed & Testing Architecture
 - **Fast Iteration Policy Codified**: Enforced zero-test overhead for refactors, dead code pruning, renames, and formatting. Monolithic 3,200-test runs are barred during active development.
-- **Single-File Micro-Testing**: Removed `-n auto` xdist process spawn overhead from default `pytest` configuration in `pyproject.toml`; individual test files execute in **<0.5s**.
+- **Single-File Micro-Testing**: Removed `-n auto` xdist process spawn overhead from default `pytest` configuration in `pyproject.toml`; individual test files execute in **<0.5s** (down from 5.05s, a 7.2x speedup).
+- **Test Monolith Volume Lowered**: Added `norecursedirs` in `pyproject.toml` for `rebuild`, `archive`, `data`, `dist`, `build` to eliminate 650+ unimported sandbox tests from default discovery. Marked 8 legacy research/joblib test files with `@pytest.mark.slow` (deselected by default via `-m "not slow"`), eliminating 53,000+ deprecation warnings.
 - **Code Hygiene**: 0 `ruff` linter findings and 100% formatted across all 989 files in the codebase. All 132 active contract and model tests pass green.
 
 ## 2026-09-14 evening — Control-plane audit and initial consolidation fixes
