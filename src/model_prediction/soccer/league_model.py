@@ -52,6 +52,14 @@ class LeagueSoccerConfig:
     global_baseline: float | None = None  # only used when shrinkage_prior_games is set
     divide_away: bool = False
 
+    def __post_init__(self) -> None:
+        # Plausibility guard: a corrupted fit (Brasileirao once shipped
+        # home_advantage=2.43) silently inflates every home win probability.
+        if not 0.8 <= self.home_advantage <= 2.0:
+            raise ValueError(f"{self.league_code}: implausible home_advantage {self.home_advantage}")
+        if not 0.5 <= self.baseline <= 3.0:
+            raise ValueError(f"{self.league_code}: implausible baseline {self.baseline}")
+
 
 @dataclass(frozen=True)
 class UpcomingLeagueMatch:
