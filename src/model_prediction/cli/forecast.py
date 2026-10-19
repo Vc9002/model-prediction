@@ -4316,14 +4316,14 @@ def _forecast_soccer_sport(
 
     model_config = config["models"].get("SOCCER", {})
     configured_markets = tuple(model_config.get("markets") or ())
-    from ..models.soccer import soccer_model, soccer_model_v2
+    from ..models.soccer_v3 import soccer_model_for_version
 
     model_ver = str(
         model_config.get("active_production_version")
         or model_config.get("active_research_version")
-        or "soccer-poisson-dc-v2"
+        or "soccer-poisson-dc-v3"
     )
-    active_model = soccer_model_v2() if "v2" in model_ver else soccer_model()
+    active_model = soccer_model_for_version(model_ver)
     forecast = build_soccer_total_slate(
         data_root=data_root,
         game_date=args_date,

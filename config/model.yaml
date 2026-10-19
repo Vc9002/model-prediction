@@ -319,8 +319,8 @@ models:
       +44.2 units at -110, every qualifying month positive. Operator
       approved wiring research_confidence_gate below from that real result.'
     model_type: multinomial_3way
-    active_production_version: soccer-poisson-dc-v2
-    active_research_version: soccer-poisson-dc-v2
+    active_production_version: soccer-poisson-dc-v3
+    active_research_version: soccer-poisson-dc-v3
     legacy_binary_research_version: soccer-elo-trend-lr-v2
     legacy_binary_research_artifact: config/models/soccer-elo-trend-lr-v2.json
     market_residual_artifact: config/models/soccer-market-residual-v1.json

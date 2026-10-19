@@ -14,7 +14,7 @@ from .learned_replay import snapshot_hash
 SCHEMA = "coded-moneyline-replay-v1"
 VERSIONS = {"SOCCER": "soccer-poisson-dc-v1", "TENNIS": "tennis-surface-elo-v4"}
 ALLOWED_VERSIONS = {
-    "SOCCER": {"soccer-poisson-dc-v1", "soccer-poisson-dc-v2"},
+    "SOCCER": {"soccer-poisson-dc-v1", "soccer-poisson-dc-v2", "soccer-poisson-dc-v3"},
     "TENNIS": {
         "tennis-surface-elo-v1",
         "tennis-markov-hierarchical-v2",
@@ -24,8 +24,10 @@ ALLOWED_VERSIONS = {
 }
 
 
-def code_hashes(sport: str) -> dict[str, str]:
+def code_hashes(sport: str, model_version: str | None = None) -> dict[str, str]:
     files = [f"models/{sport.lower()}.py"]
+    if sport == "SOCCER" and model_version == "soccer-poisson-dc-v3":
+        files.append("models/soccer_v3.py")
     if sport == "TENNIS":
         files.append("features/elo_ratings.py")
     return {name: hashlib.sha256((Path(__file__).parent / name).read_bytes()).hexdigest() for name in files}
@@ -35,13 +37,16 @@ def capture_inputs(sport: str, values: dict[str, Any]) -> dict[str, Any]:
     if sport not in VERSIONS:
         raise ValueError("coded_replay_unsupported_sport")
     return json.loads(
-        json.dumps({"sport": sport, "code_sha256": code_hashes(sport), **values}, allow_nan=False)
+        json.dumps(
+            {"sport": sport, "code_sha256": code_hashes(sport, values.get("model_version")), **values},
+            allow_nan=False,
+        )
     )
 
 
 def replay_inputs(inputs: dict[str, Any]) -> dict[str, float]:
     sport = inputs["sport"]
-    if sport not in VERSIONS or inputs["code_sha256"] != code_hashes(sport):
+    if sport not in VERSIONS or inputs["code_sha256"] != code_hashes(sport, inputs.get("model_version")):
         raise ValueError("coded_replay_code_identity_mismatch")
     if sport == "SOCCER":
         from .models.soccer import SoccerModel, soccer_model_v2

@@ -99,12 +99,12 @@ def test_real_production_yaml_resolves_every_model() -> None:
     registry = ProductionModelRegistry.load(REPO)
 
     assert registry.schema_version == "3"
-    assert len(registry.entries) == 32
+    assert len(registry.entries) == 33
     # Under the permanent champion-challenger framework, all models
-    # across supported markets are available contracts (32 champions + rollbacks).
+    # across supported markets are available contracts (33 champions + rollbacks).
     # Weak evidence models have evidence_status=degraded and
     # replacement_priority=critical rather than being disabled.
-    assert len(registry.available_entries()) == 32
+    assert len(registry.available_entries()) == 33
     assert len(registry.problem_entries()) == 0
     assert registry.primary.model_id == "wnba-elo-trend-lr-v4"
     assert registry.primary.artifact_hash
@@ -150,8 +150,8 @@ def test_real_production_yaml_resolves_every_model() -> None:
     soccer_v2 = registry.entries["soccer-poisson-dc-v2"]
     assert soccer_v2.implementation == IMPLEMENTATION_CODE_BACKED
     assert soccer_v2.entry == "model_prediction.models.soccer:soccer_model_v2"
-    assert registry.champion("SOCCER", "moneyline").model_id == "soccer-poisson-dc-v2"
-    assert registry.champion("SOCCER", "moneyline").rollback_model == "soccer-poisson-dc-v1"
+    assert registry.champion("SOCCER", "moneyline").model_id == "soccer-poisson-dc-v3"
+    assert registry.champion("SOCCER", "moneyline").rollback_model == "soccer-poisson-dc-v2"
     tennis = registry.entries["tennis-surface-elo-v1"]
     assert tennis.implementation == IMPLEMENTATION_CODE_BACKED
     assert tennis.entry == "model_prediction.models.tennis:tennis_model"

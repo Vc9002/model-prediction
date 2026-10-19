@@ -352,6 +352,7 @@ def build_soccer_total_slate(
     if model is None:
         model = soccer_model()
     all_predictions = model.predict_games(history, upcoming)
+    skipped.extend(getattr(model, "skipped_predictions", []))
     totals = [prediction for prediction in all_predictions if str(prediction.market_type) == "total"]
     spreads = [prediction for prediction in all_predictions if str(prediction.market_type) == "spread"]
     moneylines = [prediction for prediction in all_predictions if str(prediction.market_type) == "moneyline"]

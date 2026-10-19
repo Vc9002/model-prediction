@@ -177,13 +177,23 @@ prediction_service:
     serving_status: production
     evidence_status: predictively_qualified
     replacement_priority: low
+  - model_id: soccer-poisson-dc-v3
+    sport: SOCCER
+    market: moneyline
+    implementation: code_backed_model
+    entry: model_prediction.models.soccer_v3:soccer_model_v3
+    enabled: true
+    serving_status: production
+    evidence_status: unverified
+    replacement_priority: high
+    rollback_model: soccer-poisson-dc-v2
   - model_id: soccer-poisson-dc-v2
     sport: SOCCER
     market: moneyline
     implementation: code_backed_model
     entry: model_prediction.models.soccer:soccer_model_v2
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: soccer-poisson-dc-v1
@@ -360,7 +370,7 @@ prediction_service:
       spread: cfb-structural-v2
       total: cfb-structural-v2
     SOCCER:
-      moneyline: soccer-poisson-dc-v2
+      moneyline: soccer-poisson-dc-v3
     TENNIS:
       moneyline: tennis-surface-elo-v4
     CS2:
@@ -479,10 +489,10 @@ prediction_service:
     evidence_status: predictively_qualified
   - sport: SOCCER
     market: moneyline
-    incumbent: soccer-poisson-dc-v2
-    replacement_priority: low
+    incumbent: soccer-poisson-dc-v3
+    replacement_priority: high
     challenger: null
-    evidence_status: predictively_qualified
+    evidence_status: unverified
   - sport: TENNIS
     market: moneyline
     incumbent: tennis-surface-elo-v4
@@ -554,6 +564,7 @@ prediction_service:
   - nfl-elo-trend-lr-v4
   - nfl-spread-structural-v5
   - nfl-total-structural-v5
+  - soccer-poisson-dc-v3
   - soccer-poisson-dc-v2
   - soccer-poisson-dc-v1
   - tennis-surface-elo-v4

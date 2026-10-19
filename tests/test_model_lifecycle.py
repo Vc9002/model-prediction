@@ -88,19 +88,19 @@ def test_evidence_status_does_not_control_serving_status() -> None:
     assert mlb_champ.evidence_status == "historical_only"
     assert mlb_champ.replacement_priority == ReplacementPriority.HIGH.value
 
-    # SOCCER moneyline was promoted to soccer-poisson-dc-v2 (predictively_qualified)
+    # The corrective v3 serves paper predictions with unverified performance evidence.
     soccer_champ = registry.champion("SOCCER", "moneyline")
     assert soccer_champ is not None
     assert soccer_champ.available is True
     assert soccer_champ.serving_status in {"production", "active"}
-    assert soccer_champ.evidence_status == EvidenceStatus.PREDICTIVELY_QUALIFIED.value
-    assert soccer_champ.replacement_priority == ReplacementPriority.LOW.value
+    assert soccer_champ.evidence_status == EvidenceStatus.UNVERIFIED.value
+    assert soccer_champ.replacement_priority == ReplacementPriority.HIGH.value
 
     contract = registry.lifecycle_contract("SOCCER", "moneyline")
     assert contract is not None
     assert contract.serving_status in {"production", "active"}
-    assert contract.evidence_status == EvidenceStatus.PREDICTIVELY_QUALIFIED.value
-    assert contract.replacement_priority == ReplacementPriority.LOW.value
+    assert contract.evidence_status == EvidenceStatus.UNVERIFIED.value
+    assert contract.replacement_priority == ReplacementPriority.HIGH.value
 
     # NCAAF was unified under cfb-structural-v2 (predictively_qualified with medium replacement priority)
     for market in ("moneyline", "spread", "total"):

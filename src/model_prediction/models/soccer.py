@@ -109,6 +109,11 @@ class SoccerModel:
         self.rho = rho
         self.divide_away = divide_away
 
+    def _league_config(self, league_name: str, historical_baseline: float):
+        from ..soccer.registry import resolve
+
+        return resolve(league_name)
+
     def _strengths(self, history: Sequence[GameRecord]) -> tuple[dict[str, dict[str, float]], float]:
         by_team: dict[str, dict[str, list[float]]] = {}
         goals: list[float] = []
@@ -152,8 +157,6 @@ class SoccerModel:
         history: Sequence[GameRecord],
         upcoming: Sequence[UpcomingMatch],
     ) -> list[GamePrediction]:
-        from ..soccer.registry import resolve
-
         global_strengths, global_baseline = self._strengths(history)
         league_cache: dict[str, tuple[dict[str, dict[str, float]], float]] = {}
 
@@ -179,7 +182,11 @@ class SoccerModel:
             away = strengths.get(match.away_team, {"attack": 1.0, "defense": 1.0, "games": 0.0})
 
             # League-specific parameters from per-league champion configs
-            lg_cfg = resolve(norm_lg) if norm_lg and norm_lg not in {"SOCCER", "UNKNOWN"} else None
+            lg_cfg = (
+                self._league_config(norm_lg, hist_baseline)
+                if norm_lg and norm_lg not in {"SOCCER", "UNKNOWN"}
+                else None
+            )
             if lg_cfg is not None:
                 baseline = lg_cfg.baseline or hist_baseline
                 h_boost = lg_cfg.home_advantage

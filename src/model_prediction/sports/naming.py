@@ -267,6 +267,14 @@ MODEL_CATALOG: dict[str, ModelDescriptor] = {
         description="NFL Total structural joint distribution model with key number discretization and weather adjustment.",
     ),
     # ── SOCCER ──
+    "soccer-poisson-dc-v3": ModelDescriptor(
+        model_id="soccer-poisson-dc-v3",
+        sport="SOCCER",
+        market="moneyline",
+        standard_name="soccer-moneyline-poisson-dc-v3",
+        display_name="Soccer Moneyline (Poisson DC v3)",
+        description="League-normalized Poisson DC model with configured fallback shrinkage.",
+    ),
     "soccer-poisson-dc-v2": ModelDescriptor(
         model_id="soccer-poisson-dc-v2",
         sport="SOCCER",

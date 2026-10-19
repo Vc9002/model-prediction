@@ -43,6 +43,7 @@ IMPLEMENTATION_TYPES = (
 CODE_BACKED_ENTRYPOINTS: dict[str, str] = {
     "soccer-poisson-dc-v1": "model_prediction.models.soccer:soccer_model",
     "soccer-poisson-dc-v2": "model_prediction.models.soccer:soccer_model_v2",
+    "soccer-poisson-dc-v3": "model_prediction.models.soccer_v3:soccer_model_v3",
     "tennis-surface-elo-v1": "model_prediction.models.tennis:tennis_model",
     "tennis-markov-hierarchical-v2": "model_prediction.models.tennis:tennis_model",
     "tennis-learned-v3": "model_prediction.models.tennis:tennis_model",
