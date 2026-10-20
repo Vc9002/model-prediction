@@ -259,8 +259,12 @@ class DashboardCache:
         tiers: dict[str, list[Path]] = {}
 
         main_paths = sorted(sports_dir.glob("*/main.xlsx")) if sports_dir.exists() else []
-        if not main_paths and main_dir.exists():
-            main_paths = sorted(main_dir.glob("*.xlsx"))
+        discovered_main_sports = {path.parent.name.lower() for path in main_paths}
+        if main_dir.exists():
+            for path in sorted(main_dir.glob("*.xlsx")):
+                if path.stem.lower() not in discovered_main_sports:
+                    main_paths.append(path)
+                    discovered_main_sports.add(path.stem.lower())
         if main_paths:
             tiers["main"] = main_paths
 

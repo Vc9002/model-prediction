@@ -178,7 +178,11 @@ def test_an_unlisted_sports_rows_are_still_reachable_by_operator_commands(tmp_pa
     -- all of which route through _ledger_for_pick_id -- must still reach
     them."""
     monkeypatch.setenv("MODEL_PREDICTION_LEDGER_MIRROR", "0")
-    assert "nba" not in MAIN_LEDGER_SPORTS
+    # Simulate a not-yet-admitted sport; NBA itself is now wired to Main.
+    monkeypatch.setattr(
+        "model_prediction.main_ledgers.MAIN_LEDGER_SPORTS",
+        tuple(sport for sport in MAIN_LEDGER_SPORTS if sport != "nba"),
+    )
 
     orphan = PickLedger(
         tmp_path / "main" / "nba.xlsx",
@@ -198,6 +202,34 @@ def test_an_unlisted_sports_rows_are_still_reachable_by_operator_commands(tmp_pa
     # repair, admitting a new sport into Main is a decision.
     with pytest.raises(ValueError, match="no Main/Flat ledger configured"):
         ledger.append_evaluated(_nba_request("nba-2"), _qualified_call(), now=datetime.now(UTC))
+
+
+def test_nba_routes_to_both_operational_tiers(tmp_path, monkeypatch) -> None:
+    from model_prediction.domain import PRODUCTION_SPORTS
+
+    monkeypatch.setenv("MODEL_PREDICTION_LEDGER_MIRROR", "0")
+    assert "nba" in PRODUCTION_SPORTS
+    assert "nba" in MAIN_LEDGER_SPORTS
+    for flat in (False, True):
+        ledger = MultiSportPickLedger(tmp_path, flat=flat)
+        row = ledger.append_evaluated(_nba_request("nba-wired"), _qualified_call(), now=datetime.now(UTC))
+        assert row["pick_id"]
+        assert any(saved["pick_id"] == row["pick_id"] for saved in ledger.rows())
+        settled = ledger.void(row["pick_id"], "routing check")
+        assert settled["status"] == "settled"
+
+
+def test_dashboard_cache_discovers_legacy_nba_alongside_sport_folders(tmp_path) -> None:
+    from model_prediction.dashboard_cache import DashboardCache
+
+    for relative in ("sports/mlb/main.xlsx", "main/nba.xlsx", "main/mlb.xlsx"):
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch()
+    paths = DashboardCache(tmp_path)._all_tiers()["main"]
+    assert tmp_path / "main/nba.xlsx" in paths
+    assert tmp_path / "sports/mlb/main.xlsx" in paths
+    assert tmp_path / "main/mlb.xlsx" not in paths
 
 
 def test_dashboard_and_ledger_sport_lists_cannot_drift(monkeypatch) -> None:

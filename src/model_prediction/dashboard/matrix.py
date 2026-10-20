@@ -318,10 +318,19 @@ def matrix() -> dict:
             "model": (
                 "learned_forward.py -- Elo + trend logistic regression "
                 f"({active_version('nba')}); features: elo_probability, trend_gap, "
-                "defensive_trend_gap. Not in PRODUCTION_SPORTS (domain.py) -- never "
-                "reaches Main regardless of real-world strength."
+                "defensive_trend_gap. Daily paper forecasts route to Main + Flat; "
+                "missing executable quotes remain explicitly flagged."
             ),
-            "ledger": "Flat only",
+            "ledger": "Main + Flat",
+        },
+        {
+            "sport": "NBA",
+            "market": "Spread & Total",
+            "wired": True,
+            "model": "nba-spread-margin-v2 / nba-total-margin-v2 -- artifact-verified "
+            "normal margin/total models; daily Main + Flat paper records require "
+            "an exact matched market and line. Missing markets are reported as unmatched.",
+            "ledger": "Main + Flat",
         },
         {
             "sport": "WNBA",

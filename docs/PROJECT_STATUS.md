@@ -1,5 +1,28 @@
 # Project status and source of truth
 
+## 2026-10-20 — NBA operational ledger wiring repaired
+
+NBA was already in the daily learned/derivative dispatch and production registry,
+but absent from `PRODUCTION_SPORTS`, `MAIN_LEDGER_SPORTS`, and the dashboard's
+reader list. Those exclusions are removed. NBA moneyline v4, spread v2, and total
+v2 now use the existing Main + Flat paper pipeline; immutable artifacts are unchanged.
+
+Verified using the Windows Daily task's runtime root and SQLite authority:
+two upcoming moneyline forecasts persisted in Main and two in Flat. Re-running
+Main wrote zero new rows and returned both duplicate IDs. Both tiers are visible
+to the settlement router. Main records explicitly flag missing executable quotes;
+spread/total had no matched markets. Boston/Detroit was already underway and was
+not retroactively logged. Canonical records are in the runtime `ledgers/ledgers.db`,
+not the separate WNBA production-canary database. See `LEDGER_ROUTING.md`.
+
+The XLSX dashboard cache also now merges legacy Main files with the newer
+sport-folder layout, preferring the newer file per sport. Previously any migrated
+sport folder caused legacy-only NBA exports to disappear from the cached Main view.
+
+Verification: scoped Ruff and diff whitespace checks passed; live forecast, ledger
+readback, duplicate handling, and dashboard reader checks passed. No full pytest
+suite was run, following the repository's fast-iteration policy for non-math changes.
+
 ## 2026-10-18 — Multi-Sport Mathematical Hardening, Hockey Production Wiring & Fast Iteration Policy
 
 The platform operates nominal production serving in **100% paper trading ("fugazi") mode** (`automated_orders: false`, `mode: "paper"`). All prospective order flow strictly enforces the Hard Edge Gate ($0.02 \le \text{Edge} \le 0.08$) with 31 models actively qualified across 13 sport domains and 32 soccer leagues.

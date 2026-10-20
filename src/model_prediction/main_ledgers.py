@@ -11,11 +11,8 @@ ledger system.
 Only sports that actually reach Main get a Flat pair here -- Flat is Main's
 "log every candidate, no gate" companion, the same relationship Research
 has to Gated Research. Esports/KBO/NPB never reach Main (they're
-Research+Gated only) and no longer get a Flat file either; NBA/NFL are
-wired for Main in the forecast code but the `daily` command never actually
-passes them a ledger there (a dead path, not a live one) and had zero real
-rows in either file at migration time -- excluded here as well until that
-changes for real.
+Research+Gated only) and no longer get a Flat file either. NBA and NFL
+use Main + Flat through the daily learned forecast and derivative paths.
 """
 
 from __future__ import annotations
@@ -29,7 +26,7 @@ from .eligibility import EligibilityResult
 from .ledger import PickLedger
 from .runtime_ledger_store import RuntimeLedgerStore
 
-MAIN_LEDGER_SPORTS: tuple[str, ...] = ("mlb", "wnba", "soccer", "tennis", "ncaaf", "nfl")
+MAIN_LEDGER_SPORTS: tuple[str, ...] = ("mlb", "nba", "wnba", "soccer", "tennis", "ncaaf", "nfl")
 
 
 def normalize_main_sport(sport: str) -> str:

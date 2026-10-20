@@ -1,6 +1,26 @@
 # Ledger routing: which sport/market goes into which ledger
 
-**Last verified**: 2026-08-03 against live code in `cli.py`, `domain.py`, `research_ledgers.py`.
+**NBA wiring updated**: 2026-10-20 against `cli/daily.py`, `cli/forecast.py`,
+`domain.py`, `main_ledgers.py`, and `dashboard/common.py`.
+
+## NBA operational wiring (2026-10-20)
+
+NBA moneyline (`nba-elo-trend-lr-v4`), spread (`nba-spread-margin-v2`), and
+total (`nba-total-margin-v2`) are wired to Main + Flat in the daily paper pipeline.
+The production-sport, ledger-router, and dashboard-reader lists all include NBA.
+Main shows eligible paper calls; Flat records the diagnostic slate. Missing
+moneyline quotes are visibly flagged as non-executable; derivative forecasts
+require real matched lines and do not fabricate markets. Started games are skipped.
+
+On Windows, the scheduled Daily task invokes `run_supervisor run daily` with
+`MODEL_PREDICTION_RUNTIME_ROOT=E:\model-prediction-runtime` and
+`MODEL_PREDICTION_LEDGER_AUTHORITY=sqlite`. Canonical operational records live in
+`ledgers/ledgers.db`; XLSX files are reporting exports. Dashboard and settlement
+discover NBA through the same operational tier routing. The separate production
+canary database is not the daily Main/Flat ledger.
+
+The remaining sections describe the older 2026-08-03 topology and are historical
+where they conflict with this NBA update.
 
 ## The four ledgers
 
