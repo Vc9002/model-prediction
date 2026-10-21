@@ -113,6 +113,10 @@ def validate_decision_snapshot(payload: dict[str, Any], row: dict[str, Any]) -> 
         from .mlb_margin_replay import validate_decision_snapshot as validate_margin
 
         return validate_margin(payload, row)
+    if payload.get("schema") == "feature-capture-v1":
+        from .feature_capture import validate_decision_snapshot as validate_capture
+
+        return validate_capture(payload, row)
     if payload.get("schema") == "coded-moneyline-replay-v1":
         from .coded_market_replay import validate_decision_snapshot as validate_coded
 

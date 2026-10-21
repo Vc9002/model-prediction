@@ -374,6 +374,31 @@ def test_archive_and_remove_leave_exempt_tombstones_in_the_mirror(tmp_path) -> N
     store.close()
 
 
+def test_supersede_keeps_the_old_pick_in_the_store_but_hides_it_from_live_reads(tmp_path) -> None:
+    """Re-forecast replacement retires the open row as `superseded`: the store
+    keeps it (audit history, parity-exempt) while live reads see no row."""
+    from model_prediction.ledger import PickLedger
+    from model_prediction.ledger_parity import compare
+    from model_prediction.runtime_ledger_store import RuntimeLedgerStore
+    from tests.test_ledger import request as make_request
+
+    paths = RuntimePaths.for_test(tmp_path)
+    store = RuntimeLedgerStore(paths)
+    ledger = PickLedger(tmp_path / "picks.xlsx", tier="flat", mirror=store)
+    logged = ledger.append_call(make_request(), 0.25, 70)
+
+    retired = ledger.supersede_open_rows(
+        [logged["pick_id"]], "re-forecast replacement for test", allow_staked_removal=True
+    )
+    assert retired == [logged["pick_id"]]
+    assert ledger.rows() == []
+
+    records = store.records(tier="flat")
+    assert [r["status"] for r in records] == ["superseded"]
+    assert compare(ledger.rows(), records)["clean"] is True
+    store.close()
+
+
 def test_backfill_replays_historical_rows_deterministically(tmp_path) -> None:
     """H-prep: rows written before the mirror existed are replayed with
     fixed op-backfill-<pick_id> ids; re-running is a no-op."""

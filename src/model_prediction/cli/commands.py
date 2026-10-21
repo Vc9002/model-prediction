@@ -171,12 +171,14 @@ def _research_models_dir() -> Path:
 def _clear_today_open(
     ledger, date_str: str, by_event_date: bool = False, leagues: set[str] | None = None
 ) -> list[str]:
-    """Remove open picks for a date before re-forecasting, via the audited path.
+    """Supersede open picks for a date before re-forecasting, via the audited path.
 
     When by_event_date is True, also removes open picks whose event_start_utc
     matches date_str — used for flat ledger to prevent duplicate forecast runs.
-    All removals go through ``PickLedger.remove_open_rows`` so they hold the
-    ledger lock and append ``pick_removed`` audit events.
+    All retirements go through ``PickLedger.supersede_open_rows`` so they hold
+    the ledger lock and append ``pick_superseded`` audit events. The replaced
+    rows stay in the canonical store with status ``superseded`` (hidden from
+    live reads), so only the latest pick per game is visible.
 
     leagues: when given (casefolded league names), only rows in those leagues
     are considered for removal. ``ledger`` here is frequently a
@@ -238,7 +240,7 @@ def _clear_today_open(
                 shutil.copy2(target_path, bak_path)
         except OSError:
             pass
-    return ledger.remove_open_rows(
+    return ledger.supersede_open_rows(
         to_remove, reason=f"re-forecast replacement for {date_str}", allow_staked_removal=True
     )
 

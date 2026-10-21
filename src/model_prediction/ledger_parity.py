@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import PROJECT_ROOT
+from .domain import RETIRED_STATUSES
 from .runtime_ledger_store import RuntimeLedgerStore
 from .runtime_paths import RuntimePaths
 
@@ -57,7 +58,7 @@ def compare(xlsx_rows: list[dict[str, Any]], sqlite_rows: list[dict[str, Any]]) 
     # Archived/removed records stay in the mirror as tombstones (their
     # audit events reference them) but have left the XLSX — they are
     # exempt from the missing_xlsx count, not a parity failure.
-    sqlite = {str(r["pick_id"]): r for r in sqlite_rows if r.get("status") not in ("archived", "removed")}
+    sqlite = {str(r["pick_id"]): r for r in sqlite_rows if r.get("status") not in RETIRED_STATUSES}
     report: dict[str, Any] = {
         "rows": {
             "xlsx": len(xlsx),
@@ -333,7 +334,7 @@ def _reconcile_ledger(ledger, store: RuntimeLedgerStore, *, tier: str, sport: st
     canonical_records = store.records(tier=tier, sport=sport)
     export_by_id = {row["pick_id"]: row for row in export_rows}
     active_canonical = {
-        row["pick_id"]: row for row in canonical_records if row.get("status") not in {"archived", "removed"}
+        row["pick_id"]: row for row in canonical_records if row.get("status") not in RETIRED_STATUSES
     }
 
     if ledger.authority == "sqlite":

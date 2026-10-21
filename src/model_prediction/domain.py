@@ -98,6 +98,13 @@ class MarketType(StrEnum):
 class PickStatus(StrEnum):
     OPEN = "open"
     SETTLED = "settled"
+    SUPERSEDED = "superseded"
+
+
+# Statuses a canonical-store row can hold once it has left the live ledger.
+# Such rows stay in the SQLite store as audit tombstones but are never live
+# picks: readers, parity and coverage must skip them.
+RETIRED_STATUSES = frozenset({"archived", "removed", PickStatus.SUPERSEDED.value})
 
 
 class PickResult(StrEnum):

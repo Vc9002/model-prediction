@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 from zipfile import BadZipFile
 
+from .domain import RETIRED_STATUSES
 from .runtime_ledger_store import RuntimeLedgerStore
 from .runtime_paths import RuntimePaths
 
@@ -157,7 +158,7 @@ class DashboardCache:
                 rows = [
                     self._dashboard_row(row)
                     for row in store.pick_rows(tier=tier)
-                    if row.get("status") not in {"archived", "removed"}
+                    if row.get("status") not in RETIRED_STATUSES
                 ]
                 state_key = f"sqlite-events:{event_count}:tier:{tier}"
                 if not force and self._is_fresh(conn, tier, state_key):

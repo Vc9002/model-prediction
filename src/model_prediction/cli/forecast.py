@@ -49,6 +49,7 @@ from ..esports import (
     refresh_recent_matches,
     validate_all_esports_baselines,
 )
+from ..feature_capture import contract_snapshot_json
 from ..features.base import FeatureStore
 from ..features.nfl_efficiency import NFLEfficiencyStore
 from ..forward import build_mlb_slate
@@ -3933,6 +3934,16 @@ def _log_esports_forecast(
             errors.append({"event_id": contract.get("event_id"), "reason": f"Invalid replay inputs: {error}"})
             continue
         contract_model_version = str(contract.get("model_version") or forecast["model_version"])
+        if esports_snapshot_json is None and contract.get("observed_at_utc"):
+            esports_snapshot_json = contract_snapshot_json(
+                {**contract, "market_type": m_type.value, "model_version": contract_model_version},
+                sport=league.value,
+                selection=selection,
+                line=m_line,
+                probability=round(model_prob, 6),
+                observed_at_utc=str(contract["observed_at_utc"]),
+                artifact_hash=str(contract.get("artifact_hash", "")),
+            )
         request = PickRequest(
             event_start_utc=str(contract["event_start_utc"]),
             event_id=str(contract["event_id"]),
@@ -4402,6 +4413,16 @@ def _forecast_soccer_sport(
             except (KeyError, ValueError, TypeError) as exc:
                 errors.append({"event_id": contract["event_id"], "error": str(exc)})
                 continue
+        if coded_snapshot_json is None:
+            coded_snapshot_json = contract_snapshot_json(
+                contract,
+                sport="SOCCER",
+                selection=str(contract["selection"]),
+                line=None if contract["line"] is None else float(contract["line"]),
+                probability=float(contract["model_probability"]),
+                observed_at_utc=str(contract["observed_at_utc"]),
+                artifact_hash=str(forecast["model_code_hash"]),
+            )
         request = PickRequest(
             event_start_utc=str(contract["event_start_utc"]),
             event_id=str(contract["event_id"]),
@@ -4634,6 +4655,16 @@ def _forecast_tennis_sport(
             except (KeyError, ValueError, TypeError) as exc:
                 errors.append({"event_id": contract["event_id"], "error": str(exc)})
                 continue
+        if coded_snapshot_json is None:
+            coded_snapshot_json = contract_snapshot_json(
+                contract,
+                sport="TENNIS",
+                selection=str(contract["selection"]),
+                line=None if contract["line"] is None else float(contract["line"]),
+                probability=float(contract["model_probability"]),
+                observed_at_utc=str(contract["observed_at_utc"]),
+                artifact_hash=str(forecast["model_code_hash"]),
+            )
         request = PickRequest(
             event_start_utc=str(contract["event_start_utc"]),
             event_id=str(contract["event_id"]),
@@ -5056,6 +5087,8 @@ def _forecast_hockey_sport(
             ask_val = float(contract.get("executable_ask") or 0.5)
             contract_edge = float(contract.get("edge_vs_executable_ask") or (prob_val - ask_val))
 
+            hockey_observed_at = str(contract.get("observed_at_utc") or effective_now.isoformat())
+            hockey_model_version = str(contract.get("model_version") or "hockey-poisson-dc-v1")
             request = PickRequest(
                 event_start_utc=str(contract["event_start_utc"]),
                 event_id=str(contract["event_id"]),
@@ -5076,9 +5109,17 @@ def _forecast_hockey_sport(
                 risks=("Paper-mode hockey score model; bivariate Poisson with OT resolution."),
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
                 model_state=model_state_val,
-                observed_at_utc=str(contract.get("observed_at_utc") or effective_now.isoformat()),
+                observed_at_utc=hockey_observed_at,
                 calibration_method="poisson_dixon_coles",
-                calibration_version=str(contract.get("model_version") or "hockey-poisson-dc-v1"),
+                calibration_version=hockey_model_version,
+                model_input_snapshot_json=contract_snapshot_json(
+                    {**contract, "market_type": m_type, "model_version": hockey_model_version},
+                    sport="HOCKEY",
+                    selection=sel_str,
+                    line=line_val,
+                    probability=prob_val,
+                    observed_at_utc=hockey_observed_at,
+                ),
             )
 
             from ..eligibility import EligibilityResult

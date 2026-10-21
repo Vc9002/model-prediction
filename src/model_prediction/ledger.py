@@ -49,6 +49,7 @@ from .calibration import calibration_metrics
 from .domain import (
     EASTERN,
     LOSS_CLASSIFICATIONS,
+    RETIRED_STATUSES,
     MarketType,
     ModelOrigin,
     PickRequest,
@@ -1045,7 +1046,7 @@ class PickLedger:
     def _feature_payload(row: dict[str, str], *, event_type: str = "append") -> dict[str, Any]:
         """Build an auditable feature snapshot without synthesizing values.
 
-        ``event_type == "remove"`` skips the replay-reproducibility
+        ``event_type in ("remove", "supersede")`` skips the replay-reproducibility
         assertion: removal discards a stale open row (e.g. daily
         re-forecast clearing yesterday's unsettled picks) without asserting
         any new fact about it, so it must never become permanently blocked
@@ -1074,7 +1075,7 @@ class PickLedger:
                         row.get("pick_id"),
                         exc,
                     )
-            elif event_type != "remove":
+            elif event_type not in ("remove", "supersede"):
                 validate_decision_snapshot(snapshot, row)
             features.update({name: str(value) for name, value in snapshot.get("features", {}).items()})
         unavailable_features = row.get("unavailable_features") or None
@@ -1427,11 +1428,31 @@ class PickLedger:
         first produced it. Callers pass True only for ledgers that can never
         hold real money.
         """
+        return self._retire_open_rows(pick_ids, reason, allow_staked_removal, superseded=False)
+
+    def supersede_open_rows(
+        self, pick_ids: list[str], reason: str, allow_staked_removal: bool = False
+    ) -> list[str]:
+        """Retire OPEN rows replaced by a re-forecast, keeping them in the store.
+
+        Same guards and locking as ``remove_open_rows``, but the canonical
+        SQLite record is kept with status ``superseded`` (and a ``supersede``
+        audit event) instead of ``removed``. Live reads skip superseded rows,
+        so only the latest pick for a game is visible, while every earlier
+        version stays queryable as audit history.
+        """
+        return self._retire_open_rows(pick_ids, reason, allow_staked_removal, superseded=True)
+
+    def _retire_open_rows(
+        self, pick_ids: list[str], reason: str, allow_staked_removal: bool, *, superseded: bool
+    ) -> list[str]:
         if not reason.strip():
             raise ValueError("a removal reason is required")
         requested = {str(pick_id) for pick_id in pick_ids if str(pick_id)}
         if not requested:
             return []
+        retired_status = PickStatus.SUPERSEDED.value if superseded else "removed"
+        event_type = "supersede" if superseded else "remove"
         removed: list[dict[str, str]] = []
         with self._lock():
             self._migrate_if_needed()
@@ -1452,7 +1473,7 @@ class PickLedger:
             if removed:
                 for row in removed:
                     self.audit.append(
-                        "pick_removed",
+                        "pick_superseded" if superseded else "pick_removed",
                         row["pick_id"],
                         {
                             "reason": reason,
@@ -1468,16 +1489,16 @@ class PickLedger:
                 if self.authority == "sqlite":
                     for row in removed:
                         self._mirror_row(
-                            {**row, "status": "removed"},
-                            "remove",
-                            f"op-remove-{row['pick_id']}",
+                            {**row, "status": retired_status},
+                            event_type,
+                            f"op-{event_type}-{row['pick_id']}",
                         )
                 self._write_rows(keep)
         for row in removed:
             self._mirror_row(
-                {**row, "status": "removed"},
-                "remove",
-                f"op-remove-{row['pick_id']}",
+                {**row, "status": retired_status},
+                event_type,
+                f"op-{event_type}-{row['pick_id']}",
             )
         return [row["pick_id"] for row in removed]
 
@@ -2007,7 +2028,7 @@ class PickLedger:
                 raise RuntimeError("sqlite ledger authority requires a RuntimeLedgerStore and ledger tier")
             canonical_rows: list[dict[str, str]] = []
             for projected in self.mirror.pick_rows(tier=self.tier, sport=self.sport):
-                if projected.get("status") in {"archived", "removed"}:
+                if projected.get("status") in RETIRED_STATUSES:
                     continue
                 row = {field: "" for field in FIELDNAMES}
                 row.update(

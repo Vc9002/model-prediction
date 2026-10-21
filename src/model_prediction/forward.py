@@ -233,6 +233,31 @@ def _paired_event_candidates(
                 distribution,
                 observed_at.isoformat(),
             )
+        elif features is not None and market_type is MarketType.TOTAL:
+            from dataclasses import asdict
+
+            from .feature_capture import build_snapshot as build_capture
+            from .feature_capture import flatten_features
+
+            # Totals have no exact replay adapter. The served probability can
+            # still be re-blended with the market downstream, so it is
+            # recorded for reference only (serving_probability_exact=False).
+            model_input_snapshot = build_capture(
+                sport="MLB",
+                market_type=market_type.value,
+                model_version=str(model.raw["model_version"]),
+                event_id=str(event["id"]),
+                event_start_utc=event["date"],
+                home_team=home_team,
+                away_team=away_team,
+                selection=selection,
+                line=selected_line,
+                probability=round(calibrated_probability, 6),
+                observed_at_utc=observed_at.isoformat(),
+                features=flatten_features(asdict(features)),
+                artifact_hash=str(model.raw["artifact_hash"]),
+                serving_probability_exact=False,
+            )
         output.append(
             MLBForwardCandidate(
                 event_id=str(event["id"]),

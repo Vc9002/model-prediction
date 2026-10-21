@@ -342,6 +342,18 @@ class MultiSportPickLedger:
             removed.extend(ledger.remove_open_rows(ids, reason, allow_staked_removal))
         return removed
 
+    def supersede_open_rows(
+        self, pick_ids: list[str], reason: str, allow_staked_removal: bool = False
+    ) -> list[str]:
+        by_ledger: dict[int, tuple[PickLedger, list[str]]] = {}
+        for pick_id in pick_ids:
+            ledger = self._ledger_for_pick_id(pick_id)
+            by_ledger.setdefault(id(ledger), (ledger, []))[1].append(pick_id)
+        removed: list[str] = []
+        for ledger, ids in by_ledger.values():
+            removed.extend(ledger.supersede_open_rows(ids, reason, allow_staked_removal))
+        return removed
+
     def restore_rows_for_rollback(self, rows: list[dict[str, str]], reason: str) -> None:
         """Restore every per-sport ledger to a captured combined snapshot."""
         for sport, ledger in self._ledgers.items():

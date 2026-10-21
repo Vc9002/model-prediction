@@ -120,7 +120,7 @@ CREATE TABLE IF NOT EXISTS ledger_runs (
 );
 """
 
-_EVENT_TYPES = ("append", "settle", "void", "update", "archive", "remove")
+_EVENT_TYPES = ("append", "settle", "void", "update", "archive", "remove", "supersede")
 # v2: the primary key became (pick_id, ledger_tier) — main and flat
 # legitimately share pick_ids (one decision, two tiers), so a single
 # pick_id key wrongly collapsed them (found live on flat/tennis).
