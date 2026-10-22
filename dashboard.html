@@ -7,21 +7,25 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='13' font-size='13'%3E%F0%9F%93%88%3C/text%3E%3C/svg%3E">
 <style>
 :root{
+  color-scheme:dark;
   --bg:#0a0c11; --surface:#12151d; --surface-2:#181c27; --border:#242938;
   --text:#e7e9f0; --dim:#7d8496;
   --accent:#5b8cff; --accent-dim:#2c4a8f;
-  --green:#33d17e; --red:#ff5c5c; --yellow:#f2a93c; --violet:#a48cf5;
+  --green:#33d17e; --red:#ff5c5c; --red-text:#ff7878; --row-line:rgba(255,255,255,.05); --tip-bg:#000; --tip-fg:#fff; --yellow:#f2a93c; --violet:#a48cf5;
   --statusbar-h:53px;
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
 }
 [data-theme="light"]{
+  color-scheme:light;
   --bg:#f3f4f8; --surface:#ffffff; --surface-2:#eceef4; --border:#dbdfea;
   --text:#171a24; --dim:#5b6274;
   --accent:#3a6ae8; --accent-dim:#c7d5fb;
-  --green:#1f9a5c; --red:#e0384b; --yellow:#c07c10; --violet:#7458d6;
+  --green:#1f9a5c; --red:#e0384b; --red-text:#e0384b; --row-line:rgba(0,0,0,.07); --tip-bg:#171a24; --tip-fg:#fff; --yellow:#c07c10; --violet:#7458d6;
 }
 *{box-sizing:border-box;margin:0;padding:0}
+table.data,table.ledger,table.matrix,.kpis,.perf-kpis,.health-kpis,.rebuild-kpis,.pick-metrics,.mono{font-variant-numeric:tabular-nums}
+h2,h3,h4,.perf-heading{text-wrap:balance}p,.small,.order-note,.menu-note,.perf-market-note{text-wrap:pretty}
 html,body{overflow-x:hidden;max-width:100%}
 body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px}
 a{color:var(--accent);text-decoration:none}
@@ -34,13 +38,15 @@ h2{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
 .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
 @media(max-width:1000px){.grid3{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}}
 .mono{font-family:var(--mono)}
-.dim{color:var(--dim)} .green{color:var(--green)} .red{color:var(--red)} .yellow{color:var(--yellow)}
+.dim{color:var(--dim)} .green{color:var(--green)} .red{color:var(--red-text)} .yellow{color:var(--yellow)}
 
 /* ---------- app shell: status strip + left rail + content ---------- */
 #statusbar{position:sticky;top:0;z-index:50;background:var(--surface);border-bottom:1px solid var(--border);
   padding:9px 18px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-family:var(--mono);font-size:12px;min-height:var(--statusbar-h)}
 #statusbar .chip{display:flex;gap:6px;align-items:center;white-space:nowrap;color:var(--dim)}
 #statusbar #unitValueInput{width:70px;padding:4px 6px}
+#statusbar button,#statusbar .bar-menu summary{min-height:32px}
+@media(pointer:coarse){#statusbar button,#statusbar .bar-menu summary,#tabs button,.segmented button{min-height:44px}}
 .status-health-link{display:none}
 @media(max-width:1250px){
   #statusbar .status-detail{display:none}
@@ -53,7 +59,12 @@ h2{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
 /* status bar clusters: left = system state, right = controls. Controls that are
    set once and rarely touched live in popovers; the live-order state never hides. */
 #statusbar .bar-cluster{display:flex;gap:10px 16px;flex-wrap:wrap;align-items:center}
-#statusbar .bar-controls{margin-left:auto;gap:8px 10px}
+#statusbar{align-items:flex-start}
+#statusbar .bar-state{flex:1 1 0;min-width:0}
+#statusbar .bar-state #dataTxt{order:10;flex:1 0 100%;font-size:11px;white-space:normal}
+#tabs,.wrap,.ledger-scroll,.matrix-scroll,#drawer{scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+@media(max-width:900px){#statusbar .bar-state{flex-basis:100%}}
+#statusbar .bar-controls{margin-left:auto;gap:8px 10px;flex:0 0 auto;flex-wrap:nowrap}
 #statusbar.live-on{border-bottom:2px solid var(--red);box-shadow:0 1px 0 rgba(255,92,92,.35)}
 .bar-menu{position:relative}
 .bar-menu summary{list-style:none;display:inline-flex;align-items:center;gap:6px;min-height:30px;padding:5px 11px;
@@ -82,30 +93,30 @@ h2{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
 .ab-menu[data-state="live"] summary{background:var(--red);border-color:var(--red);color:#1a0508}
 .ab-menu[data-state="live"] summary:after{border-color:#1a0508}
 .ab-toggle{min-width:92px;font-weight:700}
-.ab-toggle.off{background:rgba(255,92,92,.14);border-color:rgba(255,92,92,.5);color:var(--red)}
+.ab-toggle.off{background:rgba(255,92,92,.14);border-color:rgba(255,92,92,.5);color:var(--red-text)}
 .ab-toggle.paper{background:var(--accent-dim);border-color:var(--accent);color:var(--text)}
 .ab-toggle.live{background:var(--red);border-color:var(--red);color:#1a0508}
 .ab-seg button{font-weight:700;color:var(--dim);background:transparent}
 .ab-seg button.on{color:var(--text);background:var(--accent-dim)}
 .ab-seg button.on.is-live{color:#1a0508;background:var(--red)}
-@media(max-width:900px){#statusbar .bar-controls{margin-left:0}}
+@media(max-width:900px){#statusbar .bar-controls{margin-left:0;flex:1 1 100%;max-width:100%;flex-wrap:wrap}}
 @media(max-width:650px){.bar-menu .menu{position:fixed;left:12px;right:12px;top:auto;min-width:0}}
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:0 0 auto}
 .dot.g{background:var(--green);box-shadow:0 0 0 3px rgba(51,209,126,.18)}
 .dot.r{background:var(--red);box-shadow:0 0 0 3px rgba(255,92,92,.18)}
 .dot.y{background:var(--yellow);box-shadow:0 0 0 3px rgba(242,169,60,.18)}
 .dot.gray{background:#4a4f5e}
-.shell{display:flex;align-items:flex-start;max-width:1520px;margin:0 auto}
+.shell{display:flex;align-items:flex-start;max-width:2400px;margin:0 auto}
 #tabs{width:186px;flex:0 0 auto;position:sticky;top:var(--statusbar-h);align-self:flex-start;
   max-height:calc(100vh - var(--statusbar-h));overflow-y:auto;padding:16px 10px 40px}
 #tabs .rail-group{margin-bottom:16px}
-#tabs .rail-label{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);
+#tabs .rail-label{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);
   padding:0 10px;margin-bottom:5px}
 #tabs button{display:block;width:100%;text-align:left;background:transparent;border:none;border-left:2px solid transparent;
   border-radius:0 6px 6px 0;color:var(--dim);padding:7px 10px;font-family:var(--sans);font-size:13px;margin-bottom:1px}
 #tabs button:hover{background:var(--surface-2);color:var(--text);border-color:var(--border)}
 #tabs button.on{background:var(--surface-2);color:var(--text);border-left-color:var(--accent);font-weight:600}
-.wrap{flex:1;min-width:0;max-width:1360px;margin:0 auto;padding:16px 20px 60px}
+.wrap{flex:1;min-width:0;max-width:none;margin:0;padding:16px 24px 60px}
 @media(max-width:900px){
   .shell{display:block}
   #tabs{position:static;width:auto;max-height:none;padding:8px 12px;display:flex;gap:14px;overflow-x:auto;border-bottom:1px solid var(--border)}
@@ -126,7 +137,7 @@ button.sell:hover{border-color:var(--red)}
 button:disabled{opacity:.4;cursor:not-allowed}
 input.order-price{width:62px;padding:5px 6px;font-family:var(--mono);font-size:12px}
 .order-wrap{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
-.order-note{font-size:10.5px;color:var(--dim)}
+.order-note{font-size:11px;color:var(--dim)}
 .exit-wrap{display:grid;grid-template-columns:auto 62px auto 66px auto;align-items:center;gap:4px;white-space:nowrap}
 .exit-wrap input{width:62px;padding:5px 6px}.exit-wrap .shares{width:66px}
 .exit-wrap .order-note{grid-column:1/-1}
@@ -153,19 +164,19 @@ td.cell.u{background:rgba(242,169,60,.09);border-color:rgba(242,169,60,.35)}
 td.cell.u .c1{color:var(--yellow)}
 td.cell.r{background:rgba(164,140,245,.09);border-color:rgba(164,140,245,.32)}
 td.cell.r .c1{color:var(--violet)}
-td.cell.b{background:rgba(255,255,255,.02)}
-td.cell.b .c1{color:#5a6178}
-td.cell.n .c1{color:#4d5468}
-td.cell.na .c1{color:#3d4356}
+td.cell.b{background:var(--row-line)}
+td.cell.b .c1{color:var(--dim)}
+td.cell.n .c1{color:var(--dim);opacity:.85}
+td.cell.na .c1{color:var(--dim);opacity:.7}
 td.cell[data-tip]:hover:after{content:attr(data-tip);position:absolute;left:50%;bottom:100%;
-  transform:translateX(-50%) translateY(-6px);background:#000;color:#fff;padding:6px 9px;
+  transform:translateX(-50%) translateY(-6px);background:var(--tip-bg);color:var(--tip-fg);padding:6px 9px;
   border-radius:6px;font-size:11px;white-space:nowrap;z-index:10;box-shadow:0 4px 14px rgba(0,0,0,.4);
   pointer-events:none}
 
 /* tables */
 table.data{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12px}
 table.data th{color:var(--dim);text-align:left;padding:6px;border-bottom:1px solid var(--border);cursor:pointer;white-space:nowrap;font-weight:600}
-table.data td{padding:5px 6px;border-bottom:1px solid rgba(255,255,255,.04);white-space:nowrap}
+table.data td{padding:5px 6px;border-bottom:1px solid var(--row-line);white-space:nowrap}
 table.data tr:hover td{background:var(--surface-2)}
 /* shared ledger look: every ledger uses the same scroll box, sticky header and cell rhythm */
 .ledger-scroll{overflow:auto;max-height:min(70vh,640px);border:1px solid var(--border);border-radius:8px}
@@ -174,14 +185,14 @@ table.ledger th{position:sticky;top:0;z-index:2;background:var(--surface-2);colo
   border-bottom:1px solid var(--border);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
 table.ledger th[onclick]{cursor:pointer}
 table.ledger th[onclick]:hover{color:var(--text)}
-table.ledger td{padding:7px 9px;border-bottom:1px solid rgba(255,255,255,.05);white-space:nowrap;vertical-align:middle}
+table.ledger td{padding:7px 9px;border-bottom:1px solid var(--row-line);white-space:nowrap;vertical-align:middle}
 table.ledger tr.click-row{cursor:pointer}
 table.ledger tr.click-row:hover td{background:var(--surface-2)}
 table.ledger tr.ledger-more td{text-align:center;white-space:normal;padding:12px;background:var(--surface)}
 .section-head{margin:0}
 .pill{padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600}
 .pill.win{background:rgba(51,209,126,.15);color:var(--green)}
-.pill.loss{background:rgba(255,92,92,.15);color:var(--red)}
+.pill.loss{background:rgba(255,92,92,.15);color:var(--red-text)}
 .pill.open{background:rgba(242,169,60,.15);color:var(--yellow)}
 .pill.push{background:rgba(255,255,255,.08);color:var(--dim)}
 input,select{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-family:var(--mono);font-size:12px}
@@ -194,12 +205,12 @@ input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);ou
 .segmented button:last-child{border-right:0}.segmented button.on{background:var(--accent);color:#fff}
 .panel-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:7px 0 12px;color:var(--dim);font:11px var(--mono)}
 .panel-meta .ok{color:var(--green)}.panel-meta .error{color:var(--red)}
-.state-badge{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);border-radius:999px;padding:2px 7px;font:700 10px var(--mono);text-transform:uppercase}
+.state-badge{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);border-radius:999px;padding:2px 7px;font:700 11px var(--mono);text-transform:uppercase}
 .state-badge.ok{color:var(--green);border-color:rgba(51,209,126,.5)}
 .state-badge.warn{color:var(--yellow);border-color:rgba(242,169,60,.5)}
-.state-badge.bad{color:var(--red);border-color:rgba(255,92,92,.5)}
+.state-badge.bad{color:var(--red-text);border-color:rgba(255,92,92,.5)}
 .blocked-order{display:flex;min-width:200px;max-width:260px;gap:6px;align-items:flex-start;white-space:normal}
-.blocked-order .reason{color:var(--dim);font-size:10.5px;line-height:1.35}
+.blocked-order .reason{color:var(--dim);font-size:11px;line-height:1.35}
 .pager{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:10px;font:11px var(--mono);color:var(--dim)}
 .integrity-list{display:grid;gap:8px}
 .integrity-row{display:flex;justify-content:space-between;gap:14px;border-bottom:1px solid var(--border);padding-bottom:7px}
@@ -216,7 +227,7 @@ canvas{width:100%;height:180px;display:block}
 .kpis{display:flex;gap:26px;flex-wrap:wrap;font-family:var(--mono);margin-bottom:10px}
 .kpis .k{display:flex;flex-direction:column;gap:2px}
 .kpis .k b{font-size:22px;font-weight:700}
-.kpis .k span{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+.kpis .k span{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
 .perf-context{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 14px}
 .perf-context .chip{border:1px solid var(--border);background:var(--surface-2);border-radius:999px;
   padding:3px 8px;font-family:var(--mono);font-size:11px;color:var(--dim)}
@@ -230,16 +241,16 @@ canvas{width:100%;height:180px;display:block}
 .perf-kpis .k span{line-height:1.25}
 .perf-hero{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;margin-top:8px}
 .perf-panel{border:1px solid var(--border);border-radius:8px;padding:12px;min-width:0;overflow-x:auto}
-.perf-panel h3{font-size:10.5px;color:var(--dim);letter-spacing:.07em;text-transform:uppercase;margin-bottom:8px}
+.perf-panel h3{font-size:11px;color:var(--dim);letter-spacing:.07em;text-transform:uppercase;margin-bottom:8px}
 .perf-sections{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;margin-top:14px}
 .perf-section{border:1px solid var(--border);border-radius:8px;padding:12px;min-width:0;overflow-x:auto}
 .perf-section.wide{grid-column:1/-1}
-.perf-section h3{font-size:10.5px;color:var(--dim);letter-spacing:.07em;text-transform:uppercase;margin-bottom:8px}
+.perf-section h3{font-size:11px;color:var(--dim);letter-spacing:.07em;text-transform:uppercase;margin-bottom:8px}
 .perf-panel table.data,.perf-section table.data{font-size:clamp(10px,.78vw,12px)}
 .perf-market-note{font-family:var(--mono);font-size:11px;color:var(--dim);line-height:1.5;margin-bottom:8px}
 .perf-market-stack{display:grid;gap:14px}
 .perf-market-block+.perf-market-block{border-top:1px solid var(--border);padding-top:14px}
-.perf-market-block h4{font-size:10.5px;color:var(--dim);letter-spacing:.07em;text-transform:uppercase;margin-bottom:7px}
+.perf-market-block h4{font-size:11px;color:var(--dim);letter-spacing:.07em;text-transform:uppercase;margin-bottom:7px}
 .perf-months{display:flex;gap:8px;flex-wrap:wrap}
 .perf-month{border:1px solid var(--border);background:var(--surface-2);border-radius:6px;padding:7px 9px;
   font-family:var(--mono);font-size:11px}
@@ -266,18 +277,19 @@ canvas{width:100%;height:180px;display:block}
 @media(max-width:850px){.pick-row{align-items:flex-start;flex-direction:column}.pick-action{width:100%;justify-content:flex-start}.pick-action .order-note{text-align:left}}
 
 /* alerts */
-.alert{display:flex;gap:8px;align-items:center;padding:8px 11px;border-radius:8px;margin-bottom:6px;font-size:12.5px;cursor:pointer}
+.alert{display:flex;gap:8px;align-items:center;padding:8px 11px;border-radius:8px;margin-bottom:6px;font-size:12.5px}
 .alert.error{background:rgba(255,92,92,.09);border:1px solid rgba(255,92,92,.45)}
 .alert.warn{background:rgba(242,169,60,.09);border:1px solid rgba(242,169,60,.4);animation:pulse 2.5s infinite}
+@media(prefers-reduced-motion:reduce){.card{animation:none}.alert.warn{animation:none}td.cell,td.cell:hover{transition:none;transform:none}}
 .alert.info{background:var(--surface-2);border:1px solid var(--border)}
 
 /* system health */
 .health-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:14px}
 .health-kpi{border:1px solid var(--border);background:var(--surface-2);border-radius:8px;padding:11px}
 .health-kpi b{display:block;font-family:var(--mono);font-size:19px;margin-bottom:3px}
-.health-kpi span{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+.health-kpi span{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
 .health-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(320px,.75fr);gap:14px}
-.health-state{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:2px 7px;font-size:10px;font-weight:700;text-transform:uppercase}
+.health-state{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:2px 7px;font-size:11px;font-weight:700;text-transform:uppercase}
 .health-state.ok{color:var(--green);border-color:rgba(51,209,126,.45)}
 .health-state.warn{color:var(--yellow);border-color:rgba(242,169,60,.45)}
 .health-state.bad{color:var(--red);border-color:rgba(255,92,92,.45)}
@@ -297,10 +309,10 @@ canvas{width:100%;height:180px;display:block}
 .drawer-head h2{font-size:14px;color:var(--text);margin:0;text-transform:none;letter-spacing:0}
 .detail-grid{display:grid;grid-template-columns:minmax(120px,.7fr) minmax(0,1.3fr);gap:8px 14px;font:12px var(--mono)}
 .detail-grid dt{color:var(--dim)}.detail-grid dd{overflow-wrap:anywhere}
-pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:break-word;background:var(--bg);padding:10px;border-radius:8px}
+pre{font-family:var(--mono);font-size:12px;white-space:pre-wrap;word-break:break-word;background:var(--bg);padding:10px;border-radius:8px}
 .secgrid{display:grid;grid-template-columns:2fr 1fr;gap:14px}
 @media(max-width:1100px){.secgrid{grid-template-columns:1fr}}
-.small{font-size:11.5px}
+.small{font-size:12px}
 
 /* production model evidence */
 .evidence-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
@@ -327,14 +339,70 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
 .rebuild-kpis,.rebuild-sports{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .rebuild-kpi,.rebuild-sport{border:1px solid var(--border);background:var(--surface-2);border-radius:8px;padding:11px;min-width:0}
 .rebuild-kpi b{display:block;font:700 18px var(--mono);overflow-wrap:anywhere}
-.rebuild-kpi span{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+.rebuild-kpi span{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
 .rebuild-sport h3{font:700 14px var(--mono);margin-bottom:8px}
 .rebuild-detail{display:grid;grid-template-columns:1fr auto;gap:5px 9px;font-size:11px}
 .rebuild-detail dt{color:var(--dim)}.rebuild-detail dd{text-align:right;overflow-wrap:anywhere}
-.rebuild-state{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:2px 7px;font-size:10px;text-transform:uppercase}
+.rebuild-state{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:2px 7px;font-size:11px;text-transform:uppercase}
 .rebuild-state.rejected{color:var(--yellow);border-color:rgba(242,169,60,.55)}
 .rebuild-state.failed{color:var(--red);border-color:rgba(255,92,92,.55)}
 .rebuild-state.available{color:var(--green);border-color:rgba(51,209,126,.55)}
+
+/* utilities replacing repeated inline styles */
+.mb-16{margin-bottom:16px}.mb-12{margin-bottom:12px}.mb-8{margin-bottom:8px}.mt-12{margin-top:12px}.mt-9{margin-top:9px}
+.m-0{margin:0}.flex-1{flex:1}.ox-auto{overflow-x:auto}.fw-7{font-weight:700}.fw-6{font-weight:600}
+.empty-state{text-align:center;padding:24px}
+.row-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.row-between{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.ico{width:13px;height:13px;vertical-align:-2px;flex:0 0 auto}
+/* left rail: disabled items fold away */
+#tabs details.rail-disabled summary{cursor:pointer;list-style:none}
+#tabs details.rail-disabled summary::-webkit-details-marker{display:none}
+#tabs details.rail-disabled button{opacity:.5}
+/* production overview strip */
+.overview{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.ov-item{display:flex;flex-direction:column;gap:3px;align-items:flex-start;text-align:left;padding:10px 12px;border-radius:8px;
+  background:var(--surface);border:1px solid var(--border);font-family:var(--mono)}
+.ov-item:hover{border-color:var(--accent)}
+.ov-item .ov-label{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+.ov-item .ov-value{font-size:18px;font-weight:700}
+.ov-item .ov-sub{font-size:11px;color:var(--dim)}
+.ov-item.warn{border-color:rgba(242,169,60,.55)}.ov-item.bad{border-color:rgba(255,92,92,.6)}
+/* status-bar chip buttons */
+.chip-btn{background:transparent;border:1px solid transparent;border-radius:6px;padding:3px 7px;display:inline-flex;align-items:center;
+  gap:6px;color:var(--dim);font:12px var(--mono);white-space:nowrap}
+.chip-btn:hover{border-color:var(--border);color:var(--text)}
+.chip-btn[hidden]{display:none}
+#alertChip[data-level="error"] #alertTxt{color:var(--red-text)}#alertChip[data-level="warn"] #alertTxt{color:var(--yellow)}
+/* stale-data banner */
+.stale-banner{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:9px 12px;border:1px solid rgba(242,169,60,.5);
+  background:rgba(242,169,60,.09);border-radius:8px;margin-bottom:14px;font-size:12.5px}
+.stale-banner[hidden]{display:none}
+/* skeleton placeholders */
+.skel{display:grid;gap:10px;min-height:120px;align-content:start}
+.skel i{display:block;height:14px;border-radius:4px;background:linear-gradient(90deg,var(--surface-2),var(--border),var(--surface-2));
+  background-size:200% 100%;animation:shimmer 1.4s linear infinite}
+@keyframes shimmer{to{background-position:-200% 0}}
+@media(prefers-reduced-motion:reduce){.skel i{animation:none}}
+/* command palette */
+#palette{position:fixed;inset:0;background:rgba(4,5,9,.6);display:none;align-items:flex-start;justify-content:center;padding-top:14vh;z-index:120}
+.palette-box{width:min(520px,92vw);background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;
+  display:grid;gap:8px;box-shadow:0 16px 40px rgba(0,0,0,.5)}
+.palette-box input{width:100%;padding:9px 10px;font-size:14px}
+#paletteList{list-style:none;max-height:50vh;overflow:auto;display:grid;gap:2px}
+#paletteList li{padding:8px 10px;border-radius:6px;cursor:pointer;display:flex;justify-content:space-between;gap:12px;font-size:13px}
+#paletteList li small{color:var(--dim);font-family:var(--mono);font-size:11px}
+#paletteList li.on,#paletteList li:hover{background:var(--surface-2);outline:1px solid var(--accent)}
+/* ledger tables: numbers right-aligned, sticky game column, hideable columns */
+table.ledger th.num,table.ledger td.num{text-align:right}
+table.ledger td.c-game{position:sticky;left:0;z-index:1;background:var(--surface)}
+table.ledger th.c-game{position:sticky;left:0;z-index:3;background:var(--surface-2)}
+table.ledger tr:hover td.c-game{background:var(--surface-2)}
+body.hide-col-type .c-type,body.hide-col-bought .c-bought,body.hide-col-size .c-size,
+body.hide-col-order .c-order,body.hide-col-matchup .c-matchup{display:none}
+.filter-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;width:100%}
+.filter-row+.filter-row{margin-top:2px}
+.col-menu label{display:flex;gap:8px;align-items:center;color:var(--text);font-family:var(--mono);font-size:12px}
 </style>
 </head>
 <body>
@@ -343,13 +411,13 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <div class="bar-cluster bar-state">
     <span class="chip"><span class="dot gray" id="testDot"></span><span id="testTxt">Tests: not run</span></span>
     <span class="chip"><span class="dot g"></span><span id="modelsTxt">Models: …</span></span>
-    <span class="chip mono dim status-detail" id="dataTxt">Data: …</span>
     <span class="chip"><span class="dot gray" id="dailyDot"></span><span id="dailyTxt" title="Split pipeline: settle → flat forecast → main forecast">Pipeline: …</span></span>
     <span class="chip dim mono status-detail" id="pipelineSteps" style="font-size:11px"></span>
-    <span class="chip"><span class="dot y" id="alertDot"></span><span id="alertTxt">Alerts: 0</span></span>
+    <button class="chip-btn" id="alertChip" onclick="gotoTab('health')" title="Open active alerts"><span class="dot y" id="alertDot"></span><span id="alertTxt">Alerts: 0</span></button>
     <span class="chip dim" id="updatedTxt">Updated: —</span>
-    <button onclick="manualRefresh(this)" title="Refresh all data now">↻ Refresh</button>
+    <button onclick="manualRefresh(this)" title="Refresh all data now"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg> Refresh</button>
     <span class="chip dim">auto <span id="countdown" class="mono">—</span>s</span>
+    <button class="chip-btn" id="jobChip" hidden onclick="reopenJobModal()" title="Show job output"><span class="dot y" id="jobChipDot"></span><span id="jobChipTxt"></span></button>
     <button class="status-health-link" onclick="gotoTab('health')" aria-label="Open full system health details">Health details</button>
   </div>
   <div class="bar-cluster bar-controls">
@@ -384,49 +452,35 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
         </div>
       </div>
     </details>
+    <button onclick="confirmAction('settle','Settle every unsettled pick now? This grades finished games in the ledgers; no orders are placed.')" title="Grade all finished games in the ledgers (settle --all-unsettled)">Settle</button>
     <button class="primary" onclick="confirmAction('daily','Run the split daily pipeline (settle → flat forecast → main forecast) for today? Shadow-only; no orders are placed.')">Daily Forecast</button>
   </div>
 </div>
 
 <div class="shell">
-   <nav id="tabs">
-     <div class="rail-group">
-       <div class="rail-label">Production</div>
-       <button data-tab="production" class="on">Production</button>
-     </div>
-     <div class="rail-group">
-       <div class="rail-label">Monitor</div>
-       <button data-tab="matrix">Matrix</button>
-       <button data-tab="health">Health</button>
-       <button data-tab="today">Today</button>
-       <button data-tab="market">Market</button>
-     </div>
-     <div class="rail-group">
-       <div class="rail-label">Ledgers</div>
-       <button data-tab="picks">Model Picks Ledger</button>
-       <button data-tab="flat">Flat Ledger</button>
-       <button data-tab="v9-ledger">MLB v9 Ledger</button>
-       <button data-tab="audit">Validation &amp; Audit</button>
-       <button data-tab="poly-ledger" disabled title="Disabled by operator">Polymarket — OFF</button>
-     </div>
-     <div class="rail-group">
-       <div class="rail-label">Performance</div>
-       <button data-tab="perf">Performance</button>
-     </div>
+   <nav id="tabs" aria-label="Dashboard sections">
     <div class="rail-group">
-      <div class="rail-label">Models</div>
+      <div class="rail-label">Overview</div>
+      <button data-tab="production" class="on">Production</button>
+      <button data-tab="perf">Performance</button>
       <button data-tab="models">Models</button>
-    </div>
-    <div class="rail-group">
-      <div class="rail-label">Portfolio</div>
       <button data-tab="folio">Portfolio</button>
     </div>
     <div class="rail-group">
-      <div class="rail-label">Polymarket US</div>
-      <button data-tab="polymarket" disabled title="Disabled by operator">Edge Scanner — OFF</button>
-      <button data-tab="poly-ledger" disabled title="Disabled by operator">Edge Ledger — OFF</button>
+      <div class="rail-label">Monitor</div>
+      <button data-tab="matrix">Matrix</button>
+      <button data-tab="health">Health</button>
+      <button data-tab="today">Today</button>
+      <button data-tab="market">Market</button>
+    </div>
+    <div class="rail-group">
+      <div class="rail-label">Ledgers</div>
+      <button data-tab="picks">Model Picks Ledger</button>
+      <button data-tab="flat">Flat Ledger</button>
+      <button data-tab="v9-ledger">MLB v9 Ledger</button>
       <button data-tab="auto-buyer-ledger">Auto-Buyer Ledger</button>
       <button data-tab="manual-bets">Manual Bets Ledger</button>
+      <button data-tab="audit">Validation &amp; Audit</button>
     </div>
     <div class="rail-group">
       <div class="rail-label">System</div>
@@ -434,16 +488,23 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <button data-tab="evidence">Evidence</button>
       <button data-tab="settings">Settings</button>
     </div>
+    <details class="rail-group rail-disabled">
+      <summary class="rail-label">Disabled by operator</summary>
+      <button data-tab="poly-ledger" disabled title="Disabled by operator">Polymarket Ledger</button>
+      <button data-tab="polymarket" disabled title="Disabled by operator">Edge Scanner</button>
+    </details>
   </nav>
 
   <div class="wrap">
+  <div id="staleBanner" class="stale-banner" role="status" hidden><span id="staleTxt"></span><button onclick="manualRefresh(null)">Retry now</button></div>
   <section id="tab-production" style="display:none">
-    <div id="productionPanel"><div class="card dim">Loading production status…</div></div>
+    <div id="overviewStrip" class="overview" aria-label="Key numbers"></div>
+    <div id="productionPanel"><div class="card skel" aria-busy="true"><i style="width:30%"></i><i></i><i style="width:70%"></i></div></div>
   </section>
   <section id="tab-matrix" style="display:none">
     <div class="card">
       <h2>Model Wiring Matrix</h2>
-      <div class="small dim" id="matrixGate" style="margin-bottom:8px"></div>
+      <div class="small dim mb-8" id="matrixGate"></div>
       <div class="matrix-scroll"><table class="matrix" id="matrixTable"></table></div>
       <div class="small dim" style="margin-top:8px">
         <span class="green">wired in daily</span> · <span class="red">not wired</span> — shows what's actually running and what feeds it, not hit rates or promotion-gate status
@@ -457,14 +518,15 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <h2>System Health</h2>
       <div class="small dim">Operational freshness and coverage from the sources the dashboard actually reads. Zero means zero records in that source—not an inferred model failure.</div>
       <div class="panel-meta" id="healthMeta" role="status" aria-live="polite">Loading health…</div>
-      <div class="health-kpis" id="healthKpis" style="margin-top:12px"></div>
+      <div class="health-kpis mt-12" id="healthKpis"></div>
     </div>
     <div class="health-grid">
       <div class="card">
         <h2>Data Freshness by Sport</h2>
-        <div style="overflow-x:auto"><table class="data" id="healthDataTable"></table></div>
+        <div class="ox-auto"><table class="data" id="healthDataTable"></table></div>
       </div>
       <div>
+        <div class="card"><h2>Data Coverage</h2><div id="dataTxt" class="mono small dim">Data: …</div></div>
         <div class="card"><h2>Pipeline Steps</h2><div id="healthPipeline"></div></div>
         <div class="card"><h2>Active Alerts</h2><div id="healthAlerts"></div></div>
         <div class="card"><h2>Dashboard Integrity</h2><div id="integrityChecks" class="integrity-list"></div></div>
@@ -479,7 +541,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <div class="small mono dim" id="modelLedgersGenerated" style="margin-top:7px">Generated: --</div>
     </div>
     <div class="card">
-      <div style="overflow-x:auto"><table class="data evidence-table" id="modelEvidenceTable">
+      <div class="ox-auto"><table class="data evidence-table" id="modelEvidenceTable">
         <thead><tr><th>Model</th><th>Total</th><th>Open</th><th>Settled</th><th>Record (W-L-P)</th><th>P&amp;L (U)</th><th>Brier</th><th>Log loss</th><th>CLV coverage</th><th>Mean CLV</th><th>Missing-input rate</th><th>Latest data</th></tr></thead>
         <tbody><tr><td colspan="12" class="dim">Loading model evidence...</td></tr></tbody>
       </table></div>
@@ -487,7 +549,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     <div class="card">
       <h2>Live Comparison — one event, every applicable model</h2>
       <div class="small dim">Open predictions only; settled history is in the evidence table above.</div>
-      <div id="modelLedgerEvents" style="margin-top:9px"><div class="dim">Loading...</div></div>
+      <div class="mt-9" id="modelLedgerEvents"><div class="dim">Loading...</div></div>
     </div>
   </section>
 
@@ -499,17 +561,17 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     <div class="card">
       <h2>Shadow Picks</h2>
       <div class="small dim">Real predictions/decisions from the shadow ledger. Research only &mdash; no order execution is wired to this table.</div>
-      <div id="shadowPicks" style="margin-top:12px"></div>
+      <div class="mt-12" id="shadowPicks"></div>
     </div>
     <div class="card">
       <h2>Rebuild Overview</h2>
       <div class="small dim" id="rebuildMeta">Read-only evidence has not been loaded.</div>
-      <div class="rebuild-kpis" id="rebuildKpis" style="margin-top:12px"></div>
+      <div class="rebuild-kpis mt-12" id="rebuildKpis"></div>
     </div>
     <div class="card">
       <h2>Sport Status</h2>
       <div class="small dim">A rejected challenger is a research outcome, not a system failure.</div>
-      <div class="rebuild-sports" id="rebuildSports" style="margin-top:12px"></div>
+      <div class="rebuild-sports mt-12" id="rebuildSports"></div>
     </div>
     <div class="card">
       <h2>MLB Authoritative Challenger</h2>
@@ -518,7 +580,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     <div class="card">
       <h2>Prospective Test Protection</h2>
       <div class="small dim">Unconsumed final-test performance is redacted by the server.</div>
-      <div id="rebuildSealed" style="margin-top:9px"></div>
+      <div class="mt-9" id="rebuildSealed"></div>
     </div>
     <div class="health-grid">
       <div class="card"><h2>Economics</h2><div id="rebuildEconomics"></div></div>
@@ -533,12 +595,12 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       <div class="small mono dim" id="productionEvidenceGenerated" style="margin-top:7px">Generated: --</div>
     </div>
     <div class="evidence-grid" id="productionEvidence">
-      <div class="card dim">Loading production evidence...</div>
+      <div class="card skel" aria-busy="true"><i style="width:35%"></i><i></i><i style="width:60%"></i></div>
     </div>
     <div class="card">
       <h2>Feature Registry</h2>
       <div class="small dim">Every tracked feature, its current retention verdict, strict ablation result, and production-safety status. The retention policy keeps any positive out-of-sample contribution; provenance blockers still force research-only use.</div>
-      <div id="featureRegistry" style="margin-top:9px"><div class="dim">Loading feature registry...</div></div>
+      <div class="mt-9" id="featureRegistry"><div class="dim">Loading feature registry...</div></div>
     </div>
   </section>
 
@@ -546,11 +608,11 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     <div class="card">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
         <h2 class="section-head">Model Picks Ledger</h2>
-        <span style="flex:1"></span>
+        <span class="flex-1"></span>
         <button class="primary" onclick="confirmAction('main_forecast','Run the main forecast for today? MLB/WNBA qualified calls go to this ledger; esports/soccer/nba/nfl route to Research and Gated Research in the same pass.')">Run Main Forecast</button>
       </div>
-      <div class="small dim" style="margin-bottom:8px">Paper model forecasts: Size and P&amp;L are hypothetical units. Order shows exchange status only; live positions and dollar P&amp;L appear in Portfolio.</div>
-      <div class="filters" id="filters_L" style="margin-bottom:12px"></div>
+      <div class="small dim mb-8">Paper model forecasts: Size and P&amp;L are hypothetical units. Order shows exchange status only; live positions and dollar P&amp;L appear in Portfolio.</div>
+      <div class="filters mb-12" id="filters_L"></div>
       <div class="kpis" id="pickKpis"></div>
       <div class="ledger-scroll"><table class="ledger" id="pickTable"></table></div>
     </div>
@@ -560,7 +622,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
      <div class="card">
        <div class="perf-heading">
          <h2 id="perfTitle">Performance</h2>
-         <div class="filters" style="margin:0">
+         <div class="filters m-0">
            <label class="filter-field" for="perfLedgerSelect">Ledger
              <select id="perfLedgerSelect" onchange="performanceControlChanged()">
                <option value="main">Qualified</option><option value="flat">Flat</option>
@@ -577,7 +639,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
        <div class="panel-meta" id="perfMeta" role="status" aria-live="polite">Loading performance…</div>
        <div class="small dim" id="perfSummary">Loading ledger context…</div>
        <div class="perf-context" id="perfContext"></div>
-       <div id="perfKpis" class="kpis perf-kpis" style="margin-bottom:16px"></div>
+       <div id="perfKpis" class="kpis perf-kpis mb-16"></div>
        <div id="perfDetail">
          <div class="perf-hero">
            <div class="perf-panel"><h3>Cumulative scored P&amp;L</h3><canvas id="cPnl" height="180"></canvas></div>
@@ -593,7 +655,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     <div class="card">
       <h2>Live Portfolio — Exchange Positions</h2>
       <div class="panel-meta" id="folioMeta" role="status" aria-live="polite">Loading portfolio…</div>
-      <div class="small dim" id="folioStatus" style="margin-bottom:8px"></div>
+      <div class="small dim mb-8" id="folioStatus"></div>
       <div class="kpis" id="folioOpenKpis"></div>
       <div id="folioOpen"></div>
     </div>
@@ -618,7 +680,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     <div class="card">
       <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
         <h2>Today's Picks <span id="todayDate" class="dim"></span></h2>
-        <div class="filters" style="margin:0">
+        <div class="filters m-0">
           <label class="filter-field" for="todaySport">Sport <select id="todaySport" onchange="todayFiltersChanged()"><option value="">All sports</option></select></label>
           <label class="filter-field" for="todayMarket">Market <select id="todayMarket" onchange="todayFiltersChanged()"><option value="">All markets</option></select></label>
           <label class="small dim"><input type="checkbox" id="todayActionable" onchange="todayFiltersChanged()"> actionable only</label>
@@ -627,7 +689,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       </div>
       <div class="panel-meta" id="todayMeta" role="status" aria-live="polite">Loading today…</div>
       <div class="kpis" id="todayKpis"></div>
-      <div class="small dim" style="margin-bottom:8px">Qualified calls are shown first. Flat and Research slates are collapsed below so the operational view is not buried under every candidate. Dates use America/New_York, including daylight saving. <b>1U = $<span id="unitValueLabel">7.50</span>.</b> All picks remain paper research until you submit a separate order.</div>
+      <div class="small dim mb-8">Qualified calls are shown first. Flat and Research slates are collapsed below so the operational view is not buried under every candidate. Dates use America/New_York, including daylight saving. <b>1U = $<span id="unitValueLabel">7.50</span>.</b> All picks remain paper research until you submit a separate order.</div>
       <div id="todayPicks"></div>
     </div>
   </section>
@@ -652,7 +714,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     <div class="secgrid">
       <div class="card">
         <h2>Backtest &amp; validation history (outputs/latest)</h2>
-        <div style="overflow-x:auto"><table class="data" id="btTable"></table></div>
+        <div class="ox-auto"><table class="data" id="btTable"></table></div>
       </div>
       <div>
         <div class="card"><h2>Feature decisions</h2><div id="featureLog" class="small mono"></div></div>
@@ -663,66 +725,66 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   </section>
 
   <section id="tab-flat" style="display:none">
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+    <div class="row-head">
       <h2 class="section-head">Flat Ledger — All Games, No Edge Gate</h2>
       <span class="chip dim">Model run on every game regardless of edge</span>
-      <span style="flex:1"></span>
+      <span class="flex-1"></span>
       <button class="primary" onclick="confirmAction('flat_forecast','Run flat forecast on all games for today?')">Run Flat Forecast</button>
     </div>
-    <div class="filters" id="filters_F" style="margin-bottom:12px"></div>
-    <div id="flatKpis" class="kpis" style="margin-bottom:16px"></div>
+    <div class="filters mb-12" id="filters_F"></div>
+    <div id="flatKpis" class="kpis mb-16"></div>
     <div class="card">
       <div class="ledger-scroll"><table class="ledger" id="flatTable"><tr><td>Loading…</td></tr></table></div>
     </div>
   </section>
 
   <section id="tab-v9-ledger" style="display:none">
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+    <div class="row-head">
       <h2 class="section-head">MLB v9 Ledger — Challenger Benchmark (1.0U)</h2>
       <span class="chip dim">Challenger model run on every MLB game regardless of edge</span>
-      <span style="flex:1"></span>
+      <span class="flex-1"></span>
       <button class="primary" onclick="confirmAction('v9_forecast','Run MLB v9 flat forecast for today?')">Run MLB v9 Forecast</button>
       <button onclick="confirmAction('v9_settle','Settle open MLB v9 benchmark games?')">Settle MLB v9</button>
     </div>
-    <div class="filters" id="filters_V9" style="margin-bottom:12px"></div>
-    <div id="v9LedgerKpis" class="kpis" style="margin-bottom:16px"></div>
+    <div class="filters mb-12" id="filters_V9"></div>
+    <div id="v9LedgerKpis" class="kpis mb-16"></div>
     <div class="card">
       <div class="ledger-scroll"><table class="ledger" id="v9LedgerTable"><tr><td>Loading…</td></tr></table></div>
     </div>
   </section>
 
   <section id="tab-poly-ledger" style="display:none">
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+    <div class="row-head">
       <h2 class="section-head">Polymarket Edge Ledger — Executed & Scanned Trades</h2>
       <span class="chip dim">Recorded picks & Quarter-Kelly tickets from Polymarket CLOB Edge Scanner</span>
-      <span style="flex:1"></span>
+      <span class="flex-1"></span>
       <button onclick="gotoTab('polymarket')">Back to Edge Scanner</button>
       <button class="primary" onclick="confirmAction('settle_polymarket','Settle open Polymarket edge ledger trades?')">Settle Polymarket Trades</button>
     </div>
-    <div class="filters" id="filters_PL" style="margin-bottom:12px"></div>
-    <div id="polyLedgerKpis" class="kpis" style="margin-bottom:16px"></div>
+    <div class="filters mb-12" id="filters_PL"></div>
+    <div id="polyLedgerKpis" class="kpis mb-16"></div>
     <div class="card">
       <div class="ledger-scroll"><table class="ledger" id="polyLedgerTable"><tr><td>Loading Polymarket trades…</td></tr></table></div>
     </div>
   </section>
 
   <section id="tab-auto-buyer-ledger" style="display:none">
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+    <div class="row-head">
       <h2 class="section-head">Auto-Buyer Ledger — Execution & Realized Settlement</h2>
       <span class="chip dim">Live automated Polymarket executions · configurable future-order unit value · ESPN official outcome settlement · Realized ROI & P&L accounting</span>
-      <span style="flex:1"></span>
+      <span class="flex-1"></span>
       <label class="chip" title="Changes future Auto-Buyer sizing only; historical rows retain their execution-time unit value">Auto-Buyer 1U = $<input id="autoBuyerUnitValueInput" aria-label="Auto-Buyer dollar value of one unit" type="number" min="0.01" max="100000" step="0.01" value="0.50" style="width:68px;padding:2px 4px" onkeydown="if(event.key==='Enter')saveAutoBuyerUnitValue()"><button onclick="saveAutoBuyerUnitValue()" style="padding:2px 7px">Set</button></label>
       <button onclick="renderAutoBuyer(true)">↻ Refresh</button>
-      <button onclick="runAutoBuyerNow()" style="background:rgba(51,209,126,0.15);color:var(--green);font-weight:700">⚡ Run Auto-Buyer</button>
-      <button class="primary" id="btnSettleAutoBuyerNow" onclick="settleAutoBuyerTrades(true)" style="font-weight:700">⚖️ Settle Auto-Buyer Positions</button>
+      <button onclick="runAutoBuyerNow()" style="background:rgba(51,209,126,0.15);color:var(--green);font-weight:700">Run Auto-Buyer</button>
+      <button class="primary fw-7" id="btnSettleAutoBuyerNow" onclick="settleAutoBuyerTrades(true)"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M3 14h10M3 5h10M3 5l-2 5a2 2 0 0 0 4 0L3 5zm10 0l-2 5a2 2 0 0 0 4 0l-2-5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg> Settle Auto-Buyer Positions</button>
     </div>
-    <div id="autoBuyerKpis" class="kpis" style="margin-bottom:16px"></div>
+    <div id="autoBuyerKpis" class="kpis mb-16"></div>
     <div id="autoBuyerSettleKpis" class="kpis" style="display:none"></div>
 
     <div class="filter-bar" style="margin-bottom:14px;display:flex;gap:8px;align-items:center">
       <button class="primary" id="btnAutoBuyerLedgerView" onclick="setAutoBuyerView('ledger')">Ledger</button>
       <button id="btnAutoBuyerPerformanceView" onclick="setAutoBuyerView('performance')">Performance</button>
-      <span style="flex:1"></span>
+      <span class="flex-1"></span>
       <span class="small dim">Source:</span>
       <button class="primary" id="btnAutoBuyerSourceLive" onclick="setAutoBuyerLedgerSource('live')" title="Real Polymarket executions">Live</button>
       <button id="btnAutoBuyerSourcePaper" onclick="setAutoBuyerLedgerSource('paper')" title="Simulated paper fills, no real orders">Paper</button>
@@ -746,8 +808,8 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     </div>
 
     <div class="card" id="absPendingCard" style="margin-bottom:16px;display:none">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <h3 style="margin:0">Pending Settlement Queue (<span id="absPendingBadge">0</span>)</h3>
+      <div class="row-between">
+        <h3 class="m-0">Pending Settlement Queue (<span id="absPendingBadge">0</span>)</h3>
         <span class="small dim">Awaiting match completion or official box score ingest</span>
       </div>
       <div class="ledger-scroll">
@@ -755,9 +817,9 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
       </div>
     </div>
 
-    <div class="card" style="margin-bottom:16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <h3 style="margin:0" id="absTableTitle">Settled Positions & Realized Trade Log</h3>
+    <div class="card mb-16">
+      <div class="row-between">
+        <h3 class="m-0" id="absTableTitle">Settled Positions & Realized Trade Log</h3>
         <span class="small dim" id="absSettledSummary">Showing settled contracts</span>
       </div>
       <div class="ledger-scroll">
@@ -767,8 +829,8 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     </div>
 
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <h3 style="margin:0">Operational Execution Log (data/logs/auto_buyer.log)</h3>
+      <div class="row-between">
+        <h3 class="m-0">Operational Execution Log (data/logs/auto_buyer.log)</h3>
         <button onclick="loadAutoBuyerLog()" style="padding:2px 8px;font-size:11px">↻ Refresh Log</button>
       </div>
       <pre id="autoBuyerLogBox" style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:var(--mono);font-size:11px;max-height:260px;overflow-y:auto;white-space:pre-wrap;color:var(--text)">Loading operational log…</pre>
@@ -776,7 +838,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     </div>
 
     <div id="autoBuyerPerformancePanel" style="display:none">
-      <div id="autoBuyerPerformanceCohorts" class="kpis" style="margin-bottom:16px"></div>
+      <div id="autoBuyerPerformanceCohorts" class="kpis mb-16"></div>
       <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
         <div class="card" style="flex:2;min-width:320px">
           <h3 style="margin:0 0 8px">Cumulative Realized P&amp;L</h3>
@@ -787,18 +849,18 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
           <canvas id="autoBuyerSportPnl" height="180"></canvas>
         </div>
       </div>
-      <div class="card" style="margin-bottom:16px">
+      <div class="card mb-16">
         <h3 style="margin:0 0 10px">By Sport</h3>
-        <div style="overflow-x:auto">
+        <div class="ox-auto">
           <table class="data" id="autoBuyerSportTable"><tr><td>Loading sport breakdown…</td></tr></table>
         </div>
       </div>
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px">
-          <h3 style="margin:0">Day-by-Day Settled Performance</h3>
+          <h3 class="m-0">Day-by-Day Settled Performance</h3>
           <span class="small dim">Pending positions excluded</span>
         </div>
-        <div style="overflow-x:auto">
+        <div class="ox-auto">
           <table class="data" id="autoBuyerDailyPerformanceTable"><tr><td>Loading settled performance…</td></tr></table>
         </div>
       </div>
@@ -808,17 +870,17 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   <!-- Legacy Tab Alias Anchor (Maintains Full Routing Parity) -->
 
   <section id="tab-manual-bets" style="display:none">
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+    <div class="row-head">
       <h2 class="section-head">Manual Bets Ledger</h2>
       <span class="chip dim">Bets you place by hand on any book/exchange — tracked separately from Auto-Buyer</span>
-      <span style="flex:1"></span>
+      <span class="flex-1"></span>
       <label class="chip" title="Used to compute exposure % below; does not affect Auto-Buyer">Bankroll $<input id="manualBankrollInput" type="number" min="1" step="1" value="350" style="width:72px;padding:2px 4px" onkeydown="if(event.key==='Enter')saveManualBankroll()"><button onclick="saveManualBankroll()" style="padding:2px 7px">Set</button></label>
       <button onclick="renderManualBets(true)">↻ Refresh</button>
-      <button class="primary" onclick="settleManualBetsNow()" style="font-weight:700">⚖️ Settle Manual Bets</button>
+      <button class="primary fw-7" onclick="settleManualBetsNow()"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M3 14h10M3 5h10M3 5l-2 5a2 2 0 0 0 4 0L3 5zm10 0l-2 5a2 2 0 0 0 4 0l-2-5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg> Settle Manual Bets</button>
     </div>
-    <div id="manualBetsKpis" class="kpis" style="margin-bottom:16px"></div>
+    <div id="manualBetsKpis" class="kpis mb-16"></div>
 
-    <div class="card" style="margin-bottom:16px">
+    <div class="card mb-16">
       <h3 style="margin:0 0 10px">Log a New Bet</h3>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <input id="mbLeague" placeholder="League (e.g. MLB)" size="10">
@@ -837,8 +899,8 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
     </div>
 
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <h3 style="margin:0">Manual Bet Log</h3>
+      <div class="row-between">
+        <h3 class="m-0">Manual Bet Log</h3>
         <span class="small dim">Manual overrides available for markets ESPN can't grade</span>
       </div>
       <div class="ledger-scroll">
@@ -884,7 +946,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
           </span>
         </label>
       </div>
-      <div style="margin-top:12px"><button onclick="saveSettings()">Save</button></div>
+      <div class="mt-12"><button onclick="saveSettings()">Save</button></div>
       <div class="small dim" style="margin-top:10px">Display preferences stay in this browser. The 1U control in the top bar updates the shared bankroll setting used by future dollar displays and order sizing; historical unit records and existing orders do not change.</div>
     </div>
   </section>
@@ -966,7 +1028,7 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
           <button onclick="gotoTab('poly-ledger')">View Polymarket Ledger</button>
         </div>
       </div>
-      <div style="overflow-x:auto">
+      <div class="ox-auto">
         <table class="data" id="polyOrdersTable" style="width:100%;font-family:var(--mono);font-size:12px">
           <thead>
             <tr>
@@ -994,6 +1056,9 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
   </div>
 </div>
 
+<div id="palette" role="dialog" aria-modal="true" aria-label="Jump to section" onclick="if(event.target===this)closePalette()">
+  <div class="palette-box"><input id="paletteInput" aria-label="Search sections" placeholder="Jump to… (type a section name)" autocomplete="off"><ul id="paletteList" role="listbox"></ul><div class="small dim">Up/Down to move, Enter to open, Esc to close</div></div>
+</div>
 <div id="modal" onclick="if(event.target===this)this.style.display='none'">
   <div class="box"><div id="modalBody"></div></div>
 </div>
@@ -1034,13 +1099,14 @@ function setPanelState(id,status,message,retry){
 }
 const observedNow=()=>new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"});
 
+const ICON_SCALE=`<svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M3 14h10M3 5h10M3 5l-2 5a2 2 0 0 0 4 0L3 5zm10 0l-2 5a2 2 0 0 0 4 0l-2-5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>`;
 /* ---------- tabs ---------- */
 $$("#tabs button").forEach(b=>b.onclick=()=>{ 
   $$("#tabs button").forEach(x=>x.classList.remove("on"));
   b.classList.add("on"); 
   $$("section[id^=tab-]").forEach(s=>s.style.display="none");
   $("#tab-"+b.dataset.tab).style.display=""; 
-  setUrlState({tab:b.dataset.tab});
+  setUrlState({tab:b.dataset.tab});try{localStorage.setItem("mp.tab",b.dataset.tab);}catch(e){}
   updateCounts();
   if(b.dataset.tab==="picks")renderPicks();
   // Opening a secondary ledger always refetches it: the periodic refresh skips closed tabs.
@@ -1324,6 +1390,7 @@ function renderStatus(s){
   $("#alertTxt").textContent=`Alerts: ${n}`;
   const hasError=t.status==="failed"||(s.alerts||[]).some(a=>a.level==="error");
   const hasWarning=(s.alerts||[]).some(a=>a.level==="warn");
+  const alertChip=$("#alertChip");if(alertChip)alertChip.dataset.level=hasError?"error":hasWarning?"warn":"";
   $("#alertDot").className="dot "+(hasError?"r":hasWarning?"y":"g");
   $("#updatedTxt").textContent="Updated: "+new Date().toLocaleTimeString();
   const box=$("#alerts"); box.innerHTML="";
@@ -1879,7 +1946,7 @@ function ledgerBody(key,rows,rowHtml,render){
 }
 function ledgerShowMore(key){ledgerLimit[key]=(ledgerLimit[key]||LEDGER_PAGE_SIZE)+LEDGER_PAGE_SIZE;ledgerRerender[key]?.();}
 function ledgerResetPage(key){delete ledgerLimit[key];}
-function ledgerHeaderRow(showCheckbox,mode="default"){
+function ledgerHeaderRowRaw(showCheckbox,mode="default"){
   const cols=[["event_start_utc","Game (ET)"],["league","Sport"],["market_type","Type"],["selection","Pick"],
     ["model_probability","Model"],["market_implied_probability","Pregame close"],["filled_entry","Bought at"],["edge","Decision edge"],
     ["units","Size"],["result","State"],["pnl_units","P&L"]];
@@ -1889,7 +1956,7 @@ function ledgerHeaderRow(showCheckbox,mode="default"){
     :`<th>${l}</th>`).join("");
   return `<tr>${checkboxTh}${headCells}<th>Order</th><th>Matchup</th></tr>`;
 }
-function ledgerRowHtml(p,showCheckbox,mode="default"){
+function ledgerRowHtmlRaw(p,showCheckbox,mode="default"){
   const research=mode==="research",gated=mode==="gated";
   const noCall=String(p.decision||"").toUpperCase()==="NO_CALL";
   const resultState=p.result?`<span class="pill ${p.result}">${p.result}</span>`:(p.status==="open"?'<span class="pill open">open</span>':"");
@@ -1911,6 +1978,34 @@ function ledgerRowHtml(p,showCheckbox,mode="default"){
     <td class="${rowPnl==null?"":pnlClass(rowPnl)}">${rowPnl==null?"—":fmt(rowPnl)}</td>
     <td>${order}</td>
     <td class="dim">${p.away_team} @ ${p.home_team}</td></tr>`;
+}
+/* column roles let CSS right-align numbers, pin the Game column and hide optional columns */
+const LEDGER_COLS=["game","sport","type","pick","model","pregame","bought","edge","size","state","pnl","order","matchup"];
+const LEDGER_NUM=new Set(["model","pregame","bought","edge","size","pnl"]);
+function decorateLedgerCells(html,hasCheckbox){
+  let i=hasCheckbox?-1:0;
+  return html.replace(/<(td|th)(\s[^>]*)?>/g,(m,tag,attrs)=>{
+    const idx=i++;
+    if(idx<0||idx>=LEDGER_COLS.length)return m;
+    const name=LEDGER_COLS[idx],cls=`c-${name}${LEDGER_NUM.has(name)?" num":""}`;
+    attrs=attrs||"";
+    attrs=/\sclass="/.test(attrs)?attrs.replace(/\sclass="([^"]*)"/,(_,c)=>` class="${c} ${cls}"`):attrs+` class="${cls}"`;
+    return `<${tag}${attrs}>`;
+  });
+}
+function ledgerHeaderRow(showCheckbox,mode="default"){applyLedgerCols();return decorateLedgerCells(ledgerHeaderRowRaw(showCheckbox,mode),showCheckbox);}
+function ledgerRowHtml(p,showCheckbox,mode="default"){return decorateLedgerCells(ledgerRowHtmlRaw(p,showCheckbox,mode),showCheckbox);}
+function hiddenLedgerCols(){try{return JSON.parse(localStorage.getItem("mp.hiddenCols")||"[]");}catch(e){return [];}}
+function applyLedgerCols(){
+  const hidden=new Set(hiddenLedgerCols());
+  ["type","bought","size","order","matchup"].forEach(c=>document.body.classList.toggle("hide-col-"+c,hidden.has(c)));
+  $$("input[data-col]").forEach(cb=>{cb.checked=!hidden.has(cb.dataset.col);});
+}
+function toggleLedgerCol(cb){
+  const hidden=new Set(hiddenLedgerCols());
+  if(cb.checked)hidden.delete(cb.dataset.col);else hidden.add(cb.dataset.col);
+  try{localStorage.setItem("mp.hiddenCols",JSON.stringify([...hidden]));}catch(e){}
+  applyLedgerCols();
 }
 /* Each ledger view (Ledger=L, Flat=F, MLB v9=V9, Research=R, Gated=G, Polymarket=PL) gets its own independent
    copy of the filter bar (own sport/market/status/result/search/date-range
@@ -1939,23 +2034,32 @@ function filterBarHTML(tab){
     <label class="small dim" style="margin-left:4px"><input type="checkbox" id="fArchived_${tab}" onchange="onFilterChange('${tab}')"> show hidden (<span id="archCount_${tab}">0</span>)</label>`;
 
   return `
+    <div class="filter-row">
     <button class="primary" id="btnActive_${tab}" onclick="preset('open','${tab}')">Active (<span id="openCount_${tab}">0</span>)</button>
     <button id="btnSettled_${tab}" onclick="preset('settled','${tab}')">Settled (<span id="settledCount_${tab}">0</span>)</button>
     <button id="btnToday_${tab}" onclick="preset('today','${tab}')">Today active</button>
     <button id="btn7d_${tab}" onclick="preset('7d','${tab}')">Active 7d</button>
     <button id="btnAll_${tab}" onclick="preset('all','${tab}')">All picks</button>
     ${archiveTools}
+    </div>
+    <div class="filter-row">
     <span style="width:8px"></span>
     <select aria-label="Filter ${tab} ledger by sport" id="fSport_${tab}" onchange="onFilterChange('${tab}')"><option value="">all sports</option></select>
     <select aria-label="Filter ${tab} ledger by market" id="fMarket_${tab}" onchange="onFilterChange('${tab}')"><option value="">all markets</option></select>
     <select aria-label="Filter ${tab} ledger by status" id="fStatus_${tab}" onchange="onFilterChange('${tab}')"><option value="open" selected>active only</option><option value="settled">settled only</option><option value="">all status</option></select>
     <select aria-label="Filter ${tab} ledger by result" id="fResult_${tab}" onchange="onFilterChange('${tab}')"><option value="">all results</option><option value="win">win</option><option value="loss">loss</option><option value="push">push</option></select>
+    </div>
+    <div class="filter-row">
     <input aria-label="Search ${tab} ledger" id="fSearch_${tab}" placeholder="search team / event id / pick" size="22" oninput="onFilterInput('${tab}')">
     <input aria-label="${tab} start date" id="fFrom_${tab}" type="date" onchange="onFilterChange('${tab}')">
     <input aria-label="${tab} end date" id="fTo_${tab}" type="date" onchange="onFilterChange('${tab}')">
     <button onclick="onFilterChange('${tab}')">Apply</button>
     <button onclick="resetFilters('${tab}')">Reset</button>
-    <button onclick="exportCsv('${tab}')">Export CSV</button>`;
+    <button onclick="exportCsv('${tab}')">Export CSV</button>
+    <details class="view-tools"><summary>Columns</summary><div class="menu col-menu">
+      ${[['type','Type'],['bought','Bought at'],['size','Size'],['order','Order'],['matchup','Matchup']].map(([c,l])=>`<label><input type="checkbox" data-col="${c}" checked onchange="toggleLedgerCol(this)"> ${l}</label>`).join('')}
+    </div></details>
+    </div>`;
 }
 
 function mountFilterBars(){
@@ -2805,15 +2909,15 @@ async function previewPositionSell(i){
 }
 window.previewPositionSell=previewPositionSell;
 async function manualRefresh(btn){
-  const label=btn?btn.textContent:null;
-  if(btn){btn.disabled=true;btn.textContent="↻ …";}
+  const label=btn?btn.innerHTML:null;
+  if(btn){btn.disabled=true;btn.textContent="Refreshing…";}
   try {
     await refreshAll();
     resetTimer();
   } catch(e) {
     console.error("Dashboard refresh failed:", e);
   } finally {
-    if(btn){btn.disabled=false;btn.textContent=label||"↻ Refresh";}
+    if(btn){btn.disabled=false;btn.innerHTML=label||"Refresh";}
   }
 }
 window.manualRefresh=manualRefresh;
@@ -3263,8 +3367,8 @@ async function confirmAction(action,message,extra={}){
     start=await r.json();
   }catch(e){
     showModal(`<h2>${action}</h2><pre class="red">Could not reach the dashboard server (${esc(String(e))}).
-Is dashboard_server.py still running? Start it with:
-  python3 dashboard_server.py</pre>`);
+Is dashboard_server.py still running? Start it from E:\\MP with:
+  .\\dash.ps1</pre>`);
     return;
   }
   if(start.status==="busy"&&start.job_id){pollJob(action,start.job_id);return;}
@@ -3274,8 +3378,26 @@ Is dashboard_server.py still running? Start it with:
   }
   pollJob(action,start.job_id);
 }
+let jobModalDismissed=false,lastJobHtml="",jobChipTimer=null;
+function setJobChip(label,state){
+  const c=$("#jobChip");if(!c)return;
+  clearTimeout(jobChipTimer);
+  if(!label){c.hidden=true;return;}
+  c.hidden=false;$("#jobChipTxt").textContent=label;
+  $("#jobChipDot").className="dot "+(state==="running"?"y":state==="ok"?"g":state==="skipped"?"gray":"r");
+}
+function reopenJobModal(){jobModalDismissed=false;if(lastJobHtml){showModal(lastJobHtml);$("#modalBody").dataset.job="1";}}
 async function pollJob(action,jobId){
-  let misses=0;
+  let misses=0,lastViewShown=false;
+  jobModalDismissed=false;
+  const view=html=>{
+    lastJobHtml=html;
+    const modal=$("#modal"),body=$("#modalBody");
+    // a closed modal (or one now showing something else) means the user moved on: keep updating the chip only
+    if(lastViewShown&&(modal.style.display==="none"||body.dataset.job!==jobId))jobModalDismissed=true;
+    if(jobModalDismissed)return;
+    showModal(html);body.dataset.job=jobId;lastViewShown=true;
+  };
   const tick=async()=>{
     let d;
     try{
@@ -3284,28 +3406,31 @@ async function pollJob(action,jobId){
     }catch(e){
       misses++;
       if(misses<=5){ // server may be briefly busy or restarting — retry
-        showModal(`<h2>${action} <span class="yellow">⏳ reconnecting (${misses}/5)…</span></h2>
+        setJobChip(`${action} · reconnecting`,"running");
+        view(`<h2>${action} <span class="yellow">reconnecting (${misses}/5)…</span></h2>
           <div class="dim small">temporary loss of contact; retrying every 3s</div>`);
         setTimeout(tick,3000);return;
       }
-      showModal(`<h2>${action}</h2><pre class="red">Lost contact with the dashboard server after 5 retries (${esc(String(e))}).
-The server process has stopped. Restart it through its launchd service:
-  launchctl kickstart -k gui/$(id -u)/com.vc.model-dashboard
-(Do not start it by hand — one launchd-owned instance is the contract.)
+      setJobChip(`${action} · lost contact`,"error");
+      view(`<h2>${action}</h2><pre class="red">Lost contact with the dashboard server after 5 retries (${esc(String(e))}).
+The server process has stopped. Restart it from E:\\MP with:
+  .\\dash.ps1
 Crash details, if any, are in dashboard/server.log</pre>`);
       return;
     }
-    const spin=d.status==="running"?` <span class="yellow">⏳ running · ${d.seconds||0}s</span>`:
-      d.status==="ok"?' <span class="green">✔ done</span>':
-      d.status==="skipped"?` <span class="yellow">⏭ skipped — another run already active</span>`:
-      `<span class="red">✖ ${d.status}</span>`;
-    showModal(`<h2>${action}${spin}</h2>
+    const spin=d.status==="running"?` <span class="yellow"><span class="dot y"></span> running · ${d.seconds||0}s</span>`:
+      d.status==="ok"?' <span class="green"><span class="dot g"></span> done</span>':
+      d.status==="skipped"?` <span class="yellow"><span class="dot gray"></span> skipped, another run already active</span>`:
+      `<span class="red"><span class="dot r"></span> ${d.status}</span>`;
+    setJobChip(d.status==="running"?`${action} · ${d.seconds||0}s`:`${action} · ${d.status==="ok"?"done":d.status}`,d.status);
+    view(`<h2>${action}${spin}</h2>
       <div class="dim small">${d.command||""}</div>
       <pre>${esc(d.output_tail||d.error||"(no output yet)")}</pre>`);
     if(d.status==="running"){setTimeout(tick,2000);}
     else{
+      jobChipTimer=setTimeout(()=>setJobChip(null),8000);
       refreshAll();
-      if(action==="daily"&&d.status==="ok"){
+      if(action==="daily"&&d.status==="ok"&&!jobModalDismissed){
         setTimeout(()=>{$("#modal").style.display="none";gotoTab("today");renderToday();},1200);
       }
     }
@@ -3322,7 +3447,7 @@ function bootstrapDialog(){
 window.confirmAction=confirmAction; window.bootstrapDialog=bootstrapDialog;
 
 /* ---------- modal ---------- */
-function showModal(html){$("#modalBody").innerHTML=html;$("#modal").style.display="flex";}
+function showModal(html){const b=$("#modalBody");b.innerHTML=html;delete b.dataset.job;$("#modal").style.display="flex";}
 const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 let drawerReturnFocus=null;
 function detailGrid(items){
@@ -3421,6 +3546,31 @@ function renderIntegrity(){
 }
 document.addEventListener("keydown",event=>{if(event.key==="Escape"){closeDrawer();$("#modal").style.display="none";}});
 
+/* ---------- command palette (Ctrl/Cmd+K) ---------- */
+let paletteIdx=0,paletteItems=[];
+function renderPalette(q){
+  const seen=new Set();
+  const all=$$("#tabs button").filter(b=>!b.disabled&&!seen.has(b.dataset.tab)&&seen.add(b.dataset.tab)).map(b=>({
+    tab:b.dataset.tab,label:b.textContent.trim(),group:(b.closest(".rail-group")?.querySelector(".rail-label")?.textContent||"").trim()}));
+  q=(q||"").toLowerCase();
+  paletteItems=all.filter(x=>(x.label+" "+x.group).toLowerCase().includes(q));
+  paletteIdx=Math.min(paletteIdx,Math.max(0,paletteItems.length-1));
+  $("#paletteList").innerHTML=paletteItems.map((x,i)=>`<li role="option" class="${i===paletteIdx?"on":""}" data-i="${i}">${esc(x.label)}<small>${esc(x.group)}</small></li>`).join("")||'<li class="dim">No matching section</li>';
+}
+function openPalette(){const el=$("#palette");el.style.display="flex";paletteIdx=0;const i=$("#paletteInput");i.value="";renderPalette("");i.focus();}
+function closePalette(){$("#palette").style.display="none";}
+function paletteGo(i){const x=paletteItems[i];if(!x)return;closePalette();gotoTab(x.tab);}
+$("#paletteInput").addEventListener("input",e=>{paletteIdx=0;renderPalette(e.target.value);});
+$("#paletteInput").addEventListener("keydown",e=>{
+  if(e.key==="ArrowDown"){e.preventDefault();paletteIdx=Math.min(paletteItems.length-1,paletteIdx+1);renderPalette(e.target.value);}
+  else if(e.key==="ArrowUp"){e.preventDefault();paletteIdx=Math.max(0,paletteIdx-1);renderPalette(e.target.value);}
+  else if(e.key==="Enter"){e.preventDefault();paletteGo(paletteIdx);}
+  else if(e.key==="Escape"){closePalette();}
+});
+$("#paletteList").addEventListener("click",e=>{const li=e.target.closest("li[data-i]");if(li)paletteGo(Number(li.dataset.i));});
+document.addEventListener("keydown",e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();openPalette();}
+});
 /* ---------- refresh loop ---------- */
 let timer=null,remaining=0;
 function resetTimer(){
@@ -3428,14 +3578,46 @@ function resetTimer(){
   const every=parseInt(state.settings.refresh??"300",10);
   if(!every){$("#countdown").textContent="manual";return;}
   remaining=every;
-  timer=setInterval(()=>{remaining--; $("#countdown").textContent=remaining;
+  timer=setInterval(()=>{
+    if(document.hidden)return; // no polling while the tab is in the background
+    remaining--; $("#countdown").textContent=remaining;
     if(remaining<=0){remaining=every;refreshAll();}},1000);
 }
+document.addEventListener("visibilitychange",()=>{
+  // returning to the tab after a stale gap: refresh on the next tick instead of waiting out the countdown
+  if(!document.hidden&&timer&&remaining<parseInt(state.settings.refresh??"300",10)*0.5)remaining=1;
+});
 function currentActiveTab(){
   const onBtn = $("#tabs button.on");
   return onBtn ? onBtn.dataset.tab : "rebuild";
 }
 
+/* ---------- production overview strip + stale banner ---------- */
+function setStaleBanner(show,failed){
+  const b=$("#staleBanner");if(!b)return;
+  b.hidden=!show;
+  if(show)$("#staleTxt").textContent=`Some data may be stale: ${failed||"all"} request${failed===1?"":"s"} failed on the last refresh (${observedNow()}).`;
+}
+function renderOverview(){
+  const el=$("#overviewStrip");if(!el)return;
+  const s=state.status||{},p=state.perf||{};
+  const ab=(typeof _autoBuyerStatusCache!=="undefined"&&_autoBuyerStatusCache)||{};
+  const alerts=s.alerts||[];
+  const errs=alerts.filter(a=>a.level==="error").length,warns=alerts.filter(a=>a.level==="warn").length;
+  const dp=s.daily_pipeline||{};
+  const pnl=Number(p.total_pnl);
+  const abMode=String(ab.mode||"paper").toLowerCase();
+  const items=[
+    {tab:"perf",label:"Total P&L",value:Number.isFinite(pnl)?`${pnl>=0?"+":""}${pnl.toFixed(2)}U`:"—",cls:Number.isFinite(pnl)?pnlClass(pnl):"",sub:p.roi!=null?`ROI ${pct(p.roi)}`:""},
+    {tab:"perf",label:"Win rate",value:pct(p.win_rate),sub:p.settled!=null?`${Number(p.settled).toLocaleString()} settled`:""},
+    {tab:"picks",label:"Open picks",value:p.open??"—",sub:s.unit_value_usd!=null?`1U = $${Number(s.unit_value_usd).toFixed(2)}`:""},
+    {tab:"health",label:"Alerts",value:alerts.length,level:errs?"bad":warns?"warn":"",sub:errs?`${errs} error${errs>1?"s":""}`:warns?`${warns} warning${warns>1?"s":""}`:"all clear"},
+    {tab:"health",label:"Pipeline",value:dp.last_run_at_utc?(dp.stale?"STALE":"OK"):"—",level:dp.stale?"bad":"",sub:dp.age_hours!=null?`${dp.age_hours}h ago`:""},
+    {tab:"auto-buyer-ledger",label:"Auto-Buyer",value:ab.enabled?abMode.toUpperCase():"OFF",level:ab.enabled&&abMode==="live"?"bad":"",sub:ab.enabled?"enabled":"disabled"}
+  ];
+  el.innerHTML=items.map(i=>`<button class="ov-item ${i.level||""}" onclick="gotoTab('${i.tab}')" title="Open ${esc(i.label)} details">
+    <span class="ov-label">${esc(i.label)}</span><span class="ov-value ${i.cls||""}">${esc(i.value)}</span><span class="ov-sub">${esc(i.sub||"")}</span></button>`).join("");
+}
 async function refreshAll(){
   // Each ledger's count badges only show on its own tab, so the periodic refresh
   // fetches a secondary ledger only while its tab is open. Opening the tab forces
@@ -3453,6 +3635,8 @@ async function refreshAll(){
 
   const core = coreResults.status === "fulfilled" ? coreResults.value : [];
   const [statusResult,matrixResult,picksResult,perfResult,evidenceResult,modelLedgersResult] = core;
+  const failedCore=core.filter(r=>r.status==="rejected").length;
+  setStaleBanner(coreResults.status!=="fulfilled"||failedCore>0,failedCore);
 
   if(statusResult?.status==="fulfilled") renderStatus(statusResult.value);
   else setPanelState("healthMeta","error",`Health request failed: ${statusResult?.reason?.message||"unknown error"}`,"refreshAll()");
@@ -3483,6 +3667,7 @@ async function refreshAll(){
   }
 
   updateCounts();
+  renderOverview();
   populateFilters();
   renderIntegrity();
 
@@ -3574,7 +3759,7 @@ function renderPolymarketOrdersTable(orders) {
 
     const age = o.observed_at_utc ? ageInfo(o.observed_at_utc, 15) : null;
     const ageBadge = age
-      ? `<span class="health-state ${age.stale ? "warn" : "ok"}" style="padding:1px 5px;font-size:10px;border-radius:4px">${age.stale ? "! " + age.label : "✓ " + age.label}</span>`
+      ? `<span class="health-state ${age.stale ? "warn" : "ok"}" style="padding:1px 5px;font-size:11px;border-radius:4px">${age.stale ? "! " + age.label : "✓ " + age.label}</span>`
       : "";
 
     const targetTeam = o.target_selection || (isYes ? (o.home_team || "YES") : (o.away_team || "NO"));
@@ -3596,7 +3781,7 @@ function renderPolymarketOrdersTable(orders) {
           <div class="dim small" style="font-family:var(--mono);display:flex;gap:6px;align-items:center;margin-top:2px">
             <span>ID: ${esc(o.market_id)}</span>
             ${ageBadge}
-            <span class="health-state" style="font-size:10px;padding:1px 5px;background:rgba(255,255,255,.06);color:var(--text);border-radius:4px">Depth: ${((o.depth_imbalance || 0.5) * 100).toFixed(0)}% Bid · ${o.spread_cents ? o.spread_cents.toFixed(1) : "1.0"}¢ Spread</span>
+            <span class="health-state" style="font-size:11px;padding:1px 5px;background:rgba(255,255,255,.06);color:var(--text);border-radius:4px">Depth: ${((o.depth_imbalance || 0.5) * 100).toFixed(0)}% Bid · ${o.spread_cents ? o.spread_cents.toFixed(1) : "1.0"}¢ Spread</span>
           </div>
         </td>
         <td>
@@ -3665,6 +3850,7 @@ function updateAutoBuyerUI(data){
   const pillDot=$("#autoBuyerDot");
   if(pillDot)pillDot.className="dot "+({live:"r",paper:"g",armed:"y",off:"gray"}[state]);
   $("#statusbar").classList.toggle("live-on",state==="live");
+  renderOverview();
   for(const [id,target] of [["autoBuyerPaperBtn","paper"],["autoBuyerLiveBtn","live"]]){
     const modeBtn=$("#"+id);
     if(!modeBtn)continue;
@@ -4459,7 +4645,7 @@ async function settleAutoBuyerTrades(fromButton = false) {
   } catch (e) {
     alert("Auto-Buyer settlement failed: " + e);
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = "⚖️ Settle Auto-Buyer Positions"; }
+    if (btn) { btn.disabled = false; btn.innerHTML = ICON_SCALE+" Settle Auto-Buyer Positions"; }
   }
 }
 
@@ -4504,7 +4690,8 @@ setControlFromUrl("todayActionable","today_actionable",true);setControlFromUrl("
 setControlFromUrl("folioFrom","folio_from");setControlFromUrl("folioTo","folio_to");
 setControlFromUrl("folioType","folio_type");setControlFromUrl("folioAttribution","folio_attribution");
 setControlFromUrl("folioPageSize","folio_rows");
-const requestedTab=initialUrlState.get("tab");
+let savedTab=null;try{savedTab=localStorage.getItem("mp.tab");}catch(e){}
+const requestedTab=initialUrlState.get("tab")||savedTab;
 if(requestedTab&&$("#tab-"+requestedTab))gotoTab(requestedTab);
 else gotoTab("production");
 refreshAll();resetTimer();
