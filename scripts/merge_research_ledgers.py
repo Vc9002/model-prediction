@@ -33,6 +33,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from model_prediction.ledger import PickLedger
+from model_prediction.main_ledgers import flat_ledger_path, main_ledger_path
 from model_prediction.research_ledgers import RESEARCH_LEDGER_SPORTS
 from model_prediction.runtime_ledger_store import LedgerMutation, RuntimeLedgerStore
 from model_prediction.runtime_paths import RuntimePaths
@@ -167,7 +169,41 @@ def summarize(rows: list[dict[str, Any]]) -> list[str]:
     return lines
 
 
-def run(paths: RuntimePaths, *, apply: bool) -> dict[str, Any]:
+def destination_workbooks(conn: sqlite3.Connection) -> set[tuple[str, str]]:
+    """(sport, tier) of every Main / Flat group already holding rows for the research sports."""
+    sports = ",".join("?" for _ in RESEARCH_LEDGER_SPORTS)
+    rows = conn.execute(
+        f"SELECT DISTINCT sport, ledger_tier FROM ledger_records "
+        f"WHERE ledger_tier IN ('main', 'flat') AND sport IN ({sports})",
+        RESEARCH_LEDGER_SPORTS,
+    )
+    return {(sport, tier) for sport, tier in rows}
+
+
+def rebuild_exports(store: RuntimeLedgerStore, data_root: Path, targets: set[tuple[str, str]]) -> int:
+    """Rebuild the XLSX projection of every listed (sport, tier) Main / Flat workbook.
+
+    Copies go straight into the canonical SQLite store, so the per-sport workbooks (which the
+    dashboard reads) would otherwise only catch up on the next forecast write for that sport.
+    """
+    rebuilt = 0
+    for sport, tier in sorted(targets):
+        path = main_ledger_path(data_root, sport) if tier == "main" else flat_ledger_path(data_root, sport)
+        ledger = PickLedger(
+            path,
+            audit_path=data_root / "events.jsonl",
+            model_ledgers_dir=data_root / "model_ledgers",
+            tier=tier,
+            mirror=store,
+            authority="sqlite",
+            sport=sport,
+        )
+        ledger.rebuild_xlsx_projection()
+        rebuilt += 1
+    return rebuilt
+
+
+def run(paths: RuntimePaths, *, apply: bool, data_root: Path | None = None) -> dict[str, Any]:
     db = Path(paths.ledgers_db)
     if not db.exists():
         raise FileNotFoundError(f"ledger database not found: {db}")
@@ -175,7 +211,13 @@ def run(paths: RuntimePaths, *, apply: bool) -> dict[str, Any]:
         source_rows = load_source_rows(conn)
         destination_keys = load_destination_keys(conn)
     chosen, stats = plan_rows(source_rows, destination_keys)
-    result: dict[str, Any] = {**stats, "applied": 0, "summary": summarize(chosen), "integrity_ok": None}
+    result: dict[str, Any] = {
+        **stats,
+        "applied": 0,
+        "summary": summarize(chosen),
+        "integrity_ok": None,
+        "exports_rebuilt": 0,
+    }
     if not apply:
         return result
     with RuntimeLedgerStore(paths) as store:
@@ -183,6 +225,9 @@ def run(paths: RuntimePaths, *, apply: bool) -> dict[str, Any]:
             if store.apply(to_mutation(row)):
                 result["applied"] += 1
         ok, problems = store.verify_integrity()
+        with sqlite3.connect(f"file:{db.as_posix()}?mode=ro", uri=True) as conn:
+            targets = destination_workbooks(conn)
+        result["exports_rebuilt"] = rebuild_exports(store, data_root or paths.repo_root / "data", targets)
     result["integrity_ok"] = ok
     result["integrity_problems"] = problems[:5]
     return result
@@ -192,20 +237,24 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--runtime-root", default=os.environ.get("MODEL_PREDICTION_RUNTIME_ROOT", ""))
     parser.add_argument("--repo-root", default=str(Path(__file__).resolve().parents[1]))
+    parser.add_argument("--data-root", default="", help="workbook directory (default: <repo-root>/data)")
     parser.add_argument("--apply", action="store_true", help="write the copies (default is a dry run)")
     args = parser.parse_args(argv)
     if not args.runtime_root:
         print("set --runtime-root or MODEL_PREDICTION_RUNTIME_ROOT", file=sys.stderr)
         return 2
     paths = RuntimePaths(repo_root=Path(args.repo_root), runtime_root=Path(args.runtime_root))
-    result = run(paths, apply=args.apply)
+    result = run(paths, apply=args.apply, data_root=Path(args.data_root) if args.data_root else None)
     print("\n".join(result["summary"]))
     print(
         f"source settled rows {result['source_rows']}, duplicate rows dropped {result['duplicate_rows_dropped']}, "
         f"already present {result['already_present']}, to copy {result['to_copy']}"
     )
     if args.apply:
-        print(f"applied {result['applied']} mutations; hash chain intact: {result['integrity_ok']}")
+        print(
+            f"applied {result['applied']} mutations; hash chain intact: {result['integrity_ok']}; "
+            f"workbook exports rebuilt: {result['exports_rebuilt']}"
+        )
         if result["integrity_ok"] is False:
             print("integrity problems:", result["integrity_problems"], file=sys.stderr)
             return 1

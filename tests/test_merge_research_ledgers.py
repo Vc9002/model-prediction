@@ -121,3 +121,15 @@ def test_existing_destination_key_is_never_overwritten(tmp_path) -> None:
         flat = {r["pick_id"]: r for r in store.records(tier="flat")}
         assert set(flat) == {"flat-existing", "r-two"}
         assert flat["flat-existing"]["pnl_units"] == 5.0
+
+
+def test_apply_rebuilds_the_workbooks_the_dashboard_reads(tmp_path) -> None:
+    paths = RuntimePaths.for_test(tmp_path)
+    _seed(paths)
+    data_root = tmp_path / "data"
+
+    result = merge.run(paths, apply=True, data_root=data_root)
+
+    assert result["exports_rebuilt"] == 2  # cs2 flat and cs2 main
+    assert (data_root / "sports" / "cs2" / "flat.xlsx").exists() or (data_root / "flat" / "cs2.xlsx").exists()
+    assert (data_root / "sports" / "cs2" / "main.xlsx").exists() or (data_root / "main" / "cs2.xlsx").exists()
