@@ -879,6 +879,8 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
             <label><input type="checkbox" class="sSport" value="hockey" checked>Hockey</label>
             <label><input type="checkbox" class="sSport" value="darts" checked>Darts</label>
             <label><input type="checkbox" class="sSport" value="ncaab" checked>NCAAB</label>
+            <label><input type="checkbox" class="sSport" value="euroleague" checked>Euroleague</label>
+            <label><input type="checkbox" class="sSport" value="nbl" checked>NBL</label>
           </span>
         </label>
       </div>
@@ -1008,7 +1010,7 @@ const state={picks:[],perf:null,matrix:null,status:null,productionEvidence:null,
   settings:JSON.parse(localStorage.getItem("dash-settings")||"{}")};
 const fmt=(v,d=2)=>v==null?"—":Number(v).toFixed(d);
 const pct=v=>v==null?"—":(100*v).toFixed(1)+"%";
-const ALL_SPORTS=["mlb","nba","wnba","nfl","ncaaf","soccer","tennis","lol","cs2","dota2","valorant","rainbow_six","kbo","npb","hockey","darts","ncaab"];
+const ALL_SPORTS=["mlb","nba","wnba","nfl","ncaaf","soccer","tennis","lol","cs2","dota2","valorant","rainbow_six","kbo","npb","hockey","darts","ncaab","euroleague","nbl"];
 const urlParams=()=>new URLSearchParams(location.search);
 const initialUrlState=urlParams();
 function setUrlState(patch){
