@@ -752,3 +752,67 @@ def test_log_and_settle_esports_derivatives(tmp_path, monkeypatch) -> None:
     res_total = _settle_esports_pick(total_row, ledger)
     assert res_total is not None and res_total.get("settled") is True
     assert res_total["result"] == "win"
+
+
+def _moneyline_row() -> dict:
+    return {
+        "pick_id": "p1",
+        "league": "CS2",
+        "market_type": "moneyline",
+        "selection": "home",
+        "home_team": "FORZE Reload",
+        "away_team": "BakS eSports",
+        "event_start_utc": "2026-10-18T17:15:00Z",
+        "rationale": "Neutral Elo baseline; executable ask 0.5900 (market_slug=aec-cs2-forzer-baks-2026-10-18).",
+    }
+
+
+class _CaptureSettleLedger:
+    def __init__(self) -> None:
+        self.settled: list[tuple] = []
+
+    def settle(self, pick_id, away_score, home_score, *args, **kwargs):
+        self.settled.append((pick_id, away_score, home_score))
+        return {"result": "win" if home_score > away_score else "loss"}
+
+
+def _patch_polymarket(monkeypatch, *, status: str, book_state: str, prices=("1", "0")):
+    from model_prediction.data_sources import polymarket_us
+
+    class Client:
+        def market(self, slug):
+            return {
+                "status": status,
+                "marketSides": [
+                    {"description": "FORZE Reload", "price": prices[0]},
+                    {"description": "BakS eSports", "price": prices[1]},
+                ],
+            }
+
+        def book(self, slug):
+            return {"state": book_state}
+
+    monkeypatch.setattr(polymarket_us, "PolymarketUSClient", Client)
+
+
+def test_resolved_market_with_an_open_empty_book_still_settles(monkeypatch) -> None:
+    """A resolved CS2 market kept reporting MARKET_STATE_OPEN with no quotes; settlement only looked at the
+    book state, so the pick sat open until the seven-day void."""
+    from model_prediction.cli import _settle_esports_pick
+
+    _patch_polymarket(monkeypatch, status="MARKET_STATUS_RESOLVED", book_state="MARKET_STATE_OPEN")
+    ledger = _CaptureSettleLedger()
+    result = _settle_esports_pick(_moneyline_row(), ledger)
+    assert result == {"pick_id": "p1", "result": "win", "settled": True}
+    assert ledger.settled == [("p1", 0, 1)]  # home team won
+
+
+def test_unresolved_market_with_an_open_book_stays_pending(monkeypatch) -> None:
+    from model_prediction.cli import _settle_esports_pick
+
+    _patch_polymarket(
+        monkeypatch, status="MARKET_STATUS_ACTIVE", book_state="MARKET_STATE_OPEN", prices=("0.6", "0.4")
+    )
+    ledger = _CaptureSettleLedger()
+    assert _settle_esports_pick(_moneyline_row(), ledger) is None
+    assert ledger.settled == []

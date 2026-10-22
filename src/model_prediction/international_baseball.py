@@ -47,6 +47,10 @@ from .validation import (
 
 KBO_SCHEDULE_PAGE = "https://www.koreabaseball.com/Schedule/Schedule.aspx"
 KBO_RESULTS_ENDPOINT = "https://www.koreabaseball.com/ws/Schedule.asmx/GetScheduleList"
+# Official series ids: "0,9,6" is the regular season only. Postseason games (3, 4, 5, 7) were never
+# fetched, so a postseason pick could not find its result and sat open until it was voided after
+# seven days (Kia Tigers vs LG Twins on 2026-10-17 and 2026-10-20 returned no result).
+KBO_SERIES_IDS = "0,9,6,3,4,5,7"
 NPB_CALENDAR_TEMPLATE = "https://npb.jp/bis/eng/{year}/calendar/index_{month:02d}.html"
 
 KBO_TEAMS = {
@@ -328,7 +332,7 @@ class OfficialInternationalBaseballClient:
                 KBO_RESULTS_ENDPOINT,
                 data={
                     "leId": "1",
-                    "srIdList": "0,9,6",
+                    "srIdList": KBO_SERIES_IDS,
                     "seasonId": str(year),
                     "gameMonth": f"{month:02d}",
                     "teamId": "",
@@ -626,13 +630,20 @@ def find_international_baseball_result(
         away_ids = aliases.get(_identity_key(away_team), set())
         if not home_ids or not away_ids:
             return None
-        for row in _load_games(games_path):
-            if row["game_date"] != game_date:
-                continue
-            if _FABRICATED_KBO_ID_RE.match(str(row["game_id"])):
-                continue
+        games = [
+            row
+            for row in _load_games(games_path)
+            if row["game_date"] == game_date and not _FABRICATED_KBO_ID_RE.match(str(row["game_id"]))
+        ]
+        for row in games:
             if row["home_team_id"] in home_ids and row["away_team_id"] in away_ids:
                 return int(row["away_score"]), int(row["home_score"])
+        # Polymarket's home/away labels do not always match the official schedule (a postseason
+        # game can be listed with the teams swapped: Kia/LG on 2026-10-20). Accept the swapped
+        # orientation and report the scores in the ledger's own away/home order.
+        for row in games:
+            if row["home_team_id"] in away_ids and row["away_team_id"] in home_ids:
+                return int(row["home_score"]), int(row["away_score"])
         return None
 
     result = _match()

@@ -1097,3 +1097,79 @@ def test_forecast_international_baseball_prices_runline_and_totals_derivatives(t
     assert (
         round(over_side["model_fair_settlement_value"] + under_side["model_fair_settlement_value"], 4) == 1.0
     )
+
+
+def test_kbo_client_requests_postseason_series_with_the_regular_season() -> None:
+    """The official endpoint only returns a postseason game when its series id is requested; with
+    only the regular-season ids, a postseason pick never found its result and was voided after a week."""
+    from urllib.parse import parse_qs
+
+    from model_prediction.international_baseball import KBO_SERIES_IDS, OfficialInternationalBaseballClient
+
+    requested: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "POST":
+            requested.append(parse_qs(request.content.decode())["srIdList"][0])
+            return httpx.Response(200, json={"rows": []})
+        return httpx.Response(200, text="<html></html>")
+
+    client = OfficialInternationalBaseballClient(httpx.Client(transport=httpx.MockTransport(handler)))
+    list(client._kbo_month_payloads(2026))
+
+    assert requested and set(requested) == {KBO_SERIES_IDS}
+    assert set(KBO_SERIES_IDS.split(",")) >= {"0", "9", "6", "3", "4", "5", "7"}
+
+
+def test_find_international_baseball_result_accepts_swapped_home_away_and_reorients_scores(tmp_path) -> None:
+    """Polymarket labelled Kia home and LG away for 2026-10-20 while the official schedule had LG home
+    (13-1 for Kia). The ledger's own orientation must come back: (away_score, home_score) = (1, 13)."""
+    _write_completed_games(
+        tmp_path,
+        "kbo",
+        [
+            {
+                "game_id": "kbo:1",
+                "league": "kbo",
+                "game_date": "2026-05-01",
+                "home_team_id": "HANWHA",
+                "away_team_id": "DOOSAN",
+                "home_score": 1,
+                "away_score": 13,
+                "tie": False,
+            }
+        ],
+    )
+    # Ledger says Doosan is home and Hanwha away -- the reverse of the official row.
+    result = find_international_baseball_result(tmp_path, "kbo", "2026-05-01", "Doosan", "Hanwha")
+    assert result == (1, 13)  # (ledger away=Hanwha 1, ledger home=Doosan 13)
+
+
+def test_find_international_baseball_result_prefers_the_exact_orientation(tmp_path) -> None:
+    _write_completed_games(
+        tmp_path,
+        "kbo",
+        [
+            {
+                "game_id": "kbo:1",
+                "league": "kbo",
+                "game_date": "2026-05-01",
+                "home_team_id": "HANWHA",
+                "away_team_id": "DOOSAN",
+                "home_score": 2,
+                "away_score": 3,
+                "tie": False,
+            },
+            {
+                "game_id": "kbo:2",
+                "league": "kbo",
+                "game_date": "2026-05-01",
+                "home_team_id": "DOOSAN",
+                "away_team_id": "HANWHA",
+                "home_score": 6,
+                "away_score": 4,
+                "tie": False,
+            },
+        ],
+    )
+    assert find_international_baseball_result(tmp_path, "kbo", "2026-05-01", "Doosan", "Hanwha") == (4, 6)

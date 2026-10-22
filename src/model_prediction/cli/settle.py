@@ -500,6 +500,23 @@ def _extract_market_slug(rationale: str) -> str | None:
     return match.group(1) if match else None
 
 
+_RESOLVED_MARKET_STATUSES = frozenset({"MARKET_STATUS_RESOLVED"})
+
+
+def _market_is_terminal(market: dict, book: dict) -> bool:
+    """True when a Polymarket contract has finished.
+
+    The book state turns terminal once it expires, but a resolved market can keep reporting an
+    open, empty book (MARKET_STATE_OPEN with no bid or ask) while the market itself is already
+    MARKET_STATUS_RESOLVED with side prices 1 and 0 (CS2 FORZE Reload vs BakS, 2026-10-18, sat
+    open for days). Either signal counts; callers still require clean 1/0 side prices before
+    they settle anything.
+    """
+    if str(book.get("state") or "") in _TERMINAL_MARKET_STATES:
+        return True
+    return str(market.get("status") or "") in _RESOLVED_MARKET_STATUSES
+
+
 def _settle_esports_pick(row: dict, ledger, data_root=None, bo3_client=None) -> dict | None:
     """Settle an esports pick from the exchange's terminal market state.
 
@@ -530,7 +547,7 @@ def _settle_esports_pick(row: dict, ledger, data_root=None, bo3_client=None) -> 
         )
         return None
     book_state = str(book.get("state") or "")
-    if book_state not in _TERMINAL_MARKET_STATES:
+    if not _market_is_terminal(market, book):
         try:
             start_dt = parse_utc(row["event_start_utc"])
             if (utc_now() - start_dt).total_seconds() > 7 * 86400:
