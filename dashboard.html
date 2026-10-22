@@ -50,6 +50,46 @@ h2{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
   #statusbar{gap:8px;padding:7px 10px}
   #statusbar .unit-control,#statusbar .desktop-action{display:none}
 }
+/* status bar clusters: left = system state, right = controls. Controls that are
+   set once and rarely touched live in popovers; the live-order state never hides. */
+#statusbar .bar-cluster{display:flex;gap:10px 16px;flex-wrap:wrap;align-items:center}
+#statusbar .bar-controls{margin-left:auto;gap:8px 10px}
+#statusbar.live-on{border-bottom:2px solid var(--red);box-shadow:0 1px 0 rgba(255,92,92,.35)}
+.bar-menu{position:relative}
+.bar-menu summary{list-style:none;display:inline-flex;align-items:center;gap:6px;min-height:30px;padding:5px 11px;
+  background:var(--surface-2);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:12px;
+  color:var(--text);white-space:nowrap;user-select:none}
+.bar-menu summary::-webkit-details-marker{display:none}
+.bar-menu summary:after{content:"";width:5px;height:5px;border-right:1.5px solid var(--dim);border-bottom:1.5px solid var(--dim);
+  transform:translateY(-2px) rotate(45deg);margin-left:2px}
+.bar-menu[open] summary{border-color:var(--accent)}
+.bar-menu summary:hover{border-color:var(--accent)}
+.bar-menu summary:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.bar-menu .menu{position:absolute;z-index:60;top:calc(100% + 6px);right:0;min-width:300px;display:grid;gap:10px;
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;box-shadow:0 12px 32px rgba(0,0,0,.45);
+  font-family:var(--mono);font-size:12px;color:var(--text)}
+.bar-menu .menu-row{display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--dim)}
+.bar-menu .menu-row>span:first-child,.bar-menu .menu-row>label{color:var(--dim)}
+.bar-menu .menu-note{color:var(--dim);font-size:11px;line-height:1.4;max-width:290px}
+.bar-menu .menu button,.bar-menu .menu input{min-height:30px}
+.bar-menu .menu .menu-actions{display:grid;gap:6px}
+.bar-menu .menu .menu-actions button{text-align:left}
+/* Auto-Buyer: the pill always states ON/OFF and PAPER/LIVE in words and color */
+.ab-pill{font-weight:700;letter-spacing:.02em}
+.ab-pill .dot{box-shadow:none}
+.ab-menu[data-state="paper"] summary{border-color:rgba(91,140,255,.55)}
+.ab-menu[data-state="armed"] summary{border-color:rgba(242,169,60,.6);color:var(--yellow)}
+.ab-menu[data-state="live"] summary{background:var(--red);border-color:var(--red);color:#1a0508}
+.ab-menu[data-state="live"] summary:after{border-color:#1a0508}
+.ab-toggle{min-width:92px;font-weight:700}
+.ab-toggle.off{background:rgba(255,92,92,.14);border-color:rgba(255,92,92,.5);color:var(--red)}
+.ab-toggle.paper{background:var(--accent-dim);border-color:var(--accent);color:var(--text)}
+.ab-toggle.live{background:var(--red);border-color:var(--red);color:#1a0508}
+.ab-seg button{font-weight:700;color:var(--dim);background:transparent}
+.ab-seg button.on{color:var(--text);background:var(--accent-dim)}
+.ab-seg button.on.is-live{color:#1a0508;background:var(--red)}
+@media(max-width:900px){#statusbar .bar-controls{margin-left:0}}
+@media(max-width:650px){.bar-menu .menu{position:fixed;left:12px;right:12px;top:auto;min-width:0}}
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:0 0 auto}
 .dot.g{background:var(--green);box-shadow:0 0 0 3px rgba(51,209,126,.18)}
 .dot.r{background:var(--red);box-shadow:0 0 0 3px rgba(255,92,92,.18)}
@@ -300,31 +340,52 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
 <body>
 
 <div id="statusbar">
-  <span class="chip"><span class="dot gray" id="testDot"></span><span id="testTxt">Tests: not run</span></span>
-  <span class="chip"><span class="dot g"></span><span id="modelsTxt">Models: …</span></span>
-  <span class="chip mono dim status-detail" id="dataTxt">Data: …</span>
-  <span class="chip"><span class="dot gray" id="dailyDot"></span><span id="dailyTxt" title="Split pipeline: settle → flat forecast → main forecast">Pipeline: …</span></span>
-  <span class="chip dim mono status-detail" id="pipelineSteps" style="font-size:10px"></span>
-  <span class="chip"><span class="dot y" id="alertDot"></span><span id="alertTxt">Alerts: 0</span></span>
-  <span class="chip dim" id="updatedTxt">Updated: —</span>
-  <button onclick="manualRefresh(this)" title="Refresh all data now">↻ Refresh</button>
-  <span class="chip dim">auto <span id="countdown" class="mono">—</span>s</span>
-  <button class="status-health-link" onclick="gotoTab('health')" aria-label="Open full system health details">Health details</button>
-  <label class="chip unit-control" title="Changes future dollar displays and order sizing; historical unit records stay unchanged">1U = $<input id="unitValueInput" aria-label="Dollar value of one unit" type="number" min="0.01" max="100000" step="0.01" value="7.50" onkeydown="if(event.key==='Enter')saveUnitValue()"><button onclick="saveUnitValue()">Set</button><input id="autoPctInput" aria-label="Bankroll percentage for one unit" type="number" min="1" max="50" step="0.5" value="10" style="width:42px;padding:1px 2px" title="Percentage of bankroll">%<button onclick="autoUnitValue()" title="Set 1U to this percentage of the live balance; adjusts up or down">Apply</button></label>
-  <div id="autoBuyerTopControl" style="display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:3px 8px;font-family:var(--mono);font-size:11px">
-    <span>Auto-Buyer (<span id="autoBuyerUnitBadge">50¢/U</span>):</span>
-    <button id="autoBuyerToggleBtn" onclick="toggleAutoBuyer()" style="font-weight:700;padding:2px 8px;border-radius:5px;font-size:11px;background:rgba(255,92,92,0.2);color:var(--red)">OFF</button>
-    <div id="autoBuyerModeSeg" style="display:inline-flex;border:1px solid var(--border);border-radius:5px;overflow:hidden">
-      <button id="autoBuyerPaperBtn" onclick="setAutoBuyerMode('paper')" style="font-weight:700;padding:2px 8px;font-size:11px;border:0;border-radius:0">PAPER</button>
-      <button id="autoBuyerLiveBtn" onclick="setAutoBuyerMode('live')" style="font-weight:700;padding:2px 8px;font-size:11px;border:0;border-radius:0">LIVE</button>
-    </div>
-    <button onclick="runAutoBuyerNow()" title="Trigger Auto-Buyer check now" style="padding:2px 6px;font-size:11px">⚡ Run</button>
+  <div class="bar-cluster bar-state">
+    <span class="chip"><span class="dot gray" id="testDot"></span><span id="testTxt">Tests: not run</span></span>
+    <span class="chip"><span class="dot g"></span><span id="modelsTxt">Models: …</span></span>
+    <span class="chip mono dim status-detail" id="dataTxt">Data: …</span>
+    <span class="chip"><span class="dot gray" id="dailyDot"></span><span id="dailyTxt" title="Split pipeline: settle → flat forecast → main forecast">Pipeline: …</span></span>
+    <span class="chip dim mono status-detail" id="pipelineSteps" style="font-size:11px"></span>
+    <span class="chip"><span class="dot y" id="alertDot"></span><span id="alertTxt">Alerts: 0</span></span>
+    <span class="chip dim" id="updatedTxt">Updated: —</span>
+    <button onclick="manualRefresh(this)" title="Refresh all data now">↻ Refresh</button>
+    <span class="chip dim">auto <span id="countdown" class="mono">—</span>s</span>
+    <button class="status-health-link" onclick="gotoTab('health')" aria-label="Open full system health details">Health details</button>
   </div>
-  <span style="flex:1"></span>
-  <button class="desktop-action" onclick="confirmAction('run_tests','Run pytest for the whole suite?')">Run Tests</button>
-  <button class="desktop-action" onclick="bootstrapDialog()">Bootstrap</button>
-  <button onclick="confirmAction('refresh_prices','Refresh executable bid/ask prices for every unique open pick in the ledger?')">Scan Open Ledger Prices</button>
-  <button class="primary" onclick="confirmAction('daily','Run the split daily pipeline (settle → flat forecast → main forecast) for today? Shadow-only; no orders are placed.')">Daily Forecast</button>
+  <div class="bar-cluster bar-controls">
+    <details class="bar-menu ab-menu" id="autoBuyerTopControl" data-state="off">
+      <summary class="ab-pill" id="autoBuyerPill" aria-label="Auto-Buyer status and controls"><span class="dot gray" id="autoBuyerDot"></span><span id="autoBuyerPillTxt">Auto-Buyer OFF</span></summary>
+      <div class="menu">
+        <div class="menu-row"><span>Auto-Buyer (<span id="autoBuyerUnitBadge">50¢/U</span>)</span><button id="autoBuyerToggleBtn" class="ab-toggle off" onclick="toggleAutoBuyer()">OFF</button></div>
+        <div class="menu-row"><span>Order mode</span>
+          <div id="autoBuyerModeSeg" class="segmented ab-seg">
+            <button id="autoBuyerPaperBtn" onclick="setAutoBuyerMode('paper')">PAPER</button>
+            <button id="autoBuyerLiveBtn" class="is-live" onclick="setAutoBuyerMode('live')">LIVE</button>
+          </div>
+        </div>
+        <p class="menu-note">PAPER records simulated fills only. LIVE places real Polymarket orders whenever Auto-Buyer is ON.</p>
+        <button onclick="runAutoBuyerNow()" title="Trigger Auto-Buyer check now">Run check now</button>
+      </div>
+    </details>
+    <details class="bar-menu unit-control">
+      <summary title="Dollar value of one unit (1U)">1U = $<span id="unitSummaryVal">7.50</span></summary>
+      <div class="menu">
+        <label class="menu-row" title="Changes future dollar displays and order sizing; historical unit records stay unchanged"><span>1U in dollars</span><span style="display:inline-flex;gap:6px;align-items:center">$<input id="unitValueInput" aria-label="Dollar value of one unit" type="number" min="0.01" max="100000" step="0.01" value="7.50" onkeydown="if(event.key==='Enter')saveUnitValue()"><button onclick="saveUnitValue()">Set</button></span></label>
+        <label class="menu-row" title="Set 1U to this percentage of the live balance; adjusts up or down"><span>1U as % of bankroll</span><span style="display:inline-flex;gap:6px;align-items:center"><input id="autoPctInput" aria-label="Bankroll percentage for one unit" type="number" min="1" max="50" step="0.5" value="10" style="width:56px">%<button onclick="autoUnitValue()">Apply</button></span></label>
+      </div>
+    </details>
+    <details class="bar-menu">
+      <summary>Actions</summary>
+      <div class="menu">
+        <div class="menu-actions">
+          <button class="desktop-action" onclick="confirmAction('run_tests','Run pytest for the whole suite?')">Run Tests</button>
+          <button class="desktop-action" onclick="bootstrapDialog()">Bootstrap</button>
+          <button onclick="confirmAction('refresh_prices','Refresh executable bid/ask prices for every unique open pick in the ledger?')">Scan Open Ledger Prices</button>
+        </div>
+      </div>
+    </details>
+    <button class="primary" onclick="confirmAction('daily','Run the split daily pipeline (settle → flat forecast → main forecast) for today? Shadow-only; no orders are placed.')">Daily Forecast</button>
+  </div>
 </div>
 
 <div class="shell">
@@ -815,6 +876,9 @@ pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:bre
             <label><input type="checkbox" class="sSport" value="rainbow_six" checked>Rainbow Six</label>
             <label><input type="checkbox" class="sSport" value="kbo" checked>KBO</label>
             <label><input type="checkbox" class="sSport" value="npb" checked>NPB</label>
+            <label><input type="checkbox" class="sSport" value="hockey" checked>Hockey</label>
+            <label><input type="checkbox" class="sSport" value="darts" checked>Darts</label>
+            <label><input type="checkbox" class="sSport" value="ncaab" checked>NCAAB</label>
           </span>
         </label>
       </div>
@@ -944,7 +1008,7 @@ const state={picks:[],perf:null,matrix:null,status:null,productionEvidence:null,
   settings:JSON.parse(localStorage.getItem("dash-settings")||"{}")};
 const fmt=(v,d=2)=>v==null?"—":Number(v).toFixed(d);
 const pct=v=>v==null?"—":(100*v).toFixed(1)+"%";
-const ALL_SPORTS=["mlb","nba","wnba","nfl","ncaaf","soccer","tennis","lol","cs2","dota2","valorant","rainbow_six","kbo","npb"];
+const ALL_SPORTS=["mlb","nba","wnba","nfl","ncaaf","soccer","tennis","lol","cs2","dota2","valorant","rainbow_six","kbo","npb","hockey","darts","ncaab"];
 const urlParams=()=>new URLSearchParams(location.search);
 const initialUrlState=urlParams();
 function setUrlState(patch){
@@ -1228,6 +1292,7 @@ function renderStatus(s){
   const unitValue=Number(s.unit_value_usd||7.5);
   if(document.activeElement!==$("#unitValueInput"))$("#unitValueInput").value=unitValue.toFixed(2);
   $("#unitValueLabel").textContent=unitValue.toFixed(2);
+  const unitSum=$("#unitSummaryVal");if(unitSum)unitSum.textContent=unitValue.toFixed(2);
   const t=s.tests||{};
   const dot=$("#testDot"), txt=$("#testTxt");
   if(t.status==="ok"){dot.className="dot g";txt.textContent="Tests: passing";}
@@ -3584,25 +3649,26 @@ function updateAutoBuyerUI(data){
   const isLive=mode==="live";
   if(unitBadge)unitBadge.textContent=unitValue<1?`${Math.round(unitValue*100)}¢/U`:`$${unitValue.toFixed(2)}/U`;
   if(unitInput&&document.activeElement!==unitInput)unitInput.value=unitValue.toFixed(2);
-  if(data.enabled){
-    btn.textContent=isLive?"ON (LIVE)":"ON (PAPER)";
-    btn.style.background=isLive?"var(--green)":"rgba(120,170,255,0.35)";
-    btn.style.color=isLive?"#000":"#78aaff";
-    btn.title=`Auto-Buyer is ACTIVE in ${isLive?"LIVE":"PAPER"} mode (1U=$${unitValue.toFixed(2)}). Click to turn OFF.`;
-  }else{
-    btn.textContent="OFF";
-    btn.style.background="rgba(255,92,92,0.2)";
-    btn.style.color="var(--red)";
-    btn.title="Auto-Buyer is DISABLED. Click to turn ON.";
-  }
+  const on=!!data.enabled;
+  const state=on?(isLive?"live":"paper"):(isLive?"armed":"off");
+  btn.className="ab-toggle "+(on?(isLive?"live":"paper"):"off");
+  btn.textContent=on?(isLive?"ON (LIVE)":"ON (PAPER)"):"OFF";
+  btn.title=on
+    ?`Auto-Buyer is ACTIVE in ${isLive?"LIVE":"PAPER"} mode (1U=$${unitValue.toFixed(2)}). Click to turn OFF.`
+    :"Auto-Buyer is DISABLED. Click to turn ON.";
+  const pill=$("#autoBuyerTopControl");
+  if(pill)pill.dataset.state=state;
+  const pillTxt=$("#autoBuyerPillTxt");
+  if(pillTxt)pillTxt.textContent={live:"LIVE: real orders ON",paper:"Auto-Buyer ON · paper",armed:"Auto-Buyer OFF · LIVE set",off:"Auto-Buyer OFF"}[state];
+  const pillDot=$("#autoBuyerDot");
+  if(pillDot)pillDot.className="dot "+({live:"r",paper:"g",armed:"y",off:"gray"}[state]);
+  $("#statusbar").classList.toggle("live-on",state==="live");
   for(const [id,target] of [["autoBuyerPaperBtn","paper"],["autoBuyerLiveBtn","live"]]){
     const modeBtn=$("#"+id);
     if(!modeBtn)continue;
-    const active=mode===target;
-    const isLiveBtn=target==="live";
-    modeBtn.style.background=active?(isLiveBtn?"var(--red)":"rgba(120,170,255,0.35)"):"transparent";
-    modeBtn.style.color=active?(isLiveBtn?"#000":"#78aaff"):"#888";
-    modeBtn.title=isLiveBtn
+    modeBtn.classList.toggle("on",mode===target);
+    modeBtn.setAttribute("aria-pressed",String(mode===target));
+    modeBtn.title=target==="live"
       ?"LIVE: Auto-Buyer places REAL Polymarket orders when ON."
       :"PAPER: simulated fills only, recorded for tracking, no real orders.";
   }
@@ -4417,6 +4483,13 @@ if(location.protocol==="file:"){
   '<p style="line-height:1.7">then open <a href="http://127.0.0.1:8765/" style="color:#33d17e">http://127.0.0.1:8765/</a></p></div>';
   throw new Error("file:// mode");
 }
+document.addEventListener("click",e=>{
+  document.querySelectorAll("#statusbar details[open]").forEach(d=>{if(!d.contains(e.target))d.open=false;});
+});
+document.addEventListener("keydown",e=>{
+  if(e.key!=="Escape")return;
+  document.querySelectorAll("#statusbar details[open]").forEach(d=>{d.open=false;d.querySelector("summary")?.focus();});
+});
 if("ResizeObserver" in window)new ResizeObserver(syncStatusbarHeight).observe($("#statusbar"));
 window.addEventListener("resize",syncStatusbarHeight);
 syncStatusbarHeight();
