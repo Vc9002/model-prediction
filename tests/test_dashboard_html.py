@@ -904,3 +904,16 @@ def test_polymarket_edge_navigation_is_pinned_disabled() -> None:
     assert 'data-tab="polymarket" disabled title="Disabled by operator">Edge Scanner — OFF' in html
     assert 'data-tab="poly-ledger" disabled title="Disabled by operator">Edge Ledger — OFF' in html
     assert 'data-tab="poly-ledger" disabled title="Disabled by operator">Polymarket — OFF' in html
+
+
+def test_unguarded_filter_bar_mounts_target_elements_that_exist() -> None:
+    """mountFilterBars() runs at page load: an unguarded write to a removed container throws and
+    stops the whole page from starting (the Research / Gated Research tabs were removed 2026-10-22
+    but their filter bars were still mounted, so no ledger rendered)."""
+    html = (ROOT / "dashboard.html").read_text(encoding="utf-8")
+    start = html.index("function mountFilterBars()")
+    body = html[start : html.index("\n}\n", start)]
+    unguarded = re.findall(r'^\s+\$\("#(filters_\w+)"\)\.innerHTML=', body, re.MULTILINE)
+    assert unguarded, "expected unguarded filter bar mounts"
+    for container in unguarded:
+        assert f'id="{container}"' in html, f"mountFilterBars writes to missing #{container}"
