@@ -631,25 +631,6 @@ def test_get_retries_connect_errors_then_succeeds_and_raises_when_exhausted(monk
         client._get("/v1/x")
 
 
-def test_pacing_spaces_requests_when_enabled_and_is_off_by_default(monkeypatch) -> None:
-    import model_prediction.data_sources.polymarket_us as module
-
-    sleeps: list[float] = []
-    monkeypatch.setattr(module.time, "sleep", sleeps.append)
-    monkeypatch.setattr(module.time, "monotonic", lambda: 100.0)
-    monkeypatch.setattr(module, "_next_request_at", 0.0)
-    monkeypatch.delenv("POLYMARKET_US_MIN_INTERVAL_S", raising=False)
-    module._pace_requests()
-    module._pace_requests()
-    assert sleeps == []
-    monkeypatch.setenv("POLYMARKET_US_MIN_INTERVAL_S", "1.5")
-    monkeypatch.setattr(module, "_next_request_at", 0.0)
-    module._pace_requests()
-    module._pace_requests()
-    module._pace_requests()
-    assert sleeps == [pytest.approx(1.5), pytest.approx(3.0)]
-
-
 class _SlateClient:
     def __init__(self) -> None:
         self.slate_calls: list[str] = []

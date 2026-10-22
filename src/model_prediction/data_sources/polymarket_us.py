@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import random
-import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
@@ -386,31 +384,6 @@ def _connect_retry_delay_seconds(attempt: int) -> float:
     return base + random.uniform(0.0, base / 4)
 
 
-_PACING_LOCK = threading.Lock()
-_next_request_at = 0.0
-
-
-def _pace_requests() -> None:
-    """Space gateway requests at least POLYMARKET_US_MIN_INTERVAL_S apart (0 = off).
-
-    The gateway limits by request rate, not concurrency (probes 2026-10-22), so
-    this is the knob that matches it. Off by default until measured to help.
-    """
-    global _next_request_at
-    try:
-        interval = float(os.environ.get("POLYMARKET_US_MIN_INTERVAL_S", "0"))
-    except ValueError:
-        interval = 0.0
-    if interval <= 0:
-        return
-    with _PACING_LOCK:
-        now = time.monotonic()
-        wait = _next_request_at - now
-        _next_request_at = max(now, _next_request_at) + interval
-    if wait > 0:
-        time.sleep(wait)
-
-
 class PolymarketUSClient:
     """Read-only client for the unauthenticated Polymarket US public gateway."""
 
@@ -435,7 +408,6 @@ class PolymarketUSClient:
         # 16 workers stop retrying in lockstep.
         max_attempts = 6
         for attempt in range(max_attempts):
-            _pace_requests()
             try:
                 response = self.client.get(f"{self.base_url}{path}", params=params)
             except (httpx.ConnectError, httpx.ConnectTimeout):
