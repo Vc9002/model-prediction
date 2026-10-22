@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import random
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
@@ -378,6 +380,20 @@ def _retry_delay_seconds(response: httpx.Response, attempt: int) -> float:
     return base + random.uniform(0.0, base / 4)
 
 
+def _max_concurrent_requests() -> int:
+    """Process-wide cap on in-flight gateway requests (env override, default 8)."""
+    try:
+        return max(1, int(os.environ.get("POLYMARKET_US_MAX_CONCURRENT", "8")))
+    except ValueError:
+        return 8
+
+
+# One gate shared by every client instance and worker pool in the process, so
+# the 16-worker snapshot pool cannot burst past what the gateway tolerates
+# (bursts were exhausting the 429 retry budget and dropping book snapshots).
+_REQUEST_GATE = threading.BoundedSemaphore(_max_concurrent_requests())
+
+
 class PolymarketUSClient:
     """Read-only client for the unauthenticated Polymarket US public gateway."""
 
@@ -402,8 +418,10 @@ class PolymarketUSClient:
         # 16 workers stop retrying in lockstep.
         max_attempts = 6
         for attempt in range(max_attempts):
-            response = self.client.get(f"{self.base_url}{path}", params=params)
+            with _REQUEST_GATE:
+                response = self.client.get(f"{self.base_url}{path}", params=params)
             if response.status_code == 429 and attempt < max_attempts - 1:
+                # Sleep outside the gate so a backing-off worker frees its slot.
                 time.sleep(_retry_delay_seconds(response, attempt))
                 continue
             response.raise_for_status()

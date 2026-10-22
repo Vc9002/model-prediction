@@ -477,17 +477,26 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             logger.warning("MLB starter snapshot capture failed for %s", args.date, exc_info=True)
             mlb_starter_snapshot_result = {"status": "error"}
 
+    capture_task_seconds: dict[str, float] = {}
+
+    def _timed(name, fn, *fn_args):
+        started = time.monotonic()
+        try:
+            return fn(*fn_args)
+        finally:
+            capture_task_seconds[name] = round(time.monotonic() - started, 1)
+
     with ThreadPoolExecutor(max_workers=12) as io_pool:
-        f0 = io_pool.submit(_polymarket_slate, slate_args, config)
-        f1 = io_pool.submit(_capture_wnba)
-        f2 = io_pool.submit(_build_priors)
-        f3 = io_pool.submit(_collect_soccer)
-        f4 = io_pool.submit(_capture_mlb_probables)
-        f5 = io_pool.submit(_capture_mlb_availability)
-        f6 = io_pool.submit(_capture_mlb_starter_snapshots)
-        f7 = io_pool.submit(_capture_mlb_lineups)
-        f8 = io_pool.submit(_collect_bet_better)
-        f9 = io_pool.submit(_capture_nfl_injuries)
+        f0 = io_pool.submit(_timed, "polymarket_slate", _polymarket_slate, slate_args, config)
+        f1 = io_pool.submit(_timed, "wnba", _capture_wnba)
+        f2 = io_pool.submit(_timed, "priors", _build_priors)
+        f3 = io_pool.submit(_timed, "soccer", _collect_soccer)
+        f4 = io_pool.submit(_timed, "mlb_probables", _capture_mlb_probables)
+        f5 = io_pool.submit(_timed, "mlb_availability", _capture_mlb_availability)
+        f6 = io_pool.submit(_timed, "mlb_starter_snapshots", _capture_mlb_starter_snapshots)
+        f7 = io_pool.submit(_timed, "mlb_lineups", _capture_mlb_lineups)
+        f8 = io_pool.submit(_timed, "bet_better", _collect_bet_better)
+        f9 = io_pool.submit(_timed, "nfl_injuries", _capture_nfl_injuries)
         for f in (f1, f2, f3, f4, f5, f6, f7, f8, f9):
             f.result()  # Wait for all, surface exceptions
         try:
@@ -554,6 +563,10 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     # Compute forecasts once, log to both ledgers (compute > log main > log research > log flat)
     forecast_result = {}
     workers = min(len(DAILY_LEARNED_SPORTS), 5)
+    # Seconds from pool start to each sport's completion (a queued sport's
+    # figure includes its wait for a free worker).
+    forecast_sport_done_seconds: dict[str, float] = {}
+    _forecast_pool_started = time.monotonic()
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {}
         for sport in DAILY_LEARNED_SPORTS:
@@ -576,6 +589,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             ] = sport
         for future in as_completed(futures):
             sport = futures[future]
+            forecast_sport_done_seconds[sport] = round(time.monotonic() - _forecast_pool_started, 1)
             try:
                 forecast_result[sport] = future.result()
             except Exception as exc:  # noqa: BLE001 — a failed sport must degrade to an error dict, never take down the whole forecast
@@ -1333,6 +1347,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         "timing": {
             "total_seconds": round(time.monotonic() - _t_start, 1),
             "capture_pool_seconds": round(_t_pool_end - _t_start, 1),
+            "capture_task_seconds": capture_task_seconds,
+            "forecast_sport_done_seconds": forecast_sport_done_seconds,
             "forecast_seconds": round(_t_forecast_end - _t_pool_end, 1),
             "settlement_seconds": round(_t_settle_end - _t_forecast_end, 1),
             "post_settlement_seconds": round(time.monotonic() - _t_settle_end, 1),
