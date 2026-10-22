@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
@@ -87,6 +88,19 @@ from .state import ESPN_SPORTS, SPORTS
 logger = logging.getLogger("model_prediction.cli")
 
 
+def _capture_horizon_hours() -> float | None:
+    """Hours ahead to price books for (env POLYMARKET_CAPTURE_HORIZON_HOURS, default 12).
+
+    With four daily runs every game starts inside the horizon of at least two
+    runs. Zero, negative or invalid disables the filter.
+    """
+    try:
+        hours = float(os.environ.get("POLYMARKET_CAPTURE_HORIZON_HOURS", "12"))
+    except ValueError:
+        return None
+    return hours if hours > 0 else None
+
+
 def _polymarket_slate(args, config) -> dict:
     if args.provider == "kalshi":
         return {"provider": "kalshi", "status": "deferred", "note": KALSHI_DEFERRED_MESSAGE}
@@ -137,6 +151,7 @@ def _polymarket_slate(args, config) -> dict:
             events,
             Path(ledger_path(config)).parent,
             args.date,
+            horizon_hours=_capture_horizon_hours(),
         )
     )
     return {

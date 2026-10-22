@@ -1,7 +1,8 @@
 import json
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import httpx
+import pytest
 
 from model_prediction.data_sources.polymarket_us import (
     POLYMARKET_SPORT_LEAGUES,
@@ -555,3 +556,163 @@ def test_get_honors_retry_after_and_backs_off_with_jitter(monkeypatch) -> None:
     assert client._get("/v1/markets/x/book") == {"ok": True}
     assert sleeps[0] == 3.0
     assert 1.0 <= sleeps[1] <= 1.25
+
+
+def _slate_market(slug: str = "mkt-1") -> dict:
+    return {
+        "market_id": "42",
+        "market_slug": slug,
+        "market_type": "spread",
+        "line": -3.5,
+        "sides": [
+            {"description": "Hawks -3.5", "team": "Hawks", "is_long": True, "line": -3.5},
+            {"description": "Magic +3.5", "team": "Magic", "is_long": False, "line": 3.5},
+        ],
+    }
+
+
+def test_snapshot_from_slate_matches_snapshot_with_one_request() -> None:
+    raw_market = {
+        "market": {
+            "id": "42",
+            "gameStartTime": "2026-10-22T23:00:00Z",
+            "line": -3.5,
+            "marketSides": [
+                {"description": "Hawks -3.5", "long": True, "team": {"name": "Hawks"}},
+                {"description": "Magic +3.5", "long": False, "team": {"name": "Magic"}},
+            ],
+        }
+    }
+    book = {
+        "marketData": {
+            "state": "MARKET_STATE_OPEN",
+            "transactTime": "2026-10-22T20:00:00Z",
+            "bestAsk": {"value": "0.46"},
+            "bestBid": {"value": "0.43"},
+        }
+    }
+    paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        paths.append(request.url.path)
+        return httpx.Response(200, json=raw_market if "/market/slug/" in request.url.path else book)
+
+    client = PolymarketUSClient("https://example.test", httpx.Client(transport=httpx.MockTransport(handler)))
+    moment = datetime(2026, 10, 22, 20, tzinfo=UTC)
+    full = client.snapshot("mkt-1", moment)
+    assert len(paths) == 2
+    paths.clear()
+    event = {"event_start_utc": "2026-10-22T23:00:00Z"}
+    fast = client.snapshot_from_slate(event, _slate_market(), moment)
+    assert paths == ["/v1/markets/mkt-1/book"]
+    assert fast == full
+
+
+def test_get_retries_connect_errors_then_succeeds_and_raises_when_exhausted(monkeypatch) -> None:
+    sleeps: list[float] = []
+    monkeypatch.setattr("model_prediction.data_sources.polymarket_us.time.sleep", sleeps.append)
+    calls = {"count": 0}
+
+    def flaky(request: httpx.Request) -> httpx.Response:
+        calls["count"] += 1
+        if calls["count"] < 3:
+            raise httpx.ConnectError("[Errno 11001] getaddrinfo failed")
+        return httpx.Response(200, json={"ok": True})
+
+    client = PolymarketUSClient("https://example.test", httpx.Client(transport=httpx.MockTransport(flaky)))
+    assert client._get("/v1/x") == {"ok": True}
+    assert calls["count"] == 3 and len(sleeps) == 2
+
+    def down(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("[Errno 11001] getaddrinfo failed")
+
+    client = PolymarketUSClient("https://example.test", httpx.Client(transport=httpx.MockTransport(down)))
+    with pytest.raises(httpx.ConnectError):
+        client._get("/v1/x")
+
+
+def test_pacing_spaces_requests_when_enabled_and_is_off_by_default(monkeypatch) -> None:
+    import model_prediction.data_sources.polymarket_us as module
+
+    sleeps: list[float] = []
+    monkeypatch.setattr(module.time, "sleep", sleeps.append)
+    monkeypatch.setattr(module.time, "monotonic", lambda: 100.0)
+    monkeypatch.setattr(module, "_next_request_at", 0.0)
+    monkeypatch.delenv("POLYMARKET_US_MIN_INTERVAL_S", raising=False)
+    module._pace_requests()
+    module._pace_requests()
+    assert sleeps == []
+    monkeypatch.setenv("POLYMARKET_US_MIN_INTERVAL_S", "1.5")
+    monkeypatch.setattr(module, "_next_request_at", 0.0)
+    module._pace_requests()
+    module._pace_requests()
+    module._pace_requests()
+    assert sleeps == [pytest.approx(1.5), pytest.approx(3.0)]
+
+
+class _SlateClient:
+    def __init__(self) -> None:
+        self.slate_calls: list[str] = []
+        self.snapshot_calls: list[str] = []
+
+    def snapshot_from_slate(self, event: dict, market: dict) -> dict:
+        self.slate_calls.append(market["market_slug"])
+        return {
+            "market_slug": market["market_slug"],
+            "event_start_utc": event["event_start_utc"],
+            "observed_at_utc": "2026-10-22T10:00:00Z",
+            "long": {"ask": 0.55},
+            "short": {"ask": 0.47},
+        }
+
+    def snapshot(self, slug: str) -> dict:
+        self.snapshot_calls.append(slug)
+        raise AssertionError("snapshot() must not be used when the slate market is complete")
+
+
+def _events(now: datetime) -> dict:
+    def event(event_id: str, hours: float, slug: str) -> dict:
+        start = (now + timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return {"event_id": event_id, "event_start_utc": start, "markets": [_slate_market(slug)]}
+
+    return {
+        "MLB": [event("soon", 2, "soon-mkt"), event("later", 30, "later-mkt"), event("live", -1, "live-mkt")]
+    }
+
+
+def test_capture_horizon_skips_only_events_starting_beyond_it(tmp_path) -> None:
+    now = datetime(2026, 10, 22, 10, tzinfo=UTC)
+    client = _SlateClient()
+    result = capture_slate_snapshots(client, _events(now), tmp_path, "2026-10-22", horizon_hours=12, now=now)
+    assert sorted(client.slate_calls) == ["live-mkt", "soon-mkt"]
+    assert client.snapshot_calls == []
+    assert result["captured"] == 2
+    assert result["skipped_beyond_horizon"] == 1
+    assert result["horizon_hours"] == 12
+
+
+def test_capture_without_horizon_keeps_every_event(tmp_path) -> None:
+    now = datetime(2026, 10, 22, 10, tzinfo=UTC)
+    client = _SlateClient()
+    result = capture_slate_snapshots(client, _events(now), tmp_path, "2026-10-22")
+    assert result["captured"] == 3
+    assert result["skipped_beyond_horizon"] == 0
+
+
+def test_capture_falls_back_to_snapshot_for_incomplete_slate_market(tmp_path) -> None:
+    class Legacy:
+        def snapshot(self, slug: str) -> dict:
+            return {
+                "market_slug": slug,
+                "event_start_utc": "2026-10-22T23:00:00Z",
+                "observed_at_utc": "2026-10-22T10:00:00Z",
+                "long": {"ask": 0.55},
+                "short": {"ask": 0.47},
+            }
+
+    events = {
+        "MLB": [
+            {"event_id": "e", "markets": [{"market_slug": "m", "market_type": "moneyline", "line": None}]}
+        ]
+    }
+    assert capture_slate_snapshots(Legacy(), events, tmp_path, "2026-10-22")["captured"] == 1

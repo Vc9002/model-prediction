@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import random
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -378,6 +380,37 @@ def _retry_delay_seconds(response: httpx.Response, attempt: int) -> float:
     return base + random.uniform(0.0, base / 4)
 
 
+def _connect_retry_delay_seconds(attempt: int) -> float:
+    """Jittered exponential backoff for DNS/connect failures (no response to inspect)."""
+    base = min(8.0, 0.5 * (2**attempt))
+    return base + random.uniform(0.0, base / 4)
+
+
+_PACING_LOCK = threading.Lock()
+_next_request_at = 0.0
+
+
+def _pace_requests() -> None:
+    """Space gateway requests at least POLYMARKET_US_MIN_INTERVAL_S apart (0 = off).
+
+    The gateway limits by request rate, not concurrency (probes 2026-10-22), so
+    this is the knob that matches it. Off by default until measured to help.
+    """
+    global _next_request_at
+    try:
+        interval = float(os.environ.get("POLYMARKET_US_MIN_INTERVAL_S", "0"))
+    except ValueError:
+        interval = 0.0
+    if interval <= 0:
+        return
+    with _PACING_LOCK:
+        now = time.monotonic()
+        wait = _next_request_at - now
+        _next_request_at = max(now, _next_request_at) + interval
+    if wait > 0:
+        time.sleep(wait)
+
+
 class PolymarketUSClient:
     """Read-only client for the unauthenticated Polymarket US public gateway."""
 
@@ -402,7 +435,18 @@ class PolymarketUSClient:
         # 16 workers stop retrying in lockstep.
         max_attempts = 6
         for attempt in range(max_attempts):
-            response = self.client.get(f"{self.base_url}{path}", params=params)
+            _pace_requests()
+            try:
+                response = self.client.get(f"{self.base_url}{path}", params=params)
+            except (httpx.ConnectError, httpx.ConnectTimeout):
+                # DNS resolution (getaddrinfo) and connect failures arrive as
+                # exceptions, not responses. A burst of them (1,810 in one daily
+                # run, 2026-10-22) lost almost every book snapshot, so retry
+                # with backoff before surfacing the error.
+                if attempt < max_attempts - 1:
+                    time.sleep(_connect_retry_delay_seconds(attempt))
+                    continue
+                raise
             if response.status_code == 429 and attempt < max_attempts - 1:
                 time.sleep(_retry_delay_seconds(response, attempt))
                 continue
@@ -534,6 +578,38 @@ class PolymarketUSClient:
     def snapshot(self, slug: str, observed_at: datetime | None = None) -> dict[str, Any]:
         market = self.market(slug)
         book = self.book(slug)
+        return self._build_snapshot(market, book, slug, observed_at)
+
+    def snapshot_from_slate(
+        self, event: dict[str, Any], market: dict[str, Any], observed_at: datetime | None = None
+    ) -> dict[str, Any]:
+        """Snapshot a slate market with one request (the live book).
+
+        `snapshot` also calls `market(slug)`, but that response only supplies the
+        market id, sides, line, start time and team, all of which the normalized
+        slate market already holds. The book is still fetched live.
+        """
+        slug = market["market_slug"]
+        sides = [
+            {
+                "description": side["description"],
+                "long": bool(side.get("is_long")),
+                "team": {"name": side["team"]} if side.get("team") else None,
+            }
+            for side in market["sides"]
+        ]
+        market_like = {
+            "id": market["market_id"],
+            "gameStartTime": event.get("event_start_utc"),
+            "line": market.get("line"),
+            "marketSides": sides,
+        }
+        return self._build_snapshot(market_like, self.book(slug), slug, observed_at)
+
+    @staticmethod
+    def _build_snapshot(
+        market: dict[str, Any], book: dict[str, Any], slug: str, observed_at: datetime | None
+    ) -> dict[str, Any]:
         long_side = next(side for side in market["marketSides"] if side.get("long"))
         short_side = next(side for side in market["marketSides"] if not side.get("long"))
         best_bid, bid_size = _best_level(book, "bids", best=max)
@@ -739,19 +815,36 @@ def _is_preseason_event(event: dict[str, Any], league: str) -> bool:
     return start_month in (7, 8)
 
 
+def _starts_after(event: dict[str, Any], cutoff: datetime) -> bool:
+    """True when the event has a parseable start later than ``cutoff``."""
+    try:
+        return parse_utc(str(event["event_start_utc"])) > cutoff
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
 def capture_slate_snapshots(
     client: PolymarketUSClient,
     events_by_league: dict[str, list[dict[str, Any]]],
     data_root: str | Path,
     game_date: str,
+    *,
+    horizon_hours: float | None = None,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Persist a prospective executable BBO for every discovered contract."""
+    """Persist a prospective executable BBO for every discovered contract.
+
+    With ``horizon_hours`` set, contracts whose event starts later than that
+    many hours from now are skipped (each run only prices games about to start;
+    games already started are still captured). ``None`` keeps every contract.
+    """
     league_to_sport = {
         league: sport for sport, leagues in POLYMARKET_SPORT_LEAGUES.items() for league in leagues
     }
     qualification_sports = BBO_CAPTURE_SPORTS
     captured = missing_bbo = failures = skipped_nonqualification_contracts = 0
-    skipped_summer_league = timestamp_invalid = 0
+    skipped_summer_league = timestamp_invalid = skipped_beyond_horizon = 0
+    horizon_cutoff = None if horizon_hours is None else (now or utc_now()) + timedelta(hours=horizon_hours)
     failure_details: list[dict[str, str]] = []
 
     # Skip summer league / preseason events — they offer only moneyline
@@ -796,13 +889,20 @@ def capture_slate_snapshots(
             )
         ]
         skipped_summer_league += len(league_contracts) - len(kept)
+        if horizon_cutoff is not None:
+            within = [entry for entry in kept if not _starts_after(entry[2], horizon_cutoff)]
+            skipped_beyond_horizon += len(kept) - len(within)
+            kept = within
         all_contracts.extend(kept)
 
     def _fetch(entry):
         league, sport, event, market = entry
         slug = str(market.get("market_slug") or "")
         try:
-            snapshot = client.snapshot(slug)
+            if hasattr(client, "snapshot_from_slate") and market.get("sides") and market.get("market_id"):
+                snapshot = client.snapshot_from_slate(event, market)
+            else:
+                snapshot = client.snapshot(slug)
             observed = parse_utc(snapshot["observed_at_utc"])
             event_start = parse_utc(snapshot["event_start_utc"])
             snapshot.update(
@@ -873,6 +973,8 @@ def capture_slate_snapshots(
         "failures": failures,
         "skipped_nonqualification_contracts": skipped_nonqualification_contracts,
         "skipped_summer_league": skipped_summer_league,
+        "skipped_beyond_horizon": skipped_beyond_horizon,
+        "horizon_hours": horizon_hours,
         "failure_details": failure_details,
         "timestamp_valid": timestamp_invalid == 0,
         "timestamp_invalid_count": timestamp_invalid,
