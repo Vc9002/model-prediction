@@ -490,8 +490,9 @@ body.hide-col-order .c-order,body.hide-col-matchup .c-matchup{display:none}
     </div>
     <details class="rail-group rail-disabled">
       <summary class="rail-label">Disabled by operator</summary>
-      <button data-tab="poly-ledger" disabled title="Disabled by operator">Polymarket Ledger</button>
-      <button data-tab="polymarket" disabled title="Disabled by operator">Edge Scanner</button>
+      <button data-tab="polymarket" disabled title="Disabled by operator">Edge Scanner — OFF</button>
+      <button data-tab="poly-ledger" disabled title="Disabled by operator">Edge Ledger — OFF</button>
+      <button data-tab="poly-ledger" disabled title="Disabled by operator">Polymarket — OFF</button>
     </details>
   </nav>
 
@@ -1118,6 +1119,7 @@ $$("#tabs button").forEach(b=>b.onclick=()=>{
   if(b.dataset.tab==="today")renderToday();
   if(b.dataset.tab==="folio"&&state.livePortfolio)renderFolioHistory();
   if(b.dataset.tab==="production")loadProduction();
+  if(b.dataset.tab==="models")renderModelLedgers();
   if(b.dataset.tab==="rebuild")loadRebuild();
   if(b.dataset.tab==="polymarket")loadPolymarketScanner();
   if(b.dataset.tab==="poly-ledger")renderPolyLedger(true);
@@ -1499,7 +1501,14 @@ async function recordModelDecision(modelId,predictionId){
   }catch(e){alert("server unreachable: "+e.message);}
 }
 window.recordModelDecision=recordModelDecision;
+/* The Models tab is ~15k DOM nodes: keep the latest payload, build the DOM only while the tab is open. */
+let _modelLedgersPayload=null;
 function renderModelLedgers(payload){
+  if(payload)_modelLedgersPayload=payload;
+  if(currentActiveTab()!=="models")return;
+  renderModelLedgersNow(_modelLedgersPayload);
+}
+function renderModelLedgersNow(payload){
   if(!payload)return;
   $("#modelLedgersGenerated").textContent=`Generated: ${evidenceText(payload.generated_at)}`;
   const models=Object.values(payload.models||{}).sort((a,b)=>String(a.model_id).localeCompare(String(b.model_id)));
