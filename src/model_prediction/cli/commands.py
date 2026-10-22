@@ -74,11 +74,11 @@ from ..international_baseball import (
     validate_all_international_baseball_baselines,
 )
 from ..ledger import LEDGER_SCHEMA_VERSION
+from ..main_ledgers import MultiSportPickLedger
 from ..mlb_baseline_refresh import refresh_if_due
 from ..models import MODEL_SPECS
 from ..models.market_residual import MarketResidualModel, ResidualTrainingRow
 from ..models.registry import model_spec
-from ..research_ledgers import research_ledger
 from ..runtime_paths import rolling_models_root
 from ..total_score import validate_all_total_score_models
 from ..units import edge_scaled_units
@@ -729,9 +729,9 @@ def cmd_esports_forecast(args, config, registry, bans, ledger, audit, data_root)
             logged = _log_esports_forecast(
                 forecast,
                 config,
-                research_ledger(data_root, title),
+                MultiSportPickLedger(data_root, flat=True),
                 flat_mode=False,
-                gated_ledger=research_ledger(data_root, title, gated=True),
+                gated_ledger=ledger,
             )
             forecast["logged"] = logged
         output[title] = forecast

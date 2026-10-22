@@ -26,7 +26,25 @@ from .eligibility import EligibilityResult
 from .ledger import PickLedger
 from .runtime_ledger_store import RuntimeLedgerStore
 
-MAIN_LEDGER_SPORTS: tuple[str, ...] = ("mlb", "nba", "wnba", "soccer", "tennis", "ncaaf", "nfl")
+# Esports, KBO and NPB joined 2026-10-22 (operator directive): their research and
+# gated-research ledgers were merged into Flat (every candidate) and Main (gated
+# CALLs), so they now route here like every other sport.
+MAIN_LEDGER_SPORTS: tuple[str, ...] = (
+    "mlb",
+    "nba",
+    "wnba",
+    "soccer",
+    "tennis",
+    "ncaaf",
+    "nfl",
+    "lol",
+    "cs2",
+    "dota2",
+    "valorant",
+    "rainbow_six",
+    "kbo",
+    "npb",
+)
 
 
 def normalize_main_sport(sport: str) -> str:

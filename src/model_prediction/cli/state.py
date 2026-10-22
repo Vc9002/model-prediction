@@ -39,7 +39,22 @@ FLAT_LEDGER_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "tennis", "ncaaf")
 # clear the *other* ledger too for sports in this set, or a second same-day
 # run of the other command duplicates that sport's rows there (see the
 # dual_ledger_sports handling in the forecast/log/flat-forecast dispatch).
-DUAL_LEDGER_SPORTS = frozenset({"soccer", "tennis", "ncaaf", "hockey", "darts"})
+DUAL_LEDGER_SPORTS = frozenset(
+    {
+        "soccer",
+        "tennis",
+        "ncaaf",
+        "hockey",
+        "darts",
+        "lol",
+        "cs2",
+        "dota2",
+        "valorant",
+        "rainbow_six",
+        "kbo",
+        "npb",
+    }
+)
 RESEARCH_ONLY_DAILY_SPORTS = (
     "soccer",
     "tennis",

@@ -140,12 +140,17 @@ def test_dashboard_exposes_two_decimal_limit_price_and_unit_value() -> None:
     assert "Current ask buys immediately" in html
     assert "immediate-or-cancel buy" in html
     assert 'value="open" selected>active only' in html
-    # Ledger/Flat/Research each render their own independent filter bar
+    # Ledger and Flat each render their own independent filter bar
     # (filterBarHTML(tab)) rather than sharing one global set of controls.
     assert 'Settled (<span id="settledCount_${tab}">0</span>)' in html
     assert 'id="filters_L"' in html
     assert 'id="filters_F"' in html
-    assert 'id="filters_R"' in html
+    # The Research / Gated Research ledger views were merged into Flat and Main (2026-10-22).
+    assert 'id="filters_R"' not in html
+    assert 'id="filters_G"' not in html
+    assert 'data-tab="research"' not in html
+    assert 'data-tab="gated-research"' not in html
+    assert 'data-tab="audit"' in html
     assert "No active picks remain today" in html
     assert 'id="todayShowSettled"' in html
     assert 'if(p.status!=="open")' in html
@@ -186,8 +191,8 @@ def test_dashboard_exposes_live_health_and_applies_display_settings() -> None:
     # filters (including the MLB v9 challenger ledger) and the Today
     # source loaders now honor the shared predicate.
     assert "const passesDisplaySettings" in html
-    assert html.count("if(!passesDisplaySettings(p))return false;") == 5
-    assert html.count("passesDisplaySettings(p)&&todayPassesControls(p)&&etDate(start)===todayET()") == 2
+    assert html.count("if(!passesDisplaySettings(p))return false;") == 3
+    assert html.count("passesDisplaySettings(p)&&todayPassesControls(p)&&etDate(start)===todayET()") == 1
 
     # Today must use the real America/New_York conversion (including DST),
     # respect "show settled" for supplemental ledgers, and avoid inflating a
@@ -639,7 +644,7 @@ def test_dashboard_ledger_filter_system_node_execution() -> None:
     html = (ROOT / "dashboard.html").read_text(encoding="utf-8")
 
     # Verify filter container sections and template strings exist in HTML
-    for tab in ["L", "F", "R", "G", "PL"]:
+    for tab in ["L", "F", "PL"]:
         assert f'id="filters_{tab}"' in html
 
     assert 'id="fSport_${tab}"' in html

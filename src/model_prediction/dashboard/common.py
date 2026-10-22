@@ -51,7 +51,22 @@ OUTPUTS = ROOT / "outputs" / "latest"
 # mirrors -- duplicated here as a plain tuple rather than importing that
 # module at load time, matching this file's existing pattern of keeping
 # model_prediction imports lazy/local to the functions that need them).
-_MAIN_LEDGER_SPORTS = ("mlb", "nba", "wnba", "soccer", "tennis", "ncaaf", "nfl")
+_MAIN_LEDGER_SPORTS = (
+    "mlb",
+    "nba",
+    "wnba",
+    "soccer",
+    "tennis",
+    "ncaaf",
+    "nfl",
+    "lol",
+    "cs2",
+    "dota2",
+    "valorant",
+    "rainbow_six",
+    "kbo",
+    "npb",
+)
 DASH_DIR = ROOT / "dashboard"
 PID_FILE = DASH_DIR / "server.pid"
 LOG_FILE = DASH_DIR / "server.log"

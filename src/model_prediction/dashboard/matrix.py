@@ -360,7 +360,7 @@ def matrix() -> dict:
             "market": "Totals (2.5)",
             "wired": True,
             "model": "models/soccer.py -- Poisson/Dixon-Coles score matrix",
-            "ledger": "Flat Research + Gated Research",
+            "ledger": "Flat + Main",
         },
         {
             "sport": "Soccer",
@@ -368,7 +368,7 @@ def matrix() -> dict:
             "wired": True,
             "model": "Same score matrix, matched against Polymarket's per-team team_win "
             "Yes/No markets (not a single combined moneyline market)",
-            "ledger": "Flat Research + Gated Research",
+            "ledger": "Flat + Main",
         },
         {
             "sport": "Soccer",
@@ -380,7 +380,7 @@ def matrix() -> dict:
             "ever been observed live on Polymarket US (checked across all 19 configured "
             "leagues and 4 real captured days) -- activates automatically, no further "
             "code changes, once one appears and its raw market type is confirmed.",
-            "ledger": "Flat Research + Gated Research (currently prices 0 -- no real market exists yet)",
+            "ledger": "Flat + Main (currently prices 0 -- no real market exists yet)",
         },
         {
             "sport": "Tennis",
@@ -389,7 +389,7 @@ def matrix() -> dict:
             "model": "models/tennis.py -- surface-blended Elo, singles only, WTA only "
             f"({active_version('tennis')}; Polymarket US has no ATP market; "
             "ESPN has no ITF scoreboard)",
-            "ledger": "Flat Research + Gated Research",
+            "ledger": "Flat + Main",
         },
         {
             "sport": "LOL / CS2 / DOTA2 / VALORANT / Rainbow Six",
@@ -401,7 +401,7 @@ def matrix() -> dict:
             "title, barely filtering anything -- real settled Gated picks were "
             "performing worse than unfiltered Research) to each title's own already-"
             "validated confidence_threshold: LOL/DOTA2/VALORANT 0.05, CS2/Rainbow Six 0.03.",
-            "ledger": "Flat Research + Gated Research",
+            "ledger": "Flat + Main",
         },
         {
             "sport": "CoD / Rocket League / Overwatch",
@@ -418,7 +418,7 @@ def matrix() -> dict:
             "model": "international_baseball.py -- tie-aware home-field Elo "
             f"(KBO {active_version('kbo')}; NPB {active_version('npb')}; "
             "result/margin only, no starters/park/weather)",
-            "ledger": "Flat Research + Gated Research",
+            "ledger": "Flat + Main",
         },
     ]
     return {

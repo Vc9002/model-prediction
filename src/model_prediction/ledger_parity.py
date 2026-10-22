@@ -285,11 +285,14 @@ def main(argv: list[str] | None = None) -> int:
     return 0 if report["clean"] else 1
 
 
+_RESEARCH_SPORTS = ("lol", "cs2", "dota2", "valorant", "rainbow_six", "kbo", "npb")
+# Esports, KBO and NPB moved into Main and Flat on 2026-10-22; their legacy research and
+# gated-research tiers stay listed so the historical rows remain reconcilable.
 _TIER_SPORTS = {
-    "main": ("mlb", "wnba", "soccer", "tennis"),
-    "flat": ("mlb", "wnba", "soccer", "tennis"),
-    "research": ("lol", "cs2", "dota2", "valorant", "rainbow_six", "kbo", "npb"),
-    "gated_research": ("lol", "cs2", "dota2", "valorant", "rainbow_six", "kbo", "npb"),
+    "main": ("mlb", "wnba", "soccer", "tennis", *_RESEARCH_SPORTS),
+    "flat": ("mlb", "wnba", "soccer", "tennis", *_RESEARCH_SPORTS),
+    "research": _RESEARCH_SPORTS,
+    "gated_research": _RESEARCH_SPORTS,
 }
 
 

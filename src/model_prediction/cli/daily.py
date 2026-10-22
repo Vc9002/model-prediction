@@ -37,7 +37,7 @@ from ..esports import forecast_esports_slate
 from ..ledger import defer_sqlite_xlsx_exports
 from ..main_ledgers import MultiSportPickLedger
 from ..mlb_baseline_refresh import refresh_if_due
-from ..research_ledgers import RESEARCH_LEDGER_SPORTS, existing_research_ledgers, research_ledger
+from ..research_ledgers import existing_research_ledgers
 from .commands import (
     _clear_today_open,
     _polymarket_slate,
@@ -554,12 +554,9 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     # and repeated upstream reads for no decision-quality benefit.
     forecast_observed_at = utc_now()
     data_directory = Path(ledger_path(config)).parent
-    for research_sport in RESEARCH_LEDGER_SPORTS:
-        rl1 = research_ledger(data_directory, research_sport)
-        rl2 = research_ledger(data_directory, research_sport, gated=True)
-        cleared_ledgers.extend([rl1, rl2])
-        _clear_today_open(rl1, args.date, by_event_date=True)
-        _clear_today_open(rl2, args.date, by_event_date=True)
+    # Esports/KBO/NPB write to Main and Flat since the 2026-10-22 ledger merge, so the
+    # Main/Flat clears above already cover them; the legacy research/gated ledgers
+    # are no longer written and are not cleared.
     # Compute forecasts once, log to both ledgers (compute > log main > log research > log flat)
     forecast_result = {}
     workers = min(len(DAILY_LEARNED_SPORTS), 5)
@@ -945,16 +942,14 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             title=title,
             game_date=args.date,
         )
-        # Esports never reaches Main, so it no longer gets a Flat
-        # row either (operator directive, 2026-08-03) -- Research is
-        # already its "every candidate, no gate" companion, the same
-        # relationship Flat has to Main.
+        # Merged 2026-10-22: every candidate goes to Flat and the gated CALL subset to
+        # Main (the old research / gated-research ledgers are no longer written).
         _esports_logged = _log_esports_forecast(
             forecast_result[title],
             config,
-            research_ledger(data_directory, title),
+            flat_ledger,
             flat_mode=False,
-            gated_ledger=research_ledger(data_directory, title, gated=True),
+            gated_ledger=ledger,
         )
         _priced_esports = forecast_result[title].get("priced_contracts") or []
         if _priced_esports and not _esports_logged:
@@ -987,16 +982,15 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                     }
 
     def _intl_baseball_league_task(league: str) -> None:
-        # KBO/NPB never reach Main, so no Flat row either (operator
-        # directive, 2026-08-03) -- same reasoning as esports above.
+        # Merged 2026-10-22: Flat gets every candidate, Main the gated CALL subset.
         forecast_result[league] = _forecast_international_sport(
             data_root=data_directory,
             artifact_dir=_research_models_dir(),
             league=league,
             args_date=args.date,
             config=config,
-            research_ledger=research_ledger(data_directory, league),
-            gated_ledger=research_ledger(data_directory, league, gated=True),
+            research_ledger=flat_ledger,
+            gated_ledger=ledger,
         )
         _priced_intl = forecast_result[league].get("priced_contracts") or []
         if _priced_intl and not forecast_result[league].get("logged"):

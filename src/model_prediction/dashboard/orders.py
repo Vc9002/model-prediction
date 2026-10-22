@@ -64,7 +64,6 @@ from model_prediction.dashboard.picks import (
     _dedupe_contract_observations,
     _find_pick_by_id,
     _main_ledger_paths,
-    _parse_research_picks,
     read_flat_picks,
     read_picks,
 )
@@ -963,24 +962,15 @@ def live_gateway_slate(sport: str, day: str) -> dict:
 
 
 def _all_ledger_rows_for_price_scan() -> list[dict]:
-    """Every row from all four ledgers (Main, Flat, Research, Gated
-    Research), for the "Scan Open Ledger Prices" action.
+    """Every row from the Main and Flat ledgers, for the "Scan Open Ledger Prices" action.
 
-    read_picks() only ever parsed picks.xlsx (Main) -- confirmed a real gap
-    (2026-07-31): every open Flat/Research/Gated Research pick's price was
-    permanently stale, since nothing else ever refreshed them. Pulled into
-    its own function (rather than inlined in _action_command) so tests can
-    monkeypatch this one seam instead of four separate parse calls. The
-    caller's (sport, game_day, slug) dedup already collapses the same real
-    contract appearing in more than one ledger (e.g. an MLB game open in
-    both Main and Flat) into a single --contract entry.
+    The research and gated-research ledgers were merged into Flat and Main on
+    2026-10-22, so these two sources cover every sport. Pulled into its own
+    function (rather than inlined in _action_command) so tests can monkeypatch
+    this one seam. The caller's (sport, game_day, slug) dedup already collapses the
+    same real contract appearing in both ledgers into a single --contract entry.
     """
-    return (
-        read_picks()
-        + read_flat_picks()
-        + _parse_research_picks(gated=False)
-        + _parse_research_picks(gated=True)
-    )
+    return read_picks() + read_flat_picks()
 
 
 def _action_command(name: str, payload: dict) -> list[str]:

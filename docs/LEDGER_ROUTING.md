@@ -22,14 +22,39 @@ canary database is not the daily Main/Flat ledger.
 The remaining sections describe the older 2026-08-03 topology and are historical
 where they conflict with this NBA update.
 
-## The four ledgers
+## Research ledgers merged into Flat and Main (2026-10-22)
+
+Esports (LoL, CS2, Dota 2, Valorant, Rainbow Six), KBO and NPB no longer have their own
+research and gated-research ledgers. They route like every other sport:
+
+- **Flat** gets every priced candidate (what the Research ledger used to hold).
+- **Main** gets the rows the gated-research ledger used to hold: `decision == CALL`, which under the
+  "every pick is a CALL with units" design includes `PAPER_CALL_*` rows, exactly as Main already does
+  for the other sports. Only `QUALIFIED` rows carry real edge; filter on `reason_code` for those.
+
+What changed in code: the seven sports are in `MAIN_LEDGER_SPORTS` and `DUAL_LEDGER_SPORTS`; the daily
+run, `forecast --log` and `esports-forecast --log` pass the Flat ledger as the primary ledger and Main as
+the gated ledger of `_log_esports_forecast` / `_forecast_international_sport`; and the daily run no
+longer clears the legacy ledgers. Settlement needed no change: `_settle_all_unsettled` dispatches on the
+row's league, not on the ledger it came from.
+
+Legacy research and gated-research ledgers are no longer written. They stay readable (the auto-buyer still
+reads them) and keep settling until their last open rows close. History was copied into Flat and Main by
+`scripts/merge_research_ledgers.py` (settled rows only, latest per pick key, original pick ids and
+results kept, provenance in `decision_payload`: `merged_from_tier`, `merged_from_pick_id`, `merge_tag`).
+Re-run it after the remaining open legacy rows settle; it is idempotent.
+
+The dashboard no longer has Research or Gated Research tabs; the backtest, audit and pipeline cards that
+shared the old research tab live under **Validation & Audit**.
+
+## The four ledgers (Research and Gated Research are legacy since 2026-10-22)
 
 | Ledger | File(s) | Rule |
 |---|---|---|
 | **Main** | `data/picks.xlsx` | Gated only — CALL decisions (trust-boundary clears + eligibility gate passes) |
 | **Flat** | `data/flat_picks.xlsx` | Everything — every candidate, every sport, no edge gate |
-| **Research** | `data/research/{sport}.xlsx` | Everything — all candidates for research-only sports |
-| **Gated Research** | `data/gated_research/{sport}.xlsx` | Gated only — CALL decisions for research-only sports |
+| **Research** *(legacy)* | `data/research/{sport}.xlsx` | Historical only — merged into Flat on 2026-10-22 |
+| **Gated Research** *(legacy)* | `data/gated_research/{sport}.xlsx` | Historical only — merged into Main on 2026-10-22 |
 
 ## Main (`picks.xlsx`)
 
@@ -52,7 +77,7 @@ Only rows with `decision == "CALL"` (genuinely eligible picks that pass trust-bo
 - SOCCER (moneyline, total) — via `_forecast_soccer_sport`
 - TENNIS (moneyline, WTA+ATP) — via `_forecast_tennis_sport`
 
-## Research (`data/research/{sport}.xlsx`)
+## Research (`data/research/{sport}.xlsx`) — legacy, merged into Flat 2026-10-22
 
 Every candidate for research-only sports. One workbook per sport.
 
@@ -65,7 +90,7 @@ Every candidate for research-only sports. One workbook per sport.
 
 SOCCER and TENNIS were removed from Research per operator directive 2026-08-03 — they now route to Main+Flat only.
 
-## Gated Research (`data/gated_research/{sport}.xlsx`)
+## Gated Research (`data/gated_research/{sport}.xlsx`) — legacy, merged into Main 2026-10-22
 
 Curated subset of Research: only rows that clear `evaluate_gated_research_eligibility` (minimum edge + confidence).
 

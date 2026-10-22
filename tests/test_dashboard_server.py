@@ -1004,11 +1004,11 @@ def test_scan_prices_targets_all_unique_open_visible_ledger_contracts(
     assert "--all" not in command
 
 
-def test_all_ledger_rows_for_price_scan_pulls_from_all_four_ledgers(monkeypatch, patch_dash) -> None:
-    """Confirmed real gap (2026-07-31): read_picks() only ever parsed
-    picks.xlsx (Main), so every open Flat/Research/Gated Research pick's
-    price silently went stale forever, since nothing else ever refreshed
-    them. This pins that all four sources feed the price scan now.
+def test_all_ledger_rows_for_price_scan_pulls_from_main_and_flat_only(monkeypatch, patch_dash) -> None:
+    """Confirmed real gap (2026-07-31): read_picks() only ever parsed picks.xlsx (Main), so every
+    open Flat pick's price silently went stale forever, since nothing else ever refreshed it.
+    The research and gated-research ledgers were merged into Flat and Main on 2026-10-22, so the
+    scan reads those two sources and never the legacy research ledgers.
 
     read_picks()/read_flat_picks() are mocked whole (not _parse_picks):
     _read_split_picks() now short-circuits to the SQLite dashboard cache
@@ -1016,11 +1016,15 @@ def test_all_ledger_rows_for_price_scan_pulls_from_all_four_ledgers(monkeypatch,
     real cached rows into the scan."""
     patch_dash("read_picks", lambda: [{"pick_id": "main-1"}])
     patch_dash("read_flat_picks", lambda: [{"pick_id": "flat-1"}])
-    patch_dash("_parse_research_picks", lambda *, gated: [{"pick_id": "gated-1" if gated else "research-1"}])
+
+    def forbidden(*, gated):
+        raise AssertionError("the legacy research ledgers must not be scanned")
+
+    patch_dash("_parse_research_picks", forbidden)
 
     rows = dashboard_server._all_ledger_rows_for_price_scan()
 
-    assert {row["pick_id"] for row in rows} == {"main-1", "flat-1", "research-1", "gated-1"}
+    assert {row["pick_id"] for row in rows} == {"main-1", "flat-1"}
 
 
 def test_portfolio_uses_only_exchange_confirmed_positions_and_persists_activity(

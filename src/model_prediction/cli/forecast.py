@@ -65,7 +65,6 @@ from ..models.market_residual import MarketResidualModel
 from ..models.mlb import canonical_mlb_artifact_hash, load_formula_spec
 from ..pricing import implied_probability
 from ..production_registry import ProductionModelRegistry, compute_artifact_hash
-from ..research_ledgers import RESEARCH_LEDGER_SPORTS, research_ledger
 from ..runtime_paths import RuntimePaths
 from ..soccer_forward import build_soccer_total_slate
 from ..tennis_forward import build_tennis_slate
@@ -5477,22 +5476,8 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
     # either sport.
     dual_ledger_sports = {s.casefold() for s in sports} & DUAL_LEDGER_SPORTS
     if replace_today and log and not is_flat:
-        selected_research_sports = (
-            RESEARCH_LEDGER_SPORTS
-            if getattr(args, "all", False)
-            else tuple(sport for sport in sports if sport.casefold() in RESEARCH_LEDGER_SPORTS)
-        )
-        for research_sport in selected_research_sports:
-            _clear_today_open(
-                research_ledger(data_directory, research_sport),
-                args.date,
-                by_event_date=True,
-            )
-            _clear_today_open(
-                research_ledger(data_directory, research_sport, gated=True),
-                args.date,
-                by_event_date=True,
-            )
+        # Esports/KBO/NPB are dual-ledger sports since the 2026-10-22 merge: Main was
+        # cleared above and Flat is cleared here.
         if dual_ledger_sports:
             _clear_today_open(flat_ledger, args.date, by_event_date=True, leagues=dual_ledger_sports)
     elif replace_today and log and is_flat and dual_ledger_sports:
@@ -5513,8 +5498,6 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
                 raise ValueError("legacy-measured-edge is available only for MLB")
             results[sport] = _forecast_mlb(args.date, log, config, registry, bans, ledger, audit)
         elif sport in ESPORTS_TITLES:
-            sport_research = research_ledger(data_directory, sport)
-            sport_gated = research_ledger(data_directory, sport, gated=True)
             results[sport] = forecast_esports_slate(
                 data_root=data_directory,
                 artifact_dir=_research_models_dir(),
@@ -5522,30 +5505,26 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
                 game_date=args.date,
             )
             if log and ledger is not None:
-                # Esports never reaches Main, so no Flat row either
-                # (operator directive, 2026-08-03) -- Research is
-                # already its "every candidate" companion.
+                # Merged 2026-10-22: Flat gets every candidate, Main the gated CALLs. Both
+                # ledgers are written whichever command ran (a dual-ledger sport), so a
+                # same-day re-run of either command regenerates what it clears.
                 _log_esports_forecast(
                     results[sport],
                     config,
-                    sport_research,
-                    flat_mode=is_flat,
-                    gated_ledger=sport_gated,
+                    flat_ledger,
+                    flat_mode=False,
+                    gated_ledger=ledger,
                 )
         elif sport in ("kbo", "npb"):
-            # KBO/NPB never reach Main, so no Flat row either
-            # (operator directive, 2026-08-03) -- same reasoning as
-            # esports above.
+            # Merged 2026-10-22: same routing as esports above.
             results[sport] = _forecast_international_sport(
                 data_root=data_directory,
                 artifact_dir=_research_models_dir(),
                 league=sport,
                 args_date=args.date,
                 config=config,
-                research_ledger=(research_ledger(data_directory, sport) if log and not is_flat else None),
-                gated_ledger=(
-                    research_ledger(data_directory, sport, gated=True) if log and not is_flat else None
-                ),
+                research_ledger=(flat_ledger if log else None),
+                gated_ledger=(ledger if log else None),
             )
         elif sport == "soccer":
             # Main+Flat only (operator directive 2026-08-03).

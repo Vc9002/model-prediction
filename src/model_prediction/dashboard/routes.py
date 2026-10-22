@@ -81,7 +81,6 @@ from model_prediction.dashboard.orders import (
     today_picks,
 )
 from model_prediction.dashboard.picks import (
-    _parse_research_picks,
     explain_pick,
     performance_for_sport,
     read_flat_picks,
@@ -297,53 +296,6 @@ class Handler(BaseHTTPRequestHandler):
                         lambda: performance_for_sport(flat, sport, archived_ids=archived),
                     )
                 )
-            elif route == "/api/research-performance":
-                sport = str(query.get("sport") or "").strip()
-                research = _parse_research_picks()
-                archived = set(_load_archive().get("pick_ids", []))
-                self._send(
-                    _cached(
-                        f"research-performance:{sport.casefold() or 'all'}",
-                        30,
-                        lambda: performance_for_sport(research, sport, archived_ids=archived),
-                    )
-                )
-            elif route == "/api/research-picks":
-
-                def _research_decorated():
-                    orders = _load_orders()
-                    portfolio = _load_portfolio_history()
-                    archived = set(_load_archive().get("pick_ids", []))
-                    return [
-                        _decorate_pick(r, orders, portfolio, archived_ids=archived)
-                        for r in _parse_research_picks()
-                    ]
-
-                self._send(_cached("research-picks", 60, _research_decorated))
-            elif route == "/api/gated-research-performance":
-                sport = str(query.get("sport") or "").strip()
-                archived = set(_load_archive().get("pick_ids", []))
-                self._send(
-                    _cached(
-                        f"gated-research-performance:{sport.casefold() or 'all'}",
-                        60,
-                        lambda: performance_for_sport(
-                            _parse_research_picks(gated=True), sport, archived_ids=archived
-                        ),
-                    )
-                )
-            elif route == "/api/gated-research-picks":
-
-                def _gated_research_decorated():
-                    orders = _load_orders()
-                    portfolio = _load_portfolio_history()
-                    archived = set(_load_archive().get("pick_ids", []))
-                    return [
-                        _decorate_pick(r, orders, portfolio, archived_ids=archived)
-                        for r in _parse_research_picks(gated=True)
-                    ]
-
-                self._send(_cached("gated-research-picks", 60, _gated_research_decorated))
             elif route == "/api/backtests":
                 self._send(_cached("backtests", 60, backtests))
             elif route == "/api/backtest":
