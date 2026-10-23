@@ -1,0 +1,1188 @@
+{
+  "artifact_hash": "f649d1152396fc41748c07a1a08e513d7b4cb5f0758c72017a6aa0caa9fb98b7",
+  "baseline_statuses": {
+    "corrected_v6": "REQUIRES_MATCHED_ARCHIVED_PIT_TRAINING_STATE",
+    "exact_v6": "BLOCKED_REPRODUCTION",
+    "recalibration_only_v6": "BLOCKED_UNTIL_CONTROL_AND_COHORT_VALID"
+  },
+  "comparative_verdict": "INSUFFICIENT_EVIDENCE_NO_ACTIVATION",
+  "histories": {
+    "cs2": {
+      "coverage": {
+        "contextual_feature_policy": "tier and best_of excluded: metadata observation time unverified; audit counts only",
+        "eligible_unique_events": 42061,
+        "exact_duplicates_removed": 0,
+        "excluded": {
+          "invalid_end_order": 59,
+          "missing_end": 5
+        },
+        "immutable_input_archive": "cs2_history_snapshot.jsonl.gz",
+        "map_score_pairs_present": 42125,
+        "metadata_best_of_counts": {
+          "1": 12737,
+          "2": 71,
+          "3": 29048,
+          "5": 269
+        },
+        "metadata_tier_counts": {
+          "a": 1278,
+          "b": 14349,
+          "c": 24232,
+          "s": 2266
+        },
+        "pre_event_observation_timestamp_verified": false,
+        "raw_records": 42125,
+        "result_availability_policy": "end_utc strictly before decision; provider END proxy, collection/publication delay unverified",
+        "source_byte_sha256": "d36df659e7d61a5117c4d57f0ce4df6a20d91d82cbc39b63de5753db7b02bf5b",
+        "source_match_identity_present": 42125,
+        "source_observed_at_present": 0,
+        "source_path": "E:\\MP\\data\\esports\\cs2\\matches.jsonl",
+        "source_url_present": 42125
+      },
+      "diagnostic_research": {
+        "aggregate_development": {
+          "learned_rating": {
+            "brier": 0.22516493718671868,
+            "log_loss": 0.6410864796224942,
+            "n": 18484
+          },
+          "regularized_logistic": {
+            "brier": 0.22327263772428174,
+            "log_loss": 0.6372079389436603,
+            "n": 18484
+          }
+        },
+        "context_features": "tier/best_of excluded pending timestamped metadata",
+        "development_events": 34054,
+        "final_window_event_count": 8007,
+        "final_window_start": "2026-04-02",
+        "final_window_status": "UNSCORED_NOT_A_FRESH_HOLDOUT: source history used by earlier generations",
+        "folds": [
+          {
+            "base_fit_n": 13395,
+            "calibration_n": 2172,
+            "fold": 0,
+            "learned_rating": {
+              "brier": 0.22638911681928156,
+              "log_loss": 0.6434406067852392,
+              "n": 5537
+            },
+            "regularized_logistic": {
+              "brier": 0.2255423545785957,
+              "log_loss": 0.642024359172485,
+              "n": 5537
+            },
+            "selected_C": 0.01,
+            "selected_inactivity_half_life_days": null,
+            "selected_k": 32.0,
+            "train_n_result_available": 15569,
+            "uncalibrated_rating_diagnostic": {
+              "brier": 0.22663192567286153,
+              "log_loss": 0.6439431025569305,
+              "n": 5537
+            },
+            "validation_end_exclusive": "2025-05-07",
+            "validation_start": "2025-01-04"
+          },
+          {
+            "base_fit_n": 17030,
+            "calibration_n": 4072,
+            "fold": 1,
+            "learned_rating": {
+              "brier": 0.22536416500930792,
+              "log_loss": 0.6415397159181914,
+              "n": 3965
+            },
+            "regularized_logistic": {
+              "brier": 0.223647403014094,
+              "log_loss": 0.638143722186907,
+              "n": 3965
+            },
+            "selected_C": 0.01,
+            "selected_inactivity_half_life_days": null,
+            "selected_k": 32.0,
+            "train_n_result_available": 21103,
+            "uncalibrated_rating_diagnostic": {
+              "brier": 0.2256735518094314,
+              "log_loss": 0.6420759539235841,
+              "n": 3965
+            },
+            "validation_end_exclusive": "2025-09-06",
+            "validation_start": "2025-05-07"
+          },
+          {
+            "base_fit_n": 21735,
+            "calibration_n": 3333,
+            "fold": 2,
+            "learned_rating": {
+              "brier": 0.22628879359292253,
+              "log_loss": 0.6438941807515214,
+              "n": 4693
+            },
+            "regularized_logistic": {
+              "brier": 0.2233469665336022,
+              "log_loss": 0.6376235195944705,
+              "n": 4693
+            },
+            "selected_C": 0.01,
+            "selected_inactivity_half_life_days": null,
+            "selected_k": 32.0,
+            "train_n_result_available": 25070,
+            "uncalibrated_rating_diagnostic": {
+              "brier": 0.22634179584411207,
+              "log_loss": 0.6440281284279312,
+              "n": 4693
+            },
+            "validation_end_exclusive": "2026-01-10",
+            "validation_start": "2025-09-06"
+          },
+          {
+            "base_fit_n": 24894,
+            "calibration_n": 4868,
+            "fold": 3,
+            "learned_rating": {
+              "brier": 0.22217065435706565,
+              "log_loss": 0.6345561869176488,
+              "n": 4289
+            },
+            "regularized_logistic": {
+              "brier": 0.2199147007462954,
+              "log_loss": 0.6296702333337917,
+              "n": 4289
+            },
+            "selected_C": 0.01,
+            "selected_inactivity_half_life_days": null,
+            "selected_k": 32.0,
+            "train_n_result_available": 29764,
+            "uncalibrated_rating_diagnostic": {
+              "brier": 0.22237456009830533,
+              "log_loss": 0.6349801437850108,
+              "n": 4289
+            },
+            "validation_end_exclusive": "2026-04-02",
+            "validation_start": "2026-01-10"
+          }
+        ],
+        "form_window": "last 10 result residuals per team, predeclared diagnostic feature; ablation required before use",
+        "limitations": [
+          "end_utc is provider completion proxy, not verified publication/collection timestamp",
+          "stable team ID does not certify roster continuity",
+          "no market residual training without audited quotes",
+          "fixed learned-Elo offset plus regularized residual; not a market-offset model without audited quote histories"
+        ],
+        "production_comparison": "BLOCKED: diagnostic histories not same executable decision cohort",
+        "profitability": null,
+        "rating_initialization": "neutral zero log strength; zero form with explicit zero history count; no invented contextual inputs",
+        "status": "RETROSPECTIVE_REUSED_HISTORY_DIAGNOSTIC_ONLY"
+      }
+    },
+    "dota2": {
+      "coverage": {
+        "contextual_feature_policy": "tier and best_of excluded: metadata observation time unverified; audit counts only",
+        "eligible_unique_events": 11511,
+        "exact_duplicates_removed": 0,
+        "excluded": {
+          "invalid_end_order": 2,
+          "missing_end": 5
+        },
+        "immutable_input_archive": "dota2_history_snapshot.jsonl.gz",
+        "map_score_pairs_present": 11518,
+        "metadata_best_of_counts": {
+          "1": 1168,
+          "2": 996,
+          "3": 9017,
+          "5": 337
+        },
+        "metadata_tier_counts": {
+          "a": 3357,
+          "b": 5855,
+          "c": 57,
+          "s": 2249
+        },
+        "pre_event_observation_timestamp_verified": false,
+        "raw_records": 11518,
+        "result_availability_policy": "end_utc strictly before decision; provider END proxy, collection/publication delay unverified",
+        "source_byte_sha256": "397749d3d0456ac63aff61b0df0968493d0e425bad0be5327bd7133c2545c027",
+        "source_match_identity_present": 11518,
+        "source_observed_at_present": 0,
+        "source_path": "E:\\MP\\data\\esports\\dota2\\matches.jsonl",
+        "source_url_present": 11518
+      },
+      "diagnostic_research": {
+        "aggregate_development": {
+          "learned_rating": {
+            "brier": 0.21682750376438434,
+            "log_loss": 0.6229026478326253,
+            "n": 5519
+          },
+          "regularized_logistic": {
+            "brier": 0.21478741051745362,
+            "log_loss": 0.6186095789983729,
+            "n": 5519
+          }
+        },
+        "context_features": "tier/best_of excluded pending timestamped metadata",
+        "development_events": 9478,
+        "final_window_event_count": 2033,
+        "final_window_start": "2026-03-08",
+        "final_window_status": "UNSCORED_NOT_A_FRESH_HOLDOUT: source history used by earlier generations",
+        "folds": [
+          {
+            "base_fit_n": 3277,
+            "calibration_n": 682,
+            "fold": 0,
+            "learned_rating": {
+              "brier": 0.21244292450244914,
+              "log_loss": 0.6133148867143997,
+              "n": 1665
+            },
+            "regularized_logistic": {
+              "brier": 0.21042375786950393,
+              "log_loss": 0.6091285207905456,
+              "n": 1665
+            },
+            "selected_C": 0.01,
+            "selected_inactivity_half_life_days": null,
+            "selected_k": 64.0,
+            "train_n_result_available": 3959,
+            "uncalibrated_rating_diagnostic": {
+              "brier": 0.21372473869673986,
+              "log_loss": 0.6168139066072219,
+              "n": 1665
+            },
+            "validation_end_exclusive": "2025-03-09",
+            "validation_start": "2024-10-16"
+          },
+          {
+            "base_fit_n": 4344,
+            "calibration_n": 1280,
+            "fold": 1,
+            "learned_rating": {
+              "brier": 0.21630503063652495,
+              "log_loss": 0.6210876355683713,
+              "n": 1262
+            },
+            "regularized_logistic": {
+              "brier": 0.21641077538024056,
+              "log_loss": 0.6210679729832937,
+              "n": 1262
+            },
+            "selected_C": 0.01,
+            "selected_inactivity_half_life_days": null,
+            "selected_k": 64.0,
+            "train_n_result_available": 5624,
+            "uncalibrated_rating_diagnostic": {
+              "brier": 0.21643135240761405,
+              "log_loss": 0.621161175607823,
+              "n": 1262
+            },
+            "validation_end_exclusive": "2025-07-26",
+            "validation_start": "2025-03-09"
+          },
+          {
+            "base_fit_n": 5723,
+            "calibration_n": 1162,
+            "fold": 2,
+            "learned_rating": {
+              "brier": 0.21661438330161503,
+              "log_loss": 0.6237448111492698,
+              "n": 1499
+            },
+            "regularized_logistic": {
+              "brier": 0.21525161993511902,
+              "log_loss": 0.6208401450078928,
+              "n": 1499
+            },
+            "selected_C": 0.01,
+            "selected_inactivity_half_life_days": null,
+            "selected_k": 64.0,
+            "train_n_result_available": 6886,
+            "uncalibrated_rating_diagnostic": {
+              "brier": 0.2176226187059475,
+              "log_loss": 0.6278451409475384,
+              "n": 1499
+            },
+            "validation_end_exclusive": "2025-12-07",
+            "validation_start": "2025-07-26"
+          },
+          {
+            "base_fit_n": 6829,
+            "calibration_n": 1556,
+            "fold": 3,
+            "learned_rating": {
+              "brier": 0.2244022092832971,
+              "log_loss": 0.638448635872592,
+              "n": 1093
+            },
+            "regularized_logistic": {
+              "brier": 0.21892368250731545,
+              "log_loss": 0.6271547301958039,
+              "n": 1093
+            },
+            "selected_C": 0.01,
+            "selected_inactivity_half_life_days": null,
+            "selected_k": 32.0,
+            "train_n_result_available": 8385,
+            "uncalibrated_rating_diagnostic": {
+              "brier": 0.223784593407569,
+              "log_loss": 0.6370498005807118,
+              "n": 1093
+            },
+            "validation_end_exclusive": "2026-03-08",
+            "validation_start": "2025-12-07"
+          }
+        ],
+        "form_window": "last 10 result residuals per team, predeclared diagnostic feature; ablation required before use",
+        "limitations": [
+          "end_utc is provider completion proxy, not verified publication/collection timestamp",
+          "stable team ID does not certify roster continuity",
+          "no market residual training without audited quotes",
+          "fixed learned-Elo offset plus regularized residual; not a market-offset model without audited quote histories"
+        ],
+        "production_comparison": "BLOCKED: diagnostic histories not same executable decision cohort",
+        "profitability": null,
+        "rating_initialization": "neutral zero log strength; zero form with explicit zero history count; no invented contextual inputs",
+        "status": "RETROSPECTIVE_REUSED_HISTORY_DIAGNOSTIC_ONLY"
+      }
+    },
+    "lol": {
+      "coverage": {
+        "contextual_feature_policy": "tier and best_of excluded: metadata observation time unverified; audit counts only",
+        "eligible_unique_events": 13196,
+        "exact_duplicates_removed": 0,
+        "excluded": {
+          "invalid_end_order": 19,
+          "missing_end": 1
+        },
+        "immutable_input_archive": "lol_history_snapshot.jsonl.gz",
+        "map_score_pairs_present": 13216,
+        "metadata_best_of_counts": {
+          "1": 5573,
+          "2": 214,
+          "3": 5490,
+          "4": 4,
+          "5": 1935
+        },
+        "metadata_tier_counts": {
+          "a": 4049,
+          "b": 5721,
+          "c": 515,
+          "s": 2931
+        },
+        "pre_event_observation_timestamp_verified": false,
+        "raw_records": 13216,
+        "result_availability_policy": "end_utc strictly before decision; provider END proxy, collection/publication delay unverified",
+        "source_byte_sha256": "a4185c413c47219b0f99b4656a3960e7f0ce7c933d57df0a49d42cbe6d7df5e4",
+        "source_match_identity_present": 13216,
+        "source_observed_at_present": 0,
+        "source_path": "E:\\MP\\data\\esports\\lol\\matches.jsonl",
+        "source_url_present": 13216
+      },
+      "diagnostic_research": {
+        "aggregate_development": {
+          "learned_rating": {
+            "brier": 0.2243660164656118,
+            "log_loss": 0.6394201872984574,
+            "n": 5434
+          },
+          "regularized_logistic": {
+            "brier": 0.22122245115714836,
+            "log_loss": 0.632829488286793,
+            "n": 5434
+          }
+        },
+        "context_features": "tier/best_of excluded pending timestamped metadata",
+        "development_events": 10598,
+        "final_window_event_count": 2598,
+        "final_window_start": "2026-04-10",
+        "final_window_status": "UNSCORED_NOT_A_FRESH_HOLDOUT: source history used by earlier generations",
+        "folds": [
+          {
+            "base_fit_n": 4884,
+            "calibration_n": 280,
+            "fold": 0,
+            "learned_rating": {
+              "brier": 0.23246654519699006,
+              "log_loss": 0.6571630687154654,
+              "n": 1980
+            },
+            "regularized_logistic": {
+              "brier": 0.22552604756636974,
+              "log_loss": 0.6429130312833045,
+              "n": 1980
+            },
+            "selected_C": 0.01,
+            "selected_inactivity_half_life_days": null,
+            "selected_k": 16.0,
+            "train_n_result_available": 5164,
+            "uncalibrated_rating_diagnostic": {
+              "brier": 0.22826474818013434,
+              "log_loss": 0.6472987747209786,
+              "n": 1980
+            },
+            "validation_end_exclusive": "2025-05-04",
+            "validation_start": "2024-12-29"
+          },
+          {
+            "base_fit_n": 5686,
+            "calibration_n": 1457,
+            "fold": 1,
+            "learned_rating": {
+              "brier": 0.20752639700865597,
+              "log_loss": 0.6023267310958584,
+              "n": 1675
+            },
+            "regularized_logistic": {
+              "brier": 0.2067192403175787,
+              "log_loss": 0.6002723893539262,
+              "n": 1675
+            },
+            "selected_C": 0.01,
+            "selected_inactivity_half_life_days": 180.0,
+            "selected_k": 64.0,
+            "train_n_result_available": 7143,
+            "uncalibrated_rating_diagnostic": {
+              "brier": 0.2089347448586396,
+              "log_loss": 0.6054609728600199,
+              "n": 1675
+            },
+            "validation_end_exclusive": "2025-08-29",
+            "validation_start": "2025-05-04"
+          },
+          {
+            "base_fit_n": 7432,
+            "calibration_n": 1384,
+            "fold": 2,
+            "learned_rating": {
+              "brier": 0.23674051109968305,
+              "log_loss": 0.6667492956095075,
+              "n": 776
+            },
+            "regularized_logistic": {
+              "brier": 0.23585278886262567,
+              "log_loss": 0.6649848322842151,
+              "n": 776
+            },
+            "selected_C": 10.0,
+            "selected_inactivity_half_life_days": 180.0,
+            "selected_k": 64.0,
+            "train_n_result_available": 8817,
+            "uncalibrated_rating_diagnostic": {
+              "brier": 0.2362802095516516,
+              "log_loss": 0.6653255180233186,
+              "n": 776
+            },
+            "validation_end_exclusive": "2026-01-24",
+            "validation_start": "2025-08-29"
+          },
+          {
+            "base_fit_n": 8730,
+            "calibration_n": 864,
+            "fold": 3,
+            "learned_rating": {
+              "brier": 0.22692305322157666,
+              "log_loss": 0.6451961054283705,
+              "n": 1003
+            },
+            "regularized_logistic": {
+              "brier": 0.2256278501666901,
+              "log_loss": 0.6424159076661149,
+              "n": 1003
+            },
+            "selected_C": 0.01,
+            "selected_inactivity_half_life_days": null,
+            "selected_k": 64.0,
+            "train_n_result_available": 9595,
+            "uncalibrated_rating_diagnostic": {
+              "brier": 0.22693774284179127,
+              "log_loss": 0.6485439686629474,
+              "n": 1003
+            },
+            "validation_end_exclusive": "2026-04-10",
+            "validation_start": "2026-01-24"
+          }
+        ],
+        "form_window": "last 10 result residuals per team, predeclared diagnostic feature; ablation required before use",
+        "limitations": [
+          "end_utc is provider completion proxy, not verified publication/collection timestamp",
+          "stable team ID does not certify roster continuity",
+          "no market residual training without audited quotes",
+          "fixed learned-Elo offset plus regularized residual; not a market-offset model without audited quote histories"
+        ],
+        "production_comparison": "BLOCKED: diagnostic histories not same executable decision cohort",
+        "profitability": null,
+        "rating_initialization": "neutral zero log strength; zero form with explicit zero history count; no invented contextual inputs",
+        "status": "RETROSPECTIVE_REUSED_HISTORY_DIAGNOSTIC_ONLY"
+      }
+    },
+    "rainbow_six": {
+      "coverage": {
+        "contextual_feature_policy": "tier and best_of excluded: metadata observation time unverified; audit counts only",
+        "eligible_unique_events": 3317,
+        "exact_duplicates_removed": 0,
+        "excluded": {
+          "missing_end": 9
+        },
+        "immutable_input_archive": "rainbow_six_history_snapshot.jsonl.gz",
+        "map_score_pairs_present": 3326,
+        "metadata_best_of_counts": {
+          "1": 1850,
+          "3": 1458,
+          "5": 18
+        },
+        "metadata_tier_counts": {
+          "a": 2239,
+          "b": 522,
+          "s": 565
+        },
+        "pre_event_observation_timestamp_verified": false,
+        "raw_records": 3326,
+        "result_availability_policy": "end_utc strictly before decision; provider END proxy, collection/publication delay unverified",
+        "source_byte_sha256": "d6eb38d3e80581ba5f3fc2a277592156a3aae3d5f0f5354824c4778832e1ae76",
+        "source_match_identity_present": 3326,
+        "source_observed_at_present": 0,
+        "source_path": "E:\\MP\\data\\esports\\rainbow_six\\matches.jsonl",
+        "source_url_present": 3326
+      },
+      "diagnostic_research": {
+        "aggregate_development": {
+          "learned_rating": {
+            "brier": 0.24011759333290367,
+            "log_loss": 0.6730168267442443,
+            "n": 1461
+          },
+          "regularized_logistic": {
+            "brier": 0.2339704874916859,
+            "log_loss": 0.6615420656698578,
+            "n": 1461
+          }
+        },
+        "context_features": "tier/best_of excluded pending timestamped metadata",
+        "development_events": 2643,
+        "final_window_event_count": 674,
+        "final_window_start": "2026-06-05",
+        "final_window_status": "UNSCORED_NOT_A_FRESH_HOLDOUT: source history used by earlier generations",
+        "folds": [
+          {
+            "base_fit_n": 1036,
+            "calibration_n": 144,
+            "fold": 0,
+            "learned_rating": {
+              "brier": 0.26004553188271257,
+              "log_loss": 0.7135652349598757,
+              "n": 353
+            },
+            "regularized_logistic": {
+              "brier": 0.247357850358177,
+              "log_loss": 0.6876523404669543,
+              "n": 353
+            },
+            "selected_C": 0.01,
+            "selected_inactivity_half_life_days": null,
+            "selected_k": 64.0,
+            "train_n_result_available": 1181,
+            "uncalibrated_rating_diagnostic": {
+              "brier": 0.23530592763723807,
+              "log_loss": 0.6656536502058733,
+              "n": 353
+            },
+            "validation_end_exclusive": "2025-07-08",
+            "validation_start": "2025-01-10"
+          },
+          {
+            "base_fit_n": 1268,
+            "calibration_n": 267,
+            "fold": 1,
+            "learned_rating": {
+              "brier": 0.22388597673625807,
+              "log_loss": 0.6385241890591817,
+              "n": 387
+            },
+            "regularized_logistic": {
+              "brier": 0.2253068270600661,
+              "log_loss": 0.6418773529622884,
+              "n": 387
+            },
+            "selected_C": 0.01,
+            "selected_inactivity_half_life_days": 180.0,
+            "selected_k": 8.0,
+            "train_n_result_available": 1535,
+            "uncalibrated_rating_diagnostic": {
+              "brier": 0.23849706421067718,
+              "log_loss": 0.6700123873014967,
+              "n": 387
+            },
+            "validation_end_exclusive": "2025-10-11",
+            "validation_start": "2025-07-08"
+          },
+          {
+            "base_fit_n": 1578,
+            "calibration_n": 342,
+            "fold": 2,
+            "learned_rating": {
+              "brier": 0.24114966581754613,
+              "log_loss": 0.67573005802056,
+              "n": 470
+            },
+            "regularized_logistic": {
+              "brier": 0.23128092898228464,
+              "log_loss": 0.6548692039512337,
+              "n": 470
+            },
+            "selected_C": 0.01,
+            "selected_inactivity_half_life_days": 180.0,
+            "selected_k": 64.0,
+            "train_n_result_available": 1920,
+            "uncalibrated_rating_diagnostic": {
+              "brier": 0.24166939798972567,
+              "log_loss": 0.6765457885283274,
+              "n": 470
+            },
+            "validation_end_exclusive": "2026-03-30",
+            "validation_start": "2025-10-11"
+          },
+          {
+            "base_fit_n": 1900,
+            "calibration_n": 492,
+            "fold": 3,
+            "learned_rating": {
+              "brier": 0.235185319416718,
+              "log_loss": 0.6640919023782399,
+              "n": 251
+            },
+            "regularized_logistic": {
+              "brier": 0.23353698149401292,
+              "log_loss": 0.6676359374714816,
+              "n": 251
+            },
+            "selected_C": 0.1,
+            "selected_inactivity_half_life_days": null,
+            "selected_k": 64.0,
+            "train_n_result_available": 2392,
+            "uncalibrated_rating_diagnostic": {
+              "brier": 0.23878183277142634,
+              "log_loss": 0.6768434726793443,
+              "n": 251
+            },
+            "validation_end_exclusive": "2026-06-05",
+            "validation_start": "2026-03-30"
+          }
+        ],
+        "form_window": "last 10 result residuals per team, predeclared diagnostic feature; ablation required before use",
+        "limitations": [
+          "end_utc is provider completion proxy, not verified publication/collection timestamp",
+          "stable team ID does not certify roster continuity",
+          "no market residual training without audited quotes",
+          "fixed learned-Elo offset plus regularized residual; not a market-offset model without audited quote histories"
+        ],
+        "production_comparison": "BLOCKED: diagnostic histories not same executable decision cohort",
+        "profitability": null,
+        "rating_initialization": "neutral zero log strength; zero form with explicit zero history count; no invented contextual inputs",
+        "status": "RETROSPECTIVE_REUSED_HISTORY_DIAGNOSTIC_ONLY"
+      }
+    },
+    "valorant": {
+      "coverage": {
+        "contextual_feature_policy": "tier and best_of excluded: metadata observation time unverified; audit counts only",
+        "eligible_unique_events": 14826,
+        "exact_duplicates_removed": 0,
+        "excluded": {
+          "invalid_end_order": 187
+        },
+        "immutable_input_archive": "valorant_history_snapshot.jsonl.gz",
+        "map_score_pairs_present": 15013,
+        "metadata_best_of_counts": {
+          "1": 2414,
+          "2": 121,
+          "3": 11607,
+          "5": 871
+        },
+        "metadata_tier_counts": {
+          "a": 1723,
+          "b": 10028,
+          "c": 1313,
+          "s": 1948,
+          "\u0441": 1
+        },
+        "pre_event_observation_timestamp_verified": false,
+        "raw_records": 15013,
+        "result_availability_policy": "end_utc strictly before decision; provider END proxy, collection/publication delay unverified",
+        "source_byte_sha256": "ccffbd1f1b346d6d1adb055336e8633305976f7b52ff0b3b2ba2674a9d2f5fd8",
+        "source_match_identity_present": 15013,
+        "source_observed_at_present": 0,
+        "source_path": "E:\\MP\\data\\esports\\valorant\\matches.jsonl",
+        "source_url_present": 15013
+      },
+      "diagnostic_research": {
+        "aggregate_development": {
+          "learned_rating": {
+            "brier": 0.2219425761987555,
+            "log_loss": 0.6338850215451265,
+            "n": 6163
+          },
+          "regularized_logistic": {
+            "brier": 0.2190181357057718,
+            "log_loss": 0.6276035214425878,
+            "n": 6163
+          }
+        },
+        "context_features": "tier/best_of excluded pending timestamped metadata",
+        "development_events": 12351,
+        "final_window_event_count": 2475,
+        "final_window_start": "2026-01-28",
+        "final_window_status": "UNSCORED_NOT_A_FRESH_HOLDOUT: source history used by earlier generations",
+        "folds": [
+          {
+            "base_fit_n": 5019,
+            "calibration_n": 1167,
+            "fold": 0,
+            "learned_rating": {
+              "brier": 0.21119143715226552,
+              "log_loss": 0.6082621746900934,
+              "n": 2017
+            },
+            "regularized_logistic": {
+              "brier": 0.20789406559294504,
+              "log_loss": 0.6013519533572053,
+              "n": 2017
+            },
+            "selected_C": 0.01,
+            "selected_inactivity_half_life_days": 180.0,
+            "selected_k": 64.0,
+            "train_n_result_available": 6188,
+            "uncalibrated_rating_diagnostic": {
+              "brier": 0.21407653350819117,
+              "log_loss": 0.6158912216756041,
+              "n": 2017
+            },
+            "validation_end_exclusive": "2024-10-18",
+            "validation_start": "2024-05-14"
+          },
+          {
+            "base_fit_n": 7351,
+            "calibration_n": 851,
+            "fold": 1,
+            "learned_rating": {
+              "brier": 0.22934841272863368,
+              "log_loss": 0.6514234117011357,
+              "n": 1734
+            },
+            "regularized_logistic": {
+              "brier": 0.2285065028339939,
+              "log_loss": 0.650208256997184,
+              "n": 1734
+            },
+            "selected_C": 10.0,
+            "selected_inactivity_half_life_days": 180.0,
+            "selected_k": 64.0,
+            "train_n_result_available": 8204,
+            "uncalibrated_rating_diagnostic": {
+              "brier": 0.22896925754682504,
+              "log_loss": 0.6494002971550793,
+              "n": 1734
+            },
+            "validation_end_exclusive": "2025-04-14",
+            "validation_start": "2024-10-18"
+          },
+          {
+            "base_fit_n": 8364,
+            "calibration_n": 1574,
+            "fold": 2,
+            "learned_rating": {
+              "brier": 0.22222373519865152,
+              "log_loss": 0.6354260715525375,
+              "n": 1629
+            },
+            "regularized_logistic": {
+              "brier": 0.22087874804699642,
+              "log_loss": 0.6320198981186006,
+              "n": 1629
+            },
+            "selected_C": 0.01,
+            "selected_inactivity_half_life_days": null,
+            "selected_k": 64.0,
+            "train_n_result_available": 9938,
+            "uncalibrated_rating_diagnostic": {
+              "brier": 0.22307068030079621,
+              "log_loss": 0.6399982468021481,
+              "n": 1629
+            },
+            "validation_end_exclusive": "2025-09-19",
+            "validation_start": "2025-04-14"
+          },
+          {
+            "base_fit_n": 9804,
+            "calibration_n": 1764,
+            "fold": 3,
+            "learned_rating": {
+              "brier": 0.23265179574298372,
+              "log_loss": 0.6578433141556104,
+              "n": 783
+            },
+            "regularized_logistic": {
+              "brier": 0.22279014504597575,
+              "log_loss": 0.6359796692986817,
+              "n": 783
+            },
+            "selected_C": 0.01,
+            "selected_inactivity_half_life_days": 180.0,
+            "selected_k": 64.0,
+            "train_n_result_available": 11568,
+            "uncalibrated_rating_diagnostic": {
+              "brier": 0.23377321344376836,
+              "log_loss": 0.6599737475307712,
+              "n": 783
+            },
+            "validation_end_exclusive": "2026-01-28",
+            "validation_start": "2025-09-19"
+          }
+        ],
+        "form_window": "last 10 result residuals per team, predeclared diagnostic feature; ablation required before use",
+        "limitations": [
+          "end_utc is provider completion proxy, not verified publication/collection timestamp",
+          "stable team ID does not certify roster continuity",
+          "no market residual training without audited quotes",
+          "fixed learned-Elo offset plus regularized residual; not a market-offset model without audited quote histories"
+        ],
+        "production_comparison": "BLOCKED: diagnostic histories not same executable decision cohort",
+        "profitability": null,
+        "rating_initialization": "neutral zero log strength; zero form with explicit zero history count; no invented contextual inputs",
+        "status": "RETROSPECTIVE_REUSED_HISTORY_DIAGNOSTIC_ONLY"
+      }
+    }
+  },
+  "ledger": {
+    "all_esports_records": 3586,
+    "cohort": {
+      "duplicates_removed": 1375,
+      "input_records": 1826,
+      "keys_across_tiers": 447,
+      "settlement_conflicts": 0,
+      "tier_counts_canonical": {
+        "flat": 447,
+        "main": 4
+      },
+      "tier_counts_input": {
+        "flat": 447,
+        "gated_research": 464,
+        "main": 450,
+        "research": 465
+      },
+      "unique_pick_keys": 451
+    },
+    "control_name": "exact_archived_v6_incumbent",
+    "control_rule": "strict archived state/code identity replay; missing or drifted rows block ranking; no self-comparison",
+    "eligible_settled_active_moneyline_records": 1826,
+    "gate": "BLOCKED_REPRODUCTION",
+    "incumbent_dependency_scope": "archived esports.py and elo_ratings.py verified exactly; remaining dependencies from pinned original source",
+    "incumbent_source": "E:\\MP\\scratch\\esports-overhaul-20261023\\incumbent-src",
+    "incumbent_source_groups": [
+      {
+        "actual_replay_code_sha256": {
+          "esports.py": "48eab29fd660f72bcbd6f9557cca081a5e6f76c9da89c9cf36ce7181c79b1174",
+          "features/elo_ratings.py": "8525faf022a6343c452286dbfeb17dbb043744c6bdabbe448b6b371216da439b"
+        },
+        "archived_elo_sha256": "8525faf022a6343c452286dbfeb17dbb043744c6bdabbe448b6b371216da439b",
+        "archived_esports_sha256": "48eab29fd660f72bcbd6f9557cca081a5e6f76c9da89c9cf36ce7181c79b1174",
+        "git_commits": {
+          "esports.py": "50f624304859bfe83c4af9327bcacd9b74902b84",
+          "features/elo_ratings.py": "bd8a82d176570366af877ef18329c28dc2cc0c8c"
+        },
+        "historical_sources_recovered": true,
+        "rows": 87
+      },
+      {
+        "actual_replay_code_sha256": {
+          "esports.py": "1062b45bde8c425712239cfa42636f4a857797ed888c3072b9976f0af0f28526",
+          "features/elo_ratings.py": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872"
+        },
+        "archived_elo_sha256": "8525faf022a6343c452286dbfeb17dbb043744c6bdabbe448b6b371216da439b",
+        "archived_esports_sha256": "a3c853f49dbf985f47a1d90696fafa74e5b8f097160af8d28d7fa1215c8bce8a",
+        "historical_sources_recovered": false,
+        "rows": 1
+      },
+      {
+        "actual_replay_code_sha256": {
+          "esports.py": "1062b45bde8c425712239cfa42636f4a857797ed888c3072b9976f0af0f28526",
+          "features/elo_ratings.py": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872"
+        },
+        "archived_elo_sha256": "8525faf022a6343c452286dbfeb17dbb043744c6bdabbe448b6b371216da439b",
+        "archived_esports_sha256": "8d25951d04320147b4f82f35408c7948ac3d6a80af203ada3bac1aa630e7b330",
+        "historical_sources_recovered": false,
+        "rows": 9
+      },
+      {
+        "actual_replay_code_sha256": {
+          "esports.py": "1062b45bde8c425712239cfa42636f4a857797ed888c3072b9976f0af0f28526",
+          "features/elo_ratings.py": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872"
+        },
+        "archived_elo_sha256": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872",
+        "archived_esports_sha256": "8d25951d04320147b4f82f35408c7948ac3d6a80af203ada3bac1aa630e7b330",
+        "historical_sources_recovered": false,
+        "rows": 60
+      },
+      {
+        "actual_replay_code_sha256": {
+          "esports.py": "3abbfc5d7124cc94603dada2e4c996da231a679d437c5a066d994a2a7d428f61",
+          "features/elo_ratings.py": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872"
+        },
+        "archived_elo_sha256": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872",
+        "archived_esports_sha256": "3abbfc5d7124cc94603dada2e4c996da231a679d437c5a066d994a2a7d428f61",
+        "git_commits": {
+          "esports.py": "338742cd277f3a75a0c6a60be28159134d5d7f9c",
+          "features/elo_ratings.py": "338742cd277f3a75a0c6a60be28159134d5d7f9c"
+        },
+        "historical_sources_recovered": true,
+        "rows": 88
+      },
+      {
+        "actual_replay_code_sha256": {
+          "esports.py": "ec64bcad0f00ffb3fb38160304eed3f40f74161c93889a0e4215bca26558985e",
+          "features/elo_ratings.py": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872"
+        },
+        "archived_elo_sha256": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872",
+        "archived_esports_sha256": "ec64bcad0f00ffb3fb38160304eed3f40f74161c93889a0e4215bca26558985e",
+        "git_commits": {
+          "esports.py": "48fa0f8b7b32b39ed3752b27e45e6d5ffb2c0587",
+          "features/elo_ratings.py": "338742cd277f3a75a0c6a60be28159134d5d7f9c"
+        },
+        "historical_sources_recovered": true,
+        "rows": 34
+      },
+      {
+        "actual_replay_code_sha256": {
+          "esports.py": "1062b45bde8c425712239cfa42636f4a857797ed888c3072b9976f0af0f28526",
+          "features/elo_ratings.py": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872"
+        },
+        "archived_elo_sha256": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872",
+        "archived_esports_sha256": "c1c2408e1f75d4e0393dd513e024e25fe1444a621f03f404ed31d2ff03b02c01",
+        "historical_sources_recovered": false,
+        "rows": 1
+      },
+      {
+        "actual_replay_code_sha256": {
+          "esports.py": "1062b45bde8c425712239cfa42636f4a857797ed888c3072b9976f0af0f28526",
+          "features/elo_ratings.py": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872"
+        },
+        "archived_elo_sha256": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872",
+        "archived_esports_sha256": "1062b45bde8c425712239cfa42636f4a857797ed888c3072b9976f0af0f28526",
+        "git_commits": {
+          "esports.py": "4941da6d3de8c126d520e06ffa4c79a2e0f02e4f",
+          "features/elo_ratings.py": "338742cd277f3a75a0c6a60be28159134d5d7f9c"
+        },
+        "historical_sources_recovered": true,
+        "rows": 171
+      }
+    ],
+    "ledger_snapshot_rows_hash": "b29ecd58e9a520e046600d497a0c860eebc3c292a517de0c817e90fa1cf7711f",
+    "mismatch_classes": {
+      "esports_replay_code_mismatch": 71,
+      "exact_match": 380
+    },
+    "per_feature_policy": "zero deltas only after independently verified replay; null when replay cannot establish lineage",
+    "profitability_status": "NOT_EVALUATED: references alone do not certify executable contracts, costs or fills",
+    "quote_references_present": 0,
+    "ranking_allowed": false,
+    "titles": {
+      "cs2": {
+        "canonical_pick_keys": 339,
+        "canonical_stored_market_diagnostic": {
+          "brier": 0.23866625574420058,
+          "log_loss": 0.6698701943699825,
+          "n": 339
+        },
+        "canonical_stored_model": {
+          "brier": 0.24579952491030976,
+          "log_loss": 0.6855284597784956,
+          "n": 339
+        },
+        "exact_control_reproduced_metrics": {
+          "brier": 0.24870720987239442,
+          "log_loss": 0.6917137112264954,
+          "n": 284
+        },
+        "flat_proposal_cohort_n": 339,
+        "flat_stored_market_diagnostic": {
+          "brier": 0.23866625574420058,
+          "log_loss": 0.6698701943699825,
+          "n": 339
+        },
+        "flat_stored_model": {
+          "brier": 0.24579952491030976,
+          "log_loss": 0.6855284597784956,
+          "n": 339
+        },
+        "reproduction_mismatch_classes": {
+          "esports_replay_code_mismatch": 55,
+          "exact_match": 284
+        },
+        "stored_metrics_on_same_reproduced_rows": {
+          "brier": 0.24870720987239442,
+          "log_loss": 0.6917137112264954,
+          "n": 284
+        },
+        "unique_events": 338
+      },
+      "dota2": {
+        "canonical_pick_keys": 65,
+        "canonical_stored_market_diagnostic": {
+          "brier": 0.20785708861935387,
+          "log_loss": 0.6062753385731628,
+          "n": 65
+        },
+        "canonical_stored_model": {
+          "brier": 0.23165226701750768,
+          "log_loss": 0.6560207408657502,
+          "n": 65
+        },
+        "exact_control_reproduced_metrics": {
+          "brier": 0.23306589685838597,
+          "log_loss": 0.6589882891227097,
+          "n": 57
+        },
+        "flat_proposal_cohort_n": 63,
+        "flat_stored_market_diagnostic": {
+          "brier": 0.2062611375629524,
+          "log_loss": 0.602992761799117,
+          "n": 63
+        },
+        "flat_stored_model": {
+          "brier": 0.2324684100229841,
+          "log_loss": 0.6576474076338745,
+          "n": 63
+        },
+        "reproduction_mismatch_classes": {
+          "esports_replay_code_mismatch": 8,
+          "exact_match": 57
+        },
+        "stored_metrics_on_same_reproduced_rows": {
+          "brier": 0.23306589685838597,
+          "log_loss": 0.6589882891227097,
+          "n": 57
+        },
+        "unique_events": 65
+      },
+      "lol": {
+        "canonical_pick_keys": 15,
+        "canonical_stored_market_diagnostic": {
+          "brier": 0.22189863135586668,
+          "log_loss": 0.634663863531655,
+          "n": 15
+        },
+        "canonical_stored_model": {
+          "brier": 0.25947316962033334,
+          "log_loss": 0.7134266355986055,
+          "n": 15
+        },
+        "exact_control_reproduced_metrics": {
+          "brier": 0.22973902551981817,
+          "log_loss": 0.650424703423921,
+          "n": 11
+        },
+        "flat_proposal_cohort_n": 15,
+        "flat_stored_market_diagnostic": {
+          "brier": 0.22189863135586668,
+          "log_loss": 0.634663863531655,
+          "n": 15
+        },
+        "flat_stored_model": {
+          "brier": 0.25947316962033334,
+          "log_loss": 0.7134266355986055,
+          "n": 15
+        },
+        "reproduction_mismatch_classes": {
+          "esports_replay_code_mismatch": 4,
+          "exact_match": 11
+        },
+        "stored_metrics_on_same_reproduced_rows": {
+          "brier": 0.22973902551981817,
+          "log_loss": 0.650424703423921,
+          "n": 11
+        },
+        "unique_events": 15
+      },
+      "rainbow_six": {
+        "canonical_pick_keys": 11,
+        "canonical_stored_market_diagnostic": {
+          "brier": 0.2940733718564546,
+          "log_loss": 0.7883289789423482,
+          "n": 11
+        },
+        "canonical_stored_model": {
+          "brier": 0.28484653191018183,
+          "log_loss": 0.763435366036255,
+          "n": 11
+        },
+        "exact_control_reproduced_metrics": {
+          "brier": 0.29189823327099995,
+          "log_loss": 0.7776707685405714,
+          "n": 9
+        },
+        "flat_proposal_cohort_n": 10,
+        "flat_stored_market_diagnostic": {
+          "brier": 0.3119114591925,
+          "log_loss": 0.82558972425647,
+          "n": 10
+        },
+        "flat_stored_model": {
+          "brier": 0.2949539307043,
+          "log_loss": 0.7837970968008092,
+          "n": 10
+        },
+        "reproduction_mismatch_classes": {
+          "esports_replay_code_mismatch": 2,
+          "exact_match": 9
+        },
+        "stored_metrics_on_same_reproduced_rows": {
+          "brier": 0.29189823327099995,
+          "log_loss": 0.7776707685405714,
+          "n": 9
+        },
+        "unique_events": 11
+      },
+      "valorant": {
+        "canonical_pick_keys": 21,
+        "canonical_stored_market_diagnostic": {
+          "brier": 0.21922322375028577,
+          "log_loss": 0.6312921127522385,
+          "n": 21
+        },
+        "canonical_stored_model": {
+          "brier": 0.24810343329742862,
+          "log_loss": 0.6905619236693846,
+          "n": 21
+        },
+        "exact_control_reproduced_metrics": {
+          "brier": 0.2521197095055263,
+          "log_loss": 0.6988643219686145,
+          "n": 19
+        },
+        "flat_proposal_cohort_n": 20,
+        "flat_stored_market_diagnostic": {
+          "brier": 0.21862744336975007,
+          "log_loss": 0.6300863979832128,
+          "n": 20
+        },
+        "flat_stored_model": {
+          "brier": 0.23874028539585002,
+          "log_loss": 0.6711755594230697,
+          "n": 20
+        },
+        "reproduction_mismatch_classes": {
+          "esports_replay_code_mismatch": 2,
+          "exact_match": 19
+        },
+        "stored_metrics_on_same_reproduced_rows": {
+          "brier": 0.2521197095055263,
+          "log_loss": 0.6988643219686145,
+          "n": 19
+        },
+        "unique_events": 21
+      }
+    }
+  },
+  "production_ranking": "BLOCKED",
+  "profitability": "NOT_ESTIMATED",
+  "protocol_hash": "b8e0402fdee7d998471ae27d496383bd2fa10b2611a3c933c2554cfbb3c1ca96",
+  "reproduction_gate": "BLOCKED_REPRODUCTION"
+}

@@ -1,0 +1,375 @@
+{
+  "artifact_hash": "a929b817061232eefa7dd783e959c77eeaee4a4e18a4d4ccd58d94c87a69a60c",
+  "context_features_excluded": [
+    "tier",
+    "best_of"
+  ],
+  "fold_artifacts": [
+    {
+      "base_fit_n": 1036,
+      "base_logistic_residual": {
+        "C": 0.01,
+        "coef": [
+          0.06296813551772622,
+          0.2461180774377666,
+          -0.06262630587157819
+        ],
+        "fixed_elo_offset_coefficient": 1.0,
+        "intercept": 0.1952007858946467,
+        "residual_feature_names": [
+          "recent_result_residual_gap",
+          "log_history_count_gap",
+          "minimum_log_history_count"
+        ],
+        "scaler_mean": [
+          0.015238056050205746,
+          0.056598869243945846,
+          1.9721055069190483
+        ],
+        "scaler_scale": [
+          0.29128784083021325,
+          0.8368799654709705,
+          0.9490386775587165
+        ]
+      },
+      "calibration_n": 144,
+      "feature_names": [
+        "elo_logit",
+        "recent_result_residual_gap",
+        "log_history_count_gap",
+        "minimum_log_history_count"
+      ],
+      "fold": 0,
+      "learned_rating": {
+        "brier": 0.26004553188271257,
+        "log_loss": 0.7135652349598757,
+        "n": 353
+      },
+      "rating_calibrator": {
+        "C": 1.0,
+        "coef": [
+          [
+            -0.030915663812639167
+          ]
+        ],
+        "intercept": [
+          0.3079988966715735
+        ],
+        "scaler_mean": [
+          0.19819463581353833
+        ],
+        "scaler_scale": [
+          0.6761299605365577
+        ]
+      },
+      "regularized_logistic": {
+        "brier": 0.247357850358177,
+        "log_loss": 0.6876523404669543,
+        "n": 353
+      },
+      "residual_calibrator": {
+        "C": 1.0,
+        "coef": [
+          [
+            0.1026897056676091
+          ]
+        ],
+        "intercept": [
+          0.30873416457191477
+        ],
+        "scaler_mean": [
+          0.39715944314050045
+        ],
+        "scaler_scale": [
+          0.839560303762175
+        ]
+      },
+      "selected_C": 0.01,
+      "selected_inactivity_half_life_days": null,
+      "selected_k": 64.0,
+      "train_n_result_available": 1181,
+      "uncalibrated_rating_diagnostic": {
+        "brier": 0.23530592763723807,
+        "log_loss": 0.6656536502058733,
+        "n": 353
+      },
+      "validation_end_exclusive": "2025-07-08",
+      "validation_start": "2025-01-10"
+    },
+    {
+      "base_fit_n": 1268,
+      "base_logistic_residual": {
+        "C": 0.01,
+        "coef": [
+          0.33962814951440007,
+          0.29597372695726293,
+          -0.04700682694171288
+        ],
+        "fixed_elo_offset_coefficient": 1.0,
+        "intercept": 0.20843560825905738,
+        "residual_feature_names": [
+          "recent_result_residual_gap",
+          "log_history_count_gap",
+          "minimum_log_history_count"
+        ],
+        "scaler_mean": [
+          0.01783111655059512,
+          0.062441928662441866,
+          2.0478106669030716
+        ],
+        "scaler_scale": [
+          0.31955676407284006,
+          0.9630243235138543,
+          1.0204604525813106
+        ]
+      },
+      "calibration_n": 267,
+      "feature_names": [
+        "elo_logit",
+        "recent_result_residual_gap",
+        "log_history_count_gap",
+        "minimum_log_history_count"
+      ],
+      "fold": 1,
+      "learned_rating": {
+        "brier": 0.22388597673625807,
+        "log_loss": 0.6385241890591817,
+        "n": 387
+      },
+      "rating_calibrator": {
+        "C": 1.0,
+        "coef": [
+          [
+            0.6488042535329682
+          ]
+        ],
+        "intercept": [
+          -0.1005108659235801
+        ],
+        "scaler_mean": [
+          0.007159768260393914
+        ],
+        "scaler_scale": [
+          0.11700568745544905
+        ]
+      },
+      "regularized_logistic": {
+        "brier": 0.2253068270600661,
+        "log_loss": 0.6418773529622884,
+        "n": 387
+      },
+      "residual_calibrator": {
+        "C": 1.0,
+        "coef": [
+          [
+            0.6190968602383199
+          ]
+        ],
+        "intercept": [
+          -0.10320595173420638
+        ],
+        "scaler_mean": [
+          0.13040429363761197
+        ],
+        "scaler_scale": [
+          0.6335333025797878
+        ]
+      },
+      "selected_C": 0.01,
+      "selected_inactivity_half_life_days": 180.0,
+      "selected_k": 8.0,
+      "train_n_result_available": 1535,
+      "uncalibrated_rating_diagnostic": {
+        "brier": 0.23849706421067718,
+        "log_loss": 0.6700123873014967,
+        "n": 387
+      },
+      "validation_end_exclusive": "2025-10-11",
+      "validation_start": "2025-07-08"
+    },
+    {
+      "base_fit_n": 1578,
+      "base_logistic_residual": {
+        "C": 0.01,
+        "coef": [
+          0.07305857303623835,
+          0.2137493098141787,
+          -0.10594765408225706
+        ],
+        "fixed_elo_offset_coefficient": 1.0,
+        "intercept": 0.14603598059901862,
+        "residual_feature_names": [
+          "recent_result_residual_gap",
+          "log_history_count_gap",
+          "minimum_log_history_count"
+        ],
+        "scaler_mean": [
+          0.01027436947915949,
+          0.048735767310288246,
+          2.1654465267088727
+        ],
+        "scaler_scale": [
+          0.2768516432229161,
+          1.0575865590212066,
+          1.0867003959133075
+        ]
+      },
+      "calibration_n": 342,
+      "feature_names": [
+        "elo_logit",
+        "recent_result_residual_gap",
+        "log_history_count_gap",
+        "minimum_log_history_count"
+      ],
+      "fold": 2,
+      "learned_rating": {
+        "brier": 0.24114966581754613,
+        "log_loss": 0.67573005802056,
+        "n": 470
+      },
+      "rating_calibrator": {
+        "C": 1.0,
+        "coef": [
+          [
+            0.8221754238061453
+          ]
+        ],
+        "intercept": [
+          0.23867750983100058
+        ],
+        "scaler_mean": [
+          0.1686176788328408
+        ],
+        "scaler_scale": [
+          0.7480658210254909
+        ]
+      },
+      "regularized_logistic": {
+        "brier": 0.23128092898228464,
+        "log_loss": 0.6548692039512337,
+        "n": 470
+      },
+      "residual_calibrator": {
+        "C": 1.0,
+        "coef": [
+          [
+            0.8858284004787205
+          ]
+        ],
+        "intercept": [
+          0.2420881306469864
+        ],
+        "scaler_mean": [
+          0.2087817544918808
+        ],
+        "scaler_scale": [
+          0.8581535784586007
+        ]
+      },
+      "selected_C": 0.01,
+      "selected_inactivity_half_life_days": 180.0,
+      "selected_k": 64.0,
+      "train_n_result_available": 1920,
+      "uncalibrated_rating_diagnostic": {
+        "brier": 0.24166939798972567,
+        "log_loss": 0.6765457885283274,
+        "n": 470
+      },
+      "validation_end_exclusive": "2026-03-30",
+      "validation_start": "2025-10-11"
+    },
+    {
+      "base_fit_n": 1900,
+      "base_logistic_residual": {
+        "C": 0.1,
+        "coef": [
+          0.06520106851938413,
+          0.1998785552149438,
+          -0.14027729761256055
+        ],
+        "fixed_elo_offset_coefficient": 1.0,
+        "intercept": 0.12205321212362889,
+        "residual_feature_names": [
+          "recent_result_residual_gap",
+          "log_history_count_gap",
+          "minimum_log_history_count"
+        ],
+        "scaler_mean": [
+          0.009608324950675621,
+          0.052119333653280774,
+          2.353322094437027
+        ],
+        "scaler_scale": [
+          0.26552984430891474,
+          1.0271290550488312,
+          1.1214371346106915
+        ]
+      },
+      "calibration_n": 492,
+      "feature_names": [
+        "elo_logit",
+        "recent_result_residual_gap",
+        "log_history_count_gap",
+        "minimum_log_history_count"
+      ],
+      "fold": 3,
+      "learned_rating": {
+        "brier": 0.235185319416718,
+        "log_loss": 0.6640919023782399,
+        "n": 251
+      },
+      "rating_calibrator": {
+        "C": 1.0,
+        "coef": [
+          [
+            0.40946750873458754
+          ]
+        ],
+        "intercept": [
+          0.1881687784047121
+        ],
+        "scaler_mean": [
+          0.12708830551146294
+        ],
+        "scaler_scale": [
+          0.6024611513800211
+        ]
+      },
+      "regularized_logistic": {
+        "brier": 0.23353698149401292,
+        "log_loss": 0.6676359374714816,
+        "n": 251
+      },
+      "residual_calibrator": {
+        "C": 1.0,
+        "coef": [
+          [
+            0.5924372367802856
+          ]
+        ],
+        "intercept": [
+          0.1932919311274436
+        ],
+        "scaler_mean": [
+          0.2714701607240838
+        ],
+        "scaler_scale": [
+          0.6567563487950449
+        ]
+      },
+      "selected_C": 0.1,
+      "selected_inactivity_half_life_days": null,
+      "selected_k": 64.0,
+      "train_n_result_available": 2392,
+      "uncalibrated_rating_diagnostic": {
+        "brier": 0.23878183277142634,
+        "log_loss": 0.6768434726793443,
+        "n": 251
+      },
+      "validation_end_exclusive": "2026-06-05",
+      "validation_start": "2026-03-30"
+    }
+  ],
+  "status": "RESEARCH_ONLY_NOT_SERVING",
+  "title": "rainbow_six"
+}

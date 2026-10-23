@@ -1,0 +1,80 @@
+{
+  "source_origin": "E:\\MP-esports-overhaul-20261023\\src\\model_prediction\\esports.py",
+  "ruff": "passed",
+  "tests": [
+    {
+      "file": "tests/test_esports.py",
+      "arguments": [],
+      "exit_code": 0,
+      "summary": "19 passed in 3.91s",
+      "output_sha256": "f457ea7521fbfaa0565977fb6dc47d4a37f22dee3a7c72dea78dc0d2becb3cd6"
+    },
+    {
+      "file": "tests/test_esports_replay.py",
+      "arguments": [],
+      "exit_code": 0,
+      "summary": "7 passed in 4.66s",
+      "output_sha256": "cb9baf77bd7e1a9f74ee55aef4dba6005dc879522f6f727979a536922c2c31e1"
+    },
+    {
+      "file": "tests/test_esports_serving_contract.py",
+      "arguments": [],
+      "exit_code": 0,
+      "summary": "25 passed in 2.12s",
+      "output_sha256": "f6096458c8add7a4c1d8e8a8a526f037c0fa0c6f1fc9349ea6a24fb8396e6a50"
+    },
+    {
+      "file": "tests/test_esports_logging_contract.py",
+      "arguments": [],
+      "exit_code": 0,
+      "summary": "8 passed in 7.03s",
+      "output_sha256": "3ba9490473d478cbb36996cf3f225d6cc4ae7c9448fbf4b75e664fd8958b61dd"
+    },
+    {
+      "file": "tests/test_esports_context.py",
+      "arguments": [],
+      "exit_code": 0,
+      "summary": "13 passed in 0.44s",
+      "output_sha256": "7790208522929d9e553dde98474dc9eb75ab73cb25201482501665496ff537bb"
+    },
+    {
+      "file": "tests/test_esports_series.py",
+      "arguments": [],
+      "exit_code": 0,
+      "summary": "63 passed in 0.39s",
+      "output_sha256": "7bb61b666b8b1e04fb8d2a7629b7d89618b833cf244cb57fb21946e2e502976d"
+    },
+    {
+      "file": "tests/test_esports_calibration_cohort.py",
+      "arguments": [],
+      "exit_code": 0,
+      "summary": "16 passed in 1.32s",
+      "output_sha256": "8e36303a95e5e2327966b5ba5e641507f58a3187d85e985616d17c5cc7c85521"
+    },
+    {
+      "file": "tests/test_calibration_serving.py",
+      "arguments": [],
+      "exit_code": 0,
+      "summary": "13 passed in 1.46s",
+      "output_sha256": "67a62dd67d0864265fa543a93459a4de34254f7b6da4c5293ac81580efa379f0"
+    },
+    {
+      "file": "tests/test_esports_overhaul_research.py",
+      "arguments": [],
+      "exit_code": 0,
+      "summary": "9 passed in 2.47s",
+      "output_sha256": "dcb02563445a412976cbbbed280bbd1cf494cd7fcec80f0d4a9019d53aa44d55"
+    },
+    {
+      "file": "tests/test_cli.py",
+      "arguments": [
+        "-k",
+        "esports"
+      ],
+      "exit_code": 0,
+      "summary": "5 passed, 73 deselected in 3.17s",
+      "output_sha256": "d219a7b41aa7d4fe85b08cee2a79532f7017f7107dc9f0027e32debbd176f391"
+    }
+  ],
+  "total_passed": 178
+}

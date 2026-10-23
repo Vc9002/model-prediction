@@ -1,0 +1,29 @@
+{
+  "activation": false,
+  "artifact_hash": "b8e0402fdee7d998471ae27d496383bd2fa10b2611a3c933c2554cfbb3c1ca96",
+  "comparison_rule": "date-cluster bootstrap lower 95% bound > .002; at least 30 clusters; exact control gate required",
+  "effect_rationale": ".002 absolute Brier is 0.8% of the .25 neutral benchmark; conservative research screening floor, not an operator-approved economic risk budget",
+  "final_window": "last 20% unique start dates reserved unscored; earlier inspected history not fresh prospective evidence",
+  "minimum_brier_gain": 0.002,
+  "purpose": "retrospective reused history diagnostics and exact production reproduction audit",
+  "rating_search": {
+    "inactivity_half_life_days": [
+      60,
+      180,
+      null
+    ],
+    "k": [
+      8,
+      16,
+      32,
+      64
+    ]
+  },
+  "regularization_C": [
+    0.01,
+    0.1,
+    1,
+    10
+  ],
+  "split": "date grouped; all decisions for event same fold; model training outcomes end strictly before fold cutoff"
+}
