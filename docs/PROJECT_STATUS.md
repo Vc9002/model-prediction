@@ -1,5 +1,12 @@
 # Project status and source of truth
 
+## 2026-10-21 — NCAAF status corrected; open items moved to one handoff file
+
+- Live NCAAF ledger (`ledgers.db`, Main, settled) does not support the earlier backtest. `cfb-total-v1` is about -1% ROI over 293 picks, against +29% in the 2020–2024 backtest. `cfb-structural-v2`, which `config/production.yaml` serves for all NCAAF markets, is +9.5 units over 116 picks. That sample is too small to conclude anything.
+- Commit `b77a563d` (2026-10-21) changes re-forecasts to mark the old pick `superseded` instead of writing a duplicate. No duplicates were written after that commit. 18 legacy duplicate keys remain in the store.
+- Open items are in `docs/handoffs/HANDOFF.md`. It is the only handoff file, and it is deleted once its items are done. `CLAUDE.md` describes the rule.
+- Details: `docs/CFB_PREDICTION_SYSTEM.md` §7.
+
 ## 2026-10-20 — NBA operational ledger wiring repaired
 
 NBA was already in the daily learned/derivative dispatch and production registry,
@@ -218,7 +225,7 @@ See [generation results and limitations](GENERATION_2026-09-09.md) and the
 current [rebuild queue](ROADMAP.md). Older freeze restrictions below are
 historical context; current operator authorization is recorded in `AGENTS.md`.
 
-**Last full-suite verification**: 2026-08-31 (Commit `3066d59`, Tag `lifecycle-v1`). Full test suite passed (2,547 passed, 0 failures, 3 skipped); ruff 100% clean; strict type checking clean across all modules. All 21 supported production markets maintain active champions under the permanent champion–challenger lifecycle framework. NCAAF models (`college-football-v1`, `cfb-spread-v1`, `cfb-total-v1`) are active champions serving under `degraded` evidence status / `critical` replacement priority, with unified decomposed scoring challenger `cfb-structural-v2` implemented. MLB Totals champion is `mlb-structural-v10-frozen` (`promotion_basis: operator_predictive_promotion`) with `measured-edge-totals-v3` as rollback. Automated Polymarket Buyer uses $1\text{U} = \$0.50$.
+**Last full-suite verification**: 2026-08-31 (Commit `3066d59`, Tag `lifecycle-v1`). Full test suite passed (2,547 passed, 0 failures, 3 skipped); ruff 100% clean; strict type checking clean across all modules. All 21 supported production markets maintain active champions under the permanent champion–challenger lifecycle framework. NCAAF status as of 2026-08-31 (superseded 2026-10-21): `cfb-structural-v2` is the serving model for all NCAAF markets per `config/production.yaml`. The earlier champions (`college-football-v1`, `cfb-spread-v1`, `cfb-total-v1`) were `degraded`. The NCAAF champion per market is an open operator decision (`docs/handoffs/HANDOFF.md`, item 3). MLB Totals champion is `mlb-structural-v10-frozen` (`promotion_basis: operator_predictive_promotion`) with `measured-edge-totals-v3` as rollback. Automated Polymarket Buyer uses $1\text{U} = \$0.50$.
 
 **Operating Architecture**: Permanent champion–challenger production lifecycle with strict Point-in-Time (PIT) feature extraction, fail-closed `EvidenceOrigin` provenance separation, Unified Model Qualification Registry research control plane, automated Polymarket execution engine, and multi-horizon pregame snapshot tracking ($T-6\text{h}, T-3\text{h}, T-1\text{h}, T-30\text{m}, T-10\text{m}$).
 

@@ -34,6 +34,13 @@ This file is about *how to work here*, not *what's currently true*.
   (`${MODEL_PREDICTION_RUNTIME_ROOT:-data}/locks/daily.lock`), not in the
   repo checkout.
 
+## Handoffs
+
+- Open work lives in one file: `docs/handoffs/HANDOFF.md`. Read it at the start of a session if it exists.
+- There is only ever one handoff file. Overwrite it for new open work; do not create a second one.
+- When every item in it is done, delete the file. Do not archive it.
+- Keep it short: next action first, then facts with evidence (paths, PIDs, row counts). No secrets.
+
 ## Knowledge graph
 
 A graphify knowledge graph of this repo lives at `graphify-out/` (graph.json,

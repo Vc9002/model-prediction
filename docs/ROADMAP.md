@@ -191,3 +191,8 @@ flowchart TD
   - [`docs/CHANGELOG.md`](CHANGELOG.md): Historical commit and release logs.
 - **Architecture & Infrastructure**:
   - [`docs/ARCHITECTURE.md`](ARCHITECTURE.md): Runtime paths, external storage, and split-brain safeguards.
+
+
+## 2026-10-23 — Esports overhaul execution
+
+Serving/replay consistency, exact derivative contract logging, canonical esports calibration cohorts, prospective format capture, joint series research pricing and five-title chronological candidate research are implemented. Evidence and rollback: `ESPORTS_OVERHAUL_2026-10-23.md`. New champions are not activated: frozen control replays 380/451 exactly, with 71 unavailable archived source versions. Remaining work is evidence-bound: fresh prospective comparison or exact source recovery; timestamped roster/map/patch/draft acquisition; independent derivative validation; event/result-availability embargo for generic calibration. Do not rank or promote candidates from the blocked comparison.

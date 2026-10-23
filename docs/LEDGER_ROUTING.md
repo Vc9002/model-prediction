@@ -22,6 +22,12 @@ canary database is not the daily Main/Flat ledger.
 The remaining sections describe the older 2026-08-03 topology and are historical
 where they conflict with this NBA update.
 
+**Current tiers (2026-10-22).** `ledgers/ledgers.db` holds four tiers: `main`, `flat`,
+`research`, `gated_research`. The XLSX paths below are old. Live tiers are `main` and
+`flat`. Research sports (lol, cs2, dota2, valorant, rainbow_six, kbo, npb) were merged
+into `main` and `flat` on 2026-10-22 (next section); `research` and `gated_research`
+are legacy history.
+
 ## Research ledgers merged into Flat and Main (2026-10-22)
 
 Esports (LoL, CS2, Dota 2, Valorant, Rainbow Six), KBO and NPB no longer have their own
@@ -47,7 +53,7 @@ Re-run it after the remaining open legacy rows settle; it is idempotent.
 The dashboard no longer has Research or Gated Research tabs; the backtest, audit and pipeline cards that
 shared the old research tab live under **Validation & Audit**.
 
-## The four ledgers (Research and Gated Research are legacy since 2026-10-22)
+## The four ledgers (2026-08-03 layout, historical)
 
 | Ledger | File(s) | Rule |
 |---|---|---|

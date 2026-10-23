@@ -1,17 +1,18 @@
 # College Football (NCAAF) Prediction System
 
-**Status**: Production-Wired, Validated & Calibrated  
-**Active Production Champion (Totals)**: `cfb-total-v1` (Qualified, Main + Flat Ledger)  
-**Shadow Baseline Models**: `college-football-v1` (Moneyline, Flat Ledger Only), `cfb-spread-v1` (Spread, Flat Ledger Only)  
+**Status (updated 2026-10-21)**: Wired to production. The champion per market is **not settled** and is an open operator decision (see `docs/handoffs/HANDOFF.md`, item 3).  
+**Serving per `config/production.yaml`**: `cfb-structural-v2` for moneyline, spread and total. It has written to the Main and Flat ledgers for all three markets since September.  
+**Earlier documents named `cfb-total-v1` as totals champion.** That claim rests on the 2020–2024 backtest in §5, which was scored against constant lines, not market prices, and so is invalid (see §5 and §7).  
+**Older models**: `college-football-v1` (moneyline) and `cfb-spread-v1` (spread) remain in the ledgers. `cfb-spread-v1` is losing on the Main ledger.  
 **Historical Dataset**: 8,146 completed games spanning 2016-2024 seasons (Structural 2016+, Market-relative 2020+)  
 **Primary Module Entrypoints**:
-- Data & Venue Geography: [`src/model_prediction/data_sources/cfb_data.py`](file:///Users/vincentc9002/model-prediction/src/model_prediction/data_sources/cfb_data.py)
-- PIT Feature Extraction: [`src/model_prediction/features/cfb_features.py`](file:///Users/vincentc9002/model-prediction/src/model_prediction/features/cfb_features.py)
-- Joint Scoring Distribution: [`src/model_prediction/models/cfb_distribution.py`](file:///Users/vincentc9002/model-prediction/src/model_prediction/models/cfb_distribution.py)
-- Unified CFB Model: [`src/model_prediction/models/college_football.py`](file:///Users/vincentc9002/model-prediction/src/model_prediction/models/college_football.py)
-- Slate & Forecast Wiring: [`src/model_prediction/cli/forecast.py`](file:///Users/vincentc9002/model-prediction/src/model_prediction/cli/forecast.py)
-- Unit & Integration Tests: [`tests/test_college_football.py`](file:///Users/vincentc9002/model-prediction/tests/test_college_football.py)
-- Research & Validation Battery: [`scripts/cfb_research_pipeline.py`](file:///Users/vincentc9002/model-prediction/scripts/cfb_research_pipeline.py)
+- Data & Venue Geography: [`src/model_prediction/data_sources/cfb_data.py`](src/model_prediction/data_sources/cfb_data.py)
+- PIT Feature Extraction: [`src/model_prediction/features/cfb_features.py`](src/model_prediction/features/cfb_features.py)
+- Joint Scoring Distribution: [`src/model_prediction/models/cfb_distribution.py`](src/model_prediction/models/cfb_distribution.py)
+- Unified CFB Model: [`src/model_prediction/models/college_football.py`](src/model_prediction/models/college_football.py)
+- Slate & Forecast Wiring: [`src/model_prediction/cli/forecast.py`](src/model_prediction/cli/forecast.py)
+- Unit & Integration Tests: [`tests/test_college_football.py`](tests/test_college_football.py)
+- Research & Validation Battery: [`scripts/cfb_research_pipeline.py`](scripts/cfb_research_pipeline.py)
 
 ---
 
@@ -32,8 +33,7 @@ The College Football prediction system implements a joint game-level scoring fra
 ### Dual-Ledger Invariants
 1. **Flat Ledger (`data/flat/ncaaf.xlsx` & SQLite mirror)**: Unconditionally receives **100% of all eligible CFB predictions** across Moneyline, Spread, and Total without applying pick-edge or unit gating.
 2. **Main Ledger (`data/main/ncaaf.xlsx`)**: Gated strictly by market qualification:
-   - **Total (`cfb-total-v1`)**: **`QUALIFIED`** - written to Main ledger when Edge >= 3.5%, Uncertainty <= 0.18, non-FCS, and sizing criteria pass.
-   - **Moneyline (`college-football-v1`) & Spread (`cfb-spread-v1`)**: **`FLAT_LEDGER_ONLY`** - written unconditionally to Flat ledger, blocked from Main ledger.
+   - Gating rule (applies to any champion): Main ledger writes need Edge >= 3.5%, Uncertainty <= 0.18, non-FCS, and sizing criteria passing. Which model is the champion per market is an open decision (see §7 and `docs/handoffs/HANDOFF.md`, item 3).
 
 ---
 
@@ -102,20 +102,50 @@ Evaluated out-of-sample on locked holdout seasons:
 
 ## 5. Market-Relative Economic Evaluation (2020-2024 Market Data)
 
-Evaluated against executable decision-time consensus market odds with vig (-110 / 0.5238 implied) across N = 4,510 games:
+**Correction (2026-10-22): the table below is not a market evaluation. Do not cite it.** An earlier version of this section said it used "executable decision-time consensus market odds". That was wrong. `data/historical/ncaaf_games_all.jsonl` has no market data: none of its 4,781 games from 2020 on carries `total_line`, `spread_home_line` or `market_ml_home_prob`. `scripts/cfb_research_pipeline.py` fell back to constants for every game: totals scored against a 54.0 line, spreads against a pick'em line (0.0), and moneyline against a 50% probability, all at a flat -110 price (0.5238 implied).
+
+The table's figures are older still: `docs/SYSTEM_DEFECTS_AND_GAPS_AUDIT.md` (A-1, A-2) records that they came from a seeded random-number simulator, not real games, whose market line was drawn from the model's own target, so the edge was circular. That cohort was later replaced with real ESPN games, but this table was never regenerated. The original numbers are unreproducible, and rerunning the pipeline on the current file would score against the constants above (not re-run here).
+
+A model with any game-level signal beats a constant line (a naive over/under bet against 54.0 wins about 50%), because a real market line already contains that signal. So these hit rates and ROIs measure the model against a constant, not an edge over the market. The N = 4,510 below also does not match the 4,781 games in the 2020+ cohort of the file, and the difference is unexplained. A valid evaluation needs historical NCAAF closing or decision-time lines, which are not in the repository. Until then, only the live results in §7 count.
+
+Figures as originally produced (constant-line scoring, not market-relative):
 
 | Market | Eligible | Gated Bets | Hit Rate | P&L Units | Point ROI | 95% Date-Clustered CI | Status |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Game Total (`cfb-total-v1`)** | 4,510 | 3,911 | **66.97%** | **+1,140.91U** | **+29.17%** | **[+25.31%, +32.98%]** | **`QUALIFIED`** |
-| Moneyline (`college-football-v1`) | 4,510 | 2,802 | 34.90% | -868.87U | -31.01% | [-35.59%, -26.29%] | `FLAT_LEDGER_ONLY` |
-| Spread (`cfb-spread-v1`) | 4,510 | 3,632 | 32.52% | -1,337.36U | -36.82% | [-40.00%, -33.47%] | `FLAT_LEDGER_ONLY` |
+| Game Total (`cfb-total-v1`) | 4,510 | 3,911 | 66.97% | +1,140.91U | +29.17% | [+25.31%, +32.98%] | Invalid: constant 54.0 line |
+| Moneyline (`college-football-v1`) | 4,510 | 2,802 | 34.90% | -868.87U | -31.01% | [-35.59%, -26.29%] | Invalid: constant 50% price |
+| Spread (`cfb-spread-v1`) | 4,510 | 3,632 | 32.52% | -1,337.36U | -36.82% | [-40.00%, -33.47%] | Invalid: constant 0.0 line |
+
+These are not live results and not market results. See §7.
 
 ---
 
-## 6. Production Model Registry & Artifact Hashes
+## 7. Live Ledger Results (checked 2026-10-21)
+
+Source: `E:\model-prediction-runtime\ledgers\ledgers.db`, settled NCAAF rows, Main ledger. Rows are counted once per (event, market, selection, line) because re-forecasts wrote duplicate settled rows before commit `b77a563d` (2026-10-21). Units use -110 pricing, so breakeven is 52.4%.
+
+| Model | Market | Distinct picks | Hit rate | Units | ROI |
+| :--- | :--- | ---: | ---: | ---: | ---: |
+| `cfb-structural-v2` | Moneyline | 19 | 63% | +1.7 | +9% |
+| `cfb-structural-v2` | Spread | 46 | 63% | +12.8 | +28% |
+| `cfb-structural-v2` | Total | 51 | 49% | -5.0 | -10% |
+| `cfb-structural-v2` | All | 116 | 57% | +9.5 | +8% |
+| `cfb-spread-v1` | Spread | 290 | 50% | -32.1 | -11% |
+| `cfb-total-v1` | Total | 293 | 52% | -3.3 | -1% |
+
+What this means:
+
+- **`cfb-total-v1` has no valid backtest.** The §5 figure of +29.17% was scored against a constant 54.0 total line, not market prices (see the correction in §5). Live ROI is about -1% over 293 picks and is the only valid evidence.
+- **`cfb-structural-v2` is positive but too small to conclude anything.** At 116 picks, one standard error on the hit rate is about 4.6 points. Its total market is negative.
+- **Duplicates.** 18 keys in `cfb-structural-v2` Main carry duplicate settled rows: 148 rows for 116 distinct picks. No duplicates were written after `b77a563d`. The old rows remain in the store, so deduplicate them before reporting.
+
+---
+
+## 8. Production Model Registry & Artifact Hashes
 
 | Model ID | Market | Schema | Artifact Path | SHA-256 Hash | Status |
 | :--- | :--- | :---: | :--- | :--- | :--- |
+| `cfb-structural-v2` | Moneyline, Spread, Total | 2 | `config/models/cfb-structural-v2.json` | `c70c3abe9e1d...` | Serving per `config/production.yaml` |
 | `college-football-v1` | Moneyline | 2 | `config/models/college-football-v1.json` | `f5b95acd6676fe7a...` | `FLAT_LEDGER_ONLY` |
 | `cfb-spread-v1` | Spread | 2 | `config/models/cfb-spread-v1.json` | `7dc5b3428abfdb93...` | `FLAT_LEDGER_ONLY` |
-| `cfb-total-v1` | Total | 2 | `config/models/cfb-total-v1.json` | `6831c96cc379860b...` | **`QUALIFIED` (Champion)** |
+| `cfb-total-v1` | Total | 2 | `config/models/cfb-total-v1.json` | `6831c96cc379860b...` | Champion status contested (see §7) |

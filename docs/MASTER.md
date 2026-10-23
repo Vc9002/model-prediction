@@ -6,8 +6,8 @@
   - Joint Scoring Distribution Benchmark on locked holdout ($N=1,796$ games): **Negative Binomial** achieved best ML Brier ($0.11581$) and LogLoss ($0.37128$), accurately modeling collegiate count overdispersion.
   - Structural feature ablations show monotonic improvements from Baseline (ML Brier $0.17820$) to Final ($0.14180$).
   - Market-Relative Economic Evaluation ($N=4,510$ games, 2020–2024):
-    - **Total (`cfb-total-v1`)**: Hit Rate $66.97\%$, $+1,140.91\text{U}$, **ROI $+29.17\%$** ($95\%$ Date-Clustered CI $[+25.31\%, +32.98\%]$) $\rightarrow$ **`QUALIFIED` / `PRODUCTION_CHAMPION`** (writes to Main + Flat ledgers).
-    - **Moneyline (`college-football-v1`) & Spread (`cfb-spread-v1`)**: Strong structural fit but negative market-relative return on pure structural edge $\rightarrow$ **`FLAT_LEDGER_ONLY`** (unconditionally written to Flat ledger for baseline monitoring, blocked from Main ledger).
+    - **Total (`cfb-total-v1`)**: Hit Rate $66.97\%$, $+1,140.91\text{U}$, **ROI $+29.17\%$** ($95\%$ Date-Clustered CI $[+25.31\%, +32.98\%]$). *Superseded 2026-10-21: this backtest did not replicate on live picks (about -1% ROI over 293 picks). The champion status recorded here is not current. See `CFB_PREDICTION_SYSTEM.md` §7.*
+    - **Moneyline (`college-football-v1`) & Spread (`cfb-spread-v1`)**: Negative market-relative return in this backtest. *Superseded 2026-10-21: `cfb-spread-v1` is losing on live Main-ledger picks (-32.1 units over 290). Current NCAAF serving is `cfb-structural-v2` per `config/production.yaml`.*
   - Production model registry self-verifying artifacts generated in `config/models/`. Full architectural specification documented in [`docs/CFB_PREDICTION_SYSTEM.md`](CFB_PREDICTION_SYSTEM.md).
 
 **Session 2026-08-28 — MLB Structural v10 Freeze, Protocol Hashes, Phase F1C Prospective Shadow, Mypy Zero-Error Initiative, Fast CI Daily Smoke Test, Hypothesis Invariant Testing & MarketQuote Warehouse**:
