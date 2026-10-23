@@ -76,6 +76,11 @@ markers = [
 [tool.ruff]
 line-length = 110
 target-version = "py311"
+# Archived incumbent source copies are evidence: their bytes are pinned by the
+# sha256 values in each research manifest, so lint/format must never rewrite them.
+# force-exclude makes this hold for files pre-commit passes explicitly.
+extend-exclude = ["outputs/esports_overhaul/**/incumbent_sources"]
+force-exclude = true
 
 [tool.mypy]
 python_version = "3.14"
