@@ -664,7 +664,7 @@ models:
     active_research_version: darts-markov-v1
     min_edge: 0.02
     research_confidence_gate: 0.0
-    min_team_matches: 0
+    min_team_matches: 5
     markets:
     - moneyline
     - spread
@@ -688,6 +688,40 @@ models:
     - total
     leagues:
     - NCAAB
+  EUROLEAGUE:
+    family: elo_trend_normal_approximation
+    status: shadow_qualified
+    origin: statistical_model
+    active_production_version: eurolg-tempo-v1
+    active_research_version: eurolg-tempo-v1
+    min_edge: 0.035
+    min_team_games: 8
+    spread_sd: 10.0
+    total_sd: 14.5
+    home_court_points: 3.2
+    # Unverified (no settled-pick record): flat ledger only until one exists.
+    main_ledger_enabled: false
+    markets:
+    - moneyline
+    - spread
+    - total
+    leagues:
+    - EUROLEAGUE
+  NBL:
+    family: elo_trend_normal_approximation
+    status: shadow_qualified
+    origin: statistical_model
+    active_production_version: nbl-tempo-v1
+    active_research_version: nbl-tempo-v1
+    min_edge: 0.035
+    min_team_games: 8
+    main_ledger_enabled: false
+    markets:
+    - moneyline
+    - spread
+    - total
+    leagues:
+    - NBL
   market_residual:
     method: logistic_regression
     rolling_window_days: 90

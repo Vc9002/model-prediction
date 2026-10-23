@@ -179,7 +179,8 @@ prediction_service:
     replacement_priority: low
   - model_id: soccer-poisson-dc-v3
     sport: SOCCER
-    market: moneyline
+    # spread/total are served unverified; evidence_status describes the moneyline contract.
+    market: moneyline,spread,total
     implementation: code_backed_model
     entry: model_prediction.models.soccer_v3:soccer_model_v3
     enabled: true
@@ -217,6 +218,16 @@ prediction_service:
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: tennis-surface-elo-v1
+  - model_id: tennis-games-markov-v1
+    sport: TENNIS
+    market: spread,total
+    implementation: code_backed_model
+    entry: model_prediction.models.tennis_derivatives:tennis_games_model
+    enabled: true
+    serving_status: production
+    evidence_status: unverified
+    replacement_priority: high
+    rollback_model: null
   - model_id: tennis-learned-v3
     sport: TENNIS
     market: multi
@@ -339,7 +350,9 @@ prediction_service:
     rollback_model: null
   - model_id: hockey-poisson-dc-v1
     sport: HOCKEY
-    market: moneyline
+    # spread/total are served unverified (no settled-pick record yet); the
+    # evidence_status below describes the moneyline contract only.
+    market: moneyline,spread,total
     implementation: code_backed_model
     entry: model_prediction.models.hockey:hockey_model
     enabled: true
@@ -347,7 +360,161 @@ prediction_service:
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: null
+  - model_id: darts-markov-v1
+    sport: DARTS
+    market: moneyline
+    implementation: code_backed_model
+    entry: model_prediction.models.darts:darts_model
+    enabled: true
+    serving_status: production
+    evidence_status: unverified
+    replacement_priority: high
+    rollback_model: null
+  - model_id: ncaab-tempo-v1
+    sport: NCAAB
+    market: multi
+    implementation: code_backed_model
+    entry: model_prediction.models.basketball_leagues:ncaab_model
+    enabled: true
+    serving_status: production
+    evidence_status: unverified
+    replacement_priority: high
+    rollback_model: null
+  - model_id: eurolg-tempo-v1
+    sport: EUROLEAGUE
+    market: multi
+    implementation: code_backed_model
+    entry: model_prediction.models.basketball_leagues:euroleague_model
+    enabled: true
+    serving_status: production
+    evidence_status: unverified
+    replacement_priority: high
+    rollback_model: null
+  - model_id: nbl-tempo-v1
+    sport: NBL
+    market: multi
+    implementation: code_backed_model
+    entry: model_prediction.models.basketball_leagues:nbl_model
+    enabled: true
+    serving_status: production
+    evidence_status: unverified
+    replacement_priority: high
+    rollback_model: null
+  - model_id: cs2-spread-tiered-elo-v6
+    sport: CS2
+    market: spread
+    implementation: code_backed_model
+    entry: model_prediction.models.esports_derivatives:esports_derivative_model
+    enabled: true
+    serving_status: production
+    evidence_status: unverified
+    replacement_priority: high
+    rollback_model: null
+  - model_id: cs2-total-tiered-elo-v6
+    sport: CS2
+    market: total
+    implementation: code_backed_model
+    entry: model_prediction.models.esports_derivatives:esports_derivative_model
+    enabled: true
+    serving_status: production
+    evidence_status: unverified
+    replacement_priority: high
+    rollback_model: null
+  - model_id: dota2-spread-tiered-elo-v6
+    sport: DOTA2
+    market: spread
+    implementation: code_backed_model
+    entry: model_prediction.models.esports_derivatives:esports_derivative_model
+    enabled: true
+    serving_status: production
+    evidence_status: unverified
+    replacement_priority: high
+    rollback_model: null
+  - model_id: dota2-total-tiered-elo-v6
+    sport: DOTA2
+    market: total
+    implementation: code_backed_model
+    entry: model_prediction.models.esports_derivatives:esports_derivative_model
+    enabled: true
+    serving_status: production
+    evidence_status: unverified
+    replacement_priority: high
+    rollback_model: null
+  - model_id: lol-spread-tiered-elo-v6
+    sport: LOL
+    market: spread
+    implementation: code_backed_model
+    entry: model_prediction.models.esports_derivatives:esports_derivative_model
+    enabled: true
+    serving_status: production
+    evidence_status: unverified
+    replacement_priority: high
+    rollback_model: null
+  - model_id: lol-total-tiered-elo-v6
+    sport: LOL
+    market: total
+    implementation: code_backed_model
+    entry: model_prediction.models.esports_derivatives:esports_derivative_model
+    enabled: true
+    serving_status: production
+    evidence_status: unverified
+    replacement_priority: high
+    rollback_model: null
+  - model_id: valorant-spread-tiered-elo-v6
+    sport: VALORANT
+    market: spread
+    implementation: code_backed_model
+    entry: model_prediction.models.esports_derivatives:esports_derivative_model
+    enabled: true
+    serving_status: production
+    evidence_status: unverified
+    replacement_priority: high
+    rollback_model: null
+  - model_id: valorant-total-tiered-elo-v6
+    sport: VALORANT
+    market: total
+    implementation: code_backed_model
+    entry: model_prediction.models.esports_derivatives:esports_derivative_model
+    enabled: true
+    serving_status: production
+    evidence_status: unverified
+    replacement_priority: high
+    rollback_model: null
+  - model_id: rainbow_six-spread-tiered-elo-v6
+    sport: RAINBOW_SIX
+    market: spread
+    implementation: code_backed_model
+    entry: model_prediction.models.esports_derivatives:esports_derivative_model
+    enabled: true
+    serving_status: production
+    evidence_status: unverified
+    replacement_priority: high
+    rollback_model: null
+  - model_id: rainbow_six-total-tiered-elo-v6
+    sport: RAINBOW_SIX
+    market: total
+    implementation: code_backed_model
+    entry: model_prediction.models.esports_derivatives:esports_derivative_model
+    enabled: true
+    serving_status: production
+    evidence_status: unverified
+    replacement_priority: high
+    rollback_model: null
   champions:
+    NCAAB:
+      moneyline: ncaab-tempo-v1
+      spread: ncaab-tempo-v1
+      total: ncaab-tempo-v1
+    EUROLEAGUE:
+      moneyline: eurolg-tempo-v1
+      spread: eurolg-tempo-v1
+      total: eurolg-tempo-v1
+    NBL:
+      moneyline: nbl-tempo-v1
+      spread: nbl-tempo-v1
+      total: nbl-tempo-v1
+    DARTS:
+      moneyline: darts-markov-v1
     WNBA:
       moneyline: wnba-elo-trend-lr-v4
       spread: wnba-spread-margin-v2
@@ -371,24 +538,40 @@ prediction_service:
       total: cfb-structural-v2
     SOCCER:
       moneyline: soccer-poisson-dc-v3
+      spread: soccer-poisson-dc-v3
+      total: soccer-poisson-dc-v3
     TENNIS:
       moneyline: tennis-surface-elo-v4
+      spread: tennis-games-markov-v1
+      total: tennis-games-markov-v1
     CS2:
       moneyline: cs2-tiered-elo-v6
+      spread: cs2-spread-tiered-elo-v6
+      total: cs2-total-tiered-elo-v6
     DOTA2:
       moneyline: dota2-tiered-elo-v6
+      spread: dota2-spread-tiered-elo-v6
+      total: dota2-total-tiered-elo-v6
     LOL:
       moneyline: lol-tiered-elo-v6
+      spread: lol-spread-tiered-elo-v6
+      total: lol-total-tiered-elo-v6
     VALORANT:
       moneyline: valorant-tiered-elo-v6
+      spread: valorant-spread-tiered-elo-v6
+      total: valorant-total-tiered-elo-v6
     RAINBOW_SIX:
       moneyline: rainbow_six-tiered-elo-v6
+      spread: rainbow_six-spread-tiered-elo-v6
+      total: rainbow_six-total-tiered-elo-v6
     KBO:
       moneyline: kbo-tie-aware-elo-v2
     NPB:
       moneyline: npb-tie-aware-elo-v2
     HOCKEY:
       moneyline: hockey-poisson-dc-v1
+      spread: hockey-poisson-dc-v1
+      total: hockey-poisson-dc-v1
   challengers:
     MLB:
       moneyline: mlb-moneyline-v9-frozen
@@ -568,6 +751,7 @@ prediction_service:
   - soccer-poisson-dc-v2
   - soccer-poisson-dc-v1
   - tennis-surface-elo-v4
+  - tennis-games-markov-v1
   - tennis-learned-v3
   - tennis-surface-elo-v1
   - cfb-structural-v2
@@ -581,6 +765,20 @@ prediction_service:
   - kbo-tie-aware-elo-v2
   - npb-tie-aware-elo-v2
   - hockey-poisson-dc-v1
+  - darts-markov-v1
+  - ncaab-tempo-v1
+  - eurolg-tempo-v1
+  - nbl-tempo-v1
+  - cs2-spread-tiered-elo-v6
+  - cs2-total-tiered-elo-v6
+  - dota2-spread-tiered-elo-v6
+  - dota2-total-tiered-elo-v6
+  - lol-spread-tiered-elo-v6
+  - lol-total-tiered-elo-v6
+  - valorant-spread-tiered-elo-v6
+  - valorant-total-tiered-elo-v6
+  - rainbow_six-spread-tiered-elo-v6
+  - rainbow_six-total-tiered-elo-v6
   artifact_map:
     wnba-elo-trend-lr-v4: config/models/wnba-elo-trend-lr-v4.json
     wnba-spread-margin-v2: config/models/wnba-spread-margin-v2.json
