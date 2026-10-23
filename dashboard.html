@@ -2120,6 +2120,7 @@ function populateFilters(){
       setControlFromUrl("fStatus_"+tab,key+"_status");setControlFromUrl("fResult_"+tab,key+"_result");
       setControlFromUrl("fSearch_"+tab,key+"_search");setControlFromUrl("fFrom_"+tab,key+"_from");
       setControlFromUrl("fTo_"+tab,key+"_to");
+      syncPresetHighlight(tab);
     });
     ledgerUrlRestored=true;
     renderPicks();renderFlatTable();renderPolyLedgerTable();
@@ -2190,7 +2191,21 @@ function filteredPicks(){
   });
 }
 
+function syncPresetHighlight(tab){
+  const v=id=>$("#"+id+"_"+tab)?.value||"";
+  const st=v("fStatus"),from=v("fFrom"),to=v("fTo");
+  let on=null;
+  if(!v("fResult")){
+    if(st==="open"&&!from&&!to)on="Active";
+    else if(st==="settled"&&!from&&!to)on="Settled";
+    else if(st===""&&!from&&!to)on="All";
+    else if(st==="open"&&from&&from===to)on="Today";
+    else if(st==="open"&&from&&!to)on="7d";
+  }
+  ["Active","Settled","Today","7d","All"].forEach(b=>$(`#btn${b}_${tab}`)?.classList.toggle("primary",b===on));
+}
 function onFilterChange(tab){
+  syncPresetHighlight(tab);
   ledgerResetPage(tab);
   const key=tab.toLowerCase();
   setUrlState({
