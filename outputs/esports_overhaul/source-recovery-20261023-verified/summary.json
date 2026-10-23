@@ -1,0 +1,163 @@
+{
+  "cohort_rows": 451,
+  "initial_frozen_run_manifest_artifact_hash": "005a0716d21c375175bdb69d80d41628418d464993bc242b2bc1210fdbae0040",
+  "initial_frozen_run_manifest_sha256": "ba4b61b68603acc496c61bb3972855b1c573fc727f73da284d83783d6a87af14",
+  "replay_status_counts": {
+    "esports_replay_code_mismatch": 1,
+    "exact_match": 450
+  },
+  "resolver": "reachable history followed by streaming exact-SHA256 scan of all Git blobs, including unreachable objects",
+  "source_groups": [
+    {
+      "actual_replay_code_sha256": {
+        "esports.py": "48eab29fd660f72bcbd6f9557cca081a5e6f76c9da89c9cf36ce7181c79b1174",
+        "features/elo_ratings.py": "8525faf022a6343c452286dbfeb17dbb043744c6bdabbe448b6b371216da439b"
+      },
+      "archived_elo_sha256": "8525faf022a6343c452286dbfeb17dbb043744c6bdabbe448b6b371216da439b",
+      "archived_esports_sha256": "48eab29fd660f72bcbd6f9557cca081a5e6f76c9da89c9cf36ce7181c79b1174",
+      "git_sources": {
+        "esports.py": {
+          "blob": "d6a21119af650735e071b259bb1f3d46efdb2d8e",
+          "commit": "50f624304859bfe83c4af9327bcacd9b74902b84"
+        },
+        "features/elo_ratings.py": {
+          "blob": "dc67045cc2127b915499e6f58a098242fe523608",
+          "commit": "bd8a82d176570366af877ef18329c28dc2cc0c8c"
+        }
+      },
+      "historical_sources_recovered": true,
+      "rows": 87
+    },
+    {
+      "actual_replay_code_sha256": {
+        "esports.py": "1062b45bde8c425712239cfa42636f4a857797ed888c3072b9976f0af0f28526",
+        "features/elo_ratings.py": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872"
+      },
+      "archived_elo_sha256": "8525faf022a6343c452286dbfeb17dbb043744c6bdabbe448b6b371216da439b",
+      "archived_esports_sha256": "a3c853f49dbf985f47a1d90696fafa74e5b8f097160af8d28d7fa1215c8bce8a",
+      "historical_sources_recovered": false,
+      "rows": 1
+    },
+    {
+      "actual_replay_code_sha256": {
+        "esports.py": "8d25951d04320147b4f82f35408c7948ac3d6a80af203ada3bac1aa630e7b330",
+        "features/elo_ratings.py": "8525faf022a6343c452286dbfeb17dbb043744c6bdabbe448b6b371216da439b"
+      },
+      "archived_elo_sha256": "8525faf022a6343c452286dbfeb17dbb043744c6bdabbe448b6b371216da439b",
+      "archived_esports_sha256": "8d25951d04320147b4f82f35408c7948ac3d6a80af203ada3bac1aa630e7b330",
+      "git_sources": {
+        "esports.py": {
+          "blob": "b5194df75e587fa7304bceb83d0327ea57846f6e",
+          "commit": null
+        },
+        "features/elo_ratings.py": {
+          "blob": "dc67045cc2127b915499e6f58a098242fe523608",
+          "commit": "bd8a82d176570366af877ef18329c28dc2cc0c8c"
+        }
+      },
+      "historical_sources_recovered": true,
+      "rows": 9
+    },
+    {
+      "actual_replay_code_sha256": {
+        "esports.py": "8d25951d04320147b4f82f35408c7948ac3d6a80af203ada3bac1aa630e7b330",
+        "features/elo_ratings.py": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872"
+      },
+      "archived_elo_sha256": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872",
+      "archived_esports_sha256": "8d25951d04320147b4f82f35408c7948ac3d6a80af203ada3bac1aa630e7b330",
+      "git_sources": {
+        "esports.py": {
+          "blob": "b5194df75e587fa7304bceb83d0327ea57846f6e",
+          "commit": null
+        },
+        "features/elo_ratings.py": {
+          "blob": "3269be5b585e8c253ec2983285345b72c3085f5e",
+          "commit": "338742cd277f3a75a0c6a60be28159134d5d7f9c"
+        }
+      },
+      "historical_sources_recovered": true,
+      "rows": 60
+    },
+    {
+      "actual_replay_code_sha256": {
+        "esports.py": "3abbfc5d7124cc94603dada2e4c996da231a679d437c5a066d994a2a7d428f61",
+        "features/elo_ratings.py": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872"
+      },
+      "archived_elo_sha256": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872",
+      "archived_esports_sha256": "3abbfc5d7124cc94603dada2e4c996da231a679d437c5a066d994a2a7d428f61",
+      "git_sources": {
+        "esports.py": {
+          "blob": "d7c4d91806dacddd2851fd26829a323e0c6e6e6e",
+          "commit": "338742cd277f3a75a0c6a60be28159134d5d7f9c"
+        },
+        "features/elo_ratings.py": {
+          "blob": "3269be5b585e8c253ec2983285345b72c3085f5e",
+          "commit": "338742cd277f3a75a0c6a60be28159134d5d7f9c"
+        }
+      },
+      "historical_sources_recovered": true,
+      "rows": 88
+    },
+    {
+      "actual_replay_code_sha256": {
+        "esports.py": "ec64bcad0f00ffb3fb38160304eed3f40f74161c93889a0e4215bca26558985e",
+        "features/elo_ratings.py": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872"
+      },
+      "archived_elo_sha256": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872",
+      "archived_esports_sha256": "ec64bcad0f00ffb3fb38160304eed3f40f74161c93889a0e4215bca26558985e",
+      "git_sources": {
+        "esports.py": {
+          "blob": "241c6aab6fb1187d21f02174c68e5a2d115f9b0f",
+          "commit": "48fa0f8b7b32b39ed3752b27e45e6d5ffb2c0587"
+        },
+        "features/elo_ratings.py": {
+          "blob": "3269be5b585e8c253ec2983285345b72c3085f5e",
+          "commit": "338742cd277f3a75a0c6a60be28159134d5d7f9c"
+        }
+      },
+      "historical_sources_recovered": true,
+      "rows": 34
+    },
+    {
+      "actual_replay_code_sha256": {
+        "esports.py": "c1c2408e1f75d4e0393dd513e024e25fe1444a621f03f404ed31d2ff03b02c01",
+        "features/elo_ratings.py": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872"
+      },
+      "archived_elo_sha256": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872",
+      "archived_esports_sha256": "c1c2408e1f75d4e0393dd513e024e25fe1444a621f03f404ed31d2ff03b02c01",
+      "git_sources": {
+        "esports.py": {
+          "blob": "de498cd2559e368382ade446dc067a7d9f481e7b",
+          "commit": null
+        },
+        "features/elo_ratings.py": {
+          "blob": "3269be5b585e8c253ec2983285345b72c3085f5e",
+          "commit": "338742cd277f3a75a0c6a60be28159134d5d7f9c"
+        }
+      },
+      "historical_sources_recovered": true,
+      "rows": 1
+    },
+    {
+      "actual_replay_code_sha256": {
+        "esports.py": "1062b45bde8c425712239cfa42636f4a857797ed888c3072b9976f0af0f28526",
+        "features/elo_ratings.py": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872"
+      },
+      "archived_elo_sha256": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872",
+      "archived_esports_sha256": "1062b45bde8c425712239cfa42636f4a857797ed888c3072b9976f0af0f28526",
+      "git_sources": {
+        "esports.py": {
+          "blob": "ddcb291765f683c98c6918f7dddf42bb7ec2eff8",
+          "commit": "4941da6d3de8c126d520e06ffa4c79a2e0f02e4f"
+        },
+        "features/elo_ratings.py": {
+          "blob": "3269be5b585e8c253ec2983285345b72c3085f5e",
+          "commit": "338742cd277f3a75a0c6a60be28159134d5d7f9c"
+        }
+      },
+      "historical_sources_recovered": true,
+      "rows": 171
+    }
+  ],
+  "unresolved_source_sha256": "a3c853f49dbf985f47a1d90696fafa74e5b8f097160af8d28d7fa1215c8bce8a"
+}

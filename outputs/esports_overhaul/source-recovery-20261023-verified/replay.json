@@ -1,0 +1,4662 @@
+{
+  "dependency_scope": "archived esports.py and elo_ratings.py verified exactly; remaining dependencies from pinned original source",
+  "rows": {
+    "005bc6829351403e:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.591862
+    },
+    "00c285118dac4d3e:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.521806
+    },
+    "0115fbb793fa4f08:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.577776
+    },
+    "01b5cb9da64c4e8b:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.591861
+    },
+    "03806c3a125340fe:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.545991
+    },
+    "03ac2bc4689a4536:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.529057
+    },
+    "03b6df7bb1864289:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.510655
+    },
+    "0437bfb81520434f:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.573013
+    },
+    "0565fc8681274cbb:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.6671
+    },
+    "0623007a1d874c67:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.733355
+    },
+    "087a8f163c974233:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.513148
+    },
+    "08c468bb2e69484e:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.630943
+    },
+    "0906f86354604b73:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.555168
+    },
+    "090c337777534257:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.584218
+    },
+    "09227cc76c424021:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.506732
+    },
+    "09bec8efe3314d14:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.565031
+    },
+    "0a6ce372453d4d90:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.630854
+    },
+    "0a7ca2202b744e29:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.525564
+    },
+    "0ad88cf8326b4920:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.596981
+    },
+    "0adeef5705824fbe:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.537411
+    },
+    "0b75b0f2c0354f31:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.52064
+    },
+    "0b789f5f4cb643f7:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.503831
+    },
+    "0b9ab1ed04a0416a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.521084
+    },
+    "0c17287b93b04953:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.705223
+    },
+    "0c6d6fba964b4880:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.608593
+    },
+    "0cc004002ba6400a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.607609
+    },
+    "0d1b267c0bc34843:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.603277
+    },
+    "0d6c671971bb4d8a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.599226
+    },
+    "0de8db8c5caa40b2:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.516319
+    },
+    "0ea9093947134dc6:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.515712
+    },
+    "0eed31701830491a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.580023
+    },
+    "1009c9b9822e40cf:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.55009
+    },
+    "11ab89efc4424fcf:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.654895
+    },
+    "13ce7f50b7ee4f12:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.536236
+    },
+    "142b61eed0434b74:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.501479
+    },
+    "14732293a9b64ca8:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.650526
+    },
+    "14b249396e624917:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.533176
+    },
+    "14b74a15b12a4986:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.596761
+    },
+    "166edc6920104d44:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.718608
+    },
+    "173f5f18a1f548ff:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.755238
+    },
+    "17a2a04b986d48af:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.562741
+    },
+    "194ca9b09742443a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.636189
+    },
+    "19b0f1115ea3453a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.502246
+    },
+    "1ab61cbd5b9e4962:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.652763
+    },
+    "1ade0c54bc5a4ecc:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.700742
+    },
+    "1b04ff89fcf5454c:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.506229
+    },
+    "1b0fa9f2a0b1491c:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.723571
+    },
+    "1bb6f16f6a654d39:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.570155
+    },
+    "1bd892b21e504c9e:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.539503
+    },
+    "1c64d63ce6044147:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.533946
+    },
+    "1cd70c2242074a0b:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.628134
+    },
+    "1e03d59ed6c2495f:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.611585
+    },
+    "1e9d466977c043fd:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.589949
+    },
+    "1f06570c0c8e4f34:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.575289
+    },
+    "1f6370fee5d94736:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.510527
+    },
+    "1f6a9026ceaa4297:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.504056
+    },
+    "1fa708e8a2694da6:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.525628
+    },
+    "1fb79832e98e4924:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.616922
+    },
+    "20246d7faa8b4607:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.653748
+    },
+    "210491adfbfc4c00:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.657725
+    },
+    "2135c6279cb841a5:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.651216
+    },
+    "2376babecf6042e4:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.544608
+    },
+    "23b3d7d637de43d9:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.623276
+    },
+    "23b90b09691242d9:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.551287
+    },
+    "259b34a5c00c4095:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.578819
+    },
+    "2633b487aa484af1:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.529058
+    },
+    "267da1ee35b74d9e:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.543631
+    },
+    "26e36667dd634574:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.581152
+    },
+    "28525fb4755e4b42:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.706836
+    },
+    "2a122072cd2540f1:main": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.541333
+    },
+    "2a259afe4f2a4785:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.568065
+    },
+    "2aa9f491c03d4160:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.539506
+    },
+    "2b720860f1cf4bda:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.517808
+    },
+    "2be483f49c9540f7:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.562152
+    },
+    "2c0a165906b44f6c:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.705816
+    },
+    "2c9401bb45904222:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.569514
+    },
+    "2e2d33ec143344a3:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.516772
+    },
+    "2e30635561424e31:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.534839
+    },
+    "2f2a8a035f96410a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.547141
+    },
+    "2f34eee25d904b17:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.635706
+    },
+    "2f60efe77db24469:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.586712
+    },
+    "2f74ca21018946ac:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.564888
+    },
+    "2f756d7bab0a4312:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.508972
+    },
+    "3026ed92b7224da7:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.592475
+    },
+    "30c0aaa67ab14f20:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.545149
+    },
+    "311ac365cb8a42ea:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.610252
+    },
+    "31754dbc03854994:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.642602
+    },
+    "32ed79107bbb4ed9:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.526295
+    },
+    "3302201152d44257:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.622076
+    },
+    "336504de4f484c4f:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.510167
+    },
+    "33b8f7b0c1e54511:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.7275
+    },
+    "33e72d2233c640a9:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.73136
+    },
+    "34db3c871c244416:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.632553
+    },
+    "34e8ba4ef2d041b9:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.600921
+    },
+    "35cda84c80bd409c:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.519572
+    },
+    "361f8a04863f44f9:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.591977
+    },
+    "362a29b9dadf4037:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.623333
+    },
+    "368318861f154b07:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.56734
+    },
+    "36e85405c9ae4a11:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.594862
+    },
+    "37be84c806324c77:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.534396
+    },
+    "388be18f090a4a20:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.561542
+    },
+    "39f0ebf206e348e4:main": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.551099
+    },
+    "3a733ecdfe354eb2:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.602822
+    },
+    "3a99a79f376f4783:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.551842
+    },
+    "3ba8a11ae7704a70:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.588411
+    },
+    "3c5e9a75330c4d39:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.56745
+    },
+    "3c63b20b0166415a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.502912
+    },
+    "3d353e65fef44b26:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.538944
+    },
+    "3e6387b75c6f4963:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.565879
+    },
+    "4057568fbb624843:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.530132
+    },
+    "4069df6f77f5431a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.637364
+    },
+    "4079e1ccdea4458c:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.615885
+    },
+    "40b28bd428e04b87:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.513066
+    },
+    "40d901914e074be1:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.563634
+    },
+    "4159a97757aa4f37:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.558658
+    },
+    "4190a315b380493c:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.524861
+    },
+    "4192be892c9b474a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.591248
+    },
+    "41b29c86564548b9:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.54622
+    },
+    "42d75e6b57b64483:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.510498
+    },
+    "42ec06f787874dad:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.522445
+    },
+    "42f24e38710c4538:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.523601
+    },
+    "430679b60e374980:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.526899
+    },
+    "434fa771c1814422:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.618922
+    },
+    "439718802e3d4fc2:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.575884
+    },
+    "4411069d7e7e4bba:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.568562
+    },
+    "44c992931146429e:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.534386
+    },
+    "4575c8bd6dd6476f:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.533628
+    },
+    "45f3a6e588414718:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.681893
+    },
+    "463dc454c4b74207:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.69727
+    },
+    "46cf0e5beae648af:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.501451
+    },
+    "46ff6697a24a4c88:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.561074
+    },
+    "47d66e081e054f6b:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.509218
+    },
+    "4850d0b427a54d6a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.524833
+    },
+    "48bb26c924e242ac:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.628621
+    },
+    "49db828e92ff4170:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.556942
+    },
+    "49e60adc81874e82:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.614965
+    },
+    "4b9897b0120a4cab:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.611938
+    },
+    "4c629f21f0ad470b:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.672375
+    },
+    "4c78a3b74f5444a8:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.587462
+    },
+    "4cdfa2fb51d24fc7:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.512548
+    },
+    "4da11c1be6f841d2:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.510383
+    },
+    "4e33f215bc044629:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.545591
+    },
+    "4e6adcfa016f48e5:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.522778
+    },
+    "4f7638367ec44d12:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.611676
+    },
+    "5012f0d4b8dd4857:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.665182
+    },
+    "513f24a582d34d9e:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.627823
+    },
+    "51c6aa5267ec4567:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.619229
+    },
+    "52f753f523ce4cd7:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.501032
+    },
+    "5475582f0f984d3d:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.584004
+    },
+    "55bc22cc563a40e9:main": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.571313
+    },
+    "56640aae20984e8d:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.686824
+    },
+    "56f8d9dda7eb47fa:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.541305
+    },
+    "57795e473ce84dc7:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.50567
+    },
+    "57f395f6d01b440c:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.509682
+    },
+    "5926f9e65aa34bdf:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.597538
+    },
+    "5a5e89a8ba9646b9:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.580766
+    },
+    "5b58ad8750204a7f:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.579971
+    },
+    "5b97f3f4f3b4450c:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.667624
+    },
+    "5d1019e69d4c4c05:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.534663
+    },
+    "5d1b65230d314c51:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.534684
+    },
+    "5d7d0b3ce4ca45d9:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.658351
+    },
+    "5ecfdc6cc0134507:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.593184
+    },
+    "5f10e871c53a4ff9:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.616201
+    },
+    "6009e39db2c841a3:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.778302
+    },
+    "606f08f05b98460f:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.536694
+    },
+    "6084828cb57b4b7c:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.586581
+    },
+    "60852d96df424c16:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.547194
+    },
+    "608ac87143524f38:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.571842
+    },
+    "60f16b4c9e4142c9:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.549256
+    },
+    "614d9836665b4865:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.668534
+    },
+    "61db7244dd1f4beb:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.634356
+    },
+    "62131ab07bb941ac:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.513072
+    },
+    "627543a8d4fd4658:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.648743
+    },
+    "6512c2d3827841f7:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.501302
+    },
+    "652e388d0fc749e0:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.577129
+    },
+    "6584b41afef94368:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.519401
+    },
+    "66e37431795a4170:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.63267
+    },
+    "66fd7d3411694c66:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.567261
+    },
+    "6754815580954e41:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.506171
+    },
+    "678a4539cde140c2:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.618869
+    },
+    "6831e884f03944c9:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.538608
+    },
+    "683ed14c6455497e:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.65332
+    },
+    "6891fd062b4f44d7:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.543541
+    },
+    "68d75b64811a4dd0:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.607441
+    },
+    "68e42885fd4d4714:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.649391
+    },
+    "69431a9f59ba46b7:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.647002
+    },
+    "6a553a52af5c4ad8:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.554476
+    },
+    "6a6f905029494567:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.506928
+    },
+    "6a9827ae055b43ba:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.509543
+    },
+    "6aad433fe72343b4:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.547389
+    },
+    "6b12ef6aa9f9415a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.52273
+    },
+    "6bd11fd8697444fe:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.639911
+    },
+    "6d5365ee3edb41f4:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.507018
+    },
+    "6e4c69e31f3044c5:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.533917
+    },
+    "6e5e8f097ac24711:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.55778
+    },
+    "6eb0f226017c4fc5:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.576099
+    },
+    "6f503f622c03449c:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.528173
+    },
+    "6f8f659ccd134a07:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.518759
+    },
+    "701af0a1c5e14f62:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.536665
+    },
+    "7068129d01d84aa6:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.561924
+    },
+    "70892b7086154813:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.500231
+    },
+    "71b238b933fa4abc:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.510927
+    },
+    "7430a4372b1244f7:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.52474
+    },
+    "748e3d4dab4c4333:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.507932
+    },
+    "74bb8f65ab3944c8:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.57645
+    },
+    "756e73cd9bfc44d0:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.654428
+    },
+    "75b7ff62955b42d7:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.524747
+    },
+    "7661844d13214c3b:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.593196
+    },
+    "76c4653da59d44c9:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.595395
+    },
+    "76ef10e352064280:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.649658
+    },
+    "77378a7e62324708:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.572948
+    },
+    "77539218370d419d:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.50538
+    },
+    "77aa550e8ea44e08:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.659604
+    },
+    "7841e82ecb5241ed:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.522645
+    },
+    "78810e901c734085:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.572508
+    },
+    "7886d48fc4c740fb:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.567475
+    },
+    "78bca71f28d244ba:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.5273
+    },
+    "78ebde929d414a89:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.531826
+    },
+    "792321693008454e:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.610191
+    },
+    "792511e9b3884ef9:main": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.659823
+    },
+    "79c3e5d9264d4f03:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.528351
+    },
+    "79cd15974c334e32:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.546604
+    },
+    "7a03627e8a1b463d:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.53064
+    },
+    "7b031a2d70f24961:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.635719
+    },
+    "7d05a2efa64b41ff:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.628451
+    },
+    "7d9447d8262546da:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.579805
+    },
+    "7f68e03e5688479a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.555484
+    },
+    "7faf83e4ff3e43c9:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.598176
+    },
+    "7fb2a74392c5492c:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.670727
+    },
+    "80d7ba92c76d43e8:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.509662
+    },
+    "810a334c57cd4f00:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.510933
+    },
+    "8118a1332a164029:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.736366
+    },
+    "821d03282c074a16:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.678605
+    },
+    "8236b8c78f0241b2:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.506324
+    },
+    "83ce9365f1c8486b:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.523655
+    },
+    "848942eaaf014aac:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.543478
+    },
+    "84c3f697387a4364:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.584143
+    },
+    "853dabd1bf3242d5:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.54183
+    },
+    "8604e3ae526d46a6:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.586894
+    },
+    "8636f4ca8fb540a9:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.589432
+    },
+    "8715023d7eee4a5a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.507917
+    },
+    "8767dbcdf9bf4270:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.589733
+    },
+    "88156a995d364b94:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.506528
+    },
+    "890dd8e71afe444d:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.535992
+    },
+    "89562be64b2249df:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.509597
+    },
+    "895eda7a124e49b0:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.55201
+    },
+    "8bbcc099be794808:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.630435
+    },
+    "8c49258ac28845d2:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.529675
+    },
+    "8cefd49654204cc8:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.673769
+    },
+    "8d0b165fb99b4a8f:flat": {
+      "feature_deltas": null,
+      "mismatch": "esports_replay_code_mismatch",
+      "probability": null
+    },
+    "8d0c7d7aba2b40db:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.568717
+    },
+    "8d5b805d9c6949e6:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.562428
+    },
+    "8e09f87706ce474a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.504053
+    },
+    "8e83ea570c494c4f:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.506192
+    },
+    "8eebe7f32bf64eaa:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.737703
+    },
+    "8eefbe8415d54e80:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.715115
+    },
+    "8fd3eeea81b94f19:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.512541
+    },
+    "903040fc22554433:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.598473
+    },
+    "903686e4496d435d:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.505905
+    },
+    "90dc73e70a0d45fa:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.567206
+    },
+    "917c3e9557a64cc1:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.597877
+    },
+    "9203c19c4d164ef0:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.587103
+    },
+    "930a7deebb9140b2:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.546528
+    },
+    "932259158ba7486f:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.561898
+    },
+    "9343cee619cd460a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.557684
+    },
+    "93c771e4bee84a30:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.536098
+    },
+    "9456e436c010421c:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.543128
+    },
+    "9467138982aa4ad4:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.536188
+    },
+    "952ab74d5088405e:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.561546
+    },
+    "9577e83861504ef7:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.542356
+    },
+    "9587146a30624892:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.589463
+    },
+    "9595ffa5046d472f:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.528417
+    },
+    "96e7d53eaf3d4c1c:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.659199
+    },
+    "97e6148ef03847f8:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.519271
+    },
+    "98219bf805524568:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.574389
+    },
+    "98664605ee7f4f68:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.550206
+    },
+    "987e8b137a6d4e2a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.617352
+    },
+    "98b63e4631d84044:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.55826
+    },
+    "9974d68af15c4aa1:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.533706
+    },
+    "9a0d224196c7495e:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.504064
+    },
+    "9aad4741ff074e21:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.608032
+    },
+    "9b79b1b12a54479a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.777252
+    },
+    "9baa3b8c9e1941ca:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.513366
+    },
+    "9cd29e25e9a648ac:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.682904
+    },
+    "9cfa239503cf457c:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.662991
+    },
+    "9d9a895b5cd24320:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.612969
+    },
+    "9e30a77b380d4565:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.620302
+    },
+    "9e4bb79b196d473b:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.5721
+    },
+    "9f07dce4e5814863:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.590185
+    },
+    "a01abc8b40c14792:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.560813
+    },
+    "a032cb929ac44244:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.584457
+    },
+    "a1139826c6e74f23:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.619398
+    },
+    "a128b472c77c42e7:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.618883
+    },
+    "a291dc4382094299:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.59146
+    },
+    "a2d1063879584820:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.599215
+    },
+    "a33518ce100744ec:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.699449
+    },
+    "a5be97863e8348df:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.702516
+    },
+    "a648b59098ab492c:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.53684
+    },
+    "a65cfc411f564af5:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.562191
+    },
+    "a69a1472a5d14049:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.56636
+    },
+    "a6d48d3552664e4d:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.665197
+    },
+    "a76d04ac05104010:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.604789
+    },
+    "a77e3114a64a4d0a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.585725
+    },
+    "a81971b9bb8f46e3:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.52805
+    },
+    "a82871f572194f50:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.628311
+    },
+    "a8e6152fb6d3415e:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.549683
+    },
+    "a99bf3ba3ba04b9f:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.673193
+    },
+    "aabb5f010ee443b7:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.617322
+    },
+    "ab10f0ed7a644e40:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.554153
+    },
+    "abb1f870ecdc4a32:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.507099
+    },
+    "abfb041f0ca64ef5:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.605665
+    },
+    "ad5955ec30dd46ce:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.644312
+    },
+    "adbda64d94724119:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.570443
+    },
+    "ae29387849b242b5:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.670214
+    },
+    "af10f2a705ab4383:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.508608
+    },
+    "af52aea29b0e4bac:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.534116
+    },
+    "afccdefc119142b1:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.583178
+    },
+    "b0bb01aad76543a0:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.677852
+    },
+    "b1150114b6a94ea9:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.606915
+    },
+    "b1f3d00eed3f4b28:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.529375
+    },
+    "b223108666104c41:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.653881
+    },
+    "b336cb3de51542b7:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.608275
+    },
+    "b3e79e16aa3b4cc3:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.629299
+    },
+    "b4111fe1c36647e3:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.668172
+    },
+    "b4aaf7fefac4402f:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.553373
+    },
+    "b656054d28254416:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.566602
+    },
+    "b78c45a66c384897:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.590655
+    },
+    "b8d80950e0954e97:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.503457
+    },
+    "b9bdf6d294524f49:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.501911
+    },
+    "ba696776800243e0:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.511929
+    },
+    "bb588c8ba9384083:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.54287
+    },
+    "bc2bab6444c94c84:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.73358
+    },
+    "bcd57d1678884086:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.56987
+    },
+    "bd07b26ffbeb496b:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.634366
+    },
+    "be3a94d2a7f7405c:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.527991
+    },
+    "befad45aa04f4511:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.586186
+    },
+    "befb696563564ac3:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.594617
+    },
+    "bf96745e4481447b:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.591035
+    },
+    "c02c1f35cf5245d8:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.538121
+    },
+    "c06f5a7c802a4893:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.503418
+    },
+    "c097f2631c054985:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.591355
+    },
+    "c0d85ad2d5ba4c12:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.573081
+    },
+    "c0ede797a00544b6:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.553594
+    },
+    "c109a0420fe84e1b:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.549037
+    },
+    "c13175b1305d4072:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.563098
+    },
+    "c15766d5095b4785:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.553548
+    },
+    "c18f132cb8cd4cb2:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.644137
+    },
+    "c1a17f83d55b4347:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.543242
+    },
+    "c1b1db6753424dfd:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.611882
+    },
+    "c2595dfa765b4493:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.711676
+    },
+    "c29478faf29b4bac:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.682756
+    },
+    "c295a206b6a54faa:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.537078
+    },
+    "c29e650cf08f428f:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.662231
+    },
+    "c2bfd004d3ef4760:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.645076
+    },
+    "c4e39c6ef9be4a8b:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.688669
+    },
+    "c4f250cc64a64efe:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.514196
+    },
+    "c522a16a6a264e69:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.556633
+    },
+    "c6a5da4508424a4b:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.504011
+    },
+    "c6d84960cf7e4460:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.559436
+    },
+    "c94fc05c293741db:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.608718
+    },
+    "c9e6e8af48094198:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.545991
+    },
+    "ca374d7ec7344977:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.644842
+    },
+    "ca64be8a324d48d9:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.507418
+    },
+    "cb95248fe6124a01:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.547056
+    },
+    "cc42c40540f64f42:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.510286
+    },
+    "ccd8164ac14d439a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.642666
+    },
+    "cdd23cc5753b4aee:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.583695
+    },
+    "cf41c3d6a19442fc:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.554719
+    },
+    "cfdf0b2ba7ea4090:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.631588
+    },
+    "cffafcf27ce54d23:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.646254
+    },
+    "d2b2fd3cfa9c4b97:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.512377
+    },
+    "d3eb906630264ed6:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.648202
+    },
+    "d43202f040434986:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.596582
+    },
+    "d509153cdd2f45af:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.50092
+    },
+    "d5929df1438b4a0b:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.544654
+    },
+    "d5bc51aa97e64acf:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.550806
+    },
+    "d5e3211664364dbb:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.542885
+    },
+    "d62dd1ae3c8d4efd:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.501428
+    },
+    "d69922e44ffe4937:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.546366
+    },
+    "d819c2582b0c49f1:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.580971
+    },
+    "d8772c1c9dec442f:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.692838
+    },
+    "d8aee530ff384a38:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.53612
+    },
+    "d9873bab29744aaa:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.514576
+    },
+    "da0bad9686764f0c:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.63096
+    },
+    "da376ce2e3034248:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.591205
+    },
+    "da5e70d23b614e31:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.544042
+    },
+    "dbeb51b449914a73:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.611786
+    },
+    "dc7a349b416a4b0c:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.652006
+    },
+    "dc9dc5e2c86f41bb:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.550796
+    },
+    "dd31c24f49434cdb:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.550463
+    },
+    "dd9e657c2b7344ab:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.658381
+    },
+    "de3b1fa395334f90:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.579015
+    },
+    "de54dd1fcadd464e:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.511744
+    },
+    "de7f4e6803c9436f:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.708988
+    },
+    "debfe161c78f4e7b:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.643582
+    },
+    "df7545c4141c4fdf:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.58289
+    },
+    "df806d902fa44de9:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.605671
+    },
+    "dfcb0d3ca334487c:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.552316
+    },
+    "e006ee2ecee341a2:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.538731
+    },
+    "e01dbdf31a674920:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.704351
+    },
+    "e05fff0d29a04037:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.502013
+    },
+    "e0917ecfe396428d:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.514511
+    },
+    "e17379799b6f40fe:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.565703
+    },
+    "e1c1749fa47d4aca:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.572291
+    },
+    "e238734474494fae:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.71609
+    },
+    "e2a87e2ea29843f5:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.526853
+    },
+    "e2e732e90a8e4ca5:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.686746
+    },
+    "e30cc1610af04767:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.505733
+    },
+    "e33349f97e7c4fa5:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.595023
+    },
+    "e4b1ea99a8b1487f:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.562983
+    },
+    "e4cccef2db914b6d:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.534272
+    },
+    "e4fa1647b7c44b1c:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.590184
+    },
+    "e5efb46e743e4b9a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.587997
+    },
+    "e6f33fc966004c14:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.555617
+    },
+    "e7172804f3f848f2:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.510584
+    },
+    "e751482631534582:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.573106
+    },
+    "e91af6fa228a4503:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.558935
+    },
+    "ea45b2f00dfb4153:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.503367
+    },
+    "eb4c722720f94afc:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.704397
+    },
+    "eba8f49a255e4a5c:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.557868
+    },
+    "ec308063aa7347eb:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.646798
+    },
+    "ecb3bd4b1cea486e:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.609986
+    },
+    "ee1ac7a9fc03457a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.60733
+    },
+    "eef0bc4d069846e7:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.506064
+    },
+    "ef394ef1c4c2478e:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.586246
+    },
+    "ef42429da9c74dff:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.718247
+    },
+    "ef616dc624374804:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.635992
+    },
+    "efcf2a02346443d9:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.517913
+    },
+    "f05ab749ea774dd4:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.635069
+    },
+    "f3b0cbc1d3864e68:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.55538
+    },
+    "f3d894c2e9364b1d:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.628115
+    },
+    "f4cfd37c360d45d6:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.692508
+    },
+    "f528d2db7270454f:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.544947
+    },
+    "f5420d02a4ae48ca:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.529355
+    },
+    "f55a6d492b6d4e10:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.508055
+    },
+    "f6403674968c40b0:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.590505
+    },
+    "f66c127bfc384bf0:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.555225
+    },
+    "f68f26a47d63481a:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.538864
+    },
+    "f888f3de469f4d54:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.508196
+    },
+    "f929577210c34dfb:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.621903
+    },
+    "fa08aec15c0342a5:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.621185
+    },
+    "fa51ba816d374cbd:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.557554
+    },
+    "fa59fb7f6af84565:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.623108
+    },
+    "fab445940ccb4d31:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.524296
+    },
+    "fab9b83d024e4a8e:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.503468
+    },
+    "fc83f84952d643df:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.612185
+    },
+    "fc9ee6693727469c:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.522617
+    },
+    "fd81e6becb5e4808:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.546781
+    },
+    "fd9136262c164b11:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.54393
+    },
+    "fdd6a1a778a04a33:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.632062
+    },
+    "ffbb096829494fe3:flat": {
+      "feature_deltas": {
+        "away_elo": 0.0,
+        "away_history_count": 0,
+        "home_elo": 0.0,
+        "home_history_count": 0
+      },
+      "mismatch": "exact_match",
+      "probability": 0.545756
+    }
+  },
+  "source_groups": [
+    {
+      "actual_replay_code_sha256": {
+        "esports.py": "48eab29fd660f72bcbd6f9557cca081a5e6f76c9da89c9cf36ce7181c79b1174",
+        "features/elo_ratings.py": "8525faf022a6343c452286dbfeb17dbb043744c6bdabbe448b6b371216da439b"
+      },
+      "archived_elo_sha256": "8525faf022a6343c452286dbfeb17dbb043744c6bdabbe448b6b371216da439b",
+      "archived_esports_sha256": "48eab29fd660f72bcbd6f9557cca081a5e6f76c9da89c9cf36ce7181c79b1174",
+      "git_sources": {
+        "esports.py": {
+          "blob": "d6a21119af650735e071b259bb1f3d46efdb2d8e",
+          "commit": "50f624304859bfe83c4af9327bcacd9b74902b84"
+        },
+        "features/elo_ratings.py": {
+          "blob": "dc67045cc2127b915499e6f58a098242fe523608",
+          "commit": "bd8a82d176570366af877ef18329c28dc2cc0c8c"
+        }
+      },
+      "historical_sources_recovered": true,
+      "rows": 87
+    },
+    {
+      "actual_replay_code_sha256": {
+        "esports.py": "1062b45bde8c425712239cfa42636f4a857797ed888c3072b9976f0af0f28526",
+        "features/elo_ratings.py": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872"
+      },
+      "archived_elo_sha256": "8525faf022a6343c452286dbfeb17dbb043744c6bdabbe448b6b371216da439b",
+      "archived_esports_sha256": "a3c853f49dbf985f47a1d90696fafa74e5b8f097160af8d28d7fa1215c8bce8a",
+      "historical_sources_recovered": false,
+      "rows": 1
+    },
+    {
+      "actual_replay_code_sha256": {
+        "esports.py": "8d25951d04320147b4f82f35408c7948ac3d6a80af203ada3bac1aa630e7b330",
+        "features/elo_ratings.py": "8525faf022a6343c452286dbfeb17dbb043744c6bdabbe448b6b371216da439b"
+      },
+      "archived_elo_sha256": "8525faf022a6343c452286dbfeb17dbb043744c6bdabbe448b6b371216da439b",
+      "archived_esports_sha256": "8d25951d04320147b4f82f35408c7948ac3d6a80af203ada3bac1aa630e7b330",
+      "git_sources": {
+        "esports.py": {
+          "blob": "b5194df75e587fa7304bceb83d0327ea57846f6e",
+          "commit": null
+        },
+        "features/elo_ratings.py": {
+          "blob": "dc67045cc2127b915499e6f58a098242fe523608",
+          "commit": "bd8a82d176570366af877ef18329c28dc2cc0c8c"
+        }
+      },
+      "historical_sources_recovered": true,
+      "rows": 9
+    },
+    {
+      "actual_replay_code_sha256": {
+        "esports.py": "8d25951d04320147b4f82f35408c7948ac3d6a80af203ada3bac1aa630e7b330",
+        "features/elo_ratings.py": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872"
+      },
+      "archived_elo_sha256": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872",
+      "archived_esports_sha256": "8d25951d04320147b4f82f35408c7948ac3d6a80af203ada3bac1aa630e7b330",
+      "git_sources": {
+        "esports.py": {
+          "blob": "b5194df75e587fa7304bceb83d0327ea57846f6e",
+          "commit": null
+        },
+        "features/elo_ratings.py": {
+          "blob": "3269be5b585e8c253ec2983285345b72c3085f5e",
+          "commit": "338742cd277f3a75a0c6a60be28159134d5d7f9c"
+        }
+      },
+      "historical_sources_recovered": true,
+      "rows": 60
+    },
+    {
+      "actual_replay_code_sha256": {
+        "esports.py": "3abbfc5d7124cc94603dada2e4c996da231a679d437c5a066d994a2a7d428f61",
+        "features/elo_ratings.py": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872"
+      },
+      "archived_elo_sha256": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872",
+      "archived_esports_sha256": "3abbfc5d7124cc94603dada2e4c996da231a679d437c5a066d994a2a7d428f61",
+      "git_sources": {
+        "esports.py": {
+          "blob": "d7c4d91806dacddd2851fd26829a323e0c6e6e6e",
+          "commit": "338742cd277f3a75a0c6a60be28159134d5d7f9c"
+        },
+        "features/elo_ratings.py": {
+          "blob": "3269be5b585e8c253ec2983285345b72c3085f5e",
+          "commit": "338742cd277f3a75a0c6a60be28159134d5d7f9c"
+        }
+      },
+      "historical_sources_recovered": true,
+      "rows": 88
+    },
+    {
+      "actual_replay_code_sha256": {
+        "esports.py": "ec64bcad0f00ffb3fb38160304eed3f40f74161c93889a0e4215bca26558985e",
+        "features/elo_ratings.py": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872"
+      },
+      "archived_elo_sha256": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872",
+      "archived_esports_sha256": "ec64bcad0f00ffb3fb38160304eed3f40f74161c93889a0e4215bca26558985e",
+      "git_sources": {
+        "esports.py": {
+          "blob": "241c6aab6fb1187d21f02174c68e5a2d115f9b0f",
+          "commit": "48fa0f8b7b32b39ed3752b27e45e6d5ffb2c0587"
+        },
+        "features/elo_ratings.py": {
+          "blob": "3269be5b585e8c253ec2983285345b72c3085f5e",
+          "commit": "338742cd277f3a75a0c6a60be28159134d5d7f9c"
+        }
+      },
+      "historical_sources_recovered": true,
+      "rows": 34
+    },
+    {
+      "actual_replay_code_sha256": {
+        "esports.py": "c1c2408e1f75d4e0393dd513e024e25fe1444a621f03f404ed31d2ff03b02c01",
+        "features/elo_ratings.py": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872"
+      },
+      "archived_elo_sha256": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872",
+      "archived_esports_sha256": "c1c2408e1f75d4e0393dd513e024e25fe1444a621f03f404ed31d2ff03b02c01",
+      "git_sources": {
+        "esports.py": {
+          "blob": "de498cd2559e368382ade446dc067a7d9f481e7b",
+          "commit": null
+        },
+        "features/elo_ratings.py": {
+          "blob": "3269be5b585e8c253ec2983285345b72c3085f5e",
+          "commit": "338742cd277f3a75a0c6a60be28159134d5d7f9c"
+        }
+      },
+      "historical_sources_recovered": true,
+      "rows": 1
+    },
+    {
+      "actual_replay_code_sha256": {
+        "esports.py": "1062b45bde8c425712239cfa42636f4a857797ed888c3072b9976f0af0f28526",
+        "features/elo_ratings.py": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872"
+      },
+      "archived_elo_sha256": "d6513e79d65448c06cc0f9b9eed0eaa091567835128e1f6647a310da8d78a872",
+      "archived_esports_sha256": "1062b45bde8c425712239cfa42636f4a857797ed888c3072b9976f0af0f28526",
+      "git_sources": {
+        "esports.py": {
+          "blob": "ddcb291765f683c98c6918f7dddf42bb7ec2eff8",
+          "commit": "4941da6d3de8c126d520e06ffa4c79a2e0f02e4f"
+        },
+        "features/elo_ratings.py": {
+          "blob": "3269be5b585e8c253ec2983285345b72c3085f5e",
+          "commit": "338742cd277f3a75a0c6a60be28159134d5d7f9c"
+        }
+      },
+      "historical_sources_recovered": true,
+      "rows": 171
+    }
+  ]
+}
