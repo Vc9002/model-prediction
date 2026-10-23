@@ -710,9 +710,33 @@ class PickLedger:
     def append_evaluated(
         self, request: PickRequest, eligibility: EligibilityResult, now: datetime | None = None
     ) -> dict[str, str]:
+        from dataclasses import replace
+
         from .eligibility import enforce_universal_paper_call
 
-        eligibility = enforce_universal_paper_call(request, eligibility)
+        if self.tier == "flat":
+            # Operator Directive: Flat ledger calls everything (1.0 unit flat, full coverage).
+            # No shadow picks or research observations in Flat ledger -- every row is a real qualified flat call
+            # so performance is fully visible, logged, and tracked in reporting.
+            eligibility = replace(
+                eligibility,
+                record_type=RecordType.QUALIFIED_SHADOW_CALL,
+                decision="CALL",
+                reason_code="QUALIFIED" if eligibility.reason_code == "QUALIFIED" else "FLAT_CALL",
+                units=1.0,
+            )
+        elif self.tier == "main":
+            # Main ledger is the gated ledger. Calls reaching Main are qualified calls.
+            # No shadow picks or downgraded paper observations in Main.
+            eligibility = replace(
+                eligibility,
+                record_type=RecordType.QUALIFIED_SHADOW_CALL,
+                decision="CALL",
+                reason_code="QUALIFIED",
+                units=eligibility.units if eligibility.units > 0 else 1.0,
+            )
+        else:
+            eligibility = enforce_universal_paper_call(request, eligibility)
         return self._append_record(request, eligibility, now or utc_now())
 
     def append_call(

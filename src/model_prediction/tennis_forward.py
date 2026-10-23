@@ -404,7 +404,7 @@ def build_tennis_slate(
                 away_side_key = "long" if away_is_long else "short"
                 home_side_key = "short" if away_side_key == "long" else "long"
 
-                # Two-sided value evaluation: evaluate both sides against executable asks
+                # Two-sided value evaluation for full coverage: evaluate both sides and select highest edge
                 candidates = []
                 for side_sel, side_prob, side_key in (
                     ("away", p_away, away_side_key),
@@ -412,12 +412,9 @@ def build_tennis_slate(
                 ):
                     side = snapshot.get(side_key) or {}
                     ask_val = side.get("ask")
-                    if ask_val is None or not (0.01 <= float(ask_val) <= 0.99):
-                        continue
-                    ask_float = float(ask_val)
-                    edge = side_prob - ask_float
-                    # Guardrails: positive edge (>=0.015), win prob floor (0.25), market ask ceiling (0.78 to prevent chalk trap)
-                    if edge >= 0.015 and side_prob >= 0.25 and ask_float <= 0.78:
+                    if ask_val is not None and 0.01 <= float(ask_val) <= 0.99:
+                        ask_float = float(ask_val)
+                        edge = side_prob - ask_float
                         candidates.append(
                             {
                                 "selection": side_sel,
@@ -426,24 +423,6 @@ def build_tennis_slate(
                                 "edge": edge,
                             }
                         )
-
-                # Fallback: if no candidate clears strict guardrails, select highest relative edge candidate
-                if not candidates:
-                    for side_sel, side_prob, side_key in (
-                        ("away", p_away, away_side_key),
-                        ("home", p_home, home_side_key),
-                    ):
-                        side = snapshot.get(side_key) or {}
-                        ask_val = side.get("ask")
-                        if ask_val is not None and 0.01 <= float(ask_val) <= 0.99:
-                            candidates.append(
-                                {
-                                    "selection": side_sel,
-                                    "prob": side_prob,
-                                    "ask": float(ask_val),
-                                    "edge": side_prob - float(ask_val),
-                                }
-                            )
 
                 if not candidates:
                     continue

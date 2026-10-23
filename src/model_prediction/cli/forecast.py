@@ -4814,8 +4814,8 @@ def _forecast_tennis_sport(
                         gated += 1
                     else:
                         gated_duplicates += 1
-                if flat_ledger is not None and market_allowed and contract_edge >= 0.015:
-                    # Flat: log priced contracts clearing positive value threshold
+                if flat_ledger is not None:
+                    # Flat: call every priced contract on the slate for 100% full coverage (flat 1.0U, real qualified call)
                     if (
                         _append_secondary_ledger(
                             flat_ledger, request, eligibility, observed_now, "tennis:flat_ledger"
