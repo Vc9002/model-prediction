@@ -1,18 +1,19 @@
 {
-  "calibration_drift": 14.5525,
-  "last_checked_utc": "2026-10-23T18:00:17.898628+00:00",
-  "models_count": 56,
+  "calibration_drift": 1.7223,
+  "last_checked_utc": "2026-10-23T20:39:36.617297+00:00",
+  "models_count": 58,
   "moderate_drift_models": [
+    "mlb:moneyline:mlb-elo-trend-lr-v8",
+    "cs2:moneyline:cs2-tiered-elo-v6",
     "soccer:moneyline:soccer-poisson-dc-v1",
     "tennis:moneyline:tennis-surface-elo-v4"
   ],
   "raw_status": "SEVERE_DRIFT",
-  "recalibrated_count": 7,
+  "recalibrated_count": 6,
   "recalibrated_models": [
     "mlb:spread:measured-edge-margin-v3",
     "mlb:moneyline:mlb-elo-trend-lr-v8",
     "cs2:moneyline:cs2-tiered-elo-v6",
-    "tennis:moneyline:tennis-surface-elo-v4",
     "wnba:moneyline:wnba-elo-trend-lr-v4",
     "ncaaf:spread:cfb-structural-v2",
     "dota2:moneyline:dota2-tiered-elo-v6"
@@ -21,7 +22,6 @@
     "tennis:moneyline:tennis-surface-elo-v1",
     "mlb:spread:measured-edge-margin-v3",
     "mlb:total:measured-edge-totals-v3",
-    "mlb:moneyline:mlb-elo-trend-lr-v8",
     "cs2:moneyline:cs2-tiered-elo-v6",
     "ncaaf:total:cfb-total-v1",
     "ncaaf:spread:cfb-spread-v1",
@@ -41,13 +41,14 @@
     "nfl:moneyline:nfl-elo-trend-lr-v4",
     "wnba:total:wnba-total-margin-v2",
     "wnba:spread:wnba-spread-margin-v2",
-    "nfl:spread:nfl-spread-structural-v5",
     "tennis:spread:tennis-games-markov-v1",
     "tennis:total:tennis-games-markov-v1",
-    "hockey:moneyline:hockey-poisson-dc-v1",
     "soccer:moneyline:soccer-poisson-dc-v3",
-    "tennis:spread:tennis-surface-elo-v4",
+    "nfl:spread:nfl-spread-structural-v5",
+    "hockey:moneyline:hockey-poisson-dc-v1",
     "valorant:moneyline:valorant-tiered-elo-v6",
+    "soccer:double_chance:soccer-poisson-dc-v3",
+    "tennis:spread:tennis-surface-elo-v4",
     "nfl:total:nfl-total-structural-v5"
   ],
   "status": "SEVERE_DRIFT"

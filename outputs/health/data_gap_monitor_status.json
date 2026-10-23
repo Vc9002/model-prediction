@@ -1,6 +1,6 @@
 {
   "overall_status": "HEALTHY",
-  "generated_at_utc": "2026-10-23T17:45:35.563705+00:00",
+  "generated_at_utc": "2026-10-23T21:29:48.724126+00:00",
   "odds_freshness": {
     "status": "WARN",
     "stale_active_sports": [
@@ -215,7 +215,7 @@
       "nba-spread-margin-v2": {
         "hash_valid": true,
         "settled_picks": 20,
-        "open_picks": 0,
+        "open_picks": 22,
         "removed_picks": 0,
         "evidence_status": "predictively_qualified"
       },
@@ -250,7 +250,7 @@
       "cfb-structural-v2": {
         "hash_valid": true,
         "settled_picks": 362,
-        "open_picks": 18,
+        "open_picks": 19,
         "removed_picks": 0,
         "evidence_status": "predictively_qualified"
       },
@@ -270,15 +270,15 @@
       },
       "cs2-tiered-elo-v6": {
         "hash_valid": true,
-        "settled_picks": 1724,
-        "open_picks": 36,
+        "settled_picks": 1746,
+        "open_picks": 18,
         "removed_picks": 0,
         "evidence_status": "historical_only"
       },
       "dota2-tiered-elo-v6": {
         "hash_valid": true,
-        "settled_picks": 272,
-        "open_picks": 6,
+        "settled_picks": 276,
+        "open_picks": 4,
         "removed_picks": 0,
         "evidence_status": "historical_only"
       },
@@ -291,7 +291,7 @@
       },
       "valorant-tiered-elo-v6": {
         "hash_valid": true,
-        "settled_picks": 96,
+        "settled_picks": 102,
         "open_picks": 14,
         "removed_picks": 0,
         "evidence_status": "historical_only"
@@ -322,6 +322,6 @@
   "self_healing": {
     "status": "skipped",
     "message": "Auto-heal disabled. Pass --auto-heal to execute write-remediation routines.",
-    "timestamp_utc": "2026-10-23T17:45:35.563705+00:00"
+    "timestamp_utc": "2026-10-23T21:29:48.724126+00:00"
   }
 }

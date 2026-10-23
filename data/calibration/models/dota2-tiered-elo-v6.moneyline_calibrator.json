@@ -1,15 +1,11 @@
 {
-  "baseline_brier": 0.231652,
-  "calibrated_at_utc": "2026-10-23T16:42:30.311145+00:00",
-  "calibrated_oof_brier": 0.23337483548160784,
-  "champion_method": "beta",
+  "baseline_brier": 0.235402,
+  "calibrated_at_utc": "2026-10-23T20:39:36.617297+00:00",
+  "calibrated_oof_brier": 0.23540190510028788,
+  "champion_method": "identity",
   "market": "moneyline",
   "model_version": "dota2-tiered-elo-v6",
-  "parameters": {
-    "a": 4.5655,
-    "b": 1.5195,
-    "c": 1.6634
-  },
-  "sample_size": 65,
+  "parameters": {},
+  "sample_size": 66,
   "sport": "dota2"
 }
