@@ -12,7 +12,7 @@ from .domain import parse_utc
 from .learned_replay import snapshot_hash
 
 SCHEMA = "coded-moneyline-replay-v1"
-VERSIONS = {"SOCCER": "soccer-poisson-dc-v1", "TENNIS": "tennis-surface-elo-v4"}
+VERSIONS = {"SOCCER": "soccer-poisson-dc-v1", "TENNIS": "tennis-surface-elo-v5"}
 ALLOWED_VERSIONS = {
     "SOCCER": {"soccer-poisson-dc-v1", "soccer-poisson-dc-v2", "soccer-poisson-dc-v3"},
     "TENNIS": {
@@ -20,6 +20,7 @@ ALLOWED_VERSIONS = {
         "tennis-markov-hierarchical-v2",
         "tennis-learned-v3",
         "tennis-surface-elo-v4",
+        "tennis-surface-elo-v5",
     },
 }
 
@@ -104,6 +105,35 @@ def replay_inputs(inputs: dict[str, Any]) -> dict[str, float]:
             p = apply_market_residual(p, float(market_prob))
         return {"away": round(round(p, 6), 4), "home": round(round(1 - p, 6), 4)}
 
+    if model_version == "tennis-surface-elo-v5":
+        from .models.tennis import TennisModel
+
+        players = inputs["players"]
+        surface = inputs["surface"]
+        overall = dict(zip(players, inputs["overall_ratings"], strict=True))
+        by_surface = dict(zip(((p, surface) for p in players), inputs["surface_ratings"], strict=True))
+        surface_counts = dict(zip(((p, surface) for p in players), inputs["surface_counts"], strict=True))
+        counts = dict(zip(players, inputs.get("counts", [0, 0]), strict=True))
+        recent_form = dict(
+            zip(players, inputs.get("recent_form_ratings", inputs["overall_ratings"]), strict=True)
+        )
+        rest_days = dict(zip(players, inputs.get("rest_days", [14.0, 14.0]), strict=True))
+        best_of = int(inputs.get("best_of", 3))
+        tennis_model = TennisModel(version="tennis-surface-elo-v5")
+        tennis_model.recent_form = recent_form
+        p = tennis_model.match_probability_v5(
+            overall=overall,
+            by_surface=by_surface,
+            surface_counts=surface_counts,
+            counts=counts,
+            player_one=players[0],
+            player_two=players[1],
+            surface=surface,
+            rest_days=rest_days,
+            best_of=best_of,
+        )
+        return {"away": round(round(p, 6), 4), "home": round(round(1 - p, 6), 4)}
+
     if model_version == "tennis-surface-elo-v4":
         from .models.tennis import TennisModel
 
@@ -135,7 +165,13 @@ def replay_inputs(inputs: dict[str, Any]) -> dict[str, float]:
 
     if model_version == "tennis-markov-hierarchical-v2" or (
         "p_serve_a" in inputs
-        and model_version not in ("tennis-surface-elo-v1", "tennis-learned-v3", "tennis-surface-elo-v4")
+        and model_version
+        not in (
+            "tennis-surface-elo-v1",
+            "tennis-learned-v3",
+            "tennis-surface-elo-v4",
+            "tennis-surface-elo-v5",
+        )
     ):
         from .models.tennis_derivatives import price_tennis_derivatives
 

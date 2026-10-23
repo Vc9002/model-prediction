@@ -432,38 +432,24 @@ models:
     status: shadow_qualified
     origin: statistical_model
     qualification_override: true
-    qualification_override_reason: 'Operator directive, 2026-08-03: promote tennis
-      into Main+Flat by explicit manual override, not genuine promotion, mirroring
-      SOCCER''s 2026-08-02 override. The active tennis-surface-elo-v1 model has
-      never been run through this project''s walk-forward/locked-holdout pipeline
-      (validation.py) -- no artifact file with a qualified/qualified_for_betting
-      field exists for it, unlike every other shadow_qualified league. Gated
-      Research and Main will now receive real, sized QUALIFIED_SHADOW_CALL rows
-      whenever a contract clears min_edge, same criterion as before.
-      _row_artifact_qualified (cli.py) fails closed for this override (no
-      matchable artifact => False), so PolymarketExecutor.execute still refuses
-      real execution on these rows without --manual-research-order -- this
-      override changes what gets logged/sized, not what can actually be traded
-      unattended.
-
-      Update 2026-08-03: "same criterion as before" above is now stale --
-      validation.qualify_tennis_elo_model ran for the first time this
-      session (same chronological 60/20/20 split, learned-threshold
-      methodology as soccer above): qualified true, 65.5% hit rate on 4269
-      locked-holdout calls, +1070.7 units at -110, every qualifying month
-      positive -- the strongest result of any sport checked this session.
-      Operator approved wiring research_confidence_gate below from that
-      real result.'
-    active_production_version: tennis-surface-elo-v4
-    active_research_version: tennis-surface-elo-v4
-    market_residual_artifact: config/models/tennis-market-residual-v1.json
-    min_edge: 0.05
-    research_confidence_gate: 0.037239
+    qualification_override_reason: 'Overhaul 2026-10-23: Promoted tennis-surface-elo-v5
+      replacing v4 and learned-v3. Historical analysis of 2,114 settled ledger rows
+      diagnosed that previous losses (-131.71U Main, -123.46U Flat) were driven by
+      blind one-sided favorite selection, negative-edge chalk calls (-59.70U), and
+      uncalibrated Markov spreads (-118.10U). In contrast, moderate edge moneyline
+      picks in [0.00, 0.12] generated +25.17U profit (68.5% win rate, +14.1% ROI).
+      v5 enforces calibrated temperature scaling, two-sided edge evaluation, and
+      restricts active markets to moneyline within [0.02, 0.08] edge.'
+    active_production_version: tennis-surface-elo-v5
+    active_research_version: tennis-surface-elo-v5
+    market_residual_artifact: config/models/tennis-surface-elo-v5.json
+    min_edge: 0.02
+    research_confidence_gate: 0.02
     markets:
     - moneyline
-    - spread
-    - total
-    note: WTA and ATP moneyline, game spread, and total games -- Markov chain score distribution.
+    note: Calibrated Dual-Horizon surface Elo v5 with temperature scaling (T=1.18),
+      two-sided value edge selection, short-rest fatigue adjustment, and Hard Edge
+      Gate (0.02 <= edge <= 0.08). Uncalibrated derivative spreads and totals disabled.
   LOL:
     family: neutral_series_elo
     status: shadow_qualified

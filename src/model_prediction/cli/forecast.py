@@ -4645,7 +4645,8 @@ def _forecast_tennis_sport(
         forecast["logged"] = 0
         return forecast
 
-    min_edge = float(model_config.get("min_edge", 0.05))
+    min_edge = float(model_config.get("min_edge", 0.02))
+    configured_markets = tuple(model_config.get("markets") or ("moneyline",))
     # Real edge/confidence validation lives in validation.qualify_tennis_elo_model
     # (chronological 60/20/20 split, learned confidence threshold, locked-
     # holdout units_at_minus_110 + monthly-consistency check -- same rigor
@@ -4785,7 +4786,16 @@ def _forecast_tennis_sport(
                         eligibility,
                         reason_code="PAPER_CALL_MARKET_UNAVAILABLE",
                     )
-                genuinely_eligible = eligibility.decision == "CALL"
+                contract_edge = float(contract.get("edge_vs_executable_ask", 0.0))
+                mtype_str = str(contract.get("market_type", "moneyline"))
+                market_allowed = mtype_str in configured_markets
+                genuinely_eligible = (
+                    eligibility.decision == "CALL"
+                    and not eligibility.reason_code.startswith("PAPER_CALL_")
+                    and market_allowed
+                    and (min_edge <= contract_edge <= 0.08)
+                    and float(contract.get("model_probability", 0.0)) >= 0.25
+                )
                 if (
                     research_ledger is not None
                     and _append_secondary_ledger(
@@ -4804,10 +4814,8 @@ def _forecast_tennis_sport(
                         gated += 1
                     else:
                         gated_duplicates += 1
-                if flat_ledger is not None:
-                    # Flat: log every priced contract regardless of
-                    # eligibility, same "show everything" semantics flat
-                    # mode uses for every other sport.
+                if flat_ledger is not None and market_allowed and contract_edge >= 0.015:
+                    # Flat: log priced contracts clearing positive value threshold
                     if (
                         _append_secondary_ledger(
                             flat_ledger, request, eligibility, observed_now, "tennis:flat_ledger"

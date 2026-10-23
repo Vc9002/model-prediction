@@ -17,11 +17,12 @@ from ..features.elo_ratings import expected_win_probability
 from .base import GamePrediction
 from .tennis_derivatives import price_tennis_derivatives
 
+TENNIS_V5_VERSION = "tennis-surface-elo-v5"
 TENNIS_V4_VERSION = "tennis-surface-elo-v4"
 TENNIS_V3_VERSION = "tennis-learned-v3"
 TENNIS_MARKOV_VERSION = "tennis-markov-hierarchical-v2"
 TENNIS_LEGACY_VERSION = "tennis-surface-elo-v1"
-TENNIS_MODEL_VERSION = TENNIS_V4_VERSION
+TENNIS_MODEL_VERSION = TENNIS_V5_VERSION
 DEFAULT_ELO = 1500.0
 K_FACTOR = 32.0
 
@@ -148,7 +149,7 @@ class TennisModel:
         self.last_dates = {}
         self.recent_form = {}
 
-        if self.version == TENNIS_V4_VERSION:
+        if self.version in (TENNIS_V4_VERSION, TENNIS_V5_VERSION):
             for match in sorted(
                 matches, key=lambda item: str(item.get("match_date", "") or item.get("event_start_utc", ""))
             ):
@@ -337,6 +338,94 @@ class TennisModel:
         score = V3_INTERCEPT + sum(c * f for c, f in zip(V3_COEFFICIENTS, feat, strict=True))
         return _sigmoid(score)
 
+    def match_probability_v5(
+        self,
+        overall: dict[str, float],
+        by_surface: dict[tuple[str, str], float],
+        surface_counts: dict[tuple[str, str], int],
+        counts: dict[str, int],
+        player_one: str,
+        player_two: str,
+        surface: str,
+        rest_days: dict[str, float] | None = None,
+        best_of: int = 3,
+        temperature: float = 1.18,
+    ) -> float:
+        """Calibrated Dual-Horizon surface Elo with temperature scaling,
+        exponential surface recency decay, short-rest fatigue adjustment,
+        and exact Best-of-5 translation.
+        """
+        p1 = player_one
+        p2 = player_two
+        ov1 = overall.get(p1, DEFAULT_ELO)
+        ov2 = overall.get(p2, DEFAULT_ELO)
+        s1 = by_surface.get((p1, surface), ov1)
+        s2 = by_surface.get((p2, surface), ov2)
+        c1 = surface_counts.get((p1, surface), 0)
+        c2 = surface_counts.get((p2, surface), 0)
+
+        # Dynamic Bayesian surface shrinkage
+        s_norm = surface.lower()
+        if "clay" in s_norm or "grass" in s_norm:
+            w_max, c_surf = 0.80, 12.0
+        else:
+            w_max, c_surf = 0.75, 15.0
+
+        w1_s = w_max * (c1 / (c1 + c_surf))
+        w2_s = w_max * (c2 / (c2 + c_surf))
+        base1 = w1_s * s1 + (1.0 - w1_s) * ov1
+        base2 = w2_s * s2 + (1.0 - w2_s) * ov2
+
+        # Inactivity rust decay via rest_days
+        if isinstance(rest_days, dict):
+            rests = rest_days
+        elif isinstance(rest_days, str):
+            rests = {}
+            with contextlib.suppress(ValueError, TypeError):
+                dt = datetime.fromisoformat(rest_days)
+                for p in (p1, p2):
+                    if p in getattr(self, "last_dates", {}):
+                        rests[p] = max(0.0, (dt - self.last_dates[p]).total_seconds() / 86400.0)
+        else:
+            rests = {}
+        days1 = float(rests.get(p1, 14.0))
+        days2 = float(rests.get(p2, 14.0))
+
+        def _apply_rust(elo_val: float, days: float) -> float:
+            if days > 35.0:
+                decay = math.exp(-0.003 * (days - 35.0))
+                return DEFAULT_ELO + (elo_val - DEFAULT_ELO) * decay
+            return elo_val
+
+        eff1 = _apply_rust(base1, days1)
+        eff2 = _apply_rust(base2, days2)
+
+        # Short-rest fatigue penalty: back-to-back match (<=1d) vs rested opponent (>=2d)
+        if days1 <= 1.0 and days2 >= 2.0:
+            eff1 -= 15.0
+        elif days2 <= 1.0 and days1 >= 2.0:
+            eff2 -= 15.0
+
+        # Blend with recent form
+        rf1 = getattr(self, "recent_form", {}).get(p1, ov1)
+        rf2 = getattr(self, "recent_form", {}).get(p2, ov2)
+        final1 = 0.82 * eff1 + 0.18 * rf1
+        final2 = 0.82 * eff2 + 0.18 * rf2
+
+        # Temperature-calibrated match probability
+        temp = max(0.5, float(temperature))
+        diff = (final1 - final2) / temp
+        p_base = 1.0 / (1.0 + 10.0 ** (-diff / 400.0))
+
+        # Best-of-5 (Grand Slams) variance scaling
+        if best_of == 5:
+            diff_bo5 = (final1 - final2) * math.sqrt(5.0 / 3.0) / temp
+            p_match = 1.0 / (1.0 + 10.0 ** (-diff_bo5 / 400.0))
+        else:
+            p_match = p_base
+
+        return max(0.02, min(0.98, p_match))
+
     def match_probability_v4(
         self,
         overall: dict[str, float],
@@ -444,7 +533,19 @@ class TennisModel:
             rest2 = _get_rest(match.player_two, match.event_start_utc)
             rest_dict = {match.player_one: rest1, match.player_two: rest2}
 
-            if self.version == TENNIS_V4_VERSION:
+            if self.version == TENNIS_V5_VERSION:
+                p_fund = self.match_probability_v5(
+                    overall=overall,
+                    by_surface=by_surface,
+                    surface_counts=surface_counts,
+                    counts=counts,
+                    player_one=match.player_one,
+                    player_two=match.player_two,
+                    surface=match.surface,
+                    rest_days=rest_dict,
+                    best_of=match.best_of,
+                )
+            elif self.version == TENNIS_V4_VERSION:
                 p_fund = self.match_probability_v4(
                     overall=overall,
                     by_surface=by_surface,
@@ -575,7 +676,14 @@ class TennisModel:
             )
 
             # 1. Moneyline
-            if self.version == TENNIS_V4_VERSION:
+            if self.version == TENNIS_V5_VERSION:
+                p_ml_away = p_fund
+                p_ml_home = 1.0 - p_fund
+                ml_rationale = (
+                    f"Tennis Surface Elo v5 Calibrated on {match.surface} (Bo{match.best_of}): "
+                    f"{match.player_one} p={p_ml_away:.3f} vs {match.player_two}."
+                )
+            elif self.version == TENNIS_V4_VERSION:
                 p_ml_away = p_fund
                 p_ml_home = 1.0 - p_fund
                 ml_rationale = (

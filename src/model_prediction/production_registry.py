@@ -49,6 +49,7 @@ CODE_BACKED_ENTRYPOINTS: dict[str, str] = {
     "tennis-games-markov-v1": "model_prediction.models.tennis_derivatives:tennis_games_model",
     "tennis-learned-v3": "model_prediction.models.tennis:tennis_model",
     "tennis-surface-elo-v4": "model_prediction.models.tennis:tennis_model",
+    "tennis-surface-elo-v5": "model_prediction.models.tennis:tennis_model",
     "college-football-v1": "model_prediction.models.college_football:cfb_model",
     "cfb-spread-v1": "model_prediction.models.college_football:cfb_model",
     "cfb-total-v1": "model_prediction.models.college_football:cfb_model",

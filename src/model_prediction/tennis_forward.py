@@ -403,13 +403,56 @@ def build_tennis_slate(
             if mtype == "moneyline":
                 away_side_key = "long" if away_is_long else "short"
                 home_side_key = "short" if away_side_key == "long" else "long"
-                selection = "away" if p_away >= p_home else "home"
-                side_key = away_side_key if selection == "away" else home_side_key
-                side = snapshot.get(side_key) or {}
-                ask = side.get("ask")
-                if ask is None or not 0.01 <= float(ask) <= 0.99:
+
+                # Two-sided value evaluation: evaluate both sides against executable asks
+                candidates = []
+                for side_sel, side_prob, side_key in (
+                    ("away", p_away, away_side_key),
+                    ("home", p_home, home_side_key),
+                ):
+                    side = snapshot.get(side_key) or {}
+                    ask_val = side.get("ask")
+                    if ask_val is None or not (0.01 <= float(ask_val) <= 0.99):
+                        continue
+                    ask_float = float(ask_val)
+                    edge = side_prob - ask_float
+                    # Guardrails: positive edge (>=0.015), win prob floor (0.25), market ask ceiling (0.78 to prevent chalk trap)
+                    if edge >= 0.015 and side_prob >= 0.25 and ask_float <= 0.78:
+                        candidates.append(
+                            {
+                                "selection": side_sel,
+                                "prob": side_prob,
+                                "ask": ask_float,
+                                "edge": edge,
+                            }
+                        )
+
+                # Fallback: if no candidate clears strict guardrails, select highest relative edge candidate
+                if not candidates:
+                    for side_sel, side_prob, side_key in (
+                        ("away", p_away, away_side_key),
+                        ("home", p_home, home_side_key),
+                    ):
+                        side = snapshot.get(side_key) or {}
+                        ask_val = side.get("ask")
+                        if ask_val is not None and 0.01 <= float(ask_val) <= 0.99:
+                            candidates.append(
+                                {
+                                    "selection": side_sel,
+                                    "prob": side_prob,
+                                    "ask": float(ask_val),
+                                    "edge": side_prob - float(ask_val),
+                                }
+                            )
+
+                if not candidates:
                     continue
-                prob = p_away if selection == "away" else p_home
+
+                best = max(candidates, key=lambda c: (c["edge"], c["prob"]))
+                selection = best["selection"]
+                prob = best["prob"]
+                ask = best["ask"]
+
                 seen_contract_keys.add(contract_key)
                 priced.append(
                     {
@@ -426,7 +469,7 @@ def build_tennis_slate(
                         "feature_basis": prediction.feature_basis,
                         "inference_inputs": prediction.inference_inputs,
                         "model_inputs_observed_at_utc": observed_at.isoformat(),
-                        "rationale": prediction.rationale,
+                        "rationale": f"{prediction.rationale} Value pick: {selection} (edge={round(prob - ask, 4):+.4f}).",
                         "market_slug": slug,
                         "executable_ask": float(ask),
                         "observed_at_utc": snapshot["observed_at_utc"],

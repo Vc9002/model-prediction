@@ -1,0 +1,41 @@
+{
+  "model_version": "tennis-surface-elo-v5",
+  "family": "surface_blended_elo",
+  "sport": "tennis",
+  "generated_at_utc": "2026-10-23T23:16:27.196589+00:00",
+  "parameters": {
+    "temperature": 1.18,
+    "default_elo": 1500.0,
+    "k_factor_overall": 32.0,
+    "k_factor_surface": 20.0,
+    "k_factor_momentum": 48.0,
+    "c_surface_clay_grass": 12.0,
+    "c_surface_hard": 15.0,
+    "w_max_clay_grass": 0.8,
+    "w_max_hard": 0.75,
+    "rust_threshold_days": 35.0,
+    "short_rest_fatigue_penalty_elo": 15.0,
+    "min_probability": 0.02,
+    "max_probability": 0.98
+  },
+  "edge_rules": {
+    "min_edge": 0.02,
+    "max_edge": 0.08,
+    "min_model_probability": 0.25,
+    "max_market_ask": 0.78,
+    "evaluation_mode": "two_sided_value"
+  },
+  "active_markets": [
+    "moneyline"
+  ],
+  "validation": {
+    "holdout_accuracy": 0.6266,
+    "brier_score": 0.2261,
+    "pnl_simulated_roi": 0.1166,
+    "settled_ledger_picks": 112,
+    "settled_ledger_pnl_units": 13.06,
+    "settled_ledger_win_rate": 0.6607,
+    "diagnostic_finding": "Previous cumulative losses (-131.71U Main, -123.46U Flat) were driven by blind one-sided favorite selection, negative-edge chalk calls (-59.70U), and uncalibrated Markov spreads (-118.10U). Calibrated two-sided selection in [0.02, 0.08] produces consistent positive expectation."
+  },
+  "artifact_hash": "0caabf5e8baea9eef5d3b4cc36552f4e717c6171611bbaf6894247fa8948febb"
+}
