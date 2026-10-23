@@ -1,15 +1,15 @@
 {
-  "baseline_brier": 0.18674,
-  "calibrated_at_utc": "2026-10-18T16:11:22.730687+00:00",
-  "calibrated_oof_brier": 0.19331204209710157,
+  "baseline_brier": 0.188161,
+  "calibrated_at_utc": "2026-10-21T17:03:13.148989+00:00",
+  "calibrated_oof_brier": 0.19619061409836505,
   "champion_method": "beta",
   "market": "moneyline",
   "model_version": "wnba-elo-trend-lr-v4",
   "parameters": {
-    "a": 2.0415,
-    "b": 3.1731,
-    "c": -1.493
+    "a": 1.9672,
+    "b": 3.263,
+    "c": -1.6462
   },
-  "sample_size": 118,
+  "sample_size": 119,
   "sport": "wnba"
 }

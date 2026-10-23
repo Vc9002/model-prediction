@@ -1,0 +1,11 @@
+{
+  "baseline_brier": 0.247824,
+  "calibrated_at_utc": "2026-10-23T16:42:30.311145+00:00",
+  "calibrated_oof_brier": 0.24782390622994652,
+  "champion_method": "identity",
+  "market": "nrfi",
+  "model_version": "mlb-nrfi-v2",
+  "parameters": {},
+  "sample_size": 374,
+  "sport": "mlb"
+}

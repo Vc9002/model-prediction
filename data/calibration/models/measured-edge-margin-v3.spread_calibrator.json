@@ -1,0 +1,39 @@
+{
+  "baseline_brier": 0.246247,
+  "calibrated_at_utc": "2026-10-23T16:42:30.311145+00:00",
+  "calibrated_oof_brier": 0.25452848464868866,
+  "champion_method": "isotonic",
+  "market": "spread",
+  "model_version": "measured-edge-margin-v3",
+  "parameters": {
+    "max_val": 0.6667,
+    "min_val": 0.4286,
+    "num_thresholds": 10,
+    "thresholds": [
+      0.541225,
+      0.54579,
+      0.546403,
+      0.589911,
+      0.603402,
+      0.624526,
+      0.645922,
+      0.667795,
+      0.673348,
+      0.705306
+    ],
+    "values": [
+      0.428571,
+      0.5,
+      0.5,
+      0.55,
+      0.578947,
+      0.581081,
+      0.6,
+      0.6,
+      0.666667,
+      0.666667
+    ]
+  },
+  "sample_size": 584,
+  "sport": "mlb"
+}
