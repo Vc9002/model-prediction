@@ -1,10 +1,8 @@
 {
-  "calibration_drift": 1.7223,
-  "last_checked_utc": "2026-10-23T20:39:36.617297+00:00",
+  "calibration_drift": 14.5525,
+  "last_checked_utc": "2026-10-23T22:30:21.059219+00:00",
   "models_count": 58,
   "moderate_drift_models": [
-    "mlb:moneyline:mlb-elo-trend-lr-v8",
-    "cs2:moneyline:cs2-tiered-elo-v6",
     "soccer:moneyline:soccer-poisson-dc-v1",
     "tennis:moneyline:tennis-surface-elo-v4"
   ],
@@ -22,6 +20,7 @@
     "tennis:moneyline:tennis-surface-elo-v1",
     "mlb:spread:measured-edge-margin-v3",
     "mlb:total:measured-edge-totals-v3",
+    "mlb:moneyline:mlb-elo-trend-lr-v8",
     "cs2:moneyline:cs2-tiered-elo-v6",
     "ncaaf:total:cfb-total-v1",
     "ncaaf:spread:cfb-spread-v1",
