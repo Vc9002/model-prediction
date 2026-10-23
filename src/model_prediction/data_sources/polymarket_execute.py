@@ -34,6 +34,7 @@ import math
 import os
 import re
 import time
+import unicodedata
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
@@ -65,9 +66,32 @@ _MARKET_SLUG_LEGACY_RE = re.compile(r"\(([a-z0-9\-]+)\)\.?\s*$")
 _LIVE_QUOTE_MAXIMUM_AGE_SECONDS = 300
 
 
+# Mirror of dashboard/backtests.py _TEAM_NAME_ALIASES: ESPN-style names that
+# share no word with Polymarket US's name for the same team. Keep in sync.
+_TEAM_NAME_ALIASES = {
+    "app state mountaineers": "appalachian state",
+    "app state": "appalachian state",
+    "central connecticut blue devils": "central connecticut state",
+    "central connecticut": "central connecticut state",
+    "grambling tigers": "grambling state",
+    "long island university sharks": "liu",
+    "long island university": "liu",
+    "massachusetts minutemen": "umass",
+    "massachusetts": "umass",
+    "miami hurricanes": "miami fl",
+    "se louisiana lions": "southeastern louisiana",
+    "san jose state spartans": "san jose state",
+    "san jos� state spartans": "san jose state",
+    "ul monroe warhawks": "louisiana monroe",
+    "ul monroe": "louisiana monroe",
+}
+
+
 def _normalize_name_tokens(name: str) -> str:
-    cleaned = re.sub(r"[(),.\-_]", " ", name)
-    return " ".join(cleaned.casefold().split())
+    folded = "".join(ch for ch in unicodedata.normalize("NFKD", name) if not unicodedata.combining(ch))
+    cleaned = re.sub(r"[(),.\-_]", " ", folded)
+    normalized = " ".join(cleaned.casefold().split())
+    return _TEAM_NAME_ALIASES.get(normalized, normalized)
 
 
 def _team_name_matches(team_name: str, side_description: str) -> bool:

@@ -1020,6 +1020,14 @@ def _action_command(name: str, payload: dict) -> list[str]:
                 continue
             quote = _pick_quote(row) or {}
             sport = str(row.get("league") or "").strip().lower()
+            # The CLI's contract sports are storage buckets, not leagues: every
+            # esports title lives under "esports" and CFB under "ncaaf".
+            # Passing "cs2" made polymarket-ledger-prices abort the whole
+            # refresh ("unsupported contract sport: cs2") for any open esports pick.
+            if sport in ("cs2", "lol", "dota2", "valorant", "rainbow_six", "r6", "cod", "ow", "rl"):
+                sport = "esports"
+            elif sport == "cfb":
+                sport = "ncaaf"
             slug = str(quote.get("market_slug") or "").strip()
             try:
                 game_day = (

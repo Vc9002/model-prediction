@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
@@ -160,9 +161,37 @@ _RE_NAME_PUNCT = re.compile(r"[(),.\-_]")
 _RE_VS_SPLIT = re.compile(r"\s+(?:vs\.?|@)\s+", re.IGNORECASE)
 
 
+# ESPN-style full names -> Polymarket US names (normalized). The loose
+# containment match below cannot bridge these (no shared word), which left
+# every game involving them with no executable quote ("no exact executable
+# Polymarket US market mapping"). Found 2026-10-23 on NCAAF spreads: 35 of 273
+# games failed to match. Keys/values are post-normalization; a copy lives in
+# polymarket_execute.py (the dashboard deliberately imports nothing from it).
+_TEAM_NAME_ALIASES = {
+    "app state mountaineers": "appalachian state",
+    "app state": "appalachian state",
+    "central connecticut blue devils": "central connecticut state",
+    "central connecticut": "central connecticut state",
+    "grambling tigers": "grambling state",
+    "long island university sharks": "liu",
+    "long island university": "liu",
+    "massachusetts minutemen": "umass",
+    "massachusetts": "umass",
+    "miami hurricanes": "miami fl",
+    "se louisiana lions": "southeastern louisiana",
+    "san jose state spartans": "san jose state",
+    "san jos� state spartans": "san jose state",
+    "ul monroe warhawks": "louisiana monroe",
+    "ul monroe": "louisiana monroe",
+}
+
+
 @lru_cache(maxsize=4096)
 def _normalize_name_tokens(name: str) -> str:
-    return " ".join(_RE_NAME_PUNCT.sub(" ", name).casefold().split())
+    folded = unicodedata.normalize("NFKD", name)
+    folded = "".join(ch for ch in folded if not unicodedata.combining(ch))
+    normalized = " ".join(_RE_NAME_PUNCT.sub(" ", folded).casefold().split())
+    return _TEAM_NAME_ALIASES.get(normalized, normalized)
 
 
 def _team_matches(team_name: str, side_description: str) -> bool:

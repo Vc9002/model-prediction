@@ -70,7 +70,6 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     "nfl-elo-trend-lr-v4",
     "nfl-spread-structural-v5",
     "nfl-total-structural-v5",
-    "tennis-surface-elo-v4",
     "nba-elo-trend-lr-v4",
     "nba-spread-margin-v2",
     "nba-total-margin-v2",
@@ -1258,7 +1257,17 @@ class AutoPolymarketBuyer:
                 try:
                     from model_prediction.data_sources.polymarket_us import PolymarketUSClient
 
-                    live_snap = PolymarketUSClient().snapshot(str(quote["market_slug"]))
+                    # The gateway throttles bursts (the client already backs off
+                    # inside one call); a stale pick that exhausts those retries
+                    # was silently rejected. Give it one more attempt after a
+                    # longer pause before treating the quote as unrefreshable.
+                    try:
+                        live_snap = PolymarketUSClient().snapshot(str(quote["market_slug"]))
+                    except httpx.HTTPStatusError as throttled:
+                        if throttled.response.status_code != 429:
+                            raise
+                        time.sleep(10)
+                        live_snap = PolymarketUSClient().snapshot(str(quote["market_slug"]))
                     side = str(quote.get("side") or "long").lower()
                     side_data = live_snap.get(side) or {}
                     fresh_ask = side_data.get("ask") or side_data.get("price")
@@ -1279,8 +1288,15 @@ class AutoPolymarketBuyer:
                     TypeError,
                     RuntimeError,
                     ExecutionGateError,
-                ):
-                    pass
+                ) as refresh_error:
+                    # Was a bare `pass`: a failed live refresh just showed up
+                    # as an unexplained "stale quote" rejection.
+                    logger.warning(
+                        "live quote refresh failed for %s (%s): %s",
+                        quote.get("market_slug"),
+                        pick_id,
+                        refresh_error,
+                    )
 
             if not quote.get("fresh", False) and age_sec > 300:
                 result.rejected_stale_quote += 1
