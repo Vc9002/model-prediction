@@ -241,3 +241,41 @@ def test_dashboard_and_ledger_sport_lists_cannot_drift(monkeypatch) -> None:
     from model_prediction.dashboard.common import _MAIN_LEDGER_SPORTS
 
     assert tuple(_MAIN_LEDGER_SPORTS) == MAIN_LEDGER_SPORTS
+
+
+def test_flat_and_main_ledgers_eliminate_shadow_downgrades_and_ensure_real_calls(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("MODEL_PREDICTION_LEDGER_MIRROR", "0")
+    from model_prediction.ledger import RecordType
+
+    # Flat ledger: everything is called flat (1.0U) with QUALIFIED_SHADOW_CALL, visible in reporting
+    flat_ledger = MultiSportPickLedger(tmp_path, flat=True)
+    obs_eligibility = EligibilityResult(
+        RecordType.RESEARCH_OBSERVATION,
+        "NO_CALL",
+        "NO_CALL_LOW_EDGE",
+        0.0,
+        45,
+        0.005,
+        0.52,
+        AWAY,
+        HOME,
+    )
+    flat_row = flat_ledger.append_evaluated(
+        _request("event-flat-cov"), obs_eligibility, now=datetime.now(UTC)
+    )
+    assert flat_row["record_type"] == "QUALIFIED_SHADOW_CALL"
+    assert flat_row["decision"] == "CALL"
+    assert float(flat_row["units"]) == 1.0
+
+    # Main ledger: gated qualified calls remain QUALIFIED_SHADOW_CALL with CALL decision
+    main_ledger = MultiSportPickLedger(tmp_path, flat=False)
+    qual_eligibility = _qualified_call()
+    main_row = main_ledger.append_evaluated(
+        _request("event-main-gated"), qual_eligibility, now=datetime.now(UTC)
+    )
+    assert main_row["record_type"] == "QUALIFIED_SHADOW_CALL"
+    assert main_row["decision"] == "CALL"
+    assert main_row["reason_code"] == "QUALIFIED"
+    assert float(main_row["units"]) > 0.0
