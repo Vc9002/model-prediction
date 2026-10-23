@@ -24,7 +24,7 @@ from .domain import parse_utc
 from .features.base import FeatureStore
 from .models.soccer import UpcomingMatch, soccer_model
 
-_PARTIAL_MARKERS = ("-fh-", "-h1-", "-h2-", "-1h-", "-2h-")
+_PARTIAL_MARKERS = ("-fh-", "-sh-", "-h1-", "-h2-", "-1h-", "-2h-")
 # Corporate-suffix words only -- never a word that legitimately distinguishes
 # two real clubs. "city"/"united" were removed 2026-07-31: stripping them
 # collapsed same-city derby pairs onto the same "distinctive" token (e.g.
@@ -894,63 +894,99 @@ def build_soccer_total_slate(
             }
         )
 
+    spreads_by_event: dict[str, dict[float, Any]] = {}
     for prediction in spreads:
-        start = parse_utc(prediction.event_start_utc)
+        spreads_by_event.setdefault(prediction.event_id, {})[float(prediction.line)] = prediction
+    for by_line in spreads_by_event.values():
+        sample = next(iter(by_line.values()))
+        min_g = float((sample.feature_basis or {}).get("min_team_games") or 0.0)
+        if min_g < min_team_games:
+            unmatched.append(
+                {
+                    "event_id": sample.event_id,
+                    "reason": f"insufficient_history: min_team_games {min_g:.0f} < {min_team_games}",
+                }
+            )
+            continue
+        start = parse_utc(sample.event_start_utc)
         candidates = []
         for snapshot in spread_snapshots:
             try:
                 snapshot_start = parse_utc(str(snapshot["event_start_utc"]))
                 snapshot_at = parse_utc(str(snapshot["observed_at_utc"]))
-                snap_line = float(snapshot.get("line") or 0.0)
+                snap_line = float(snapshot["line"])
             except (KeyError, TypeError, ValueError):
                 continue
             if (
                 abs((snapshot_start - start).total_seconds()) <= 30 * 60
                 and snapshot_at < start
-                and abs(snap_line - float(prediction.line or 0.0)) < 1e-4
-                and _team_matches_title(
-                    prediction.away_team,
-                    str(snapshot.get("event_title", "")),
-                )
-                and _team_matches_title(
-                    prediction.home_team,
-                    str(snapshot.get("event_title", "")),
-                )
+                and _team_matches_title(sample.away_team, str(snapshot.get("event_title", "")))
+                and _team_matches_title(sample.home_team, str(snapshot.get("event_title", "")))
+                and any(abs(snap_line - line) < 1e-4 or abs(snap_line + line) < 1e-4 for line in by_line)
             ):
                 candidates.append(snapshot)
-        if len(candidates) != 1:
+        if not candidates:
             continue
-        snapshot = candidates[0]
-        selection = max(("home", "away"), key=lambda side: prediction.probabilities[side])
-        side_key = "long" if selection == "home" else "short"
-        side = snapshot.get(side_key) or {}
-        ask = side.get("ask")
-        if ask is None or not 0 < float(ask) < 1:
+
+        def _imbalance(snapshot: dict[str, Any]) -> float:
+            asks = [float((snapshot.get(k) or {}).get("ask") or 0.0) for k in ("long", "short")]
+            return max((abs(a - 0.5) for a in asks if 0 < a < 1), default=1.0)
+
+        # Main line only: alternate handicaps repeat one opinion.
+        snapshot = min(candidates, key=_imbalance)
+        snap_line = float(snapshot["line"])
+        anchor = str(snapshot.get("team") or "")
+        anchor_is_home = _team_matches_title(sample.home_team, anchor)
+        anchor_is_away = _team_matches_title(sample.away_team, anchor)
+        if anchor_is_home == anchor_is_away:
+            skipped.append({"event_id": sample.event_id, "reason": "spread_anchor_team_unresolved"})
             continue
+        # The market line is the anchor team's handicap and its long side backs that team at
+        # the line. Model lines are home handicaps; an away side at L covers when home fails at -L.
+        home_line = snap_line if anchor_is_home else -snap_line
+        pred = by_line.get(home_line)
+        if pred is None:
+            continue
+        home_cover = pred.probabilities["home"]
+        long_prob = home_cover if anchor_is_home else 1.0 - home_cover
+        quotes = []
+        for side_key, prob, ask_key in (
+            ("long", long_prob, "long"),
+            ("short", 1.0 - long_prob, "short"),
+        ):
+            ask = (snapshot.get(ask_key) or {}).get("ask")
+            if ask is None or not 0 < float(ask) < 1:
+                continue
+            backs_anchor = side_key == "long"
+            selects_home = backs_anchor == anchor_is_home
+            side_line = snap_line if backs_anchor else -snap_line
+            quotes.append(
+                (prob - float(ask), prob, float(ask), "home" if selects_home else "away", side_line)
+            )
+        if not quotes:
+            continue
+        edge, prob, ask, selection, side_line = max(quotes, key=lambda q: (q[0], q[1]))
         priced.append(
             {
-                "event_id": prediction.event_id,
-                "event_start_utc": prediction.event_start_utc,
-                "away_team": prediction.away_team,
-                "home_team": prediction.home_team,
+                "event_id": pred.event_id,
+                "event_start_utc": pred.event_start_utc,
+                "away_team": pred.away_team,
+                "home_team": pred.home_team,
                 "market_type": "spread",
                 "selection": selection,
-                "line": prediction.line,
-                "model_probability": prediction.probabilities[selection],
-                "model_uncertainty": prediction.uncertainty,
-                "model_version": prediction.model_version,
-                "feature_basis": prediction.feature_basis,
-                "inference_inputs": prediction.inference_inputs,
+                "line": side_line,
+                "model_probability": prob,
+                "model_uncertainty": pred.uncertainty,
+                "model_version": pred.model_version,
+                "feature_basis": pred.feature_basis,
+                "inference_inputs": pred.inference_inputs,
                 "model_inputs_observed_at_utc": observed_at.isoformat(),
-                "rationale": prediction.rationale,
+                "rationale": f"Dixon-Coles handicap {selection} {side_line:+.1f}: cover p={prob:.3f}.",
                 "market_slug": snapshot["market_slug"],
-                "executable_ask": float(ask),
+                "executable_ask": ask,
                 "observed_at_utc": snapshot["observed_at_utc"],
                 "timestamp_valid": True,
-                "edge_vs_executable_ask": round(
-                    prediction.probabilities[selection] - float(ask),
-                    6,
-                ),
+                "edge_vs_executable_ask": round(edge, 6),
             }
         )
 

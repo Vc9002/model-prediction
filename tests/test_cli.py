@@ -435,7 +435,7 @@ def _mlb_totals_candidate(market_type: MarketType, selection: str, line: float |
 
 
 def test_mlb_totals_flat_keeps_total_and_spread_but_not_moneyline_and_never_touches_main_ledger(
-    monkeypatch, registry, ban_list
+    monkeypatch, registry, ban_list, tmp_path
 ) -> None:
     monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 7, 27, 20, tzinfo=UTC))
     monkeypatch.setattr(cli_forecast, "load_formula_spec", lambda path: object())
@@ -447,9 +447,13 @@ def test_mlb_totals_flat_keeps_total_and_spread_but_not_moneyline_and_never_touc
         _mlb_totals_candidate(MarketType.TOTAL, "over", 8.5),
     ]
     monkeypatch.setattr(cli_forecast, "build_mlb_slate", lambda *args, **kwargs: (candidates, [], 1))
+    monkeypatch.setattr(
+        "model_prediction.mlb_champion_forward.champion_candidates",
+        lambda candidates, *args: (candidates, []),
+    )
 
     flat_ledger = _CaptureLedger()
-    config = {"project": {}, "bankroll": {}}
+    config = {"project": {"ledger_path": str(tmp_path / "picks.xlsx")}, "bankroll": {}}
 
     result = cli._forecast_mlb_totals_flat("2026-07-27", True, config, registry, ban_list, flat_ledger, None)
 
@@ -515,6 +519,10 @@ def test_mlb_totals_flat_policy_uses_same_measured_edge_artifact_and_fails_close
         market_snapshot_hash=snapshot_hash,
     )
     monkeypatch.setattr(cli_forecast, "build_mlb_slate", lambda *args, **kwargs: ([candidate], [], 1))
+    monkeypatch.setattr(
+        "model_prediction.mlb_champion_forward.champion_candidates",
+        lambda candidates, *args: (candidates, []),
+    )
     runtime_paths = RuntimePaths(repo_root=PROJECT_ROOT, runtime_root=tmp_path / "runtime")
     config_hash = canonical_config_logical_hash(config_path().read_bytes())
     policy_raw = {
@@ -558,7 +566,7 @@ def test_mlb_totals_flat_policy_uses_same_measured_edge_artifact_and_fails_close
             }
         )
     )
-    config = {"project": {}, "bankroll": {}}
+    config = {"project": {"ledger_path": str(tmp_path / "picks.xlsx")}, "bankroll": {}}
 
     incumbent_ledger = _CaptureLedger()
     cli_forecast._forecast_mlb_totals_flat(
@@ -645,7 +653,7 @@ def test_flat_forecast_parser_exposes_explicit_blend_opt_in_paths() -> None:
 
 
 def test_mlb_totals_main_ledger_duplicate_is_tracked_not_silently_dropped(
-    monkeypatch, registry, ban_list
+    monkeypatch, registry, ban_list, tmp_path
 ) -> None:
     """DD-2 (deep debug audit, 2026-08-04): main_ledger's secondary write
     used to be a bare `with suppress(DuplicatePickError):` -- a genuine
@@ -656,10 +664,14 @@ def test_mlb_totals_main_ledger_duplicate_is_tracked_not_silently_dropped(
 
     candidates = [_mlb_totals_candidate(MarketType.TOTAL, "over", 8.5)]
     monkeypatch.setattr(cli_forecast, "build_mlb_slate", lambda *args, **kwargs: (candidates, [], 1))
+    monkeypatch.setattr(
+        "model_prediction.mlb_champion_forward.champion_candidates",
+        lambda candidates, *args: (candidates, []),
+    )
 
     flat_ledger = _CaptureLedger()
     main_ledger = _DuplicateLedger("main-existing-1")
-    config = {"project": {}, "bankroll": {}}
+    config = {"project": {"ledger_path": str(tmp_path / "picks.xlsx")}, "bankroll": {}}
 
     result = cli._forecast_mlb_totals_flat(
         "2026-07-27", True, config, registry, ban_list, flat_ledger, None, main_ledger=main_ledger
@@ -965,7 +977,21 @@ def test_daily_forecast_roster_includes_soccer_and_both_international_baseball_l
     assert "soccer" not in cli.DAILY_LEARNED_SPORTS
     assert "soccer" in cli.SPORTS
     assert set(cli.DAILY_INTERNATIONAL_BASEBALL_SPORTS) == {"kbo", "npb"}
-    assert set(cli.FLAT_LEDGER_SPORTS) == {"mlb", "nba", "wnba", "nfl", "soccer", "tennis", "ncaaf"}
+    assert set(cli.FLAT_LEDGER_SPORTS) == {
+        "mlb",
+        "nba",
+        "wnba",
+        "nfl",
+        "soccer",
+        "tennis",
+        "ncaaf",
+        "hockey",
+        "darts",
+        "ncaab",
+        "euroleague",
+        "nbl",
+    }
+    assert set(cli.DAILY_ADDITIONAL_SPORTS) == {"hockey", "darts", "ncaab", "euroleague", "nbl"}
     assert set(cli.RESEARCH_ONLY_DAILY_SPORTS) == {
         "soccer",
         "tennis",
@@ -1608,6 +1634,8 @@ def test_learned_sport_gated_ledger_duplicate_is_tracked_not_silently_dropped(mo
         feature_snapshot_hash="feature-hash-nba-1",
     )
     monkeypatch.setattr(cli_forecast, "utc_now", lambda: observed)
+    monkeypatch.setattr(cli_forecast, "_canonical_market_snapshot_lineage", lambda *args: {})
+    monkeypatch.setattr(cli_forecast, "_is_registered_serving_model", lambda *args: True)
     monkeypatch.setattr(cli_forecast, "build_learned_moneyline_slate", lambda **kwargs: ([candidate], [], 1))
     monkeypatch.setattr(
         cli_forecast,
@@ -1646,7 +1674,7 @@ def test_learned_sport_gated_ledger_duplicate_is_tracked_not_silently_dropped(mo
     gated_ledger = _DuplicateLedger("gated-existing-learned-1")
     config = {
         "models": {
-            "NBA": {
+            "NCAAB": {
                 "production_artifact": str(tmp_path / "artifact.json"),
                 "status": "shadow_qualified",
                 "min_edge": 0.02,
@@ -1661,7 +1689,7 @@ def test_learned_sport_gated_ledger_duplicate_is_tracked_not_silently_dropped(mo
     }
 
     result = cli._forecast_learned_sport(
-        "nba",
+        "ncaab",
         "2026-07-26",
         True,
         config,

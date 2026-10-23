@@ -21,11 +21,18 @@ def code_hashes() -> dict[str, str]:
     root = Path(__file__).parent
     return {
         name: hashlib.sha256((root / name).read_bytes()).hexdigest()
-        for name in ("esports.py", "features/elo_ratings.py")
+        for name in ("esports.py", "esports_context.py", "features/elo_ratings.py")
     }
 
 
-def capture_inputs(book: Any, team_ids: list[str], reference_date: datetime) -> dict[str, Any]:
+def capture_inputs(
+    book: Any,
+    team_ids: list[str],
+    reference_date: datetime,
+    *,
+    series_context: dict[str, Any] | None = None,
+    team_resolution_methods: list[str] | None = None,
+) -> dict[str, Any]:
     if len(team_ids) != 2 or team_ids[0] == team_ids[1]:
         raise ValueError("invalid_esports_replay_teams")
     state = asdict(book)
@@ -36,6 +43,9 @@ def capture_inputs(book: Any, team_ids: list[str], reference_date: datetime) -> 
     return json.loads(
         json.dumps(
             {
+                "serving_math": "v6-book-unscaled-v1",
+                "series_context": series_context,
+                "team_resolution_methods": team_resolution_methods,
                 "book_state": state,
                 "team_ids": team_ids,
                 "reference_date": reference_date.isoformat(),
@@ -51,9 +61,21 @@ def replay_inputs(inputs: dict[str, Any]) -> dict[str, float]:
 
     if inputs["code_sha256"] != code_hashes():
         raise ValueError("esports_replay_code_mismatch")
+    if inputs.get("serving_math", "v6-book-unscaled-v1") != "v6-book-unscaled-v1":
+        raise ValueError("esports_replay_serving_math_mismatch")
     ids = inputs["team_ids"]
     if len(ids) != 2 or ids[0] == ids[1]:
         raise ValueError("esports_replay_team_mismatch")
+    context = inputs.get("series_context") or {}
+    if context.get("status") == "matched" and (
+        context.get("source_team_ids") != sorted(ids)
+        or context.get("best_of") not in {1, 3, 5}
+        or len(inputs.get("team_resolution_methods") or []) != 2
+        or any(method not in {"exact", "manual"} for method in inputs["team_resolution_methods"])
+        or parse_utc(context["provenance"]["observed_at_utc"]) > parse_utc(inputs["reference_date"])
+        or parse_utc(context["event_start_utc"]) <= parse_utc(inputs["reference_date"])
+    ):
+        raise ValueError("esports_replay_context_mismatch")
     book = NeutralElo(**inputs["book_state"])
     p = book.probability(ids[0], ids[1], parse_utc(inputs["reference_date"]))
     if not math.isfinite(p) or not 0 <= p <= 1:
@@ -68,6 +90,11 @@ def build_snapshot(contract: dict[str, Any]) -> dict[str, Any]:
     if inputs["team_ids"] != contract["source_team_ids"]:
         raise ValueError("esports_replay_source_identity_mismatch")
     probabilities = replay_inputs(inputs)
+    context = inputs.get("series_context") or {}
+    if context.get("status") == "matched" and parse_utc(context["event_start_utc"]) != parse_utc(
+        contract["event_start_utc"]
+    ):
+        raise ValueError("esports_replay_context_event_mismatch")
     names = contract["teams"]
     if len(names) != 2 or identity_key(names[0]) == identity_key(names[1]):
         raise ValueError("esports_replay_ambiguous_names")
@@ -92,6 +119,8 @@ def build_snapshot(contract: dict[str, Any]) -> dict[str, Any]:
         "home_team": names[0],
         "away_team": names[1],
         "inference_inputs": inputs,
+        "series_format": contract.get("best_of"),
+        "series_format_source": contract.get("series_format_source"),
         "probabilities": probabilities,
         "features": {
             "home_elo": book["ratings"].get(ids[0], 1500.0),

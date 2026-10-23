@@ -20,8 +20,11 @@ from .base import GamePrediction, GamePredictionBase
 DARTS_MODEL_VERSION = "darts-markov-v1"
 # Baseline throw advantage in log-odds: a player holds throw ~62.2% of the time against an equal opponent
 DEFAULT_THROW_ADVANTAGE_LOGIT = 0.50
-# Scale factor converting Elo rating differences into logit probability shifts
-ELO_SCALE_LOGIT = 1.0 / 173.7178  # ln(10) / 400
+# Scale factor converting Elo rating differences into logit probability shifts.
+# The textbook ln(10)/400 is ~3.3x too steep for darts leg odds: on 2,251 PDC
+# matches (2024-2026, Wikipedia brackets) a walk-forward fit tuned on the middle
+# 40% scored holdout log-loss 0.642 at 0.3x versus 0.751 at 1.0x (coin flip 0.693).
+ELO_SCALE_LOGIT = 0.3 / 173.7178
 
 
 def _logistic(x: float) -> float:

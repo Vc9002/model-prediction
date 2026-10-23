@@ -8,6 +8,19 @@ for Best-of-3 and Best-of-5 tennis matches.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
+
+# Fitted on completed singles matches (ATP 2021-2026 via TennisMyLife; WTA 2024-2026
+# via ESPN linescores) with the pre-match Elo probability fixed as the match-win
+# target; fit on the early period, validated on the later one (ATP: predicted mean
+# total 23.9 vs 24.0 actual out of sample, WTA 22.6 vs 22.1). ``base`` is the
+# effective serve-point level (below raw serve-point-won rates because iid points
+# overstate game counts) and ``FORM_SIGMA`` the per-match serve-level spread that
+# produces realistic blowout/tight-match mixes.
+TENNIS_GAMES_VERSION = "tennis-games-markov-v1"
+TENNIS_BASE_SERVE = {"ATP": 0.62, "WTA": 0.58}
+TENNIS_FORM_SIGMA = 0.08
+_GAUSS_HERMITE_3 = ((-1.2247, 1.0 / 6.0), (0.0, 2.0 / 3.0), (1.2247, 1.0 / 6.0))
 
 
 def hold_game_probability(p: float) -> float:
@@ -85,9 +98,26 @@ def set_score_distribution(pa_hold: float, pb_hold: float, p_tb_a: float) -> dic
 
 
 def match_state_distribution(
-    pa_point: float, pb_point: float, best_of: int = 3
+    pa_point: float, pb_point: float, best_of: int = 3, form_sigma: float = 0.0
 ) -> dict[tuple[int, int, int, int], float]:
-    """Computes distribution over match states (sets_a, sets_b, total_games_a, total_games_b)."""
+    """Computes distribution over match states (sets_a, sets_b, total_games_a, total_games_b).
+
+    ``form_sigma`` > 0 mixes the distribution over independent per-player serve-level
+    shifts (3-point Gauss-Hermite), which fattens the blowout and tight-match tails
+    that a fixed-point-probability Markov chain understates.
+    """
+    if form_sigma > 0:
+        mixed: dict[tuple[int, int, int, int], float] = {}
+        for z_a, w_a in _GAUSS_HERMITE_3:
+            for z_b, w_b in _GAUSS_HERMITE_3:
+                shifted = match_state_distribution(
+                    min(0.9, max(0.4, pa_point + form_sigma * z_a)),
+                    min(0.9, max(0.4, pb_point + form_sigma * z_b)),
+                    best_of,
+                )
+                for key, probability in shifted.items():
+                    mixed[key] = mixed.get(key, 0.0) + probability * w_a * w_b
+        return mixed
     pa_hold = hold_game_probability(pa_point)
     pb_hold = hold_game_probability(pb_point)
     p_tb_a = tiebreak_probability(pa_point, pb_point)
@@ -116,6 +146,34 @@ def match_state_distribution(
         finished_states[(sa, sb, ga, gb)] = finished_states.get((sa, sb, ga, gb), 0.0) + m_prob
 
     return finished_states
+
+
+@lru_cache(maxsize=4096)
+def _serve_shift(p_win_milli: int, base: float, best_of: int, form_sigma: float) -> float:
+    target = p_win_milli / 1000.0
+    low, high = -0.2, 0.2
+    for _ in range(16):
+        mid = (low + high) / 2.0
+        states = match_state_distribution(base + mid, base - mid, best_of, form_sigma)
+        if sum(p for (sa, sb, _, _), p in states.items() if sa > sb) < target:
+            low = mid
+        else:
+            high = mid
+    return (low + high) / 2.0
+
+
+def serve_pair_for_win_probability(
+    p_win: float, tour: str, best_of: int = 3, form_sigma: float = TENNIS_FORM_SIGMA
+) -> tuple[float, float]:
+    """Serve-point probabilities (a, b) whose Markov match-win probability for A is ``p_win``.
+
+    Ties the game spread/total distributions to the model's own moneyline
+    probability instead of an unrelated Elo-to-serve shift.
+    """
+    base = TENNIS_BASE_SERVE.get(tour.upper(), TENNIS_BASE_SERVE["ATP"])
+    target = min(0.995, max(0.005, p_win))
+    shift = _serve_shift(round(target * 1000), base, best_of, form_sigma)
+    return base + shift, base - shift
 
 
 def match_game_distribution(
@@ -148,9 +206,10 @@ def price_tennis_derivatives(
     spread_line: float | None = None,
     total_line: float | None = None,
     best_of: int = 3,
+    form_sigma: float = 0.0,
 ) -> TennisDerivativePricing:
     """Prices moneyline, game spread, and total games using exact Markov distribution."""
-    states = match_state_distribution(p_serve_a, p_serve_b, best_of=best_of)
+    states = match_state_distribution(p_serve_a, p_serve_b, best_of=best_of, form_sigma=form_sigma)
 
     p_win_a = sum(p for (sa, sb, ga, gb), p in states.items() if sa > sb)
     p_win_b = sum(p for (sa, sb, ga, gb), p in states.items() if sb > sa)
@@ -195,3 +254,14 @@ def price_tennis_derivatives(
         total_over=round(tot_over, 6) if tot_over is not None else None,
         total_under=round(tot_under, 6) if tot_under is not None else None,
     )
+
+
+class TennisGamesMarkovModel:
+    """Serving identity of the game spread/total lane (see ``tennis_forward``)."""
+
+    version = TENNIS_GAMES_VERSION
+    sport = "tennis"
+
+
+def tennis_games_model() -> TennisGamesMarkovModel:
+    return TennisGamesMarkovModel()

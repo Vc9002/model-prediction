@@ -165,3 +165,136 @@ def test_build_darts_slate_empty(tmp_path):
     assert slate["events_count"] == 0
     assert slate["priced_contracts"] == 0
     assert slate["priced"] == []
+
+
+def test_darts_skips_lines_without_exact_model_price(tmp_path):
+    event = {
+        "event_id": "darts-line-check",
+        "title": "Luke Humphries vs. Michael Smith",
+        "event_start_utc": "2026-10-24T18:00:00Z",
+        "markets": [
+            {
+                "market_type": "moneyline",
+                "market_slug": "moneyline",
+                "sides": [
+                    {"description": "Luke Humphries", "price_probability": 0.01},
+                    {"description": "Michael Smith", "price_probability": 0.99},
+                ],
+            },
+            {
+                "market_type": "total",
+                "market_slug": "unsupported-total",
+                "line": 100.5,
+                "sides": [
+                    {"selection": "over", "description": "Over", "price_probability": 0.01},
+                    {"selection": "under", "description": "Under", "price_probability": 0.99},
+                ],
+            },
+        ],
+    }
+
+    class Client:
+        def slate(self, league, game_date):
+            return [event]
+
+    slate = build_darts_slate(
+        data_root=tmp_path, game_date="2026-10-23", client=Client(), leagues=["DARTS_PDC"]
+    )
+    assert all(p["market_type"] != "total" for p in slate["priced"])
+
+
+def test_untrained_darts_model_is_flat_only(monkeypatch, tmp_path):
+    from datetime import UTC, datetime, timedelta
+
+    from model_prediction.cli import forecast as cli_forecast
+
+    contract = {
+        "event_id": "darts-baseline",
+        "event_start_utc": (datetime.now(UTC) + timedelta(days=1)).isoformat(),
+        "away_team": "Michael Smith",
+        "home_team": "Luke Humphries",
+        "market_type": "moneyline",
+        "selection": "home",
+        "line": None,
+        "model_probability": 0.6,
+        "executable_ask": 0.4,
+        "model_version": "darts-markov-v1",
+    }
+    monkeypatch.setattr(
+        "model_prediction.darts_forward.build_darts_slate",
+        lambda **kwargs: {"priced": [contract], "skipped": []},
+    )
+
+    class Ledger:
+        def __init__(self):
+            self.rows = []
+
+        def append_evaluated(self, request, eligibility, **kwargs):
+            self.rows.append((request, eligibility))
+
+    flat, main = Ledger(), Ledger()
+    report = cli_forecast._forecast_darts_sport(
+        data_root=tmp_path,
+        args_date="2026-10-23",
+        config={"models": {"DARTS": {}}},
+        flat_ledger=flat,
+        main_ledger=main,
+    )
+    assert report["training_status"] == "untrained_equal_rating_baseline"
+    assert report["flat_logged"] == 1
+    assert report["main_logged"] == 0
+    assert flat.rows[0][1].reason_code == "NO_CALL_UNTRAINED_MODEL"
+
+
+def _trained_darts_forecast(monkeypatch, tmp_path, darts_config):
+    from datetime import UTC, datetime, timedelta
+
+    from model_prediction.cli import forecast as cli_forecast
+
+    contract = {
+        "event_id": "darts-trained",
+        "event_start_utc": (datetime.now(UTC) + timedelta(days=1)).isoformat(),
+        "away_team": "Michael Smith",
+        "home_team": "Luke Humphries",
+        "market_type": "moneyline",
+        "selection": "home",
+        "line": None,
+        "model_probability": 0.7,
+        "executable_ask": 0.5,
+        "model_version": "darts-markov-v1",
+    }
+
+    def slate(**kwargs):
+        kwargs["model"].fit([DartsMatchRecord("m", "2026-01-01", "DARTS_PDC", "A", "B", 6, 3, "A")])
+        return {"priced": [contract], "skipped": []}
+
+    monkeypatch.setattr("model_prediction.darts_forward.build_darts_slate", slate)
+
+    class Ledger:
+        def __init__(self):
+            self.rows = []
+
+        def append_evaluated(self, request, eligibility, **kwargs):
+            self.rows.append((request, eligibility))
+
+    flat, main = Ledger(), Ledger()
+    report = cli_forecast._forecast_darts_sport(
+        data_root=tmp_path,
+        args_date="2026-10-23",
+        config={"models": {"DARTS": darts_config}},
+        flat_ledger=flat,
+        main_ledger=main,
+    )
+    return report, flat, main
+
+
+def test_trained_darts_calls_stay_flat_only_until_main_ledger_is_enabled(monkeypatch, tmp_path):
+    report, flat, main = _trained_darts_forecast(monkeypatch, tmp_path, {})
+    assert report["training_status"] == "observed_match_history"
+    assert report["flat_logged"] == 1 and report["main_logged"] == 0
+    assert flat.rows[0][1].decision == "CALL" and main.rows == []
+
+
+def test_trained_darts_calls_reach_main_ledger_only_when_enabled(monkeypatch, tmp_path):
+    report, _, main = _trained_darts_forecast(monkeypatch, tmp_path, {"main_ledger_enabled": True})
+    assert report["main_logged"] == 1 and len(main.rows) == 1

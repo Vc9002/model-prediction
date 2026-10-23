@@ -348,6 +348,14 @@ MODEL_CATALOG: dict[str, ModelDescriptor] = {
         display_name="Tennis Unified (Hierarchical Markov v2)",
         description="Tennis hierarchical Markov model unifying Moneyline, Spread, and Totals with Barnett & Clarke point-level adjustment.",
     ),
+    "tennis-games-markov-v1": ModelDescriptor(
+        model_id="tennis-games-markov-v1",
+        sport="TENNIS",
+        market="multi",
+        standard_name="tennis-multi-games-markov-v1",
+        display_name="Tennis Game Spread/Total (Markov v1)",
+        description="Game spread and total-games Markov distribution with serve levels solved to match the moneyline probability.",
+    ),
     "tennis-spread-markov-v2": ModelDescriptor(
         model_id="tennis-spread-markov-v2",
         sport="TENNIS",
@@ -616,6 +624,14 @@ MODEL_CATALOG: dict[str, ModelDescriptor] = {
         standard_name="wncaab-multi-tempo-v1",
         display_name="WNCAAB Basketball (Tempo v1)",
         description="Women's College Basketball independent pace, possession, and scoring model.",
+    ),
+    "nbl-tempo-v1": ModelDescriptor(
+        model_id="nbl-tempo-v1",
+        sport="NBL",
+        market="multi",
+        standard_name="nbl-multi-tempo-v1",
+        display_name="NBL Basketball (Tempo v1)",
+        description="Australian NBL independent pace, possession, and scoring model.",
     ),
     "eurolg-tempo-v1": ModelDescriptor(
         model_id="eurolg-tempo-v1",

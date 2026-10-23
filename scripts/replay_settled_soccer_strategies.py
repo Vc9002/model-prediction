@@ -225,7 +225,7 @@ def run_settled_replay():
     print("=" * 80)
 
     # Save to outputs/research
-    out_file = Path("E:/model-prediction/outputs/research/soccer_settled_strategies_replay.json")
+    out_file = Path("E:/MP/outputs/research/soccer_settled_strategies_replay.json")
     out_file.parent.mkdir(parents=True, exist_ok=True)
     out_file.write_text(json.dumps(results, indent=2), encoding="utf-8")
     print(f"\nSaved evaluation summary to: {out_file}")

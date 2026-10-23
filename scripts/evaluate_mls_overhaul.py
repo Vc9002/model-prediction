@@ -13,7 +13,7 @@ import sqlite3
 from pathlib import Path
 
 LEDGER_DB = Path("E:/model-prediction-runtime/ledgers/ledgers.db")
-GAMES_PATH = Path("E:/model-prediction/data/processed/soccer/games.jsonl")
+GAMES_PATH = Path("E:/MP/data/processed/soccer/games.jsonl")
 
 
 def evaluate_mls():
@@ -86,7 +86,7 @@ def evaluate_mls():
     print("\n# MLS Overhaul Settled Games Evaluation Report")
     print(json.dumps(summary, indent=2))
 
-    out_file = Path("E:/model-prediction/outputs/research/mls_overhaul_evaluation_report.json")
+    out_file = Path("E:/MP/outputs/research/mls_overhaul_evaluation_report.json")
     out_file.parent.mkdir(parents=True, exist_ok=True)
     out_file.write_text(json.dumps(summary, indent=2), encoding="utf-8")
     print(f"\nReport written to: {out_file}")

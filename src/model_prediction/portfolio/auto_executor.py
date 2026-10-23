@@ -29,6 +29,7 @@ import httpx
 logger = logging.getLogger("model_prediction.auto_executor")
 
 from model_prediction.audit import AuditLog
+from model_prediction.calibration_pipeline import calibrate_for_serving
 from model_prediction.data_sources.polymarket_execute import (
     ExecutionGateError,
     OrderTicket,
@@ -1343,7 +1344,22 @@ class AutoPolymarketBuyer:
                 continue
 
             # 9. Win probability gate: Outcome must be favored by the model (>= min_model_probability)
-            model_prob = float(row.get("model_probability") or 0.0)
+            # Map the raw probability through the model's fitted calibrator when it
+            # passes the serving guard. The pick ledgers stay raw on purpose: the
+            # calibration pipeline trains on them, and calibrated values there
+            # would be calibrated again on the next fit. Everything below (gates,
+            # edge, sizing, the recorded order) sees the calibrated copy.
+            raw_model_prob = float(row.get("model_probability") or 0.0)
+            calibration = calibrate_for_serving(
+                model_id, market_type, raw_model_prob, data_root=self.data_root
+            )
+            model_prob = calibration.probability
+            row = {
+                **row,
+                "model_probability": model_prob,
+                "model_probability_raw": raw_model_prob,
+                "calibration_method": calibration.method,
+            }
             if model_prob < self.config.min_model_probability:
                 result.rejected_below_win_probability += 1
                 continue
@@ -1467,6 +1483,8 @@ class AutoPolymarketBuyer:
                 "away_team": row.get("away_team"),
                 "market_type": row.get("market_type"),
                 "model_probability": row.get("model_probability"),
+                "model_probability_raw": row.get("model_probability_raw"),
+                "calibration_method": row.get("calibration_method"),
                 "market_probability": row.get("market_probability") or row.get("market_implied_probability"),
                 "event_id": row.get("event_id"),
                 "line": row.get("line"),

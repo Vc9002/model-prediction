@@ -7,7 +7,8 @@ import tempfile
 import time
 from pathlib import Path
 
-from model_prediction.log_maintenance import compact_sqlite_databases, prune_stale_logs
+from model_prediction.log_maintenance import compact_sqlite_databases, prune_stale_logs, run_maintenance
+from model_prediction.runtime_paths import RuntimePaths
 
 
 def test_prune_stale_and_oversized_logs():
@@ -52,3 +53,27 @@ def test_compact_sqlite_databases():
 
         compacted = compact_sqlite_databases(data_dir=tmp_dir)
         assert "test.db" in compacted
+
+
+def test_daily_maintenance_entrypoint_uses_supplied_runtime(tmp_path):
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    db_path = runtime / "test.db"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE marker (value INTEGER)")
+    paths = RuntimePaths(repo_root=tmp_path, runtime_root=runtime)
+    supervisor_logs = paths.supervisor_log_root
+    supervisor_logs.mkdir(parents=True)
+    old_worker_log = supervisor_logs / "production-20260101.log"
+    old_worker_log.write_text("old worker output\n")
+    import os
+
+    old_time = time.time() - 30 * 86400
+    os.utime(old_worker_log, (old_time, old_time))
+
+    report = run_maintenance(repo_root=tmp_path, paths=paths)
+
+    assert report["compacted_databases"] == ["test.db"]
+    assert report["daily_logs"] == {"deleted_files": 0, "truncated_files": 0}
+    assert report["runtime_logs"]["deleted_files"] == 1
+    assert not old_worker_log.exists()

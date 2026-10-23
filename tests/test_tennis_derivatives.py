@@ -178,3 +178,25 @@ def test_tennis_model_predict_derivatives_with_player_form():
     assert len(preds) == 3
     spread_p = next(p for p in preds if p.market_type == "spread")
     assert spread_p.probabilities["away"] > spread_p.probabilities["home"]
+
+
+def test_serve_pair_reproduces_target_win_probability_and_total_games():
+    from model_prediction.models.tennis_derivatives import (
+        TENNIS_FORM_SIGMA,
+        price_tennis_derivatives,
+        serve_pair_for_win_probability,
+    )
+
+    for tour, best_of in (("ATP", 3), ("ATP", 5), ("WTA", 3)):
+        for target in (0.5, 0.65, 0.85):
+            a, b = serve_pair_for_win_probability(target, tour, best_of)
+            priced = price_tennis_derivatives(a, b, best_of=best_of, form_sigma=TENNIS_FORM_SIGMA)
+            assert abs(priced.match_win_a - target) < 0.004
+            assert (a >= b) == (target >= 0.5)
+    # Realistic game counts: the fixed-point Markov chain overstated them by ~2 games.
+    a, b = serve_pair_for_win_probability(0.5, "ATP", 3)
+    even = price_tennis_derivatives(a, b, best_of=3, form_sigma=TENNIS_FORM_SIGMA)
+    a, b = serve_pair_for_win_probability(0.9, "ATP", 3)
+    lopsided = price_tennis_derivatives(a, b, best_of=3, form_sigma=TENNIS_FORM_SIGMA)
+    assert 22.0 < even.expected_total_games < 25.0
+    assert lopsided.expected_total_games < even.expected_total_games - 2.0

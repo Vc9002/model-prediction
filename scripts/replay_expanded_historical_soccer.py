@@ -17,7 +17,7 @@ import pandas as pd
 
 from model_prediction.models.soccer import SoccerModel
 
-PROCESSED_GAMES = Path("E:/model-prediction/data/processed/soccer/games.jsonl")
+PROCESSED_GAMES = Path("E:/MP/data/processed/soccer/games.jsonl")
 
 
 def run_historical_replay(sample_size: int = 1500):

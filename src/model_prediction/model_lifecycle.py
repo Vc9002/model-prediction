@@ -36,24 +36,25 @@ SUPPORTED_MARKETS: dict[str, set[str]] = {
     "NCAAF": {"moneyline", "spread", "total"},
     "NBA": {"moneyline"},
     "NFL": {"moneyline", "spread", "total"},
-    "SOCCER": {"moneyline"},
-    "TENNIS": {"moneyline"},
-    "CS2": {"moneyline"},
-    "DOTA2": {"moneyline"},
-    "LOL": {"moneyline"},
-    "VALORANT": {"moneyline"},
-    "RAINBOW_SIX": {"moneyline"},
+    "SOCCER": {"moneyline", "spread", "total"},
+    "TENNIS": {"moneyline", "spread", "total"},
+    "CS2": {"moneyline", "spread", "total"},
+    "DOTA2": {"moneyline", "spread", "total"},
+    "LOL": {"moneyline", "spread", "total"},
+    "VALORANT": {"moneyline", "spread", "total"},
+    "RAINBOW_SIX": {"moneyline", "spread", "total"},
     "KBO": {"moneyline"},
     "NPB": {"moneyline"},
-    "HOCKEY": {"moneyline"},
+    "HOCKEY": {"moneyline", "spread", "total"},
+    "DARTS": {"moneyline"},
+    "NCAAB": {"moneyline", "spread", "total"},
+    "EUROLEAGUE": {"moneyline", "spread", "total"},
+    "NBL": {"moneyline", "spread", "total"},
 }
 
-PLANNED_MARKETS: dict[str, set[str]] = {
-    "NBA": {"spread", "total"},
-    "SOCCER": {"spread", "total"},
-    "TENNIS": {"spread", "total"},
-    "HOCKEY": {"spread", "total"},
-}
+# Every market with a priced lane now has a registered champion; markets without a model
+# (and the sports blocked on one) are tracked in the coverage audit, not here.
+PLANNED_MARKETS: dict[str, set[str]] = {}
 
 
 # ── Canonical Lifecycle Vocabularies ──────────────────────────────────────────

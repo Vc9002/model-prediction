@@ -867,69 +867,87 @@ def match_executable_quote(
     name against the long/short side descriptions. The decision price is the
     ASK of the selected side; midpoint is carried as reference only.
     """
-    path = Path(data_root) / "odds" / sport.lower() / game_date / "polymarket_snapshots.jsonl"
-    if not path.exists():
+    from .snapshot_archives import snapshot_paths
+
+    paths = snapshot_paths(data_root, sport, game_date)
+    if not paths:
         return None
     away = candidate.away_team
     home = candidate.home_team
     best: dict[str, Any] | None = None
     matched_slugs: set[str] = set()
-    with path.open(encoding="utf-8") as handle:
-        for line in handle:
-            if not line.strip():
-                continue
-            try:
-                snap = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if snap.get("market_type") != "moneyline":
-                continue
-            slug = str(snap.get("market_slug") or "").casefold()
-            if any(
-                marker in slug
-                for marker in (
-                    "-f5-",
-                    "-f3-",
-                    "-f7-",
-                    "-1st-",
-                    "-h1-",
-                    "-h2-",
-                    "-1h-",
-                    "-2h-",
-                    "-1q-",
-                    "-2q-",
-                    "-3q-",
-                    "-4q-",
-                    "-tt-",
-                    "-tt1h-",
-                    "-tt2h-",
-                )
-            ):
-                continue  # partial-game contracts never price a full-game pick
-            long_desc = str((snap.get("long") or {}).get("description", ""))
-            short_desc = str((snap.get("short") or {}).get("description", ""))
-            # Polymarket uses short nicknames ("Storm"); ESPN uses full display
-            # names ("Seattle Storm"). Require the two sides to map uniquely
-            # onto the two teams, in either order.
-            pairing = (_team_matches(away, long_desc) and _team_matches(home, short_desc)) or (
-                _team_matches(home, long_desc) and _team_matches(away, short_desc)
-            )
-            if not pairing:
-                continue
-            observed_at = str(snap.get("observed_at_utc", ""))
-            # Decision prices must be pregame. Without this check, capturing
-            # BBO snapshots more than once a day (needed so late-day games
-            # get a fresher line than a single morning snapshot) would let a
-            # later, in-game/post-game snapshot win the "latest wins" compare
-            # below for an earlier game that already started.
-            try:
-                if observed_at and parse_utc(observed_at) >= parse_utc(candidate.event_start_utc):
+    best_path = None
+    for path in paths:
+        with path.open(encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
                     continue
-            except ValueError:
-                continue
-            matched_slugs.add(slug)
-            if best is None or observed_at > str(best.get("observed_at_utc", "")):
-                best = snap
+                try:
+                    snap = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if (
+                    path.parent.parent.name == "basketball"
+                    and str(snap.get("league", "")).casefold() != sport.casefold()
+                ):
+                    continue
+                if snap.get("market_type") != "moneyline":
+                    continue
+                slug = str(snap.get("market_slug") or "").casefold()
+                if any(
+                    marker in slug
+                    for marker in (
+                        "-f5-",
+                        "-f3-",
+                        "-f7-",
+                        "-1st-",
+                        "-h1-",
+                        "-h2-",
+                        "-1h-",
+                        "-2h-",
+                        "-1q-",
+                        "-2q-",
+                        "-3q-",
+                        "-4q-",
+                        "-tt-",
+                        "-tt1h-",
+                        "-tt2h-",
+                    )
+                ):
+                    continue  # partial-game contracts never price a full-game pick
+                long_desc = str((snap.get("long") or {}).get("description", ""))
+                short_desc = str((snap.get("short") or {}).get("description", ""))
+                # Polymarket uses short nicknames ("Storm"); ESPN uses full display
+                # names ("Seattle Storm"). Require the two sides to map uniquely
+                # onto the two teams, in either order.
+                pairing = (_team_matches(away, long_desc) and _team_matches(home, short_desc)) or (
+                    _team_matches(home, long_desc) and _team_matches(away, short_desc)
+                )
+                if not pairing:
+                    continue
+                observed_at = str(snap.get("observed_at_utc", ""))
+                # Decision prices must be pregame. Without this check, capturing
+                # BBO snapshots more than once a day (needed so late-day games
+                # get a fresher line than a single morning snapshot) would let a
+                # later, in-game/post-game snapshot win the "latest wins" compare
+                # below for an earlier game that already started.
+                try:
+                    if not observed_at:
+                        continue
+                    captured = parse_utc(observed_at)
+                    if captured >= parse_utc(candidate.event_start_utc):
+                        continue
+                    decision_time = (getattr(candidate, "model_input_snapshot", None) or {}).get(
+                        "observed_at_utc"
+                    )
+                    if decision_time and captured > parse_utc(decision_time):
+                        continue
+                except ValueError:
+                    continue
+                matched_slugs.add(slug)
+                if best is None or observed_at > str(best.get("observed_at_utc", "")):
+                    best = snap
+                    best_path = path
     if best is None:
         return None
     if len(matched_slugs) > 1:
@@ -965,6 +983,7 @@ def match_executable_quote(
         # projection below omits contract identity and depth and is not itself
         # an archived JSON line.
         "_archive_record": best,
+        "_archive_path": str(best_path),
         "side": side_key,
         "executable_ask": round(float(ask), 6),
         "midpoint_reference": side.get("midpoint"),

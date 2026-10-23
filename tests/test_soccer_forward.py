@@ -659,6 +659,7 @@ def test_soccer_forward_prices_spread_and_multiple_totals(tmp_path) -> None:
             "timestamp_valid": True,
             "market_type": "spread",
             "line": -1.5,
+            "team": "Alpha FC",  # the market line is Alpha's (the away team's) handicap
             "market_slug": "asc-mls-alpha-beta-2026-07-27-neg-1pt5",
             "long": {"description": "-1.50", "ask": 0.35},
             "short": {"description": "+1.50", "ask": 0.68},
@@ -702,7 +703,9 @@ def test_soccer_forward_prices_spread_and_multiple_totals(tmp_path) -> None:
     assert "spread" in market_types
 
     spread_c = next(c for c in result["priced_contracts"] if c["market_type"] == "spread")
-    assert spread_c["line"] == -1.5
+    # Alpha (away) -1.5 is the long side; its opposite is Beta (home) +1.5. The ledger line is
+    # relative to the selected side, never the home handicap regardless of the selection.
+    assert (spread_c["selection"], spread_c["line"]) in {("away", -1.5), ("home", 1.5)}
     assert 0.0 < spread_c["model_probability"] < 1.0
 
     lines = {c["line"] for c in result["priced_contracts"] if c["market_type"] == "total"}
@@ -806,3 +809,88 @@ def test_soccer_forward_prices_double_chance_contracts(tmp_path) -> None:
     c_1x = next(c for c in dc_contracts if c["selection"] == "1X")
     assert 0.0 < c_1x["model_probability"] < 1.0
     assert 0.0 < c_1x["executable_ask"] < 1.0
+
+
+def test_soccer_spread_orientation_for_home_anchored_market(tmp_path) -> None:
+    """A market anchored on the home team: long = home at the line, short = away at the negation."""
+    history_path = tmp_path / "processed" / "soccer" / "games.jsonl"
+    history_path.parent.mkdir(parents=True)
+    history_path.write_text(
+        "".join(
+            json.dumps(
+                {
+                    "event_id": f"h{i}",
+                    "event_start_utc": f"2026-05-{i % 28 + 1:02d}T12:00:00Z",
+                    "league": "MLS",
+                    "away_team": "Alpha FC" if i % 2 else "Beta FC",
+                    "home_team": "Beta FC" if i % 2 else "Alpha FC",
+                    "away_score": i % 3,
+                    "home_score": (i + 1) % 4,
+                }
+            )
+            + "\n"
+            for i in range(60)
+        ),
+        encoding="utf-8",
+    )
+    snapshot_path = tmp_path / "odds" / "soccer" / "2026-07-27" / "polymarket_snapshots.jsonl"
+    snapshot_path.parent.mkdir(parents=True)
+    base = {
+        "event_id": "pm",
+        "event_title": "Alpha FC vs Beta FC",
+        "event_start_utc": "2026-07-27T20:00:00Z",
+        "observed_at_utc": "2026-07-27T12:00:00Z",
+        "timestamp_valid": True,
+        "market_type": "spread",
+    }
+    snapshot_path.write_text(
+        json.dumps(
+            {
+                **base,
+                "line": 1.5,
+                "team": "Beta FC",
+                "market_slug": "asc-mls-alpha-beta-2026-07-27-pos-1pt5",
+                "long": {"description": "+1.50", "ask": 0.60},
+                "short": {"description": "-1.50", "ask": 0.42},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    class Client:
+        @staticmethod
+        def scoreboard(league, game_date):
+            return {
+                "events": [
+                    {
+                        "id": "e",
+                        "date": "2026-07-27T20:00:00Z",
+                        "competitions": [
+                            {
+                                "competitors": [
+                                    {"homeAway": "away", "team": {"displayName": "Alpha FC"}},
+                                    {"homeAway": "home", "team": {"displayName": "Beta FC"}},
+                                ]
+                            }
+                        ],
+                    }
+                ]
+            }
+
+    result = build_soccer_total_slate(
+        data_root=tmp_path,
+        game_date="2026-07-27",
+        client=Client(),
+        leagues=("MLS",),
+        observed_at=datetime(2026, 7, 27, 13, tzinfo=UTC),
+    )
+    spread = next(c for c in result["priced_contracts"] if c["market_type"] == "spread")
+    # Beta (home) +1.5, or Alpha (away) -1.5 - never the home handicap attached to an away pick.
+    assert (spread["selection"], spread["line"]) in {("home", 1.5), ("away", -1.5)}
+    from model_prediction.domain import MarketType
+    from model_prediction.pricing import PickResult, grade_pick
+
+    # 1-0 to Alpha away: Beta +1.5 covers (margin -1+1.5>0), Alpha -1.5 does not.
+    result_ = grade_pick(MarketType.SPREAD, spread["selection"], spread["line"], away_score=1, home_score=0)
+    assert result_ is (PickResult.LOSS if spread["selection"] == "away" else PickResult.WIN)

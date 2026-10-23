@@ -21,6 +21,7 @@ from typing import Any
 
 import httpx
 
+from .darts_history import load_darts_history
 from .data_sources.polymarket_us import (
     PolymarketUSClient,
     probability_to_american,
@@ -60,6 +61,15 @@ def _player_matches(name_a: str, name_b: str) -> bool:
         and a_tokens[-1] == b_tokens[-1]
         and a_tokens[0][0] == b_tokens[0][0]
     )
+
+
+def _resolve_player(name: str, known: Sequence[str]) -> str:
+    """Map a market name onto the unique rated player it refers to, else keep it."""
+    exact = [candidate for candidate in known if _clean_tokens(candidate) == _clean_tokens(name)]
+    if exact:
+        return exact[0]
+    fuzzy = [candidate for candidate in known if _player_matches(name, candidate)]
+    return fuzzy[0] if len(fuzzy) == 1 else name
 
 
 def _parse_players_from_title(title: str) -> tuple[str, str] | None:
@@ -184,6 +194,9 @@ def build_darts_slate(
             "priced": [],
         }
 
+    history = load_darts_history(data_root) if data_root is not None else []
+    rated_names = sorted({name for record in history for name in (record.player_a, record.player_b)})
+
     # Extract matchups for prediction
     upcoming: list[UpcomingDartsMatch] = []
     event_map: dict[str, dict[str, Any]] = {}
@@ -194,7 +207,7 @@ def build_darts_slate(
         players = _parse_players_from_title(title)
         if not players:
             continue
-        p1, p2 = players
+        p1, p2 = (_resolve_player(name, rated_names) for name in players)
         league_name = ev.get("league", "DARTS_PDC")
 
         # Set standard format: PDC European Tour matches are best-of-11 legs; MODUS is best-of-7 legs
@@ -212,7 +225,7 @@ def build_darts_slate(
         event_map[ev_id] = ev
 
     # Generate model predictions
-    predictions = active_model.predict_games([], upcoming)
+    predictions = active_model.predict_games(history, upcoming)
 
     # Group predictions by event_id and market_type
     preds_by_event: dict[str, dict[str, list[Any]]] = {}
@@ -220,6 +233,7 @@ def build_darts_slate(
         preds_by_event.setdefault(p.event_id, {}).setdefault(p.market_type, []).append(p)
 
     priced: list[dict[str, Any]] = []
+    skipped_thin: list[str] = []
 
     for ev_id, ev in event_map.items():
         ev_preds = preds_by_event.get(ev_id, {})
@@ -229,6 +243,16 @@ def build_darts_slate(
         pred_totals = ev_preds.get("total", [])
 
         if not pred_ml:
+            continue
+        if (
+            min_team_matches
+            and min(
+                active_model.match_counts.get(pred_ml.home_team, 0),
+                active_model.match_counts.get(pred_ml.away_team, 0),
+            )
+            < min_team_matches
+        ):
+            skipped_thin.append(ev_id)
             continue
 
         for market in ev.get("markets", []):
@@ -245,7 +269,11 @@ def build_darts_slate(
                     ask = side.get("price_probability")
                     if ask is None or not (0 < ask < 1):
                         continue
-                    is_p1 = _player_matches(desc, pred_ml.home_team)
+                    home_match = _player_matches(desc, pred_ml.home_team)
+                    away_match = _player_matches(desc, pred_ml.away_team)
+                    if home_match == away_match:
+                        continue
+                    is_p1 = home_match
                     side_key = "home" if is_p1 else "away"
                     model_prob = pred_ml.probabilities[side_key]
                     edge = model_prob - ask
@@ -285,14 +313,22 @@ def build_darts_slate(
                     )
 
             elif m_type == "spread" and pred_spreads:
-                market_line = market.get("line") or -1.5
-                pred_spread = min(pred_spreads, key=lambda p: abs((p.line or -1.5) - float(market_line)))
+                market_line = market.get("line")
+                if market_line is None:
+                    continue
+                pred_spread = next((p for p in pred_spreads if p.line == float(market_line)), None)
+                if pred_spread is None:
+                    continue
                 for side in sides:
                     desc = side.get("description", "")
                     ask = side.get("price_probability")
                     if ask is None or not (0 < ask < 1):
                         continue
-                    is_p1 = _player_matches(desc, pred_spread.home_team)
+                    home_match = _player_matches(desc, pred_spread.home_team)
+                    away_match = _player_matches(desc, pred_spread.away_team)
+                    if home_match == away_match:
+                        continue
+                    is_p1 = home_match
                     side_key = "home" if is_p1 else "away"
                     model_prob = pred_spread.probabilities.get(side_key, 0.5)
                     edge = model_prob - ask
@@ -321,8 +357,12 @@ def build_darts_slate(
                         )
 
             elif m_type == "total" and pred_totals:
-                market_line = market.get("line") or 9.5
-                pred_tot = min(pred_totals, key=lambda p: abs((p.line or 9.5) - float(market_line)))
+                market_line = market.get("line")
+                if market_line is None:
+                    continue
+                pred_tot = next((p for p in pred_totals if p.line == float(market_line)), None)
+                if pred_tot is None:
+                    continue
                 for side in sides:
                     sel = side.get("selection", "").lower()
                     desc = side.get("description", "").lower()
@@ -330,6 +370,9 @@ def build_darts_slate(
                     if ask is None or not (0 < ask < 1):
                         continue
                     is_over = "over" in sel or "over" in desc or ">" in desc
+                    is_under = "under" in sel or "under" in desc or "<" in desc
+                    if is_over == is_under:
+                        continue
                     side_key = "over" if is_over else "under"
                     model_prob = pred_tot.probabilities.get(side_key, 0.5)
                     edge = model_prob - ask
@@ -364,4 +407,6 @@ def build_darts_slate(
         "events_count": len(events),
         "priced_contracts": len(priced),
         "priced": priced,
+        "history_matches": len(history),
+        "skipped_thin_history": skipped_thin,
     }

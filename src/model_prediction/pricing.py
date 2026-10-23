@@ -64,6 +64,15 @@ def grade_pick(
             raise ValueError("spread requires a line")
         raw_margin = home_score - away_score if selection == "home" else away_score - home_score
         margin = raw_margin + line
+    elif market_type is MarketType.DOUBLE_CHANCE:
+        if selection not in {"1x", "x2", "12"}:
+            raise ValueError("invalid double-chance selection")
+        won = {
+            "1x": home_score >= away_score,
+            "x2": away_score >= home_score,
+            "12": home_score != away_score,
+        }[selection]
+        return PickResult.WIN if won else PickResult.LOSS
     elif market_type is MarketType.BTTS:
         # Binary yes/no on both teams scoring -- no push case, like
         # moneyline's "draw" sub-case above.

@@ -11,6 +11,7 @@ import hashlib
 import json
 import logging
 import math
+import re
 from collections.abc import Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -689,7 +690,23 @@ def _load_matches(path: Path) -> list[dict[str, Any]]:
     return sorted(rows, key=lambda row: (row["start_utc"], row["match_id"]))
 
 
-def _predict(book: NeutralElo, rows: Iterable[dict[str, Any]], update: bool = True) -> list[dict[str, Any]]:
+def _predict(
+    book: NeutralElo,
+    rows: Iterable[dict[str, Any]],
+    update: bool = True,
+    *,
+    result_availability: bool = False,
+) -> list[dict[str, Any]]:
+    """Walk forward; opt into end-time eligibility for corrected comparisons.
+
+    The default retains historical v6 reproduction semantics. In corrected mode,
+    missing/invalid end timestamps never become updates. Pending results persist
+    across train/evaluation calls on the same book, without flushing future data.
+    End time is a lower bound, not proof of historical source observation time.
+    """
+    from .domain import parse_utc
+
+    pending = getattr(book, "_pending_results", []) if result_availability else []
     output = []
     for row in rows:
         # Each row's own start_utc is the correct "as of" reference date for
@@ -705,11 +722,32 @@ def _predict(book: NeutralElo, rows: Iterable[dict[str, Any]], update: bool = Tr
                 reference_date = datetime.fromisoformat(str(start))
             except (ValueError, TypeError):
                 reference_date = None
+        if result_availability:
+            decision_time = parse_utc(str(start))
+            # Strictly prior: a result at the same timestamp is not presumed
+            # observable before this decision.
+            ready = sorted(
+                (item for item in pending if item[0] < decision_time),
+                key=lambda item: (item[0], str(item[1].get("match_id", ""))),
+            )
+            pending = [item for item in pending if item[0] >= decision_time]
+            for _, completed in ready:
+                book.update(completed)
         probability = book.probability(row["team1_id"], row["team2_id"], reference_date)
         outcome = 1 if row["winner_id"] == row["team1_id"] else 0
         output.append({"probability": probability, "outcome": outcome})
         if update:
-            book.update(row)
+            if not result_availability:
+                book.update(row)
+            elif row.get("end_utc"):
+                try:
+                    end = parse_utc(str(row["end_utc"]))
+                    if end > decision_time:
+                        pending.append((end, row))
+                except (ValueError, TypeError):
+                    pass
+        if result_availability:
+            book._pending_results = pending
     return output
 
 
@@ -1124,6 +1162,31 @@ def resolve_esports_match_result(
     return None
 
 
+def _explicit_series_format(event: dict[str, Any]) -> tuple[int | None, str]:
+    """Read an explicit format only; lines and title conventions prove nothing.
+
+    The gateway normalizer retains title/question but currently drops any
+    structured provider format. Accept explicit Best-of/Bo text when present;
+    conflicting or unsupported declarations remain ineligible.
+    """
+    declarations: set[int] = set()
+    raw = event.get("best_of")
+    if raw is not None:
+        try:
+            declarations.add(int(raw) if str(raw).isdigit() else 0)
+        except (TypeError, ValueError):
+            declarations.add(0)
+    texts = [str(event.get("title") or "")]
+    texts.extend(str(market.get("question") or "") for market in event.get("markets", []))
+    for value in texts:
+        declarations.update(
+            int(match) for match in re.findall(r"\b(?:best[ -]*of[ -]*|bo[ -]*)(\d+)\b", value, re.IGNORECASE)
+        )
+    if len(declarations) == 1 and next(iter(declarations)) in {1, 3, 5}:
+        return next(iter(declarations)), "explicit_event_format_or_market_text"
+    return None, "conflicting_or_unsupported_format" if declarations else "provider_format_not_available"
+
+
 def forecast_esports_slate(
     data_root: str | Path,
     artifact_dir: str | Path,
@@ -1131,6 +1194,7 @@ def forecast_esports_slate(
     game_date: str,
     timezone_name: str = "America/New_York",
     client: Any | None = None,
+    format_client: Any | None = None,
 ) -> dict[str, Any]:
     """Price exact, identity-resolved Polymarket match-winner contracts.
 
@@ -1181,6 +1245,20 @@ def forecast_esports_slate(
         temperature=float(artifact.get("temperature", 1.18)),
     )
     trained_through = parse_utc(str(artifact["trained_through_utc"]))
+    from .esports_context import capture_schedule, resolve_format
+
+    schedule_context = None
+    acquisition_start = utc_now()
+    future_starts = [
+        parse_utc(str(event["event_start_utc"]))
+        for event in events
+        if parse_utc(str(event["event_start_utc"])) > acquisition_start
+    ]
+    # Existing injected market-client tests stay offline. Explicit source
+    # injection enables an end-to-end context test without a live API.
+    if future_starts and (client is None or format_client is not None):
+        schedule_context = capture_schedule(data_root, title, min(future_starts), format_client)
+    # Capture the decision only after prospective context fetches complete.
     observed_now = utc_now()
     manual_aliases = _load_manual_aliases(data_root).get(title, {})
     rows: list[dict[str, Any]] = []
@@ -1199,12 +1277,14 @@ def forecast_esports_slate(
             continue
         descriptions = [str(side.get("description") or "") for side in ml_market["sides"]]
         matches: list[set[str]] = []
+        team_resolution_methods: list[str] = []
         for description in descriptions:
             ikey = _identity_key(description)
             # 1. Exact alias match in BO3 catalog
             exact = aliases.get(ikey, set())
             if exact:
                 matches.append(exact)
+                team_resolution_methods.append("exact")
                 continue
             # 2. Manual alias override (Polymarket name → BO3 name mapping)
             manual_name = manual_aliases.get(ikey)
@@ -1213,16 +1293,19 @@ def forecast_esports_slate(
                 manual_match = aliases.get(manual_key, set())
                 if manual_match:
                     matches.append(manual_match)
+                    team_resolution_methods.append("manual")
                     continue
             # 3. Fuzzy match in BO3 catalog
             fuzzy = _fuzzy_match_team(description, teams, aliases)
             if fuzzy:
                 matches.append({fuzzy})
+                team_resolution_methods.append("fuzzy")
                 continue
             # Unknown team: assign a synthetic ID so we can still price
             # the match using default 1500 Elo rating for the unknown side.
             synthetic_id = "unknown:" + ikey
             matches.append({synthetic_id})
+            team_resolution_methods.append("synthetic")
         event_base = {
             "event_id": event["event_id"],
             "event_start_utc": event["event_start_utc"],
@@ -1232,7 +1315,7 @@ def forecast_esports_slate(
         if event_start <= observed_now:
             no_calls.append({**event_base, "reason": "NO_CALL_EVENT_STARTED"})
             continue
-        if event_start <= trained_through:
+        if event_start <= trained_through or trained_through >= observed_now:
             no_calls.append({**event_base, "reason": "NO_CALL_POINT_IN_TIME_MODEL_ARTIFACT"})
             continue
         if any(len(candidate_ids) != 1 for candidate_ids in matches):
@@ -1252,22 +1335,43 @@ def forecast_esports_slate(
         # complete research ledger with the neutral 1500 prior. They are
         # not valid inputs for the curated gated-research ledger until
         # both identities have learned ratings in the pinned artifact.
-        source_teams_resolved = all(not team_id.startswith("unknown:") for team_id in team_ids)
+        source_teams_resolved = all(method in {"exact", "manual"} for method in team_resolution_methods)
         source_teams_trained = source_teams_resolved and all(team_id in ratings for team_id in team_ids)
         probability1 = book.probability(team_ids[0], team_ids[1], observed_now)
         from .esports_replay import capture_inputs
         from .models.esports_derivatives import price_esports_bo3_derivatives, price_esports_bo5_derivatives
 
-        inference_inputs = capture_inputs(book, team_ids, observed_now)
-        match_bo = int(event.get("best_of") or 0)
-        if match_bo == 1:
-            from .models.esports_contextual_v7 import _expit, _logit
-
-            probability1 = _expit(_logit(probability1) * 0.75)
-        elif match_bo == 5:
-            from .models.esports_contextual_v7 import _expit, _logit
-
-            probability1 = _expit(_logit(probability1) * 1.30)
+        match_bo, format_source = _explicit_series_format(event)
+        series_context = {"status": "not_requested", "best_of": None}
+        if schedule_context is not None:
+            series_context = (
+                resolve_format(schedule_context, team_ids, event_start, observed_now)
+                if source_teams_resolved
+                else {"status": "source_identity_unresolved", "best_of": None}
+            )
+            source_bo = series_context.get("best_of")
+            if series_context["status"] == "matched":
+                if format_source == "conflicting_or_unsupported_format" or (
+                    match_bo is not None and match_bo != source_bo
+                ):
+                    match_bo, format_source = None, "explicit_and_source_format_conflict"
+                else:
+                    match_bo, format_source = source_bo, "prospective_bo3_exact_identity_and_start"
+            elif series_context["status"] == "source_format_unsupported":
+                match_bo, format_source = None, "source_format_unsupported"
+        inference_inputs = capture_inputs(
+            book,
+            team_ids,
+            observed_now,
+            series_context=series_context,
+            team_resolution_methods=team_resolution_methods,
+        )
+        if match_bo is None:
+            no_calls.append(
+                {**event_base, "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED", "detail": format_source}
+            )
+        # v6 is fitted on match winners. No fitted format transform exists;
+        # use exactly the captured book probability for every format.
         bo3_derivatives = price_esports_bo3_derivatives(probability1)
         bo5_derivatives = price_esports_bo5_derivatives(probability1)
 
@@ -1294,6 +1398,24 @@ def forecast_esports_slate(
             market_model_version = str(artifact["model_version"])
             probabilities_by_name: dict[str, float] = {}
 
+            if m_type != "moneyline":
+                if match_bo not in {3, 5}:
+                    no_calls.append({**market_base, "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED"})
+                    continue
+                raw_line = market.get("line") if market.get("line") is not None else snapshot.get("line")
+                try:
+                    exact_line = float(raw_line)
+                except (TypeError, ValueError):
+                    exact_line = float("nan")
+                allowed_lines = (
+                    ({2.5} if match_bo == 3 else {3.5, 4.5})
+                    if m_type == "total"
+                    else ({-1.5, 1.5} if match_bo == 3 else {-2.5, -1.5, 1.5, 2.5})
+                )
+                if exact_line not in allowed_lines:
+                    no_calls.append({**market_base, "reason": "NO_CALL_EXACT_LINE_UNAVAILABLE"})
+                    continue
+
             if m_type == "moneyline":
                 probabilities_by_name = {
                     _identity_key(descriptions[0]): probability1,
@@ -1302,7 +1424,7 @@ def forecast_esports_slate(
             elif m_type == "total":
                 raw_line = market.get("line") if market.get("line") is not None else snapshot.get("line")
                 try:
-                    line_val = float(raw_line if raw_line is not None else 2.5)
+                    line_val = float(raw_line)
                 except (ValueError, TypeError):
                     continue
                 if abs(line_val - 2.5) <= 0.1:
@@ -1331,11 +1453,11 @@ def forecast_esports_slate(
             elif m_type == "spread":
                 raw_line = market.get("line") if market.get("line") is not None else snapshot.get("line")
                 try:
-                    line_val = float(raw_line if raw_line is not None else -1.5)
+                    line_val = float(raw_line)
                 except (ValueError, TypeError):
                     continue
                 abs_line = abs(line_val)
-                is_bo5 = match_bo == 5 or abs(abs_line - 2.5) <= 0.1
+                is_bo5 = match_bo == 5
                 if not (abs(abs_line - 1.5) <= 0.1 or abs(abs_line - 2.5) <= 0.1):
                     continue
                 market_base["line"] = line_val
@@ -1344,16 +1466,11 @@ def forecast_esports_slate(
                 anchor_team = snapshot.get("team") or market.get("team")
                 key0 = _identity_key(descriptions[0])
                 key1 = _identity_key(descriptions[1])
-                anchor_is_team1 = True
-                if anchor_team:
-                    anchor_key = _identity_key(str(anchor_team))
-                    if anchor_key == key1 or (anchor_key in key1 and anchor_key not in key0):
-                        anchor_is_team1 = False
-                else:
-                    long_desc = str((snapshot.get("long") or {}).get("description") or "")
-                    long_key = _identity_key(long_desc)
-                    if key1 in long_key:
-                        anchor_is_team1 = False
+                anchor_key = _identity_key(str(anchor_team or ""))
+                if anchor_key not in {key0, key1}:
+                    no_calls.append({**market_base, "reason": "NO_CALL_SPREAD_ANCHOR_UNRESOLVED"})
+                    continue
+                anchor_is_team1 = anchor_key == key0
 
                 if is_bo5:
                     if abs(abs_line - 2.5) <= 0.1:
@@ -1406,53 +1523,43 @@ def forecast_esports_slate(
                             model_probability = 1.0 - probability1
                             side_team = descriptions[1]
                 elif m_type == "total":
-                    if "over" in desc_key or desc_str.lower().startswith("o"):
+                    if "over" in desc_key:
                         model_probability = probabilities_by_name.get(
                             "over", bo3_derivatives.total_maps_over_2pt5
                         )
                         side_team = "Over"
-                    elif "under" in desc_key or desc_str.lower().startswith("u"):
-                        model_probability = probabilities_by_name.get(
-                            "under", bo3_derivatives.total_maps_under_2pt5
-                        )
-                        side_team = "Under"
-                    elif side_name == "long":
-                        model_probability = probabilities_by_name.get(
-                            "over", bo3_derivatives.total_maps_over_2pt5
-                        )
-                        side_team = "Over"
-                    else:
+                    elif "under" in desc_key:
                         model_probability = probabilities_by_name.get(
                             "under", bo3_derivatives.total_maps_under_2pt5
                         )
                         side_team = "Under"
                 elif m_type == "spread":
-                    if desc_str.startswith("-") or "-1.5" in desc_str:
+                    if desc_str.startswith("-") or f"-{abs_line:g}" in desc_str:
                         model_probability = p_minus
-                        side_team = f"{team_minus} -1.5"
-                    elif desc_str.startswith(("+", "1.5")) or "+1.5" in desc_str:
+                        side_team = f"{team_minus} -{abs_line:g}"
+                    elif desc_str.startswith(("+", "1.5")) or f"+{abs_line:g}" in desc_str:
                         model_probability = p_plus
-                        side_team = f"{team_plus} +1.5"
+                        side_team = f"{team_plus} +{abs_line:g}"
                     elif _identity_key(team_minus) in desc_key:
                         model_probability = p_minus
-                        side_team = f"{team_minus} -1.5"
+                        side_team = f"{team_minus} -{abs_line:g}"
                     elif _identity_key(team_plus) in desc_key:
                         model_probability = p_plus
-                        side_team = f"{team_plus} +1.5"
+                        side_team = f"{team_plus} +{abs_line:g}"
                     elif side_name == "long":
                         if line_val < 0:
                             model_probability = p_minus
-                            side_team = f"{team_minus} -1.5"
+                            side_team = f"{team_minus} -{abs_line:g}"
                         else:
                             model_probability = p_plus
-                            side_team = f"{team_plus} +1.5"
+                            side_team = f"{team_plus} +{abs_line:g}"
                     else:  # short
                         if line_val < 0:
                             model_probability = p_plus
-                            side_team = f"{team_plus} +1.5"
+                            side_team = f"{team_plus} +{abs_line:g}"
                         else:
                             model_probability = p_minus
-                            side_team = f"{team_minus} -1.5"
+                            side_team = f"{team_minus} -{abs_line:g}"
 
                 if model_probability is None or ask is None:
                     sides = []
@@ -1466,7 +1573,7 @@ def forecast_esports_slate(
                         "edge_vs_executable_ask": round(model_probability - float(ask), 6),
                     }
                 )
-            if len(sides) != 2:
+            if len(sides) != 2 or sides[0]["team"] == sides[1]["team"]:
                 no_calls.append({**market_base, "reason": "NO_CALL_MARKET_OR_SIDE_UNRESOLVED"})
                 continue
             # Reject illiquid/thin markets where the Polymarket pricing is unreliable.
@@ -1482,12 +1589,25 @@ def forecast_esports_slate(
                     **market_base,
                     "title": title,
                     "source_team_ids": team_ids,
+                    "team_resolution_methods": team_resolution_methods,
                     "inference_inputs": inference_inputs,
                     "source_teams_resolved": source_teams_resolved,
                     "source_teams_trained": source_teams_trained,
-                    "gated_research_eligible": source_teams_trained,
+                    "best_of": match_bo,
+                    "series_format_source": format_source,
+                    "series_context": series_context,
+                    "serving_math": "v6-book-unscaled-v1",
+                    "gated_research_eligible": source_teams_trained
+                    and match_bo in {1, 3, 5}
+                    and m_type == "moneyline",
                     "gated_research_ineligibility_reason": (
-                        None if source_teams_trained else "NO_CALL_MODEL_UNVALIDATED_NEW_TEAM"
+                        "NO_CALL_MODEL_UNVALIDATED_NEW_TEAM"
+                        if not source_teams_trained
+                        else "NO_CALL_SERIES_FORMAT_UNRESOLVED"
+                        if match_bo is None
+                        else "NO_CALL_DERIVATIVE_UNVALIDATED"
+                        if m_type != "moneyline"
+                        else None
                     ),
                     "model_version": market_model_version,
                     "model_state": "research",
@@ -1508,6 +1628,15 @@ def forecast_esports_slate(
         "priced_count": len(rows),
         "no_calls": no_calls,
         "no_call_count": len(no_calls),
+        "format_coverage": {
+            "known_format_events": len({row["event_id"] for row in rows if row["best_of"] is not None}),
+            "unresolved_format_events": len({row["event_id"] for row in rows if row["best_of"] is None}),
+            "source_schedule_status": schedule_context["status"]
+            if schedule_context is not None
+            else "not_requested",
+            "source_pages_captured": len(schedule_context["pages"]) if schedule_context is not None else 0,
+            "source_limit": "Prospective observations only; exact source IDs and exact start required. No historical format availability is inferred.",
+        },
         "model_state": "research",
         "profitability": "not_established",
         "units": 0,

@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 import math
 import unicodedata
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -140,6 +141,8 @@ def _settle_all_unsettled(
                 scoreboard_cache=scoreboard_cache,
             )
             if result is None:
+                result = _settle_by_resolution(row, ledger)
+            if result is None:
                 if (now - start).total_seconds() > 7 * 86400:
                     try:
                         v = ledger.void(
@@ -166,6 +169,50 @@ def _settle_all_unsettled(
                     voided.append(v["pick_id"])
                 except (KeyError, ValueError, OSError) as e:
                     failures.append({"pick_id": row["pick_id"], "reason": str(e)})
+            else:
+                failures.append(result)
+            continue
+        # Darts: no ESPN/Polymarket result feed -- grade from the observed
+        # match history (Wikipedia brackets, refreshed in the daily forecast).
+        if row["league"] in ("DARTS_PDC", "DARTS_MODUS"):
+            result = _settle_darts_pick(row, ledger, data_root=data_root)
+            if result is None:
+                if (now - start).total_seconds() > 7 * 86400:
+                    try:
+                        voided.append(
+                            ledger.void(
+                                row["pick_id"], "darts result unrecorded in match history after >7 days"
+                            )["pick_id"]
+                        )
+                    except (KeyError, ValueError, OSError) as e:
+                        failures.append({"pick_id": row["pick_id"], "reason": str(e)})
+                else:
+                    pending.append(row["pick_id"])
+            elif result.get("settled"):
+                settled.append(result)
+            else:
+                failures.append(result)
+            continue
+        # EuroLeague: ESPN has no feed -- grade from the official live API results
+        # cached by the daily forecast.
+        if row["league"] == "EUROLEAGUE":
+            result = _settle_euroleague_pick(row, ledger, data_root=data_root) or _settle_by_resolution(
+                row, ledger
+            )
+            if result is None:
+                if (now - start).total_seconds() > 7 * 86400:
+                    try:
+                        voided.append(
+                            ledger.void(row["pick_id"], "euroleague result unrecorded after >7 days")[
+                                "pick_id"
+                            ]
+                        )
+                    except (KeyError, ValueError, OSError) as e:
+                        failures.append({"pick_id": row["pick_id"], "reason": str(e)})
+                else:
+                    pending.append(row["pick_id"])
+            elif result.get("settled"):
+                settled.append(result)
             else:
                 failures.append(result)
             continue
@@ -200,6 +247,12 @@ def _settle_all_unsettled(
             if match is None:
                 match = _find_espn_soccer_result_by_event_id(espn, row)
         if match is None:
+            # No ESPN record (leagues ESPN does not carry): the contract's own resolution is
+            # enough to grade a win/loss.
+            resolved = _settle_by_resolution(row, ledger)
+            if resolved is not None and resolved.get("settled"):
+                settled.append(resolved)
+                continue
             if (now - start).total_seconds() > 7 * 86400:
                 try:
                     voided.append(
@@ -498,6 +551,167 @@ def _extract_market_slug(rationale: str) -> str | None:
             return m
     match = re.search(r"\(([a-z0-9\-]+)\)", rationale)
     return match.group(1) if match else None
+
+
+def _settle_darts_pick(row: dict, ledger, data_root=None) -> dict | None:
+    """Settle a darts pick from the cached match history; None while the result is unrecorded."""
+    from ..darts_forward import _player_matches
+    from ..darts_history import load_darts_history
+
+    if data_root is None:
+        return None
+    start = parse_utc(row["event_start_utc"])
+    home, away = str(row.get("home_team", "")), str(row.get("away_team", ""))
+    for record in load_darts_history(data_root):
+        gap_days = abs((date.fromisoformat(record.match_date) - start.date()).days)
+        if gap_days > 2:
+            continue
+        if _player_matches(home, record.player_a) and _player_matches(away, record.player_b):
+            home_legs, away_legs = record.legs_a, record.legs_b
+        elif _player_matches(home, record.player_b) and _player_matches(away, record.player_a):
+            home_legs, away_legs = record.legs_b, record.legs_a
+        else:
+            continue
+        slug = _extract_market_slug(str(row.get("rationale", "")))
+        closing_probability = closing_odds = None
+        if slug is not None:
+            try:
+                closing_probability, closing_odds = _closing_probability_for_moneyline_pick(
+                    data_root, "darts", slug, row["event_start_utc"], home, away, row.get("selection", "")
+                )
+            except (OSError, ValueError):
+                logger.warning("darts closing-snapshot lookup failed for slug %s", slug, exc_info=True)
+        try:
+            settled = ledger.settle(
+                row["pick_id"],
+                away_legs,
+                home_legs,
+                None,
+                closing_odds,
+                closing_raw_probability=closing_probability,
+            )
+        except (KeyError, ValueError) as error:
+            return {"pick_id": row["pick_id"], "reason": str(error)}
+        return {"pick_id": row["pick_id"], "settled": True, "result": settled["result"]}
+    return None
+
+
+def _settle_euroleague_pick(row: dict, ledger, data_root=None) -> dict | None:
+    """Settle a EuroLeague pick from the cached official results; None while unrecorded."""
+    import json
+
+    from ..data_sources.euroleague import games_path
+
+    if data_root is None or not games_path(data_root).exists():
+        return None
+    start = parse_utc(row["event_start_utc"])
+    home, away = str(row.get("home_team", "")), str(row.get("away_team", ""))
+    for line in games_path(data_root).read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        record = json.loads(line)
+        if record["home_team"] != home or record["away_team"] != away:
+            continue
+        if abs((parse_utc(record["event_start_utc"]) - start).total_seconds()) > 2 * 86400:
+            continue
+        try:
+            settled = ledger.settle(row["pick_id"], record["away_score"], record["home_score"], None, None)
+        except (KeyError, ValueError) as error:
+            return {"pick_id": row["pick_id"], "reason": str(error)}
+        return {"pick_id": row["pick_id"], "settled": True, "result": settled["result"]}
+    return None
+
+
+def _scores_for_outcome(market_type: str, selection: str, line, won: bool) -> tuple[int, int]:
+    """Minimal (away, home) scores that grade the pick ``won``/lost under ``grade_pick``.
+
+    Resolution tells us only whether the contract paid, which is all grading needs;
+    the scores are synthetic and never used for modelling.
+    """
+    import math
+
+    selection = selection.lower()
+    if market_type == "total":
+        over_score = (math.floor(float(line)) + 1, 0)  # total just above the line
+        under_score = (0, 0)
+        return over_score if (selection == "over") == won else under_score
+    if market_type == "spread":
+        # margin for the selected side must land on the covering side of the line
+        margin = math.floor(-float(line)) + 1 if won else math.floor(-float(line))
+        sel_score, other = max(margin, 0), max(-margin, 0)
+    else:
+        sel_score, other = (1, 0) if won else (0, 1)
+    return (other, sel_score) if selection == "home" else (sel_score, other)
+
+
+def _settle_by_resolution(row: dict, ledger, client=None) -> dict | None:
+    """Settle any pick from its Polymarket contract's terminal resolution.
+
+    Used when no results API covers the league. None while the market is unresolved or
+    the terminal prices are not a clean 1/0 (never guessed); the caller keeps the pick
+    pending and eventually voids it.
+    """
+    from ..data_sources.polymarket_us import PolymarketUSClient, _amount
+
+    slug = _extract_market_slug(str(row.get("rationale", "")))
+    market_type = str(row.get("market_type") or "").lower().split(".")[-1]
+    if slug is None or market_type not in {"moneyline", "spread", "total"}:
+        return None
+    client = client or PolymarketUSClient()
+    try:
+        market = client.market(slug)
+        book = client.book(slug)
+    except Exception:
+        logger.warning("resolution lookup failed for %s", slug, exc_info=True)
+        return None
+    if not _market_is_terminal(market, book):
+        return None
+    sides = market.get("marketSides", [])
+    prices = [(side, _amount(side.get("price"))) for side in sides]
+    if len(prices) != 2 or sorted(p for _, p in prices if p is not None) != [0.0, 1.0]:
+        return None
+    selection = str(row.get("selection") or "").lower()
+    own = None
+    if market_type == "total":
+        own = next(
+            (
+                side
+                for side, _ in prices
+                if str(side.get("description", "")).lower().startswith(selection[:1])
+            ),
+            None,
+        )
+    else:
+        team = str(row["home_team"] if selection == "home" else row["away_team"])
+        tkey = _identity_key(team)
+        for side, _ in prices:
+            name = _identity_key(str((side.get("team") or {}).get("name") or side.get("description") or ""))
+            if name and (name in tkey or tkey in name):
+                if market_type == "spread":
+                    try:
+                        if (
+                            abs(float(str(side.get("description")).replace("+", "")) - float(row["line"]))
+                            > 1e-6
+                        ):
+                            continue
+                    except (TypeError, ValueError):
+                        continue
+                own = side
+                break
+    if own is None:
+        return {"pick_id": row["pick_id"], "reason": f"resolution side unresolved for {slug}"}
+    won = next(price for side, price in prices if side is own) == 1.0
+    away, home = _scores_for_outcome(market_type, selection, row.get("line"), won)
+    try:
+        settled = ledger.settle(row["pick_id"], away, home, None, None)
+    except (KeyError, ValueError) as error:
+        return {"pick_id": row["pick_id"], "reason": str(error)}
+    return {
+        "pick_id": row["pick_id"],
+        "settled": True,
+        "result": settled["result"],
+        "source": "polymarket_resolution",
+    }
 
 
 _RESOLVED_MARKET_STATUSES = frozenset({"MARKET_STATUS_RESOLVED"})

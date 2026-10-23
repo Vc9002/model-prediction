@@ -46,6 +46,7 @@ class League(StrEnum):
     NCAAB = "NCAAB"
     WNCAAB = "WNCAAB"
     EUROLEAGUE = "EUROLEAGUE"
+    NBL = "NBL"
 
 
 # Canonical sport tuples — single source of truth for iteration and CLI choices.
@@ -82,6 +83,8 @@ ALL_SPORTS: tuple[str, ...] = (
     "darts",
     "ncaab",
     "wncaab",
+    "euroleague",
+    "nbl",
 )
 
 
@@ -361,6 +364,10 @@ class PickRequest:
             allowed = {"away", "home"}
             if self.line is None:
                 raise ValueError("spread calls require a selection-relative line")
+        elif self.market_type is MarketType.DOUBLE_CHANCE:
+            allowed = {"1x", "x2", "12"}
+            if self.line is not None:
+                raise ValueError("double-chance calls must not have a line")
         elif self.market_type is MarketType.BTTS:
             # A binary yes/no on both teams scoring, no line -- same shape
             # as moneyline's "draw" case, not a totals-style line bet.

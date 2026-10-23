@@ -137,9 +137,18 @@ class Ingestor:
             cache_is_stale = (
                 cached_payload is not None
                 and is_past_date
-                and bool(cached_payload.get("events"))
                 and (
-                    not completed_events or (sport_key != "tennis" and _has_unfinished_events(cached_payload))
+                    (
+                        sport_key == "ncaab"
+                        and cached_payload.get("_scoreboard_query_version") != "ncaab_division_i_v1"
+                    )
+                    or (
+                        bool(cached_payload.get("events"))
+                        and (
+                            not completed_events
+                            or (sport_key != "tennis" and _has_unfinished_events(cached_payload))
+                        )
+                    )
                 )
             )
             if cached_payload is not None and not cache_is_stale:
@@ -158,6 +167,8 @@ class Ingestor:
                             "detail": str(error)[:200],
                         },
                     )
+                if sport_key == "ncaab":
+                    payload["_scoreboard_query_version"] = "ncaab_division_i_v1"
                 raw_path.parent.mkdir(parents=True, exist_ok=True)
                 raw_path.write_text(
                     json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",

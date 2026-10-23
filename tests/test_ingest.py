@@ -1,5 +1,6 @@
 import json
 
+from model_prediction.data_sources.espn import ESPNClient
 from model_prediction.ingest import Ingestor
 
 
@@ -34,6 +35,34 @@ class FakeESPN:
                 }
             ]
         }
+
+
+def test_ncaab_scoreboard_requests_full_division_i_group(monkeypatch) -> None:
+    seen = {}
+
+    def fake_get(self, url, params):
+        seen.update(params)
+        return {"events": []}
+
+    monkeypatch.setattr(ESPNClient, "_get", fake_get)
+    ESPNClient().scoreboard("NCAAB", "2026-01-10")
+    assert seen == {"dates": "20260110", "limit": 500, "groups": 50}
+
+
+def test_ncaab_partial_featured_cache_is_refetched(tmp_path) -> None:
+    fake = FakeESPN()
+    ingestor = Ingestor(tmp_path, client=fake, rate_limit_seconds=0)
+    raw_path = ingestor.raw_dir("ncaab", "2026-01-10") / "scores_ncaab.json"
+    raw_path.parent.mkdir(parents=True)
+    raw_path.write_text(json.dumps({"events": []}))
+
+    first = ingestor.ingest_scores("ncaab", "2026-01-10")
+    second = ingestor.ingest_scores("ncaab", "2026-01-10")
+
+    assert first["fetched"] == 1
+    assert second["cached"] == 1
+    assert fake.calls == 1
+    assert json.loads(raw_path.read_text())["_scoreboard_query_version"] == "ncaab_division_i_v1"
 
 
 def test_ingest_is_idempotent_raw_immutable_processed_deduped(tmp_path) -> None:

@@ -12,8 +12,8 @@ Supports all 8 Polymarket hockey leagues:
 
 Markets:
   * moneyline (2-way full-game winner, including OT / shootout settlement)
-  * spread (puck line: home -1.5, away +1.5)
-  * total (full-game over/under: 5.5, 6.0, 6.5)
+  * spread (home-relative goal handicaps +/-1.5, 2.5, 3.5, OT/SO included)
+  * total (full-game over/under: 2.5 through 9.5)
 
 Point-in-time safety: ratings and feature inputs are calculated strictly from
 games completed before the target event start time.
@@ -31,6 +31,9 @@ from .base import GamePrediction, GamePredictionBase
 
 HOCKEY_MODEL_VERSION = "hockey-poisson-dc-v1"
 MAX_GOALS = 10
+# Home-handicap and total lines Polymarket lists for NHL (spreads +/-1.5..3.5, totals 2.5..9.5).
+SPREAD_LINES = (-3.5, -2.5, -1.5, 1.5, 2.5, 3.5)
+TOTAL_LINES = (2.5, 3.5, 4.5, 5.5, 6.0, 6.5, 7.5, 8.5, 9.5)
 
 # Baseline goals per team per game and home advantage boost by league
 LEAGUE_CONSTANTS: dict[str, dict[str, float]] = {
@@ -227,11 +230,17 @@ class HockeyModel:
                 home_ml /= total_ml
                 away_ml /= total_ml
 
-            # Spread (Puck line: -1.5 home / +1.5 away)
-            home_puckline = sum(
-                matrix[h][a] for h in range(MAX_GOALS + 1) for a in range(MAX_GOALS + 1) if h - a >= 2
-            )
-            away_puckline = 1.0 - home_puckline
+            # Final goal-margin distribution (home minus away) including OT/SO: a
+            # regulation tie is decided by exactly one goal, so its margin is +/-1.
+            margin_pmf: dict[int, float] = {}
+            for h in range(MAX_GOALS + 1):
+                for a in range(MAX_GOALS + 1):
+                    if h == a:
+                        margin_pmf[1] = margin_pmf.get(1, 0.0) + matrix[h][a] * p_ot_home
+                        margin_pmf[-1] = margin_pmf.get(-1, 0.0) + matrix[h][a] * p_ot_away
+                    else:
+                        margin_pmf[h - a] = margin_pmf.get(h - a, 0.0) + matrix[h][a]
+            margin_total = sum(margin_pmf.values())
 
             # Uncertainty calculation based on team observation count
             sample = min(home["games"], away["games"])
@@ -282,31 +291,34 @@ class HockeyModel:
                 )
             )
 
-            # 2. Spread (Puck line 1.5)
-            predictions.append(
-                GamePrediction(
-                    event_id=base["event_id"],
-                    event_start_utc=base["event_start_utc"],
-                    league=base["league"],
-                    away_team=base["away_team"],
-                    home_team=base["home_team"],
-                    uncertainty=base["uncertainty"],
-                    model_version=base["model_version"],
-                    feature_basis=base["feature_basis"],
-                    market_type="spread",
-                    line=1.5,
-                    probabilities={
-                        "home": round(home_puckline, 6),
-                        "away": round(away_puckline, 6),
-                    },
-                    rationale=f"Puckline 1.5: {home_puckline:.1%} home -1.5 cover",
+            # 2. Spread: ``line`` is the HOME team's handicap and ``home`` the probability
+            # that home + line beats away; ``away`` is the complementary away cover.
+            for spread_line in SPREAD_LINES:
+                home_cover = sum(p for m, p in margin_pmf.items() if m + spread_line > 0) / margin_total
+                predictions.append(
+                    GamePrediction(
+                        event_id=base["event_id"],
+                        event_start_utc=base["event_start_utc"],
+                        league=base["league"],
+                        away_team=base["away_team"],
+                        home_team=base["home_team"],
+                        uncertainty=base["uncertainty"],
+                        model_version=base["model_version"],
+                        feature_basis=base["feature_basis"],
+                        market_type="spread",
+                        line=spread_line,
+                        probabilities={
+                            "home": round(home_cover, 6),
+                            "away": round(1.0 - home_cover, 6),
+                        },
+                        rationale=f"Home {spread_line:+.1f} goals cover p={home_cover:.1%}",
+                    )
                 )
-            )
 
             # 3. Totals for lines 5.5, 6.0, 6.5 (including OT / shootout settlement)
             # In regulation, if h == a (tied game), exactly 1 game-winning goal is awarded in OT/SO,
             # so the realized game total is (h + a + 1). If h != a, the realized total is (h + a).
-            for line_val in (5.5, 6.0, 6.5):
+            for line_val in TOTAL_LINES:
                 prob_over = sum(
                     matrix[h][a]
                     for h in range(MAX_GOALS + 1)

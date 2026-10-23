@@ -21,6 +21,7 @@ from functools import wraps
 from pathlib import Path
 from typing import Any
 
+from ..college_basketball_forward import forecast_ncaab_sport
 from ..config import PROJECT_ROOT, ledger_path, polymarket_edge_enabled
 from ..daily_lock import acquire_lock, release_lock
 from ..data_sources.espn_probables import capture_probable_starter_snapshot
@@ -34,10 +35,13 @@ from ..data_sources.mlb_lineups import capture_and_store as capture_lineups_and_
 from ..data_sources.wnba_injuries import capture_latest_report
 from ..domain import LEARNED_PRODUCTION_SPORTS, utc_now
 from ..esports import forecast_esports_slate
+from ..euroleague_forward import forecast_euroleague_sport
 from ..ledger import defer_sqlite_xlsx_exports
 from ..main_ledgers import MultiSportPickLedger
 from ..mlb_baseline_refresh import refresh_if_due
+from ..nbl_forward import forecast_nbl_sport
 from ..research_ledgers import existing_research_ledgers
+from ..runtime_paths import RuntimePaths
 from .commands import (
     _clear_today_open,
     _polymarket_slate,
@@ -46,6 +50,8 @@ from .commands import (
 )
 from .forecast import (
     _forecast_cfb_sport,
+    _forecast_darts_sport,
+    _forecast_hockey_sport,
     _forecast_international_sport,
     _forecast_learned_sport,
     _forecast_mlb_nrfi_flat,
@@ -63,7 +69,12 @@ from .forecast import (
     _refresh_international_baseball_ratings,
 )
 from .settle import _settle_all_unsettled
-from .state import DAILY_INTERNATIONAL_BASEBALL_SPORTS, DAILY_LEARNED_SPORTS, ESPORTS_TITLES
+from .state import (
+    DAILY_ADDITIONAL_SPORTS,
+    DAILY_INTERNATIONAL_BASEBALL_SPORTS,
+    DAILY_LEARNED_SPORTS,
+    ESPORTS_TITLES,
+)
 
 logger = logging.getLogger("model_prediction.cli")
 
@@ -1030,7 +1041,32 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                         "logged": 0,
                     }
 
-    with ThreadPoolExecutor(max_workers=13) as research_pool:
+    def _additional_sport_task(sport: str, forecast_function) -> None:
+        try:
+            if sport == "hockey":
+                from ..hockey_history import refresh_hockey_history
+
+                forecast_result["_hockey_history_refresh"] = refresh_hockey_history(data_directory, args.date)
+            elif sport == "darts":
+                from ..darts_history import refresh_darts_history
+
+                forecast_result["_darts_history_refresh"] = refresh_darts_history(data_directory, args.date)
+            result = forecast_function(
+                data_root=data_directory,
+                args_date=args.date,
+                config=config,
+                research_ledger=None,
+                main_ledger=ledger,
+                flat_ledger=flat_ledger,
+            )
+            if result.get("errors"):
+                result["status"] = "error"
+            forecast_result[sport] = result
+        except Exception as exc:
+            logger.warning("%s forecast failed", sport, exc_info=True)
+            forecast_result[sport] = {"status": "error", "reason": str(exc), "logged": 0}
+
+    with ThreadPoolExecutor(max_workers=16) as research_pool:
         research_futures = [
             research_pool.submit(_mlb_totals_task),
             research_pool.submit(_mlb_nrfi_task),
@@ -1045,6 +1081,20 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             research_pool.submit(_nfl_total_task),
             research_pool.submit(_esports_block),
             research_pool.submit(_intl_baseball_block),
+            *(
+                research_pool.submit(_additional_sport_task, sport, forecast_function)
+                for sport, forecast_function in zip(
+                    DAILY_ADDITIONAL_SPORTS,
+                    (
+                        _forecast_hockey_sport,
+                        _forecast_darts_sport,
+                        forecast_ncaab_sport,
+                        forecast_euroleague_sport,
+                        forecast_nbl_sport,
+                    ),
+                    strict=True,
+                )
+            ),
         ]
 
         # Each task above already catches and logs its own real
@@ -1384,4 +1434,20 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         "step12_auto_polymarket_buyer": auto_buyer_result,
         "step12b_auto_buyer_fallback_reconcile": fallback_reconcile_result,
     }
+    from ..ledger_coverage import build_report
+
+    try:
+        coverage = build_report(
+            PROJECT_ROOT,
+            RuntimePaths.resolve(repo_root=PROJECT_ROOT).ledgers_db,
+            args.date,
+            report,
+        )
+        report["ledger_coverage"] = coverage
+        coverage_path = PROJECT_ROOT / "outputs/health/ledger_model_coverage.json"
+        coverage_path.parent.mkdir(parents=True, exist_ok=True)
+        coverage_path.write_text(json.dumps(coverage, indent=2) + "\n", encoding="utf-8")
+    except Exception as exc:
+        logger.warning("Ledger coverage verification failed", exc_info=True)
+        report["ledger_coverage"] = {"status": "error", "reason": str(exc)}
     return _finalize_daily_report(report)

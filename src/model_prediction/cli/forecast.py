@@ -111,7 +111,7 @@ def _is_registered_serving_model(model_version: str, sport: str, market: str) ->
         champion = ProductionModelRegistry.load(PROJECT_ROOT).champion(sport, market)
     except (FileNotFoundError, OSError, TypeError, ValueError):
         return False
-    return champion is not None and champion.model_id == model_version
+    return champion is not None and champion.available and champion.model_id == model_version
 
 
 def _downgrade_unserved(eligibility: Any, reason_code: str = "PAPER_CALL_MODEL_UNVALIDATED") -> Any:
@@ -158,8 +158,19 @@ def _canonical_market_snapshot_lineage(row: dict[str, Any], archive_path: Path) 
 
 def _read_polymarket_snapshot_rows(snapshot_path: Path) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    if not snapshot_path.is_file():
-        return rows
+    from ..snapshot_archives import snapshot_paths
+
+    sport = snapshot_path.parent.parent.name
+    paths = [snapshot_path] if snapshot_path.is_file() else []
+    if len(snapshot_path.parents) > 3 and snapshot_path.parents[2].name == "odds":
+        paths = snapshot_paths(snapshot_path.parents[3], sport, snapshot_path.parent.name)
+    for archive_path in paths:
+        rows.extend(_read_single_snapshot_archive(archive_path, sport))
+    return rows
+
+
+def _read_single_snapshot_archive(snapshot_path: Path, sport: str) -> list[dict[str, Any]]:
+    rows = []
     with snapshot_path.open(encoding="utf-8") as handle:
         for line in handle:
             if not line.strip():
@@ -167,6 +178,11 @@ def _read_polymarket_snapshot_rows(snapshot_path: Path) -> list[dict[str, Any]]:
             try:
                 row = json.loads(line)
             except json.JSONDecodeError:
+                continue
+            if (
+                snapshot_path.parent.parent.name == "basketball"
+                and str(row.get("league", "")).casefold() != sport.casefold()
+            ):
                 continue
             lineage = _canonical_market_snapshot_lineage(row, snapshot_path)
             if lineage is not None:
@@ -395,6 +411,13 @@ def _forecast_mlb_totals_flat(
         for candidate in candidates
         if candidate.market_type in (MarketType.TOTAL, MarketType.SPREAD)
     ]
+    if blend_policy is None:
+        from ..mlb_champion_forward import champion_candidates
+
+        totals_candidates, structural_skipped = champion_candidates(
+            totals_candidates, Path(ledger_path(config)).parent, PROJECT_ROOT, observed_at
+        )
+        skipped.extend(structural_skipped)
     stage1_config_path = config_path().resolve()
     try:
         stage1_config_bytes = stage1_config_path.read_bytes()
@@ -3513,7 +3536,10 @@ def _forecast_learned_sport(
             if quote is not None:
                 quote_lineage = _canonical_market_snapshot_lineage(
                     quote,
-                    data_root / "odds" / sport / args_date / "polymarket_snapshots.jsonl",
+                    Path(
+                        quote.get("_archive_path")
+                        or data_root / "odds" / sport / args_date / "polymarket_snapshots.jsonl"
+                    ),
                 )
                 if quote_lineage is None:
                     quote_warning = "executable_quote_lineage_unverifiable"
@@ -3892,33 +3918,43 @@ def _log_esports_forecast(
         m_type_str = str(contract.get("market_type") or "moneyline")
         m_type = MarketType(m_type_str)
 
-        if m_type_str == "total":
-            selection = "over" if "over" in selected_team.lower() else "under"
-            m_line = 2.5
-        elif m_type_str == "spread":
-            home_key = _identity_key(home_team)
-            away_key = _identity_key(away_team)
-            sel_key = _identity_key(selected_team)
-            if home_key in sel_key:
-                selection = "home"
-            elif away_key in sel_key:
-                selection = "away"
-            else:
-                selection = "home" if home_team in selected_team else "away"
+        # Persist the selected contract exactly; never fabricate a default line
+        # or recover identity from an ambiguous team-name substring.
+        try:
+            if m_type_str == "total":
+                label = selected_team.strip().lower()
+                if label not in {"over", "under"}:
+                    raise ValueError("unresolved total selection")
+                selection = label
+                m_line = float(contract["line"])
+                if m_line not in {2.5, 3.5, 4.5}:
+                    raise ValueError("unsupported exact total line")
+            elif m_type_str == "spread":
+                import re
 
-            if "-1.5" in selected_team:
-                m_line = -1.5
-            elif "+1.5" in selected_team:
-                m_line = 1.5
+                label = re.fullmatch(r"(.+?)\s+([+-](?:1\.5|2\.5))", selected_team.strip())
+                if label is None:
+                    raise ValueError("unresolved signed spread selection")
+                selected_key = _identity_key(label.group(1))
+                team_keys = [_identity_key(home_team), _identity_key(away_team)]
+                if team_keys.count(selected_key) != 1:
+                    raise ValueError("unresolved spread team")
+                selection = "home" if selected_key == team_keys[0] else "away"
+                m_line = float(label.group(2))
+                if abs(float(contract["line"])) != abs(m_line):
+                    raise ValueError("spread selection/contract line mismatch")
             else:
-                raw_line = contract.get("line")
-                m_line = float(raw_line) if raw_line is not None else (-1.5 if selection == "home" else 1.5)
-        else:
-            pick_is_home = selected_team == home_team or _identity_key(selected_team) == _identity_key(
-                home_team
+                team_keys = [_identity_key(home_team), _identity_key(away_team)]
+                selected_key = _identity_key(selected_team)
+                if team_keys.count(selected_key) != 1:
+                    raise ValueError("unresolved moneyline team")
+                selection = "home" if selected_key == team_keys[0] else "away"
+                m_line = None
+        except (KeyError, TypeError, ValueError) as error:
+            errors.append(
+                {"event_id": contract.get("event_id"), "reason": f"Invalid exact contract: {error}"}
             )
-            selection = "home" if pick_is_home else "away"
-            m_line = None
+            continue
 
         american_odds = probability_to_american(ask)
         from ..esports_replay import build_snapshot as build_esports_snapshot
@@ -3960,7 +3996,13 @@ def _log_esports_forecast(
             rationale=(
                 f"Neutral Elo baseline; executable ask {ask:.4f} (market_slug={contract['market_slug']})."
             ),
-            risks="Config-promoted esports baseline; gates enforced at log time.",
+            risks=(
+                "Paper observation; "
+                f"actionable_inputs_valid={model_inputs_valid}; "
+                f"input_ineligibility={contract.get('gated_research_ineligibility_reason') or 'none'}; "
+                f"series_format_source={contract.get('series_format_source') or 'not_recorded'}; "
+                f"team_resolution_methods={contract.get('team_resolution_methods') or 'not_recorded'}."
+            ),
             model_origin=ModelOrigin.STATISTICAL_MODEL,
             model_state=ModelState(configured_state),
             observed_at_utc=str(contract.get("observed_at_utc") or "") or None,
@@ -5044,6 +5086,9 @@ def _forecast_hockey_sport(
     from ..hockey_forward import build_hockey_slate
     from ..models.hockey import hockey_model
 
+    model = hockey_model()
+    if not _is_registered_serving_model(model.version, "HOCKEY", "moneyline"):
+        raise ValueError(f"HOCKEY moneyline champion does not match executable model {model.version}")
     model_config = config.get("models", {}).get("HOCKEY", {})
     leagues = tuple(model_config.get("leagues") or ())
     min_edge = float(model_config.get("min_edge", 0.02))
@@ -5058,7 +5103,7 @@ def _forecast_hockey_sport(
         game_date=args_date,
         leagues=leagues,
         observed_at=utc_now(),
-        model=hockey_model(),
+        model=model,
         min_team_games=int(model_config.get("min_team_games", 0)),
     )
 
@@ -5078,7 +5123,21 @@ def _forecast_hockey_sport(
 
     for contract in forecast.get("priced", []):
         try:
+            if parse_utc(str(contract["event_start_utc"])) <= effective_now:
+                forecast.setdefault("skipped", []).append(
+                    {"event_id": contract.get("event_id"), "reason": "event_started"}
+                )
+                continue
             m_type = str(contract.get("market_type") or "moneyline")
+            if not _is_registered_serving_model(model.version, "HOCKEY", m_type):
+                forecast.setdefault("skipped", []).append(
+                    {
+                        "event_id": contract.get("event_id"),
+                        "reason": "market_has_no_serving_champion",
+                        "market": m_type,
+                    }
+                )
+                continue
             market_type_enum = MarketType(m_type)
             sel_str = str(contract.get("selection") or "home").lower()
             line_val = None if contract.get("line") is None else float(contract["line"])
@@ -5097,13 +5156,14 @@ def _forecast_hockey_sport(
                 market_type=market_type_enum,
                 selection=sel_str,
                 line=line_val,
-                sportsbook="polymarket_us",
+                sportsbook="model_opinion_indicative_market",
                 american_odds=probability_to_american(ask_val),
                 model_probability=prob_val,
                 model_uncertainty=float(contract.get("model_uncertainty") or 0.1),
                 model_version=str(contract.get("model_version") or "hockey-poisson-dc-v1"),
                 rationale=(
-                    f"{contract.get('rationale', '')} Executable ask {ask_val:.4f} ({contract.get('market_slug', '')})."
+                    f"{contract.get('rationale', '')} Indicative market price {ask_val:.4f} "
+                    f"({contract.get('market_slug', '')}); executable BBO unverified."
                 ),
                 risks=("Paper-mode hockey score model; bivariate Poisson with OT resolution."),
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
@@ -5177,7 +5237,13 @@ def _forecast_hockey_sport(
                         logged += 1
                     else:
                         research_duplicates += 1
-                if main_ledger is not None and contract_edge >= min_edge and eligibility.decision == "CALL":
+                # Spread/total are unverified (no settled-pick record): flat/research only.
+                if (
+                    main_ledger is not None
+                    and m_type == "moneyline"
+                    and contract_edge >= min_edge
+                    and eligibility.decision == "CALL"
+                ):
                     if (
                         _append_secondary_ledger(
                             main_ledger, request, eligibility, effective_now, "hockey:main_ledger"
@@ -5220,6 +5286,9 @@ def _forecast_darts_sport(
     from ..data_sources.polymarket_us import probability_to_american
     from ..models.darts import darts_model
 
+    model = darts_model()
+    if not _is_registered_serving_model(model.version, "DARTS", "moneyline"):
+        raise ValueError(f"DARTS moneyline champion does not match executable model {model.version}")
     model_config = config.get("models", {}).get("DARTS", {})
     leagues = tuple(model_config.get("leagues") or ())
     min_edge = float(model_config.get("min_edge", 0.02))
@@ -5234,8 +5303,13 @@ def _forecast_darts_sport(
         game_date=args_date,
         leagues=leagues,
         observed_at=utc_now(),
-        model=darts_model(),
-        min_team_matches=int(model_config.get("min_team_matches", 0)),
+        model=model,
+        min_team_matches=int(model_config.get("min_team_matches", 5)),
+    )
+    # Darts stays flat-ledger-only until the model is promoted: main_ledger_enabled opts in.
+    baseline_only = not bool(model.match_counts)
+    forecast["training_status"] = (
+        "untrained_equal_rating_baseline" if baseline_only else "observed_match_history"
     )
 
     exposure_source = research_ledger or flat_ledger or main_ledger
@@ -5254,7 +5328,21 @@ def _forecast_darts_sport(
 
     for contract in forecast.get("priced", []):
         try:
+            if parse_utc(str(contract["event_start_utc"])) <= effective_now:
+                forecast.setdefault("skipped", []).append(
+                    {"event_id": contract.get("event_id"), "reason": "event_started"}
+                )
+                continue
             m_type = str(contract.get("market_type") or "moneyline")
+            if not _is_registered_serving_model(model.version, "DARTS", m_type):
+                forecast.setdefault("skipped", []).append(
+                    {
+                        "event_id": contract.get("event_id"),
+                        "reason": "market_has_no_serving_champion",
+                        "market": m_type,
+                    }
+                )
+                continue
             market_type_enum = MarketType(m_type)
             sel_str = str(contract.get("selection") or "home").lower()
             line_val = None if contract.get("line") is None else float(contract["line"])
@@ -5271,13 +5359,14 @@ def _forecast_darts_sport(
                 market_type=market_type_enum,
                 selection=sel_str,
                 line=line_val,
-                sportsbook="polymarket_us",
+                sportsbook="model_opinion_indicative_market",
                 american_odds=probability_to_american(ask_val),
                 model_probability=prob_val,
                 model_uncertainty=float(contract.get("model_uncertainty") or 0.1),
                 model_version=str(contract.get("model_version") or "darts-markov-v1"),
                 rationale=(
-                    f"{contract.get('rationale', '')} Executable ask {ask_val:.4f} ({contract.get('market_slug', '')})."
+                    f"{contract.get('rationale', '')} Indicative market price {ask_val:.4f} "
+                    f"({contract.get('market_slug', '')}); executable BBO unverified."
                 ),
                 risks=("Paper-mode darts score model; exact Markov leg-progression distribution."),
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
@@ -5312,9 +5401,15 @@ def _forecast_darts_sport(
             )
             eligibility = EligibilityResult(
                 record_type=RecordType.RESEARCH_OBSERVATION,
-                decision="CALL" if contract_edge >= min_edge else "NO_CALL",
-                reason_code="PAPER_CALL_MODEL_QUALIFIED" if contract_edge >= min_edge else "NO_CALL_LOW_EDGE",
-                units=1.0 if contract_edge >= min_edge else 0.0,
+                decision="CALL" if not baseline_only and contract_edge >= min_edge else "NO_CALL",
+                reason_code=(
+                    "NO_CALL_UNTRAINED_MODEL"
+                    if baseline_only
+                    else "PAPER_CALL_MODEL_QUALIFIED"
+                    if contract_edge >= min_edge
+                    else "NO_CALL_LOW_EDGE"
+                ),
+                units=1.0 if not baseline_only and contract_edge >= min_edge else 0.0,
                 confidence_score=round(prob_val * 100),
                 edge=round(contract_edge, 6),
                 adjusted_edge=round(contract_edge, 6),
@@ -5343,7 +5438,12 @@ def _forecast_darts_sport(
                         logged += 1
                     else:
                         research_duplicates += 1
-                if main_ledger is not None and contract_edge >= min_edge and eligibility.decision == "CALL":
+                if (
+                    main_ledger is not None
+                    and model_config.get("main_ledger_enabled", False)
+                    and contract_edge >= min_edge
+                    and eligibility.decision == "CALL"
+                ):
                     if (
                         _append_secondary_ledger(
                             main_ledger, request, eligibility, effective_now, "darts:main_ledger"
@@ -5427,8 +5527,10 @@ def _append_secondary_ledger(
         logger.debug("%s: duplicate suppressed for existing pick %s", ledger_name, error.pick_id)
         return error.pick_id
     except ValueError as error:
-        logger.debug("%s: secondary append skipped (%s)", ledger_name, error)
-        return None
+        # None means a new durable row to every caller's counter. Returning
+        # it on rejection falsely reported successful writes for whole sports.
+        logger.warning("%s: ledger rejected pick (%s)", ledger_name, error)
+        raise
 
 
 def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict:
@@ -5568,6 +5670,36 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
                 config=config,
                 main_ledger=(ledger if log else None),
                 flat_ledger=(flat_ledger if log else None),
+            )
+        elif sport == "ncaab":
+            from ..college_basketball_forward import forecast_ncaab_sport
+
+            results[sport] = forecast_ncaab_sport(
+                data_root=data_directory,
+                args_date=args.date,
+                config=config,
+                main_ledger=ledger if log else None,
+                flat_ledger=flat_ledger if log else None,
+            )
+        elif sport == "nbl":
+            from ..nbl_forward import forecast_nbl_sport
+
+            results[sport] = forecast_nbl_sport(
+                data_root=data_directory,
+                args_date=args.date,
+                config=config,
+                main_ledger=ledger if log else None,
+                flat_ledger=flat_ledger if log else None,
+            )
+        elif sport == "euroleague":
+            from ..euroleague_forward import forecast_euroleague_sport
+
+            results[sport] = forecast_euroleague_sport(
+                data_root=data_directory,
+                args_date=args.date,
+                config=config,
+                main_ledger=ledger if log else None,
+                flat_ledger=flat_ledger if log else None,
             )
         elif sport in LEARNED_PRODUCTION_SPORTS:
             use_ledger = flat_ledger if is_flat else ledger

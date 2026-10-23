@@ -1,5 +1,8 @@
 """Tests for College Football Structural v2 Model (cfb-structural-v2)."""
 
+import json
+
+from model_prediction.config import PROJECT_ROOT
 from model_prediction.models.cfb_structural_v2 import (
     CFB_V2_MODEL_VERSION,
     CFBStructuralV2Model,
@@ -37,7 +40,8 @@ def test_cfb_structural_v2_forecast_coherence():
 
 def test_cfb_structural_v2_calibrated_dispersion():
     model = CFBStructuralV2Model()
-    assert model.total_sd == 17.5
+    artifact = json.loads((PROJECT_ROOT / "config/models/cfb-structural-v2.json").read_text())
+    assert model.total_sd == artifact["total_sd"]
     assert model.distribution_engine.score_correlation == 0.20
 
 

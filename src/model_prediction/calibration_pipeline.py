@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -35,6 +36,53 @@ from .main_ledgers import MultiSportPickLedger
 from .research_ledgers import existing_research_ledgers
 
 logger = logging.getLogger("model_prediction.calibration")
+
+ESPORTS_CALIBRATION_TITLES = frozenset({"cs2", "dota2", "lol", "valorant", "rainbow_six"})
+
+
+def _esports_calibration_rows(rows: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    """One latest settled decision per contract/model, ordered by decision time.
+
+    A workbook's insertion order is not a temporal split. In particular, the
+    retired research ledgers contain repeated forecasts and backfilled rows.
+    Non-esports records retain the existing extraction behavior.
+    """
+    other: list[dict[str, Any]] = []
+    latest: dict[tuple[str, ...], tuple[datetime, dict[str, Any]]] = {}
+    for row in rows:
+        sport = str(row.get("sport") or row.get("league") or "").strip().lower()
+        if sport not in ESPORTS_CALIBRATION_TITLES:
+            other.append(row)
+            continue
+        if row.get("status") != "settled":
+            continue
+        event = str(row.get("canonical_event_id") or row.get("event_id") or "").strip()
+        model = str(row.get("model_version") or row.get("model_id") or "").strip()
+        selection = str(row.get("selection") or "").strip().lower()
+        try:
+            observed = datetime.fromisoformat(str(row.get("created_at_utc") or ""))
+            if observed.tzinfo is None:
+                continue
+            observed = observed.astimezone(UTC)
+        except (TypeError, ValueError):
+            continue
+        if not event or not model or not selection:
+            continue
+        raw_line = row.get("line")
+        try:
+            line = "" if raw_line is None or raw_line == "" else str(float(raw_line))
+            if line and not math.isfinite(float(line)):
+                continue
+            if line and float(line) == 0:
+                line = "0.0"
+        except (TypeError, ValueError):
+            continue
+        market = str(row.get("market_type") or row.get("market") or "moneyline").strip().lower()
+        key = (sport, event, market, selection, line, model)
+        if key not in latest or observed > latest[key][0]:
+            latest[key] = (observed, row)
+    return other + [row for _, row in sorted(latest.values(), key=lambda pair: pair[0])]
+
 
 CALIBRATION_OUTPUT_DIR = PROJECT_ROOT / "outputs" / "calibration"
 CALIBRATION_DATA_DIR = PROJECT_ROOT / "data" / "calibration"
@@ -81,7 +129,21 @@ def extract_settled_model_predictions(
     def _ingest_rows(rows: Sequence[dict[str, Any]], tier_name: str) -> None:
         if tier_filter and tier_filter != tier_name:
             return
-        for row in rows:
+        # Retain authority even when all Flat rows fail eligibility. Otherwise
+        # an empty canonical sample silently falls back to retired research.
+        if tier_name == "flat":
+            for row in rows:
+                sport = str(row.get("sport") or row.get("league") or "").strip().lower()
+                model = str(row.get("model_version") or row.get("model_id") or "").strip()
+                market = str(row.get("market_type") or row.get("market") or "moneyline").strip().lower()
+                if sport not in ESPORTS_CALIBRATION_TITLES or not model or model == "unknown":
+                    continue
+                if sport_filter and sport_filter.lower() != sport:
+                    continue
+                if market_filter and market_filter.lower() != market:
+                    continue
+                results.setdefault((sport, market, model, tier_name), ([], []))
+        for row in _esports_calibration_rows(rows):
             if row.get("status") != "settled":
                 continue
 
@@ -95,11 +157,18 @@ def extract_settled_model_predictions(
                 continue
 
             # Parse model probability
-            raw_prob = (
-                row.get("model_probability")
-                or row.get("probability")
-                or row.get("calibrated_probability")
-                or row.get("serving_probability")
+            raw_prob = next(
+                (
+                    row.get(name)
+                    for name in (
+                        "model_probability",
+                        "probability",
+                        "calibrated_probability",
+                        "serving_probability",
+                    )
+                    if row.get(name) is not None and row.get(name) != ""
+                ),
+                None,
             )
             if raw_prob is None or raw_prob == "":
                 continue
@@ -118,7 +187,7 @@ def extract_settled_model_predictions(
             if market_filter and market_filter.lower() != market:
                 continue
 
-            model_version = str(row.get("model_version") or "unknown").strip()
+            model_version = str(row.get("model_version") or row.get("model_id") or "unknown").strip()
             if not model_version or model_version == "unknown":
                 continue
 
@@ -422,32 +491,81 @@ def run_full_calibration_pipeline(
     if update_artifacts:
         models_dir = cal_data_dir / "models"
         models_dir.mkdir(parents=True, exist_ok=True)
+        # The same settled picks sit in several ledger tiers (main/flat/research),
+        # so a model has several records per market. One artifact per
+        # (model_version, market): canonical Flat wins for esports, otherwise
+        # the largest sample wins. Identity also replaces stale fitted files.
+        best: dict[tuple[str, str], ModelCalibrationRecord] = {}
+        canonical_flat = {
+            (model, market): (sport, len(probs))
+            for (sport, market, model, tier), (probs, _) in grouped_data.items()
+            if sport.lower() in ESPORTS_CALIBRATION_TITLES and tier == "flat"
+        }
         for r in records:
-            if r.champion_calibrator_method != "identity":
-                artifact_path = models_dir / f"{r.model_version}_calibrator.json"
-                artifact_payload = {
-                    "sport": r.sport,
-                    "market": r.market,
-                    "model_version": r.model_version,
-                    "champion_method": r.champion_calibrator_method,
-                    "parameters": r.champion_calibrator_params,
-                    "sample_size": r.sample_size,
-                    "baseline_brier": r.brier_score,
-                    "calibrated_oof_brier": r.scorecard.get(r.champion_calibrator_method, {}).get(
-                        "oof_brier_score"
-                    ),
-                    "calibrated_at_utc": now_iso,
-                }
-                artifact_path.write_text(
-                    json.dumps(artifact_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-                )
+            key = (r.model_version, r.market)
+            if key in canonical_flat and r.tier != "flat":
+                continue
+            current = best.get(key)
+            # Flat is the complete canonical esports cohort after the ledger
+            # merge. A larger retired research tier may contain stale history;
+            # it must not displace the current cohort merely through volume.
+            prefer_flat = r.sport.lower() in ESPORTS_CALIBRATION_TITLES
+            candidate_rank = (int(prefer_flat and r.tier == "flat"), r.sample_size)
+            current_rank = (
+                int(prefer_flat and current is not None and current.tier == "flat"),
+                current.sample_size if current is not None else -1,
+            )
+            if current is None or candidate_rank > current_rank:
+                best[key] = r
+        for r in best.values():
+            artifact_payload = {
+                "sport": r.sport,
+                "market": r.market,
+                "model_version": r.model_version,
+                "champion_method": r.champion_calibrator_method,
+                "parameters": r.champion_calibrator_params,
+                "sample_size": r.sample_size,
+                "baseline_brier": r.brier_score,
+                "calibrated_oof_brier": r.scorecard.get(r.champion_calibrator_method, {}).get(
+                    "oof_brier_score"
+                ),
+                "calibrated_at_utc": now_iso,
+            }
+            _calibrator_artifact_path(cal_data_dir, r.model_version, r.market).write_text(
+                json.dumps(artifact_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+        for (model, market), (sport, count) in canonical_flat.items():
+            if (model, market) in best:
+                continue
+            # Revoke any stale fitted file when the authoritative cohort cannot
+            # support calibration; skipping publication would leave it active.
+            payload = {
+                "sport": sport,
+                "market": market,
+                "model_version": model,
+                "champion_method": "identity",
+                "parameters": {},
+                "sample_size": count,
+                "baseline_brier": None,
+                "calibrated_oof_brier": None,
+                "calibrated_at_utc": now_iso,
+                "reason": "canonical_flat_insufficient_evidence",
+            }
+            _calibrator_artifact_path(cal_data_dir, model, market).write_text(
+                json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
 
     return report
+
+
+def _calibrator_artifact_path(cal_data_dir: Path, model_version: str, market: str) -> Path:
+    return cal_data_dir / "models" / f"{model_version}.{market}_calibrator.json"
 
 
 def load_model_calibrator(
     model_version: str,
     data_root: str | Path | None = None,
+    market: str | None = None,
 ) -> Any | None:
     """Load the automated re-fit calibrator artifact for a given model version.
 
@@ -455,7 +573,11 @@ def load_model_calibrator(
     BetaCalibrator, IsotonicCalibrator, or IdentityCalibrator) or None if absent.
     """
     data_path = Path(data_root) if data_root else PROJECT_ROOT / "data"
-    artifact_path = data_path / "calibration" / "models" / f"{model_version}_calibrator.json"
+    artifact_path = (
+        _calibrator_artifact_path(data_path / "calibration", model_version, market)
+        if market
+        else data_path / "calibration" / "models" / f"{model_version}_calibrator.json"
+    )
     if not artifact_path.exists():
         return None
 
@@ -508,3 +630,71 @@ def calibrate_model_probability(
     if cal is None:
         return probability
     return float(cal.transform(probability))
+
+
+# A fitted calibrator is applied to live probabilities only when it is trustworthy:
+# enough settled picks, and an out-of-fold Brier that actually beats the raw model.
+# The tournament's champion can lose to the raw model (wnba-elo-trend-lr-v4,
+# 2026-10-21: calibrated OOF Brier 0.1962 vs raw 0.1882), so the artifact's own
+# numbers are re-checked here rather than trusted.
+MIN_SERVING_SAMPLE = 100
+MIN_SERVING_BRIER_IMPROVEMENT = 0.001
+SERVING_PROBABILITY_BOUNDS = (0.01, 0.99)
+
+
+@dataclass(frozen=True)
+class ServingCalibration:
+    probability: float
+    raw_probability: float
+    applied: bool
+    method: str
+    reason: str
+
+
+def calibrate_for_serving(
+    model_version: str,
+    market: str,
+    probability: float,
+    data_root: str | Path | None = None,
+) -> ServingCalibration:
+    """Map a raw pick probability through the model's calibrator when it passes the guard.
+
+    Never raises: any problem leaves the raw probability untouched and says why.
+    """
+
+    def raw(reason: str) -> ServingCalibration:
+        return ServingCalibration(probability, probability, False, "identity", reason)
+
+    data_path = Path(data_root) if data_root else PROJECT_ROOT / "data"
+    path = _calibrator_artifact_path(data_path / "calibration", model_version, market)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return raw("no_artifact")
+    except (OSError, ValueError):
+        return raw("unreadable_artifact")
+    method = str(payload.get("champion_method") or "identity").lower()
+    if method == "identity":
+        return raw("identity_champion")
+    try:
+        if str(payload.get("market")) != market or str(payload.get("model_version")) != model_version:
+            return raw("artifact_mismatch")
+        if int(payload.get("sample_size") or 0) < MIN_SERVING_SAMPLE:
+            return raw("sample_too_small")
+        baseline, oof = payload.get("baseline_brier"), payload.get("calibrated_oof_brier")
+        if baseline is None or oof is None or float(baseline) - float(oof) < MIN_SERVING_BRIER_IMPROVEMENT:
+            return raw("no_oof_improvement")
+    except (TypeError, ValueError):
+        return raw("unreadable_artifact")
+    calibrator = load_model_calibrator(model_version, data_root=data_path, market=market)
+    if calibrator is None:
+        return raw("unreadable_artifact")
+    try:
+        mapped = float(calibrator.transform(probability))
+    except (TypeError, ValueError, ArithmeticError):
+        return raw("transform_failed")
+    if not math.isfinite(mapped):
+        return raw("transform_failed")
+    low, high = SERVING_PROBABILITY_BOUNDS
+    mapped = min(high, max(low, mapped))
+    return ServingCalibration(mapped, probability, True, f"{method}-recalibrated-v1", "applied")

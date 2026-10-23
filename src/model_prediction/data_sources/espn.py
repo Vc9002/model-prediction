@@ -101,6 +101,7 @@ LEAGUE_PATHS: dict[str, str] = {
     "AFCON": "soccer/caf.nations",
     "ASIAN_CUP": "soccer/afc.asian.cup",
     "NCAAB": "basketball/mens-college-basketball",
+    "NBL": "basketball/nbl",
     "WNCAAB": "basketball/womens-college-basketball",
     "NHL": "hockey/nhl",
     "MENS_COLLEGE_HOCKEY": "hockey/mens-college-hockey",
@@ -250,9 +251,13 @@ class ESPNClient:
             raise ValueError(f"unsupported ESPN league: {league}") from error
 
     def scoreboard(self, league: str, game_date: str) -> dict[str, Any]:
+        params: dict[str, Any] = {"dates": game_date.replace("-", ""), "limit": 100}
+        if league.upper() == "NCAAB":
+            # The default feed is a featured-games subset even with limit=100.
+            params.update(groups=50, limit=500)
         return self._get(
             f"{SITE_API}/{self._league_path(league)}/scoreboard",
-            {"dates": game_date.replace("-", ""), "limit": 100},
+            params,
         )
 
     def summary(self, league: str, event_id: str) -> dict[str, Any]:

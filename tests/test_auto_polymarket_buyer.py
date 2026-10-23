@@ -12,6 +12,7 @@ import httpx
 import pytest
 
 from model_prediction.audit import AuditLog
+from model_prediction.calibration_pipeline import ServingCalibration
 from model_prediction.domain import iso_utc, utc_now
 from model_prediction.portfolio.auto_buyer_ledger import (
     read_auto_buyer_ledger,
@@ -46,6 +47,14 @@ def _isolate_auto_buyer_daily_totals(monkeypatch):
     monkeypatch.setattr(
         "model_prediction.portfolio.auto_executor._today_auto_buyer_totals",
         lambda *_a, **_k: (0.0, 0.0),
+    )
+    # Same isolation for fitted calibrators: buyers built without data_root would
+    # otherwise read whatever artifacts the real daily run last wrote.
+    monkeypatch.setattr(
+        "model_prediction.portfolio.auto_executor.calibrate_for_serving",
+        lambda _model, _market, probability, **_k: ServingCalibration(
+            probability, probability, False, "identity", "test_isolation"
+        ),
     )
 
 

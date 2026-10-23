@@ -1640,7 +1640,15 @@ class PickLedger:
                         "pick_ids": [row["pick_id"] for row in imported],
                     },
                 )
+                if self.authority == "sqlite":
+                    for row in imported:
+                        self._mirror_row(
+                            row, "append", f"op-import-{row['pick_id']}", note=f"{source}: {reason}"
+                        )
                 self._write_rows(existing)
+        if self.authority != "sqlite":
+            for row in imported:
+                self._mirror_row(row, "append", f"op-import-{row['pick_id']}", note=f"{source}: {reason}")
         return [row["pick_id"] for row in imported]
 
     def void(

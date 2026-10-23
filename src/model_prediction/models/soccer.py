@@ -280,8 +280,9 @@ class SoccerModel:
                     )
                 )
 
-            # Spreads / Handicaps (-1.5, 1.5)
-            for s_line in (-1.5, 1.5):
+            # Spreads / Handicaps: ``line`` is the HOME handicap, ``home`` the probability
+            # that home + line beats away.
+            for s_line in (-2.5, -1.5, -0.5, 0.5, 1.5, 2.5):
                 home_cov = sum(
                     matrix[h][a]
                     for h in range(MAX_GOALS + 1)

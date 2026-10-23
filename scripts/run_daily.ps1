@@ -80,7 +80,7 @@ Write-Log ("MLB v9 settlement took: {0}s" -f [int]$Stopwatch.Elapsed.TotalSecond
 # sport's two dates stay sequential to avoid racing on the same file.
 Write-Log '--- Step 1b: Historical game ingestion ---'
 $Stopwatch.Restart()
-$Sports = @('mlb', 'nba', 'wnba', 'nfl', 'ncaaf', 'tennis')
+$Sports = @('mlb', 'nba', 'wnba', 'nfl', 'ncaaf', 'ncaab', 'tennis')
 $IngestExit = 0
 foreach ($sport in $Sports) {
     foreach ($d in @($Yesterday, $RunDate)) {

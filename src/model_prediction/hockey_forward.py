@@ -23,6 +23,7 @@ import unicodedata
 from collections.abc import Sequence
 from datetime import date, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 from .data_sources.polymarket_us import (
@@ -140,10 +141,42 @@ def _load_historical_games(data_root: str | Path, league: str | None = None) -> 
                 with p.open(encoding="utf-8") as f:
                     for line in f:
                         if line.strip():
-                            games.append(json.loads(line))
+                            row = json.loads(line)
+                            if row.get("completed") is True:
+                                games.append(SimpleNamespace(**row))
             except (json.JSONDecodeError, OSError) as e:
                 logger.debug("error reading %s: %s", p, e)
     return games
+
+
+def _resolve_names(market_name: str, names: set[str]) -> list[str]:
+    """History names matching a market team name; ties break on the nickname (last word).
+
+    "NJD Devils" fuzzy-matches three New York/New Jersey clubs, but only one is "Devils".
+    """
+    matches = [name for name in names if _team_matches(market_name, name)]
+    if len(matches) > 1:
+        nickname = market_name.split()[-1].casefold()
+        narrowed = [name for name in matches if name.split()[-1].casefold() == nickname]
+        if narrowed:
+            return narrowed
+    return matches
+
+
+def _main_line_market(markets: list[dict[str, Any]], kind: str) -> dict[str, Any] | None:
+    """The most balanced two-sided market of ``kind`` (the main line).
+
+    Alternate lines repeat one opinion and would multiply correlated ledger rows.
+    """
+    candidates = [m for m in markets if m.get("market_type") == kind and len(m.get("sides", [])) == 2]
+
+    def imbalance(market: dict[str, Any]) -> float:
+        prices = [
+            float(s["price_probability"]) for s in market["sides"] if s.get("price_probability") is not None
+        ]
+        return max((abs(p - 0.5) for p in prices), default=1.0)
+
+    return min(candidates, key=imbalance) if candidates else None
 
 
 def _parse_teams_from_event(event: dict[str, Any]) -> tuple[str, str]:
@@ -190,7 +223,7 @@ def build_hockey_slate(
     m = model or hockey_model()
     market_client = client or PolymarketUSClient()
 
-    history = _load_historical_games(data_root)
+    history = [g for g in _load_historical_games(data_root) if str(g.start)[:10] < str(game_date)[:10]]
 
     events_by_league: dict[str, list[dict[str, Any]]] = {}
     upcoming_matches: list[UpcomingHockeyMatch] = []
@@ -211,7 +244,21 @@ def build_hockey_slate(
             for ev in events:
                 ev_id = str(ev.get("event_id") or ev.get("id", ""))
                 events_map[ev_id] = ev
-                away_t, home_t = _parse_teams_from_event(ev)
+                # Team names come from the moneyline market only: spread/total sides are
+                # "+1.5"/"Over", and hydrated events list markets in arbitrary order.
+                moneylines = [m for m in ev.get("markets", []) if m.get("market_type") == "moneyline"]
+                away_t, home_t = _parse_teams_from_event({**ev, "markets": moneylines})
+                # Polymarket commonly supplies nicknames ("Avalanche"), while
+                # result history supplies full names ("Colorado Avalanche").
+                names = {
+                    name for game in history if game.league == lg for name in (game.away_team, game.home_team)
+                }
+                away_matches = _resolve_names(away_t, names)
+                home_matches = _resolve_names(home_t, names)
+                if len(away_matches) == 1:
+                    away_t = away_matches[0]
+                if len(home_matches) == 1:
+                    home_t = home_matches[0]
                 start_utc = str(ev.get("event_start_utc") or ev.get("startTime", ""))
                 upcoming_matches.append(
                     UpcomingHockeyMatch(
@@ -242,9 +289,23 @@ def build_hockey_slate(
             unmatched.append({"event_id": ev_id, "reason": "no model predictions generated"})
             continue
 
+        sample = min(float(p.feature_basis.get("min_team_games", 0)) for p in preds)
+        if sample < min_team_games:
+            unmatched.append(
+                {
+                    "event_id": ev_id,
+                    "reason": "insufficient_team_history",
+                    "observed_team_games": sample,
+                    "required_team_games": min_team_games,
+                }
+            )
+            continue
+
         pred_ml = next((p for p in preds if p.market_type == "moneyline"), None)
-        pred_spread = next((p for p in preds if p.market_type == "spread"), None)
-        pred_totals = [p for p in preds if p.market_type == "total"]
+        spreads_by_line = {p.line: p for p in preds if p.market_type == "spread"}
+        totals_by_line = {p.line: p for p in preds if p.market_type == "total"}
+        main_spread = _main_line_market(ev.get("markets", []), "spread")
+        main_total = _main_line_market(ev.get("markets", []), "total")
 
         for market in ev.get("markets", []):
             m_type = market.get("market_type")
@@ -263,11 +324,11 @@ def build_hockey_slate(
                     if ask is None or not (0 < ask < 1):
                         continue
 
-                    is_home = (
-                        sel == "home"
-                        or _team_matches(desc, pred_ml.home_team)
-                        or not _team_matches(desc, pred_ml.away_team)
-                    )
+                    home_match = sel == "home" or _team_matches(desc, pred_ml.home_team)
+                    away_match = sel == "away" or _team_matches(desc, pred_ml.away_team)
+                    if home_match == away_match:
+                        continue
+                    is_home = home_match
                     side_key = "home" if is_home else "away"
                     model_prob = pred_ml.probabilities[side_key]
                     edge = model_prob - ask
@@ -308,75 +369,92 @@ def build_hockey_slate(
                         }
                     )
 
-            elif m_type == "spread" and pred_spread:
+            elif m_type == "spread" and market is main_spread and spreads_by_line:
+                candidates = []
                 for side in sides:
+                    ask = side.get("price_probability")
+                    line = side.get("line")
+                    if ask is None or not (0 < ask < 1) or line is None:
+                        continue
+                    sample_pred = next(iter(spreads_by_line.values()))
                     sel = side.get("selection", "").lower()
                     desc = side.get("description", "")
-                    ask = side.get("price_probability")
-                    if ask is None or not (0 < ask < 1):
+                    home_match = sel == "home" or _team_matches(desc, sample_pred.home_team)
+                    away_match = sel == "away" or _team_matches(desc, sample_pred.away_team)
+                    if home_match == away_match:
                         continue
-                    is_home = sel == "home" or _team_matches(desc, pred_spread.home_team)
-                    side_key = "home" if is_home else "away"
-                    model_prob = pred_spread.probabilities.get(side_key, 0.5)
-                    edge = model_prob - ask
-                    if edge > 0.01:
-                        priced.append(
-                            {
-                                "event_id": ev_id,
-                                "league": pred_spread.league,
-                                "event_start_utc": pred_spread.event_start_utc,
-                                "away_team": pred_spread.away_team,
-                                "home_team": pred_spread.home_team,
-                                "market_type": "spread",
-                                "selection": side_key,
-                                "line": pred_spread.line,
-                                "model_probability": round(model_prob, 6),
-                                "model_uncertainty": pred_spread.uncertainty,
-                                "model_version": pred_spread.model_version,
-                                "feature_basis": pred_spread.feature_basis,
-                                "rationale": pred_spread.rationale,
-                                "market_slug": m_slug,
-                                "executable_ask": round(ask, 4),
-                                "observed_at_utc": observed.isoformat(),
-                                "timestamp_valid": True,
-                                "edge_vs_executable_ask": round(edge, 6),
-                            }
-                        )
+                    # Model lines are home handicaps: a home side at L is the home cover at L;
+                    # an away side at L covers exactly when home fails at -L.
+                    pred = spreads_by_line.get(float(line) if home_match else -float(line))
+                    if pred is None:
+                        continue
+                    side_key = "home" if home_match else "away"
+                    model_prob = pred.probabilities[side_key]
+                    candidates.append((model_prob - ask, side_key, float(line), model_prob, ask, pred))
+                if candidates:
+                    edge, side_key, line, model_prob, ask, pred = max(candidates, key=lambda c: (c[0], c[3]))
+                    priced.append(
+                        {
+                            "event_id": ev_id,
+                            "league": pred.league,
+                            "event_start_utc": pred.event_start_utc,
+                            "away_team": pred.away_team,
+                            "home_team": pred.home_team,
+                            "market_type": "spread",
+                            "selection": side_key,
+                            "line": line,
+                            "model_probability": round(model_prob, 6),
+                            "model_uncertainty": pred.uncertainty,
+                            "model_version": pred.model_version,
+                            "feature_basis": pred.feature_basis,
+                            "rationale": pred.rationale,
+                            "market_slug": m_slug,
+                            "executable_ask": round(ask, 4),
+                            "observed_at_utc": observed.isoformat(),
+                            "timestamp_valid": True,
+                            "edge_vs_executable_ask": round(edge, 6),
+                        }
+                    )
 
-            elif m_type == "total" and pred_totals:
-                market_line = market.get("line") or 5.5
-                pred_tot = min(pred_totals, key=lambda p: abs((p.line or 5.5) - float(market_line)))
+            elif m_type == "total" and market is main_total and totals_by_line:
+                market_line = market.get("line")
+                if market_line is None:
+                    continue
+                pred_tot = totals_by_line.get(float(market_line))
+                if pred_tot is None:
+                    continue
+                candidates = []
                 for side in sides:
                     sel = side.get("selection", "").lower()
                     ask = side.get("price_probability")
-                    if ask is None or not (0 < ask < 1):
+                    if ask is None or not (0 < ask < 1) or sel not in {"over", "under"}:
                         continue
-                    side_key = "over" if "over" in sel else "under"
-                    model_prob = pred_tot.probabilities.get(side_key, 0.5)
-                    edge = model_prob - ask
-                    if edge > 0.01:
-                        priced.append(
-                            {
-                                "event_id": ev_id,
-                                "league": pred_tot.league,
-                                "event_start_utc": pred_tot.event_start_utc,
-                                "away_team": pred_tot.away_team,
-                                "home_team": pred_tot.home_team,
-                                "market_type": "total",
-                                "selection": side_key,
-                                "line": pred_tot.line,
-                                "model_probability": round(model_prob, 6),
-                                "model_uncertainty": pred_tot.uncertainty,
-                                "model_version": pred_tot.model_version,
-                                "feature_basis": pred_tot.feature_basis,
-                                "rationale": pred_tot.rationale,
-                                "market_slug": m_slug,
-                                "executable_ask": round(ask, 4),
-                                "observed_at_utc": observed.isoformat(),
-                                "timestamp_valid": True,
-                                "edge_vs_executable_ask": round(edge, 6),
-                            }
-                        )
+                    model_prob = pred_tot.probabilities.get(sel, 0.5)
+                    candidates.append((model_prob - ask, sel, model_prob, ask))
+                if candidates:
+                    edge, sel, model_prob, ask = max(candidates, key=lambda c: (c[0], c[2]))
+                    priced.append(
+                        {
+                            "event_id": ev_id,
+                            "league": pred_tot.league,
+                            "event_start_utc": pred_tot.event_start_utc,
+                            "away_team": pred_tot.away_team,
+                            "home_team": pred_tot.home_team,
+                            "market_type": "total",
+                            "selection": sel,
+                            "line": pred_tot.line,
+                            "model_probability": round(model_prob, 6),
+                            "model_uncertainty": pred_tot.uncertainty,
+                            "model_version": pred_tot.model_version,
+                            "feature_basis": pred_tot.feature_basis,
+                            "rationale": pred_tot.rationale,
+                            "market_slug": m_slug,
+                            "executable_ask": round(ask, 4),
+                            "observed_at_utc": observed.isoformat(),
+                            "timestamp_valid": True,
+                            "edge_vs_executable_ask": round(edge, 6),
+                        }
+                    )
 
     counts_by_lg = {lg: len(evs) for lg, evs in events_by_league.items()}
 

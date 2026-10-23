@@ -280,6 +280,66 @@ BBO_CAPTURE_SPORTS = {
     "wncaab",
 }
 
+# Leagues whose league-feed events carry only the winner market while the
+# per-event detail page lists spreads/totals (live-verified 2026-10-21 per
+# league; AHL/KHL/DEL/SHL, the smaller soccer leagues, tennis ITF, Overwatch
+# and the smaller European basketball leagues list winner markets only).
+FULL_GAME_LINE_LEAGUES = frozenset(
+    {
+        "NBA",
+        "WNBA",
+        "NFL",
+        "NCAAF",
+        "NHL",
+        "EPL",
+        "LA_LIGA",
+        "BUNDESLIGA",
+        "SERIE_A",
+        "LIGUE_1",
+        "MLS",
+        "LIGA_MX",
+        "UCL",
+        "UEFA",
+        "UEL",
+        "UECL",
+        "SUDAMERICANA",
+        "LIBERTADORES",
+        "EUROLEAGUE",
+        "LOL",
+        "RAINBOW_SIX",
+        "CS2",
+        "VALORANT",
+        "DOTA2",
+        "NCAAB",
+        "WNCAAB",
+        "ATP",
+        "WTA",
+    }
+)
+HYDRATED_LEAGUES = frozenset({"MLB"}) | FULL_GAME_LINE_LEAGUES
+# The generic V2 SPREAD/TOTAL types also cover quarter, half, period and
+# team-total markets (e.g. an NBA first-quarter total at 58.5 beside the 224.5
+# game total). For these leagues only the legacy full-game types are priced; the
+# models forecast full-game spreads and totals.
+FULL_GAME_LINE_TYPES = frozenset(
+    {
+        "basketball_team_full_game_spread",
+        "basketball_team_full_game_total",
+        "football_team_full_game_spread",
+        "football_team_full_game_total",
+        "hockey_team_full_game_spread",
+        "hockey_team_full_game_total",
+        "soccer_team_full_game_spread",
+        "soccer_team_full_game_total",
+        "tennis_match_games_spread",
+        "tennis_match_total_games",
+        "esports_series_game_handicap",
+        "esports_series_total_games",
+        "esports_series_map_handicap",
+        "esports_series_total_maps",
+    }
+)
+
 MARKET_TYPES = {
     "SPORTS_MARKET_TYPE_MONEYLINE": "moneyline",
     "SPORTS_MARKET_TYPE_SPREAD": "spread",
@@ -477,11 +537,15 @@ class PolymarketUSClient:
                 continue
             matching_events.append(event)
 
-        # MLB's league endpoint is a summary/general feed. Hydrate only the
-        # already date-filtered games so innings markets are captured without
-        # turning every sport into a large detail crawl. A failed detail fetch
-        # retains the general event; no missing contract is ever invented.
-        if league.upper() == "MLB" and matching_events:
+        # The league endpoint is a summary/general feed: for NBA/WNBA/NFL/NCAAF it
+        # now carries only the game-winner market (2026-10-21: 118 NBA events, 118
+        # winner markets, while each event's detail page lists ~14 spreads and ~15
+        # totals), so spread/total lanes saw "no_matched_markets". Hydrate only the
+        # already date-filtered games of leagues with spread/total models, so MLB
+        # innings and these lines are captured without turning every sport into a
+        # large detail crawl. A failed detail fetch retains the general event; no
+        # missing contract is ever invented.
+        if league.upper() in HYDRATED_LEAGUES and matching_events:
 
             def _hydrate(event: dict[str, Any]) -> dict[str, Any]:
                 slug = str(event.get("slug") or "")
@@ -490,10 +554,12 @@ class PolymarketUSClient:
                 try:
                     return self.event(slug)
                 except (httpx.HTTPError, KeyError, TypeError):
-                    logger.warning("Polymarket MLB event-detail hydration failed for %s", slug, exc_info=True)
+                    logger.warning(
+                        "Polymarket %s event-detail hydration failed for %s", league, slug, exc_info=True
+                    )
                     return event
 
-            with ThreadPoolExecutor(max_workers=min(8, len(matching_events))) as pool:
+            with ThreadPoolExecutor(max_workers=min(4, len(matching_events))) as pool:
                 matching_events = list(pool.map(_hydrate, matching_events))
 
         slate = [self._normalize_event(event, league.upper(), timezone_name) for event in matching_events]
@@ -530,7 +596,7 @@ class PolymarketUSClient:
         # every sport daily calls sport_slate for, was the single largest
         # contributor to daily's wall-clock time (measured: ~6 minutes on
         # its own, far more than the BBO-capture step downstream of it).
-        with ThreadPoolExecutor(max_workers=min(16, len(leagues))) as pool:
+        with ThreadPoolExecutor(max_workers=min(8, len(leagues))) as pool:
             for league, (league_events, error) in zip(leagues, pool.map(_fetch_league, leagues), strict=True):
                 events[league] = league_events
                 if error is not None:
@@ -652,6 +718,13 @@ class PolymarketUSClient:
             market_type = MARKET_TYPES.get(raw_type_v2) or MARKET_TYPES.get(raw_type_legacy)
             if market_type is None:
                 _log_unknown_market_type(raw_type_v2 or raw_type_legacy, league)
+                continue
+            if (
+                league in FULL_GAME_LINE_LEAGUES
+                and market_type in {"spread", "total"}
+                and raw_type_legacy is not None
+                and raw_type_legacy not in FULL_GAME_LINE_TYPES
+            ):
                 continue
             sides = []
             for side in market.get("marketSides", []):
@@ -813,6 +886,15 @@ def capture_slate_snapshots(
     league_to_sport = {
         league: sport for sport, leagues in POLYMARKET_SPORT_LEAGUES.items() for league in leagues
     }
+    # Broad groups such as basketball also contain NBA/WNBA/NCAAB. They
+    # must not overwrite a dedicated sport's canonical archive directory.
+    league_to_sport.update(
+        {
+            sport.upper(): sport
+            for sport, leagues in POLYMARKET_SPORT_LEAGUES.items()
+            if sport.upper() in leagues
+        }
+    )
     qualification_sports = BBO_CAPTURE_SPORTS
     captured = missing_bbo = failures = skipped_nonqualification_contracts = 0
     skipped_summer_league = timestamp_invalid = skipped_beyond_horizon = 0

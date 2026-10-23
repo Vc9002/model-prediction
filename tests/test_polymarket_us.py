@@ -135,8 +135,10 @@ def test_slate_normalizes_executable_side_prices_and_lines() -> None:
     }
 
     def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.path == "/v2/leagues/wnba/events"
-        return httpx.Response(200, json={"events": [event]})
+        if request.url.path == "/v2/leagues/wnba/events":
+            return httpx.Response(200, json={"events": [{**event, "markets": []}]})
+        assert request.url.path == "/v1/events/slug/wnba-away-home-2026-07-14"
+        return httpx.Response(200, json={"event": event})
 
     http_client = httpx.Client(transport=httpx.MockTransport(handler))
     slate = PolymarketUSClient("https://example.test", http_client).slate("WNBA", date(2026, 7, 14))
@@ -556,6 +558,106 @@ def test_get_honors_retry_after_and_backs_off_with_jitter(monkeypatch) -> None:
     assert client._get("/v1/markets/x/book") == {"ok": True}
     assert sleeps[0] == 3.0
     assert 1.0 <= sleeps[1] <= 1.25
+
+
+def _line_market(market_id: str, legacy_type: str, v2: str, line: float) -> dict:
+    return {
+        "id": market_id,
+        "slug": f"slug-{market_id}",
+        "sportsMarketTypeV2": v2,
+        "sportsMarketType": legacy_type,
+        "line": line,
+        "marketSides": [
+            {"id": f"{market_id}-o", "description": "Over", "long": True, "quote": {"value": "0.52"}},
+            {"id": f"{market_id}-u", "description": "Under", "long": False, "quote": {"value": "0.49"}},
+        ],
+    }
+
+
+def test_nba_slate_hydrates_detail_and_keeps_only_full_game_totals() -> None:
+    """The NBA league feed carries only the winner market; spreads/totals live in
+    the per-event detail, where the generic TOTAL type also covers quarter, half
+    and team-total markets that must not be priced as the full-game total."""
+    total = "SPORTS_MARKET_TYPE_TOTAL"
+    summary = {
+        "id": "1",
+        "slug": "nba-mil-was-2026-10-21",
+        "title": "MIL vs WAS",
+        "startTime": "2026-10-21T23:00:00Z",
+        "markets": [],
+    }
+    detail = {
+        **summary,
+        "markets": [
+            _line_market("full", "basketball_team_full_game_total", total, 224.5),
+            _line_market("q1", "basketball_team_first_quarter_total", total, 58.5),
+            _line_market("half", "basketball_team_first_half_total", total, 114.5),
+            _line_market("team", "basketball_team_total_points", total, 111.5),
+        ],
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v2/leagues/nba/events":
+            return httpx.Response(200, json={"events": [summary]})
+        assert request.url.path == "/v1/events/slug/nba-mil-was-2026-10-21"
+        return httpx.Response(200, json={"event": detail})
+
+    client = PolymarketUSClient("https://example.test", httpx.Client(transport=httpx.MockTransport(handler)))
+    markets = client.slate("NBA", date(2026, 10, 21))[0]["markets"]
+    assert [(m["market_type"], m["line"]) for m in markets] == [("total", 224.5)]
+
+
+def test_hydrated_leagues_keep_only_full_game_lines_for_hockey_soccer_and_esports() -> None:
+    spread, total = "SPORTS_MARKET_TYPE_SPREAD", "SPORTS_MARKET_TYPE_TOTAL"
+    cases = {
+        "NHL": (
+            "nhl",
+            [
+                _line_market("full", "hockey_team_full_game_total", total, 5.5),
+                _line_market("p1", "hockey_team_first_period_total", total, 1.5),
+                _line_market("pl", "hockey_team_full_game_spread", spread, -1.5),
+                _line_market("p2", "hockey_team_second_period_spread", spread, -0.5),
+            ],
+            [("total", 5.5), ("spread", -1.5)],
+        ),
+        "EPL": (
+            "epl",
+            [
+                _line_market("full", "soccer_team_full_game_total", total, 2.5),
+                _line_market("half", "soccer_team_second_half_total", total, 1.5),
+                _line_market("hcp", "soccer_team_full_game_spread", spread, -1.5),
+            ],
+            [("total", 2.5), ("spread", -1.5)],
+        ),
+        "CS2": (
+            "cs2",
+            [
+                _line_market("maps", "esports_series_total_maps", total, 2.5),
+                _line_market("hcp", "esports_series_map_handicap", spread, -1.5),
+                _line_market("kills", "esports_map_total_kills", total, 40.5),
+            ],
+            [("total", 2.5), ("spread", -1.5)],
+        ),
+    }
+    for league, (slug_league, markets, expected) in cases.items():
+        summary = {
+            "id": "1",
+            "slug": f"{slug_league}-a-b-2026-10-21",
+            "title": "A vs B",
+            "startTime": "2026-10-21T23:00:00Z",
+            "markets": [],
+        }
+
+        def handler(request: httpx.Request, summary=summary, markets=markets) -> httpx.Response:
+            if request.url.path.endswith("/events"):
+                return httpx.Response(200, json={"events": [summary]})
+            return httpx.Response(200, json={"event": {**summary, "markets": markets}})
+
+        client = PolymarketUSClient(
+            "https://example.test", httpx.Client(transport=httpx.MockTransport(handler))
+        )
+        got = client.slate(league, date(2026, 10, 21))[0]["markets"]
+        assert sorted((m["market_type"], m["line"]) for m in got) == sorted(expected), league
 
 
 def _slate_market(slug: str = "mkt-1") -> dict:

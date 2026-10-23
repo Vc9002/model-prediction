@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 import re
 from datetime import date, datetime, time
 from pathlib import Path
@@ -33,7 +32,12 @@ from typing import Any
 from .data_sources.espn import _infer_tennis_surface
 from .domain import EASTERN, parse_utc
 from .models.tennis import UpcomingMatch, tennis_model
-from .models.tennis_derivatives import price_tennis_derivatives
+from .models.tennis_derivatives import (
+    TENNIS_FORM_SIGMA,
+    TENNIS_GAMES_VERSION,
+    price_tennis_derivatives,
+    serve_pair_for_win_probability,
+)
 
 _TENNIS_SUBPERIOD_MARKERS = ("fh", "h1", "h2", "1h", "set", "ss", "st")
 
@@ -440,25 +444,28 @@ def build_tennis_slate(
                 except (KeyError, TypeError, ValueError):
                     continue
 
-                inf_inputs = prediction.inference_inputs or {}
-                p_serve_a = inf_inputs.get("p_serve_a")
-                p_serve_b = inf_inputs.get("p_serve_b")
-                if p_serve_a is None or p_serve_b is None:
-                    base_serve = 0.635 if prediction.league.upper() == "ATP" else 0.590
-                    diff = 400.0 * math.log10(max(1e-6, p_away) / max(1e-6, 1.0 - p_away))
-                    p_serve_a = max(0.45, min(0.78, base_serve + diff / 2400.0))
-                    p_serve_b = max(0.45, min(0.78, base_serve - diff / 2400.0))
-                else:
-                    p_serve_a = float(str(p_serve_a))
-                    p_serve_b = float(str(p_serve_b))
+                best_of = int((prediction.inference_inputs or {}).get("best_of", 3))
+                p_serve_a, p_serve_b = serve_pair_for_win_probability(p_away, prediction.league, best_of)
 
                 is_team_away = _name_matches(prediction.away_team, str(snapshot.get("team") or ""))
                 c_line = spread_val
                 if is_team_away:
-                    deriv = price_tennis_derivatives(p_serve_a, p_serve_b, spread_line=c_line, best_of=3)
+                    deriv = price_tennis_derivatives(
+                        p_serve_a,
+                        p_serve_b,
+                        spread_line=c_line,
+                        best_of=best_of,
+                        form_sigma=TENNIS_FORM_SIGMA,
+                    )
                     p_long = deriv.spread_p1_cover or 0.5
                 else:
-                    deriv = price_tennis_derivatives(p_serve_a, p_serve_b, spread_line=-c_line, best_of=3)
+                    deriv = price_tennis_derivatives(
+                        p_serve_a,
+                        p_serve_b,
+                        spread_line=-c_line,
+                        best_of=best_of,
+                        form_sigma=TENNIS_FORM_SIGMA,
+                    )
                     p_long = deriv.spread_p2_cover or 0.5
 
                 p_short = 1.0 - p_long
@@ -502,7 +509,7 @@ def build_tennis_slate(
                         "line": selection_line,
                         "model_probability": round(prob, 4),
                         "model_uncertainty": prediction.uncertainty,
-                        "model_version": prediction.model_version,
+                        "model_version": TENNIS_GAMES_VERSION,
                         "feature_basis": prediction.feature_basis,
                         "inference_inputs": prediction.inference_inputs,
                         "model_inputs_observed_at_utc": observed_at.isoformat(),
@@ -524,19 +531,11 @@ def build_tennis_slate(
                 except (KeyError, TypeError, ValueError):
                     continue
 
-                inf_inputs = prediction.inference_inputs or {}
-                p_serve_a = inf_inputs.get("p_serve_a")
-                p_serve_b = inf_inputs.get("p_serve_b")
-                if p_serve_a is None or p_serve_b is None:
-                    base_serve = 0.635 if prediction.league.upper() == "ATP" else 0.590
-                    diff = 400.0 * math.log10(max(1e-6, p_away) / max(1e-6, 1.0 - p_away))
-                    p_serve_a = max(0.45, min(0.78, base_serve + diff / 2400.0))
-                    p_serve_b = max(0.45, min(0.78, base_serve - diff / 2400.0))
-                else:
-                    p_serve_a = float(str(p_serve_a))
-                    p_serve_b = float(str(p_serve_b))
-
-                deriv = price_tennis_derivatives(p_serve_a, p_serve_b, total_line=total_val, best_of=3)
+                best_of = int((prediction.inference_inputs or {}).get("best_of", 3))
+                p_serve_a, p_serve_b = serve_pair_for_win_probability(p_away, prediction.league, best_of)
+                deriv = price_tennis_derivatives(
+                    p_serve_a, p_serve_b, total_line=total_val, best_of=best_of, form_sigma=TENNIS_FORM_SIGMA
+                )
                 p_over = deriv.total_over or 0.5
                 p_under = deriv.total_under or 0.5
                 selection = "over" if p_over >= p_under else "under"
@@ -560,7 +559,7 @@ def build_tennis_slate(
                         "line": total_val,
                         "model_probability": round(prob, 4),
                         "model_uncertainty": prediction.uncertainty,
-                        "model_version": prediction.model_version,
+                        "model_version": TENNIS_GAMES_VERSION,
                         "feature_basis": prediction.feature_basis,
                         "inference_inputs": prediction.inference_inputs,
                         "model_inputs_observed_at_utc": observed_at.isoformat(),

@@ -365,3 +365,7 @@ def wncaab_model() -> WNCAABModel:
 
 def euroleague_model() -> EuroLeagueModel:
     return EuroLeagueModel()
+
+
+def nbl_model() -> DedicatedBasketballLeagueModel:
+    return DedicatedBasketballLeagueModel(NBL_CONFIG)

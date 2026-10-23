@@ -328,6 +328,8 @@ def record_auto_buy_execution(
         "unit_value_usd": unit_value_usd,
         "model_id": model_id,
         "model_probability": round(model_p, 4),
+        "model_probability_raw": pick.get("model_probability_raw"),
+        "calibration_method": pick.get("calibration_method"),
         "market_probability": round(market_p, 4),
         "edge": round(edge, 4),
         "order_state": order_state,

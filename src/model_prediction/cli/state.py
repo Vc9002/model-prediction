@@ -31,7 +31,21 @@ ESPN_SPORTS = tuple(SPORT_LEAGUES)
 ESPORTS_TITLES = ("lol", "cs2", "dota2", "valorant", "rainbow_six")
 DAILY_LEARNED_SPORTS = ("mlb", "nba", "wnba", "nfl")
 DAILY_INTERNATIONAL_BASEBALL_SPORTS = ("kbo", "npb")
-FLAT_LEDGER_SPORTS = ("mlb", "nba", "wnba", "nfl", "soccer", "tennis", "ncaaf")
+DAILY_ADDITIONAL_SPORTS = ("hockey", "darts", "ncaab", "euroleague", "nbl")
+FLAT_LEDGER_SPORTS = (
+    "mlb",
+    "nba",
+    "wnba",
+    "nfl",
+    "soccer",
+    "tennis",
+    "ncaaf",
+    "hockey",
+    "darts",
+    "ncaab",
+    "euroleague",
+    "nbl",
+)
 # Sports whose _forecast_*_sport function writes BOTH main_ledger and
 # flat_ledger unconditionally whenever log=True, regardless of which command
 # (forecast/log vs. flat-forecast) ran -- every other sport only ever writes
@@ -46,6 +60,9 @@ DUAL_LEDGER_SPORTS = frozenset(
         "ncaaf",
         "hockey",
         "darts",
+        "ncaab",
+        "euroleague",
+        "nbl",
         "lol",
         "cs2",
         "dota2",
@@ -69,6 +86,8 @@ _LEDGER_LOCK = threading.Lock()
 # League value on a ledger row -> ESPN league key(s) to search for results.
 # WORLD_CUP dropped 2026-07: tournament is over, no games left to forecast or settle.
 _LEDGER_LEAGUE_TO_ESPN = {
+    "NCAAB": ("NCAAB",),
+    "NBL": ("NBL",),
     "MLB": ("MLB", "COLLEGE_BASEBALL"),
     "NBA": ("NBA", "NCAAB", "WNCAAB"),
     "WNBA": ("WNBA",),

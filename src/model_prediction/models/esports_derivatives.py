@@ -149,3 +149,18 @@ def price_esports_derivatives(
     if best_of == 5:
         return price_esports_bo5_derivatives(p_match)
     return price_esports_bo3_derivatives(p_match)
+
+
+class EsportsDerivativeModel:
+    """Serving identity of the esports map/game handicap and total lanes.
+
+    The prices come from ``price_esports_bo3_derivatives`` / ``price_esports_bo5_derivatives``
+    applied to the title's tiered-Elo series probability (see ``esports.forecast_esports_slate``).
+    """
+
+    sport = "esports"
+    version = "esports-derivatives-v6"
+
+
+def esports_derivative_model() -> EsportsDerivativeModel:
+    return EsportsDerivativeModel()

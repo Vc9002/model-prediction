@@ -38,6 +38,10 @@ class NHLClient:
         """Scores for games on ``date`` (YYYY-MM-DD)."""
         return self._get(f"/score/{date}")
 
+    def club_season(self, team: str, season: str) -> dict[str, Any]:
+        """Every game of one club's season (``season`` like ``20252026``), scores included."""
+        return self._get(f"/club-schedule-season/{team}/{season}")
+
     def standings(self, date: str) -> dict[str, Any]:
         """League standings as of ``date`` (YYYY-MM-DD)."""
         return self._get(f"/standings/{date}")

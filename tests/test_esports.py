@@ -385,6 +385,7 @@ def test_forecast_requires_exact_identity_and_remains_zero_unit(tmp_path) -> Non
             return [
                 {
                     "event_id": "event",
+                    "best_of": 3,
                     "event_start_utc": "2099-01-01T12:00:00Z",
                     "markets": [
                         {
@@ -453,6 +454,7 @@ def test_forecast_esports_prices_map_spread_and_totals_derivatives(tmp_path) -> 
             return [
                 {
                     "event_id": "event-1",
+                    "best_of": 3,
                     "event_start_utc": "2099-01-01T12:00:00Z",
                     "markets": [
                         {
@@ -494,6 +496,7 @@ def test_forecast_esports_prices_map_spread_and_totals_derivatives(tmp_path) -> 
                 }
             elif slug == "market-spread":
                 return {
+                    "team": "Alpha Esports",
                     "observed_at_utc": "2026-07-18T01:00:00Z",
                     "long": {"description": "-1.50", "ask": 0.45},
                     "short": {"description": "+1.50", "ask": 0.58},
@@ -561,6 +564,7 @@ def test_forecast_esports_prices_map_spread_anchored_to_team2(tmp_path) -> None:
             return [
                 {
                     "event_id": "event-1",
+                    "best_of": 3,
                     "event_start_utc": "2099-01-01T12:00:00Z",
                     "markets": [
                         {

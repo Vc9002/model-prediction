@@ -22,6 +22,8 @@ def prune_stale_logs(
     logs_dir: Path | str | None = None,
     max_age_days: int = 14,
     max_file_size_mb: float = 10.0,
+    *,
+    delete_all_old: bool = False,
 ) -> dict[str, int]:
     """Prune daily logs older than max_age_days and truncate oversized active log files."""
     if logs_dir is None:
@@ -41,7 +43,7 @@ def prune_stale_logs(
         try:
             stat = file_path.stat()
             # If older than cutoff and is a dated log (e.g. daily_2026-10-04.log), delete it
-            if stat.st_mtime < cutoff_sec and file_path.name.startswith("daily_"):
+            if stat.st_mtime < cutoff_sec and (delete_all_old or file_path.name.startswith("daily_")):
                 file_path.unlink()
                 deleted_count += 1
                 continue
@@ -81,3 +83,19 @@ def compact_sqlite_databases(data_dir: Path | str | None = None) -> list[str]:
                 conn.close()
 
     return compacted
+
+
+def run_maintenance(
+    repo_root: Path | str,
+    paths: RuntimePaths,
+    max_age_days: int = 14,
+) -> dict[str, object]:
+    """Run the daily runner's log and SQLite maintenance against its runtime."""
+    repo_logs = Path(repo_root) / "data" / "logs"
+    return {
+        "daily_logs": prune_stale_logs(repo_logs, max_age_days=max_age_days),
+        "runtime_logs": prune_stale_logs(
+            paths.supervisor_log_root, max_age_days=max_age_days, delete_all_old=True
+        ),
+        "compacted_databases": compact_sqlite_databases(paths.runtime_root),
+    }
