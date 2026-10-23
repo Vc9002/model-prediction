@@ -131,6 +131,27 @@ def test_git_source_resolution_requires_exact_bytes(tmp_path):
     assert ("esports.py", "0" * 64) not in resolved
 
 
+def test_git_source_resolution_finds_unreachable_exact_blob(tmp_path):
+    import hashlib
+    import subprocess
+
+    from model_prediction.esports_overhaul_research import resolve_git_sources
+
+    def git(*args, input=None):
+        return subprocess.run(
+            ["git", "-C", str(tmp_path), *args], check=True, capture_output=True, input=input
+        )
+
+    git("init")
+    content = b"# archived but deliberately unreachable\n"
+    blob = git("hash-object", "-w", "--stdin", input=content).stdout.decode().strip()
+    sha = hashlib.sha256(content).hexdigest()
+    resolved = resolve_git_sources(tmp_path, {"esports.py": {sha}})
+    assert resolved[("esports.py", sha)]["bytes"] == content
+    assert resolved[("esports.py", sha)]["blob"] == blob
+    assert resolved[("esports.py", sha)]["commit"] is None
+
+
 def test_residual_keeps_fixed_elo_logit_offset():
     import numpy as np
 

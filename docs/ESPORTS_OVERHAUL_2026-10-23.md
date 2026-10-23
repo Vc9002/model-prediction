@@ -20,9 +20,11 @@ Authoritative run: [research report](../outputs/esports_overhaul/research-202610
 - Frozen queried SQLite esports rows: 3,586.
 - Active settled moneyline records before tier/forecast deduplication: 1,826.
 - Canonical pick keys: 451 (447 Flat, 4 Main); 1,375 duplicates removed, zero settlement conflicts.
-- Exact source-verified control replays: **380 / 451**.
-- Remaining archived-source mismatches: **71**. Missing historical code bytes could not be recovered from current source, Git history, or alternate newline representations. Hash checks were never bypassed.
-- Control verdict: **BLOCKED_REPRODUCTION**. Production rankings, new-model activation and profitability conclusions remain blocked.
+- Exact source-verified control replays: **450 / 451** after follow-up recovery.
+- One archived-source mismatch remains: the Oct 11 esports module hash `a3c853f4…15c8bce8a` has no exact source copy in the current checkout, reachable or unreachable Git blobs, session/editor history, or newline-normalized candidates. Its one row remains unresolved; no substitute source was accepted.
+- Control verdict remains **BLOCKED_REPRODUCTION**. Production rankings, new-model activation and profitability conclusions remain blocked.
+
+Follow-up source-recovery evidence is stored in [the verified replay and recovered source archive](../outputs/esports_overhaul/source-recovery-20261023-verified/). The resolver now scans unreachable Git blobs by exact SHA-256 and records each Git blob ID separately from commit provenance. It recovered source hashes `8d25951d…30e7b330` (69 rows) and `c1c2408e…03b02c01` (1 row), accounting for 70 of the previous 71 failures. This archive is separate from the frozen initial report and does not rewrite its manifest.
 
 Stored market probabilities are diagnostic benchmarks; executable quote semantics, fees, fills and latency were not certified. Lower Brier is better.
 
@@ -42,13 +44,17 @@ The final run freezes the exact five history byte streams as deterministic gzip,
 
 Ruff passed on all changed code and focused tests. **178 targeted tests passed** across the directly affected modules, each file run separately with `-o addopts='' -q`; the CLI check selected only esports tests. Source import location was verified to avoid testing the original checkout from a shared editable venv. No full suite was run, following AGENTS.md.
 
+The source-recovery follow-up added a regression test for unreachable Git blobs. Its focused suite passed **10 tests**, Ruff passed, and the verified 451-row replay produced 450 exact matches with one source-unavailable row. Both the initial 41-file frozen research manifest and the separate 37-file recovery manifest independently re-verified.
+
 Independent review found and corrected UTC train/validation overlap, canonical contract normalization, insufficient/empty Flat authority, and fuzzy participant identity borrowing. Series math was checked against closed forms and independent exhaustive paths.
 
 Live read-only prospective proof: Rainbow Six source match 132559, IDs 19230/19728, start 2026-10-24T19:00:00Z, explicit Bo3, fetched 2026-10-23T16:33:42.496213Z; capture hash verified. Source evidence is retained under `outputs/esports_overhaul/prospective-context-proof/`. This proves acquisition/binding, not model predictive lift or real-market coverage.
 
+Live `esports-forecast --all` also completed with exit code 0 and no `--log` flag: 10 CS2, 1 Dota 2, 3 LoL, 0 Rainbow Six and 4 Valorant contracts were priced. It produced no ledger writes. The provider returned unsupported `SPORTS_MARKET_TYPE_PROP` market types on four titles; those were dropped with warnings.
+
 ## Remaining evidence requirements
 
-1. Recover the missing exact archived code/state lineage or establish a separately preregistered fresh prospective comparison; do not silently discard failed controls to obtain a passing verdict.
+1. Recover the final missing exact archived code/state lineage or establish a separately preregistered fresh prospective comparison; do not silently discard the failed control to obtain a passing verdict.
 2. Accumulate timestamped source/context and exact contract/quote observations. Roster, patch, map/veto and draft inputs cannot be fabricated from today's information. The new collector solves prospective series format only.
 3. Validate map-specific predictions and derivative contracts separately before connecting the new joint distribution to serving. Existing v6 derivative diagnostics retain their independent-map limitations.
 4. Existing generic calibration tournaments still lack event-group/result-availability embargo metadata. Deduplication and sorting do not certify those folds as point-in-time valid; no new calibration lift is claimed here.

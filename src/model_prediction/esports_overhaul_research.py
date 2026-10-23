@@ -351,7 +351,12 @@ print(json.dumps({"rows":results,"code_sha256":hashes_before}))
 
 
 def resolve_git_sources(repo: Path, wanted: dict[str, set[str]]) -> dict:
-    """Find immutable git source bytes only when their SHA256 is requested."""
+    """Find immutable git source bytes, including unreachable Git objects.
+
+    Legacy prediction records store a SHA256 but not a commit. Git garbage
+    collection may leave the exact blob unreachable while it still exists in
+    the object database, so history lookup alone is insufficient.
+    """
     resolved = {}
     for relative, hashes in wanted.items():
         if relative not in {"esports.py", "features/elo_ratings.py"}:
@@ -371,9 +376,75 @@ def resolve_git_sources(repo: Path, wanted: dict[str, set[str]]) -> dict:
                 continue
             sha = hashlib.sha256(blob.stdout).hexdigest()
             if sha in hashes and (relative, sha) not in resolved:
-                resolved[(relative, sha)] = {"commit": commit, "bytes": blob.stdout}
+                blob_id = subprocess.run(
+                    ["git", "-C", str(repo), "rev-parse", commit + ":" + path],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout.strip()
+                resolved[(relative, sha)] = {"commit": commit, "blob": blob_id, "bytes": blob.stdout}
             if all((relative, sha) in resolved for sha in hashes):
                 break
+    missing = {
+        sha for relative, hashes in wanted.items() for sha in hashes if (relative, sha) not in resolved
+    }
+    if missing:
+        # Stream every object; avoid a 4+ GB capture in memory. Exact SHA256
+        # matching is the authority because unreachable blobs carry no path.
+        process = subprocess.Popen(
+            ["git", "-C", str(repo), "cat-file", "--batch-all-objects", "--batch"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        assert process.stdout is not None
+        stopped_after_matches = False
+        while header := process.stdout.readline():
+            parts = header.rstrip(b"\n").split()
+            if len(parts) != 3:
+                process.kill()
+                raise RuntimeError("invalid_git_object_stream")
+            object_id, object_type, size_bytes = parts
+            size = int(size_bytes)
+            source_hash = hashlib.sha256()
+            chunks = []
+            remaining = size
+            retain = size <= 1_048_576
+            while remaining:
+                chunk = process.stdout.read(min(1_048_576, remaining))
+                if not chunk:
+                    process.kill()
+                    raise RuntimeError("truncated_git_object_stream")
+                source_hash.update(chunk)
+                if retain:
+                    chunks.append(chunk)
+                remaining -= len(chunk)
+            if process.stdout.read(1) != b"\n":
+                process.kill()
+                raise RuntimeError("truncated_git_object_stream")
+            if object_type == b"blob":
+                sha = source_hash.hexdigest()
+                if sha in missing:
+                    if not retain:
+                        process.kill()
+                        raise ValueError("requested_incumbent_source_exceeds_1MiB")
+                    content = b"".join(chunks)
+                    matches = [relative for relative, hashes in wanted.items() if sha in hashes]
+                    for relative in matches:
+                        resolved[(relative, sha)] = {
+                            "commit": None,
+                            "blob": object_id.decode("ascii"),
+                            "bytes": content,
+                        }
+                    missing.remove(sha)
+                    if not missing:
+                        stopped_after_matches = True
+                        break
+        if stopped_after_matches:
+            process.terminate()
+        stderr = process.communicate()[1]
+        if not stopped_after_matches and process.returncode != 0:
+            raise RuntimeError("git_object_scan_failed: " + stderr.decode("utf-8", "replace"))
     return resolved
 
 
@@ -418,13 +489,16 @@ def archived_control_replays(cohort: list[dict], source_root: Path, repo: Path, 
                 (folder / "__init__.py").write_text(
                     "__path__.append(" + repr(str(fallback.resolve())) + ")\n", encoding="utf-8"
                 )
-            source_record["git_commits"] = {}
+            source_record["git_sources"] = {}
             for relative, sha in zip(("esports.py", "features/elo_ratings.py"), key, strict=True):
                 blob = resolved[(relative, sha)]
                 (package / relative).write_bytes(blob["bytes"])
                 if hashlib.sha256((package / relative).read_bytes()).hexdigest() != sha:
                     raise ValueError("recovered_source_hash_mismatch")
-                source_record["git_commits"][relative] = blob["commit"]
+                source_record["git_sources"][relative] = {
+                    "commit": blob["commit"],
+                    "blob": blob["blob"],
+                }
             (package / "esports_replay.py").write_bytes(
                 (source_root / "model_prediction" / "esports_replay.py").read_bytes()
             )
