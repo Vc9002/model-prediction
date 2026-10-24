@@ -428,6 +428,8 @@ models:
     spread_sd: 14.8
     total_sd: 15.5
     home_field_advantage_points: 2.5
+    max_moneyline_american_odds: 200
+    blowout_spread_edge_cap: 0.08
     protected_versions:
     - college-football-v1
     - cfb-structural-v2

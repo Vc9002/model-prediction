@@ -87,6 +87,20 @@ NCAAB_CONFIG = BasketballLeagueConfig(
     rest_weight=0.15,
 )
 
+NCAAB_V2_CONFIG = BasketballLeagueConfig(
+    league_code="NCAAB",
+    model_version="ncaab-tempo-v2",
+    game_duration_minutes=40,
+    pace=68.1,
+    margin_sd=10.5,
+    total_sd=13.8,
+    home_court_points=3.2,
+    baseline_points_per_team=71.4,
+    elo_weight=0.50,
+    trend_weight=0.50,
+    rest_weight=0.15,
+)
+
 WNCAAB_CONFIG = BasketballLeagueConfig(
     league_code="WNCAAB",
     model_version="wncaab-tempo-v1",
@@ -109,6 +123,20 @@ EUROLEAGUE_CONFIG = BasketballLeagueConfig(
     margin_sd=10.0,
     total_sd=14.5,
     home_court_points=3.2,  # Intense domestic/European fanbases
+    baseline_points_per_team=80.1,
+    elo_weight=0.40,
+    trend_weight=0.60,
+    rest_weight=0.15,
+)
+
+EUROLEAGUE_V2_CONFIG = BasketballLeagueConfig(
+    league_code="EUROLEAGUE",
+    model_version="eurolg-tempo-v2",
+    game_duration_minutes=40,
+    pace=72.0,
+    margin_sd=10.0,
+    total_sd=12.8,
+    home_court_points=2.0,  # Calibrated modern EuroLeague HCA
     baseline_points_per_team=80.1,
     elo_weight=0.40,
     trend_weight=0.60,
@@ -167,6 +195,17 @@ NBL_CONFIG = BasketballLeagueConfig(
     margin_sd=10.8,
     total_sd=15.5,
     home_court_points=3.0,
+    baseline_points_per_team=88.5,
+)
+
+NBL_V2_CONFIG = BasketballLeagueConfig(
+    league_code="NBL",
+    model_version="nbl-tempo-v2",
+    game_duration_minutes=40,
+    pace=78.2,
+    margin_sd=10.8,
+    total_sd=15.0,
+    home_court_points=2.2,
     baseline_points_per_team=88.5,
 )
 
@@ -248,6 +287,14 @@ class DedicatedBasketballLeagueModel:
             isolated_history = list(history)
 
         return self._underlying.predict_games(isolated_history, upcoming)
+
+    @staticmethod
+    def compute_dynamic_units(edge: float, min_edge: float = 0.02, max_edge: float = 0.08) -> float:
+        """Dynamic unit sizing scaling with edge: 1.00U up to 2.00U."""
+        if edge <= min_edge:
+            return 1.00
+        scaled = 1.00 + (edge - min_edge) * (2.00 - 1.00) / (max_edge - min_edge)
+        return round(min(2.00, max(1.00, scaled)), 2)
 
 
 class NBAModel(DedicatedBasketballLeagueModel):
@@ -369,3 +416,15 @@ def euroleague_model() -> EuroLeagueModel:
 
 def nbl_model() -> DedicatedBasketballLeagueModel:
     return DedicatedBasketballLeagueModel(NBL_CONFIG)
+
+
+def ncaab_v2_model() -> DedicatedBasketballLeagueModel:
+    return DedicatedBasketballLeagueModel(NCAAB_V2_CONFIG)
+
+
+def euroleague_v2_model() -> DedicatedBasketballLeagueModel:
+    return DedicatedBasketballLeagueModel(EUROLEAGUE_V2_CONFIG)
+
+
+def nbl_v2_model() -> DedicatedBasketballLeagueModel:
+    return DedicatedBasketballLeagueModel(NBL_V2_CONFIG)

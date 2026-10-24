@@ -1,0 +1,25 @@
+{
+  "model_version": "eurolg-tempo-v2",
+  "sport": "EUROLEAGUE",
+  "schema_version": "basketball-tempo-v2",
+  "model_type": "independent_tempo_margin_possession",
+  "status": "production",
+  "qualified_for_betting": true,
+  "confidence_threshold": 0.02,
+  "min_edge": 0.02,
+  "max_edge": 0.08,
+  "max_underdog_odds": 250,
+  "home_court_points": 2.0,
+  "margin_sd": 10.0,
+  "total_sd": 12.8,
+  "pace": 72.0,
+  "dynamic_sizing": {
+    "enabled": true,
+    "base_units": 1.0,
+    "max_units": 2.0,
+    "edge_slope": 16.67
+  },
+  "target": "EuroLeague independent 40-minute FIBA pace and scoring model with calibrated HCA",
+  "trained_through_date": "2026-10-24",
+  "artifact_hash": "1ae9024a642b3b18699d5dd65ed7b0abcfcf763d0e0a70c880016738b5fdcdb4"
+}

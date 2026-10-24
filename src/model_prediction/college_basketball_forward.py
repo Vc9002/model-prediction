@@ -14,7 +14,7 @@ from .features.base import FeatureStore
 from .hockey_forward import _parse_teams_from_event, _team_matches
 from .ledger import DuplicatePickError
 from .models.basketball import UpcomingGame
-from .models.basketball_leagues import ncaab_model
+from .models.basketball_leagues import ncaab_v2_model
 from .production_registry import ProductionModelRegistry
 
 
@@ -31,7 +31,7 @@ def forecast_ncaab_sport(
     board = ESPNClient().scoreboard("NCAAB", args_date)
     result = {
         "sport": "ncaab",
-        "model_version": "ncaab-tempo-v1",
+        "model_version": "ncaab-tempo-v2",
         "scheduled_games": len(board.get("events", [])),
         "logged": 0,
         "flat_logged": 0,
@@ -49,7 +49,7 @@ def forecast_ncaab_sport(
         result.update(status="data_unavailable", reason="no_completed_ncaab_history")
         return result
     events = PolymarketUSClient().slate("NCAAB", date.fromisoformat(args_date))
-    model, observed = ncaab_model(), utc_now()
+    model, observed = ncaab_v2_model(), utc_now()
     registry = ProductionModelRegistry.load(PROJECT_ROOT)
     for market in ("moneyline", "spread", "total"):
         champion = registry.champion("NCAAB", market)
@@ -144,11 +144,17 @@ def forecast_ncaab_sport(
                     CanonicalTeam(name, League.NCAAB, name, name[:3], True, None, None, ())
                     for name in (away, home)
                 ]
+                dynamic_units = (
+                    getattr(model, "compute_dynamic_units", None)
+                    and model.compute_dynamic_units(
+                        edge, min_edge=policy.get("min_edge", 0.02), max_edge=0.08
+                    )
+                ) or 1.00
                 eligibility = EligibilityResult(
                     RecordType.RESEARCH_OBSERVATION,
                     "CALL",
                     "PAPER_CALL_MODEL_UNVALIDATED",
-                    1.0,
+                    dynamic_units,
                     round(probability * 100),
                     edge,
                     edge,

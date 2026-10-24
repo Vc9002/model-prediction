@@ -1,0 +1,25 @@
+{
+  "model_version": "nbl-tempo-v2",
+  "sport": "NBL",
+  "schema_version": "basketball-tempo-v2",
+  "model_type": "independent_tempo_margin_possession",
+  "status": "production",
+  "qualified_for_betting": true,
+  "confidence_threshold": 0.02,
+  "min_edge": 0.02,
+  "max_edge": 0.08,
+  "max_underdog_odds": 250,
+  "home_court_points": 2.2,
+  "margin_sd": 10.8,
+  "total_sd": 15.0,
+  "pace": 78.2,
+  "dynamic_sizing": {
+    "enabled": true,
+    "base_units": 1.0,
+    "max_units": 2.0,
+    "edge_slope": 16.67
+  },
+  "target": "Australian NBL independent pace, possession, and scoring model with calibrated HCA",
+  "trained_through_date": "2026-10-24",
+  "artifact_hash": "5d473f558e55089de795ad667f9db942d3631075005df6d8e756f79ff56ebb50"
+}

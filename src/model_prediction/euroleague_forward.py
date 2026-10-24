@@ -26,7 +26,7 @@ from .features.base import FeatureStore
 from .hockey_forward import _parse_teams_from_event
 from .ledger import DuplicatePickError
 from .models.basketball import UpcomingGame
-from .models.basketball_leagues import euroleague_model
+from .models.basketball_leagues import euroleague_v2_model
 from .production_registry import ProductionModelRegistry
 
 MARKETS = ("moneyline", "spread", "total")
@@ -77,7 +77,7 @@ def forecast_euroleague_sport(*, data_root, args_date, config, history_client=No
         "euroleague",
         "EUROLEAGUE",
         League.EUROLEAGUE,
-        euroleague_model,
+        euroleague_v2_model,
         refresh_euroleague_history,
         _euroleague_resolver,
     )
@@ -230,11 +230,15 @@ def forecast_basketball_lane(
                 CanonicalTeam(name, spec.league, name, name[:3], True, None, None, ())
                 for name in (away, home)
             ]
+            dynamic_units = (
+                getattr(model, "compute_dynamic_units", None)
+                and model.compute_dynamic_units(edge, min_edge=min_edge, max_edge=0.08)
+            ) or 1.00
             eligibility = EligibilityResult(
                 RecordType.RESEARCH_OBSERVATION,
                 "CALL",
                 "PAPER_CALL_MODEL_UNVALIDATED",
-                1.0,
+                dynamic_units,
                 round(probability * 100),
                 edge,
                 edge,

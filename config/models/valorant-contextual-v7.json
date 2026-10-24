@@ -1,0 +1,22 @@
+{
+  "model_version": "valorant-contextual-v7",
+  "sport": "VALORANT",
+  "schema_version": "esports-contextual-v7",
+  "model_type": "contextual_residual_tiered_elo",
+  "status": "production",
+  "qualified_for_betting": true,
+  "confidence_threshold": 0.02,
+  "min_edge": 0.02,
+  "max_edge": 0.12,
+  "max_underdog_odds": 120,
+  "l2_shrinkage": 0.8,
+  "dynamic_sizing": {
+    "enabled": true,
+    "base_units": 1.0,
+    "max_units": 2.0,
+    "edge_slope": 16.67
+  },
+  "target": "Map pool win rate, Attack/Defense side skew, and series format win probability",
+  "trained_through_date": "2026-10-24",
+  "artifact_hash": "b2cb20cae5d87a4fa97d810754b67b9292928a53aab79033a22ab464e8d553cf"
+}

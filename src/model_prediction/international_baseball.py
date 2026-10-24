@@ -1282,11 +1282,7 @@ def forecast_international_baseball_slate(
     directory = Path(data_root) / "international_baseball" / league
     # v2 filename: matches the artifact's own model_version (see the
     # comment at the write site in validate_international_baseball_baseline).
-    artifact_v3 = Path(artifact_dir) / f"{league}-baseball-v3.json"
-    if artifact_v3.exists():
-        artifact_path = artifact_v3
-    else:
-        artifact_path = Path(artifact_dir) / f"{league}-tie-aware-elo-v2.json"
+    artifact_path = Path(artifact_dir) / f"{league}-tie-aware-elo-v2.json"
     if not artifact_path.exists():
         raise FileNotFoundError(f"missing research artifact: {artifact_path}")
     artifact = json.loads(artifact_path.read_text(encoding="utf-8"))

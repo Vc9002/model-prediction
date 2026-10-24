@@ -1,0 +1,25 @@
+{
+  "model_version": "ncaab-tempo-v2",
+  "sport": "NCAAB",
+  "schema_version": "basketball-tempo-v2",
+  "model_type": "independent_tempo_margin_possession",
+  "status": "production",
+  "qualified_for_betting": true,
+  "confidence_threshold": 0.02,
+  "min_edge": 0.02,
+  "max_edge": 0.08,
+  "max_underdog_odds": 250,
+  "home_court_points": 3.2,
+  "margin_sd": 10.5,
+  "total_sd": 13.8,
+  "pace": 68.1,
+  "dynamic_sizing": {
+    "enabled": true,
+    "base_units": 1.0,
+    "max_units": 2.0,
+    "edge_slope": 16.67
+  },
+  "target": "NCAAB Men's College Basketball independent pace, possession, and scoring model",
+  "trained_through_date": "2026-10-24",
+  "artifact_hash": "82f2dcbb525f729c728256fbb4232729ca1284fc24a1a977a31ea2b8bcff1ce1"
+}

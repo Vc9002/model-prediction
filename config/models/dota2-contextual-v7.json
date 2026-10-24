@@ -1,0 +1,22 @@
+{
+  "model_version": "dota2-contextual-v7",
+  "sport": "DOTA2",
+  "schema_version": "esports-contextual-v7",
+  "model_type": "contextual_residual_tiered_elo",
+  "status": "production",
+  "qualified_for_betting": true,
+  "confidence_threshold": 0.02,
+  "min_edge": 0.02,
+  "max_edge": 0.12,
+  "max_underdog_odds": 120,
+  "l2_shrinkage": 0.8,
+  "dynamic_sizing": {
+    "enabled": true,
+    "base_units": 1.0,
+    "max_units": 2.0,
+    "edge_slope": 16.67
+  },
+  "target": "Radiant vs Dire balance, draft versatility, and series format win probability",
+  "trained_through_date": "2026-10-24",
+  "artifact_hash": "9ce652a10bd66a8e62f10202a900d45da0485bca61773d669577a78aedb706fb"
+}

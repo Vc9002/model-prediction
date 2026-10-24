@@ -62,6 +62,9 @@ CODE_BACKED_ENTRYPOINTS: dict[str, str] = {
     "ncaab-tempo-v1": "model_prediction.models.basketball_leagues:ncaab_model",
     "eurolg-tempo-v1": "model_prediction.models.basketball_leagues:euroleague_model",
     "nbl-tempo-v1": "model_prediction.models.basketball_leagues:nbl_model",
+    "ncaab-tempo-v2": "model_prediction.models.basketball_leagues:ncaab_v2_model",
+    "eurolg-tempo-v2": "model_prediction.models.basketball_leagues:euroleague_v2_model",
+    "nbl-tempo-v2": "model_prediction.models.basketball_leagues:nbl_v2_model",
     # Local Challenger & Extended Models
     "nba-structural-v5": "model_prediction.models.nba_structural_v5:NBAStructuralV5Engine",
     "mlb-structural-runline-v4": "model_prediction.models.mlb_runline_v4:MLBStructuralRunlineV4Model",
