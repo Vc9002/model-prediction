@@ -1,0 +1,32 @@
+{
+  "artifact_hash": "cfde56e4644d4d2ce64bfd0af9f3dbaaa9363fb26f88ac8984d2202ca01b317f",
+  "model_version": "darts-markov-v2",
+  "sport": "DARTS",
+  "leagues": [
+    "DARTS_PDC",
+    "DARTS_MODUS"
+  ],
+  "schema_version": "darts-exact-markov-v2",
+  "model_type": "exact_markov_leg_progression",
+  "status": "production",
+  "qualified_for_betting": true,
+  "confidence_threshold": 0.02,
+  "min_edge": 0.02,
+  "max_edge": 0.12,
+  "min_sample_matches": 3,
+  "unrated_shrinkage_weight": 0.7,
+  "max_underdog_odds": 250,
+  "min_executable_ask": 0.28,
+  "throw_advantage_logit": 0.5,
+  "elo_scale_logit": 0.0017269,
+  "k_factor": 24.0,
+  "default_rating": 1500.0,
+  "dynamic_sizing": {
+    "enabled": true,
+    "base_units": 1.0,
+    "max_units": 2.0,
+    "edge_slope": 16.67
+  },
+  "target": "moneyline, spread, and total legs exact dynamic programming distribution",
+  "trained_through_date": "2026-10-24"
+}

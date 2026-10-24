@@ -44,6 +44,13 @@ class InternationalBaseballForecast:
 class InternationalBaseballV3Model:
     """Tie-aware structural baseball model for KBO and NPB."""
 
+    @staticmethod
+    def compute_dynamic_units(edge: float, min_edge: float = 0.02, max_edge: float = 0.08) -> float:
+        """Dynamic unit sizing scaling from 1.00U to 2.00U with edge."""
+        abs_edge = abs(edge)
+        scaled = 1.0 + min(1.0, max(0.0, (abs_edge - min_edge) / (max_edge - min_edge)))
+        return round(float(scaled), 2)
+
     def __init__(self, league: str = "NPB", max_runs: int = 15) -> None:
         self.league = league.upper()
         self.max_runs = max_runs
@@ -243,3 +250,13 @@ class InternationalBaseballV3Model:
         upcoming: Sequence[Any] | None = None,
     ) -> list[GamePrediction]:
         return self.predict_games(history=history, upcoming=upcoming)
+
+
+def kbo_v3_model() -> InternationalBaseballV3Model:
+    """Default KBO structural v3 model factory."""
+    return InternationalBaseballV3Model(league="KBO")
+
+
+def npb_v3_model() -> InternationalBaseballV3Model:
+    """Default NPB structural v3 model factory."""
+    return InternationalBaseballV3Model(league="NPB")

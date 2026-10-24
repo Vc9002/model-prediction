@@ -368,6 +368,16 @@ prediction_service:
     evidence_status: historical_only
     replacement_priority: low
     rollback_model: null
+  - model_id: kbo-baseball-v3
+    sport: KBO
+    market: moneyline
+    implementation: code_backed_model
+    entry: model_prediction.models.international_baseball_v3:InternationalBaseballV3Model
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: kbo-tie-aware-elo-v2
   - model_id: kbo-tie-aware-elo-v2
     sport: KBO
     market: moneyline
@@ -400,6 +410,16 @@ prediction_service:
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: null
+  - model_id: darts-markov-v2
+    sport: DARTS
+    market: moneyline
+    implementation: code_backed_model
+    entry: model_prediction.models.darts:darts_v2_model
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: darts-markov-v1
   - model_id: darts-markov-v1
     sport: DARTS
     market: moneyline
@@ -554,7 +574,7 @@ prediction_service:
       spread: nbl-tempo-v1
       total: nbl-tempo-v1
     DARTS:
-      moneyline: darts-markov-v1
+      moneyline: darts-markov-v2
     WNBA:
       moneyline: wnba-elo-trend-lr-v4
       spread: wnba-spread-margin-v2
@@ -605,7 +625,7 @@ prediction_service:
       spread: rainbow_six-spread-tiered-elo-v6
       total: rainbow_six-total-tiered-elo-v6
     KBO:
-      moneyline: kbo-tie-aware-elo-v2
+      moneyline: kbo-baseball-v3
     NPB:
       moneyline: npb-tie-aware-elo-v2
     HOCKEY:
@@ -806,9 +826,11 @@ prediction_service:
   - lol-tiered-elo-v6
   - valorant-tiered-elo-v6
   - rainbow_six-tiered-elo-v6
+  - kbo-baseball-v3
   - kbo-tie-aware-elo-v2
   - npb-tie-aware-elo-v2
   - hockey-poisson-dc-v1
+  - darts-markov-v2
   - darts-markov-v1
   - ncaab-tempo-v1
   - eurolg-tempo-v1

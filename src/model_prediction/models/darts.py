@@ -17,7 +17,9 @@ from typing import Any
 
 from .base import GamePrediction, GamePredictionBase
 
-DARTS_MODEL_VERSION = "darts-markov-v1"
+DARTS_V1_MODEL_VERSION = "darts-markov-v1"
+DARTS_V2_MODEL_VERSION = "darts-markov-v2"
+DARTS_MODEL_VERSION = DARTS_V2_MODEL_VERSION
 # Baseline throw advantage in log-odds: a player holds throw ~62.2% of the time against an equal opponent
 DEFAULT_THROW_ADVANTAGE_LOGIT = 0.50
 # Scale factor converting Elo rating differences into logit probability shifts.
@@ -187,6 +189,13 @@ class DartsLegMarkovEngine:
 class DartsModel:
     """Production-ready Darts model tracking player ratings and leg distributions."""
 
+    @staticmethod
+    def compute_dynamic_units(edge: float, min_edge: float = 0.02, max_edge: float = 0.08) -> float:
+        """Dynamic unit sizing scaling from 1.00U to 2.00U with edge."""
+        abs_edge = abs(edge)
+        scaled = 1.0 + min(1.0, max(0.0, (abs_edge - min_edge) / (max_edge - min_edge)))
+        return round(float(scaled), 2)
+
     sport = "darts"
 
     def __init__(
@@ -251,6 +260,22 @@ class DartsModel:
         rb = self.get_rating(player_b)
         result = self.engine.evaluate_markets(ra, rb, best_of_legs=best_of_legs)
 
+        sample_a = self.match_counts.get(player_a, 0)
+        sample_b = self.match_counts.get(player_b, 0)
+        sample = min(sample_a, sample_b)
+
+        p_win_a = result["p_win_a"]
+        p_win_b = result["p_win_b"]
+        # In v2, if player sample is below threshold, shrink win probability toward 0.50
+        if self.version != DARTS_V1_MODEL_VERSION and sample < 3:
+            weight = sample / 3.0
+            p_win_a = weight * p_win_a + (1.0 - weight) * 0.50
+            p_win_b = weight * p_win_b + (1.0 - weight) * 0.50
+            tot = p_win_a + p_win_b
+            if tot > 0:
+                p_win_a /= tot
+                p_win_b /= tot
+
         scores = result["score_distribution"]
 
         # Spread probability: player_a covers line S if legs_a - legs_b + S > 0
@@ -286,7 +311,7 @@ class DartsModel:
             "rating_a": ra,
             "rating_b": rb,
             "best_of_legs": best_of_legs,
-            "moneyline": {"a": result["p_win_a"], "b": result["p_win_b"]},
+            "moneyline": {"a": p_win_a, "b": p_win_b},
             "spread": spread_probs,
             "total": total_probs,
             "expected_legs_a": result["expected_legs_a"],
@@ -393,6 +418,16 @@ class DartsModel:
         return predictions
 
 
+def darts_v1_model() -> DartsModel:
+    """Legacy Darts v1 model factory."""
+    return DartsModel(version=DARTS_V1_MODEL_VERSION)
+
+
+def darts_v2_model() -> DartsModel:
+    """Production Darts v2 model factory."""
+    return DartsModel(version=DARTS_V2_MODEL_VERSION)
+
+
 def darts_model() -> DartsModel:
-    """Default Darts model factory."""
-    return DartsModel()
+    """Default Darts model factory (points to v2)."""
+    return darts_v2_model()

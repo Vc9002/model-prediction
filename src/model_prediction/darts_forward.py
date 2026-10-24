@@ -115,7 +115,7 @@ def build_darts_slate(
     model: DartsModel | None = None,
     leagues: Sequence[str] | None = None,
     observed_at: datetime | None = None,
-    min_team_matches: int = 0,
+    min_team_matches: int = 3,
 ) -> dict[str, Any]:
     """Build prospective darts slate and evaluate actionable edges against executable asks."""
     active_model = model or darts_model()
@@ -277,6 +277,16 @@ def build_darts_slate(
                     side_key = "home" if is_p1 else "away"
                     model_prob = pred_ml.probabilities[side_key]
                     edge = model_prob - ask
+                    sample_min = min(
+                        active_model.match_counts.get(pred_ml.home_team, 0),
+                        active_model.match_counts.get(pred_ml.away_team, 0),
+                    )
+                    # Prune unrated extreme longshot dogs (odds > +250, ask < 0.28)
+                    if ask < 0.28 and sample_min < 5:
+                        continue
+                    # Prune false anomaly edges > 12%
+                    if edge > 0.12:
+                        continue
                     candidates.append(
                         {
                             "selection": side_key,
@@ -285,6 +295,7 @@ def build_darts_slate(
                             "model_probability": model_prob,
                             "edge": edge,
                             "american_odds": probability_to_american(model_prob),
+                            "units": DartsModel.compute_dynamic_units(edge),
                         }
                     )
                 if candidates:
@@ -309,6 +320,7 @@ def build_darts_slate(
                             "observed_at_utc": observed.isoformat(),
                             "timestamp_valid": True,
                             "edge_vs_executable_ask": round(best["edge"], 6),
+                            "units": best.get("units", 1.0),
                         }
                     )
 

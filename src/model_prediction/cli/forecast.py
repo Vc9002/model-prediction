@@ -5433,6 +5433,13 @@ def _forecast_darts_sport(
                 valid_to=None,
                 aliases=(),
             )
+            from ..models.darts import DartsModel
+
+            dyn_units = (
+                DartsModel.compute_dynamic_units(contract_edge, min_edge=min_edge, max_edge=0.08)
+                if not baseline_only and contract_edge >= min_edge
+                else 0.0
+            )
             eligibility = EligibilityResult(
                 record_type=RecordType.RESEARCH_OBSERVATION,
                 decision="CALL" if not baseline_only and contract_edge >= min_edge else "NO_CALL",
@@ -5443,7 +5450,7 @@ def _forecast_darts_sport(
                     if contract_edge >= min_edge
                     else "NO_CALL_LOW_EDGE"
                 ),
-                units=1.0 if not baseline_only and contract_edge >= min_edge else 0.0,
+                units=dyn_units,
                 confidence_score=round(prob_val * 100),
                 edge=round(contract_edge, 6),
                 adjusted_edge=round(contract_edge, 6),

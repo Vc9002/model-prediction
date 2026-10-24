@@ -1,0 +1,97 @@
+{
+  "artifact_hash": "088422677b0ed22c3bf2fd6e08a033d6e1ca4e53be521f9bb088ffb661eb86f6",
+  "model_version": "kbo-baseball-v3",
+  "league": "kbo",
+  "schema_version": "international-baseball-structural-v3",
+  "model_type": "bivariate_poisson_tie_aware",
+  "status": "production",
+  "qualified_for_betting": true,
+  "confidence_threshold": 0.02,
+  "min_edge": 0.02,
+  "max_edge": 0.12,
+  "tie_rate_factor": 0.18,
+  "tie_probability": 0.02257709,
+  "tie_method": "flat",
+  "k": 8.0,
+  "home_advantage": 20.0,
+  "margin_weight": 0.0,
+  "decay_rate": 0.002,
+  "baseline_lambda_home": 4.8,
+  "baseline_lambda_away": 4.4,
+  "league_fip": 4.2,
+  "home_advantage_runs": 0.4,
+  "ratings": {
+    "DOOSAN": 1514.267432,
+    "HANWHA": 1431.069215,
+    "KIA": 1533.663815,
+    "KIWOOM": 1429.320554,
+    "KT": 1588.680604,
+    "LG": 1508.27313,
+    "LOTTE": 1485.583169,
+    "NC": 1466.613016,
+    "SAMSUNG": 1532.788731,
+    "SSG": 1509.740334
+  },
+  "games_played": {
+    "DOOSAN": 1568,
+    "HANWHA": 1568,
+    "KIA": 1568,
+    "KIWOOM": 1120,
+    "KT": 1568,
+    "LG": 1568,
+    "LOTTE": 1568,
+    "NC": 1568,
+    "SAMSUNG": 1568,
+    "SSG": 864
+  },
+  "team_ratings": {
+    "DOOSAN": {
+      "offense": 1.02,
+      "defense": 0.98
+    },
+    "HANWHA": {
+      "offense": 0.94,
+      "defense": 1.06
+    },
+    "KIA": {
+      "offense": 1.08,
+      "defense": 0.92
+    },
+    "KIWOOM": {
+      "offense": 0.93,
+      "defense": 1.07
+    },
+    "KT": {
+      "offense": 1.04,
+      "defense": 0.96
+    },
+    "LG": {
+      "offense": 1.06,
+      "defense": 0.94
+    },
+    "LOTTE": {
+      "offense": 0.98,
+      "defense": 1.02
+    },
+    "NC": {
+      "offense": 0.97,
+      "defense": 1.03
+    },
+    "SAMSUNG": {
+      "offense": 1.05,
+      "defense": 0.95
+    },
+    "SSG": {
+      "offense": 1.01,
+      "defense": 0.99
+    }
+  },
+  "dynamic_sizing": {
+    "enabled": true,
+    "base_units": 1.0,
+    "max_units": 2.0,
+    "edge_slope": 16.67
+  },
+  "target": "bivariate run distribution with extra-inning tie settlements",
+  "trained_through_date": "2026-10-24"
+}
