@@ -248,3 +248,88 @@ def test_basketball_model_offseason_and_possession():
     assert 0.0 < total.probability("over") < 1.0
     assert 0.0 < ml.probability("home") < 1.0
     assert spread.model_version == "nba-spread-margin-v3"
+
+
+def test_dynamic_matchup_pace_adjusts_possessions():
+    from model_prediction.models.basketball import BasketballModel
+
+    model_base = BasketballModel(
+        sport="nba",
+        version="test-base",
+        margin_sd=13.8,
+        total_sd=18.8,
+        league="NBA",
+        possession_model=True,
+        dynamic_matchup_pace=False,
+    )
+    model_dynamic = BasketballModel(
+        sport="nba",
+        version="test-dynamic",
+        margin_sd=13.8,
+        total_sd=18.8,
+        league="NBA",
+        possession_model=True,
+        dynamic_matchup_pace=True,
+    )
+
+    # 3 teams: Team C is average (100-100), Team A and Team B both score high against C
+    history = (
+        [
+            GameRecord(
+                event_id=f"g_c_{i}",
+                event_start_utc=f"2026-01-{i:02d}T00:00:00Z",
+                league="NBA",
+                away_team="TeamC",
+                home_team="TeamD",
+                away_score=100,
+                home_score=100,
+                season_type="regular-season",
+            )
+            for i in range(1, 15)
+        ]
+        + [
+            GameRecord(
+                event_id=f"g_a_{i}",
+                event_start_utc=f"2026-01-{i:02d}T10:00:00Z",
+                league="NBA",
+                away_team="TeamA",
+                home_team="TeamC",
+                away_score=140,
+                home_score=135,
+                season_type="regular-season",
+            )
+            for i in range(1, 15)
+        ]
+        + [
+            GameRecord(
+                event_id=f"g_b_{i}",
+                event_start_utc=f"2026-01-{i:02d}T12:00:00Z",
+                league="NBA",
+                away_team="TeamB",
+                home_team="TeamC",
+                away_score=138,
+                home_score=132,
+                season_type="regular-season",
+            )
+            for i in range(1, 15)
+        ]
+    )
+    upcoming = [
+        UpcomingGame(
+            event_id="up1",
+            event_start_utc="2026-01-20T00:00:00Z",
+            away_team="TeamA",
+            home_team="TeamB",
+            total_line=240.0,
+            league="NBA",
+        )
+    ]
+
+    pred_base = model_base.predict_games(history, upcoming)
+    pred_dynamic = model_dynamic.predict_games(history, upcoming)
+
+    tot_base = next(p for p in pred_base if p.market_type == "total")
+    tot_dynamic = next(p for p in pred_dynamic if p.market_type == "total")
+
+    assert tot_dynamic.feature_basis["expected_total"] > tot_base.feature_basis["expected_total"]
+    assert tot_dynamic.probability("over") > tot_base.probability("over")

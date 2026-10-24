@@ -259,7 +259,13 @@ def _downgrade_research_call(
     2026-07-31: "every pick should have units and pnl, hard code this").
     """
     uncertainty = request.model_uncertainty or 0.05
-    units = edge_scaled_units(request.model_probability, uncertainty, request.american_odds, policy)
+    units = edge_scaled_units(
+        request.model_probability,
+        uncertainty,
+        request.american_odds,
+        policy,
+        market_type=request.market_type,
+    )
     return EligibilityResult(
         RecordType.RESEARCH_OBSERVATION,
         "CALL",
@@ -296,7 +302,13 @@ def _call_result(
     )
     adjusted_edge = (request.model_probability - uncertainty) - market_no_vig
     confidence = max(0, min(100, round(50 + 500 * adjusted_edge - 100 * uncertainty)))
-    units = edge_scaled_units(request.model_probability, uncertainty, request.american_odds, policy)
+    units = edge_scaled_units(
+        request.model_probability,
+        uncertainty,
+        request.american_odds,
+        policy,
+        market_type=request.market_type,
+    )
     return EligibilityResult(
         RecordType.QUALIFIED_SHADOW_CALL,
         "CALL",
@@ -332,12 +344,14 @@ def _research(
         Exposure(),
         policy,
         validated_model=False,
+        market_type=request.market_type,
     )
     units = edge_scaled_units(
         request.model_probability,
         uncertainty or 0.05,
         request.american_odds,
         policy,
+        market_type=request.market_type,
     )
     return EligibilityResult(
         RecordType.RESEARCH_OBSERVATION,
@@ -376,6 +390,7 @@ def enforce_universal_paper_call(
             request.model_uncertainty or 0.05,
             request.american_odds,
             policy or UnitPolicy(),
+            market_type=request.market_type,
         )
     return replace(
         eligibility,

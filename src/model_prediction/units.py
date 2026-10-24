@@ -52,19 +52,21 @@ def edge_scaled_units(
     model_uncertainty: float,
     american_odds: int,
     policy: UnitPolicy | None = None,
+    market_type: str | None = None,
 ) -> float:
     """Scale units by real market-relative edge, adjusted for model uncertainty.
 
-    Fixed: Previously scaled by distance from 50% (abs(model_prob - 0.5)), which
-    erroneously assigned max 2.0U stakes to heavy favorites with tiny edges over
-    the market. Now scales strictly by the conservative edge over the implied
-    market probability (adjusted_probability - market_probability).
+    Hybrid market rule:
+    - Spreads & Totals scale dynamically up to max_pick_units (2.0U) based on conservative edge.
+    - Moneyline caps at min_pick_units (1.0U) to protect against fat-tail variance and asymmetric payoff risk.
 
     Higher real edge = more units. Lower edge = fewer units.
     Caps at policy.max_pick_units (2.0U), floors at policy.min_pick_units (1.0U).
     """
     if policy is None:
         policy = UnitPolicy()
+    if market_type is not None and str(market_type).strip().lower() in ("moneyline", "ml"):
+        return policy.min_pick_units
     market_prob = implied_probability(american_odds) if american_odds else 0.5
     unc = max(0.0, model_uncertainty or 0.0)
     adjusted_prob = max(0.0, model_probability - unc)
@@ -84,6 +86,7 @@ def recommend_units(
     policy: UnitPolicy | None = None,
     validated_model: bool = False,
     force_shadow_call: bool = False,
+    market_type: str | None = None,
 ) -> UnitRecommendation:
     policy = policy or UnitPolicy()
     decimal_odds = american_to_decimal(american_odds)
@@ -105,7 +108,9 @@ def recommend_units(
 
     # Edge-scaled override: proven +34.1U vs +13.3U flat on MLB walk-forward.
     # Scales units by model edge: higher confidence = more units.
-    edge_units = edge_scaled_units(model_probability, model_uncertainty, american_odds, policy)
+    edge_units = edge_scaled_units(
+        model_probability, model_uncertainty, american_odds, policy, market_type=market_type
+    )
     units = max(units, edge_units)  # Take the higher of Kelly or edge-scaled
     if validated_model:
         # min_pick_units is a NO-BET CUTOFF, never a raise. Inflating a sub-minimum

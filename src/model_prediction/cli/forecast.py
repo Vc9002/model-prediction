@@ -1848,6 +1848,7 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
     b2b_penalty_home = float(artifact.get("b2b_penalty_home", 0.0))
     b2b_pace_drag = float(artifact.get("b2b_pace_drag", 0.0))
     coherent_moneyline = bool(artifact.get("coherent_moneyline", False))
+    dynamic_matchup_pace = bool(artifact.get("dynamic_matchup_pace", False))
 
     model = BasketballModel(
         sport="nba",
@@ -1868,6 +1869,7 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
         b2b_penalty_home=b2b_penalty_home,
         b2b_pace_drag=b2b_pace_drag,
         coherent_moneyline=coherent_moneyline,
+        dynamic_matchup_pace=dynamic_matchup_pace,
     )
     store = FeatureStore(data_root)
     history = store.games_before("nba", args_date)
@@ -2164,6 +2166,7 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
     isolate_postseason = bool(artifact.get("isolate_postseason", False))
     possession_model = bool(artifact.get("possession_model", False))
     b2b_pace_drag = float(artifact.get("b2b_pace_drag", 0.0))
+    dynamic_matchup_pace = bool(artifact.get("dynamic_matchup_pace", False))
 
     model = BasketballModel(
         sport="nba",
@@ -2178,6 +2181,7 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
         isolate_postseason=isolate_postseason,
         possession_model=possession_model,
         b2b_pace_drag=b2b_pace_drag,
+        dynamic_matchup_pace=dynamic_matchup_pace,
     )
     store = FeatureStore(data_root)
     history = store.games_before("nba", args_date)

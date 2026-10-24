@@ -95,6 +95,7 @@ class BasketballModel:
         b2b_penalty_home: float = 0.0,
         b2b_pace_drag: float = 0.0,
         coherent_moneyline: bool = False,
+        dynamic_matchup_pace: bool = False,
     ) -> None:
         self._sport = sport
         self._version = version
@@ -117,6 +118,7 @@ class BasketballModel:
         self.b2b_penalty_home = b2b_penalty_home
         self.b2b_pace_drag = b2b_pace_drag
         self.coherent_moneyline = coherent_moneyline
+        self.dynamic_matchup_pace = dynamic_matchup_pace
 
     @property
     def version(self) -> str:
@@ -229,7 +231,19 @@ class BasketballModel:
                     pace_adj -= 0.5
                 if (home_b2b or away_b2b) and self.b2b_pace_drag > 0.0:
                     pace_adj -= self.b2b_pace_drag
-                est_possessions = league_pace + pace_adj
+
+                if self.dynamic_matchup_pace and baseline > 0.0:
+                    pf_away = 1.0 + 0.50 * (
+                        ((away_trend.offense["hl10"] + away_trend.defense["hl10"]) / (2.0 * baseline)) - 1.0
+                    )
+                    pf_home = 1.0 + 0.50 * (
+                        ((home_trend.offense["hl10"] + home_trend.defense["hl10"]) / (2.0 * baseline)) - 1.0
+                    )
+                    matchup_pace_mult = pf_away * pf_home
+                    est_possessions = (league_pace * matchup_pace_mult) + pace_adj
+                else:
+                    est_possessions = league_pace + pace_adj
+
                 ortg_away = (away_points / league_pace) * 100.0
                 ortg_home = (home_points / league_pace) * 100.0
                 expected_total = est_possessions * (ortg_away + ortg_home) / 100.0
