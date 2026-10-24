@@ -407,8 +407,15 @@ def load_auto_buyer_state() -> dict[str, Any]:
     }
     data: dict[str, Any] = {}
     state_file = AUTO_BUYER_STATE_FILE
-    if not state_file.exists() and (_paths.repo_root / "data" / "auto_buyer_state.json").exists():
-        state_file = _paths.repo_root / "data" / "auto_buyer_state.json"
+    canonical_runtime_file = _paths.runtime_root / "auto_buyer_state.json"
+    repo_seed_file = _paths.repo_root / "data" / "auto_buyer_state.json"
+    if (
+        not state_file.exists()
+        and state_file == canonical_runtime_file
+        and DATA == _paths.runtime_root
+        and repo_seed_file.exists()
+    ):
+        state_file = repo_seed_file
     if state_file.exists():
         try:
             data = json.loads(state_file.read_text(encoding="utf-8"))

@@ -22,7 +22,7 @@ from dataclasses import dataclass
 NBA_V5_MODEL_VERSION = "nba-structural-v5"
 NBA_LEAGUE_AVG_PACE = 99.2
 NBA_LEAGUE_AVG_ORTG = 114.5  # Points per 100 possessions
-NBA_HFA_POINTS = 2.4
+NBA_HFA_POINTS = 1.4  # Calibrated modern NBA HCA (down from legacy 2.4)
 NBA_DEFAULT_SPREAD_SD = 12.2
 NBA_DEFAULT_TOTAL_SD = 14.0
 

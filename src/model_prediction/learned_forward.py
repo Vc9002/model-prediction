@@ -610,8 +610,34 @@ def build_learned_moneyline_slate(
             except (KeyError, TypeError, ValueError):
                 continue
         prefetch_live_weather(home_teams)
-    elo = build_elo(history, key)
-    trends = TrendEngine(history)
+    elo_home_adv = artifact.raw.get("home_advantage")
+    if elo_home_adv is None and key == "nba":
+        elo_home_adv = 38.0
+    elo_offseason_reg = artifact.raw.get("offseason_regression")
+    elo_offseason_gap = artifact.raw.get("offseason_gap_days", 60)
+    elo = build_elo(
+        history,
+        key,
+        offseason_regression=elo_offseason_reg,
+        offseason_gap_days=int(elo_offseason_gap),
+        home_advantage=elo_home_adv,
+    )
+    trend_gap_days = artifact.raw.get("offseason_gap_days")
+    trend_retention = float(artifact.raw.get("offseason_retention", 0.50))
+    trend_isolate_postseason = bool(artifact.raw.get("isolate_postseason", False))
+    if key == "nba":
+        if trend_gap_days is None:
+            trend_gap_days = 60.0
+        if "offseason_retention" not in artifact.raw:
+            trend_retention = 0.40
+        if "isolate_postseason" not in artifact.raw:
+            trend_isolate_postseason = True
+    trends = TrendEngine(
+        history,
+        offseason_gap_days=trend_gap_days,
+        offseason_retention=trend_retention,
+        isolate_postseason=trend_isolate_postseason,
+    )
     candidates: list[LearnedForwardCandidate] = []
     skipped: list[dict[str, str]] = []
     seen_hashes: set[str] = set()
