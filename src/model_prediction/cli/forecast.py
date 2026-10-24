@@ -5028,6 +5028,9 @@ def _forecast_cfb_sport(
                 ):
                     # Hard Edge Gate / Anomaly Trap: Blowout spreads with claimed edge > 8% are tail errors
                     genuinely_eligible = False
+                if genuinely_eligible and mtype == MarketType.TOTAL and contract_edge > 0.05:
+                    # Hard Edge Gate / Anomaly Trap: CFB Totals with claimed edge > 5% suffer shootout variance
+                    genuinely_eligible = False
                 # CFB spread (cfb-spread-v1) and total (cfb-total-v1) artifacts explicitly declare
                 # "status": "FLAT_LEDGER_ONLY" and "qualified": false. Unified cfb-structural-v3
                 # produces calibrated joint probabilities and is qualified across moneyline,
