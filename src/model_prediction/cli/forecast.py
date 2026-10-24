@@ -4736,7 +4736,13 @@ def _forecast_tennis_sport(
                 if contract["model_version"] == "tennis-learned-v3"
                 else (
                     "markov_hierarchical"
-                    if contract["model_version"] == "tennis-markov-hierarchical-v2"
+                    if contract["model_version"]
+                    in (
+                        "tennis-markov-hierarchical-v2",
+                        "tennis-games-markov-v1",
+                        "tennis-games-markov-v2",
+                        "tennis-games-markov-v3",
+                    )
                     else "surface_blended_elo"
                 )
             ),

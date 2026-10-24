@@ -447,9 +447,12 @@ models:
     research_confidence_gate: 0.02
     markets:
     - moneyline
+    - spread
+    - total
     note: Calibrated Dual-Horizon surface Elo v5 with temperature scaling (T=1.18),
       two-sided value edge selection, short-rest fatigue adjustment, and Hard Edge
-      Gate (0.02 <= edge <= 0.08). Uncalibrated derivative spreads and totals disabled.
+      Gate (0.02 <= edge <= 0.08). Spread and total derivatives powered by Markov v3
+      with empirical set momentum and dynamic unit sizing.
   LOL:
     family: neutral_series_elo
     status: shadow_qualified

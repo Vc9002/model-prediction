@@ -356,6 +356,22 @@ MODEL_CATALOG: dict[str, ModelDescriptor] = {
         display_name="Tennis Game Spread/Total (Markov v1)",
         description="Game spread and total-games Markov distribution with serve levels solved to match the moneyline probability.",
     ),
+    "tennis-games-markov-v2": ModelDescriptor(
+        model_id="tennis-games-markov-v2",
+        sport="TENNIS",
+        market="multi",
+        standard_name="tennis-multi-games-markov-v2",
+        display_name="Tennis Game Spread/Total (Markov v2)",
+        description="Game spread and total-games Markov distribution with calibrated surface baselines and two-sided selection.",
+    ),
+    "tennis-games-markov-v3": ModelDescriptor(
+        model_id="tennis-games-markov-v3",
+        sport="TENNIS",
+        market="multi",
+        standard_name="tennis-multi-games-markov-v3",
+        display_name="Tennis Game Spread/Total (Markov v3)",
+        description="Game spread and total-games Markov distribution with empirical set momentum and dynamic unit sizing.",
+    ),
     "tennis-spread-markov-v2": ModelDescriptor(
         model_id="tennis-spread-markov-v2",
         sport="TENNIS",
@@ -387,6 +403,14 @@ MODEL_CATALOG: dict[str, ModelDescriptor] = {
         standard_name="tennis-moneyline-surface-elo-v4",
         display_name="Tennis Moneyline (Surface Elo v4)",
         description="Tennis dual-horizon surface Elo model v4 with tournament/surface weighting.",
+    ),
+    "tennis-surface-elo-v5": ModelDescriptor(
+        model_id="tennis-surface-elo-v5",
+        sport="TENNIS",
+        market="moneyline",
+        standard_name="tennis-moneyline-surface-elo-v5",
+        display_name="Tennis Moneyline (Surface Elo v5)",
+        description="Tennis calibrated surface-blended Elo model v5 with temperature scaling and short-rest dynamics.",
     ),
     # ── ESPORTS ──
     "cs2-tiered-elo-v6": ModelDescriptor(
