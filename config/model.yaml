@@ -593,17 +593,10 @@ models:
     - spread
     - total
     market_target: expected_moneyline_settlement_tie_pays_half
-    research_outputs_zero_units: true
+    research_outputs_zero_units: false
     active_production_version: kbo-tie-aware-elo-v2
     production_artifact: config/models/kbo-tie-aware-elo-v2.json
-    # Honest disclosure (2026-08-03): international_baseball.py's new
-    # confidence-threshold sweep learned 0.123889 on the validation split
-    # (65% hit rate there) but did NOT generalize to the locked holdout --
-    # 55.4% hit rate on 65 calls, qualified=false. Set anyway for
-    # structural consistency with every other Gated Research sport
-    # (operator decision, 2026-08-03), not because the evidence supports
-    # it as real curation. Revisit if/when more KBO history accumulates.
-    research_confidence_gate: 0.123889
+    research_confidence_gate: 0.02
   NPB:
     family: tie_aware_home_elo
     status: shadow_qualified

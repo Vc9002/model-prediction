@@ -126,6 +126,29 @@ class InternationalBaseballV3Model:
         version = KBO_V3_MODEL_VERSION if self.league == "KBO" else NPB_V3_MODEL_VERSION
         predictions: list[GamePrediction] = []
 
+        # Extract historical team scoring and conceding rates from history if provided
+        team_rs: dict[str, list[float]] = {}
+        team_ra: dict[str, list[float]] = {}
+        if history:
+            for g in history:
+                h_n = (
+                    getattr(g, "home_team", None)
+                    or (g.get("home_team_name") if isinstance(g, dict) else None)
+                    or (g.get("home_team") if isinstance(g, dict) else None)
+                )
+                a_n = (
+                    getattr(g, "away_team", None)
+                    or (g.get("away_team_name") if isinstance(g, dict) else None)
+                    or (g.get("away_team") if isinstance(g, dict) else None)
+                )
+                h_s = getattr(g, "home_score", None) or (g.get("home_score") if isinstance(g, dict) else None)
+                a_s = getattr(g, "away_score", None) or (g.get("away_score") if isinstance(g, dict) else None)
+                if h_n and a_n and h_s is not None and a_s is not None:
+                    team_rs.setdefault(str(h_n), []).append(float(h_s))
+                    team_ra.setdefault(str(h_n), []).append(float(a_s))
+                    team_rs.setdefault(str(a_n), []).append(float(a_s))
+                    team_ra.setdefault(str(a_n), []).append(float(h_s))
+
         for match in upcoming:
             event_id = str(getattr(match, "event_id", "") or "match")
             event_start = str(getattr(match, "event_start_utc", "") or "")
@@ -146,17 +169,36 @@ class InternationalBaseballV3Model:
                 else:
                     default_lh = 4.8 if self.league == "KBO" else 3.5
                     default_la = 4.4 if self.league == "KBO" else 3.2
+                    h_rs_hist = team_rs.get(str(home_team), [])
+                    h_ra_hist = team_ra.get(str(home_team), [])
+                    a_rs_hist = team_rs.get(str(away_team), [])
+                    a_ra_hist = team_ra.get(str(away_team), [])
+                    if len(h_rs_hist) >= 5 and len(a_rs_hist) >= 5:
+                        h_off = 1.0 + 0.40 * (
+                            (sum(h_rs_hist[-25:]) / len(h_rs_hist[-25:])) / default_lh - 1.0
+                        )
+                        h_def = 1.0 + 0.40 * (
+                            (sum(h_ra_hist[-25:]) / len(h_ra_hist[-25:])) / default_la - 1.0
+                        )
+                        a_off = 1.0 + 0.40 * (
+                            (sum(a_rs_hist[-25:]) / len(a_rs_hist[-25:])) / default_la - 1.0
+                        )
+                        a_def = 1.0 + 0.40 * (
+                            (sum(a_ra_hist[-25:]) / len(a_ra_hist[-25:])) / default_lh - 1.0
+                        )
+                        lh = default_lh * h_off * a_def
+                        la = default_la * a_off * h_def
+                    else:
+                        lh = default_lh
+                        la = default_la
+
                     sp_fip_h = getattr(match, "home_starter_fip", None)
                     sp_fip_a = getattr(match, "away_starter_fip", None)
                     league_fip = 4.20 if self.league == "KBO" else 3.40
                     if sp_fip_a is not None and league_fip > 0:
-                        lh = default_lh * (float(sp_fip_a) / league_fip)
-                    else:
-                        lh = default_lh
+                        lh = lh * (float(sp_fip_a) / league_fip)
                     if sp_fip_h is not None and league_fip > 0:
-                        la = default_la * (float(sp_fip_h) / league_fip)
-                    else:
-                        la = default_la
+                        la = la * (float(sp_fip_h) / league_fip)
 
             total_line = getattr(match, "total_line", 8.5) or 8.5
             forecast = self.forecast_match(

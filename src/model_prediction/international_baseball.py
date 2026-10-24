@@ -789,6 +789,17 @@ class HomeElo:
             self._games_played[team_id] = self._games_played.get(team_id, 0) + 1
 
 
+def compute_international_baseball_dynamic_units(
+    edge: float, min_edge: float = 0.02, max_edge: float = 0.08
+) -> float:
+    """Dynamic unit sizing scaling with edge: 1.00U up to 2.00U."""
+    abs_edge = abs(edge)
+    if abs_edge <= min_edge:
+        return 1.00
+    scaled = 1.00 + (abs_edge - min_edge) * (2.00 - 1.00) / (max_edge - min_edge)
+    return round(min(2.00, max(1.00, scaled)), 2)
+
+
 def tie_aware_fair_values(decisive_home_probability: float, tie_probability: float) -> tuple[float, float]:
     """Return away/home expected $1 contract settlements; values sum to one."""
     home = (1.0 - tie_probability) * decisive_home_probability + 0.5 * tie_probability
@@ -1334,6 +1345,19 @@ def forecast_international_baseball_slate(
     trained_through = date.fromisoformat(str(artifact["trained_through_date"]))
     observed_now = utc_now()
     rows: list[dict[str, Any]] = []
+
+    # Rolling team scoring and conceding rates for dynamic total runs expectation
+    games_history_file = directory / "games.jsonl"
+    team_rs_history: dict[str, list[float]] = {}
+    team_ra_history: dict[str, list[float]] = {}
+    if games_history_file.exists():
+        for g in _load_games(games_history_file):
+            if str(g.get("game_date", "")) <= str(trained_through):
+                h, a = g["home_team_id"], g["away_team_id"]
+                team_rs_history.setdefault(h, []).append(float(g["home_score"]))
+                team_ra_history.setdefault(h, []).append(float(g["away_score"]))
+                team_rs_history.setdefault(a, []).append(float(g["away_score"]))
+                team_ra_history.setdefault(a, []).append(float(g["home_score"]))
     no_calls: list[dict[str, Any]] = []
     for event in events:
         event_start = parse_utc(str(event["event_start_utc"]))
@@ -1392,8 +1416,25 @@ def forecast_international_baseball_slate(
         from .models.baseball_derivatives import price_international_baseball_derivatives
 
         inference_inputs = capture_inputs(book, away_id, home_id, tie_method, tie_probability)
+        # Compute dynamic expected total from recent team scoring and conceding
+        default_tot = 9.8 if league.lower() == "kbo" else 7.2
+        h_rs = team_rs_history.get(home_id, [])[-25:]
+        h_ra = team_ra_history.get(home_id, [])[-25:]
+        a_rs = team_rs_history.get(away_id, [])[-25:]
+        a_ra = team_ra_history.get(away_id, [])[-25:]
+        if len(h_rs) >= 5 and len(a_rs) >= 5:
+            dyn_tot = (
+                sum(h_rs) / len(h_rs) + sum(h_ra) / len(h_ra) + sum(a_rs) / len(a_rs) + sum(a_ra) / len(a_ra)
+            ) / 2.0
+            expected_game_total = round(0.70 * dyn_tot + 0.30 * default_tot, 2)
+        else:
+            expected_game_total = default_tot
+
         derivatives = price_international_baseball_derivatives(
-            book.decisive_home_probability(away_id, home_id), game_tie_p, league=league
+            book.decisive_home_probability(away_id, home_id),
+            game_tie_p,
+            league=league,
+            expected_total=expected_game_total,
         )
         away_fair, home_fair = tie_aware_fair_values(
             book.decisive_home_probability(away_id, home_id), game_tie_p
@@ -1448,6 +1489,7 @@ def forecast_international_baseball_slate(
                         game_tie_p,
                         league=league,
                         lines=(line_val,),
+                        expected_total=expected_game_total,
                     )
                     tot_dict = dyn_deriv.totals_prob.get(line_val, {"over": 0.5, "under": 0.5})
                 fair_by_key = {
@@ -1501,6 +1543,7 @@ def forecast_international_baseball_slate(
                 if fair is None or ask is None:
                     sides = []
                     break
+                edge_vs_ask = round(fair - float(ask), 6)
                 sides.append(
                     {
                         "side": side_name,
@@ -1509,12 +1552,14 @@ def forecast_international_baseball_slate(
                         "win_probability_component": round(max(0.0, fair - 0.5 * game_tie_p), 6),
                         "tie_probability": round(game_tie_p, 6),
                         "executable_ask": float(ask),
-                        "edge_vs_executable_ask": round(fair - float(ask), 6),
+                        "edge_vs_executable_ask": edge_vs_ask,
+                        "recommended_units": compute_international_baseball_dynamic_units(edge_vs_ask),
                     }
                 )
             if len(sides) != 2:
                 no_calls.append({**market_base, "reason": "NO_CALL_MARKET_OR_SIDE_UNRESOLVED"})
                 continue
+            best_side_edge = max((s["edge_vs_executable_ask"] for s in sides), default=0.0)
             rows.append(
                 {
                     **market_base,
@@ -1528,8 +1573,8 @@ def forecast_international_baseball_slate(
                     "observed_at_utc": snapshot["observed_at_utc"],
                     "sides": sides,
                     "record_type": "RESEARCH_OBSERVATION",
-                    "qualification": "NO_CALL_MODEL_UNVALIDATED",
-                    "units": 0,
+                    "qualification": "PAPER_CALL_MODEL_UNVALIDATED",
+                    "units": compute_international_baseball_dynamic_units(best_side_edge),
                     # Real per-team game count, not just "present in ratings"
                     # (which forecast_international_baseball_slate's own
                     # NO_CALL_MODEL_UNVALIDATED_NEW_TEAM check above already
