@@ -193,16 +193,16 @@ def _with_timed_exports(function):
 
 
 def _with_process_lock(function):
-    """Ensure a non-blocking process lock on daily_pipeline.lock during execution."""
+    """Ensure a non-blocking process lock on daily.lock during execution."""
 
     @wraps(function)
     def wrapped(*args, **kwargs):
-        data_root = kwargs.get("data_root")
-        if data_root is None and len(args) > 6:
-            data_root = args[6]
-        if data_root is None:
-            data_root = Path("data")
-        lock_path = Path(data_root) / "daily_pipeline.lock"
+        # When run_daily.ps1/sh wraps execution, the outer process already owns daily.lock
+        if os.environ.get("MODEL_PREDICTION_DAILY_LOCK_HELD") == "1":
+            return function(*args, **kwargs)
+
+        paths = RuntimePaths.resolve(require_external_runtime=False)
+        lock_path = paths.daily_lock
         lock_handle = acquire_lock(lock_path)
         if lock_handle is None:
             logger.warning(

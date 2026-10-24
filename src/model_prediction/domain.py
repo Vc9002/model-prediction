@@ -85,6 +85,13 @@ ALL_SPORTS: tuple[str, ...] = (
     "wncaab",
     "euroleague",
     "nbl",
+    "lol",
+    "cs2",
+    "dota2",
+    "valorant",
+    "rainbow_six",
+    "kbo",
+    "npb",
 )
 
 

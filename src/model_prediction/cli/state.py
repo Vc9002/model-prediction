@@ -45,6 +45,13 @@ FLAT_LEDGER_SPORTS = (
     "ncaab",
     "euroleague",
     "nbl",
+    "lol",
+    "cs2",
+    "dota2",
+    "valorant",
+    "rainbow_six",
+    "kbo",
+    "npb",
 )
 # Sports whose _forecast_*_sport function writes BOTH main_ledger and
 # flat_ledger unconditionally whenever log=True, regardless of which command

@@ -227,6 +227,11 @@ class RuntimePaths:
         return self.runtime_root / "locks"
 
     @property
+    def daily_lock(self) -> Path:
+        """Canonical lock path for the daily forecast and auto-buyer singleton lease."""
+        return self.lock_root / "daily.lock"
+
+    @property
     def log_root(self) -> Path:
         return self.runtime_root / "logs"
 

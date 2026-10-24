@@ -21,14 +21,14 @@ $conn = Get-NetTCPConnection -LocalPort 8765 -State Listen -ErrorAction Silently
 # Fallback direct start if scheduled task did not start it
 if (-not $conn) {
     Write-Host "Starting dashboard server directly..." -ForegroundColor Yellow
-    $RepoRoot = 'E:\model-prediction'
+    $RepoRoot = Split-Path -Parent $PSScriptRoot
     $vbs = Join-Path $RepoRoot 'scripts\run_silent.vbs'
     $Py = Join-Path $RepoRoot '.venv\Scripts\python.exe'
     $RuntimeRoot = if ($env:MODEL_PREDICTION_RUNTIME_ROOT) { $env:MODEL_PREDICTION_RUNTIME_ROOT } else { 'E:\model-prediction-runtime' }
     $LogDir = Join-Path $RepoRoot 'dashboard'
     if (-not (Test-Path $LogDir)) { New-Item -ItemType Directory -Force -Path $LogDir | Out-Null }
     
-    $psArgs = "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -Command `"& { `$env:PYTHONPATH = 'src'; `$env:MODEL_PREDICTION_RUNTIME_ROOT = '$RuntimeRoot'; & '$Py' dashboard_server.py 1> '$LogDir\launchd.out.log' 2> '$LogDir\launchd.err.log' }`""
+    $psArgs = "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -Command `"& { `$env:PYTHONPATH = 'src'; `$env:MODEL_PREDICTION_RUNTIME_ROOT = '$RuntimeRoot'; `$env:MODEL_PREDICTION_LEDGER_AUTHORITY = 'sqlite'; & '$Py' dashboard_server.py 1> '$LogDir\launchd.out.log' 2> '$LogDir\launchd.err.log' }`""
     Start-Process -FilePath 'wscript.exe' -ArgumentList "`"$vbs`" powershell.exe $psArgs" -WorkingDirectory $RepoRoot
     Start-Sleep -Seconds 3
     $conn = Get-NetTCPConnection -LocalPort 8765 -State Listen -ErrorAction SilentlyContinue
@@ -41,5 +41,5 @@ if ($conn) {
     Start-Process 'http://127.0.0.1:8765/'
 } else {
     Write-Host "ERROR: Dashboard failed to start on port 8765." -ForegroundColor Red
-    Write-Host "Check log for details: E:\model-prediction\dashboard\launchd.err.log" -ForegroundColor Yellow
+    Write-Host "Check log for details: $LogDir\launchd.err.log" -ForegroundColor Yellow
 }
