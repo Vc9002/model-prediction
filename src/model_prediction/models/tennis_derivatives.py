@@ -18,7 +18,9 @@ from functools import lru_cache
 # overstate game counts) and ``FORM_SIGMA`` the per-match serve-level spread that
 # produces realistic blowout/tight-match mixes.
 TENNIS_GAMES_VERSION = "tennis-games-markov-v1"
-TENNIS_BASE_SERVE = {"ATP": 0.62, "WTA": 0.58}
+TENNIS_GAMES_V2_VERSION = "tennis-games-markov-v2"
+TENNIS_BASE_SERVE = {"ATP": 0.62, "WTA": 0.555}
+TENNIS_BASE_SERVE_V1 = {"ATP": 0.62, "WTA": 0.58}
 TENNIS_FORM_SIGMA = 0.08
 _GAUSS_HERMITE_3 = ((-1.2247, 1.0 / 6.0), (0.0, 2.0 / 3.0), (1.2247, 1.0 / 6.0))
 
@@ -259,9 +261,11 @@ def price_tennis_derivatives(
 class TennisGamesMarkovModel:
     """Serving identity of the game spread/total lane (see ``tennis_forward``)."""
 
-    version = TENNIS_GAMES_VERSION
     sport = "tennis"
 
+    def __init__(self, version: str = TENNIS_GAMES_V2_VERSION) -> None:
+        self.version = version
 
-def tennis_games_model() -> TennisGamesMarkovModel:
-    return TennisGamesMarkovModel()
+
+def tennis_games_model(version: str = TENNIS_GAMES_V2_VERSION) -> TennisGamesMarkovModel:
+    return TennisGamesMarkovModel(version=version)

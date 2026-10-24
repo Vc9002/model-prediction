@@ -34,9 +34,11 @@ from .domain import EASTERN, parse_utc
 from .models.tennis import UpcomingMatch, tennis_model
 from .models.tennis_derivatives import (
     TENNIS_FORM_SIGMA,
-    TENNIS_GAMES_VERSION,
     price_tennis_derivatives,
     serve_pair_for_win_probability,
+)
+from .models.tennis_derivatives import (
+    TENNIS_GAMES_V2_VERSION as TENNIS_GAMES_VERSION,
 )
 
 _TENNIS_SUBPERIOD_MARKERS = ("fh", "h1", "h2", "1h", "set", "ss", "st")
@@ -150,17 +152,18 @@ def _select_one_tennis_line_per_market(
     suppressed: list[dict[str, str]] = []
     for (event_id, market_type), members in grouped.items():
 
-        def rank(item: tuple[int, dict[str, Any]]) -> tuple[float, float, str, str]:
+        def rank(item: tuple[int, dict[str, Any]]) -> tuple[int, float, float, str]:
             _, row = item
             probability = float(row.get("model_probability") or 0.0)
             ask = float(row.get("executable_ask") or 0.0)
-            expected_return = probability / ask - 1.0 if 0.0 < ask < 1.0 else float("-inf")
             edge = float(row.get("edge_vs_executable_ask") or probability - ask)
+            in_liquid_tier = 1 if (0.20 <= ask <= 0.80 and probability >= 0.20) else 0
+            expected_return = probability / ask - 1.0 if 0.0 < ask < 1.0 else float("-inf")
             return (
-                expected_return,
+                in_liquid_tier,
                 edge,
+                expected_return,
                 str(row.get("observed_at_utc") or ""),
-                str(row.get("market_slug") or ""),
             )
 
         survivor = max(members, key=rank)
@@ -560,14 +563,32 @@ def build_tennis_slate(
                 )
                 p_over = deriv.total_over or 0.5
                 p_under = deriv.total_under or 0.5
-                selection = "over" if p_over >= p_under else "under"
-                prob = p_over if selection == "over" else p_under
 
-                side_key = "long" if selection == "over" else "short"
-                side = snapshot.get(side_key) or {}
-                ask = side.get("ask")
-                if ask is None or not 0.01 <= float(ask) <= 0.99:
+                long_ask = (snapshot.get("long") or {}).get("ask")
+                short_ask = (snapshot.get("short") or {}).get("ask")
+
+                edge_over = (
+                    (p_over - float(long_ask))
+                    if (long_ask is not None and 0.01 <= float(long_ask) <= 0.99)
+                    else -999.0
+                )
+                edge_under = (
+                    (p_under - float(short_ask))
+                    if (short_ask is not None and 0.01 <= float(short_ask) <= 0.99)
+                    else -999.0
+                )
+
+                if max(edge_over, edge_under) <= -900.0:
                     continue
+
+                if edge_over >= edge_under:
+                    selection = "over"
+                    prob = p_over
+                    ask = float(long_ask)
+                else:
+                    selection = "under"
+                    prob = p_under
+                    ask = float(short_ask)
 
                 seen_contract_keys.add(contract_key)
                 priced.append(
