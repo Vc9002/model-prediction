@@ -1844,6 +1844,10 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
     if elo_home_advantage is not None:
         elo_home_advantage = float(elo_home_advantage)
     possession_model = bool(artifact.get("possession_model", False))
+    b2b_penalty_away = float(artifact.get("b2b_penalty_away", 0.0))
+    b2b_penalty_home = float(artifact.get("b2b_penalty_home", 0.0))
+    b2b_pace_drag = float(artifact.get("b2b_pace_drag", 0.0))
+    coherent_moneyline = bool(artifact.get("coherent_moneyline", False))
 
     model = BasketballModel(
         sport="nba",
@@ -1860,6 +1864,10 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
         isolate_postseason=isolate_postseason,
         elo_home_advantage=elo_home_advantage,
         possession_model=possession_model,
+        b2b_penalty_away=b2b_penalty_away,
+        b2b_penalty_home=b2b_penalty_home,
+        b2b_pace_drag=b2b_pace_drag,
+        coherent_moneyline=coherent_moneyline,
     )
     store = FeatureStore(data_root)
     history = store.games_before("nba", args_date)
@@ -2155,6 +2163,7 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
     offseason_retention = float(artifact.get("offseason_retention", 0.50))
     isolate_postseason = bool(artifact.get("isolate_postseason", False))
     possession_model = bool(artifact.get("possession_model", False))
+    b2b_pace_drag = float(artifact.get("b2b_pace_drag", 0.0))
 
     model = BasketballModel(
         sport="nba",
@@ -2168,6 +2177,7 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
         offseason_retention=offseason_retention,
         isolate_postseason=isolate_postseason,
         possession_model=possession_model,
+        b2b_pace_drag=b2b_pace_drag,
     )
     store = FeatureStore(data_root)
     history = store.games_before("nba", args_date)

@@ -98,7 +98,7 @@ def test_ci_imports_of_checked_in_config_resolve() -> None:
     from model_prediction.production_registry import ProductionModelRegistry
 
     registry = ProductionModelRegistry.load(Path(__file__).resolve().parents[1])
-    assert len(registry.entries) == 59
+    assert len(registry.entries) == 61
     assert "cfb-structural-v3" in registry.entries
     assert "mlb-structural-runline-v4" in registry.entries
     assert "measured-edge-totals-v3" in registry.entries
@@ -109,8 +109,10 @@ def test_ci_imports_of_checked_in_config_resolve() -> None:
     assert "tennis-games-markov-v2" in registry.entries
     assert "tennis-games-markov-v3" in registry.entries
     assert "tennis-learned-v3" in registry.entries
+    assert "nba-spread-margin-v4" in registry.entries
     assert "nba-spread-margin-v3" in registry.entries
     assert "nba-spread-margin-v2" in registry.entries
+    assert "nba-total-margin-v4" in registry.entries
     assert "nba-total-margin-v3" in registry.entries
     assert "nba-total-margin-v2" in registry.entries
     assert "hockey-poisson-dc-v1" in registry.entries
@@ -120,4 +122,4 @@ def test_ci_imports_of_checked_in_config_resolve() -> None:
     # across supported markets are valid serving entries (zero problem entries).
     problems = {e.model_id for e in registry.problem_entries()}
     assert problems == set()
-    assert len(registry.available_entries()) == 59
+    assert len(registry.available_entries()) == 61

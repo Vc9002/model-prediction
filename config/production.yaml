@@ -119,13 +119,23 @@ prediction_service:
     evidence_status: historical_only
     replacement_priority: medium
     rollback_model: nba-elo-trend-lr-v3
+  - model_id: nba-spread-margin-v4
+    sport: NBA
+    market: spread
+    implementation: json_artifact
+    artifact: config/models/nba-spread-margin-v4.json
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: nba-spread-margin-v3
   - model_id: nba-spread-margin-v3
     sport: NBA
     market: spread
     implementation: json_artifact
     artifact: config/models/nba-spread-margin-v3.json
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: nba-spread-margin-v2
@@ -139,13 +149,23 @@ prediction_service:
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: nba-spread-margin-v1
+  - model_id: nba-total-margin-v4
+    sport: NBA
+    market: total
+    implementation: json_artifact
+    artifact: config/models/nba-total-margin-v4.json
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: nba-total-margin-v3
   - model_id: nba-total-margin-v3
     sport: NBA
     market: total
     implementation: json_artifact
     artifact: config/models/nba-total-margin-v3.json
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: nba-total-margin-v2
@@ -624,8 +644,8 @@ prediction_service:
       nrfi: mlb-nrfi-v4
     NBA:
       moneyline: nba-elo-trend-lr-v4
-      spread: nba-spread-margin-v3
-      total: nba-total-margin-v3
+      spread: nba-spread-margin-v4
+      total: nba-total-margin-v4
     NFL:
       moneyline: nfl-elo-trend-lr-v4
       spread: nfl-spread-structural-v5
@@ -840,8 +860,10 @@ prediction_service:
   - mlb-nrfi-v4
   - mlb-nrfi-v3
   - nba-elo-trend-lr-v4
+  - nba-spread-margin-v4
   - nba-spread-margin-v3
   - nba-spread-margin-v2
+  - nba-total-margin-v4
   - nba-total-margin-v3
   - nba-total-margin-v2
   - nfl-elo-trend-lr-v4
@@ -899,8 +921,10 @@ prediction_service:
     mlb-nrfi-v4: config/models/mlb-nrfi-v4.json
     mlb-nrfi-v3: config/models/mlb-nrfi-v3.json
     nba-elo-trend-lr-v4: config/models/nba-elo-trend-lr-v4.json
+    nba-spread-margin-v4: config/models/nba-spread-margin-v4.json
     nba-spread-margin-v3: config/models/nba-spread-margin-v3.json
     nba-spread-margin-v2: config/models/nba-spread-margin-v2.json
+    nba-total-margin-v4: config/models/nba-total-margin-v4.json
     nba-total-margin-v3: config/models/nba-total-margin-v3.json
     nba-total-margin-v2: config/models/nba-total-margin-v2.json
     nfl-elo-trend-lr-v4: config/models/nfl-elo-trend-lr-v4.json

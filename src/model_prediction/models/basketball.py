@@ -91,6 +91,10 @@ class BasketballModel:
         isolate_postseason: bool = False,
         elo_home_advantage: float | None = None,
         possession_model: bool = False,
+        b2b_penalty_away: float = 0.0,
+        b2b_penalty_home: float = 0.0,
+        b2b_pace_drag: float = 0.0,
+        coherent_moneyline: bool = False,
     ) -> None:
         self._sport = sport
         self._version = version
@@ -109,6 +113,10 @@ class BasketballModel:
         self.isolate_postseason = isolate_postseason
         self.elo_home_advantage = elo_home_advantage
         self.possession_model = possession_model
+        self.b2b_penalty_away = b2b_penalty_away
+        self.b2b_penalty_home = b2b_penalty_home
+        self.b2b_pace_drag = b2b_pace_drag
+        self.coherent_moneyline = coherent_moneyline
 
     @property
     def version(self) -> str:
@@ -168,7 +176,14 @@ class BasketballModel:
             home_prev.sort(key=lambda g: g.start)
             away_prev.sort(key=lambda g: g.start)
 
-            if self.rest_weight != 0.0:
+            home_b2b = False
+            away_b2b = False
+            if (
+                self.rest_weight != 0.0
+                or self.b2b_penalty_away > 0.0
+                or self.b2b_penalty_home > 0.0
+                or self.b2b_pace_drag > 0.0
+            ):
                 try:
                     home_rest = (
                         (game_start_dt - home_prev[-1].start).total_seconds() / 86400.0
@@ -181,8 +196,16 @@ class BasketballModel:
                         else 3.0
                     )
                     rest_diff = min(5.0, max(-5.0, home_rest - away_rest))
+                    home_b2b = home_rest <= 1.25
+                    away_b2b = away_rest <= 1.25
                 except (ValueError, TypeError):
                     rest_diff = 0.0
+
+            if home_b2b and self.b2b_penalty_home > 0.0:
+                home_points -= self.b2b_penalty_home
+            if away_b2b and self.b2b_penalty_away > 0.0:
+                away_points -= self.b2b_penalty_away
+            trend_margin = (home_points - away_points) + self.home_court_points
 
             if self.elo_weight > 0.0 or self.rest_weight != 0.0:
                 expected_margin = (
@@ -204,6 +227,8 @@ class BasketballModel:
                     pace_adj += 0.5
                 elif rest_diff < -2.0:
                     pace_adj -= 0.5
+                if (home_b2b or away_b2b) and self.b2b_pace_drag > 0.0:
+                    pace_adj -= self.b2b_pace_drag
                 est_possessions = league_pace + pace_adj
                 ortg_away = (away_points / league_pace) * 100.0
                 ortg_home = (home_points / league_pace) * 100.0
@@ -251,8 +276,13 @@ class BasketballModel:
                     "history_games": len(history),
                 },
             }
-            p_h_clamped = max(0.0001, min(0.9999, home_win))
-            p_a_clamped = max(0.0001, min(0.9999, 1.0 - home_win))
+            if self.coherent_moneyline:
+                p_margin_home = 1.0 - _normal_cdf(0.0, expected_margin, self.margin_sd)
+                p_home = self.elo_weight * home_win + (1.0 - self.elo_weight) * p_margin_home
+            else:
+                p_home = home_win
+            p_h_clamped = max(0.0001, min(0.9999, p_home))
+            p_a_clamped = max(0.0001, min(0.9999, 1.0 - p_home))
             predictions.append(
                 GamePrediction(
                     market_type="moneyline",
