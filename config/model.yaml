@@ -411,22 +411,24 @@ models:
     - nfl-spread-structural-v5
     - nfl-total-structural-v5
   NCAAF:
-    family: cfb_structural_v2_bivariate_engine
-    status: shadow_qualified
+    family: cfb_structural_v3_bivariate_engine
+    status: production
     origin: statistical_model
-    active_production_version: cfb-structural-v2
-    production_artifact: config/models/cfb-structural-v2.json
+    active_production_version: cfb-structural-v3
+    production_artifact: config/models/cfb-structural-v3.json
     markets:
     - moneyline
     - spread
     - total
-    min_edge: 0.035
-    spread_sd: 14.5
-    total_sd: 14.8
-    home_field_advantage_points: 2.8
+    min_edge: 0.02
+    spread_sd: 14.8
+    total_sd: 15.5
+    home_field_advantage_points: 2.5
     protected_versions:
     - college-football-v1
     - cfb-structural-v2
+    - cfb-structural-v3
+    note: Overhauled bivariate Negative Binomial score engine with blowout tail expansion (>21.5), key-number preservation, and dynamic unit sizing.
   TENNIS:
     family: surface_blended_elo
     status: shadow_qualified

@@ -251,6 +251,26 @@ def test_snapshot_store_uses_last_observation_before_game(tmp_path) -> None:
     assert closing["long"]["price"] == 0.53
 
 
+def test_snapshot_store_tolerates_corrupted_lines_and_bad_timestamps(tmp_path) -> None:
+    snapshot_path = tmp_path / "snapshots_corrupted.jsonl"
+    store = PolymarketSnapshotStore(snapshot_path)
+    store.append(
+        {"market_slug": "market", "observed_at_utc": "2026-07-14T22:00:00Z", "long": {"price": 0.51}}
+    )
+    # Append malformed JSON line and missing/invalid timestamps
+    with snapshot_path.open("a", encoding="utf-8") as handle:
+        handle.write("MALFORMED JSON {{{ line\n")
+        handle.write('{"market_slug": "market"}\n')
+        handle.write('{"market_slug": "market", "observed_at_utc": "not-a-date"}\n')
+    store.append(
+        {"market_slug": "market", "observed_at_utc": "2026-07-14T22:30:00Z", "long": {"price": 0.55}}
+    )
+
+    closing = store.closing_snapshot("market", "2026-07-14T23:00:00Z")
+    assert closing is not None
+    assert closing["long"]["price"] == 0.55
+
+
 def test_snapshot_uses_executable_asks_for_both_sides() -> None:
     market = {
         "market": {

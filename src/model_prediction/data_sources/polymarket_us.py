@@ -832,10 +832,19 @@ class PolymarketSnapshotStore:
         candidates = []
         with self.path.open(encoding="utf-8") as handle:
             for line in handle:
-                item = json.loads(line)
+                try:
+                    item = json.loads(line)
+                except (json.JSONDecodeError, ValueError):
+                    continue
                 if item.get("market_slug") != slug:
                     continue
-                observed = parse_utc(item["observed_at_utc"])
+                raw_observed = item.get("observed_at_utc")
+                if not raw_observed:
+                    continue
+                try:
+                    observed = parse_utc(raw_observed)
+                except (ValueError, TypeError):
+                    continue
                 if observed <= event_start:
                     candidates.append((observed, item))
         return max(candidates, key=lambda item: item[0])[1] if candidates else None

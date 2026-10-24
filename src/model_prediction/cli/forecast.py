@@ -4916,7 +4916,7 @@ def _forecast_cfb_sport(
         mtype = MarketType(str(contract["market_type"]))
         m_version = str(
             contract.get("model_version")
-            or model_config.get("active_production_version", "cfb-structural-v2")
+            or model_config.get("active_production_version", "cfb-structural-v3")
         )
 
         try:
@@ -5011,14 +5011,31 @@ def _forecast_cfb_sport(
                     )
                 ):
                     genuinely_eligible = False
+                if (
+                    genuinely_eligible
+                    and mtype == MarketType.MONEYLINE
+                    and request.american_odds is not None
+                    and request.american_odds > 200
+                ):
+                    # Empirical Audit: Longshot dogs (> +200) suffer extreme negative expectancy in CFB
+                    genuinely_eligible = False
+                if (
+                    genuinely_eligible
+                    and mtype == MarketType.SPREAD
+                    and contract.get("line") is not None
+                    and abs(float(contract["line"])) > 21.5
+                    and contract_edge > 0.08
+                ):
+                    # Hard Edge Gate / Anomaly Trap: Blowout spreads with claimed edge > 8% are tail errors
+                    genuinely_eligible = False
                 # CFB spread (cfb-spread-v1) and total (cfb-total-v1) artifacts explicitly declare
-                # "status": "FLAT_LEDGER_ONLY" and "qualified": false. Unified cfb-structural-v2
-                # produces calibrated joint probabilities and is shadow-qualified across moneyline,
+                # "status": "FLAT_LEDGER_ONLY" and "qualified": false. Unified cfb-structural-v3
+                # produces calibrated joint probabilities and is qualified across moneyline,
                 # spread, and total for main_ledger.
                 is_qualified_call = (
                     genuinely_eligible
                     and not eligibility.reason_code.startswith("PAPER_CALL_")
-                    and m_version == "cfb-structural-v2"
+                    and m_version in ("cfb-structural-v3", "cfb-structural-v2")
                 )
                 if (
                     research_ledger is not None

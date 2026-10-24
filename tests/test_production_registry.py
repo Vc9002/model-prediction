@@ -99,12 +99,12 @@ def test_real_production_yaml_resolves_every_model() -> None:
     registry = ProductionModelRegistry.load(REPO)
 
     assert registry.schema_version == "3"
-    assert len(registry.entries) == 51
+    assert len(registry.entries) == 52
     # Under the permanent champion-challenger framework, all models
     # across supported markets are available contracts (champions + rollbacks).
     # Weak evidence models have evidence_status=degraded and
     # replacement_priority=critical rather than being disabled.
-    assert len(registry.available_entries()) == 51
+    assert len(registry.available_entries()) == 52
     assert len(registry.problem_entries()) == 0
     assert registry.primary.model_id == "wnba-elo-trend-lr-v4"
     assert registry.primary.artifact_hash
@@ -114,11 +114,11 @@ def test_real_production_yaml_resolves_every_model() -> None:
     assert registry.champion("NBA", "total").rollback_model == "nba-total-margin-v1"
     assert registry.champion("NFL", "spread").model_id == "nfl-spread-structural-v5"
     assert registry.champion("NFL", "total").model_id == "nfl-total-structural-v5"
-    assert registry.champion("NCAAF", "moneyline").model_id == "cfb-structural-v2"
-    assert registry.champion("NCAAF", "spread").model_id == "cfb-structural-v2"
-    assert registry.lifecycle_contract("NCAAF", "spread").rollback_model_id == "cfb-spread-v1"
-    assert registry.champion("NCAAF", "total").model_id == "cfb-structural-v2"
-    assert registry.lifecycle_contract("NCAAF", "total").rollback_model_id == "cfb-total-v1"
+    assert registry.champion("NCAAF", "moneyline").model_id == "cfb-structural-v3"
+    assert registry.champion("NCAAF", "spread").model_id == "cfb-structural-v3"
+    assert registry.lifecycle_contract("NCAAF", "spread").rollback_model_id == "cfb-structural-v2"
+    assert registry.champion("NCAAF", "total").model_id == "cfb-structural-v3"
+    assert registry.lifecycle_contract("NCAAF", "total").rollback_model_id == "cfb-structural-v2"
     assert registry.champion("MLB", "spread").model_id == "mlb-structural-runline-v4"
     assert registry.champion("MLB", "spread").rollback_model == "measured-edge-margin-v3"
     assert registry.champion("MLB", "nrfi").model_id == "mlb-nrfi-v4"

@@ -278,13 +278,23 @@ prediction_service:
     evidence_status: historical_only
     replacement_priority: low
     rollback_model: null
+  - model_id: cfb-structural-v3
+    sport: NCAAF
+    market: multi
+    implementation: json_artifact
+    artifact: config/models/cfb-structural-v3.json
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: cfb-structural-v2
   - model_id: cfb-structural-v2
     sport: NCAAF
     market: multi
     implementation: json_artifact
     artifact: config/models/cfb-structural-v2.json
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: predictively_qualified
     replacement_priority: medium
     rollback_model: college-football-v1
@@ -563,9 +573,9 @@ prediction_service:
       spread: nfl-spread-structural-v5
       total: nfl-total-structural-v5
     NCAAF:
-      moneyline: cfb-structural-v2
-      spread: cfb-structural-v2
-      total: cfb-structural-v2
+      moneyline: cfb-structural-v3
+      spread: cfb-structural-v3
+      total: cfb-structural-v3
     SOCCER:
       moneyline: soccer-poisson-dc-v3
       spread: soccer-poisson-dc-v3
@@ -648,20 +658,20 @@ prediction_service:
   research_queue:
   - sport: NCAAF
     market: moneyline
-    incumbent: cfb-structural-v2
-    replacement_priority: medium
+    incumbent: cfb-structural-v3
+    replacement_priority: low
     challenger: null
     evidence_status: predictively_qualified
   - sport: NCAAF
     market: spread
-    incumbent: cfb-structural-v2
-    replacement_priority: medium
+    incumbent: cfb-structural-v3
+    replacement_priority: low
     challenger: null
     evidence_status: predictively_qualified
   - sport: NCAAF
     market: total
-    incumbent: cfb-structural-v2
-    replacement_priority: medium
+    incumbent: cfb-structural-v3
+    replacement_priority: low
     challenger: null
     evidence_status: predictively_qualified
   - sport: MLB
@@ -787,6 +797,7 @@ prediction_service:
   - tennis-games-markov-v1
   - tennis-learned-v3
   - tennis-surface-elo-v1
+  - cfb-structural-v3
   - cfb-structural-v2
   - cfb-spread-v1
   - cfb-total-v1
@@ -828,6 +839,7 @@ prediction_service:
     nfl-elo-trend-lr-v4: config/models/nfl-elo-trend-lr-v4.json
     nfl-spread-structural-v5: config/models/nfl-spread-structural-v5.json
     nfl-total-structural-v5: config/models/nfl-total-structural-v5.json
+    cfb-structural-v3: config/models/cfb-structural-v3.json
     cfb-structural-v2: config/models/cfb-structural-v2.json
     cfb-spread-v1: config/models/cfb-spread-v1.json
     cfb-total-v1: config/models/cfb-total-v1.json

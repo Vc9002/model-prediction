@@ -109,7 +109,10 @@ def test_evidence_status_does_not_control_serving_status() -> None:
         assert champion.available is True
         assert champion.serving_status in {"production", "active"}
         assert champion.evidence_status == EvidenceStatus.PREDICTIVELY_QUALIFIED.value
-        assert champion.replacement_priority == ReplacementPriority.MEDIUM.value
+        assert champion.replacement_priority in {
+            ReplacementPriority.MEDIUM.value,
+            ReplacementPriority.LOW.value,
+        }
 
 
 def test_challenger_failure_does_not_disable_champion() -> None:

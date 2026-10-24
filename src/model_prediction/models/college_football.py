@@ -34,9 +34,11 @@ from .cfb_distribution import (
     CFBJointMarketProbabilities,
 )
 
-MODEL_VERSION = "cfb-structural-v2"
-CFB_SPREAD_MODEL_VERSION = "cfb-structural-v2"
-CFB_TOTAL_MODEL_VERSION = "cfb-structural-v2"
+MODEL_VERSION = "cfb-structural-v3"
+CFB_SPREAD_MODEL_VERSION = "cfb-structural-v3"
+CFB_TOTAL_MODEL_VERSION = "cfb-structural-v3"
+CFB_BLOWOUT_SPREAD_THRESHOLD = 21.5
+CFB_BLOWOUT_MARGIN_SCALE = 0.025
 
 # feat.uncertainty (0.04 floor -- established teams, no FBS/FCS mismatch,
 # confirmed starters) previously reached the ledger only as sizing metadata;
@@ -164,6 +166,9 @@ class CollegeFootballModel:
         effective_margin_sd = self.margin_sd * (
             1.0 + CFB_UNCERTAINTY_MARGIN_SD_SCALE * (feat.uncertainty - CFB_UNCERTAINTY_FLOOR)
         )
+        if abs(sp_home_line) > CFB_BLOWOUT_SPREAD_THRESHOLD:
+            excess = min(15.0, abs(sp_home_line) - CFB_BLOWOUT_SPREAD_THRESHOLD)
+            effective_margin_sd *= 1.0 + CFB_BLOWOUT_MARGIN_SCALE * excess
         self.distribution_engine.margin_sd = effective_margin_sd
         try:
             inference_inputs = capture_inputs(

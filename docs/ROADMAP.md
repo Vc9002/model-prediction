@@ -171,10 +171,10 @@ flowchart TD
 
 #### 4. High-Performance Decoupling & 24/7 Stealth Runtime — COMPLETED
 - **Status**: Completed / Enforced.
-- **Two-Stage Decoupling (P0)**: [`src/model_prediction/two_stage.py`](file:///E:/model-prediction/src/model_prediction/two_stage.py) cleanly isolates Stage 1 (fundamental physical probability simulation, run once per game and cached) from Stage 2 (microsecond market valuation and Hard Edge Gate enforcement).
-- **Stealth Runtime & Minimal System Load (P0)**: [`src/model_prediction/stealth_runtime.py`](file:///E:/model-prediction/src/model_prediction/stealth_runtime.py) automatically demotes background 24/7 worker processes to Windows `PROCESS_MODE_BACKGROUND_BEGIN` with idle CPU and low disk I/O priority. Throttled dashboard cache warmer from 5s to 30s cooperative sleep, guaranteeing 0% frame drops during gaming or schoolwork.
-- **Online Bayesian Drift Correction (P1)**: [`src/model_prediction/online_bayesian.py`](file:///E:/model-prediction/src/model_prediction/online_bayesian.py) tracks dynamic form for high-velocity sports (Tennis, Esports) using $O(1)$ recursive Kalman scalar updating upon settlement, preventing calibration drift without heavy retrains.
-- **WebSocket Order Book Streaming (P2)**: [`src/model_prediction/polymarket_stream.py`](file:///E:/model-prediction/src/model_prediction/polymarket_stream.py) provides event-driven async streaming to Stage 2 with automatic idle sleep.
+- **Two-Stage Decoupling (P0)**: [`src/model_prediction/two_stage.py`](file:///E:/MP/src/model_prediction/two_stage.py) cleanly isolates Stage 1 (fundamental physical probability simulation, run once per game and cached) from Stage 2 (microsecond market valuation and Hard Edge Gate enforcement).
+- **Stealth Runtime & Minimal System Load (P0)**: [`src/model_prediction/stealth_runtime.py`](file:///E:/MP/src/model_prediction/stealth_runtime.py) automatically demotes background 24/7 worker processes to Windows `PROCESS_MODE_BACKGROUND_BEGIN` with idle CPU and low disk I/O priority. Throttled dashboard cache warmer from 5s to 30s cooperative sleep, guaranteeing 0% frame drops during gaming or schoolwork.
+- **Online Bayesian Drift Correction (P1)**: [`src/model_prediction/online_bayesian.py`](file:///E:/MP/src/model_prediction/online_bayesian.py) tracks dynamic form for high-velocity sports (Tennis, Esports) using $O(1)$ recursive Kalman scalar updating upon settlement, preventing calibration drift without heavy retrains.
+- **WebSocket Order Book Streaming (P2)**: [`src/model_prediction/polymarket_stream.py`](file:///E:/MP/src/model_prediction/polymarket_stream.py) provides event-driven async streaming to Stage 2 with automatic idle sleep.
 
 ---
 
