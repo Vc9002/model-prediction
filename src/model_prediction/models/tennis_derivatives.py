@@ -21,6 +21,13 @@ TENNIS_GAMES_VERSION = "tennis-games-markov-v1"
 TENNIS_GAMES_V2_VERSION = "tennis-games-markov-v2"
 TENNIS_BASE_SERVE = {"ATP": 0.62, "WTA": 0.555}
 TENNIS_BASE_SERVE_V1 = {"ATP": 0.62, "WTA": 0.58}
+TENNIS_SURFACE_BASE_SERVE: dict[str, dict[str, float]] = {
+    "Hard": {"ATP": 0.620, "WTA": 0.555},
+    "Clay": {"ATP": 0.585, "WTA": 0.525},
+    "Grass": {"ATP": 0.650, "WTA": 0.590},
+    "Carpet": {"ATP": 0.640, "WTA": 0.580},
+    "Default": {"ATP": 0.620, "WTA": 0.555},
+}
 TENNIS_FORM_SIGMA = 0.08
 _GAUSS_HERMITE_3 = ((-1.2247, 1.0 / 6.0), (0.0, 2.0 / 3.0), (1.2247, 1.0 / 6.0))
 
@@ -165,14 +172,19 @@ def _serve_shift(p_win_milli: int, base: float, best_of: int, form_sigma: float)
 
 
 def serve_pair_for_win_probability(
-    p_win: float, tour: str, best_of: int = 3, form_sigma: float = TENNIS_FORM_SIGMA
+    p_win: float,
+    tour: str,
+    best_of: int = 3,
+    surface: str = "Hard",
+    form_sigma: float = TENNIS_FORM_SIGMA,
 ) -> tuple[float, float]:
     """Serve-point probabilities (a, b) whose Markov match-win probability for A is ``p_win``.
 
-    Ties the game spread/total distributions to the model's own moneyline
-    probability instead of an unrelated Elo-to-serve shift.
+    Calibrated dynamically per-surface (Hard, Clay, Grass) and per-tour (ATP, WTA).
     """
-    base = TENNIS_BASE_SERVE.get(tour.upper(), TENNIS_BASE_SERVE["ATP"])
+    surf_key = surface if surface in TENNIS_SURFACE_BASE_SERVE else "Default"
+    surf_dict = TENNIS_SURFACE_BASE_SERVE[surf_key]
+    base = surf_dict.get(tour.upper(), surf_dict["ATP"])
     target = min(0.995, max(0.005, p_win))
     shift = _serve_shift(round(target * 1000), base, best_of, form_sigma)
     return base + shift, base - shift

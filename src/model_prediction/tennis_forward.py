@@ -470,7 +470,10 @@ def build_tennis_slate(
                     continue
 
                 best_of = int((prediction.inference_inputs or {}).get("best_of", 3))
-                p_serve_a, p_serve_b = serve_pair_for_win_probability(p_away, prediction.league, best_of)
+                match_surface = str((prediction.feature_basis or {}).get("surface") or "Hard")
+                p_serve_a, p_serve_b = serve_pair_for_win_probability(
+                    p_away, prediction.league, best_of, surface=match_surface
+                )
 
                 is_team_away = _name_matches(prediction.away_team, str(snapshot.get("team") or ""))
                 c_line = spread_val
@@ -557,7 +560,10 @@ def build_tennis_slate(
                     continue
 
                 best_of = int((prediction.inference_inputs or {}).get("best_of", 3))
-                p_serve_a, p_serve_b = serve_pair_for_win_probability(p_away, prediction.league, best_of)
+                match_surface = str((prediction.feature_basis or {}).get("surface") or "Hard")
+                p_serve_a, p_serve_b = serve_pair_for_win_probability(
+                    p_away, prediction.league, best_of, surface=match_surface
+                )
                 deriv = price_tennis_derivatives(
                     p_serve_a, p_serve_b, total_line=total_val, best_of=best_of, form_sigma=TENNIS_FORM_SIGMA
                 )

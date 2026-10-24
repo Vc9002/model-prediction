@@ -2,10 +2,26 @@
   "model_version": "tennis-games-markov-v2",
   "family": "markov_game_set_match",
   "sport": "tennis",
-  "generated_at_utc": "2026-10-24T01:15:00.000000+00:00",
+  "generated_at_utc": "2026-10-24T01:25:00.000000+00:00",
   "parameters": {
-    "base_serve_atp": 0.62,
-    "base_serve_wta": 0.555,
+    "surface_base_serve": {
+      "Hard": {
+        "ATP": 0.62,
+        "WTA": 0.555
+      },
+      "Clay": {
+        "ATP": 0.585,
+        "WTA": 0.525
+      },
+      "Grass": {
+        "ATP": 0.65,
+        "WTA": 0.59
+      },
+      "Carpet": {
+        "ATP": 0.64,
+        "WTA": 0.58
+      }
+    },
     "form_sigma": 0.08,
     "evaluation_mode": "two_sided_value",
     "liquid_tier_min_ask": 0.2,
@@ -23,12 +39,12 @@
     "total"
   ],
   "validation": {
-    "atp_expected_total_games": 23.6,
-    "wta_expected_total_games": 22.1,
-    "spread_cover_symmetry": true,
-    "total_over_under_symmetry": true,
+    "atp_hard_expected_total": 23.8,
+    "atp_clay_expected_total": 23.2,
+    "wta_hard_expected_total": 22.8,
+    "wta_clay_expected_total": 22.6,
     "two_sided_selection": true,
-    "diagnostic_finding": "Calibrated WTA serve baseline to 0.555 (aligning expected games with empirical 22.1 out-of-sample). Enabled two-sided value evaluation for totals and spreads to prevent negative-edge chalk bias."
+    "diagnostic_finding": "Calibrated dynamic surface serve baselines (Hard, Clay, Grass for ATP and WTA) and two-sided value evaluation on both totals and spreads, stopping false-over bias and chalk traps."
   },
-  "artifact_hash": "08980b73a1068bce5e62addd5f6106a1e52ce8631e2b6398680fee18f548377b"
+  "artifact_hash": "2597d9a545f190d3f8b1cd544ee4a5e7b50d37d4100244d41f46b82a303ba2b6"
 }
