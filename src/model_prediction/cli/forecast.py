@@ -5180,7 +5180,7 @@ def _forecast_hockey_sport(
             contract_edge = float(contract.get("edge_vs_executable_ask") or (prob_val - ask_val))
 
             hockey_observed_at = str(contract.get("observed_at_utc") or effective_now.isoformat())
-            hockey_model_version = str(contract.get("model_version") or "hockey-poisson-dc-v1")
+            hockey_model_version = str(contract.get("model_version") or "hockey-poisson-dc-v2")
             request = PickRequest(
                 event_start_utc=str(contract["event_start_utc"]),
                 event_id=str(contract["event_id"]),
@@ -5194,7 +5194,7 @@ def _forecast_hockey_sport(
                 american_odds=probability_to_american(ask_val),
                 model_probability=prob_val,
                 model_uncertainty=float(contract.get("model_uncertainty") or 0.1),
-                model_version=str(contract.get("model_version") or "hockey-poisson-dc-v1"),
+                model_version=str(contract.get("model_version") or "hockey-poisson-dc-v2"),
                 rationale=(
                     f"{contract.get('rationale', '')} Indicative market price {ask_val:.4f} "
                     f"({contract.get('market_slug', '')}); executable BBO unverified."
@@ -5238,11 +5238,18 @@ def _forecast_hockey_sport(
                 valid_to=None,
                 aliases=(),
             )
+            from ..models.hockey import HockeyModel
+
+            dyn_units = (
+                HockeyModel.compute_dynamic_units(contract_edge, min_edge=min_edge, max_edge=0.08)
+                if contract_edge >= min_edge
+                else 0.0
+            )
             eligibility = EligibilityResult(
                 record_type=RecordType.RESEARCH_OBSERVATION,
                 decision="CALL" if contract_edge >= min_edge else "NO_CALL",
                 reason_code="PAPER_CALL_MODEL_QUALIFIED" if contract_edge >= min_edge else "NO_CALL_LOW_EDGE",
-                units=1.0 if contract_edge >= min_edge else 0.0,
+                units=dyn_units,
                 confidence_score=round(prob_val * 100),
                 edge=round(contract_edge, 6),
                 adjusted_edge=round(contract_edge, 6),

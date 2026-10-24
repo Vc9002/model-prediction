@@ -562,7 +562,7 @@ models:
     family: neutral_series_elo
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: rainbow_six-tiered-elo-v6
+    active_production_version: r6-contextual-v7
     active_research_version: rainbow_six-tiered-elo-v6
     production_artifact: config/models/rainbow_six-tiered-elo-v6.json
     markets:
@@ -628,7 +628,7 @@ models:
     status: shadow_qualified
     origin: statistical_model
     model_type: hockey_bivariate_poisson
-    active_production_version: hockey-poisson-dc-v1
+    active_production_version: hockey-poisson-dc-v2
     active_research_version: hockey-poisson-dc-v1
     min_edge: 0.02
     research_confidence_gate: 0.0

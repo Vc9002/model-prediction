@@ -358,6 +358,16 @@ prediction_service:
     evidence_status: historical_only
     replacement_priority: low
     rollback_model: null
+  - model_id: r6-contextual-v7
+    sport: RAINBOW_SIX
+    market: moneyline
+    implementation: code_backed_model
+    entry: model_prediction.models.esports_contextual_v7:EsportsContextualV7Model
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: rainbow_six-tiered-elo-v6
   - model_id: rainbow_six-tiered-elo-v6
     sport: RAINBOW_SIX
     market: moneyline
@@ -388,6 +398,16 @@ prediction_service:
     evidence_status: historical_only
     replacement_priority: low
     rollback_model: null
+  - model_id: npb-baseball-v3
+    sport: NPB
+    market: moneyline
+    implementation: code_backed_model
+    entry: model_prediction.models.international_baseball_v3:InternationalBaseballV3Model
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: npb-tie-aware-elo-v2
   - model_id: npb-tie-aware-elo-v2
     sport: NPB
     market: moneyline
@@ -398,6 +418,16 @@ prediction_service:
     evidence_status: historical_only
     replacement_priority: low
     rollback_model: null
+  - model_id: hockey-poisson-dc-v2
+    sport: HOCKEY
+    market: moneyline,spread,total
+    implementation: code_backed_model
+    entry: model_prediction.models.hockey:hockey_v2_model
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: hockey-poisson-dc-v1
   - model_id: hockey-poisson-dc-v1
     sport: HOCKEY
     # spread/total are served unverified (no settled-pick record yet); the
@@ -621,17 +651,17 @@ prediction_service:
       spread: valorant-spread-tiered-elo-v6
       total: valorant-total-tiered-elo-v6
     RAINBOW_SIX:
-      moneyline: rainbow_six-tiered-elo-v6
+      moneyline: r6-contextual-v7
       spread: rainbow_six-spread-tiered-elo-v6
       total: rainbow_six-total-tiered-elo-v6
     KBO:
       moneyline: kbo-baseball-v3
     NPB:
-      moneyline: npb-tie-aware-elo-v2
+      moneyline: npb-baseball-v3
     HOCKEY:
-      moneyline: hockey-poisson-dc-v1
-      spread: hockey-poisson-dc-v1
-      total: hockey-poisson-dc-v1
+      moneyline: hockey-poisson-dc-v2
+      spread: hockey-poisson-dc-v2
+      total: hockey-poisson-dc-v2
   challengers:
     MLB:
       moneyline: mlb-moneyline-v9-frozen
@@ -825,10 +855,13 @@ prediction_service:
   - dota2-tiered-elo-v6
   - lol-tiered-elo-v6
   - valorant-tiered-elo-v6
+  - r6-contextual-v7
   - rainbow_six-tiered-elo-v6
   - kbo-baseball-v3
   - kbo-tie-aware-elo-v2
+  - npb-baseball-v3
   - npb-tie-aware-elo-v2
+  - hockey-poisson-dc-v2
   - hockey-poisson-dc-v1
   - darts-markov-v2
   - darts-markov-v1

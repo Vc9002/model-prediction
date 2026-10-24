@@ -1,0 +1,31 @@
+{
+  "artifact_hash": "eb17a1a2e750026f6f116fba85930ca34a4907f264e8b83600376d58ca947cab",
+  "model_version": "hockey-poisson-dc-v2",
+  "sport": "HOCKEY",
+  "leagues": [
+    "NHL",
+    "AHL",
+    "KHL",
+    "DEL",
+    "SHL",
+    "SNHL",
+    "CEHL",
+    "LIIGA"
+  ],
+  "schema_version": "hockey-dixon-coles-poisson-v2",
+  "model_type": "bivariate_poisson_dixon_coles",
+  "status": "production",
+  "qualified_for_betting": true,
+  "confidence_threshold": 0.02,
+  "min_edge": 0.02,
+  "max_edge": 0.08,
+  "max_goals": 10,
+  "dynamic_sizing": {
+    "enabled": true,
+    "base_units": 1.0,
+    "max_units": 2.0,
+    "edge_slope": 16.67
+  },
+  "target": "2-way full-game winner, spreads, and totals with overtime and shootout resolution",
+  "trained_through_date": "2026-10-24"
+}

@@ -99,12 +99,12 @@ def test_real_production_yaml_resolves_every_model() -> None:
     registry = ProductionModelRegistry.load(REPO)
 
     assert registry.schema_version == "3"
-    assert len(registry.entries) == 54
+    assert len(registry.entries) == 57
     # Under the permanent champion-challenger framework, all models
     # across supported markets are available contracts (champions + rollbacks).
     # Weak evidence models have evidence_status=degraded and
     # replacement_priority=critical rather than being disabled.
-    assert len(registry.available_entries()) == 54
+    assert len(registry.available_entries()) == 57
     assert len(registry.problem_entries()) == 0
     assert registry.primary.model_id == "wnba-elo-trend-lr-v4"
     assert registry.primary.artifact_hash
@@ -167,10 +167,12 @@ def test_real_production_yaml_resolves_every_model() -> None:
     assert registry.champion("TENNIS", "moneyline").model_id == "tennis-surface-elo-v5"
     assert registry.champion("TENNIS", "moneyline").rollback_model == "tennis-surface-elo-v4"
 
-    hockey = registry.entries["hockey-poisson-dc-v1"]
+    hockey = registry.entries["hockey-poisson-dc-v2"]
     assert hockey.implementation == IMPLEMENTATION_CODE_BACKED
-    assert hockey.entry == "model_prediction.models.hockey:hockey_model"
-    assert registry.champion("HOCKEY", "moneyline").model_id == "hockey-poisson-dc-v1"
+    assert hockey.entry == "model_prediction.models.hockey:hockey_v2_model"
+    assert registry.champion("HOCKEY", "moneyline").model_id == "hockey-poisson-dc-v2"
+    assert registry.champion("NPB", "moneyline").model_id == "npb-baseball-v3"
+    assert registry.champion("RAINBOW_SIX", "moneyline").model_id == "r6-contextual-v7"
     darts = registry.entries["darts-markov-v2"]
     assert darts.implementation == IMPLEMENTATION_CODE_BACKED
     assert darts.entry == "model_prediction.models.darts:darts_v2_model"

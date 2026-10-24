@@ -1,0 +1,22 @@
+{
+  "artifact_hash": "485ca7cd4de115e18c28923ed1b6401a4f25e430d52c0b717ef4cf8182654b5f",
+  "model_version": "r6-contextual-v7",
+  "sport": "RAINBOW_SIX",
+  "schema_version": "esports-contextual-v7",
+  "model_type": "contextual_residual_tiered_elo",
+  "status": "production",
+  "qualified_for_betting": true,
+  "confidence_threshold": 0.02,
+  "min_edge": 0.02,
+  "max_edge": 0.08,
+  "max_underdog_odds": 120,
+  "l2_shrinkage": 0.8,
+  "dynamic_sizing": {
+    "enabled": true,
+    "base_units": 1.0,
+    "max_units": 2.0,
+    "edge_slope": 16.67
+  },
+  "target": "map balance, bomb site defense advantage, and series format win probability",
+  "trained_through_date": "2026-10-24"
+}

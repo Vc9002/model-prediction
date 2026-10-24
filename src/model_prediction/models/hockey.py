@@ -29,7 +29,9 @@ from typing import Any
 from ..features.trends import ewm_level
 from .base import GamePrediction, GamePredictionBase
 
-HOCKEY_MODEL_VERSION = "hockey-poisson-dc-v1"
+HOCKEY_V1_MODEL_VERSION = "hockey-poisson-dc-v1"
+HOCKEY_V2_MODEL_VERSION = "hockey-poisson-dc-v2"
+HOCKEY_MODEL_VERSION = HOCKEY_V2_MODEL_VERSION
 MAX_GOALS = 10
 # Home-handicap and total lines Polymarket lists for NHL (spreads +/-1.5..3.5, totals 2.5..9.5).
 SPREAD_LINES = (-3.5, -2.5, -1.5, 1.5, 2.5, 3.5)
@@ -90,6 +92,13 @@ def _dc_adjustment(
 
 class HockeyModel:
     sport = "hockey"
+
+    @staticmethod
+    def compute_dynamic_units(edge: float, min_edge: float = 0.02, max_edge: float = 0.08) -> float:
+        """Dynamic unit sizing scaling from 1.00U to 2.00U with edge."""
+        abs_edge = abs(edge)
+        scaled = 1.0 + min(1.0, max(0.0, (abs_edge - min_edge) / (max_edge - min_edge)))
+        return round(float(scaled), 2)
 
     def __init__(
         self,
@@ -362,5 +371,16 @@ class HockeyModel:
         return predictions
 
 
+def hockey_v1_model() -> HockeyModel:
+    """Legacy Hockey v1 model factory."""
+    return HockeyModel(version=HOCKEY_V1_MODEL_VERSION)
+
+
+def hockey_v2_model() -> HockeyModel:
+    """Production Hockey v2 model factory."""
+    return HockeyModel(version=HOCKEY_V2_MODEL_VERSION)
+
+
 def hockey_model() -> HockeyModel:
-    return HockeyModel()
+    """Default Hockey model factory (points to v2)."""
+    return hockey_v2_model()
