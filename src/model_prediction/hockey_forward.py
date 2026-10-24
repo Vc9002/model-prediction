@@ -366,6 +366,7 @@ def build_hockey_slate(
                             "observed_at_utc": observed.isoformat(),
                             "timestamp_valid": True,
                             "edge_vs_executable_ask": round(best["edge"], 6),
+                            "units": HockeyModel.compute_dynamic_units(best["edge"]),
                         }
                     )
 
@@ -413,6 +414,7 @@ def build_hockey_slate(
                             "observed_at_utc": observed.isoformat(),
                             "timestamp_valid": True,
                             "edge_vs_executable_ask": round(edge, 6),
+                            "units": HockeyModel.compute_dynamic_units(edge),
                         }
                     )
 
@@ -453,6 +455,7 @@ def build_hockey_slate(
                             "observed_at_utc": observed.isoformat(),
                             "timestamp_valid": True,
                             "edge_vs_executable_ask": round(edge, 6),
+                            "units": HockeyModel.compute_dynamic_units(edge),
                         }
                     )
 

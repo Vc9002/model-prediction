@@ -372,6 +372,7 @@ def build_darts_slate(
                                 "observed_at_utc": observed.isoformat(),
                                 "timestamp_valid": True,
                                 "edge_vs_executable_ask": round(edge, 6),
+                                "units": DartsModel.compute_dynamic_units(edge),
                             }
                         )
 
@@ -416,6 +417,7 @@ def build_darts_slate(
                                 "observed_at_utc": observed.isoformat(),
                                 "timestamp_valid": True,
                                 "edge_vs_executable_ask": round(edge, 6),
+                                "units": DartsModel.compute_dynamic_units(edge),
                             }
                         )
 

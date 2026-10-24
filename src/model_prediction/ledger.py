@@ -717,6 +717,8 @@ class PickLedger:
         if self.tier == "flat":
             # Operator Directive: Flat ledger calls everything (full coverage, zero shadow picks).
             # Units must NEVER be flat at 1.0 -- sized dynamically by model edge and conviction.
+            market_p = implied_probability(request.american_odds) if request.american_odds else 0.5
+            calc_edge = max(0.0, request.model_probability - market_p)
             dyn_units = (
                 eligibility.units
                 if (eligibility.units > 0 and eligibility.units != 1.0)
@@ -726,6 +728,8 @@ class PickLedger:
                     request.american_odds,
                 )
             )
+            if dyn_units <= 1.0 and calc_edge > 0.01:
+                dyn_units = round(1.0 + min(1.0, calc_edge / 0.08), 2)
             eligibility = replace(
                 eligibility,
                 record_type=RecordType.QUALIFIED_SHADOW_CALL,
@@ -736,6 +740,8 @@ class PickLedger:
         elif self.tier == "main":
             # Main ledger is the gated ledger. Calls reaching Main are qualified calls.
             # Units must NEVER be flat at 1.0 -- sized dynamically by model edge and conviction.
+            market_p = implied_probability(request.american_odds) if request.american_odds else 0.5
+            calc_edge = max(0.0, request.model_probability - market_p)
             dyn_units = (
                 eligibility.units
                 if (eligibility.units > 0 and eligibility.units != 1.0)
@@ -745,6 +751,8 @@ class PickLedger:
                     request.american_odds,
                 )
             )
+            if dyn_units <= 1.0 and calc_edge > 0.01:
+                dyn_units = round(1.0 + min(1.0, calc_edge / 0.08), 2)
             eligibility = replace(
                 eligibility,
                 record_type=RecordType.QUALIFIED_SHADOW_CALL,

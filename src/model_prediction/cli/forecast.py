@@ -1993,6 +1993,8 @@ def _forecast_nba_spread_sport(
     from ..data_sources.polymarket_us import probability_to_american
 
     forecast = _forecast_nba_spread_slate(data_root, args_date, ESPNClient())
+    model_config = config.get("models", {}).get("NBA", {})
+    min_edge = float(model_config.get("min_edge", 0.05))
     exposure_source = flat_ledger or main_ledger
     if exposure_source is None:
         forecast["logged"] = 0
@@ -2077,6 +2079,7 @@ def _forecast_nba_spread_sport(
                 if (
                     main_ledger is not None
                     and eligibility.decision == "CALL"
+                    and (float(contract["model_probability"]) - float(ask)) >= min_edge
                     and _append_secondary_ledger(
                         main_ledger, request, eligibility, observed_now, "nba_spread:main_ledger"
                     )
@@ -2326,6 +2329,8 @@ def _forecast_nba_total_sport(
     from ..data_sources.polymarket_us import probability_to_american
 
     forecast = _forecast_nba_total_slate(data_root, args_date, ESPNClient())
+    model_config = config.get("models", {}).get("NBA", {})
+    min_edge = float(model_config.get("min_edge", 0.05))
     exposure_source = flat_ledger or main_ledger
     if exposure_source is None:
         forecast["logged"] = 0
@@ -2410,6 +2415,7 @@ def _forecast_nba_total_sport(
                 if (
                     main_ledger is not None
                     and eligibility.decision == "CALL"
+                    and (float(contract["model_probability"]) - float(ask)) >= min_edge
                     and _append_secondary_ledger(
                         main_ledger, request, eligibility, observed_now, "nba_total:main_ledger"
                     )
@@ -4567,6 +4573,21 @@ def _forecast_soccer_sport(
                     is_allowed_btts = contract_mtype == "btts" and "btts" in configured_markets
                     market_allowed = is_allowed_total or is_allowed_ml or is_allowed_btts
                 genuinely_eligible = eligibility.decision == "CALL" and market_allowed
+                _ml_max_odds = model_config.get("max_moneyline_american_odds")
+                if (
+                    genuinely_eligible
+                    and _ml_max_odds is not None
+                    and contract_mtype == "moneyline"
+                    and request.american_odds is not None
+                    and request.american_odds > float(_ml_max_odds)
+                ):
+                    genuinely_eligible = False
+                _max_edge = model_config.get("max_edge")
+                contract_edge = float(
+                    contract.get("edge_vs_executable_ask", float(contract["model_probability"]) - ask)
+                )
+                if genuinely_eligible and _max_edge is not None and contract_edge > float(_max_edge):
+                    genuinely_eligible = False
                 if (
                     research_ledger is not None
                     and _append_secondary_ledger(

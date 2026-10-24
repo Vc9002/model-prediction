@@ -256,6 +256,7 @@ models:
     family: elo_trend_normal_approximation
     status: shadow_qualified
     origin: statistical_model
+    min_edge: 0.05
     active_production_version: nba-elo-trend-lr-v4
     production_artifact: config/models/nba-elo-trend-lr-v4.json
     spread_production_artifact: config/models/nba-spread-margin-v3.json
@@ -330,6 +331,8 @@ models:
     market_residual_artifact: config/models/soccer-market-residual-v1.json
     total_market_residual_artifact: config/models/soccer-total-market-residual-v1.json
     min_edge: 0.02
+    max_moneyline_american_odds: 100
+    max_edge: 0.12
     # Restored 2026-09-09: 0.0 (no gate) contradicted this section's own
     # comment above ("wiring research_confidence_gate ... from that real
     # result") and the live Auto-Buyer's actual moneyline record on this
@@ -416,7 +419,7 @@ models:
     - nfl-total-structural-v5
   NCAAF:
     family: cfb_structural_v3_bivariate_engine
-    status: production
+    status: shadow_qualified
     origin: statistical_model
     active_production_version: cfb-structural-v3
     production_artifact: config/models/cfb-structural-v3.json
