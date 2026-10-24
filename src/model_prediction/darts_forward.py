@@ -115,7 +115,10 @@ def build_darts_slate(
     model: DartsModel | None = None,
     leagues: Sequence[str] | None = None,
     observed_at: datetime | None = None,
-    min_team_matches: int = 3,
+    min_team_matches: int = 0,
+    longshot_ask_floor: float | None = None,
+    longshot_min_sample: int = 5,
+    max_claimed_edge: float | None = None,
 ) -> dict[str, Any]:
     """Build prospective darts slate and evaluate actionable edges against executable asks."""
     active_model = model or darts_model()
@@ -281,11 +284,15 @@ def build_darts_slate(
                         active_model.match_counts.get(pred_ml.home_team, 0),
                         active_model.match_counts.get(pred_ml.away_team, 0),
                     )
-                    # Prune unrated extreme longshot dogs (odds > +250, ask < 0.28)
-                    if ask < 0.28 and sample_min < 5:
+                    # Both prunes are opt-in via model config; unvalidated thresholds must not
+                    # silently change live output (max_claimed_edge drops the largest edges).
+                    if (
+                        longshot_ask_floor is not None
+                        and ask < longshot_ask_floor
+                        and sample_min < longshot_min_sample
+                    ):
                         continue
-                    # Prune false anomaly edges > 12%
-                    if edge > 0.12:
+                    if max_claimed_edge is not None and edge > max_claimed_edge:
                         continue
                     candidates.append(
                         {

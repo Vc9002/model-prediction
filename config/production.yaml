@@ -382,7 +382,7 @@ prediction_service:
     sport: KBO
     market: moneyline
     implementation: code_backed_model
-    entry: model_prediction.models.international_baseball_v3:InternationalBaseballV3Model
+    entry: model_prediction.models.international_baseball_v3:kbo_v3_model
     enabled: true
     serving_status: production
     evidence_status: predictively_qualified
@@ -402,7 +402,7 @@ prediction_service:
     sport: NPB
     market: moneyline
     implementation: code_backed_model
-    entry: model_prediction.models.international_baseball_v3:InternationalBaseballV3Model
+    entry: model_prediction.models.international_baseball_v3:npb_v3_model
     enabled: true
     serving_status: production
     evidence_status: predictively_qualified

@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "f88e3ca2b1d9000f5c3ce0eb48ff05f7b0259cbd81916c0e0af8a56cd2389945",
+  "artifact_hash": "4357fc74836f69b497ec9c6dc59573fa895079adefd7d86471d8dd2a27daf59e",
   "model_version": "npb-baseball-v3",
   "league": "npb",
   "schema_version": "international-baseball-structural-v3",
@@ -55,5 +55,6 @@
     "edge_slope": 16.67
   },
   "target": "bivariate run distribution with 12-inning tie settlement",
-  "trained_through_date": "2026-10-24"
+  "trained_through_date": "2026-10-24",
+  "training_prefix_sha256": "945501d80b6ffc9218fd7b302b953386da4428a2f72f0465134b6bb77a7c1c0a"
 }

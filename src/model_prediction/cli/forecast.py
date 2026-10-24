@@ -5011,25 +5011,26 @@ def _forecast_cfb_sport(
                     )
                 ):
                     genuinely_eligible = False
+                # Optional, off-by-default gates: each needs a config value, which in turn needs
+                # walk-forward evidence (ARCHITECTURE.md validation contract) before being set.
+                _ml_max_odds = model_config.get("max_moneyline_american_odds")
                 if (
                     genuinely_eligible
+                    and _ml_max_odds is not None
                     and mtype == MarketType.MONEYLINE
                     and request.american_odds is not None
-                    and request.american_odds > 200
+                    and request.american_odds > float(_ml_max_odds)
                 ):
-                    # Empirical Audit: Longshot dogs (> +200) suffer extreme negative expectancy in CFB
                     genuinely_eligible = False
+                _blowout_cap = model_config.get("blowout_spread_edge_cap")
                 if (
                     genuinely_eligible
+                    and _blowout_cap is not None
                     and mtype == MarketType.SPREAD
                     and contract.get("line") is not None
                     and abs(float(contract["line"])) > 21.5
-                    and contract_edge > 0.08
+                    and contract_edge > float(_blowout_cap)
                 ):
-                    # Hard Edge Gate / Anomaly Trap: Blowout spreads with claimed edge > 8% are tail errors
-                    genuinely_eligible = False
-                if genuinely_eligible and mtype == MarketType.TOTAL and contract_edge > 0.05:
-                    # Hard Edge Gate / Anomaly Trap: CFB Totals with claimed edge > 5% suffer shootout variance
                     genuinely_eligible = False
                 # CFB spread (cfb-spread-v1) and total (cfb-total-v1) artifacts explicitly declare
                 # "status": "FLAT_LEDGER_ONLY" and "qualified": false. Unified cfb-structural-v3
@@ -5346,6 +5347,9 @@ def _forecast_darts_sport(
         observed_at=utc_now(),
         model=model,
         min_team_matches=int(model_config.get("min_team_matches", 5)),
+        longshot_ask_floor=model_config.get("longshot_ask_floor"),
+        longshot_min_sample=int(model_config.get("longshot_min_sample", 5)),
+        max_claimed_edge=model_config.get("max_claimed_edge"),
     )
     # Darts stays flat-ledger-only until the model is promoted: main_ledger_enabled opts in.
     baseline_only = not bool(model.match_counts)

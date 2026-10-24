@@ -73,8 +73,8 @@ CODE_BACKED_ENTRYPOINTS: dict[str, str] = {
     "lol-contextual-v7": "model_prediction.models.esports_contextual_v7:EsportsContextualV7Model",
     "valorant-contextual-v7": "model_prediction.models.esports_contextual_v7:EsportsContextualV7Model",
     "r6-contextual-v7": "model_prediction.models.esports_contextual_v7:EsportsContextualV7Model",
-    "kbo-baseball-v3": "model_prediction.models.international_baseball_v3:InternationalBaseballV3Model",
-    "npb-baseball-v3": "model_prediction.models.international_baseball_v3:InternationalBaseballV3Model",
+    "kbo-baseball-v3": "model_prediction.models.international_baseball_v3:kbo_v3_model",
+    "npb-baseball-v3": "model_prediction.models.international_baseball_v3:npb_v3_model",
 }
 
 
