@@ -39,7 +39,7 @@ from model_prediction.domain import iso_utc, parse_utc, utc_now
 from model_prediction.runtime_paths import RuntimePaths
 
 _paths = RuntimePaths.resolve()
-DATA = _paths.repo_root / "data"
+DATA = _paths.runtime_root
 EASTERN = ZoneInfo("America/New_York")
 
 # Auto-load .env credentials if present
@@ -403,9 +403,12 @@ def load_auto_buyer_state() -> dict[str, Any]:
         "last_daily_date": None,
     }
     data: dict[str, Any] = {}
-    if AUTO_BUYER_STATE_FILE.exists():
+    state_file = AUTO_BUYER_STATE_FILE
+    if not state_file.exists() and (_paths.repo_root / "data" / "auto_buyer_state.json").exists():
+        state_file = _paths.repo_root / "data" / "auto_buyer_state.json"
+    if state_file.exists():
         try:
-            data = json.loads(AUTO_BUYER_STATE_FILE.read_text(encoding="utf-8"))
+            data = json.loads(state_file.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             data = {}
     state = {**default_state, **data}
