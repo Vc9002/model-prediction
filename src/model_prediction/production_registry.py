@@ -697,5 +697,13 @@ def _resolve_entrypoint(entry: str) -> Any:
     if ":" not in entry:
         raise ValueError(f"entry point must be 'pkg.mod:attr', got {entry!r}")
     module_name, attr_name = entry.split(":", 1)
-    module = importlib.import_module(module_name)
+    try:
+        module = importlib.import_module(module_name)
+    except ModuleNotFoundError:
+        import sys
+
+        src_dir = str(Path(__file__).resolve().parent.parent)
+        if src_dir not in sys.path:
+            sys.path.insert(0, src_dir)
+        module = importlib.import_module(module_name)
     return getattr(module, attr_name)

@@ -579,7 +579,7 @@ models:
     - spread
     - total
     market_target: esports_match_winner
-    min_edge: 0.025
+    min_edge: 0.05
     research_confidence_gate: 0.04
   KBO:
     family: tie_aware_home_elo
