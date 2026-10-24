@@ -726,10 +726,15 @@ class HomeElo:
     _last_active: dict[str, str] | None = None
     _games_played: dict[str, int] | None = None
 
-    def decisive_home_probability(self, away_id: str, home_id: str) -> float:
+    def decisive_home_probability(
+        self, away_id: str, home_id: str, park_factor: float | None = None
+    ) -> float:
         away = self.ratings.get(away_id, 1500.0)
         home = self.ratings.get(home_id, 1500.0)
-        return expected_win_probability(home, away, self.home_advantage)
+        h_adv = self.home_advantage
+        if park_factor is not None:
+            h_adv += (park_factor - 1.0) * 10.0
+        return expected_win_probability(home, away, h_adv)
 
     def games_played(self, team_id: str) -> int:
         """Real completed games this team has updated ratings from -- a
@@ -1430,15 +1435,20 @@ def forecast_international_baseball_slate(
         else:
             expected_game_total = default_tot
 
+        from .models.international_baseball_v3 import KBO_PARK_FACTORS, NPB_PARK_FACTORS
+
+        park_factors = KBO_PARK_FACTORS if league.lower() == "kbo" else NPB_PARK_FACTORS
+        pf = park_factors.get(home_id, 1.0)
+        expected_game_total = round(expected_game_total * pf, 2)
+        decisive_home_prob = book.decisive_home_probability(away_id, home_id, park_factor=pf)
+
         derivatives = price_international_baseball_derivatives(
-            book.decisive_home_probability(away_id, home_id),
+            decisive_home_prob,
             game_tie_p,
             league=league,
             expected_total=expected_game_total,
         )
-        away_fair, home_fair = tie_aware_fair_values(
-            book.decisive_home_probability(away_id, home_id), game_tie_p
-        )
+        away_fair, home_fair = tie_aware_fair_values(decisive_home_prob, game_tie_p)
 
         for market in event.get("markets", []):
             m_type = str(market.get("market_type") or "")

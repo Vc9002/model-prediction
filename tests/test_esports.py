@@ -820,3 +820,36 @@ def test_unresolved_market_with_an_open_book_stays_pending(monkeypatch) -> None:
     ledger = _CaptureSettleLedger()
     assert _settle_esports_pick(_moneyline_row(), ledger) is None
     assert ledger.settled == []
+
+
+def test_esports_margin_of_victory_update() -> None:
+    """Verify that NeutralElo scales update magnitude based on series map dominance (sweeps vs close)."""
+    book_sweep = NeutralElo(k=20.0, ratings={"teamA": 1500.0, "teamB": 1500.0}, margin_weight=0.15)
+    book_close = NeutralElo(k=20.0, ratings={"teamA": 1500.0, "teamB": 1500.0}, margin_weight=0.15)
+
+    row_sweep = {
+        "team1_id": "teamA",
+        "team2_id": "teamB",
+        "winner_id": "teamA",
+        "team1_score": 2,
+        "team2_score": 0,
+        "best_of": 3,
+    }
+    row_close = {
+        "team1_id": "teamA",
+        "team2_id": "teamB",
+        "winner_id": "teamA",
+        "team1_score": 2,
+        "team2_score": 1,
+        "best_of": 3,
+    }
+
+    book_sweep.update(row_sweep)
+    book_close.update(row_close)
+
+    delta_sweep = book_sweep.ratings["teamA"] - 1500.0
+    delta_close = book_close.ratings["teamA"] - 1500.0
+
+    # 2-0 sweep should yield strictly greater rating adjustment than 2-1 close finish
+    assert delta_sweep > delta_close
+    assert pytest.approx(delta_sweep / delta_close, rel=0.05) == 1.15 / 0.95

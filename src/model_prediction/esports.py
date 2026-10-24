@@ -540,6 +540,7 @@ class NeutralElo:
     recency_max_boost: float | None = None
     tier_weights: dict[str, float] | None = None
     temperature: float | None = None
+    margin_weight: float = 0.15
 
     def raw_probability(self, team1_id: str, team2_id: str) -> float:
         """Unshrunk Elo expectation — the correct basis for rating updates.
@@ -669,6 +670,23 @@ class NeutralElo:
                     k_eff *= 1.00  # standard series baseline
                 elif bo >= 5:
                     k_eff *= 1.25  # high-confidence multi-map series
+            except (ValueError, TypeError):
+                pass
+
+        # Margin-of-victory map differential weighting: sweeps (2-0, 3-0)
+        # demonstrate higher true-strength margin than close series (2-1, 3-2).
+        s1 = row.get("team1_score")
+        s2 = row.get("team2_score")
+        if self.margin_weight > 0.0 and s1 is not None and s2 is not None:
+            try:
+                score1 = float(s1)
+                score2 = float(s2)
+                tot_maps = score1 + score2
+                if tot_maps > 1:
+                    w_score = max(score1, score2)
+                    dom = w_score / tot_maps
+                    mult = 1.0 + self.margin_weight * (dom - 0.75) * 4.0
+                    k_eff *= max(0.5, min(1.8, mult))
             except (ValueError, TypeError):
                 pass
 
@@ -921,6 +939,7 @@ def validate_esports_baseline(
         "initial_rating": 1500.0,
         "home_or_order_advantage": 0.0,
         "k": chosen_k,
+        "margin_weight": 0.15,
         "confidence_threshold": chosen_threshold,
         "platt_intercept": platt_intercept,
         "platt_slope": platt_slope,
@@ -1243,6 +1262,7 @@ def forecast_esports_slate(
         last_match_utc=last_match_utc,
         games_played=games_played,
         temperature=float(artifact.get("temperature", 1.18)),
+        margin_weight=float(artifact.get("margin_weight", 0.15)),
     )
     trained_through = parse_utc(str(artifact["trained_through_utc"]))
     from .esports_context import capture_schedule, resolve_format

@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "359c5cbac3090b0ad633d078620058ab7e8f2ccdf94ded7ec29f4b58251f2646",
+  "artifact_hash": "14225cc8d83989880e04c0dfef7225829ab94d0176358d59f19603acd503ee94",
   "model_version": "kbo-baseball-v3",
   "league": "kbo",
   "schema_version": "international-baseball-structural-v3",
@@ -94,5 +94,17 @@
   },
   "target": "bivariate run distribution with extra-inning tie settlements",
   "trained_through_date": "2026-10-24",
-  "training_prefix_sha256": "d7003e759ecfb6b14a74b678b26d20531dfcd29005d21e6ee550af33c021d2d9"
+  "training_prefix_sha256": "d7003e759ecfb6b14a74b678b26d20531dfcd29005d21e6ee550af33c021d2d9",
+  "park_factors": {
+    "SAMSUNG": 1.08,
+    "SSG": 1.06,
+    "KIA": 1.04,
+    "NC": 1.03,
+    "KT": 1.02,
+    "HANWHA": 1.02,
+    "LOTTE": 1.01,
+    "KIWOOM": 0.94,
+    "DOOSAN": 0.92,
+    "LG": 0.92
+  }
 }

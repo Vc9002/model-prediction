@@ -12,17 +12,50 @@ Structural, tie-aware baseball scoring engine for KBO (Korea) and NPB (Japan):
 
 from __future__ import annotations
 
+import json
+import logging
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 
 from .base import GamePrediction
 
+logger = logging.getLogger(__name__)
+
 KBO_V3_MODEL_VERSION = "kbo-baseball-v3"
 NPB_V3_MODEL_VERSION = "npb-baseball-v3"
+
+KBO_PARK_FACTORS: dict[str, float] = {
+    "SAMSUNG": 1.08,  # Daegu Samsung Lions Park (extreme hitter friendly)
+    "SSG": 1.06,  # Incheon SSG Landers Field (short fences, high HR)
+    "KIA": 1.04,  # Gwangju-Kia Champions Field
+    "NC": 1.03,  # Changwon NC Park
+    "KT": 1.02,  # Suwon KT Wiz Park
+    "HANWHA": 1.02,  # Daejeon Hanwha Life Ballpark
+    "LOTTE": 1.01,  # Busan Sajik Baseball Stadium
+    "KIWOOM": 0.94,  # Gocheok Sky Dome (dome, suppresses extra-base hits)
+    "DOOSAN": 0.92,  # Seoul Jamsil Stadium (deep outfield dimensions)
+    "LG": 0.92,  # Seoul Jamsil Stadium (deep outfield dimensions)
+}
+
+NPB_PARK_FACTORS: dict[str, float] = {
+    "S": 1.12,  # Tokyo Yakult Swallows (Meiji Jingu Stadium)
+    "DB": 1.08,  # Yokohama DeNA BayStars (Yokohama Stadium)
+    "G": 1.05,  # Yomiuri Giants (Tokyo Dome)
+    "E": 1.01,  # Tohoku Rakuten Golden Eagles
+    "H": 1.00,  # Fukuoka SoftBank Hawks (PayPay Dome)
+    "L": 0.98,  # Saitama Seibu Lions (Belluna Dome)
+    "F": 0.98,  # Hokkaido Nippon-Ham Fighters (ES CON FIELD)
+    "C": 0.97,  # Hiroshima Toyo Carp (Mazda Stadium)
+    "M": 0.96,  # Chiba Lotte Marines (ZOZO Marine Stadium)
+    "B": 0.94,  # Orix Buffaloes (Kyocera Dome)
+    "T": 0.93,  # Hanshin Tigers (Koshien Stadium)
+    "D": 0.92,  # Chunichi Dragons (Vantelin Dome Nagoya)
+}
 
 
 @dataclass(frozen=True)
@@ -51,12 +84,20 @@ class InternationalBaseballV3Model:
         scaled = 1.0 + min(1.0, max(0.0, (abs_edge - min_edge) / (max_edge - min_edge)))
         return round(float(scaled), 2)
 
-    def __init__(self, league: str = "NPB", max_runs: int = 15) -> None:
+    def __init__(
+        self,
+        league: str = "NPB",
+        max_runs: int = 15,
+        team_ratings: dict[str, dict[str, float]] | None = None,
+        ratings: dict[str, float] | None = None,
+    ) -> None:
         self.league = league.upper()
         self.max_runs = max_runs
         # Conditional extra-inning tie probability given game was tied after 9 innings (~14% of games)
         # Yields overall ~8.1% tie rate for NPB (12-inning cap, no ghost runner) and ~2.5% for KBO
         self.tie_rate_factor = 0.58 if self.league == "NPB" else 0.18
+        self.team_ratings = team_ratings or {}
+        self.ratings = ratings or {}
 
     def forecast_match(
         self,
@@ -188,12 +229,31 @@ class InternationalBaseballV3Model:
                         )
                         lh = default_lh * h_off * a_def
                         la = default_la * a_off * h_def
+                    elif self.team_ratings:
+                        h_tr = self.team_ratings.get(str(home_team), {})
+                        a_tr = self.team_ratings.get(str(away_team), {})
+                        h_off = float(h_tr.get("offense", 1.0))
+                        h_def = float(h_tr.get("defense", 1.0))
+                        a_off = float(a_tr.get("offense", 1.0))
+                        a_def = float(a_tr.get("defense", 1.0))
+                        lh = default_lh * h_off * a_def
+                        la = default_la * a_off * h_def
                     else:
                         lh = default_lh
                         la = default_la
 
-                    sp_fip_h = getattr(match, "home_starter_fip", None)
-                    sp_fip_a = getattr(match, "away_starter_fip", None)
+                    # Stadium Park Factor adjustment
+                    park_factors = KBO_PARK_FACTORS if self.league == "KBO" else NPB_PARK_FACTORS
+                    pf = park_factors.get(str(home_team), 1.0)
+                    lh *= math.sqrt(pf)
+                    la *= math.sqrt(pf)
+
+                    sp_fip_h = getattr(match, "home_starter_fip", None) or (
+                        match.get("home_starter_fip") if isinstance(match, dict) else None
+                    )
+                    sp_fip_a = getattr(match, "away_starter_fip", None) or (
+                        match.get("away_starter_fip") if isinstance(match, dict) else None
+                    )
                     league_fip = 4.20 if self.league == "KBO" else 3.40
                     if sp_fip_a is not None and league_fip > 0:
                         lh = lh * (float(sp_fip_a) / league_fip)
@@ -209,11 +269,22 @@ class InternationalBaseballV3Model:
                 total_line=float(total_line),
             )
 
+            park_factors = KBO_PARK_FACTORS if self.league == "KBO" else NPB_PARK_FACTORS
+            pf = park_factors.get(str(home_team), 1.0)
+            sp_fip_h = getattr(match, "home_starter_fip", None) or (
+                match.get("home_starter_fip") if isinstance(match, dict) else None
+            )
+            sp_fip_a = getattr(match, "away_starter_fip", None) or (
+                match.get("away_starter_fip") if isinstance(match, dict) else None
+            )
             feature_basis = {
                 "lambda_home": forecast.lambda_home,
                 "lambda_away": forecast.lambda_away,
                 "tie_rate_factor": self.tie_rate_factor,
                 "prob_draw": forecast.prob_draw,
+                "park_factor": pf,
+                "home_starter_fip": sp_fip_h,
+                "away_starter_fip": sp_fip_a,
             }
 
             # 1. Moneyline
@@ -296,9 +367,31 @@ class InternationalBaseballV3Model:
 
 def kbo_v3_model() -> InternationalBaseballV3Model:
     """Default KBO structural v3 model factory."""
+    artifact_path = Path("config/models/kbo-baseball-v3.json")
+    if artifact_path.exists():
+        try:
+            artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+            return InternationalBaseballV3Model(
+                league="KBO",
+                team_ratings=artifact.get("team_ratings"),
+                ratings=artifact.get("ratings"),
+            )
+        except (OSError, json.JSONDecodeError, KeyError) as exc:
+            logger.debug("Failed loading KBO v3 artifact: %s", exc)
     return InternationalBaseballV3Model(league="KBO")
 
 
 def npb_v3_model() -> InternationalBaseballV3Model:
     """Default NPB structural v3 model factory."""
+    artifact_path = Path("config/models/npb-baseball-v3.json")
+    if artifact_path.exists():
+        try:
+            artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+            return InternationalBaseballV3Model(
+                league="NPB",
+                team_ratings=artifact.get("team_ratings"),
+                ratings=artifact.get("ratings"),
+            )
+        except (OSError, json.JSONDecodeError, KeyError) as exc:
+            logger.debug("Failed loading NPB v3 artifact: %s", exc)
     return InternationalBaseballV3Model(league="NPB")

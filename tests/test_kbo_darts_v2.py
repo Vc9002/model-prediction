@@ -188,3 +188,38 @@ def test_r6_contextual_v7_model():
     forecast = model.forecast_match(feat)
     assert forecast.prob_a_wins > feat.elo_prob_a
     assert forecast.prob_a_wins + forecast.prob_b_wins == pytest.approx(1.0)
+
+
+def test_kbo_v3_park_factors_and_starter_fip():
+    model = kbo_v3_model()
+    assert model.league == "KBO"
+    assert "SAMSUNG" in model.team_ratings
+
+    class DummyMatch:
+        def __init__(self, home, away, sp_h=None, sp_a=None):
+            self.event_id = "test-kbo-1"
+            self.event_start_utc = "2026-10-25T05:00:00Z"
+            self.home_team = home
+            self.away_team = away
+            self.home_starter_fip = sp_h
+            self.away_starter_fip = sp_a
+
+    # Game at Daegu (SAMSUNG, Park Factor 1.08) vs Game at Jamsil (DOOSAN, Park Factor 0.92)
+    preds_daegu = model.predict_games(upcoming=[DummyMatch("SAMSUNG", "HANWHA")])
+    preds_jamsil = model.predict_games(upcoming=[DummyMatch("DOOSAN", "HANWHA")])
+
+    fb_daegu = preds_daegu[0].feature_basis
+    fb_jamsil = preds_jamsil[0].feature_basis
+
+    assert fb_daegu["park_factor"] == 1.08
+    assert fb_jamsil["park_factor"] == 0.92
+    # Expected total runs at hitter-friendly Daegu must exceed pitcher-friendly Jamsil
+    total_runs_daegu = fb_daegu["lambda_home"] + fb_daegu["lambda_away"]
+    total_runs_jamsil = fb_jamsil["lambda_home"] + fb_jamsil["lambda_away"]
+    assert total_runs_daegu > total_runs_jamsil
+
+    # Ace starter with low FIP (2.50) vs average FIP (4.20) suppresses opposing runs
+    match_ace = DummyMatch("SAMSUNG", "HANWHA", sp_h=2.50)
+    preds_ace = model.predict_games(upcoming=[match_ace])
+    fb_ace = preds_ace[0].feature_basis
+    assert fb_ace["lambda_away"] < fb_daegu["lambda_away"]
