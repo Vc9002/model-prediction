@@ -794,6 +794,44 @@ def test_capture_horizon_skips_only_events_starting_beyond_it(tmp_path) -> None:
     assert result["horizon_hours"] == 12
 
 
+def _ladder_event(league_prices: dict[str, float | None], market_type: str = "spread") -> dict:
+    markets = []
+    for slug, price in league_prices.items():
+        market = _slate_market(slug)
+        market["market_type"] = market_type
+        if price is not None:
+            market["sides"][0]["price_probability"] = price
+        markets.append(market)
+    return {"event_id": "g1", "event_start_utc": "2026-10-22T11:00:00Z", "markets": markets}
+
+
+def test_ladder_keep_fetches_only_the_most_balanced_alternates_for_listed_leagues(tmp_path) -> None:
+    prices = {"far": 0.95, "near": 0.52, "mid": 0.70, "close": 0.49, "nocache": None}
+    events = {"NCAAF": [_ladder_event(prices)], "NBA": [_ladder_event(prices)]}
+    client = _SlateClient()
+    result = capture_slate_snapshots(client, events, tmp_path, "2026-10-22", ladder_keep=2)
+    ncaaf_nba = sorted(client.slate_calls)
+    # NCAAF keeps its 2 most balanced plus the uncached contract; NBA is untouched.
+    assert ncaaf_nba.count("close") == 2 and ncaaf_nba.count("near") == 2
+    assert ncaaf_nba.count("far") == 1 and ncaaf_nba.count("mid") == 1
+    assert ncaaf_nba.count("nocache") == 2
+    assert result["skipped_ladder_alternates"] == 2
+
+
+def test_ladder_keep_never_prunes_moneylines_or_other_market_types(tmp_path) -> None:
+    events = {"NCAAF": [_ladder_event({"a": 0.9, "b": 0.8, "c": 0.7}, market_type="moneyline")]}
+    client = _SlateClient()
+    result = capture_slate_snapshots(client, events, tmp_path, "2026-10-22", ladder_keep=1)
+    assert len(client.slate_calls) == 3 and result["skipped_ladder_alternates"] == 0
+
+
+def test_ladder_keep_off_by_default(tmp_path) -> None:
+    events = {"NCAAF": [_ladder_event({"a": 0.9, "b": 0.8, "c": 0.5})]}
+    client = _SlateClient()
+    result = capture_slate_snapshots(client, events, tmp_path, "2026-10-22")
+    assert len(client.slate_calls) == 3 and result["skipped_ladder_alternates"] == 0
+
+
 def test_capture_without_horizon_keeps_every_event(tmp_path) -> None:
     now = datetime(2026, 10, 22, 10, tzinfo=UTC)
     client = _SlateClient()

@@ -101,6 +101,20 @@ def _capture_horizon_hours() -> float | None:
     return hours if hours > 0 else None
 
 
+def _capture_ladder_keep() -> int | None:
+    """Spread/total alternates to price per NCAAF event (env POLYMARKET_CAPTURE_LADDER_KEEP).
+
+    Off by default (None): every alternate gets a /book request, which at the
+    gateway's rate limit made one capture take 2.8 hours. Zero, negative or
+    invalid leaves it off.
+    """
+    try:
+        keep = int(os.environ.get("POLYMARKET_CAPTURE_LADDER_KEEP", "0"))
+    except ValueError:
+        return None
+    return keep if keep > 0 else None
+
+
 def _polymarket_slate(args, config) -> dict:
     if args.provider == "kalshi":
         return {"provider": "kalshi", "status": "deferred", "note": KALSHI_DEFERRED_MESSAGE}
@@ -152,6 +166,7 @@ def _polymarket_slate(args, config) -> dict:
             Path(ledger_path(config)).parent,
             args.date,
             horizon_hours=_capture_horizon_hours(),
+            ladder_keep=_capture_ladder_keep(),
         )
     )
     return {
