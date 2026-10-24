@@ -116,6 +116,11 @@ class RuntimePaths:
     # ── mutable rebuild state: lives under runtime_root ──────────────────
 
     @property
+    def data_root(self) -> Path:
+        """Mutable data root: canonical runtime root for cache, logs, and state."""
+        return self.runtime_root
+
+    @property
     def rebuild_root(self) -> Path:
         return self.runtime_root / "rebuild"
 
