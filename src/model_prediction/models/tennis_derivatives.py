@@ -19,6 +19,7 @@ from functools import lru_cache
 # produces realistic blowout/tight-match mixes.
 TENNIS_GAMES_VERSION = "tennis-games-markov-v1"
 TENNIS_GAMES_V2_VERSION = "tennis-games-markov-v2"
+TENNIS_GAMES_V3_VERSION = "tennis-games-markov-v3"
 TENNIS_BASE_SERVE = {"ATP": 0.62, "WTA": 0.555}
 TENNIS_BASE_SERVE_V1 = {"ATP": 0.62, "WTA": 0.58}
 TENNIS_SURFACE_BASE_SERVE: dict[str, dict[str, float]] = {
@@ -29,6 +30,7 @@ TENNIS_SURFACE_BASE_SERVE: dict[str, dict[str, float]] = {
     "Default": {"ATP": 0.620, "WTA": 0.555},
 }
 TENNIS_FORM_SIGMA = 0.08
+TENNIS_MOMENTUM_SHIFT = 0.035
 _GAUSS_HERMITE_3 = ((-1.2247, 1.0 / 6.0), (0.0, 2.0 / 3.0), (1.2247, 1.0 / 6.0))
 
 
@@ -107,13 +109,18 @@ def set_score_distribution(pa_hold: float, pb_hold: float, p_tb_a: float) -> dic
 
 
 def match_state_distribution(
-    pa_point: float, pb_point: float, best_of: int = 3, form_sigma: float = 0.0
+    pa_point: float,
+    pb_point: float,
+    best_of: int = 3,
+    form_sigma: float = 0.0,
+    momentum_shift: float = 0.0,
 ) -> dict[tuple[int, int, int, int], float]:
     """Computes distribution over match states (sets_a, sets_b, total_games_a, total_games_b).
 
     ``form_sigma`` > 0 mixes the distribution over independent per-player serve-level
     shifts (3-point Gauss-Hermite), which fattens the blowout and tight-match tails
     that a fixed-point-probability Markov chain understates.
+    ``momentum_shift`` > 0 captures empirical set-level momentum between sets.
     """
     if form_sigma > 0:
         mixed: dict[tuple[int, int, int, int], float] = {}
@@ -123,6 +130,8 @@ def match_state_distribution(
                     min(0.9, max(0.4, pa_point + form_sigma * z_a)),
                     min(0.9, max(0.4, pb_point + form_sigma * z_b)),
                     best_of,
+                    form_sigma=0.0,
+                    momentum_shift=momentum_shift,
                 )
                 for key, probability in shifted.items():
                     mixed[key] = mixed.get(key, 0.0) + probability * w_a * w_b
@@ -130,19 +139,47 @@ def match_state_distribution(
     pa_hold = hold_game_probability(pa_point)
     pb_hold = hold_game_probability(pb_point)
     p_tb_a = tiebreak_probability(pa_point, pb_point)
-    set_dist = set_score_distribution(pa_hold, pb_hold, p_tb_a)
+    dist_even = set_score_distribution(pa_hold, pb_hold, p_tb_a)
+
+    if momentum_shift > 0.0:
+        pa_lead = min(0.90, pa_point + momentum_shift)
+        pb_trail = max(0.35, pb_point - momentum_shift)
+        dist_a_leads = set_score_distribution(
+            hold_game_probability(pa_lead),
+            hold_game_probability(pb_trail),
+            tiebreak_probability(pa_lead, pb_trail),
+        )
+
+        pb_lead = min(0.90, pb_point + momentum_shift)
+        pa_trail = max(0.35, pa_point - momentum_shift)
+        dist_b_leads = set_score_distribution(
+            hold_game_probability(pa_trail),
+            hold_game_probability(pb_lead),
+            tiebreak_probability(pa_trail, pb_lead),
+        )
+    else:
+        dist_a_leads = dist_even
+        dist_b_leads = dist_even
 
     target_sets = (best_of // 2) + 1
     match_dp: dict[tuple[int, int, int, int], float] = {(0, 0, 0, 0): 1.0}
     finished_states: dict[tuple[int, int, int, int], float] = {}
 
-    for _ in range(best_of):
+    for set_idx in range(best_of):
         next_dp: dict[tuple[int, int, int, int], float] = {}
         for (sa, sb, ga, gb), m_prob in match_dp.items():
             if sa == target_sets or sb == target_sets:
                 finished_states[(sa, sb, ga, gb)] = finished_states.get((sa, sb, ga, gb), 0.0) + m_prob
                 continue
-            for (set_ga, set_gb), set_prob in set_dist.items():
+
+            if set_idx > 0 and sa > sb:
+                cur_set_dist = dist_a_leads
+            elif set_idx > 0 and sb > sa:
+                cur_set_dist = dist_b_leads
+            else:
+                cur_set_dist = dist_even
+
+            for (set_ga, set_gb), set_prob in cur_set_dist.items():
                 new_sa = sa + 1 if set_ga > set_gb else sa
                 new_sb = sb + 1 if set_gb > set_ga else sb
                 new_ga = ga + set_ga
@@ -158,12 +195,18 @@ def match_state_distribution(
 
 
 @lru_cache(maxsize=4096)
-def _serve_shift(p_win_milli: int, base: float, best_of: int, form_sigma: float) -> float:
+def _serve_shift(
+    p_win_milli: int,
+    base: float,
+    best_of: int,
+    form_sigma: float,
+    momentum_shift: float = 0.0,
+) -> float:
     target = p_win_milli / 1000.0
     low, high = -0.2, 0.2
     for _ in range(16):
         mid = (low + high) / 2.0
-        states = match_state_distribution(base + mid, base - mid, best_of, form_sigma)
+        states = match_state_distribution(base + mid, base - mid, best_of, form_sigma, momentum_shift)
         if sum(p for (sa, sb, _, _), p in states.items() if sa > sb) < target:
             low = mid
         else:
@@ -177,6 +220,7 @@ def serve_pair_for_win_probability(
     best_of: int = 3,
     surface: str = "Hard",
     form_sigma: float = TENNIS_FORM_SIGMA,
+    momentum_shift: float = 0.0,
 ) -> tuple[float, float]:
     """Serve-point probabilities (a, b) whose Markov match-win probability for A is ``p_win``.
 
@@ -186,7 +230,7 @@ def serve_pair_for_win_probability(
     surf_dict = TENNIS_SURFACE_BASE_SERVE[surf_key]
     base = surf_dict.get(tour.upper(), surf_dict["ATP"])
     target = min(0.995, max(0.005, p_win))
-    shift = _serve_shift(round(target * 1000), base, best_of, form_sigma)
+    shift = _serve_shift(round(target * 1000), base, best_of, form_sigma, momentum_shift)
     return base + shift, base - shift
 
 
@@ -221,9 +265,12 @@ def price_tennis_derivatives(
     total_line: float | None = None,
     best_of: int = 3,
     form_sigma: float = 0.0,
+    momentum_shift: float = 0.0,
 ) -> TennisDerivativePricing:
     """Prices moneyline, game spread, and total games using exact Markov distribution."""
-    states = match_state_distribution(p_serve_a, p_serve_b, best_of=best_of, form_sigma=form_sigma)
+    states = match_state_distribution(
+        p_serve_a, p_serve_b, best_of=best_of, form_sigma=form_sigma, momentum_shift=momentum_shift
+    )
 
     p_win_a = sum(p for (sa, sb, ga, gb), p in states.items() if sa > sb)
     p_win_b = sum(p for (sa, sb, ga, gb), p in states.items() if sb > sa)
@@ -275,9 +322,9 @@ class TennisGamesMarkovModel:
 
     sport = "tennis"
 
-    def __init__(self, version: str = TENNIS_GAMES_V2_VERSION) -> None:
+    def __init__(self, version: str = TENNIS_GAMES_V3_VERSION) -> None:
         self.version = version
 
 
-def tennis_games_model(version: str = TENNIS_GAMES_V2_VERSION) -> TennisGamesMarkovModel:
+def tennis_games_model(version: str = TENNIS_GAMES_V3_VERSION) -> TennisGamesMarkovModel:
     return TennisGamesMarkovModel(version=version)

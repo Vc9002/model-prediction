@@ -48,6 +48,7 @@ CODE_BACKED_ENTRYPOINTS: dict[str, str] = {
     "tennis-markov-hierarchical-v2": "model_prediction.models.tennis:tennis_model",
     "tennis-games-markov-v1": "model_prediction.models.tennis_derivatives:tennis_games_model",
     "tennis-games-markov-v2": "model_prediction.models.tennis_derivatives:tennis_games_model",
+    "tennis-games-markov-v3": "model_prediction.models.tennis_derivatives:tennis_games_model",
     "tennis-learned-v3": "model_prediction.models.tennis:tennis_model",
     "tennis-surface-elo-v4": "model_prediction.models.tennis:tennis_model",
     "tennis-surface-elo-v5": "model_prediction.models.tennis:tennis_model",

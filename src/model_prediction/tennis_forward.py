@@ -34,11 +34,12 @@ from .domain import EASTERN, parse_utc
 from .models.tennis import UpcomingMatch, tennis_model
 from .models.tennis_derivatives import (
     TENNIS_FORM_SIGMA,
+    TENNIS_MOMENTUM_SHIFT,
     price_tennis_derivatives,
     serve_pair_for_win_probability,
 )
 from .models.tennis_derivatives import (
-    TENNIS_GAMES_V2_VERSION as TENNIS_GAMES_VERSION,
+    TENNIS_GAMES_V3_VERSION as TENNIS_GAMES_VERSION,
 )
 
 _TENNIS_SUBPERIOD_MARKERS = ("fh", "h1", "h2", "1h", "set", "ss", "st")
@@ -484,6 +485,7 @@ def build_tennis_slate(
                         spread_line=c_line,
                         best_of=best_of,
                         form_sigma=TENNIS_FORM_SIGMA,
+                        momentum_shift=TENNIS_MOMENTUM_SHIFT,
                     )
                     p_long = deriv.spread_p1_cover or 0.5
                 else:
@@ -493,6 +495,7 @@ def build_tennis_slate(
                         spread_line=-c_line,
                         best_of=best_of,
                         form_sigma=TENNIS_FORM_SIGMA,
+                        momentum_shift=TENNIS_MOMENTUM_SHIFT,
                     )
                     p_long = deriv.spread_p2_cover or 0.5
 
@@ -565,7 +568,12 @@ def build_tennis_slate(
                     p_away, prediction.league, best_of, surface=match_surface
                 )
                 deriv = price_tennis_derivatives(
-                    p_serve_a, p_serve_b, total_line=total_val, best_of=best_of, form_sigma=TENNIS_FORM_SIGMA
+                    p_serve_a,
+                    p_serve_b,
+                    total_line=total_val,
+                    best_of=best_of,
+                    form_sigma=TENNIS_FORM_SIGMA,
+                    momentum_shift=TENNIS_MOMENTUM_SHIFT,
                 )
                 p_over = deriv.total_over or 0.5
                 p_under = deriv.total_under or 0.5

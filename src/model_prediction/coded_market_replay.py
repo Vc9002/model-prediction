@@ -20,6 +20,7 @@ ALLOWED_VERSIONS = {
         "tennis-markov-hierarchical-v2",
         "tennis-games-markov-v1",
         "tennis-games-markov-v2",
+        "tennis-games-markov-v3",
         "tennis-learned-v3",
         "tennis-surface-elo-v4",
         "tennis-surface-elo-v5",

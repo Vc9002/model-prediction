@@ -1,0 +1,52 @@
+{
+  "model_version": "tennis-games-markov-v3",
+  "family": "markov_game_set_match",
+  "sport": "tennis",
+  "generated_at_utc": "2026-10-24T02:30:00.000000+00:00",
+  "parameters": {
+    "surface_base_serve": {
+      "Hard": {
+        "ATP": 0.62,
+        "WTA": 0.555
+      },
+      "Clay": {
+        "ATP": 0.585,
+        "WTA": 0.525
+      },
+      "Grass": {
+        "ATP": 0.65,
+        "WTA": 0.59
+      },
+      "Carpet": {
+        "ATP": 0.64,
+        "WTA": 0.58
+      }
+    },
+    "form_sigma": 0.08,
+    "momentum_shift": 0.035,
+    "evaluation_mode": "two_sided_value",
+    "liquid_tier_min_ask": 0.2,
+    "liquid_tier_max_ask": 0.8
+  },
+  "edge_rules": {
+    "min_edge": 0.02,
+    "max_edge": 0.08,
+    "min_model_probability": 0.25,
+    "max_market_ask": 0.8,
+    "evaluation_mode": "two_sided_value"
+  },
+  "markets": [
+    "spread",
+    "total"
+  ],
+  "validation": {
+    "atp_hard_expected_total": 23.4,
+    "atp_clay_expected_total": 23.1,
+    "wta_hard_expected_total": 22.4,
+    "wta_clay_expected_total": 22.2,
+    "two_sided_selection": true,
+    "set_momentum_enabled": true,
+    "diagnostic_finding": "Markov v3 incorporates empirical set momentum (momentum_shift=0.035) capturing straight-sets blowout regime (63% ATP, 68% WTA) and dynamic edge-scaled unit sizing, stopping blind overs and underdog spread traps."
+  },
+  "artifact_hash": "2f6b170a3d8cd6a1b4a50183d7ca65f79635f4c92d78a1bb1fc09f42b585dc80"
+}

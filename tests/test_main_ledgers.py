@@ -267,7 +267,9 @@ def test_flat_and_main_ledgers_eliminate_shadow_downgrades_and_ensure_real_calls
     )
     assert flat_row["record_type"] == "QUALIFIED_SHADOW_CALL"
     assert flat_row["decision"] == "CALL"
-    assert float(flat_row["units"]) == 1.0
+    # Dynamic edge-scaled units -- never flat at 1.0 (operator directive 2026-10-23)
+    assert float(flat_row["units"]) > 0.0
+    assert float(flat_row["units"]) != 1.0
 
     # Main ledger: gated qualified calls remain QUALIFIED_SHADOW_CALL with CALL decision
     main_ledger = MultiSportPickLedger(tmp_path, flat=False)

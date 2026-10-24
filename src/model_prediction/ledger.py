@@ -715,25 +715,42 @@ class PickLedger:
         from .eligibility import enforce_universal_paper_call
 
         if self.tier == "flat":
-            # Operator Directive: Flat ledger calls everything (1.0 unit flat, full coverage).
-            # No shadow picks or research observations in Flat ledger -- every row is a real qualified flat call
-            # so performance is fully visible, logged, and tracked in reporting.
+            # Operator Directive: Flat ledger calls everything (full coverage, zero shadow picks).
+            # Units must NEVER be flat at 1.0 -- sized dynamically by model edge and conviction.
+            dyn_units = (
+                eligibility.units
+                if (eligibility.units > 0 and eligibility.units != 1.0)
+                else edge_scaled_units(
+                    request.model_probability,
+                    request.model_uncertainty or 0.02,
+                    request.american_odds,
+                )
+            )
             eligibility = replace(
                 eligibility,
                 record_type=RecordType.QUALIFIED_SHADOW_CALL,
                 decision="CALL",
                 reason_code="QUALIFIED" if eligibility.reason_code == "QUALIFIED" else "FLAT_CALL",
-                units=1.0,
+                units=dyn_units,
             )
         elif self.tier == "main":
             # Main ledger is the gated ledger. Calls reaching Main are qualified calls.
-            # No shadow picks or downgraded paper observations in Main.
+            # Units must NEVER be flat at 1.0 -- sized dynamically by model edge and conviction.
+            dyn_units = (
+                eligibility.units
+                if (eligibility.units > 0 and eligibility.units != 1.0)
+                else edge_scaled_units(
+                    request.model_probability,
+                    request.model_uncertainty or 0.02,
+                    request.american_odds,
+                )
+            )
             eligibility = replace(
                 eligibility,
                 record_type=RecordType.QUALIFIED_SHADOW_CALL,
                 decision="CALL",
                 reason_code="QUALIFIED",
-                units=eligibility.units if eligibility.units > 0 else 1.0,
+                units=dyn_units,
             )
         else:
             eligibility = enforce_universal_paper_call(request, eligibility)

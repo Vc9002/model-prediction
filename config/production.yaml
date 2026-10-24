@@ -228,6 +228,16 @@ prediction_service:
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: tennis-surface-elo-v1
+  - model_id: tennis-games-markov-v3
+    sport: TENNIS
+    market: spread,total
+    implementation: code_backed_model
+    entry: model_prediction.models.tennis_derivatives:tennis_games_model
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: tennis-games-markov-v2
   - model_id: tennis-games-markov-v2
     sport: TENNIS
     market: spread,total
@@ -562,8 +572,8 @@ prediction_service:
       total: soccer-poisson-dc-v3
     TENNIS:
       moneyline: tennis-surface-elo-v5
-      spread: tennis-games-markov-v2
-      total: tennis-games-markov-v2
+      spread: tennis-games-markov-v3
+      total: tennis-games-markov-v3
     CS2:
       moneyline: cs2-tiered-elo-v6
       spread: cs2-spread-tiered-elo-v6
@@ -772,6 +782,7 @@ prediction_service:
   - soccer-poisson-dc-v1
   - tennis-surface-elo-v5
   - tennis-surface-elo-v4
+  - tennis-games-markov-v3
   - tennis-games-markov-v2
   - tennis-games-markov-v1
   - tennis-learned-v3
