@@ -60,6 +60,17 @@ $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
 Write-Log "=== model-prediction daily $RunDate (America/New_York) ==="
 Write-Log ("Started: " + (Get-Date -Format o))
 
+# -- Preflight ----------------------------------------------------------------
+# The scheduled job runs the live working tree, which can be mid-edit. A
+# config/model.yaml validation error or a SyntaxError/ImportError in the CLI
+# package makes every step below fail identically (the 2026-10-24 01:00 EDT run
+# spent 53 minutes on 17 identical tracebacks), so stop before step 1 instead.
+$PreflightExit = Invoke-Step @('-c', 'import model_prediction.cli; from model_prediction.config import load_config; load_config()')
+if ($PreflightExit -ne 0) {
+    Write-Log "PREFLIGHT FAILED (exit $PreflightExit): config or CLI import is broken; no step was run."
+    exit 1
+}
+
 # -- Step 1: Settlement ------------------------------------------------------
 Write-Log '--- Step 1: Settlement ---'
 $Stopwatch.Restart()
