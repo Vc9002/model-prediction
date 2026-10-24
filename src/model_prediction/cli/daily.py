@@ -201,8 +201,15 @@ def _with_process_lock(function):
         if os.environ.get("MODEL_PREDICTION_DAILY_LOCK_HELD") == "1":
             return function(*args, **kwargs)
 
-        paths = RuntimePaths.resolve(require_external_runtime=False)
-        lock_path = paths.daily_lock
+        data_root = kwargs.get("data_root")
+        if data_root is None and len(args) > 6:
+            data_root = args[6]
+
+        if data_root is not None and str(data_root) not in {"data", "."}:
+            lock_path = Path(data_root) / "daily_pipeline.lock"
+        else:
+            paths = RuntimePaths.resolve(require_external_runtime=False)
+            lock_path = paths.daily_lock
         lock_handle = acquire_lock(lock_path)
         if lock_handle is None:
             logger.warning(

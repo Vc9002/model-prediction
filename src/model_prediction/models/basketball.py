@@ -19,7 +19,7 @@ from typing import Any
 from ..domain import parse_utc
 from ..features.base import GameRecord
 from ..features.elo_ratings import build_elo
-from ..features.trends import TrendEngine
+from ..features.trends import TrendEngine, ewm_level
 from .base import GamePrediction, GamePredictionBase
 
 
@@ -30,6 +30,30 @@ def _normal_cdf(x: float, mean: float, sd: float) -> float:
         return 0.5 if x == mean else (0.9999 if x > mean else 0.0001)
     raw = 0.5 * (1 + erf((x - mean) / (sd * sqrt(2))))
     return max(0.0001, min(0.9999, raw))
+
+
+def _weighted_rolling_total(
+    prev_games: Sequence[GameRecord],
+    baseline_tot: float,
+    gap_days_threshold: float | None,
+    retention: float,
+) -> float:
+    if not prev_games:
+        return baseline_tot
+    recent = prev_games[-10:]
+    if gap_days_threshold is None or len(recent) <= 1:
+        return sum(g.home_score + g.away_score for g in recent) / len(recent)
+    scores = [float(g.home_score + g.away_score) for g in recent]
+    dates = [g.start for g in recent]
+    return ewm_level(
+        scores,
+        half_life=5.0,
+        baseline=baseline_tot,
+        prior=3.0,
+        dates=dates,
+        offseason_gap_days=gap_days_threshold,
+        offseason_retention=retention,
+    )
 
 
 @dataclass(frozen=True)
@@ -62,6 +86,11 @@ class BasketballModel:
         trend_total_weight: float = 1.0,
         team_total_weight: float = 0.0,
         baseline_points_per_team: float | None = None,
+        offseason_gap_days: float | None = None,
+        offseason_retention: float = 0.50,
+        isolate_postseason: bool = False,
+        elo_home_advantage: float | None = None,
+        possession_model: bool = False,
     ) -> None:
         self._sport = sport
         self._version = version
@@ -75,6 +104,11 @@ class BasketballModel:
         self.trend_total_weight = trend_total_weight
         self.team_total_weight = team_total_weight
         self.baseline_points_per_team = baseline_points_per_team
+        self.offseason_gap_days = offseason_gap_days
+        self.offseason_retention = offseason_retention
+        self.isolate_postseason = isolate_postseason
+        self.elo_home_advantage = elo_home_advantage
+        self.possession_model = possession_model
 
     @property
     def version(self) -> str:
@@ -89,8 +123,13 @@ class BasketballModel:
         history: Sequence[GameRecord],
         upcoming: Sequence[UpcomingGame],
     ) -> list[GamePrediction]:
-        elo = build_elo(history, self._sport)
-        trend = TrendEngine(history)
+        elo = build_elo(history, self._sport, home_advantage=self.elo_home_advantage)
+        trend = TrendEngine(
+            history,
+            offseason_gap_days=self.offseason_gap_days,
+            offseason_retention=self.offseason_retention,
+            isolate_postseason=self.isolate_postseason,
+        )
         default_baseline = (
             self.baseline_points_per_team
             if self.baseline_points_per_team is not None
@@ -158,18 +197,23 @@ class BasketballModel:
 
             # Composite total prediction
             raw_trend_total = away_points + home_points
-            if self.team_total_weight > 0.0:
-                home_10 = home_prev[-10:] if home_prev else []
-                away_10 = away_prev[-10:] if away_prev else []
-                home_tot = (
-                    sum(g.home_score + g.away_score for g in home_10) / len(home_10)
-                    if home_10
-                    else (baseline * 2.0)
+            if self.possession_model:
+                league_pace = 99.2 if str(self._sport).lower() == "nba" else 81.4
+                pace_adj = 0.0
+                if rest_diff > 2.0:
+                    pace_adj += 0.5
+                elif rest_diff < -2.0:
+                    pace_adj -= 0.5
+                est_possessions = league_pace + pace_adj
+                ortg_away = (away_points / league_pace) * 100.0
+                ortg_home = (home_points / league_pace) * 100.0
+                expected_total = est_possessions * (ortg_away + ortg_home) / 100.0
+            elif self.team_total_weight > 0.0:
+                home_tot = _weighted_rolling_total(
+                    home_prev, baseline * 2.0, self.offseason_gap_days, self.offseason_retention
                 )
-                away_tot = (
-                    sum(g.home_score + g.away_score for g in away_10) / len(away_10)
-                    if away_10
-                    else (baseline * 2.0)
+                away_tot = _weighted_rolling_total(
+                    away_prev, baseline * 2.0, self.offseason_gap_days, self.offseason_retention
                 )
                 team_avg_total = (home_tot + away_tot) / 2.0
                 w_league = max(0.0, 1.0 - self.trend_total_weight - self.team_total_weight)

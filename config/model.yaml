@@ -258,8 +258,10 @@ models:
     origin: statistical_model
     active_production_version: nba-elo-trend-lr-v4
     production_artifact: config/models/nba-elo-trend-lr-v4.json
-    spread_production_artifact: config/models/nba-spread-margin-v2.json
-    total_production_artifact: config/models/nba-total-margin-v2.json
+    spread_production_artifact: config/models/nba-spread-margin-v3.json
+    total_production_artifact: config/models/nba-total-margin-v3.json
+    spread_rollback_artifact: config/models/nba-spread-margin-v2.json
+    total_rollback_artifact: config/models/nba-total-margin-v2.json
     markets:
     - moneyline
     - spread
@@ -268,6 +270,8 @@ models:
     - nba-elo-trend-v1
     - nba-elo-trend-lr-v1
     - nba-elo-trend-lr-v3
+    - nba-spread-margin-v2
+    - nba-total-margin-v2
   WNBA:
     family: elo_trend_normal_approximation
     status: shadow_qualified

@@ -171,3 +171,80 @@ def test_basketball_league_registry_slate_prediction():
     assert by_event["g_nba"][0].model_version == NBA_CONFIG.model_version
     assert by_event["g_ncaa"][0].model_version == NCAAB_CONFIG.model_version
     assert by_event["g_euro"][0].model_version == EUROLEAGUE_CONFIG.model_version
+
+
+def test_basketball_model_offseason_and_possession():
+    from model_prediction.models.basketball import BasketballModel
+
+    model = BasketballModel(
+        sport="nba",
+        version="nba-spread-margin-v3",
+        margin_sd=13.8,
+        total_sd=18.2,
+        league="NBA",
+        elo_weight=0.50,
+        trend_weight=0.50,
+        rest_weight=0.20,
+        home_court_points=1.4,
+        offseason_gap_days=60.0,
+        offseason_retention=0.40,
+        isolate_postseason=True,
+        possession_model=True,
+        elo_home_advantage=38.0,
+    )
+
+    history = [
+        GameRecord(
+            event_id="h1",
+            event_start_utc="2026-04-10T00:00:00Z",
+            league="NBA",
+            away_team="Celtics",
+            home_team="Heat",
+            away_score=115,
+            home_score=110,
+            season_type="regular-season",
+        ),
+        GameRecord(
+            event_id="h2",
+            event_start_utc="2026-05-15T00:00:00Z",
+            league="NBA",
+            away_team="Celtics",
+            home_team="Heat",
+            away_score=92,
+            home_score=88,
+            season_type="post-season",
+        ),
+        GameRecord(
+            event_id="h3",
+            event_start_utc="2026-10-21T00:00:00Z",
+            league="NBA",
+            away_team="Heat",
+            home_team="Celtics",
+            away_score=112,
+            home_score=118,
+            season_type="regular-season",
+        ),
+    ]
+
+    upcoming = [
+        UpcomingGame(
+            event_id="up1",
+            event_start_utc="2026-10-23T00:00:00Z",
+            away_team="Heat",
+            home_team="Celtics",
+            spread_away_line=4.5,
+            total_line=224.5,
+            league="NBA",
+        )
+    ]
+
+    preds = model.predict_games(history, upcoming)
+    assert len(preds) == 3
+    spread = next(p for p in preds if p.market_type == "spread")
+    total = next(p for p in preds if p.market_type == "total")
+    ml = next(p for p in preds if p.market_type == "moneyline")
+
+    assert 0.0 < spread.probability("home") < 1.0
+    assert 0.0 < total.probability("over") < 1.0
+    assert 0.0 < ml.probability("home") < 1.0
+    assert spread.model_version == "nba-spread-margin-v3"

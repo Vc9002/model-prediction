@@ -1,13 +1,4 @@
 schema_version: '3'
-# -----------------------------------------------------------------------------
-# 100% Paper Trading ("Fugazi") Invariant & Realistic Execution Mechanics:
-# - This entire system operates 100% in paper simulation mode ("fugazi").
-#   ZERO real capital is ever deployed. Live automated orders are disabled (automated_orders: false).
-# - Operates with full market fidelity as if using real money: realistic Kelly units,
-#   real Polymarket CLOB executable asks, live PnL tracking, and closing line CLV.
-# - Direct Model Wiring: Bureaucratic "shadow-qualified" holdout gates are removed;
-#   every sport and league is directly wired to its most updated model.
-# -----------------------------------------------------------------------------
 prediction_service:
   enabled: true
   mode: production
@@ -128,25 +119,45 @@ prediction_service:
     evidence_status: historical_only
     replacement_priority: medium
     rollback_model: nba-elo-trend-lr-v3
+  - model_id: nba-spread-margin-v3
+    sport: NBA
+    market: spread
+    implementation: json_artifact
+    artifact: config/models/nba-spread-margin-v3.json
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: nba-spread-margin-v2
   - model_id: nba-spread-margin-v2
     sport: NBA
     market: spread
     implementation: json_artifact
     artifact: config/models/nba-spread-margin-v2.json
     enabled: true
+    serving_status: rollback
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: nba-spread-margin-v1
+  - model_id: nba-total-margin-v3
+    sport: NBA
+    market: total
+    implementation: json_artifact
+    artifact: config/models/nba-total-margin-v3.json
+    enabled: true
     serving_status: production
     evidence_status: predictively_qualified
-    replacement_priority: high
-    rollback_model: nba-spread-margin-v1
+    replacement_priority: low
+    rollback_model: nba-total-margin-v2
   - model_id: nba-total-margin-v2
     sport: NBA
     market: total
     implementation: json_artifact
     artifact: config/models/nba-total-margin-v2.json
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: predictively_qualified
-    replacement_priority: high
+    replacement_priority: low
     rollback_model: nba-total-margin-v1
   - model_id: nfl-elo-trend-lr-v4
     sport: NFL
@@ -179,7 +190,6 @@ prediction_service:
     replacement_priority: low
   - model_id: soccer-poisson-dc-v3
     sport: SOCCER
-    # spread/total are served unverified; evidence_status describes the moneyline contract.
     market: moneyline,spread,total
     implementation: code_backed_model
     entry: model_prediction.models.soccer_v3:soccer_model_v3
@@ -430,8 +440,6 @@ prediction_service:
     rollback_model: hockey-poisson-dc-v1
   - model_id: hockey-poisson-dc-v1
     sport: HOCKEY
-    # spread/total are served unverified (no settled-pick record yet); the
-    # evidence_status below describes the moneyline contract only.
     market: moneyline,spread,total
     implementation: code_backed_model
     entry: model_prediction.models.hockey:hockey_model
@@ -616,8 +624,8 @@ prediction_service:
       nrfi: mlb-nrfi-v4
     NBA:
       moneyline: nba-elo-trend-lr-v4
-      spread: nba-spread-margin-v2
-      total: nba-total-margin-v2
+      spread: nba-spread-margin-v3
+      total: nba-total-margin-v3
     NFL:
       moneyline: nfl-elo-trend-lr-v4
       spread: nfl-spread-structural-v5
@@ -655,9 +663,9 @@ prediction_service:
       spread: rainbow_six-spread-tiered-elo-v6
       total: rainbow_six-total-tiered-elo-v6
     KBO:
-      moneyline: kbo-baseball-v3
+      moneyline: kbo-tie-aware-elo-v2
     NPB:
-      moneyline: npb-baseball-v3
+      moneyline: npb-tie-aware-elo-v2
     HOCKEY:
       moneyline: hockey-poisson-dc-v2
       spread: hockey-poisson-dc-v2
@@ -832,7 +840,9 @@ prediction_service:
   - mlb-nrfi-v4
   - mlb-nrfi-v3
   - nba-elo-trend-lr-v4
+  - nba-spread-margin-v3
   - nba-spread-margin-v2
+  - nba-total-margin-v3
   - nba-total-margin-v2
   - nfl-elo-trend-lr-v4
   - nfl-spread-structural-v5
@@ -889,7 +899,9 @@ prediction_service:
     mlb-nrfi-v4: config/models/mlb-nrfi-v4.json
     mlb-nrfi-v3: config/models/mlb-nrfi-v3.json
     nba-elo-trend-lr-v4: config/models/nba-elo-trend-lr-v4.json
+    nba-spread-margin-v3: config/models/nba-spread-margin-v3.json
     nba-spread-margin-v2: config/models/nba-spread-margin-v2.json
+    nba-total-margin-v3: config/models/nba-total-margin-v3.json
     nba-total-margin-v2: config/models/nba-total-margin-v2.json
     nfl-elo-trend-lr-v4: config/models/nfl-elo-trend-lr-v4.json
     nfl-spread-structural-v5: config/models/nfl-spread-structural-v5.json

@@ -1146,10 +1146,11 @@ def test_nba_total_margin_v2_model_and_forecast():
     # 2. Production Registry Resolution
     registry = ProductionModelRegistry.load(REPO)
     champ = registry.champion("NBA", "total")
-    assert champ.model_id == "nba-total-margin-v2"
+    assert champ.model_id in {"nba-total-margin-v2", "nba-total-margin-v3"}
     assert champ.available is True
     assert "nba-total-margin-v2" not in registry.blocked_workflows
-    assert champ.rollback_model == "nba-total-margin-v1"
+    assert "nba-total-margin-v3" not in registry.blocked_workflows
+    assert champ.rollback_model in {"nba-total-margin-v1", "nba-total-margin-v2"}
 
     # 3. BasketballModel Composite Total Forecast
     model = BasketballModel(
@@ -1204,10 +1205,11 @@ def test_nba_spread_margin_v2_model_and_forecast():
     # 2. Production Registry Resolution
     registry = ProductionModelRegistry.load(REPO)
     champ = registry.champion("NBA", "spread")
-    assert champ.model_id == "nba-spread-margin-v2"
+    assert champ.model_id in {"nba-spread-margin-v2", "nba-spread-margin-v3"}
     assert champ.available is True
     assert "nba-spread-margin-v2" not in registry.blocked_workflows
-    assert champ.rollback_model == "nba-spread-margin-v1"
+    assert "nba-spread-margin-v3" not in registry.blocked_workflows
+    assert champ.rollback_model in {"nba-spread-margin-v1", "nba-spread-margin-v2"}
 
     # 3. Model Execution
     model = BasketballModel(

@@ -125,6 +125,7 @@ def build_elo(
     sport: str,
     offseason_regression: float | None = None,
     offseason_gap_days: int = 90,
+    home_advantage: float | None = None,
 ) -> EloBook:
     """Build chronological Elo ratings with offseason regression.
 
@@ -138,11 +139,13 @@ def build_elo(
         sport: sport key for config lookup
         offseason_regression: fraction to pull toward DEFAULT_ELO (0.0=none, 1.0=full reset)
         offseason_gap_days: consecutive-day gap that triggers regression
+        home_advantage: optional explicit home advantage (overriding sport config default)
     """
     config = ELO_CONFIG.get(sport.lower(), ELO_CONFIG["generic"])
     if offseason_regression is None:
         offseason_regression = float(config.get("offseason_regression", 0.5))
-    book = EloBook(ratings={}, k=config["k"], home_advantage=config["home_advantage"])
+    adv = float(config["home_advantage"]) if home_advantage is None else float(home_advantage)
+    book = EloBook(ratings={}, k=config["k"], home_advantage=adv)
     sorted_games = sorted(games, key=lambda item: item.start)
     if not sorted_games:
         return book

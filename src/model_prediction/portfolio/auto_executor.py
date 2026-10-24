@@ -72,8 +72,11 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     "nfl-spread-structural-v5",
     "nfl-total-structural-v5",
     "nba-elo-trend-lr-v4",
+    "nba-spread-margin-v3",
     "nba-spread-margin-v2",
+    "nba-total-margin-v3",
     "nba-total-margin-v2",
+    "cfb-structural-v3",
     "cfb-structural-v2",
     "mlb-structural-runline-v4",
 )

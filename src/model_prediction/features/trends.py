@@ -13,17 +13,20 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
+from datetime import datetime
 from math import exp, log, sqrt
 from typing import Any, TypedDict
 
 from .base import FeatureContext, GameRecord, register_feature
 
 
-class _TeamGameRow(TypedDict):
+class _TeamGameRow(TypedDict, total=False):
     opponent: str
     scored: float
     allowed: float
     won: float
+    start: datetime
+    season_type: str
 
 
 HALF_LIVES = (3.0, 10.0, 25.0)
@@ -50,16 +53,52 @@ class TeamTrend:
     win_rate_hl10: float
 
 
-def ewm_level(values: Sequence[float], half_life: float, baseline: float, prior: float) -> float:
-    """Exponentially weighted level shrunk toward a baseline."""
+def ewm_level(
+    values: Sequence[float],
+    half_life: float,
+    baseline: float,
+    prior: float,
+    dates: Sequence[datetime] | None = None,
+    offseason_gap_days: float | None = None,
+    offseason_retention: float = 0.50,
+) -> float:
+    """Exponentially weighted level shrunk toward a baseline.
+
+    When ``dates`` and ``offseason_gap_days`` are provided, consecutive games separated
+    by more than ``offseason_gap_days`` receive an extra multiplicative retention factor
+    ``offseason_retention``, and pre-gap games are discounted in the shrinkage sample size.
+    """
     if half_life <= 0:
         raise ValueError("half life must be positive")
     if not values:
         return baseline
     decay = exp(-log(2) / half_life)
-    weights = [decay ** (len(values) - 1 - index) for index in range(len(values))]
-    recent = sum(w * v for w, v in zip(weights, values, strict=True)) / sum(weights)
-    shrinkage = len(values) / (len(values) + prior)
+    n = len(values)
+    if dates is not None and offseason_gap_days is not None and len(dates) == n and n > 1:
+        weights = [1.0] * n
+        for index in range(n - 2, -1, -1):
+            step_decay = decay
+            gap_days = (dates[index + 1] - dates[index]).total_seconds() / 86400.0
+            if gap_days > offseason_gap_days:
+                step_decay *= max(0.01, min(1.0, offseason_retention))
+            weights[index] = weights[index + 1] * step_decay
+        recent = sum(w * v for w, v in zip(weights, values, strict=True)) / sum(weights)
+
+        # Calculate effective sample size discounting pre-offseason games
+        current_season_games = 1
+        for index in range(n - 2, -1, -1):
+            gap_days = (dates[index + 1] - dates[index]).total_seconds() / 86400.0
+            if gap_days > offseason_gap_days:
+                break
+            current_season_games += 1
+        prior_season_games = n - current_season_games
+        effective_n = current_season_games + prior_season_games * max(0.01, min(1.0, offseason_retention))
+        shrinkage = effective_n / (effective_n + prior)
+    else:
+        weights = [decay ** (n - 1 - index) for index in range(n)]
+        recent = sum(w * v for w, v in zip(weights, values, strict=True)) / sum(weights)
+        shrinkage = n / (n + prior)
+
     return shrinkage * recent + (1 - shrinkage) * baseline
 
 
@@ -71,16 +110,28 @@ class TrendEngine:
         games: Iterable[GameRecord],
         half_lives: Sequence[float] = HALF_LIVES,
         prior_strength: float = PRIOR_STRENGTH_GAMES,
+        offseason_gap_days: float | None = None,
+        offseason_retention: float = 0.50,
+        isolate_postseason: bool = False,
     ) -> None:
         self.games = sorted(games, key=lambda game: game.start)
         self.half_lives = tuple(half_lives)
         self.prior_strength = prior_strength
+        self.offseason_gap_days = offseason_gap_days
+        self.offseason_retention = offseason_retention
+        self.isolate_postseason = isolate_postseason
         self._by_team: dict[str, list[_TeamGameRow]] = {}
         self._league_points: list[float] = []
         self._index()
 
     def _index(self) -> None:
         for game in self.games:
+            if self.isolate_postseason and getattr(game, "season_type", "") in {
+                "post-season",
+                "playoffs",
+                "play-in-season",
+            }:
+                continue
             self._league_points.extend([float(game.away_score), float(game.home_score)])
             for team, opponent, scored, allowed, won in (
                 (
@@ -104,6 +155,8 @@ class TrendEngine:
                         "scored": float(scored),
                         "allowed": float(allowed),
                         "won": 1.0 if won else 0.0,
+                        "start": game.start,
+                        "season_type": getattr(game, "season_type", ""),
                     }
                 )
 
@@ -134,19 +187,45 @@ class TrendEngine:
         # more than 5 on a weak one), and symmetrically for points allowed.
         adjusted_scored: list[float] = []
         adjusted_allowed: list[float] = []
+        dates: list[datetime] = []
         for row in rows:
+            if "start" in row:
+                dates.append(row["start"])
             opponent_defense = self._defense_simple(str(row["opponent"]))
             opponent_offense = self._offense_simple(str(row["opponent"]))
             defense_ratio = opponent_defense / baseline if baseline > 0 else 1.0
             offense_ratio = opponent_offense / baseline if baseline > 0 else 1.0
             adjusted_scored.append(row["scored"] / max(defense_ratio, 1e-6))
             adjusted_allowed.append(row["allowed"] / max(offense_ratio, 1e-6))
+        dates_seq = dates if len(dates) == len(rows) else None
         offense = {
-            f"hl{int(hl)}": round(ewm_level(adjusted_scored, hl, baseline, self.prior_strength), 6)
+            f"hl{int(hl)}": round(
+                ewm_level(
+                    adjusted_scored,
+                    hl,
+                    baseline,
+                    self.prior_strength,
+                    dates=dates_seq,
+                    offseason_gap_days=self.offseason_gap_days,
+                    offseason_retention=self.offseason_retention,
+                ),
+                6,
+            )
             for hl in self.half_lives
         }
         defense = {
-            f"hl{int(hl)}": round(ewm_level(adjusted_allowed, hl, baseline, self.prior_strength), 6)
+            f"hl{int(hl)}": round(
+                ewm_level(
+                    adjusted_allowed,
+                    hl,
+                    baseline,
+                    self.prior_strength,
+                    dates=dates_seq,
+                    offseason_gap_days=self.offseason_gap_days,
+                    offseason_retention=self.offseason_retention,
+                ),
+                6,
+            )
             for hl in self.half_lives
         }
         short_key = f"hl{int(self.half_lives[0])}"
@@ -162,7 +241,15 @@ class TrendEngine:
             season_mean = sum(season_scored) / len(season_scored)
             season_sd = _stdev(season_scored)
             if season_sd > 1e-9:
-                raw_recent = ewm_level(season_scored, self.half_lives[0], season_mean, self.prior_strength)
+                raw_recent = ewm_level(
+                    season_scored,
+                    self.half_lives[0],
+                    season_mean,
+                    self.prior_strength,
+                    dates=dates_seq,
+                    offseason_gap_days=self.offseason_gap_days,
+                    offseason_retention=self.offseason_retention,
+                )
                 hot_cold = (raw_recent - season_mean) / season_sd
         wins_recent = [row["won"] for row in rows[-10:]]
         return TeamTrend(

@@ -1806,8 +1806,15 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
     from ..models.basketball import BasketballModel, UpcomingGame
 
     observed_at = utc_now()
-    model_version = "nba-spread-margin-v2"
+    try:
+        champion = ProductionModelRegistry.load(PROJECT_ROOT).champion("NBA", "spread")
+    except (FileNotFoundError, OSError, KeyError, TypeError, ValueError):
+        champion = None
+    model_version = champion.model_id if champion and champion.available else "nba-spread-margin-v3"
     artifact, artifact_error = _load_exact_artifact_contract(model_version)
+    if artifact is None and model_version != "nba-spread-margin-v2":
+        model_version = "nba-spread-margin-v2"
+        artifact, artifact_error = _load_exact_artifact_contract(model_version)
     if artifact is None:
         return {
             "status": "blocked",
@@ -1823,21 +1830,36 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
         }
     model_artifact_hash = str(artifact["artifact_hash"])
     model_qualified = artifact.get("qualification", {}).get("qualified") is True
-    margin_sd = float(artifact.get("margin_sd", 12.0))
-    elo_weight = float(artifact.get("elo_weight", 0.35))
-    trend_weight = float(artifact.get("trend_weight", 0.65))
+    margin_sd = float(artifact.get("margin_sd", 13.8))
+    elo_weight = float(artifact.get("elo_weight", 0.50))
+    trend_weight = float(artifact.get("trend_weight", 0.50))
     rest_weight = float(artifact.get("rest_weight", 0.20))
-    home_court_points = float(artifact.get("home_court_points", 2.30))
+    home_court_points = float(artifact.get("home_court_points", 1.40))
+    offseason_gap_days = artifact.get("offseason_gap_days")
+    if offseason_gap_days is not None:
+        offseason_gap_days = float(offseason_gap_days)
+    offseason_retention = float(artifact.get("offseason_retention", 0.50))
+    isolate_postseason = bool(artifact.get("isolate_postseason", False))
+    elo_home_advantage = artifact.get("elo_home_advantage")
+    if elo_home_advantage is not None:
+        elo_home_advantage = float(elo_home_advantage)
+    possession_model = bool(artifact.get("possession_model", False))
+
     model = BasketballModel(
         sport="nba",
         version=model_version,
         margin_sd=margin_sd,
-        total_sd=18.5,
+        total_sd=float(artifact.get("total_sd", 18.2)),
         league="NBA",
         elo_weight=elo_weight,
         trend_weight=trend_weight,
         rest_weight=rest_weight,
         home_court_points=home_court_points,
+        offseason_gap_days=offseason_gap_days,
+        offseason_retention=offseason_retention,
+        isolate_postseason=isolate_postseason,
+        elo_home_advantage=elo_home_advantage,
+        possession_model=possession_model,
     )
     store = FeatureStore(data_root)
     history = store.games_before("nba", args_date)
@@ -2100,8 +2122,15 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
     from ..models.basketball import BasketballModel, UpcomingGame
 
     observed_at = utc_now()
-    model_version = "nba-total-margin-v2"
+    try:
+        champion = ProductionModelRegistry.load(PROJECT_ROOT).champion("NBA", "total")
+    except (FileNotFoundError, OSError, KeyError, TypeError, ValueError):
+        champion = None
+    model_version = champion.model_id if champion and champion.available else "nba-total-margin-v3"
     artifact, artifact_error = _load_exact_artifact_contract(model_version)
+    if artifact is None and model_version != "nba-total-margin-v2":
+        model_version = "nba-total-margin-v2"
+        artifact, artifact_error = _load_exact_artifact_contract(model_version)
     if artifact is None:
         return {
             "status": "blocked",
@@ -2117,15 +2146,25 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
         }
     model_artifact_hash = str(artifact["artifact_hash"])
     model_qualified = artifact.get("qualification", {}).get("qualified") is True
+    offseason_gap_days = artifact.get("offseason_gap_days")
+    if offseason_gap_days is not None:
+        offseason_gap_days = float(offseason_gap_days)
+    offseason_retention = float(artifact.get("offseason_retention", 0.50))
+    isolate_postseason = bool(artifact.get("isolate_postseason", False))
+    possession_model = bool(artifact.get("possession_model", False))
 
     model = BasketballModel(
         sport="nba",
         version=model_version,
         margin_sd=float(artifact.get("margin_sd", 12.0)),
-        total_sd=float(artifact.get("total_sd", 19.2)),
+        total_sd=float(artifact.get("total_sd", 18.2)),
         league="NBA",
         trend_total_weight=float(artifact.get("trend_total_weight", 0.85)),
         team_total_weight=float(artifact.get("team_total_weight", 0.15)),
+        offseason_gap_days=offseason_gap_days,
+        offseason_retention=offseason_retention,
+        isolate_postseason=isolate_postseason,
+        possession_model=possession_model,
     )
     store = FeatureStore(data_root)
     history = store.games_before("nba", args_date)
