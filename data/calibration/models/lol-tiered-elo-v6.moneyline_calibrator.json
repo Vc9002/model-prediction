@@ -1,12 +1,12 @@
 {
   "baseline_brier": null,
-  "calibrated_at_utc": "2026-10-23T20:39:36.617297+00:00",
+  "calibrated_at_utc": "2026-10-24T16:39:47.874668+00:00",
   "calibrated_oof_brier": null,
   "champion_method": "identity",
   "market": "moneyline",
   "model_version": "lol-tiered-elo-v6",
   "parameters": {},
   "reason": "canonical_flat_insufficient_evidence",
-  "sample_size": 15,
+  "sample_size": 18,
   "sport": "lol"
 }

@@ -1,11 +1,11 @@
 {
-  "baseline_brier": 0.235402,
-  "calibrated_at_utc": "2026-10-23T20:39:36.617297+00:00",
-  "calibrated_oof_brier": 0.23540190510028788,
+  "baseline_brier": 0.234633,
+  "calibrated_at_utc": "2026-10-24T16:39:47.874668+00:00",
+  "calibrated_oof_brier": 0.23463342545811763,
   "champion_method": "identity",
   "market": "moneyline",
   "model_version": "dota2-tiered-elo-v6",
   "parameters": {},
-  "sample_size": 66,
+  "sample_size": 68,
   "sport": "dota2"
 }
