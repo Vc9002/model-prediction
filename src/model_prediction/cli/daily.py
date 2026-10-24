@@ -1067,22 +1067,22 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             forecast_result[sport] = {"status": "error", "reason": str(exc), "logged": 0}
 
     with ThreadPoolExecutor(max_workers=16) as research_pool:
-        research_futures = [
-            research_pool.submit(_mlb_totals_task),
-            research_pool.submit(_mlb_nrfi_task),
-            research_pool.submit(_soccer_task),
-            research_pool.submit(_tennis_task),
-            research_pool.submit(_cfb_task),
-            research_pool.submit(_wnba_spread_task),
-            research_pool.submit(_wnba_total_task),
-            research_pool.submit(_nba_spread_task),
-            research_pool.submit(_nba_total_task),
-            research_pool.submit(_nfl_spread_task),
-            research_pool.submit(_nfl_total_task),
-            research_pool.submit(_esports_block),
-            research_pool.submit(_intl_baseball_block),
-            *(
-                research_pool.submit(_additional_sport_task, sport, forecast_function)
+        research_futures_map = {
+            research_pool.submit(_mlb_totals_task): "mlb_totals",
+            research_pool.submit(_mlb_nrfi_task): "mlb_nrfi",
+            research_pool.submit(_soccer_task): "soccer",
+            research_pool.submit(_tennis_task): "tennis",
+            research_pool.submit(_cfb_task): "cfb",
+            research_pool.submit(_wnba_spread_task): "wnba_spread",
+            research_pool.submit(_wnba_total_task): "wnba_total",
+            research_pool.submit(_nba_spread_task): "nba_spread",
+            research_pool.submit(_nba_total_task): "nba_total",
+            research_pool.submit(_nfl_spread_task): "nfl_spread",
+            research_pool.submit(_nfl_total_task): "nfl_total",
+            research_pool.submit(_esports_block): "esports",
+            research_pool.submit(_intl_baseball_block): "intl_baseball",
+            **{
+                research_pool.submit(_additional_sport_task, sport, forecast_function): sport
                 for sport, forecast_function in zip(
                     DAILY_ADDITIONAL_SPORTS,
                     (
@@ -1094,19 +1094,19 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                     ),
                     strict=True,
                 )
-            ),
-        ]
+            },
+        }
 
-        # Each task above already catches and logs its own real
-        # forecast errors; .result() here only re-raises a bug in the
-        # wrapper itself (e.g. a NameError), which should still stop
-        # the run loudly rather than be swallowed.
-        for rf in as_completed(research_futures):
+        _research_pool_started = time.monotonic()
+        for rf in as_completed(research_futures_map):
+            name = research_futures_map[rf]
+            forecast_sport_done_seconds[name] = round(time.monotonic() - _research_pool_started, 1)
             try:
                 rf.result()
             except Exception:
                 logger.exception(
-                    "Forecasting task wrapper failed; rolling back open ledgers from pre-clear snapshots"
+                    "Forecasting task wrapper %s failed; rolling back open ledgers from pre-clear snapshots",
+                    name,
                 )
                 from .commands import _rollback_pre_clear
 
