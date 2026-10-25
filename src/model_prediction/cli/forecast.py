@@ -5023,6 +5023,7 @@ def _forecast_cfb_sport(
             # A forced refresh cannot manufacture a pregame decision time.
             # validate() below rejects started events using the actual clock.
             effective_now = observed_now
+            contract_obs = str(contract.get("observed_at_utc") or effective_now.isoformat())
             from ..cfb_replay import build_snapshot as build_cfb_snapshot
 
             cfb_snapshot_json = (
@@ -5030,7 +5031,7 @@ def _forecast_cfb_sport(
                     build_cfb_snapshot(
                         contract,
                         model_hash=str(forecast["model_code_hash"]),
-                        observed_at_utc=effective_now.isoformat(),
+                        observed_at_utc=contract_obs,
                     ),
                     sort_keys=True,
                     allow_nan=False,
@@ -5040,7 +5041,6 @@ def _forecast_cfb_sport(
             )
             contract_sportsbook = str(contract.get("sportsbook") or "espn_consensus")
             contract_slug = str(contract.get("market_slug") or "")
-            contract_obs = str(contract.get("observed_at_utc") or effective_now.isoformat())
             rationale_text = str(contract.get("rationale") or "")
             if contract_sportsbook == "polymarket_us" and contract_slug:
                 rationale_text = f"{rationale_text} Executable ask {ask:.4f} ({contract_slug})."
