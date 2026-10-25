@@ -451,9 +451,13 @@ class PolymarketUSClient:
         self,
         base_url: str = "https://gateway.polymarket.us",
         client: httpx.Client | None = None,
+        max_attempts: int = 6,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.client = client or httpx.Client(timeout=30)
+        if max_attempts < 1:
+            raise ValueError("max_attempts must be positive")
+        self.max_attempts = max_attempts
 
     def _get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         # The gateway throttles bursts from the 16-worker snapshot pool with
@@ -466,8 +470,7 @@ class PolymarketUSClient:
         # 4-attempt ~3.5s budget ran out while the pool was still bursting.
         # Honor Retry-After when given, otherwise back off with jitter so the
         # 16 workers stop retrying in lockstep.
-        max_attempts = 6
-        for attempt in range(max_attempts):
+        for attempt in range(self.max_attempts):
             try:
                 response = self.client.get(f"{self.base_url}{path}", params=params)
             except (httpx.ConnectError, httpx.ConnectTimeout):
@@ -475,11 +478,11 @@ class PolymarketUSClient:
                 # exceptions, not responses. A burst of them (1,810 in one daily
                 # run, 2026-10-22) lost almost every book snapshot, so retry
                 # with backoff before surfacing the error.
-                if attempt < max_attempts - 1:
+                if attempt < self.max_attempts - 1:
                     time.sleep(_connect_retry_delay_seconds(attempt))
                     continue
                 raise
-            if response.status_code == 429 and attempt < max_attempts - 1:
+            if response.status_code == 429 and attempt < self.max_attempts - 1:
                 time.sleep(_retry_delay_seconds(response, attempt))
                 continue
             response.raise_for_status()

@@ -98,6 +98,28 @@ def test_get_raises_after_exhausting_429_retries(monkeypatch) -> None:
         raise AssertionError("persistent 429s did not raise")
 
 
+def test_forecast_client_can_bound_retries_without_changing_capture_default(monkeypatch) -> None:
+    sleeps = []
+    monkeypatch.setattr("model_prediction.data_sources.polymarket_us.time.sleep", sleeps.append)
+    attempts = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        return httpx.Response(429, headers={"Retry-After": "10"}, request=request)
+
+    client = PolymarketUSClient(
+        "https://example.test",
+        httpx.Client(transport=httpx.MockTransport(handler)),
+        max_attempts=2,
+    )
+    with pytest.raises(httpx.HTTPStatusError):
+        client._get("/book")
+    assert attempts == 2
+    assert sleeps == [10]
+    assert PolymarketUSClient().max_attempts == 6
+
+
 def test_all_qualification_sports_are_available_to_slate_and_cli() -> None:
     assert {"mlb", "nba", "wnba", "nfl"} <= set(POLYMARKET_SPORT_LEAGUES)
     assert "esports" in POLYMARKET_SPORT_LEAGUES

@@ -390,6 +390,7 @@ def test_forecast_requires_exact_identity_and_remains_zero_unit(tmp_path) -> Non
                     "markets": [
                         {
                             "market_type": "moneyline",
+                            "market_id": "market-id",
                             "market_slug": "market",
                             "sides": [
                                 {"description": "Alpha Esports"},
@@ -401,6 +402,11 @@ def test_forecast_requires_exact_identity_and_remains_zero_unit(tmp_path) -> Non
             ]
 
         def snapshot(self, slug):
+            raise AssertionError("a normalized market must not refetch its detail")
+
+        def snapshot_from_slate(self, event, market):
+            assert event["event_id"] == "event"
+            assert market["market_id"] == "market-id"
             return {
                 "observed_at_utc": "2026-07-18T01:00:00Z",
                 "long": {"description": "Alpha Esports", "ask": 0.7},
@@ -419,6 +425,31 @@ def test_forecast_requires_exact_identity_and_remains_zero_unit(tmp_path) -> Non
 
     evidence = build_snapshot(result["priced_contracts"][0])
     assert replay_inputs(evidence["inference_inputs"]) == evidence["probabilities"]
+
+    class RateLimitedClient(FakeClient):
+        attempts = 0
+
+        def slate(self, league, game_date, timezone_name):
+            events = super().slate(league, game_date, timezone_name)
+            events[0]["markets"].append({**events[0]["markets"][0], "market_slug": "second-market"})
+            return events
+
+        def snapshot_from_slate(self, event, market):
+            self.attempts += 1
+            request = httpx.Request("GET", "https://example.test/book")
+            response = httpx.Response(429, request=request)
+            raise httpx.HTTPStatusError("rate limited", request=request, response=response)
+
+    rate_limited_client = RateLimitedClient()
+    limited = forecast_esports_slate(
+        tmp_path / "data", artifacts, "lol", "2099-01-01", client=rate_limited_client
+    )
+    assert limited["status"] == "error"
+    assert limited["reason"] == "market_source_rate_limited"
+    assert limited["priced_count"] == 0
+    assert limited["no_calls"][0]["reason"] == "NO_CALL_MARKET_UNAVAILABLE"
+    assert limited["no_calls"][1]["reason"] == "NO_CALL_MARKET_SOURCE_RATE_LIMITED"
+    assert rate_limited_client.attempts == 1
 
 
 def test_forecast_esports_prices_map_spread_and_totals_derivatives(tmp_path) -> None:

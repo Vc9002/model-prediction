@@ -42,6 +42,19 @@ a pregame prediction after an event starts. Such historical capture gaps,
 source timeouts, unavailable exact markets, and no-schedule days remain visible
 with distinct reasons. They are not filled with reconstructed pretend picks.
 
+Esports forecasts reuse the normalized slate's exact market identity and fetch
+the live book once per contract. Their market client makes at most two attempts
+per request, honoring provider `Retry-After`; the broader capture client keeps
+its existing six-attempt policy. After a 429, the forecast stops asking for
+additional books in that run and marks every unpriced contract as source rate
+limited. The forecast status is `error`, including when some earlier contracts
+were priced, so daily integrity and lane coverage cannot present partial source
+coverage as complete. A later run can retry; no missing pick is fabricated.
+
+Official KBO/NPB schedule requests now use a five-second connection timeout
+and a 12-second read timeout. A source outage remains a reported refresh
+warning and does not block forecasts from using the last verified artifact.
+
 Verification: `pytest tests/test_forecast_runtime_regressions.py -o addopts='' -q`
 plus non-logging NBA/NFL CLI forecasts and a before/after canonical ledger
 comparison. Do not run `--log`, `flat-forecast`, or `--replace-today` to validate

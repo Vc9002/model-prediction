@@ -26,6 +26,17 @@ from model_prediction.international_baseball import (
 )
 
 
+def test_official_baseball_default_network_waits_are_bounded() -> None:
+    from model_prediction.international_baseball import OfficialInternationalBaseballClient
+
+    source = OfficialInternationalBaseballClient()
+    try:
+        assert source.client.timeout.connect == 5.0
+        assert source.client.timeout.read == 12.0
+    finally:
+        source.client.close()
+
+
 class _UnavailableClient:
     """Stands in for a real client that's genuinely unreachable (e.g. the
     official source is down) -- raises the same exception type

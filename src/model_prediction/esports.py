@@ -1233,7 +1233,7 @@ def forecast_esports_slate(
     artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
     teams = json.loads((directory / "teams.json").read_text(encoding="utf-8"))
     aliases = _team_alias_index(teams)
-    market_client = client or PolymarketUSClient()
+    market_client = client or PolymarketUSClient(max_attempts=2)
     league = str(TITLE_SPECS[title]["polymarket_league"])
     # Fetch today + tomorrow to capture all open contracts without stale
     # yesterday events that may have already resolved or expired.
@@ -1283,6 +1283,7 @@ def forecast_esports_slate(
     manual_aliases = _load_manual_aliases(data_root).get(title, {})
     rows: list[dict[str, Any]] = []
     no_calls: list[dict[str, Any]] = []
+    source_rate_limited = False
     for event in events:
         event_start = parse_utc(str(event["event_start_utc"]))
         ml_market = next(
@@ -1407,9 +1408,21 @@ def forecast_esports_slate(
                 "line": market.get("line"),
                 "teams": descriptions,
             }
+            if source_rate_limited:
+                no_calls.append({**market_base, "reason": "NO_CALL_MARKET_SOURCE_RATE_LIMITED"})
+                continue
             try:
-                snapshot = market_client.snapshot(str(market["market_slug"]))
+                if (
+                    hasattr(market_client, "snapshot_from_slate")
+                    and market.get("market_id")
+                    and market.get("sides")
+                ):
+                    snapshot = market_client.snapshot_from_slate(event, market)
+                else:
+                    snapshot = market_client.snapshot(str(market["market_slug"]))
             except (httpx.HTTPError, KeyError, StopIteration, TypeError, ValueError) as error:
+                if isinstance(error, httpx.HTTPStatusError) and error.response.status_code == 429:
+                    source_rate_limited = True
                 no_calls.append(
                     {**market_base, "reason": "NO_CALL_MARKET_UNAVAILABLE", "detail": str(error)[:200]}
                 )
@@ -1641,6 +1654,8 @@ def forecast_esports_slate(
             )
     return {
         "title": title,
+        "status": "error" if source_rate_limited else "ok",
+        "reason": "market_source_rate_limited" if source_rate_limited else None,
         "game_date": game_date,
         "model_version": artifact["model_version"],
         "events": len(events),

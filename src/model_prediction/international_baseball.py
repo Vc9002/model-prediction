@@ -320,7 +320,7 @@ class OfficialInternationalBaseballClient:
 
     def __init__(self, client: httpx.Client | None = None) -> None:
         self.client = client or httpx.Client(
-            timeout=45,
+            timeout=httpx.Timeout(12.0, connect=5.0),
             follow_redirects=True,
             headers={"User-Agent": "model-prediction-research/1.0"},
         )
