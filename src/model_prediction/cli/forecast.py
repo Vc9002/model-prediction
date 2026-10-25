@@ -1849,6 +1849,12 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
     b2b_pace_drag = float(artifact.get("b2b_pace_drag", 0.0))
     coherent_moneyline = bool(artifact.get("coherent_moneyline", False))
     dynamic_matchup_pace = bool(artifact.get("dynamic_matchup_pace", False))
+    altitude_hca = bool(artifact.get("altitude_hca", False))
+    schedule_density_drag = bool(artifact.get("schedule_density_drag", False))
+    dynamic_volatility = bool(artifact.get("dynamic_volatility", False))
+    overtime_risk_adjustment = bool(artifact.get("overtime_risk_adjustment", False))
+    use_logistic_moneyline = bool(artifact.get("use_logistic_moneyline", False))
+    logistic_scale = float(artifact.get("logistic_scale", 11.2))
 
     model = BasketballModel(
         sport="nba",
@@ -1870,6 +1876,12 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
         b2b_pace_drag=b2b_pace_drag,
         coherent_moneyline=coherent_moneyline,
         dynamic_matchup_pace=dynamic_matchup_pace,
+        altitude_hca=altitude_hca,
+        schedule_density_drag=schedule_density_drag,
+        dynamic_volatility=dynamic_volatility,
+        overtime_risk_adjustment=overtime_risk_adjustment,
+        use_logistic_moneyline=use_logistic_moneyline,
+        logistic_scale=logistic_scale,
     )
     store = FeatureStore(data_root)
     history = store.games_before("nba", args_date)
@@ -2167,6 +2179,8 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
     possession_model = bool(artifact.get("possession_model", False))
     b2b_pace_drag = float(artifact.get("b2b_pace_drag", 0.0))
     dynamic_matchup_pace = bool(artifact.get("dynamic_matchup_pace", False))
+    schedule_density_drag = bool(artifact.get("schedule_density_drag", False))
+    overtime_risk_adjustment = bool(artifact.get("overtime_risk_adjustment", False))
 
     model = BasketballModel(
         sport="nba",
@@ -2182,6 +2196,8 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
         possession_model=possession_model,
         b2b_pace_drag=b2b_pace_drag,
         dynamic_matchup_pace=dynamic_matchup_pace,
+        schedule_density_drag=schedule_density_drag,
+        overtime_risk_adjustment=overtime_risk_adjustment,
     )
     store = FeatureStore(data_root)
     history = store.games_before("nba", args_date)
