@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import math
+import time
 import unicodedata
 from datetime import date
 from pathlib import Path
@@ -89,7 +90,20 @@ def _settle_all_unsettled(
     data_root = Path(ledger_path(config)).parent
     settled, voided, pending, failures = [], [], [], []
     bo3_client = None
+    # Wall time per league: the daily settlement step took 226-576s with no
+    # way to tell which provider (ESPN, Polymarket resolution, Bo3) owned it.
+    league_seconds: dict[str, float] = {}
+    _lap_state: list[Any] = ["(ledger_read)", time.monotonic()]
+
+    def _lap_row(next_label: str) -> None:
+        now_t = time.monotonic()
+        league_seconds[_lap_state[0]] = round(
+            league_seconds.get(_lap_state[0], 0.0) + now_t - _lap_state[1], 2
+        )
+        _lap_state[0], _lap_state[1] = next_label, now_t
+
     for row in ledger.rows():
+        _lap_row(str(row.get("league") or "?"))
         if row["status"] != "open":
             continue
         try:
@@ -349,11 +363,13 @@ def _settle_all_unsettled(
     else:
         poly_settle_res = {"status": "disabled", "reason": "operator_disabled"}
 
+    _lap_row("(after_loop)")
     return {
         "settled": settled,
         "voided": voided,
         "still_open": pending,
         "failures": failures,
+        "seconds_by_league": dict(sorted(league_seconds.items(), key=lambda kv: -kv[1])),
         "polymarket_edge_settlement": poly_settle_res,
         "note": "Results pulled from ESPN scoreboards; closing prices from stored pregame BBO asks.",
     }
