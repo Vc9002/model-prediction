@@ -1251,6 +1251,16 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         with ThreadPoolExecutor(max_workers=min(8, max(1, len(gated_ledgers_list)))) as pool:
             _gated_settlement = dict(pool.map(_settle_ledger_entry, gated_ledgers_list))
     _t_settle_end = time.monotonic()
+    # Per-step wall time of everything after settlement (~850s in the
+    # 2026-10-24 07:30 run, with no breakdown of which step owns it).
+    post_step_seconds: dict[str, float] = {}
+    _lap_start = _t_settle_end
+
+    def _lap(name: str) -> None:
+        nonlocal _lap_start
+        now = time.monotonic()
+        post_step_seconds[name] = round(now - _lap_start, 1)
+        _lap_start = now
 
     # Step 4b: Automated Model Calibration & Drift Monitor
     calibration_result: dict[str, Any] = {"status": "skipped"}
@@ -1274,6 +1284,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         except Exception as exc:
             logger.warning("Automated model calibration failed", exc_info=True)
             calibration_result = {"status": "error", "reason": str(exc)}
+
+    _lap("calibration_4b")
 
     # Step 10 & 11: Automated Polymarket CLOB Edge Scanner & Settlement
     poly_edge_record_result: dict[str, Any] = {"status": "skipped"}
@@ -1315,6 +1327,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         # explicit; the record failure remains independently material.
         poly_edge_settle_result = {"status": "skipped"}
 
+    _lap("polymarket_edge_scan_settle")
+
     # Step 11b: Automated Auto-Buyer Settlement & Pre-Cycle Fallback Reconciliation
     #
     # run_auto_buyer_cycle() (step 12) performs its own pre-cycle reconcile +
@@ -1348,6 +1362,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         except Exception:
             logger.warning("Automated Auto-Buyer settlement failed", exc_info=True)
             auto_buyer_settle_result = {"status": "error"}
+
+    _lap("auto_buyer_settle_11b")
 
     # Step 12: Automated Polymarket Buyer (if enabled in dashboard state)
     auto_buyer_result: dict[str, Any]
@@ -1416,6 +1432,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             logger.warning("Automated Polymarket buyer cycle failed", exc_info=True)
             auto_buyer_result = {"status": "error"}
 
+    _lap("auto_buyer_cycle_12")
+
     # Step 12b: reconcile any resting Auto-Buyer fallback orders (IOC
     # partial/zero fills left resting at the same price -- see DEBUG.md's
     # 2026-09-03 entry) against live exchange state, and cancel any that
@@ -1432,9 +1450,11 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         except Exception:
             logger.warning("Auto-Buyer fallback reconciliation failed", exc_info=True)
             fallback_reconcile_result = {"status": "error"}
+    _lap("fallback_reconcile_12b")
 
     report = {
         "timing": {
+            "post_step_seconds": post_step_seconds,
             "total_seconds": round(time.monotonic() - _t_start, 1),
             "capture_pool_seconds": round(_t_pool_end - _t_start, 1),
             "capture_task_seconds": capture_task_seconds,
@@ -1483,6 +1503,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         "step12_auto_polymarket_buyer": auto_buyer_result,
         "step12b_auto_buyer_fallback_reconcile": fallback_reconcile_result,
     }
+    _lap("report_build")
     from ..ledger_coverage import build_report
 
     try:
@@ -1499,4 +1520,5 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     except Exception as exc:
         logger.warning("Ledger coverage verification failed", exc_info=True)
         report["ledger_coverage"] = {"status": "error", "reason": str(exc)}
+    _lap("ledger_coverage")
     return _finalize_daily_report(report)
