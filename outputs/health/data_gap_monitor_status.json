@@ -1,11 +1,9 @@
 {
   "overall_status": "HEALTHY",
-  "generated_at_utc": "2026-10-24T23:15:46.543691+00:00",
+  "generated_at_utc": "2026-10-25T02:14:05.411339+00:00",
   "odds_freshness": {
-    "status": "WARN",
-    "stale_active_sports": [
-      "nfl"
-    ],
+    "status": "OK",
+    "stale_active_sports": [],
     "sports": {
       "basketball": {
         "status": "FRESH",
@@ -49,9 +47,9 @@
         "file_count": 30
       },
       "nfl": {
-        "status": "STALE",
-        "latest_date": "2026-10-22",
-        "file_count": 19
+        "status": "FRESH",
+        "latest_date": "2026-10-25",
+        "file_count": 20
       },
       "npb": {
         "status": "FRESH",
@@ -75,72 +73,72 @@
         "season_state": "Season concluded (resumes May)"
       }
     },
-    "total_snapshot_files": 631
+    "total_snapshot_files": 632
   },
   "market_quotes_warehouse": {
     "status": "HEALTHY",
-    "total_quotes": 2402131,
-    "quotes_with_depth": 1190974,
-    "depth_coverage_pct": 49.58,
+    "total_quotes": 2485020,
+    "quotes_with_depth": 1271287,
+    "depth_coverage_pct": 51.16,
     "sports_covered": {
       "basketball": {
-        "count": 7,
-        "latest_observed": "2026-10-16T22:04:42.811627Z"
+        "count": 695,
+        "latest_observed": "2026-10-24T22:55:21.716234Z"
       },
       "darts": {
-        "count": 7,
-        "latest_observed": "2026-10-16T22:08:32.546511Z"
+        "count": 291,
+        "latest_observed": "2026-10-24T22:55:41.868405Z"
       },
       "esports": {
-        "count": 154030,
-        "latest_observed": "2026-10-16T22:07:53.212529Z"
+        "count": 157267,
+        "latest_observed": "2026-10-24T22:49:50.731114Z"
       },
       "hockey": {
-        "count": 38,
-        "latest_observed": "2026-10-16T22:08:22.416499Z"
+        "count": 1601,
+        "latest_observed": "2026-10-24T22:55:31.774464Z"
       },
       "kbo": {
-        "count": 1319,
-        "latest_observed": "2026-10-12T10:57:10.199909Z"
+        "count": 1367,
+        "latest_observed": "2026-10-20T10:20:12.203808Z"
       },
       "mlb": {
-        "count": 1392113,
-        "latest_observed": "2026-10-16T22:04:32.778129Z"
+        "count": 1394522,
+        "latest_observed": "2026-10-24T20:40:13.673010Z"
       },
       "nba": {
-        "count": 3619,
-        "latest_observed": "2026-10-16T16:13:24.563981Z"
+        "count": 7708,
+        "latest_observed": "2026-10-24T20:56:26.116665Z"
       },
       "ncaaf": {
-        "count": 264558,
-        "latest_observed": "2026-10-16T22:04:52.935500Z"
+        "count": 292448,
+        "latest_observed": "2026-10-24T22:37:57.944938Z"
       },
       "nfl": {
-        "count": 46290,
-        "latest_observed": "2026-10-15T22:09:04.448202Z"
+        "count": 59957,
+        "latest_observed": "2026-10-25T00:40:40.360622Z"
       },
       "npb": {
-        "count": 1313,
-        "latest_observed": "2026-10-16T10:16:32.214577Z"
+        "count": 1343,
+        "latest_observed": "2026-10-24T14:20:17.539082Z"
       },
       "soccer": {
-        "count": 142127,
-        "latest_observed": "2026-10-16T22:05:52.352320Z"
+        "count": 154092,
+        "latest_observed": "2026-10-24T22:46:30.424158Z"
       },
       "tennis": {
-        "count": 354399,
-        "latest_observed": "2026-10-16T22:07:43.144942Z"
+        "count": 371019,
+        "latest_observed": "2026-10-24T22:49:40.644664Z"
       },
       "wnba": {
-        "count": 42311,
-        "latest_observed": "2026-10-07T22:11:27.099850Z"
+        "count": 42710,
+        "latest_observed": "2026-10-24T16:57:14.139593Z"
       }
     }
   },
   "models_and_ledgers": {
     "status": "PASS",
     "hash_mismatches": [],
-    "production_models_audited": 30,
+    "production_models_audited": 32,
     "details": {
       "wnba-elo-trend-lr-v4": {
         "hash_valid": true,
@@ -212,6 +210,13 @@
         "removed_picks": 0,
         "evidence_status": "historical_only"
       },
+      "nba-spread-margin-v5": {
+        "hash_valid": true,
+        "settled_picks": 0,
+        "open_picks": 0,
+        "removed_picks": 0,
+        "evidence_status": "predictively_qualified"
+      },
       "nba-spread-margin-v4": {
         "hash_valid": true,
         "settled_picks": 0,
@@ -229,6 +234,13 @@
       "nba-spread-margin-v2": {
         "hash_valid": true,
         "settled_picks": 42,
+        "open_picks": 0,
+        "removed_picks": 0,
+        "evidence_status": "predictively_qualified"
+      },
+      "nba-total-margin-v5": {
+        "hash_valid": true,
+        "settled_picks": 0,
         "open_picks": 0,
         "removed_picks": 0,
         "evidence_status": "predictively_qualified"
@@ -357,6 +369,6 @@
   "self_healing": {
     "status": "skipped",
     "message": "Auto-heal disabled. Pass --auto-heal to execute write-remediation routines.",
-    "timestamp_utc": "2026-10-24T23:15:46.543691+00:00"
+    "timestamp_utc": "2026-10-25T02:14:05.411339+00:00"
   }
 }

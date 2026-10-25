@@ -378,6 +378,42 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             logger.warning("NFL injury report capture failed for %s", args.date, exc_info=True)
             nfl_injuries_result = {"status": "error"}
 
+    nba_injuries_result: dict[str, Any] = {"status": "skipped"}
+
+    def _capture_nba_injuries():
+        nonlocal nba_injuries_result
+        try:
+            from ..data_sources.espn_nba_injuries import capture_espn_nba_injuries
+
+            nba_injuries_result = capture_espn_nba_injuries(data_root)
+        except Exception:
+            logger.warning("NBA injury report capture failed for %s", args.date, exc_info=True)
+            nba_injuries_result = {"status": "error"}
+
+    nhl_injuries_result: dict[str, Any] = {"status": "skipped"}
+
+    def _capture_nhl_injuries():
+        nonlocal nhl_injuries_result
+        try:
+            from ..data_sources.espn_nhl_injuries import capture_espn_nhl_injuries
+
+            nhl_injuries_result = capture_espn_nhl_injuries(data_root)
+        except Exception:
+            logger.warning("NHL injury report capture failed for %s", args.date, exc_info=True)
+            nhl_injuries_result = {"status": "error"}
+
+    cfb_injuries_result: dict[str, Any] = {"status": "skipped"}
+
+    def _capture_cfb_injuries():
+        nonlocal cfb_injuries_result
+        try:
+            from ..data_sources.espn_cfb_injuries import capture_espn_cfb_injuries
+
+            cfb_injuries_result = capture_espn_cfb_injuries(data_root)
+        except Exception:
+            logger.warning("CFB injury report capture failed for %s", args.date, exc_info=True)
+            cfb_injuries_result = {"status": "error"}
+
     def _capture_mlb_probables():
         nonlocal mlb_probables_result
         try:
@@ -504,7 +540,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         finally:
             capture_task_seconds[name] = round(time.monotonic() - started, 1)
 
-    with ThreadPoolExecutor(max_workers=12) as io_pool:
+    with ThreadPoolExecutor(max_workers=16) as io_pool:
         f0 = io_pool.submit(_timed, "polymarket_slate", _polymarket_slate, slate_args, config)
         f1 = io_pool.submit(_timed, "wnba", _capture_wnba)
         f2 = io_pool.submit(_timed, "priors", _build_priors)
@@ -515,7 +551,10 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         f7 = io_pool.submit(_timed, "mlb_lineups", _capture_mlb_lineups)
         f8 = io_pool.submit(_timed, "bet_better", _collect_bet_better)
         f9 = io_pool.submit(_timed, "nfl_injuries", _capture_nfl_injuries)
-        for f in (f1, f2, f3, f4, f5, f6, f7, f8, f9):
+        f10 = io_pool.submit(_timed, "nba_injuries", _capture_nba_injuries)
+        f11 = io_pool.submit(_timed, "nhl_injuries", _capture_nhl_injuries)
+        f12 = io_pool.submit(_timed, "cfb_injuries", _capture_cfb_injuries)
+        for f in (f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12):
             f.result()  # Wait for all, surface exceptions
         try:
             slate = f0.result()
@@ -1419,6 +1458,9 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         "step1b_soccer_scores": soccer_collection,
         "step1e_bet_better_models": bet_better_result,
         "step1f_nfl_injuries": nfl_injuries_result,
+        "step1g_nba_injuries": nba_injuries_result,
+        "step1h_nhl_injuries": nhl_injuries_result,
+        "step1i_cfb_injuries": cfb_injuries_result,
         "step1c_mlb_probable_starters": {
             "captured_events": len(mlb_probables_result),
             "archive": "data/point_in_time/mlb_probable_starters.jsonl",

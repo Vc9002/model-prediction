@@ -253,6 +253,46 @@ def test_ledger_economics_flags_settled_result_without_scoring_basis(tmp_path: P
     assert check["examples"][0]["pick_id"] == "zero-paper-pnl"
 
 
+def test_ledger_economics_exempts_unpriced_retrospective_tracking(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    paths = RuntimePaths(repo_root=repo, runtime_root=repo / "data")
+    paths.ledgers_db.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(paths.ledgers_db)
+    connection.execute(
+        """CREATE TABLE ledger_records (
+        ledger_tier TEXT, sport TEXT, pick_id TEXT, status TEXT, result TEXT,
+        units REAL, pnl_units REAL, decision_payload_json TEXT)"""
+    )
+    connection.execute(
+        "INSERT INTO ledger_records VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "flat",
+            "nba",
+            "retrospective-unpriced-pick",
+            "settled",
+            "win",
+            0.0,
+            None,
+            json.dumps(
+                {
+                    "record_type": "RESEARCH_OBSERVATION",
+                    "reason_code": "OPERATOR_REQUESTED_RETROSPECTIVE_UNPRICED",
+                    "call_type": "retrospective_model_tracking",
+                    "research_score_units": "0",
+                }
+            ),
+        ),
+    )
+    connection.commit()
+    connection.close()
+
+    check = _ledger_economics(paths)
+
+    assert check["semantic_errors"] == 0
+    assert check["unscored_results"] == 0
+    assert len(check["examples"]) == 0
+
+
 def test_stale_prediction_degrades(tmp_path: Path) -> None:
     repo = _make_repo(tmp_path)
     _seed_prediction_state(repo, minutes_ago=300)  # max_data_age_minutes=120

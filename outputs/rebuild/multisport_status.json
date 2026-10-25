@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-08-08T20:14:43.952585+00:00",
-  "code_revision": "793a3a1247cb03c5bee016d5cd7d52ffe8031d02-dirty",
+  "generated_at_utc": "2026-10-25T02:01:46.180364+00:00",
+  "code_revision": "df4cb82ad63139cf32b290c215b31060848c68f3-dirty",
   "mode": "SHADOW_ONLY",
   "execution_enabled": false,
   "production_promotion": false,

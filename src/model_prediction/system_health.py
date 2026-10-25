@@ -210,6 +210,8 @@ def _ledger_economics(paths: RuntimePaths) -> dict[str, Any]:
                      json_extract(decision_payload_json, '$.reason_code') AS reason_code
               FROM ledger_records
               WHERE status = 'settled' AND result IN ('win', 'loss')
+                AND COALESCE(reason_code, json_extract(decision_payload_json, '$.reason_code'), '') != 'OPERATOR_REQUESTED_RETROSPECTIVE_UNPRICED'
+                AND COALESCE(json_extract(decision_payload_json, '$.call_type'), '') != 'retrospective_model_tracking'
             ), effective AS (
               SELECT *,
                      CASE WHEN ledger_units > 0 THEN ledger_units ELSE research_units END AS effective_units,
@@ -247,6 +249,8 @@ def _ledger_economics(paths: RuntimePaths) -> dict[str, Any]:
                                   '$.research_pnl_units'), '') AS REAL) END AS effective_pnl
                   FROM ledger_records
                   WHERE status = 'settled' AND result IN ('win', 'loss')
+                    AND COALESCE(reason_code, json_extract(decision_payload_json, '$.reason_code'), '') != 'OPERATOR_REQUESTED_RETROSPECTIVE_UNPRICED'
+                    AND COALESCE(json_extract(decision_payload_json, '$.call_type'), '') != 'retrospective_model_tracking'
                 )
                 SELECT ledger_tier, sport, pick_id, result, reason_code,
                        effective_units, effective_pnl
