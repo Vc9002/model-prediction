@@ -2093,19 +2093,33 @@ def _norm_cfb_name(s: str) -> str:
     return s.replace("'", "").replace("’", "").replace(".", "").replace("-", " ").strip()
 
 
+_TEAM_INDEX_CACHE: tuple[tuple[int, int], dict[str, CFBTeam]] | None = None
+
+
+def _team_index() -> dict[str, CFBTeam]:
+    """Normalized name/abbreviation/alias -> team, first team in table order winning.
+
+    A per-call linear scan re-normalized every alias of every team (~400
+    normalizations per lookup); the NCAAF slate matcher resolves every snapshot
+    row for every game, which cost 142M normalizations (~8 minutes) per forecast.
+    Keyed on the table's identity and size so a swapped or extended table rebuilds.
+    """
+    global _TEAM_INDEX_CACHE
+    fingerprint = (id(CFB_TEAMS), len(CFB_TEAMS))
+    if _TEAM_INDEX_CACHE is None or _TEAM_INDEX_CACHE[0] != fingerprint:
+        index: dict[str, CFBTeam] = {}
+        for team in CFB_TEAMS.values():
+            for key in (team.canonical_name, team.abbreviation, *team.aliases):
+                index.setdefault(_norm_cfb_name(key), team)
+        _TEAM_INDEX_CACHE = (fingerprint, index)
+    return _TEAM_INDEX_CACHE[1]
+
+
 def resolve_team(name: str) -> CFBTeam | None:
     """Resolve a team string by canonical name or alias."""
     if not name:
         return None
-    cleaned = name.strip()
-    norm = _norm_cfb_name(cleaned)
-    for team in CFB_TEAMS.values():
-        if norm == _norm_cfb_name(team.canonical_name) or norm == _norm_cfb_name(team.abbreviation):
-            return team
-        for alias in team.aliases:
-            if norm == _norm_cfb_name(alias):
-                return team
-    return None
+    return _team_index().get(_norm_cfb_name(name.strip()))
 
 
 resolve_cfb_team = resolve_team
