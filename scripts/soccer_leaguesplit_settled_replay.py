@@ -29,10 +29,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from model_prediction.config import PROJECT_ROOT
+from model_prediction.runtime_paths import RuntimePaths
 from model_prediction.soccer.league_model import LeagueSoccerModel
 from model_prediction.soccer.registry import resolve
 
-DEFAULT_LEDGER_DB = PROJECT_ROOT / "data" / "ledgers" / "ledgers.db"
+DEFAULT_LEDGER_DB = RuntimePaths.resolve(require_external_runtime=True).ledgers_db
 # Both local soccer history files are checked -- the processed file feeds
 # FeatureStore (what soccer_forward.py's serving path actually reads) and the
 # historical file is the Odds API-sourced accumulation. Verified 2026-08-18:

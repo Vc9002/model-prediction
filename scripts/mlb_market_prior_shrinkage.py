@@ -46,9 +46,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from model_prediction.config import PROJECT_ROOT
+from model_prediction.runtime_paths import RuntimePaths
 from scripts.mlb_v9_calibration_xgb import _safe_metrics
 
-DEFAULT_LEDGER_DB = PROJECT_ROOT / "data" / "ledgers" / "ledgers.db"
+DEFAULT_LEDGER_DB = RuntimePaths.resolve(require_external_runtime=True).ledgers_db
 LAMBDA_GRID = tuple(round(x * 0.05, 2) for x in range(21))  # 0.0 .. 1.0 step 0.05
 
 

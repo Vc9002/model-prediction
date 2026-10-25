@@ -30,9 +30,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from model_prediction.calibration import TemperatureCalibrator
 from model_prediction.config import PROJECT_ROOT
+from model_prediction.runtime_paths import RuntimePaths
 from scripts.mlb_v9_calibration_xgb import _safe_metrics
 
-DEFAULT_LEDGER_DB = PROJECT_ROOT / "data" / "ledgers" / "ledgers.db"
+DEFAULT_LEDGER_DB = RuntimePaths.resolve(require_external_runtime=True).ledgers_db
 MODEL_ID = "wnba-elo-trend-lr-v4"
 TEMPERATURE = 0.8
 

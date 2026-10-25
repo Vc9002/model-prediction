@@ -38,8 +38,9 @@ from model_prediction.rebuild.mlb_shadow_pipeline import (
 )
 from model_prediction.rebuild.mlb_shadow_pipeline import load_state as pipeline_load_state
 from model_prediction.rebuild.shadow_ledger import ShadowLedger
+from model_prediction.runtime_paths import RuntimePaths
 
-DATA_ROOT = "data/rebuild"
+DATA_ROOT = str(RuntimePaths.resolve(require_external_runtime=True).rebuild_root)
 
 
 def main() -> None:

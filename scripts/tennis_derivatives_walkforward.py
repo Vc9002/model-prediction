@@ -15,10 +15,11 @@ import argparse
 import sys
 from pathlib import Path
 
+from model_prediction.runtime_paths import RuntimePaths
 from model_prediction.tennis_derivatives_research import main
 
 DEFAULT_DATA_ROOT = Path(__file__).resolve().parents[1] / "data"
-DEFAULT_LEDGER_DB = DEFAULT_DATA_ROOT / "ledgers" / "ledgers.db"
+DEFAULT_LEDGER_DB = RuntimePaths.resolve(require_external_runtime=True).ledgers_db
 DEFAULT_OUT = Path(__file__).resolve().parents[1] / "tmp" / "tennis_derivatives_walkforward.json"
 
 

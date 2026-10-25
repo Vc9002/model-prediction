@@ -234,7 +234,7 @@ def auto_heal_data_gaps(
     healed_actions = []
 
     # 1. Self-heal Market Quotes Warehouse depth if needed
-    db_path = PROJECT_ROOT / "data" / "market_quotes.db"
+    db_path = runtime_paths.market_quotes_db
     if db_path.exists():
         conn = sqlite3.connect(str(db_path))
         cur = conn.cursor()

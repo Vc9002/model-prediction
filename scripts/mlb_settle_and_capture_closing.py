@@ -70,8 +70,9 @@ from model_prediction.rebuild.metadata import MetadataDB
 from model_prediction.rebuild.mlb_features import dedupe_scoreboard
 from model_prediction.rebuild.shadow_ledger import ShadowLedger, utc_now
 from model_prediction.rebuild.storage import MarketStore
+from model_prediction.runtime_paths import RuntimePaths
 
-DATA_ROOT = "data/rebuild"
+DATA_ROOT = str(RuntimePaths.resolve(require_external_runtime=True).rebuild_root)
 SPORT = "mlb"
 
 
