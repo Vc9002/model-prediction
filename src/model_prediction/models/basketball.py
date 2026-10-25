@@ -96,6 +96,12 @@ class BasketballModel:
         b2b_pace_drag: float = 0.0,
         coherent_moneyline: bool = False,
         dynamic_matchup_pace: bool = False,
+        altitude_hca: bool = False,
+        schedule_density_drag: bool = False,
+        dynamic_volatility: bool = False,
+        overtime_risk_adjustment: bool = False,
+        use_logistic_moneyline: bool = False,
+        logistic_scale: float = 11.2,
     ) -> None:
         self._sport = sport
         self._version = version
@@ -119,6 +125,12 @@ class BasketballModel:
         self.b2b_pace_drag = b2b_pace_drag
         self.coherent_moneyline = coherent_moneyline
         self.dynamic_matchup_pace = dynamic_matchup_pace
+        self.altitude_hca = altitude_hca
+        self.schedule_density_drag = schedule_density_drag
+        self.dynamic_volatility = dynamic_volatility
+        self.overtime_risk_adjustment = overtime_risk_adjustment
+        self.use_logistic_moneyline = use_logistic_moneyline
+        self.logistic_scale = logistic_scale
 
     @property
     def version(self) -> str:
@@ -155,7 +167,14 @@ class BasketballModel:
             # Expected points per team from opponent-adjusted hl10 levels.
             away_points = (away_trend.offense["hl10"] + home_trend.defense["hl10"]) / 2 or baseline
             home_points = (home_trend.offense["hl10"] + away_trend.defense["hl10"]) / 2 or baseline
-            trend_margin = (home_points - away_points) + self.home_court_points
+
+            # Altitude HCA adjustment
+            effective_hca = self.home_court_points
+            if self.altitude_hca and str(self._sport).lower() == "nba":
+                if game.home_team == "Denver Nuggets":
+                    effective_hca += 1.40
+                elif game.home_team == "Utah Jazz":
+                    effective_hca += 0.80
 
             # Elo margin (home rating with HCA minus away rating)
             r_home = elo.rating(game.home_team) + elo.home_advantage
@@ -185,6 +204,7 @@ class BasketballModel:
                 or self.b2b_penalty_away > 0.0
                 or self.b2b_penalty_home > 0.0
                 or self.b2b_pace_drag > 0.0
+                or self.schedule_density_drag
             ):
                 try:
                     home_rest = (
@@ -203,11 +223,33 @@ class BasketballModel:
                 except (ValueError, TypeError):
                     rest_diff = 0.0
 
+            # Schedule density (3-in-4 nights)
+            home_3in4 = False
+            away_3in4 = False
+            if self.schedule_density_drag and game_start_dt is not None:
+                h_4d = [g for g in home_prev if 0 < (game_start_dt - g.start).total_seconds() <= 4.2 * 86400]
+                a_4d = [g for g in away_prev if 0 < (game_start_dt - g.start).total_seconds() <= 4.2 * 86400]
+                home_3in4 = len(h_4d) >= 2
+                away_3in4 = len(a_4d) >= 2
+
             if home_b2b and self.b2b_penalty_home > 0.0:
                 home_points -= self.b2b_penalty_home
             if away_b2b and self.b2b_penalty_away > 0.0:
                 away_points -= self.b2b_penalty_away
-            trend_margin = (home_points - away_points) + self.home_court_points
+            if home_3in4 and not home_b2b:
+                home_points -= 0.8
+            if away_3in4 and not away_b2b:
+                away_points -= 1.2
+
+            # Altitude interaction with visitor fatigue
+            if (
+                self.altitude_hca
+                and game.home_team in ("Denver Nuggets", "Utah Jazz")
+                and (away_b2b or away_3in4)
+            ):
+                effective_hca += 1.0
+
+            trend_margin = (home_points - away_points) + effective_hca
 
             if self.elo_weight > 0.0 or self.rest_weight != 0.0:
                 expected_margin = (
@@ -220,6 +262,16 @@ class BasketballModel:
 
             expected_margin += game.availability_points_gap
 
+            # Dynamic Volatility on margin_sd
+            effective_margin_sd = self.margin_sd
+            if self.dynamic_volatility:
+                c_away = away_trend.consistency or 0.05
+                c_home = home_trend.consistency or 0.05
+                avg_c = (c_away + c_home) / 2.0
+                effective_margin_sd = max(
+                    12.0, min(17.5, self.margin_sd * (1.0 + 0.25 * (1.0 - avg_c / 0.055)))
+                )
+
             # Composite total prediction
             raw_trend_total = away_points + home_points
             if self.possession_model:
@@ -231,6 +283,8 @@ class BasketballModel:
                     pace_adj -= 0.5
                 if (home_b2b or away_b2b) and self.b2b_pace_drag > 0.0:
                     pace_adj -= self.b2b_pace_drag
+                if (home_3in4 or away_3in4) and self.schedule_density_drag:
+                    pace_adj -= 0.6
 
                 if self.dynamic_matchup_pace and baseline > 0.0:
                     pf_away = 1.0 + 0.50 * (
@@ -266,6 +320,13 @@ class BasketballModel:
 
             expected_total -= game.availability_total_loss
 
+            # Overtime risk adjustment on total
+            if self.overtime_risk_adjustment:
+                if abs(expected_margin) <= 3.5:
+                    expected_total += 1.2
+                elif abs(expected_margin) <= 6.5:
+                    expected_total += 0.6
+
             uncertainty = max(0.03, min(0.20, 0.20 - 0.005 * sample))
             base: GamePredictionBase = {
                 "event_id": game.event_id,
@@ -291,7 +352,10 @@ class BasketballModel:
                 },
             }
             if self.coherent_moneyline:
-                p_margin_home = 1.0 - _normal_cdf(0.0, expected_margin, self.margin_sd)
+                if self.use_logistic_moneyline:
+                    p_margin_home = 1.0 / (1.0 + 10.0 ** (-expected_margin / self.logistic_scale))
+                else:
+                    p_margin_home = 1.0 - _normal_cdf(0.0, expected_margin, effective_margin_sd)
                 p_home = self.elo_weight * home_win + (1.0 - self.elo_weight) * p_margin_home
             else:
                 p_home = home_win
@@ -311,13 +375,13 @@ class BasketballModel:
             )
             if game.spread_away_line is not None:
                 # P(away covers) = P(margin_home < away_line)
-                away_cover = _normal_cdf(game.spread_away_line, expected_margin, self.margin_sd)
+                away_cover = _normal_cdf(game.spread_away_line, expected_margin, effective_margin_sd)
                 predictions.append(
                     GamePrediction(
                         market_type="spread",
                         inference_inputs={
                             "mean": expected_margin,
-                            "sd": self.margin_sd,
+                            "sd": effective_margin_sd,
                             "line": game.spread_away_line,
                         },
                         line=game.spread_away_line,
@@ -328,7 +392,7 @@ class BasketballModel:
                             "home_cover": round(1 - away_cover, 6),
                         },
                         rationale=(
-                            f"Projected margin {expected_margin:+.1f} (home), sd {self.margin_sd:.1f}."
+                            f"Projected margin {expected_margin:+.1f} (home), sd {effective_margin_sd:.1f}."
                             + (
                                 f" Availability adj: {game.availability_points_gap:+.1f}."
                                 if game.availability_points_gap != 0.0

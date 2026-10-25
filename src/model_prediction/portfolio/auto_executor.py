@@ -57,9 +57,6 @@ if _env_file.exists():
         pass
 
 DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
-    "cs2-tiered-elo-v6",
-    "cs2-spread-tiered-elo-v6",
-    "cs2-total-tiered-elo-v6",
     "wnba-elo-trend-lr-v4",
     "wnba-total-margin-v2",
     "wnba-spread-margin-v2",
@@ -84,6 +81,10 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
 )
 
 EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
+    # CS / CS2 pulled per operator directive 2026-10-24
+    "cs2-tiered-elo-v6",
+    "cs2-spread-tiered-elo-v6",
+    "cs2-total-tiered-elo-v6",
     "measured-edge-totals-v3",  # MLB totals (degraded, negative CLV vs market close)
     "measured-edge-margin-v3",  # MLB run line (negative EV)
     "wnba-spread-margin-v1",  # Legacy WNBA spread (severe miscalibration)
