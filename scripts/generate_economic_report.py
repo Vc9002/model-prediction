@@ -25,11 +25,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from model_prediction.rebuild.shadow_ledger import ShadowLedger
-from model_prediction.runtime_paths import RuntimePaths
 
 
 def main() -> None:
-    db_path = RuntimePaths.resolve(require_external_runtime=True).rebuild_shadow_db
+    db_path = Path("data/rebuild/shadow.db")
     if not db_path.exists():
         print(f"ERROR: {db_path} not found. Run the shadow pipeline first.")
         sys.exit(1)

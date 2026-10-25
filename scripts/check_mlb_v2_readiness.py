@@ -23,10 +23,9 @@ from model_prediction.rebuild.mlb_v2_artifact import (
     FrozenMLBV2Anchor,
     parse_frozen_mlb_v2_anchor,
 )
-from model_prediction.runtime_paths import RuntimePaths
 
 REGISTRY_PATH = Path("outputs/rebuild/test_consumption_registry.json")
-SHADOW_DB_PATH = RuntimePaths.resolve(require_external_runtime=True).rebuild_shadow_db
+SHADOW_DB_PATH = Path("data/rebuild/shadow.db")
 
 
 @dataclass(frozen=True)
