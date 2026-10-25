@@ -183,7 +183,7 @@ def _polymarket_slate(args, config) -> dict:
         {"status": "disabled"}
         if getattr(args, "no_snapshot_bbo", False)
         else capture_slate_snapshots(
-            client,
+            PolymarketUSClient(base_url=client.base_url, client=client.client, max_attempts=2),
             events,
             snapshot_root,
             args.date,

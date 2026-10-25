@@ -364,6 +364,41 @@ def test_slate_capture_stores_prospective_bbo_by_sport_and_date(tmp_path) -> Non
     assert stored["usage"] == "prospective_executable_bbo"
 
 
+def test_slate_capture_stops_queued_book_requests_after_rate_limit(tmp_path) -> None:
+    class RateLimitedClient:
+        calls = 0
+
+        def snapshot(self, slug: str) -> dict:
+            self.calls += 1
+            request = httpx.Request("GET", f"https://example.test/{slug}")
+            response = httpx.Response(429, request=request)
+            raise httpx.HTTPStatusError("rate limited", request=request, response=response)
+
+    source = RateLimitedClient()
+    result = capture_slate_snapshots(
+        source,
+        {
+            "MLB": [
+                {
+                    "event_id": "event-1",
+                    "markets": [
+                        {"market_slug": f"market-{index}", "market_type": "moneyline"} for index in range(3)
+                    ],
+                }
+            ]
+        },
+        tmp_path,
+        "2026-07-18",
+        max_workers=1,
+    )
+    assert source.calls == 1
+    assert result["captured"] == 0
+    assert result["failures"] == 3
+    assert result["source_rate_limited"] is True
+    assert result["skipped_after_rate_limit"] == 2
+    assert result["status"] == "partial"
+
+
 def test_sport_slate_surfaces_a_failed_league_distinctly_from_an_empty_one() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         if "/leagues/lol/events" in request.url.path:

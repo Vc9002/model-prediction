@@ -9,6 +9,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from threading import Event
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -929,6 +930,7 @@ def capture_slate_snapshots(
     ladder_keep: int | None = None,
     ladder_leagues: frozenset[str] = frozenset({"NCAAF"}),
     ladder_keep_slugs: frozenset[str] = frozenset(),
+    max_workers: int = 4,
 ) -> dict[str, Any]:
     """Persist a prospective executable BBO for every discovered contract.
 
@@ -940,6 +942,8 @@ def capture_slate_snapshots(
     that many spread/total alternates per event (see ``_prune_line_ladders``);
     ``ladder_keep_slugs`` are fetched regardless.
     """
+    if max_workers < 1:
+        raise ValueError("max_workers must be positive")
     league_to_sport = {
         league: sport for sport, leagues in POLYMARKET_SPORT_LEAGUES.items() for league in leagues
     }
@@ -957,6 +961,7 @@ def capture_slate_snapshots(
     skipped_summer_league = timestamp_invalid = skipped_beyond_horizon = skipped_ladder = 0
     horizon_cutoff = None if horizon_hours is None else (now or utc_now()) + timedelta(hours=horizon_hours)
     failure_details: list[dict[str, str]] = []
+    source_rate_limited = Event()
 
     # Skip summer league / preseason events — they offer only moneyline
     # markets and pollute the spread/total readiness counts.
@@ -1013,6 +1018,8 @@ def capture_slate_snapshots(
     def _fetch(entry):
         league, sport, event, market = entry
         slug = str(market.get("market_slug") or "")
+        if source_rate_limited.is_set():
+            return league, sport, slug, None, "source_rate_limited_after_http_429"
         try:
             if hasattr(client, "snapshot_from_slate") and market.get("sides") and market.get("market_id"):
                 snapshot = client.snapshot_from_slate(event, market)
@@ -1044,19 +1051,16 @@ def capture_slate_snapshots(
             )
             return league, sport, slug, snapshot, None
         except (httpx.HTTPError, KeyError, StopIteration, TypeError, ValueError) as exc:
+            if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 429:
+                source_rate_limited.set()
             return league, sport, slug, None, str(exc)[:200]
 
-    # Fetch every league's contracts through one shared pool, then append
-    # per-sport-store serially (grouped below) so each JSONL still only
-    # ever sees one writer at a time. Capped at 16 workers, not scaled up
-    # with contract count: measured directly against the live gateway,
-    # snapshot() latency is flat (~0.6s) up through ~16 concurrent in-flight
-    # requests, then degrades sharply (3-5s per call, plus intermittent SSL
-    # EOF connection errors) at 24-32 -- past a certain point more workers
-    # makes this slower, not faster.
+    # Keep requests below the gateway's observed burst limit. Once a 429 is
+    # confirmed, do not spend the rest of the daily run retrying every queued
+    # contract; each omitted quote is recorded as a source failure below.
     results: list[tuple[str, str, str, dict[str, Any] | None, str | None]] = []
     if all_contracts:
-        with ThreadPoolExecutor(max_workers=min(16, len(all_contracts))) as pool:
+        with ThreadPoolExecutor(max_workers=min(max_workers, len(all_contracts))) as pool:
             results = list(pool.map(_fetch, all_contracts))
 
     stores: dict[str, PolymarketSnapshotStore] = {}
@@ -1086,6 +1090,10 @@ def capture_slate_snapshots(
         "captured": captured,
         "missing_executable_ask": missing_bbo,
         "failures": failures,
+        "source_rate_limited": source_rate_limited.is_set(),
+        "skipped_after_rate_limit": sum(
+            detail["reason"] == "source_rate_limited_after_http_429" for detail in failure_details
+        ),
         "skipped_nonqualification_contracts": skipped_nonqualification_contracts,
         "skipped_summer_league": skipped_summer_league,
         "skipped_beyond_horizon": skipped_beyond_horizon,

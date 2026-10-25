@@ -55,6 +55,14 @@ Official KBO/NPB schedule requests now use a five-second connection timeout
 and a 12-second read timeout. A source outage remains a reported refresh
 warning and does not block forecasts from using the last verified artifact.
 
+The all-sport prospective BBO capture uses four concurrent book requests and
+two request attempts. A confirmed HTTP 429 stops queued book requests for that
+capture; each skipped contract is counted in `failure_details`, and the capture
+reports `partial` with `source_rate_limited` and `skipped_after_rate_limit`.
+Already captured quotes remain in their original archives. The daily pipeline
+can proceed to per-sport forecasts, whose own source failures still fail daily
+integrity rather than silently implying complete coverage.
+
 Verification: `pytest tests/test_forecast_runtime_regressions.py -o addopts='' -q`
 plus non-logging NBA/NFL CLI forecasts and a before/after canonical ledger
 comparison. Do not run `--log`, `flat-forecast`, or `--replace-today` to validate
