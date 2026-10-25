@@ -115,6 +115,26 @@ def _capture_ladder_keep() -> int | None:
     return keep if keep > 0 else None
 
 
+def _open_pick_slugs(data_root: Path, sport: str = "ncaaf") -> frozenset[str]:
+    """Market slugs of open Main/Flat picks, so ladder pruning never starves their CLV history.
+
+    Fail-soft: a ledger read error only loses the safeguard, it must not stop capture.
+    """
+    from ..main_ledgers import flat_ledger, main_ledger
+    from .settle import _extract_market_slug
+
+    slugs: set[str] = set()
+    for open_ledger in (main_ledger, flat_ledger):
+        try:
+            for row in open_ledger(data_root, sport).rows({"status": "open"}):
+                slug = _extract_market_slug(str(row.get("rationale", "")))
+                if slug:
+                    slugs.add(slug)
+        except Exception:
+            logger.warning("open-pick slug lookup failed for %s", open_ledger.__name__, exc_info=True)
+    return frozenset(slugs)
+
+
 def _polymarket_slate(args, config) -> dict:
     if args.provider == "kalshi":
         return {"provider": "kalshi", "status": "deferred", "note": KALSHI_DEFERRED_MESSAGE}
@@ -157,16 +177,19 @@ def _polymarket_slate(args, config) -> dict:
         league_errors = result.errors
     else:
         raise ValueError("provide --sport, --league, or --all")
+    ladder_keep = _capture_ladder_keep()
+    snapshot_root = Path(ledger_path(config)).parent
     bbo_capture = (
         {"status": "disabled"}
         if getattr(args, "no_snapshot_bbo", False)
         else capture_slate_snapshots(
             client,
             events,
-            Path(ledger_path(config)).parent,
+            snapshot_root,
             args.date,
             horizon_hours=_capture_horizon_hours(),
-            ladder_keep=_capture_ladder_keep(),
+            ladder_keep=ladder_keep,
+            ladder_keep_slugs=_open_pick_slugs(snapshot_root) if ladder_keep else frozenset(),
         )
     )
     return {

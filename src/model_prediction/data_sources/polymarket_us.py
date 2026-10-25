@@ -886,7 +886,9 @@ def _long_side_distance(market: dict[str, Any]) -> float:
 
 
 def _prune_line_ladders(
-    entries: list[tuple[str, str, dict[str, Any], dict[str, Any]]], keep: int
+    entries: list[tuple[str, str, dict[str, Any], dict[str, Any]]],
+    keep: int,
+    keep_slugs: frozenset[str] = frozenset(),
 ) -> list[tuple[str, str, dict[str, Any], dict[str, Any]]]:
     """Keep the ``keep`` most balanced spread/total lines per (event, market type).
 
@@ -896,11 +898,14 @@ def _prune_line_ladders(
     quote is stale (it cannot be used as a price) yet orders a ladder well
     enough to shortlist the lines worth a live book; the true main line is
     still decided from live asks among the survivors. Contracts without a
-    cached price are always kept.
+    cached price are always kept, as are ``keep_slugs`` (open picks): a pick's
+    closing-line value is read from its own slug's snapshot history, so a line
+    that drops out of a later run's shortlist would leave CLV measured against
+    a stale price.
     """
     groups: dict[tuple[str, str], list[tuple[float, int]]] = {}
     for index, (_league, _sport, event, market) in enumerate(entries):
-        if market.get("market_type") in {"spread", "total"}:
+        if market.get("market_type") in {"spread", "total"} and market.get("market_slug") not in keep_slugs:
             key = (str(event.get("event_id", "")), str(market["market_type"]))
             groups.setdefault(key, []).append((_long_side_distance(market), index))
     dropped: set[int] = set()
@@ -920,6 +925,7 @@ def capture_slate_snapshots(
     now: datetime | None = None,
     ladder_keep: int | None = None,
     ladder_leagues: frozenset[str] = frozenset({"NCAAF"}),
+    ladder_keep_slugs: frozenset[str] = frozenset(),
 ) -> dict[str, Any]:
     """Persist a prospective executable BBO for every discovered contract.
 
@@ -928,7 +934,8 @@ def capture_slate_snapshots(
     games already started are still captured). ``None`` keeps every contract.
 
     With ``ladder_keep`` set, leagues in ``ladder_leagues`` only fetch books for
-    that many spread/total alternates per event (see ``_prune_line_ladders``).
+    that many spread/total alternates per event (see ``_prune_line_ladders``);
+    ``ladder_keep_slugs`` are fetched regardless.
     """
     league_to_sport = {
         league: sport for sport, leagues in POLYMARKET_SPORT_LEAGUES.items() for league in leagues
@@ -995,7 +1002,7 @@ def capture_slate_snapshots(
             skipped_beyond_horizon += len(kept) - len(within)
             kept = within
         if ladder_keep and league.upper() in ladder_leagues:
-            pruned = _prune_line_ladders(kept, ladder_keep)
+            pruned = _prune_line_ladders(kept, ladder_keep, ladder_keep_slugs)
             skipped_ladder += len(kept) - len(pruned)
             kept = pruned
         all_contracts.extend(kept)

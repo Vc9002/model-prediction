@@ -818,6 +818,42 @@ def test_ladder_keep_fetches_only_the_most_balanced_alternates_for_listed_league
     assert result["skipped_ladder_alternates"] == 2
 
 
+def test_ladder_keep_slugs_survive_pruning_without_using_up_the_quota(tmp_path) -> None:
+    prices = {"far": 0.95, "near": 0.52, "mid": 0.70, "close": 0.49}
+    client = _SlateClient()
+    result = capture_slate_snapshots(
+        client,
+        {"NCAAF": [_ladder_event(prices)]},
+        tmp_path,
+        "2026-10-22",
+        ladder_keep=1,
+        ladder_keep_slugs=frozenset({"far"}),
+    )
+    # The open pick's line ("far") is fetched on top of the single shortlisted line.
+    assert sorted(client.slate_calls) == ["close", "far"]
+    assert result["skipped_ladder_alternates"] == 2
+
+
+def test_open_pick_slugs_reads_main_and_flat_and_survives_a_ledger_error(monkeypatch, tmp_path) -> None:
+    from model_prediction import main_ledgers
+    from model_prediction.cli import commands
+
+    class _Ledger:
+        def __init__(self, rows: list[dict] | Exception) -> None:
+            self._rows = rows
+
+        def rows(self, filters: dict) -> list[dict]:
+            assert filters == {"status": "open"}
+            if isinstance(self._rows, Exception):
+                raise self._rows
+            return self._rows
+
+    rows = [{"rationale": "Over 55.5 (tsc-cfb-aaa-bbb-2026-10-24-total-55pt5)"}, {"rationale": ""}]
+    monkeypatch.setattr(main_ledgers, "main_ledger", lambda root, sport: _Ledger(rows))
+    monkeypatch.setattr(main_ledgers, "flat_ledger", lambda root, sport: _Ledger(RuntimeError("boom")))
+    assert commands._open_pick_slugs(tmp_path) == frozenset({"tsc-cfb-aaa-bbb-2026-10-24-total-55pt5"})
+
+
 def test_ladder_keep_never_prunes_moneylines_or_other_market_types(tmp_path) -> None:
     events = {"NCAAF": [_ladder_event({"a": 0.9, "b": 0.8, "c": 0.7}, market_type="moneyline")]}
     client = _SlateClient()
