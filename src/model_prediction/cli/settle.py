@@ -188,8 +188,10 @@ def _settle_all_unsettled(
             continue
         # Darts: no ESPN/Polymarket result feed -- grade from the observed
         # match history (Wikipedia brackets, refreshed in the daily forecast).
-        if row["league"] in ("DARTS_PDC", "DARTS_MODUS"):
-            result = _settle_darts_pick(row, ledger, data_root=data_root)
+        if row["league"] in ("DARTS", "DARTS_PDC", "DARTS_MODUS"):
+            result = _settle_darts_pick(row, ledger, data_root=data_root) or _settle_by_resolution(
+                row, ledger
+            )
             if result is None:
                 if (now - start).total_seconds() > 7 * 86400:
                     try:
