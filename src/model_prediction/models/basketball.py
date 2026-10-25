@@ -145,7 +145,13 @@ class BasketballModel:
         history: Sequence[GameRecord],
         upcoming: Sequence[UpcomingGame],
     ) -> list[GamePrediction]:
-        elo = build_elo(history, self._sport, home_advantage=self.elo_home_advantage)
+        gap_days = int(self.offseason_gap_days) if self.offseason_gap_days is not None else 90
+        elo = build_elo(
+            history,
+            self._sport,
+            offseason_gap_days=gap_days,
+            home_advantage=self.elo_home_advantage,
+        )
         trend = TrendEngine(
             history,
             offseason_gap_days=self.offseason_gap_days,

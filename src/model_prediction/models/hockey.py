@@ -144,10 +144,12 @@ class HockeyModel:
             if not a_team or not h_team:
                 continue
             all_goals.extend([a_score, h_score])
+            g_start = getattr(game, "start", None)
             for team, scored, allowed in ((a_team, a_score, h_score), (h_team, h_score, a_score)):
-                entry = by_team.setdefault(team, {"scored": [], "allowed": []})
+                entry = by_team.setdefault(team, {"scored": [], "allowed": [], "dates": []})
                 entry["scored"].append(scored)
                 entry["allowed"].append(allowed)
+                entry["dates"].append(g_start)
 
         consts = self.get_constants(league or "NHL")
         baseline = sum(all_goals) / len(all_goals) if all_goals else consts["baseline"]
@@ -156,9 +158,28 @@ class HockeyModel:
         for team, entry in by_team.items():
             scored_series = entry["scored"]
             allowed_series = entry["allowed"]
+            dates = entry.get("dates") if len(entry.get("dates", [])) == len(scored_series) else None
             strengths[team] = {
-                "attack": ewm_level(scored_series, 10.0, baseline, 8.0) / baseline,
-                "defense": ewm_level(allowed_series, 10.0, baseline, 8.0) / baseline,
+                "attack": ewm_level(
+                    scored_series,
+                    10.0,
+                    baseline,
+                    8.0,
+                    dates=dates,
+                    offseason_gap_days=60.0,
+                    offseason_retention=0.50,
+                )
+                / baseline,
+                "defense": ewm_level(
+                    allowed_series,
+                    10.0,
+                    baseline,
+                    8.0,
+                    dates=dates,
+                    offseason_gap_days=60.0,
+                    offseason_retention=0.50,
+                )
+                / baseline,
                 "games": float(len(scored_series)),
             }
         return strengths, baseline

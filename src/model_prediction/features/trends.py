@@ -122,6 +122,8 @@ class TrendEngine:
         self.isolate_postseason = isolate_postseason
         self._by_team: dict[str, list[_TeamGameRow]] = {}
         self._league_points: list[float] = []
+        self._defense_cache: dict[str, float] = {}
+        self._offense_cache: dict[str, float] = {}
         self._index()
 
     def _index(self) -> None:
@@ -168,16 +170,56 @@ class TrendEngine:
 
     def _defense_simple(self, team: str) -> float:
         """Unadjusted points allowed per game — used for opponent adjustment."""
+        if team in self._defense_cache:
+            return self._defense_cache[team]
         rows = self._by_team.get(team, [])
         if not rows:
-            return self.league_baseline
-        return sum(row["allowed"] for row in rows) / len(rows)
+            val = self.league_baseline
+        elif self.offseason_gap_days is not None and len(rows) > 1:
+            dates = [r["start"] for r in rows if "start" in r and isinstance(r["start"], datetime)]
+            if len(dates) == len(rows):
+                hl = self.half_lives[1] if len(self.half_lives) > 1 else self.half_lives[0]
+                val = ewm_level(
+                    [r["allowed"] for r in rows],
+                    half_life=hl,
+                    baseline=self.league_baseline,
+                    prior=self.prior_strength,
+                    dates=dates,
+                    offseason_gap_days=self.offseason_gap_days,
+                    offseason_retention=self.offseason_retention,
+                )
+            else:
+                val = sum(row["allowed"] for row in rows) / len(rows)
+        else:
+            val = sum(row["allowed"] for row in rows) / len(rows)
+        self._defense_cache[team] = val
+        return val
 
     def _offense_simple(self, team: str) -> float:
+        if team in self._offense_cache:
+            return self._offense_cache[team]
         rows = self._by_team.get(team, [])
         if not rows:
-            return self.league_baseline
-        return sum(row["scored"] for row in rows) / len(rows)
+            val = self.league_baseline
+        elif self.offseason_gap_days is not None and len(rows) > 1:
+            dates = [r["start"] for r in rows if "start" in r and isinstance(r["start"], datetime)]
+            if len(dates) == len(rows):
+                hl = self.half_lives[1] if len(self.half_lives) > 1 else self.half_lives[0]
+                val = ewm_level(
+                    [r["scored"] for r in rows],
+                    half_life=hl,
+                    baseline=self.league_baseline,
+                    prior=self.prior_strength,
+                    dates=dates,
+                    offseason_gap_days=self.offseason_gap_days,
+                    offseason_retention=self.offseason_retention,
+                )
+            else:
+                val = sum(row["scored"] for row in rows) / len(rows)
+        else:
+            val = sum(row["scored"] for row in rows) / len(rows)
+        self._offense_cache[team] = val
+        return val
 
     def team_trend(self, team: str) -> TeamTrend:
         rows = self._by_team.get(team, [])

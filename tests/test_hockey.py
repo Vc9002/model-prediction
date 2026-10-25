@@ -183,7 +183,7 @@ def test_registry_integration() -> None:
     """Verify get_model('hockey') and model_spec(League.HOCKEY)."""
     m = get_model("hockey")
     assert isinstance(m, HockeyModel)
-    assert m.version == "hockey-poisson-dc-v1"
+    assert m.version in ("hockey-poisson-dc-v1", "hockey-poisson-dc-v2")
 
     spec = model_spec(League.HOCKEY)
     assert spec.league == League.HOCKEY

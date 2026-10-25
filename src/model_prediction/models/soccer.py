@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from math import exp, log
+from typing import Any
 
 from ..features.base import GameRecord
 from ..features.trends import ewm_level
@@ -115,7 +116,7 @@ class SoccerModel:
         return resolve(league_name)
 
     def _strengths(self, history: Sequence[GameRecord]) -> tuple[dict[str, dict[str, float]], float]:
-        by_team: dict[str, dict[str, list[float]]] = {}
+        by_team: dict[str, dict[str, Any]] = {}
         goals: list[float] = []
         for game in sorted(history, key=lambda item: item.start):
             goals.extend([float(game.away_score), float(game.home_score)])
@@ -123,15 +124,35 @@ class SoccerModel:
                 (game.away_team, game.away_score, game.home_score),
                 (game.home_team, game.home_score, game.away_score),
             ):
-                entry = by_team.setdefault(team, {"scored": [], "allowed": []})
+                entry = by_team.setdefault(team, {"scored": [], "allowed": [], "dates": []})
                 entry["scored"].append(float(scored))
                 entry["allowed"].append(float(allowed))
+                entry["dates"].append(game.start)
         baseline = sum(goals) / len(goals) if goals else 1.35
         strengths = {}
         for team, entry in by_team.items():
+            dates = entry.get("dates") if len(entry.get("dates", [])) == len(entry["scored"]) else None
             strengths[team] = {
-                "attack": ewm_level(entry["scored"], 10.0, baseline, 8.0) / baseline,
-                "defense": ewm_level(entry["allowed"], 10.0, baseline, 8.0) / baseline,
+                "attack": ewm_level(
+                    entry["scored"],
+                    10.0,
+                    baseline,
+                    8.0,
+                    dates=dates,
+                    offseason_gap_days=60.0,
+                    offseason_retention=0.60,
+                )
+                / baseline,
+                "defense": ewm_level(
+                    entry["allowed"],
+                    10.0,
+                    baseline,
+                    8.0,
+                    dates=dates,
+                    offseason_gap_days=60.0,
+                    offseason_retention=0.60,
+                )
+                / baseline,
                 "games": float(len(entry["scored"])),
             }
         return strengths, baseline

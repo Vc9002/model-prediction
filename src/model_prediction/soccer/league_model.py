@@ -21,6 +21,7 @@ from __future__ import annotations
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from ..features.base import GameRecord
 from ..features.trends import ewm_level
@@ -51,6 +52,8 @@ class LeagueSoccerConfig:
     shrinkage_prior_games: float | None = None
     global_baseline: float | None = None  # only used when shrinkage_prior_games is set
     divide_away: bool = False
+    offseason_gap_days: float = 60.0
+    offseason_retention: float = 0.60
 
     def __post_init__(self) -> None:
         # Plausibility guard: a corrupted fit (Brasileirao once shipped
@@ -78,24 +81,42 @@ class LeagueSoccerModel:
     def _strengths(self, history: Sequence[GameRecord]) -> dict[str, dict[str, float]]:
         cfg = self.config
         league_history = [g for g in history if g.league == cfg.league_code]
-        by_team: dict[str, dict[str, list[float]]] = {}
+        by_team: dict[str, dict[str, Any]] = {}
         for game in sorted(league_history, key=lambda item: item.start):
             for team, scored, allowed in (
                 (game.away_team, game.away_score, game.home_score),
                 (game.home_team, game.home_score, game.away_score),
             ):
-                entry = by_team.setdefault(team, {"scored": [], "allowed": []})
+                entry = by_team.setdefault(team, {"scored": [], "allowed": [], "dates": []})
                 entry["scored"].append(float(scored))
                 entry["allowed"].append(float(allowed))
+                entry["dates"].append(game.start)
         strengths = {}
         for team, entry in by_team.items():
             n = len(entry["scored"])
+            dates = entry.get("dates") if len(entry.get("dates", [])) == n else None
             attack = (
-                ewm_level(entry["scored"], cfg.ewma_halflife, cfg.baseline, cfg.ewma_prior_strength)
+                ewm_level(
+                    entry["scored"],
+                    cfg.ewma_halflife,
+                    cfg.baseline,
+                    cfg.ewma_prior_strength,
+                    dates=dates,
+                    offseason_gap_days=cfg.offseason_gap_days,
+                    offseason_retention=cfg.offseason_retention,
+                )
                 / cfg.baseline
             )
             defense = (
-                ewm_level(entry["allowed"], cfg.ewma_halflife, cfg.baseline, cfg.ewma_prior_strength)
+                ewm_level(
+                    entry["allowed"],
+                    cfg.ewma_halflife,
+                    cfg.baseline,
+                    cfg.ewma_prior_strength,
+                    dates=dates,
+                    offseason_gap_days=cfg.offseason_gap_days,
+                    offseason_retention=cfg.offseason_retention,
+                )
                 / cfg.baseline
             )
             if cfg.shrinkage_prior_games and cfg.global_baseline:

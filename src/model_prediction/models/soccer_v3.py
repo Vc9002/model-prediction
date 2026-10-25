@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import replace
+from typing import Any
 
 from ..domain import parse_utc
 from ..features.base import GameRecord
@@ -38,22 +39,32 @@ class SoccerModelV3(SoccerModel):
         if historical_baseline <= 0 and next(iter(leagues)) not in named_league_codes():
             raise ValueError("soccer_v3_requires_positive_league_goal_baseline")
         config = self._league_config(next(iter(leagues)), historical_baseline)
-        by_team: dict[str, dict[str, list[float]]] = {}
+        by_team: dict[str, dict[str, Any]] = {}
         for game in sorted(history, key=lambda game: game.start):
             for team, scored, allowed in (
                 (game.home_team, game.home_score, game.away_score),
                 (game.away_team, game.away_score, game.home_score),
             ):
-                entry = by_team.setdefault(team, {"scored": [], "allowed": []})
+                entry = by_team.setdefault(team, {"scored": [], "allowed": [], "dates": []})
                 entry["scored"].append(float(scored))
                 entry["allowed"].append(float(allowed))
+                entry["dates"].append(game.start)
         strengths = {}
+        offseason_gap = getattr(config, "offseason_gap_days", 60.0)
+        offseason_ret = getattr(config, "offseason_retention", 0.60)
         for team, entry in by_team.items():
             count = len(entry["scored"])
             weight = count / (count + config.shrinkage_prior_games) if config.shrinkage_prior_games else 1.0
+            dates = entry.get("dates") if len(entry.get("dates", [])) == count else None
             values = {
                 name: ewm_level(
-                    entry[source], config.ewma_halflife, config.baseline, config.ewma_prior_strength
+                    entry[source],
+                    config.ewma_halflife,
+                    config.baseline,
+                    config.ewma_prior_strength,
+                    dates=dates,
+                    offseason_gap_days=offseason_gap,
+                    offseason_retention=offseason_ret,
                 )
                 / config.baseline
                 for name, source in (("attack", "scored"), ("defense", "allowed"))
