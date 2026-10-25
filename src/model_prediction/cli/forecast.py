@@ -5247,6 +5247,12 @@ def _forecast_hockey_sport(
     model = hockey_model()
     if not _is_registered_serving_model(model.version, "HOCKEY", "moneyline"):
         raise ValueError(f"HOCKEY moneyline champion does not match executable model {model.version}")
+    artifact, artifact_error = _load_exact_artifact_contract(model.version)
+    if artifact_error or artifact is None:
+        raise ValueError(artifact_error or f"HOCKEY serving artifact unavailable for {model.version}")
+    max_edge = float(artifact["max_edge"])
+    if not 0 < max_edge < 1:
+        raise ValueError(f"HOCKEY serving artifact has invalid max_edge for {model.version}")
     model_config = config.get("models", {}).get("HOCKEY", {})
     leagues = tuple(model_config.get("leagues") or ())
     min_edge = float(model_config.get("min_edge", 0.02))
@@ -5364,15 +5370,22 @@ def _forecast_hockey_sport(
             )
             from ..models.hockey import HockeyModel
 
+            edge_qualified = min_edge <= contract_edge <= max_edge
             dyn_units = (
-                HockeyModel.compute_dynamic_units(contract_edge, min_edge=min_edge, max_edge=0.08)
-                if contract_edge >= min_edge
+                HockeyModel.compute_dynamic_units(contract_edge, min_edge=min_edge, max_edge=max_edge)
+                if edge_qualified
                 else 0.0
             )
             eligibility = EligibilityResult(
                 record_type=RecordType.RESEARCH_OBSERVATION,
-                decision="CALL" if contract_edge >= min_edge else "NO_CALL",
-                reason_code="PAPER_CALL_MODEL_QUALIFIED" if contract_edge >= min_edge else "NO_CALL_LOW_EDGE",
+                decision="CALL" if edge_qualified else "NO_CALL",
+                reason_code=(
+                    "PAPER_CALL_MODEL_QUALIFIED"
+                    if edge_qualified
+                    else "NO_CALL_EXCESSIVE_EDGE"
+                    if contract_edge > max_edge
+                    else "NO_CALL_LOW_EDGE"
+                ),
                 units=dyn_units,
                 confidence_score=round(prob_val * 100),
                 edge=round(contract_edge, 6),
@@ -5406,7 +5419,7 @@ def _forecast_hockey_sport(
                 if (
                     main_ledger is not None
                     and m_type == "moneyline"
-                    and contract_edge >= min_edge
+                    and edge_qualified
                     and eligibility.decision == "CALL"
                 ):
                     if (
