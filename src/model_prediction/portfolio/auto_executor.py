@@ -138,6 +138,7 @@ DEFAULT_MAX_DAILY_SPEND_UNITS = 50.0
 DEFAULT_MAX_GAME_STAKE_UNITS = 5.0
 DEFAULT_MAX_EVENT_LOOKAHEAD_HOURS = 24.0
 DEFAULT_MAX_MODEL_AGE_MINUTES = 12 * 60
+MAX_AUTO_BUYER_QUOTE_AGE_SECONDS = 300
 
 
 @dataclass(frozen=True)
@@ -165,6 +166,11 @@ class AutoExecutionConfig:
     min_tennis_edge: float | None = None  # Sport-specific tightened edge for Tennis (e.g. 0.08)
     max_tennis_price: float | None = None  # Sport-specific ceiling on market price for Tennis (e.g. 0.75)
     max_moneyline_price: float | None = 0.72  # Ceiling on moneyline buy price (odds <= -260 / implied > 72%)
+    auto_quarantine_underperforming: bool = True  # Dynamic circuit breaker against underperforming models
+    auto_quarantine_min_picks: int = 15  # Minimum sample before evaluating rolling drawdown
+    auto_quarantine_max_loss_roi: float = (
+        -0.10
+    )  # Auto-quarantine models worse than -10% ROI on rolling window
 
     def __post_init__(self) -> None:
         if self.execute_live and self.mode != "live":
@@ -194,6 +200,8 @@ class AutoExecutionResult:
     rejected_dedup: int = 0
     rejected_min_topup: int = 0
     rejected_daily_loss_breaker: int = 0
+    rejected_quarantined_model: int = 0
+    quarantined_models: list[str] = field(default_factory=list)
     submitted_orders: list[dict[str, Any]] = field(default_factory=list)
     dry_run_orders: list[dict[str, Any]] = field(default_factory=list)
     total_spend_usd: float = 0.0
@@ -275,7 +283,16 @@ def _capture_missing_active_snapshot_slates(
             continue
         game_date = event_start.astimezone(eastern).date().isoformat()
         snapshot_path = root / "odds" / sport / game_date / "polymarket_snapshots.jsonl"
-        if not snapshot_path.exists() or snapshot_path.stat().st_size == 0:
+        is_missing = not snapshot_path.exists() or snapshot_path.stat().st_size == 0
+        is_stale = False
+        if not is_missing:
+            try:
+                age_seconds = now.timestamp() - snapshot_path.stat().st_mtime
+                if age_seconds > MAX_AUTO_BUYER_QUOTE_AGE_SECONDS and seconds_until_start <= 12 * 3600:
+                    is_stale = True
+            except OSError:
+                pass
+        if is_missing or is_stale:
             missing.add((sport, game_date))
 
     if not missing:
@@ -747,6 +764,8 @@ def run_auto_buyer_cycle(
         "rejected_dedup": res.rejected_dedup,
         "rejected_min_topup": res.rejected_min_topup,
         "rejected_daily_loss_breaker": res.rejected_daily_loss_breaker,
+        "rejected_quarantined_model": res.rejected_quarantined_model,
+        "quarantined_models": res.quarantined_models,
         "total_spend_usd": res.total_spend_usd,
         "orders_count": len(res.submitted_orders) if should_execute else len(res.dry_run_orders),
         "orders": res.submitted_orders if should_execute else res.dry_run_orders,
@@ -761,6 +780,60 @@ def run_auto_buyer_cycle(
         state["last_daily_date"] = forecast_date
     save_auto_buyer_state(state)
     return run_summary
+
+
+def _get_quarantined_underperforming_models(
+    data_root: Path | str = DATA,
+    min_picks: int = 15,
+    max_loss_roi: float = -0.10,
+) -> dict[str, dict[str, Any]]:
+    """Identify whitelisted models currently in steep rolling drawdown (>=15 picks and ROI < -10%).
+
+    Provides an autonomous self-pruning circuit breaker so underperforming models
+    are dynamically quarantined without requiring manual operator intervention.
+    """
+    from model_prediction.portfolio.auto_buyer_ledger import (
+        _is_settled_auto_buyer_record,
+        read_auto_buyer_ledger,
+    )
+
+    quarantined: dict[str, dict[str, Any]] = {}
+    ledger_path = Path(data_root) / "auto_buyer_ledger.jsonl"
+    try:
+        all_rows = read_auto_buyer_ledger(jsonl_path=ledger_path)
+    except OSError:
+        all_rows = []
+
+    by_model: dict[str, list[dict[str, Any]]] = {}
+    for r in all_rows:
+        if _is_settled_auto_buyer_record(r):
+            m = str(r.get("model_id") or r.get("model_version") or "")
+            if m:
+                by_model.setdefault(m, []).append(r)
+
+    for model_id, rows in by_model.items():
+
+        def settled_at_timestamp(row: dict[str, Any]) -> float:
+            try:
+                return parse_utc(str(row.get("settled_at_utc") or "")).timestamp()
+            except (TypeError, ValueError):
+                return float("-inf")
+
+        rows.sort(key=settled_at_timestamp)
+        recent = rows[-30:] if len(rows) > 30 else rows
+        if len(recent) >= min_picks:
+            cost = sum(float(x.get("cost_usd") or 0.0) for x in recent)
+            pnl = sum(float(x.get("pnl_usd") or 0.0) for x in recent)
+            roi = (pnl / cost) if cost > 0 else 0.0
+            if roi < max_loss_roi:
+                quarantined[model_id] = {
+                    "sample": len(recent),
+                    "roi": round(roi, 3),
+                    "cost_usd": round(cost, 2),
+                    "pnl_usd": round(pnl, 2),
+                }
+
+    return quarantined
 
 
 class AutoPolymarketBuyer:
@@ -1142,7 +1215,27 @@ class AutoPolymarketBuyer:
                 picks,
                 config=self.config,
                 now=now,
+                data_root=self.data_root,
             )
+        quarantined = (
+            _get_quarantined_underperforming_models(
+                totals_root,
+                min_picks=self.config.auto_quarantine_min_picks,
+                max_loss_roi=self.config.auto_quarantine_max_loss_roi,
+            )
+            if self.config.auto_quarantine_underperforming
+            else {}
+        )
+        if quarantined:
+            result.quarantined_models = sorted(quarantined.keys())
+            for q_model, q_info in quarantined.items():
+                logger.info(
+                    "Dynamic circuit breaker quarantined underperforming model %s (rolling ROI: %.1f%% over %d picks)",
+                    q_model,
+                    q_info["roi"] * 100,
+                    q_info["sample"],
+                )
+
         # Seeded from today's already-executed spend so the "daily" cap enforces a
         # real per-calendar-day ceiling across every cycle, not just this one.
         current_spend = today_spend_usd
@@ -1164,6 +1257,10 @@ class AutoPolymarketBuyer:
             # live-candidate funnel instead of being diluted by historical rows.
             if row.get("status") != "open":
                 result.rejected_not_open += 1
+                continue
+
+            if model_id in quarantined:
+                result.rejected_quarantined_model += 1
                 continue
 
             # Append-only forecast files retain open rows after an event starts.
@@ -1258,6 +1355,9 @@ class AutoPolymarketBuyer:
             if self._live_quote_fn is not None:
                 try:
                     mock_quote = self._live_quote_fn(str(row.get("market_slug") or f"slug-{pick_id}"))
+                    if not mock_quote:
+                        result.rejected_stale_quote += 1
+                        continue
                     quote = {
                         "market_slug": mock_quote.get("market_slug") or f"slug-{pick_id}",
                         "side": mock_quote.get("side") or str(row.get("token_side") or "long"),
@@ -1277,7 +1377,11 @@ class AutoPolymarketBuyer:
 
             # 7. Quote Staleness & Market State Check (with live refresh fallback)
             age_sec = float(quote.get("age_seconds") or 999999)
-            if not quote.get("fresh", False) and age_sec > 300 and self._live_quote_fn is None:
+            if (
+                not quote.get("fresh", False)
+                and age_sec > MAX_AUTO_BUYER_QUOTE_AGE_SECONDS
+                and self._live_quote_fn is None
+            ):
                 try:
                     from model_prediction.data_sources.polymarket_us import PolymarketUSClient
 
@@ -1322,7 +1426,7 @@ class AutoPolymarketBuyer:
                         refresh_error,
                     )
 
-            if not quote.get("fresh", False) and age_sec > 300:
+            if not quote.get("fresh", False) and age_sec > MAX_AUTO_BUYER_QUOTE_AGE_SECONDS:
                 result.rejected_stale_quote += 1
                 continue
 

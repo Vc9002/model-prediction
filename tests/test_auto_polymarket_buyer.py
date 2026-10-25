@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -24,6 +25,7 @@ from model_prediction.portfolio.auto_executor import (
     AutoExecutionResult,
     AutoPolymarketBuyer,
     _capture_missing_active_snapshot_slates,
+    _get_quarantined_underperforming_models,
     _today_auto_buyer_totals,
     load_auto_buyer_state,
     run_auto_buyer_cycle,
@@ -350,7 +352,7 @@ def test_buyer_allows_nrfi_to_reach_exact_quote_lookup():
 def test_live_buyer_preflight_captures_missing_next_day_slate(tmp_path: Path):
     class FakeSlate:
         def __init__(self):
-            self.events = {"CS2": [{"markets": []}]}
+            self.events = {"LOL": [{"markets": []}]}
             self.errors = {}
 
     class FakeClient:
@@ -373,9 +375,9 @@ def test_live_buyer_preflight_captures_missing_next_day_slate(tmp_path: Path):
     result = _capture_missing_active_snapshot_slates(
         [
             {
-                "model_id": "cs2-tiered-elo-v6",
+                "model_id": "lol-tiered-elo-v6",
                 "status": "open",
-                "league": "CS2",
+                "league": "LOL",
                 "market_type": "moneyline",
                 "event_start_utc": iso_utc(event_start),
             }
@@ -398,6 +400,92 @@ def test_live_buyer_preflight_captures_missing_next_day_slate(tmp_path: Path):
     ]
     assert len(client.requests) == 1
     assert len(captures) == 1
+
+
+def test_preflight_refreshes_snapshot_older_than_quote_freshness_limit(tmp_path: Path):
+    class FakeSlate:
+        def __init__(self):
+            self.events = {"LOL": [{"markets": []}]}
+            self.errors = {}
+
+    class FakeClient:
+        def __init__(self):
+            self.requests = []
+
+        def sport_slate(self, sport, game_date, timezone_name="America/New_York"):
+            self.requests.append((sport, game_date.isoformat(), timezone_name))
+            return FakeSlate()
+
+    now = utc_now()
+    event_start = now + timedelta(hours=2)
+    game_date = event_start.astimezone(ZoneInfo("America/New_York")).date().isoformat()
+    snapshot_path = tmp_path / "odds" / "esports" / game_date / "polymarket_snapshots.jsonl"
+    snapshot_path.parent.mkdir(parents=True)
+    snapshot_path.write_text("{}\n", encoding="utf-8")
+    stale_mtime = now.timestamp() - 10 * 60
+    os.utime(snapshot_path, (stale_mtime, stale_mtime))
+
+    client = FakeClient()
+    captures = []
+    result = _capture_missing_active_snapshot_slates(
+        [
+            {
+                "model_id": "lol-tiered-elo-v6",
+                "status": "open",
+                "league": "LOL",
+                "market_type": "moneyline",
+                "event_start_utc": iso_utc(event_start),
+            }
+        ],
+        config=AutoExecutionConfig(execute_live=True),
+        now=now,
+        data_root=tmp_path,
+        client=client,
+        capture_fn=lambda *_args: captures.append(True) or {"status": "ok", "captured": 1},
+    )
+
+    assert len(result) == 1
+    assert len(client.requests) == 1
+    assert captures == [True]
+
+
+def test_underperforming_quarantine_is_scoped_to_ledger_and_latest_settlements(tmp_path: Path):
+    now = utc_now()
+    model_id = "test-model-v1"
+
+    def settled_row(settled_at, pnl):
+        return {
+            "model_id": model_id,
+            "status": "settled",
+            "settled_at_utc": iso_utc(settled_at),
+            "cost_usd": 1.0,
+            "pnl_usd": pnl,
+        }
+
+    live_root = tmp_path / "live"
+    live_ledger = live_root / "auto_buyer_ledger.jsonl"
+    live_ledger.parent.mkdir(parents=True)
+    # Newer winners are deliberately written before older losses, as can happen
+    # when settlement/update order differs from the original execution order.
+    live_rows = [settled_row(now - timedelta(hours=hour), 0.5) for hour in range(30)] + [
+        settled_row(now - timedelta(days=2, hours=hour), -1.0) for hour in range(15)
+    ]
+    live_ledger.write_text(
+        "".join(json.dumps(row) + "\n" for row in live_rows),
+        encoding="utf-8",
+    )
+
+    paper_root = live_root / "paper_auto_buyer"
+    paper_ledger = paper_root / "auto_buyer_ledger.jsonl"
+    paper_root.mkdir()
+    paper_rows = [settled_row(now - timedelta(hours=hour), -1.0) for hour in range(15)]
+    paper_ledger.write_text(
+        "".join(json.dumps(row) + "\n" for row in paper_rows),
+        encoding="utf-8",
+    )
+
+    assert _get_quarantined_underperforming_models(live_root) == {}
+    assert model_id in _get_quarantined_underperforming_models(paper_root)
 
 
 def test_buyer_sizes_fractional_units(tmp_path: Path):
@@ -2158,4 +2246,61 @@ def test_partial_fill_skipped_when_remaining_spend_under_50_cents(tmp_path):
 
     res = buyer.evaluate_and_execute(picks)
     assert res.rejected_min_topup == 1
+    assert len(res.dry_run_orders) == 0
+
+
+def test_buyer_auto_quarantines_underperforming_model(tmp_path: Path):
+    j_path = tmp_path / "paper_auto_buyer" / "auto_buyer_ledger.jsonl"
+    j_path.parent.mkdir(parents=True)
+    now = utc_now()
+    records = []
+    for i in range(16):
+        records.append(
+            json.dumps(
+                {
+                    "execution_id": f"EXEC_{i}",
+                    "event_id": f"EV_{i}",
+                    "market_slug": f"slug-{i}",
+                    "selection": "home",
+                    "shares": 10.0,
+                    "cost_usd": 5.0,
+                    "status": "settled",
+                    "result": "loss",
+                    "pnl_usd": -5.0,
+                    "model_id": "lol-tiered-elo-v6",
+                }
+            )
+        )
+    j_path.write_text("\n".join(records) + "\n", encoding="utf-8")
+
+    buyer = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(
+            whitelisted_models=("lol-tiered-elo-v6",),
+            blacklisted_models=(),
+            auto_quarantine_underperforming=True,
+            execute_live=False,
+        ),
+        data_root=tmp_path,
+        live_quote_fn=lambda _slug: None,
+    )
+    picks = [
+        {
+            "pick_id": "PICK_QUARANTINED",
+            "model_id": "lol-tiered-elo-v6",
+            "status": "open",
+            "sport": "LOL",
+            "away_team": "Team B",
+            "home_team": "Team A",
+            "selection": "home",
+            "token_side": "long",
+            "market_slug": "slug-new",
+            "event_start_utc": iso_utc(now + timedelta(hours=6)),
+            "model_probability": 0.55,
+            "market_probability": 0.50,
+            "units": 1.0,
+        }
+    ]
+    res = buyer.evaluate_and_execute(picks)
+    assert res.rejected_quarantined_model == 1
+    assert "lol-tiered-elo-v6" in res.quarantined_models
     assert len(res.dry_run_orders) == 0
