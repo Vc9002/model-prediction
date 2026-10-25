@@ -130,10 +130,12 @@ def _settle_all_unsettled(
             else:
                 failures.append(result)
             continue
-        # KBO/NPB: neither ESPN nor Polymarket resolution covers these --
-        # settle from the official league schedule instead.
+        # KBO/NPB: settle from official schedule; fall back to Polymarket
+        # resolution when official league sites timeout or fail.
         if row["league"] in ("KBO", "NPB"):
-            result = _settle_international_baseball_pick(row, ledger, config, data_root=data_root)
+            result = _settle_international_baseball_pick(
+                row, ledger, config, data_root=data_root
+            ) or _settle_by_resolution(row, ledger)
             if result is None:
                 pending.append(row["pick_id"])
             elif result.get("voided"):
@@ -204,6 +206,8 @@ def _settle_all_unsettled(
                         failures.append({"pick_id": row["pick_id"], "reason": str(e)})
                 else:
                     pending.append(row["pick_id"])
+            elif result.get("voided"):
+                voided.append(result["pick_id"])
             elif result.get("settled"):
                 settled.append(result)
             else:
@@ -227,6 +231,8 @@ def _settle_all_unsettled(
                         failures.append({"pick_id": row["pick_id"], "reason": str(e)})
                 else:
                     pending.append(row["pick_id"])
+            elif result.get("voided"):
+                voided.append(result["pick_id"])
             elif result.get("settled"):
                 settled.append(result)
             else:
@@ -268,6 +274,9 @@ def _settle_all_unsettled(
             resolved = _settle_by_resolution(row, ledger)
             if resolved is not None and resolved.get("settled"):
                 settled.append(resolved)
+                continue
+            if resolved is not None and resolved.get("voided"):
+                voided.append(resolved["pick_id"])
                 continue
             if (now - start).total_seconds() > 7 * 86400:
                 try:
@@ -686,8 +695,20 @@ def _settle_by_resolution(row: dict, ledger, client=None) -> dict | None:
         return None
     sides = market.get("marketSides", [])
     prices = [(side, _amount(side.get("price"))) for side in sides]
-    if len(prices) != 2 or sorted(p for _, p in prices if p is not None) != [0.0, 1.0]:
+    valid_prices = [p for _, p in prices if p is not None]
+    if len(prices) != 2 or len(valid_prices) != 2:
         return None
+    if sorted(valid_prices) != [0.0, 1.0]:
+        # Market reached terminal state with non-binary prices (e.g. 0.3/0.7 or void/split
+        # settlement due to player withdrawal, cancellation, or walkover). Void cleanly.
+        try:
+            voided = ledger.void(
+                row["pick_id"],
+                f"market resolved terminal with non-binary prices {valid_prices}",
+            )
+            return {"pick_id": row["pick_id"], "voided": True, "result": voided["result"]}
+        except (KeyError, ValueError, OSError) as error:
+            return {"pick_id": row["pick_id"], "reason": str(error)}
     selection = str(row.get("selection") or "").lower()
     own = None
     if market_type == "total":
