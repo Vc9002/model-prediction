@@ -5,7 +5,7 @@ description: Forecast, log, settle, review, and diagnose sports picks in the mod
 
 # Forecast Model Picks
 
-Work from `/Users/vincentc9002/model prediction`.
+Work from the repo root (`e:\MP` on this Windows machine; `/Users/vincentc9002/model prediction` on the macOS deployment). On Windows PowerShell replace `env PYTHONPATH=src:. .venv/bin/python` with `$env:PYTHONPATH='src;.'; .venv\Scripts\python`.
 
 ## Establish current truth
 

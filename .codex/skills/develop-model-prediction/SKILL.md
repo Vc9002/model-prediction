@@ -5,7 +5,7 @@ description: Design, implement, test, and document model or data-pipeline change
 
 # Develop Model Prediction
 
-Work from `/Users/vincentc9002/model prediction` and
+Work from the repo root (`e:\MP` on this Windows machine; `/Users/vincentc9002/model prediction` on the macOS deployment) and
 preserve unrelated dirty-worktree changes.
 
 ## Define the change
@@ -43,14 +43,18 @@ Use:
 env PYTHONPATH=src:. .venv/bin/python -m model_prediction.cli <command>
 ```
 
+On Windows PowerShell use `$env:PYTHONPATH='src;.'; .venv\Scripts\python -m model_prediction.cli <command>` and `.venv\Scriptsuff`.
+
 Do not pass `--write-artifacts`, mutate ledgers, or call execution surfaces
 unless that mutation is explicitly part of the task and preceding checks pass.
 
 ## Verify and report
 
+Per the project CLAUDE.md fast-iteration directive: never run the full `pytest tests/` suite (about 6 minutes) unless Vincent explicitly asks. Run `ruff check src/ tests/` for refactors, renames, docs, and formatting; for algorithm or pricing changes run only the directly affected test file.
+
 ```sh
-env PYTHONPATH=src:. .venv/bin/python -m pytest tests/ -q
 .venv/bin/ruff check src/ tests/
+env PYTHONPATH=src:. .venv/bin/python -m pytest tests/<affected_file>.py -o addopts='' -q
 ```
 
 Reproduce the relevant report without changing the declared split. Verify

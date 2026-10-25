@@ -5,7 +5,7 @@ description: Start, inspect, test, troubleshoot, and safely modify the local mod
 
 # Operate Model Dashboard
 
-Work from `/Users/vincentc9002/model prediction`.
+Work from the repo root (`e:\MP` on this Windows machine; `/Users/vincentc9002/model prediction` on the macOS deployment). On Windows PowerShell replace `env PYTHONPATH=src:. .venv/bin/python` with `$env:PYTHONPATH='src;.'; .venv\Scripts\python`.
 
 ## Diagnose before restarting
 
@@ -25,7 +25,7 @@ Work from `/Users/vincentc9002/model prediction`.
 ## Verify in Dia
 
 Use the Codex Dia Bridge from
-`/Users/vincentc9002/Documents/Codex Chrome Bridge`. Prefer `snapshot`, then
+`/Users/vincentc9002/Documents/Codex Chrome Bridge` (macOS only; on Windows verify through the dashboard's `/api/health` and `/api/status` unless a browser bridge is configured). Prefer `snapshot`, then
 `click-ref` or `type-ref`, then verify with a fresh snapshot or API response.
 Do not target Chrome, Safari, or the generic system browser.
 
