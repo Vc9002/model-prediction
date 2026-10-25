@@ -451,6 +451,31 @@ def test_forecast_requires_exact_identity_and_remains_zero_unit(tmp_path) -> Non
     assert limited["no_calls"][1]["reason"] == "NO_CALL_MARKET_SOURCE_RATE_LIMITED"
     assert rate_limited_client.attempts == 1
 
+    class NextDayRateLimitedClient(RateLimitedClient):
+        def slate(self, league, game_date, timezone_name):
+            events = super().slate(league, game_date, timezone_name)
+            events[0]["event_start_utc"] = "2099-01-02T12:00:00Z"
+            return events
+
+    next_day_limited = forecast_esports_slate(
+        tmp_path / "data", artifacts, "lol", "2099-01-01", client=NextDayRateLimitedClient()
+    )
+    assert next_day_limited["status"] == "ok"
+    assert next_day_limited["source_rate_limited"] is True
+    assert next_day_limited["next_date_source_rate_limited"] is True
+
+    class LateEasternDateClient(NextDayRateLimitedClient):
+        def slate(self, league, game_date, timezone_name):
+            events = super().slate(league, game_date, timezone_name)
+            events[0]["event_start_utc"] = "2099-01-02T03:00:00Z"
+            return events
+
+    late_eastern_date = forecast_esports_slate(
+        tmp_path / "data", artifacts, "lol", "2099-01-01", client=LateEasternDateClient()
+    )
+    assert late_eastern_date["status"] == "error"
+    assert late_eastern_date["next_date_source_rate_limited"] is False
+
 
 def test_forecast_esports_prices_map_spread_and_totals_derivatives(tmp_path) -> None:
     data = tmp_path / "data/esports/lol"

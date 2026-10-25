@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -1284,6 +1285,7 @@ def forecast_esports_slate(
     rows: list[dict[str, Any]] = []
     no_calls: list[dict[str, Any]] = []
     source_rate_limited = False
+    source_rate_limited_current_date = False
     for event in events:
         event_start = parse_utc(str(event["event_start_utc"]))
         ml_market = next(
@@ -1423,6 +1425,9 @@ def forecast_esports_slate(
             except (httpx.HTTPError, KeyError, StopIteration, TypeError, ValueError) as error:
                 if isinstance(error, httpx.HTTPStatusError) and error.response.status_code == 429:
                     source_rate_limited = True
+                    source_rate_limited_current_date = (
+                        event_start.astimezone(ZoneInfo(timezone_name)).date() == base_date
+                    )
                 no_calls.append(
                     {**market_base, "reason": "NO_CALL_MARKET_UNAVAILABLE", "detail": str(error)[:200]}
                 )
@@ -1654,8 +1659,10 @@ def forecast_esports_slate(
             )
     return {
         "title": title,
-        "status": "error" if source_rate_limited else "ok",
-        "reason": "market_source_rate_limited" if source_rate_limited else None,
+        "status": "error" if source_rate_limited_current_date else "ok",
+        "reason": "market_source_rate_limited" if source_rate_limited_current_date else None,
+        "source_rate_limited": source_rate_limited,
+        "next_date_source_rate_limited": source_rate_limited and not source_rate_limited_current_date,
         "game_date": game_date,
         "model_version": artifact["model_version"],
         "events": len(events),
