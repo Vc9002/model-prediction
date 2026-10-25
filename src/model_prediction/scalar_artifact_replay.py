@@ -138,7 +138,19 @@ def replay_snapshot(payload: dict[str, Any]) -> dict[str, float]:
         return {"under": round(p_under, 6), "over": round(p_over, 6)}
 
     is_margin = method == "margin_normal"
-    if sd != float(artifact["margin_sd" if is_margin else "total_sd"]):
+    expected_sd = float(artifact["margin_sd" if is_margin else "total_sd"])
+    if is_margin and artifact.get("dynamic_volatility"):
+        # Replay the enabled engine transform from its exact trend inputs;
+        # accepting an arbitrary in-range sd would weaken artifact validation.
+        consistency = [
+            float(payload["features"][key])
+            for key in ("volatility_away_consistency", "volatility_home_consistency")
+        ]
+        if not all(math.isfinite(value) and 0 <= value <= 1 for value in consistency):
+            raise ValueError("invalid_scalar_replay_volatility_features")
+        avg_c = sum(value or 0.05 for value in consistency) / 2.0
+        expected_sd = max(12.0, min(17.5, expected_sd * (1.0 + 0.25 * (1.0 - avg_c / 0.055))))
+    if sd != expected_sd:
         raise ValueError("scalar_replay_artifact_parameter_mismatch")
     below = _normal_cdf(line, mean, sd)
     values = {"away": below, "home": 1 - below} if is_margin else {"under": below, "over": 1 - below}

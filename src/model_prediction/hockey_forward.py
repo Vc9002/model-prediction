@@ -30,7 +30,7 @@ from .data_sources.polymarket_us import (
     PolymarketUSClient,
     probability_to_american,
 )
-from .domain import utc_now
+from .domain import parse_utc, utc_now
 from .models.hockey import HockeyModel, UpcomingHockeyMatch, hockey_model
 
 logger = logging.getLogger(__name__)
@@ -143,6 +143,13 @@ def _load_historical_games(data_root: str | Path, league: str | None = None) -> 
                         if line.strip():
                             row = json.loads(line)
                             if row.get("completed") is True:
+                                # JSON timestamps must cross the model boundary as datetimes:
+                                # EWMA offseason decay subtracts consecutive game starts.
+                                try:
+                                    row["start"] = parse_utc(row["start"])
+                                except (KeyError, TypeError, ValueError):
+                                    logger.warning("skipping hockey history row with invalid start in %s", p)
+                                    continue
                                 games.append(SimpleNamespace(**row))
             except (json.JSONDecodeError, OSError) as e:
                 logger.debug("error reading %s: %s", p, e)

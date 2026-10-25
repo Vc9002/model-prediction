@@ -142,6 +142,7 @@ def _material_daily_errors(report: dict[str, Any]) -> list[str]:
         "step9_gated_research_settlement",
         "step10_polymarket_edge_record",
         "step11_polymarket_edge_settle",
+        "ledger_coverage",
     ):
         if _contains_error_status(report.get(step)):
             errors.append(step)

@@ -21,7 +21,8 @@ Two roots, two different lifecycles:
 Resolution order for `runtime_root`:
 1. `MODEL_PREDICTION_RUNTIME_ROOT` env var, if set -- the real external
    location once the operational cutover has happened.
-2. `repo_root / "data"` otherwise -- the historical, repo-local behavior,
+2. The same key in the checkout's private `.env`, for interactive CLI parity.
+3. `repo_root / "data"` otherwise -- the historical, repo-local behavior,
    preserved as a safe default so an unconfigured dev checkout (or a test
    that forgets to override) keeps working exactly as it always has,
    rather than silently writing somewhere unexpected.
@@ -260,6 +261,13 @@ class RuntimePaths:
         """
         resolved_repo_root = Path(repo_root) if repo_root is not None else _default_repo_root()
         runtime_root_env = os.environ.get("MODEL_PREDICTION_RUNTIME_ROOT")
+        if not runtime_root_env:
+            local_env = resolved_repo_root / ".env"
+            if local_env.is_file():
+                for line in local_env.read_text(encoding="utf-8-sig").splitlines():
+                    key, separator, value = line.partition("=")
+                    if separator and key.strip() == "MODEL_PREDICTION_RUNTIME_ROOT":
+                        runtime_root_env = value.strip().strip("\"'")
         if runtime_root_env and runtime_root_env.strip():
             runtime_root = Path(runtime_root_env.strip())
         elif require_external_runtime:

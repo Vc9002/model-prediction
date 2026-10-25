@@ -191,6 +191,23 @@ def _read_single_snapshot_archive(snapshot_path: Path, sport: str) -> list[dict[
     return rows
 
 
+def _nba_volatility_features(artifact: dict, history, prediction) -> dict:
+    """Capture exact replay inputs without changing the protected NBA engine."""
+    features = dict(prediction.feature_basis)
+    if artifact.get("dynamic_volatility"):
+        from ..features.trends import TrendEngine
+
+        trend = TrendEngine(
+            history,
+            offseason_gap_days=artifact.get("offseason_gap_days"),
+            offseason_retention=float(artifact.get("offseason_retention", 0.50)),
+            isolate_postseason=bool(artifact.get("isolate_postseason", False)),
+        )
+        features["volatility_away_consistency"] = trend.team_trend(prediction.away_team).consistency
+        features["volatility_home_consistency"] = trend.team_trend(prediction.home_team).consistency
+    return features
+
+
 def _forecast_mlb(args_date: str, log: bool, config, registry, bans, ledger, audit) -> dict:
     """Legacy Measured Edge research path retained as an explicit rollback."""
     spec = load_formula_spec(PROJECT_ROOT / "config/models/mlb-analyst-poisson-trend-v0.3.yaml")
@@ -619,14 +636,14 @@ def _forecast_mlb_totals_flat(
             for request, eligibility in planned_rows:
                 try:
                     logged.append(flat_ledger.append_evaluated(request, eligibility, now=observed_at))
-                    if main_ledger is not None and eligibility.decision == "CALL":
-                        existing_pick_id = _append_secondary_ledger(
-                            main_ledger, request, eligibility, observed_at, "mlb_totals:main_ledger"
-                        )
-                        if existing_pick_id is not None:
-                            main_duplicates.append(existing_pick_id)
                 except DuplicatePickError as error:
                     duplicates.append(error.pick_id)
+                if main_ledger is not None and eligibility.decision == "CALL":
+                    existing_pick_id = _append_secondary_ledger(
+                        main_ledger, request, eligibility, observed_at, "mlb_totals:main_ledger"
+                    )
+                    if existing_pick_id is not None:
+                        main_duplicates.append(existing_pick_id)
     return {
         "sport": "mlb_totals",
         "model_name": "Measured Edge Totals + Spread",
@@ -1956,7 +1973,7 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
         model_snapshot = (
             build_scalar_snapshot(
                 artifact,
-                prediction.feature_basis,
+                _nba_volatility_features(artifact, history, prediction),
                 prediction.inference_inputs,
                 event_id=prediction.event_id,
                 event_start_utc=prediction.event_start_utc,
@@ -4121,7 +4138,10 @@ def _log_esports_forecast(
                     ),
                 )
                 genuinely_eligible = eligibility.decision == "CALL"
-                ledger.append_evaluated(request, eligibility, now=observed_now)
+                primary_duplicate = _append_secondary_ledger(
+                    ledger, request, eligibility, observed_now, f"{title}:primary_ledger"
+                )
+                primary_duplicates += int(primary_duplicate is not None)
                 # Flat: every candidate, no edge gate (operator directive 2026-08-03).
                 if (
                     flat_ledger is not None
@@ -4143,7 +4163,7 @@ def _log_esports_forecast(
                     is not None
                 ):
                     gated_duplicates += 1
-            logged += 1
+            logged += int(primary_duplicate is None)
         except DuplicatePickError as error:
             # Primary ledger write only -- flat/gated are handled above via
             # _append_secondary_ledger, which never raises. DD-2: this used
@@ -4355,7 +4375,10 @@ def _forecast_international_sport(
                     ),
                 )
                 genuinely_eligible = eligibility.decision == "CALL"
-                research_ledger.append_evaluated(request, eligibility, now=observed_now)
+                primary_duplicate = _append_secondary_ledger(
+                    research_ledger, request, eligibility, observed_now, f"{league_upper}:primary_ledger"
+                )
+                research_duplicates += int(primary_duplicate is not None)
                 # Flat: every candidate, no edge gate (operator directive 2026-08-03).
                 if (
                     flat_ledger is not None
@@ -4374,7 +4397,7 @@ def _forecast_international_sport(
                     is not None
                 ):
                     gated_duplicates += 1
-            logged += 1
+            logged += int(primary_duplicate is None)
         except DuplicatePickError as error:
             # Primary (research_ledger) write only -- flat/gated are handled
             # above via _append_secondary_ledger, which never raises. DD-2:
@@ -5698,6 +5721,27 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
     # main/flat ledgers form a pair -- soccer, matching how its research/
     # gated ledgers already pair -- can log to both from either command.
     flat_ledger = MultiSportPickLedger(data_root, flat=True)
+    from ..saved_forecasts import (
+        existing_started_picks,
+        preserve_started_args,
+        stored_slate_coverage,
+    )
+
+    saved = existing_started_picks(
+        args.date,
+        sports,
+        ledger=flat_ledger if is_flat else ledger,
+        flat=is_flat,
+        data_root=data_root,
+    )
+    other_tier_saved = existing_started_picks(
+        args.date,
+        sports,
+        ledger=ledger if is_flat else flat_ledger,
+        flat=not is_flat,
+        data_root=data_root,
+    )
+    args = preserve_started_args(args, saved, other_tier_saved)
     # Scopes clearing to only the sport(s) this invocation is about to
     # regenerate -- flat_ledger/ledger both span every Main-ledger
     # sport (mlb/wnba/soccer/tennis), so an unscoped clear on a
@@ -5855,6 +5899,11 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
             )
         elif sport in LEARNED_PRODUCTION_SPORTS:
             use_ledger = flat_ledger if is_flat else ledger
+            forecast_observed_at = (
+                datetime.strptime(args.date, "%Y-%m-%d").replace(tzinfo=UTC)
+                if getattr(args, "force", False)
+                else utc_now()
+            )
             results[sport] = _forecast_learned_sport(
                 sport,
                 args.date,
@@ -5872,7 +5921,27 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
                 research_ledger=None,
                 gated_ledger=None,
                 exposure_ledger=ledger,
+                observed_at=forecast_observed_at,
             )
+            if log and not is_flat:
+                # Main qualification must never suppress Flat's full slate.
+                results[f"_flat_{sport}"] = _forecast_learned_sport(
+                    sport,
+                    args.date,
+                    True,
+                    config,
+                    registry,
+                    bans,
+                    flat_ledger,
+                    maximum_data_age_hours=float(config["project"].get("maximum_data_age_hours", 12)),
+                    maximum_unreviewed_disagreement=float(
+                        config["project"].get("maximum_unreviewed_market_disagreement", 0.10)
+                    ),
+                    flat_mode=True,
+                    force=getattr(args, "force", False),
+                    exposure_ledger=ledger,
+                    observed_at=forecast_observed_at,
+                )
             if sport == "mlb":
                 results["mlb_totals"] = _forecast_mlb_totals_flat(
                     args.date,
@@ -5956,5 +6025,14 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
                 )
         else:
             results[sport] = _forecast_research_sport(sport, args.date, config)
+    for sport in sports:
+        if sport in results:
+            results[sport]["existing_started_picks"] = [
+                row for row in saved if str(row.get("league", "")).casefold() == sport.casefold()
+            ]
+            if sport in MAIN_LEDGER_SPORTS:
+                results[sport]["stored_slate_coverage"] = stored_slate_coverage(
+                    args.date, sport, ledger=ledger, flat_ledger=flat_ledger, data_root=data_root
+                )
     output = results[sports[0]] if len(sports) == 1 and len(results) == 1 else results
     return output

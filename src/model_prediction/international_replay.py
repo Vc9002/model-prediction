@@ -122,7 +122,11 @@ def validate_decision_snapshot(payload: dict[str, Any], row: dict[str, Any]) -> 
     if (
         payload["sport"] not in {"KBO", "NPB"}
         or str(row.get("league")).upper() != payload["sport"]
-        or payload["model_version"] != payload["sport"].lower() + "-tie-aware-elo-v2"
+        or payload["model_version"]
+        not in {
+            payload["sport"].lower() + "-tie-aware-elo-v2",
+            payload["sport"].lower() + "-baseball-v3",
+        }
         or row.get("model_version") != payload["model_version"]
         or row.get("model_artifact_hash") != payload["artifact_hash"]
         or str(row.get("event_id")) != payload["event_id"]

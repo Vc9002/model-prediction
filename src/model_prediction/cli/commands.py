@@ -273,7 +273,7 @@ def _clear_today_open(
         try:
             started = parse_utc(event) <= now
         except ValueError:
-            started = False  # can't verify timing — don't risk deleting it
+            started = True  # can't verify timing — preserve the original
         if started:
             continue
         to_remove.append(row["pick_id"])
