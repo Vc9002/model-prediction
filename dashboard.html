@@ -186,6 +186,10 @@ table.ledger th{position:sticky;top:0;z-index:2;background:var(--surface-2);colo
 table.ledger th[onclick]{cursor:pointer}
 table.ledger th[onclick]:hover{color:var(--text)}
 table.ledger td{padding:7px 9px;border-bottom:1px solid var(--row-line);white-space:nowrap;vertical-align:middle}
+/* auto-buyer tables have 12+ columns: wrap and tighten so everything fits without horizontal scroll */
+#absSettledTable,#absPendingTable{table-layout:auto;font-size:11px}
+#absSettledTable th,#absPendingTable th{white-space:normal;padding:6px 5px;font-size:10px}
+#absSettledTable td,#absPendingTable td{white-space:normal;word-break:break-word;padding:6px 5px}
 table.ledger tr.click-row{cursor:pointer}
 table.ledger tr.click-row:hover td{background:var(--surface-2)}
 table.ledger tr.ledger-more td{text-align:center;white-space:normal;padding:12px;background:var(--surface)}

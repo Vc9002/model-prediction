@@ -1,11 +1,11 @@
 {
-  "baseline_brier": 0.245524,
-  "calibrated_at_utc": "2026-10-24T16:39:47.874668+00:00",
-  "calibrated_oof_brier": 0.24552433020513612,
+  "baseline_brier": 0.24625,
+  "calibrated_at_utc": "2026-10-24T20:38:56.584651+00:00",
+  "calibrated_oof_brier": 0.24625023839217808,
   "champion_method": "identity",
   "market": "moneyline",
   "model_version": "cs2-tiered-elo-v6",
   "parameters": {},
-  "sample_size": 360,
+  "sample_size": 365,
   "sport": "cs2"
 }
