@@ -23,7 +23,12 @@ def code_hashes() -> dict[str, str]:
 
 
 def capture_inputs(
-    book: Any, away_id: str, home_id: str, tie_method: str, base_tie_rate: float
+    book: Any,
+    away_id: str,
+    home_id: str,
+    tie_method: str,
+    base_tie_rate: float,
+    park_factor: float = 1.0,
 ) -> dict[str, Any]:
     state = asdict(book)
     state["ratings"] = {key: value for key, value in state["ratings"].items() if key in {away_id, home_id}}
@@ -40,6 +45,7 @@ def capture_inputs(
                 "home_id": home_id,
                 "tie_method": tie_method,
                 "base_tie_rate": base_tie_rate,
+                "park_factor": park_factor,
                 "code_sha256": code_hashes(),
             },
             allow_nan=False,
@@ -55,7 +61,9 @@ def replay_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     if inputs["tie_method"] not in {"flat", "elo_gap"} or not 0 <= inputs["base_tie_rate"] <= 1:
         raise ValueError("international_replay_invalid_tie_policy")
     book = HomeElo(**inputs["book_state"])
-    p_home = book.decisive_home_probability(inputs["away_id"], inputs["home_id"])
+    p_home = book.decisive_home_probability(
+        inputs["away_id"], inputs["home_id"], park_factor=inputs.get("park_factor", 1.0)
+    )
     tie = _game_tie_probability(
         inputs["away_id"], inputs["home_id"], book, inputs["tie_method"], inputs["base_tie_rate"]
     )

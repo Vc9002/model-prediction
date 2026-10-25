@@ -259,10 +259,10 @@ models:
     min_edge: 0.05
     active_production_version: nba-elo-trend-lr-v4
     production_artifact: config/models/nba-elo-trend-lr-v4.json
-    spread_production_artifact: config/models/nba-spread-margin-v3.json
-    total_production_artifact: config/models/nba-total-margin-v3.json
-    spread_rollback_artifact: config/models/nba-spread-margin-v2.json
-    total_rollback_artifact: config/models/nba-total-margin-v2.json
+    spread_production_artifact: config/models/nba-spread-margin-v5.json
+    total_production_artifact: config/models/nba-total-margin-v5.json
+    spread_rollback_artifact: config/models/nba-spread-margin-v4.json
+    total_rollback_artifact: config/models/nba-total-margin-v4.json
     markets:
     - moneyline
     - spread
@@ -597,8 +597,8 @@ models:
     - total
     market_target: expected_moneyline_settlement_tie_pays_half
     research_outputs_zero_units: false
-    active_production_version: kbo-tie-aware-elo-v2
-    production_artifact: config/models/kbo-tie-aware-elo-v2.json
+    active_production_version: kbo-baseball-v3
+    production_artifact: config/models/kbo-baseball-v3.json
     research_confidence_gate: 0.02
   NPB:
     family: tie_aware_home_elo
@@ -616,8 +616,8 @@ models:
     - total
     market_target: expected_moneyline_settlement_tie_pays_half
     research_outputs_zero_units: true
-    active_production_version: npb-tie-aware-elo-v2
-    production_artifact: config/models/npb-tie-aware-elo-v2.json
+    active_production_version: npb-baseball-v3
+    production_artifact: config/models/npb-baseball-v3.json
     # Honest disclosure (2026-08-03): same story as KBO above -- learned
     # 0.090624 on validation (65% hit rate there), did NOT generalize to
     # the locked holdout (55.7% hit rate on 176 calls, qualified=false,
@@ -669,7 +669,7 @@ models:
     family: elo_trend_normal_approximation
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: ncaab-tempo-v1
+    active_production_version: ncaab-tempo-v2
     active_research_version: ncaab-tempo-v1
     min_edge: 0.035
     spread_sd: 10.5
@@ -685,7 +685,7 @@ models:
     family: elo_trend_normal_approximation
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: eurolg-tempo-v1
+    active_production_version: eurolg-tempo-v2
     active_research_version: eurolg-tempo-v1
     min_edge: 0.035
     min_team_games: 8
@@ -704,7 +704,7 @@ models:
     family: elo_trend_normal_approximation
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: nbl-tempo-v1
+    active_production_version: nbl-tempo-v2
     active_research_version: nbl-tempo-v1
     min_edge: 0.035
     min_team_games: 8

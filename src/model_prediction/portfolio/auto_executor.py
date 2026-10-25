@@ -69,15 +69,22 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     "nfl-spread-structural-v5",
     "nfl-total-structural-v5",
     "nba-elo-trend-lr-v4",
+    "nba-spread-margin-v5",
     "nba-spread-margin-v4",
     "nba-spread-margin-v3",
     "nba-spread-margin-v2",
+    "nba-total-margin-v5",
     "nba-total-margin-v4",
     "nba-total-margin-v3",
     "nba-total-margin-v2",
     "cfb-structural-v3",
     "cfb-structural-v2",
     "mlb-structural-runline-v4",
+    "kbo-baseball-v3",
+    "npb-baseball-v3",
+    "ncaab-tempo-v2",
+    "eurolg-tempo-v2",
+    "nbl-tempo-v2",
 )
 
 EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (

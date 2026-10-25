@@ -119,13 +119,23 @@ prediction_service:
     evidence_status: historical_only
     replacement_priority: medium
     rollback_model: nba-elo-trend-lr-v3
+  - model_id: nba-spread-margin-v5
+    sport: NBA
+    market: spread
+    implementation: json_artifact
+    artifact: config/models/nba-spread-margin-v5.json
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: nba-spread-margin-v4
   - model_id: nba-spread-margin-v4
     sport: NBA
     market: spread
     implementation: json_artifact
     artifact: config/models/nba-spread-margin-v4.json
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: nba-spread-margin-v3
@@ -149,13 +159,23 @@ prediction_service:
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: nba-spread-margin-v1
+  - model_id: nba-total-margin-v5
+    sport: NBA
+    market: total
+    implementation: json_artifact
+    artifact: config/models/nba-total-margin-v5.json
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: nba-total-margin-v4
   - model_id: nba-total-margin-v4
     sport: NBA
     market: total
     implementation: json_artifact
     artifact: config/models/nba-total-margin-v4.json
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: nba-total-margin-v3
@@ -424,7 +444,7 @@ prediction_service:
     implementation: json_artifact
     artifact: config/models/kbo-tie-aware-elo-v2.json
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: historical_only
     replacement_priority: low
     rollback_model: null
@@ -444,7 +464,7 @@ prediction_service:
     implementation: json_artifact
     artifact: config/models/npb-tie-aware-elo-v2.json
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: historical_only
     replacement_priority: low
     rollback_model: null
@@ -488,33 +508,63 @@ prediction_service:
     evidence_status: unverified
     replacement_priority: high
     rollback_model: null
+  - model_id: ncaab-tempo-v2
+    sport: NCAAB
+    market: multi
+    implementation: code_backed_model
+    entry: model_prediction.models.basketball_leagues:ncaab_v2_model
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: ncaab-tempo-v1
   - model_id: ncaab-tempo-v1
     sport: NCAAB
     market: multi
     implementation: code_backed_model
     entry: model_prediction.models.basketball_leagues:ncaab_model
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: unverified
     replacement_priority: high
     rollback_model: null
+  - model_id: eurolg-tempo-v2
+    sport: EUROLEAGUE
+    market: multi
+    implementation: code_backed_model
+    entry: model_prediction.models.basketball_leagues:euroleague_v2_model
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: eurolg-tempo-v1
   - model_id: eurolg-tempo-v1
     sport: EUROLEAGUE
     market: multi
     implementation: code_backed_model
     entry: model_prediction.models.basketball_leagues:euroleague_model
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: unverified
     replacement_priority: high
     rollback_model: null
+  - model_id: nbl-tempo-v2
+    sport: NBL
+    market: multi
+    implementation: code_backed_model
+    entry: model_prediction.models.basketball_leagues:nbl_v2_model
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: nbl-tempo-v1
   - model_id: nbl-tempo-v1
     sport: NBL
     market: multi
     implementation: code_backed_model
     entry: model_prediction.models.basketball_leagues:nbl_model
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: unverified
     replacement_priority: high
     rollback_model: null
@@ -620,17 +670,17 @@ prediction_service:
     rollback_model: null
   champions:
     NCAAB:
-      moneyline: ncaab-tempo-v1
-      spread: ncaab-tempo-v1
-      total: ncaab-tempo-v1
+      moneyline: ncaab-tempo-v2
+      spread: ncaab-tempo-v2
+      total: ncaab-tempo-v2
     EUROLEAGUE:
-      moneyline: eurolg-tempo-v1
-      spread: eurolg-tempo-v1
-      total: eurolg-tempo-v1
+      moneyline: eurolg-tempo-v2
+      spread: eurolg-tempo-v2
+      total: eurolg-tempo-v2
     NBL:
-      moneyline: nbl-tempo-v1
-      spread: nbl-tempo-v1
-      total: nbl-tempo-v1
+      moneyline: nbl-tempo-v2
+      spread: nbl-tempo-v2
+      total: nbl-tempo-v2
     DARTS:
       moneyline: darts-markov-v2
     WNBA:
@@ -644,8 +694,8 @@ prediction_service:
       nrfi: mlb-nrfi-v4
     NBA:
       moneyline: nba-elo-trend-lr-v4
-      spread: nba-spread-margin-v4
-      total: nba-total-margin-v4
+      spread: nba-spread-margin-v5
+      total: nba-total-margin-v5
     NFL:
       moneyline: nfl-elo-trend-lr-v4
       spread: nfl-spread-structural-v5
@@ -683,9 +733,9 @@ prediction_service:
       spread: rainbow_six-spread-tiered-elo-v6
       total: rainbow_six-total-tiered-elo-v6
     KBO:
-      moneyline: kbo-tie-aware-elo-v2
+      moneyline: kbo-baseball-v3
     NPB:
-      moneyline: npb-tie-aware-elo-v2
+      moneyline: npb-baseball-v3
     HOCKEY:
       moneyline: hockey-poisson-dc-v2
       spread: hockey-poisson-dc-v2
@@ -860,9 +910,11 @@ prediction_service:
   - mlb-nrfi-v4
   - mlb-nrfi-v3
   - nba-elo-trend-lr-v4
+  - nba-spread-margin-v5
   - nba-spread-margin-v4
   - nba-spread-margin-v3
   - nba-spread-margin-v2
+  - nba-total-margin-v5
   - nba-total-margin-v4
   - nba-total-margin-v3
   - nba-total-margin-v2
@@ -897,8 +949,11 @@ prediction_service:
   - hockey-poisson-dc-v1
   - darts-markov-v2
   - darts-markov-v1
+  - ncaab-tempo-v2
   - ncaab-tempo-v1
+  - eurolg-tempo-v2
   - eurolg-tempo-v1
+  - nbl-tempo-v2
   - nbl-tempo-v1
   - cs2-spread-tiered-elo-v6
   - cs2-total-tiered-elo-v6
@@ -921,9 +976,11 @@ prediction_service:
     mlb-nrfi-v4: config/models/mlb-nrfi-v4.json
     mlb-nrfi-v3: config/models/mlb-nrfi-v3.json
     nba-elo-trend-lr-v4: config/models/nba-elo-trend-lr-v4.json
+    nba-spread-margin-v5: config/models/nba-spread-margin-v5.json
     nba-spread-margin-v4: config/models/nba-spread-margin-v4.json
     nba-spread-margin-v3: config/models/nba-spread-margin-v3.json
     nba-spread-margin-v2: config/models/nba-spread-margin-v2.json
+    nba-total-margin-v5: config/models/nba-total-margin-v5.json
     nba-total-margin-v4: config/models/nba-total-margin-v4.json
     nba-total-margin-v3: config/models/nba-total-margin-v3.json
     nba-total-margin-v2: config/models/nba-total-margin-v2.json

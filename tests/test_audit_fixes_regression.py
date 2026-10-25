@@ -1146,12 +1146,22 @@ def test_nba_total_margin_v2_model_and_forecast():
     # 2. Production Registry Resolution
     registry = ProductionModelRegistry.load(REPO)
     champ = registry.champion("NBA", "total")
-    assert champ.model_id in {"nba-total-margin-v2", "nba-total-margin-v3", "nba-total-margin-v4"}
+    assert champ.model_id in {
+        "nba-total-margin-v2",
+        "nba-total-margin-v3",
+        "nba-total-margin-v4",
+        "nba-total-margin-v5",
+    }
     assert champ.available is True
     assert "nba-total-margin-v2" not in registry.blocked_workflows
     assert "nba-total-margin-v3" not in registry.blocked_workflows
     assert "nba-total-margin-v4" not in registry.blocked_workflows
-    assert champ.rollback_model in {"nba-total-margin-v1", "nba-total-margin-v2", "nba-total-margin-v3"}
+    assert champ.rollback_model in {
+        "nba-total-margin-v1",
+        "nba-total-margin-v2",
+        "nba-total-margin-v3",
+        "nba-total-margin-v4",
+    }
 
     # 3. BasketballModel Composite Total Forecast
     model = BasketballModel(
@@ -1206,12 +1216,22 @@ def test_nba_spread_margin_v2_model_and_forecast():
     # 2. Production Registry Resolution
     registry = ProductionModelRegistry.load(REPO)
     champ = registry.champion("NBA", "spread")
-    assert champ.model_id in {"nba-spread-margin-v2", "nba-spread-margin-v3", "nba-spread-margin-v4"}
+    assert champ.model_id in {
+        "nba-spread-margin-v2",
+        "nba-spread-margin-v3",
+        "nba-spread-margin-v4",
+        "nba-spread-margin-v5",
+    }
     assert champ.available is True
     assert "nba-spread-margin-v2" not in registry.blocked_workflows
     assert "nba-spread-margin-v3" not in registry.blocked_workflows
     assert "nba-spread-margin-v4" not in registry.blocked_workflows
-    assert champ.rollback_model in {"nba-spread-margin-v1", "nba-spread-margin-v2", "nba-spread-margin-v3"}
+    assert champ.rollback_model in {
+        "nba-spread-margin-v1",
+        "nba-spread-margin-v2",
+        "nba-spread-margin-v3",
+        "nba-spread-margin-v4",
+    }
 
     # 3. Model Execution
     model = BasketballModel(

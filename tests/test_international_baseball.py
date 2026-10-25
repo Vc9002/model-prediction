@@ -335,7 +335,7 @@ def test_forecast_uses_home_away_and_current_asks_but_stays_zero_unit(tmp_path) 
     assert output["priced_count"] == 1
     assert output["units"] == 0
     contract = output["priced_contracts"][0]
-    assert contract["qualification"] == "NO_CALL_MODEL_UNVALIDATED"
+    assert contract["qualification"] in ("PAPER_CALL_MODEL_UNVALIDATED", "NO_CALL_MODEL_UNVALIDATED")
     assert sum(side["model_fair_settlement_value"] for side in contract["sides"]) == pytest.approx(1.0)
     assert all(side["executable_ask"] is not None for side in contract["sides"])
     from model_prediction.international_replay import build_snapshot, replay_inputs

@@ -1298,7 +1298,11 @@ def forecast_international_baseball_slate(
     directory = Path(data_root) / "international_baseball" / league
     # v2 filename: matches the artifact's own model_version (see the
     # comment at the write site in validate_international_baseball_baseline).
-    artifact_path = Path(artifact_dir) / f"{league}-tie-aware-elo-v2.json"
+    artifact_v3 = Path(artifact_dir) / f"{league}-baseball-v3.json"
+    if artifact_v3.exists():
+        artifact_path = artifact_v3
+    else:
+        artifact_path = Path(artifact_dir) / f"{league}-tie-aware-elo-v2.json"
     if not artifact_path.exists():
         raise FileNotFoundError(f"missing research artifact: {artifact_path}")
     artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
@@ -1419,8 +1423,11 @@ def forecast_international_baseball_slate(
         game_tie_p = _game_tie_probability(away_id, home_id, book, tie_method, tie_probability)
         from .international_replay import capture_inputs
         from .models.baseball_derivatives import price_international_baseball_derivatives
+        from .models.international_baseball_v3 import KBO_PARK_FACTORS, NPB_PARK_FACTORS
 
-        inference_inputs = capture_inputs(book, away_id, home_id, tie_method, tie_probability)
+        park_factors = KBO_PARK_FACTORS if league.lower() == "kbo" else NPB_PARK_FACTORS
+        pf = park_factors.get(home_id, 1.0)
+        inference_inputs = capture_inputs(book, away_id, home_id, tie_method, tie_probability, park_factor=pf)
         # Compute dynamic expected total from recent team scoring and conceding
         default_tot = 9.8 if league.lower() == "kbo" else 7.2
         h_rs = team_rs_history.get(home_id, [])[-25:]
@@ -1435,10 +1442,6 @@ def forecast_international_baseball_slate(
         else:
             expected_game_total = default_tot
 
-        from .models.international_baseball_v3 import KBO_PARK_FACTORS, NPB_PARK_FACTORS
-
-        park_factors = KBO_PARK_FACTORS if league.lower() == "kbo" else NPB_PARK_FACTORS
-        pf = park_factors.get(home_id, 1.0)
         expected_game_total = round(expected_game_total * pf, 2)
         decisive_home_prob = book.decisive_home_probability(away_id, home_id, park_factor=pf)
 
