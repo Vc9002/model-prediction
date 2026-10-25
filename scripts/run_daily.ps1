@@ -93,11 +93,28 @@ Write-Log '--- Step 1b: Historical game ingestion ---'
 $Stopwatch.Restart()
 $Sports = @('mlb', 'nba', 'wnba', 'nfl', 'ncaaf', 'ncaab', 'tennis')
 $IngestExit = 0
-foreach ($sport in $Sports) {
-    foreach ($d in @($Yesterday, $RunDate)) {
-        $code = Invoke-Step @('-m', 'model_prediction.cli', 'ingest', '--sport', $sport, '--date', $d)
-        if ($code -ne 0) { $IngestExit = $code }
+# One job per sport (each pays the ~12s CLI import once per date, and the
+# imports overlap instead of queueing 14 deep). Output is collected per job so
+# lines from different sports do not interleave in the log.
+$env:PYTHONPATH = 'src'
+$IngestJobs = foreach ($sport in $Sports) {
+    Start-Job -ArgumentList $Py, $RepoRoot, $sport, $Yesterday, $RunDate -ScriptBlock {
+        param($Py, $RepoRoot, $sport, $d1, $d2)
+        Set-Location $RepoRoot
+        $worst = 0
+        foreach ($d in @($d1, $d2)) {
+            & $Py -m model_prediction.cli ingest --sport $sport --date $d 2>&1
+            if ($LASTEXITCODE -ne 0) { $worst = $LASTEXITCODE }
+        }
+        "INGEST_EXIT=$worst"
     }
+}
+foreach ($job in $IngestJobs) {
+    $lines = @(Receive-Job -Job $job -Wait -AutoRemoveJob)
+    $lines | Where-Object { $_ -notmatch '^INGEST_EXIT=' } | Out-File -FilePath $Log -Append -Encoding utf8
+    $exitLine = $lines | Where-Object { $_ -match '^INGEST_EXIT=' } | Select-Object -Last 1
+    $code = if ($exitLine) { [int]($exitLine -replace '^INGEST_EXIT=', '') } else { 1 }
+    if ($code -ne 0) { $IngestExit = $code }
 }
 Write-Log "Ingestion exit code: $IngestExit"
 Write-Log ("Ingestion took: {0}s" -f [int]$Stopwatch.Elapsed.TotalSeconds)
