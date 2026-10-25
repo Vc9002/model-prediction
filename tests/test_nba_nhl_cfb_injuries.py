@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
+from pathlib import Path
 
 from model_prediction.data_sources.espn_cfb_injuries import normalize_espn_cfb_injuries
 from model_prediction.data_sources.espn_nba_injuries import normalize_espn_nba_injuries
@@ -11,7 +13,9 @@ from model_prediction.features.multi_sport_weather import (
     VENUE_CATALOG,
     compute_environmental_physics,
     fetch_venue_hourly_weather,
+    resolve_cfb_game_weather,
 )
+from model_prediction.features.nba_player_availability import compute_nba_matchup_availability
 
 
 def test_normalize_espn_nba_injuries() -> None:
@@ -171,3 +175,111 @@ def test_environmental_physics_indoor_vs_outdoor() -> None:
     assert indoor_weather["is_indoor"] is True
     assert indoor_weather["hourly"]["wind_speed_10m"][0] == 0.0
     assert indoor_weather["hourly"]["precipitation"][0] == 0.0
+
+
+def test_compute_nba_matchup_availability() -> None:
+    snapshot = {
+        "timestamp": "2026-10-24T20:00:00Z",
+        "entries": [
+            {
+                "player_name": "Jayson Tatum",
+                "team": "Boston Celtics",
+                "team_abbreviation": "BOS",
+                "status": "Questionable",
+                "position": "SF",
+            },
+            {
+                "player_name": "Kristaps Porzingis",
+                "team": "Boston Celtics",
+                "team_abbreviation": "BOS",
+                "status": "Out",
+                "position": "C",
+            },
+            {
+                "player_name": "Jimmy Butler",
+                "team": "Miami Heat",
+                "team_abbreviation": "MIA",
+                "status": "Out",
+                "position": "SF",
+            },
+        ],
+    }
+
+    result = compute_nba_matchup_availability(
+        data_root="dummy",
+        home_team="Boston Celtics",
+        away_team="Miami Heat",
+        snapshot=snapshot,
+    )
+
+    # Tatum: 4.8 * (1 - 0.5) = 2.4; Porzingis: 2.5 * (1 - 0.0) = 2.5 -> home_loss = 4.9
+    # Butler: 4.8 * (1 - 0.0) = 4.8 -> away_loss = 4.8
+    # Gap: away_loss - home_loss = 4.8 - 4.9 = -0.1
+    # Total loss: 4.9 + 4.8 = 9.7
+    assert result["home_points_lost"] == 4.9
+    assert result["away_points_lost"] == 4.8
+    assert result["availability_points_gap"] == -0.1
+    assert result["availability_total_loss"] == 9.7
+    assert len(result["home_injuries"]) == 2
+    assert len(result["away_injuries"]) == 1
+
+    empty_result = compute_nba_matchup_availability(
+        data_root="dummy",
+        home_team="Boston Celtics",
+        away_team="Miami Heat",
+        snapshot={"entries": []},
+    )
+    assert empty_result["availability_points_gap"] == 0.0
+    assert empty_result["availability_total_loss"] == 0.0
+
+
+def test_resolve_cfb_game_weather(tmp_path: Path) -> None:
+    # 1. Dome team (Syracuse)
+    temp, wind, precip, is_dome = resolve_cfb_game_weather(
+        data_root=tmp_path,
+        home_team="Syracuse",
+        game_date="2026-10-24",
+    )
+    assert is_dome is True
+    assert temp == 70.0
+    assert wind == 0.0
+    assert precip == 0.0
+
+    # 2. Outdoor team with no weather file
+    temp, wind, precip, is_dome = resolve_cfb_game_weather(
+        data_root=tmp_path,
+        home_team="Michigan",
+        game_date="2026-10-24",
+    )
+    assert is_dome is False
+    assert temp is None
+    assert wind is None
+    assert precip is None
+
+    # 3. Outdoor team with historical weather data
+    weather_dir = tmp_path / "weather"
+    weather_dir.mkdir(parents=True, exist_ok=True)
+    ncaaf_file = weather_dir / "ncaaf_historical.jsonl"
+
+    record = {
+        "venue_name": "Michigan Stadium",
+        "date": "2026-10-24",
+        "hourly": {
+            "temperature_2m": [10.0] * 24,
+            "wind_speed_10m": [20.0] * 24,
+            "precipitation": [2.54] * 24,
+        },
+    }
+    with open(ncaaf_file, "w", encoding="utf-8") as f:
+        f.write(json.dumps(record) + "\n")
+
+    temp, wind, precip, is_dome = resolve_cfb_game_weather(
+        data_root=tmp_path,
+        home_team="Michigan",
+        game_date="2026-10-24",
+        event_start_utc="2026-10-24T19:00:00Z",
+    )
+    assert is_dome is False
+    assert temp == 50.0
+    assert wind == 12.4
+    assert precip == 0.10

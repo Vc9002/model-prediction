@@ -1,0 +1,163 @@
+{
+  "status": "COMPLETED",
+  "generated_at_utc": "2026-10-25T02:13:51.332178+00:00",
+  "elapsed_seconds": 60.6,
+  "scores_ingestion": {
+    "nba": {
+      "dates_checked": 4,
+      "completed_games_seen": 14,
+      "new_games_appended": 0,
+      "errors": 0
+    },
+    "nfl": {
+      "dates_checked": 4,
+      "completed_games_seen": 1,
+      "new_games_appended": 0,
+      "errors": 0
+    },
+    "ncaaf": {
+      "dates_checked": 4,
+      "completed_games_seen": 8,
+      "new_games_appended": 0,
+      "errors": 0
+    },
+    "hockey": {
+      "dates_checked": 4,
+      "completed_games_seen": 23,
+      "new_games_appended": 0,
+      "errors": 0
+    },
+    "soccer": {
+      "dates_checked": 4,
+      "completed_games_seen": 106,
+      "new_games_appended": 0,
+      "errors": 0
+    }
+  },
+  "injury_availability_snapshots": {
+    "nba": {
+      "status": "ok",
+      "snapshot_path": "E:\\MP\\data\\availability\\nba\\espn_injury_snapshots\\2026-10-25\\nba-injuries-20261025T021253+0000-d095d065476e.json",
+      "total_injuries": 79,
+      "observed_at_utc": "2026-10-25T02:12:53.419998+00:00"
+    },
+    "hockey": {
+      "status": "ok",
+      "snapshot_path": "E:\\MP\\data\\availability\\hockey\\espn_injury_snapshots\\2026-10-25\\nhl-injuries-20261025T021253+0000-7e437aea32fd.json",
+      "total_injuries": 130,
+      "observed_at_utc": "2026-10-25T02:12:53.734188+00:00"
+    },
+    "ncaaf": {
+      "status": "ok",
+      "snapshot_path": "E:\\MP\\data\\availability\\ncaaf\\espn_injury_snapshots\\2026-10-25\\cfb-injuries-20261025T021254+0000-ff17e7d50b56.json",
+      "total_injuries": 3,
+      "observed_at_utc": "2026-10-25T02:12:54.041639+00:00"
+    },
+    "nfl": {
+      "status": "ok",
+      "snapshot_path": "E:\\MP\\data\\availability\\nfl\\espn_injury_snapshots\\2026-10-25\\nfl-injuries-20261025T021254+0000-cad25de4d284.json",
+      "total_injuries": 800,
+      "observed_at_utc": "2026-10-25T02:12:54.361123+00:00"
+    }
+  },
+  "atmospheric_weather": {
+    "nfl": {
+      "observations_fetched": 30,
+      "appended": 0
+    },
+    "ncaaf": {
+      "observations_fetched": 27,
+      "appended": 0
+    },
+    "soccer": {
+      "observations_fetched": 24,
+      "appended": 0
+    }
+  },
+  "market_quotes_sync": {
+    "status": "success",
+    "total_quotes_ingested": 82889,
+    "sports": {
+      "basketball": {
+        "quotes": 688,
+        "with_depth": 653,
+        "files": 9
+      },
+      "darts": {
+        "quotes": 284,
+        "with_depth": 264,
+        "files": 8
+      },
+      "esports": {
+        "quotes": 3237,
+        "with_depth": 3040,
+        "files": 15
+      },
+      "hockey": {
+        "quotes": 1563,
+        "with_depth": 1482,
+        "files": 9
+      },
+      "kbo": {
+        "quotes": 48,
+        "with_depth": 48,
+        "files": 15
+      },
+      "mlb": {
+        "quotes": 2409,
+        "with_depth": 2374,
+        "files": 15
+      },
+      "nba": {
+        "quotes": 4089,
+        "with_depth": 4060,
+        "files": 15
+      },
+      "ncaaf": {
+        "quotes": 27890,
+        "with_depth": 26894,
+        "files": 15
+      },
+      "nfl": {
+        "quotes": 13667,
+        "with_depth": 13551,
+        "files": 15
+      },
+      "npb": {
+        "quotes": 30,
+        "with_depth": 30,
+        "files": 15
+      },
+      "soccer": {
+        "quotes": 11965,
+        "with_depth": 11600,
+        "files": 15
+      },
+      "tennis": {
+        "quotes": 16620,
+        "with_depth": 15919,
+        "files": 15
+      },
+      "wnba": {
+        "quotes": 399,
+        "with_depth": 398,
+        "files": 15
+      }
+    },
+    "database_file": "E:\\model-prediction-runtime\\market_quotes.db"
+  },
+  "processed_games_line_counts": {
+    "darts": 2621,
+    "euroleague": 1461,
+    "hockey": 6954,
+    "mlb": 8767,
+    "nba": 3717,
+    "nbl": 412,
+    "ncaab": 6300,
+    "ncaaf": 7791,
+    "nfl": 3037,
+    "soccer": 14695,
+    "tennis": 77057,
+    "wnba": 963
+  }
+}

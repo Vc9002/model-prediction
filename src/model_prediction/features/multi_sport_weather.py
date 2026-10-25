@@ -334,3 +334,66 @@ def store_weather_observations(
                 appended += 1
 
     return appended
+
+
+def resolve_cfb_game_weather(
+    data_root: str | Path,
+    home_team: str,
+    game_date: str,
+    event_start_utc: str | None = None,
+) -> tuple[float | None, float | None, float | None, bool]:
+    """Resolves (temperature_f, wind_mph, precipitation_in, is_dome) for a CFB matchup."""
+    from ..data_sources.cfb_data import resolve_team
+    from ..domain import parse_utc
+
+    team_info = resolve_team(home_team)
+    if team_info is not None and team_info.is_dome:
+        return (70.0, 0.0, 0.0, True)
+
+    weather_file = Path(data_root) / "weather" / "ncaaf_historical.jsonl"
+    if not weather_file.exists():
+        return (None, None, None, False)
+
+    stadium_name = team_info.stadium_name if team_info else home_team
+    stadium_norm = stadium_name.casefold().strip()
+
+    target_hour = 19  # Default ~3 PM EDT / 19:00 UTC
+    if event_start_utc:
+        try:
+            dt = parse_utc(event_start_utc)
+            target_hour = min(23, max(0, dt.hour))
+        except (ValueError, TypeError):
+            pass
+
+    try:
+        with open(weather_file, "r", encoding="utf-8") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                rec = json.loads(line)
+                v_name = str(rec.get("venue_name", "")).casefold().strip()
+                v_date = str(rec.get("date", ""))
+                if v_date == game_date and (v_name in stadium_norm or stadium_norm in v_name):
+                    hourly = rec.get("hourly", {})
+                    temps = hourly.get("temperature_2m", [])
+                    winds = hourly.get("wind_speed_10m", [])
+                    precips = hourly.get("precipitation", [])
+
+                    temp_c = temps[target_hour] if len(temps) > target_hour else (temps[0] if temps else None)
+                    wind_kmh = (
+                        winds[target_hour] if len(winds) > target_hour else (winds[0] if winds else None)
+                    )
+                    precip_mm = (
+                        precips[target_hour]
+                        if len(precips) > target_hour
+                        else (precips[0] if precips else None)
+                    )
+
+                    temp_f = round(temp_c * 1.8 + 32.0, 1) if temp_c is not None else None
+                    wind_mph = round(wind_kmh * 0.621371, 1) if wind_kmh is not None else None
+                    precip_in = round(precip_mm / 25.4, 2) if precip_mm is not None else None
+                    return (temp_f, wind_mph, precip_in, False)
+    except (OSError, json.JSONDecodeError):
+        pass
+
+    return (None, None, None, False)

@@ -1917,6 +1917,9 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
             unmatched.append({"event_id": event_id, "reason": "no matched spread market"})
             continue
 
+        from ..features.nba_player_availability import compute_nba_matchup_availability
+
+        avail = compute_nba_matchup_availability(data_root, home_team, away_team, observed_at=observed_at)
         upcoming.append(
             UpcomingGame(
                 event_id=event_id,
@@ -1924,6 +1927,8 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
                 away_team=away_team,
                 home_team=home_team,
                 spread_away_line=float(market["line"]),
+                availability_points_gap=avail.get("availability_points_gap", 0.0),
+                availability_total_loss=avail.get("availability_total_loss", 0.0),
                 league="NBA",
             )
         )
@@ -2261,6 +2266,9 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
         except (KeyError, TypeError, ValueError):
             continue
 
+        from ..features.nba_player_availability import compute_nba_matchup_availability
+
+        avail = compute_nba_matchup_availability(data_root, home_team, away_team, observed_at=observed_at)
         upcoming.append(
             UpcomingGame(
                 event_id=event_id,
@@ -2268,6 +2276,8 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
                 away_team=away_team,
                 home_team=home_team,
                 total_line=t_line,
+                availability_points_gap=avail.get("availability_points_gap", 0.0),
+                availability_total_loss=avail.get("availability_total_loss", 0.0),
                 league="NBA",
             )
         )

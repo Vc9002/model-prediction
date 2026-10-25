@@ -1,6 +1,6 @@
 {
   "overall_status": "HEALTHY",
-  "generated_at_utc": "2026-10-25T02:14:05.411339+00:00",
+  "generated_at_utc": "2026-10-25T02:33:35.873906+00:00",
   "odds_freshness": {
     "status": "OK",
     "stale_active_sports": [],
@@ -369,6 +369,6 @@
   "self_healing": {
     "status": "skipped",
     "message": "Auto-heal disabled. Pass --auto-heal to execute write-remediation routines.",
-    "timestamp_utc": "2026-10-25T02:14:05.411339+00:00"
+    "timestamp_utc": "2026-10-25T02:33:35.873906+00:00"
   }
 }

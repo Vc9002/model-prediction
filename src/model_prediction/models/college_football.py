@@ -799,6 +799,12 @@ def build_cfb_slate(
         ev_season = int((ev.get("season") or {}).get("year") or iso_date[:4])
         ev_week = int((ev.get("week") or {}).get("number") or 1)
 
+        from ..features.multi_sport_weather import resolve_cfb_game_weather
+
+        w_temp, w_wind, w_precip, _ = resolve_cfb_game_weather(
+            root, home_team, iso_date, event_start_utc=event_start_utc
+        )
+
         upcoming = UpcomingCFBGame(
             event_id=event_id,
             event_start_utc=event_start_utc,
@@ -807,6 +813,9 @@ def build_cfb_slate(
             spread_away_line=effective_spread_away,
             spread_home_line=effective_spread_home,
             total_line=effective_total,
+            wind_mph=w_wind,
+            temperature_f=w_temp,
+            precipitation_in=w_precip,
             is_neutral_site=is_neutral,
             season_year=ev_season,
             week=ev_week,
