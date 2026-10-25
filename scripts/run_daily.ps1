@@ -143,7 +143,7 @@ Write-Log ("MLB v9 forecast took: {0}s" -f [int]$Stopwatch.Elapsed.TotalSeconds)
 # -- Step 2c: Automated Health and Data Gap Monitor ---------------------------
 Write-Log '--- Step 2c: Automated Health and Data Gap Monitor ---'
 $Stopwatch.Restart()
-$HealthExit = Invoke-Step @('scripts/health_and_data_gap_monitor.py') 'src;.'
+$HealthExit = Invoke-Step @('scripts/health_and_data_gap_monitor.py', '--auto-heal') 'src;.'
 Write-Log "Health monitor exit code: $HealthExit"
 Write-Log ("Health monitor took: {0}s" -f [int]$Stopwatch.Elapsed.TotalSeconds)
 

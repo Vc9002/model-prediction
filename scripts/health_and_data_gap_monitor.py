@@ -227,7 +227,9 @@ def audit_models_and_ledgers(runtime_paths: RuntimePaths) -> dict[str, Any]:
     }
 
 
-def auto_heal_data_gaps(runtime_paths: RuntimePaths) -> dict[str, Any]:
+def auto_heal_data_gaps(
+    runtime_paths: RuntimePaths, odds_report: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Execute automated self-healing procedures for detected data gaps."""
     healed_actions = []
 
@@ -262,6 +264,27 @@ def auto_heal_data_gaps(runtime_paths: RuntimePaths) -> dict[str, Any]:
         except (OSError, json.JSONDecodeError):
             pass
 
+    # 3. Self-heal stale active sports odds snapshots
+    if odds_report:
+        stale_sports = odds_report.get("stale_active_sports", [])
+        if stale_sports:
+            today_str = datetime.now(UTC).strftime("%Y-%m-%d")
+            for sp in stale_sports:
+                try:
+                    from model_prediction.data_sources.polymarket_us import (
+                        PolymarketUSClient,
+                        capture_slate_snapshots,
+                    )
+
+                    client = PolymarketUSClient()
+                    snap_res = capture_slate_snapshots(
+                        client, [sp], today_str, data_root=str(PROJECT_ROOT / "data")
+                    )
+                    rows = snap_res.get("captured_rows", 0)
+                    healed_actions.append(f"Auto-captured fresh prospective odds for {sp}: {rows} rows")
+                except (OSError, RuntimeError, ValueError) as exc:
+                    healed_actions.append(f"Auto-capture for {sp} attempted: {exc}")
+
     return {
         "healed_actions": healed_actions,
         "timestamp_utc": datetime.now(UTC).isoformat(),
@@ -278,7 +301,7 @@ def run_health_and_data_gap_monitor(auto_heal: bool = False) -> dict[str, Any]:
     models_report = audit_models_and_ledgers(runtime_paths)
 
     if auto_heal:
-        healing_report = auto_heal_data_gaps(runtime_paths)
+        healing_report = auto_heal_data_gaps(runtime_paths, odds_report=odds_report)
     else:
         healing_report = {
             "status": "skipped",
