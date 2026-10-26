@@ -1161,6 +1161,14 @@ class AutoPolymarketBuyer:
         """Scan open picks, apply filters and sizing, and execute live or paper-trade."""
         from model_prediction.dashboard.orders import _decorate_pick
 
+        # Circuit breaker for this cycle's live quote refresh (step 7 below):
+        # once the gateway 429s once, every subsequent stale-quote pick would
+        # otherwise retry (with its own 10s backoff) against a still-throttled
+        # endpoint -- 30 stale picks under live throttling cost ~1623s of the
+        # daily run this way (2026-10-26). Mirrors the same breaker already
+        # used in polymarket_us.py's capture_pool_slates.
+        gateway_rate_limited = False
+
         if picks is None:
             from model_prediction.dashboard.picks import _parse_research_picks, read_flat_picks, read_picks
 
@@ -1381,6 +1389,7 @@ class AutoPolymarketBuyer:
                 not quote.get("fresh", False)
                 and age_sec > MAX_AUTO_BUYER_QUOTE_AGE_SECONDS
                 and self._live_quote_fn is None
+                and not gateway_rate_limited
             ):
                 try:
                     from model_prediction.data_sources.polymarket_us import PolymarketUSClient
@@ -1408,6 +1417,15 @@ class AutoPolymarketBuyer:
                             "market_state": live_snap.get("market_state", "MARKET_STATE_OPEN"),
                         }
                         age_sec = 0.0
+                except httpx.HTTPStatusError as throttled_again:
+                    if throttled_again.response.status_code == 429:
+                        gateway_rate_limited = True
+                    logger.warning(
+                        "live quote refresh failed for %s (%s): %s",
+                        quote.get("market_slug"),
+                        pick_id,
+                        throttled_again,
+                    )
                 except (
                     httpx.HTTPError,
                     OSError,
