@@ -1234,7 +1234,7 @@ def forecast_esports_slate(
     artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
     teams = json.loads((directory / "teams.json").read_text(encoding="utf-8"))
     aliases = _team_alias_index(teams)
-    market_client = client or PolymarketUSClient(max_attempts=2)
+    market_client = client or PolymarketUSClient(max_attempts=2, prefer_bbo=True)
     league = str(TITLE_SPECS[title]["polymarket_league"])
     # Fetch today + tomorrow to capture all open contracts without stale
     # yesterday events that may have already resolved or expired.

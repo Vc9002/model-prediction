@@ -787,6 +787,105 @@ def test_snapshot_from_slate_matches_snapshot_with_one_request() -> None:
     assert fast == full
 
 
+def test_slate_snapshot_uses_verified_bbo_when_full_book_is_rate_limited(monkeypatch) -> None:
+    paths = []
+    sleeps = []
+    monkeypatch.setattr("model_prediction.data_sources.polymarket_us.time.sleep", sleeps.append)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        paths.append(request.url.path)
+        if request.url.path.endswith("/book"):
+            return httpx.Response(429, text="Too Many Requests")
+        return httpx.Response(
+            200,
+            json={
+                "marketData": {
+                    "marketSlug": "mkt-1",
+                    "state": "MARKET_STATE_OPEN",
+                    "bestBid": {"value": "0.58"},
+                    "bestAsk": {"value": "0.61"},
+                }
+            },
+        )
+
+    client = PolymarketUSClient(
+        "https://example.test", httpx.Client(transport=httpx.MockTransport(handler)), max_attempts=1
+    )
+    event = {"event_start_utc": "2026-10-22T23:00:00Z"}
+    snapshot = client.snapshot_from_slate(event, _slate_market(), datetime(2026, 10, 22, 20, tzinfo=UTC))
+    assert paths == ["/v1/markets/mkt-1/book", "/v1/markets/mkt-1/bbo"]
+    assert sleeps and sleeps[0] >= 1.0
+    assert snapshot["long"]["ask"] == 0.61
+    assert snapshot["short"]["ask"] == 0.42
+    assert snapshot["long"]["ask_size"] is None
+    assert snapshot["transact_time_utc"] is None
+    assert snapshot["reconstruction_status_source"] == "live_gateway_market_and_bbo_response"
+
+
+def test_slate_snapshot_prefers_bbo_without_requesting_full_book() -> None:
+    paths = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        paths.append(request.url.path)
+        return httpx.Response(
+            200,
+            json={
+                "marketData": {
+                    "marketSlug": "mkt-1",
+                    "state": "MARKET_STATE_OPEN",
+                    "bestBid": {"value": "0.58"},
+                    "bestAsk": {"value": "0.61"},
+                }
+            },
+        )
+
+    client = PolymarketUSClient(
+        "https://example.test", httpx.Client(transport=httpx.MockTransport(handler)), prefer_bbo=True
+    )
+    snapshot = client.snapshot_from_slate({"event_start_utc": "2026-10-22T23:00:00Z"}, _slate_market())
+    assert paths == ["/v1/markets/mkt-1/bbo"]
+    assert snapshot["long"]["ask"] == 0.61
+    assert snapshot["long"]["ask_size"] is None
+
+
+@pytest.mark.parametrize(
+    "bad_bbo",
+    [
+        {
+            "marketSlug": "other",
+            "state": "MARKET_STATE_OPEN",
+            "bestBid": {"value": "0.58"},
+            "bestAsk": {"value": "0.61"},
+        },
+        {
+            "marketSlug": "mkt-1",
+            "state": "MARKET_STATE_SUSPENDED",
+            "bestBid": {"value": "0.58"},
+            "bestAsk": {"value": "0.61"},
+        },
+        {
+            "marketSlug": "mkt-1",
+            "state": "MARKET_STATE_OPEN",
+            "bestBid": {"value": "0.61"},
+            "bestAsk": {"value": "0.58"},
+        },
+    ],
+)
+def test_slate_snapshot_rejects_invalid_bbo_fallback(bad_bbo: dict, monkeypatch) -> None:
+    monkeypatch.setattr("model_prediction.data_sources.polymarket_us.time.sleep", lambda duration: None)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/book"):
+            return httpx.Response(429, text="Too Many Requests")
+        return httpx.Response(200, json={"marketData": bad_bbo})
+
+    client = PolymarketUSClient(
+        "https://example.test", httpx.Client(transport=httpx.MockTransport(handler)), max_attempts=1
+    )
+    with pytest.raises(ValueError, match="invalid_executable_bbo"):
+        client.snapshot_from_slate({"event_start_utc": "2026-10-22T23:00:00Z"}, _slate_market())
+
+
 def test_get_retries_connect_errors_then_succeeds_and_raises_when_exhausted(monkeypatch) -> None:
     sleeps: list[float] = []
     monkeypatch.setattr("model_prediction.data_sources.polymarket_us.time.sleep", sleeps.append)

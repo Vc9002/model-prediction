@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import random
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -453,12 +454,15 @@ class PolymarketUSClient:
         base_url: str = "https://gateway.polymarket.us",
         client: httpx.Client | None = None,
         max_attempts: int = 6,
+        prefer_bbo: bool = False,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.client = client or httpx.Client(timeout=30)
         if max_attempts < 1:
             raise ValueError("max_attempts must be positive")
         self.max_attempts = max_attempts
+        self.prefer_bbo = prefer_bbo
+        self._last_bbo_request = 0.0
 
     def _get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         # The gateway throttles bursts from the 16-worker snapshot pool with
@@ -617,9 +621,40 @@ class PolymarketUSClient:
     def book(self, slug: str) -> dict[str, Any]:
         return self._get(f"/v1/markets/{slug}/book")["marketData"]
 
+    def _book_with_bbo_fallback(self, slug: str) -> dict[str, Any]:
+        """Recover an exact, two-sided top-of-book quote if full depth is throttled."""
+        if not self.prefer_bbo:
+            try:
+                return self.book(slug)
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code != 429:
+                    raise
+                # The documented IP-wide 429 contract requires a pause before
+                # trying the lighter endpoint; an immediate request also 429s.
+                time.sleep(max(1.0, _retry_delay_seconds(exc.response, 0)))
+        else:
+            # One request per second from this client avoids a book+BBO burst
+            # across the esports slate. The gateway limit is shared by IP.
+            remaining = 1.0 - (time.monotonic() - self._last_bbo_request)
+            if remaining > 0:
+                time.sleep(remaining)
+            self._last_bbo_request = time.monotonic()
+        bbo = self._get(f"/v1/markets/{slug}/bbo")["marketData"]
+        bid = _amount(bbo.get("bestBid"))
+        ask = _amount(bbo.get("bestAsk"))
+        if (
+            bbo.get("marketSlug") != slug
+            or bbo.get("state") != "MARKET_STATE_OPEN"
+            or bid is None
+            or ask is None
+            or not (math.isfinite(bid) and math.isfinite(ask) and 0 < bid < ask < 1)
+        ):
+            raise ValueError(f"invalid_executable_bbo_for_{slug}")
+        return {**bbo, "_response_source": "bbo"}
+
     def snapshot(self, slug: str, observed_at: datetime | None = None) -> dict[str, Any]:
         market = self.market(slug)
-        book = self.book(slug)
+        book = self._book_with_bbo_fallback(slug)
         return self._build_snapshot(market, book, slug, observed_at)
 
     def snapshot_from_slate(
@@ -646,7 +681,7 @@ class PolymarketUSClient:
             "line": market.get("line"),
             "marketSides": sides,
         }
-        return self._build_snapshot(market_like, self.book(slug), slug, observed_at)
+        return self._build_snapshot(market_like, self._book_with_bbo_fallback(slug), slug, observed_at)
 
     @staticmethod
     def _build_snapshot(
@@ -683,7 +718,11 @@ class PolymarketUSClient:
             # market/book responses in this call; it is not reconstructed
             # from historical prices or postgame data.
             "reconstructed": False,
-            "reconstruction_status_source": "live_gateway_market_and_book_response",
+            "reconstruction_status_source": (
+                "live_gateway_market_and_bbo_response"
+                if book.get("_response_source") == "bbo"
+                else "live_gateway_market_and_book_response"
+            ),
             "market_id": str(market["id"]),
             "market_slug": slug,
             "event_start_utc": market.get("gameStartTime"),
