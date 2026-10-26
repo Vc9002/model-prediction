@@ -20,6 +20,7 @@ import sqlite3
 import sys
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from model_prediction.config import PROJECT_ROOT
 from model_prediction.production_canary import load_production_config
@@ -86,8 +87,8 @@ def is_sport_off_season(sport: str, reference_date: datetime.date) -> tuple[bool
 
 def audit_odds_freshness(runtime_paths: RuntimePaths) -> dict[str, Any]:
     """Check freshness and depth across data/odds/<sport>."""
-    odds_root = PROJECT_ROOT / "data" / "odds"
-    today = datetime.now(UTC).date()
+    odds_root = runtime_paths.runtime_root / "odds"
+    today = datetime.now(ZoneInfo("America/New_York")).date()
     yesterday_iso = (today - timedelta(days=1)).isoformat()
 
     sports_status = {}
@@ -232,6 +233,7 @@ def auto_heal_data_gaps(
 ) -> dict[str, Any]:
     """Execute automated self-healing procedures for detected data gaps."""
     healed_actions = []
+    healing_failures: list[dict[str, Any]] = []
 
     # 1. Self-heal Market Quotes Warehouse depth if needed
     db_path = runtime_paths.market_quotes_db
@@ -268,25 +270,45 @@ def auto_heal_data_gaps(
     if odds_report:
         stale_sports = odds_report.get("stale_active_sports", [])
         if stale_sports:
-            today_str = datetime.now(UTC).strftime("%Y-%m-%d")
+            today = datetime.now(ZoneInfo("America/New_York")).date()
+            today_str = today.isoformat()
             for sp in stale_sports:
                 try:
+                    import httpx
+
                     from model_prediction.data_sources.polymarket_us import (
                         PolymarketUSClient,
                         capture_slate_snapshots,
                     )
 
-                    client = PolymarketUSClient()
-                    snap_res = capture_slate_snapshots(
-                        client, [sp], today_str, data_root=str(PROJECT_ROOT / "data")
-                    )
-                    rows = snap_res.get("captured_rows", 0)
-                    healed_actions.append(f"Auto-captured fresh prospective odds for {sp}: {rows} rows")
-                except (OSError, RuntimeError, ValueError) as exc:
-                    healed_actions.append(f"Auto-capture for {sp} attempted: {exc}")
+                    with httpx.Client(timeout=5) as transport:
+                        client = PolymarketUSClient(client=transport, max_attempts=1)
+                        slate = client.sport_slate(sp, today)
+                        capture = capture_slate_snapshots(
+                            client,
+                            slate.events,
+                            runtime_paths.runtime_root,
+                            today_str,
+                            max_workers=2,
+                        )
+                    rows = int(capture.get("captured", 0))
+                    if rows:
+                        healed_actions.append(f"Auto-captured fresh prospective odds for {sp}: {rows} rows")
+                    if slate.errors or capture.get("failures") or not rows:
+                        healing_failures.append(
+                            {
+                                "sport": sp,
+                                "source_errors": slate.errors,
+                                "capture_failures": capture.get("failures", 0),
+                                "captured": rows,
+                            }
+                        )
+                except (OSError, RuntimeError, ValueError, httpx.HTTPError) as exc:
+                    healing_failures.append({"sport": sp, "error": str(exc)[:200]})
 
     return {
         "healed_actions": healed_actions,
+        "healing_failures": healing_failures,
         "timestamp_utc": datetime.now(UTC).isoformat(),
     }
 
@@ -302,6 +324,7 @@ def run_health_and_data_gap_monitor(auto_heal: bool = False) -> dict[str, Any]:
 
     if auto_heal:
         healing_report = auto_heal_data_gaps(runtime_paths, odds_report=odds_report)
+        odds_report = audit_odds_freshness(runtime_paths)
     else:
         healing_report = {
             "status": "skipped",
@@ -310,7 +333,12 @@ def run_health_and_data_gap_monitor(auto_heal: bool = False) -> dict[str, Any]:
         }
 
     overall_status = "HEALTHY"
-    if models_report.get("status") != "PASS" or warehouse_report.get("status") in {"MISSING", "EMPTY"}:
+    if (
+        models_report.get("status") != "PASS"
+        or warehouse_report.get("status") in {"MISSING", "EMPTY"}
+        or odds_report.get("status") != "OK"
+        or healing_report.get("healing_failures")
+    ):
         overall_status = "WARNING"
 
     summary = {
