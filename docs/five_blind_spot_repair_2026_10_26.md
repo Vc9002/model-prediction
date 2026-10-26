@@ -17,3 +17,7 @@ This is a serving and evidence audit of the October 25 UTC settlement cohort in 
 - A live, non-ordering October 31 weather capture covered all 44 scheduled outdoor CFB games; three indoor games were static. A non-logging slate build produced 141 contracts across 47 games, all with verified weather evidence.
 
 The guards are prospective. They do not establish that any new model is more accurate or profitable. Promote a challenger only after point-in-time feature audits, walk-forward calibration and market-relative performance, a locked holdout, and the existing monthly gate. Keep incumbent artifacts available for rollback.
+
+## Current source availability
+
+At 2026-10-26 07:36 UTC, `system_health()` remained `DOWN` because the 05:00 UTC supervised daily run exited 1. A direct read-only CS2 forecast reproduced `status=error`, `reason=market_source_rate_limited`: the Polymarket US book endpoint returned HTTP 429 for current-date contracts. The canonical runtime has no October 26 esports BBO archive from which to price those contracts. This is an external quote outage and a genuine daily coverage gap. The engine correctly emits no-calls and keeps integrity red; prior-day quotes cannot be presented as current executable prices. Production prediction and calibration workers were fresh in that health check.
