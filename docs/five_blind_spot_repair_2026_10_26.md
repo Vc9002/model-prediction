@@ -1,0 +1,19 @@
+# Five reported loss clusters: repair status (2026-10-26)
+
+This is a serving and evidence audit of the October 25 UTC settlement cohort in `loss_forensic_report_2026_10_25.md`. The 79 losses total **-113.02 units**, not -108.01. A loss cohort alone cannot measure overall model profitability or prove a cause. Existing started-game decisions and settled rows were not changed.
+
+| Cluster | Verified finding | Serving repair | Still unproved / next research gate |
+| --- | --- | --- | --- |
+| Soccer | Five losing picks came from three scoreless matches; some Main rows recorded negative executable edge. | Main now checks the contract's exact quoted edge against its configured minimum. Flat still records all priced observations. | No point-in-time formation evidence supports the asserted 5-4-1 trap. Compare zero-goal and Over 1.5 calibration by league and price band using pregame features before versioning a tactical challenger. |
+| Hockey | The v2 artifact's `max_edge=0.08` was not enforced at Main admission. | The prior artifact-backed repair retains excessive-edge observations in Flat as zero-unit no-calls. | Backup-goalie status is absent from verified pregame snapshots. Ten losses, seven in the AHL, do not establish a goalie coefficient or justify a blanket AHL ban. Capture timestamped starter confirmations, then test an AHL challenger walk-forward. |
+| CFB | Outdoor weather previously came from an untimestamped archive or defaulted to neutral values. The cited games had no verified weather adjustment. | Daily capture now stores timestamped, hash-checked Open-Meteo forecasts; inference accepts only a forecast captured before decision and kickoff at the exact event hour. Unverified outdoor totals and edges above the v3 artifact's bound remain Flat-only. | This fixes feature provenance, not the asserted road/rushing effect. Test a new version with pregame play-rate, opponent and forecast-weather features against the incumbent. |
+| LoL | The current Elo match graph is mostly connected; region labels and historical roster context are not available in the required pregame evidence. Two cited losses are not Western-vs-LPL/LCK examples. | No arbitrary regional penalty or 8% cap was installed. | Build a timestamped region/roster source and validate a versioned interregional challenger out of sample. The reported three losses do not identify a safe coefficient. |
+| NBA | Active v5 totals already include dynamic matchup pace, but its very large market disagreements and injury adjustment require scrutiny. The NBA engine is protected. | Main now requires a qualified record and the existing project market-disagreement limit. Flat preserves all priced contracts and the reason for rejection. | This is a risk guard, not proof of better totals. A new version must test whether availability deductions double-count long-term absences and evaluate pregame transition/pace features walk-forward. Do not train on final possessions. |
+
+## Verification
+
+- `ruff check` passed for the changed source and targeted test.
+- `pytest tests/test_five_blind_spot_guards.py -o addopts='' -q`: 6 passed. The tests cover CFB forecast provenance and capture, the accented ESPN team name, CFB Flat/Main admission, soccer negative edge, and NBA qualification/disagreement admission.
+- A live, non-ordering October 31 weather capture covered all 44 scheduled outdoor CFB games; three indoor games were static. A non-logging slate build produced 141 contracts across 47 games, all with verified weather evidence.
+
+The guards are prospective. They do not establish that any new model is more accurate or profitable. Promote a challenger only after point-in-time feature audits, walk-forward calibration and market-relative performance, a locked holdout, and the existing monthly gate. Keep incumbent artifacts available for rollback.

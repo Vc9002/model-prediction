@@ -415,6 +415,18 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             logger.warning("CFB injury report capture failed for %s", args.date, exc_info=True)
             cfb_injuries_result = {"status": "error"}
 
+    cfb_weather_result: dict[str, Any] = {"status": "skipped"}
+
+    def _capture_cfb_weather():
+        nonlocal cfb_weather_result
+        try:
+            from ..features.multi_sport_weather import capture_cfb_pregame_weather
+
+            cfb_weather_result = capture_cfb_pregame_weather(data_root, args.date)
+        except Exception:
+            logger.warning("CFB pregame weather capture failed for %s", args.date, exc_info=True)
+            cfb_weather_result = {"status": "error"}
+
     def _capture_mlb_probables():
         nonlocal mlb_probables_result
         try:
@@ -555,7 +567,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         f10 = io_pool.submit(_timed, "nba_injuries", _capture_nba_injuries)
         f11 = io_pool.submit(_timed, "nhl_injuries", _capture_nhl_injuries)
         f12 = io_pool.submit(_timed, "cfb_injuries", _capture_cfb_injuries)
-        for f in (f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12):
+        f13 = io_pool.submit(_timed, "cfb_weather", _capture_cfb_weather)
+        for f in (f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13):
             f.result()  # Wait for all, surface exceptions
         try:
             slate = f0.result()
@@ -1482,6 +1495,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         "step1g_nba_injuries": nba_injuries_result,
         "step1h_nhl_injuries": nhl_injuries_result,
         "step1i_cfb_injuries": cfb_injuries_result,
+        "step1j_cfb_weather": cfb_weather_result,
         "step1c_mlb_probable_starters": {
             "captured_events": len(mlb_probables_result),
             "archive": "data/point_in_time/mlb_probable_starters.jsonl",

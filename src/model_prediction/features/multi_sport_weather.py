@@ -10,10 +10,12 @@ Provides point-in-time environmental features across NFL, CFB, and Soccer venues
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -265,6 +267,7 @@ def fetch_venue_hourly_weather(
             "is_indoor": True,
             "hourly": hourly_indoor,
             "source": "indoor_constant",
+            "observed_at_utc": datetime.now(UTC).isoformat(),
         }
 
     http_client = client or httpx.Client(timeout=20)
@@ -281,7 +284,9 @@ def fetch_venue_hourly_weather(
         params["start_date"] = game_date
         params["end_date"] = game_date
     else:
-        params["forecast_days"] = 7
+        # An evening game on the requested Eastern date can start after UTC
+        # midnight, so include the following UTC date in the forecast window.
+        params["forecast_days"] = max(2, (date.fromisoformat(game_date) - datetime.now(UTC).date()).days + 2)
 
     try:
         resp = http_client.get(endpoint, params=params)
@@ -298,6 +303,7 @@ def fetch_venue_hourly_weather(
             "elevation_m": venue.elevation_m,
             "hourly": hourly,
             "source": f"open_meteo:{endpoint.split('/')[-1]}",
+            "observed_at_utc": datetime.now(UTC).isoformat(),
         }
     except (httpx.HTTPError, KeyError, ValueError, TypeError, OSError):
         return None
@@ -312,7 +318,7 @@ def store_weather_observations(
     out_path = Path(data_root) / "weather" / f"{sport.lower()}_historical.jsonl"
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    existing_keys: set[tuple[str, str]] = set()
+    existing_keys: set[tuple[str, str, str, str, str]] = set()
     if out_path.exists():
         with open(out_path, "r", encoding="utf-8") as f:
             for line in f:
@@ -320,14 +326,16 @@ def store_weather_observations(
                     continue
                 try:
                     rec = json.loads(line)
-                    existing_keys.add((str(rec.get("venue_name")), str(rec.get("date"))))
+                    existing_keys.add(_weather_storage_key(rec))
                 except json.JSONDecodeError:
                     continue
 
     appended = 0
     with open(out_path, "a", encoding="utf-8") as f:
-        for obs in observations:
-            key = (str(obs.get("venue_name")), str(obs.get("date")))
+        for raw_obs in observations:
+            obs = dict(raw_obs)
+            obs["capture_sha256"] = _weather_capture_hash(obs)
+            key = _weather_storage_key(obs)
             if key not in existing_keys:
                 f.write(json.dumps(obs, sort_keys=True) + "\n")
                 existing_keys.add(key)
@@ -336,11 +344,113 @@ def store_weather_observations(
     return appended
 
 
+def _weather_storage_key(observation: dict[str, Any]) -> tuple[str, str, str, str, str]:
+    source = str(observation.get("source"))
+    return (
+        str(observation.get("venue_name")),
+        str(observation.get("date")),
+        str(observation.get("home_team")),
+        source,
+        str(observation.get("observed_at_utc")) if source == "open_meteo:forecast" else "",
+    )
+
+
+def _weather_capture_hash(observation: dict[str, Any]) -> str:
+    payload = {key: value for key, value in observation.items() if key != "capture_sha256"}
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    ).hexdigest()
+
+
+def capture_cfb_pregame_weather(
+    data_root: str | Path,
+    game_date: str,
+    *,
+    scoreboard: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Capture timestamped forecast weather for upcoming outdoor CFB games."""
+    from ..data_sources.cfb_data import resolve_team
+    from ..data_sources.espn import ESPNClient
+    from ..domain import parse_utc
+
+    events = (scoreboard if scoreboard is not None else ESPNClient().scoreboard("NCAAF", game_date)).get(
+        "events", []
+    )
+    now = datetime.now(UTC)
+    targets = []
+    skipped = 0
+    seen = set()
+    for event in events:
+        try:
+            start = parse_utc(str(event["date"]))
+            home_name = next(
+                item["team"]["displayName"]
+                for item in event["competitions"][0]["competitors"]
+                if item["homeAway"] == "home"
+            )
+        except (KeyError, IndexError, StopIteration, TypeError, ValueError):
+            skipped += 1
+            continue
+        team = resolve_team(home_name)
+        if start <= now or team is None or team.is_dome or team.latitude is None or team.longitude is None:
+            skipped += 1
+            continue
+        identity = (team.canonical_name, start.isoformat())
+        if identity in seen:
+            continue
+        seen.add(identity)
+        profile = VenueProfile(
+            team.stadium_name,
+            "ncaaf",
+            team.city,
+            team.state,
+            team.latitude,
+            team.longitude,
+            team.elevation_ft / 3.28084,
+            0.0,
+            False,
+        )
+        targets.append((team.canonical_name, start, profile))
+
+    def fetch(target):
+        home_name, start, profile = target
+        with httpx.Client(timeout=4.0) as client:
+            row = fetch_venue_hourly_weather(profile, game_date, client=client)
+        if row is None:
+            return None
+        try:
+            captured = parse_utc(str(row["observed_at_utc"]))
+        except (KeyError, TypeError, ValueError):
+            return None
+        target_hour = start.strftime("%Y-%m-%dT%H:00")
+        if (
+            captured >= start
+            or row.get("source") != "open_meteo:forecast"
+            or target_hour not in (row.get("hourly", {}).get("time") or [])
+        ):
+            return None
+        row["home_team"] = home_name
+        return row
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        observations = [row for row in pool.map(fetch, targets) if row is not None]
+    appended = store_weather_observations(data_root, "ncaaf", observations)
+    return {
+        "status": "ok" if len(observations) == len(targets) else "partial",
+        "scheduled_outdoor": len(targets),
+        "captured": len(observations),
+        "appended": appended,
+        "skipped": skipped,
+    }
+
+
 def resolve_cfb_game_weather(
     data_root: str | Path,
     home_team: str,
     game_date: str,
     event_start_utc: str | None = None,
+    observed_at_utc: str | None = None,
+    provenance_out: dict[str, Any] | None = None,
 ) -> tuple[float | None, float | None, float | None, bool]:
     """Resolves (temperature_f, wind_mph, precipitation_in, is_dome) for a CFB matchup."""
     from ..data_sources.cfb_data import resolve_team
@@ -348,11 +458,26 @@ def resolve_cfb_game_weather(
 
     team_info = resolve_team(home_team)
     if team_info is not None and team_info.is_dome:
+        if provenance_out is not None:
+            provenance_out.update({"source": "cfb_team_catalog:indoor", "home_team": team_info.canonical_name})
         return (70.0, 0.0, 0.0, True)
 
     weather_file = Path(data_root) / "weather" / "ncaaf_historical.jsonl"
     if not weather_file.exists():
         return (None, None, None, False)
+
+    decision_time = None
+    event_time = None
+    if observed_at_utc is not None:
+        if event_start_utc is None:
+            return (None, None, None, False)
+        try:
+            decision_time = parse_utc(observed_at_utc)
+            event_time = parse_utc(event_start_utc)
+        except (TypeError, ValueError):
+            return (None, None, None, False)
+        if decision_time >= event_time:
+            return (None, None, None, False)
 
     stadium_name = team_info.stadium_name if team_info else home_team
     stadium_norm = stadium_name.casefold().strip()
@@ -365,6 +490,7 @@ def resolve_cfb_game_weather(
         except (ValueError, TypeError):
             pass
 
+    latest = None
     try:
         with open(weather_file, "r", encoding="utf-8") as f:
             for line in f:
@@ -373,11 +499,36 @@ def resolve_cfb_game_weather(
                 rec = json.loads(line)
                 v_name = str(rec.get("venue_name", "")).casefold().strip()
                 v_date = str(rec.get("date", ""))
-                if v_date == game_date and (v_name in stadium_norm or stadium_norm in v_name):
+                expected_home = team_info.canonical_name if team_info else home_team
+                team_matches = (
+                    not rec.get("home_team")
+                    or str(rec["home_team"]).casefold() == expected_home.casefold()
+                )
+                if v_date == game_date and team_matches and (v_name in stadium_norm or stadium_norm in v_name):
                     hourly = rec.get("hourly", {})
                     temps = hourly.get("temperature_2m", [])
                     winds = hourly.get("wind_speed_10m", [])
                     precips = hourly.get("precipitation", [])
+
+                    if decision_time is not None:
+                        if rec.get("source") != "open_meteo:forecast":
+                            continue
+                        if rec.get("capture_sha256") != _weather_capture_hash(rec):
+                            continue
+                        try:
+                            captured = parse_utc(str(rec["observed_at_utc"]))
+                        except (KeyError, TypeError, ValueError):
+                            continue
+                        if captured > decision_time or captured >= event_time:
+                            continue
+                        target = event_time.strftime("%Y-%m-%dT%H:00")
+                        times = hourly.get("time") or []
+                        try:
+                            target_hour = times.index(target)
+                        except ValueError:
+                            continue
+                        if latest is not None and captured <= latest[0]:
+                            continue
 
                     temp_c = temps[target_hour] if len(temps) > target_hour else (temps[0] if temps else None)
                     wind_kmh = (
@@ -392,8 +543,20 @@ def resolve_cfb_game_weather(
                     temp_f = round(temp_c * 1.8 + 32.0, 1) if temp_c is not None else None
                     wind_mph = round(wind_kmh * 0.621371, 1) if wind_kmh is not None else None
                     precip_in = round(precip_mm / 25.4, 2) if precip_mm is not None else None
-                    return (temp_f, wind_mph, precip_in, False)
+                    if decision_time is None:
+                        return (temp_f, wind_mph, precip_in, False)
+                    if None not in (temp_f, wind_mph, precip_in):
+                        latest = (captured, temp_f, wind_mph, precip_in, rec)
     except (OSError, json.JSONDecodeError):
         pass
 
-    return (None, None, None, False)
+    if latest and provenance_out is not None:
+        provenance_out.update(
+            {
+                "source": latest[4]["source"],
+                "observed_at_utc": latest[4]["observed_at_utc"],
+                "capture_sha256": latest[4]["capture_sha256"],
+                "venue_name": latest[4]["venue_name"],
+            }
+        )
+    return (latest[1], latest[2], latest[3], False) if latest else (None, None, None, False)

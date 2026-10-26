@@ -2388,6 +2388,7 @@ def _forecast_nba_total_sport(
     forecast = _forecast_nba_total_slate(data_root, args_date, ESPNClient())
     model_config = config.get("models", {}).get("NBA", {})
     min_edge = float(model_config.get("min_edge", 0.05))
+    max_disagreement = float(config["project"]["maximum_unreviewed_market_disagreement"])
     exposure_source = flat_ledger or main_ledger
     if exposure_source is None:
         forecast["logged"] = 0
@@ -2398,6 +2399,7 @@ def _forecast_nba_total_sport(
     duplicates: list[str] = []
     main_duplicates: list[str] = []
     skipped: list[dict] = []
+    main_rejections: list[dict] = []
     for contract in forecast["priced_contracts"]:
         ask = contract["executable_ask"]
         request = PickRequest(
@@ -2461,6 +2463,16 @@ def _forecast_nba_total_sport(
                     )
                 ):
                     eligibility = _downgrade_unserved(eligibility)
+                edge = float(contract["model_probability"]) - float(ask)
+                main_eligible = (
+                    eligibility.decision == "CALL"
+                    and eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
+                    and min_edge <= edge <= max_disagreement
+                )
+                if edge > max_disagreement:
+                    main_rejections.append(
+                        {"event_id": contract["event_id"], "reason": "market_disagreement_exceeds_limit"}
+                    )
                 if (
                     flat_ledger is not None
                     and _append_secondary_ledger(
@@ -2471,8 +2483,7 @@ def _forecast_nba_total_sport(
                     duplicates.append(contract["event_id"])
                 if (
                     main_ledger is not None
-                    and eligibility.decision == "CALL"
-                    and (float(contract["model_probability"]) - float(ask)) >= min_edge
+                    and main_eligible
                     and _append_secondary_ledger(
                         main_ledger, request, eligibility, observed_now, "nba_total:main_ledger"
                     )
@@ -2487,6 +2498,7 @@ def _forecast_nba_total_sport(
 
     forecast["logged"] = len(logged)
     forecast["logged_event_ids"] = logged
+    forecast["main_rejections"] = main_rejections
     forecast["duplicate_pick_ids"] = duplicates
     forecast["main_ledger_duplicate_event_ids"] = main_duplicates
     forecast["skipped"] = forecast.get("unmatched", []) + skipped
@@ -4649,6 +4661,8 @@ def _forecast_soccer_sport(
                 contract_edge = float(
                     contract.get("edge_vs_executable_ask", float(contract["model_probability"]) - ask)
                 )
+                if genuinely_eligible and contract_edge < min_edge:
+                    genuinely_eligible = False
                 if genuinely_eligible and _max_edge is not None and contract_edge > float(_max_edge):
                     genuinely_eligible = False
                 if (
@@ -5016,6 +5030,13 @@ def _forecast_cfb_sport(
     from ..models.college_football import build_cfb_slate
 
     model_config = config.get("models", {}).get("NCAAF", {})
+    serving_version = str(model_config.get("active_production_version") or "cfb-structural-v3")
+    serving_artifact, artifact_error = _load_exact_artifact_contract(serving_version)
+    if artifact_error or serving_artifact is None:
+        raise ValueError(artifact_error or f"NCAAF serving artifact unavailable for {serving_version}")
+    max_edge = float(serving_artifact["gates"]["max_edge"])
+    if not 0 < max_edge < 1:
+        raise ValueError(f"NCAAF serving artifact has invalid max_edge for {serving_version}")
     forecast = build_cfb_slate(
         data_root=data_root,
         game_date=args_date,
@@ -5033,6 +5054,7 @@ def _forecast_cfb_sport(
     logged = gated = flat_logged = main_logged = 0
     research_duplicates = gated_duplicates = flat_duplicates = main_duplicates = 0
     errors: list[dict] = []
+    main_rejections: list[dict] = []
 
     for contract in forecast.get("priced_contracts", []):
         ask = float(contract["executable_ask"])
@@ -5118,8 +5140,21 @@ def _forecast_cfb_sport(
                 genuinely_eligible = (
                     eligibility.decision == "CALL"
                     and eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
-                    and contract_edge >= min_edge
+                    and min_edge <= contract_edge <= max_edge
                 )
+                if contract_edge > max_edge:
+                    main_rejections.append(
+                        {"event_id": contract["event_id"], "market": mtype.value, "reason": "excessive_edge"}
+                    )
+                if mtype == MarketType.TOTAL and contract.get("weather_inputs_verified") is not True:
+                    genuinely_eligible = False
+                    main_rejections.append(
+                        {
+                            "event_id": contract["event_id"],
+                            "market": mtype.value,
+                            "reason": "pregame_weather_unverified",
+                        }
+                    )
                 if (
                     genuinely_eligible
                     and mtype == MarketType.TOTAL
@@ -5226,6 +5261,7 @@ def _forecast_cfb_sport(
         "main_ledger": main_duplicates,
     }
     forecast["errors"] = errors
+    forecast["main_rejections"] = main_rejections
     return forecast
 
 

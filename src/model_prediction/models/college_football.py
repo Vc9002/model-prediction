@@ -801,9 +801,16 @@ def build_cfb_slate(
 
         from ..features.multi_sport_weather import resolve_cfb_game_weather
 
-        w_temp, w_wind, w_precip, _ = resolve_cfb_game_weather(
-            root, home_team, iso_date, event_start_utc=event_start_utc
+        weather_evidence: dict[str, Any] = {}
+        w_temp, w_wind, w_precip, is_dome = resolve_cfb_game_weather(
+            root,
+            home_team,
+            iso_date,
+            event_start_utc=event_start_utc,
+            observed_at_utc=obs.isoformat(),
+            provenance_out=weather_evidence,
         )
+        weather_inputs_verified = is_dome or None not in (w_temp, w_wind, w_precip)
 
         upcoming = UpcomingCFBGame(
             event_id=event_id,
@@ -925,8 +932,13 @@ def build_cfb_slate(
                     "line": line_val,
                     "model_probability": prob,
                     "model_uncertainty": p.uncertainty,
+                    "weather_inputs_verified": weather_inputs_verified,
                     "model_version": m_ver,
-                    "feature_basis": p.feature_basis,
+                    "feature_basis": {
+                        **p.feature_basis,
+                        "weather_inputs_verified": weather_inputs_verified,
+                        "weather_evidence": weather_evidence,
+                    },
                     "inference_inputs": p.inference_inputs,
                     "rationale": p.rationale,
                     "market_slug": slug,
