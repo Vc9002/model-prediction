@@ -1913,6 +1913,7 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
 
     upcoming: list[UpcomingGame] = []
     market_by_event_id: dict[str, dict] = {}
+    availability_diagnostics: dict[str, dict[str, float | bool]] = {}
     unmatched: list[dict[str, str]] = []
     for event in events:
         try:
@@ -1937,6 +1938,11 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
         from ..features.nba_player_availability import compute_nba_matchup_availability
 
         avail = compute_nba_matchup_availability(data_root, home_team, away_team, observed_at=observed_at)
+        availability_diagnostics[event_id] = {
+            "estimated_margin_adjustment": float(avail.get("availability_points_gap", 0.0)),
+            "estimated_total_adjustment": float(avail.get("availability_total_loss", 0.0)),
+            "applied_to_qualified_model": False,
+        }
         upcoming.append(
             UpcomingGame(
                 event_id=event_id,
@@ -1944,8 +1950,8 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
                 away_team=away_team,
                 home_team=home_team,
                 spread_away_line=float(market["line"]),
-                availability_points_gap=avail.get("availability_points_gap", 0.0),
-                availability_total_loss=avail.get("availability_total_loss", 0.0),
+                availability_points_gap=0.0,
+                availability_total_loss=0.0,
                 league="NBA",
             )
         )
@@ -1997,6 +2003,7 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
                 "model_version": model_version,
                 "model_artifact_hash": model_artifact_hash,
                 "model_qualified": model_qualified,
+                "research_availability": availability_diagnostics[prediction.event_id],
                 "rationale": prediction.rationale,
                 "market_slug": market.get("market_slug"),
                 "observed_at_utc": (
@@ -2240,6 +2247,7 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
 
     upcoming: list[UpcomingGame] = []
     market_by_event_id: dict[str, dict] = {}
+    availability_diagnostics: dict[str, dict[str, float | bool]] = {}
     unmatched: list[dict[str, str]] = []
     for event in events:
         try:
@@ -2286,6 +2294,11 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
         from ..features.nba_player_availability import compute_nba_matchup_availability
 
         avail = compute_nba_matchup_availability(data_root, home_team, away_team, observed_at=observed_at)
+        availability_diagnostics[event_id] = {
+            "estimated_margin_adjustment": float(avail.get("availability_points_gap", 0.0)),
+            "estimated_total_adjustment": float(avail.get("availability_total_loss", 0.0)),
+            "applied_to_qualified_model": False,
+        }
         upcoming.append(
             UpcomingGame(
                 event_id=event_id,
@@ -2293,8 +2306,8 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
                 away_team=away_team,
                 home_team=home_team,
                 total_line=t_line,
-                availability_points_gap=avail.get("availability_points_gap", 0.0),
-                availability_total_loss=avail.get("availability_total_loss", 0.0),
+                availability_points_gap=0.0,
+                availability_total_loss=0.0,
                 league="NBA",
             )
         )
@@ -2346,6 +2359,7 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
                 "model_version": model_version,
                 "model_artifact_hash": model_artifact_hash,
                 "model_qualified": model_qualified,
+                "research_availability": availability_diagnostics[prediction.event_id],
                 "rationale": prediction.rationale,
                 "market_slug": market.get("market_slug"),
                 "observed_at_utc": (

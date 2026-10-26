@@ -1,5 +1,7 @@
 """Pregame input provenance and serving-policy guards for reported loss cohorts."""
 
+import hashlib
+import json
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
@@ -7,6 +9,7 @@ from model_prediction.cli import forecast as forecast_cli
 from model_prediction.data_sources.cfb_data import resolve_team
 from model_prediction.domain import RecordType
 from model_prediction.features import multi_sport_weather as weather
+from model_prediction.features.nba_player_availability import load_latest_nba_injury_snapshot
 
 
 def test_cfb_weather_requires_a_hashed_pregame_forecast_at_the_event_hour(tmp_path):
@@ -329,3 +332,102 @@ def test_nba_total_extreme_disagreement_stays_in_flat(monkeypatch, tmp_path):
     assert result["main_rejections"] == [
         {"event_id": "extreme", "reason": "market_disagreement_exceeds_limit"}
     ]
+
+
+def test_nba_injury_reader_rejects_tampered_and_late_snapshots(tmp_path):
+    directory = tmp_path / "availability" / "nba" / "espn_injury_snapshots" / "2026-10-30"
+    directory.mkdir(parents=True)
+
+    def write_snapshot(stamp, player, tamper=False):
+        payload = {
+            "observed_at_utc": stamp,
+            "entries": [{"player_name": player}],
+            "source": "espn_nba_injuries",
+        }
+        digest = hashlib.sha256(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        payload["snapshot_sha256"] = digest
+        if tamper:
+            payload["entries"][0]["player_name"] = "Altered"
+        filename_stamp = datetime.fromisoformat(stamp).strftime("%Y%m%dT%H%M%S%z")
+        (directory / f"nba-injuries-{filename_stamp}-{digest[:12]}.json").write_text(
+            json.dumps(payload), encoding="utf-8"
+        )
+
+    write_snapshot("2026-10-30T15:00:00+00:00", "Verified")
+    write_snapshot("2026-10-30T16:00:00+00:00", "Tampered", tamper=True)
+    write_snapshot("2026-10-30T18:00:00+00:00", "Too late")
+    result = load_latest_nba_injury_snapshot(
+        tmp_path, observed_at=datetime(2026, 10, 30, 17, tzinfo=UTC)
+    )
+    assert result["entries"][0]["player_name"] == "Verified"
+
+
+def test_qualified_nba_slate_keeps_unvalidated_availability_diagnostic_only(monkeypatch, tmp_path):
+    from model_prediction.features import nba_player_availability
+    from model_prediction.models import basketball
+
+    now = datetime(2026, 10, 30, 12, tzinfo=UTC)
+    start = "2026-10-31T19:00:00Z"
+    event = {
+        "id": "game-1",
+        "date": start,
+        "competitions": [
+            {"competitors": [
+                {"homeAway": "away", "team": {"displayName": "Miami Heat"}},
+                {"homeAway": "home", "team": {"displayName": "Boston Celtics"}},
+            ]}
+        ],
+    }
+    quote = {
+        "market_type": "total",
+        "team": "Miami Heat",
+        "event_start_utc": start,
+        "line": 228.5,
+        "market_slug": "game-1-total",
+        "long": {"ask": 0.49},
+        "short": {"ask": 0.52},
+    }
+    monkeypatch.setattr(forecast_cli, "utc_now", lambda: now)
+    monkeypatch.setattr(
+        forecast_cli.ProductionModelRegistry,
+        "load",
+        lambda root: SimpleNamespace(
+            champion=lambda *args: SimpleNamespace(model_id="nba-total-margin-v5", available=True)
+        ),
+    )
+    monkeypatch.setattr(
+        forecast_cli, "_load_exact_artifact_contract",
+        lambda version: ({"artifact_hash": "verified", "qualification": {"qualified": True}}, None),
+    )
+    monkeypatch.setattr(forecast_cli.FeatureStore, "games_before", lambda *args: [])
+    monkeypatch.setattr(forecast_cli, "_read_polymarket_snapshot_rows", lambda path: [quote])
+    monkeypatch.setattr(forecast_cli, "_quotes_known_at", lambda rows, observed: rows)
+    monkeypatch.setattr(
+        nba_player_availability,
+        "compute_nba_matchup_availability",
+        lambda *args, **kwargs: {"availability_points_gap": 4.8, "availability_total_loss": 12.0},
+    )
+    captured = []
+
+    def fake_predict(self, history, upcoming):
+        captured.extend(upcoming)
+        return [SimpleNamespace(
+            market_type="total", event_id="game-1", event_start_utc=start,
+            away_team="Miami Heat", home_team="Boston Celtics",
+            probability=lambda selection: 0.62, uncertainty=0.1, rationale="test",
+            feature_basis={}, inference_inputs=None,
+        )]
+
+    monkeypatch.setattr(basketball.BasketballModel, "predict_games", fake_predict)
+    result = forecast_cli._forecast_nba_total_slate(
+        tmp_path, "2026-10-31", SimpleNamespace(scoreboard=lambda *args: {"events": [event]})
+    )
+    assert captured[0].availability_points_gap == 0.0
+    assert captured[0].availability_total_loss == 0.0
+    assert result["priced_contracts"][0]["research_availability"] == {
+        "estimated_margin_adjustment": 4.8,
+        "estimated_total_adjustment": 12.0,
+        "applied_to_qualified_model": False,
+    }

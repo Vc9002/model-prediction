@@ -14,6 +14,7 @@ Extracts point-in-time player availability and injury impact for upcoming NBA ma
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Mapping
 from datetime import UTC, datetime
@@ -156,13 +157,30 @@ def load_latest_nba_injury_snapshot(
         return None
 
     candidates.sort(key=lambda x: x[0], reverse=True)
-    best_file = candidates[0][1]
-
-    try:
-        with open(best_file, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, json.JSONDecodeError):
-        return None
+    for file_dt, file_path in candidates:
+        try:
+            payload = json.loads(file_path.read_text(encoding="utf-8"))
+            if not isinstance(payload, dict):
+                continue
+            observed = parse_utc(str(payload["observed_at_utc"]))
+            digest = str(payload["snapshot_sha256"])
+            if (
+                observed.replace(microsecond=0) != file_dt
+                or observed > cutoff
+                or digest[:12] != file_path.stem.split("-")[-1]
+            ):
+                continue
+            canonical = json.dumps(
+                {key: value for key, value in payload.items() if key != "snapshot_sha256"},
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+            if hashlib.sha256(canonical).hexdigest() != digest:
+                continue
+            return payload
+        except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
+            continue
+    return None
 
 
 def compute_nba_matchup_availability(
@@ -182,7 +200,7 @@ def compute_nba_matchup_availability(
         home_injuries: List of injured home players.
         away_injuries: List of injured away players.
     """
-    snap = snapshot or load_latest_nba_injury_snapshot(data_root, observed_at=observed_at)
+    snap = snapshot if snapshot is not None else load_latest_nba_injury_snapshot(data_root, observed_at=observed_at)
     if not snap:
         return {
             "availability_points_gap": 0.0,
