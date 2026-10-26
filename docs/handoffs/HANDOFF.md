@@ -1,6 +1,6 @@
-# Handoff — open work (updated 2026-10-22)
+# Handoff — open work (updated 2026-10-26)
 
-**Status: OPEN.** Nothing in this file has been executed. This file records the state and the steps needed. Delete it when every item below is done. There is only ever one handoff file.
+**Status: OPEN.** Delete this file when every item below is done or explicitly dropped.
 
 ## 1. Rename project folder to `E:\MP` (DONE 2026-10-21)
 
@@ -14,7 +14,7 @@
 
 Steps, in order: stop the dashboard; remove the `E:\MP` junction by hand; rename `E:\model-prediction` to `E:\MP`; update the seven task actions; verify the dashboard and the next scheduled run start from the new path.
 
-## 2. NCAAF ledger duplicate settled picks (partly resolved)
+## 2. NCAAF ledger duplicate settled picks (script ready, run manually)
 
 Settled Main rows in `E:\model-prediction-runtime\ledgers\ledgers.db`:
 
@@ -32,17 +32,19 @@ Re-counted 2026-10-22 (read-only, settled Main rows, key = event, market, select
 - Recommended rule: keep the latest row per key and mark the older rows `superseded` (not deleted). It matches what `b77a563d` does going forward. Keep-first vs keep-latest differ by 0.3U on `cfb-structural-v2`.
 - Backup taken 2026-10-22 01:38 EDT: `E:\model-prediction-runtime\backups\ledgers\ledgers_20261022T013809_pre-dedupe.db` (12,126 records, integrity ok). The dedupe and the item 5 merge have not been run. Do each only when no scheduled run is writing, and take a fresh backup first if much time has passed.
 
-Still open: the legacy duplicate keys stay in the store. Deduplicate by (event, market, selection, line, model) before reporting P&L. Confirm on the next forecast run that no new duplicates appear.
+**2026-10-26 update**: Count is now 1,000 duplicate keys / 1,026 rows to mark superseded (grown since 10-22 as more games settled and `college-football-v1` included). Fresh backup taken: `E:\model-prediction-runtime\backups\ledgers\ledgers_20261026T171805_pre-ncaaf-dedup.db`. Dedup script at `scripts/dedup_ncaaf_settled_picks.py` — dry-run verified. Run when no scheduled job is writing:
 
-## 3. NCAAF champion is contradictory across docs (operator decision)
+```powershell
+cd E:\MP; $env:PYTHONPATH='src;.'; .venv\Scripts\python scripts/dedup_ncaaf_settled_picks.py
+```
 
-- `docs/CFB_PREDICTION_SYSTEM.md` (updated 2026-10-21): the status header now states the champion is not settled. The earlier text named `cfb-total-v1` as totals champion.
-- `config/production.yaml` and `docs/PROMOTION_POLICY.md`: all NCAAF markets route to `cfb-structural-v2`.
-- The ledger shows `cfb-structural-v2` on the Main ledger for all three markets.
+Still open: run the script above to mark 1,026 rows superseded. Confirm on the next forecast run that no new duplicates appear.
 
-Needed from the operator: the champion for each market. Then bring `CFB_PREDICTION_SYSTEM.md` and `PROJECT_STATUS.md` into line with that decision.
+## 3. NCAAF champion — DONE (2026-10-26)
 
-## 4. `cfb-total-v1` backtest does not replicate live (open)
+`cfb-structural-v3` is production champion for all three NCAAF markets (`serving_status: production`, `market: multi` in `config/production.yaml`). `cfb-structural-v2` is the rollback. `CFB_PREDICTION_SYSTEM.md` updated to reflect this.
+
+## 4. `cfb-total-v1` backtest does not replicate live — DONE (committed 2026-10-23)
 
 - Backtest (`CFB_PREDICTION_SYSTEM.md` §5): +29.17% ROI over 4,510 games, 2020–2024.
 - Live ledger (`CFB_PREDICTION_SYSTEM.md` §7): about -1.1% ROI over 293 distinct picks.

@@ -20,7 +20,7 @@ AUDIT_SCHEMA_VERSION = "1"
 # fcntl.flock(LOCK_EX) blocks indefinitely with no built-in timeout -- a hung
 # holder (not crashed; POSIX auto-releases on process death) would otherwise
 # wedge every other appender forever with no diagnostic.
-LOCK_TIMEOUT_SECONDS = 30
+LOCK_TIMEOUT_SECONDS = 120  # bumped from 30: parallel ingest jobs (7 sports) can queue up
 LOCK_POLL_INTERVAL_SECONDS = 0.1
 
 
@@ -74,10 +74,20 @@ class AuditLog:
         with self._lock():
             previous_hash = "0" * 64
             if self.path.exists():
+                # Tail-read only: events.jsonl can be hundreds of MB; reading the
+                # whole file under the lock blocks parallel ingest jobs past the
+                # timeout (the AuditLockTimeout that broke morning runs daily).
+                # 8 KB is enough for any single event line (~500 bytes typical).
                 with self.path.open("rb") as handle:
-                    lines = [line for line in handle if line.strip()]
-                if lines:
-                    previous_hash = json.loads(lines[-1])["event_hash"]
+                    handle.seek(0, os.SEEK_END)
+                    size = handle.tell()
+                    if size > 0:
+                        read_size = min(8192, size)
+                        handle.seek(size - read_size)
+                        tail = handle.read()
+                        tail_lines = [l for l in tail.splitlines() if l.strip()]
+                        if tail_lines:
+                            previous_hash = json.loads(tail_lines[-1])["event_hash"]
             event = {
                 "event_id": uuid.uuid4().hex,
                 "event_type": event_type,

@@ -1,9 +1,8 @@
 # College Football (NCAAF) Prediction System
 
-**Status (updated 2026-10-21)**: Wired to production. The champion per market is **not settled** and is an open operator decision (see `docs/handoffs/HANDOFF.md`, item 3).  
-**Serving per `config/production.yaml`**: `cfb-structural-v2` for moneyline, spread and total. It has written to the Main and Flat ledgers for all three markets since September.  
+**Status (updated 2026-10-26)**: Wired to production. Champion is **`cfb-structural-v3`** for all three markets (moneyline, spread, total) — `serving_status: production` in `config/production.yaml`. `cfb-structural-v2` is the rollback.  
 **Earlier documents named `cfb-total-v1` as totals champion.** That claim rests on the 2020–2024 backtest in §5, which was scored against constant lines, not market prices, and so is invalid (see §5 and §7).  
-**Older models**: `college-football-v1` (moneyline) and `cfb-spread-v1` (spread) remain in the ledgers. `cfb-spread-v1` is losing on the Main ledger.  
+**Older models**: `college-football-v1` (moneyline) and `cfb-spread-v1` (spread) remain in the ledgers as history. `cfb-spread-v1` is losing on the Main ledger.  
 **Historical Dataset**: 8,146 completed games spanning 2016-2024 seasons (Structural 2016+, Market-relative 2020+)  
 **Primary Module Entrypoints**:
 - Data & Venue Geography: [`src/model_prediction/data_sources/cfb_data.py`](src/model_prediction/data_sources/cfb_data.py)
