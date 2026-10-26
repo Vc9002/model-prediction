@@ -1,5 +1,6 @@
 """Scheduled health monitor reads and repairs the canonical runtime odds store."""
 
+import sqlite3
 from datetime import datetime
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
@@ -57,3 +58,23 @@ def test_auto_heal_uses_sport_slate_and_capture_signature(monkeypatch, tmp_path)
     assert calls[1] == ("capture", {"CS2": [{"event_id": "one"}]}, runtime, calls[0][2], 2)
     assert result["healing_failures"] == []
     assert monitor.audit_odds_freshness(paths)["status"] == "OK"
+
+
+def test_monitor_reports_failed_daily_worker_from_runtime(tmp_path):
+    paths = RuntimePaths(tmp_path / "repo", tmp_path / "runtime")
+    assert monitor.audit_daily_worker(paths)["status"] == "UNKNOWN"
+    paths.runs_db.parent.mkdir(parents=True)
+    with sqlite3.connect(paths.runs_db) as conn:
+        conn.execute("CREATE TABLE runs (worker TEXT, status TEXT, exit_code INTEGER, started_at_utc TEXT)")
+        conn.executemany(
+            "INSERT INTO runs VALUES (?, ?, ?, ?)",
+            [
+                ("daily", "completed", 0, "2026-10-25T05:00:00Z"),
+                ("daily", "failed", 1, "2026-10-26T11:30:00Z"),
+            ],
+        )
+    assert monitor.audit_daily_worker(paths) == {
+        "status": "failed",
+        "exit_code": 1,
+        "started_at_utc": "2026-10-26T11:30:00Z",
+    }

@@ -228,6 +228,24 @@ def audit_models_and_ledgers(runtime_paths: RuntimePaths) -> dict[str, Any]:
     }
 
 
+def audit_daily_worker(runtime_paths: RuntimePaths) -> dict[str, Any]:
+    """Read the latest supervised daily outcome from the canonical runs DB."""
+    if not runtime_paths.runs_db.is_file():
+        return {"status": "UNKNOWN", "reason": "supervisor_runs_missing"}
+    try:
+        with sqlite3.connect(f"file:{runtime_paths.runs_db}?mode=ro", uri=True) as conn:
+            row = conn.execute(
+                "SELECT status, exit_code, started_at_utc FROM runs "
+                "WHERE worker = ? ORDER BY started_at_utc DESC LIMIT 1",
+                ("daily",),
+            ).fetchone()
+    except sqlite3.Error as exc:
+        return {"status": "UNKNOWN", "reason": str(exc)[:200]}
+    if row is None:
+        return {"status": "UNKNOWN", "reason": "daily_run_missing"}
+    return {"status": row[0], "exit_code": row[1], "started_at_utc": row[2]}
+
+
 def auto_heal_data_gaps(
     runtime_paths: RuntimePaths, odds_report: dict[str, Any] | None = None
 ) -> dict[str, Any]:
@@ -321,6 +339,7 @@ def run_health_and_data_gap_monitor(auto_heal: bool = False) -> dict[str, Any]:
     odds_report = audit_odds_freshness(runtime_paths)
     warehouse_report = audit_market_quotes_warehouse(runtime_paths)
     models_report = audit_models_and_ledgers(runtime_paths)
+    daily_worker = audit_daily_worker(runtime_paths)
 
     if auto_heal:
         healing_report = auto_heal_data_gaps(runtime_paths, odds_report=odds_report)
@@ -338,6 +357,7 @@ def run_health_and_data_gap_monitor(auto_heal: bool = False) -> dict[str, Any]:
         or warehouse_report.get("status") in {"MISSING", "EMPTY"}
         or odds_report.get("status") != "OK"
         or healing_report.get("healing_failures")
+        or daily_worker.get("status") != "completed"
     ):
         overall_status = "WARNING"
 
@@ -347,6 +367,7 @@ def run_health_and_data_gap_monitor(auto_heal: bool = False) -> dict[str, Any]:
         "odds_freshness": odds_report,
         "market_quotes_warehouse": warehouse_report,
         "models_and_ledgers": models_report,
+        "daily_worker": daily_worker,
         "self_healing": healing_report,
     }
 
