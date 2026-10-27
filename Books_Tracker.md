@@ -6,10 +6,10 @@ Tracks new picks from **FadeMeBets (FMB), Scout, and Kytra** when Vincent provid
 
 | Provider | Logged picks | Settled record | Pending | Total posted stakes | Realized net |
 | :--- | ---: | :---: | ---: | ---: | ---: |
-| FadeMeBets | 40 | 23-14-0 | 3 | 55.50u | +8.60u |
-| Scout | 8 | 0-4-0 | 3 | 17.00u | -9.00u |
-| Kytra | 9 | 4-4-0 | 1 | 12.00u | -0.64u |
-| **All providers** | **57** | **27-22-0** | **7** | **84.50u** | **-1.04u** |
+| FadeMeBets | 40 | 23-17-0 | 0 | 55.50u | +5.85u |
+| Scout | 8 | 0-5-0 | 2 | 17.00u | -11.00u |
+| Kytra | 9 | 5-4-0 | 0 | 12.00u | +0.44u |
+| **All providers** | **57** | **28-26-0** | **2** | **84.50u** | **-4.71u** |
 
 Screenshot entries are dated October 25, 2026. Settlement status is shown per row. Message timestamps are posting times. Scout's screenshot explicitly names Scout. Kytra attribution is inferred from the user's request: that screenshot displays Winible Bot rather than Kytra. The parlay is one pick at the displayed combined price; its legs are not counted separately. Standalone alternate spreads remain separate picks.
 
@@ -29,11 +29,11 @@ Screenshot entries are dated October 25, 2026. Settlement status is shown per ro
 
 | ID | Sport | Selection | Odds (US) | Stake | Posted time | Status | Net P/L |
 | :--- | :--- | :--- | ---: | ---: | :--- | :--- | :--- |
-| S006 | NBA | Hawks +6.5 | -140 | 2.00u | 12:28 PM | PENDING | — |
+| S006 | NBA | Hawks +6.5 | -140 | 2.00u | 12:28 PM | LOSS — Rockets 120, Hawks 110 | -2.00u |
 | S007 | NBA | Warriors +9.5 | -140 | 2.00u | 12:28 PM | PENDING | — |
 | S008 | NBA | S. Curry (Warriors) over 24.5 points | -120 | 2.00u | 12:28 PM | PENDING | — |
 
-**October 26 posted stakes:** 6.00u. **Status:** 3 pending.
+**October 26 posted stakes:** 6.00u. **Settled:** 0-1-0, -2.00u. **Pending:** 4.00u across S007-S008.
 
 ## Kytra — October 25, 2026
 
@@ -54,11 +54,11 @@ Screenshot entries are dated October 25, 2026. Settlement status is shown per ro
 | ID | Sport | Selection | Odds (US) | Stake | Posted time | Status | Net P/L |
 | :--- | :--- | :--- | ---: | ---: | :--- | :--- | :--- |
 | K008 | NBA | Cavaliers -3.5 | -117 | 1.00u | 12:13 PM | LOSS — Cavaliers won 127-125 in OT (won by 2) | -1.00u |
-| K009 | MLB | Brewers moneyline | +108 | 1.00u | 12:13 PM | PENDING | — |
+| K009 | MLB | Brewers moneyline | +108 | 1.00u | 12:13 PM | WIN — Brewers 10, Rays 1 | +1.08u |
 
 *Note: Cowboys/Eagles MNF pending official injury report release.*
 
-**October 26 posted stakes:** 2.00u. **Settled:** 0-1-0, -1.00u. **Pending:** 1.00u (K009). Cleveland final: [Cavaliers 127, Timberwolves 125 (OT)](https://www.nba.com/game/0022600120/box-score).
+**October 26 posted stakes:** 2.00u. **Settled:** 1-1-0, +0.08u. **Pending:** 0.00u. Finals: [Cavaliers 127, Timberwolves 125 (OT)](https://www.nba.com/game/0022600120/box-score); Brewers 10, Rays 1.
 
 ---
 
@@ -71,19 +71,19 @@ A structured, ongoing tracking ledger for **FadeMeBets** premium picks, covering
 
 ## 📊 Performance Dashboard
 
-*Last Updated: October 26, 2026. One Oct. 26 pick settled; three remain pending. Provider stakes, not personal wagers.*
+*Last Updated: October 26, 2026. All four Oct. 26 FMB picks settled. Provider stakes, not personal wagers.*
 
 | Metric | Overall | Lock of the Day (Featured) | EV Picks |
 | :--- | :---: | :---: | :---: |
 | **Total Picks Logged** | **40** | 10 | 30 |
-| **Settled Record** | **23 - 14 - 0** | 7 - 3 - 0 | 16 - 11 - 0 |
-| **Pending / Live** | **3** | 0 | 3 |
-| **Win Rate (Settled)** | **62.2%** | 70.0% | **59.3%** |
+| **Settled Record** | **23 - 17 - 0** | 7 - 3 - 0 | 16 - 14 - 0 |
+| **Pending / Live** | **0** | 0 | 0 |
+| **Win Rate (Settled)** | **57.5%** | 70.0% | **53.3%** |
 | **Total Units Risked** | **55.50u** | 25.50u | 30.00u |
-| **Settled Units Risked**| **52.75u** | 25.50u | 27.25u |
-| **Net Profit / Loss** | **+8.60u** | **+6.92u** | **+1.68u** |
-| **ROI % (Settled)** | **+16.3%** | +27.1% | **+6.2%** |
-| **Pending Potential** | **2.75u posted stakes** | 0.00u | 2.75u |
+| **Settled Units Risked**| **55.50u** | 25.50u | 30.00u |
+| **Net Profit / Loss** | **+5.85u** | **+6.92u** | **-1.07u** |
+| **ROI % (Settled)** | **+10.5%** | +27.1% | **-3.6%** |
+| **Pending Potential** | **0.00u posted stakes** | 0.00u | 0.00u |
 
 ### Sport Breakdown
 
@@ -129,7 +129,11 @@ A structured, ongoing tracking ledger for **FadeMeBets** premium picks, covering
 
 - **NBA** (Oct 25): 1 Pick (1.00u risked) — **0-1-0 (-1.00u)** *(Settled)*
 
-- **NBA** (Oct 26): 1 Pick settled (2.00u risked) — **0-1-0 (-2.00u)**; 3 other picks pending
+- **NBA** (Oct 26): 1 Pick (2.00u risked) — **0-1-0 (-2.00u)**
+
+- **MLB** (Oct 26): 1 Pick (0.50u risked) — **0-1-0 (-0.50u)**
+
+- **NFL** (Oct 26): 2 Picks (2.25u risked) — **0-2-0 (-2.25u)**
 
 ### Daily Results
 
@@ -144,7 +148,7 @@ A structured, ongoing tracking ledger for **FadeMeBets** premium picks, covering
 | Oct 23 | 3-1-0 | 5.00u | +3.70u | +12.30u |
 | Oct 24 | 2-2-0 | 5.25u | -0.52u | +11.78u |
 | Oct 25 | 2-2-0 | 5.00u | -1.18u | +10.60u |
-| Oct 26 | 0-1-0 | 2.00u | -2.00u | +8.60u |
+| Oct 26 | 0-4-0 | 4.75u | -4.75u | +5.85u |
 
 
 ---
@@ -220,9 +224,9 @@ A structured, ongoing tracking ledger for **FadeMeBets** premium picks, covering
 | **036** | Oct 25, 2026 | NFL | Los Angeles Rams vs Las Vegas Raiders | **Over 47.5** | -110 | 1.00u | 9.4% EV (55 Conf) | 4:05 PM | **FINAL** | **WIN** (Rams 35, Raiders 21; 56 pts) | **+0.91u** |
 
 | **037** | Oct 26, 2026 | NBA | Minnesota Timberwolves at Cleveland Cavaliers | **Cavaliers -4.5** | +102 | 2.00u | Lock; High Confidence | 7:00 PM | **FINAL** | **LOSS** ([Cavaliers 127, Timberwolves 125 (OT)](https://www.nba.com/game/0022600120/box-score); won by 2) | **-2.00u** |
-| **038** | Oct 26, 2026 | MLB | Milwaukee Brewers at Tampa Bay Rays | **Rays moneyline** | -120 | 0.50u | 8.5% EV; 58% cover | 8:00 PM | PENDING | — | — |
-| **039** | Oct 26, 2026 | NFL | Dallas Cowboys at Philadelphia Eagles | **Under 44.5** | -110 | 1.00u | 18.4% posted EV; 59% cover | 8:15 PM | PENDING | — | — |
-| **040** | Oct 26, 2026 | NFL | Dallas Cowboys at Philadelphia Eagles | **Eagles +5** | -110 | 1.25u | 8.4% posted EV; 56% cover | 8:15 PM | PENDING | — | — |
+| **038** | Oct 26, 2026 | MLB | Milwaukee Brewers at Tampa Bay Rays | **Rays moneyline** | -120 | 0.50u | 8.5% EV; 58% cover | 8:00 PM | **FINAL** | **LOSS** (Brewers 10, Rays 1) | **-0.50u** |
+| **039** | Oct 26, 2026 | NFL | Dallas Cowboys at Philadelphia Eagles | **Under 44.5** | -110 | 1.00u | 18.4% posted EV; 59% cover | 8:15 PM | **FINAL** | **LOSS** (Cowboys 38, Eagles 21; 59 points) | **-1.00u** |
+| **040** | Oct 26, 2026 | NFL | Dallas Cowboys at Philadelphia Eagles | **Eagles +5** | -110 | 1.25u | 8.4% posted EV; 56% cover | 8:15 PM | **FINAL** | **LOSS** (Cowboys 38, Eagles 21) | **-1.25u** |
 
 
 ---
@@ -646,8 +650,8 @@ The Sunday Night NFL window has completed:
    - **FadeMeBets #034** (Under 42.5 EV, -110, 1.00u): **WIN** (+0.91u).
    - **Kytra K006** (Seahawks moneyline, -140, 2.00u): **WIN** (+1.43u).
 
-**Realized totals across all providers as of October 26, 2026 (All 48 picks settled)**:
-- Settled record: **27–20–0** (57.4% win rate; 1 void).
-- Realized Net Profit: **+1.96u** on 71.75u total stakes.
-- Kytra finished Sunday positive (**4–3–0, +0.36u**) following the settled Lions LIVE ML winner (+0.88u).
-- Pending: **0 picks**. All slates fully settled.
+**Realized totals across all providers as of October 26, 2026**:
+- Settled record: **28–26–0** (51.9% win rate; 1 void).
+- Realized net profit: **-4.71u**.
+- October 26 blind-tail result so far: **1–6, -6.67u** on 8.75u settled stakes.
+- Pending: **2 Scout picks** (Warriors +9.5 and Stephen Curry over 24.5 points; 4.00u posted stakes).
