@@ -8,6 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import polars as pl
+import pytest
 
 from model_prediction.cli.forecast import _load_nfl_injuries_known_at, _nfl_situational_features
 from model_prediction.data_sources.nfl_efficiency_snapshot import (
@@ -79,6 +80,11 @@ def test_unplayed_game_and_future_depth_chart_excluded() -> None:
     assert team.height == 1 and qb.height == 1
     assert team["passing_epa"].to_list() == [5.0]
     assert projected_qbs(depth, observed) == {"DAL": "Dak Prescott"}
+
+
+def test_live_release_capture_cannot_be_backdated(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="cannot be backdated"):
+        capture_nfl_efficiency(tmp_path, observed_at=datetime(2026, 10, 1, tzinfo=UTC))
 
 
 def test_capture_is_asof_hash_checked_and_team_coverage_required(tmp_path: Path) -> None:

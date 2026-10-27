@@ -98,6 +98,8 @@ def capture_nfl_efficiency(
     client: httpx.Client | None = None,
 ) -> dict[str, object]:
     """Atomically archive raw releases, derived inputs, and their hashes."""
+    if observed_at is not None and client is None:
+        raise ValueError("live NFL release capture cannot be backdated")
     observed = parse_utc((observed_at or utc_now()).isoformat())
     owns_client = client is None
     http_client = client or httpx.Client(follow_redirects=True, timeout=45)

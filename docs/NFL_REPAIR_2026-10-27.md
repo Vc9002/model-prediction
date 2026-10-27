@@ -36,6 +36,8 @@ Parquets, and hashes every file and its manifest. The reader chooses only a
 hash-valid snapshot observed by the decision time; legacy Parquets are
 diagnostic fallback only. This timing rule follows the source's update and
 revision schedule: [nflverse data availability](https://nflreadr.nflverse.com/articles/nflverse_data_schedule.html).
+The live downloader rejects caller-supplied past observation timestamps so a
+modern release cannot be mislabelled as a historical vintage.
 
 Spread/total v6 uses the latest captured QB1 projection, rather than the
 last historical starter, and computes rest from Eastern game dates. It embeds
