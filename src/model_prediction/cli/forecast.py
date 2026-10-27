@@ -51,7 +51,7 @@ from ..esports import (
 )
 from ..feature_capture import contract_snapshot_json
 from ..features.base import FeatureStore
-from ..features.nfl_efficiency import NFLEfficiencyStore
+from ..features.nfl_efficiency import NFLEfficiencyStore, normalize_nfl_team_code
 from ..forward import build_mlb_slate
 from ..international_baseball import (
     refresh_recent_international_baseball_matches,
@@ -2577,7 +2577,7 @@ def _nfl_situational_features(
     team_starters: dict[str, str] = {}
     for g in history:
         try:
-            g_dt = parse_utc(str(g.event_start_utc)).date()
+            g_dt = parse_utc(str(g.event_start_utc)).astimezone(EASTERN).date()
             team_last_date[g.home_team] = g_dt
             team_last_date[g.away_team] = g_dt
             if getattr(g, "home_starter_name", None) and g.home_starter_name != "Unknown":
@@ -2657,31 +2657,43 @@ def _nfl_is_division_game(home_team: str, away_team: str) -> bool:
     return h_div is not None and h_div == a_div
 
 
-def _load_nfl_injuries_known_at(data_root: str | Path, observed_at: datetime) -> list[dict[str, Any]]:
-    """Load latest timestamped injury entries from espn_injury_snapshots strictly <= observed_at."""
+def _load_nfl_injuries_known_at(
+    data_root: str | Path, observed_at: datetime
+) -> tuple[list[dict[str, Any]], dict[str, str] | None]:
+    """Return only verified, as-of injury entries and their source identity."""
     snap_dir = Path(data_root) / "availability" / "nfl" / "espn_injury_snapshots"
     if not snap_dir.exists():
-        return []
+        return [], None
     candidates = []
     for p in snap_dir.glob("*/*.json"):
         try:
             with open(p, "r", encoding="utf-8") as f:
                 data = json.load(f)
+            expected_hash = data.pop("snapshot_sha256", None)
+            if (
+                not expected_hash
+                or hashlib.sha256(
+                    json.dumps(data, sort_keys=True, separators=(",", ":")).encode()
+                ).hexdigest()
+                != expected_hash
+            ):
+                continue
             obs = parse_utc(data.get("observed_at_utc", ""))
             if obs <= observed_at:
-                candidates.append((obs, data.get("entries", [])))
+                candidates.append((obs, data.get("entries", []), expected_hash, str(p)))
         except (json.JSONDecodeError, KeyError, ValueError, OSError):
             continue
     if not candidates:
-        return []
+        return [], None
     candidates.sort(key=lambda c: c[0])
-    return candidates[-1][1]
+    obs, entries, digest, path = candidates[-1]
+    return entries, {"observed_at_utc": obs.isoformat(), "sha256": digest, "path": path}
 
 
 def _forecast_nfl_spread_slate(
     data_root, args_date: str, client, *, observed_at: datetime | None = None
 ) -> dict:
-    """Price NFL spreads using NFLStructuralV5Engine (nfl-spread-structural-v5)."""
+    """Price NFL spreads using vintaged-input v6 research challenger."""
     from ..features.base import FeatureStore
     from ..features.nfl_qb_oline import check_nfl_qb_injury_status
     from ..learned_forward import _team_matches, _teams
@@ -2689,8 +2701,8 @@ def _forecast_nfl_spread_slate(
     from ..scalar_artifact_replay import build_snapshot as build_scalar_snapshot
 
     observed_at = observed_at or utc_now()
-    injury_entries = _load_nfl_injuries_known_at(data_root, observed_at)
-    model_version = "nfl-spread-structural-v5"
+    injury_entries, injury_source = _load_nfl_injuries_known_at(data_root, observed_at)
+    model_version = "nfl-spread-structural-v6"
     artifact, artifact_error = _load_exact_artifact_contract(model_version)
     if artifact is None:
         return {
@@ -2712,7 +2724,8 @@ def _forecast_nfl_spread_slate(
 
     store = FeatureStore(data_root)
     history = store.games_before("nfl", args_date)
-    team_last_date, team_starters = _nfl_situational_features(history)
+    team_last_date, _ = _nfl_situational_features(history)
+    efficiency_store = NFLEfficiencyStore.get_default(data_root, observed_at=observed_at)
 
     scoreboard = client.scoreboard("NFL", args_date)
     events = scoreboard.get("events", [])
@@ -2784,19 +2797,23 @@ def _forecast_nfl_spread_slate(
         is_dome, wind_mph, temperature_f = _nfl_venue_weather(event)
         is_division_game = _nfl_is_division_game(home_team, away_team)
 
-        event_date = start.date()
+        event_date = start.astimezone(EASTERN).date()
         h_last = team_last_date.get(home_team)
         a_last = team_last_date.get(away_team)
         home_rest_days = max(4, min(14, (event_date - h_last).days)) if h_last else 7
         away_rest_days = max(4, min(14, (event_date - a_last).days)) if a_last else 7
 
-        h_qb = team_starters.get(home_team)
-        a_qb = team_starters.get(away_team)
+        projected_qbs = (efficiency_store.source_manifest or {}).get("projected_qbs") or {}
+        qb_updates = (efficiency_store.source_manifest or {}).get("projected_qb_updated_utc") or {}
+        h_qb = projected_qbs.get(normalize_nfl_team_code(home_team))
+        a_qb = projected_qbs.get(normalize_nfl_team_code(away_team))
+        h_qb_update = qb_updates.get(normalize_nfl_team_code(home_team))
+        a_qb_update = qb_updates.get(normalize_nfl_team_code(away_team))
 
         _, _h_stat, h_qb_pen = check_nfl_qb_injury_status(home_team, h_qb or "", injury_entries)
         _, _a_stat, a_qb_pen = check_nfl_qb_injury_status(away_team, a_qb or "", injury_entries)
 
-        eff = NFLEfficiencyStore.get_default(data_root).get_matchup_efficiency(
+        eff = efficiency_store.get_matchup_efficiency(
             home_team=home_team,
             away_team=away_team,
             as_of_date=start,
@@ -2806,6 +2823,18 @@ def _forecast_nfl_spread_slate(
 
         h_qb_tier_adj = eff.home_qb_tier_adj - h_qb_pen
         a_qb_tier_adj = eff.away_qb_tier_adj - a_qb_pen
+        input_qualified = (
+            efficiency_store.covers_last_game(home_team, h_last)
+            and efficiency_store.covers_last_game(away_team, a_last)
+            and bool(h_qb and a_qb)
+            and bool(h_qb_update and a_qb_update)
+            and parse_utc(h_qb_update).date() == observed_at.date()
+            and parse_utc(a_qb_update).date() == observed_at.date()
+            and _h_stat not in ("Out", "IR")
+            and _a_stat not in ("Out", "IR")
+            and injury_source is not None
+            and parse_utc(injury_source["observed_at_utc"]).date() == observed_at.date()
+        )
 
         fc = engine.forecast_game(
             home_team=home_team,
@@ -2881,6 +2910,9 @@ def _forecast_nfl_spread_slate(
             "away_rest_days": away_rest_days,
             "is_dome": is_dome,
             "is_division_game": is_division_game,
+            "efficiency_source": efficiency_store.source_manifest,
+            "injury_source": injury_source,
+            "input_qualified": input_qualified,
         }
         model_snapshot = build_scalar_snapshot(
             artifact,
@@ -2906,9 +2938,9 @@ def _forecast_nfl_spread_slate(
                 "model_uncertainty": 0.08,
                 "model_version": model_version,
                 "model_artifact_hash": model_artifact_hash,
-                "model_qualified": model_qualified,
+                "model_qualified": model_qualified and input_qualified,
                 "rationale": (
-                    f"NFL Structural v5 Spread projection. Projected margin {fc.projected_margin_home:+.1f} "
+                    f"NFL Structural v6 Spread projection. Projected margin {fc.projected_margin_home:+.1f} "
                     f"(Rest: {home_rest_days}v{away_rest_days}d, Dome: {is_dome})."
                 ),
                 "market_slug": market_slug,
@@ -2924,9 +2956,12 @@ def _forecast_nfl_spread_slate(
 
     return {
         "sport": "nfl_spread",
-        "model_name": "NFL Spread (Structural v5)",
+        "model_name": "NFL Spread (Structural v6 research)",
         "model_version": model_version,
-        "model_qualified": model_qualified,
+        "model_qualified": model_qualified
+        and bool(priced_contracts)
+        and all(row["model_qualified"] for row in priced_contracts),
+        "qualified_contracts": sum(bool(row["model_qualified"]) for row in priced_contracts),
         "game_date": args_date,
         "scheduled_games": len(events),
         "market_candidates": len(priced_contracts),
@@ -2984,7 +3019,7 @@ def _forecast_nfl_spread_sport(
             model_uncertainty=contract["model_uncertainty"],
             model_version=contract["model_version"],
             rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
-            risks="NFL Structural v5 joint distribution spread model.",
+            risks="NFL Structural v6 projected-QB research model; prospective validation pending.",
             model_origin=ModelOrigin.STATISTICAL_MODEL,
             model_state=ModelState.SHADOW_QUALIFIED
             if contract.get("model_qualified")
@@ -3082,7 +3117,7 @@ def _select_nfl_total_market(candidates: list[dict]) -> dict | None:
 def _forecast_nfl_total_slate(
     data_root, args_date: str, client, *, observed_at: datetime | None = None
 ) -> dict:
-    """Price NFL totals using NFLStructuralV5Engine (nfl-total-structural-v5)."""
+    """Price NFL totals using vintaged-input v6 research challenger."""
 
     from ..features.base import FeatureStore
     from ..features.nfl_qb_oline import check_nfl_qb_injury_status
@@ -3091,8 +3126,8 @@ def _forecast_nfl_total_slate(
     from ..scalar_artifact_replay import build_snapshot as build_scalar_snapshot
 
     observed_at = observed_at or utc_now()
-    injury_entries = _load_nfl_injuries_known_at(data_root, observed_at)
-    model_version = "nfl-total-structural-v5"
+    injury_entries, injury_source = _load_nfl_injuries_known_at(data_root, observed_at)
+    model_version = "nfl-total-structural-v6"
     artifact, artifact_error = _load_exact_artifact_contract(model_version)
     if artifact is None:
         return {
@@ -3115,7 +3150,8 @@ def _forecast_nfl_total_slate(
 
     store = FeatureStore(data_root)
     history = store.games_before("nfl", args_date)
-    team_last_date, team_starters = _nfl_situational_features(history)
+    team_last_date, _ = _nfl_situational_features(history)
+    efficiency_store = NFLEfficiencyStore.get_default(data_root, observed_at=observed_at)
 
     scoreboard = client.scoreboard("NFL", args_date)
     events = scoreboard.get("events", [])
@@ -3192,19 +3228,23 @@ def _forecast_nfl_total_slate(
         is_dome, wind_mph, temperature_f = _nfl_venue_weather(event)
         is_division_game = _nfl_is_division_game(home_team, away_team)
 
-        event_date = start.date()
+        event_date = start.astimezone(EASTERN).date()
         h_last = team_last_date.get(home_team)
         a_last = team_last_date.get(away_team)
         home_rest_days = max(4, min(14, (event_date - h_last).days)) if h_last else 7
         away_rest_days = max(4, min(14, (event_date - a_last).days)) if a_last else 7
 
-        h_qb = team_starters.get(home_team)
-        a_qb = team_starters.get(away_team)
+        projected_qbs = (efficiency_store.source_manifest or {}).get("projected_qbs") or {}
+        qb_updates = (efficiency_store.source_manifest or {}).get("projected_qb_updated_utc") or {}
+        h_qb = projected_qbs.get(normalize_nfl_team_code(home_team))
+        a_qb = projected_qbs.get(normalize_nfl_team_code(away_team))
+        h_qb_update = qb_updates.get(normalize_nfl_team_code(home_team))
+        a_qb_update = qb_updates.get(normalize_nfl_team_code(away_team))
 
         _, _h_stat, h_qb_pen = check_nfl_qb_injury_status(home_team, h_qb or "", injury_entries)
         _, _a_stat, a_qb_pen = check_nfl_qb_injury_status(away_team, a_qb or "", injury_entries)
 
-        eff = NFLEfficiencyStore.get_default(data_root).get_matchup_efficiency(
+        eff = efficiency_store.get_matchup_efficiency(
             home_team=home_team,
             away_team=away_team,
             as_of_date=start,
@@ -3214,6 +3254,18 @@ def _forecast_nfl_total_slate(
 
         h_qb_tier_adj = eff.home_qb_tier_adj - h_qb_pen
         a_qb_tier_adj = eff.away_qb_tier_adj - a_qb_pen
+        input_qualified = (
+            efficiency_store.covers_last_game(home_team, h_last)
+            and efficiency_store.covers_last_game(away_team, a_last)
+            and bool(h_qb and a_qb)
+            and bool(h_qb_update and a_qb_update)
+            and parse_utc(h_qb_update).date() == observed_at.date()
+            and parse_utc(a_qb_update).date() == observed_at.date()
+            and _h_stat not in ("Out", "IR")
+            and _a_stat not in ("Out", "IR")
+            and injury_source is not None
+            and parse_utc(injury_source["observed_at_utc"]).date() == observed_at.date()
+        )
 
         fc = engine.forecast_game(
             home_team=home_team,
@@ -3288,6 +3340,9 @@ def _forecast_nfl_total_slate(
             "is_dome": is_dome,
             "is_division_game": is_division_game,
             "short_week_penalty": fc.short_week_penalty,
+            "efficiency_source": efficiency_store.source_manifest,
+            "injury_source": injury_source,
+            "input_qualified": input_qualified,
         }
         model_snapshot = build_scalar_snapshot(
             artifact,
@@ -3318,9 +3373,9 @@ def _forecast_nfl_total_slate(
                 "model_uncertainty": 0.08,
                 "model_version": model_version,
                 "model_artifact_hash": model_artifact_hash,
-                "model_qualified": model_qualified,
+                "model_qualified": model_qualified and input_qualified,
                 "rationale": (
-                    f"NFL Structural v5 Total projection. Projected total {fc.projected_total:.1f} "
+                    f"NFL Structural v6 Total projection. Projected total {fc.projected_total:.1f} "
                     f"(Dome: {is_dome}, Weather: {wind_mph:.0f}mph/{temperature_f:.0f}F).{tnf_note}"
                 ),
                 "market_slug": market_slug,
@@ -3336,9 +3391,12 @@ def _forecast_nfl_total_slate(
 
     return {
         "sport": "nfl_total",
-        "model_name": "NFL Total (Structural v5)",
+        "model_name": "NFL Total (Structural v6 research)",
         "model_version": model_version,
-        "model_qualified": model_qualified,
+        "model_qualified": model_qualified
+        and bool(priced_contracts)
+        and all(row["model_qualified"] for row in priced_contracts),
+        "qualified_contracts": sum(bool(row["model_qualified"]) for row in priced_contracts),
         "game_date": args_date,
         "scheduled_games": len(events),
         "market_candidates": len(priced_contracts),
@@ -3394,7 +3452,7 @@ def _forecast_nfl_total_sport(
             model_uncertainty=contract["model_uncertainty"],
             model_version=contract["model_version"],
             rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
-            risks="NFL Structural v5 joint distribution total model.",
+            risks="NFL Structural v6 projected-QB research model; prospective validation pending.",
             model_origin=ModelOrigin.STATISTICAL_MODEL,
             model_state=ModelState.SHADOW_QUALIFIED
             if contract.get("model_qualified")

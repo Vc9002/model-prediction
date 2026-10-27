@@ -369,6 +369,18 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
 
     nfl_injuries_result: dict[str, Any] = {"status": "skipped"}
 
+    nfl_efficiency_result: dict[str, Any] = {"status": "skipped"}
+
+    def _capture_nfl_efficiency():
+        nonlocal nfl_efficiency_result
+        try:
+            from ..data_sources.nfl_efficiency_snapshot import capture_nfl_efficiency
+
+            nfl_efficiency_result = capture_nfl_efficiency(Path(ledger_path(config)).parent)
+        except Exception:
+            logger.warning("NFL efficiency capture failed for %s", args.date, exc_info=True)
+            nfl_efficiency_result = {"status": "error"}
+
     def _capture_nfl_injuries():
         nonlocal nfl_injuries_result
         try:
@@ -568,7 +580,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         f11 = io_pool.submit(_timed, "nhl_injuries", _capture_nhl_injuries)
         f12 = io_pool.submit(_timed, "cfb_injuries", _capture_cfb_injuries)
         f13 = io_pool.submit(_timed, "cfb_weather", _capture_cfb_weather)
-        for f in (f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13):
+        f14 = io_pool.submit(_timed, "nfl_efficiency", _capture_nfl_efficiency)
+        for f in (f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14):
             f.result()  # Wait for all, surface exceptions
         try:
             slate = f0.result()
@@ -1492,6 +1505,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         "step1b_soccer_scores": soccer_collection,
         "step1e_bet_better_models": bet_better_result,
         "step1f_nfl_injuries": nfl_injuries_result,
+        "step1f_nfl_efficiency": nfl_efficiency_result,
         "step1g_nba_injuries": nba_injuries_result,
         "step1h_nhl_injuries": nhl_injuries_result,
         "step1i_cfb_injuries": cfb_injuries_result,

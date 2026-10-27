@@ -13,6 +13,7 @@ from pathlib import Path
 
 import polars as pl
 
+from model_prediction.data_sources.nfl_efficiency_snapshot import load_efficiency_snapshot
 from model_prediction.runtime_paths import RuntimePaths
 
 logger = logging.getLogger(__name__)
@@ -151,7 +152,7 @@ class NFLEfficiencyStore:
 
     _instance: NFLEfficiencyStore | None = None
 
-    def __init__(self, data_root: Path | None = None) -> None:
+    def __init__(self, data_root: Path | None = None, *, observed_at: datetime | None = None) -> None:
         if data_root is None:
             data_root = RuntimePaths.resolve().repo_root / "data"
         self.data_root = Path(data_root)
@@ -160,9 +161,15 @@ class NFLEfficiencyStore:
 
         self._team_df: pl.DataFrame | None = None
         self._qb_df: pl.DataFrame | None = None
-        self._load()
+        self.source_manifest: dict[str, object] | None = None
+        self._load(observed_at)
 
-    def _load(self) -> None:
+    def _load(self, observed_at: datetime | None) -> None:
+        if observed_at is not None:
+            snapshot = load_efficiency_snapshot(self.data_root, observed_at)
+            if snapshot is not None:
+                self._team_df, self._qb_df, self.source_manifest = snapshot
+                return
         try:
             if self.team_parquet.exists():
                 self._team_df = pl.read_parquet(self.team_parquet)
@@ -172,10 +179,20 @@ class NFLEfficiencyStore:
             logger.warning("Could not read local NFL efficiency parquets: %s", exc)
 
     @classmethod
-    def get_default(cls, data_root: Path | None = None) -> NFLEfficiencyStore:
-        if cls._instance is None:
-            cls._instance = cls(data_root=data_root)
-        return cls._instance
+    def get_default(
+        cls, data_root: Path | None = None, *, observed_at: datetime | None = None
+    ) -> NFLEfficiencyStore:
+        # A singleton can retain another root or an older release across slates.
+        return cls(data_root=data_root, observed_at=observed_at)
+
+    def covers_last_game(self, team: str, last_game_date: date | None) -> bool:
+        """Qualification requires a verified release covering the team's latest result."""
+        if self.source_manifest is None or self._team_df is None or last_game_date is None:
+            return False
+        rows = self._team_df.filter(pl.col("team") == normalize_nfl_team_code(team))
+        if rows.is_empty():
+            return False
+        return str(rows.select(pl.col("gameday").max()).item()) >= last_game_date.isoformat()
 
     def get_matchup_efficiency(
         self,

@@ -108,6 +108,9 @@ class _CaptureLedger:
     def exposure(self, request, now=None, **kwargs):
         return Exposure()
 
+    def rows(self, filters=None):
+        return []
+
     def append_evaluated(self, request, eligibility, now=None):
         self.appended.append((request, eligibility))
         return {"pick_id": f"pick-{len(self.appended)}"}

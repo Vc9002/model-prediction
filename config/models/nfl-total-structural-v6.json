@@ -1,0 +1,23 @@
+{
+  "artifact_hash": "93845298682960640abf3384f3eb2c00f82b678462b22bb2df726c696193b796",
+  "gates": {
+    "max_uncertainty": 0.15,
+    "min_edge": 0.035,
+    "sizing": "flat_1u_gated"
+  },
+  "league": "NFL",
+  "league_avg_total": 45.5,
+  "method": "nfl_structural_v5_total_engine",
+  "model_version": "nfl-total-structural-v6",
+  "positive_class": "over",
+  "qualification": {
+    "framework": "nfl_v6_point_in_time_inputs",
+    "locked_holdout": false,
+    "qualified": false,
+    "status": "research"
+  },
+  "schema_version": "2",
+  "source_contract": "nflverse_snapshot_v1_projected_qb_depth_chart",
+  "sport": "nfl",
+  "total_sd": 14.2
+}
