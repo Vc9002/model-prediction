@@ -1,0 +1,19 @@
+{
+  "artifact_hash": "73d6b21971c4f98aed3f18f1d0f59eab3bab420695581c44c1fa8a5cd8d2d41a",
+  "inputs": {
+    "market_quote": "timestamp_valid_nonreconstructed_two_sided_moneyline_no_vig",
+    "moneyline_artifact_hash": "5cb5857519c32e04c895a3220afdc208e3d717ba0793e8d4a6946b1332f11654",
+    "moneyline_model_version": "nfl-elo-trend-lr-v4",
+    "spread_artifact_hash": "af7e91f423d415cbf2e9c543eb0d2af747713099f73f4ba1df5a11851fed7c89",
+    "spread_model_version": "nfl-spread-structural-v5",
+    "total_artifact_hash": "dd689d8faaffbc84998f5a66bcafa255c89d1891bf4e7f89d0d09e6fb260de07",
+    "total_model_version": "nfl-total-structural-v5",
+    "weight_rule": "minimize_brier_on_prior_complete_dates_with_settlement_before_forecast"
+  },
+  "method": "asof_brier_market_anchor_plus_joint_integer_score_lattice",
+  "model_version": "nfl-joint-market-v2",
+  "research_note": "Price-aware joint-score research model; no new static weights; requires prospective promotion evidence.",
+  "schema_version": "1",
+  "sport": "nfl",
+  "status": "research_challenger_not_production"
+}
