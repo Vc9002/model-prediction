@@ -53,12 +53,12 @@ Screenshot entries are dated October 25, 2026. Settlement status is shown per ro
 
 | ID | Sport | Selection | Odds (US) | Stake | Posted time | Status | Net P/L |
 | :--- | :--- | :--- | ---: | ---: | :--- | :--- | :--- |
-| K008 | NBA | Cavaliers -3.5 | -117 | 1.00u | 12:13 PM | LOSS — Cavaliers won 125-122 in OT (won by 3) | -1.00u |
+| K008 | NBA | Cavaliers -3.5 | -117 | 1.00u | 12:13 PM | LOSS — Cavaliers won 127-125 in OT (won by 2) | -1.00u |
 | K009 | MLB | Brewers moneyline | +108 | 1.00u | 12:13 PM | PENDING | — |
 
 *Note: Cowboys/Eagles MNF pending official injury report release.*
 
-**October 26 posted stakes:** 2.00u. **Settled:** 0-1-0, -1.00u. **Pending:** 1.00u (K009). Cleveland final: [Cavaliers 125, Timberwolves 122 (OT)](https://www.nba.com/game/0022600120/box-score).
+**October 26 posted stakes:** 2.00u. **Settled:** 0-1-0, -1.00u. **Pending:** 1.00u (K009). Cleveland final: [Cavaliers 127, Timberwolves 125 (OT)](https://www.nba.com/game/0022600120/box-score).
 
 ---
 
@@ -219,7 +219,7 @@ A structured, ongoing tracking ledger for **FadeMeBets** premium picks, covering
 | **035** | Oct 25, 2026 | NBA | New York Knicks vs Orlando Magic | **Knicks -7.5** | -110 | 1.00u | 9.5% EV (57 Conf) | 7:00 PM | **FINAL** | **LOSS** (Magic 111, Knicks 102) | **-1.00u** |
 | **036** | Oct 25, 2026 | NFL | Los Angeles Rams vs Las Vegas Raiders | **Over 47.5** | -110 | 1.00u | 9.4% EV (55 Conf) | 4:05 PM | **FINAL** | **WIN** (Rams 35, Raiders 21; 56 pts) | **+0.91u** |
 
-| **037** | Oct 26, 2026 | NBA | Minnesota Timberwolves at Cleveland Cavaliers | **Cavaliers -4.5** | +102 | 2.00u | Lock; High Confidence | 7:00 PM | **FINAL** | **LOSS** ([Cavaliers 125, Timberwolves 122 (OT)](https://www.nba.com/game/0022600120/box-score); won by 3) | **-2.00u** |
+| **037** | Oct 26, 2026 | NBA | Minnesota Timberwolves at Cleveland Cavaliers | **Cavaliers -4.5** | +102 | 2.00u | Lock; High Confidence | 7:00 PM | **FINAL** | **LOSS** ([Cavaliers 127, Timberwolves 125 (OT)](https://www.nba.com/game/0022600120/box-score); won by 2) | **-2.00u** |
 | **038** | Oct 26, 2026 | MLB | Milwaukee Brewers at Tampa Bay Rays | **Rays moneyline** | -120 | 0.50u | 8.5% EV; 58% cover | 8:00 PM | PENDING | — | — |
 | **039** | Oct 26, 2026 | NFL | Dallas Cowboys at Philadelphia Eagles | **Under 44.5** | -110 | 1.00u | 18.4% posted EV; 59% cover | 8:15 PM | PENDING | — | — |
 | **040** | Oct 26, 2026 | NFL | Dallas Cowboys at Philadelphia Eagles | **Eagles +5** | -110 | 1.25u | 8.4% posted EV; 56% cover | 8:15 PM | PENDING | — | — |
