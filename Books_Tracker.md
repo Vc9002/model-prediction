@@ -19,7 +19,7 @@ Screenshot entries are dated October 25, 2026. Settlement status is shown per ro
 | :--- | :--- | :--- | ---: | ---: | :--- | :--- | :--- |
 | S001 | NFL | J. Chase (Bengals) 80+ receiving yards | -125 | 3.00u | 10:01 AM | LOSS — 62 receiving yards (final) | -3.00u |
 | S002 | NFL | C. Watson (Packers) 70+ receiving yards | -145 | 3.00u | 10:01 AM | LOSS — 57 receiving yards (final; Lions 20, Packers 17) | -3.00u |
-| S003 | NBA | K. Leonard over 24.5 points | -115 | 2.00u | 10:01 AM | VOID / PENDING — DNP (Inactive, did not dress or play) | 0.00u |
+| S003 | NBA | K. Leonard over 24.5 points | -115 | 2.00u | 10:01 AM | VOID — DNP (Inactive, did not dress or play) | 0.00u |
 | S004 | NFL | Panthers moneyline | -150 | 2.00u | 10:01 AM | LOSS — Buccaneers 43, Panthers 13 | -2.00u |
 | S005 | NBA | Raptors moneyline | -110 | 1.00u | 10:56 AM | **LOSS** (Timberwolves 117, Raptors 94) | **-1.00u** |
 
@@ -55,8 +55,6 @@ Screenshot entries are dated October 25, 2026. Settlement status is shown per ro
 | :--- | :--- | :--- | ---: | ---: | :--- | :--- | :--- |
 | K008 | NBA | Cavaliers -3.5 | -117 | 1.00u | 12:13 PM | LOSS — Cavaliers won 127-125 in OT (won by 2) | -1.00u |
 | K009 | MLB | Brewers moneyline | +108 | 1.00u | 12:13 PM | WIN — Brewers 10, Rays 1 | +1.08u |
-
-*Note: Cowboys/Eagles MNF pending official injury report release.*
 
 **October 26 posted stakes:** 2.00u. **Settled:** 1-1-0, +0.08u. **Pending:** 0.00u. Finals: [Cavaliers 127, Timberwolves 125 (OT)](https://www.nba.com/game/0022600120/box-score); Brewers 10, Rays 1.
 
