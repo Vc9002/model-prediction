@@ -1,0 +1,17 @@
+{
+  "schema_version": "1",
+  "artifact_hash": "6bbab1297fe791bbff63e00e6414e88a7490f7d20f1ec49d9050af167824eba1",
+  "model_version": "nfl-joint-score-v1",
+  "sport": "nfl",
+  "method": "joint_integer_score_lattice",
+  "status": "research_challenger_not_production",
+  "inputs": {
+    "moneyline_model_version": "nfl-elo-trend-lr-v4",
+    "moneyline_artifact_hash": "5cb5857519c32e04c895a3220afdc208e3d717ba0793e8d4a6946b1332f11654",
+    "spread_model_version": "nfl-spread-structural-v5",
+    "spread_artifact_hash": "af7e91f423d415cbf2e9c543eb0d2af747713099f73f4ba1df5a11851fed7c89",
+    "total_model_version": "nfl-total-structural-v5",
+    "total_artifact_hash": "dd689d8faaffbc84998f5a66bcafa255c89d1891bf4e7f89d0d09e6fb260de07"
+  },
+  "research_note": "Moneyline marginal anchored to incumbent; score shape from incumbent structural distributions. No new fitted weights. No production qualification."
+}
