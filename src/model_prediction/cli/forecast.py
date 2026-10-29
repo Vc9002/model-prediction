@@ -2943,6 +2943,17 @@ def _forecast_nfl_spread_slate(
                     f"NFL Structural v6 Spread projection. Projected margin {fc.projected_margin_home:+.1f} "
                     f"(Rest: {home_rest_days}v{away_rest_days}d, Dome: {is_dome})."
                 ),
+                "joint_packet_quote": (
+                    {
+                        "line": anchor_line,
+                        "anchor_team": anchor_team,
+                        "long_ask": market["long"].get("ask"),
+                        "short_ask": market["short"].get("ask"),
+                        "lineage": market_lineage,
+                    }
+                    if market is not None and market_lineage is not None
+                    else None
+                ),
                 "market_slug": market_slug,
                 "observed_at_utc": (
                     market_lineage["market_quote_observed_at_utc"]
@@ -2964,6 +2975,11 @@ def _forecast_nfl_spread_slate(
         "qualified_contracts": sum(bool(row["model_qualified"]) for row in priced_contracts),
         "game_date": args_date,
         "scheduled_games": len(events),
+        "event_roster": [
+            {"event_id": str(event["id"]), "event_start_utc": str(event["date"])}
+            for event in events
+            if event.get("id") and event.get("date")
+        ],
         "market_candidates": len(priced_contracts),
         "priced_contracts": priced_contracts,
         "unmatched": unmatched,
@@ -3377,6 +3393,16 @@ def _forecast_nfl_total_slate(
                 "rationale": (
                     f"NFL Structural v6 Total projection. Projected total {fc.projected_total:.1f} "
                     f"(Dome: {is_dome}, Weather: {wind_mph:.0f}mph/{temperature_f:.0f}F).{tnf_note}"
+                ),
+                "joint_packet_quote": (
+                    {
+                        "line": t_line,
+                        "long_ask": market["long"].get("ask"),
+                        "short_ask": market["short"].get("ask"),
+                        "lineage": market_lineage,
+                    }
+                    if market is not None and market_lineage is not None
+                    else None
                 ),
                 "market_slug": market_slug,
                 "observed_at_utc": (
@@ -6155,5 +6181,41 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
                 results[sport]["stored_slate_coverage"] = stored_slate_coverage(
                     args.date, sport, ledger=ledger, flat_ledger=flat_ledger, data_root=data_root
                 )
+    if log and not getattr(args, "force", False) and "nfl" in results:
+        from ..learned_forward import LearnedForwardCandidate
+        from ..nfl_joint_packet_capture import capture_packets
+
+        packet_candidates: dict[str, dict[str, dict[str, Any]]] = {}
+        for candidate in results["nfl"].get("candidates", []):
+            row = dict(candidate)
+            quote = match_executable_quote(
+                data_directory, "nfl", args.date, LearnedForwardCandidate(**candidate)
+            )
+            if quote is not None:
+                lineage = _canonical_market_snapshot_lineage(
+                    quote["_archive_record"], Path(quote["_archive_path"])
+                )
+                if lineage is not None and quote.get("no_vig_probability") is not None:
+                    record = quote["_archive_record"]
+                    row["quote"] = {
+                        "selected_ask": quote["executable_ask"],
+                        "no_vig_selected": quote["no_vig_probability"],
+                        "long_ask": (record.get("long") or {}).get("ask"),
+                        "short_ask": (record.get("short") or {}).get("ask"),
+                        "lineage": lineage,
+                    }
+            packet_candidates.setdefault(candidate["event_id"], {})["moneyline"] = row
+        for market in ("spread", "total"):
+            for contract in results.get(f"nfl_{market}", {}).get("priced_contracts", []):
+                row = dict(contract)
+                row["quote"] = row.get("joint_packet_quote")
+                packet_candidates.setdefault(contract["event_id"], {})[market] = row
+        for event in results.get("nfl_spread", {}).get("event_roster", []):
+            packet_candidates.setdefault(event["event_id"], {}).setdefault(
+                "scheduled", event
+            )
+        results["nfl"]["joint_packet_capture"] = capture_packets(
+            data_directory, args.date, iso_utc(utc_now()), packet_candidates
+        )
     output = results[sports[0]] if len(sports) == 1 and len(results) == 1 else results
     return output
