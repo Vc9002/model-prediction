@@ -1,0 +1,24 @@
+{
+  "artifact_hash": "3a738b473de5dda1ee0926ad32c1b4c1675e6ccec25d8d134778e60af30fc30d",
+  "inputs": {
+    "market_quote": "timestamp_valid_nonreconstructed_two_sided_moneyline_no_vig",
+    "moneyline_artifact_hash": "5cb5857519c32e04c895a3220afdc208e3d717ba0793e8d4a6946b1332f11654",
+    "source_contract": "nfl-joint-decision-packet-v1",
+    "spread_artifact_hash": "bbd602800924c3dadbbb982ad97a4bcce89cd30aaf87e09348f284f4dc2a95aa",
+    "total_artifact_hash": "93845298682960640abf3384f3eb2c00f82b678462b22bb2df726c696193b796",
+    "weight_rule": "minimize_brier_on_prior_complete_dates_with_settlement_before_forecast"
+  },
+  "method": "asof_brier_market_anchor_plus_joint_integer_score_lattice",
+  "model_version": "nfl-joint-market-v3",
+  "research_note": "V6 input lineage and exact decision-time quotes; proper-score and economic qualification pending.",
+  "schema_version": "1",
+  "source_sha256": {
+    "src/model_prediction/models/nfl_joint_market_v2.py": "507f3ff44f06edce66a4895844781eaf860637c02b144505e28c3c617a2f7cca",
+    "src/model_prediction/models/nfl_joint_market_v3.py": "d932a1ae48e62d8181ff7334ee95884d3213fa4e1023c429f9d335b7750c02f7",
+    "src/model_prediction/models/nfl_joint_score_v1.py": "6dc4caf5788a73cff0148835e5461159490960c054cc9892f23bf0aab646bde6",
+    "src/model_prediction/models/nfl_market_anchor_v1.py": "80991a79a400d86ca2b7e11ac69587c05c3496176e4a7b9488589f523371c02f",
+    "src/model_prediction/models/nfl_structural_v5.py": "2740603b11e0e0581c81ddf7728a498d6b95ff0c33294b31afaa8323406dffb3"
+  },
+  "sport": "nfl",
+  "status": "research_challenger_not_production"
+}

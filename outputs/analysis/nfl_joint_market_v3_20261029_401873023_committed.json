@@ -1,0 +1,317 @@
+{
+  "artifact_hash": "3a738b473de5dda1ee0926ad32c1b4c1675e6ccec25d8d134778e60af30fc30d",
+  "contracts": {
+    "moneyline": {
+      "ask": 0.6425,
+      "line": null,
+      "quote_record_id": "425949c72b53fac4c313eea50e4640a0a77a31bb5a9132ac5ec1433a00cedb6f",
+      "selection": "home"
+    },
+    "spread": {
+      "ask": 0.5,
+      "line": 3.5,
+      "quote_record_id": "fe99100dbbe29fa378993e0c461db657609f8cf76b638bf10a1e281d7bcb3c3d",
+      "selection": "away"
+    },
+    "total": {
+      "ask": 0.485,
+      "line": 47.5,
+      "quote_record_id": "6073fd3bb1d88b511d12307faac26fe41148cc6cd6535414ec6fb287d191d270",
+      "selection": "over"
+    }
+  },
+  "decision": "RESEARCH_FORECAST_ONLY",
+  "decision_at_utc": "2026-10-29T20:18:29.953000Z",
+  "event_id": "401873023",
+  "event_start_utc": "2026-10-30T00:15Z",
+  "home_win_probability": 0.6408980000000001,
+  "market_weight": 1.0,
+  "model_version": "nfl-joint-market-v3",
+  "packet_sha256": "98c82fbeec3c6e4ab8c7e7392fe87b39875c567d17ce9f4fbd09e2a8a88eeec8",
+  "raw_edges": {
+    "moneyline": -0.0016019999999998813,
+    "spread": -0.0169099190483894,
+    "total": 0.04436550921325566
+  },
+  "scope": "prospective research forecast; no call, stake, or order",
+  "selected_asks": {
+    "moneyline": 0.6425,
+    "spread": 0.5,
+    "total": 0.485
+  },
+  "selected_probabilities": {
+    "moneyline": 0.6408980000000001,
+    "spread": 0.4830900809516106,
+    "total": 0.5293655092132556
+  },
+  "shadow_sha256": "6c75d92369cc4f77d1558a6468cbea84dc3fcc3187d39ba43d2f9a2d07912010",
+  "source_packet_path": "E:\\MP\\outputs\\analysis\\nfl_joint_market_v3_packets\\401873023-98c82fbeec3c6e4ab8c7e7392fe87b39875c567d17ce9f4fbd09e2a8a88eeec8.json",
+  "training_evidence": [
+    {
+      "event_date": "2026-10-11",
+      "market_probability": 0.765586,
+      "model_probability": 0.698453,
+      "outcome": 1,
+      "settled_at_utc": "2026-10-11T22:00:49.029701+00:00"
+    },
+    {
+      "event_date": "2026-10-11",
+      "market_probability": 0.523691,
+      "model_probability": 0.62508,
+      "outcome": 0,
+      "settled_at_utc": "2026-10-11T22:00:50.312148+00:00"
+    },
+    {
+      "event_date": "2026-10-11",
+      "market_probability": 0.760599,
+      "model_probability": 0.661023,
+      "outcome": 1,
+      "settled_at_utc": "2026-10-11T22:00:51.575776+00:00"
+    },
+    {
+      "event_date": "2026-10-11",
+      "market_probability": 0.753117,
+      "model_probability": 0.636645,
+      "outcome": 1,
+      "settled_at_utc": "2026-10-11T22:00:52.799870+00:00"
+    },
+    {
+      "event_date": "2026-10-11",
+      "market_probability": 0.436409,
+      "model_probability": 0.614321,
+      "outcome": 0,
+      "settled_at_utc": "2026-10-11T22:00:56.695844+00:00"
+    },
+    {
+      "event_date": "2026-10-11",
+      "market_probability": 0.583541,
+      "model_probability": 0.528758,
+      "outcome": 1,
+      "settled_at_utc": "2026-10-11T22:00:57.970512+00:00"
+    },
+    {
+      "event_date": "2026-10-11",
+      "market_probability": 0.633416,
+      "model_probability": 0.62105,
+      "outcome": 1,
+      "settled_at_utc": "2026-10-12T10:03:42.023248+00:00"
+    },
+    {
+      "event_date": "2026-10-11",
+      "market_probability": 0.695761,
+      "model_probability": 0.591991,
+      "outcome": 1,
+      "settled_at_utc": "2026-10-12T10:03:43.879511+00:00"
+    },
+    {
+      "event_date": "2026-10-11",
+      "market_probability": 0.613466,
+      "model_probability": 0.588189,
+      "outcome": 0,
+      "settled_at_utc": "2026-10-12T10:03:45.540801+00:00"
+    },
+    {
+      "event_date": "2026-10-11",
+      "market_probability": 0.61596,
+      "model_probability": 0.553449,
+      "outcome": 0,
+      "settled_at_utc": "2026-10-12T10:03:53.721081+00:00"
+    },
+    {
+      "event_date": "2026-10-12",
+      "market_probability": 0.61596,
+      "model_probability": 0.500606,
+      "outcome": 0,
+      "settled_at_utc": "2026-10-13T04:35:46.513042+00:00"
+    },
+    {
+      "event_date": "2026-10-15",
+      "market_probability": 0.566085,
+      "model_probability": 0.555669,
+      "outcome": 0,
+      "settled_at_utc": "2026-10-16T04:36:30.745713+00:00"
+    },
+    {
+      "event_date": "2026-10-18",
+      "market_probability": 0.566085,
+      "model_probability": 0.607892,
+      "outcome": 0,
+      "settled_at_utc": "2026-10-18T22:26:20.631920+00:00"
+    },
+    {
+      "event_date": "2026-10-18",
+      "market_probability": 0.486284,
+      "model_probability": 0.559279,
+      "outcome": 0,
+      "settled_at_utc": "2026-10-18T22:28:05.435786+00:00"
+    },
+    {
+      "event_date": "2026-10-18",
+      "market_probability": 0.613466,
+      "model_probability": 0.573933,
+      "outcome": 0,
+      "settled_at_utc": "2026-10-18T22:28:06.302971+00:00"
+    },
+    {
+      "event_date": "2026-10-18",
+      "market_probability": 0.72818,
+      "model_probability": 0.70613,
+      "outcome": 0,
+      "settled_at_utc": "2026-10-18T22:28:07.175443+00:00"
+    },
+    {
+      "event_date": "2026-10-18",
+      "market_probability": 0.755611,
+      "model_probability": 0.718208,
+      "outcome": 1,
+      "settled_at_utc": "2026-10-18T22:28:08.065331+00:00"
+    },
+    {
+      "event_date": "2026-10-18",
+      "market_probability": 0.501247,
+      "model_probability": 0.629959,
+      "outcome": 0,
+      "settled_at_utc": "2026-10-18T22:28:09.043659+00:00"
+    },
+    {
+      "event_date": "2026-10-18",
+      "market_probability": 0.605985,
+      "model_probability": 0.563033,
+      "outcome": 1,
+      "settled_at_utc": "2026-10-18T22:28:09.940677+00:00"
+    },
+    {
+      "event_date": "2026-10-18",
+      "market_probability": 0.548628,
+      "model_probability": 0.579057,
+      "outcome": 1,
+      "settled_at_utc": "2026-10-18T22:28:10.800649+00:00"
+    },
+    {
+      "event_date": "2026-10-18",
+      "market_probability": 0.875312,
+      "model_probability": 0.702492,
+      "outcome": 0,
+      "settled_at_utc": "2026-10-19T04:32:12.137688+00:00"
+    },
+    {
+      "event_date": "2026-10-18",
+      "market_probability": 0.785536,
+      "model_probability": 0.695723,
+      "outcome": 1,
+      "settled_at_utc": "2026-10-19T04:32:15.664068+00:00"
+    },
+    {
+      "event_date": "2026-10-18",
+      "market_probability": 0.678304,
+      "model_probability": 0.592063,
+      "outcome": 1,
+      "settled_at_utc": "2026-10-19T04:32:19.205494+00:00"
+    },
+    {
+      "event_date": "2026-10-18",
+      "market_probability": 0.491272,
+      "model_probability": 0.571589,
+      "outcome": 1,
+      "settled_at_utc": "2026-10-19T04:33:19.489093+00:00"
+    },
+    {
+      "event_date": "2026-10-19",
+      "market_probability": 0.780549,
+      "model_probability": 0.72532,
+      "outcome": 1,
+      "settled_at_utc": "2026-10-20T04:31:37.330138+00:00"
+    },
+    {
+      "event_date": "2026-10-22",
+      "market_probability": 0.406484,
+      "model_probability": 0.512806,
+      "outcome": 0,
+      "settled_at_utc": "2026-10-23T05:00:54.295876+00:00"
+    },
+    {
+      "event_date": "2026-10-25",
+      "market_probability": 0.600998,
+      "model_probability": 0.58223,
+      "outcome": 1,
+      "settled_at_utc": "2026-10-25T20:43:50.302949+00:00"
+    },
+    {
+      "event_date": "2026-10-25",
+      "market_probability": 0.57606,
+      "model_probability": 0.594684,
+      "outcome": 0,
+      "settled_at_utc": "2026-10-25T20:43:51.556325+00:00"
+    },
+    {
+      "event_date": "2026-10-25",
+      "market_probability": 0.548628,
+      "model_probability": 0.577526,
+      "outcome": 1,
+      "settled_at_utc": "2026-10-25T20:43:52.793931+00:00"
+    },
+    {
+      "event_date": "2026-10-25",
+      "market_probability": 0.730673,
+      "model_probability": 0.667812,
+      "outcome": 1,
+      "settled_at_utc": "2026-10-25T20:43:54.038658+00:00"
+    },
+    {
+      "event_date": "2026-10-25",
+      "market_probability": 0.665835,
+      "model_probability": 0.618972,
+      "outcome": 0,
+      "settled_at_utc": "2026-10-25T20:43:55.285848+00:00"
+    },
+    {
+      "event_date": "2026-10-25",
+      "market_probability": 0.591022,
+      "model_probability": 0.711048,
+      "outcome": 0,
+      "settled_at_utc": "2026-10-25T20:43:56.572192+00:00"
+    },
+    {
+      "event_date": "2026-10-25",
+      "market_probability": 0.805486,
+      "model_probability": 0.603556,
+      "outcome": 0,
+      "settled_at_utc": "2026-10-25T20:43:58.993795+00:00"
+    },
+    {
+      "event_date": "2026-10-25",
+      "market_probability": 0.673317,
+      "model_probability": 0.617568,
+      "outcome": 1,
+      "settled_at_utc": "2026-10-26T02:16:56.770156+00:00"
+    },
+    {
+      "event_date": "2026-10-25",
+      "market_probability": 0.633416,
+      "model_probability": 0.591853,
+      "outcome": 1,
+      "settled_at_utc": "2026-10-26T02:16:58.010839+00:00"
+    },
+    {
+      "event_date": "2026-10-25",
+      "market_probability": 0.389027,
+      "model_probability": 0.524726,
+      "outcome": 0,
+      "settled_at_utc": "2026-10-26T02:16:59.239289+00:00"
+    },
+    {
+      "event_date": "2026-10-25",
+      "market_probability": 0.586035,
+      "model_probability": 0.599431,
+      "outcome": 1,
+      "settled_at_utc": "2026-10-26T03:20:22.136398+00:00"
+    },
+    {
+      "event_date": "2026-10-26",
+      "market_probability": 0.329177,
+      "model_probability": 0.524444,
+      "outcome": 0,
+      "settled_at_utc": "2026-10-27T04:40:19.362487+00:00"
+    }
+  ]
+}
