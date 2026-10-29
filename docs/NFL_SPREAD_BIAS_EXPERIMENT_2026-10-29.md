@@ -7,7 +7,7 @@ margin. This experiment tests whether adding a home-margin intercept fitted on
 earlier settled complete game dates improves later spread probabilities on the
 same exact saved lines. It uses the saved parent artifact and source-engine
 hashes and requires exact incumbent probability replay, event/line orientation,
-decision timing, and independent result agreement. Training outcomes must
+decision timing, and saved score/result consistency. Training outcomes must
 settle before the later decision. No threshold, stake, champion, or ledger is
 changed.
 
