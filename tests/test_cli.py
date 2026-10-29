@@ -2659,6 +2659,7 @@ def test_select_nfl_spread_market_ignores_partial_and_team_totals() -> None:
             "long": {"ask": 0.52},
             "short": {"ask": 0.48},
             "market_slug": "nfl-spread-phi-dal-3pt5",
+            "observed_at_utc": "2026-10-11T09:59:00Z",
         },
     ]
     picked = cli._select_nfl_spread_market(rows)
@@ -3246,14 +3247,68 @@ def _nfl_total_forecast(*, selection: str, line: float) -> dict:
 
 
 def test_select_nfl_spread_market_picks_the_most_balanced_line() -> None:
+    observed = "2026-10-11T09:59:00Z"
     best = cli_forecast._select_nfl_spread_market(
         [
-            {"line": 3.5, "long": {"ask": 0.15}},
-            {"line": -3.5, "long": {"ask": 0.52}},
-            {"line": -7.5, "long": {"ask": 0.88}},
+            {
+                "market_slug": "nfl-spread-a",
+                "line": 3.5,
+                "long": {"ask": 0.15},
+                "short": {"ask": 0.86},
+                "observed_at_utc": observed,
+            },
+            {
+                "market_slug": "nfl-spread-b",
+                "line": -3.5,
+                "long": {"ask": 0.52},
+                "short": {"ask": 0.49},
+                "observed_at_utc": observed,
+            },
+            {
+                "market_slug": "nfl-spread-c",
+                "line": -7.5,
+                "long": {"ask": 0.88},
+                "short": {"ask": 0.13},
+                "observed_at_utc": observed,
+            },
         ]
     )
-    assert best == {"line": -3.5, "long": {"ask": 0.52}}
+    assert best is not None and best["market_slug"] == "nfl-spread-b"
+
+
+def test_select_nfl_spread_market_uses_latest_two_sided_quote_per_contract() -> None:
+    rows = [
+        {
+            "market_slug": "nfl-spread-a",
+            "line": 3.5,
+            "long": {"ask": 0.50},
+            "short": {"ask": 0.51},
+            "observed_at_utc": "2026-10-11T09:00:00Z",
+        },
+        {
+            "market_slug": "nfl-spread-a",
+            "line": 3.5,
+            "long": {"ask": 0.70},
+            "short": {"ask": 0.31},
+            "observed_at_utc": "2026-10-11T10:00:00Z",
+        },
+        {
+            "market_slug": "nfl-spread-b",
+            "line": 4.5,
+            "long": {"ask": 0.53},
+            "short": {"ask": 0.48},
+            "observed_at_utc": "2026-10-11T10:00:00Z",
+        },
+        {
+            "market_slug": "nfl-spread-c",
+            "line": 5.5,
+            "long": {"ask": 0.50},
+            "short": {},
+            "observed_at_utc": "2026-10-11T10:00:00Z",
+        },
+    ]
+    picked = cli_forecast._select_nfl_spread_market(rows)
+    assert picked is not None and picked["market_slug"] == "nfl-spread-b"
 
 
 def test_quotes_known_at_drops_rows_observed_after_the_run() -> None:

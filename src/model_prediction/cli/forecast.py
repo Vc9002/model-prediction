@@ -2522,17 +2522,33 @@ def _forecast_nba_total_sport(
 def _select_nfl_spread_market(candidates: list[dict]) -> dict | None:
     """Select the most balanced spread market line for an NFL game."""
     partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")
-    valid = [
-        row
-        for row in candidates
-        if isinstance(row.get("long"), dict)
-        and row["long"].get("ask") is not None
-        and row.get("line") is not None
-        and not any(token in str(row.get("market_slug", "")).lower() for token in partial_tokens)
-    ]
-    if not valid:
+    latest_by_contract: dict[str, dict] = {}
+    for row in candidates:
+        slug = str(row.get("market_slug") or "")
+        if (
+            not slug
+            or any(token in slug.lower() for token in partial_tokens)
+            or row.get("line") is None
+            or not isinstance(row.get("long"), dict)
+            or not isinstance(row.get("short"), dict)
+            or row["long"].get("ask") is None
+            or row["short"].get("ask") is None
+        ):
+            continue
+        try:
+            long_ask = float(row["long"]["ask"])
+            short_ask = float(row["short"]["ask"])
+            observed = parse_utc(str(row.get("observed_at_utc") or ""))
+        except (TypeError, ValueError):
+            continue
+        if not (0 < long_ask < 1 and 0 < short_ask < 1):
+            continue
+        previous = latest_by_contract.get(slug)
+        if previous is None or observed > parse_utc(str(previous["observed_at_utc"])):
+            latest_by_contract[slug] = row
+    if not latest_by_contract:
         return None
-    return min(valid, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
+    return min(latest_by_contract.values(), key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
 
 
 def _nfl_is_neutral_site(event: dict) -> bool:
