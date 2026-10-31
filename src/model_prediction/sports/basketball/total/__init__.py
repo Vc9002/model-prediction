@@ -15,6 +15,7 @@ from model_prediction.models.basketball import (
     ncaab_model,
     wncaab_model,
 )
+from model_prediction.models.nba_total_v6 import NBATotalModelV6
 
 __all__ = [
     "BasketballLeagueConfig",
@@ -22,6 +23,7 @@ __all__ = [
     "DedicatedBasketballLeagueModel",
     "EuroLeagueModel",
     "NBAModel",
+    "NBATotalModelV6",
     "NCAABModel",
     "UpcomingGame",
     "WNBAModel",

@@ -1,7 +1,7 @@
 {
-  "artifact_hash": "c63f65a7179e59e6b3bce8e7daf5c16392c0e3db38f59e36707aabecc86fa7bd",
+  "artifact_hash": "c3a872eb6ff44103d8bbf0e93c5843817be3a4ece8daca44c3f57a73439d7a4e",
   "cold_temp_penalty": 1.5,
-  "dome_boost": 3.5,
+  "dome_boost": 2.0,
   "gates": {
     "max_uncertainty": 0.15,
     "min_edge": 0.035,
@@ -9,13 +9,13 @@
   },
   "key_number_weight": 0.15,
   "league": "NFL",
-  "league_avg_total": 45.2,
-  "market_weight": 0.8,
+  "league_avg_total": 45.5,
+  "market_weight": 0.6,
   "max_total_prob": 0.65,
   "method": "nfl_total_structural_v6_engine",
   "min_total_prob": 0.35,
   "model_version": "nfl-total-structural-v6",
-  "note": "Overhauled independent NFL Total Points engine v6. Features offensive/defensive pace modeling (plays/game), pass vs rush EPA scoring, dome boost (+3.5 pts), non-linear wind drag (>12 mph), Bayesian market anchoring (w=0.80), and smooth key-total distribution.",
+  "note": "Overhauled independent NFL Total Points engine v6. Features offensive/defensive pace modeling (plays/game), pass vs rush EPA scoring, dome boost (+2.0 pts), non-linear wind drag (>12 mph), Bayesian market anchoring (w=0.60), and calibrated continuous CDF.",
   "positive_class": "over",
   "qualification": {
     "framework": "nfl_v6_point_in_time_inputs",
@@ -29,7 +29,7 @@
   "schema_version": "2",
   "short_week_drag": 1.0,
   "sport": "nfl",
-  "total_sd": 13.5,
+  "total_sd": 13.8,
   "wind_14_penalty": 2.5,
   "wind_15_penalty": 2.5,
   "wind_20_penalty": 5.0

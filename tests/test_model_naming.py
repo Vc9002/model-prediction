@@ -50,6 +50,12 @@ def test_canonical_model_id_resolves_aliases() -> None:
     assert canonical_model_id("cfb-moneyline-v1") == "college-football-v1"
     assert canonical_model_id("cfb-v1") == "college-football-v1"
 
+    # NFL & NBA v6 Aliases
+    assert canonical_model_id("nfl-spread-v6") == "nfl-spread-structural-v6"
+    assert canonical_model_id("nfl-total-v6") == "nfl-total-structural-v6"
+    assert canonical_model_id("nba-spread-v6") == "nba-spread-margin-v6"
+    assert canonical_model_id("nba-total-v6") == "nba-total-margin-v6"
+
     # Case insensitive
     assert canonical_model_id("MLB-SPREAD-MARGIN-V3") == "measured-edge-margin-v3"
 
@@ -62,6 +68,8 @@ def test_standard_model_names_have_clear_structure() -> None:
     assert standard_model_name("cfb-structural-v2") == "cfb-multi-structural-v2"
     assert standard_model_name("tennis-markov-hierarchical-v2") == "tennis-multi-markov-hierarchical-v2"
     assert standard_model_name("wnba-elo-trend-lr-v4") == "wnba-moneyline-elo-trend-lr-v4"
+    assert standard_model_name("nfl-spread-structural-v6") == "nfl-spread-structural-v6"
+    assert standard_model_name("nba-spread-margin-v6") == "nba-spread-margin-v6"
 
 
 def test_display_model_names_are_human_readable() -> None:
@@ -73,6 +81,8 @@ def test_display_model_names_are_human_readable() -> None:
     assert display_model_name("tennis-markov-hierarchical-v2") == "Tennis Unified (Hierarchical Markov v2)"
     assert display_model_name("wnba-elo-trend-lr-v4") == "WNBA Moneyline (Elo Trend LR v4)"
     assert display_model_name("cs2-tiered-elo-v6") == "CS2 Moneyline (Tiered Elo v6)"
+    assert display_model_name("nfl-spread-structural-v6") == "NFL Spread (Structural v6)"
+    assert display_model_name("nba-spread-margin-v6") == "NBA Spread (Margin v6)"
 
 
 def test_production_registry_get_and_properties() -> None:

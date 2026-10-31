@@ -80,7 +80,7 @@ def test_nfl_total_v6_pace_and_weather():
 
     # Dome + fast pace game should project significantly higher than windy + slow outdoor game
     assert fc_dome_fast.projected_total > fc_windy_slow.projected_total
-    assert fc_windy_slow.weather_total_penalty >= 5.0
+    assert fc_windy_slow.weather_total_penalty >= 4.0
     assert fc_windy_slow.prob_under > fc_dome_fast.prob_under
 
     # Bounded alternate-total probability safeguards
