@@ -21,10 +21,10 @@ These are Vincent's reported purchases, separate from provider-posted stakes and
 
 | Provider | Logged picks | Settled record | Pending | Total posted stakes | Realized net |
 | :--- | ---: | :---: | ---: | ---: | ---: |
-| FadeMeBets | 60 | 29-27-0 | 4 | 85.50u | +0.67u |
+| FadeMeBets | 60 | 31-27-0 | 2 | 85.50u | +2.03u |
 | Scout | 12 | 2-9-0 (1 void) | 0 | 23.00u plus unspecified Oct. 29 stake | -14.09u |
-| Kytra | 18 | 7-7-0 | 4 | 25.50u | -0.17u |
-| **All providers** | **90** | **38-43-0 (1 void)** | **8** | **134.00u plus unspecified Scout stake** | **-13.59u** |
+| Kytra | 18 | 8-7-0 | 3 | 25.50u | +1.35u |
+| **All providers** | **90** | **41-43-0 (1 void)** | **5** | **134.00u plus unspecified Scout stake** | **-10.71u** |
 
 Screenshot entries are dated October 25, 2026. Settlement status is shown per row. Message timestamps are posting times. Scout's screenshot explicitly names Scout. Kytra attribution is inferred from the user's request: that screenshot displays Winible Bot rather than Kytra. The parlay is one pick at the displayed combined price; its legs are not counted separately. Standalone alternate spreads remain separate picks.
 
@@ -114,12 +114,12 @@ Scout posted this at 11:40 AM. The post does not state a unit size; no stake was
 
 | ID | Sport | Selection | Odds (US) | Stake | Result | Net P/L |
 | :--- | :--- | :--- | ---: | ---: | :--- | ---: |
-| K015 | NCAAF | Maryland +3.5 | -132 | 2.00u | PENDING | — |
+| K015 | NCAAF | Maryland +3.5 | -132 | 2.00u | **WIN** — [Illinois 20, Maryland 17](https://www.espn.com/college-football/game/_/gameId/401858503); covered +3.5 | **+1.52u** |
 | K016 | NCAAF | Indiana -19.5 | -120 | 2.00u | PENDING | — |
 | K017 | NCAAF | Ohio State/USC over 50.5 | -112 | 2.00u | PENDING | — |
 | K018 | NBA | 2-Leg SGP: Thunder +7.5 / Shai Gilgeous-Alexander over 24.5 points | -112 | 2.00u | PENDING | — |
 
-**October 31 posted stakes:** 8.00u. A "possible live bets" note was mentioned but no concrete selection/stake was posted, so it is not logged. All four games were not yet final as of this update.
+**October 31 Kytra:** 1-0-0 (+1.52u settled), 3 picks pending (6.00u). K016 live in 2nd Qtr; K017 & K018 scheduled tonight.
 
 ### Settlement evidence — October 29 & 30, 2026
 
@@ -140,8 +140,11 @@ October 29 provider total: 0-5-0, -5.00u on 5.00u risked.
 - Kytra K014: [Denver Nuggets 127, Phoenix Suns 120](https://www.espn.com/nba/game/_/gameId/401909286). Nikola Jokic scored 18 points (8-13 FG); fell short of 24.5 points (LOSS, -1.50u).
 October 30 provider total: 3-3-0, +0.94u net on 8.00u risked (+0.73u FMB, +0.21u Kytra).
 
-### October 31 Integrity Note
-All October 31 games across all providers remain **PENDING**. None are finalized as of October 31, 12:10 PM ET. Oregon State at Fresno State is scheduled for 11:00 PM ET. All premature settlements have been reverted.
+### October 31 Settlement Verification (as of 4:38 PM ET)
+- **FMB #058**: [Texas Tech 34, Arizona 26](https://www.espn.com/college-football/game/_/gameId/401856842). Texas Tech covered -3.5 (WIN, +0.91u).
+- **FMB #059**: [Ole Miss 45, Auburn 15](https://www.espn.com/college-football/game/_/gameId/401856735). Ole Miss covered -10.5 (WIN, +0.45u).
+- **Kytra K015**: [Illinois 20, Maryland 17](https://www.espn.com/college-football/game/_/gameId/401858503). Maryland covered +3.5 (WIN, +1.52u).
+- Remaining 5 picks (FMB #057, FMB #060, K016, K017, K018) remain strictly **PENDING**.
 
 ### Settlement evidence and rounding — October 28
 
@@ -158,19 +161,19 @@ A structured, ongoing tracking ledger for **FadeMeBets** premium picks, covering
 
 ## 📊 Performance Dashboard
 
-*Last Updated: October 31, 2026. 56 FMB picks settled; 4 Oct. 31 picks pending (Oregon State, Texas Tech, Ole Miss, Oklahoma State — games not yet final). Provider stakes, not personal wagers.*
+*Last Updated: October 31, 2026 (4:38 PM ET). 58 FMB picks settled; 2 Oct. 31 picks pending (Oklahoma State, Oregon State — scheduled tonight). Provider stakes, not personal wagers.*
 
 | Metric | Overall | Lock of the Day (Featured) | EV Picks |
 | :--- | :---: | :---: | :---: |
 | **Total Picks Logged** | **60** | 15 | 45 |
-| **Settled Record** | **29 - 27 - 0** | 9 - 5 - 0 | 20 - 22 - 0 |
-| **Pending / Live** | **4** | 1 | 3 |
-| **Win Rate (Settled)** | **51.8%** | 64.3% | **47.6%** |
+| **Settled Record** | **31 - 27 - 0** | 9 - 5 - 0 | 22 - 22 - 0 |
+| **Pending / Live** | **2** | 1 | 1 |
+| **Win Rate (Settled)** | **53.4%** | 64.3% | **50.0%** |
 | **Total Units Risked** | **85.50u** | 41.00u | 44.50u |
-| **Settled Units Risked**| **79.00u** | 37.00u | 42.00u |
-| **Net Profit / Loss** | **+0.67u** | **+6.10u** | **-5.43u** |
-| **ROI % (Settled)** | **+0.8%** | +16.5% | **-12.9%** |
-| **Pending Potential** | **6.50u posted stakes** | 4.00u | 2.50u |
+| **Settled Units Risked**| **80.50u** | 37.00u | 43.50u |
+| **Net Profit / Loss** | **+2.03u** | **+6.10u** | **-4.07u** |
+| **ROI % (Settled)** | **+2.5%** | +16.5% | **-9.4%** |
+| **Pending Potential** | **5.00u posted stakes** | 4.00u | 1.00u |
 
 ### Sport Breakdown
 
@@ -253,6 +256,7 @@ A structured, ongoing tracking ledger for **FadeMeBets** premium picks, covering
 | Oct 28 | 3-1-0 | 6.50u | +4.18u | +4.94u |
 | Oct 29 | 0-4-0 | 5.00u | -5.00u | -0.06u |
 | Oct 30 | 2-2-0 | 5.00u | +0.73u | +0.67u |
+| Oct 31 | 2-0-0 (2 pend) | 1.50u | +1.36u | +2.03u |
 
 
 ---
@@ -348,8 +352,8 @@ A structured, ongoing tracking ledger for **FadeMeBets** premium picks, covering
 | **055** | Oct 30, 2026 | NHL | Vegas Golden Knights at New Jersey Devils | **Golden Knights moneyline** | -110 (play -115 or better) | 1.00u | 9.4% EV; 55 Conf | 2:13 PM | **FINAL** | **LOSS** ([Devils 5, Golden Knights 2](https://www.espn.com/nhl/recap?gameId=401892611)) | **-1.00u** |
 | **056** | Oct 30, 2026 | NCAAF | Baylor at UCF | **Baylor -1.5** | -110 | 1.00u | 9.4% EV; 55 Conf | 2:12 PM | **FINAL** | **WIN** ([Baylor 41, UCF 9](https://www.espn.com/college-football/game/_/gameId/401856844/baylor-ucf)) | **+0.91u** |
 | **057** | Oct 31, 2026 | NCAAF | Oregon State at Fresno State | **Oregon State -6.5** | -110 | 4.00u | Lock; High Confidence | 11:00 PM | **PENDING** | Scheduled 11:00 PM ET; not yet played | — |
-| **058** | Oct 31, 2026 | NCAAF | Arizona at Texas Tech | **Texas Tech -3.5** | -110 | 1.00u | 12.4% EV; 57 Conf | 12:00 PM | **PENDING** | In progress / Not yet final | — |
-| **059** | Oct 31, 2026 | NCAAF | Auburn at Ole Miss | **Ole Miss -10.5** | -110 | 0.50u | 4.3% EV; 53 Conf | 12:45 PM | **PENDING** | Scheduled 12:45 PM ET; not yet final | — |
+| **058** | Oct 31, 2026 | NCAAF | Arizona at Texas Tech | **Texas Tech -3.5** | -110 | 1.00u | 12.4% EV; 57 Conf | 12:00 PM | **FINAL** | **WIN** ([Texas Tech 34, Arizona 26](https://www.espn.com/college-football/game/_/gameId/401856842); won by 8, covered -3.5) | **+0.91u** |
+| **059** | Oct 31, 2026 | NCAAF | Auburn at Ole Miss | **Ole Miss -10.5** | -110 | 0.50u | 4.3% EV; 53 Conf | 12:45 PM | **FINAL** | **WIN** ([Ole Miss 45, Auburn 15](https://www.espn.com/college-football/game/_/gameId/401856735); won by 30, covered -10.5) | **+0.45u** |
 | **060** | Oct 31, 2026 | NCAAF | Oklahoma State at Iowa State | **Oklahoma State -9.5** | -110 | 1.00u | 15.4% EV; 58 Conf | 7:00 PM | **PENDING** | Scheduled 7:00 PM ET; not yet final | — |
 
 ---
