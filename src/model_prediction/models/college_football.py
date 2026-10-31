@@ -22,6 +22,7 @@ from ..features.cfb_features import (
     CFB_DEFAULT_HOME_ADVANTAGE_POINTS,
     CFB_UNCERTAINTY_FLOOR,
     CFBFeatureExtractor,
+    CFBGameRecord,
     CFBMatchupFeatures,
 )
 from ..pricing import implied_probability
@@ -338,7 +339,7 @@ def _load_cfb_history(data_root: Path, cutoff_dt: datetime | None = None) -> lis
                     home_team = g.get("home_team") or (g.get("home") or {}).get("team_name") or ""
                     if not away_team or not home_team:
                         continue
-                    rec = GameRecord(
+                    rec = CFBGameRecord(
                         event_id=eid,
                         event_start_utc=start_str,
                         league="NCAAF",
@@ -349,6 +350,31 @@ def _load_cfb_history(data_root: Path, cutoff_dt: datetime | None = None) -> lis
                         season_type=str(g.get("season_type", "regular")),
                         season_year=g.get("season_year"),
                         competition_type=str(g.get("competition_type", "STD")),
+                        possessions=float(g["possessions"]) if g.get("possessions") is not None else None,
+                        home_epa_per_play=float(g["home_epa_per_play"])
+                        if g.get("home_epa_per_play") is not None
+                        else None,
+                        away_epa_per_play=float(g["away_epa_per_play"])
+                        if g.get("away_epa_per_play") is not None
+                        else None,
+                        home_success_rate=float(g["home_success_rate"])
+                        if g.get("home_success_rate") is not None
+                        else None,
+                        away_success_rate=float(g["away_success_rate"])
+                        if g.get("away_success_rate") is not None
+                        else None,
+                        travel_distance_miles=float(g["travel_distance_miles"])
+                        if g.get("travel_distance_miles") is not None
+                        else None,
+                        timezone_diff_hours=float(g["timezone_diff_hours"])
+                        if g.get("timezone_diff_hours") is not None
+                        else None,
+                        elevation_ft=int(g["elevation_ft"]) if g.get("elevation_ft") is not None else None,
+                        is_dome=bool(g["is_dome"]) if g.get("is_dome") is not None else False,
+                        temperature_f=float(g["temperature_f"])
+                        if g.get("temperature_f") is not None
+                        else None,
+                        wind_mph=float(g["wind_mph"]) if g.get("wind_mph") is not None else None,
                     )
                     records.append(rec)
                     seen_ids.add(eid)
@@ -837,41 +863,50 @@ def build_cfb_slate(
                 p_h = float(p.probabilities.get("home", 0.5))
                 p_a = float(p.probabilities.get("away", 0.5))
                 if pm_ml is not None and pm_ml_home_prob is not None and pm_ml_away_prob is not None:
-                    edge_h = p_h - float(pm_ml_home_prob)
-                    edge_a = p_a - float(pm_ml_away_prob)
-                    if edge_h >= edge_a:
-                        selection, prob, ask = "home", p_h, float(pm_ml_home_prob)
-                    else:
-                        selection, prob, ask = "away", p_a, float(pm_ml_away_prob)
-                    line_val = None
-                    slug = str(pm_ml.get("market_slug"))
+                    h_ask = float(pm_ml_home_prob)
+                    a_ask = float(pm_ml_away_prob)
+                    slug_base = str(pm_ml.get("market_slug"))
                     sportsbook = "polymarket_us"
                     market_lineage = pm_ml_lineage
                     m_ver = p.model_version
                 elif market_ml_home_prob is not None or market_ml_away_prob is not None:
-                    h_ask = (
+                    h_ask = float(
                         market_ml_home_prob
                         if market_ml_home_prob is not None
                         else (1.0 - market_ml_away_prob + 0.045)
                     )
-                    a_ask = (
+                    a_ask = float(
                         market_ml_away_prob
                         if market_ml_away_prob is not None
                         else (1.0 - market_ml_home_prob + 0.045)
                     )
-                    edge_h = p_h - float(h_ask)
-                    edge_a = p_a - float(a_ask)
-                    if edge_h >= edge_a:
-                        selection, prob, ask = "home", p_h, float(h_ask)
-                    else:
-                        selection, prob, ask = "away", p_a, float(a_ask)
-                    line_val = None
-                    slug = f"ncaaf-ml-{event_id}-{selection}"
+                    slug_base = f"ncaaf-ml-{event_id}"
                     sportsbook = "espn_consensus"
                     market_lineage = None
                     m_ver = p.model_version
                 else:
                     continue
+
+                # 3-Tier Moneyline Selection Rule (Eliminates catastrophic extreme dog trap)
+                fav_side = "home" if h_ask >= 0.5 else "away"
+                dog_side = "away" if fav_side == "home" else "home"
+                fav_ask = h_ask if fav_side == "home" else a_ask
+                dog_ask = 1.0 - fav_ask + 0.045
+                p_fav = p_h if fav_side == "home" else p_a
+                p_dog = p_a if fav_side == "home" else p_h
+
+                if fav_ask <= 0.67:
+                    # Moderate favorite (-110 to -200): back favorite
+                    selection, prob, ask = fav_side, p_fav, fav_ask
+                elif fav_ask <= 0.80 and (p_dog - dog_ask) > -0.05:
+                    # Mid-dog (+175 to +350) with model edge: back dog
+                    selection, prob, ask = dog_side, p_dog, dog_ask
+                else:
+                    # Deep chalk: back favorite (never extreme dogs > +350)
+                    selection, prob, ask = fav_side, p_fav, fav_ask
+
+                line_val = None
+                slug = f"{slug_base}-{selection}"
             elif mtype == "spread":
                 p_cov_a = float(p.probabilities.get("away", 0.5))
                 p_cov_h = float(p.probabilities.get("home", 0.5))

@@ -101,9 +101,11 @@ class CFBStructuralV4Model:
         self,
         spread_home_line: float,
         uncertainty: float = 0.04,
+        is_conference_matchup: bool = False,
     ) -> float:
-        """Compute effective margin standard deviation with blowout and uncertainty scaling."""
-        sd = self.margin_sd * (1.0 + 2.0 * max(0.0, uncertainty - 0.04))
+        """Compute effective margin standard deviation with conference, blowout and uncertainty scaling."""
+        base_sd = self.margin_sd * (0.9135 if is_conference_matchup else 1.0)
+        sd = base_sd * (1.0 + 2.0 * max(0.0, uncertainty - 0.04))
         abs_spread = abs(spread_home_line)
         if abs_spread > CFB_BLOWOUT_SPREAD_THRESHOLD:
             excess = min(15.0, abs_spread - CFB_BLOWOUT_SPREAD_THRESHOLD)
@@ -123,6 +125,7 @@ class CFBStructuralV4Model:
         effective_margin_sd = self.compute_effective_margin_sd(
             spread_home_line=spread_home_line,
             uncertainty=matchup_features.uncertainty,
+            is_conference_matchup=getattr(matchup_features, "is_conference_matchup", False),
         )
 
         orig_margin_sd = self.distribution_engine.margin_sd

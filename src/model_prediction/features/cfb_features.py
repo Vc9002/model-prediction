@@ -24,12 +24,40 @@ from ..data_sources.cfb_data import (
     resolve_team,
 )
 from ..domain import parse_utc
+from ..features.base import GameRecord
 
-# Baseline Constants
-CFB_BASELINE_TOTAL = 51.5
+# Baseline Constants (Calibrated to 2026 Empirical Reality)
+CFB_BASELINE_TOTAL = 52.8
 CFB_BASELINE_MARGIN_SD = 16.2
 CFB_BASELINE_TOTAL_SD = 16.0
-CFB_DEFAULT_HOME_ADVANTAGE_POINTS = 2.8
+CFB_DEFAULT_HOME_ADVANTAGE_POINTS = 2.5
+CFB_UNCERTAINTY_FLOOR = 0.04
+CFB_UNCERTAINTY_CEILING = 0.25
+
+
+@dataclass(frozen=True)
+class CFBGameRecord(GameRecord):
+    """Point-in-time completed CFB game with granular EPA, pace, and weather metadata."""
+
+    possessions: float | None = None
+    home_epa_per_play: float | None = None
+    away_epa_per_play: float | None = None
+    home_success_rate: float | None = None
+    away_success_rate: float | None = None
+    travel_distance_miles: float | None = None
+    timezone_diff_hours: float | None = None
+    home_returning_production: float | None = None
+    away_returning_production: float | None = None
+    home_transfer_index: float | None = None
+    away_transfer_index: float | None = None
+    home_qb_experience_starts: int | None = None
+    away_qb_experience_starts: int | None = None
+    elevation_ft: int | None = None
+    is_dome: bool | None = None
+    temperature_f: float | None = None
+    wind_mph: float | None = None
+
+
 CFB_UNCERTAINTY_FLOOR = 0.04
 CFB_UNCERTAINTY_CEILING = 0.25
 
@@ -206,6 +234,7 @@ class CFBMatchupFeatures:
     uncertainty: float
     sample_games: int
     is_fbs_vs_fcs: bool
+    is_conference_matchup: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -231,6 +260,7 @@ class CFBMatchupFeatures:
             "is_dome": self.is_dome,
             "uncertainty": round(self.uncertainty, 4),
             "is_fbs_vs_fcs": self.is_fbs_vs_fcs,
+            "is_conference_matchup": self.is_conference_matchup,
         }
 
 
@@ -381,8 +411,27 @@ class CFBFeatureExtractor:
         adj_off_ppp = decay_w * prior_off_ppp + (1.0 - decay_w) * sample_off_ppp
         adj_def_ppp = decay_w * prior_def_ppp + (1.0 - decay_w) * sample_def_ppp
 
-        adj_off_epa = (adj_off_ppp - 2.25) * 0.12
-        adj_def_epa = (2.25 - adj_def_ppp) * 0.12
+        # Rolling opponent-adjusted EPA from past games
+        epas_off: list[float] = []
+        epas_def: list[float] = []
+        for g in curr_season_games:
+            is_h = _get_val(g, "home_team", "") == team_name
+            h_epa = _get_val(g, "home_epa_per_play")
+            a_epa = _get_val(g, "away_epa_per_play")
+            if h_epa is not None and a_epa is not None and (h_epa != 0.0 or a_epa != 0.0):
+                epas_off.append(float(h_epa if is_h else a_epa))
+                epas_def.append(float(a_epa if is_h else h_epa))
+
+        if epas_off:
+            sample_off_epa = float(sum(epas_off) / len(epas_off))
+            sample_def_epa = float(sum(epas_def) / len(epas_def))
+            prior_off_epa = conf_offset * 0.015
+            prior_def_epa = -conf_offset * 0.015
+            adj_off_epa = decay_w * prior_off_epa + (1.0 - decay_w) * sample_off_epa
+            adj_def_epa = decay_w * prior_def_epa + (1.0 - decay_w) * sample_def_epa
+        else:
+            adj_off_epa = (adj_off_ppp - 2.25) * 0.12
+            adj_def_epa = (2.25 - adj_def_ppp) * 0.12
 
         return CFBTeamState(
             team_name=team_name,
@@ -438,6 +487,12 @@ class CFBFeatureExtractor:
 
         away_obj = resolve_team(away_team)
         home_obj = resolve_team(home_team)
+        is_conf_matchup = bool(
+            away_obj
+            and home_obj
+            and away_obj.conference == home_obj.conference
+            and away_obj.conference not in ("FBS Independents", "FCS")
+        )
 
         # 1. State Computation
         away_state = self._compute_team_state(history, away_team, start_dt, resolved_season_year, week)
@@ -584,8 +639,16 @@ class CFBFeatureExtractor:
         # 1. Base margin from Elo (24.5 rating points per point of spread)
         elo_margin = elo_diff / 24.5
 
-        # 2. Structural efficiency margin (PPP differential adjusted for situational factors)
-        raw_eff_margin = proj_possessions * (exp_home_ppp - exp_away_ppp) + home_qb_adj - away_qb_adj
+        # 2. Structural efficiency margin (PPP differential adjusted for situational factors and net EPA)
+        net_epa_gap = (home_state.adj_offense_epa - home_state.adj_defense_epa) - (
+            away_state.adj_offense_epa - away_state.adj_defense_epa
+        )
+        raw_eff_margin = (
+            proj_possessions * (exp_home_ppp - exp_away_ppp)
+            + (net_epa_gap * 15.0)
+            + home_qb_adj
+            - away_qb_adj
+        )
 
         # 3. Dynamic shrinkage between Elo prior and in-season sample efficiency
         n_games_min = min(away_state.games_played, home_state.games_played)
@@ -634,6 +697,7 @@ class CFBFeatureExtractor:
             away_team=away_team,
             home_team=home_team,
             is_neutral_site=is_neutral_site,
+            is_conference_matchup=is_conf_matchup,
             elo_away=away_state.elo_rating,
             elo_home=home_state.elo_rating,
             elo_home_win_prob=elo_home_prob,
