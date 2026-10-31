@@ -2992,6 +2992,16 @@ def _forecast_nfl_spread_slate(
                 home_def_epa=eff.home_def_epa,
                 away_off_epa=eff.away_off_epa,
                 away_def_epa=eff.away_def_epa,
+                home_pass_epa=eff.home_pass_epa,
+                home_rush_epa=eff.home_rush_epa,
+                away_pass_epa=eff.away_pass_epa,
+                away_rush_epa=eff.away_rush_epa,
+                home_def_pass_epa=eff.home_def_pass_epa,
+                home_def_rush_epa=eff.home_def_rush_epa,
+                away_def_pass_epa=eff.away_def_pass_epa,
+                away_def_rush_epa=eff.away_def_rush_epa,
+                home_pressure_disparity=eff.home_pressure_disparity,
+                away_pressure_disparity=eff.away_pressure_disparity,
                 home_qb_tier_adj=h_qb_tier_adj,
                 away_qb_tier_adj=a_qb_tier_adj,
                 home_rest_days=home_rest_days,
@@ -3478,6 +3488,12 @@ def _forecast_nfl_total_slate(
             from ..models.nfl_total_v6 import NFLTotalModelV6
 
             total_v6 = NFLTotalModelV6.from_artifact(artifact)
+            tot_pass_epa = (eff.home_pass_epa + eff.away_def_pass_epa) + (
+                eff.away_pass_epa + eff.home_def_pass_epa
+            )
+            tot_rush_epa = (eff.home_rush_epa + eff.away_def_rush_epa) + (
+                eff.away_rush_epa + eff.home_def_rush_epa
+            )
             fc = total_v6.forecast_total(
                 home_team=home_team,
                 away_team=away_team,
@@ -3485,15 +3501,14 @@ def _forecast_nfl_total_slate(
                 home_def_epa=eff.home_def_epa,
                 away_off_epa=eff.away_off_epa,
                 away_def_epa=eff.away_def_epa,
-                home_qb_tier_adj=h_qb_tier_adj,
-                away_qb_tier_adj=a_qb_tier_adj,
+                home_pace=eff.home_pace,
+                away_pace=eff.away_pace,
+                total_pass_epa=tot_pass_epa,
+                total_rush_epa=tot_rush_epa,
                 wind_mph=wind_mph,
                 temperature_f=temperature_f,
                 is_dome=is_dome,
-                home_rest_days=home_rest_days,
-                away_rest_days=away_rest_days,
                 total_line=t_line,
-                is_neutral_site=is_neutral_site,
             )
         else:
             fc = engine.forecast_game(
@@ -5394,7 +5409,7 @@ def _forecast_cfb_sport(
     from ..models.college_football import build_cfb_slate
 
     model_config = config.get("models", {}).get("NCAAF", {})
-    serving_version = str(model_config.get("active_production_version") or "cfb-structural-v3")
+    serving_version = str(model_config.get("active_production_version") or "cfb-structural-v4")
     serving_artifact, artifact_error = _load_exact_artifact_contract(serving_version)
     if artifact_error or serving_artifact is None:
         raise ValueError(artifact_error or f"NCAAF serving artifact unavailable for {serving_version}")
@@ -5431,7 +5446,7 @@ def _forecast_cfb_sport(
         mtype = MarketType(str(contract["market_type"]))
         m_version = str(
             contract.get("model_version")
-            or model_config.get("active_production_version", "cfb-structural-v3")
+            or model_config.get("active_production_version", "cfb-structural-v4")
         )
 
         try:
@@ -5566,7 +5581,7 @@ def _forecast_cfb_sport(
                 is_qualified_call = (
                     genuinely_eligible
                     and not eligibility.reason_code.startswith("PAPER_CALL_")
-                    and m_version in ("cfb-structural-v3", "cfb-structural-v2")
+                    and m_version in ("cfb-structural-v4", "cfb-structural-v3", "cfb-structural-v2")
                 )
                 if (
                     research_ledger is not None

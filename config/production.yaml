@@ -368,13 +368,23 @@ prediction_service:
     evidence_status: historical_only
     replacement_priority: low
     rollback_model: null
+  - model_id: cfb-structural-v4
+    sport: NCAAF
+    market: multi
+    implementation: json_artifact
+    artifact: config/models/cfb-structural-v4.json
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: cfb-structural-v3
   - model_id: cfb-structural-v3
     sport: NCAAF
     market: multi
     implementation: json_artifact
     artifact: config/models/cfb-structural-v3.json
     enabled: true
-    serving_status: production
+    serving_status: candidate
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: cfb-structural-v2
@@ -741,9 +751,9 @@ prediction_service:
       spread: nfl-spread-structural-v6
       total: nfl-total-structural-v6
     NCAAF:
-      moneyline: cfb-structural-v3
-      spread: cfb-structural-v3
-      total: cfb-structural-v3
+      moneyline: cfb-structural-v4
+      spread: cfb-structural-v4
+      total: cfb-structural-v4
     SOCCER:
       moneyline: soccer-poisson-dc-v3
       spread: soccer-poisson-dc-v3
@@ -975,6 +985,7 @@ prediction_service:
   - tennis-games-markov-v1
   - tennis-learned-v3
   - tennis-surface-elo-v1
+  - cfb-structural-v4
   - cfb-structural-v3
   - cfb-structural-v2
   - cfb-spread-v1
@@ -1035,6 +1046,7 @@ prediction_service:
     nfl-spread-structural-v5: config/models/nfl-spread-structural-v5.json
     nfl-total-structural-v6: config/models/nfl-total-structural-v6.json
     nfl-total-structural-v5: config/models/nfl-total-structural-v5.json
+    cfb-structural-v4: config/models/cfb-structural-v4.json
     cfb-structural-v3: config/models/cfb-structural-v3.json
     cfb-structural-v2: config/models/cfb-structural-v2.json
     cfb-spread-v1: config/models/cfb-spread-v1.json

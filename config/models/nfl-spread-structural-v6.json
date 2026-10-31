@@ -1,20 +1,21 @@
 {
-  "artifact_hash": "1a7208f5ca799a129abae38419a9d6a112e894b932d80a2f84e1ce90c6c1fe3d",
+  "artifact_hash": "3deeef254e1bc9af4d31afdf2a98d0cfced4660ff3d5d5e6dc8aef38ba58b69a",
   "gates": {
     "max_uncertainty": 0.15,
     "min_edge": 0.035,
     "sizing": "flat_1u_gated"
   },
-  "home_field_advantage_points": 1.4,
-  "key_number_weight": 0.15,
+  "home_field_advantage_points": 1.35,
+  "key_number_weight": 0.18,
   "league": "NFL",
   "logistic_scale": 13.5,
-  "margin_sd": 13.98,
+  "margin_sd": 13.8,
+  "market_weight": 0.8,
   "max_cover_prob": 0.65,
   "method": "nfl_spread_structural_v6_engine",
   "min_cover_prob": 0.35,
   "model_version": "nfl-spread-structural-v6",
-  "note": "Overhauled independent NFL Point Spread & Coherent Moneyline engine v6. Calibrated on 1,981 modern games (2020-2026). Features 1.4 pt HFA, regularized key-margin mixture, and bounded alternate-spread probabilities.",
+  "note": "Overhauled independent NFL Point Spread & Coherent Moneyline engine v6. Features pass/rush EPA decomposition, pass protection vs pass rush pressure disparity, +1.35 pt modern HFA, Bayesian market anchoring (w=0.80), and smooth key-margin push distribution.",
   "positive_class": "away_cover",
   "qualification": {
     "framework": "nfl_v6_point_in_time_inputs",

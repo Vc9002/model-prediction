@@ -69,6 +69,8 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     "valorant-tiered-elo-v6",
     "lol-tiered-elo-v6",
     "dota2-tiered-elo-v6",
+    "cfb-structural-v4",
+    "cfb-structural-v4",
     "cfb-structural-v3",
     "cfb-structural-v2",
     "mlb-structural-runline-v4",

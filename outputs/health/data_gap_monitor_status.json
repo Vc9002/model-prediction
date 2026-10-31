@@ -1,38 +1,40 @@
 {
   "overall_status": "WARNING",
-  "generated_at_utc": "2026-10-31T02:49:24.574039+00:00",
+  "generated_at_utc": "2026-10-31T06:11:12.175781+00:00",
   "odds_freshness": {
-    "status": "OK",
-    "stale_active_sports": [],
+    "status": "WARN",
+    "stale_active_sports": [
+      "nfl"
+    ],
     "sports": {
       "esports": {
         "status": "FRESH",
-        "latest_date": "2026-10-29",
-        "file_count": 4
+        "latest_date": "2026-10-31",
+        "file_count": 5
       },
       "nba": {
         "status": "FRESH",
-        "latest_date": "2026-10-29",
-        "file_count": 6
+        "latest_date": "2026-10-31",
+        "file_count": 7
       },
       "ncaaf": {
         "status": "FRESH",
-        "latest_date": "2026-10-30",
-        "file_count": 1
+        "latest_date": "2026-10-31",
+        "file_count": 2
       },
       "nfl": {
-        "status": "FRESH",
+        "status": "STALE",
         "latest_date": "2026-10-29",
         "file_count": 3
       },
       "wnba": {
         "status": "FRESH",
-        "latest_date": "2026-10-29",
-        "file_count": 3,
+        "latest_date": "2026-10-31",
+        "file_count": 4,
         "season_state": "Season concluded (resumes May)"
       }
     },
-    "total_snapshot_files": 17
+    "total_snapshot_files": 21
   },
   "market_quotes_warehouse": {
     "status": "HEALTHY",
@@ -97,12 +99,12 @@
   "models_and_ledgers": {
     "status": "PASS",
     "hash_mismatches": [],
-    "production_models_audited": 34,
+    "production_models_audited": 37,
     "details": {
       "wnba-elo-trend-lr-v4": {
         "hash_valid": true,
         "settled_picks": 261,
-        "open_picks": 0,
+        "open_picks": 2,
         "removed_picks": 0,
         "evidence_status": "predictively_qualified"
       },
@@ -165,7 +167,7 @@
       "nba-elo-trend-lr-v4": {
         "hash_valid": true,
         "settled_picks": 81,
-        "open_picks": 0,
+        "open_picks": 14,
         "removed_picks": 0,
         "evidence_status": "historical_only"
       },
@@ -246,9 +248,23 @@
         "removed_picks": 0,
         "evidence_status": "predictively_qualified"
       },
+      "nfl-spread-structural-v6": {
+        "hash_valid": true,
+        "settled_picks": 1,
+        "open_picks": 0,
+        "removed_picks": 0,
+        "evidence_status": "predictively_qualified"
+      },
       "nfl-spread-structural-v5": {
         "hash_valid": true,
         "settled_picks": 64,
+        "open_picks": 0,
+        "removed_picks": 0,
+        "evidence_status": "predictively_qualified"
+      },
+      "nfl-total-structural-v6": {
+        "hash_valid": true,
+        "settled_picks": 0,
         "open_picks": 0,
         "removed_picks": 0,
         "evidence_status": "predictively_qualified"
@@ -260,10 +276,17 @@
         "removed_picks": 0,
         "evidence_status": "predictively_qualified"
       },
+      "cfb-structural-v4": {
+        "hash_valid": true,
+        "settled_picks": 0,
+        "open_picks": 0,
+        "removed_picks": 0,
+        "evidence_status": "predictively_qualified"
+      },
       "cfb-structural-v3": {
         "hash_valid": true,
         "settled_picks": 136,
-        "open_picks": 3,
+        "open_picks": 182,
         "removed_picks": 0,
         "evidence_status": "predictively_qualified"
       },
@@ -291,7 +314,7 @@
       "cs2-tiered-elo-v6": {
         "hash_valid": true,
         "settled_picks": 4050,
-        "open_picks": 12,
+        "open_picks": 18,
         "removed_picks": 0,
         "evidence_status": "historical_only"
       },
@@ -340,13 +363,35 @@
     }
   },
   "daily_worker": {
-    "status": "failed",
-    "exit_code": 1,
-    "started_at_utc": "2026-10-31T01:55:06.017739+00:00"
+    "status": "started",
+    "exit_code": null,
+    "started_at_utc": "2026-10-31T05:00:02.273384+00:00"
   },
   "self_healing": {
-    "healed_actions": [],
-    "healing_failures": [],
-    "timestamp_utc": "2026-10-31T02:49:24.572482+00:00"
+    "healed_actions": [
+      "Auto-captured fresh prospective odds for esports: 22 rows",
+      "Auto-captured fresh prospective odds for nba: 6 rows"
+    ],
+    "healing_failures": [
+      {
+        "sport": "esports",
+        "source_errors": {},
+        "capture_failures": 39,
+        "captured": 22
+      },
+      {
+        "sport": "nba",
+        "source_errors": {},
+        "capture_failures": 443,
+        "captured": 6
+      },
+      {
+        "sport": "nfl",
+        "source_errors": {},
+        "capture_failures": 0,
+        "captured": 0
+      }
+    ],
+    "timestamp_utc": "2026-10-31T06:11:12.168888+00:00"
   }
 }

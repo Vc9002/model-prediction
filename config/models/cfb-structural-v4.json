@@ -1,0 +1,56 @@
+{
+  "method": "cfb_structural_v4_bivariate_engine",
+  "model_version": "cfb-structural-v4",
+  "schema_version": "2",
+  "sport": "ncaaf",
+  "league": "NCAAF",
+  "positive_class": "home_win",
+  "distribution": "negative_binomial",
+  "home_advantage_points": 2.5,
+  "margin_sd": 16.2,
+  "total_sd": 16.0,
+  "features": [
+    "elo_away",
+    "elo_home",
+    "elo_home_win_prob",
+    "away_offense_ppp",
+    "home_offense_ppp",
+    "away_defense_ppp",
+    "home_defense_ppp",
+    "projected_possessions",
+    "efficiency_gap",
+    "travel_distance_miles",
+    "stadium_elevation_ft",
+    "altitude_fatigue_penalty",
+    "home_field_advantage_points",
+    "weather_total_adjustment",
+    "is_dome",
+    "away_preseason_prior_weight",
+    "home_preseason_prior_weight",
+    "away_qb_value_adjustment",
+    "home_qb_value_adjustment"
+  ],
+  "gates": {
+    "min_edge": 0.02,
+    "max_edge": 0.08,
+    "max_moneyline_dog_odds": 200,
+    "max_spread_line": 21.5,
+    "block_fcs": true,
+    "sizing": "dynamic_edge_scaled"
+  },
+  "calibration": {
+    "method": "bivariate_negative_binomial_joint_v4",
+    "brier_holdout": 0.1845,
+    "logloss_holdout": 0.541,
+    "delta_brier_vs_v3": -0.005,
+    "delta_logloss_vs_v3": -0.0132,
+    "n_evaluated_games": 3250
+  },
+  "qualification": {
+    "status": "PRODUCTION_ACTIVE",
+    "qualified": true,
+    "locked_holdout": true,
+    "framework": "cfb_structural_v4_bivariate_engine"
+  },
+  "artifact_hash": "21a9390c663a5131d0708670b4bb96587cfa8b71816f1cf9c4845f7c1341389e"
+}

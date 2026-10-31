@@ -26,9 +26,9 @@ from ..data_sources.cfb_data import (
 from ..domain import parse_utc
 
 # Baseline Constants
-CFB_BASELINE_TOTAL = 54.0
-CFB_BASELINE_MARGIN_SD = 15.5
-CFB_BASELINE_TOTAL_SD = 19.2
+CFB_BASELINE_TOTAL = 51.5
+CFB_BASELINE_MARGIN_SD = 16.2
+CFB_BASELINE_TOTAL_SD = 16.0
 CFB_DEFAULT_HOME_ADVANTAGE_POINTS = 2.8
 CFB_UNCERTAINTY_FLOOR = 0.04
 CFB_UNCERTAINTY_CEILING = 0.25
@@ -607,7 +607,7 @@ class CFBFeatureExtractor:
         epa_total_adj = (home_state.adj_offense_epa + away_state.adj_offense_epa) * 12.0
         proj_total = max(
             30.0,
-            CFB_BASELINE_TOTAL + weather_total_adj + (proj_possessions - 12.4) * 2.25 + epa_total_adj,
+            CFB_BASELINE_TOTAL + weather_total_adj + (proj_possessions - 11.5) * 2.25 + epa_total_adj,
         )
 
         proj_home_pts = max(3.0, (proj_total + proj_margin) / 2.0)

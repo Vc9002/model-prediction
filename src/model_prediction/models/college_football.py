@@ -19,8 +19,6 @@ from typing import Any
 from ..domain import parse_utc, utc_now
 from ..features.base import GameRecord
 from ..features.cfb_features import (
-    CFB_BASELINE_MARGIN_SD,
-    CFB_BASELINE_TOTAL_SD,
     CFB_DEFAULT_HOME_ADVANTAGE_POINTS,
     CFB_UNCERTAINTY_FLOOR,
     CFBFeatureExtractor,
@@ -34,9 +32,9 @@ from .cfb_distribution import (
     CFBJointMarketProbabilities,
 )
 
-MODEL_VERSION = "cfb-structural-v3"
-CFB_SPREAD_MODEL_VERSION = "cfb-structural-v3"
-CFB_TOTAL_MODEL_VERSION = "cfb-structural-v3"
+MODEL_VERSION = "cfb-structural-v4"
+CFB_SPREAD_MODEL_VERSION = "cfb-structural-v4"
+CFB_TOTAL_MODEL_VERSION = "cfb-structural-v4"
 CFB_BLOWOUT_SPREAD_THRESHOLD = 21.5
 CFB_BLOWOUT_MARGIN_SCALE = 0.025
 
@@ -90,8 +88,8 @@ class CollegeFootballModel:
         spread_version: str | None = None,
         total_version: str | None = None,
         home_advantage_points: float = CFB_DEFAULT_HOME_ADVANTAGE_POINTS,
-        margin_sd: float = CFB_BASELINE_MARGIN_SD,
-        total_sd: float = CFB_BASELINE_TOTAL_SD,
+        margin_sd: float = 16.2,
+        total_sd: float = 16.0,
         distribution_type: CFBDistributionType = CFBDistributionType.NEGATIVE_BINOMIAL,
     ) -> None:
         self.version = version
@@ -836,50 +834,71 @@ def build_cfb_slate(
             market_lineage = None
 
             if mtype == "moneyline":
-                if pm_ml is not None:
-                    selection = "home" if p.probabilities.get("home", 0.0) >= 0.5 else "away"
-                    prob = p.probabilities[selection]
+                p_h = float(p.probabilities.get("home", 0.5))
+                p_a = float(p.probabilities.get("away", 0.5))
+                if pm_ml is not None and pm_ml_home_prob is not None and pm_ml_away_prob is not None:
+                    edge_h = p_h - float(pm_ml_home_prob)
+                    edge_a = p_a - float(pm_ml_away_prob)
+                    if edge_h >= edge_a:
+                        selection, prob, ask = "home", p_h, float(pm_ml_home_prob)
+                    else:
+                        selection, prob, ask = "away", p_a, float(pm_ml_away_prob)
                     line_val = None
-                    ask = pm_ml_home_prob if selection == "home" else pm_ml_away_prob
                     slug = str(pm_ml.get("market_slug"))
                     sportsbook = "polymarket_us"
                     market_lineage = pm_ml_lineage
                     m_ver = p.model_version
                 elif market_ml_home_prob is not None or market_ml_away_prob is not None:
-                    selection = "home" if p.probabilities.get("home", 0.0) >= 0.5 else "away"
-                    prob = p.probabilities[selection]
+                    h_ask = (
+                        market_ml_home_prob
+                        if market_ml_home_prob is not None
+                        else (1.0 - market_ml_away_prob + 0.045)
+                    )
+                    a_ask = (
+                        market_ml_away_prob
+                        if market_ml_away_prob is not None
+                        else (1.0 - market_ml_home_prob + 0.045)
+                    )
+                    edge_h = p_h - float(h_ask)
+                    edge_a = p_a - float(a_ask)
+                    if edge_h >= edge_a:
+                        selection, prob, ask = "home", p_h, float(h_ask)
+                    else:
+                        selection, prob, ask = "away", p_a, float(a_ask)
                     line_val = None
-                    ask = market_ml_home_prob if selection == "home" else market_ml_away_prob
                     slug = f"ncaaf-ml-{event_id}-{selection}"
                     sportsbook = "espn_consensus"
                     market_lineage = None
                     m_ver = p.model_version
                 else:
-                    # Do not use -110 as standard for moneyline when no quote exists
                     continue
             elif mtype == "spread":
-                if pm_sp is not None:
-                    selection = (
-                        "away"
-                        if p.probabilities.get("away", 0.0) >= p.probabilities.get("home", 0.0)
-                        else "home"
-                    )
-                    prob = p.probabilities[selection]
-                    line_val = pm_spread_away_line if selection == "away" else pm_spread_home_line
-                    ask = pm_spread_away_prob if selection == "away" else pm_spread_home_prob
+                p_cov_a = float(p.probabilities.get("away", 0.5))
+                p_cov_h = float(p.probabilities.get("home", 0.5))
+                if pm_sp is not None and pm_spread_away_prob is not None and pm_spread_home_prob is not None:
+                    edge_a = p_cov_a - float(pm_spread_away_prob)
+                    edge_h = p_cov_h - float(pm_spread_home_prob)
+                    if edge_a >= edge_h:
+                        selection, prob, ask = "away", p_cov_a, float(pm_spread_away_prob)
+                        line_val = pm_spread_away_line
+                    else:
+                        selection, prob, ask = "home", p_cov_h, float(pm_spread_home_prob)
+                        line_val = pm_spread_home_line
                     slug = str(pm_sp.get("market_slug"))
                     sportsbook = "polymarket_us"
                     market_lineage = pm_spread_lineage
                     m_ver = p.model_version
                 elif spread_away_line is not None and spread_home_line is not None:
-                    selection = (
-                        "away"
-                        if p.probabilities.get("away", 0.0) >= p.probabilities.get("home", 0.0)
-                        else "home"
-                    )
-                    prob = p.probabilities[selection]
-                    line_val = spread_away_line if selection == "away" else spread_home_line
-                    ask = market_spread_away_prob if selection == "away" else market_spread_home_prob
+                    a_ask = market_spread_away_prob or STANDARD_LAY_ASK
+                    h_ask = market_spread_home_prob or STANDARD_LAY_ASK
+                    edge_a = p_cov_a - float(a_ask)
+                    edge_h = p_cov_h - float(h_ask)
+                    if edge_a >= edge_h:
+                        selection, prob, ask = "away", p_cov_a, float(a_ask)
+                        line_val = spread_away_line
+                    else:
+                        selection, prob, ask = "home", p_cov_h, float(h_ask)
+                        line_val = spread_home_line
                     slug = f"ncaaf-spread-{event_id}-{selection}"
                     sportsbook = "espn_consensus"
                     market_lineage = None
@@ -887,28 +906,30 @@ def build_cfb_slate(
                 else:
                     continue
             else:  # total
-                if pm_tot is not None:
-                    selection = (
-                        "over"
-                        if p.probabilities.get("over", 0.0) >= p.probabilities.get("under", 0.0)
-                        else "under"
-                    )
-                    prob = p.probabilities[selection]
+                p_ov = float(p.probabilities.get("over", 0.5))
+                p_un = float(p.probabilities.get("under", 0.5))
+                if pm_tot is not None and pm_total_over_prob is not None and pm_total_under_prob is not None:
+                    edge_o = p_ov - float(pm_total_over_prob)
+                    edge_u = p_un - float(pm_total_under_prob)
+                    if edge_o >= edge_u:
+                        selection, prob, ask = "over", p_ov, float(pm_total_over_prob)
+                    else:
+                        selection, prob, ask = "under", p_un, float(pm_total_under_prob)
                     line_val = pm_total_line
-                    ask = pm_total_over_prob if selection == "over" else pm_total_under_prob
                     slug = str(pm_tot.get("market_slug"))
                     sportsbook = "polymarket_us"
                     market_lineage = pm_total_lineage
                     m_ver = p.model_version
                 elif total_line is not None:
-                    selection = (
-                        "over"
-                        if p.probabilities.get("over", 0.0) >= p.probabilities.get("under", 0.0)
-                        else "under"
-                    )
-                    prob = p.probabilities[selection]
+                    o_ask = market_total_over_prob or STANDARD_LAY_ASK
+                    u_ask = market_total_under_prob or STANDARD_LAY_ASK
+                    edge_o = p_ov - float(o_ask)
+                    edge_u = p_un - float(u_ask)
+                    if edge_o >= edge_u:
+                        selection, prob, ask = "over", p_ov, float(o_ask)
+                    else:
+                        selection, prob, ask = "under", p_un, float(u_ask)
                     line_val = total_line
-                    ask = market_total_over_prob if selection == "over" else market_total_under_prob
                     slug = f"ncaaf-total-{event_id}-{selection}"
                     sportsbook = "espn_consensus"
                     market_lineage = None

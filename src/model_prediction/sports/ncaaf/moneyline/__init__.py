@@ -7,15 +7,25 @@ from model_prediction.models.cfb_structural_v3 import (
     CFBStructuralV3Model,
     cfb_structural_v3_model,
 )
+from model_prediction.models.cfb_structural_v4 import (
+    CFB_V4_MODEL_VERSION,
+    CFBStructuralForecastV4,
+    CFBStructuralV4Model,
+    cfb_structural_v4_model,
+)
 from model_prediction.models.college_football import CollegeFootballModel, UpcomingCFBGame
 
 __all__ = [
     "CFB_V3_MODEL_VERSION",
+    "CFB_V4_MODEL_VERSION",
     "CFBStructuralForecast",
     "CFBStructuralForecastV3",
+    "CFBStructuralForecastV4",
     "CFBStructuralV2Model",
     "CFBStructuralV3Model",
+    "CFBStructuralV4Model",
     "CollegeFootballModel",
     "UpcomingCFBGame",
     "cfb_structural_v3_model",
+    "cfb_structural_v4_model",
 ]

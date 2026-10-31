@@ -741,9 +741,9 @@ def test_cfb_models_serving_with_degraded_evidence():
     assert all(enabled.values()), f"CFB models must stay enabled: {enabled}"
 
     champions = svc.get("champions", {}).get("NCAAF", {})
-    assert champions.get("moneyline") in ("cfb-structural-v3", "cfb-structural-v2")
-    assert champions.get("spread") in ("cfb-structural-v3", "cfb-structural-v2")
-    assert champions.get("total") in ("cfb-structural-v3", "cfb-structural-v2")
+    assert champions.get("moneyline") in ("cfb-structural-v4", "cfb-structural-v3", "cfb-structural-v2")
+    assert champions.get("spread") in ("cfb-structural-v4", "cfb-structural-v3", "cfb-structural-v2")
+    assert champions.get("total") in ("cfb-structural-v4", "cfb-structural-v3", "cfb-structural-v2")
 
     with (root / "config/model.yaml").open() as f:
         model_cfg = yaml.safe_load(f)

@@ -14,9 +14,9 @@ from .models.cfb_distribution import CFBDistributionType, CFBJointDistributionEn
 
 SCHEMA = "cfb-joint-replay-v1"
 VERSIONS = {
-    "moneyline": ("cfb-structural-v3", "cfb-structural-v2", "college-football-v1"),
-    "spread": ("cfb-structural-v3", "cfb-structural-v2", "cfb-spread-v1"),
-    "total": ("cfb-structural-v3", "cfb-structural-v2", "cfb-total-v1"),
+    "moneyline": ("cfb-structural-v4", "cfb-structural-v3", "cfb-structural-v2", "college-football-v1"),
+    "spread": ("cfb-structural-v4", "cfb-structural-v3", "cfb-structural-v2", "cfb-spread-v1"),
+    "total": ("cfb-structural-v4", "cfb-structural-v3", "cfb-structural-v2", "cfb-total-v1"),
 }
 
 
