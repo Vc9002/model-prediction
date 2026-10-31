@@ -136,7 +136,7 @@ def write_xlsx_rows_atomic(
         workbook.close()
 
 
-def _replace_with_retry(temporary: str, destination: Path, attempts: int = 10) -> None:
+def _replace_with_retry(temporary: str | Path, destination: Path, attempts: int = 10) -> None:
     # On Windows a briefly open handle (antivirus scan, OneDrive/indexer read)
     # makes os.replace fail with WinError 5 even though the file is free moments
     # later. 2026-10-04 settlement lost a whole run to one such failure.
@@ -146,7 +146,13 @@ def _replace_with_retry(temporary: str, destination: Path, attempts: int = 10) -
             return
         except PermissionError:
             if attempt == attempts - 1:
-                raise
+                import shutil
+                from contextlib import suppress
+
+                shutil.copyfile(temporary, destination)
+                with suppress(OSError):
+                    os.unlink(temporary)
+                return
             time.sleep(min(3.0, 0.5 * (attempt + 1)))
 
 

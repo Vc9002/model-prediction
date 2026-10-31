@@ -61,8 +61,8 @@ if _env_file.exists():
     except OSError:
         pass
 
-_MARKET_SLUG_RE = re.compile(r"market_slug=([a-z0-9\-]+)")
-_MARKET_SLUG_LEGACY_RE = re.compile(r"\(([a-z0-9\-]+)\)\.?\s*$")
+_MARKET_SLUG_RE = re.compile(r"market_slug=([a-z0-9_\-]+)")
+_MARKET_SLUG_LEGACY_RE = re.compile(r"\(([a-z0-9_\-]+)\)\.?\s*$")
 _LIVE_QUOTE_MAXIMUM_AGE_SECONDS = 300
 
 

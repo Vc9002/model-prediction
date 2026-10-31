@@ -25,12 +25,34 @@ _TEAM_DISAMBIGUATOR_RE = re.compile(r"\s*\([^)]*\)\s*$")
 # settlement's ESPN lookup silently finds nothing without this normalization.
 _POLYMARKET_LEAGUE_TO_LEDGER_LEAGUE = {
     "cfb": "NCAAF",
+    "cbb": "NCAAB",
     "mlb": "MLB",
     "nba": "NBA",
     "wnba": "WNBA",
     "nfl": "NFL",
     "nhl": "NHL",
-    "cbb": "NBA",
+    "kbo": "KBO",
+    "npb": "NPB",
+    "cs2": "CS2",
+    "lol": "LOL",
+    "dota2": "DOTA2",
+    "valorant": "VALORANT",
+    "rainbow_six": "RAINBOW_SIX",
+    "soccer": "SOCCER",
+    "epl": "SOCCER",
+    "la_liga": "SOCCER",
+    "bundesliga": "SOCCER",
+    "serie_a": "SOCCER",
+    "ligue_1": "SOCCER",
+    "mls": "SOCCER",
+    "ucl": "SOCCER",
+    "uel": "SOCCER",
+    "tennis": "TENNIS",
+    "wta": "TENNIS",
+    "atp": "TENNIS",
+    "darts": "DARTS",
+    "euroleague": "EUROLEAGUE",
+    "nbl": "NBL",
 }
 
 
@@ -260,6 +282,9 @@ def sync_manual_bets_from_polymarket(
     skipped_zero = 0
 
     for slug, position in live_positions.items():
+        if slug.startswith("caoc-"):
+            # Non-sports market (crypto/other category) -- do not contaminate sports ledger
+            continue
         if slug in auto_buyer_slugs:
             continue
         if slug in known_manual_slugs:

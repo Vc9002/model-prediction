@@ -2981,23 +2981,42 @@ def _forecast_nfl_spread_slate(
             and parse_utc(injury_source["observed_at_utc"]).date() == observed_at.date()
         )
 
-        fc = engine.forecast_game(
-            home_team=home_team,
-            away_team=away_team,
-            home_off_epa=eff.home_off_epa,
-            home_def_epa=eff.home_def_epa,
-            away_off_epa=eff.away_off_epa,
-            away_def_epa=eff.away_def_epa,
-            home_qb_tier_adj=h_qb_tier_adj,
-            away_qb_tier_adj=a_qb_tier_adj,
-            wind_mph=wind_mph,
-            temperature_f=temperature_f,
-            is_dome=is_dome,
-            home_rest_days=home_rest_days,
-            away_rest_days=away_rest_days,
-            spread_home_line=spread_home_line,
-            is_neutral_site=is_neutral_site,
-        )
+        if model_version == "nfl-spread-structural-v6":
+            from ..models.nfl_spread_v6 import NFLSpreadModelV6
+
+            spread_v6 = NFLSpreadModelV6.from_artifact(artifact)
+            fc = spread_v6.forecast_spread(
+                home_team=home_team,
+                away_team=away_team,
+                home_off_epa=eff.home_off_epa,
+                home_def_epa=eff.home_def_epa,
+                away_off_epa=eff.away_off_epa,
+                away_def_epa=eff.away_def_epa,
+                home_qb_tier_adj=h_qb_tier_adj,
+                away_qb_tier_adj=a_qb_tier_adj,
+                home_rest_days=home_rest_days,
+                away_rest_days=away_rest_days,
+                spread_home_line=spread_home_line,
+                is_neutral_site=is_neutral_site,
+            )
+        else:
+            fc = engine.forecast_game(
+                home_team=home_team,
+                away_team=away_team,
+                home_off_epa=eff.home_off_epa,
+                home_def_epa=eff.home_def_epa,
+                away_off_epa=eff.away_off_epa,
+                away_def_epa=eff.away_def_epa,
+                home_qb_tier_adj=h_qb_tier_adj,
+                away_qb_tier_adj=a_qb_tier_adj,
+                wind_mph=wind_mph,
+                temperature_f=temperature_f,
+                is_dome=is_dome,
+                home_rest_days=home_rest_days,
+                away_rest_days=away_rest_days,
+                spread_home_line=spread_home_line,
+                is_neutral_site=is_neutral_site,
+            )
 
         cover_prob = fc.prob_away_cover if anchor_is_away else fc.prob_home_cover
         if cover_prob >= 0.5:
@@ -3455,23 +3474,45 @@ def _forecast_nfl_total_slate(
             and parse_utc(injury_source["observed_at_utc"]).date() == observed_at.date()
         )
 
-        fc = engine.forecast_game(
-            home_team=home_team,
-            away_team=away_team,
-            home_off_epa=eff.home_off_epa,
-            home_def_epa=eff.home_def_epa,
-            away_off_epa=eff.away_off_epa,
-            away_def_epa=eff.away_def_epa,
-            home_qb_tier_adj=h_qb_tier_adj,
-            away_qb_tier_adj=a_qb_tier_adj,
-            wind_mph=wind_mph,
-            temperature_f=temperature_f,
-            is_dome=is_dome,
-            home_rest_days=home_rest_days,
-            away_rest_days=away_rest_days,
-            total_line=t_line,
-            is_neutral_site=is_neutral_site,
-        )
+        if model_version == "nfl-total-structural-v6":
+            from ..models.nfl_total_v6 import NFLTotalModelV6
+
+            total_v6 = NFLTotalModelV6.from_artifact(artifact)
+            fc = total_v6.forecast_total(
+                home_team=home_team,
+                away_team=away_team,
+                home_off_epa=eff.home_off_epa,
+                home_def_epa=eff.home_def_epa,
+                away_off_epa=eff.away_off_epa,
+                away_def_epa=eff.away_def_epa,
+                home_qb_tier_adj=h_qb_tier_adj,
+                away_qb_tier_adj=a_qb_tier_adj,
+                wind_mph=wind_mph,
+                temperature_f=temperature_f,
+                is_dome=is_dome,
+                home_rest_days=home_rest_days,
+                away_rest_days=away_rest_days,
+                total_line=t_line,
+                is_neutral_site=is_neutral_site,
+            )
+        else:
+            fc = engine.forecast_game(
+                home_team=home_team,
+                away_team=away_team,
+                home_off_epa=eff.home_off_epa,
+                home_def_epa=eff.home_def_epa,
+                away_off_epa=eff.away_off_epa,
+                away_def_epa=eff.away_def_epa,
+                home_qb_tier_adj=h_qb_tier_adj,
+                away_qb_tier_adj=a_qb_tier_adj,
+                wind_mph=wind_mph,
+                temperature_f=temperature_f,
+                is_dome=is_dome,
+                home_rest_days=home_rest_days,
+                away_rest_days=away_rest_days,
+                total_line=t_line,
+                is_neutral_site=is_neutral_site,
+            )
 
         over_prob = fc.prob_over
         if over_prob >= 0.5:

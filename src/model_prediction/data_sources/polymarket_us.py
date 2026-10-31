@@ -400,6 +400,13 @@ def _log_unknown_market_type(raw_type: str | None, league: str) -> None:
     if key in _UNKNOWN_MARKET_TYPES_LOGGED:
         return
     _UNKNOWN_MARKET_TYPES_LOGGED.add(key)
+    if raw_type == "SPORTS_MARKET_TYPE_PROP":
+        logger.debug(
+            "generic Polymarket prop dropped from capture: %r (league %s)",
+            raw_type,
+            league,
+        )
+        return
     logger.warning(
         "unrecognized Polymarket market type dropped from capture: %r (league %s)",
         raw_type,

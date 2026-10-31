@@ -3138,16 +3138,33 @@ function renderFolioHistory(){
 function slugToTitle(slug){
   // aec-wnba-conn-phx-2026-07-17 → WNBA: Connecticut @ Phoenix
   // tsc-mlb-sd-kc-2026-07-17-9pt5 → MLB: SD @ KC (o/u 9.5)
+  // cs2-fut-nemi-2026-10-29 → CS2: FUT @ NEMI
   const parts=(slug||"").split("-");
-  if(parts.length<5)return slug||"—";
-  const prefix=parts[0]; // aec, tsc, astatc
-  let sport=parts[1]?.toUpperCase()||"";
-  const markets={"mlb":"MLB","wnba":"WNBA","nba":"NBA","nfl":"NFL","soccer":"SOC","lol":"LoL","cs2":"CS2"};
+  if(parts.length<4)return slug||"—";
+  const knownPrefixes=new Set(["aec","tsc","asc","atc","astatc"]);
+  let sport="",away="",home="",extra="";
+  if(knownPrefixes.has(parts[0].toLowerCase())){
+    if(parts.length<5)return slug||"—";
+    sport=parts[1]?.toUpperCase()||"";
+    away=parts[2]?.toUpperCase()||"";
+    home=parts[3]?.toUpperCase()||"";
+    extra=parts.slice(5).join(" ");
+  } else {
+    sport=parts[0]?.toUpperCase()||"";
+    away=parts[1]?.toUpperCase()||"";
+    home=parts[2]?.toUpperCase()||"";
+    extra=parts.slice(4).join(" ");
+  }
+  const markets={"mlb":"MLB","wnba":"WNBA","nba":"NBA","nfl":"NFL","soccer":"SOC","lol":"LoL","cs2":"CS2","dota2":"DOTA2","valorant":"VAL","kbo":"KBO","npb":"NPB","nhl":"NHL","cfb":"CFB","ncaaf":"NCAAF","wta":"WTA","atp":"ATP","darts":"DARTS"};
   sport=markets[sport?.toLowerCase()]||sport;
-  const away=parts[2]?.toUpperCase()||"";
-  const home=parts[3]?.toUpperCase()||"";
-  const extra=parts.slice(5).join(" ");
-  const line=extra.match(/(\d+pt\d+)/)?` (o/u ${extra.match(/(\d+)pt/)[1]})`:"";
+  let line="";
+  if(extra.includes("tot-")||extra.includes("total-")||extra.includes("-tg-")||parts[0]==="tsc"){
+    const m=extra.match(/(\d+)pt(\d+)/);
+    if(m)line=` (o/u ${m[1]}.${m[2]})`;
+  } else if(extra.includes("hcap-")||extra.includes("neg-")||extra.includes("pos-")||parts[0]==="asc"){
+    const m=extra.match(/(neg|pos)-(\d+)pt(\d+)/);
+    if(m)line=` (${m[1]==="neg"?"-":"+"}${m[2]}.${m[3]})`;
+  }
   return `${sport}: ${away} @ ${home}${line}`;
 }
 

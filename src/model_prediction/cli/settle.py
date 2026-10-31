@@ -570,13 +570,13 @@ def _extract_market_slug(rationale: str) -> str | None:
     """Recover the Polymarket market slug embedded in a row's rationale text."""
     import re
 
-    match = re.search(r"market_slug=([a-z0-9\-]+)", rationale)
+    match = re.search(r"market_slug=([a-z0-9_\-]+)", rationale)
     if match:
         return match.group(1)
-    for m in re.findall(r"\(([a-z0-9\-]+)\)", rationale):
-        if "-" in m or m.startswith(("atc", "tsc", "asc", "mkt")):
+    for m in re.findall(r"\(([a-z0-9_\-]+)\)", rationale):
+        if "-" in m or m.startswith(("atc", "tsc", "asc", "mkt", "aec")):
             return m
-    match = re.search(r"\(([a-z0-9\-]+)\)", rationale)
+    match = re.search(r"\(([a-z0-9_\-]+)\)", rationale)
     return match.group(1) if match else None
 
 

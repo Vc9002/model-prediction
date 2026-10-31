@@ -62,6 +62,8 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     "wnba-spread-margin-v2",
     "nba-spread-margin-v6",
     "nba-total-margin-v6",
+    "nfl-spread-structural-v6",
+    "nfl-total-structural-v6",
     "soccer-poisson-dc-v2",
     "soccer-total-v1",
     "valorant-tiered-elo-v6",
@@ -98,6 +100,8 @@ EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
     "nba-total-margin-v5",
     "nba-elo-trend-lr-v4",
     "nfl-elo-trend-lr-v4",
+    "nfl-spread-structural-v5",
+    "nfl-total-structural-v5",
     "mlb-nrfi-v1",  # Legacy MLB NRFI
     "cfb-spread-v1",  # Legacy CFB spread (severe drift / degraded)
     "cfb-total-v1",  # CFB total (uncalibrated / degraded)

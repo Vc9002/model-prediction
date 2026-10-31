@@ -1533,8 +1533,8 @@ def _public_market_question(slug: str) -> str | None:
 def _human_market_name(slug: str, title: str = "", *, allow_lookup: bool = True) -> str:
     """Turn an exchange identifier into a compact, readable market name."""
     match = re.match(
-        r"^(?P<prefix>[a-z]+)-(?P<league>[a-z0-9]+)-(?P<away>[a-z0-9]+)-"
-        r"(?P<home>[a-z0-9]+)-(?P<date>\d{4}-\d{2}-\d{2})(?:-(?P<detail>.*))?$",
+        r"^(?:(?P<prefix>aec|tsc|asc|atc|astatc)-)?(?P<league>[a-z0-9_]+)-(?P<away>[a-z0-9_]+)-"
+        r"(?P<home>[a-z0-9_]+)-(?P<date>\d{4}-\d{2}-\d{2})(?:-(?P<detail>.*))?$",
         slug.casefold(),
     )
     if not match:
