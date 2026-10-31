@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from ..college_basketball_forward import forecast_ncaab_sport
-from ..config import PROJECT_ROOT, ledger_path, polymarket_edge_enabled
+from ..config import PROJECT_ROOT, is_sport_daily_enabled, ledger_path, polymarket_edge_enabled
 from ..daily_lock import acquire_lock, release_lock
 from ..data_sources.espn_probables import capture_probable_starter_snapshot
 from ..data_sources.espn_wnba_injuries import capture_espn_event_injuries
@@ -245,11 +245,14 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     # docstring) -- safe to call every daily cron cycle since it's a
     # cheap no-op most of the time, but keeps park factors and league
     # rates from silently drifting stale for months between manual runs.
-    try:
-        mlb_baseline_refresh_result = refresh_if_due(data_root, PROJECT_ROOT)
-    except (OSError, ValueError):
-        logger.warning("MLB baseline refresh failed", exc_info=True)
-        mlb_baseline_refresh_result = {"status": "error"}
+    if is_sport_daily_enabled(config, "MLB"):
+        try:
+            mlb_baseline_refresh_result = refresh_if_due(data_root, PROJECT_ROOT)
+        except (OSError, ValueError):
+            logger.warning("MLB baseline refresh failed", exc_info=True)
+            mlb_baseline_refresh_result = {"status": "error"}
+    else:
+        mlb_baseline_refresh_result = {"status": "off_season", "reason": "season_concluded"}
     slate_args = argparse.Namespace(
         provider="polymarket",
         league=None,
@@ -269,6 +272,9 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     bet_better_result: dict[str, Any] = {}
 
     def _capture_wnba():
+        if not is_sport_daily_enabled(config, "WNBA"):
+            logger.info("WNBA season concluded; skipping WNBA injury capture.")
+            return
         try:
             from ..data_sources.espn import ESPNClient
 
@@ -295,6 +301,10 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
 
     def _build_priors():
         nonlocal wnba_priors_result
+        if not is_sport_daily_enabled(config, "WNBA"):
+            logger.info("WNBA season concluded; skipping WNBA availability priors.")
+            wnba_priors_result = {"status": "off_season", "reason": "season_concluded"}
+            return
         try:
             from ..data_sources.espn import ESPNClient
             from ..features.base import FeatureStore
@@ -441,6 +451,10 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
 
     def _capture_mlb_probables():
         nonlocal mlb_probables_result
+        if not is_sport_daily_enabled(config, "MLB"):
+            logger.info("MLB season concluded; skipping MLB probable starter capture.")
+            mlb_probables_result = {"status": "off_season", "reason": "season_concluded"}
+            return
         try:
             mlb_probables_result = capture_probable_starter_snapshot(
                 args.date,
@@ -455,11 +469,15 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     mlb_lineups_result: dict[str, Any] = {"status": "skipped"}
 
     def _capture_mlb_lineups():
+        nonlocal mlb_lineups_result
+        if not is_sport_daily_enabled(config, "MLB"):
+            logger.info("MLB season concluded; skipping MLB lineups capture.")
+            mlb_lineups_result = {"status": "off_season", "reason": "season_concluded"}
+            return
         # Lineups cannot be backfilled -- a completed boxscore says
         # who played, never what was announced pregame. So this
         # capture is fail-soft (never blocks the daily run) but its
         # misses are permanent, unlike every other step here.
-        nonlocal mlb_lineups_result
         try:
             mlb_lineups_result = capture_lineups_and_store(args.date)
         except Exception:
@@ -474,11 +492,15 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     mlb_availability_result: dict[str, Any] = {"status": "skipped"}
 
     def _capture_mlb_availability():
+        nonlocal mlb_availability_result
+        if not is_sport_daily_enabled(config, "MLB"):
+            logger.info("MLB season concluded; skipping MLB availability capture.")
+            mlb_availability_result = {"status": "off_season", "reason": "season_concluded"}
+            return
         # Shadow feature (features/mlb_player_availability.py) --
         # only captures raw roster/transaction data here; per-matchup
         # feature computation happens lazily, only if a future
         # artifact requests these feature names.
-        nonlocal mlb_availability_result
         try:
             from ..data_sources.espn import ESPNClient
 
@@ -523,6 +545,11 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     mlb_starter_snapshot_result: dict[str, Any] = {"status": "skipped"}
 
     def _capture_mlb_starter_snapshots():
+        nonlocal mlb_starter_snapshot_result
+        if not is_sport_daily_enabled(config, "MLB"):
+            logger.info("MLB season concluded; skipping MLB starter snapshots capture.")
+            mlb_starter_snapshot_result = {"status": "off_season", "reason": "season_concluded"}
+            return
         # Keeps data/mlb_statsapi/game_snapshots.jsonl current --
         # features/starter_history.py's live starter_era_gap provider
         # (added 2026-08-04) reads real per-starter innings/earned-runs
@@ -534,7 +561,6 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         # 3-day lookback (not just yesterday) so one skipped/failed
         # run auto-heals on the next, matching the historical-game
         # ingestion step's own reasoning above.
-        nonlocal mlb_starter_snapshot_result
         try:
             from ..data_sources.mlb_statsapi import MLBStatsAPIClient, collect_game_snapshots
 
@@ -611,18 +637,21 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     # run's newest snapshots). Fail-soft: aggregate freshness is a research
     # input, never a blocker for the daily run.
     statcast_aggregates_result: dict[str, Any] = {"status": "skipped"}
-    try:
-        from ..statcast_aggregates import build_statcast_game_aggregates
+    if is_sport_daily_enabled(config, "MLB"):
+        try:
+            from ..statcast_aggregates import build_statcast_game_aggregates
 
-        pitcher_frame, batter_frame = build_statcast_game_aggregates(data_root)
-        statcast_aggregates_result = {
-            "status": "ok",
-            "pitcher_rows": len(pitcher_frame),
-            "batter_rows": len(batter_frame),
-        }
-    except Exception:
-        logger.warning("Statcast aggregate rebuild failed", exc_info=True)
-        statcast_aggregates_result = {"status": "error"}
+            pitcher_frame, batter_frame = build_statcast_game_aggregates(data_root)
+            statcast_aggregates_result = {
+                "status": "ok",
+                "pitcher_rows": len(pitcher_frame),
+                "batter_rows": len(batter_frame),
+            }
+        except Exception:
+            logger.warning("Statcast aggregate rebuild failed", exc_info=True)
+            statcast_aggregates_result = {"status": "error"}
+    else:
+        statcast_aggregates_result = {"status": "off_season", "reason": "season_concluded"}
 
     cleared_ledgers: list[Any] = [ledger]
     _clear_today_open(ledger, args.date, by_event_date=True)
@@ -651,6 +680,16 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {}
         for sport in DAILY_LEARNED_SPORTS:
+            if not is_sport_daily_enabled(config, sport):
+                logger.info("Sport %s is off-season; skipping daily forecast.", sport.upper())
+                forecast_result[sport] = {
+                    "sport": sport,
+                    "status": "off_season",
+                    "logged": 0,
+                    "candidates": [],
+                    "reason": "season_concluded",
+                }
+                continue
             futures[
                 pool.submit(
                     _forecast_learned_sport,
@@ -685,6 +724,15 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     with ThreadPoolExecutor(max_workers=workers) as pool:
         flat_futures = {}
         for sport in DAILY_LEARNED_SPORTS:
+            if not is_sport_daily_enabled(config, sport):
+                forecast_result[f"_flat_{sport}"] = {
+                    "sport": sport,
+                    "status": "off_season",
+                    "logged": 0,
+                    "candidates": [],
+                    "reason": "season_concluded",
+                }
+                continue
             result = forecast_result.get(sport, {})
             candidates = result.get("candidates", [])
             if candidates:
@@ -732,6 +780,15 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     # comment, mirrored in _forecast_soccer_sport/_forecast_tennis_sport/
     # _forecast_international_sport/_forecast_mlb_totals_flat).
     def _mlb_totals_task() -> None:
+        if not is_sport_daily_enabled(config, "MLB"):
+            logger.info("MLB is off-season; skipping MLB totals forecast.")
+            forecast_result["mlb_totals"] = {
+                "sport": "mlb_totals",
+                "status": "off_season",
+                "logged": 0,
+                "reason": "season_concluded",
+            }
+            return
         try:
             forecast_result["mlb_totals"] = _forecast_mlb_totals_flat(
                 args.date,
@@ -753,6 +810,15 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             }
 
     def _mlb_nrfi_task() -> None:
+        if not is_sport_daily_enabled(config, "MLB"):
+            logger.info("MLB is off-season; skipping MLB NRFI forecast.")
+            forecast_result["mlb_nrfi"] = {
+                "sport": "mlb_nrfi",
+                "status": "off_season",
+                "logged": 0,
+                "reason": "season_concluded",
+            }
+            return
         try:
             forecast_result["mlb_nrfi"] = _forecast_mlb_nrfi_flat(
                 args.date,
@@ -809,6 +875,15 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             )
 
     def _wnba_spread_task() -> None:
+        if not is_sport_daily_enabled(config, "WNBA"):
+            logger.info("WNBA is off-season; skipping WNBA spread forecast.")
+            forecast_result["wnba_spread"] = {
+                "sport": "wnba_spread",
+                "status": "off_season",
+                "logged": 0,
+                "reason": "season_concluded",
+            }
+            return
         # WNBA spread: Main+Flat, same routing as MLB spread/total
         # (operator directive 2026-08-03). Independent of WNBA
         # moneyline (already logged by the learned-sports pool above).
@@ -838,6 +913,15 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             }
 
     def _wnba_total_task() -> None:
+        if not is_sport_daily_enabled(config, "WNBA"):
+            logger.info("WNBA is off-season; skipping WNBA total forecast.")
+            forecast_result["wnba_total"] = {
+                "sport": "wnba_total",
+                "status": "off_season",
+                "logged": 0,
+                "reason": "season_concluded",
+            }
+            return
         try:
             forecast_result["wnba_total"] = _forecast_wnba_total_sport(
                 data_root=data_directory,

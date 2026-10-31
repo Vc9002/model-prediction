@@ -19,7 +19,14 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from ..config import PROJECT_ROOT, config_path, ledger_path, market_odds_snapshot_path, unit_policy
+from ..config import (
+    PROJECT_ROOT,
+    config_path,
+    is_sport_daily_enabled,
+    ledger_path,
+    market_odds_snapshot_path,
+    unit_policy,
+)
 from ..cross_market_consistency import validate_cross_market_pick_coherence
 from ..data_sources.espn import ESPNClient, ESPNMLBClient
 from ..data_sources.mlb_market_odds import (
@@ -3911,6 +3918,16 @@ def _forecast_learned_sport(
     decision_observed_at = observed_at or (
         utc_now() if not force else datetime.strptime(args_date, "%Y-%m-%d").replace(tzinfo=UTC)
     )
+    if not is_sport_daily_enabled(config, sport) and not force:
+        logger.info("%s is off-season in daily forecast configuration; skipping.", sport.upper())
+        return {
+            "sport": sport,
+            "status": "off_season",
+            "logged": 0,
+            "candidates": [],
+            "reason": "season_concluded",
+            "note": f"{sport.upper()} is marked off-season in configuration.",
+        }
     model_config = config["models"][sport.upper()]
     residual_model = _load_market_residual_model(config)
     artifact_value = model_config.get("production_artifact")
@@ -6298,6 +6315,20 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
     for sport in sports:
         if sport == "esports":
             continue  # handled individually as lol/cs2
+        if (
+            not is_sport_daily_enabled(config, sport)
+            and not getattr(args, "force", False)
+            and sport in ("mlb", "wnba")
+        ):
+            logger.info("%s is off-season; skipping in forecast run.", sport.upper())
+            results[sport] = {
+                "sport": sport,
+                "status": "off_season",
+                "logged": 0,
+                "candidates": [],
+                "reason": "season_concluded",
+            }
+            continue
         selected_model = getattr(args, "model", "learned")
         if selected_model == "legacy-measured-edge":
             if sport != "mlb":

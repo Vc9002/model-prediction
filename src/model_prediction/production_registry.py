@@ -110,6 +110,8 @@ class ProductionModelEntry:
     promotion_protocol_hash: str | None = None
     promotion_basis: str | None = None
     promotion_evidence_level: str | None = None
+    daily_forecast_enabled: bool = True
+    season_active: bool = True
 
     @property
     def available(self) -> bool:
@@ -435,6 +437,8 @@ class ProductionModelRegistry:
         evidence_status = str(raw.get("evidence_status", EvidenceStatus.HISTORICAL_ONLY.value))
         replacement_priority = str(raw.get("replacement_priority", ReplacementPriority.MEDIUM.value))
         challenger_model_id = raw.get("challenger_model") or raw.get("challenger")
+        daily_forecast_enabled = bool(raw.get("daily_forecast_enabled", True))
+        season_active = bool(raw.get("season_active", True))
 
         if implementation not in IMPLEMENTATION_TYPES:
             return ProductionModelEntry(
@@ -555,6 +559,8 @@ class ProductionModelRegistry:
                 evidence_status=evidence_status,
                 replacement_priority=replacement_priority,
                 challenger_model_id=challenger_model_id,
+                daily_forecast_enabled=daily_forecast_enabled,
+                season_active=season_active,
             )
 
         # code_backed_model / rating_engine
@@ -602,6 +608,8 @@ class ProductionModelRegistry:
             evidence_status=evidence_status,
             replacement_priority=replacement_priority,
             challenger_model_id=challenger_model_id,
+            daily_forecast_enabled=daily_forecast_enabled,
+            season_active=season_active,
         )
 
     # -------------------------------------------------------------- access

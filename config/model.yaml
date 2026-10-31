@@ -154,6 +154,8 @@ models:
   MLB:
     family: elo_trend_logistic_regression
     status: shadow_qualified
+    season_active: false
+    daily_forecast_enabled: false
     origin: statistical_model
     qualification_override: true
     qualification_override_reason: 'v8 (2026-08-04): operator-directed promotion
@@ -276,6 +278,8 @@ models:
   WNBA:
     family: elo_trend_normal_approximation
     status: shadow_qualified
+    season_active: false
+    daily_forecast_enabled: false
     origin: statistical_model
     active_production_version: wnba-elo-trend-lr-v4
     min_edge: 0.05
@@ -402,8 +406,9 @@ models:
     family: nfl_structural_v7_bivariate_engine
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: nfl-spread-structural-v7
-    production_artifact: config/models/nfl-spread-structural-v7.json
+    active_production_version: nfl-elo-trend-lr-v4
+    production_artifact: config/models/nfl-elo-trend-lr-v4.json
+    active_spread_version: nfl-spread-structural-v7
     markets:
     - moneyline
     - spread

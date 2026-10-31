@@ -158,6 +158,29 @@ def polymarket_edge_enabled(config: dict[str, Any], component: str) -> bool:
     return section.get(f"{component}_enabled") is True
 
 
+def is_sport_daily_enabled(config: dict[str, Any], sport: str) -> bool:
+    """Return whether a sport is active for daily forecasting and telemetry capture."""
+    sport_key = str(sport).upper()
+    sport_cfg = (config.get("models") or {}).get(sport_key, {})
+    if isinstance(sport_cfg, dict):
+        if sport_cfg.get("daily_forecast_enabled") is False:
+            return False
+        if sport_cfg.get("season_active") is False:
+            return False
+        if sport_cfg.get("enabled") is False:
+            return False
+        if sport_cfg.get("status") in {"off_season", "suspended", "retired"}:
+            return False
+
+    svc = config.get("prediction_service") or {}
+    if isinstance(svc, dict):
+        off_season_sports = {str(s).upper() for s in (svc.get("off_season_sports") or [])}
+        if sport_key in off_season_sports:
+            return False
+
+    return True
+
+
 def config_path() -> Path:
     path = Path(os.getenv("MODEL_PREDICTION_CONFIG", "config/model.yaml"))
     return path if path.is_absolute() else PROJECT_ROOT / path

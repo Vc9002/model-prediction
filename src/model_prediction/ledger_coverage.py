@@ -136,6 +136,12 @@ def build_report(root: Path, database: Path, day: str, run: dict) -> dict:
                 state = "champion_route_mismatch"
             elif result.get("status") in {"error", "failed"} or result.get("errors"):
                 state = "forecast_error"
+            elif (
+                result.get("status") == "off_season"
+                or not configured.get(sport, {}).get("season_active", True)
+                or not configured.get(sport, {}).get("daily_forecast_enabled", True)
+            ):
+                state = "off_season"
             elif missing_flat or main_without_flat:
                 state = "missing_flat_records"
             elif counts:

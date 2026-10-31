@@ -2,6 +2,9 @@ schema_version: '3'
 prediction_service:
   enabled: true
   mode: production
+  off_season_sports:
+  - MLB
+  - WNBA
   primary:
     sport: WNBA
     market: moneyline
@@ -13,6 +16,8 @@ prediction_service:
     implementation: json_artifact
     artifact: config/models/wnba-elo-trend-lr-v4.json
     enabled: true
+    season_active: false
+    daily_forecast_enabled: false
     serving_status: production
     evidence_status: predictively_qualified
     replacement_priority: low
@@ -23,6 +28,8 @@ prediction_service:
     implementation: json_artifact
     artifact: config/models/wnba-spread-margin-v2.json
     enabled: true
+    season_active: false
+    daily_forecast_enabled: false
     serving_status: production
     evidence_status: predictively_qualified
     replacement_priority: medium
@@ -33,6 +40,8 @@ prediction_service:
     implementation: json_artifact
     artifact: config/models/wnba-total-margin-v2.json
     enabled: true
+    season_active: false
+    daily_forecast_enabled: false
     serving_status: production
     evidence_status: predictively_qualified
     replacement_priority: medium
@@ -43,6 +52,8 @@ prediction_service:
     implementation: json_artifact
     artifact: config/models/mlb-elo-trend-lr-v8.json
     enabled: true
+    season_active: false
+    daily_forecast_enabled: false
     serving_status: production
     evidence_status: historical_only
     replacement_priority: high
@@ -53,6 +64,8 @@ prediction_service:
     implementation: code_backed_model
     entry: model_prediction.models.mlb_runline_v4:MLBStructuralRunlineV4Model
     enabled: true
+    season_active: false
+    daily_forecast_enabled: false
     serving_status: production
     evidence_status: predictively_qualified
     replacement_priority: low
@@ -63,6 +76,8 @@ prediction_service:
     implementation: json_artifact
     artifact: config/models/measured-edge-margin-v3.json
     enabled: true
+    season_active: false
+    daily_forecast_enabled: false
     serving_status: rollback
     evidence_status: degraded
     replacement_priority: low
@@ -73,6 +88,8 @@ prediction_service:
     implementation: json_artifact
     artifact: config/models/measured-edge-totals-v3.json
     enabled: true
+    season_active: false
+    daily_forecast_enabled: false
     serving_status: rollback
     evidence_status: degraded
     replacement_priority: high
@@ -83,6 +100,8 @@ prediction_service:
     implementation: json_artifact
     artifact: config/models/mlb-structural-v10-frozen.json
     enabled: true
+    season_active: false
+    daily_forecast_enabled: false
     serving_status: production
     evidence_status: predictively_qualified
     replacement_priority: low
@@ -95,6 +114,8 @@ prediction_service:
     implementation: json_artifact
     artifact: config/models/mlb-nrfi-v4.json
     enabled: true
+    season_active: false
+    daily_forecast_enabled: false
     serving_status: production
     evidence_status: predictively_qualified
     replacement_priority: low
@@ -105,6 +126,8 @@ prediction_service:
     implementation: json_artifact
     artifact: config/models/mlb-nrfi-v3.json
     enabled: true
+    season_active: false
+    daily_forecast_enabled: false
     serving_status: shadow
     evidence_status: predictively_qualified
     replacement_priority: low
