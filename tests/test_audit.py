@@ -105,3 +105,23 @@ def test_lock_acquire_times_out_when_another_holder_never_releases(tmp_path) -> 
     finally:
         unlock(holder.fileno())
         holder.close()
+
+
+def test_append_chains_correctly_with_large_events_exceeding_tail_buffer(tmp_path) -> None:
+    path = tmp_path / "events.jsonl"
+    log = AuditLog(path)
+    # Event 1: large payload (e.g. 10 KB, exceeding former 8 KB limit)
+    large_payload_10k = {"data": "x" * 10000}
+    first = log.append("pick_created", "pick-1", large_payload_10k)
+    # Event 2: should successfully chain from Event 1 without JSONDecodeError
+    second = log.append("pick_created", "pick-2", {"units": 1.0})
+    assert second["previous_hash"] == first["event_hash"]
+
+    # Event 3: extra-large payload (e.g. 70 KB, exceeding single 64 KB chunk)
+    large_payload_70k = {"data": "y" * 70000}
+    third = log.append("pick_created", "pick-3", large_payload_70k)
+    assert third["previous_hash"] == second["event_hash"]
+
+    # Event 4: should successfully chain from Event 3
+    fourth = log.append("pick_settled", "pick-3", {"result": "win"})
+    assert fourth["previous_hash"] == third["event_hash"]

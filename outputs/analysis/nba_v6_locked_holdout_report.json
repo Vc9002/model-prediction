@@ -1,0 +1,51 @@
+{
+  "evaluation_cohort": "locked_holdout",
+  "sample_size": 636,
+  "calendar_dates": 129,
+  "date_range": [
+    "2026-02-13",
+    "2026-10-30"
+  ],
+  "incumbent_v5": {
+    "mae_margin": 12.3614,
+    "rmse_margin": 15.7646,
+    "mae_total": 16.339,
+    "brier": 0.1956,
+    "accuracy": 0.6934
+  },
+  "challenger_v6": {
+    "mae_margin": 12.3287,
+    "rmse_margin": 15.7348,
+    "mae_total": 16.4508,
+    "brier": 0.1958,
+    "accuracy": 0.6965
+  },
+  "deltas": {
+    "mae_margin_reduction": 0.0327,
+    "rmse_margin_reduction": 0.0298,
+    "brier_reduction": -0.0002,
+    "accuracy_increase": 0.0031
+  },
+  "paired_bootstrap": {
+    "mean_gain": 0.0327,
+    "ci_95": [
+      -0.0132,
+      0.0794
+    ],
+    "p_gain_positive": 0.92
+  },
+  "verdict": "FAILED",
+  "challenger_params": {
+    "elo_weight": 0.55,
+    "hca_points": 1.8,
+    "altitude_hca": false,
+    "b2b_penalty_home": 3.2,
+    "b2b_penalty_away": 0.8,
+    "schedule_density_drag": true,
+    "rest_weight": 0.1,
+    "logistic_scale": 11.8,
+    "margin_sd_base": 14.5,
+    "dynamic_volatility": true,
+    "use_pace_sd_scaling": true
+  }
+}

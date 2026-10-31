@@ -1,12 +1,12 @@
 {
   "baseline_brier": null,
-  "calibrated_at_utc": "2026-10-24T20:38:56.584651+00:00",
+  "calibrated_at_utc": "2026-10-31T05:01:19.604084+00:00",
   "calibrated_oof_brier": null,
   "champion_method": "identity",
   "market": "spread",
   "model_version": "dota2-spread-tiered-elo-v6",
   "parameters": {},
   "reason": "canonical_flat_insufficient_evidence",
-  "sample_size": 3,
+  "sample_size": 8,
   "sport": "dota2"
 }

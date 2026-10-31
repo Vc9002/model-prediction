@@ -60,23 +60,13 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     "wnba-elo-trend-lr-v4",
     "wnba-total-margin-v2",
     "wnba-spread-margin-v2",
+    "nba-spread-margin-v6",
+    "nba-total-margin-v6",
     "soccer-poisson-dc-v2",
     "soccer-total-v1",
     "valorant-tiered-elo-v6",
     "lol-tiered-elo-v6",
     "dota2-tiered-elo-v6",
-    "nfl-elo-trend-lr-v4",
-    "nfl-spread-structural-v5",
-    "nfl-total-structural-v5",
-    "nba-elo-trend-lr-v4",
-    "nba-spread-margin-v5",
-    "nba-spread-margin-v4",
-    "nba-spread-margin-v3",
-    "nba-spread-margin-v2",
-    "nba-total-margin-v5",
-    "nba-total-margin-v4",
-    "nba-total-margin-v3",
-    "nba-total-margin-v2",
     "cfb-structural-v3",
     "cfb-structural-v2",
     "mlb-structural-runline-v4",
@@ -98,6 +88,16 @@ EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
     "wnba-total-margin-v1",  # Legacy WNBA totals (uncalibrated static SD)
     "nba-spread-margin-v1",  # Legacy NBA spread replaced by calibrated v2
     "nba-total-margin-v1",  # Legacy NBA totals replaced by calibrated v2
+    "nba-spread-margin-v2",
+    "nba-spread-margin-v3",
+    "nba-spread-margin-v4",
+    "nba-spread-margin-v5",
+    "nba-total-margin-v2",
+    "nba-total-margin-v3",
+    "nba-total-margin-v4",
+    "nba-total-margin-v5",
+    "nba-elo-trend-lr-v4",
+    "nfl-elo-trend-lr-v4",
     "mlb-nrfi-v1",  # Legacy MLB NRFI
     "cfb-spread-v1",  # Legacy CFB spread (severe drift / degraded)
     "cfb-total-v1",  # CFB total (uncalibrated / degraded)

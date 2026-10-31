@@ -2,14 +2,29 @@
 
 Tracks new picks from **FadeMeBets (FMB), Scout, and Kytra** when Vincent provides them, and retains each provider's history separately. Units are provider-posted stakes, not confirmed personal wagers. Settle picks when requested.
 
+## Personal wagers reported — October 28, 2026
+
+These are Vincent's reported purchases, separate from provider-posted stakes and provider performance. Only the 76ers/Pacers under ticket odds were confirmed. Final 76ers/Pacers score was Philadelphia 114, Indiana 109 (223 total); ESPN's structured game summary marked the event `STATUS_FINAL` and `completed=true` when checked October 28, 2026 ET.
+
+| Selection | Personal stake | Ticket line / odds | Status |
+| :--- | ---: | :--- | :--- |
+| 76ers -4.5 | 1.00u | -4.5 / odds unknown | WIN by 5; profit unknown pending ticket odds |
+| Brewers moneyline | 3.00u | moneyline / odds unknown | WIN, 4-1; profit unknown pending ticket odds |
+| 76ers/Pacers under | 1.00u | Under 238.5 / -135, confirmed by Vincent after correcting "285.8" | WIN; +0.74u |
+| Timberwolves moneyline | 1.00u | moneyline / odds unknown | LOSS, 114-119; -1.00u |
+
+**Reported personal stake:** 6.00u across four tickets. No assumption that the posted provider odds were Vincent's execution prices.
+
+**Settled personal tickets:** 3 wins, 1 loss. Known components net to -0.26u (+0.74u under, -1.00u Timberwolves), plus unquantified winnings on 76ers -4.5 and Brewers ML. Exact personal P/L awaits those two ticket prices.
+
 ## Provider Overview
 
 | Provider | Logged picks | Settled record | Pending | Total posted stakes | Realized net |
 | :--- | ---: | :---: | ---: | ---: | ---: |
-| FadeMeBets | 40 | 23-17-0 | 0 | 55.50u | +5.85u |
-| Scout | 8 | 0-5-0 | 2 | 17.00u | -11.00u |
-| Kytra | 9 | 5-4-0 | 0 | 12.00u | +0.44u |
-| **All providers** | **57** | **28-26-0** | **2** | **84.50u** | **-4.71u** |
+| FadeMeBets | 52 | 27-25-0 | 0 | 74.00u | -0.06u |
+| Scout | 12 | 2-9-0 (1 void) | 0 | 23.00u plus unspecified Oct. 29 stake | -14.09u |
+| Kytra | 12 | 6-6-0 | 0 | 14.50u | -0.38u |
+| **All providers** | **76** | **35-40-0 (1 void)** | **0** | **111.50u plus unspecified Scout stake** | **-14.53u** |
 
 Screenshot entries are dated October 25, 2026. Settlement status is shown per row. Message timestamps are posting times. Scout's screenshot explicitly names Scout. Kytra attribution is inferred from the user's request: that screenshot displays Winible Bot rather than Kytra. The parlay is one pick at the displayed combined price; its legs are not counted separately. Standalone alternate spreads remain separate picks.
 
@@ -30,10 +45,28 @@ Screenshot entries are dated October 25, 2026. Settlement status is shown per ro
 | ID | Sport | Selection | Odds (US) | Stake | Posted time | Status | Net P/L |
 | :--- | :--- | :--- | ---: | ---: | :--- | :--- | :--- |
 | S006 | NBA | Hawks +6.5 | -140 | 2.00u | 12:28 PM | LOSS — Rockets 120, Hawks 110 | -2.00u |
-| S007 | NBA | Warriors +9.5 | -140 | 2.00u | 12:28 PM | PENDING | — |
-| S008 | NBA | S. Curry (Warriors) over 24.5 points | -120 | 2.00u | 12:28 PM | PENDING | — |
+| S007 | NBA | Warriors +9.5 | -140 | 2.00u | 12:28 PM | WIN — Warriors 134, Nuggets 114 | +1.43u |
+| S008 | NBA | S. Curry (Warriors) over 24.5 points | -120 | 2.00u | 12:28 PM | LOSS — Curry 24 points | -2.00u |
 
-**October 26 posted stakes:** 6.00u. **Settled:** 0-1-0, -2.00u. **Pending:** 4.00u across S007-S008.
+**October 26 posted stakes:** 6.00u. **Settled:** 1-2-0, -2.57u. **Pending:** 0.00u.
+
+### Scout — October 28, 2026
+
+| ID | Sport | Selection | Odds | Posted stake | Result | Net P/L |
+| :--- | :--- | :--- | ---: | ---: | :--- | ---: |
+| S009 | NBA | 76ers/Pacers under 238.5 | -135 | 2.00u | WIN — 114-109, 223 total | +1.48u |
+| S010 | NBA | Pelicans +6.5 | -140 | 2.00u | LOSS — Nuggets 104, Pelicans 91 | -2.00u |
+| S011 | NBA | Timberwolves moneyline | -165 | 2.00u | LOSS — Warriors 119, Timberwolves 114 | -2.00u |
+
+**October 28 Scout:** 1-2-0, -2.52u on 6.00u posted stakes.
+
+### Scout — October 29, 2026
+
+| ID | Sport | Selection | Odds | Posted stake | Result | Net P/L |
+| :--- | :--- | :--- | ---: | :--- | :--- | :--- |
+| S012 | NFL | Panthers +5.5 | -140 | Unspecified (Free POTD) | LOSS (Packers 27, Panthers 19; lost by 8, did not cover +5.5) | 0.00u (no stake specified) |
+
+Scout posted this at 11:40 AM. The post does not state a unit size; no stake was inferred, so settlement carries no P/L even though the pick lost.
 
 ## Kytra — October 25, 2026
 
@@ -58,6 +91,20 @@ Screenshot entries are dated October 25, 2026. Settlement status is shown per ro
 
 **October 26 posted stakes:** 2.00u. **Settled:** 1-1-0, +0.08u. **Pending:** 0.00u. Finals: [Cavaliers 127, Timberwolves 125 (OT)](https://www.nba.com/game/0022600120/box-score); Brewers 10, Rays 1.
 
+### Kytra — October 28, 2026
+
+| ID | Sport | Selection | Odds | Posted stake | Result | Net P/L |
+| :--- | :--- | :--- | ---: | ---: | :--- | ---: |
+| K010 | MLB | Brewers moneyline | -147 | 1.00u | WIN — Brewers 4, Rays 1 | +0.68u |
+| K011 | MLB | Jacob Misiorowski over 5.5 strikeouts | -127 | 1.00u | LOSS — 2 strikeouts | -1.00u |
+| K012 | MLB | Brewers ML + Misiorowski over 4.5 strikeouts parlay | +119 | 0.50u | LOSS — strikeout leg lost (2) | -0.50u |
+
+**October 28 Kytra:** 1-2-0, -0.82u on 2.50u posted stakes. The parlay is one wager; its legs are not separate picks.
+
+### Settlement evidence and rounding — October 28
+
+ESPN structured game summaries returned terminal `STATUS_FINAL` with final scores for [76ers at Pacers](https://www.espn.com/nba/game/_/gameId/401909884), [Warriors at Timberwolves](https://www.espn.com/nba/game/_/gameId/401909888), [Nuggets at Pelicans](https://www.espn.com/nba/game/_/gameId/401909889), [Brewers at Rays](https://www.espn.com/mlb/game/_/gameId/401908046), and [Flames at Oilers](https://www.espn.com/nhl/game/_/gameId/401892597). The MLB box-score pitching row lists Misiorowski at 2 strikeouts. October 27 finals for FMB rows 041-044 were also checked against ESPN structured scores. Each row's P/L is rounded to 0.01u; daily and all-time displayed totals sum the rounded row values. Personal ticket winnings remain unquantified where execution odds are unknown.
+
 ---
 
 ## FadeMeBets
@@ -69,19 +116,19 @@ A structured, ongoing tracking ledger for **FadeMeBets** premium picks, covering
 
 ## 📊 Performance Dashboard
 
-*Last Updated: October 26, 2026. All four Oct. 26 FMB picks settled. Provider stakes, not personal wagers.*
+*Last Updated: October 30, 2026. 52 FMB picks settled; 4 new Oct. 30 picks pending. Provider stakes, not personal wagers.*
 
 | Metric | Overall | Lock of the Day (Featured) | EV Picks |
 | :--- | :---: | :---: | :---: |
-| **Total Picks Logged** | **40** | 10 | 30 |
-| **Settled Record** | **23 - 17 - 0** | 7 - 3 - 0 | 16 - 14 - 0 |
-| **Pending / Live** | **0** | 0 | 0 |
-| **Win Rate (Settled)** | **57.5%** | 70.0% | **53.3%** |
-| **Total Units Risked** | **55.50u** | 25.50u | 30.00u |
-| **Settled Units Risked**| **55.50u** | 25.50u | 30.00u |
-| **Net Profit / Loss** | **+5.85u** | **+6.92u** | **-1.07u** |
-| **ROI % (Settled)** | **+10.5%** | +27.1% | **-3.6%** |
-| **Pending Potential** | **0.00u posted stakes** | 0.00u | 0.00u |
+| **Total Picks Logged** | **56** | 14 | 42 |
+| **Settled Record** | **27 - 25 - 0** | 8 - 5 - 0 | 19 - 20 - 0 |
+| **Pending / Live** | **4** | 1 | 3 |
+| **Win Rate (Settled)** | **51.9%** | 61.5% | **48.7%** |
+| **Total Units Risked** | **79.00u** | 37.00u | 42.00u |
+| **Settled Units Risked**| **74.00u** | 35.00u | 39.00u |
+| **Net Profit / Loss** | **-0.06u** | **+4.28u** | **-4.34u** |
+| **ROI % (Settled)** | **-0.1%** | +12.2% | **-11.1%** |
+| **Pending Potential** | **5.00u posted stakes** | 2.00u | 3.00u |
 
 ### Sport Breakdown
 
@@ -133,6 +180,16 @@ A structured, ongoing tracking ledger for **FadeMeBets** premium picks, covering
 
 - **NFL** (Oct 26): 2 Picks (2.25u risked) — **0-2-0 (-2.25u)**
 
+- **MLB** (Oct 27): 1 Pick (3.50u risked) — **0-1-0 (-3.50u)**
+- **NBA** (Oct 27): 2 Picks (2.00u risked) — **1-1-0 (-0.09u)**
+- **NHL** (Oct 27): 1 Pick (1.50u risked) — **0-1-0 (-1.50u)**
+- **MLB** (Oct 28): 1 Pick (4.00u risked) — **1-0-0 (+2.86u)**
+- **NBA** (Oct 28): 2 Picks (2.00u risked) — **2-0-0 (+1.82u)**
+- **NHL** (Oct 28): 1 Pick (0.50u risked) — **0-1-0 (-0.50u)**
+- **NCAAF** (Oct 29): 1 Pick (2.00u risked) — **0-1-0 (-2.00u)**
+- **NHL** (Oct 29): 2 Picks (2.00u risked) — **0-2-0 (-2.00u)**
+- **NFL** (Oct 29): 1 Pick (1.00u risked) — **0-1-0 (-1.00u)**
+
 ### Daily Results
 
 | Day | Record | Units Risked | Net | Cumulative |
@@ -147,6 +204,9 @@ A structured, ongoing tracking ledger for **FadeMeBets** premium picks, covering
 | Oct 24 | 2-2-0 | 5.25u | -0.52u | +11.78u |
 | Oct 25 | 2-2-0 | 5.00u | -1.18u | +10.60u |
 | Oct 26 | 0-4-0 | 4.75u | -4.75u | +5.85u |
+| Oct 27 | 1-3-0 | 7.00u | -5.09u | +0.76u |
+| Oct 28 | 3-1-0 | 6.50u | +4.18u | +4.94u |
+| Oct 29 | 0-4-0 | 5.00u | -5.00u | -0.06u |
 
 
 ---
@@ -225,7 +285,22 @@ A structured, ongoing tracking ledger for **FadeMeBets** premium picks, covering
 | **038** | Oct 26, 2026 | MLB | Milwaukee Brewers at Tampa Bay Rays | **Rays moneyline** | -120 | 0.50u | 8.5% EV; 58% cover | 8:00 PM | **FINAL** | **LOSS** (Brewers 10, Rays 1) | **-0.50u** |
 | **039** | Oct 26, 2026 | NFL | Dallas Cowboys at Philadelphia Eagles | **Under 44.5** | -110 | 1.00u | 18.4% posted EV; 59% cover | 8:15 PM | **FINAL** | **LOSS** (Cowboys 38, Eagles 21; 59 points) | **-1.00u** |
 | **040** | Oct 26, 2026 | NFL | Dallas Cowboys at Philadelphia Eagles | **Eagles +5** | -110 | 1.25u | 8.4% posted EV; 56% cover | 8:15 PM | **FINAL** | **LOSS** (Cowboys 38, Eagles 21) | **-1.25u** |
-
+| **041** | Oct 27, 2026 | MLB | Milwaukee Brewers at Tampa Bay Rays | **Brewers moneyline** | -124 | 3.50u | Lock | — | **FINAL** | **LOSS** (Rays 4, Brewers 3 in 12) | **-3.50u** |
+| **042** | Oct 27, 2026 | NBA | Portland Trail Blazers at Los Angeles Lakers | **Trail Blazers +3.5** | -110 | 1.00u | EV | — | **FINAL** | **WIN** (Portland 136, Lakers 129) | **+0.91u** |
+| **043** | Oct 27, 2026 | NBA | Detroit Pistons at New York Knicks | **Pistons +4.5** | -110 | 1.00u | EV | — | **FINAL** | **LOSS** (Knicks 111, Pistons 97) | **-1.00u** |
+| **044** | Oct 27, 2026 | NHL | New York Islanders at Nashville Predators | **Predators moneyline** | -120 | 1.50u | EV | — | **FINAL** | **LOSS** (Islanders 4, Predators 3 SO) | **-1.50u** |
+| **045** | Oct 28, 2026 | MLB | Milwaukee Brewers at Tampa Bay Rays | **Brewers moneyline** | -140 | 4.00u | Lock | — | **FINAL** | **WIN** (Brewers 4, Rays 1) | **+2.86u** |
+| **046** | Oct 28, 2026 | NHL | Calgary Flames at Edmonton Oilers | **Flames +1.5** | -130 | 0.50u | EV | — | **FINAL** | **LOSS** (Oilers 4, Flames 0) | **-0.50u** |
+| **047** | Oct 28, 2026 | NBA | Denver Nuggets at New Orleans Pelicans | **Nuggets -4.5** | -110 | 1.00u | EV | — | **FINAL** | **WIN** (Nuggets 104, Pelicans 91) | **+0.91u** |
+| **048** | Oct 28, 2026 | NBA | Philadelphia 76ers at Indiana Pacers | **76ers -4.5** | -110 | 1.00u | EV | — | **FINAL** | **WIN** (76ers 114, Pacers 109) | **+0.91u** |
+| **049** | Oct 29, 2026 | NCAAF | Florida Atlantic at North Texas | **North Texas -13.5** | -110 | 2.00u | Lock | 7:30 PM | **FINAL** | **LOSS** ([North Texas 48, FAU 41](https://www.espn.com/college-football/game/_/gameId/401862812); won by 7, did not cover) | **-2.00u** |
+| **050** | Oct 29, 2026 | NHL | Boston Bruins at St. Louis Blues | **Bruins moneyline** | -100 | 1.00u | EV | 8:00 PM | **FINAL** | **LOSS** (Blues 4, Bruins 1) | **-1.00u** |
+| **051** | Oct 29, 2026 | NHL | Columbus Blue Jackets at Carolina Hurricanes | **Hurricanes -1.5** | +111 | 1.00u | EV; conditional on Kochetkov starting | 7:00 PM | **FINAL** | **LOSS** (Hurricanes 3, Blue Jackets 2; won by 1, did not cover -1.5) | **-1.00u** |
+| **052** | Oct 29, 2026 | NFL | Carolina Panthers at Green Bay Packers | **Panthers +4** | -106 | 1.00u | EV; pick title says +4 while analysis discusses +3.5 | 8:15 PM | **FINAL** | **LOSS** (Packers 27, Panthers 19; lost by 8, did not cover +4) | **-1.00u** |
+| **053** | Oct 30, 2026 | NBA | New York Knicks at Philadelphia 76ers | **Under 228.5** | -110 | 2.00u | Lock; High Confidence | — | **PENDING** | — | — |
+| **054** | Oct 30, 2026 | NCAAF | Tulane at Charlotte | **Tulane First Half -6.5** | -110 | 1.00u | 8.4% EV; 57 Conf | 2:15 PM | **PENDING** | — | — |
+| **055** | Oct 30, 2026 | NHL | Vegas Golden Knights at New Jersey Devils | **Golden Knights moneyline** | -110 (play -115 or better) | 1.00u | 9.4% EV; 55 Conf | 2:13 PM | **PENDING** | — | — |
+| **056** | Oct 30, 2026 | NCAAF | Baylor at UCF | **Baylor -1.5** | -110 | 1.00u | 9.4% EV; 55 Conf | 2:12 PM | **PENDING** | — | — |
 
 ---
 

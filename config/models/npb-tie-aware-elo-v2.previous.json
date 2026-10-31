@@ -1,22 +1,22 @@
 {
-  "artifact_hash": "503d94d9140cfeef77c55f9832f1b0ef0436353858a4fd1d77fc8cc06abdc9c0",
+  "artifact_hash": "89e03db7fc19cdf401c33707a0f837b0efe0153a954d2f15f317fedd8ced31d8",
   "confidence_threshold": null,
   "decay_rate": 0.0,
   "games_played": {
     "B": 702,
     "C": 707,
     "D": 708,
-    "DB": 709,
+    "DB": 713,
     "E": 699,
     "F": 712,
     "G": 710,
-    "H": 706,
+    "H": 710,
     "L": 707,
     "M": 702,
     "S": 704,
     "T": 714
   },
-  "games_sha256": "ff5e5fa60401fcb5919f0fc1a085b9a8c5ca0b1ccdd890295468962f05b42b36",
+  "games_sha256": "ad3b5216e7037e605213d1b38087f7f4b9bc9467ada037b9fdd31d5c96b13d94",
   "home_advantage": 35.0,
   "initial_rating": 1500.0,
   "k": 8.0,
@@ -26,14 +26,14 @@
   "model_version": "npb-tie-aware-elo-v2",
   "qualification": {
     "locked_test": {
-      "accuracy_decisive": 0.588761,
-      "brier_settlement": 0.239037,
-      "calls": 783,
-      "hits": 461,
-      "mae_settlement": 0.475606,
-      "observations": 798,
+      "accuracy_decisive": 0.587776,
+      "brier_settlement": 0.238621,
+      "calls": 769,
+      "hits": 452,
+      "mae_settlement": 0.47504,
+      "observations": 784,
       "ties": 15,
-      "units_at_minus_110": 97.090909
+      "units_at_minus_110": 93.909091
     },
     "promotion_rationale": "",
     "qualified": false
@@ -43,40 +43,40 @@
     "B": 1475.953661,
     "C": 1456.716237,
     "D": 1449.85898,
-    "DB": 1538.012494,
+    "DB": 1526.40877,
     "E": 1473.714758,
     "F": 1551.647816,
     "G": 1495.642562,
-    "H": 1627.742754,
+    "H": 1639.346478,
     "L": 1534.793842,
     "M": 1471.44313,
     "S": 1421.701846,
     "T": 1502.771921
   },
   "schema_version": "international-baseball-tie-aware-elo-v2",
-  "source_manifest_sha256": "a454ceabda06bea8135a0788a591693f6414391ed3ce9f06602a9e518182ad0f",
+  "source_manifest_sha256": "b4ffc818cfae62e1bbde72b9318c6355f3d1c9c0a8c1f563cbadd2ebc8378c00",
   "target": "expected moneyline settlement where a tie pays 0.50",
   "tie_method": "flat",
-  "tie_probability": 0.02382075,
-  "trained_through_date": "2026-10-17",
+  "tie_probability": 0.0237983,
+  "trained_through_date": "2026-10-28",
   "training": {
     "coefficient_fit": {
-      "end_date": "2025-04-08",
-      "observations": 2580,
+      "end_date": "2025-04-10",
+      "observations": 2589,
       "start_date": "2022-03-25"
     },
     "locked_holdout": {
-      "end_date": "2026-10-17",
-      "observations": 798,
-      "start_date": "2026-04-11"
+      "end_date": "2026-10-28",
+      "observations": 784,
+      "start_date": "2026-04-15"
     },
     "threshold_selection": {
-      "end_date": "2026-04-10",
-      "observations": 862,
-      "start_date": "2025-04-09"
+      "end_date": "2026-04-14",
+      "observations": 871,
+      "start_date": "2025-04-11"
     }
   },
-  "training_observations": 4240,
-  "training_prefix_sha256": "945501d80b6ffc9218fd7b302b953386da4428a2f72f0465134b6bb77a7c1c0a",
+  "training_observations": 4244,
+  "training_prefix_sha256": "1de3b46b479450b0418cf1bed894992462e2e5c50b67481aab6a0abb8273ffd0",
   "units": 0
 }

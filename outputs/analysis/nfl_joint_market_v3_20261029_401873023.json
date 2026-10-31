@@ -1,0 +1,28 @@
+{
+  "artifact_hash": "8ebdf5e7ba97b537f8486b9ff6ee16a4e3a746535fc6ac96042da0f4e2a70cdc",
+  "decision": "RESEARCH_FORECAST_ONLY",
+  "decision_at_utc": "2026-10-29T20:18:29.953000Z",
+  "event_id": "401873023",
+  "event_start_utc": "2026-10-30T00:15Z",
+  "home_win_probability": 0.6408980000000001,
+  "market_weight": 1.0,
+  "model_version": "nfl-joint-market-v3",
+  "packet_sha256": "98c82fbeec3c6e4ab8c7e7392fe87b39875c567d17ce9f4fbd09e2a8a88eeec8",
+  "raw_edges": {
+    "moneyline": -0.0016019999999998813,
+    "spread": -0.0169099190483894,
+    "total": 0.04436550921325566
+  },
+  "scope": "prospective research forecast; no call, stake, or order",
+  "selected_asks": {
+    "moneyline": 0.6425,
+    "spread": 0.5,
+    "total": 0.485
+  },
+  "selected_probabilities": {
+    "moneyline": 0.6408980000000001,
+    "spread": 0.4830900809516106,
+    "total": 0.5293655092132556
+  },
+  "source_packet_path": "E:\\model-prediction-runtime\\research\\nfl_joint_packets\\2026-10-29\\401873023-98c82fbeec3c6e4ab8c7e7392fe87b39875c567d17ce9f4fbd09e2a8a88eeec8.json"
+}

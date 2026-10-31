@@ -159,9 +159,7 @@ def test_cfb_main_requires_artifact_edge_and_pregame_weather(monkeypatch, tmp_pa
     monkeypatch.setattr(
         forecast_cli,
         "_append_secondary_ledger",
-        lambda ledger, request, eligibility, observed_at, source: writes.append(
-            (ledger, request.event_id)
-        ),
+        lambda ledger, request, eligibility, observed_at, source: writes.append((ledger, request.event_id)),
     )
     flat = SimpleNamespace(exposure=lambda *args, **kwargs: object())
     main = object()
@@ -334,6 +332,196 @@ def test_nba_total_extreme_disagreement_stays_in_flat(monkeypatch, tmp_path):
     ]
 
 
+def test_nba_spread_extreme_disagreement_stays_in_flat(monkeypatch, tmp_path):
+    """A missing spread-side disagreement cap must never admit a 30-point edge to Main."""
+    now = datetime(2026, 10, 30, 12, tzinfo=UTC)
+    contracts = []
+    for event_id, edge in [("normal", 0.07), ("extreme", 0.30)]:
+        contracts.append(
+            {
+                "event_id": event_id,
+                "event_start_utc": "2026-10-31T19:00:00Z",
+                "away_team": "Away",
+                "home_team": "Home",
+                "market_type": "spread",
+                "selection": "away",
+                "line": 4.5,
+                "model_probability": 0.6,
+                "model_uncertainty": 0.1,
+                "model_version": "nba-spread-margin-v5",
+                "model_artifact_hash": "test-hash",
+                "model_qualified": True,
+                "market_lineage": {},
+                "market_slug": event_id,
+                "rationale": "Test",
+                "executable_ask": 0.6 - edge,
+                "observed_at_utc": now.isoformat(),
+            }
+        )
+    monkeypatch.setattr(forecast_cli, "utc_now", lambda: now)
+    monkeypatch.setattr(forecast_cli.PickRequest, "validate", lambda self, now: None)
+    monkeypatch.setattr(
+        forecast_cli,
+        "_forecast_nba_spread_slate",
+        lambda *args: {"priced_contracts": contracts},
+    )
+    monkeypatch.setattr(forecast_cli, "unit_policy", lambda config: object())
+    monkeypatch.setattr(forecast_cli, "_is_registered_serving_model", lambda *args: True)
+    monkeypatch.setattr(
+        forecast_cli,
+        "evaluate_eligibility",
+        lambda *args, **kwargs: SimpleNamespace(
+            decision="CALL", record_type=RecordType.QUALIFIED_SHADOW_CALL
+        ),
+    )
+    monkeypatch.setattr(
+        forecast_cli,
+        "_append_secondary_ledger",
+        lambda ledger, request, eligibility, observed_at, source: writes.append((ledger, request.event_id)),
+    )
+    writes = []
+    flat = SimpleNamespace(exposure=lambda *args, **kwargs: object(), rows=lambda **kwargs: [])
+    main = object()
+    registry = SimpleNamespace(resolve=lambda *args: SimpleNamespace(canonical_team_id="test"))
+    result = forecast_cli._forecast_nba_spread_sport(
+        data_root=tmp_path,
+        args_date="2026-10-31",
+        config={
+            "models": {"NBA": {"min_edge": 0.05}},
+            "project": {"maximum_unreviewed_market_disagreement": 0.10},
+        },
+        registry=registry,
+        bans=None,
+        flat_ledger=flat,
+        main_ledger=main,
+    )
+    assert {event_id for ledger, event_id in writes if ledger is flat} == {"normal", "extreme"}
+    assert [event_id for ledger, event_id in writes if ledger is main] == ["normal"]
+    assert result["main_rejections"] == [
+        {"event_id": "extreme", "reason": "market_disagreement_exceeds_limit"}
+    ]
+
+
+def test_nba_v5_historical_evidence_is_not_reported_as_qualified(monkeypatch, tmp_path):
+    """Artifact self-claims cannot override the registry's exact evidence status."""
+    now = datetime(2026, 10, 30, 12, tzinfo=UTC)
+    start = "2026-10-31T19:00:00Z"
+    event = {
+        "id": "game-1",
+        "date": start,
+        "competitions": [
+            {
+                "competitors": [
+                    {"homeAway": "away", "team": {"displayName": "Miami Heat"}},
+                    {"homeAway": "home", "team": {"displayName": "Boston Celtics"}},
+                ]
+            }
+        ],
+    }
+    quote = {
+        "market_type": "total",
+        "team": "Miami Heat",
+        "event_start_utc": start,
+        "line": 228.5,
+        "market_slug": "game-1-total",
+        "long": {"ask": 0.49},
+        "short": {"ask": 0.52},
+    }
+    champion = SimpleNamespace(
+        model_id="nba-total-margin-v5",
+        available=True,
+        evidence_status="historical_only",
+    )
+    monkeypatch.setattr(forecast_cli, "utc_now", lambda: now)
+    monkeypatch.setattr(
+        forecast_cli.ProductionModelRegistry,
+        "load",
+        lambda root: SimpleNamespace(champion=lambda *args: champion),
+    )
+    monkeypatch.setattr(
+        forecast_cli,
+        "_load_exact_artifact_contract",
+        lambda version: ({"artifact_hash": "verified", "qualification": {"qualified": True}}, None),
+    )
+    monkeypatch.setattr(forecast_cli.FeatureStore, "games_before", lambda *args: [])
+    monkeypatch.setattr(forecast_cli, "_read_polymarket_snapshot_rows", lambda path: [quote])
+    monkeypatch.setattr(forecast_cli, "_quotes_known_at", lambda rows, observed: rows)
+    from model_prediction.models import basketball
+
+    monkeypatch.setattr(
+        basketball.BasketballModel,
+        "predict_games",
+        lambda self, history, upcoming: [
+            SimpleNamespace(
+                market_type="total",
+                event_id="game-1",
+                event_start_utc=start,
+                away_team="Miami Heat",
+                home_team="Boston Celtics",
+                probability=lambda selection: 0.62,
+                uncertainty=0.1,
+                rationale="test",
+                feature_basis={},
+                inference_inputs=None,
+            )
+        ],
+    )
+    result = forecast_cli._forecast_nba_total_slate(
+        tmp_path, "2026-10-31", SimpleNamespace(scoreboard=lambda *args: {"events": [event]})
+    )
+    assert result["model_qualified"] is False
+    assert result["priced_contracts"][0]["model_qualified"] is False
+
+
+def test_nba_historical_only_registry_entry_fails_predictive_qualification():
+    assert (
+        forecast_cli._is_predictively_qualified_serving_model("nba-elo-trend-lr-v4", "NBA", "moneyline")
+        is False
+    )
+
+
+def test_nba_moneyline_forecast_surfaces_unverified_evidence(monkeypatch, tmp_path):
+    from model_prediction.learned_forward import LearnedForwardCandidate
+
+    candidate = LearnedForwardCandidate(
+        event_id="nba-ml",
+        event_start_utc="2026-10-31T19:00:00Z",
+        away_team="Miami Heat",
+        home_team="Boston Celtics",
+        market_type="moneyline",
+        selection="home",
+        model_probability=0.62,
+        home_probability=0.62,
+        confidence_threshold=0.55,
+        call=True,
+        action="QUALIFIED_SHADOW_CALL",
+        reason="above threshold",
+        model_version="nba-elo-trend-lr-v4",
+        model_artifact_hash="hash",
+        model_qualified=True,
+        feature_basis={},
+        feature_snapshot_hash="snapshot",
+    )
+    monkeypatch.setattr(
+        forecast_cli,
+        "build_learned_moneyline_slate",
+        lambda **kwargs: ([candidate], [], 1),
+    )
+    result = forecast_cli._forecast_learned_sport(
+        "nba",
+        "2026-10-31",
+        False,
+        {
+            "project": {"ledger_path": str(tmp_path / "picks.xlsx")},
+            "models": {"NBA": {"production_artifact": "config/models/nba-elo-trend-lr-v4.json"}},
+        },
+    )
+    assert result["qualified_shadow_calls"] == 0
+    assert result["zero_unit_research_calls"] == 1
+    assert result["candidates"][0]["model_qualified"] is False
+    assert result["candidates"][0]["action"] == "PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED"
+
+
 def test_nba_injury_reader_rejects_tampered_and_late_snapshots(tmp_path):
     directory = tmp_path / "availability" / "nba" / "espn_injury_snapshots" / "2026-10-30"
     directory.mkdir(parents=True)
@@ -358,9 +546,7 @@ def test_nba_injury_reader_rejects_tampered_and_late_snapshots(tmp_path):
     write_snapshot("2026-10-30T15:00:00+00:00", "Verified")
     write_snapshot("2026-10-30T16:00:00+00:00", "Tampered", tamper=True)
     write_snapshot("2026-10-30T18:00:00+00:00", "Too late")
-    result = load_latest_nba_injury_snapshot(
-        tmp_path, observed_at=datetime(2026, 10, 30, 17, tzinfo=UTC)
-    )
+    result = load_latest_nba_injury_snapshot(tmp_path, observed_at=datetime(2026, 10, 30, 17, tzinfo=UTC))
     assert result["entries"][0]["player_name"] == "Verified"
 
 
@@ -374,10 +560,12 @@ def test_qualified_nba_slate_keeps_unvalidated_availability_diagnostic_only(monk
         "id": "game-1",
         "date": start,
         "competitions": [
-            {"competitors": [
-                {"homeAway": "away", "team": {"displayName": "Miami Heat"}},
-                {"homeAway": "home", "team": {"displayName": "Boston Celtics"}},
-            ]}
+            {
+                "competitors": [
+                    {"homeAway": "away", "team": {"displayName": "Miami Heat"}},
+                    {"homeAway": "home", "team": {"displayName": "Boston Celtics"}},
+                ]
+            }
         ],
     }
     quote = {
@@ -398,7 +586,8 @@ def test_qualified_nba_slate_keeps_unvalidated_availability_diagnostic_only(monk
         ),
     )
     monkeypatch.setattr(
-        forecast_cli, "_load_exact_artifact_contract",
+        forecast_cli,
+        "_load_exact_artifact_contract",
         lambda version: ({"artifact_hash": "verified", "qualification": {"qualified": True}}, None),
     )
     monkeypatch.setattr(forecast_cli.FeatureStore, "games_before", lambda *args: [])
@@ -413,12 +602,20 @@ def test_qualified_nba_slate_keeps_unvalidated_availability_diagnostic_only(monk
 
     def fake_predict(self, history, upcoming):
         captured.extend(upcoming)
-        return [SimpleNamespace(
-            market_type="total", event_id="game-1", event_start_utc=start,
-            away_team="Miami Heat", home_team="Boston Celtics",
-            probability=lambda selection: 0.62, uncertainty=0.1, rationale="test",
-            feature_basis={}, inference_inputs=None,
-        )]
+        return [
+            SimpleNamespace(
+                market_type="total",
+                event_id="game-1",
+                event_start_utc=start,
+                away_team="Miami Heat",
+                home_team="Boston Celtics",
+                probability=lambda selection: 0.62,
+                uncertainty=0.1,
+                rationale="test",
+                feature_basis={},
+                inference_inputs=None,
+            )
+        ]
 
     monkeypatch.setattr(basketball.BasketballModel, "predict_games", fake_predict)
     result = forecast_cli._forecast_nba_total_slate(

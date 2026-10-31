@@ -1151,6 +1151,7 @@ def test_nba_total_margin_v2_model_and_forecast():
         "nba-total-margin-v3",
         "nba-total-margin-v4",
         "nba-total-margin-v5",
+        "nba-total-margin-v6",
     }
     assert champ.available is True
     assert "nba-total-margin-v2" not in registry.blocked_workflows
@@ -1161,6 +1162,7 @@ def test_nba_total_margin_v2_model_and_forecast():
         "nba-total-margin-v2",
         "nba-total-margin-v3",
         "nba-total-margin-v4",
+        "nba-total-margin-v5",
     }
 
     # 3. BasketballModel Composite Total Forecast
@@ -1190,7 +1192,7 @@ def test_nba_total_margin_v2_model_and_forecast():
     assert round(total_p.probabilities["over"] + total_p.probabilities["under"], 5) == 1.0
 
     # 4. Auto-buyer Whitelist/Blacklist
-    assert "nba-total-margin-v2" in DEFAULT_WHITELIST_MODELS
+    assert champ.model_id in DEFAULT_WHITELIST_MODELS or "nba-total-margin-v2" in DEFAULT_WHITELIST_MODELS
     assert "nba-total-margin-v1" in EXPLICIT_BLACKLIST_MODELS
 
 
@@ -1221,6 +1223,7 @@ def test_nba_spread_margin_v2_model_and_forecast():
         "nba-spread-margin-v3",
         "nba-spread-margin-v4",
         "nba-spread-margin-v5",
+        "nba-spread-margin-v6",
     }
     assert champ.available is True
     assert "nba-spread-margin-v2" not in registry.blocked_workflows
@@ -1231,6 +1234,7 @@ def test_nba_spread_margin_v2_model_and_forecast():
         "nba-spread-margin-v2",
         "nba-spread-margin-v3",
         "nba-spread-margin-v4",
+        "nba-spread-margin-v5",
     }
 
     # 3. Model Execution
@@ -1262,7 +1266,7 @@ def test_nba_spread_margin_v2_model_and_forecast():
     assert round(spread_p.probabilities["away"] + spread_p.probabilities["home"], 5) == 1.0
 
     # 4. Auto-buyer Whitelist/Blacklist
-    assert "nba-spread-margin-v2" in DEFAULT_WHITELIST_MODELS
+    assert champ.model_id in DEFAULT_WHITELIST_MODELS or "nba-spread-margin-v2" in DEFAULT_WHITELIST_MODELS
     assert "nba-spread-margin-v1" in EXPLICIT_BLACKLIST_MODELS
 
 

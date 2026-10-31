@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import IO
@@ -16,16 +17,26 @@ from model_prediction.filelock import lock_exclusive, unlock
 LOCK_BUSY_EXIT = 75
 
 
-def acquire_lock(path: str | Path) -> IO[str] | None:
-    """Acquire and retain a non-blocking exclusive lock, or return ``None``."""
+def acquire_lock(path: str | Path, *, wait_seconds: float = 0.0) -> IO[str] | None:
+    """Acquire and retain an exclusive lock, waiting up to ``wait_seconds``.
+
+    The default remains non-blocking for short workers such as the auto-buyer.
+    Scheduled daily runs use a bounded wait so an in-flight buyer cycle cannot
+    cause the entire forecast cycle to be skipped.
+    """
     lock_path = Path(str(path).strip())
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     handle = lock_path.open("a+", encoding="utf-8")
-    try:
-        lock_exclusive(handle.fileno(), blocking=False)
-    except BlockingIOError:
-        handle.close()
-        return None
+    deadline = time.monotonic() + max(0.0, float(wait_seconds))
+    while True:
+        try:
+            lock_exclusive(handle.fileno(), blocking=False)
+            break
+        except BlockingIOError:
+            if time.monotonic() >= deadline:
+                handle.close()
+                return None
+            time.sleep(min(0.1, max(0.0, deadline - time.monotonic())))
     handle.seek(0)
     handle.truncate()
     handle.write(
@@ -59,6 +70,7 @@ def release_lock(handle: IO[str] | None) -> None:
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(prog="model-prediction-daily-lock")
     root.add_argument("--lock", required=True)
+    root.add_argument("--wait-seconds", type=float, default=0.0)
     root.add_argument("command", nargs=argparse.REMAINDER)
     return root
 
@@ -70,7 +82,7 @@ def main(argv: list[str] | None = None) -> int:
         command = command[1:]
     if not command:
         raise ValueError("a command is required after --")
-    handle = acquire_lock(args.lock)
+    handle = acquire_lock(args.lock, wait_seconds=args.wait_seconds)
     if handle is None:
         print(
             json.dumps(

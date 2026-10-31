@@ -1,5 +1,23 @@
 # Project status and source of truth
 
+## 2026-10-26 — NBA v5 evidence and edge safeguards repaired
+
+NBA spread and total v5 remain the active champion identities. Their artifact
+hashes and formulas are unchanged. Audit found that v4/v5 qualification blocks
+reused predecessor holdout metrics after material formula changes, including
+dispersion, dynamic matchup pace, schedule density, altitude, volatility and
+overtime adjustments. Production registry evidence for both v5 derivative
+models is therefore `historical_only` with critical replacement priority until
+the exact artifact hashes reproduce in a point-in-time walk-forward evaluation.
+NBA moneyline already carried `historical_only` evidence and now receives the
+same fail-closed treatment. All three lanes remain visible in Flat as research
+observations; unsupported evidence can no longer create a qualified Main call.
+
+NBA spread admission now enforces the project's 10% maximum unreviewed market
+disagreement, matching totals. Oversized spread disagreements remain visible in
+Flat and are reported in `main_rejections`. No protected model artifact or
+settled decision was rewritten.
+
 ## 2026-10-21 — NCAAF status corrected; open items moved to one handoff file
 
 - Live NCAAF ledger (`ledgers.db`, Main, settled) does not support the earlier backtest. `cfb-total-v1` is about -1% ROI over 293 picks, against +29% in the 2020–2024 backtest. `cfb-structural-v2`, which `config/production.yaml` serves for all NCAAF markets, is +9.5 units over 116 picks. That sample is too small to conclude anything.

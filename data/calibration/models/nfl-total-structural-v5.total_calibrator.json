@@ -1,11 +1,11 @@
 {
-  "baseline_brier": 0.346455,
-  "calibrated_at_utc": "2026-10-24T20:38:56.584651+00:00",
-  "calibrated_oof_brier": 0.25,
+  "baseline_brier": 0.29383,
+  "calibrated_at_utc": "2026-10-31T05:01:19.604084+00:00",
+  "calibrated_oof_brier": 0.2938299650842353,
   "champion_method": "identity",
   "market": "total",
   "model_version": "nfl-total-structural-v5",
   "parameters": {},
-  "sample_size": 21,
+  "sample_size": 34,
   "sport": "nfl"
 }

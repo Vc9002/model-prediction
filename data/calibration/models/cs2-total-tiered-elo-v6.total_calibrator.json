@@ -1,12 +1,11 @@
 {
-  "baseline_brier": null,
-  "calibrated_at_utc": "2026-10-24T20:38:56.584651+00:00",
-  "calibrated_oof_brier": null,
+  "baseline_brier": 0.234972,
+  "calibrated_at_utc": "2026-10-31T05:01:19.604084+00:00",
+  "calibrated_oof_brier": 0.23497172734084212,
   "champion_method": "identity",
   "market": "total",
   "model_version": "cs2-total-tiered-elo-v6",
   "parameters": {},
-  "reason": "canonical_flat_insufficient_evidence",
-  "sample_size": 18,
+  "sample_size": 38,
   "sport": "cs2"
 }

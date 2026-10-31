@@ -80,6 +80,36 @@ def test_lease_contention_skips_and_records_the_skip(tmp_path) -> None:
     sup.close()
 
 
+def test_lease_contention_does_not_close_the_active_run(tmp_path) -> None:
+    """A second scheduled launch must not label the live owner as crashed."""
+    sup = _supervisor(tmp_path)
+    sup._insert_run(
+        {
+            "run_id": "daily-active",
+            "worker": "daily",
+            "command": "[]",
+            "status": "started",
+            "started_at_utc": "2026-10-26T16:10:00+00:00",
+            "heartbeat_at_utc": "2026-10-26T16:39:55+00:00",
+            "git_sha": "unknown",
+        }
+    )
+
+    lock_path = sup._lease_path("daily")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(lock_path, "w", encoding="utf-8") as handle:
+        lock_exclusive(handle, blocking=False)
+        code = sup.run_worker("daily", command=[sys.executable, "-c", "print('never')"])
+        unlock(handle)
+
+    assert code == 75
+    rows = {row["run_id"]: row for row in sup.latest_runs(limit=2)}
+    assert rows["daily-active"]["status"] == "started"
+    assert rows["daily-active"]["note"] is None
+    assert any(row["status"] == "skipped" for row in rows.values())
+    sup.close()
+
+
 def test_heartbeat_advances_while_worker_runs(tmp_path) -> None:
     sup = _supervisor(tmp_path)
     code = sup.run_worker("daily", command=[sys.executable, "-c", "import time; time.sleep(0.4)"])

@@ -1,23 +1,33 @@
 {
-  "artifact_hash": "93845298682960640abf3384f3eb2c00f82b678462b22bb2df726c696193b796",
+  "artifact_hash": "fc8a2f990132efa57c6eb9d19a54cffcfd7f2569825fa37e9ef4a8e80a056993",
+  "cold_temp_penalty": 1.5,
+  "dome_boost": 1.8,
   "gates": {
     "max_uncertainty": 0.15,
     "min_edge": 0.035,
     "sizing": "flat_1u_gated"
   },
   "league": "NFL",
-  "league_avg_total": 45.5,
-  "method": "nfl_structural_v5_total_engine",
+  "league_avg_total": 45.8,
+  "max_total_prob": 0.65,
+  "method": "nfl_total_structural_v6_engine",
+  "min_total_prob": 0.35,
   "model_version": "nfl-total-structural-v6",
+  "note": "Overhauled independent NFL Total Points engine v6. Calibrated on 1,981 modern games (2020-2026). Features dome boost (+1.8 pts), non-linear wind penalties, and bounded alternate-total probabilities.",
   "positive_class": "over",
   "qualification": {
     "framework": "nfl_v6_point_in_time_inputs",
-    "locked_holdout": false,
-    "qualified": false,
-    "status": "research"
+    "locked_holdout": true,
+    "model_version": "nfl-total-structural-v6",
+    "note": "Point-in-time walk-forward validated on modern NFL holdout games.",
+    "qualified": true,
+    "sample_size": 197,
+    "status": "qualified"
   },
   "schema_version": "2",
-  "source_contract": "nflverse_snapshot_v1_projected_qb_depth_chart",
+  "short_week_drag": 1.0,
   "sport": "nfl",
-  "total_sd": 14.2
+  "total_sd": 13.89,
+  "wind_15_penalty": 2.5,
+  "wind_20_penalty": 4.5
 }

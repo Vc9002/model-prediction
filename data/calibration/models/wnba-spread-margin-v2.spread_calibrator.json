@@ -1,11 +1,11 @@
 {
-  "baseline_brier": 0.219672,
-  "calibrated_at_utc": "2026-10-24T20:38:56.584651+00:00",
-  "calibrated_oof_brier": 0.21967191304058822,
+  "baseline_brier": 0.221747,
+  "calibrated_at_utc": "2026-10-31T05:01:19.604084+00:00",
+  "calibrated_oof_brier": 0.2217468541951143,
   "champion_method": "identity",
   "market": "spread",
   "model_version": "wnba-spread-margin-v2",
   "parameters": {},
-  "sample_size": 34,
+  "sample_size": 35,
   "sport": "wnba"
 }

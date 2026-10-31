@@ -102,6 +102,7 @@ class BasketballModel:
         overtime_risk_adjustment: bool = False,
         use_logistic_moneyline: bool = False,
         logistic_scale: float = 11.2,
+        pace_sd_scaling: bool = False,
     ) -> None:
         self._sport = sport
         self._version = version
@@ -131,6 +132,7 @@ class BasketballModel:
         self.overtime_risk_adjustment = overtime_risk_adjustment
         self.use_logistic_moneyline = use_logistic_moneyline
         self.logistic_scale = logistic_scale
+        self.pace_sd_scaling = pace_sd_scaling
 
     @property
     def version(self) -> str:
@@ -293,17 +295,35 @@ class BasketballModel:
                     pace_adj -= 0.6
 
                 if self.dynamic_matchup_pace and baseline > 0.0:
-                    pf_away = 1.0 + 0.50 * (
-                        ((away_trend.offense["hl10"] + away_trend.defense["hl10"]) / (2.0 * baseline)) - 1.0
+                    pf_away = (
+                        1.0
+                        + 0.50
+                        * (
+                            ((away_trend.offense["hl10"] + away_trend.defense["hl10"]) / (2.0 * baseline))
+                            - 1.0
+                        )
+                        if away_trend.games_played > 0
+                        else 1.0
                     )
-                    pf_home = 1.0 + 0.50 * (
-                        ((home_trend.offense["hl10"] + home_trend.defense["hl10"]) / (2.0 * baseline)) - 1.0
+                    pf_home = (
+                        1.0
+                        + 0.50
+                        * (
+                            ((home_trend.offense["hl10"] + home_trend.defense["hl10"]) / (2.0 * baseline))
+                            - 1.0
+                        )
+                        if home_trend.games_played > 0
+                        else 1.0
                     )
                     matchup_pace_mult = pf_away * pf_home
                     est_possessions = (league_pace * matchup_pace_mult) + pace_adj
                 else:
                     est_possessions = league_pace + pace_adj
 
+                if self.pace_sd_scaling and est_possessions > 0:
+                    effective_margin_sd = max(
+                        10.0, min(20.0, effective_margin_sd * sqrt(est_possessions / league_pace))
+                    )
                 ortg_away = (away_points / league_pace) * 100.0
                 ortg_home = (home_points / league_pace) * 100.0
                 expected_total = est_possessions * (ortg_away + ortg_home) / 100.0

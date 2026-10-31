@@ -1,0 +1,26 @@
+{
+  "params": {
+    "elo_weight": 0.55,
+    "hca_points": 1.8,
+    "altitude_hca": false,
+    "b2b_penalty_home": 3.2,
+    "b2b_penalty_away": 0.8,
+    "rest_weight": 0.1,
+    "use_pace_sd_scaling": false,
+    "logistic_scale": 11.8
+  },
+  "validation_metrics": {
+    "mae_margin": 11.4299,
+    "rmse_margin": 14.6105,
+    "mae_total": 15.8911,
+    "brier": 0.2258,
+    "accuracy": 0.6253
+  },
+  "v5_metrics": {
+    "mae_margin": 11.4656,
+    "rmse_margin": 14.6464,
+    "mae_total": 15.7989,
+    "brier": 0.2263,
+    "accuracy": 0.6208
+  }
+}

@@ -36,6 +36,19 @@ from confirmed lineups. Missing two-sided prices, identities, starters,
 point-in-time inputs, or valid qualification produces a no-call or zero-unit
 research result.
 
+Before declaring a forecast missing, compare the scheduled worker's runtime
+root with the interactive CLI's, then inspect canonical full-slate and qualified
+ledgers, saved pregame decisions, and each configured market lane. A game that
+has started may disappear from fresh inference while its original decision
+remains valid evidence. Report unpriced, started, and source-failed events
+separately; a partially populated ledger must not mask events in another.
+When backing up ledgers from multiple locations, include the full source-path
+identity in each backup name and verify distinct sources cannot collide on a
+case-insensitive filesystem.
+For shared quote captures, bound concurrency and retries after a confirmed
+rate limit, record skipped contracts, and judge daily coverage by event date
+in the configured timezone. Report lookahead-date failures separately.
+
 Use the dedicated research commands for esports, KBO, and NPB. Their output
 remains zero-unit even when model fair value exceeds the ask.
 
@@ -45,17 +58,33 @@ remains zero-unit even when model fair value exceeds the ask.
 - Use `flat-forecast` only when he asks for the flat comparison ledger; it can replace same-day rows.
 - Settle, void, update closing prices, score research, review a loss, or mutate bans only when requested.
 - Inspect exposure before and after a qualified ledger addition.
+- Before settlement, re-query an authoritative structured scoreboard and
+  require its explicit terminal-state marker and final score. A late clock,
+  search snippet, or box-score page title does not establish finality.
 - Never invoke `execute`, `sell-position`, cancellation code, dashboard order-submit endpoints, or credentialed order APIs.
 
 ## Diagnose losses
 
 1. Start from settled ledger rows, not exchange orders.
-2. Deduplicate versions by event, selection, and feature-snapshot hash.
+2. Pin the settlement timezone and as-of time. Reconcile pick-row count,
+   unique-event count, and units against canonical storage before describing
+   a loss cohort. Deduplicate versions by event, selection, and
+   feature-snapshot hash.
 3. Reconstruct the decision packet from the ledger, audit chain, artifact,
    feature cache, and exact price snapshot.
 4. Classify only after evidence supports `bad_data`, `bad_luck`,
    `market_or_rule_error`, `missing_information`, `model_error`, or
    `process_error`.
 5. Do not tune from one loss. Require a versioned cohort or ablation for a model change.
+6. Treat postgame causal stories as hypotheses until pregame-observable inputs
+   and a walk-forward ablation support them.
 
 Use the Dia Bridge for page verification. Keep all work shadow or zero-unit.
+
+## Pre-flight check
+
+Before reporting a slate or settlement, verify the worker runtime root,
+canonical ledger coverage for every configured lane, source observation times,
+and saved decision evidence. Reconcile row, event, and unit counts for any
+loss cohort. Settlement additionally requires an explicitly terminal
+scoreboard state and final score immediately before writing.

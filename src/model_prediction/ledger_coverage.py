@@ -123,7 +123,12 @@ def build_report(root: Path, database: Path, day: str, run: dict) -> dict:
                 for r in dated_priced
                 if r.get("event_id") is not None and r.get("market_type", market) == market
             }
-            missing_flat = sorted(priced_events - flat_events)
+            started_events = {
+                str(r.get("event_id"))
+                for r in result.get("skipped", [])
+                if r.get("reason") == "event_started" and r.get("event_id") is not None
+            }
+            missing_flat = sorted((priced_events - started_events) - flat_events)
             main_without_flat = sorted(main_events - flat_events)
             if not route:
                 state = "missing_route"

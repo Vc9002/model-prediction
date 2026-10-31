@@ -274,7 +274,7 @@ def fetch_venue_hourly_weather(
     today = datetime.now(UTC).date().isoformat()
     endpoint = OPEN_METEO_ARCHIVE_URL if game_date < today else OPEN_METEO_FORECAST_URL
 
-    params = {
+    params: dict[str, str | int | float] = {
         "latitude": venue.latitude,
         "longitude": venue.longitude,
         "hourly": "temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,wind_direction_10m,precipitation",
@@ -459,7 +459,9 @@ def resolve_cfb_game_weather(
     team_info = resolve_team(home_team)
     if team_info is not None and team_info.is_dome:
         if provenance_out is not None:
-            provenance_out.update({"source": "cfb_team_catalog:indoor", "home_team": team_info.canonical_name})
+            provenance_out.update(
+                {"source": "cfb_team_catalog:indoor", "home_team": team_info.canonical_name}
+            )
         return (70.0, 0.0, 0.0, True)
 
     weather_file = Path(data_root) / "weather" / "ncaaf_historical.jsonl"
@@ -501,10 +503,13 @@ def resolve_cfb_game_weather(
                 v_date = str(rec.get("date", ""))
                 expected_home = team_info.canonical_name if team_info else home_team
                 team_matches = (
-                    not rec.get("home_team")
-                    or str(rec["home_team"]).casefold() == expected_home.casefold()
+                    not rec.get("home_team") or str(rec["home_team"]).casefold() == expected_home.casefold()
                 )
-                if v_date == game_date and team_matches and (v_name in stadium_norm or stadium_norm in v_name):
+                if (
+                    v_date == game_date
+                    and team_matches
+                    and (v_name in stadium_norm or stadium_norm in v_name)
+                ):
                     hourly = rec.get("hourly", {})
                     temps = hourly.get("temperature_2m", [])
                     winds = hourly.get("wind_speed_10m", [])
@@ -519,7 +524,7 @@ def resolve_cfb_game_weather(
                             captured = parse_utc(str(rec["observed_at_utc"]))
                         except (KeyError, TypeError, ValueError):
                             continue
-                        if captured > decision_time or captured >= event_time:
+                        if event_time is None or captured > decision_time or captured >= event_time:
                             continue
                         target = event_time.strftime("%Y-%m-%dT%H:00")
                         times = hourly.get("time") or []

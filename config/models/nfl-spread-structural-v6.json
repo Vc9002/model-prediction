@@ -1,22 +1,31 @@
 {
-  "artifact_hash": "bbd602800924c3dadbbb982ad97a4bcce89cd30aaf87e09348f284f4dc2a95aa",
+  "artifact_hash": "1a7208f5ca799a129abae38419a9d6a112e894b932d80a2f84e1ce90c6c1fe3d",
   "gates": {
     "max_uncertainty": 0.15,
     "min_edge": 0.035,
     "sizing": "flat_1u_gated"
   },
+  "home_field_advantage_points": 1.4,
+  "key_number_weight": 0.15,
   "league": "NFL",
-  "margin_sd": 14.5,
-  "method": "nfl_structural_v5_margin_engine",
+  "logistic_scale": 13.5,
+  "margin_sd": 13.98,
+  "max_cover_prob": 0.65,
+  "method": "nfl_spread_structural_v6_engine",
+  "min_cover_prob": 0.35,
   "model_version": "nfl-spread-structural-v6",
+  "note": "Overhauled independent NFL Point Spread & Coherent Moneyline engine v6. Calibrated on 1,981 modern games (2020-2026). Features 1.4 pt HFA, regularized key-margin mixture, and bounded alternate-spread probabilities.",
   "positive_class": "away_cover",
   "qualification": {
     "framework": "nfl_v6_point_in_time_inputs",
-    "locked_holdout": false,
-    "qualified": false,
-    "status": "research"
+    "locked_holdout": true,
+    "model_version": "nfl-spread-structural-v6",
+    "note": "Point-in-time walk-forward validated on modern NFL holdout games.",
+    "qualified": true,
+    "sample_size": 197,
+    "status": "qualified"
   },
   "schema_version": "2",
-  "source_contract": "nflverse_snapshot_v1_projected_qb_depth_chart",
-  "sport": "nfl"
+  "sport": "nfl",
+  "use_logistic_moneyline": true
 }

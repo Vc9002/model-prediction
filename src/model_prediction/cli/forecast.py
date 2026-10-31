@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from ..config import PROJECT_ROOT, config_path, ledger_path, market_odds_snapshot_path, unit_policy
+from ..cross_market_consistency import validate_cross_market_pick_coherence
 from ..data_sources.espn import ESPNClient, ESPNMLBClient
 from ..data_sources.mlb_market_odds import (
     MarketOddsSnapshotStore,
@@ -114,6 +115,20 @@ def _is_registered_serving_model(model_version: str, sport: str, market: str) ->
     return champion is not None and champion.available and champion.model_id == model_version
 
 
+def _is_predictively_qualified_serving_model(model_version: str, sport: str, market: str) -> bool:
+    """Require the registry's evidence verdict in addition to route identity."""
+    try:
+        champion = ProductionModelRegistry.load(PROJECT_ROOT).champion(sport, market)
+    except (FileNotFoundError, OSError, KeyError, TypeError, ValueError):
+        return False
+    return bool(
+        champion is not None
+        and champion.available
+        and champion.model_id == model_version
+        and champion.evidence_status == "predictively_qualified"
+    )
+
+
 def _downgrade_unserved(eligibility: Any, reason_code: str = "PAPER_CALL_MODEL_UNVALIDATED") -> Any:
     return replace(
         eligibility,
@@ -121,6 +136,31 @@ def _downgrade_unserved(eligibility: Any, reason_code: str = "PAPER_CALL_MODEL_U
         decision="CALL",
         reason_code=reason_code.replace("NO_CALL_", "PAPER_CALL_"),
     )
+
+
+def _retire_conflicting_side_calls(
+    ledgers: tuple[Any, ...],
+    *,
+    event_id: str,
+    market_type: str,
+    selection: str,
+    line: float | None,
+) -> None:
+    """Retire each Main-tier conflicting ID while preserving Flat diagnostics."""
+    for ledger in {id(item): item for item in ledgers if item is not None}.values():
+        conflicting_ids = []
+        for row in ledger.rows(filters={"event_id": event_id}):
+            if str(row.get("status", "")).lower() != "open" or row.get("decision") != "CALL":
+                continue
+            coherent, _ = validate_cross_market_pick_coherence(market_type, selection, line, [row])
+            if not coherent:
+                conflicting_ids.append(row["pick_id"])
+        if conflicting_ids:
+            ledger.supersede_open_rows(
+                conflicting_ids,
+                reason="NFL moneyline/spread models disagree; no side call",
+                allow_staked_removal=True,
+            )
 
 
 def _canonical_market_snapshot_lineage(row: dict[str, Any], archive_path: Path) -> dict[str, Any] | None:
@@ -1402,6 +1442,34 @@ def _forecast_wnba_spread_sport(
                     )
                 ):
                     eligibility = _downgrade_unserved(eligibility)
+                if eligibility.decision == "CALL":
+                    conflicting_ml_ids = []
+                    for ex_pick in exposure_source.rows(filters={"event_id": str(contract["event_id"])}):
+                        if str(ex_pick.get("status", "")).lower() == "open":
+                            raw_mkt = ex_pick.get("market_type")
+                            ex_mkt = str(getattr(raw_mkt, "value", raw_mkt) or "").lower()
+                            if ex_mkt == "moneyline" and ex_pick.get("decision") == "CALL":
+                                coherent, _ = validate_cross_market_pick_coherence(
+                                    candidate_market_type="spread",
+                                    candidate_selection=request.selection,
+                                    candidate_line=request.line,
+                                    existing_picks_for_event=[ex_pick],
+                                )
+                                if not coherent:
+                                    conflicting_ml_ids.append(ex_pick.get("pick_id"))
+                    if conflicting_ml_ids:
+                        if flat_ledger is not None:
+                            flat_ledger.supersede_open_rows(
+                                conflicting_ml_ids,
+                                reason="Superseded by structural spread pick (cross-market coherence)",
+                                allow_staked_removal=True,
+                            )
+                        if main_ledger is not None:
+                            main_ledger.supersede_open_rows(
+                                conflicting_ml_ids,
+                                reason="Superseded by structural spread pick (cross-market coherence)",
+                                allow_staked_removal=True,
+                            )
                 if (
                     flat_ledger is not None
                     and _append_secondary_ledger(
@@ -1846,7 +1914,11 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
             "observed_at_utc": observed_at.isoformat(),
         }
     model_artifact_hash = str(artifact["artifact_hash"])
-    model_qualified = artifact.get("qualification", {}).get("qualified") is True
+    model_qualified = (
+        artifact.get("qualification", {}).get("qualified") is True
+        and champion is not None
+        and getattr(champion, "evidence_status", None) == "predictively_qualified"
+    )
     margin_sd = float(artifact.get("margin_sd", 13.8))
     elo_weight = float(artifact.get("elo_weight", 0.50))
     trend_weight = float(artifact.get("trend_weight", 0.50))
@@ -1872,6 +1944,7 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
     overtime_risk_adjustment = bool(artifact.get("overtime_risk_adjustment", False))
     use_logistic_moneyline = bool(artifact.get("use_logistic_moneyline", False))
     logistic_scale = float(artifact.get("logistic_scale", 11.2))
+    pace_sd_scaling = bool(artifact.get("pace_sd_scaling", False))
 
     model = BasketballModel(
         sport="nba",
@@ -1899,6 +1972,7 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
         overtime_risk_adjustment=overtime_risk_adjustment,
         use_logistic_moneyline=use_logistic_moneyline,
         logistic_scale=logistic_scale,
+        pace_sd_scaling=pace_sd_scaling,
     )
     store = FeatureStore(data_root)
     history = store.games_before("nba", args_date)
@@ -1957,7 +2031,15 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
         )
         market_by_event_id[event_id] = market
 
-    predictions = [p for p in model.predict_games(history, upcoming) if p.market_type == "spread"]
+    if model_version == "nba-spread-margin-v6":
+        from ..models.nba_spread_v6 import NBASpreadModelV6
+
+        spread_v6_model = NBASpreadModelV6.from_artifact(artifact)
+        predictions = [
+            p for p in spread_v6_model.predict_spreads(history, upcoming) if p.market_type == "spread"
+        ]
+    else:
+        predictions = [p for p in model.predict_games(history, upcoming) if p.market_type == "spread"]
 
     priced_contracts = []
     for prediction in predictions:
@@ -2046,6 +2128,7 @@ def _forecast_nba_spread_sport(
     forecast = _forecast_nba_spread_slate(data_root, args_date, ESPNClient())
     model_config = config.get("models", {}).get("NBA", {})
     min_edge = float(model_config.get("min_edge", 0.05))
+    max_disagreement = float(config["project"]["maximum_unreviewed_market_disagreement"])
     exposure_source = flat_ledger or main_ledger
     if exposure_source is None:
         forecast["logged"] = 0
@@ -2056,6 +2139,7 @@ def _forecast_nba_spread_sport(
     duplicates: list[str] = []
     main_duplicates: list[str] = []
     skipped: list[dict] = []
+    main_rejections: list[dict] = []
     for contract in forecast["priced_contracts"]:
         ask = contract["executable_ask"]
         request = PickRequest(
@@ -2119,6 +2203,34 @@ def _forecast_nba_spread_sport(
                     )
                 ):
                     eligibility = _downgrade_unserved(eligibility)
+                if eligibility.decision == "CALL":
+                    conflicting_ml_ids = []
+                    for ex_pick in exposure_source.rows(filters={"event_id": str(contract["event_id"])}):
+                        if str(ex_pick.get("status", "")).lower() == "open":
+                            raw_mkt = ex_pick.get("market_type")
+                            ex_mkt = str(getattr(raw_mkt, "value", raw_mkt) or "").lower()
+                            if ex_mkt == "moneyline" and ex_pick.get("decision") == "CALL":
+                                coherent, _ = validate_cross_market_pick_coherence(
+                                    candidate_market_type="spread",
+                                    candidate_selection=request.selection,
+                                    candidate_line=request.line,
+                                    existing_picks_for_event=[ex_pick],
+                                )
+                                if not coherent:
+                                    conflicting_ml_ids.append(ex_pick.get("pick_id"))
+                    if conflicting_ml_ids:
+                        if flat_ledger is not None:
+                            flat_ledger.supersede_open_rows(
+                                conflicting_ml_ids,
+                                reason="Superseded by structural spread pick (cross-market coherence)",
+                                allow_staked_removal=True,
+                            )
+                        if main_ledger is not None:
+                            main_ledger.supersede_open_rows(
+                                conflicting_ml_ids,
+                                reason="Superseded by structural spread pick (cross-market coherence)",
+                                allow_staked_removal=True,
+                            )
                 if (
                     flat_ledger is not None
                     and _append_secondary_ledger(
@@ -2130,13 +2242,17 @@ def _forecast_nba_spread_sport(
                 if (
                     main_ledger is not None
                     and eligibility.decision == "CALL"
-                    and (float(contract["model_probability"]) - float(ask)) >= min_edge
+                    and min_edge <= (float(contract["model_probability"]) - float(ask)) <= max_disagreement
                     and _append_secondary_ledger(
                         main_ledger, request, eligibility, observed_now, "nba_spread:main_ledger"
                     )
                     is not None
                 ):
                     main_duplicates.append(contract["event_id"])
+                if (float(contract["model_probability"]) - float(ask)) > max_disagreement:
+                    main_rejections.append(
+                        {"event_id": contract["event_id"], "reason": "market_disagreement_exceeds_limit"}
+                    )
             logged.append(contract["event_id"])
         except DuplicatePickError as error:
             duplicates.append(error.pick_id)
@@ -2147,6 +2263,7 @@ def _forecast_nba_spread_sport(
     forecast["logged_event_ids"] = logged
     forecast["duplicate_pick_ids"] = duplicates
     forecast["main_ledger_duplicate_event_ids"] = main_duplicates
+    forecast["main_rejections"] = main_rejections
     forecast["skipped"] = forecast.get("unmatched", []) + skipped
     return forecast
 
@@ -2199,7 +2316,11 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
             "observed_at_utc": observed_at.isoformat(),
         }
     model_artifact_hash = str(artifact["artifact_hash"])
-    model_qualified = artifact.get("qualification", {}).get("qualified") is True
+    model_qualified = (
+        artifact.get("qualification", {}).get("qualified") is True
+        and champion is not None
+        and getattr(champion, "evidence_status", None) == "predictively_qualified"
+    )
     offseason_gap_days = artifact.get("offseason_gap_days")
     if offseason_gap_days is not None:
         offseason_gap_days = float(offseason_gap_days)
@@ -2313,7 +2434,15 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
         )
         market_by_event_id[event_id] = market
 
-    predictions = [p for p in model.predict_games(history, upcoming) if p.market_type == "total"]
+    if model_version == "nba-total-margin-v6":
+        from ..models.nba_total_v6 import NBATotalModelV6
+
+        total_v6_model = NBATotalModelV6.from_artifact(artifact)
+        predictions = [
+            p for p in total_v6_model.predict_totals(history, upcoming) if p.market_type == "total"
+        ]
+    else:
+        predictions = [p for p in model.predict_games(history, upcoming) if p.market_type == "total"]
 
     priced_contracts = []
     for prediction in predictions:
@@ -3097,10 +3226,37 @@ def _forecast_nfl_spread_sport(
                     )
                 ):
                     eligibility = _downgrade_unserved(eligibility)
+                flat_eligibility = eligibility
+                if eligibility.decision == "CALL":
+                    existing_for_event = exposure_source.rows(filters={"event_id": str(contract["event_id"])})
+                    coherent, _ = validate_cross_market_pick_coherence(
+                        "spread", request.selection, request.line, existing_for_event
+                    )
+                    if not coherent:
+                        _retire_conflicting_side_calls(
+                            (main_ledger,),
+                            event_id=str(contract["event_id"]),
+                            market_type="spread",
+                            selection=request.selection,
+                            line=request.line,
+                        )
+                        request = replace(
+                            request,
+                            rationale=(
+                                request.rationale + " Cross-market conflict with an active NFL moneyline; "
+                                "preserved as a Flat diagnostic call and excluded from Main."
+                            ),
+                        )
+                        eligibility = replace(
+                            eligibility,
+                            record_type=RecordType.RESEARCH_OBSERVATION,
+                            decision="NO_CALL",
+                            reason_code="REJECTED_CROSS_MARKET_CONFLICT",
+                        )
                 if (
                     flat_ledger is not None
                     and _append_secondary_ledger(
-                        flat_ledger, request, eligibility, observed_now, "nfl_spread:flat_ledger"
+                        flat_ledger, request, flat_eligibility, observed_now, "nfl_spread:flat_ledger"
                     )
                     is not None
                 ):
@@ -3661,6 +3817,20 @@ def _forecast_learned_sport(
             "logged": 0,
             "candidates": [],
         }
+    if sport.upper() == "NBA":
+        candidates = [
+            replace(
+                candidate,
+                model_qualified=False,
+                action="PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED",
+                reason="Exact serving model is active with historical-only registry evidence.",
+            )
+            if not _is_predictively_qualified_serving_model(
+                candidate.model_version, "NBA", candidate.market_type
+            )
+            else candidate
+            for candidate in candidates
+        ]
     calls = [candidate for candidate in candidates if candidate.call]
     qualified_calls = [candidate for candidate in calls if candidate.model_qualified]
     research_calls = [candidate for candidate in calls if not candidate.model_qualified]
@@ -3985,6 +4155,45 @@ def _forecast_learned_sport(
                         request.market_type.value,
                     ):
                         eligibility = _downgrade_unserved(eligibility)
+                    if (
+                        eligibility.decision == "CALL"
+                        and request.league == League.NBA
+                        and not _is_predictively_qualified_serving_model(
+                            request.model_version,
+                            request.league.value,
+                            request.market_type.value,
+                        )
+                    ):
+                        eligibility = _downgrade_unserved(eligibility, "PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED")
+                    if eligibility.decision == "CALL":
+                        existing_for_event = (exposure_ledger or ledger).rows(
+                            filters={"event_id": str(request.event_id)}
+                        )
+                        if flat_mode and exposure_ledger is not None and request.league == League.NFL:
+                            existing_for_event += ledger.rows(filters={"event_id": str(request.event_id)})
+                        is_coherent, _ = validate_cross_market_pick_coherence(
+                            candidate_market_type="moneyline",
+                            candidate_selection=request.selection,
+                            candidate_line=None,
+                            existing_picks_for_event=existing_for_event,
+                        )
+                        if not is_coherent:
+                            if flat_mode and request.league == League.NFL:
+                                request = replace(
+                                    request,
+                                    rationale=(
+                                        request.rationale
+                                        + " Cross-market conflict with an active NFL spread; "
+                                        "preserved as a Flat diagnostic call."
+                                    ),
+                                )
+                            else:
+                                eligibility = replace(
+                                    eligibility,
+                                    record_type=RecordType.RESEARCH_OBSERVATION,
+                                    decision="NO_CALL",
+                                    reason_code="REJECTED_CROSS_MARKET_CONFLICT",
+                                )
                     # What's still NO_CALL here is always a hard trust-
                     # boundary reason or the confidence gate just above.
                     genuinely_eligible = eligibility.decision == "CALL"
@@ -5170,7 +5379,13 @@ def _forecast_cfb_sport(
     errors: list[dict] = []
     main_rejections: list[dict] = []
 
+    effective_now = observed_now
     for contract in forecast.get("priced_contracts", []):
+        if not force and parse_utc(str(contract["event_start_utc"])) <= effective_now:
+            forecast.setdefault("skipped", []).append(
+                {"event_id": contract.get("event_id"), "reason": "event_started"}
+            )
+            continue
         ask = float(contract["executable_ask"])
         mtype = MarketType(str(contract["market_type"]))
         m_version = str(
@@ -5181,7 +5396,6 @@ def _forecast_cfb_sport(
         try:
             # A forced refresh cannot manufacture a pregame decision time.
             # validate() below rejects started events using the actual clock.
-            effective_now = observed_now
             contract_obs = str(contract.get("observed_at_utc") or effective_now.isoformat())
             from ..cfb_replay import build_snapshot as build_cfb_snapshot
 
@@ -6227,9 +6441,7 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
                 row["quote"] = row.get("joint_packet_quote")
                 packet_candidates.setdefault(contract["event_id"], {})[market] = row
         for event in results.get("nfl_spread", {}).get("event_roster", []):
-            packet_candidates.setdefault(event["event_id"], {}).setdefault(
-                "scheduled", event
-            )
+            packet_candidates.setdefault(event["event_id"], {}).setdefault("scheduled", event)
         results["nfl"]["joint_packet_capture"] = capture_packets(
             data_directory, args.date, iso_utc(utc_now()), packet_candidates
         )

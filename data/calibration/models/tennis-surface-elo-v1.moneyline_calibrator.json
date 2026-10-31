@@ -1,11 +1,11 @@
 {
-  "baseline_brier": 0.218165,
-  "calibrated_at_utc": "2026-10-24T20:38:56.584651+00:00",
-  "calibrated_oof_brier": 0.21816492069687293,
+  "baseline_brier": 0.221028,
+  "calibrated_at_utc": "2026-10-31T05:01:19.604084+00:00",
+  "calibrated_oof_brier": 0.22102820403091852,
   "champion_method": "identity",
   "market": "moneyline",
   "model_version": "tennis-surface-elo-v1",
   "parameters": {},
-  "sample_size": 787,
+  "sample_size": 1227,
   "sport": "tennis"
 }

@@ -259,10 +259,10 @@ models:
     min_edge: 0.05
     active_production_version: nba-elo-trend-lr-v4
     production_artifact: config/models/nba-elo-trend-lr-v4.json
-    spread_production_artifact: config/models/nba-spread-margin-v5.json
-    total_production_artifact: config/models/nba-total-margin-v5.json
-    spread_rollback_artifact: config/models/nba-spread-margin-v4.json
-    total_rollback_artifact: config/models/nba-total-margin-v4.json
+    spread_production_artifact: config/models/nba-spread-margin-v6.json
+    total_production_artifact: config/models/nba-total-margin-v6.json
+    spread_rollback_artifact: config/models/nba-spread-margin-v5.json
+    total_rollback_artifact: config/models/nba-total-margin-v5.json
     markets:
     - moneyline
     - spread

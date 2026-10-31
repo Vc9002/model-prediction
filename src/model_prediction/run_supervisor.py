@@ -243,22 +243,9 @@ class RunSupervisor:
             raise ValueError(f"unknown worker: {worker}; expected one of {sorted(WORKERS)}")
 
         lease = self._acquire_lease(worker)
-        # A supervisor that was SIGKILLed (machine reboot, launchctl
-        # bootout mid-run) can never write its own failed row. The lease
-        # guarantees no OTHER live supervisor is running this worker, so
-        # any rows still marked 'started' are orphans from a dead process
-        # — close them truthfully before starting fresh.
-        with self.conn:
-            self.conn.execute(
-                "UPDATE runs SET status = 'failed', "
-                "finished_at_utc = :now, note = 'previous supervisor "
-                "process did not complete (killed or crashed)' "
-                "WHERE worker = :worker AND status = 'started'",
-                {"worker": worker, "now": datetime.now(UTC).isoformat()},
-            )
         if lease is None:
-            # Overlap protection: record the skip so monitoring can tell
-            # "another run was still going" apart from "the job never fired".
+            # The lease proves another live supervisor owns this worker.
+            # Do not rewrite that owner's started row as an orphan.
             self._insert_run(
                 {
                     "run_id": self._new_run_id(worker),
@@ -274,6 +261,19 @@ class RunSupervisor:
             )
             return _LOCK_BUSY_EXIT
 
+        # A supervisor that was SIGKILLed (machine reboot, launchctl
+        # bootout mid-run) can never write its own failed row. The lease
+        # guarantees no OTHER live supervisor is running this worker, so
+        # any rows still marked 'started' are orphans from a dead process
+        # — close them truthfully before starting fresh.
+        with self.conn:
+            self.conn.execute(
+                "UPDATE runs SET status = 'failed', "
+                "finished_at_utc = :now, note = 'previous supervisor "
+                "process did not complete (killed or crashed)' "
+                "WHERE worker = :worker AND status = 'started'",
+                {"worker": worker, "now": datetime.now(UTC).isoformat()},
+            )
         run_id = self._new_run_id(worker)
         started_at = datetime.now(UTC).isoformat()
         self.log_dir.mkdir(parents=True, exist_ok=True)

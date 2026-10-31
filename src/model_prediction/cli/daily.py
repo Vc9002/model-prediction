@@ -1050,7 +1050,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             logger.warning("Esports ratings refresh failed", exc_info=True)
         # Titles are independent of each other once ratings are
         # refreshed above -- fan them out too instead of one at a time.
-        with ThreadPoolExecutor(max_workers=len(ESPORTS_TITLES)) as title_pool:
+        with ThreadPoolExecutor(max_workers=1) as title_pool:
             title_futures = {title_pool.submit(_esports_title_task, title): title for title in ESPORTS_TITLES}
             for future in as_completed(title_futures):
                 title = title_futures[future]

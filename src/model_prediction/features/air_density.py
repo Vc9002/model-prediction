@@ -57,7 +57,8 @@ def air_density(
     es = _saturation_vapor_pressure_pa(temp_c)
     # mixing ratio r = eps * e/(p - e); e = RH * es
     e = (relative_humidity / 100.0) * es
-    mixing_ratio = G_MOLAR_RATIO * e / (pressure_pa - e)
+    denom = max(1.0, pressure_pa - e)
+    mixing_ratio = G_MOLAR_RATIO * e / denom
     virtual_temp_k = (temp_c + 273.15) * (1.0 + 0.61 * mixing_ratio)
     density = pressure_pa / (R_DRY * virtual_temp_k)
     return AirDensityResult(
@@ -78,7 +79,8 @@ def fly_ball_distance_factor(density_ratio: float) -> float:
     Published calibration: a 10% density drop adds ~4% to fly-ball
     distance, i.e. distance ~ (rho_std / rho)^0.4.
     """
-    return (1.0 / density_ratio) ** DISTANCE_EXPONENT
+    safe_ratio = max(0.01, density_ratio)
+    return (1.0 / safe_ratio) ** DISTANCE_EXPONENT
 
 
 def run_environment_anchors() -> dict[str, float]:

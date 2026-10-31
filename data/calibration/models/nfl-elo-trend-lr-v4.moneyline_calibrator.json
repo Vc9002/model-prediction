@@ -1,11 +1,11 @@
 {
-  "baseline_brier": 0.230212,
-  "calibrated_at_utc": "2026-10-24T20:38:56.584651+00:00",
-  "calibrated_oof_brier": 0.23021188736773807,
+  "baseline_brier": 0.237195,
+  "calibrated_at_utc": "2026-10-31T05:01:19.604084+00:00",
+  "calibrated_oof_brier": 0.23719483065414287,
   "champion_method": "identity",
   "market": "moneyline",
   "model_version": "nfl-elo-trend-lr-v4",
   "parameters": {},
-  "sample_size": 42,
+  "sample_size": 56,
   "sport": "nfl"
 }

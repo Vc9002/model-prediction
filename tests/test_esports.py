@@ -9,7 +9,7 @@ from model_prediction.data_sources.polymarket_us import (
     CAPTURED_UNPRICED_ESPORTS_LEAGUES,
     POLYMARKET_SPORT_LEAGUES,
 )
-from model_prediction.domain import eastern_today
+from model_prediction.domain import eastern_today, utc_now
 from model_prediction.esports import (
     TITLE_SPECS,
     Bo3EsportsClient,
@@ -874,7 +874,9 @@ def test_unresolved_market_with_an_open_book_stays_pending(monkeypatch) -> None:
         monkeypatch, status="MARKET_STATUS_ACTIVE", book_state="MARKET_STATE_OPEN", prices=("0.6", "0.4")
     )
     ledger = _CaptureSettleLedger()
-    assert _settle_esports_pick(_moneyline_row(), ledger) is None
+    row = dict(_moneyline_row())
+    row["event_start_utc"] = (utc_now() - timedelta(hours=2)).isoformat()
+    assert _settle_esports_pick(row, ledger) is None
     assert ledger.settled == []
 
 

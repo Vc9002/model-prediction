@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from math import exp, factorial
 from typing import Any
 
@@ -119,7 +120,7 @@ class HockeyModel:
     ) -> tuple[dict[str, dict[str, float]], float]:
         """Compute point-in-time EWMA attack/defense strengths per team."""
         norm_lg = str(league or "").strip().upper() if league else None
-        by_team: dict[str, dict[str, list[float]]] = {}
+        by_team: dict[str, dict[str, list[Any]]] = {}
         all_goals: list[float] = []
 
         filtered = [
@@ -156,9 +157,14 @@ class HockeyModel:
 
         strengths: dict[str, dict[str, float]] = {}
         for team, entry in by_team.items():
-            scored_series = entry["scored"]
-            allowed_series = entry["allowed"]
-            dates = entry.get("dates") if len(entry.get("dates", [])) == len(scored_series) else None
+            scored_series = [float(x) for x in entry["scored"]]
+            allowed_series = [float(x) for x in entry["allowed"]]
+            raw_dates = entry.get("dates", [])
+            dates: Sequence[datetime] | None = (
+                [d for d in raw_dates if isinstance(d, datetime)]
+                if len(raw_dates) == len(scored_series) and all(isinstance(d, datetime) for d in raw_dates)
+                else None
+            )
             strengths[team] = {
                 "attack": ewm_level(
                     scored_series,

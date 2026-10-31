@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "4357fc74836f69b497ec9c6dc59573fa895079adefd7d86471d8dd2a27daf59e",
+  "artifact_hash": "2a34b32275c20ffbfd0fb0196403043019d54d11014ba268b9b22155c630eacc",
   "model_version": "npb-baseball-v3",
   "league": "npb",
   "schema_version": "international-baseball-structural-v3",
@@ -56,5 +56,5 @@
   },
   "target": "bivariate run distribution with 12-inning tie settlement",
   "trained_through_date": "2026-10-24",
-  "training_prefix_sha256": "945501d80b6ffc9218fd7b302b953386da4428a2f72f0465134b6bb77a7c1c0a"
+  "training_prefix_sha256": "251e31cb4653e36f93cfaef0a7be29b1c036385d43e14fa84b146582f3edede5"
 }

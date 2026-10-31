@@ -1,0 +1,14 @@
+{
+  "baseline_brier": 0.241848,
+  "calibrated_at_utc": "2026-10-31T05:01:19.604084+00:00",
+  "calibrated_oof_brier": 0.24413816652919224,
+  "champion_method": "platt",
+  "market": "moneyline",
+  "model_version": "kbo-tie-aware-elo-v2",
+  "parameters": {
+    "intercept": -0.232,
+    "slope": 1.9564
+  },
+  "sample_size": 147,
+  "sport": "kbo"
+}

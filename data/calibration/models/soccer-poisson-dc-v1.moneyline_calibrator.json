@@ -1,14 +1,11 @@
 {
-  "baseline_brier": 0.238683,
-  "calibrated_at_utc": "2026-10-24T20:38:56.584651+00:00",
-  "calibrated_oof_brier": 0.23815172844120935,
-  "champion_method": "platt",
+  "baseline_brier": 0.24083,
+  "calibrated_at_utc": "2026-10-31T05:01:19.604084+00:00",
+  "calibrated_oof_brier": 0.2408301882042705,
+  "champion_method": "identity",
   "market": "moneyline",
   "model_version": "soccer-poisson-dc-v1",
-  "parameters": {
-    "intercept": -0.2363,
-    "slope": 1.0483
-  },
-  "sample_size": 330,
+  "parameters": {},
+  "sample_size": 610,
   "sport": "soccer"
 }

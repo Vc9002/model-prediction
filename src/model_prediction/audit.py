@@ -76,18 +76,28 @@ class AuditLog:
             if self.path.exists():
                 # Tail-read only: events.jsonl can be hundreds of MB; reading the
                 # whole file under the lock blocks parallel ingest jobs past the
-                # timeout (the AuditLockTimeout that broke morning runs daily).
-                # 8 KB is enough for any single event line (~500 bytes typical).
+                # timeout. Read backwards in chunks to robustly find the complete
+                # last line, accommodating events of arbitrary size (>8 KB).
                 with self.path.open("rb") as handle:
                     handle.seek(0, os.SEEK_END)
                     size = handle.tell()
                     if size > 0:
-                        read_size = min(8192, size)
-                        handle.seek(size - read_size)
-                        tail = handle.read()
-                        tail_lines = [l for l in tail.splitlines() if l.strip()]
-                        if tail_lines:
-                            previous_hash = json.loads(tail_lines[-1])["event_hash"]
+                        chunk_size = 65536
+                        pos = size
+                        buffer = b""
+                        last_line = None
+                        while pos > 0:
+                            read_size = min(chunk_size, pos)
+                            pos -= read_size
+                            handle.seek(pos)
+                            buffer = handle.read(read_size) + buffer
+                            lines = [line for line in buffer.splitlines() if line.strip()]
+                            if pos == 0 or len(lines) > 1:
+                                if lines:
+                                    last_line = lines[-1]
+                                break
+                        if last_line:
+                            previous_hash = json.loads(last_line.decode("utf-8"))["event_hash"]
             event = {
                 "event_id": uuid.uuid4().hex,
                 "event_type": event_type,

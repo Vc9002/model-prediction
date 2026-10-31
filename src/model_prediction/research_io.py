@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 import tempfile
+import time
 import unicodedata
 from contextlib import suppress
 from datetime import UTC, datetime
@@ -34,6 +35,20 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _replace_with_retry(temporary: str | Path, destination: Path, attempts: int = 10) -> None:
+    # On Windows a briefly open handle (antivirus scan, OneDrive/indexer read,
+    # or concurrent reader) makes os.replace fail with WinError 5. Retry with
+    # exponential backoff.
+    for attempt in range(attempts):
+        try:
+            os.replace(temporary, destination)
+            return
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(min(2.0, 0.05 * (2**attempt)))
+
+
 def atomic_write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
@@ -43,7 +58,7 @@ def atomic_write(path: Path, content: str) -> None:
             handle.flush()
             os.fsync(handle.fileno())
         os.chmod(temporary_name, 0o644)
-        os.replace(temporary_name, path)
+        _replace_with_retry(temporary_name, path)
     except BaseException:
         with suppress(FileNotFoundError):
             os.unlink(temporary_name)

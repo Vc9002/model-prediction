@@ -1,13 +1,13 @@
 {
-  "baseline_brier": 0.238182,
-  "calibrated_at_utc": "2026-10-24T20:38:56.584651+00:00",
-  "calibrated_oof_brier": 0.23765509898631915,
+  "baseline_brier": 0.239719,
+  "calibrated_at_utc": "2026-10-31T05:01:19.604084+00:00",
+  "calibrated_oof_brier": 0.239360280188585,
   "champion_method": "temperature",
   "market": "moneyline",
   "model_version": "mlb-elo-trend-lr-v8",
   "parameters": {
     "temperature": 0.7
   },
-  "sample_size": 474,
+  "sample_size": 706,
   "sport": "mlb"
 }

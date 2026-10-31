@@ -1,0 +1,49 @@
+{
+  "artifact_hash": "3a738b473de5dda1ee0926ad32c1b4c1675e6ccec25d8d134778e60af30fc30d",
+  "contracts": {
+    "moneyline": {
+      "ask": 0.6425,
+      "line": null,
+      "quote_record_id": "425949c72b53fac4c313eea50e4640a0a77a31bb5a9132ac5ec1433a00cedb6f",
+      "selection": "home"
+    },
+    "spread": {
+      "ask": 0.5,
+      "line": 3.5,
+      "quote_record_id": "fe99100dbbe29fa378993e0c461db657609f8cf76b638bf10a1e281d7bcb3c3d",
+      "selection": "away"
+    },
+    "total": {
+      "ask": 0.485,
+      "line": 47.5,
+      "quote_record_id": "6073fd3bb1d88b511d12307faac26fe41148cc6cd6535414ec6fb287d191d270",
+      "selection": "over"
+    }
+  },
+  "decision": "RESEARCH_FORECAST_ONLY",
+  "decision_at_utc": "2026-10-29T20:18:29.953000Z",
+  "event_id": "401873023",
+  "event_start_utc": "2026-10-30T00:15Z",
+  "home_win_probability": 0.6408980000000001,
+  "market_weight": 1.0,
+  "model_version": "nfl-joint-market-v3",
+  "packet_sha256": "98c82fbeec3c6e4ab8c7e7392fe87b39875c567d17ce9f4fbd09e2a8a88eeec8",
+  "raw_edges": {
+    "moneyline": -0.0016019999999998813,
+    "spread": -0.0169099190483894,
+    "total": 0.04436550921325566
+  },
+  "scope": "prospective research forecast; no call, stake, or order",
+  "selected_asks": {
+    "moneyline": 0.6425,
+    "spread": 0.5,
+    "total": 0.485
+  },
+  "selected_probabilities": {
+    "moneyline": 0.6408980000000001,
+    "spread": 0.4830900809516106,
+    "total": 0.5293655092132556
+  },
+  "shadow_sha256": "8a6cc4578dd7fea53e33cff08dfc718e9493b4c6dfd5bc9ab6dd2061e121de9b",
+  "source_packet_path": "E:\\model-prediction-runtime\\research\\nfl_joint_packets\\2026-10-29\\401873023-98c82fbeec3c6e4ab8c7e7392fe87b39875c567d17ce9f4fbd09e2a8a88eeec8.json"
+}
