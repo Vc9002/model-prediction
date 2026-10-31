@@ -27,6 +27,9 @@ def test_nfl_spread_v7_contract_and_hash() -> None:
     assert model.market_weight == 0.80
     assert model.edsr_weight == 4.0
     assert model.turnover_luck_weight == 0.5
+    assert model.use_scoring_simulation is True
+    assert model.rho == 0.08
+    assert model.simulation_weight == 0.20
 
     # EDSR margin boost check
     fc_edsr_high = model.forecast_spread(

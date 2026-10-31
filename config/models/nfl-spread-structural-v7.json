@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "e8e1a3cd611ed0298f7aed58492f674a819ff319febf5c410391038777194133",
+  "artifact_hash": "3a49ab9fde569edcb2f2c8ba72d2e87f9d7f694bc3111e3f2c3046dc3688157c",
   "edsr_weight": 4.0,
   "gates": {
     "max_uncertainty": 0.15,
@@ -16,7 +16,7 @@
   "method": "nfl_spread_structural_v7_engine",
   "min_cover_prob": 0.35,
   "model_version": "nfl-spread-structural-v7",
-  "note": "Overhauled independent NFL Point Spread & Coherent Moneyline engine v7. Features Early-Down Success Rate (EDSR) advantage, Turnover Luck mean-reversion regressor, opponent-adjusted pass/rush EPA decomposition, pass protection vs pass rush pressure disparity, +1.35 pt modern HFA, Bayesian market anchoring (w=0.80), and asymmetric key-margin half-point valuation (+3.5/-2.5).",
+  "note": "Overhauled independent NFL Point Spread & Coherent Moneyline engine v7. Features Dixon-Coles Correlated Bivariate Simulation (rho=0.08, w_sim=0.20), Early-Down Success Rate (EDSR) advantage, Turnover Luck mean-reversion regressor, opponent-adjusted pass/rush EPA decomposition, pass protection vs pass rush pressure disparity, +1.35 pt modern HFA, Bayesian market anchoring (w=0.80), and asymmetric key-margin half-point valuation (+3.5/-2.5).",
   "positive_class": "away_cover",
   "qualification": {
     "framework": "nfl_v7_opponent_adjusted_inputs",
@@ -27,9 +27,11 @@
     "sample_size": 197,
     "status": "qualified"
   },
+  "rho": 0.08,
   "schema_version": "2",
+  "simulation_weight": 0.2,
   "sport": "nfl",
   "turnover_luck_weight": 0.5,
   "use_logistic_moneyline": true,
-  "use_scoring_simulation": false
+  "use_scoring_simulation": true
 }

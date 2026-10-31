@@ -74,7 +74,9 @@ class NFLSpreadModelV7:
         min_cover_prob: float = 0.35,
         edsr_weight: float = 4.0,
         turnover_luck_weight: float = 0.5,
-        use_scoring_simulation: bool = False,
+        use_scoring_simulation: bool = True,
+        rho: float = 0.08,
+        simulation_weight: float = 0.20,
         version: str = NFL_SPREAD_V7_VERSION,
     ) -> None:
         self.margin_sd = margin_sd
@@ -88,6 +90,8 @@ class NFLSpreadModelV7:
         self.edsr_weight = edsr_weight
         self.turnover_luck_weight = turnover_luck_weight
         self.use_scoring_simulation = use_scoring_simulation
+        self.rho = rho
+        self.simulation_weight = simulation_weight
         self.version = version
         self.sport = "nfl"
         self.league = "NFL"
@@ -105,7 +109,9 @@ class NFLSpreadModelV7:
             min_cover_prob=float(artifact.get("min_cover_prob", 0.35)),
             edsr_weight=float(artifact.get("edsr_weight", 4.0)),
             turnover_luck_weight=float(artifact.get("turnover_luck_weight", 0.5)),
-            use_scoring_simulation=bool(artifact.get("use_scoring_simulation", False)),
+            use_scoring_simulation=bool(artifact.get("use_scoring_simulation", True)),
+            rho=float(artifact.get("rho", 0.08)),
+            simulation_weight=float(artifact.get("simulation_weight", 0.20)),
             version=str(artifact.get("model_version", NFL_SPREAD_V7_VERSION)),
         )
 
@@ -235,8 +241,11 @@ class NFLSpreadModelV7:
                 exp_home_pts=pts_home,
                 exp_away_pts=pts_away,
                 spread_home_line=spread_home_line,
+                rho=self.rho,
             )
-            p_home_cover = 0.70 * p_home_cover + 0.30 * sim.prob_home_cover
+            p_home_cover = (
+                1.0 - self.simulation_weight
+            ) * p_home_cover + self.simulation_weight * sim.prob_home_cover
             p_home_cover = max(self.min_cover_prob, min(self.max_cover_prob, p_home_cover))
             p_away_cover = 1.0 - p_home_cover
 

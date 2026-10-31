@@ -77,6 +77,7 @@ def solve_bivariate_scoring(
     away_rz_td_rate: float = 0.60,
     spread_home_line: float = 0.0,
     total_line: float = 44.0,
+    rho: float = 0.08,
     max_pts: int = 56,
 ) -> BivariateScoringResult:
     """Solve exact bivariate discrete scoring grid for NFL spread, total, and moneyline probabilities."""
@@ -88,6 +89,9 @@ def solve_bivariate_scoring(
     p_home_win, p_away_win, p_tie = 0.0, 0.0, 0.0
 
     cutoff = -spread_home_line
+    mu_h, mu_a = exp_home_pts, exp_away_pts
+    sd_h, sd_a = 9.0, 9.0
+    total_prob = 0.0
 
     for h, ph in enumerate(h_dist):
         if ph == 0.0:
@@ -95,7 +99,13 @@ def solve_bivariate_scoring(
         for a, pa in enumerate(a_dist):
             if pa == 0.0:
                 continue
-            prob = ph * pa
+            if rho != 0.0:
+                corr_factor = max(0.1, 1.0 + rho * ((h - mu_h) / sd_h) * ((a - mu_a) / sd_a))
+                prob = ph * pa * corr_factor
+            else:
+                prob = ph * pa
+            total_prob += prob
+
             margin = h - a
             tot = h + a
 
@@ -123,16 +133,18 @@ def solve_bivariate_scoring(
             else:
                 p_tie += prob
 
+    norm = total_prob if total_prob > 0.0 else 1.0
+
     return BivariateScoringResult(
-        prob_home_cover=round(p_home_cover, 6),
-        prob_away_cover=round(p_away_cover, 6),
-        prob_spread_push=round(p_sp_push, 6),
-        prob_over=round(p_over, 6),
-        prob_under=round(p_under, 6),
-        prob_total_push=round(p_tot_push, 6),
-        prob_home_win=round(p_home_win + 0.5 * p_tie, 6),
-        prob_away_win=round(p_away_win + 0.5 * p_tie, 6),
-        prob_tie=round(p_tie, 6),
+        prob_home_cover=round(p_home_cover / norm, 6),
+        prob_away_cover=round(p_away_cover / norm, 6),
+        prob_spread_push=round(p_sp_push / norm, 6),
+        prob_over=round(p_over / norm, 6),
+        prob_under=round(p_under / norm, 6),
+        prob_total_push=round(p_tot_push / norm, 6),
+        prob_home_win=round((p_home_win + 0.5 * p_tie) / norm, 6),
+        prob_away_win=round((p_away_win + 0.5 * p_tie) / norm, 6),
+        prob_tie=round(p_tie / norm, 6),
         exp_home_pts=exp_home_pts,
         exp_away_pts=exp_away_pts,
     )
