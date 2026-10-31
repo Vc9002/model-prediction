@@ -399,11 +399,11 @@ models:
     - double_chance
     - btts
   NFL:
-    family: nfl_structural_v6_bivariate_engine
+    family: nfl_structural_v7_bivariate_engine
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: nfl-spread-structural-v6
-    production_artifact: config/models/nfl-spread-structural-v6.json
+    active_production_version: nfl-spread-structural-v7
+    production_artifact: config/models/nfl-spread-structural-v7.json
     markets:
     - moneyline
     - spread
@@ -411,14 +411,16 @@ models:
     min_edge: 0.05
     spread_sd: 13.98
     total_sd: 13.89
-    spread_research_artifact: config/models/nfl-spread-structural-v6.json
-    total_research_artifact: config/models/nfl-total-structural-v6.json
+    spread_research_artifact: config/models/nfl-spread-structural-v7.json
+    total_research_artifact: config/models/nfl-total-structural-v7.json
     protected_versions:
     - nfl-elo-trend-lr-v4
     - nfl-spread-structural-v5
     - nfl-total-structural-v5
     - nfl-spread-structural-v6
     - nfl-total-structural-v6
+    - nfl-spread-structural-v7
+    - nfl-total-structural-v7
   NCAAF:
     family: cfb_structural_v4_bivariate_engine
     status: shadow_qualified

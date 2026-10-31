@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 
+import numpy as np
 import polars as pl
 
 from model_prediction.data_sources.nfl_efficiency_snapshot import load_efficiency_snapshot
@@ -213,7 +214,9 @@ class NFLEfficiencyStore:
         as_of_date: str | date | datetime,
         home_qb: str | None = None,
         away_qb: str | None = None,
-        lookback_games: int = 6,
+        lookback_games: int = 8,
+        opponent_adjust: bool = True,
+        recency_decay: bool = True,
     ) -> NFLEfficiencyMatchup:
         """Calculate strictly point-in-time EPA and QB metrics before as_of_date."""
         if isinstance(as_of_date, datetime):
@@ -226,8 +229,12 @@ class NFLEfficiencyStore:
         h_code = normalize_nfl_team_code(home_team)
         a_code = normalize_nfl_team_code(away_team)
 
-        h_eff = self._team_efficiency(h_code, date_str, lookback_games)
-        a_eff = self._team_efficiency(a_code, date_str, lookback_games)
+        h_eff = self._team_efficiency(
+            h_code, date_str, lookback_games, opponent_adjust=opponent_adjust, recency_decay=recency_decay
+        )
+        a_eff = self._team_efficiency(
+            a_code, date_str, lookback_games, opponent_adjust=opponent_adjust, recency_decay=recency_decay
+        )
 
         h_off, h_def, h_count, h_pass, h_rush, h_def_pass, h_def_rush, h_sack, h_def_sack, h_pace = h_eff
         a_off, a_def, a_count, a_pass, a_rush, a_def_pass, a_def_rush, a_sack, a_def_sack, a_pace = a_eff
@@ -264,9 +271,14 @@ class NFLEfficiencyStore:
         )
 
     def _team_efficiency(
-        self, team_code: str, date_str: str, lookback: int
+        self,
+        team_code: str,
+        date_str: str,
+        lookback: int,
+        opponent_adjust: bool = True,
+        recency_decay: bool = True,
     ) -> tuple[float, float, int, float, float, float, float, float, float, float]:
-        """Compute shrunk offensive and defensive decomposed metrics strictly before date_str."""
+        """Compute shrunk, opponent-adjusted, and recency-decayed offensive/defensive metrics strictly before date_str."""
         if self._team_df is None or len(self._team_df) == 0:
             return NFL_LEAGUE_AVG_EPA_PLAY, NFL_LEAGUE_AVG_EPA_PLAY, 0, 0.0, 0.0, 0.0, 0.0, 0.06, 0.06, 62.5
 
@@ -292,8 +304,48 @@ class NFLEfficiencyStore:
                 off_epa = (DEFAULT_PRIOR_PLAYS * NFL_LEAGUE_AVG_EPA_PLAY + pass_epa_sum + rush_epa_sum) / (
                     DEFAULT_PRIOR_PLAYS + max(1.0, plays)
                 )
-                pass_epa = pass_epa_sum / max(1.0, attempts)
-                rush_epa = rush_epa_sum / max(1.0, carries)
+
+                # Exponential recency decay weights (half-life ~ 6 games)
+                if recency_decay and count > 1:
+                    w = np.exp(-0.10 * np.arange(count)[::-1])
+                    weights = w / np.sum(w)
+                else:
+                    weights = np.ones(count) / float(count)
+
+                # Opponent schedule adjustment: lookup opponent defense baseline before date_str
+                opp_dp_map: dict[str, float] = {}
+                opp_dr_map: dict[str, float] = {}
+                if opponent_adjust:
+                    opps = off_prior["opponent_team"].to_list()
+                    opp_def_stats = (
+                        self._team_df.filter(
+                            (pl.col("opponent_team").is_in(opps)) & (pl.col("gameday") < date_str)
+                        )
+                        .group_by("opponent_team")
+                        .agg(
+                            [
+                                (pl.col("passing_epa").sum() / pl.col("attempts").sum()).alias("opp_dp"),
+                                (pl.col("rushing_epa").sum() / pl.col("carries").sum()).alias("opp_dr"),
+                            ]
+                        )
+                    )
+                    for r in opp_def_stats.iter_rows(named=True):
+                        opp_dp_map[r["opponent_team"]] = float(r["opp_dp"] or 0.0)
+                        opp_dr_map[r["opponent_team"]] = float(r["opp_dr"] or 0.0)
+
+                pass_adj_list: list[float] = []
+                rush_adj_list: list[float] = []
+                for r in off_prior.iter_rows(named=True):
+                    opp = r["opponent_team"]
+                    att_g = max(1.0, float(r["attempts"] or 0.0))
+                    car_g = max(1.0, float(r["carries"] or 0.0))
+                    raw_p = float(r["passing_epa"] or 0.0) / att_g
+                    raw_r = float(r["rushing_epa"] or 0.0) / car_g
+                    pass_adj_list.append(raw_p - opp_dp_map.get(opp, 0.0))
+                    rush_adj_list.append(raw_r - opp_dr_map.get(opp, 0.0))
+
+                pass_epa = float(np.sum(weights * np.array(pass_adj_list)))
+                rush_epa = float(np.sum(weights * np.array(rush_adj_list)))
                 sack_rate = sacks / max(1.0, attempts + sacks)
                 pace = plays / max(1.0, count)
 
@@ -321,8 +373,46 @@ class NFLEfficiencyStore:
                 def_epa = (DEFAULT_PRIOR_PLAYS * NFL_LEAGUE_AVG_EPA_PLAY + opp_pass_sum + opp_rush_sum) / (
                     DEFAULT_PRIOR_PLAYS + max(1.0, opp_plays)
                 )
-                def_pass_epa = opp_pass_sum / max(1.0, opp_attempts)
-                def_rush_epa = opp_rush_sum / max(1.0, opp_carries)
+
+                if recency_decay and len(def_prior) > 1:
+                    w_d = np.exp(-0.10 * np.arange(len(def_prior))[::-1])
+                    def_weights = w_d / np.sum(w_d)
+                else:
+                    def_weights = np.ones(len(def_prior)) / float(len(def_prior))
+
+                opp_op_map: dict[str, float] = {}
+                opp_or_map: dict[str, float] = {}
+                if opponent_adjust:
+                    opp_off_teams = def_prior["team"].to_list()
+                    opp_off_stats = (
+                        self._team_df.filter(
+                            (pl.col("team").is_in(opp_off_teams)) & (pl.col("gameday") < date_str)
+                        )
+                        .group_by("team")
+                        .agg(
+                            [
+                                (pl.col("passing_epa").sum() / pl.col("attempts").sum()).alias("opp_op"),
+                                (pl.col("rushing_epa").sum() / pl.col("carries").sum()).alias("opp_or"),
+                            ]
+                        )
+                    )
+                    for r in opp_off_stats.iter_rows(named=True):
+                        opp_op_map[r["team"]] = float(r["opp_op"] or 0.0)
+                        opp_or_map[r["team"]] = float(r["opp_or"] or 0.0)
+
+                def_pass_adj: list[float] = []
+                def_rush_adj: list[float] = []
+                for r in def_prior.iter_rows(named=True):
+                    opp_team = r["team"]
+                    att_g = max(1.0, float(r["attempts"] or 0.0))
+                    car_g = max(1.0, float(r["carries"] or 0.0))
+                    raw_p = float(r["passing_epa"] or 0.0) / att_g
+                    raw_r = float(r["rushing_epa"] or 0.0) / car_g
+                    def_pass_adj.append(raw_p - opp_op_map.get(opp_team, 0.0))
+                    def_rush_adj.append(raw_r - opp_or_map.get(opp_team, 0.0))
+
+                def_pass_epa = float(np.sum(def_weights * np.array(def_pass_adj)))
+                def_rush_epa = float(np.sum(def_weights * np.array(def_rush_adj)))
                 def_sack_rate = def_sacks / max(1.0, opp_attempts + def_sacks)
 
             return (

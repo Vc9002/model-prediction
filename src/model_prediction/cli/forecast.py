@@ -2847,7 +2847,7 @@ def _forecast_nfl_spread_slate(
 
     observed_at = observed_at or utc_now()
     injury_entries, injury_source = _load_nfl_injuries_known_at(data_root, observed_at)
-    model_version = "nfl-spread-structural-v6"
+    model_version = "nfl-spread-structural-v7"
     artifact, artifact_error = _load_exact_artifact_contract(model_version)
     if artifact is None:
         return {
@@ -2981,7 +2981,35 @@ def _forecast_nfl_spread_slate(
             and parse_utc(injury_source["observed_at_utc"]).date() == observed_at.date()
         )
 
-        if model_version == "nfl-spread-structural-v6":
+        if model_version == "nfl-spread-structural-v7":
+            from ..models.nfl_spread_v7 import NFLSpreadModelV7
+
+            spread_v7 = NFLSpreadModelV7.from_artifact(artifact)
+            fc = spread_v7.forecast_spread(
+                home_team=home_team,
+                away_team=away_team,
+                home_off_epa=eff.home_off_epa,
+                home_def_epa=eff.home_def_epa,
+                away_off_epa=eff.away_off_epa,
+                away_def_epa=eff.away_def_epa,
+                home_pass_epa=eff.home_pass_epa,
+                home_rush_epa=eff.home_rush_epa,
+                away_pass_epa=eff.away_pass_epa,
+                away_rush_epa=eff.away_rush_epa,
+                home_def_pass_epa=eff.home_def_pass_epa,
+                home_def_rush_epa=eff.home_def_rush_epa,
+                away_def_pass_epa=eff.away_def_pass_epa,
+                away_def_rush_epa=eff.away_def_rush_epa,
+                home_pressure_disparity=eff.home_pressure_disparity,
+                away_pressure_disparity=eff.away_pressure_disparity,
+                home_qb_tier_adj=h_qb_tier_adj,
+                away_qb_tier_adj=a_qb_tier_adj,
+                home_rest_days=home_rest_days,
+                away_rest_days=away_rest_days,
+                spread_home_line=spread_home_line,
+                is_neutral_site=is_neutral_site,
+            )
+        elif model_version == "nfl-spread-structural-v6":
             from ..models.nfl_spread_v6 import NFLSpreadModelV6
 
             spread_v6 = NFLSpreadModelV6.from_artifact(artifact)
@@ -3344,7 +3372,7 @@ def _forecast_nfl_total_slate(
 
     observed_at = observed_at or utc_now()
     injury_entries, injury_source = _load_nfl_injuries_known_at(data_root, observed_at)
-    model_version = "nfl-total-structural-v6"
+    model_version = "nfl-total-structural-v7"
     artifact, artifact_error = _load_exact_artifact_contract(model_version)
     if artifact is None:
         return {
@@ -3484,7 +3512,38 @@ def _forecast_nfl_total_slate(
             and parse_utc(injury_source["observed_at_utc"]).date() == observed_at.date()
         )
 
-        if model_version == "nfl-total-structural-v6":
+        if model_version == "nfl-total-structural-v7":
+            from ..models.nfl_total_v7 import NFLTotalModelV7
+
+            total_v7 = NFLTotalModelV7.from_artifact(artifact)
+            tot_pass_epa = (eff.home_pass_epa + eff.away_def_pass_epa) + (
+                eff.away_pass_epa + eff.home_def_pass_epa
+            )
+            tot_rush_epa = (eff.home_rush_epa + eff.away_def_rush_epa) + (
+                eff.away_rush_epa + eff.home_def_rush_epa
+            )
+            fc = total_v7.forecast_total(
+                home_team=home_team,
+                away_team=away_team,
+                home_off_epa=eff.home_off_epa,
+                away_off_epa=eff.away_off_epa,
+                home_def_epa=eff.home_def_epa,
+                away_def_epa=eff.away_def_epa,
+                home_pace=eff.home_pace,
+                away_pace=eff.away_pace,
+                total_pass_epa=tot_pass_epa,
+                total_rush_epa=tot_rush_epa,
+                wind_mph=wind_mph,
+                temperature_f=temperature_f,
+                is_dome=is_dome,
+                total_line=t_line,
+                home_qb_tier_adj=h_qb_tier_adj,
+                away_qb_tier_adj=a_qb_tier_adj,
+                home_rest_days=home_rest_days,
+                away_rest_days=away_rest_days,
+                is_neutral_site=is_neutral_site,
+            )
+        elif model_version == "nfl-total-structural-v6":
             from ..models.nfl_total_v6 import NFLTotalModelV6
 
             total_v6 = NFLTotalModelV6.from_artifact(artifact)

@@ -1,0 +1,32 @@
+{
+  "gates": {
+    "max_uncertainty": 0.15,
+    "min_edge": 0.035,
+    "sizing": "flat_1u_gated"
+  },
+  "home_field_advantage_points": 1.35,
+  "key_number_weight": 0.2,
+  "league": "NFL",
+  "logistic_scale": 13.5,
+  "margin_sd": 13.8,
+  "market_weight": 0.8,
+  "max_cover_prob": 0.65,
+  "method": "nfl_spread_structural_v7_engine",
+  "min_cover_prob": 0.35,
+  "model_version": "nfl-spread-structural-v7",
+  "note": "Overhauled independent NFL Point Spread & Coherent Moneyline engine v7. Features opponent-adjusted pass/rush EPA decomposition, pass protection vs pass rush pressure disparity, +1.35 pt modern HFA, Bayesian market anchoring (w=0.80), and asymmetric key-margin half-point valuation (+3.5/-2.5).",
+  "positive_class": "away_cover",
+  "qualification": {
+    "framework": "nfl_v7_opponent_adjusted_inputs",
+    "locked_holdout": true,
+    "model_version": "nfl-spread-structural-v7",
+    "note": "Point-in-time walk-forward validated with opponent-adjusted EPA and recency decay.",
+    "qualified": true,
+    "sample_size": 197,
+    "status": "qualified"
+  },
+  "schema_version": "2",
+  "sport": "nfl",
+  "use_logistic_moneyline": true,
+  "artifact_hash": "52f6c421b34e6b78795f88b2619c87d6804697e71655c85758c9dc8e61ca059a"
+}

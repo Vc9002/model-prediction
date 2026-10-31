@@ -229,13 +229,23 @@ prediction_service:
     evidence_status: predictively_qualified
     replacement_priority: medium
     rollback_model: nfl-elo-trend-lr-v3
+  - model_id: nfl-spread-structural-v7
+    sport: NFL
+    market: spread
+    implementation: json_artifact
+    artifact: config/models/nfl-spread-structural-v7.json
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: nfl-spread-structural-v6
   - model_id: nfl-spread-structural-v6
     sport: NFL
     market: spread
     implementation: json_artifact
     artifact: config/models/nfl-spread-structural-v6.json
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: nfl-spread-structural-v5
@@ -249,13 +259,23 @@ prediction_service:
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: null
+  - model_id: nfl-total-structural-v7
+    sport: NFL
+    market: total
+    implementation: json_artifact
+    artifact: config/models/nfl-total-structural-v7.json
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: nfl-total-structural-v6
   - model_id: nfl-total-structural-v6
     sport: NFL
     market: total
     implementation: json_artifact
     artifact: config/models/nfl-total-structural-v6.json
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: nfl-total-structural-v5
@@ -748,8 +768,8 @@ prediction_service:
       total: nba-total-margin-v6
     NFL:
       moneyline: nfl-elo-trend-lr-v4
-      spread: nfl-spread-structural-v6
-      total: nfl-total-structural-v6
+      spread: nfl-spread-structural-v7
+      total: nfl-total-structural-v7
     NCAAF:
       moneyline: cfb-structural-v4
       spread: cfb-structural-v4
@@ -971,8 +991,10 @@ prediction_service:
   - nba-total-margin-v3
   - nba-total-margin-v2
   - nfl-elo-trend-lr-v4
+  - nfl-spread-structural-v7
   - nfl-spread-structural-v6
   - nfl-spread-structural-v5
+  - nfl-total-structural-v7
   - nfl-total-structural-v6
   - nfl-total-structural-v5
   - soccer-poisson-dc-v3
@@ -1042,8 +1064,10 @@ prediction_service:
     nba-total-margin-v3: config/models/nba-total-margin-v3.json
     nba-total-margin-v2: config/models/nba-total-margin-v2.json
     nfl-elo-trend-lr-v4: config/models/nfl-elo-trend-lr-v4.json
+    nfl-spread-structural-v7: config/models/nfl-spread-structural-v7.json
     nfl-spread-structural-v6: config/models/nfl-spread-structural-v6.json
     nfl-spread-structural-v5: config/models/nfl-spread-structural-v5.json
+    nfl-total-structural-v7: config/models/nfl-total-structural-v7.json
     nfl-total-structural-v6: config/models/nfl-total-structural-v6.json
     nfl-total-structural-v5: config/models/nfl-total-structural-v5.json
     cfb-structural-v4: config/models/cfb-structural-v4.json

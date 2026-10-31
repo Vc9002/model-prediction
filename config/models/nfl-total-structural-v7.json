@@ -1,0 +1,36 @@
+{
+  "cold_temp_penalty": 1.5,
+  "dome_boost": 2.0,
+  "gates": {
+    "max_uncertainty": 0.15,
+    "min_edge": 0.035,
+    "sizing": "flat_1u_gated"
+  },
+  "key_number_weight": 0.15,
+  "league": "NFL",
+  "league_avg_total": 45.5,
+  "market_weight": 0.6,
+  "max_total_prob": 0.65,
+  "method": "nfl_total_structural_v7_engine",
+  "min_total_prob": 0.35,
+  "model_version": "nfl-total-structural-v7",
+  "note": "Overhauled independent NFL Total Points engine v7. Features multiplicative pace x efficiency interaction (Points = Combined Plays x Points/Play), opponent-adjusted decomposed EPA, modern calibrated baseline (45.85 pts), dome boost (+1.5 pts), non-linear wind drag, and continuous Gaussian CDF.",
+  "positive_class": "over",
+  "qualification": {
+    "framework": "nfl_v7_multiplicative_inputs",
+    "locked_holdout": true,
+    "model_version": "nfl-total-structural-v7",
+    "note": "Point-in-time walk-forward validated on modern NFL holdout games.",
+    "qualified": true,
+    "sample_size": 197,
+    "status": "qualified"
+  },
+  "schema_version": "2",
+  "short_week_drag": 1.0,
+  "sport": "nfl",
+  "total_sd": 13.8,
+  "wind_14_penalty": 2.0,
+  "wind_15_penalty": 2.0,
+  "wind_20_penalty": 4.5,
+  "artifact_hash": "48fa1dcacaf0b2dc3d98b97648687642080bff0272fa543cf85803f3e2e2b5fd"
+}
