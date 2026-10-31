@@ -172,6 +172,8 @@ class AutoExecutionConfig:
     )
     min_tennis_edge: float | None = None  # Sport-specific tightened edge for Tennis (e.g. 0.08)
     max_tennis_price: float | None = None  # Sport-specific ceiling on market price for Tennis (e.g. 0.75)
+    min_ncaaf_edge: float | None = 0.02  # Sport-specific calibrated edge for NCAAF (2.0%)
+    max_ncaaf_edge: float | None = 0.08  # Sport-specific blowout edge cap for NCAAF (8.0%)
     max_moneyline_price: float | None = 0.72  # Ceiling on moneyline buy price (odds <= -260 / implied > 72%)
     auto_quarantine_underperforming: bool = True  # Dynamic circuit breaker against underperforming models
     auto_quarantine_min_picks: int = 15  # Minimum sample before evaluating rolling drawdown
@@ -703,6 +705,8 @@ def run_auto_buyer_cycle(
         edge_scaling_min_fraction=float(state.get("edge_scaling_min_fraction", 0.5)),
         min_tennis_edge=state.get("min_tennis_edge"),
         max_tennis_price=state.get("max_tennis_price"),
+        min_ncaaf_edge=(float(state["min_ncaaf_edge"]) if state.get("min_ncaaf_edge") is not None else 0.02),
+        max_ncaaf_edge=(float(state["max_ncaaf_edge"]) if state.get("max_ncaaf_edge") is not None else 0.08),
     )
 
     buyer = AutoPolymarketBuyer(config=config)
@@ -1521,14 +1525,31 @@ class AutoPolymarketBuyer:
             effective_min_edge = (
                 self.config.min_tennis_edge
                 if sport_norm == "tennis" and self.config.min_tennis_edge is not None
-                else self.config.min_edge
+                else (
+                    self.config.min_ncaaf_edge
+                    if sport_norm in ("ncaaf", "cfb") and self.config.min_ncaaf_edge is not None
+                    else self.config.min_edge
+                )
             )
             if edge < effective_min_edge:
                 result.rejected_low_edge += 1
                 continue
-            if self.config.max_edge is not None and edge > self.config.max_edge:
+            effective_max_edge = (
+                self.config.max_ncaaf_edge
+                if sport_norm in ("ncaaf", "cfb") and self.config.max_ncaaf_edge is not None
+                else self.config.max_edge
+            )
+            if effective_max_edge is not None and edge > effective_max_edge:
                 result.rejected_unrealistic_edge += 1
                 continue
+
+            if sport_norm in ("ncaaf", "cfb") and market_type == "spread" and row.get("line") is not None:
+                try:
+                    if abs(float(row["line"])) > 21.5:
+                        result.rejected_unrealistic_edge += 1
+                        continue
+                except (ValueError, TypeError):
+                    pass
 
             # Sizing: units * unit_value_usd
             raw_units = float(row.get("units") or row.get("display_units") or 1.0)
