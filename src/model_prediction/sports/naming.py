@@ -362,6 +362,22 @@ MODEL_CATALOG: dict[str, ModelDescriptor] = {
         display_name="NFL Total (Structural v6)",
         description="Production champion NFL Total structural drive pace, weather adjustment, and key total model v6.",
     ),
+    "nfl-spread-structural-v7": ModelDescriptor(
+        model_id="nfl-spread-structural-v7",
+        sport="NFL",
+        market="spread",
+        standard_name="nfl-spread-structural-v7",
+        display_name="NFL Spread (Structural v7)",
+        description="Production champion NFL Spread structural EDSR advantage, turnover luck regressor, Dixon-Coles bivariate simulation, and key margin model v7.",
+    ),
+    "nfl-total-structural-v7": ModelDescriptor(
+        model_id="nfl-total-structural-v7",
+        sport="NFL",
+        market="total",
+        standard_name="nfl-total-structural-v7",
+        display_name="NFL Total (Structural v7)",
+        description="Production champion NFL Total structural neutral game script pace, explosive play, red zone TD rate, weather adjustment, and key total model v7.",
+    ),
     # ── SOCCER ──
     "soccer-poisson-dc-v3": ModelDescriptor(
         model_id="soccer-poisson-dc-v3",
@@ -1288,6 +1304,8 @@ MODEL_ALIASES: dict[str, str] = {
     "nfl-total-v5": "nfl-total-structural-v5",
     "nfl-spread-v6": "nfl-spread-structural-v6",
     "nfl-total-v6": "nfl-total-structural-v6",
+    "nfl-spread-v7": "nfl-spread-structural-v7",
+    "nfl-total-v7": "nfl-total-structural-v7",
     "nba-spread-v6": "nba-spread-margin-v6",
     "nba-total-v6": "nba-total-margin-v6",
     "nba-spread-v5": "nba-spread-margin-v5",

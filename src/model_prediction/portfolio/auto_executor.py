@@ -62,6 +62,8 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     "wnba-spread-margin-v2",
     "nba-spread-margin-v6",
     "nba-total-margin-v6",
+    "nfl-spread-structural-v7",
+    "nfl-total-structural-v7",
     "nfl-spread-structural-v6",
     "nfl-total-structural-v6",
     "soccer-poisson-dc-v2",

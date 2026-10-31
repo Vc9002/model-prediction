@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-10-31T08:26:47.712060+00:00",
+  "generated_at_utc": "2026-10-31T19:35:17.601508+00:00",
   "models": {
     "cs2-tiered-elo-v6": {
       "status": true,
@@ -12,26 +12,26 @@
       "feature_names": [],
       "threshold": null,
       "training_observations": {
-        "coefficient_fit": 25480,
-        "locked_holdout": 8494,
-        "threshold_selection": 8493
+        "coefficient_fit": 25492,
+        "locked_holdout": 8498,
+        "threshold_selection": 8498
       },
       "model_id": "cs2-tiered-elo-v6",
       "sport": "CS2",
       "market": "moneyline",
       "ledger": {
-        "total": 5062,
+        "total": 5074,
         "by_status": {
           "open": {
-            "n": 18,
+            "n": 12,
             "last_settled": null
           },
           "settled": {
-            "n": 4050,
-            "last_settled": "2026-10-29T11:34:39.416538Z"
+            "n": 4062,
+            "last_settled": "2026-10-31T16:45:16.864021Z"
           },
           "superseded": {
-            "n": 994,
+            "n": 1000,
             "last_settled": null
           }
         }
@@ -51,13 +51,9 @@
       "ledger": {
         "total": 98,
         "by_status": {
-          "open": {
-            "n": 2,
-            "last_settled": null
-          },
           "settled": {
-            "n": 44,
-            "last_settled": "2026-10-29T11:34:18.477146Z"
+            "n": 46,
+            "last_settled": "2026-10-31T16:45:10.363992Z"
           },
           "superseded": {
             "n": 52,
@@ -80,13 +76,9 @@
       "ledger": {
         "total": 182,
         "by_status": {
-          "open": {
-            "n": 4,
-            "last_settled": null
-          },
           "settled": {
-            "n": 116,
-            "last_settled": "2026-10-29T11:34:30.232303Z"
+            "n": 120,
+            "last_settled": "2026-10-31T16:45:09.099514Z"
           },
           "superseded": {
             "n": 62,
@@ -158,9 +150,9 @@
       "feature_names": [],
       "threshold": null,
       "training_observations": {
-        "coefficient_fit": 6956,
-        "locked_holdout": 2319,
-        "threshold_selection": 2319
+        "coefficient_fit": 6959,
+        "locked_holdout": 2320,
+        "threshold_selection": 2320
       },
       "model_id": "dota2-tiered-elo-v6",
       "sport": "DOTA2",
@@ -218,13 +210,9 @@
       "ledger": {
         "total": 68,
         "by_status": {
-          "open": {
-            "n": 2,
-            "last_settled": null
-          },
           "settled": {
-            "n": 38,
-            "last_settled": "2026-10-29T11:34:46.825679Z"
+            "n": 40,
+            "last_settled": "2026-10-31T16:45:21.876008Z"
           },
           "superseded": {
             "n": 28,
@@ -295,18 +283,18 @@
       "sport": "HOCKEY",
       "market": "moneyline,spread,total",
       "ledger": {
-        "total": 594,
+        "total": 630,
         "by_status": {
           "open": {
-            "n": 51,
+            "n": 49,
             "last_settled": null
           },
           "settled": {
-            "n": 137,
-            "last_settled": "2026-10-29T05:02:58.311246Z"
+            "n": 140,
+            "last_settled": "2026-10-31T16:44:46.624603Z"
           },
           "superseded": {
-            "n": 406,
+            "n": 441,
             "last_settled": null
           }
         }
@@ -349,8 +337,12 @@
       "sport": "KBO",
       "market": "moneyline",
       "ledger": {
-        "total": 26,
+        "total": 28,
         "by_status": {
+          "open": {
+            "n": 2,
+            "last_settled": null
+          },
           "settled": {
             "n": 6,
             "last_settled": "2026-10-31T02:09:26.016169Z"
@@ -421,7 +413,7 @@
       "sport": "LOL",
       "market": "moneyline",
       "ledger": {
-        "total": 777,
+        "total": 779,
         "by_status": {
           "open": {
             "n": 4,
@@ -432,7 +424,7 @@
             "last_settled": "2026-10-29T05:03:15.839916Z"
           },
           "superseded": {
-            "n": 152,
+            "n": 154,
             "last_settled": null
           }
         }
@@ -450,8 +442,12 @@
       "sport": "LOL",
       "market": "spread",
       "ledger": {
-        "total": 48,
+        "total": 52,
         "by_status": {
+          "open": {
+            "n": 4,
+            "last_settled": null
+          },
           "settled": {
             "n": 18,
             "last_settled": "2026-10-29T05:03:17.147271Z"
@@ -475,8 +471,12 @@
       "sport": "LOL",
       "market": "total",
       "ledger": {
-        "total": 42,
+        "total": 44,
         "by_status": {
+          "open": {
+            "n": 2,
+            "last_settled": null
+          },
           "settled": {
             "n": 6,
             "last_settled": "2026-10-29T05:03:16.822718Z"
@@ -732,7 +732,7 @@
       "sport": "NBA",
       "market": "moneyline",
       "ledger": {
-        "total": 374,
+        "total": 388,
         "by_status": {
           "open": {
             "n": 14,
@@ -743,7 +743,7 @@
             "last_settled": "2026-10-31T02:09:27.321002Z"
           },
           "superseded": {
-            "n": 279,
+            "n": 293,
             "last_settled": null
           }
         }
@@ -1070,13 +1070,9 @@
       "ledger": {
         "total": 5,
         "by_status": {
-          "open": {
-            "n": 2,
-            "last_settled": null
-          },
           "settled": {
-            "n": 3,
-            "last_settled": "2026-10-29T11:32:49.354234Z"
+            "n": 5,
+            "last_settled": "2026-10-31T16:44:45.015775Z"
           }
         }
       },
@@ -1155,8 +1151,13 @@
       "sport": "NCAAF",
       "market": "multi",
       "ledger": {
-        "total": 0,
-        "by_status": {}
+        "total": 125,
+        "by_status": {
+          "open": {
+            "n": 125,
+            "last_settled": null
+          }
+        }
       },
       "data_freshness": {},
       "findings": []
@@ -1179,15 +1180,15 @@
         "total": 544,
         "by_status": {
           "open": {
-            "n": 182,
+            "n": 47,
             "last_settled": null
           },
           "settled": {
-            "n": 136,
-            "last_settled": "2026-10-29T05:02:36.421586Z"
+            "n": 139,
+            "last_settled": "2026-10-31T16:44:39.527226Z"
           },
           "superseded": {
-            "n": 226,
+            "n": 358,
             "last_settled": "2026-10-25T20:43:45.335698Z"
           }
         }
@@ -1325,11 +1326,35 @@
       },
       "findings": []
     },
+    "nfl-spread-structural-v7": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "nfl-spread-structural-v7",
+      "is_champion": true,
+      "model_version": "nfl-spread-structural-v7",
+      "hash_valid": true,
+      "qualified": true,
+      "feature_names": [],
+      "threshold": null,
+      "training_observations": {},
+      "model_id": "nfl-spread-structural-v7",
+      "sport": "NFL",
+      "market": "spread",
+      "ledger": {
+        "total": 0,
+        "by_status": {}
+      },
+      "data_freshness": {
+        "latest_event": "2026-10-30",
+        "days_ago": 1
+      },
+      "findings": []
+    },
     "nfl-spread-structural-v6": {
       "status": true,
       "kind": "json_artifact",
-      "champion": "nfl-spread-structural-v6",
-      "is_champion": true,
+      "champion": "nfl-spread-structural-v7",
+      "is_champion": false,
       "model_version": "nfl-spread-structural-v6",
       "hash_valid": true,
       "qualified": true,
@@ -1361,7 +1386,7 @@
     "nfl-spread-structural-v5": {
       "status": true,
       "kind": "json_artifact",
-      "champion": "nfl-spread-structural-v6",
+      "champion": "nfl-spread-structural-v7",
       "is_champion": false,
       "model_version": "nfl-spread-structural-v5",
       "hash_valid": true,
@@ -1391,11 +1416,35 @@
       },
       "findings": []
     },
+    "nfl-total-structural-v7": {
+      "status": true,
+      "kind": "json_artifact",
+      "champion": "nfl-total-structural-v7",
+      "is_champion": true,
+      "model_version": "nfl-total-structural-v7",
+      "hash_valid": true,
+      "qualified": true,
+      "feature_names": [],
+      "threshold": null,
+      "training_observations": {},
+      "model_id": "nfl-total-structural-v7",
+      "sport": "NFL",
+      "market": "total",
+      "ledger": {
+        "total": 0,
+        "by_status": {}
+      },
+      "data_freshness": {
+        "latest_event": "2026-10-30",
+        "days_ago": 1
+      },
+      "findings": []
+    },
     "nfl-total-structural-v6": {
       "status": true,
       "kind": "json_artifact",
-      "champion": "nfl-total-structural-v6",
-      "is_champion": true,
+      "champion": "nfl-total-structural-v7",
+      "is_champion": false,
       "model_version": "nfl-total-structural-v6",
       "hash_valid": true,
       "qualified": true,
@@ -1423,7 +1472,7 @@
     "nfl-total-structural-v5": {
       "status": true,
       "kind": "json_artifact",
-      "champion": "nfl-total-structural-v6",
+      "champion": "nfl-total-structural-v7",
       "is_champion": false,
       "model_version": "nfl-total-structural-v5",
       "hash_valid": true,
@@ -1871,8 +1920,8 @@
       "feature_names": [],
       "threshold": null,
       "training_observations": {
-        "coefficient_fit": 9026,
-        "locked_holdout": 3009,
+        "coefficient_fit": 9027,
+        "locked_holdout": 3010,
         "threshold_selection": 3009
       },
       "model_id": "valorant-tiered-elo-v6",
@@ -1881,13 +1930,9 @@
       "ledger": {
         "total": 592,
         "by_status": {
-          "open": {
-            "n": 4,
-            "last_settled": null
-          },
           "settled": {
-            "n": 404,
-            "last_settled": "2026-10-29T11:35:00.693730Z"
+            "n": 408,
+            "last_settled": "2026-10-31T16:45:24.403757Z"
           },
           "superseded": {
             "n": 184,
@@ -1958,18 +2003,14 @@
       "sport": "WNBA",
       "market": "moneyline",
       "ledger": {
-        "total": 294,
+        "total": 295,
         "by_status": {
-          "open": {
-            "n": 2,
-            "last_settled": null
-          },
           "settled": {
             "n": 261,
             "last_settled": "2026-10-31T02:09:28.204000Z"
           },
           "superseded": {
-            "n": 31,
+            "n": 34,
             "last_settled": null
           }
         }
@@ -2028,8 +2069,12 @@
       "sport": "WNBA",
       "market": "total",
       "ledger": {
-        "total": 94,
+        "total": 96,
         "by_status": {
+          "open": {
+            "n": 2,
+            "last_settled": null
+          },
           "settled": {
             "n": 76,
             "last_settled": "2026-10-27T04:40:21.800199Z"
