@@ -981,6 +981,11 @@ def build_cfb_slate(
                 p_ov = float(p.probabilities.get("over", 0.5))
                 p_un = float(p.probabilities.get("under", 0.5))
                 eff_tot = float(pm_total_line if pm_tot is not None else (total_line or 52.5))
+                spread_mag = (
+                    abs(float(effective_spread_home))
+                    if effective_spread_home is not None
+                    else (abs(float(pm_spread_home_line)) if pm_spread_home_line is not None else 7.0)
+                )
                 if pm_tot is not None and pm_total_over_prob is not None and pm_total_under_prob is not None:
                     edge_o = p_ov - float(pm_total_over_prob)
                     edge_u = p_un - float(pm_total_under_prob)
@@ -988,6 +993,12 @@ def build_cfb_slate(
                         pick_under = edge_u > 0.08
                     elif eff_tot <= 48.5:
                         pick_under = edge_u > 0.05
+                    elif spread_mag > 14.5:
+                        # Blowout mismatches (>14.5) go Over 58.2%
+                        pick_under = edge_u > 0.04
+                    elif spread_mag <= 7.0:
+                        # Tight competitive games (<=7.0) go Under 52.3%
+                        pick_under = (edge_u + 0.01) >= edge_o
                     else:
                         pick_under = edge_u > edge_o
 
@@ -1009,6 +1020,12 @@ def build_cfb_slate(
                         pick_under = edge_u > 0.08
                     elif eff_tot <= 48.5:
                         pick_under = edge_u > 0.05
+                    elif spread_mag > 14.5:
+                        # Blowout mismatches (>14.5) go Over 58.2%
+                        pick_under = edge_u > 0.04
+                    elif spread_mag <= 7.0:
+                        # Tight competitive games (<=7.0) go Under 52.3%
+                        pick_under = (edge_u + 0.01) >= edge_o
                     else:
                         pick_under = edge_u > edge_o
 

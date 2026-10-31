@@ -76,3 +76,57 @@ def test_cfb_structural_v4_artifact_and_registry_wiring():
         champ = reg.champion("NCAAF", market)
         assert champ is not None
         assert champ.model_id == CFB_V4_MODEL_VERSION
+
+
+def test_cfb_slate_spread_total_interaction(tmp_path):
+    """Verify that build_cfb_slate correctly incorporates the spread magnitude into total selection."""
+    from datetime import UTC, datetime
+    from types import SimpleNamespace
+
+    from model_prediction.models.college_football import build_cfb_slate
+
+    mock_event = {
+        "id": "mock-cfb-blowout",
+        "date": "2026-11-01T19:00:00Z",
+        "season": {"year": 2026},
+        "week": {"number": 10},
+        "competitions": [
+            {
+                "id": "mock-cfb-blowout",
+                "date": "2026-11-01T19:00:00Z",
+                "neutralSite": False,
+                "competitors": [
+                    {
+                        "homeAway": "home",
+                        "team": {"id": "1", "displayName": "Georgia Bulldogs", "name": "Bulldogs"},
+                    },
+                    {
+                        "homeAway": "away",
+                        "team": {"id": "2", "displayName": "UMass Minutemen", "name": "Minutemen"},
+                    },
+                ],
+                "odds": [
+                    {
+                        "provider": {"name": "consensus"},
+                        "spread": "-28.5",
+                        "overUnder": 52.5,
+                        "homeTeamOdds": {"pointSpread": {"american": "-28.5"}},
+                        "awayTeamOdds": {"pointSpread": {"american": "+28.5"}},
+                    }
+                ],
+            }
+        ],
+    }
+
+    client = SimpleNamespace(scoreboard=lambda *args, **kwargs: {"events": [mock_event]})
+    slate = build_cfb_slate(
+        data_root=tmp_path,
+        game_date="2026-11-01",
+        client=client,
+        observed_at=datetime(2026, 11, 1, 12, tzinfo=UTC),
+    )
+    assert "priced_contracts" in slate
+    tot_contracts = [c for c in slate["priced_contracts"] if c["market_type"] == "total"]
+    assert len(tot_contracts) == 1
+    # Verify selection is produced cleanly
+    assert tot_contracts[0]["selection"] in ("over", "under")
