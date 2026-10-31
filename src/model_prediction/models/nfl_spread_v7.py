@@ -72,6 +72,9 @@ class NFLSpreadModelV7:
         logistic_scale: float = NFL_LOGISTIC_SCALE,
         max_cover_prob: float = 0.65,
         min_cover_prob: float = 0.35,
+        edsr_weight: float = 4.0,
+        turnover_luck_weight: float = 0.5,
+        use_scoring_simulation: bool = False,
         version: str = NFL_SPREAD_V7_VERSION,
     ) -> None:
         self.margin_sd = margin_sd
@@ -82,6 +85,9 @@ class NFLSpreadModelV7:
         self.logistic_scale = logistic_scale
         self.max_cover_prob = max_cover_prob
         self.min_cover_prob = min_cover_prob
+        self.edsr_weight = edsr_weight
+        self.turnover_luck_weight = turnover_luck_weight
+        self.use_scoring_simulation = use_scoring_simulation
         self.version = version
         self.sport = "nfl"
         self.league = "NFL"
@@ -97,6 +103,9 @@ class NFLSpreadModelV7:
             logistic_scale=float(artifact.get("logistic_scale", NFL_LOGISTIC_SCALE)),
             max_cover_prob=float(artifact.get("max_cover_prob", 0.65)),
             min_cover_prob=float(artifact.get("min_cover_prob", 0.35)),
+            edsr_weight=float(artifact.get("edsr_weight", 4.0)),
+            turnover_luck_weight=float(artifact.get("turnover_luck_weight", 0.5)),
+            use_scoring_simulation=bool(artifact.get("use_scoring_simulation", False)),
             version=str(artifact.get("model_version", NFL_SPREAD_V7_VERSION)),
         )
 
@@ -120,12 +129,19 @@ class NFLSpreadModelV7:
         away_pressure_disparity: float = 0.0,
         home_qb_tier_adj: float = 0.0,
         away_qb_tier_adj: float = 0.0,
+        home_first_down_rate: float = 0.30,
+        away_first_down_rate: float = 0.30,
+        home_def_first_down_rate: float = 0.30,
+        away_def_first_down_rate: float = 0.30,
+        home_turnover_luck: float = 0.0,
+        away_turnover_luck: float = 0.0,
         home_rest_days: int = 7,
         away_rest_days: int = 7,
         spread_home_line: float = -3.5,
         is_neutral_site: bool = False,
         market_weight: float | None = None,
         base_points_per_side: float = 23.0,
+        use_scoring_simulation: bool | None = None,
     ) -> NFLSpreadForecast:
         w_mkt = self.market_weight if market_weight is None else market_weight
 
@@ -169,9 +185,19 @@ class NFLSpreadModelV7:
         raw_away_pts = max(6.0, base_points_per_side + a_eff_pts + a_rest_adj)
         structural_margin = raw_home_pts - raw_away_pts
 
-        # 4. Bayesian Market Anchoring (w_mkt = 0.80):
+        # 4. Bayesian Market Anchoring with EDSR & Turnover Luck Upgrades:
+        edsr_diff = (home_first_down_rate - away_def_first_down_rate) - (
+            away_first_down_rate - home_def_first_down_rate
+        )
+        to_luck_diff = away_turnover_luck - home_turnover_luck
         market_expected_margin = -spread_home_line
-        exp_margin = round(w_mkt * market_expected_margin + (1.0 - w_mkt) * structural_margin, 2)
+        exp_margin = round(
+            w_mkt * market_expected_margin
+            + (1.0 - w_mkt) * structural_margin
+            + self.edsr_weight * edsr_diff
+            + self.turnover_luck_weight * to_luck_diff,
+            2,
+        )
 
         pts_home = round(base_points_per_side + exp_margin / 2.0, 1)
         pts_away = round(base_points_per_side - exp_margin / 2.0, 1)
@@ -200,6 +226,19 @@ class NFLSpreadModelV7:
             p_home_win = 1.0 - _normal_cdf(0.0, exp_margin, self.margin_sd)
         p_home_win = max(0.05, min(0.95, p_home_win))
         p_away_win = 1.0 - p_home_win
+
+        use_sim = self.use_scoring_simulation if use_scoring_simulation is None else use_scoring_simulation
+        if use_sim:
+            from .nfl_scoring_simulation import solve_bivariate_scoring
+
+            sim = solve_bivariate_scoring(
+                exp_home_pts=pts_home,
+                exp_away_pts=pts_away,
+                spread_home_line=spread_home_line,
+            )
+            p_home_cover = 0.70 * p_home_cover + 0.30 * sim.prob_home_cover
+            p_home_cover = max(self.min_cover_prob, min(self.max_cover_prob, p_home_cover))
+            p_away_cover = 1.0 - p_home_cover
 
         return NFLSpreadForecast(
             home_team=home_team,

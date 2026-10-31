@@ -166,6 +166,14 @@ class NFLEfficiencyMatchup:
     away_rz_td_rate: float = 0.60
     home_def_rz_td_rate: float = 0.60
     away_def_rz_td_rate: float = 0.60
+    home_first_down_rate: float = 0.30
+    away_first_down_rate: float = 0.30
+    home_def_first_down_rate: float = 0.30
+    away_def_first_down_rate: float = 0.30
+    home_turnover_luck: float = 0.0
+    away_turnover_luck: float = 0.0
+    home_pass_ratio: float = 0.58
+    away_pass_ratio: float = 0.58
 
 
 class NFLEfficiencyStore:
@@ -259,6 +267,10 @@ class NFLEfficiencyStore:
             h_def_exp,
             h_rz,
             h_def_rz,
+            h_fd,
+            h_dfd,
+            h_to,
+            h_pr,
         ) = h_eff
         (
             a_off,
@@ -275,6 +287,10 @@ class NFLEfficiencyStore:
             a_def_exp,
             a_rz,
             a_def_rz,
+            a_fd,
+            a_dfd,
+            a_to,
+            a_pr,
         ) = a_eff
 
         h_pressure_disparity = a_def_sack - h_sack
@@ -314,6 +330,14 @@ class NFLEfficiencyStore:
             away_rz_td_rate=round(a_rz, 4),
             home_def_rz_td_rate=round(h_def_rz, 4),
             away_def_rz_td_rate=round(a_def_rz, 4),
+            home_first_down_rate=round(h_fd, 4),
+            away_first_down_rate=round(a_fd, 4),
+            home_def_first_down_rate=round(h_dfd, 4),
+            away_def_first_down_rate=round(a_dfd, 4),
+            home_turnover_luck=round(h_to, 4),
+            away_turnover_luck=round(a_to, 4),
+            home_pass_ratio=round(h_pr, 4),
+            away_pass_ratio=round(a_pr, 4),
         )
 
     def _team_efficiency(
@@ -327,6 +351,10 @@ class NFLEfficiencyStore:
         float,
         float,
         int,
+        float,
+        float,
+        float,
+        float,
         float,
         float,
         float,
@@ -356,6 +384,10 @@ class NFLEfficiencyStore:
                 0.08,
                 0.60,
                 0.60,
+                0.30,
+                0.30,
+                0.0,
+                0.58,
             )
 
         try:
@@ -370,6 +402,7 @@ class NFLEfficiencyStore:
                 off_epa = NFL_LEAGUE_AVG_EPA_PLAY
                 pass_epa, rush_epa, sack_rate, pace = 0.0, 0.0, 0.06, 62.5
                 exp_rate, rz_td_rate = 0.08, 0.60
+                fd_rate, to_luck, pass_ratio = 0.30, 0.0, 0.58
             else:
                 attempts = float(off_prior["attempts"].sum() or 0.0)
                 carries = float(off_prior["carries"].sum() or 0.0)
@@ -377,6 +410,46 @@ class NFLEfficiencyStore:
                 pass_epa_sum = float(off_prior["passing_epa"].sum() or 0.0)
                 rush_epa_sum = float(off_prior["rushing_epa"].sum() or 0.0)
                 plays = attempts + carries
+
+                p_fd = (
+                    float(off_prior["passing_first_downs"].sum() or 0.0)
+                    if "passing_first_downs" in off_prior.columns
+                    else 0.35 * attempts
+                )
+                r_fd = (
+                    float(off_prior["rushing_first_downs"].sum() or 0.0)
+                    if "rushing_first_downs" in off_prior.columns
+                    else 0.20 * carries
+                )
+                fd_rate = (p_fd + r_fd) / max(1.0, plays)
+                pass_ratio = attempts / max(1.0, plays)
+
+                fumb_own = (
+                    float(off_prior["fumble_recovery_own"].sum() or 0.0)
+                    if "fumble_recovery_own" in off_prior.columns
+                    else 0.0
+                )
+                fumb_opp = (
+                    float(off_prior["fumble_recovery_opp"].sum() or 0.0)
+                    if "fumble_recovery_opp" in off_prior.columns
+                    else 0.0
+                )
+                fumbs_tot = (
+                    float(off_prior["fumbles_total"].sum() or 0.0)
+                    if "fumbles_total" in off_prior.columns
+                    else 0.0
+                )
+                fumbs_forced = (
+                    float(off_prior["def_fumbles_forced"].sum() or 0.0)
+                    if "def_fumbles_forced" in off_prior.columns
+                    else 0.0
+                )
+                fumb_den = fumbs_tot + fumbs_forced
+                to_luck = (
+                    max(-0.50, min(0.50, ((fumb_own + fumb_opp) / fumb_den) - 0.50))
+                    if fumb_den > 0.0
+                    else 0.0
+                )
 
                 p20 = (
                     float(off_prior["passing_20"].sum() or 0.0) if "passing_20" in off_prior.columns else 0.0
@@ -457,6 +530,7 @@ class NFLEfficiencyStore:
                 def_epa = NFL_LEAGUE_AVG_EPA_PLAY
                 def_pass_epa, def_rush_epa, def_sack_rate = 0.0, 0.0, 0.06
                 def_exp_rate, def_rz_td_rate = 0.08, 0.60
+                def_fd_rate = 0.30
             else:
                 opp_attempts = float(def_prior["attempts"].sum() or 0.0)
                 opp_carries = float(def_prior["carries"].sum() or 0.0)
@@ -468,6 +542,18 @@ class NFLEfficiencyStore:
                 opp_plays = opp_attempts + opp_carries
                 opp_pass_sum = float(def_prior["passing_epa"].sum() or 0.0)
                 opp_rush_sum = float(def_prior["rushing_epa"].sum() or 0.0)
+
+                d_p_fd = (
+                    float(def_prior["passing_first_downs"].sum() or 0.0)
+                    if "passing_first_downs" in def_prior.columns
+                    else 0.35 * opp_attempts
+                )
+                d_r_fd = (
+                    float(def_prior["rushing_first_downs"].sum() or 0.0)
+                    if "rushing_first_downs" in def_prior.columns
+                    else 0.20 * opp_carries
+                )
+                def_fd_rate = (d_p_fd + d_r_fd) / max(1.0, opp_plays)
 
                 d_p20 = (
                     float(def_prior["passing_20"].sum() or 0.0) if "passing_20" in def_prior.columns else 0.0
@@ -550,6 +636,10 @@ class NFLEfficiencyStore:
                 def_exp_rate,
                 rz_td_rate,
                 def_rz_td_rate,
+                fd_rate,
+                def_fd_rate,
+                to_luck,
+                pass_ratio,
             )
         except (KeyError, ValueError, TypeError, pl.exceptions.PolarsError) as exc:
             logger.debug("Failed computing team efficiency for %s: %s", team_code, exc)
@@ -568,6 +658,10 @@ class NFLEfficiencyStore:
                 0.08,
                 0.60,
                 0.60,
+                0.30,
+                0.30,
+                0.0,
+                0.58,
             )
 
     def _qb_adjustment(self, qb_name: str, date_str: str) -> float:

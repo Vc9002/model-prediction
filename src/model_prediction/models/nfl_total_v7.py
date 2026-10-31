@@ -62,6 +62,8 @@ class NFLTotalModelV7:
         pace_weight: float = 0.15,
         dome_boost: float = 0.80,
         bias: float = 0.80,
+        ngsp_weight: float = 0.35,
+        use_scoring_simulation: bool = False,
     ) -> None:
         self.total_sd = total_sd
         self.league_avg_total = league_avg_total
@@ -76,6 +78,8 @@ class NFLTotalModelV7:
         self.pace_weight = pace_weight
         self.dome_boost = dome_boost
         self.bias = bias
+        self.ngsp_weight = ngsp_weight
+        self.use_scoring_simulation = use_scoring_simulation
         self.sport = "nfl"
         self.league = "NFL"
 
@@ -95,6 +99,8 @@ class NFLTotalModelV7:
             pace_weight=float(artifact.get("pace_weight", 0.15)),
             dome_boost=float(artifact.get("dome_boost", 0.80)),
             bias=float(artifact.get("bias", 0.80)),
+            ngsp_weight=float(artifact.get("ngsp_weight", 0.35)),
+            use_scoring_simulation=bool(artifact.get("use_scoring_simulation", False)),
         )
 
     def forecast_total(
@@ -127,6 +133,9 @@ class NFLTotalModelV7:
         away_rz_td_rate: float = 0.60,
         home_def_rz_td_rate: float = 0.60,
         away_def_rz_td_rate: float = 0.60,
+        home_pass_ratio: float = 0.58,
+        away_pass_ratio: float = 0.58,
+        use_scoring_simulation: bool | None = None,
     ) -> NFLTotalForecast:
         # 1. Environmental Adjustments
         weather_penalty = 0.0
@@ -167,8 +176,10 @@ class NFLTotalModelV7:
             (away_explosive_rate + home_def_explosive_rate) / 2.0 - 0.08
         )
 
-        # Pace edge vs 62.5 plays baseline
-        pace_edge = ((home_pace + away_pace) / 2.0 - 62.5) * self.pace_weight
+        # Neutral Game Script Pace (NGSP) adjustment: pass frequency accelerates pace
+        adj_home_pace = home_pace * (1.0 + self.ngsp_weight * (home_pass_ratio - 0.58))
+        adj_away_pace = away_pace * (1.0 + self.ngsp_weight * (away_pass_ratio - 0.58))
+        pace_edge = ((adj_home_pace + adj_away_pace) / 2.0 - 62.5) * self.pace_weight
 
         # QB impact on scoring
         qb_pts = (home_qb_tier_adj + away_qb_tier_adj) * 0.4
@@ -192,6 +203,21 @@ class NFLTotalModelV7:
         p_over = 1.0 - _normal_cdf(total_line, exp_total, self.total_sd)
         p_over = max(self.min_total_prob, min(self.max_total_prob, p_over))
         p_under = 1.0 - p_over
+
+        use_sim = self.use_scoring_simulation if use_scoring_simulation is None else use_scoring_simulation
+        if use_sim:
+            from .nfl_scoring_simulation import solve_bivariate_scoring
+
+            sim = solve_bivariate_scoring(
+                exp_home_pts=exp_total / 2.0,
+                exp_away_pts=exp_total / 2.0,
+                home_rz_td_rate=(home_rz_td_rate + away_def_rz_td_rate) / 2.0,
+                away_rz_td_rate=(away_rz_td_rate + home_def_rz_td_rate) / 2.0,
+                total_line=total_line,
+            )
+            p_over = 0.70 * p_over + 0.30 * sim.prob_over
+            p_over = max(self.min_total_prob, min(self.max_total_prob, p_over))
+            p_under = 1.0 - p_over
 
         return NFLTotalForecast(
             home_team=home_team,

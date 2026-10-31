@@ -25,6 +25,25 @@ def test_nfl_spread_v7_contract_and_hash() -> None:
     assert model.version == "nfl-spread-structural-v7"
     assert model.home_field_advantage == 1.35
     assert model.market_weight == 0.80
+    assert model.edsr_weight == 4.0
+    assert model.turnover_luck_weight == 0.5
+
+    # EDSR margin boost check
+    fc_edsr_high = model.forecast_spread(
+        home_team="Kansas City Chiefs",
+        away_team="Baltimore Ravens",
+        home_first_down_rate=0.40,
+        away_first_down_rate=0.25,
+        spread_home_line=-2.5,
+    )
+    fc_edsr_low = model.forecast_spread(
+        home_team="Kansas City Chiefs",
+        away_team="Baltimore Ravens",
+        home_first_down_rate=0.25,
+        away_first_down_rate=0.40,
+        spread_home_line=-2.5,
+    )
+    assert fc_edsr_high.projected_margin_home > fc_edsr_low.projected_margin_home
 
     # Symmetric neutral matchup
     fc = model.forecast_spread(
@@ -73,6 +92,24 @@ def test_nfl_total_v7_contract_and_hash() -> None:
     assert model.version == "nfl-total-structural-v7"
     assert model.league_avg_total == 45.5
     assert model.market_weight == 0.60
+    assert model.ngsp_weight == 0.35
+
+    # NGSP pass-ratio pace acceleration check
+    fc_pass_heavy = model.forecast_total(
+        home_team="Miami Dolphins",
+        away_team="Detroit Lions",
+        home_pass_ratio=0.68,
+        away_pass_ratio=0.65,
+        total_line=48.5,
+    )
+    fc_run_heavy = model.forecast_total(
+        home_team="Miami Dolphins",
+        away_team="Detroit Lions",
+        home_pass_ratio=0.45,
+        away_pass_ratio=0.48,
+        total_line=48.5,
+    )
+    assert fc_pass_heavy.projected_total > fc_run_heavy.projected_total
 
     # Multiplicative pace interaction: Fast pace game has higher scoring projection
     fc_fast = model.forecast_total(
@@ -153,3 +190,26 @@ def test_nfl_efficiency_opponent_adjusted_store() -> None:
     assert isinstance(m.home_pace, float)
     assert isinstance(m.home_explosive_rate, float)
     assert isinstance(m.home_rz_td_rate, float)
+    assert isinstance(m.home_first_down_rate, float)
+    assert isinstance(m.home_turnover_luck, float)
+    assert isinstance(m.home_pass_ratio, float)
+
+
+def test_bivariate_scoring_simulation() -> None:
+    from model_prediction.models.nfl_scoring_simulation import solve_bivariate_scoring
+
+    res = solve_bivariate_scoring(
+        exp_home_pts=24.5,
+        exp_away_pts=20.5,
+        home_rz_td_rate=0.65,
+        away_rz_td_rate=0.55,
+        spread_home_line=-3.0,
+        total_line=44.0,
+    )
+    assert 0.30 <= res.prob_home_cover <= 0.70
+    assert 0.30 <= res.prob_away_cover <= 0.70
+    assert res.prob_spread_push > 0.02  # Key number 3 has notable push mass
+    assert res.prob_total_push > 0.01
+    assert round(res.prob_home_cover + res.prob_away_cover + res.prob_spread_push, 4) == 1.0000
+    assert round(res.prob_over + res.prob_under + res.prob_total_push, 4) == 1.0000
+    assert res.prob_home_win > res.prob_away_win

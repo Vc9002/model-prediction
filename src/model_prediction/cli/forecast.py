@@ -3004,6 +3004,12 @@ def _forecast_nfl_spread_slate(
                 away_pressure_disparity=eff.away_pressure_disparity,
                 home_qb_tier_adj=h_qb_tier_adj,
                 away_qb_tier_adj=a_qb_tier_adj,
+                home_first_down_rate=eff.home_first_down_rate,
+                away_first_down_rate=eff.away_first_down_rate,
+                home_def_first_down_rate=eff.home_def_first_down_rate,
+                away_def_first_down_rate=eff.away_def_first_down_rate,
+                home_turnover_luck=eff.home_turnover_luck,
+                away_turnover_luck=eff.away_turnover_luck,
                 home_rest_days=home_rest_days,
                 away_rest_days=away_rest_days,
                 spread_home_line=spread_home_line,
@@ -3550,6 +3556,8 @@ def _forecast_nfl_total_slate(
                 away_rz_td_rate=eff.away_rz_td_rate,
                 home_def_rz_td_rate=eff.home_def_rz_td_rate,
                 away_def_rz_td_rate=eff.away_def_rz_td_rate,
+                home_pass_ratio=eff.home_pass_ratio,
+                away_pass_ratio=eff.away_pass_ratio,
             )
         elif model_version == "nfl-total-structural-v6":
             from ..models.nfl_total_v6 import NFLTotalModelV6

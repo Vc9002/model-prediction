@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "4212f764f793a83f4398b4bd01eca2df6397f12fc6bae647da9c156fbe49988d",
+  "artifact_hash": "e60998164a6e8b891aaa53f0f17134193ff707302c01c89bcb27e70a1635e61c",
   "bias": 0.8,
   "cold_temp_penalty": 1.5,
   "dome_boost": 0.8,
@@ -17,7 +17,8 @@
   "method": "nfl_total_structural_v7_engine",
   "min_total_prob": 0.35,
   "model_version": "nfl-total-structural-v7",
-  "note": "Overhauled independent NFL Total Points engine v7. Features Market Delta Anchoring, Explosive Play Rate Edge (passes 20+ yds, rushes 12+ yds), Red Zone TD conversion rate (7 vs 3), decomposed EPA, stadium weather drag, indoor dome boost, and calibrated Gaussian CDF.",
+  "ngsp_weight": 0.35,
+  "note": "Overhauled independent NFL Total Points engine v7. Features Neutral Game Script Pace (NGSP) adjustment, Market Delta Anchoring, Explosive Play Rate Edge (passes 20+ yds, rushes 12+ yds), Red Zone TD conversion rate (7 vs 3), decomposed EPA, stadium weather drag, indoor dome boost, and calibrated Gaussian CDF.",
   "pace_weight": 0.15,
   "pass_weight": 1.5,
   "positive_class": "over",
@@ -36,6 +37,7 @@
   "short_week_drag": 1.0,
   "sport": "nfl",
   "total_sd": 13.8,
+  "use_scoring_simulation": false,
   "wind_14_penalty": 2.0,
   "wind_15_penalty": 2.0,
   "wind_20_penalty": 4.5
