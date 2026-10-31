@@ -3519,8 +3519,8 @@ def _forecast_nfl_total_slate(
             tot_pass_epa = (eff.home_pass_epa + eff.away_def_pass_epa) + (
                 eff.away_pass_epa + eff.home_def_pass_epa
             )
-            tot_rush_epa = (eff.home_rush_epa + eff.away_def_rush_epa) + (
-                eff.away_rush_epa + eff.home_def_rush_epa
+            tot_rush_epa = (eff.home_rush_epa - eff.away_def_rush_epa) + (
+                eff.away_rush_epa - eff.home_def_rush_epa
             )
             fc = total_v7.forecast_total(
                 home_team=home_team,
@@ -3542,6 +3542,14 @@ def _forecast_nfl_total_slate(
                 home_rest_days=home_rest_days,
                 away_rest_days=away_rest_days,
                 is_neutral_site=is_neutral_site,
+                home_explosive_rate=eff.home_explosive_rate,
+                away_explosive_rate=eff.away_explosive_rate,
+                home_def_explosive_rate=eff.home_def_explosive_rate,
+                away_def_explosive_rate=eff.away_def_explosive_rate,
+                home_rz_td_rate=eff.home_rz_td_rate,
+                away_rz_td_rate=eff.away_rz_td_rate,
+                home_def_rz_td_rate=eff.home_def_rz_td_rate,
+                away_def_rz_td_rate=eff.away_def_rz_td_rate,
             )
         elif model_version == "nfl-total-structural-v6":
             from ..models.nfl_total_v6 import NFLTotalModelV6
@@ -3550,8 +3558,8 @@ def _forecast_nfl_total_slate(
             tot_pass_epa = (eff.home_pass_epa + eff.away_def_pass_epa) + (
                 eff.away_pass_epa + eff.home_def_pass_epa
             )
-            tot_rush_epa = (eff.home_rush_epa + eff.away_def_rush_epa) + (
-                eff.away_rush_epa + eff.home_def_rush_epa
+            tot_rush_epa = (eff.home_rush_epa - eff.away_def_rush_epa) + (
+                eff.away_rush_epa - eff.home_def_rush_epa
             )
             fc = total_v6.forecast_total(
                 home_team=home_team,

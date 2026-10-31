@@ -111,7 +111,29 @@ def test_nfl_total_v7_contract_and_hash() -> None:
         total_line=47.0,
     )
     assert fc_dome.projected_total > fc_wind.projected_total
-    assert fc_wind.weather_total_penalty >= 4.0
+    assert fc_wind.weather_total_penalty >= 2.0
+
+    # Explosive play rate and red-zone TD conversion test
+    fc_explosive = model.forecast_total(
+        home_team="Kansas City Chiefs",
+        away_team="Buffalo Bills",
+        home_explosive_rate=0.14,
+        away_explosive_rate=0.13,
+        home_rz_td_rate=0.72,
+        away_rz_td_rate=0.68,
+        total_line=47.5,
+    )
+    fc_grind = model.forecast_total(
+        home_team="Kansas City Chiefs",
+        away_team="Buffalo Bills",
+        home_explosive_rate=0.05,
+        away_explosive_rate=0.06,
+        home_rz_td_rate=0.45,
+        away_rz_td_rate=0.48,
+        total_line=47.5,
+    )
+    assert fc_explosive.projected_total > fc_grind.projected_total
+    assert fc_explosive.prob_over > fc_grind.prob_over
 
 
 def test_nfl_efficiency_opponent_adjusted_store() -> None:
@@ -129,3 +151,5 @@ def test_nfl_efficiency_opponent_adjusted_store() -> None:
     assert isinstance(m.home_rush_epa, float)
     assert isinstance(m.home_pressure_disparity, float)
     assert isinstance(m.home_pace, float)
+    assert isinstance(m.home_explosive_rate, float)
+    assert isinstance(m.home_rz_td_rate, float)

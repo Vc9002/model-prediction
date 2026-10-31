@@ -158,6 +158,14 @@ class NFLEfficiencyMatchup:
     away_pressure_disparity: float = 0.0
     home_pace: float = 62.5
     away_pace: float = 62.5
+    home_explosive_rate: float = 0.08
+    away_explosive_rate: float = 0.08
+    home_def_explosive_rate: float = 0.08
+    away_def_explosive_rate: float = 0.08
+    home_rz_td_rate: float = 0.60
+    away_rz_td_rate: float = 0.60
+    home_def_rz_td_rate: float = 0.60
+    away_def_rz_td_rate: float = 0.60
 
 
 class NFLEfficiencyStore:
@@ -236,8 +244,38 @@ class NFLEfficiencyStore:
             a_code, date_str, lookback_games, opponent_adjust=opponent_adjust, recency_decay=recency_decay
         )
 
-        h_off, h_def, h_count, h_pass, h_rush, h_def_pass, h_def_rush, h_sack, h_def_sack, h_pace = h_eff
-        a_off, a_def, a_count, a_pass, a_rush, a_def_pass, a_def_rush, a_sack, a_def_sack, a_pace = a_eff
+        (
+            h_off,
+            h_def,
+            h_count,
+            h_pass,
+            h_rush,
+            h_def_pass,
+            h_def_rush,
+            h_sack,
+            h_def_sack,
+            h_pace,
+            h_exp,
+            h_def_exp,
+            h_rz,
+            h_def_rz,
+        ) = h_eff
+        (
+            a_off,
+            a_def,
+            a_count,
+            a_pass,
+            a_rush,
+            a_def_pass,
+            a_def_rush,
+            a_sack,
+            a_def_sack,
+            a_pace,
+            a_exp,
+            a_def_exp,
+            a_rz,
+            a_def_rz,
+        ) = a_eff
 
         h_pressure_disparity = a_def_sack - h_sack
         a_pressure_disparity = h_def_sack - a_sack
@@ -268,6 +306,14 @@ class NFLEfficiencyStore:
             away_pressure_disparity=round(a_pressure_disparity, 4),
             home_pace=round(h_pace, 1),
             away_pace=round(a_pace, 1),
+            home_explosive_rate=round(h_exp, 4),
+            away_explosive_rate=round(a_exp, 4),
+            home_def_explosive_rate=round(h_def_exp, 4),
+            away_def_explosive_rate=round(a_def_exp, 4),
+            home_rz_td_rate=round(h_rz, 4),
+            away_rz_td_rate=round(a_rz, 4),
+            home_def_rz_td_rate=round(h_def_rz, 4),
+            away_def_rz_td_rate=round(a_def_rz, 4),
         )
 
     def _team_efficiency(
@@ -277,10 +323,40 @@ class NFLEfficiencyStore:
         lookback: int,
         opponent_adjust: bool = True,
         recency_decay: bool = True,
-    ) -> tuple[float, float, int, float, float, float, float, float, float, float]:
+    ) -> tuple[
+        float,
+        float,
+        int,
+        float,
+        float,
+        float,
+        float,
+        float,
+        float,
+        float,
+        float,
+        float,
+        float,
+        float,
+    ]:
         """Compute shrunk, opponent-adjusted, and recency-decayed offensive/defensive metrics strictly before date_str."""
         if self._team_df is None or len(self._team_df) == 0:
-            return NFL_LEAGUE_AVG_EPA_PLAY, NFL_LEAGUE_AVG_EPA_PLAY, 0, 0.0, 0.0, 0.0, 0.0, 0.06, 0.06, 62.5
+            return (
+                NFL_LEAGUE_AVG_EPA_PLAY,
+                NFL_LEAGUE_AVG_EPA_PLAY,
+                0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.06,
+                0.06,
+                62.5,
+                0.08,
+                0.08,
+                0.60,
+                0.60,
+            )
 
         try:
             # 1. Offensive EPA (this team on offense)
@@ -293,6 +369,7 @@ class NFLEfficiencyStore:
             if count == 0:
                 off_epa = NFL_LEAGUE_AVG_EPA_PLAY
                 pass_epa, rush_epa, sack_rate, pace = 0.0, 0.0, 0.06, 62.5
+                exp_rate, rz_td_rate = 0.08, 0.60
             else:
                 attempts = float(off_prior["attempts"].sum() or 0.0)
                 carries = float(off_prior["carries"].sum() or 0.0)
@@ -300,6 +377,27 @@ class NFLEfficiencyStore:
                 pass_epa_sum = float(off_prior["passing_epa"].sum() or 0.0)
                 rush_epa_sum = float(off_prior["rushing_epa"].sum() or 0.0)
                 plays = attempts + carries
+
+                p20 = (
+                    float(off_prior["passing_20"].sum() or 0.0) if "passing_20" in off_prior.columns else 0.0
+                )
+                r12 = (
+                    float(off_prior["rushing_12"].sum() or 0.0) if "rushing_12" in off_prior.columns else 0.0
+                )
+                exp_rate = (p20 + r12) / max(1.0, plays)
+
+                tds = (
+                    float(off_prior["passing_tds"].sum() or 0.0)
+                    + float(off_prior["rushing_tds"].sum() or 0.0)
+                    if "passing_tds" in off_prior.columns
+                    else 2.0 * count
+                )
+                fgs = (
+                    float(off_prior["fg_made"].sum() or 0.0)
+                    if "fg_made" in off_prior.columns
+                    else 1.5 * count
+                )
+                rz_td_rate = tds / max(1.0, tds + fgs)
 
                 off_epa = (DEFAULT_PRIOR_PLAYS * NFL_LEAGUE_AVG_EPA_PLAY + pass_epa_sum + rush_epa_sum) / (
                     DEFAULT_PRIOR_PLAYS + max(1.0, plays)
@@ -358,6 +456,7 @@ class NFLEfficiencyStore:
             if len(def_prior) == 0:
                 def_epa = NFL_LEAGUE_AVG_EPA_PLAY
                 def_pass_epa, def_rush_epa, def_sack_rate = 0.0, 0.0, 0.06
+                def_exp_rate, def_rz_td_rate = 0.08, 0.60
             else:
                 opp_attempts = float(def_prior["attempts"].sum() or 0.0)
                 opp_carries = float(def_prior["carries"].sum() or 0.0)
@@ -369,6 +468,27 @@ class NFLEfficiencyStore:
                 opp_plays = opp_attempts + opp_carries
                 opp_pass_sum = float(def_prior["passing_epa"].sum() or 0.0)
                 opp_rush_sum = float(def_prior["rushing_epa"].sum() or 0.0)
+
+                d_p20 = (
+                    float(def_prior["passing_20"].sum() or 0.0) if "passing_20" in def_prior.columns else 0.0
+                )
+                d_r12 = (
+                    float(def_prior["rushing_12"].sum() or 0.0) if "rushing_12" in def_prior.columns else 0.0
+                )
+                def_exp_rate = (d_p20 + d_r12) / max(1.0, opp_plays)
+
+                d_tds = (
+                    float(def_prior["passing_tds"].sum() or 0.0)
+                    + float(def_prior["rushing_tds"].sum() or 0.0)
+                    if "passing_tds" in def_prior.columns
+                    else 2.0 * len(def_prior)
+                )
+                d_fgs = (
+                    float(def_prior["fg_made"].sum() or 0.0)
+                    if "fg_made" in def_prior.columns
+                    else 1.5 * len(def_prior)
+                )
+                def_rz_td_rate = d_tds / max(1.0, d_tds + d_fgs)
 
                 def_epa = (DEFAULT_PRIOR_PLAYS * NFL_LEAGUE_AVG_EPA_PLAY + opp_pass_sum + opp_rush_sum) / (
                     DEFAULT_PRIOR_PLAYS + max(1.0, opp_plays)
@@ -426,10 +546,29 @@ class NFLEfficiencyStore:
                 sack_rate,
                 def_sack_rate,
                 pace,
+                exp_rate,
+                def_exp_rate,
+                rz_td_rate,
+                def_rz_td_rate,
             )
         except (KeyError, ValueError, TypeError, pl.exceptions.PolarsError) as exc:
             logger.debug("Failed computing team efficiency for %s: %s", team_code, exc)
-            return NFL_LEAGUE_AVG_EPA_PLAY, NFL_LEAGUE_AVG_EPA_PLAY, 0, 0.0, 0.0, 0.0, 0.0, 0.06, 0.06, 62.5
+            return (
+                NFL_LEAGUE_AVG_EPA_PLAY,
+                NFL_LEAGUE_AVG_EPA_PLAY,
+                0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.06,
+                0.06,
+                62.5,
+                0.08,
+                0.08,
+                0.60,
+                0.60,
+            )
 
     def _qb_adjustment(self, qb_name: str, date_str: str) -> float:
         """Compute QB spread point value adjustment over average starter."""
