@@ -330,25 +330,42 @@ class CFBFeatureExtractor:
         n_games = len(curr_season_games)
         decay_w = PRESEASON_DECAY_WEIGHTS.get(min(week, 14), 0.10)
 
-        # Elo rating calculation
+        # Elo rating calculation with opponent adjustment and 35% offseason reversion
         current_elo = base_elo
+        last_season = None
         for g in past_games[-20:]:  # Rolling 20 games
+            g_season = _resolve_game_season(g)
+            if last_season is not None and g_season != last_season:
+                # 35% offseason regression toward conference baseline (reflects roster/portal turnover)
+                current_elo = 0.65 * current_elo + 0.35 * base_elo
+            last_season = g_season
+
             is_home = _get_val(g, "home_team", "") == team_name
             team_score = _get_val(g, "home_score", 0) if is_home else _get_val(g, "away_score", 0)
             opp_score = _get_val(g, "away_score", 0) if is_home else _get_val(g, "home_score", 0)
             won = team_score > opp_score
             margin = abs(team_score - opp_score)
 
+            # Opponent-aware strength baseline
+            opp_name = _get_val(g, "away_team", "") if is_home else _get_val(g, "home_team", "")
+            opp_obj = resolve_team(opp_name)
+            opp_conf = opp_obj.conference if opp_obj else "Mid-American"
+            opp_base_elo = 1500.0 + (CONFERENCE_TIER_OFFSETS.get(opp_conf, 0.0) * 25.0)
+
             # Margin of victory multiplier for CFB
             mov_mult = math.log(max(1.0, float(margin)) + 1.0) * (
-                2.2 / (1.0 + 0.001 * abs(current_elo - 1500.0))
+                2.2 / (1.0 + 0.001 * abs(current_elo - opp_base_elo))
             )
             k_factor = 25.0 * mov_mult
 
-            # Expected win probability
-            exp_win = 1.0 / (1.0 + 10.0 ** (-(current_elo - 1500.0) / 400.0))
+            # Expected win probability against opponent's baseline rating
+            exp_win = 1.0 / (1.0 + 10.0 ** (-(current_elo - opp_base_elo) / 400.0))
             actual_res = 1.0 if won else (0.5 if team_score == opp_score else 0.0)
             current_elo += k_factor * (actual_res - exp_win)
+
+        # Apply offseason reversion for current season if last past game was from a prior season
+        if last_season is not None and season_year is not None and season_year != last_season:
+            current_elo = 0.65 * current_elo + 0.35 * base_elo
 
         # Estimate dynamic team pace & expected possessions
         base_team_possessions = 12.4 + CONFERENCE_PACE_OFFSETS.get(conf, 0.0)
@@ -631,8 +648,9 @@ class CFBFeatureExtractor:
         away_qb_adj = (1.0 - qb_starter_prob_away) * -4.5 if qb_starter_prob_away < 0.99 else 0.0
         home_qb_adj = (1.0 - qb_starter_prob_home) * -4.5 if qb_starter_prob_home < 0.99 else 0.0
 
-        # Elo Win Probability
-        elo_diff = home_state.elo_rating - away_state.elo_rating + (0.0 if is_neutral_site else 65.0)
+        # Elo Win Probability (aligned with structural HFA to prevent double-counting)
+        elo_hfa = 0.0 if is_neutral_site else (self.home_advantage_points * 24.5)
+        elo_diff = home_state.elo_rating - away_state.elo_rating + elo_hfa
         elo_home_prob = 1.0 / (1.0 + 10.0 ** (-elo_diff / 400.0))
 
         # Expected Margin & Total Projections
@@ -659,12 +677,12 @@ class CFBFeatureExtractor:
             + (home_qb_adj - away_qb_adj) * (1.0 - eff_weight)
         )
 
-        # Non-linear talent disparity shrinkage for extreme blowouts (>21.5 pt margins)
-        # In CFB, coaches pull starters and run out the clock in the 4th quarter, suppressing tail blowout margins.
-        if abs(proj_margin) > 21.5:
-            excess = abs(proj_margin) - 21.5
+        # Non-linear talent disparity shrinkage for extreme blowouts (>28.0 pt margins)
+        # Relaxed threshold to preserve favorite margins against over-compression in mismatches
+        if abs(proj_margin) > 28.0:
+            excess = abs(proj_margin) - 28.0
             sign = 1.0 if proj_margin > 0 else -1.0
-            proj_margin = sign * (21.5 + excess * 0.70)
+            proj_margin = sign * (28.0 + excess * 0.85)
 
         # 4. Total points expectation calibrated to empirical FBS average (54.5)
         epa_total_adj = (home_state.adj_offense_epa + away_state.adj_offense_epa) * 12.0

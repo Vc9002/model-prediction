@@ -910,10 +910,21 @@ def build_cfb_slate(
             elif mtype == "spread":
                 p_cov_a = float(p.probabilities.get("away", 0.5))
                 p_cov_h = float(p.probabilities.get("home", 0.5))
+                is_conf = bool((p.feature_basis or {}).get("is_conference_matchup", False))
                 if pm_sp is not None and pm_spread_away_prob is not None and pm_spread_home_prob is not None:
                     edge_a = p_cov_a - float(pm_spread_away_prob)
                     edge_h = p_cov_h - float(pm_spread_home_prob)
-                    if edge_a >= edge_h:
+                    is_h_fav = (pm_spread_home_line or 0.0) < 0
+                    if not is_conf:
+                        pick_away = (
+                            (edge_a > 0.08 and edge_a > edge_h)
+                            if is_h_fav
+                            else not (edge_h > 0.08 and edge_h > edge_a)
+                        )
+                    else:
+                        pick_away = edge_a >= edge_h
+
+                    if pick_away:
                         selection, prob, ask = "away", p_cov_a, float(pm_spread_away_prob)
                         line_val = pm_spread_away_line
                     else:
@@ -928,7 +939,17 @@ def build_cfb_slate(
                     h_ask = market_spread_home_prob or STANDARD_LAY_ASK
                     edge_a = p_cov_a - float(a_ask)
                     edge_h = p_cov_h - float(h_ask)
-                    if edge_a >= edge_h:
+                    is_h_fav = (spread_home_line or 0.0) < 0
+                    if not is_conf:
+                        pick_away = (
+                            (edge_a > 0.08 and edge_a > edge_h)
+                            if is_h_fav
+                            else not (edge_h > 0.08 and edge_h > edge_a)
+                        )
+                    else:
+                        pick_away = edge_a >= edge_h
+
+                    if pick_away:
                         selection, prob, ask = "away", p_cov_a, float(a_ask)
                         line_val = spread_away_line
                     else:
@@ -943,10 +964,13 @@ def build_cfb_slate(
             else:  # total
                 p_ov = float(p.probabilities.get("over", 0.5))
                 p_un = float(p.probabilities.get("under", 0.5))
+                eff_tot = float(pm_total_line if pm_tot is not None else (total_line or 52.5))
                 if pm_tot is not None and pm_total_over_prob is not None and pm_total_under_prob is not None:
                     edge_o = p_ov - float(pm_total_over_prob)
                     edge_u = p_un - float(pm_total_under_prob)
-                    if edge_o >= edge_u:
+                    pick_under = (edge_u > 0.08) if eff_tot > 56.5 else (edge_u > edge_o)
+
+                    if not pick_under:
                         selection, prob, ask = "over", p_ov, float(pm_total_over_prob)
                     else:
                         selection, prob, ask = "under", p_un, float(pm_total_under_prob)
@@ -960,7 +984,9 @@ def build_cfb_slate(
                     u_ask = market_total_under_prob or STANDARD_LAY_ASK
                     edge_o = p_ov - float(o_ask)
                     edge_u = p_un - float(u_ask)
-                    if edge_o >= edge_u:
+                    pick_under = (edge_u > 0.08) if eff_tot > 56.5 else (edge_u > edge_o)
+
+                    if not pick_under:
                         selection, prob, ask = "over", p_ov, float(o_ask)
                     else:
                         selection, prob, ask = "under", p_un, float(u_ask)
