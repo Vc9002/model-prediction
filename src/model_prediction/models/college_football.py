@@ -990,12 +990,13 @@ def build_cfb_slate(
                     edge_o = p_ov - float(pm_total_over_prob)
                     edge_u = p_un - float(pm_total_under_prob)
                     if eff_tot > 56.5:
-                        pick_under = edge_u > 0.08
-                    elif eff_tot <= 48.5:
-                        pick_under = edge_u > 0.05
+                        pick_under = (edge_u >= edge_o) or (edge_u > 0.03)
+                    elif eff_tot <= 46.5:
+                        # Low totals: do not blind-buy Overs; require decisive edge > 0.06
+                        pick_under = not (edge_o > 0.06 and edge_o > edge_u)
                     elif spread_mag > 14.5:
                         # Blowout mismatches (>14.5) go Over 58.2%
-                        pick_under = edge_u > 0.04
+                        pick_under = edge_u > (edge_o + 0.02)
                     elif spread_mag <= 7.0:
                         # Tight competitive games (<=7.0) go Under 52.3%
                         pick_under = (edge_u + 0.01) >= edge_o
@@ -1017,12 +1018,13 @@ def build_cfb_slate(
                     edge_o = p_ov - float(o_ask)
                     edge_u = p_un - float(u_ask)
                     if eff_tot > 56.5:
-                        pick_under = edge_u > 0.08
-                    elif eff_tot <= 48.5:
-                        pick_under = edge_u > 0.05
+                        pick_under = (edge_u >= edge_o) or (edge_u > 0.03)
+                    elif eff_tot <= 46.5:
+                        # Low totals: do not blind-buy Overs; require decisive edge > 0.06
+                        pick_under = not (edge_o > 0.06 and edge_o > edge_u)
                     elif spread_mag > 14.5:
                         # Blowout mismatches (>14.5) go Over 58.2%
-                        pick_under = edge_u > 0.04
+                        pick_under = edge_u > (edge_o + 0.02)
                     elif spread_mag <= 7.0:
                         # Tight competitive games (<=7.0) go Under 52.3%
                         pick_under = (edge_u + 0.01) >= edge_o

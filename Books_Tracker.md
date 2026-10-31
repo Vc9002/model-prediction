@@ -23,8 +23,8 @@ These are Vincent's reported purchases, separate from provider-posted stakes and
 | :--- | ---: | :---: | ---: | ---: | ---: |
 | FadeMeBets | 60 | 31-27-0 | 2 | 85.50u | +2.03u |
 | Scout | 12 | 2-9-0 (1 void) | 0 | 23.00u plus unspecified Oct. 29 stake | -14.09u |
-| Kytra | 18 | 8-7-0 | 3 | 25.50u | +1.35u |
-| **All providers** | **90** | **41-43-0 (1 void)** | **5** | **134.00u plus unspecified Scout stake** | **-10.71u** |
+| Kytra | 18 | 8-8-0 | 2 | 25.50u | -0.65u |
+| **All providers** | **90** | **41-44-0 (1 void)** | **4** | **134.00u plus unspecified Scout stake** | **-12.71u** |
 
 Screenshot entries are dated October 25, 2026. Settlement status is shown per row. Message timestamps are posting times. Scout's screenshot explicitly names Scout. Kytra attribution is inferred from the user's request: that screenshot displays Winible Bot rather than Kytra. The parlay is one pick at the displayed combined price; its legs are not counted separately. Standalone alternate spreads remain separate picks.
 
@@ -115,11 +115,11 @@ Scout posted this at 11:40 AM. The post does not state a unit size; no stake was
 | ID | Sport | Selection | Odds (US) | Stake | Result | Net P/L |
 | :--- | :--- | :--- | ---: | ---: | :--- | ---: |
 | K015 | NCAAF | Maryland +3.5 | -132 | 2.00u | **WIN** — [Illinois 20, Maryland 17](https://www.espn.com/college-football/game/_/gameId/401858503); covered +3.5 | **+1.52u** |
-| K016 | NCAAF | Indiana -19.5 | -120 | 2.00u | PENDING | — |
+| K016 | NCAAF | Indiana -19.5 | -120 | 2.00u | **LOSS** — [Indiana 23, Minnesota 16 (OT)](https://www.espn.com/college-football/game/_/gameId/401858504); won by 7, failed to cover -19.5 | **-2.00u** |
 | K017 | NCAAF | Ohio State/USC over 50.5 | -112 | 2.00u | PENDING | — |
 | K018 | NBA | 2-Leg SGP: Thunder +7.5 / Shai Gilgeous-Alexander over 24.5 points | -112 | 2.00u | PENDING | — |
 
-**October 31 Kytra:** 1-0-0 (+1.52u settled), 3 picks pending (6.00u). K016 live in 2nd Qtr; K017 & K018 scheduled tonight.
+**October 31 Kytra:** 1-1-0 (-0.48u settled), 2 picks pending (4.00u). K017 (NCAAF OSU/USC O50.5) & K018 (NBA Thunder +7.5/SGA O24.5 SGP) tonight.
 
 ### Settlement evidence — October 29 & 30, 2026
 
@@ -144,7 +144,7 @@ October 30 provider total: 3-3-0, +0.94u net on 8.00u risked (+0.73u FMB, +0.21u
 - **FMB #058**: [Texas Tech 34, Arizona 26](https://www.espn.com/college-football/game/_/gameId/401856842). Texas Tech covered -3.5 (WIN, +0.91u).
 - **FMB #059**: [Ole Miss 45, Auburn 15](https://www.espn.com/college-football/game/_/gameId/401856735). Ole Miss covered -10.5 (WIN, +0.45u).
 - **Kytra K015**: [Illinois 20, Maryland 17](https://www.espn.com/college-football/game/_/gameId/401858503). Maryland covered +3.5 (WIN, +1.52u).
-- Remaining 5 picks (FMB #057, FMB #060, K016, K017, K018) remain strictly **PENDING**.
+- Remaining 4 picks (FMB #057, FMB #060, K017, K018) remain strictly **PENDING**.
 
 ### Settlement evidence and rounding — October 28
 

@@ -684,11 +684,19 @@ class CFBFeatureExtractor:
             sign = 1.0 if proj_margin > 0 else -1.0
             proj_margin = sign * (28.0 + excess * 0.85)
 
-        # 4. Total points expectation calibrated to empirical FBS average (54.5)
+        # 4. Total points expectation: blend structural bottom-up PPP total with macro baseline
         epa_total_adj = (home_state.adj_offense_epa + away_state.adj_offense_epa) * 12.0
+        structural_total = (
+            proj_possessions * (exp_home_ppp + exp_away_ppp) + epa_total_adj
+        )
+        sample_games = min(away_state.games_played, home_state.games_played)
+        macro_weight = max(0.20, 0.60 - 0.05 * sample_games)
+        macro_baseline = (
+            CFB_BASELINE_TOTAL + weather_total_adj + (proj_possessions - 11.5) * 1.8
+        )
         proj_total = max(
-            30.0,
-            CFB_BASELINE_TOTAL + weather_total_adj + (proj_possessions - 11.5) * 2.25 + epa_total_adj,
+            24.0,
+            macro_weight * macro_baseline + (1.0 - macro_weight) * structural_total,
         )
 
         proj_home_pts = max(3.0, (proj_total + proj_margin) / 2.0)
