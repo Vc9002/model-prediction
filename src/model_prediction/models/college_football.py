@@ -915,7 +915,15 @@ def build_cfb_slate(
                     edge_a = p_cov_a - float(pm_spread_away_prob)
                     edge_h = p_cov_h - float(pm_spread_home_prob)
                     is_h_fav = (pm_spread_home_line or 0.0) < 0
-                    if not is_conf:
+                    spread_mag = abs(pm_spread_home_line or 0.0)
+                    if 3.5 < spread_mag <= 9.5:
+                        # Key number 7 window: favorites cover only 45%. Require decisive edge > 0.08 to lay points.
+                        pick_away = (
+                            not (edge_h > 0.08 and edge_h > edge_a)
+                            if is_h_fav
+                            else (edge_a > 0.08 and edge_a > edge_h)
+                        )
+                    elif not is_conf:
                         pick_away = (
                             (edge_a > 0.08 and edge_a > edge_h)
                             if is_h_fav
@@ -940,7 +948,15 @@ def build_cfb_slate(
                     edge_a = p_cov_a - float(a_ask)
                     edge_h = p_cov_h - float(h_ask)
                     is_h_fav = (spread_home_line or 0.0) < 0
-                    if not is_conf:
+                    spread_mag = abs(spread_home_line or 0.0)
+                    if 3.5 < spread_mag <= 9.5:
+                        # Key number 7 window: favorites cover only 45%. Require decisive edge > 0.08 to lay points.
+                        pick_away = (
+                            not (edge_h > 0.08 and edge_h > edge_a)
+                            if is_h_fav
+                            else (edge_a > 0.08 and edge_a > edge_h)
+                        )
+                    elif not is_conf:
                         pick_away = (
                             (edge_a > 0.08 and edge_a > edge_h)
                             if is_h_fav
@@ -968,7 +984,12 @@ def build_cfb_slate(
                 if pm_tot is not None and pm_total_over_prob is not None and pm_total_under_prob is not None:
                     edge_o = p_ov - float(pm_total_over_prob)
                     edge_u = p_un - float(pm_total_under_prob)
-                    pick_under = (edge_u > 0.08) if eff_tot > 56.5 else (edge_u > edge_o)
+                    if eff_tot > 56.5:
+                        pick_under = edge_u > 0.08
+                    elif eff_tot <= 48.5:
+                        pick_under = edge_u > 0.05
+                    else:
+                        pick_under = edge_u > edge_o
 
                     if not pick_under:
                         selection, prob, ask = "over", p_ov, float(pm_total_over_prob)
@@ -984,7 +1005,12 @@ def build_cfb_slate(
                     u_ask = market_total_under_prob or STANDARD_LAY_ASK
                     edge_o = p_ov - float(o_ask)
                     edge_u = p_un - float(u_ask)
-                    pick_under = (edge_u > 0.08) if eff_tot > 56.5 else (edge_u > edge_o)
+                    if eff_tot > 56.5:
+                        pick_under = edge_u > 0.08
+                    elif eff_tot <= 48.5:
+                        pick_under = edge_u > 0.05
+                    else:
+                        pick_under = edge_u > edge_o
 
                     if not pick_under:
                         selection, prob, ask = "over", p_ov, float(o_ask)
