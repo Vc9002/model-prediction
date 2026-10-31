@@ -537,6 +537,7 @@ def _cfb_logging_fixture(event_start, model_version="cfb-structural-v2"):
                 "edge_vs_executable_ask": 0.05,
                 "model_version": model_version,
                 "rationale": "deterministic test fixture",
+                "weather_inputs_verified": True,
             }
             for market, selection, line in [
                 ("moneyline", "home", None),
@@ -672,7 +673,10 @@ def test_cfb_started_games_cannot_be_logged_by_backdating(tmp_path, monkeypatch,
         force=force,
     )
     assert result["flat_logged"] == 0
-    assert len(result["errors"]) == 3
+    if force:
+        assert len(result["errors"]) == 3
+    else:
+        assert len(result.get("skipped", [])) == 3
     assert flat.rows() == []
 
 
