@@ -21,10 +21,10 @@ These are Vincent's reported purchases, separate from provider-posted stakes and
 
 | Provider | Logged picks | Settled record | Pending | Total posted stakes | Realized net |
 | :--- | ---: | :---: | ---: | ---: | ---: |
-| FadeMeBets | 60 | 31-29-0 | 0 | 85.50u | -2.97u |
+| FadeMeBets | 64 | 32-32-0 | 0 | 90.50u | -4.15u |
 | Scout | 12 | 2-9-0 (1 void) | 0 | 23.00u plus unspecified Oct. 29 stake | -14.09u |
 | Kytra | 18 | 8-10-0 | 0 | 25.50u | -4.65u |
-| **All providers** | **90** | **41-48-0 (1 void)** | **0** | **134.00u plus unspecified Scout stake** | **-21.71u** |
+| **All providers** | **94** | **42-51-0 (1 void)** | **0** | **139.00u plus unspecified Scout stake** | **-22.89u** |
 
 Screenshot entries are dated October 25, 2026. Settlement status is shown per row. Message timestamps are posting times. Scout's screenshot explicitly names Scout. Kytra attribution is inferred from the user's request: that screenshot displays Winible Bot rather than Kytra. The parlay is one pick at the displayed combined price; its legs are not counted separately. Standalone alternate spreads remain separate picks.
 
@@ -151,6 +151,13 @@ October 30 provider total: 3-3-0, +0.94u net on 8.00u risked (+0.73u FMB, +0.21u
 - **Kytra K018**: [Houston Rockets 119, Oklahoma City Thunder 98](https://www.espn.com/nba/game/_/gameId/401909902). SGA scored 26 points; Thunder lost by 21 and failed to cover +7.5 (LOSS, -2.00u).
 - October 31 provider total: 3-5-0, -8.12u net on 14.50u risked (FMB 2-2-0, -3.64u; Kytra 1-3-0, -4.48u). All 8 picks fully settled.
 
+### November 1 Settlement Verification (1:00 PM ET NFL Window)
+- **FMB #061**: [Pittsburgh Steelers 27, Cleveland Browns 6](https://www.espn.com/nfl/game/_/gameId/401873027). Total 33 points; comfortably under 39.5 (**WIN**, **+1.82u**).
+- **FMB #062**: [Buffalo Bills 36, Baltimore Ravens 10](https://www.espn.com/nfl/game/_/gameId/401873026). Ravens lost by 26 without Lamar Jackson; failed to cover +3 (**LOSS**, **-1.00u**). Provider falsely claimed Jackson was starting; our model caught the injury, upgraded Bills -3.0 (65.0% cover), and faded Ravens.
+- **FMB #063**: [Cincinnati Bengals 43, Tennessee Titans 36](https://www.espn.com/nfl/game/_/gameId/401873031). Bengals won by 7; failed to cover -13.5 (**LOSS**, **-1.00u**). Our model flagged Titans +13.5 dog value.
+- **FMB #064**: [Detroit Lions 19, Minnesota Vikings 15](https://www.espn.com/nfl/game/_/gameId/401873030). Vikings lost by 4; failed to cover +3.5 (**LOSS**, **-1.00u**). Our model backed Detroit -3.0.
+- November 1 provider total (1:00 PM ET slate): 1-3-0, -1.18u net on 5.00u risked (FMB 1-3-0, -1.18u). All 4 picks fully settled.
+
 ### Settlement evidence and rounding — October 28
 
 ESPN structured game summaries returned terminal `STATUS_FINAL` with final scores for [76ers at Pacers](https://www.espn.com/nba/game/_/gameId/401909884), [Warriors at Timberwolves](https://www.espn.com/nba/game/_/gameId/401909888), [Nuggets at Pelicans](https://www.espn.com/nba/game/_/gameId/401909889), [Brewers at Rays](https://www.espn.com/mlb/game/_/gameId/401908046), and [Flames at Oilers](https://www.espn.com/nhl/game/_/gameId/401892597). The MLB box-score pitching row lists Misiorowski at 2 strikeouts. October 27 finals for FMB rows 041-044 were also checked against ESPN structured scores. Each row's P/L is rounded to 0.01u; daily and all-time displayed totals sum the rounded row values. Personal ticket winnings remain unquantified where execution odds are unknown.
@@ -166,18 +173,18 @@ A structured, ongoing tracking ledger for **FadeMeBets** premium picks, covering
 
 ## 📊 Performance Dashboard
 
-*Last Updated: November 1, 2026. All 60 FMB picks fully settled; 0 pending. Provider stakes, not personal wagers.*
+*Last Updated: November 1, 2026 (4:45 PM ET). All 64 FMB picks fully settled; 0 pending. Provider stakes, not personal wagers.*
 
 | Metric | Overall | Lock of the Day (Featured) | EV Picks |
 | :--- | :---: | :---: | :---: |
-| **Total Picks Logged** | **60** | 15 | 45 |
-| **Settled Record** | **31 - 29 - 0** | 9 - 6 - 0 | 22 - 23 - 0 |
+| **Total Picks Logged** | **64** | 16 | 48 |
+| **Settled Record** | **32 - 32 - 0** | 10 - 6 - 0 | 22 - 26 - 0 |
 | **Pending / Live** | **0** | 0 | 0 |
-| **Win Rate (Settled)** | **51.7%** | 60.0% | **48.9%** |
-| **Total Units Risked** | **85.50u** | 41.00u | 44.50u |
-| **Settled Units Risked**| **85.50u** | 41.00u | 44.50u |
-| **Net Profit / Loss** | **-2.97u** | **+2.10u** | **-5.07u** |
-| **ROI % (Settled)** | **-3.5%** | +5.1% | **-11.4%** |
+| **Win Rate (Settled)** | **50.0%** | 62.5% | **45.8%** |
+| **Total Units Risked** | **90.50u** | 43.00u | 47.50u |
+| **Settled Units Risked**| **90.50u** | 43.00u | 47.50u |
+| **Net Profit / Loss** | **-4.15u** | **+3.92u** | **-8.07u** |
+| **ROI % (Settled)** | **-4.6%** | +9.1% | **-17.0%** |
 | **Pending Potential** | **0.00u** | 0.00u | 0.00u |
 
 ### Sport Breakdown
@@ -243,6 +250,7 @@ A structured, ongoing tracking ledger for **FadeMeBets** premium picks, covering
 - **NCAAF** (Oct 30): 2 Picks (2.00u risked) — **1-1-0 (-0.09u)**
 - **NHL** (Oct 30): 1 Pick (1.00u risked) — **0-1-0 (-1.00u)**
 - **NCAAF** (Oct 31): 4 Picks (6.50u risked) — **2-2-0 (-3.64u)** (Texas Tech WIN +0.91u, Ole Miss WIN +0.45u, Oregon State LOSS -4.00u, Oklahoma State LOSS -1.00u)
+- **NFL** (Nov 1): 4 Picks (5.00u risked) — **1-3-0 (-1.18u)** (Browns/Steelers Under 39.5 WIN +1.82u; Ravens +3 LOSS -1.00u; Bengals -13.5 LOSS -1.00u; Vikings +3.5 LOSS -1.00u)
 
 ### Daily Results
 
@@ -263,6 +271,7 @@ A structured, ongoing tracking ledger for **FadeMeBets** premium picks, covering
 | Oct 29 | 0-4-0 | 5.00u | -5.00u | -0.06u |
 | Oct 30 | 2-2-0 | 5.00u | +0.73u | +0.67u |
 | Oct 31 | 2-2-0 | 6.50u | -3.64u | -2.97u |
+| Nov 1 | 1-3-0 | 5.00u | -1.18u | -4.15u |
 
 
 ---
@@ -361,6 +370,10 @@ A structured, ongoing tracking ledger for **FadeMeBets** premium picks, covering
 | **058** | Oct 31, 2026 | NCAAF | Arizona at Texas Tech | **Texas Tech -3.5** | -110 | 1.00u | 12.4% EV; 57 Conf | 12:00 PM | **FINAL** | **WIN** ([Texas Tech 34, Arizona 26](https://www.espn.com/college-football/game/_/gameId/401856842); won by 8, covered -3.5) | **+0.91u** |
 | **059** | Oct 31, 2026 | NCAAF | Auburn at Ole Miss | **Ole Miss -10.5** | -110 | 0.50u | 4.3% EV; 53 Conf | 12:45 PM | **FINAL** | **WIN** ([Ole Miss 45, Auburn 15](https://www.espn.com/college-football/game/_/gameId/401856735); won by 30, covered -10.5) | **+0.45u** |
 | **060** | Oct 31, 2026 | NCAAF | Oklahoma State at Iowa State | **Oklahoma State -9.5** | -110 | 1.00u | 15.4% EV; 58 Conf | 7:00 PM | **FINAL** | **LOSS** ([Iowa State 51, Oklahoma State 49](https://www.espn.com/college-football/game/_/gameId/401856847); lost by 2, failed to cover -9.5) | **-1.00u** |
+| **061** | Nov 1, 2026 | NFL | Cleveland Browns at Pittsburgh Steelers | **Under 39.5** | -110 | 2.00u | High Conf (Lock) | 1:00 PM | **FINAL** | **WIN** ([Steelers 27, Browns 6](https://www.espn.com/nfl/game/_/gameId/401873027); 33 total) | **+1.82u** |
+| **062** | Nov 1, 2026 | NFL | Baltimore Ravens at Buffalo Bills | **Ravens +3** | -110 | 1.00u | 8.3% EV; 54 Conf | 1:00 PM | **FINAL** | **LOSS** ([Bills 36, Ravens 10](https://www.espn.com/nfl/game/_/gameId/401873026); lost by 26, failed to cover +3) | **-1.00u** |
+| **063** | Nov 1, 2026 | NFL | Tennessee Titans at Cincinnati Bengals | **Bengals -13.5** | -110 | 1.00u | 17.3% EV; 55 Conf | 1:00 PM | **FINAL** | **LOSS** ([Bengals 43, Titans 36](https://www.espn.com/nfl/game/_/gameId/401873031); won by 7, failed to cover -13.5) | **-1.00u** |
+| **064** | Nov 1, 2026 | NFL | Minnesota Vikings at Detroit Lions | **Vikings +3.5** | -115 | 1.00u | 8.3% EV; 56 Conf | 1:00 PM | **FINAL** | **LOSS** ([Lions 19, Vikings 15](https://www.espn.com/nfl/game/_/gameId/401873030); lost by 4, failed to cover +3.5) | **-1.00u** |
 
 ---
 
@@ -788,3 +801,24 @@ The Sunday Night NFL window has completed:
 - Realized net profit: **-4.71u**.
 - October 26 blind-tail result so far: **1–6, -6.67u** on 8.75u settled stakes.
 - Pending: **2 Scout picks** (Warriors +9.5 and Stephen Curry over 24.5 points; 4.00u posted stakes).
+
+### Settlement update — November 1, 2026, 4:45 PM ET (1:00 PM NFL Window Final)
+
+The 1:00 PM ET NFL window has finalized:
+1. **Steelers vs Browns**: Pittsburgh won 27-6 (total 33 points).
+   - **FadeMeBets #061** (Under 39.5 Lock, -110, 2.00u): **WIN** (+1.82u).
+2. **Bills vs Ravens**: Buffalo won 36-10 (total 46 points).
+   - **FadeMeBets #062** (Ravens +3, -110, 1.00u): **LOSS** (-1.00u). Provider relied on Lamar Jackson starting ("Lamar Jackson is back..."), but Jackson was OUT.
+   - **Our Model V7**: With Lamar injury penalty baked in, projected Buffalo by 10.0 and Bills -3.0 cover at 65.0% -> **MASSIVE MODEL / FADE WIN**.
+3. **Bengals vs Titans**: Cincinnati won 43-36 (total 79 points).
+   - **FadeMeBets #063** (Bengals -13.5, -110, 1.00u): **LOSS** (-1.00u). Bengals failed to cover by 6.5 points.
+   - **Our Model V7**: Called Titans +13.5 as top value lean -> **MODEL / FADE WIN**.
+4. **Lions vs Vikings**: Detroit won 19-15 (total 34 points).
+   - **FadeMeBets #064** (Vikings +3.5, -115, 1.00u): **LOSS** (-1.00u). Lions covered the 3.5-point hook.
+   - **Our Model V7**: Favored Lions -3.0 -> **MODEL / FADE WIN**.
+
+**Realized totals across all providers as of November 1, 2026 (4:45 PM ET)**:
+- Settled record: **42–51–0 (1 void)** (45.2% win rate).
+- Realized net profit: **-22.89u** on 139.00u risked.
+- November 1 provider result so far: **1–3, -1.18u** on 5.00u settled stakes.
+- Strategy 6 (Fade FMB / Model Alignment) on Nov 1 1:00 PM card: **4–0 (100% Sweep)**.
