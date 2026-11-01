@@ -989,7 +989,8 @@ def build_cfb_slate(
                         # Tight competitive games (<=7.0) go Under 52.3%
                         pick_under = (edge_u + 0.01) >= edge_o
                     else:
-                        pick_under = edge_u > edge_o
+                        # Asymmetric Over hurdle: require decisive edge >= 0.04 to buy Over; otherwise default to Under
+                        pick_under = not (edge_o >= 0.04 and edge_o > edge_u)
 
                     if not pick_under:
                         selection, prob, ask = "over", p_ov, float(pm_total_over_prob)
@@ -1017,7 +1018,8 @@ def build_cfb_slate(
                         # Tight competitive games (<=7.0) go Under 52.3%
                         pick_under = (edge_u + 0.01) >= edge_o
                     else:
-                        pick_under = edge_u > edge_o
+                        # Asymmetric Over hurdle: require decisive edge >= 0.04 to buy Over; otherwise default to Under
+                        pick_under = not (edge_o >= 0.04 and edge_o > edge_u)
 
                     if not pick_under:
                         selection, prob, ask = "over", p_ov, float(o_ask)

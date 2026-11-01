@@ -689,7 +689,8 @@ class CFBFeatureExtractor:
         structural_total = proj_possessions * (exp_home_ppp + exp_away_ppp) + epa_total_adj
         sample_games = min(away_state.games_played, home_state.games_played)
         macro_weight = max(0.20, 0.60 - 0.05 * sample_games)
-        macro_baseline = CFB_BASELINE_TOTAL + weather_total_adj + (proj_possessions - 11.5) * 1.8
+        conf_macro_base = 49.5 if is_conf_matchup else 54.0
+        macro_baseline = conf_macro_base + weather_total_adj + (proj_possessions - 11.2) * 1.8
         proj_total = max(
             24.0,
             macro_weight * macro_baseline + (1.0 - macro_weight) * structural_total,

@@ -718,9 +718,14 @@ class PickLedger:
             # Operator Directive: Flat ledger calls everything (full coverage, zero shadow picks).
             # Hybrid edge-scaling: spreads and totals scale dynamically (1.0U-2.0U); moneyline capped at 1.0U.
             is_moneyline = str(getattr(request, "market_type", "")).strip().lower() in ("moneyline", "ml")
+            is_cfb_over = (
+                str(getattr(request, "league", "")).upper() in ("NCAAF", "CFB")
+                and str(getattr(request, "market_type", "")).lower() == "total"
+                and str(getattr(request, "selection", "")).lower() == "over"
+            )
             market_p = implied_probability(request.american_odds) if request.american_odds else 0.5
             calc_edge = max(0.0, request.model_probability - market_p)
-            if is_moneyline:
+            if is_moneyline or is_cfb_over:
                 dyn_units = 1.0
             else:
                 dyn_units = (
@@ -746,9 +751,14 @@ class PickLedger:
             # Main ledger is the gated ledger. Calls reaching Main are qualified calls.
             # Hybrid edge-scaling: spreads and totals scale dynamically (1.0U-2.0U); moneyline capped at 1.0U.
             is_moneyline = str(getattr(request, "market_type", "")).strip().lower() in ("moneyline", "ml")
+            is_cfb_over = (
+                str(getattr(request, "league", "")).upper() in ("NCAAF", "CFB")
+                and str(getattr(request, "market_type", "")).lower() == "total"
+                and str(getattr(request, "selection", "")).lower() == "over"
+            )
             market_p = implied_probability(request.american_odds) if request.american_odds else 0.5
             calc_edge = max(0.0, request.model_probability - market_p)
-            if is_moneyline:
+            if is_moneyline or is_cfb_over:
                 dyn_units = 1.0
             else:
                 dyn_units = (
