@@ -115,7 +115,7 @@ Scout posted this at 11:40 AM. The post does not state a unit size; no stake was
 | ID | Sport | Selection | Odds (US) | Stake | Result | Net P/L |
 | :--- | :--- | :--- | ---: | ---: | :--- | ---: |
 | K015 | NCAAF | Maryland +3.5 | -132 | 2.00u | **WIN** — [Illinois 20, Maryland 17](https://www.espn.com/college-football/game/_/gameId/401858503); covered +3.5 | **+1.52u** |
-| K016 | NCAAF | Indiana -19.5 | -120 | 2.00u | **LOSS** — [Indiana 23, Minnesota 16 (OT)](https://www.espn.com/college-football/game/_/gameId/401858504); won by 7, failed to cover -19.5 | **-2.00u** |
+| K016 | NCAAF | Indiana -19.5 | -120 | 2.00u | **LOSS** — [Indiana 23, Minnesota 16 (OT)](https://www.espn.com/college-football/game/_/gameId/401858501); won by 7, failed to cover -19.5 | **-2.00u** |
 | K017 | NCAAF | Ohio State/USC over 50.5 | -112 | 2.00u | **LOSS** — [USC 30, Ohio State 18](https://www.espn.com/college-football/game/_/gameId/401858509); 48 total points, fell short of 50.5 | **-2.00u** |
 | K018 | NBA | 2-Leg SGP: Thunder +7.5 / Shai Gilgeous-Alexander over 24.5 points | -112 | 2.00u | **LOSS** — [Rockets 119, Thunder 98](https://www.espn.com/nba/game/_/gameId/401909902); SGA scored 26 pts (won leg), but Thunder failed to cover +7.5 (lost by 21) | **-2.00u** |
 
