@@ -24,6 +24,10 @@ def engine_hash(method: str) -> str:
         "total_normal": "basketball.py",
         "nfl_structural_v5_margin_engine": "nfl_structural_v5.py",
         "nfl_structural_v5_total_engine": "nfl_structural_v5.py",
+        "nfl_spread_structural_v6_engine": "nfl_spread_v6.py",
+        "nfl_total_structural_v6_engine": "nfl_total_v6.py",
+        "nfl_spread_structural_v7_engine": "nfl_spread_v7.py",
+        "nfl_total_structural_v7_engine": "nfl_total_v7.py",
     }.get(method)
     if name is None:
         raise ValueError("unsupported_scalar_replay_method")
@@ -136,6 +140,101 @@ def replay_snapshot(payload: dict[str, Any]) -> dict[str, float]:
             p_over /= tot_total
             p_under /= tot_total
         return {"under": round(p_under, 6), "over": round(p_over, 6)}
+    if method == "nfl_spread_structural_v6_engine":
+        from .models.nfl_spread_v6 import (
+            NFL_KEY_MARGIN_WEIGHTS,
+        )
+        from .models.nfl_spread_v6 import (
+            _normal_cdf as _nfl_cdf,
+        )
+
+        cutoff = line
+        exp_margin = mean
+        margin_sd = sd
+        key_number_weight = float(artifact.get("key_number_weight", 0.2))
+        min_cover_prob = float(artifact.get("min_cover_prob", 0.35))
+        max_cover_prob = float(artifact.get("max_cover_prob", 0.65))
+
+        p_raw_home_cover = 1.0 - _nfl_cdf(cutoff, exp_margin, margin_sd)
+        key_bump = 0.0
+        for km, kw in NFL_KEY_MARGIN_WEIGHTS.items():
+            if cutoff < km <= cutoff + 1.0:
+                key_bump += kw * 0.35
+            elif cutoff - 1.0 < km <= cutoff:
+                key_bump -= kw * 0.35
+
+        p_home_cover = (1.0 - key_number_weight) * p_raw_home_cover + key_number_weight * (
+            p_raw_home_cover + key_bump
+        )
+        p_home_cover = max(min_cover_prob, min(max_cover_prob, p_home_cover))
+        p_away_cover = 1.0 - p_home_cover
+        return {"away": round(p_away_cover, 6), "home": round(p_home_cover, 6)}
+    if method == "nfl_spread_structural_v7_engine":
+        from .models.nfl_spread_v7 import (
+            NFL_KEY_MARGIN_FREQUENCIES,
+        )
+        from .models.nfl_spread_v7 import (
+            _normal_cdf as _nfl_cdf,
+        )
+
+        cutoff = line
+        exp_margin = mean
+        margin_sd = sd
+        key_number_weight = float(artifact.get("key_number_weight", 0.2))
+        min_cover_prob = float(artifact.get("min_cover_prob", 0.35))
+        max_cover_prob = float(artifact.get("max_cover_prob", 0.65))
+
+        p_raw_home_cover = 1.0 - _nfl_cdf(cutoff, exp_margin, margin_sd)
+        key_bump = 0.0
+        for km, kw in NFL_KEY_MARGIN_FREQUENCIES.items():
+            if cutoff < km <= cutoff + 1.0:
+                key_bump += kw * 0.35
+            elif cutoff - 1.0 < km <= cutoff:
+                key_bump -= kw * 0.35
+
+        p_home_cover = (1.0 - key_number_weight) * p_raw_home_cover + key_number_weight * (
+            p_raw_home_cover + key_bump
+        )
+        p_home_cover = max(min_cover_prob, min(max_cover_prob, p_home_cover))
+
+        if artifact.get("use_scoring_simulation"):
+            from .models.nfl_scoring_simulation import solve_bivariate_scoring
+
+            pts_home = round(23.0 + exp_margin / 2.0, 1)
+            pts_away = round(23.0 - exp_margin / 2.0, 1)
+            sim = solve_bivariate_scoring(
+                exp_home_pts=pts_home,
+                exp_away_pts=pts_away,
+                spread_home_line=-cutoff,
+                rho=float(artifact.get("rho", 0.08)),
+            )
+            sim_weight = float(artifact.get("simulation_weight", 0.2))
+            p_home_cover = (1.0 - sim_weight) * p_home_cover + sim_weight * sim.prob_home_cover
+            p_home_cover = max(min_cover_prob, min(max_cover_prob, p_home_cover))
+
+        p_away_cover = 1.0 - p_home_cover
+        return {"away": round(p_away_cover, 6), "home": round(p_home_cover, 6)}
+    if method in ("nfl_total_structural_v6_engine", "nfl_total_structural_v7_engine"):
+        from .models.nfl_total_v7 import _normal_cdf as _nfl_cdf
+
+        min_total_prob = float(artifact.get("min_total_prob", 0.35))
+        max_total_prob = float(artifact.get("max_total_prob", 0.65))
+        p_over = 1.0 - _nfl_cdf(line, mean, sd)
+        p_over = max(min_total_prob, min(max_total_prob, p_over))
+
+        if method == "nfl_total_structural_v7_engine" and artifact.get("use_scoring_simulation"):
+            from .models.nfl_scoring_simulation import solve_bivariate_scoring
+
+            sim = solve_bivariate_scoring(
+                exp_home_pts=mean / 2.0,
+                exp_away_pts=mean / 2.0,
+                total_line=line,
+            )
+            p_over = 0.70 * p_over + 0.30 * sim.prob_over
+            p_over = max(min_total_prob, min(max_total_prob, p_over))
+
+        p_under = 1.0 - p_over
+        return {"under": round(p_under, 6), "over": round(p_over, 6)}
 
     is_margin = method == "margin_normal"
     expected_sd = float(artifact["margin_sd" if is_margin else "total_sd"])
@@ -198,6 +297,10 @@ def validate_decision_snapshot(payload: dict[str, Any], row: dict[str, Any]) -> 
         "nfl_structural_v5_margin_engine": "spread",
         "total_normal": "total",
         "nfl_structural_v5_total_engine": "total",
+        "nfl_spread_structural_v6_engine": "spread",
+        "nfl_spread_structural_v7_engine": "spread",
+        "nfl_total_structural_v6_engine": "total",
+        "nfl_total_structural_v7_engine": "total",
     }[method]
     if (
         row.get("model_version") != artifact["model_version"]

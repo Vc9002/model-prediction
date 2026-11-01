@@ -3665,7 +3665,7 @@ def _forecast_nfl_total_slate(
             "away_rest_days": away_rest_days,
             "is_dome": is_dome,
             "is_division_game": is_division_game,
-            "short_week_penalty": fc.short_week_penalty,
+            "short_week_penalty": getattr(fc, "short_week_penalty", 0.0),
             "efficiency_source": efficiency_store.source_manifest,
             "injury_source": injury_source,
             "input_qualified": input_qualified,
@@ -3679,9 +3679,10 @@ def _forecast_nfl_total_slate(
             observed_at_utc=observed_at.isoformat(),
         )
 
+        short_week_pen = getattr(fc, "short_week_penalty", 0.0)
         tnf_note = (
-            f" TNF short-week drag: -{fc.short_week_penalty:.1f} pts ({home_rest_days}d/{away_rest_days}d rest)."
-            if fc.short_week_penalty > 0
+            f" TNF short-week drag: -{short_week_pen:.1f} pts ({home_rest_days}d/{away_rest_days}d rest)."
+            if short_week_pen > 0
             else ""
         )
         priced_contracts.append(

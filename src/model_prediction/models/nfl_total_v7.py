@@ -42,6 +42,7 @@ class NFLTotalForecast:
     effective_sd: float
     weather_total_penalty: float
     is_dome: bool
+    short_week_penalty: float = 0.0
 
 
 class NFLTotalModelV7:

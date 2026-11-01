@@ -288,3 +288,66 @@ def test_nrfi_started_event_is_not_backdated_to_look_pregame(monkeypatch):
     )
     result = cli._forecast_mlb_nrfi_flat("2000-01-01", False, {}, None, None, None, None, client=client)
     assert result["scheduled_events"] == 1 and result["nrfi_candidates"] == 0 and result["logged"] == 0
+
+
+def test_nfl_v7_spread_and_total_scalar_replay():
+    from model_prediction.models.nfl_spread_v7 import NFLSpreadModelV7
+    from model_prediction.models.nfl_total_v7 import NFLTotalModelV7
+
+    # 1. Spread V7
+    art_sp = artifact("nfl-spread-structural-v7")
+    model_sp = NFLSpreadModelV7.from_artifact(art_sp)
+    fc_sp = model_sp.forecast_spread("Buffalo Bills", "Baltimore Ravens", spread_home_line=-2.5)
+    snap_sp = build_snapshot(
+        art_sp,
+        {"home_team": "Buffalo Bills", "away_team": "Baltimore Ravens"},
+        {"mean": fc_sp.projected_margin_home, "sd": model_sp.margin_sd, "line": 2.5},
+        event_id="nfl-test-1",
+        event_start_utc="2026-11-01T18:00:00Z",
+        observed_at_utc="2026-11-01T15:00:00Z",
+    )
+    replayed_sp = replay_snapshot(snap_sp)
+    assert replayed_sp["home"] == fc_sp.prob_home_cover
+    assert replayed_sp["away"] == fc_sp.prob_away_cover
+
+    row_sp = {
+        "model_version": art_sp["model_version"],
+        "model_artifact_hash": art_sp["artifact_hash"],
+        "league": "NFL",
+        "event_id": "nfl-test-1",
+        "event_start_utc": "2026-11-01T18:00:00Z",
+        "market_type": "spread",
+        "selection": "home",
+        "line": -2.5,
+        "model_probability": fc_sp.prob_home_cover,
+    }
+    assert validate_decision_snapshot(snap_sp, row_sp) == fc_sp.prob_home_cover
+
+    # 2. Total V7
+    art_tot = artifact("nfl-total-structural-v7")
+    model_tot = NFLTotalModelV7.from_artifact(art_tot)
+    fc_tot = model_tot.forecast_total("Buffalo Bills", "Baltimore Ravens", total_line=47.5)
+    snap_tot = build_snapshot(
+        art_tot,
+        {"home_team": "Buffalo Bills", "away_team": "Baltimore Ravens"},
+        {"mean": fc_tot.projected_total, "sd": model_tot.total_sd, "line": 47.5},
+        event_id="nfl-test-2",
+        event_start_utc="2026-11-01T18:00:00Z",
+        observed_at_utc="2026-11-01T15:00:00Z",
+    )
+    replayed_tot = replay_snapshot(snap_tot)
+    assert replayed_tot["over"] == fc_tot.prob_over
+    assert replayed_tot["under"] == fc_tot.prob_under
+
+    row_tot = {
+        "model_version": art_tot["model_version"],
+        "model_artifact_hash": art_tot["artifact_hash"],
+        "league": "NFL",
+        "event_id": "nfl-test-2",
+        "event_start_utc": "2026-11-01T18:00:00Z",
+        "market_type": "total",
+        "selection": "over",
+        "line": 47.5,
+        "model_probability": fc_tot.prob_over,
+    }
+    assert validate_decision_snapshot(snap_tot, row_tot) == fc_tot.prob_over
