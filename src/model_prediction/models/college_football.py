@@ -887,23 +887,11 @@ def build_cfb_slate(
                 else:
                     continue
 
-                # 3-Tier Moneyline Selection Rule (Eliminates catastrophic extreme dog trap)
-                fav_side = "home" if h_ask >= 0.5 else "away"
-                dog_side = "away" if fav_side == "home" else "home"
-                fav_ask = h_ask if fav_side == "home" else a_ask
-                dog_ask = 1.0 - fav_ask + 0.045
-                p_fav = p_h if fav_side == "home" else p_a
-                p_dog = p_a if fav_side == "home" else p_h
-
-                if fav_ask <= 0.67:
-                    # Moderate favorite (-110 to -200): back favorite
-                    selection, prob, ask = fav_side, p_fav, fav_ask
-                elif fav_ask <= 0.80 and (p_dog - dog_ask) > -0.05:
-                    # Mid-dog (+175 to +350) with model edge: back dog
-                    selection, prob, ask = dog_side, p_dog, dog_ask
+                # Pure Probability Winner Selection: back the side with the higher win probability
+                if p_h >= p_a:
+                    selection, prob, ask = "home", p_h, h_ask
                 else:
-                    # Deep chalk: back favorite (never extreme dogs > +350)
-                    selection, prob, ask = fav_side, p_fav, fav_ask
+                    selection, prob, ask = "away", p_a, a_ask
 
                 line_val = None
                 slug = f"{slug_base}-{selection}"
