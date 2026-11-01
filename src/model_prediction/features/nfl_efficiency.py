@@ -10,6 +10,7 @@ import logging
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import polars as pl
@@ -174,6 +175,8 @@ class NFLEfficiencyMatchup:
     away_turnover_luck: float = 0.0
     home_pass_ratio: float = 0.58
     away_pass_ratio: float = 0.58
+    home_qb: str | None = None
+    away_qb: str | None = None
 
 
 class NFLEfficiencyStore:
@@ -233,6 +236,7 @@ class NFLEfficiencyStore:
         lookback_games: int = 8,
         opponent_adjust: bool = True,
         recency_decay: bool = True,
+        injury_entries: list[dict[str, Any]] | None = None,
     ) -> NFLEfficiencyMatchup:
         """Calculate strictly point-in-time EPA and QB metrics before as_of_date."""
         if isinstance(as_of_date, datetime):
@@ -244,6 +248,41 @@ class NFLEfficiencyStore:
 
         h_code = normalize_nfl_team_code(home_team)
         a_code = normalize_nfl_team_code(away_team)
+
+        # Auto-resolve starting QBs if not explicitly passed
+        manifest_qbs = (self.source_manifest or {}).get("projected_qbs", {})
+        if not home_qb and manifest_qbs:
+            home_qb = manifest_qbs.get(h_code)
+        if not away_qb and manifest_qbs:
+            away_qb = manifest_qbs.get(a_code)
+
+        if not home_qb and self._qb_df is not None and len(self._qb_df) > 0:
+            try:
+                top_h = (
+                    self._qb_df.filter((pl.col("team") == h_code) & (pl.col("gameday") < date_str))
+                    .group_by("player_display_name")
+                    .agg(pl.col("attempts").sum().alias("total_att"))
+                    .sort("total_att", descending=True)
+                    .limit(1)
+                )
+                if len(top_h) > 0:
+                    home_qb = str(top_h["player_display_name"][0])
+            except (KeyError, ValueError, TypeError, pl.exceptions.PolarsError) as exc:
+                logger.debug("Could not auto-resolve starting home QB: %s", exc)
+
+        if not away_qb and self._qb_df is not None and len(self._qb_df) > 0:
+            try:
+                top_a = (
+                    self._qb_df.filter((pl.col("team") == a_code) & (pl.col("gameday") < date_str))
+                    .group_by("player_display_name")
+                    .agg(pl.col("attempts").sum().alias("total_att"))
+                    .sort("total_att", descending=True)
+                    .limit(1)
+                )
+                if len(top_a) > 0:
+                    away_qb = str(top_a["player_display_name"][0])
+            except (KeyError, ValueError, TypeError, pl.exceptions.PolarsError) as exc:
+                logger.debug("Could not auto-resolve starting away QB: %s", exc)
 
         h_eff = self._team_efficiency(
             h_code, date_str, lookback_games, opponent_adjust=opponent_adjust, recency_decay=recency_decay
@@ -299,6 +338,14 @@ class NFLEfficiencyStore:
         h_qb_adj = self._qb_adjustment(home_qb, date_str) if home_qb else 0.0
         a_qb_adj = self._qb_adjustment(away_qb, date_str) if away_qb else 0.0
 
+        if injury_entries:
+            from .nfl_qb_oline import check_nfl_qb_injury_status
+
+            _, _, h_pen = check_nfl_qb_injury_status(home_team, home_qb or "", injury_entries)
+            _, _, a_pen = check_nfl_qb_injury_status(away_team, away_qb or "", injury_entries)
+            h_qb_adj -= h_pen
+            a_qb_adj -= a_pen
+
         return NFLEfficiencyMatchup(
             home_team=home_team,
             away_team=away_team,
@@ -338,6 +385,8 @@ class NFLEfficiencyStore:
             away_turnover_luck=round(a_to, 4),
             home_pass_ratio=round(h_pr, 4),
             away_pass_ratio=round(a_pr, 4),
+            home_qb=home_qb,
+            away_qb=away_qb,
         )
 
     def _team_efficiency(

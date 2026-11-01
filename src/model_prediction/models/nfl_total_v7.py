@@ -230,3 +230,43 @@ class NFLTotalModelV7:
             weather_total_penalty=weather_penalty,
             is_dome=is_dome,
         )
+
+    def forecast_from_efficiency(
+        self,
+        eff: Any,
+        total_line: float,
+        is_dome: bool = False,
+        wind_mph: float = 0.0,
+        temperature_f: float = 65.0,
+        market_weight: float | None = None,
+    ) -> NFLTotalForecast:
+        """Forecast total directly from point-in-time NFLEfficiencyMatchup guaranteeing QB pass-through."""
+        return self.forecast_total(
+            home_team=eff.home_team,
+            away_team=eff.away_team,
+            home_off_epa=eff.home_off_epa,
+            away_off_epa=eff.away_off_epa,
+            home_def_epa=eff.home_def_epa,
+            away_def_epa=eff.away_def_epa,
+            home_pace=eff.home_pace,
+            away_pace=eff.away_pace,
+            total_pass_epa=eff.home_pass_epa + eff.away_pass_epa,
+            total_rush_epa=eff.home_rush_epa + eff.away_rush_epa,
+            wind_mph=wind_mph,
+            temperature_f=temperature_f,
+            is_dome=is_dome,
+            total_line=total_line,
+            market_weight=market_weight,
+            home_qb_tier_adj=eff.home_qb_tier_adj,
+            away_qb_tier_adj=eff.away_qb_tier_adj,
+            home_explosive_rate=eff.home_explosive_rate,
+            away_explosive_rate=eff.away_explosive_rate,
+            home_def_explosive_rate=eff.home_def_explosive_rate,
+            away_def_explosive_rate=eff.away_def_explosive_rate,
+            home_rz_td_rate=eff.home_rz_td_rate,
+            away_rz_td_rate=eff.away_rz_td_rate,
+            home_def_rz_td_rate=eff.home_def_rz_td_rate,
+            away_def_rz_td_rate=eff.away_def_rz_td_rate,
+            home_pass_ratio=eff.home_pass_ratio,
+            away_pass_ratio=eff.away_pass_ratio,
+        )

@@ -216,3 +216,44 @@ def test_bivariate_scoring_simulation() -> None:
     assert round(res.prob_home_cover + res.prob_away_cover + res.prob_spread_push, 4) == 1.0000
     assert round(res.prob_over + res.prob_under + res.prob_total_push, 4) == 1.0000
     assert res.prob_home_win > res.prob_away_win
+
+
+def test_forecast_from_efficiency_with_qb_injury_penalty() -> None:
+    path_sp = REPO / "config" / "models" / "nfl-spread-structural-v7.json"
+    path_tot = REPO / "config" / "models" / "nfl-total-structural-v7.json"
+    spread_model = NFLSpreadModelV7.from_artifact(json.loads(path_sp.read_text(encoding="utf-8")))
+    total_model = NFLTotalModelV7.from_artifact(json.loads(path_tot.read_text(encoding="utf-8")))
+    eff_store = NFLEfficiencyStore()
+
+    # Healthy matchup
+    eff_healthy = eff_store.get_matchup_efficiency(
+        "Buffalo Bills",
+        "Baltimore Ravens",
+        as_of_date="2024-11-01",
+        home_qb="Josh Allen",
+        away_qb="Lamar Jackson",
+    )
+    fc_sp_healthy = spread_model.forecast_from_efficiency(eff_healthy, spread_home_line=-3.0)
+    fc_tot_healthy = total_model.forecast_from_efficiency(eff_healthy, total_line=50.0)
+
+    # Injured QB matchup with penalty
+    injuries = [
+        {"player_name": "Lamar Jackson", "team": "Baltimore Ravens", "position": "QB", "status": "Out"}
+    ]
+    eff_injured = eff_store.get_matchup_efficiency(
+        "Buffalo Bills",
+        "Baltimore Ravens",
+        as_of_date="2024-11-01",
+        home_qb="Josh Allen",
+        away_qb="Lamar Jackson",
+        injury_entries=injuries,
+    )
+    assert eff_injured.away_qb_tier_adj < eff_healthy.away_qb_tier_adj
+
+    fc_sp_injured = spread_model.forecast_from_efficiency(eff_injured, spread_home_line=-3.0)
+    fc_tot_injured = total_model.forecast_from_efficiency(eff_injured, total_line=50.0)
+
+    # Bills margin should increase when away QB is out
+    assert fc_sp_injured.projected_margin_home > fc_sp_healthy.projected_margin_home
+    assert fc_sp_injured.prob_home_cover > fc_sp_healthy.prob_home_cover
+    assert fc_tot_injured.projected_total < fc_tot_healthy.projected_total
