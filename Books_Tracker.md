@@ -153,7 +153,7 @@ October 30 provider total: 3-3-0, +0.94u net on 8.00u risked (+0.73u FMB, +0.21u
 
 ### November 1 Settlement Verification (1:00 PM ET NFL Window)
 - **FMB #061**: [Pittsburgh Steelers 27, Cleveland Browns 6](https://www.espn.com/nfl/game/_/gameId/401873027). Total 33 points; comfortably under 39.5 (**WIN**, **+1.82u**).
-- **FMB #062**: [Buffalo Bills 36, Baltimore Ravens 10](https://www.espn.com/nfl/game/_/gameId/401873026). Ravens lost by 26 without Lamar Jackson; failed to cover +3 (**LOSS**, **-1.00u**). Provider falsely claimed Jackson was starting; our model caught the injury, upgraded Bills -3.0 (65.0% cover), and faded Ravens.
+- **FMB #062**: [Buffalo Bills 36, Baltimore Ravens 10](https://www.espn.com/nfl/game/_/gameId/401873026). Lamar Jackson started (0/1) but re-injured his ankle on the opening drive (Q1 10:04) and was ruled out; backup Tyler Huntley also exited injured in Q2, forcing 3rd-stringer Joe Fagnano in. Baltimore was crushed 36-10 and failed to cover +3 (**LOSS**, **-1.00u**).
 - **FMB #063**: [Cincinnati Bengals 43, Tennessee Titans 36](https://www.espn.com/nfl/game/_/gameId/401873031). Bengals won by 7; failed to cover -13.5 (**LOSS**, **-1.00u**). Our model flagged Titans +13.5 dog value.
 - **FMB #064**: [Detroit Lions 19, Minnesota Vikings 15](https://www.espn.com/nfl/game/_/gameId/401873030). Vikings lost by 4; failed to cover +3.5 (**LOSS**, **-1.00u**). Our model backed Detroit -3.0.
 - November 1 provider total (1:00 PM ET slate): 1-3-0, -1.18u net on 5.00u risked (FMB 1-3-0, -1.18u). All 4 picks fully settled.
@@ -808,8 +808,8 @@ The 1:00 PM ET NFL window has finalized:
 1. **Steelers vs Browns**: Pittsburgh won 27-6 (total 33 points).
    - **FadeMeBets #061** (Under 39.5 Lock, -110, 2.00u): **WIN** (+1.82u).
 2. **Bills vs Ravens**: Buffalo won 36-10 (total 46 points).
-   - **FadeMeBets #062** (Ravens +3, -110, 1.00u): **LOSS** (-1.00u). Provider relied on Lamar Jackson starting ("Lamar Jackson is back..."), but Jackson was OUT.
-   - **Our Model V7**: With Lamar injury penalty baked in, projected Buffalo by 10.0 and Bills -3.0 cover at 65.0% -> **MASSIVE MODEL / FADE WIN**.
+   - **FadeMeBets #062** (Ravens +3, -110, 1.00u): **LOSS** (-1.00u). Lamar Jackson started but was knocked out on the opening drive (Q1 10:04, 0/1 passing) and did not return; backup Tyler Huntley was also knocked out in Q2, forcing 3rd-stringer Joe Fagnano into the game.
+   - **Our Model V7**: The backup QB replacement model projected Buffalo by 10.0 and Bills -3.0 cover at 65.0% -> **MASSIVE MODEL / FADE WIN**.
 3. **Bengals vs Titans**: Cincinnati won 43-36 (total 79 points).
    - **FadeMeBets #063** (Bengals -13.5, -110, 1.00u): **LOSS** (-1.00u). Bengals failed to cover by 6.5 points.
    - **Our Model V7**: Called Titans +13.5 as top value lean -> **MODEL / FADE WIN**.
