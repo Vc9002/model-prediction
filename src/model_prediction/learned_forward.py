@@ -42,6 +42,7 @@ from .features.team_runs import pitcher_era_gap_from_history
 from .features.trends import TrendEngine
 from .learned_replay import build_snapshot
 from .models.learned_market import LearnedMarketArtifact
+from .pricing import implied_probability
 from .wnba_availability_evaluation import adjust_home_probability, historical_margin_sigma
 
 logger = logging.getLogger(__name__)
@@ -517,6 +518,62 @@ def _build_basis(
     return basis
 
 
+def _safe_odds_int(val: Any) -> int | None:
+    if val is None:
+        return None
+    s = str(val).strip()
+    if s.upper() in ("OFF", "N/A", "NONE", ""):
+        return None
+    try:
+        n = int(s)
+        return n if (n <= -100 or n >= 100) else None
+    except (ValueError, TypeError):
+        return None
+
+
+def extract_espn_moneyline_odds(event: dict[str, Any]) -> dict[str, Any] | None:
+    """Extract moneyline odds and no-vig probabilities from ESPN scoreboard event."""
+    comp = (event.get("competitions") or [{}])[0]
+    odds_list = comp.get("odds") or []
+    if not odds_list:
+        return None
+    first_odds = odds_list[0]
+    provider_name = (first_odds.get("provider") or {}).get("name") or "espn_consensus"
+    ml_obj = first_odds.get("moneyline") or {}
+    h_ml = _safe_odds_int(
+        (ml_obj.get("home") or {}).get("close", {}).get("odds")
+        or (ml_obj.get("home") or {}).get("open", {}).get("odds")
+        or (first_odds.get("homeTeamOdds") or {}).get("moneyLine")
+        or ((first_odds.get("moneylineWinner") or {}).get("home") or {}).get("odds")
+    )
+    a_ml = _safe_odds_int(
+        (ml_obj.get("away") or {}).get("close", {}).get("odds")
+        or (ml_obj.get("away") or {}).get("open", {}).get("odds")
+        or (first_odds.get("awayTeamOdds") or {}).get("moneyLine")
+        or ((first_odds.get("moneylineWinner") or {}).get("away") or {}).get("odds")
+    )
+    if h_ml is None and a_ml is None:
+        return None
+    h_prob = round(implied_probability(h_ml), 6) if h_ml is not None else None
+    a_prob = round(implied_probability(a_ml), 6) if a_ml is not None else None
+    no_vig_h = None
+    no_vig_a = None
+    if h_prob is not None and a_prob is not None:
+        tot = h_prob + a_prob
+        if tot > 0:
+            no_vig_h = round(h_prob / tot, 6)
+            no_vig_a = round(a_prob / tot, 6)
+    return {
+        "provider": provider_name,
+        "home_odds": h_ml,
+        "away_odds": a_ml,
+        "home_implied_probability": h_prob,
+        "away_implied_probability": a_prob,
+        "home_no_vig_probability": no_vig_h,
+        "away_no_vig_probability": no_vig_a,
+    }
+
+
 @dataclass(frozen=True)
 class LearnedForwardCandidate:
     event_id: str
@@ -538,6 +595,7 @@ class LearnedForwardCandidate:
     feature_snapshot_hash: str
     unavailable_features: tuple[str, ...] = ()
     model_input_snapshot: dict[str, Any] | None = None
+    consensus_odds: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -840,6 +898,7 @@ def build_learned_moneyline_slate(
             if snap_hash in seen_hashes:
                 continue
             seen_hashes.add(snap_hash)
+            consensus_odds = extract_espn_moneyline_odds(event)
             candidates.append(
                 LearnedForwardCandidate(
                     event_id=event_id,
@@ -870,6 +929,7 @@ def build_learned_moneyline_slate(
                         served_home_probability=home_probability,
                         adjustment=adjustment,
                     ),
+                    consensus_odds=consensus_odds,
                 )
             )
         except (KeyError, TypeError, ValueError) as error:

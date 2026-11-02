@@ -470,3 +470,36 @@ def test_multi_league_scoreboard_fetch_is_concurrent_but_order_preserving(tmp_pa
     assert scheduled == len(leagues)
     event_ids_in_order = [c.event_id for c in candidates] if candidates else [s["event_id"] for s in skipped]
     assert event_ids_in_order == [f"future-{league}" for league in leagues]
+
+
+def test_extract_espn_moneyline_odds_draftkings():
+    event = {
+        "id": "401873035",
+        "competitions": [
+            {
+                "odds": [
+                    {
+                        "provider": {"name": "DraftKings"},
+                        "moneyline": {
+                            "home": {"close": {"odds": "-278"}},
+                            "away": {"close": {"odds": "+225"}},
+                        },
+                    }
+                ]
+            }
+        ],
+    }
+    extracted = learned_forward.extract_espn_moneyline_odds(event)
+    assert extracted is not None
+    assert extracted["provider"] == "DraftKings"
+    assert extracted["home_odds"] == -278
+    assert extracted["away_odds"] == 225
+    assert extracted["home_no_vig_probability"] == pytest.approx(0.705033, abs=0.0001)
+    assert extracted["away_no_vig_probability"] == pytest.approx(0.294967, abs=0.0001)
+
+
+def test_extract_espn_moneyline_odds_missing_or_empty():
+    assert learned_forward.extract_espn_moneyline_odds({}) is None
+    assert learned_forward.extract_espn_moneyline_odds({"competitions": [{}]}) is None
+    assert learned_forward.extract_espn_moneyline_odds({"competitions": [{"odds": []}]}) is None
+    assert learned_forward.extract_espn_moneyline_odds({"competitions": [{"odds": [{}]}]}) is None

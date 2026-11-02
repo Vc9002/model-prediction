@@ -4116,24 +4116,49 @@ def _forecast_learned_sport(
             # purely as a reference: how much the model currently disagrees
             # with the executable market price. Flat mode already bypassed
             # this; now every mode does.
+            # Check for ESPN consensus moneyline odds if executable quote is absent or invalid
+            cons_odds_data = getattr(candidate, "consensus_odds", None)
+            cand_odds: int | None = None
+            cand_prob: float | None = None
+            cand_no_vig: float | None = None
+            cons_provider: str = "consensus"
+            if cons_odds_data:
+                cons_provider = str(cons_odds_data.get("provider") or "consensus")
+                if candidate.selection == "home":
+                    cand_odds = cons_odds_data.get("home_odds")
+                    cand_prob = cons_odds_data.get("home_implied_probability")
+                    cand_no_vig = cons_odds_data.get("home_no_vig_probability")
+                else:
+                    cand_odds = cons_odds_data.get("away_odds")
+                    cand_prob = cons_odds_data.get("away_implied_probability")
+                    cand_no_vig = cons_odds_data.get("away_no_vig_probability")
+            has_consensus = cand_odds is not None and cand_prob is not None
+
             min_edge = float(model_config.get("min_edge", 0.02))
             max_edge = float(model_config.get("max_edge", 0.08))
             model_edge = None
+            market_ask_price = None
             if quote is not None:
-                model_edge = candidate.model_probability - quote["executable_ask"]
+                market_ask_price = quote["executable_ask"]
+                model_edge = candidate.model_probability - market_ask_price
+            elif has_consensus and cand_prob is not None:
+                market_ask_price = cand_prob
+                model_edge = candidate.model_probability - market_ask_price
+
+            if model_edge is not None and market_ask_price is not None:
                 if model_edge < min_edge:
                     edge_pct = f"{min_edge * 100:.0f}%"
                     edge_blocked.append(
                         {
                             "event_id": candidate.event_id,
-                            "reason": f"model edge {model_edge:.4f} below {edge_pct} minimum over executable ask {quote['executable_ask']:.4f} — logged anyway, operator review",
+                            "reason": f"model edge {model_edge:.4f} below {edge_pct} minimum over market price {market_ask_price:.4f} — logged anyway, operator review",
                         }
                     )
                 elif model_edge > max_edge:
                     edge_blocked.append(
                         {
                             "event_id": candidate.event_id,
-                            "reason": f"model edge {model_edge:.4f} above {max_edge * 100:.0f}% maximum over executable ask {quote['executable_ask']:.4f} — extreme edge anomaly protection",
+                            "reason": f"model edge {model_edge:.4f} above {max_edge * 100:.0f}% maximum over market price {market_ask_price:.4f} — extreme edge anomaly protection",
                         }
                     )
             # Convert UTC event time to Eastern for consistent ledger display
@@ -4156,14 +4181,26 @@ def _forecast_learned_sport(
                     f"executable ask {quote['executable_ask']:.4f} "
                     f"({quote['market_slug']}); model edge vs ask {model_edge:+.4f}."
                 )
+            elif has_consensus and cand_odds is not None and cand_prob is not None:
+                american_odds = cand_odds
+                sportsbook = f"espn_{cons_provider.lower().replace(' ', '_')}"
+                observed_at_utc = iso_utc(effective_now)
+                decision_no_vig = cand_no_vig
+                rationale = (
+                    f"Learned LR call at threshold {candidate.confidence_threshold:.4f}; "
+                    f"consensus {cons_provider} moneyline {cand_odds:+d} "
+                    f"(implied {cand_prob:.4f}, no-vig {cand_no_vig or cand_prob:.4f}); "
+                    f"model edge vs implied {model_edge:+.4f}."
+                )
             else:
                 american_odds = -110
                 sportsbook = "model_opinion_no_executable_quote" if quote_warning else "espn"
                 observed_at_utc = iso_utc(effective_now) if quote_warning else None
                 decision_no_vig = None
+                model_edge = None
                 rationale = (
                     f"Learned LR call at threshold {candidate.confidence_threshold:.4f}; "
-                    f"no Polymarket quote available — using -110 default odds."
+                    f"no Polymarket quote or consensus odds available — using -110 default odds."
                 )
                 if quote_warning:
                     rationale += (
@@ -4259,9 +4296,9 @@ def _forecast_learned_sport(
                         eligibility = replace(
                             eligibility,
                             record_type=RecordType.RESEARCH_OBSERVATION,
-                            decision="CALL",
+                            decision="NO_CALL" if not flat_mode else "CALL",
                             reason_code="PAPER_CALL_MARKET_UNAVAILABLE",
-                            units=eligibility.units,
+                            units=0.0 if not flat_mode else eligibility.units,
                         )
                     # evaluate_eligibility itself no longer gates on
                     # disagreement, exposure, or edge (operator directive,
@@ -4288,7 +4325,6 @@ def _forecast_learned_sport(
                         )
                     if (
                         eligibility.decision == "CALL"
-                        and quote is not None
                         and model_edge is not None
                         and not (min_edge <= model_edge <= max_edge)
                     ):
