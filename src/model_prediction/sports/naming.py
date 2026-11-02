@@ -524,6 +524,14 @@ MODEL_CATALOG: dict[str, ModelDescriptor] = {
         display_name="Tennis Game Spread/Total (Markov v3)",
         description="Game spread and total-games Markov distribution with empirical set momentum and dynamic unit sizing.",
     ),
+    "tennis-games-markov-v4": ModelDescriptor(
+        model_id="tennis-games-markov-v4",
+        sport="TENNIS",
+        market="multi",
+        standard_name="tennis-multi-games-markov-v4",
+        display_name="Tennis Game Spread/Total (Markov v4)",
+        description="Game spread and total-games Markov distribution with calibrated grass ATP serve rates (0.655) and enhanced momentum shift (0.040).",
+    ),
     "tennis-spread-markov-v2": ModelDescriptor(
         model_id="tennis-spread-markov-v2",
         sport="TENNIS",
@@ -563,6 +571,14 @@ MODEL_CATALOG: dict[str, ModelDescriptor] = {
         standard_name="tennis-moneyline-surface-elo-v5",
         display_name="Tennis Moneyline (Surface Elo v5)",
         description="Tennis calibrated surface-blended Elo model v5 with temperature scaling and short-rest dynamics.",
+    ),
+    "tennis-surface-elo-v6": ModelDescriptor(
+        model_id="tennis-surface-elo-v6",
+        sport="TENNIS",
+        market="moneyline",
+        standard_name="tennis-moneyline-surface-elo-v6",
+        display_name="Tennis Moneyline (Surface Elo v6)",
+        description="Tennis calibrated surface-blended Elo model v6 with true unsquashed probabilities (tau=1.0) and asymmetric underdog gating.",
     ),
     # ── ESPORTS ──
     "cs2-tiered-elo-v6": ModelDescriptor(
@@ -1342,6 +1358,11 @@ MODEL_ALIASES: dict[str, str] = {
     "nba-total-v3": "nba-total-margin-v3",
     "soccer-residual-v1": "soccer-market-residual-v1",
     "soccer-total-residual-v1": "soccer-total-market-residual-v1",
+    "tennis-v6": "tennis-surface-elo-v6",
+    "tennis-v5": "tennis-surface-elo-v5",
+    "tennis-v4": "tennis-surface-elo-v4",
+    "tennis-games-v4": "tennis-games-markov-v4",
+    "tennis-games-v3": "tennis-games-markov-v3",
     "tennis-v3": "tennis-learned-v3",
     "tennis-v1": "tennis-surface-elo-v1",
     "tennis-markov-v2": "tennis-markov-hierarchical-v2",

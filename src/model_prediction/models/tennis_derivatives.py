@@ -20,17 +20,18 @@ from functools import lru_cache
 TENNIS_GAMES_VERSION = "tennis-games-markov-v1"
 TENNIS_GAMES_V2_VERSION = "tennis-games-markov-v2"
 TENNIS_GAMES_V3_VERSION = "tennis-games-markov-v3"
+TENNIS_GAMES_V4_VERSION = "tennis-games-markov-v4"
 TENNIS_BASE_SERVE = {"ATP": 0.62, "WTA": 0.555}
 TENNIS_BASE_SERVE_V1 = {"ATP": 0.62, "WTA": 0.58}
 TENNIS_SURFACE_BASE_SERVE: dict[str, dict[str, float]] = {
     "Hard": {"ATP": 0.620, "WTA": 0.555},
     "Clay": {"ATP": 0.585, "WTA": 0.525},
-    "Grass": {"ATP": 0.650, "WTA": 0.590},
+    "Grass": {"ATP": 0.655, "WTA": 0.590},
     "Carpet": {"ATP": 0.640, "WTA": 0.580},
     "Default": {"ATP": 0.620, "WTA": 0.555},
 }
 TENNIS_FORM_SIGMA = 0.08
-TENNIS_MOMENTUM_SHIFT = 0.035
+TENNIS_MOMENTUM_SHIFT = 0.040
 _GAUSS_HERMITE_3 = ((-1.2247, 1.0 / 6.0), (0.0, 2.0 / 3.0), (1.2247, 1.0 / 6.0))
 
 
@@ -322,9 +323,9 @@ class TennisGamesMarkovModel:
 
     sport = "tennis"
 
-    def __init__(self, version: str = TENNIS_GAMES_V3_VERSION) -> None:
+    def __init__(self, version: str = TENNIS_GAMES_V4_VERSION) -> None:
         self.version = version
 
 
-def tennis_games_model(version: str = TENNIS_GAMES_V3_VERSION) -> TennisGamesMarkovModel:
+def tennis_games_model(version: str = TENNIS_GAMES_V4_VERSION) -> TennisGamesMarkovModel:
     return TennisGamesMarkovModel(version=version)

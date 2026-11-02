@@ -39,7 +39,7 @@ from .models.tennis_derivatives import (
     serve_pair_for_win_probability,
 )
 from .models.tennis_derivatives import (
-    TENNIS_GAMES_V3_VERSION as TENNIS_GAMES_VERSION,
+    TENNIS_GAMES_V4_VERSION as TENNIS_GAMES_VERSION,
 )
 
 _TENNIS_SUBPERIOD_MARKERS = ("fh", "h1", "h2", "1h", "set", "ss", "st")
@@ -408,7 +408,7 @@ def build_tennis_slate(
                 away_side_key = "long" if away_is_long else "short"
                 home_side_key = "short" if away_side_key == "long" else "long"
 
-                # Two-sided value evaluation for full coverage: evaluate both sides and select highest edge
+                # Two-sided value evaluation: evaluate both sides and select highest edge
                 candidates = []
                 for side_sel, side_prob, side_key in (
                     ("away", p_away, away_side_key),
@@ -431,7 +431,13 @@ def build_tennis_slate(
                 if not candidates:
                     continue
 
-                best = max(candidates, key=lambda c: (c["edge"], c["prob"]))
+                # Asymmetric selection filter: prefer favorites over longshot underdogs
+                # Underdogs (prob < 0.50) require prob >= 0.38 and ask >= 0.35 to be eligible against favorites
+                valid_candidates = [
+                    c for c in candidates if not (c["prob"] < 0.50 and (c["prob"] < 0.38 or c["ask"] < 0.35))
+                ]
+                pool = valid_candidates if valid_candidates else candidates
+                best = max(pool, key=lambda c: (c["edge"], c["prob"]))
                 selection = best["selection"]
                 prob = best["prob"]
                 ask = best["ask"]

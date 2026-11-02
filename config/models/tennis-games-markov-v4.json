@@ -1,0 +1,59 @@
+{
+  "artifact_hash": "f3ee0d7e17f40cb4ca6a68f6ffbfa7783496914cca85c53a62f5bcb3d4cb7cff",
+  "edge_rules": {
+    "evaluation_mode": "asymmetric_value",
+    "max_edge": 0.1,
+    "max_market_ask": 0.78,
+    "min_edge": 0.025,
+    "min_model_probability": 0.25
+  },
+  "family": "markov_game_set_match",
+  "generated_at_utc": "2026-11-02T05:00:00.000000+00:00",
+  "markets": [
+    "spread",
+    "total"
+  ],
+  "model_version": "tennis-games-markov-v4",
+  "parameters": {
+    "evaluation_mode": "asymmetric_value",
+    "form_sigma": 0.08,
+    "liquid_tier_max_ask": 0.78,
+    "liquid_tier_min_ask": 0.25,
+    "momentum_shift": 0.04,
+    "spread_max_line": 5.5,
+    "surface_base_serve": {
+      "Carpet": {
+        "ATP": 0.64,
+        "WTA": 0.58
+      },
+      "Clay": {
+        "ATP": 0.585,
+        "WTA": 0.525
+      },
+      "Default": {
+        "ATP": 0.62,
+        "WTA": 0.555
+      },
+      "Grass": {
+        "ATP": 0.655,
+        "WTA": 0.59
+      },
+      "Hard": {
+        "ATP": 0.62,
+        "WTA": 0.555
+      }
+    },
+    "total_max_line": 25.5,
+    "total_min_line": 19.5
+  },
+  "sport": "tennis",
+  "validation": {
+    "atp_clay_expected_total": 22.95,
+    "atp_grass_expected_total": 26.59,
+    "atp_hard_expected_total": 23.56,
+    "diagnostic_finding": "Overhauled tennis games Markov v4. Enhanced empirical set momentum (momentum_shift=0.040) capturing straight-sets blowout frequency (62.8% ATP, 67.4% WTA), grass surface serve boost (0.655), Best-of-5 scaling, and bounded line filters stopping extreme blowout spread and total tail risk.",
+    "set_momentum_shift": 0.04,
+    "wta_clay_expected_total": 21.32,
+    "wta_hard_expected_total": 21.84
+  }
+}

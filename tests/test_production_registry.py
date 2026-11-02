@@ -99,12 +99,12 @@ def test_real_production_yaml_resolves_every_model() -> None:
     registry = ProductionModelRegistry.load(REPO)
 
     assert registry.schema_version == "3"
-    assert len(registry.entries) == 76
+    assert len(registry.entries) == 78
     # Under the permanent champion-challenger framework, all models
     # across supported markets are available contracts (champions + rollbacks).
     # Weak evidence models have evidence_status=degraded and
     # replacement_priority=critical rather than being disabled.
-    assert len(registry.available_entries()) == 76
+    assert len(registry.available_entries()) == 78
     assert len(registry.problem_entries()) == 0
     assert registry.primary.model_id == "wnba-elo-trend-lr-v4"
     assert registry.primary.artifact_hash
@@ -168,8 +168,15 @@ def test_real_production_yaml_resolves_every_model() -> None:
     tennis_v5 = registry.entries["tennis-surface-elo-v5"]
     assert tennis_v5.implementation == IMPLEMENTATION_CODE_BACKED
     assert tennis_v5.entry == "model_prediction.models.tennis:tennis_model"
-    assert registry.champion("TENNIS", "moneyline").model_id == "tennis-surface-elo-v5"
-    assert registry.champion("TENNIS", "moneyline").rollback_model == "tennis-surface-elo-v4"
+    tennis_v6 = registry.entries["tennis-surface-elo-v6"]
+    assert tennis_v6.implementation == IMPLEMENTATION_CODE_BACKED
+    assert tennis_v6.entry == "model_prediction.models.tennis:tennis_model"
+    assert registry.champion("TENNIS", "moneyline").model_id == "tennis-surface-elo-v6"
+    assert registry.champion("TENNIS", "moneyline").rollback_model == "tennis-surface-elo-v5"
+    assert registry.champion("TENNIS", "spread").model_id == "tennis-games-markov-v4"
+    assert registry.champion("TENNIS", "spread").rollback_model == "tennis-games-markov-v3"
+    assert registry.champion("TENNIS", "total").model_id == "tennis-games-markov-v4"
+    assert registry.champion("TENNIS", "total").rollback_model == "tennis-games-markov-v3"
 
     hockey = registry.entries["hockey-poisson-dc-v2"]
     assert hockey.implementation == IMPLEMENTATION_CODE_BACKED

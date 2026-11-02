@@ -371,13 +371,23 @@ prediction_service:
     evidence_status: historical_only
     replacement_priority: low
     rollback_model: null
-  - model_id: tennis-surface-elo-v5
+  - model_id: tennis-surface-elo-v6
     sport: TENNIS
     market: moneyline
     implementation: code_backed_model
     entry: model_prediction.models.tennis:tennis_model
     enabled: true
     serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: tennis-surface-elo-v5
+  - model_id: tennis-surface-elo-v5
+    sport: TENNIS
+    market: moneyline
+    implementation: code_backed_model
+    entry: model_prediction.models.tennis:tennis_model
+    enabled: true
+    serving_status: rollback
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: tennis-surface-elo-v4
@@ -387,17 +397,27 @@ prediction_service:
     implementation: code_backed_model
     entry: model_prediction.models.tennis:tennis_model
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: tennis-surface-elo-v1
-  - model_id: tennis-games-markov-v3
+  - model_id: tennis-games-markov-v4
     sport: TENNIS
     market: spread,total
     implementation: code_backed_model
     entry: model_prediction.models.tennis_derivatives:tennis_games_model
     enabled: true
     serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: tennis-games-markov-v3
+  - model_id: tennis-games-markov-v3
+    sport: TENNIS
+    market: spread,total
+    implementation: code_backed_model
+    entry: model_prediction.models.tennis_derivatives:tennis_games_model
+    enabled: true
+    serving_status: rollback
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: tennis-games-markov-v2
@@ -832,9 +852,9 @@ prediction_service:
       spread: soccer-poisson-dc-v3
       total: soccer-poisson-dc-v3
     TENNIS:
-      moneyline: tennis-surface-elo-v5
-      spread: tennis-games-markov-v3
-      total: tennis-games-markov-v3
+      moneyline: tennis-surface-elo-v6
+      spread: tennis-games-markov-v4
+      total: tennis-games-markov-v4
     CS2:
       moneyline: cs2-tiered-elo-v6
       spread: cs2-spread-tiered-elo-v6
@@ -969,7 +989,7 @@ prediction_service:
     evidence_status: unverified
   - sport: TENNIS
     market: moneyline
-    incumbent: tennis-surface-elo-v5
+    incumbent: tennis-surface-elo-v6
     replacement_priority: low
     challenger: null
     evidence_status: predictively_qualified
@@ -1056,8 +1076,10 @@ prediction_service:
   - soccer-poisson-dc-v3
   - soccer-poisson-dc-v2
   - soccer-poisson-dc-v1
+  - tennis-surface-elo-v6
   - tennis-surface-elo-v5
   - tennis-surface-elo-v4
+  - tennis-games-markov-v4
   - tennis-games-markov-v3
   - tennis-games-markov-v2
   - tennis-games-markov-v1

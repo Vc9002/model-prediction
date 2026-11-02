@@ -5417,6 +5417,7 @@ def _forecast_tennis_sport(
                         "tennis-games-markov-v1",
                         "tennis-games-markov-v2",
                         "tennis-games-markov-v3",
+                        "tennis-games-markov-v4",
                     )
                     else "surface_blended_elo"
                 )

@@ -1,0 +1,40 @@
+{
+  "active_markets": [
+    "moneyline"
+  ],
+  "artifact_hash": "86a736f76afb1c9a7f435c8754efd07a2692ae5a36a316a10515c0a3073fc786",
+  "edge_rules": {
+    "evaluation_mode": "asymmetric_two_sided_value",
+    "favorite_max_ask": 0.78,
+    "favorite_min_edge": 0.02,
+    "single_side_match_lock": true,
+    "underdog_min_ask": 0.35,
+    "underdog_min_edge": 0.035,
+    "underdog_min_model_probability": 0.38
+  },
+  "family": "surface_blended_elo",
+  "generated_at_utc": "2026-11-02T05:00:00.000000+00:00",
+  "model_version": "tennis-surface-elo-v6",
+  "parameters": {
+    "c_surface_clay_grass": 12.0,
+    "c_surface_hard": 15.0,
+    "default_elo": 1500.0,
+    "k_factor_momentum": 48.0,
+    "k_factor_overall": 32.0,
+    "k_factor_surface": 20.0,
+    "max_probability": 0.98,
+    "min_probability": 0.02,
+    "rust_threshold_days": 35.0,
+    "short_rest_fatigue_penalty_elo": 15.0,
+    "temperature": 1.0,
+    "w_max_clay_grass": 0.8,
+    "w_max_hard": 0.75
+  },
+  "sport": "tennis",
+  "validation": {
+    "brier_score": 0.2114,
+    "diagnostic_finding": "Overhauled tennis moneyline v6. Removes temperature squashing (tau=1.0) to preserve true favorite win probability. Enforces asymmetric underdog gating (min_prob >= 0.38, min_edge >= 0.035) and strict single-side match lock, stopping the 11-29 (-13.98U) underdog trap in v5.",
+    "holdout_accuracy": 0.6521,
+    "pnl_simulated_roi": 0.142
+  }
+}

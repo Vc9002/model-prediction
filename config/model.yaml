@@ -453,27 +453,25 @@ models:
     status: shadow_qualified
     origin: statistical_model
     qualification_override: true
-    qualification_override_reason: 'Overhaul 2026-10-23: Promoted tennis-surface-elo-v5
-      replacing v4 and learned-v3. Historical analysis of 2,114 settled ledger rows
-      diagnosed that previous losses (-131.71U Main, -123.46U Flat) were driven by
-      blind one-sided favorite selection, negative-edge chalk calls (-59.70U), and
-      uncalibrated Markov spreads (-118.10U). In contrast, moderate edge moneyline
-      picks in [0.00, 0.12] generated +25.17U profit (68.5% win rate, +14.1% ROI).
-      v5 enforces calibrated temperature scaling, two-sided edge evaluation, and
-      restricts active markets to moneyline within [0.02, 0.08] edge.'
-    active_production_version: tennis-surface-elo-v5
-    active_research_version: tennis-surface-elo-v5
-    market_residual_artifact: config/models/tennis-surface-elo-v5.json
+    qualification_override_reason: 'Overhaul 2026-11-02: Promoted tennis-surface-elo-v6 and tennis-games-markov-v4
+      replacing v5 and v3. Replay of 3,322 settled calls revealed that v5 losses (-13.98U, 27.5% win rate)
+      stemmed from temperature squashing (T=1.18) compressing favorites and two-sided value repeatedly picking
+      longshot underdogs in the 17%-32% probability band. v6 restores unsquashed probabilities (T=1.0), enforces
+      asymmetric underdog gating (underdogs require model_prob >= 0.38, ask >= 0.35, edge >= 0.035; favorites require
+      ask <= 0.78, edge >= 0.02), and strict single-side match locks. Markov v4 updates ATP grass serve hold baselines
+      to 0.655 and raises set momentum shift to 0.040 to match empirical blowout distributions.'
+    active_production_version: tennis-surface-elo-v6
+    active_research_version: tennis-surface-elo-v6
+    market_residual_artifact: config/models/tennis-surface-elo-v6.json
     min_edge: 0.02
     research_confidence_gate: 0.02
     markets:
     - moneyline
     - spread
     - total
-    note: Calibrated Dual-Horizon surface Elo v5 with temperature scaling (T=1.18),
-      two-sided value edge selection, short-rest fatigue adjustment, and Hard Edge
-      Gate (0.02 <= edge <= 0.08). Spread and total derivatives powered by Markov v3
-      with empirical set momentum and dynamic unit sizing.
+    note: Calibrated Dual-Horizon surface Elo v6 with true unsquashed probabilities (T=1.0),
+      asymmetric underdog gating, and single-side match lock. Spread and total derivatives powered
+      by Markov v4 with empirical grass ATP calibration (0.655) and set momentum (0.040).
   LOL:
     family: neutral_series_elo
     status: shadow_qualified

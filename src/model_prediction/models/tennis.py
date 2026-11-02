@@ -17,12 +17,13 @@ from ..features.elo_ratings import expected_win_probability
 from .base import GamePrediction
 from .tennis_derivatives import price_tennis_derivatives
 
+TENNIS_V6_VERSION = "tennis-surface-elo-v6"
 TENNIS_V5_VERSION = "tennis-surface-elo-v5"
 TENNIS_V4_VERSION = "tennis-surface-elo-v4"
 TENNIS_V3_VERSION = "tennis-learned-v3"
 TENNIS_MARKOV_VERSION = "tennis-markov-hierarchical-v2"
 TENNIS_LEGACY_VERSION = "tennis-surface-elo-v1"
-TENNIS_MODEL_VERSION = TENNIS_V5_VERSION
+TENNIS_MODEL_VERSION = TENNIS_V6_VERSION
 DEFAULT_ELO = 1500.0
 K_FACTOR = 32.0
 
@@ -149,7 +150,7 @@ class TennisModel:
         self.last_dates = {}
         self.recent_form = {}
 
-        if self.version in (TENNIS_V4_VERSION, TENNIS_V5_VERSION):
+        if self.version in (TENNIS_V4_VERSION, TENNIS_V5_VERSION, TENNIS_V6_VERSION):
             for match in sorted(
                 matches, key=lambda item: str(item.get("match_date", "") or item.get("event_start_utc", ""))
             ):
@@ -337,6 +338,36 @@ class TennisModel:
         ]
         score = V3_INTERCEPT + sum(c * f for c, f in zip(V3_COEFFICIENTS, feat, strict=True))
         return _sigmoid(score)
+
+    def match_probability_v6(
+        self,
+        overall: dict[str, float],
+        by_surface: dict[tuple[str, str], float],
+        surface_counts: dict[tuple[str, str], int],
+        counts: dict[str, int],
+        player_one: str,
+        player_two: str,
+        surface: str,
+        rest_days: dict[str, float] | None = None,
+        best_of: int = 3,
+        temperature: float = 1.0,
+    ) -> float:
+        """Unsquashed Dual-Horizon surface Elo (temperature=1.0) with
+        Bayesian surface shrinkage, inactivity rust decay, short-rest fatigue
+        adjustment, and exact Best-of-5 variance translation.
+        """
+        return self.match_probability_v5(
+            overall=overall,
+            by_surface=by_surface,
+            surface_counts=surface_counts,
+            counts=counts,
+            player_one=player_one,
+            player_two=player_two,
+            surface=surface,
+            rest_days=rest_days,
+            best_of=best_of,
+            temperature=temperature,
+        )
 
     def match_probability_v5(
         self,
@@ -533,7 +564,19 @@ class TennisModel:
             rest2 = _get_rest(match.player_two, match.event_start_utc)
             rest_dict = {match.player_one: rest1, match.player_two: rest2}
 
-            if self.version == TENNIS_V5_VERSION:
+            if self.version == TENNIS_V6_VERSION:
+                p_fund = self.match_probability_v6(
+                    overall=overall,
+                    by_surface=by_surface,
+                    surface_counts=surface_counts,
+                    counts=counts,
+                    player_one=match.player_one,
+                    player_two=match.player_two,
+                    surface=match.surface,
+                    rest_days=rest_dict,
+                    best_of=match.best_of,
+                )
+            elif self.version == TENNIS_V5_VERSION:
                 p_fund = self.match_probability_v5(
                     overall=overall,
                     by_surface=by_surface,
@@ -676,7 +719,14 @@ class TennisModel:
             )
 
             # 1. Moneyline
-            if self.version == TENNIS_V5_VERSION:
+            if self.version == TENNIS_V6_VERSION:
+                p_ml_away = p_fund
+                p_ml_home = 1.0 - p_fund
+                ml_rationale = (
+                    f"Tennis Surface Elo v6 (Unsquashed tau=1.0) on {match.surface} (Bo{match.best_of}): "
+                    f"{match.player_one} p={p_ml_away:.3f} vs {match.player_two}."
+                )
+            elif self.version == TENNIS_V5_VERSION:
                 p_ml_away = p_fund
                 p_ml_home = 1.0 - p_fund
                 ml_rationale = (
