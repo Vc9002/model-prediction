@@ -2022,7 +2022,7 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
         availability_diagnostics[event_id] = {
             "estimated_margin_adjustment": float(avail.get("availability_points_gap", 0.0)),
             "estimated_total_adjustment": float(avail.get("availability_total_loss", 0.0)),
-            "applied_to_qualified_model": False,
+            "applied_to_qualified_model": bool(model_version == "nba-spread-margin-v7"),
         }
         upcoming.append(
             UpcomingGame(
@@ -2031,14 +2031,29 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
                 away_team=away_team,
                 home_team=home_team,
                 spread_away_line=float(market["line"]),
-                availability_points_gap=0.0,
-                availability_total_loss=0.0,
+                availability_points_gap=(
+                    float(avail.get("availability_points_gap", 0.0))
+                    if model_version == "nba-spread-margin-v7"
+                    else 0.0
+                ),
+                availability_total_loss=(
+                    float(avail.get("availability_total_loss", 0.0))
+                    if model_version == "nba-spread-margin-v7"
+                    else 0.0
+                ),
                 league="NBA",
             )
         )
         market_by_event_id[event_id] = market
 
-    if model_version == "nba-spread-margin-v6":
+    if model_version == "nba-spread-margin-v7":
+        from ..models.nba_v7 import NBASpreadModelV7
+
+        spread_v7_model = NBASpreadModelV7.from_artifact(artifact)
+        predictions = [
+            p for p in spread_v7_model.predict_spreads(history, upcoming) if p.market_type == "spread"
+        ]
+    elif model_version == "nba-spread-margin-v6":
         from ..models.nba_spread_v6 import NBASpreadModelV6
 
         spread_v6_model = NBASpreadModelV6.from_artifact(artifact)
@@ -2425,7 +2440,7 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
         availability_diagnostics[event_id] = {
             "estimated_margin_adjustment": float(avail.get("availability_points_gap", 0.0)),
             "estimated_total_adjustment": float(avail.get("availability_total_loss", 0.0)),
-            "applied_to_qualified_model": False,
+            "applied_to_qualified_model": bool(model_version == "nba-total-margin-v7"),
         }
         upcoming.append(
             UpcomingGame(
@@ -2434,14 +2449,29 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
                 away_team=away_team,
                 home_team=home_team,
                 total_line=t_line,
-                availability_points_gap=0.0,
-                availability_total_loss=0.0,
+                availability_points_gap=(
+                    float(avail.get("availability_points_gap", 0.0))
+                    if model_version == "nba-total-margin-v7"
+                    else 0.0
+                ),
+                availability_total_loss=(
+                    float(avail.get("availability_total_loss", 0.0))
+                    if model_version == "nba-total-margin-v7"
+                    else 0.0
+                ),
                 league="NBA",
             )
         )
         market_by_event_id[event_id] = market
 
-    if model_version == "nba-total-margin-v6":
+    if model_version == "nba-total-margin-v7":
+        from ..models.nba_v7 import NBATotalModelV7
+
+        total_v7_model = NBATotalModelV7.from_artifact(artifact)
+        predictions = [
+            p for p in total_v7_model.predict_totals(history, upcoming) if p.market_type == "total"
+        ]
+    elif model_version == "nba-total-margin-v6":
         from ..models.nba_total_v6 import NBATotalModelV6
 
         total_v6_model = NBATotalModelV6.from_artifact(artifact)

@@ -1,0 +1,36 @@
+{
+  "artifact_hash": "9164820ec3a28206a4ce8df9d96930b0581c9d1a7818425dba130815b155d3fd",
+  "feature_schema_version": "1",
+  "market_models": {
+    "moneyline": {
+      "coefficients": [
+        0.6001044692457492,
+        0.1022828242067072,
+        0.10069623846637565
+      ],
+      "confidence_threshold": 0.5,
+      "feature_names": [
+        "elo_probability",
+        "trend_gap",
+        "defensive_trend_gap"
+      ],
+      "intercept": -0.13117042487331987,
+      "positive_class": "home"
+    }
+  },
+  "method": "logistic_regression",
+  "model_version": "nba-moneyline-v7",
+  "qualification": {
+    "brier_score": 0.1951,
+    "framework": "nba_structural_v7_joint_engine",
+    "holdout_brier_score": 0.1951,
+    "holdout_log_loss": 0.5512,
+    "locked_holdout": true,
+    "model_version": "nba-moneyline-v7",
+    "note": "Point-in-time walk-forward validated on 650 holdout games and 88 live 2026-27 games.",
+    "qualified": true,
+    "sample_size": 650,
+    "status": "qualified"
+  },
+  "sport": "nba"
+}
