@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "da54339aad0fa43bf0d12856bac955f51325aeabb3cbc474c9eec337675180bb",
+  "artifact_hash": "f1363218ce29ed70b4e914406103cd9ba43c76fd88c5848e5bdb1cf110cfee78",
   "confidence_threshold": 0.130113074669861,
   "decay_rate": 0.002,
   "games_played": {
@@ -50,7 +50,7 @@
     "SSG": 1509.39558
   },
   "schema_version": "international-baseball-tie-aware-elo-v2",
-  "source_manifest_sha256": "02bc85a38d604f967084f891d0ea50e92a7bf6879eb95633d45ec8861184efd2",
+  "source_manifest_sha256": "5f67c89d23bae0140a5552a3fdca7a9f57713b8a502db05776f20bb29c8be162",
   "target": "expected moneyline settlement where a tie pays 0.50",
   "tie_method": "flat",
   "tie_probability": 0.02255226,

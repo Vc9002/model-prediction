@@ -1,11 +1,11 @@
 {
-  "baseline_brier": 0.224209,
-  "calibrated_at_utc": "2026-10-31T05:01:19.604084+00:00",
-  "calibrated_oof_brier": 0.22420879611583333,
+  "baseline_brier": 0.220698,
+  "calibrated_at_utc": "2026-11-01T20:33:06.161314+00:00",
+  "calibrated_oof_brier": 0.22069840532545204,
   "champion_method": "identity",
   "market": "moneyline",
   "model_version": "nba-elo-trend-lr-v4",
   "parameters": {},
-  "sample_size": 66,
+  "sample_size": 73,
   "sport": "nba"
 }
