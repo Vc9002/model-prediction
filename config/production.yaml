@@ -46,6 +46,30 @@ prediction_service:
     evidence_status: predictively_qualified
     replacement_priority: medium
     rollback_model: wnba-total-margin-v1
+  - model_id: mlb-moneyline-v9-residual
+    sport: MLB
+    market: moneyline
+    implementation: code_backed_model
+    entry: model_prediction.models.mlb_market_residual_v10:MLBMarketResidualV10Model
+    enabled: true
+    season_active: false
+    daily_forecast_enabled: false
+    serving_status: production
+    evidence_status: historical_only
+    replacement_priority: high
+    rollback_model: mlb-elo-trend-lr-v8
+    promotion_basis: operator_override
+    promotion_evidence_level: historical_only
+    promotion_note: >-
+      Operator-confirmed override 2026-11-02: own offline evaluation
+      (outputs/research/mlb_moneyline_market_residual_v10_offline_evaluation.json)
+      shows verdict MECHANICS_VALIDATED, p_bootstrap_beats_market=0.332
+      (loses to market-only baseline more often than it wins), recommendation
+      explicitly states additional feature layers required before freeze.
+      Wired anyway at Vincent's explicit direction after being shown these
+      numbers. Not a validated promotion under docs/PROMOTION_POLICY.md's
+      own evidentiary bar -- revisit if real paper results confirm the
+      negative signal.
   - model_id: mlb-elo-trend-lr-v8
     sport: MLB
     market: moneyline
@@ -54,7 +78,7 @@ prediction_service:
     enabled: true
     season_active: false
     daily_forecast_enabled: false
-    serving_status: production
+    serving_status: rollback
     evidence_status: historical_only
     replacement_priority: high
     rollback_model: mlb-elo-trend-lr-v7
@@ -831,7 +855,7 @@ prediction_service:
       spread: wnba-spread-margin-v2
       total: wnba-total-margin-v2
     MLB:
-      moneyline: mlb-elo-trend-lr-v8
+      moneyline: mlb-moneyline-v9-residual
       spread: mlb-structural-runline-v4
       total: mlb-structural-v10-frozen
       nrfi: mlb-nrfi-v4
@@ -885,8 +909,8 @@ prediction_service:
       total: hockey-poisson-dc-v2
   challengers:
     MLB:
-      moneyline: mlb-moneyline-v9-frozen
-      prospective_challenger: mlb-moneyline-v9-frozen
+      moneyline: null
+      prospective_challenger: null
       research_candidates:
       - mlb-moneyline-market-residual-v10
       spread: null
@@ -953,9 +977,9 @@ prediction_service:
     evidence_status: predictively_qualified
   - sport: MLB
     market: moneyline
-    incumbent: mlb-elo-trend-lr-v8
+    incumbent: mlb-moneyline-v9-residual
     replacement_priority: high
-    challenger: mlb-moneyline-v9-residual
+    challenger: mlb-elo-trend-lr-v8
     evidence_status: historical_only
   - sport: MLB
     market: spread
@@ -1045,6 +1069,7 @@ prediction_service:
   - wnba-elo-trend-lr-v4
   - wnba-spread-margin-v2
   - wnba-total-margin-v2
+  - mlb-moneyline-v9-residual
   - mlb-elo-trend-lr-v8
   - mlb-structural-runline-v4
   - measured-edge-margin-v3
