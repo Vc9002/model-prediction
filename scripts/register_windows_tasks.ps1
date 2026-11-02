@@ -28,8 +28,8 @@ function Register-WorkerTask([string]$TaskName, [string]$Worker, $Triggers, [str
     Write-Output "registered: $TaskName ($Worker, $LogonType, Hidden)"
 }
 
-# Daily picks: 4x/day, matching com.modelprediction.daily.plist.
-$dailyTriggers = @('00:30', '06:00', '12:00', '18:00') | ForEach-Object { New-ScheduledTaskTrigger -Daily -At $_ }
+# Daily picks: 6x/day, covering early, midday, afternoon, evening, and late West Coast waves.
+$dailyTriggers = @('00:30', '06:00', '12:00', '16:00', '18:30', '20:30') | ForEach-Object { New-ScheduledTaskTrigger -Daily -At $_ }
 Register-WorkerTask 'ModelPrediction-Daily' 'daily' $dailyTriggers 'model-prediction daily pipeline (settle, ingest, forecast)'
 
 # Model calibration: 4x/day, following daily settlement
