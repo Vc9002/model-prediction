@@ -69,20 +69,43 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     "nfl-total-structural-v7",
     "nfl-spread-structural-v6",
     "nfl-total-structural-v6",
+    "soccer-poisson-dc-v3",
     "soccer-poisson-dc-v2",
     "soccer-total-v1",
+    "tennis-surface-elo-v6",
+    "tennis-games-markov-v4",
+    "tennis-surface-elo-v5",
+    "tennis-games-markov-v3",
     "valorant-tiered-elo-v6",
+    "valorant-spread-tiered-elo-v6",
+    "valorant-total-tiered-elo-v6",
     "lol-tiered-elo-v6",
+    "lol-spread-tiered-elo-v6",
+    "lol-total-tiered-elo-v6",
     "dota2-tiered-elo-v6",
+    "dota2-spread-tiered-elo-v6",
+    "dota2-total-tiered-elo-v6",
+    "r6-contextual-v7",
+    "rainbow_six-spread-tiered-elo-v6",
+    "rainbow_six-total-tiered-elo-v6",
     "cfb-structural-v4",
     "cfb-structural-v3",
     "cfb-structural-v2",
     "mlb-structural-runline-v4",
+    "mlb-nrfi-v4",
+    "mlb-nrfi-v3",
     "kbo-baseball-v3",
     "npb-baseball-v3",
+    "hockey-poisson-dc-v2",
+    "hockey-poisson-dc-v1",
+    "darts-markov-v2",
+    "darts-markov-v1",
     "ncaab-tempo-v2",
+    "ncaab-tempo-v1",
     "eurolg-tempo-v2",
+    "eurolg-tempo-v1",
     "nbl-tempo-v2",
+    "nbl-tempo-v1",
 )
 
 EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
@@ -183,6 +206,9 @@ class AutoExecutionConfig:
     auto_quarantine_max_loss_roi: float = (
         -0.10
     )  # Auto-quarantine models worse than -10% ROI on rolling window
+    max_quote_age_seconds: float = MAX_AUTO_BUYER_QUOTE_AGE_SECONDS
+    refresh_stale_quotes: bool = True
+    capture_missing_slates: bool = True
 
     def __post_init__(self) -> None:
         if self.execute_live and self.mode != "live":
@@ -290,17 +316,35 @@ def _capture_missing_active_snapshot_slates(
         if seconds_until_start <= 0 or seconds_until_start > config.max_event_lookahead_hours * 3600:
             continue
         raw_sport = str(row.get("league") or row.get("sport") or "").lower()
-        sport = "esports" if raw_sport in ESPORTS_LEAGUES else raw_sport
+        if raw_sport in ESPORTS_LEAGUES:
+            sport = "esports"
+        elif raw_sport in ("euroleague", "nbl"):
+            sport = "basketball"
+        elif raw_sport in ("cfb", "college_football"):
+            sport = "ncaaf"
+        else:
+            sport = raw_sport
         if not sport:
             continue
         game_date = event_start.astimezone(eastern).date().isoformat()
         snapshot_path = root / "odds" / sport / game_date / "polymarket_snapshots.jsonl"
-        is_missing = not snapshot_path.exists() or snapshot_path.stat().st_size == 0
+        if data_root is None and not snapshot_path.exists():
+            runtime_snap = (
+                Path(r"E:\model-prediction-runtime\odds") / sport / game_date / "polymarket_snapshots.jsonl"
+            )
+            if runtime_snap.exists():
+                snapshot_path = runtime_snap
+        is_missing = not snapshot_path.exists()
         is_stale = False
+        max_quote_age = (
+            config.max_quote_age_seconds
+            if hasattr(config, "max_quote_age_seconds")
+            else MAX_AUTO_BUYER_QUOTE_AGE_SECONDS
+        )
         if not is_missing:
             try:
                 age_seconds = now.timestamp() - snapshot_path.stat().st_mtime
-                if age_seconds > MAX_AUTO_BUYER_QUOTE_AGE_SECONDS and seconds_until_start <= 12 * 3600:
+                if age_seconds > max_quote_age and seconds_until_start <= 12 * 3600:
                     is_stale = True
             except OSError:
                 pass
@@ -696,6 +740,17 @@ def run_auto_buyer_cycle(
         require_model_timestamp=True,
         execute_live=should_execute,
         mode=mode,
+        max_quote_age_seconds=(
+            MAX_AUTO_BUYER_QUOTE_AGE_SECONDS
+            if should_execute
+            else float(
+                state.get(
+                    "max_quote_age_seconds",
+                    state.get("max_model_age_minutes", DEFAULT_MAX_MODEL_AGE_MINUTES) * 60,
+                )
+            )
+        ),
+        refresh_stale_quotes=should_execute,
         whitelisted_models=tuple(whitelisted) if whitelisted is not None else DEFAULT_WHITELIST_MODELS,
         blacklisted_models=tuple(blacklisted) if blacklisted is not None else EXPLICIT_BLACKLIST_MODELS,
         disabled_sport_markets=_parse_disabled_sport_markets(state),
@@ -1232,7 +1287,11 @@ class AutoPolymarketBuyer:
             result.rejected_daily_loss_breaker = len(picks)
             return result
 
-        if self._live_quote_fn is None:
+        if (
+            self._live_quote_fn is None
+            and (self.config.mode == "live" or self.config.execute_live)
+            and self.config.capture_missing_slates
+        ):
             result.snapshot_captures = _capture_missing_active_snapshot_slates(
                 picks,
                 config=self.config,
@@ -1399,9 +1458,11 @@ class AutoPolymarketBuyer:
 
             # 7. Quote Staleness & Market State Check (with live refresh fallback)
             age_sec = float(quote.get("age_seconds") or 999999)
+            max_quote_age = self.config.max_quote_age_seconds
             if (
-                not quote.get("fresh", False)
-                and age_sec > MAX_AUTO_BUYER_QUOTE_AGE_SECONDS
+                self.config.refresh_stale_quotes
+                and not quote.get("fresh", False)
+                and age_sec > max_quote_age
                 and self._live_quote_fn is None
                 and not gateway_rate_limited
             ):
@@ -1458,7 +1519,7 @@ class AutoPolymarketBuyer:
                         refresh_error,
                     )
 
-            if not quote.get("fresh", False) and age_sec > MAX_AUTO_BUYER_QUOTE_AGE_SECONDS:
+            if not quote.get("fresh", False) and age_sec > max_quote_age:
                 result.rejected_stale_quote += 1
                 continue
 

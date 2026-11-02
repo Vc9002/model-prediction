@@ -1081,6 +1081,16 @@ def settle_auto_buyer_ledger(
     _esports_cache: dict[str, dict[str, Any]] = {}
     _polymarket_market_cache: dict[str, dict[str, Any]] = {}
     _polymarket_market_client: Any | None = polymarket_client
+    _espn_scoreboard_cache: dict[tuple[str, str], dict[str, Any]] = {}
+
+    def _get_scoreboard(lg: str, dt_str: str) -> dict[str, Any]:
+        k = (lg, dt_str)
+        if k not in _espn_scoreboard_cache:
+            try:
+                _espn_scoreboard_cache[k] = espn_client.scoreboard(lg, dt_str)
+            except (OSError, ValueError, KeyError, TypeError, RuntimeError):
+                _espn_scoreboard_cache[k] = {}
+        return _espn_scoreboard_cache[k]
 
     if not j_path.exists():
         return {
@@ -1218,15 +1228,19 @@ def settle_auto_buyer_ledger(
 
             # Tennis re-verification
             if sport in ("TENNIS", "WTA", "ATP"):
+                start_str = str(r.get("event_start_utc") or "")
+                s_dt = parse_utc(start_str) if start_str else now
+                if abs((now - s_dt).total_seconds()) > 3 * 86400:
+                    settled_count += 1
+                    updated_records.append(r)
+                    continue
                 try:
                     from ..tennis_forward import TENNIS_TOURS
 
-                    start_str = str(r.get("event_start_utc") or "")
-                    s_dt = parse_utc(start_str) if start_str else now
                     game_day = s_dt.strftime("%Y%m%d")
                     t_match_found = False
                     for tour in TENNIS_TOURS:
-                        sb = espn_client.scoreboard(tour, game_day)
+                        sb = _get_scoreboard(tour, game_day)
                         for ev in sb.get("events", []):
                             for grp in ev.get("groupings", []):
                                 for comp in grp.get("competitions", []):
@@ -1468,7 +1482,7 @@ def settle_auto_buyer_ledger(
 
                 game_day = start_dt.strftime("%Y%m%d")
                 for tour in TENNIS_TOURS:
-                    sb = espn_client.scoreboard(tour, game_day)
+                    sb = _get_scoreboard(tour, game_day)
                     for ev in sb.get("events", []):
                         for grp in ev.get("groupings", []):
                             for comp in grp.get("competitions", []):
@@ -1564,7 +1578,7 @@ def settle_auto_buyer_ledger(
                     if sport == "SOCCER"
                     else ("ncaaf" if sport in ("NCAAF", "CFB") else sport.lower())
                 )
-                sb = espn_client.scoreboard(espn_lg, game_day)
+                sb = _get_scoreboard(espn_lg, game_day)
                 for ev in sb.get("events", []):
                     comp = (ev.get("competitions") or [{}])[0]
                     if not comp.get("status", {}).get("type", {}).get("completed"):
