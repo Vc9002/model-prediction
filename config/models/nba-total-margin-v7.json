@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "5e3fa43aae26b5b64f15a194aa26e41de9c5199fa2b05b5511b08d6e32add785",
+  "artifact_hash": "1bc89b8c5261f3de28652d740093d2e1af870b884c6fbbcd3085e70ba54cdb47",
   "b2b_pace_drag": 0.8,
   "baseline_points_per_team": 113.8,
   "cdf_family": "normal",
@@ -15,6 +15,7 @@
   "offseason_gap_days": 60.0,
   "offseason_retention": 0.4,
   "overtime_risk_adjustment": true,
+  "pace_sd_scaling": false,
   "positive_class": "over",
   "possession_model": true,
   "prediction_formula": "P(over) = 1 - normal_cdf(total_line, expected_total, effective_total_sd)",

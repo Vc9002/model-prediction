@@ -56,7 +56,7 @@ class NBAStructuralV7Engine:
         b2b_pace_drag: float = 0.8,
         schedule_density_drag: bool = True,
         dynamic_volatility: bool = True,
-        pace_sd_scaling: bool = True,
+        pace_sd_scaling: bool = False,
         overtime_risk_adjustment: bool = True,
         logistic_scale: float = 11.8,
         offseason_gap_days: float = 60.0,
@@ -247,10 +247,11 @@ class NBAStructuralV7Engine:
                 effective_margin_sd = max(
                     10.0, min(20.0, effective_margin_sd * math.sqrt(est_possessions / self.league_pace))
                 )
-
-            effective_total_sd = max(
-                13.0, min(24.0, self.total_sd * math.sqrt(est_possessions / self.league_pace))
-            )
+                effective_total_sd = max(
+                    13.0, min(24.0, self.total_sd * math.sqrt(est_possessions / self.league_pace))
+                )
+            else:
+                effective_total_sd = self.total_sd
             uncertainty = max(0.03, min(0.20, 0.20 - 0.005 * sample))
 
             # 1. Moneyline

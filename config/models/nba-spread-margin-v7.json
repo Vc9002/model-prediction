@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "c9a9c0d876b690e49bec848955efe15c9dbb4ec06b24256257f94c123daa8912",
+  "artifact_hash": "a1e9d58f5a87892828655084eefca64ab1df18ec4d48b217b3537453b01d83e4",
   "b2b_pace_drag": 0.8,
   "b2b_penalty_away": 1.5,
   "b2b_penalty_home": 2.0,
@@ -24,7 +24,7 @@
   "offseason_gap_days": 60.0,
   "offseason_retention": 0.4,
   "overtime_risk_adjustment": true,
-  "pace_sd_scaling": true,
+  "pace_sd_scaling": false,
   "positive_class": "away_cover",
   "possession_model": true,
   "prediction_formula": "P(away_cover) = normal_cdf(spread_away_line, expected_margin, effective_margin_sd)",

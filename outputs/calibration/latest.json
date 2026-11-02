@@ -1,24 +1,24 @@
 {
-  "generated_at_utc": "2026-11-01T22:30:13.056612+00:00",
-  "max_calibration_drift": 3.2038,
+  "generated_at_utc": "2026-11-02T05:01:53.788155+00:00",
+  "max_calibration_drift": 2.3624,
   "models": [
     {
-      "brier_score": 0.245904,
-      "calibrated_brier_score": 0.245904,
-      "calibrated_drift_score": 0.3634,
+      "brier_score": 0.245837,
+      "calibrated_brier_score": 0.245837,
+      "calibrated_drift_score": 0.3618,
       "calibrated_drift_status": "SEVERE_DRIFT",
-      "calibrated_expected_calibration_error": 0.016293,
-      "calibrated_intercept": 0.1568,
-      "calibrated_log_loss": 0.687885,
-      "calibrated_slope": 0.3313,
-      "calibration_intercept": 0.1568,
-      "calibration_slope": 0.3313,
+      "calibrated_expected_calibration_error": 0.016041,
+      "calibrated_intercept": 0.1571,
+      "calibrated_log_loss": 0.687746,
+      "calibrated_slope": 0.3336,
+      "calibration_intercept": 0.1571,
+      "calibration_slope": 0.3336,
       "champion_calibrator_method": "identity",
       "champion_calibrator_params": {},
-      "drift_score": 0.3634,
+      "drift_score": 0.3618,
       "drift_status": "SEVERE_DRIFT",
-      "expected_calibration_error": 0.016293,
-      "log_loss": 0.687885,
+      "expected_calibration_error": 0.016041,
+      "log_loss": 0.687746,
       "market": "moneyline",
       "model_version": "cs2-tiered-elo-v6",
       "recalibrated": false,
@@ -31,10 +31,10 @@
           "upper": 0.6
         },
         {
-          "count": 421,
-          "hit_rate": 0.6152019002375297,
+          "count": 422,
+          "hit_rate": 0.6161137440758294,
           "lower": 0.6,
-          "mean_p": 0.6396104204275534,
+          "mean_p": 0.6395732132701422,
           "upper": 0.7
         },
         {
@@ -59,58 +59,58 @@
           "upper": 1.0
         }
       ],
-      "sample_size": 1553,
+      "sample_size": 1554,
       "scorecard": {
         "beta": {
-          "calibration_intercept": 0.2570118544114378,
-          "calibration_slope": 0.03192501467787774,
-          "oof_brier_score": 0.24659198363678256,
-          "oof_ece": 0.009738788973006157,
-          "oof_log_loss": 0.6875227675637913
+          "calibration_intercept": 0.2559574531699405,
+          "calibration_slope": 0.03979789736818747,
+          "oof_brier_score": 0.24651899150372686,
+          "oof_ece": 0.00748984034499657,
+          "oof_log_loss": 0.6873748327121194
         },
         "identity": {
-          "calibration_intercept": 0.15677771115063438,
-          "calibration_slope": 0.3312882927516489,
-          "oof_brier_score": 0.24590443072615326,
-          "oof_ece": 0.01629315260785573,
-          "oof_log_loss": 0.6878846246391231
+          "calibration_intercept": 0.15712157336970586,
+          "calibration_slope": 0.33361906971895927,
+          "oof_brier_score": 0.24583721065508174,
+          "oof_ece": 0.016040653153153117,
+          "oof_log_loss": 0.6877455423546582
         },
         "isotonic": {
-          "calibration_intercept": 0.23691493650807857,
-          "calibration_slope": 0.13631679353025491,
-          "oof_brier_score": 0.24748964002915871,
-          "oof_ece": 0.028235452844948526,
-          "oof_log_loss": 0.6913165121195152
+          "calibration_intercept": 0.2371575375229812,
+          "calibration_slope": 0.13973957018852787,
+          "oof_brier_score": 0.2474327689842555,
+          "oof_ece": 0.026931155618577424,
+          "oof_log_loss": 0.6911978158512556
         },
         "platt": {
-          "calibration_intercept": 0.3469051356341381,
-          "calibration_slope": -0.3029536715676841,
-          "oof_brier_score": 0.24751929488087582,
-          "oof_ece": 0.013836599710484615,
-          "oof_log_loss": 0.6894109188150098
+          "calibration_intercept": 0.3475593011099776,
+          "calibration_slope": -0.298795519969196,
+          "oof_brier_score": 0.24744527832745605,
+          "oof_ece": 0.013603418807467295,
+          "oof_log_loss": 0.6892612823908906
         },
         "temperature": {
-          "calibration_intercept": 0.22805201233310726,
-          "calibration_slope": 0.20224429943090713,
-          "oof_brier_score": 0.24677141445302772,
-          "oof_ece": 0.03319193977246578,
-          "oof_log_loss": 0.6879551175202742
+          "calibration_intercept": 0.22930093369705756,
+          "calibration_slope": 0.20711932344751396,
+          "oof_brier_score": 0.24673896602860487,
+          "oof_ece": 0.03767271949232774,
+          "oof_log_loss": 0.6878730659359193
         }
       },
       "sport": "cs2",
       "tier": "flat"
     },
     {
-      "brier_score": 0.246307,
-      "calibrated_brier_score": 0.257655,
-      "calibrated_drift_score": 0.2053,
-      "calibrated_drift_status": "SEVERE_DRIFT",
-      "calibrated_expected_calibration_error": 0.06845,
+      "brier_score": 0.246225,
+      "calibrated_brier_score": 0.253139,
+      "calibrated_drift_score": 0.1733,
+      "calibrated_drift_status": "MODERATE_DRIFT",
+      "calibrated_expected_calibration_error": 0.057779,
       "calibrated_intercept": 0.0,
-      "calibrated_log_loss": 0.759097,
+      "calibrated_log_loss": 0.746765,
       "calibrated_slope": 1.0,
-      "calibration_intercept": 0.14,
-      "calibration_slope": 0.3293,
+      "calibration_intercept": 0.1406,
+      "calibration_slope": 0.3316,
       "champion_calibrator_method": "isotonic",
       "champion_calibrator_params": {
         "max_val": 0.6444,
@@ -134,15 +134,15 @@
           0.509506,
           0.549296,
           0.582418,
-          0.618644,
+          0.621849,
           0.642857,
           0.644444
         ]
       },
-      "drift_score": 0.375,
+      "drift_score": 0.3733,
       "drift_status": "SEVERE_DRIFT",
-      "expected_calibration_error": 0.021562,
-      "log_loss": 0.689339,
+      "expected_calibration_error": 0.021251,
+      "log_loss": 0.689169,
       "market": "moneyline",
       "model_version": "cs2-tiered-elo-v6",
       "recalibrated": true,
@@ -155,10 +155,10 @@
           "upper": 0.6
         },
         {
-          "count": 379,
-          "hit_rate": 0.6147757255936676,
+          "count": 380,
+          "hit_rate": 0.6157894736842106,
           "lower": 0.6,
-          "mean_p": 0.6399172506596306,
+          "mean_p": 0.6398751236842105,
           "upper": 0.7
         },
         {
@@ -183,42 +183,42 @@
           "upper": 1.0
         }
       ],
-      "sample_size": 1277,
+      "sample_size": 1278,
       "scorecard": {
         "beta": {
-          "calibration_intercept": 0.30041788749496684,
-          "calibration_slope": -0.15589079282656437,
-          "oof_brier_score": 0.24817791820022694,
-          "oof_ece": 0.017824974174384084,
-          "oof_log_loss": 0.6930493275039596
+          "calibration_intercept": 0.2991334838241336,
+          "calibration_slope": -0.1465341708666734,
+          "oof_brier_score": 0.24806634298253757,
+          "oof_ece": 0.019240054990683046,
+          "oof_log_loss": 0.6928212449094688
         },
         "identity": {
-          "calibration_intercept": 0.14003216253598744,
-          "calibration_slope": 0.32929592479089337,
-          "oof_brier_score": 0.24630666220209868,
-          "oof_ece": 0.02156203602192636,
-          "oof_log_loss": 0.6893391680246826
+          "calibration_intercept": 0.1405923630202011,
+          "calibration_slope": 0.3315536425578652,
+          "oof_brier_score": 0.24622461038525897,
+          "oof_ece": 0.02125088341158057,
+          "oof_log_loss": 0.6891689110501569
         },
         "isotonic": {
           "calibration_intercept": 0.0,
           "calibration_slope": 1.0,
-          "oof_brier_score": 0.25765491747886726,
-          "oof_ece": 0.0684498826893573,
-          "oof_log_loss": 0.7590969482421155
+          "oof_brier_score": 0.25313929287503195,
+          "oof_ece": 0.057779466243357745,
+          "oof_log_loss": 0.7467646591219973
         },
         "platt": {
-          "calibration_intercept": 0.3941275967535391,
-          "calibration_slope": -0.45621494926279826,
-          "oof_brier_score": 0.24935498985817015,
-          "oof_ece": 0.017281378018110027,
-          "oof_log_loss": 0.695451868404908
+          "calibration_intercept": 0.39702807200520873,
+          "calibration_slope": -0.46111070493655093,
+          "oof_brier_score": 0.249353327358314,
+          "oof_ece": 0.01791394824093443,
+          "oof_log_loss": 0.6954509636265653
         },
         "temperature": {
-          "calibration_intercept": 0.2601535666887249,
-          "calibration_slope": -0.01693504499070967,
-          "oof_brier_score": 0.24803926054025213,
-          "oof_ece": 0.03786506374400266,
-          "oof_log_loss": 0.692751543457758
+          "calibration_intercept": 0.2611800075019845,
+          "calibration_slope": -0.015166015442069344,
+          "oof_brier_score": 0.24798797222090474,
+          "oof_ece": 0.03817301554360077,
+          "oof_log_loss": 0.6926457298615581
         }
       },
       "sport": "cs2",
@@ -2233,31 +2233,31 @@
       "tier": "flat"
     },
     {
-      "brier_score": 0.26079,
-      "calibrated_brier_score": 0.26079,
-      "calibrated_drift_score": 0.8303,
+      "brier_score": 0.261183,
+      "calibrated_brier_score": 0.261183,
+      "calibrated_drift_score": 0.8146,
       "calibrated_drift_status": "SEVERE_DRIFT",
-      "calibrated_expected_calibration_error": 0.071383,
-      "calibrated_intercept": 0.2867,
-      "calibrated_log_loss": 0.718169,
-      "calibrated_slope": -0.3255,
-      "calibration_intercept": 0.2867,
-      "calibration_slope": -0.3255,
+      "calibrated_expected_calibration_error": 0.068099,
+      "calibrated_intercept": 0.2737,
+      "calibrated_log_loss": 0.718946,
+      "calibrated_slope": -0.3205,
+      "calibration_intercept": 0.2737,
+      "calibration_slope": -0.3205,
       "champion_calibrator_method": "identity",
       "champion_calibrator_params": {},
-      "drift_score": 0.8303,
+      "drift_score": 0.8146,
       "drift_status": "SEVERE_DRIFT",
-      "expected_calibration_error": 0.071383,
-      "log_loss": 0.718169,
+      "expected_calibration_error": 0.068099,
+      "log_loss": 0.718946,
       "market": "moneyline",
       "model_version": "valorant-tiered-elo-v6",
       "recalibrated": false,
       "reliability_buckets": [
         {
-          "count": 125,
-          "hit_rate": 0.56,
+          "count": 126,
+          "hit_rate": 0.5555555555555556,
           "lower": 0.5,
-          "mean_p": 0.5436131759999999,
+          "mean_p": 0.5439191587301588,
           "upper": 0.6
         },
         {
@@ -2282,42 +2282,42 @@
           "upper": 0.9
         }
       ],
-      "sample_size": 198,
+      "sample_size": 199,
       "scorecard": {
         "beta": {
-          "calibration_intercept": 0.18677257001203995,
-          "calibration_slope": -0.09119545579478883,
-          "oof_brier_score": 0.2543362693159893,
-          "oof_ece": 0.03935702685586921,
-          "oof_log_loss": 0.7032535267239086
+          "calibration_intercept": 0.16728295964622772,
+          "calibration_slope": -0.06001187853563469,
+          "oof_brier_score": 0.25435076650096033,
+          "oof_ece": 0.04170784482669129,
+          "oof_log_loss": 0.7032753210235907
         },
         "identity": {
-          "calibration_intercept": 0.28666103303762736,
-          "calibration_slope": -0.32548992336020904,
-          "oof_brier_score": 0.2607900784141364,
-          "oof_ece": 0.07138341919191928,
-          "oof_log_loss": 0.7181692794057181
+          "calibration_intercept": 0.2736889117523252,
+          "calibration_slope": -0.320463684253576,
+          "oof_brier_score": 0.2611826831250653,
+          "oof_ece": 0.06809924623115574,
+          "oof_log_loss": 0.7189456822620636
         },
         "isotonic": {
-          "calibration_intercept": 0.28666103303762736,
-          "calibration_slope": -0.32548992336020904,
-          "oof_brier_score": 0.2607900784141363,
-          "oof_ece": 0.07138341919191928,
-          "oof_log_loss": 0.7181692794057181
+          "calibration_intercept": 0.2736889117523252,
+          "calibration_slope": -0.320463684253576,
+          "oof_brier_score": 0.26118268312506526,
+          "oof_ece": 0.0680992462311558,
+          "oof_log_loss": 0.7189456822620636
         },
         "platt": {
-          "calibration_intercept": 0.2344504879962852,
-          "calibration_slope": -0.22276950179540084,
-          "oof_brier_score": 0.25781953209723046,
-          "oof_ece": 0.03719312617459263,
-          "oof_log_loss": 0.7117176848807857
+          "calibration_intercept": 0.21391441839473133,
+          "calibration_slope": -0.1941465886957194,
+          "oof_brier_score": 0.25784027339249754,
+          "oof_ece": 0.0395781236799234,
+          "oof_log_loss": 0.711744459074571
         },
         "temperature": {
-          "calibration_intercept": 0.21398545643726946,
-          "calibration_slope": -0.16457087920968946,
-          "oof_brier_score": 0.25719732446977045,
-          "oof_ece": 0.03777891007740297,
-          "oof_log_loss": 0.7104662726618911
+          "calibration_intercept": 0.1965247648781887,
+          "calibration_slope": -0.1444239950776136,
+          "oof_brier_score": 0.2573037394343729,
+          "oof_ece": 0.03721521262198726,
+          "oof_log_loss": 0.7106647012101448
         }
       },
       "sport": "valorant",
@@ -2704,31 +2704,31 @@
       "tier": "flat"
     },
     {
-      "brier_score": 0.265234,
-      "calibrated_brier_score": 0.265234,
-      "calibrated_drift_score": 0.8283,
+      "brier_score": 0.265729,
+      "calibrated_brier_score": 0.265729,
+      "calibrated_drift_score": 0.8061,
       "calibrated_drift_status": "SEVERE_DRIFT",
-      "calibrated_expected_calibration_error": 0.078855,
-      "calibrated_intercept": 0.2333,
-      "calibrated_log_loss": 0.727748,
-      "calibrated_slope": -0.3045,
-      "calibration_intercept": 0.2333,
-      "calibration_slope": -0.3045,
+      "calibrated_expected_calibration_error": 0.074419,
+      "calibrated_intercept": 0.2153,
+      "calibrated_log_loss": 0.728721,
+      "calibrated_slope": -0.2957,
+      "calibration_intercept": 0.2153,
+      "calibration_slope": -0.2957,
       "champion_calibrator_method": "identity",
       "champion_calibrator_params": {},
-      "drift_score": 0.8283,
+      "drift_score": 0.8061,
       "drift_status": "SEVERE_DRIFT",
-      "expected_calibration_error": 0.078855,
-      "log_loss": 0.727748,
+      "expected_calibration_error": 0.074419,
+      "log_loss": 0.728721,
       "market": "moneyline",
       "model_version": "valorant-tiered-elo-v6",
       "recalibrated": false,
       "reliability_buckets": [
         {
-          "count": 89,
-          "hit_rate": 0.550561797752809,
+          "count": 90,
+          "hit_rate": 0.5444444444444444,
           "lower": 0.5,
-          "mean_p": 0.5434139101123595,
+          "mean_p": 0.5438445,
           "upper": 0.6
         },
         {
@@ -2753,42 +2753,42 @@
           "upper": 0.9
         }
       ],
-      "sample_size": 148,
+      "sample_size": 149,
       "scorecard": {
         "beta": {
-          "calibration_intercept": 0.15425464838410724,
-          "calibration_slope": -0.17549642786880126,
-          "oof_brier_score": 0.26165793255084635,
-          "oof_ece": 0.09766869212120707,
-          "oof_log_loss": 0.7198378351625768
+          "calibration_intercept": 0.13257357168040143,
+          "calibration_slope": -0.14164113261562689,
+          "oof_brier_score": 0.2612412528054904,
+          "oof_ece": 0.10209860384949682,
+          "oof_log_loss": 0.718985616950717
         },
         "identity": {
-          "calibration_intercept": 0.2333220824132605,
-          "calibration_slope": -0.3044529686629455,
-          "oof_brier_score": 0.26523426722443244,
-          "oof_ece": 0.07885528378378384,
-          "oof_log_loss": 0.7277484901912438
+          "calibration_intercept": 0.21533601708214486,
+          "calibration_slope": -0.2956868696634676,
+          "oof_brier_score": 0.26572879171211405,
+          "oof_ece": 0.07441889261744969,
+          "oof_log_loss": 0.7287211409135741
         },
         "isotonic": {
-          "calibration_intercept": 0.2333220824132605,
-          "calibration_slope": -0.3044529686629455,
-          "oof_brier_score": 0.2652342672244325,
-          "oof_ece": 0.07885528378378394,
-          "oof_log_loss": 0.7277484901912438
+          "calibration_intercept": 0.21533601708214486,
+          "calibration_slope": -0.2956868696634676,
+          "oof_brier_score": 0.2657287917121141,
+          "oof_ece": 0.07441889261744979,
+          "oof_log_loss": 0.7287211409135741
         },
         "platt": {
-          "calibration_intercept": 0.316131254812995,
-          "calibration_slope": -0.6059891448148897,
-          "oof_brier_score": 0.2715933215970358,
-          "oof_ece": 0.1570798573085569,
-          "oof_log_loss": 0.7405934086905072
+          "calibration_intercept": 0.26580714941004774,
+          "calibration_slope": -0.4857772100264213,
+          "oof_brier_score": 0.26912391179197254,
+          "oof_ece": 0.1382250679793846,
+          "oof_log_loss": 0.7356122399629643
         },
         "temperature": {
-          "calibration_intercept": 0.2942896279636502,
-          "calibration_slope": -0.49304291534614575,
-          "oof_brier_score": 0.26760238483443655,
-          "oof_ece": 0.08188158723109842,
-          "oof_log_loss": 0.7325985459604912
+          "calibration_intercept": 0.2552057082728119,
+          "calibration_slope": -0.42587503809456073,
+          "oof_brier_score": 0.2670301520358632,
+          "oof_ece": 0.077057018510066,
+          "oof_log_loss": 0.7314154633225908
         }
       },
       "sport": "valorant",
@@ -4393,6 +4393,209 @@
       "tier": "flat"
     },
     {
+      "brier_score": 0.248087,
+      "calibrated_brier_score": 0.248087,
+      "calibrated_drift_score": 0.5621,
+      "calibrated_drift_status": "SEVERE_DRIFT",
+      "calibrated_expected_calibration_error": 0.137441,
+      "calibrated_intercept": -0.4081,
+      "calibrated_log_loss": 0.687145,
+      "calibrated_slope": 0.9315,
+      "calibration_intercept": -0.4081,
+      "calibration_slope": 0.9315,
+      "champion_calibrator_method": "identity",
+      "champion_calibrator_params": {},
+      "drift_score": 0.5621,
+      "drift_status": "SEVERE_DRIFT",
+      "expected_calibration_error": 0.137441,
+      "log_loss": 0.687145,
+      "market": "moneyline",
+      "model_version": "hockey-poisson-dc-v2",
+      "recalibrated": false,
+      "reliability_buckets": [
+        {
+          "count": 1,
+          "hit_rate": 0.0,
+          "lower": 0.2,
+          "mean_p": 0.219139,
+          "upper": 0.3
+        },
+        {
+          "count": 1,
+          "hit_rate": 1.0,
+          "lower": 0.3,
+          "mean_p": 0.368093,
+          "upper": 0.4
+        },
+        {
+          "count": 7,
+          "hit_rate": 0.5714285714285714,
+          "lower": 0.4,
+          "mean_p": 0.46522499999999994,
+          "upper": 0.5
+        },
+        {
+          "count": 35,
+          "hit_rate": 0.37142857142857144,
+          "lower": 0.5,
+          "mean_p": 0.5543982571428572,
+          "upper": 0.6
+        },
+        {
+          "count": 29,
+          "hit_rate": 0.5862068965517241,
+          "lower": 0.6,
+          "mean_p": 0.6589238965517241,
+          "upper": 0.7
+        },
+        {
+          "count": 8,
+          "hit_rate": 0.5,
+          "lower": 0.7,
+          "mean_p": 0.738802375,
+          "upper": 0.8
+        },
+        {
+          "count": 8,
+          "hit_rate": 0.875,
+          "lower": 0.8,
+          "mean_p": 0.8481665,
+          "upper": 0.9
+        }
+      ],
+      "sample_size": 89,
+      "scorecard": {
+        "beta": {
+          "calibration_intercept": -0.11418409760342858,
+          "calibration_slope": 0.5092685100418233,
+          "oof_brier_score": 0.25355597751748865,
+          "oof_ece": 0.10883818134472342,
+          "oof_log_loss": 0.6999550964993427
+        },
+        "identity": {
+          "calibration_intercept": -0.4080679365204136,
+          "calibration_slope": 0.9314933757989432,
+          "oof_brier_score": 0.24808691947121347,
+          "oof_ece": 0.13744146067415733,
+          "oof_log_loss": 0.6871449788160457
+        },
+        "isotonic": {
+          "calibration_intercept": -0.4080679365204136,
+          "calibration_slope": 0.9314933757989432,
+          "oof_brier_score": 0.24808691947121356,
+          "oof_ece": 0.13744146067415733,
+          "oof_log_loss": 0.6871449788160457
+        },
+        "platt": {
+          "calibration_intercept": -0.4080679365204136,
+          "calibration_slope": 0.9314933757989432,
+          "oof_brier_score": 0.24808691947121356,
+          "oof_ece": 0.13744146067415733,
+          "oof_log_loss": 0.6871449788160457
+        },
+        "temperature": {
+          "calibration_intercept": -0.4080679365204136,
+          "calibration_slope": 0.9314933757989432,
+          "oof_brier_score": 0.24808691947121356,
+          "oof_ece": 0.13744146067415733,
+          "oof_log_loss": 0.6871449788160457
+        }
+      },
+      "sport": "hockey",
+      "tier": "flat"
+    },
+    {
+      "brier_score": 0.221617,
+      "calibrated_brier_score": 0.221617,
+      "calibrated_drift_score": 0.2026,
+      "calibrated_drift_status": "MODERATE_DRIFT",
+      "calibrated_expected_calibration_error": 0.055835,
+      "calibrated_intercept": 0.0415,
+      "calibrated_log_loss": 0.63304,
+      "calibrated_slope": 0.9433,
+      "calibration_intercept": 0.0415,
+      "calibration_slope": 0.9433,
+      "champion_calibrator_method": "identity",
+      "champion_calibrator_params": {},
+      "drift_score": 0.2026,
+      "drift_status": "MODERATE_DRIFT",
+      "expected_calibration_error": 0.055835,
+      "log_loss": 0.63304,
+      "market": "moneyline",
+      "model_version": "nba-elo-trend-lr-v4",
+      "recalibrated": false,
+      "reliability_buckets": [
+        {
+          "count": 30,
+          "hit_rate": 0.6,
+          "lower": 0.5,
+          "mean_p": 0.5607901333333333,
+          "upper": 0.6
+        },
+        {
+          "count": 19,
+          "hit_rate": 0.5263157894736842,
+          "lower": 0.6,
+          "mean_p": 0.6356827894736842,
+          "upper": 0.7
+        },
+        {
+          "count": 27,
+          "hit_rate": 0.7777777777777778,
+          "lower": 0.7,
+          "mean_p": 0.7456218888888889,
+          "upper": 0.8
+        },
+        {
+          "count": 1,
+          "hit_rate": 1.0,
+          "lower": 0.8,
+          "mean_p": 0.823171,
+          "upper": 0.9
+        }
+      ],
+      "sample_size": 77,
+      "scorecard": {
+        "beta": {
+          "calibration_intercept": 0.13792321602825675,
+          "calibration_slope": 0.7782260901304197,
+          "oof_brier_score": 0.2226839925076993,
+          "oof_ece": 0.07154157802668437,
+          "oof_log_loss": 0.6353168035163543
+        },
+        "identity": {
+          "calibration_intercept": 0.04152911808389629,
+          "calibration_slope": 0.9433351133409364,
+          "oof_brier_score": 0.2216169838707922,
+          "oof_ece": 0.055835155844155854,
+          "oof_log_loss": 0.6330404033748662
+        },
+        "isotonic": {
+          "calibration_intercept": 0.04152911808389629,
+          "calibration_slope": 0.9433351133409364,
+          "oof_brier_score": 0.2216169838707922,
+          "oof_ece": 0.05583515584415579,
+          "oof_log_loss": 0.6330404033748662
+        },
+        "platt": {
+          "calibration_intercept": 0.04152911808389629,
+          "calibration_slope": 0.9433351133409364,
+          "oof_brier_score": 0.2216169838707922,
+          "oof_ece": 0.05583515584415579,
+          "oof_log_loss": 0.6330404033748662
+        },
+        "temperature": {
+          "calibration_intercept": 0.04152911808389629,
+          "calibration_slope": 0.9433351133409364,
+          "oof_brier_score": 0.2216169838707922,
+          "oof_ece": 0.05583515584415579,
+          "oof_log_loss": 0.6330404033748662
+        }
+      },
+      "sport": "nba",
+      "tier": "flat"
+    },
+    {
       "brier_score": 0.249402,
       "calibrated_brier_score": 0.249402,
       "calibrated_drift_score": 0.6019,
@@ -4631,291 +4834,88 @@
       "tier": "flat"
     },
     {
-      "brier_score": 0.250001,
-      "calibrated_brier_score": 0.250001,
-      "calibrated_drift_score": 0.5882,
+      "brier_score": 0.225343,
+      "calibrated_brier_score": 0.225857,
+      "calibrated_drift_score": 0.3717,
       "calibrated_drift_status": "SEVERE_DRIFT",
-      "calibrated_expected_calibration_error": 0.134931,
-      "calibrated_intercept": -0.2863,
-      "calibrated_log_loss": 0.691273,
-      "calibrated_slope": 0.7561,
-      "calibration_intercept": -0.2863,
-      "calibration_slope": 0.7561,
-      "champion_calibrator_method": "identity",
-      "champion_calibrator_params": {},
-      "drift_score": 0.5882,
-      "drift_status": "SEVERE_DRIFT",
-      "expected_calibration_error": 0.134931,
-      "log_loss": 0.691273,
-      "market": "moneyline",
-      "model_version": "hockey-poisson-dc-v2",
-      "recalibrated": false,
-      "reliability_buckets": [
-        {
-          "count": 1,
-          "hit_rate": 0.0,
-          "lower": 0.2,
-          "mean_p": 0.219139,
-          "upper": 0.3
-        },
-        {
-          "count": 1,
-          "hit_rate": 1.0,
-          "lower": 0.3,
-          "mean_p": 0.368093,
-          "upper": 0.4
-        },
-        {
-          "count": 7,
-          "hit_rate": 0.5714285714285714,
-          "lower": 0.4,
-          "mean_p": 0.46522499999999994,
-          "upper": 0.5
-        },
-        {
-          "count": 28,
-          "hit_rate": 0.39285714285714285,
-          "lower": 0.5,
-          "mean_p": 0.5516481428571429,
-          "upper": 0.6
-        },
-        {
-          "count": 25,
-          "hit_rate": 0.6,
-          "lower": 0.6,
-          "mean_p": 0.6622731199999999,
-          "upper": 0.7
-        },
-        {
-          "count": 6,
-          "hit_rate": 0.3333333333333333,
-          "lower": 0.7,
-          "mean_p": 0.740434,
-          "upper": 0.8
-        },
-        {
-          "count": 8,
-          "hit_rate": 0.875,
-          "lower": 0.8,
-          "mean_p": 0.8481665,
-          "upper": 0.9
-        }
-      ],
-      "sample_size": 76,
-      "scorecard": {
-        "beta": {
-          "calibration_intercept": -0.031119371655681245,
-          "calibration_slope": 0.3371959517554086,
-          "oof_brier_score": 0.26081133708973503,
-          "oof_ece": 0.1495618618489078,
-          "oof_log_loss": 0.7147044228737146
-        },
-        "identity": {
-          "calibration_intercept": -0.28630665704655583,
-          "calibration_slope": 0.7561158797321648,
-          "oof_brier_score": 0.2500008898770921,
-          "oof_ece": 0.13493051315789475,
-          "oof_log_loss": 0.691273395200735
-        },
-        "isotonic": {
-          "calibration_intercept": -0.28630665704655583,
-          "calibration_slope": 0.7561158797321648,
-          "oof_brier_score": 0.2500008898770922,
-          "oof_ece": 0.13493051315789473,
-          "oof_log_loss": 0.691273395200735
-        },
-        "platt": {
-          "calibration_intercept": -0.28630665704655583,
-          "calibration_slope": 0.7561158797321648,
-          "oof_brier_score": 0.2500008898770922,
-          "oof_ece": 0.13493051315789473,
-          "oof_log_loss": 0.691273395200735
-        },
-        "temperature": {
-          "calibration_intercept": -0.28630665704655583,
-          "calibration_slope": 0.7561158797321648,
-          "oof_brier_score": 0.2500008898770922,
-          "oof_ece": 0.13493051315789473,
-          "oof_log_loss": 0.691273395200735
-        }
-      },
-      "sport": "hockey",
-      "tier": "flat"
-    },
-    {
-      "brier_score": 0.220698,
-      "calibrated_brier_score": 0.220698,
-      "calibrated_drift_score": 0.1826,
-      "calibrated_drift_status": "MODERATE_DRIFT",
-      "calibrated_expected_calibration_error": 0.036637,
-      "calibrated_intercept": -0.1003,
-      "calibrated_log_loss": 0.630996,
-      "calibrated_slope": 1.1064,
-      "calibration_intercept": -0.1003,
-      "calibration_slope": 1.1064,
-      "champion_calibrator_method": "identity",
-      "champion_calibrator_params": {},
-      "drift_score": 0.1826,
-      "drift_status": "MODERATE_DRIFT",
-      "expected_calibration_error": 0.036637,
-      "log_loss": 0.630996,
-      "market": "moneyline",
-      "model_version": "nba-elo-trend-lr-v4",
-      "recalibrated": false,
-      "reliability_buckets": [
-        {
-          "count": 27,
-          "hit_rate": 0.5555555555555556,
-          "lower": 0.5,
-          "mean_p": 0.5612574444444444,
-          "upper": 0.6
-        },
-        {
-          "count": 18,
-          "hit_rate": 0.5555555555555556,
-          "lower": 0.6,
-          "mean_p": 0.6375280555555556,
-          "upper": 0.7
-        },
-        {
-          "count": 27,
-          "hit_rate": 0.7777777777777778,
-          "lower": 0.7,
-          "mean_p": 0.7456218888888889,
-          "upper": 0.8
-        },
-        {
-          "count": 1,
-          "hit_rate": 1.0,
-          "lower": 0.8,
-          "mean_p": 0.823171,
-          "upper": 0.9
-        }
-      ],
-      "sample_size": 73,
-      "scorecard": {
-        "beta": {
-          "calibration_intercept": 0.09579567194984366,
-          "calibration_slope": 0.7819896218776662,
-          "oof_brier_score": 0.22354691403157503,
-          "oof_ece": 0.058150755273395305,
-          "oof_log_loss": 0.638648134016139
-        },
-        "identity": {
-          "calibration_intercept": -0.10032148109184749,
-          "calibration_slope": 1.1064297016668236,
-          "oof_brier_score": 0.22069840532545204,
-          "oof_ece": 0.036636904109588996,
-          "oof_log_loss": 0.6309958692812974
-        },
-        "isotonic": {
-          "calibration_intercept": -0.10032148109184749,
-          "calibration_slope": 1.1064297016668236,
-          "oof_brier_score": 0.22069840532545204,
-          "oof_ece": 0.036636904109589065,
-          "oof_log_loss": 0.6309958692812974
-        },
-        "platt": {
-          "calibration_intercept": -0.10032148109184749,
-          "calibration_slope": 1.1064297016668236,
-          "oof_brier_score": 0.22069840532545204,
-          "oof_ece": 0.036636904109589065,
-          "oof_log_loss": 0.6309958692812974
-        },
-        "temperature": {
-          "calibration_intercept": -0.10032148109184749,
-          "calibration_slope": 1.1064297016668236,
-          "oof_brier_score": 0.22069840532545204,
-          "oof_ece": 0.036636904109589065,
-          "oof_log_loss": 0.6309958692812974
-        }
-      },
-      "sport": "nba",
-      "tier": "flat"
-    },
-    {
-      "brier_score": 0.231888,
-      "calibrated_brier_score": 0.231287,
-      "calibrated_drift_score": 0.3843,
-      "calibrated_drift_status": "SEVERE_DRIFT",
-      "calibrated_expected_calibration_error": 0.053807,
-      "calibrated_intercept": -0.2197,
-      "calibrated_log_loss": 0.654406,
-      "calibrated_slope": 1.3923,
-      "calibration_intercept": -0.5498,
-      "calibration_slope": 1.9765,
+      "calibrated_expected_calibration_error": 0.042461,
+      "calibrated_intercept": -0.1965,
+      "calibrated_log_loss": 0.642354,
+      "calibrated_slope": 1.4635,
+      "calibration_intercept": -0.5445,
+      "calibration_slope": 2.1676,
       "champion_calibrator_method": "beta",
       "champion_calibrator_params": {
-        "a": 3.3621,
-        "b": 1.096,
-        "c": 0.9831
+        "a": 3.5929,
+        "b": 1.2533,
+        "c": 1.0399
       },
-      "drift_score": 0.6484,
+      "drift_score": 0.7044,
       "drift_status": "SEVERE_DRIFT",
-      "expected_calibration_error": 0.03096,
-      "log_loss": 0.655659,
+      "expected_calibration_error": 0.024674,
+      "log_loss": 0.642014,
       "market": "moneyline",
       "model_version": "nfl-elo-trend-lr-v4",
       "recalibrated": true,
       "reliability_buckets": [
         {
-          "count": 34,
-          "hit_rate": 0.5294117647058824,
+          "count": 35,
+          "hit_rate": 0.5428571428571428,
           "lower": 0.5,
-          "mean_p": 0.557182411764706,
+          "mean_p": 0.5579977428571429,
           "upper": 0.6
         },
         {
-          "count": 19,
-          "hit_rate": 0.631578947368421,
+          "count": 21,
+          "hit_rate": 0.6666666666666666,
           "lower": 0.6,
-          "mean_p": 0.6397102105263158,
+          "mean_p": 0.6412066666666666,
           "upper": 0.7
         },
         {
-          "count": 11,
-          "hit_rate": 0.6363636363636364,
+          "count": 12,
+          "hit_rate": 0.6666666666666666,
           "lower": 0.7,
-          "mean_p": 0.7166146363636364,
+          "mean_p": 0.7177709999999999,
           "upper": 0.8
         }
       ],
-      "sample_size": 64,
+      "sample_size": 68,
       "scorecard": {
         "beta": {
-          "calibration_intercept": -0.21971104337078465,
-          "calibration_slope": 1.3923329158632503,
-          "oof_brier_score": 0.23128679921309964,
-          "oof_ece": 0.05380748089952775,
-          "oof_log_loss": 0.654406354858229
+          "calibration_intercept": -0.19651140127534536,
+          "calibration_slope": 1.463526745555672,
+          "oof_brier_score": 0.22585743177209497,
+          "oof_ece": 0.04246053384212478,
+          "oof_log_loss": 0.6423544076665412
         },
         "identity": {
-          "calibration_intercept": -0.5497703567271305,
-          "calibration_slope": 1.9765062703459924,
-          "oof_brier_score": 0.23188796901235936,
-          "oof_ece": 0.030960265625000066,
-          "oof_log_loss": 0.6556588635525855
+          "calibration_intercept": -0.5444674896822306,
+          "calibration_slope": 2.1676388065123833,
+          "oof_brier_score": 0.22534303951983825,
+          "oof_ece": 0.024674014705882392,
+          "oof_log_loss": 0.6420141451283341
         },
         "isotonic": {
-          "calibration_intercept": -0.5497703567271305,
-          "calibration_slope": 1.9765062703459924,
-          "oof_brier_score": 0.23188796901235945,
-          "oof_ece": 0.030960265625000045,
-          "oof_log_loss": 0.6556588635525855
+          "calibration_intercept": -0.5444674896822306,
+          "calibration_slope": 2.1676388065123833,
+          "oof_brier_score": 0.2253430395198383,
+          "oof_ece": 0.024674014705882392,
+          "oof_log_loss": 0.6420141451283341
         },
         "platt": {
-          "calibration_intercept": -0.5497703567271305,
-          "calibration_slope": 1.9765062703459924,
-          "oof_brier_score": 0.23188796901235945,
-          "oof_ece": 0.030960265625000045,
-          "oof_log_loss": 0.6556588635525855
+          "calibration_intercept": -0.5444674896822306,
+          "calibration_slope": 2.1676388065123833,
+          "oof_brier_score": 0.2253430395198383,
+          "oof_ece": 0.024674014705882392,
+          "oof_log_loss": 0.6420141451283341
         },
         "temperature": {
-          "calibration_intercept": -0.5497703567271305,
-          "calibration_slope": 1.9765062703459924,
-          "oof_brier_score": 0.23188796901235945,
-          "oof_ece": 0.030960265625000045,
-          "oof_log_loss": 0.6556588635525855
+          "calibration_intercept": -0.5444674896822306,
+          "calibration_slope": 2.1676388065123833,
+          "oof_brier_score": 0.2253430395198383,
+          "oof_ece": 0.024674014705882392,
+          "oof_log_loss": 0.6420141451283341
         }
       },
       "sport": "nfl",
@@ -5707,6 +5707,104 @@
       "tier": "flat"
     },
     {
+      "brier_score": 0.262901,
+      "calibrated_brier_score": 0.262901,
+      "calibrated_drift_score": 0.837,
+      "calibrated_drift_status": "SEVERE_DRIFT",
+      "calibrated_expected_calibration_error": 0.196097,
+      "calibrated_intercept": -0.5162,
+      "calibrated_log_loss": 0.719883,
+      "calibrated_slope": 0.7654,
+      "calibration_intercept": -0.5162,
+      "calibration_slope": 0.7654,
+      "champion_calibrator_method": "identity",
+      "champion_calibrator_params": {},
+      "drift_score": 0.837,
+      "drift_status": "SEVERE_DRIFT",
+      "expected_calibration_error": 0.196097,
+      "log_loss": 0.719883,
+      "market": "moneyline",
+      "model_version": "hockey-poisson-dc-v2",
+      "recalibrated": false,
+      "reliability_buckets": [
+        {
+          "count": 4,
+          "hit_rate": 0.75,
+          "lower": 0.4,
+          "mean_p": 0.46039075,
+          "upper": 0.5
+        },
+        {
+          "count": 23,
+          "hit_rate": 0.30434782608695654,
+          "lower": 0.5,
+          "mean_p": 0.550551652173913,
+          "upper": 0.6
+        },
+        {
+          "count": 12,
+          "hit_rate": 0.5833333333333334,
+          "lower": 0.6,
+          "mean_p": 0.6591341666666667,
+          "upper": 0.7
+        },
+        {
+          "count": 3,
+          "hit_rate": 0.3333333333333333,
+          "lower": 0.7,
+          "mean_p": 0.7551466666666666,
+          "upper": 0.8
+        },
+        {
+          "count": 5,
+          "hit_rate": 0.8,
+          "lower": 0.8,
+          "mean_p": 0.8440782,
+          "upper": 0.9
+        }
+      ],
+      "sample_size": 47,
+      "scorecard": {
+        "beta": {
+          "calibration_intercept": -0.5162397174348806,
+          "calibration_slope": 0.7654070815720625,
+          "oof_brier_score": 0.262901182440468,
+          "oof_ece": 0.1960971489361702,
+          "oof_log_loss": 0.7198831090056994
+        },
+        "identity": {
+          "calibration_intercept": -0.5162397174348806,
+          "calibration_slope": 0.7654070815720625,
+          "oof_brier_score": 0.2629011824404681,
+          "oof_ece": 0.19609714893617017,
+          "oof_log_loss": 0.7198831090056994
+        },
+        "isotonic": {
+          "calibration_intercept": -0.5162397174348806,
+          "calibration_slope": 0.7654070815720625,
+          "oof_brier_score": 0.262901182440468,
+          "oof_ece": 0.1960971489361702,
+          "oof_log_loss": 0.7198831090056994
+        },
+        "platt": {
+          "calibration_intercept": -0.5162397174348806,
+          "calibration_slope": 0.7654070815720625,
+          "oof_brier_score": 0.262901182440468,
+          "oof_ece": 0.1960971489361702,
+          "oof_log_loss": 0.7198831090056994
+        },
+        "temperature": {
+          "calibration_intercept": -0.5162397174348806,
+          "calibration_slope": 0.7654070815720625,
+          "oof_brier_score": 0.262901182440468,
+          "oof_ece": 0.1960971489361702,
+          "oof_log_loss": 0.7198831090056994
+        }
+      },
+      "sport": "hockey",
+      "tier": "main"
+    },
+    {
       "brier_score": 0.308409,
       "calibrated_brier_score": 0.308409,
       "calibrated_drift_score": 1.1873,
@@ -6302,102 +6400,368 @@
       "tier": "flat"
     },
     {
-      "brier_score": 0.254001,
-      "calibrated_brier_score": 0.254001,
-      "calibrated_drift_score": 0.6684,
+      "brier_score": 0.243413,
+      "calibrated_brier_score": 0.243413,
+      "calibrated_drift_score": 2.3624,
       "calibrated_drift_status": "SEVERE_DRIFT",
-      "calibrated_expected_calibration_error": 0.150371,
-      "calibrated_intercept": -0.2335,
-      "calibrated_log_loss": 0.701875,
-      "calibrated_slope": 0.6318,
-      "calibration_intercept": -0.2335,
-      "calibration_slope": 0.6318,
+      "calibrated_expected_calibration_error": 0.296895,
+      "calibrated_intercept": 1.4778,
+      "calibrated_log_loss": 0.681344,
+      "calibrated_slope": -1.5709,
+      "calibration_intercept": 1.4778,
+      "calibration_slope": -1.5709,
       "champion_calibrator_method": "identity",
       "champion_calibrator_params": {},
-      "drift_score": 0.6684,
+      "drift_score": 2.3624,
       "drift_status": "SEVERE_DRIFT",
-      "expected_calibration_error": 0.150371,
-      "log_loss": 0.701875,
-      "market": "moneyline",
+      "expected_calibration_error": 0.296895,
+      "log_loss": 0.681344,
+      "market": "total",
+      "model_version": "cs2-total-tiered-elo-v6",
+      "recalibrated": false,
+      "reliability_buckets": [
+        {
+          "count": 40,
+          "hit_rate": 0.8,
+          "lower": 0.5,
+          "mean_p": 0.5159617,
+          "upper": 0.6
+        },
+        {
+          "count": 1,
+          "hit_rate": 1.0,
+          "lower": 0.6,
+          "mean_p": 0.63965,
+          "upper": 0.7
+        },
+        {
+          "count": 1,
+          "hit_rate": 0.0,
+          "lower": 0.7,
+          "mean_p": 0.747725,
+          "upper": 0.8
+        }
+      ],
+      "sample_size": 42,
+      "scorecard": {
+        "beta": {
+          "calibration_intercept": 1.4778305447725442,
+          "calibration_slope": -1.5709459474886467,
+          "oof_brier_score": 0.2434126036934047,
+          "oof_ece": 0.2968954047619049,
+          "oof_log_loss": 0.6813444881816333
+        },
+        "identity": {
+          "calibration_intercept": 1.4778305447725442,
+          "calibration_slope": -1.5709459474886467,
+          "oof_brier_score": 0.24341260369340473,
+          "oof_ece": 0.2968954047619048,
+          "oof_log_loss": 0.6813444881816333
+        },
+        "isotonic": {
+          "calibration_intercept": 1.4778305447725442,
+          "calibration_slope": -1.5709459474886467,
+          "oof_brier_score": 0.2434126036934047,
+          "oof_ece": 0.2968954047619049,
+          "oof_log_loss": 0.6813444881816333
+        },
+        "platt": {
+          "calibration_intercept": 1.4778305447725442,
+          "calibration_slope": -1.5709459474886467,
+          "oof_brier_score": 0.2434126036934047,
+          "oof_ece": 0.2968954047619049,
+          "oof_log_loss": 0.6813444881816333
+        },
+        "temperature": {
+          "calibration_intercept": 1.4778305447725442,
+          "calibration_slope": -1.5709459474886467,
+          "oof_brier_score": 0.2434126036934047,
+          "oof_ece": 0.2968954047619049,
+          "oof_log_loss": 0.6813444881816333
+        }
+      },
+      "sport": "cs2",
+      "tier": "main"
+    },
+    {
+      "brier_score": 0.252388,
+      "calibrated_brier_score": 0.252388,
+      "calibrated_drift_score": 0.5894,
+      "calibrated_drift_status": "SEVERE_DRIFT",
+      "calibrated_expected_calibration_error": 0.109736,
+      "calibrated_intercept": -0.2762,
+      "calibrated_log_loss": 0.704961,
+      "calibrated_slope": 0.5567,
+      "calibration_intercept": -0.2762,
+      "calibration_slope": 0.5567,
+      "champion_calibrator_method": "identity",
+      "champion_calibrator_params": {},
+      "drift_score": 0.5894,
+      "drift_status": "SEVERE_DRIFT",
+      "expected_calibration_error": 0.109736,
+      "log_loss": 0.704961,
+      "market": "spread",
       "model_version": "hockey-poisson-dc-v2",
       "recalibrated": false,
       "reliability_buckets": [
         {
-          "count": 4,
-          "hit_rate": 0.75,
+          "count": 8,
+          "hit_rate": 0.25,
+          "lower": 0.3,
+          "mean_p": 0.350627,
+          "upper": 0.4
+        },
+        {
+          "count": 9,
+          "hit_rate": 0.4444444444444444,
           "lower": 0.4,
-          "mean_p": 0.46039075,
+          "mean_p": 0.4475638888888889,
           "upper": 0.5
         },
         {
-          "count": 19,
-          "hit_rate": 0.3684210526315789,
+          "count": 5,
+          "hit_rate": 0.6,
           "lower": 0.5,
-          "mean_p": 0.547631947368421,
+          "mean_p": 0.5365542,
           "upper": 0.6
         },
         {
-          "count": 11,
-          "hit_rate": 0.6363636363636364,
+          "count": 6,
+          "hit_rate": 0.5,
           "lower": 0.6,
-          "mean_p": 0.6605748181818182,
+          "mean_p": 0.6590375,
           "upper": 0.7
         },
         {
-          "count": 3,
-          "hit_rate": 0.3333333333333333,
+          "count": 13,
+          "hit_rate": 0.6153846153846154,
           "lower": 0.7,
-          "mean_p": 0.7551466666666666,
+          "mean_p": 0.7455316923076923,
           "upper": 0.8
         },
         {
-          "count": 5,
-          "hit_rate": 0.8,
+          "count": 1,
+          "hit_rate": 0.0,
           "lower": 0.8,
-          "mean_p": 0.8440782,
+          "mean_p": 0.812443,
           "upper": 0.9
         }
       ],
       "sample_size": 42,
       "scorecard": {
         "beta": {
-          "calibration_intercept": -0.23345659914589212,
-          "calibration_slope": 0.6317691673559654,
-          "oof_brier_score": 0.25400051508147614,
-          "oof_ece": 0.15037138095238092,
-          "oof_log_loss": 0.7018751354755339
+          "calibration_intercept": -0.2761852861640937,
+          "calibration_slope": 0.5567311341340696,
+          "oof_brier_score": 0.2523879072980953,
+          "oof_ece": 0.10973571428571427,
+          "oof_log_loss": 0.7049607764360851
         },
         "identity": {
-          "calibration_intercept": -0.23345659914589212,
-          "calibration_slope": 0.6317691673559654,
-          "oof_brier_score": 0.2540005150814762,
-          "oof_ece": 0.15037138095238092,
-          "oof_log_loss": 0.7018751354755339
+          "calibration_intercept": -0.2761852861640937,
+          "calibration_slope": 0.5567311341340696,
+          "oof_brier_score": 0.25238790729809524,
+          "oof_ece": 0.1097357142857143,
+          "oof_log_loss": 0.7049607764360851
         },
         "isotonic": {
-          "calibration_intercept": -0.23345659914589212,
-          "calibration_slope": 0.6317691673559654,
-          "oof_brier_score": 0.25400051508147614,
-          "oof_ece": 0.15037138095238092,
-          "oof_log_loss": 0.7018751354755339
+          "calibration_intercept": -0.2761852861640937,
+          "calibration_slope": 0.5567311341340696,
+          "oof_brier_score": 0.2523879072980953,
+          "oof_ece": 0.10973571428571427,
+          "oof_log_loss": 0.7049607764360851
         },
         "platt": {
-          "calibration_intercept": -0.23345659914589212,
-          "calibration_slope": 0.6317691673559654,
-          "oof_brier_score": 0.25400051508147614,
-          "oof_ece": 0.15037138095238092,
-          "oof_log_loss": 0.7018751354755339
+          "calibration_intercept": -0.2761852861640937,
+          "calibration_slope": 0.5567311341340696,
+          "oof_brier_score": 0.2523879072980953,
+          "oof_ece": 0.10973571428571427,
+          "oof_log_loss": 0.7049607764360851
         },
         "temperature": {
-          "calibration_intercept": -0.23345659914589212,
-          "calibration_slope": 0.6317691673559654,
-          "oof_brier_score": 0.25400051508147614,
-          "oof_ece": 0.15037138095238092,
-          "oof_log_loss": 0.7018751354755339
+          "calibration_intercept": -0.2761852861640937,
+          "calibration_slope": 0.5567311341340696,
+          "oof_brier_score": 0.2523879072980953,
+          "oof_ece": 0.10973571428571427,
+          "oof_log_loss": 0.7049607764360851
         }
       },
       "sport": "hockey",
-      "tier": "main"
+      "tier": "flat"
+    },
+    {
+      "brier_score": 0.269053,
+      "calibrated_brier_score": 0.269053,
+      "calibrated_drift_score": 0.9398,
+      "calibrated_drift_status": "SEVERE_DRIFT",
+      "calibrated_expected_calibration_error": 0.18953,
+      "calibrated_intercept": -0.8886,
+      "calibrated_log_loss": 0.733847,
+      "calibrated_slope": 1.2616,
+      "calibration_intercept": -0.8886,
+      "calibration_slope": 1.2616,
+      "champion_calibrator_method": "identity",
+      "champion_calibrator_params": {},
+      "drift_score": 0.9398,
+      "drift_status": "SEVERE_DRIFT",
+      "expected_calibration_error": 0.18953,
+      "log_loss": 0.733847,
+      "market": "total",
+      "model_version": "hockey-poisson-dc-v2",
+      "recalibrated": false,
+      "reliability_buckets": [
+        {
+          "count": 4,
+          "hit_rate": 0.0,
+          "lower": 0.4,
+          "mean_p": 0.47517275,
+          "upper": 0.5
+        },
+        {
+          "count": 21,
+          "hit_rate": 0.38095238095238093,
+          "lower": 0.5,
+          "mean_p": 0.5672314285714286,
+          "upper": 0.6
+        },
+        {
+          "count": 13,
+          "hit_rate": 0.5384615384615384,
+          "lower": 0.6,
+          "mean_p": 0.6297957692307693,
+          "upper": 0.7
+        },
+        {
+          "count": 4,
+          "hit_rate": 0.5,
+          "lower": 0.7,
+          "mean_p": 0.7400862500000001,
+          "upper": 0.8
+        }
+      ],
+      "sample_size": 42,
+      "scorecard": {
+        "beta": {
+          "calibration_intercept": -0.8885925559789473,
+          "calibration_slope": 1.261564601144359,
+          "oof_brier_score": 0.26905276390450006,
+          "oof_ece": 0.18952954761904767,
+          "oof_log_loss": 0.733847259822977
+        },
+        "identity": {
+          "calibration_intercept": -0.8885925559789473,
+          "calibration_slope": 1.261564601144359,
+          "oof_brier_score": 0.2690527639045,
+          "oof_ece": 0.1895295476190477,
+          "oof_log_loss": 0.733847259822977
+        },
+        "isotonic": {
+          "calibration_intercept": -0.8885925559789473,
+          "calibration_slope": 1.261564601144359,
+          "oof_brier_score": 0.26905276390450006,
+          "oof_ece": 0.18952954761904767,
+          "oof_log_loss": 0.733847259822977
+        },
+        "platt": {
+          "calibration_intercept": -0.8885925559789473,
+          "calibration_slope": 1.261564601144359,
+          "oof_brier_score": 0.26905276390450006,
+          "oof_ece": 0.18952954761904767,
+          "oof_log_loss": 0.733847259822977
+        },
+        "temperature": {
+          "calibration_intercept": -0.8885925559789473,
+          "calibration_slope": 1.261564601144359,
+          "oof_brier_score": 0.26905276390450006,
+          "oof_ece": 0.18952954761904767,
+          "oof_log_loss": 0.733847259822977
+        }
+      },
+      "sport": "hockey",
+      "tier": "flat"
+    },
+    {
+      "brier_score": 0.243413,
+      "calibrated_brier_score": 0.243413,
+      "calibrated_drift_score": 2.3624,
+      "calibrated_drift_status": "SEVERE_DRIFT",
+      "calibrated_expected_calibration_error": 0.296895,
+      "calibrated_intercept": 1.4778,
+      "calibrated_log_loss": 0.681344,
+      "calibrated_slope": -1.5709,
+      "calibration_intercept": 1.4778,
+      "calibration_slope": -1.5709,
+      "champion_calibrator_method": "identity",
+      "champion_calibrator_params": {},
+      "drift_score": 2.3624,
+      "drift_status": "SEVERE_DRIFT",
+      "expected_calibration_error": 0.296895,
+      "log_loss": 0.681344,
+      "market": "total",
+      "model_version": "cs2-total-tiered-elo-v6",
+      "recalibrated": false,
+      "reliability_buckets": [
+        {
+          "count": 40,
+          "hit_rate": 0.8,
+          "lower": 0.5,
+          "mean_p": 0.5159617,
+          "upper": 0.6
+        },
+        {
+          "count": 1,
+          "hit_rate": 1.0,
+          "lower": 0.6,
+          "mean_p": 0.63965,
+          "upper": 0.7
+        },
+        {
+          "count": 1,
+          "hit_rate": 0.0,
+          "lower": 0.7,
+          "mean_p": 0.747725,
+          "upper": 0.8
+        }
+      ],
+      "sample_size": 42,
+      "scorecard": {
+        "beta": {
+          "calibration_intercept": 1.4778305447725442,
+          "calibration_slope": -1.5709459474886467,
+          "oof_brier_score": 0.2434126036934047,
+          "oof_ece": 0.2968954047619049,
+          "oof_log_loss": 0.6813444881816333
+        },
+        "identity": {
+          "calibration_intercept": 1.4778305447725442,
+          "calibration_slope": -1.5709459474886467,
+          "oof_brier_score": 0.24341260369340473,
+          "oof_ece": 0.2968954047619048,
+          "oof_log_loss": 0.6813444881816333
+        },
+        "isotonic": {
+          "calibration_intercept": 1.4778305447725442,
+          "calibration_slope": -1.5709459474886467,
+          "oof_brier_score": 0.2434126036934047,
+          "oof_ece": 0.2968954047619049,
+          "oof_log_loss": 0.6813444881816333
+        },
+        "platt": {
+          "calibration_intercept": 1.4778305447725442,
+          "calibration_slope": -1.5709459474886467,
+          "oof_brier_score": 0.2434126036934047,
+          "oof_ece": 0.2968954047619049,
+          "oof_log_loss": 0.6813444881816333
+        },
+        "temperature": {
+          "calibration_intercept": 1.4778305447725442,
+          "calibration_slope": -1.5709459474886467,
+          "oof_brier_score": 0.2434126036934047,
+          "oof_ece": 0.2968954047619049,
+          "oof_log_loss": 0.6813444881816333
+        }
+      },
+      "sport": "cs2",
+      "tier": "flat"
     },
     {
       "brier_score": 0.289118,
@@ -6481,174 +6845,6 @@
         }
       },
       "sport": "nfl",
-      "tier": "flat"
-    },
-    {
-      "brier_score": 0.243355,
-      "calibrated_brier_score": 0.243355,
-      "calibrated_drift_score": 2.546,
-      "calibrated_drift_status": "SEVERE_DRIFT",
-      "calibrated_expected_calibration_error": 0.312151,
-      "calibrated_intercept": 1.6055,
-      "calibrated_log_loss": 0.681299,
-      "calibrated_slope": -1.8198,
-      "calibration_intercept": 1.6055,
-      "calibration_slope": -1.8198,
-      "champion_calibrator_method": "identity",
-      "champion_calibrator_params": {},
-      "drift_score": 2.546,
-      "drift_status": "SEVERE_DRIFT",
-      "expected_calibration_error": 0.312151,
-      "log_loss": 0.681299,
-      "market": "total",
-      "model_version": "cs2-total-tiered-elo-v6",
-      "recalibrated": false,
-      "reliability_buckets": [
-        {
-          "count": 38,
-          "hit_rate": 0.8157894736842105,
-          "lower": 0.5,
-          "mean_p": 0.5163692894736842,
-          "upper": 0.6
-        },
-        {
-          "count": 1,
-          "hit_rate": 1.0,
-          "lower": 0.6,
-          "mean_p": 0.63965,
-          "upper": 0.7
-        },
-        {
-          "count": 1,
-          "hit_rate": 0.0,
-          "lower": 0.7,
-          "mean_p": 0.747725,
-          "upper": 0.8
-        }
-      ],
-      "sample_size": 40,
-      "scorecard": {
-        "beta": {
-          "calibration_intercept": 1.6055202838153395,
-          "calibration_slope": -1.8197685339433964,
-          "oof_brier_score": 0.24335539710164994,
-          "oof_ece": 0.31215105000000004,
-          "oof_log_loss": 0.6812988488683243
-        },
-        "identity": {
-          "calibration_intercept": 1.6055202838153395,
-          "calibration_slope": -1.8197685339433964,
-          "oof_brier_score": 0.24335539710165,
-          "oof_ece": 0.31215104999999993,
-          "oof_log_loss": 0.6812988488683243
-        },
-        "isotonic": {
-          "calibration_intercept": 1.6055202838153395,
-          "calibration_slope": -1.8197685339433964,
-          "oof_brier_score": 0.24335539710164994,
-          "oof_ece": 0.31215105000000004,
-          "oof_log_loss": 0.6812988488683243
-        },
-        "platt": {
-          "calibration_intercept": 1.6055202838153395,
-          "calibration_slope": -1.8197685339433964,
-          "oof_brier_score": 0.24335539710164994,
-          "oof_ece": 0.31215105000000004,
-          "oof_log_loss": 0.6812988488683243
-        },
-        "temperature": {
-          "calibration_intercept": 1.6055202838153395,
-          "calibration_slope": -1.8197685339433964,
-          "oof_brier_score": 0.24335539710164994,
-          "oof_ece": 0.31215105000000004,
-          "oof_log_loss": 0.6812988488683243
-        }
-      },
-      "sport": "cs2",
-      "tier": "main"
-    },
-    {
-      "brier_score": 0.243355,
-      "calibrated_brier_score": 0.243355,
-      "calibrated_drift_score": 2.546,
-      "calibrated_drift_status": "SEVERE_DRIFT",
-      "calibrated_expected_calibration_error": 0.312151,
-      "calibrated_intercept": 1.6055,
-      "calibrated_log_loss": 0.681299,
-      "calibrated_slope": -1.8198,
-      "calibration_intercept": 1.6055,
-      "calibration_slope": -1.8198,
-      "champion_calibrator_method": "identity",
-      "champion_calibrator_params": {},
-      "drift_score": 2.546,
-      "drift_status": "SEVERE_DRIFT",
-      "expected_calibration_error": 0.312151,
-      "log_loss": 0.681299,
-      "market": "total",
-      "model_version": "cs2-total-tiered-elo-v6",
-      "recalibrated": false,
-      "reliability_buckets": [
-        {
-          "count": 38,
-          "hit_rate": 0.8157894736842105,
-          "lower": 0.5,
-          "mean_p": 0.5163692894736842,
-          "upper": 0.6
-        },
-        {
-          "count": 1,
-          "hit_rate": 1.0,
-          "lower": 0.6,
-          "mean_p": 0.63965,
-          "upper": 0.7
-        },
-        {
-          "count": 1,
-          "hit_rate": 0.0,
-          "lower": 0.7,
-          "mean_p": 0.747725,
-          "upper": 0.8
-        }
-      ],
-      "sample_size": 40,
-      "scorecard": {
-        "beta": {
-          "calibration_intercept": 1.6055202838153395,
-          "calibration_slope": -1.8197685339433964,
-          "oof_brier_score": 0.24335539710164994,
-          "oof_ece": 0.31215105000000004,
-          "oof_log_loss": 0.6812988488683243
-        },
-        "identity": {
-          "calibration_intercept": 1.6055202838153395,
-          "calibration_slope": -1.8197685339433964,
-          "oof_brier_score": 0.24335539710165,
-          "oof_ece": 0.31215104999999993,
-          "oof_log_loss": 0.6812988488683243
-        },
-        "isotonic": {
-          "calibration_intercept": 1.6055202838153395,
-          "calibration_slope": -1.8197685339433964,
-          "oof_brier_score": 0.24335539710164994,
-          "oof_ece": 0.31215105000000004,
-          "oof_log_loss": 0.6812988488683243
-        },
-        "platt": {
-          "calibration_intercept": 1.6055202838153395,
-          "calibration_slope": -1.8197685339433964,
-          "oof_brier_score": 0.24335539710164994,
-          "oof_ece": 0.31215105000000004,
-          "oof_log_loss": 0.6812988488683243
-        },
-        "temperature": {
-          "calibration_intercept": 1.6055202838153395,
-          "calibration_slope": -1.8197685339433964,
-          "oof_brier_score": 0.24335539710164994,
-          "oof_ece": 0.31215105000000004,
-          "oof_log_loss": 0.6812988488683243
-        }
-      },
-      "sport": "cs2",
       "tier": "flat"
     },
     {
@@ -6740,6 +6936,90 @@
         }
       },
       "sport": "wnba",
+      "tier": "main"
+    },
+    {
+      "brier_score": 0.214361,
+      "calibrated_brier_score": 0.214361,
+      "calibrated_drift_score": 1.3633,
+      "calibrated_drift_status": "SEVERE_DRIFT",
+      "calibrated_expected_calibration_error": 0.081411,
+      "calibrated_intercept": -0.7833,
+      "calibrated_log_loss": 0.618856,
+      "calibrated_slope": 3.2103,
+      "calibration_intercept": -0.7833,
+      "calibration_slope": 3.2103,
+      "champion_calibrator_method": "identity",
+      "champion_calibrator_params": {},
+      "drift_score": 1.3633,
+      "drift_status": "SEVERE_DRIFT",
+      "expected_calibration_error": 0.081411,
+      "log_loss": 0.618856,
+      "market": "moneyline",
+      "model_version": "nfl-elo-trend-lr-v4",
+      "recalibrated": false,
+      "reliability_buckets": [
+        {
+          "count": 20,
+          "hit_rate": 0.5,
+          "lower": 0.5,
+          "mean_p": 0.55505525,
+          "upper": 0.6
+        },
+        {
+          "count": 13,
+          "hit_rate": 0.7692307692307693,
+          "lower": 0.6,
+          "mean_p": 0.6478252307692307,
+          "upper": 0.7
+        },
+        {
+          "count": 5,
+          "hit_rate": 0.8,
+          "lower": 0.7,
+          "mean_p": 0.7171548,
+          "upper": 0.8
+        }
+      ],
+      "sample_size": 38,
+      "scorecard": {
+        "beta": {
+          "calibration_intercept": -0.7832673419739006,
+          "calibration_slope": 3.2102659921759447,
+          "oof_brier_score": 0.2143605432820263,
+          "oof_ece": 0.08141060526315794,
+          "oof_log_loss": 0.6188556825633507
+        },
+        "identity": {
+          "calibration_intercept": -0.7832673419739006,
+          "calibration_slope": 3.2102659921759447,
+          "oof_brier_score": 0.2143605432820263,
+          "oof_ece": 0.08141060526315794,
+          "oof_log_loss": 0.6188556825633507
+        },
+        "isotonic": {
+          "calibration_intercept": -0.7832673419739006,
+          "calibration_slope": 3.2102659921759447,
+          "oof_brier_score": 0.2143605432820263,
+          "oof_ece": 0.08141060526315794,
+          "oof_log_loss": 0.6188556825633507
+        },
+        "platt": {
+          "calibration_intercept": -0.7832673419739006,
+          "calibration_slope": 3.2102659921759447,
+          "oof_brier_score": 0.2143605432820263,
+          "oof_ece": 0.08141060526315794,
+          "oof_log_loss": 0.6188556825633507
+        },
+        "temperature": {
+          "calibration_intercept": -0.7832673419739006,
+          "calibration_slope": 3.2102659921759447,
+          "oof_brier_score": 0.2143605432820263,
+          "oof_ece": 0.08141060526315794,
+          "oof_log_loss": 0.6188556825633507
+        }
+      },
+      "sport": "nfl",
       "tier": "main"
     },
     {
@@ -6940,202 +7220,6 @@
           "oof_brier_score": 0.2753239626321579,
           "oof_ece": 0.17933205263157895,
           "oof_log_loss": 0.7548514713423817
-        }
-      },
-      "sport": "hockey",
-      "tier": "flat"
-    },
-    {
-      "brier_score": 0.254017,
-      "calibrated_brier_score": 0.254017,
-      "calibrated_drift_score": 0.5764,
-      "calibrated_drift_status": "SEVERE_DRIFT",
-      "calibrated_expected_calibration_error": 0.105787,
-      "calibrated_intercept": -0.1417,
-      "calibrated_log_loss": 0.707517,
-      "calibrated_slope": 0.4586,
-      "calibration_intercept": -0.1417,
-      "calibration_slope": 0.4586,
-      "champion_calibrator_method": "identity",
-      "champion_calibrator_params": {},
-      "drift_score": 0.5764,
-      "drift_status": "SEVERE_DRIFT",
-      "expected_calibration_error": 0.105787,
-      "log_loss": 0.707517,
-      "market": "spread",
-      "model_version": "hockey-poisson-dc-v2",
-      "recalibrated": false,
-      "reliability_buckets": [
-        {
-          "count": 7,
-          "hit_rate": 0.2857142857142857,
-          "lower": 0.3,
-          "mean_p": 0.3495397142857143,
-          "upper": 0.4
-        },
-        {
-          "count": 8,
-          "hit_rate": 0.5,
-          "lower": 0.4,
-          "mean_p": 0.453252375,
-          "upper": 0.5
-        },
-        {
-          "count": 5,
-          "hit_rate": 0.6,
-          "lower": 0.5,
-          "mean_p": 0.5365542,
-          "upper": 0.6
-        },
-        {
-          "count": 6,
-          "hit_rate": 0.5,
-          "lower": 0.6,
-          "mean_p": 0.6590375,
-          "upper": 0.7
-        },
-        {
-          "count": 11,
-          "hit_rate": 0.6363636363636364,
-          "lower": 0.7,
-          "mean_p": 0.7377517272727272,
-          "upper": 0.8
-        },
-        {
-          "count": 1,
-          "hit_rate": 0.0,
-          "lower": 0.8,
-          "mean_p": 0.812443,
-          "upper": 0.9
-        }
-      ],
-      "sample_size": 38,
-      "scorecard": {
-        "beta": {
-          "calibration_intercept": -0.14167099698017305,
-          "calibration_slope": 0.4586395623316833,
-          "oof_brier_score": 0.2540169419193421,
-          "oof_ece": 0.10578749999999999,
-          "oof_log_loss": 0.707517423892328
-        },
-        "identity": {
-          "calibration_intercept": -0.14167099698017305,
-          "calibration_slope": 0.4586395623316833,
-          "oof_brier_score": 0.2540169419193421,
-          "oof_ece": 0.10578749999999999,
-          "oof_log_loss": 0.707517423892328
-        },
-        "isotonic": {
-          "calibration_intercept": -0.14167099698017305,
-          "calibration_slope": 0.4586395623316833,
-          "oof_brier_score": 0.2540169419193421,
-          "oof_ece": 0.10578749999999999,
-          "oof_log_loss": 0.707517423892328
-        },
-        "platt": {
-          "calibration_intercept": -0.14167099698017305,
-          "calibration_slope": 0.4586395623316833,
-          "oof_brier_score": 0.2540169419193421,
-          "oof_ece": 0.10578749999999999,
-          "oof_log_loss": 0.707517423892328
-        },
-        "temperature": {
-          "calibration_intercept": -0.14167099698017305,
-          "calibration_slope": 0.4586395623316833,
-          "oof_brier_score": 0.2540169419193421,
-          "oof_ece": 0.10578749999999999,
-          "oof_log_loss": 0.707517423892328
-        }
-      },
-      "sport": "hockey",
-      "tier": "flat"
-    },
-    {
-      "brier_score": 0.274186,
-      "calibrated_brier_score": 0.274186,
-      "calibrated_drift_score": 0.8847,
-      "calibrated_drift_status": "SEVERE_DRIFT",
-      "calibrated_expected_calibration_error": 0.197302,
-      "calibrated_intercept": -0.7482,
-      "calibrated_log_loss": 0.744742,
-      "calibrated_slope": 0.8291,
-      "calibration_intercept": -0.7482,
-      "calibration_slope": 0.8291,
-      "champion_calibrator_method": "identity",
-      "champion_calibrator_params": {},
-      "drift_score": 0.8847,
-      "drift_status": "SEVERE_DRIFT",
-      "expected_calibration_error": 0.197302,
-      "log_loss": 0.744742,
-      "market": "total",
-      "model_version": "hockey-poisson-dc-v2",
-      "recalibrated": false,
-      "reliability_buckets": [
-        {
-          "count": 3,
-          "hit_rate": 0.0,
-          "lower": 0.4,
-          "mean_p": 0.4713636666666667,
-          "upper": 0.5
-        },
-        {
-          "count": 21,
-          "hit_rate": 0.38095238095238093,
-          "lower": 0.5,
-          "mean_p": 0.5672314285714286,
-          "upper": 0.6
-        },
-        {
-          "count": 11,
-          "hit_rate": 0.5454545454545454,
-          "lower": 0.6,
-          "mean_p": 0.6297242727272727,
-          "upper": 0.7
-        },
-        {
-          "count": 3,
-          "hit_rate": 0.3333333333333333,
-          "lower": 0.7,
-          "mean_p": 0.7481876666666666,
-          "upper": 0.8
-        }
-      ],
-      "sample_size": 38,
-      "scorecard": {
-        "beta": {
-          "calibration_intercept": -0.7481636285698001,
-          "calibration_slope": 0.8290588942068007,
-          "oof_brier_score": 0.27418638363871056,
-          "oof_ece": 0.1973021315789474,
-          "oof_log_loss": 0.7447415703420289
-        },
-        "identity": {
-          "calibration_intercept": -0.7481636285698001,
-          "calibration_slope": 0.8290588942068007,
-          "oof_brier_score": 0.27418638363871056,
-          "oof_ece": 0.1973021315789474,
-          "oof_log_loss": 0.7447415703420289
-        },
-        "isotonic": {
-          "calibration_intercept": -0.7481636285698001,
-          "calibration_slope": 0.8290588942068007,
-          "oof_brier_score": 0.27418638363871056,
-          "oof_ece": 0.1973021315789474,
-          "oof_log_loss": 0.7447415703420289
-        },
-        "platt": {
-          "calibration_intercept": -0.7481636285698001,
-          "calibration_slope": 0.8290588942068007,
-          "oof_brier_score": 0.27418638363871056,
-          "oof_ece": 0.1973021315789474,
-          "oof_log_loss": 0.7447415703420289
-        },
-        "temperature": {
-          "calibration_intercept": -0.7481636285698001,
-          "calibration_slope": 0.8290588942068007,
-          "oof_brier_score": 0.27418638363871056,
-          "oof_ece": 0.1973021315789474,
-          "oof_log_loss": 0.7447415703420289
         }
       },
       "sport": "hockey",
@@ -7699,90 +7783,6 @@
         }
       },
       "sport": "wnba",
-      "tier": "main"
-    },
-    {
-      "brier_score": 0.223852,
-      "calibrated_brier_score": 0.223852,
-      "calibrated_drift_score": 1.1113,
-      "calibrated_drift_status": "SEVERE_DRIFT",
-      "calibrated_expected_calibration_error": 0.060998,
-      "calibrated_intercept": -0.7029,
-      "calibrated_log_loss": 0.638761,
-      "calibrated_slope": 2.7935,
-      "calibration_intercept": -0.7029,
-      "calibration_slope": 2.7935,
-      "champion_calibrator_method": "identity",
-      "champion_calibrator_params": {},
-      "drift_score": 1.1113,
-      "drift_status": "SEVERE_DRIFT",
-      "expected_calibration_error": 0.060998,
-      "log_loss": 0.638761,
-      "market": "moneyline",
-      "model_version": "nfl-elo-trend-lr-v4",
-      "recalibrated": false,
-      "reliability_buckets": [
-        {
-          "count": 20,
-          "hit_rate": 0.5,
-          "lower": 0.5,
-          "mean_p": 0.55505525,
-          "upper": 0.6
-        },
-        {
-          "count": 11,
-          "hit_rate": 0.7272727272727273,
-          "lower": 0.6,
-          "mean_p": 0.6464438181818182,
-          "upper": 0.7
-        },
-        {
-          "count": 4,
-          "hit_rate": 0.75,
-          "lower": 0.7,
-          "mean_p": 0.71382075,
-          "upper": 0.8
-        }
-      ],
-      "sample_size": 35,
-      "scorecard": {
-        "beta": {
-          "calibration_intercept": -0.7029358797799861,
-          "calibration_slope": 2.7935143935263205,
-          "oof_brier_score": 0.22385236346057144,
-          "oof_ece": 0.06099828571428572,
-          "oof_log_loss": 0.6387610417898009
-        },
-        "identity": {
-          "calibration_intercept": -0.7029358797799861,
-          "calibration_slope": 2.7935143935263205,
-          "oof_brier_score": 0.2238523634605714,
-          "oof_ece": 0.06099828571428572,
-          "oof_log_loss": 0.6387610417898009
-        },
-        "isotonic": {
-          "calibration_intercept": -0.7029358797799861,
-          "calibration_slope": 2.7935143935263205,
-          "oof_brier_score": 0.22385236346057144,
-          "oof_ece": 0.06099828571428572,
-          "oof_log_loss": 0.6387610417898009
-        },
-        "platt": {
-          "calibration_intercept": -0.7029358797799861,
-          "calibration_slope": 2.7935143935263205,
-          "oof_brier_score": 0.22385236346057144,
-          "oof_ece": 0.06099828571428572,
-          "oof_log_loss": 0.6387610417898009
-        },
-        "temperature": {
-          "calibration_intercept": -0.7029358797799861,
-          "calibration_slope": 2.7935143935263205,
-          "oof_brier_score": 0.22385236346057144,
-          "oof_ece": 0.06099828571428572,
-          "oof_log_loss": 0.6387610417898009
-        }
-      },
-      "sport": "nfl",
       "tier": "main"
     },
     {
@@ -8885,6 +8885,90 @@
       "tier": "flat"
     },
     {
+      "brier_score": 0.23883,
+      "calibrated_brier_score": 0.25,
+      "calibrated_drift_score": 0.3,
+      "calibrated_drift_status": "SEVERE_DRIFT",
+      "calibrated_expected_calibration_error": 0.1,
+      "calibrated_intercept": 0.0,
+      "calibrated_log_loss": 1.0,
+      "calibrated_slope": 1.0,
+      "calibration_intercept": 0.2641,
+      "calibration_slope": 0.3917,
+      "champion_calibrator_method": "identity",
+      "champion_calibrator_params": {},
+      "drift_score": 0.6437,
+      "drift_status": "SEVERE_DRIFT",
+      "expected_calibration_error": 0.10705,
+      "log_loss": 0.669637,
+      "market": "moneyline",
+      "model_version": "nba-elo-trend-lr-v4",
+      "recalibrated": false,
+      "reliability_buckets": [
+        {
+          "count": 14,
+          "hit_rate": 0.6428571428571429,
+          "lower": 0.5,
+          "mean_p": 0.5639232857142857,
+          "upper": 0.6
+        },
+        {
+          "count": 7,
+          "hit_rate": 0.42857142857142855,
+          "lower": 0.6,
+          "mean_p": 0.6459127142857143,
+          "upper": 0.7
+        },
+        {
+          "count": 5,
+          "hit_rate": 0.8,
+          "lower": 0.7,
+          "mean_p": 0.7686316,
+          "upper": 0.8
+        }
+      ],
+      "sample_size": 26,
+      "scorecard": {
+        "beta": {
+          "calibration_intercept": 0.0,
+          "calibration_slope": 1.0,
+          "oof_brier_score": 0.25,
+          "oof_ece": 0.1,
+          "oof_log_loss": 1.0
+        },
+        "identity": {
+          "calibration_intercept": 0.0,
+          "calibration_slope": 1.0,
+          "oof_brier_score": 0.25,
+          "oof_ece": 0.1,
+          "oof_log_loss": 1.0
+        },
+        "isotonic": {
+          "calibration_intercept": 0.0,
+          "calibration_slope": 1.0,
+          "oof_brier_score": 0.25,
+          "oof_ece": 0.1,
+          "oof_log_loss": 1.0
+        },
+        "platt": {
+          "calibration_intercept": 0.0,
+          "calibration_slope": 1.0,
+          "oof_brier_score": 0.25,
+          "oof_ece": 0.1,
+          "oof_log_loss": 1.0
+        },
+        "temperature": {
+          "calibration_intercept": 0.0,
+          "calibration_slope": 1.0,
+          "oof_brier_score": 0.25,
+          "oof_ece": 0.1,
+          "oof_log_loss": 1.0
+        }
+      },
+      "sport": "nba",
+      "tier": "main"
+    },
+    {
       "brier_score": 0.248679,
       "calibrated_brier_score": 0.25,
       "calibrated_drift_score": 0.3,
@@ -9043,90 +9127,6 @@
         }
       },
       "sport": "nfl",
-      "tier": "main"
-    },
-    {
-      "brier_score": 0.238912,
-      "calibrated_brier_score": 0.25,
-      "calibrated_drift_score": 0.3,
-      "calibrated_drift_status": "SEVERE_DRIFT",
-      "calibrated_expected_calibration_error": 0.1,
-      "calibrated_intercept": 0.0,
-      "calibrated_log_loss": 1.0,
-      "calibrated_slope": 1.0,
-      "calibration_intercept": -0.1075,
-      "calibration_slope": 0.8394,
-      "champion_calibrator_method": "identity",
-      "champion_calibrator_params": {},
-      "drift_score": 0.2739,
-      "drift_status": "MODERATE_DRIFT",
-      "expected_calibration_error": 0.059133,
-      "log_loss": 0.669506,
-      "market": "moneyline",
-      "model_version": "nba-elo-trend-lr-v4",
-      "recalibrated": false,
-      "reliability_buckets": [
-        {
-          "count": 11,
-          "hit_rate": 0.5454545454545454,
-          "lower": 0.5,
-          "mean_p": 0.5659248181818182,
-          "upper": 0.6
-        },
-        {
-          "count": 6,
-          "hit_rate": 0.5,
-          "lower": 0.6,
-          "mean_p": 0.6531535,
-          "upper": 0.7
-        },
-        {
-          "count": 5,
-          "hit_rate": 0.8,
-          "lower": 0.7,
-          "mean_p": 0.7686316,
-          "upper": 0.8
-        }
-      ],
-      "sample_size": 22,
-      "scorecard": {
-        "beta": {
-          "calibration_intercept": 0.0,
-          "calibration_slope": 1.0,
-          "oof_brier_score": 0.25,
-          "oof_ece": 0.1,
-          "oof_log_loss": 1.0
-        },
-        "identity": {
-          "calibration_intercept": 0.0,
-          "calibration_slope": 1.0,
-          "oof_brier_score": 0.25,
-          "oof_ece": 0.1,
-          "oof_log_loss": 1.0
-        },
-        "isotonic": {
-          "calibration_intercept": 0.0,
-          "calibration_slope": 1.0,
-          "oof_brier_score": 0.25,
-          "oof_ece": 0.1,
-          "oof_log_loss": 1.0
-        },
-        "platt": {
-          "calibration_intercept": 0.0,
-          "calibration_slope": 1.0,
-          "oof_brier_score": 0.25,
-          "oof_ece": 0.1,
-          "oof_log_loss": 1.0
-        },
-        "temperature": {
-          "calibration_intercept": 0.0,
-          "calibration_slope": 1.0,
-          "oof_brier_score": 0.25,
-          "oof_ece": 0.1,
-          "oof_log_loss": 1.0
-        }
-      },
-      "sport": "nba",
       "tier": "main"
     },
     {
@@ -9716,16 +9716,186 @@
       },
       "sport": "valorant",
       "tier": "research"
+    },
+    {
+      "brier_score": 0.290389,
+      "calibrated_brier_score": 0.25,
+      "calibrated_drift_score": 0.3,
+      "calibrated_drift_status": "SEVERE_DRIFT",
+      "calibrated_expected_calibration_error": 0.1,
+      "calibrated_intercept": 0.0,
+      "calibrated_log_loss": 1.0,
+      "calibrated_slope": 1.0,
+      "calibration_intercept": -0.1724,
+      "calibration_slope": -0.047,
+      "champion_calibrator_method": "identity",
+      "champion_calibrator_params": {},
+      "drift_score": 1.0494,
+      "drift_status": "SEVERE_DRIFT",
+      "expected_calibration_error": 0.192961,
+      "log_loss": 0.779124,
+      "market": "spread",
+      "model_version": "cs2-spread-tiered-elo-v6",
+      "recalibrated": false,
+      "reliability_buckets": [
+        {
+          "count": 6,
+          "hit_rate": 0.5,
+          "lower": 0.5,
+          "mean_p": 0.5531073333333333,
+          "upper": 0.6
+        },
+        {
+          "count": 8,
+          "hit_rate": 0.375,
+          "lower": 0.6,
+          "mean_p": 0.6503831250000001,
+          "upper": 0.7
+        },
+        {
+          "count": 6,
+          "hit_rate": 0.5,
+          "lower": 0.7,
+          "mean_p": 0.7229169999999999,
+          "upper": 0.8
+        }
+      ],
+      "sample_size": 20,
+      "scorecard": {
+        "beta": {
+          "calibration_intercept": 0.0,
+          "calibration_slope": 1.0,
+          "oof_brier_score": 0.25,
+          "oof_ece": 0.1,
+          "oof_log_loss": 1.0
+        },
+        "identity": {
+          "calibration_intercept": 0.0,
+          "calibration_slope": 1.0,
+          "oof_brier_score": 0.25,
+          "oof_ece": 0.1,
+          "oof_log_loss": 1.0
+        },
+        "isotonic": {
+          "calibration_intercept": 0.0,
+          "calibration_slope": 1.0,
+          "oof_brier_score": 0.25,
+          "oof_ece": 0.1,
+          "oof_log_loss": 1.0
+        },
+        "platt": {
+          "calibration_intercept": 0.0,
+          "calibration_slope": 1.0,
+          "oof_brier_score": 0.25,
+          "oof_ece": 0.1,
+          "oof_log_loss": 1.0
+        },
+        "temperature": {
+          "calibration_intercept": 0.0,
+          "calibration_slope": 1.0,
+          "oof_brier_score": 0.25,
+          "oof_ece": 0.1,
+          "oof_log_loss": 1.0
+        }
+      },
+      "sport": "cs2",
+      "tier": "main"
+    },
+    {
+      "brier_score": 0.290389,
+      "calibrated_brier_score": 0.25,
+      "calibrated_drift_score": 0.3,
+      "calibrated_drift_status": "SEVERE_DRIFT",
+      "calibrated_expected_calibration_error": 0.1,
+      "calibrated_intercept": 0.0,
+      "calibrated_log_loss": 1.0,
+      "calibrated_slope": 1.0,
+      "calibration_intercept": -0.1724,
+      "calibration_slope": -0.047,
+      "champion_calibrator_method": "identity",
+      "champion_calibrator_params": {},
+      "drift_score": 1.0494,
+      "drift_status": "SEVERE_DRIFT",
+      "expected_calibration_error": 0.192961,
+      "log_loss": 0.779124,
+      "market": "spread",
+      "model_version": "cs2-spread-tiered-elo-v6",
+      "recalibrated": false,
+      "reliability_buckets": [
+        {
+          "count": 6,
+          "hit_rate": 0.5,
+          "lower": 0.5,
+          "mean_p": 0.5531073333333333,
+          "upper": 0.6
+        },
+        {
+          "count": 8,
+          "hit_rate": 0.375,
+          "lower": 0.6,
+          "mean_p": 0.6503831250000001,
+          "upper": 0.7
+        },
+        {
+          "count": 6,
+          "hit_rate": 0.5,
+          "lower": 0.7,
+          "mean_p": 0.7229169999999999,
+          "upper": 0.8
+        }
+      ],
+      "sample_size": 20,
+      "scorecard": {
+        "beta": {
+          "calibration_intercept": 0.0,
+          "calibration_slope": 1.0,
+          "oof_brier_score": 0.25,
+          "oof_ece": 0.1,
+          "oof_log_loss": 1.0
+        },
+        "identity": {
+          "calibration_intercept": 0.0,
+          "calibration_slope": 1.0,
+          "oof_brier_score": 0.25,
+          "oof_ece": 0.1,
+          "oof_log_loss": 1.0
+        },
+        "isotonic": {
+          "calibration_intercept": 0.0,
+          "calibration_slope": 1.0,
+          "oof_brier_score": 0.25,
+          "oof_ece": 0.1,
+          "oof_log_loss": 1.0
+        },
+        "platt": {
+          "calibration_intercept": 0.0,
+          "calibration_slope": 1.0,
+          "oof_brier_score": 0.25,
+          "oof_ece": 0.1,
+          "oof_log_loss": 1.0
+        },
+        "temperature": {
+          "calibration_intercept": 0.0,
+          "calibration_slope": 1.0,
+          "oof_brier_score": 0.25,
+          "oof_ece": 0.1,
+          "oof_log_loss": 1.0
+        }
+      },
+      "sport": "cs2",
+      "tier": "flat"
     }
   ],
-  "moderate_drift_count": 9,
+  "moderate_drift_count": 11,
   "moderate_drift_models": [
+    "cs2:moneyline:cs2-tiered-elo-v6",
     "tennis:moneyline:tennis-surface-elo-v1",
+    "mlb:total:measured-edge-totals-v3",
     "mlb:spread:measured-edge-margin-v3",
     "soccer:moneyline:soccer-poisson-dc-v1",
-    "tennis:moneyline:tennis-surface-elo-v4",
+    "mlb:moneyline:mlb-elo-trend-lr-v8",
     "dota2:moneyline:dota2-tiered-elo-v6",
-    "npb:moneyline:npb-tie-aware-elo-v2",
+    "kbo:moneyline:kbo-tie-aware-elo-v2",
     "soccer:total:soccer-poisson-dc-v3",
     "nba:moneyline:nba-elo-trend-lr-v4",
     "ncaaf:moneyline:cfb-structural-v2"
@@ -9765,8 +9935,8 @@
     "tennis:moneyline:tennis-learned-v3",
     "tennis:spread:tennis-learned-v3",
     "tennis:total:tennis-learned-v3",
-    "soccer:moneyline:soccer-poisson-dc-v2",
     "hockey:moneyline:hockey-poisson-dc-v2",
+    "soccer:moneyline:soccer-poisson-dc-v2",
     "nfl:moneyline:nfl-elo-trend-lr-v4",
     "rainbow_six:moneyline:rainbow_six-tiered-elo-v6",
     "soccer:spread:soccer-poisson-dc-v3",
@@ -9776,12 +9946,12 @@
     "ncaaf:total:cfb-structural-v3",
     "tennis:spread:tennis-games-markov-v1",
     "ncaaf:spread:cfb-structural-v2",
-    "nfl:spread:nfl-spread-structural-v5",
     "cs2:total:cs2-total-tiered-elo-v6",
-    "wnba:total:wnba-total-margin-v2",
-    "hockey:moneyline:hockey-poisson-dc-v1",
     "hockey:spread:hockey-poisson-dc-v2",
     "hockey:total:hockey-poisson-dc-v2",
+    "nfl:spread:nfl-spread-structural-v5",
+    "wnba:total:wnba-total-margin-v2",
+    "hockey:moneyline:hockey-poisson-dc-v1",
     "tennis:total:tennis-games-markov-v1",
     "tennis:spread:tennis-games-markov-v3",
     "ncaaf:spread:cfb-structural-v3",
@@ -9794,9 +9964,11 @@
     "nba:total:nba-total-margin-v5",
     "ncaaf:spread:cfb-structural-v4",
     "nba:spread:nba-spread-margin-v5",
+    "nba:moneyline:nba-elo-trend-lr-v4",
     "nba:total:nba-total-margin-v2",
     "tennis:spread:tennis-surface-elo-v4",
-    "nba:spread:nba-spread-margin-v2"
+    "nba:spread:nba-spread-margin-v2",
+    "cs2:spread:cs2-spread-tiered-elo-v6"
   ],
   "raw_system_status": "SEVERE_DRIFT",
   "recalibrated_count": 9,
@@ -9811,32 +9983,33 @@
     "nfl:moneyline:nfl-elo-trend-lr-v4",
     "dota2:moneyline:dota2-tiered-elo-v6"
   ],
-  "severe_drift_count": 54,
+  "severe_drift_count": 57,
   "severe_drift_models": [
     "cs2:moneyline:cs2-tiered-elo-v6",
     "tennis:moneyline:tennis-surface-elo-v1",
     "mlb:moneyline:mlb-elo-trend-lr-v8",
-    "mlb:total:measured-edge-totals-v3",
     "mlb:spread:measured-edge-margin-v3",
+    "mlb:total:measured-edge-totals-v3",
     "lol:moneyline:lol-tiered-elo-v6",
     "ncaaf:total:cfb-total-v1",
     "ncaaf:spread:cfb-spread-v1",
+    "tennis:moneyline:tennis-surface-elo-v4",
     "ncaaf:moneyline:college-football-v1",
     "valorant:moneyline:valorant-tiered-elo-v6",
+    "npb:moneyline:npb-tie-aware-elo-v2",
     "dota2:moneyline:dota2-tiered-elo-v6",
     "soccer:total:soccer-poisson-dc-v1",
     "soccer:total:soccer-poisson-dc-v3",
     "soccer:moneyline:soccer-poisson-dc-v3",
-    "kbo:moneyline:kbo-tie-aware-elo-v2",
     "soccer:double_chance:soccer-poisson-dc-v3",
     "wnba:moneyline:wnba-elo-trend-lr-v4",
-    "npb:moneyline:npb-tie-aware-elo-v2",
     "mlb:nrfi:mlb-nrfi-v1",
     "tennis:moneyline:tennis-learned-v3",
+    "kbo:moneyline:kbo-tie-aware-elo-v2",
     "tennis:spread:tennis-learned-v3",
     "tennis:total:tennis-learned-v3",
-    "soccer:moneyline:soccer-poisson-dc-v2",
     "hockey:moneyline:hockey-poisson-dc-v2",
+    "soccer:moneyline:soccer-poisson-dc-v2",
     "nfl:moneyline:nfl-elo-trend-lr-v4",
     "rainbow_six:moneyline:rainbow_six-tiered-elo-v6",
     "soccer:spread:soccer-poisson-dc-v3",
@@ -9846,12 +10019,12 @@
     "ncaaf:total:cfb-structural-v3",
     "tennis:spread:tennis-games-markov-v1",
     "ncaaf:spread:cfb-structural-v2",
-    "nfl:spread:nfl-spread-structural-v5",
     "cs2:total:cs2-total-tiered-elo-v6",
-    "wnba:total:wnba-total-margin-v2",
-    "hockey:moneyline:hockey-poisson-dc-v1",
     "hockey:spread:hockey-poisson-dc-v2",
     "hockey:total:hockey-poisson-dc-v2",
+    "nfl:spread:nfl-spread-structural-v5",
+    "wnba:total:wnba-total-margin-v2",
+    "hockey:moneyline:hockey-poisson-dc-v1",
     "tennis:total:tennis-games-markov-v1",
     "tennis:spread:tennis-games-markov-v3",
     "ncaaf:spread:cfb-structural-v3",
@@ -9864,10 +10037,12 @@
     "nba:total:nba-total-margin-v5",
     "ncaaf:spread:cfb-structural-v4",
     "nba:spread:nba-spread-margin-v5",
+    "nba:moneyline:nba-elo-trend-lr-v4",
     "nba:total:nba-total-margin-v2",
     "tennis:spread:tennis-surface-elo-v4",
-    "nba:spread:nba-spread-margin-v2"
+    "nba:spread:nba-spread-margin-v2",
+    "cs2:spread:cs2-spread-tiered-elo-v6"
   ],
   "system_status": "SEVERE_DRIFT",
-  "total_evaluated_models": 102
+  "total_evaluated_models": 104
 }
