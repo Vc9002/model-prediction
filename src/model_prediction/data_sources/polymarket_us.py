@@ -1061,6 +1061,16 @@ def capture_slate_snapshots(
             kept = pruned
         all_contracts.extend(kept)
 
+    # Shared gateway throttling can stop the queue after a 429. Give each NBA
+    # event its shortlist before spending that budget on other sports.
+    all_contracts.sort(
+        key=lambda entry: (
+            entry[0].upper() != "NBA",
+            str(entry[2].get("event_start_utc") or ""),
+            str(entry[2].get("event_id") or ""),
+        )
+    )
+
     def _fetch(entry):
         league, sport, event, market = entry
         slug = str(market.get("market_slug") or "")
@@ -1110,6 +1120,7 @@ def capture_slate_snapshots(
             results = list(pool.map(_fetch, all_contracts))
 
     stores: dict[str, PolymarketSnapshotStore] = {}
+    nba_captured: dict[str, set[str]] = {}
     for league, sport, slug, snapshot, fetch_error in results:
         if snapshot is None:
             failures += 1
@@ -1126,11 +1137,29 @@ def capture_slate_snapshots(
             store = PolymarketSnapshotStore.for_sport_date(data_root, sport, game_date)
             stores[sport] = store
         store.append(snapshot)
+        if (
+            league.upper() == "NBA"
+            and snapshot.get("timestamp_valid")
+            and snapshot["long"].get("ask") is not None
+            and snapshot["short"].get("ask") is not None
+        ):
+            nba_captured.setdefault(str(snapshot.get("event_id")), set()).add(
+                str(snapshot.get("market_type"))
+            )
         captured += 1
         if snapshot["long"].get("ask") is None or snapshot["short"].get("ask") is None:
             missing_bbo += 1
         if not snapshot.get("timestamp_valid", True):
             timestamp_invalid += 1
+    nba_events = {
+        str(event.get("event_id"))
+        for event in events_by_league.get("NBA", [])
+        if event.get("event_id") is not None
+    }
+    nba_missing_by_market = {
+        market: sorted(event_id for event_id in nba_events if market not in nba_captured.get(event_id, set()))
+        for market in ("moneyline", "spread", "total")
+    }
     return {
         "status": ("ok" if failures == 0 and missing_bbo == 0 and timestamp_invalid == 0 else "partial"),
         "captured": captured,
@@ -1147,6 +1176,7 @@ def capture_slate_snapshots(
         "skipped_ladder_alternates": skipped_ladder,
         "ladder_keep": ladder_keep,
         "failure_details": failure_details,
+        "nba_missing_quote_event_ids": nba_missing_by_market,
         "timestamp_valid": timestamp_invalid == 0,
         "timestamp_invalid_count": timestamp_invalid,
         "sports_scope": sorted(qualification_sports),

@@ -178,6 +178,11 @@ def _polymarket_slate(args, config) -> dict:
     else:
         raise ValueError("provide --sport, --league, or --all")
     ladder_keep = _capture_ladder_keep()
+    # NBA alternate ladders can exhaust the shared book budget before the
+    # forecast sees a main spread/total for each game. Keep a small balanced
+    # shortlist per event while preserving every moneyline contract.
+    if ladder_keep is None and "NBA" in events:
+        ladder_keep = 3
     snapshot_root = Path(ledger_path(config)).parent
     bbo_capture = (
         {"status": "disabled"}
@@ -189,9 +194,17 @@ def _polymarket_slate(args, config) -> dict:
             args.date,
             horizon_hours=_capture_horizon_hours(),
             ladder_keep=ladder_keep,
-            ladder_keep_slugs=_open_pick_slugs(snapshot_root) if ladder_keep else frozenset(),
+            ladder_leagues=frozenset({"NBA", "NCAAF"}),
+            ladder_keep_slugs=(
+                _open_pick_slugs(snapshot_root) | _open_pick_slugs(snapshot_root, "nba")
+                if ladder_keep
+                else frozenset()
+            ),
         )
     )
+    missing_nba = bbo_capture.get("nba_missing_quote_event_ids", {})
+    if missing_nba and any(missing_nba.values()):
+        logger.warning("NBA pregame executable quote coverage incomplete: %s", missing_nba)
     return {
         "provider": "polymarket_us",
         "game_date": args.date,

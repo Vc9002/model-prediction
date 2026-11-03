@@ -974,6 +974,28 @@ def test_ladder_keep_fetches_only_the_most_balanced_alternates_for_listed_league
     assert result["skipped_ladder_alternates"] == 2
 
 
+def test_nba_capture_shortlists_each_game_before_other_sports(tmp_path) -> None:
+    first = _ladder_event({"far": 0.95, "near": 0.52, "close": 0.49})
+    first["event_id"] = "nba-1"
+    second = _ladder_event({"far2": 0.90, "near2": 0.51, "close2": 0.48})
+    second["event_id"] = "nba-2"
+    client = _SlateClient()
+    result = capture_slate_snapshots(
+        client,
+        {"MLB": [_ladder_event({"mlb": 0.5})], "NBA": [first, second]},
+        tmp_path,
+        "2026-10-22",
+        ladder_keep=2,
+        ladder_leagues=frozenset({"NBA"}),
+        max_workers=1,
+    )
+    assert client.slate_calls[:4] == ["near", "close", "near2", "close2"]
+    assert client.slate_calls[-1] == "mlb"
+    assert result["skipped_ladder_alternates"] == 2
+    assert result["nba_missing_quote_event_ids"]["spread"] == []
+    assert result["nba_missing_quote_event_ids"]["total"] == ["nba-1", "nba-2"]
+
+
 def test_ladder_keep_slugs_survive_pruning_without_using_up_the_quota(tmp_path) -> None:
     prices = {"far": 0.95, "near": 0.52, "mid": 0.70, "close": 0.49}
     client = _SlateClient()
