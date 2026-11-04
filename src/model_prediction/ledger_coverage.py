@@ -44,7 +44,7 @@ for _sport in (
     ROUTES[(_sport, "moneyline")] = (_sport.lower(), None)
 for _market in ("moneyline", "spread", "total"):
     ROUTES[("NCAAF", _market)] = ("ncaaf", None)
-    ROUTES[("NCAAB", _market)] = ("ncaab", "ncaab-tempo-v2")
+    ROUTES[("NCAAB", _market)] = ("ncaab", "ncaab-tempo-v3")
     ROUTES[("EUROLEAGUE", _market)] = ("euroleague", "eurolg-tempo-v2")
     ROUTES[("NBL", _market)] = ("nbl", "nbl-tempo-v2")
 for _sport in ("HOCKEY", "TENNIS", "SOCCER", "CS2", "DOTA2", "LOL", "VALORANT", "RAINBOW_SIX"):

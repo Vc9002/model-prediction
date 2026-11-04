@@ -53,6 +53,11 @@ BACKFILL_SEASONS = 3
 BACKFILL_THRESHOLD = 1500
 
 
+def _row_start(row: dict) -> str:
+    """Support both the forecast history and the older ingest row schema."""
+    return str(row.get("start") or row.get("event_start_utc") or "")
+
+
 def _season_ids(game_date: date) -> list[str]:
     start_year = game_date.year if game_date.month >= 9 else game_date.year - 1
     return [f"{year}{year + 1}" for year in range(start_year - BACKFILL_SEASONS + 1, start_year + 1)]
@@ -67,7 +72,7 @@ def backfill_nhl_seasons(existing: dict, game_date: date, client: NHLClient | No
     """
     source = client or NHLClient()
     espn_names = {name for row in existing.values() for name in (row["home_team"], row["away_team"])}
-    present = {(row["start"][:10], row["home_team"], row["away_team"]) for row in existing.values()}
+    present = {(_row_start(row)[:10], row["home_team"], row["away_team"]) for row in existing.values()}
     errors: list[dict] = []
     seen: set[int] = set()
     collected: list[tuple[dict, str, str]] = []  # (row, home abbrev, away abbrev)
@@ -189,7 +194,7 @@ def refresh_hockey_history(
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".tmp")
     temporary.write_text(
-        "".join(json.dumps(r) + "\n" for r in sorted(existing.values(), key=lambda r: r["start"])),
+        "".join(json.dumps(r) + "\n" for r in sorted(existing.values(), key=_row_start)),
         encoding="utf-8",
     )
     temporary.replace(path)
@@ -199,7 +204,7 @@ def refresh_hockey_history(
         errors.extend(backfill["errors"])
         if backfill["added"]:
             temporary.write_text(
-                "".join(json.dumps(r) + "\n" for r in sorted(existing.values(), key=lambda r: r["start"])),
+                "".join(json.dumps(r) + "\n" for r in sorted(existing.values(), key=_row_start)),
                 encoding="utf-8",
             )
             temporary.replace(path)
@@ -207,7 +212,7 @@ def refresh_hockey_history(
     errors.extend(others["errors"])
     if any(others["added"].values()):
         temporary.write_text(
-            "".join(json.dumps(r) + "\n" for r in sorted(existing.values(), key=lambda r: r["start"])),
+            "".join(json.dumps(r) + "\n" for r in sorted(existing.values(), key=_row_start)),
             encoding="utf-8",
         )
         temporary.replace(path)
