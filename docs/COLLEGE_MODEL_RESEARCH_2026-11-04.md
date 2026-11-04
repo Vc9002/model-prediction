@@ -56,6 +56,12 @@ total Brier worsens from 0.26429 to 0.27258 across 117 replayed Flat totals.
 Its apparent Flat units gain therefore does not justify serving it. All NCAAF
 snapshot records mark historical source observation times unverified.
 
+A second ridge ablation using Elo margin, trend margin, and their combination
+also failed to beat the incumbent's later-date margin MAE (9.03). The best
+trend-only candidate tested here reached 10.94 on those dates. Early-season
+fit does not transfer cleanly into later conference/tournament play; a larger
+coefficient or an Elo-only substitution is not a defensible repair.
+
 ## Serving repairs and next research priority
 
 Football ESPN fallback markets now require an actual quote on both sides. A
