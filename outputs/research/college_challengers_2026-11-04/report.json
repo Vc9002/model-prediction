@@ -1,0 +1,286 @@
+{
+  "artifact": {
+    "margin": {
+      "intercept": -7.248056386118142,
+      "sd": 16.804963211669182,
+      "slope": 3.427656498098261
+    },
+    "model_id": "ncaab-calibrated-margin-v4-research",
+    "total": {
+      "intercept": -277.38039944260925,
+      "sd": 17.12598021942676,
+      "slope": 2.815357081268775
+    },
+    "train_end_exclusive": "2026-02-02",
+    "train_games": 4308,
+    "training_source_sha256": "e18fa9d2f6ecb5b92b71fad3967f39b4bf428c9285bae65533956ed43733149c",
+    "validation_end_exclusive": "2026-03-05"
+  },
+  "cohorts": {
+    "ncaab": {
+      "excluded": [],
+      "markets": {
+        "moneyline": {
+          "n": 100,
+          "new_brier": 0.14993762004547861,
+          "new_logloss": 0.48330852327781476,
+          "old_brier": 0.17570439690064,
+          "old_logloss": 0.5384205534698866,
+          "original_pnl_units": -32.8034,
+          "wins": 18
+        },
+        "spread": {
+          "n": 151,
+          "new_brier": 0.29491483674913593,
+          "new_logloss": 0.8068237452042838,
+          "old_brier": 0.43447430864290737,
+          "old_logloss": 1.6520600503089733,
+          "original_pnl_units": -32.0004,
+          "wins": 66
+        },
+        "total": {
+          "n": 167,
+          "new_brier": 0.22704154175813016,
+          "new_logloss": 0.651297723105257,
+          "old_brier": 0.23040950199301205,
+          "old_logloss": 0.6604423235784748,
+          "original_pnl_units": 35.2488,
+          "wins": 95
+        }
+      },
+      "replayed_events": 127,
+      "replayed_rows": 418,
+      "total_settled_events": 127,
+      "total_settled_rows": 418
+    },
+    "ncaaf": {
+      "excluded": [
+        {
+          "event_id": "401856766",
+          "market": "moneyline",
+          "model_id": "college-football-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401856766",
+          "market": "spread",
+          "model_id": "cfb-spread-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401856766",
+          "market": "total",
+          "model_id": "cfb-total-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401864494",
+          "market": "moneyline",
+          "model_id": "college-football-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401864494",
+          "market": "spread",
+          "model_id": "cfb-spread-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401864494",
+          "market": "total",
+          "model_id": "cfb-total-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401858202",
+          "market": "moneyline",
+          "model_id": "college-football-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401858202",
+          "market": "spread",
+          "model_id": "cfb-spread-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401858202",
+          "market": "total",
+          "model_id": "cfb-total-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401864577",
+          "market": "moneyline",
+          "model_id": "college-football-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401864577",
+          "market": "spread",
+          "model_id": "cfb-spread-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401864577",
+          "market": "total",
+          "model_id": "cfb-total-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401866408",
+          "market": "moneyline",
+          "model_id": "college-football-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401866408",
+          "market": "spread",
+          "model_id": "cfb-spread-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401866408",
+          "market": "total",
+          "model_id": "cfb-total-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401858201",
+          "market": "moneyline",
+          "model_id": "college-football-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401858201",
+          "market": "spread",
+          "model_id": "cfb-spread-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401858201",
+          "market": "total",
+          "model_id": "cfb-total-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401864570",
+          "market": "moneyline",
+          "model_id": "college-football-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401864570",
+          "market": "spread",
+          "model_id": "cfb-spread-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401864570",
+          "market": "total",
+          "model_id": "cfb-total-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401862693",
+          "market": "moneyline",
+          "model_id": "college-football-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401862693",
+          "market": "spread",
+          "model_id": "cfb-spread-v1",
+          "reason": "no_pregame_replay_snapshot"
+        },
+        {
+          "event_id": "401862693",
+          "market": "total",
+          "model_id": "cfb-total-v1",
+          "reason": "no_pregame_replay_snapshot"
+        }
+      ],
+      "markets": {
+        "moneyline": {
+          "n": 143,
+          "new_brier": 0.20789543658204007,
+          "new_logloss": 0.6028784744451777,
+          "old_brier": 0.20759159815071332,
+          "old_logloss": 0.6019314980782436,
+          "original_pnl_units": -3.9936,
+          "wins": 97
+        },
+        "spread": {
+          "n": 109,
+          "new_brier": 0.24257385665195236,
+          "new_logloss": 0.6761048713518624,
+          "old_brier": 0.24300913116011008,
+          "old_logloss": 0.6771666613858534,
+          "original_pnl_units": 13.9128,
+          "wins": 59
+        },
+        "total": {
+          "n": 117,
+          "new_brier": 0.27257761867546265,
+          "new_logloss": 0.7436611876843258,
+          "old_brier": 0.2642932897592478,
+          "old_logloss": 0.7242804041544849,
+          "original_pnl_units": 2.671,
+          "wins": 60
+        }
+      },
+      "replayed_events": 160,
+      "replayed_rows": 371,
+      "total_settled_events": 168,
+      "total_settled_rows": 395
+    }
+  },
+  "database": "E:\\model-prediction-runtime\\ledgers\\ledgers.db",
+  "decision": "REJECT_NCAAB_MARGIN_AND_NCAAF_TOTAL_CHALLENGERS",
+  "generated_at_utc": "2026-11-04T08:18:40.715429+00:00",
+  "historical_metrics": {
+    "holdout": {
+      "margin": {
+        "n": 525,
+        "new_mae": 13.515999254875116,
+        "old_mae": 9.026666666666667
+      },
+      "total": {
+        "n": 525,
+        "new_mae": 13.10483384232698,
+        "old_mae": 14.036380952380954
+      }
+    },
+    "train": {
+      "margin": {
+        "n": 4308,
+        "new_mae": 12.540209330437865,
+        "old_mae": 13.847502321262768
+      },
+      "total": {
+        "n": 4308,
+        "new_mae": 13.601202646797333,
+        "old_mae": 14.61424791086351
+      }
+    },
+    "validation": {
+      "margin": {
+        "n": 1448,
+        "new_mae": 10.688282424667149,
+        "old_mae": 8.860006906077349
+      },
+      "total": {
+        "n": 1448,
+        "new_mae": 13.222254756473776,
+        "old_mae": 13.942810773480664
+      }
+    }
+  },
+  "limitations": [
+    "NCAAB original ledger has no feature snapshots; recomputation uses current historical store.",
+    "NCAAF rows without pregame inference snapshots are excluded, not reconstructed.",
+    "All available NCAAF snapshot records mark historical source observation times unverified.",
+    "The ledger records only incumbent-selected sides; opposite-side prices were not invented.",
+    "This is retrospective paired scoring, not prospective evidence or executable P&L."
+  ]
+}

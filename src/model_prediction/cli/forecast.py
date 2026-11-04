@@ -5576,6 +5576,7 @@ def _forecast_cfb_sport(
     max_edge = float(serving_artifact["gates"]["max_edge"])
     if not 0 < max_edge < 1:
         raise ValueError(f"NCAAF serving artifact has invalid max_edge for {serving_version}")
+    serving_artifact_hash = str(serving_artifact["artifact_hash"])
     forecast = build_cfb_slate(
         data_root=data_root,
         game_date=args_date,
@@ -5619,7 +5620,7 @@ def _forecast_cfb_sport(
                 json.dumps(
                     build_cfb_snapshot(
                         contract,
-                        model_hash=str(forecast["model_code_hash"]),
+                        model_hash=serving_artifact_hash,
                         observed_at_utc=contract_obs,
                     ),
                     sort_keys=True,
@@ -5653,10 +5654,10 @@ def _forecast_cfb_sport(
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
                 model_state=ModelState(configured_state),
                 observed_at_utc=contract_obs,
-                model_artifact_hash=str(forecast["model_code_hash"]),
+                model_artifact_hash=serving_artifact_hash,
                 calibration_method="cfb_key_number_engine",
                 calibration_version=m_version,
-                calibration_artifact_hash=str(forecast["model_code_hash"]),
+                calibration_artifact_hash=serving_artifact_hash,
                 feature_schema_version="cfb-v1",
                 code_revision=str(forecast["model_code_hash"]),
                 model_input_snapshot_json=cfb_snapshot_json,

@@ -55,11 +55,6 @@ CFB_BLOWOUT_MARGIN_SCALE = 0.025
 # so this scale intentionally widens margin_sd only, not total_sd.
 CFB_UNCERTAINTY_MARGIN_SD_SCALE = 2.0
 
-# Executable ask for a side laid at the standard -110 spread/total price.
-# Matches the 0.5238 constant the research pipeline prices against, so a
-# backtested edge and a served edge mean the same thing.
-STANDARD_LAY_ASK = round(implied_probability(-110), 6)
-
 
 @dataclass(frozen=True)
 class UpcomingCFBGame:
@@ -766,9 +761,9 @@ def build_cfb_slate(
             except (ValueError, TypeError):
                 total_line = None
 
-            if total_line is not None:
-                market_total_over_prob = round(implied_probability(ov_n), 6) if ov_n else STANDARD_LAY_ASK
-                market_total_under_prob = round(implied_probability(un_n), 6) if un_n else STANDARD_LAY_ASK
+            if total_line is not None and ov_n is not None and un_n is not None:
+                market_total_over_prob = round(implied_probability(ov_n), 6)
+                market_total_under_prob = round(implied_probability(un_n), 6)
 
             # Point Spread Line & Odds
             ps_obj = first_odds.get("pointSpread") or {}
@@ -785,13 +780,9 @@ def build_cfb_slate(
                 spread_home_line = None
                 spread_away_line = None
 
-            if spread_home_line is not None:
-                market_spread_home_prob = (
-                    round(implied_probability(h_ps_n), 6) if h_ps_n else STANDARD_LAY_ASK
-                )
-                market_spread_away_prob = (
-                    round(implied_probability(a_ps_n), 6) if a_ps_n else STANDARD_LAY_ASK
-                )
+            if spread_home_line is not None and h_ps_n is not None and a_ps_n is not None:
+                market_spread_home_prob = round(implied_probability(h_ps_n), 6)
+                market_spread_away_prob = round(implied_probability(a_ps_n), 6)
 
             # Moneyline parsing if available from ESPN (nested moneyline or top-level)
             ml_obj = first_odds.get("moneyline") or {}
@@ -810,11 +801,6 @@ def build_cfb_slate(
                 market_ml_home_prob = round(implied_probability(h_ml_n), 6)
             if a_ml_n is not None:
                 market_ml_away_prob = round(implied_probability(a_ml_n), 6)
-
-            if market_ml_home_prob is not None and market_ml_away_prob is None:
-                market_ml_away_prob = round(min(0.99, max(0.01, (1.0 - market_ml_home_prob) + 0.045)), 6)
-            elif market_ml_away_prob is not None and market_ml_home_prob is None:
-                market_ml_home_prob = round(min(0.99, max(0.01, (1.0 - market_ml_away_prob) + 0.045)), 6)
 
         effective_spread_away = pm_spread_away_line if pm_sp is not None else spread_away_line
         effective_spread_home = pm_spread_home_line if pm_sp is not None else spread_home_line
@@ -869,17 +855,9 @@ def build_cfb_slate(
                     sportsbook = "polymarket_us"
                     market_lineage = pm_ml_lineage
                     m_ver = p.model_version
-                elif market_ml_home_prob is not None or market_ml_away_prob is not None:
-                    h_ask = float(
-                        market_ml_home_prob
-                        if market_ml_home_prob is not None
-                        else (1.0 - market_ml_away_prob + 0.045)
-                    )
-                    a_ask = float(
-                        market_ml_away_prob
-                        if market_ml_away_prob is not None
-                        else (1.0 - market_ml_home_prob + 0.045)
-                    )
+                elif market_ml_home_prob is not None and market_ml_away_prob is not None:
+                    h_ask = float(market_ml_home_prob)
+                    a_ask = float(market_ml_away_prob)
                     slug_base = f"ncaaf-ml-{event_id}"
                     sportsbook = "espn_consensus"
                     market_lineage = None
@@ -930,9 +908,14 @@ def build_cfb_slate(
                     sportsbook = "polymarket_us"
                     market_lineage = pm_spread_lineage
                     m_ver = p.model_version
-                elif spread_away_line is not None and spread_home_line is not None:
-                    a_ask = market_spread_away_prob or STANDARD_LAY_ASK
-                    h_ask = market_spread_home_prob or STANDARD_LAY_ASK
+                elif (
+                    spread_away_line is not None
+                    and spread_home_line is not None
+                    and market_spread_away_prob is not None
+                    and market_spread_home_prob is not None
+                ):
+                    a_ask = market_spread_away_prob
+                    h_ask = market_spread_home_prob
                     edge_a = p_cov_a - float(a_ask)
                     edge_h = p_cov_h - float(h_ask)
                     is_h_fav = (spread_home_line or 0.0) < 0
@@ -1001,9 +984,13 @@ def build_cfb_slate(
                     sportsbook = "polymarket_us"
                     market_lineage = pm_total_lineage
                     m_ver = p.model_version
-                elif total_line is not None:
-                    o_ask = market_total_over_prob or STANDARD_LAY_ASK
-                    u_ask = market_total_under_prob or STANDARD_LAY_ASK
+                elif (
+                    total_line is not None
+                    and market_total_over_prob is not None
+                    and market_total_under_prob is not None
+                ):
+                    o_ask = market_total_over_prob
+                    u_ask = market_total_under_prob
                     edge_o = p_ov - float(o_ask)
                     edge_u = p_un - float(u_ask)
                     if eff_tot > 56.5:

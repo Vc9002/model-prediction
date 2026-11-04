@@ -708,21 +708,6 @@ def test_cfb_safe_fallback_no_prediction():
     assert reg.fallback_action == "no_prediction"
 
 
-def test_cfb_standard_lay_ask_is_vig_inclusive_not_no_vig():
-    """The served ask for spread/total must be the real -110 price, not 0.50.
-
-    ESPN publishes the line but no price, so the ask is synthesized. Using the
-    no-vig 0.50 understates it by ~2.4pp, which becomes fictitious edge on every
-    single call -- that is what made 8/8 NCAAF picks QUALIFIED at max size on
-    2026-08-29. It must match the 0.5238 the research pipeline prices against,
-    or a backtested edge and a served edge do not mean the same thing.
-    """
-    from model_prediction.models.college_football import STANDARD_LAY_ASK
-
-    assert STANDARD_LAY_ASK == pytest.approx(0.5238, abs=5e-5)
-    assert STANDARD_LAY_ASK > 0.50
-
-
 def test_cfb_models_serving_with_degraded_evidence():
     """Under the permanent champion-challenger architecture, NCAAF models are
     production champions marked as degraded evidence with critical replacement priority.

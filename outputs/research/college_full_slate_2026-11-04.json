@@ -1,0 +1,189 @@
+{
+  "database": "E:\\model-prediction-runtime\\ledgers\\ledgers.db",
+  "decision_rule": "retain recorded contract and stake iff challenger probability > recorded ask",
+  "generated_at_utc": "2026-11-04T08:26:50.163486+00:00",
+  "limitations": [
+    "Retrospective decision-layer diagnostic; the challenger was not selected prospectively.",
+    "Rows without reconstructable challenger inputs retain incumbent probability and are counted.",
+    "Only incumbent-selected contracts have recorded prices; opposite sides and omitted games cannot be priced.",
+    "Flat and Main overlap and must never be summed as independent wagers."
+  ],
+  "tiers": {
+    "ncaab_flat": {
+      "moneyline": {
+        "challenger_calls": 79,
+        "challenger_losses": 69,
+        "challenger_pnl_units": -49.4481,
+        "challenger_pushes": 0,
+        "challenger_wins": 10,
+        "fallback": 0,
+        "incumbent_losses": 82,
+        "incumbent_pnl_units": -32.8034,
+        "incumbent_pushes": 0,
+        "incumbent_wins": 18,
+        "replayed": 100,
+        "settled": 100
+      },
+      "spread": {
+        "challenger_calls": 104,
+        "challenger_losses": 57,
+        "challenger_pnl_units": -11.6192,
+        "challenger_pushes": 0,
+        "challenger_wins": 47,
+        "fallback": 0,
+        "incumbent_losses": 85,
+        "incumbent_pnl_units": -32.0004,
+        "incumbent_pushes": 0,
+        "incumbent_wins": 66,
+        "replayed": 151,
+        "settled": 151
+      },
+      "total": {
+        "challenger_calls": 98,
+        "challenger_losses": 36,
+        "challenger_pnl_units": 42.3901,
+        "challenger_pushes": 0,
+        "challenger_wins": 62,
+        "fallback": 0,
+        "incumbent_losses": 72,
+        "incumbent_pnl_units": 35.2488,
+        "incumbent_pushes": 0,
+        "incumbent_wins": 95,
+        "replayed": 167,
+        "settled": 167
+      }
+    },
+    "ncaab_main": {
+      "moneyline": {
+        "challenger_calls": 76,
+        "challenger_losses": 66,
+        "challenger_pnl_units": -46.4481,
+        "challenger_pushes": 0,
+        "challenger_wins": 10,
+        "fallback": 0,
+        "incumbent_losses": 73,
+        "incumbent_pnl_units": -32.9381,
+        "incumbent_pushes": 0,
+        "incumbent_wins": 14,
+        "replayed": 87,
+        "settled": 87
+      },
+      "spread": {
+        "challenger_calls": 99,
+        "challenger_losses": 54,
+        "challenger_pnl_units": -10.3548,
+        "challenger_pushes": 0,
+        "challenger_wins": 45,
+        "fallback": 0,
+        "incumbent_losses": 78,
+        "incumbent_pnl_units": -31.6166,
+        "incumbent_pushes": 0,
+        "incumbent_wins": 61,
+        "replayed": 139,
+        "settled": 139
+      },
+      "total": {
+        "challenger_calls": 89,
+        "challenger_losses": 34,
+        "challenger_pnl_units": 37.5875,
+        "challenger_pushes": 0,
+        "challenger_wins": 55,
+        "fallback": 0,
+        "incumbent_losses": 60,
+        "incumbent_pnl_units": 38.4879,
+        "incumbent_pushes": 0,
+        "incumbent_wins": 81,
+        "replayed": 141,
+        "settled": 141
+      }
+    },
+    "ncaaf_flat": {
+      "moneyline": {
+        "challenger_calls": 41,
+        "challenger_losses": 18,
+        "challenger_pnl_units": 1.5169,
+        "challenger_pushes": 0,
+        "challenger_wins": 23,
+        "fallback": 8,
+        "incumbent_losses": 48,
+        "incumbent_pnl_units": -3.827,
+        "incumbent_pushes": 0,
+        "incumbent_wins": 103,
+        "replayed": 143,
+        "settled": 151
+      },
+      "spread": {
+        "challenger_calls": 99,
+        "challenger_losses": 45,
+        "challenger_pnl_units": 15.9004,
+        "challenger_pushes": 1,
+        "challenger_wins": 53,
+        "fallback": 8,
+        "incumbent_losses": 53,
+        "incumbent_pnl_units": 17.8674,
+        "incumbent_pushes": 2,
+        "incumbent_wins": 64,
+        "replayed": 111,
+        "settled": 119
+      },
+      "total": {
+        "challenger_calls": 93,
+        "challenger_losses": 47,
+        "challenger_pnl_units": -1.9904,
+        "challenger_pushes": 0,
+        "challenger_wins": 46,
+        "fallback": 8,
+        "incumbent_losses": 64,
+        "incumbent_pnl_units": -6.0108,
+        "incumbent_pushes": 0,
+        "incumbent_wins": 61,
+        "replayed": 117,
+        "settled": 125
+      }
+    },
+    "ncaaf_main": {
+      "moneyline": {
+        "challenger_calls": 130,
+        "challenger_losses": 72,
+        "challenger_pnl_units": -46.6385,
+        "challenger_pushes": 0,
+        "challenger_wins": 58,
+        "fallback": 1,
+        "incumbent_losses": 88,
+        "incumbent_pnl_units": -38.4023,
+        "incumbent_pushes": 0,
+        "incumbent_wins": 193,
+        "replayed": 280,
+        "settled": 281
+      },
+      "spread": {
+        "challenger_calls": 350,
+        "challenger_losses": 167,
+        "challenger_pnl_units": -17.0607,
+        "challenger_pushes": 5,
+        "challenger_wins": 178,
+        "fallback": 1,
+        "incumbent_losses": 174,
+        "incumbent_pnl_units": -15.0004,
+        "incumbent_pushes": 5,
+        "incumbent_wins": 188,
+        "replayed": 366,
+        "settled": 367
+      },
+      "total": {
+        "challenger_calls": 320,
+        "challenger_losses": 154,
+        "challenger_pnl_units": -2.5212,
+        "challenger_pushes": 0,
+        "challenger_wins": 166,
+        "fallback": 1,
+        "incumbent_losses": 177,
+        "incumbent_pnl_units": -5.0114,
+        "incumbent_pushes": 0,
+        "incumbent_wins": 189,
+        "replayed": 365,
+        "settled": 366
+      }
+    }
+  }
+}
