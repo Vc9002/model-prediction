@@ -138,12 +138,41 @@ def _metrics(rows: list[dict], margin_model, total_model, sigma: float) -> dict:
         "margin_mae_v4": float(np.mean(abs(actual_margin - new_margin))),
         "total_mae_v3": float(np.mean(abs(actual_total - old_total))),
         "total_mae_v4": float(np.mean(abs(actual_total - new_total))),
-        "brier_v3": float(np.mean((old_p - outcome) ** 2)),
-        "brier_v4": float(np.mean((new_p - outcome) ** 2)),
-        "log_loss_v3": float(np.mean(-outcome * np.log(old_p) - (1 - outcome) * np.log(1 - old_p))),
-        "log_loss_v4": float(np.mean(-outcome * np.log(new_p) - (1 - outcome) * np.log(1 - new_p))),
-        "calibration_abs_v3": float(abs(np.mean(old_p) - np.mean(outcome))),
-        "calibration_abs_v4": float(abs(np.mean(new_p) - np.mean(outcome))),
+        "margin_cdf_proxy_brier_v3": float(np.mean((old_p - outcome) ** 2)),
+        "margin_cdf_proxy_brier_v4": float(np.mean((new_p - outcome) ** 2)),
+        "margin_cdf_proxy_log_loss_v3": float(
+            np.mean(-outcome * np.log(old_p) - (1 - outcome) * np.log(1 - old_p))
+        ),
+        "margin_cdf_proxy_log_loss_v4": float(
+            np.mean(-outcome * np.log(new_p) - (1 - outcome) * np.log(1 - new_p))
+        ),
+        "margin_cdf_proxy_calibration_abs_v3": float(abs(np.mean(old_p) - np.mean(outcome))),
+        "margin_cdf_proxy_calibration_abs_v4": float(abs(np.mean(new_p) - np.mean(outcome))),
+    }
+
+
+def _paired_total_bootstrap(rows: list[dict], total_model) -> dict:
+    """Resample complete dates to retain within-slate error correlation."""
+    inputs = np.array([[r["expected_total"], r["poss_total"], r["tempo"], r["min_games"]] for r in rows])
+    challenger = total_model.predict(inputs)
+    gains = np.array(
+        [
+            abs(r["actual_total"] - r["expected_total"]) - abs(r["actual_total"] - p)
+            for r, p in zip(rows, challenger, strict=True)
+        ]
+    )
+    days = np.array([r["date"] for r in rows])
+    unique_days = np.unique(days)
+    day_stats = np.array([[gains[days == day].sum(), np.sum(days == day)] for day in unique_days])
+    rng = np.random.default_rng(1729)
+    indices = rng.integers(0, len(unique_days), size=(10_000, len(unique_days)))
+    samples = day_stats[indices].sum(axis=1)
+    sampled_gains = samples[:, 0] / samples[:, 1]
+    return {
+        "days": len(unique_days),
+        "mean_mae_gain": float(np.mean(gains)),
+        "date_clustered_ci95": [float(x) for x in np.quantile(sampled_gains, [0.025, 0.975])],
+        "bootstrap_fraction_positive": float(np.mean(sampled_gains > 0)),
     }
 
 
@@ -167,11 +196,15 @@ def main() -> dict:
         "source": "sportsdataverse-data team_box_2026.parquet",
         "source_sha256": hashlib.sha256(SOURCE.read_bytes()).hexdigest(),
         "method": "previous dates only; fixed-point opponent adjustment; 12-game shrinkage; ridge alpha 1000",
-        "limitations": "Retrospective boxscore source; per-game first-seen unavailable. No executable price comparison.",
+        "limitations": "Retrospective boxscore source; per-game first-seen unavailable. Moneyline Brier/log loss are margin-CDF proxies, not serving v3 probabilities. No executable price comparison.",
         "missing_boxscore_games": len(original) - len(rows),
         "train": _metrics(train, margin_model, total_model, sigma),
         "validation": _metrics(validation, margin_model, total_model, sigma),
         "later": _metrics(later, margin_model, total_model, sigma),
+        "total_head_paired_bootstrap": {
+            "validation": _paired_total_bootstrap(validation, total_model),
+            "later": _paired_total_bootstrap(later, total_model),
+        },
     }
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")

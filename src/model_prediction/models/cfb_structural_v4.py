@@ -196,7 +196,8 @@ class CFBStructuralV4Model:
             qb_starter_prob_away=getattr(game, "qb_starter_prob_away", 1.0),
             qb_starter_prob_home=getattr(game, "qb_starter_prob_home", 1.0),
         )
-        spread_home_line = getattr(game, "spread_home_line", -3.5) or -3.5
+        supplied_spread = getattr(game, "spread_home_line", None)
+        spread_home_line = -3.5 if supplied_spread is None else supplied_spread
         sp_away_line = -spread_home_line
         tot_line = getattr(game, "total_line", 52.5) or 52.5
 

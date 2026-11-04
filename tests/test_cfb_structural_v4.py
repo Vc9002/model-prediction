@@ -62,6 +62,20 @@ def test_cfb_structural_v4_forecast_coherence():
     assert abs(sum(tot_pred.probabilities.values()) - 1.0) < 0.01
 
 
+def test_cfb_structural_v4_preserves_pickem_spread():
+    model = CFBStructuralV4Model()
+    game = UpcomingCFBGame(
+        event_id="cfb-pickem-v4",
+        event_start_utc="2026-10-24T19:00:00Z",
+        away_team="Pittsburgh Panthers",
+        home_team="Miami Hurricanes",
+        spread_home_line=0.0,
+        total_line=55.5,
+    )
+    spread = next(p for p in model.predict_matchup([], game) if p.market_type == "spread")
+    assert spread.line == 0.0
+
+
 def test_cfb_structural_v4_artifact_and_registry_wiring():
     artifact_path = PROJECT_ROOT / "config/models/cfb-structural-v4.json"
     assert artifact_path.exists()

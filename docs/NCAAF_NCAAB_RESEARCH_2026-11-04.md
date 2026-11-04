@@ -51,17 +51,22 @@ It matches 6,280 of 6,281 v3 evaluation games. Individual box-score
 first-seen times for that historical season are unknown, so this is
 retrospective development evidence.
 
-| Period | Games | Margin MAE v3 → v4 | Total MAE v3 → v4 | Brier v3 → v4 | Log loss v3 → v4 |
+| Period | Games | Margin MAE v3 → v4 | Total MAE v3 → v4 | Margin-CDF proxy Brier v3 → v4 | Margin-CDF proxy log loss v3 → v4 |
 |---|---:|---:|---:|---:|---:|
 | Train, before Feb 2 | 4,307 | 13.84 → 11.86 | 14.61 → 13.70 | .193 → .158 | .574 → .481 |
 | Validation, Feb 2–Mar 4 | 1,448 | 8.86 → 10.94 | 13.94 → 12.94 | .204 → .221 | .597 → .629 |
 | Later, Mar 5 onward | 525 | 9.03 → 12.04 | 14.04 → 12.88 | .208 → .245 | .605 → .685 |
 
-The challenger fails the required later-date margin, calibration, Brier, and
-log-loss gates. Its total improvement is insufficient for promotion. V3 stays
-in service. No v4 bet selection or P&L is reported as actionable because the
-prediction gate failed before the recorded-price comparison, and archival
-executable quote coverage is insufficient.
+The probability scores in this table use a normal CDF of each projected
+margin. Serving v3 blends Elo and margin probabilities, so these are **proxy
+scores, not serving v3 moneyline Brier or log loss**. The challenger fails
+later-date margin and proxy probability gates. The total head improves MAE
+by 1.00 points on validation (date-clustered bootstrap 95% interval
+0.75–1.28) and 1.16 on later dates (0.75–1.52). That is a retrospective,
+single-season total-head lead, not an executable edge or sufficient reason
+to promote the full model. V3 stays in service. No v4 bet selection or P&L
+is reported as actionable because archival executable quote coverage is
+insufficient.
 
 Reproduction: download the pinned asset to `scratch/team_box_2026.parquet`,
 verify its SHA-256, then run `python scripts/test_ncaab_possession_v4.py`.
