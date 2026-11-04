@@ -624,7 +624,9 @@ def build_cfb_slate(
     history = _load_cfb_history(root, cutoff_dt=start_of_day)
 
     # 3. Load Polymarket Snapshots if available
-    snapshot_path = root / "odds" / "ncaaf" / iso_date / "polymarket_snapshots.jsonl"
+    from ..college_contract_evidence import evidence_root
+
+    snapshot_path = evidence_root(root) / "odds" / "ncaaf" / iso_date / "polymarket_snapshots.jsonl"
     snapshot_rows: list[dict[str, Any]] = []
     if snapshot_path.is_file():
         try:
@@ -652,6 +654,7 @@ def build_cfb_slate(
     model = CollegeFootballModel()
     priced_contracts: list[dict[str, Any]] = []
     unmatched: list[dict[str, Any]] = []
+    candidate_bases: list[dict[str, Any]] = []
 
     for ev in events:
         competition = (ev.get("competitions") or [{}])[0]
@@ -839,6 +842,17 @@ def build_cfb_slate(
         )
 
         preds = model.predict_matchup(history, upcoming)
+        if preds and preds[0].inference_inputs is not None:
+            candidate_bases.append(
+                {
+                    "event_id": event_id,
+                    "event_start_utc": event_start_utc,
+                    "away_team": away_team,
+                    "home_team": home_team,
+                    "features": preds[0].feature_basis,
+                    "inference_inputs": preds[0].inference_inputs,
+                }
+            )
 
         for p in preds:
             mtype = p.market_type
@@ -1061,6 +1075,139 @@ def build_cfb_slate(
 
     code_hash = hashlib.sha256(MODEL_VERSION.encode("utf-8")).hexdigest()[:16]
 
+    candidate_capture: dict[str, Any] = {"status": "not_requested"}
+    if client is None:
+        try:
+            from ..cfb_replay import replay_inputs
+            from ..college_contract_evidence import build_candidate_evidence, save_candidate_evidence
+            from ..data_sources.polymarket_us import PolymarketUSClient
+            from ..learned_forward import _team_matches
+
+            listed_events = PolymarketUSClient().slate("NCAAF", datetime.fromisoformat(iso_date).date())
+            candidate_probabilities: dict[str, dict[str, Any]] = {}
+            for listed_event in listed_events:
+                title = str(listed_event.get("title") or "")
+                parts = next(
+                    (title.split(sep, 1) for sep in (" vs. ", " vs ", " @ ", " at ") if sep in title), None
+                )
+                if parts is None:
+                    continue
+                matched = [
+                    base
+                    for base in candidate_bases
+                    if (
+                        _team_matches(base["away_team"], parts[0])
+                        and _team_matches(base["home_team"], parts[1])
+                    )
+                    or (
+                        _team_matches(base["home_team"], parts[0])
+                        and _team_matches(base["away_team"], parts[1])
+                    )
+                ]
+                if len(matched) != 1:
+                    continue
+                base = matched[0]
+                for listed_market in listed_event.get("markets", []):
+                    kind = str(listed_market.get("market_type") or "")
+                    slug = str(listed_market.get("market_slug") or "")
+                    if kind not in ("moneyline", "spread", "total") or not slug:
+                        continue
+                    inputs = json.loads(json.dumps(base["inference_inputs"]))
+                    if kind == "spread":
+                        sides = listed_market.get("sides", [])
+                        home_side = next((s for s in sides if s.get("selection") == "home"), None)
+                        if home_side is None or home_side.get("line") is None:
+                            continue
+                        home_line = float(home_side["line"])
+                        inputs["spread_home_line"] = home_line
+                        uncertainty = float(
+                            (base["features"] or {}).get("uncertainty", CFB_UNCERTAINTY_FLOOR)
+                        )
+                        effective_sd = model.margin_sd * (
+                            1.0 + CFB_UNCERTAINTY_MARGIN_SD_SCALE * (uncertainty - CFB_UNCERTAINTY_FLOOR)
+                        )
+                        if abs(home_line) > CFB_BLOWOUT_SPREAD_THRESHOLD:
+                            effective_sd *= 1.0 + CFB_BLOWOUT_MARGIN_SCALE * min(
+                                15.0, abs(home_line) - CFB_BLOWOUT_SPREAD_THRESHOLD
+                            )
+                        inputs["parameters"]["margin_sd"] = effective_sd
+                    elif kind == "total":
+                        if listed_market.get("line") is None:
+                            continue
+                        inputs["total_line"] = float(listed_market["line"])
+                    try:
+                        probability = replay_inputs(inputs, kind)
+                    except (KeyError, TypeError, ValueError):
+                        continue
+                    candidate_probabilities[slug] = {
+                        "model_version": MODEL_VERSION,
+                        "model_event_id": base["event_id"],
+                        "feature_packet_hash": hashlib.sha256(
+                            json.dumps(
+                                {"features": base["features"], "inference_inputs": base["inference_inputs"]},
+                                sort_keys=True,
+                                separators=(",", ":"),
+                            ).encode()
+                        ).hexdigest(),
+                        "probabilities": probability,
+                    }
+            candidate_rows, candidate_summary = build_candidate_evidence(
+                sport="ncaaf",
+                day=iso_date,
+                events=listed_events,
+                probabilities=candidate_probabilities,
+                archive_root=root,
+                decision_at=obs,
+            )
+            candidate_by_slug = {row["market_slug"]: row for row in candidate_rows}
+            selected_joins = []
+            for selected in priced_contracts:
+                if selected.get("sportsbook") != "polymarket_us":
+                    continue
+                slug = str(selected.get("market_slug") or "")
+                if selected.get("market_type") == "moneyline":
+                    slug = slug.rsplit("-", 1)[0]
+                candidate_row = candidate_by_slug.get(slug)
+                selected_side = (
+                    next(
+                        (
+                            side
+                            for side in candidate_row["sides"]
+                            if side["selection"] == selected["selection"]
+                        ),
+                        None,
+                    )
+                    if candidate_row
+                    else None
+                )
+                selected_joins.append(
+                    {
+                        "event_id": selected["event_id"],
+                        "market_slug": slug,
+                        "selection": selected["selection"],
+                        "decision_ask": selected["executable_ask"],
+                        "decision_quote_hash": (
+                            (selected.get("market_lineage") or {}).get("market_snapshot_hash")
+                        ),
+                        "candidate_packet_ask": selected_side.get("executable_ask")
+                        if selected_side
+                        else None,
+                        "quote_hash": candidate_row.get("quote_hash") if candidate_row else None,
+                        "same_quote_hash": (
+                            (selected.get("market_lineage") or {}).get("market_snapshot_hash")
+                            == candidate_row.get("quote_hash")
+                            if candidate_row
+                            else False
+                        ),
+                        "quote_reason": candidate_row.get("quote_reason") if candidate_row else "not_listed",
+                    }
+                )
+            candidate_summary["selected_candidate_joins"] = selected_joins
+            packet = save_candidate_evidence(candidate_rows, candidate_summary, root)
+            candidate_capture = {**candidate_summary, "packet_path": str(packet), "status": "ok"}
+        except Exception as exc:  # noqa: BLE001
+            candidate_capture = {"status": "capture_error", "reason": f"{type(exc).__name__}: {exc}"}
+
     return {
         "game_date": iso_date,
         "sport": "ncaaf",
@@ -1072,4 +1219,5 @@ def build_cfb_slate(
         "unmatched_events": unmatched,
         "event_count": len(events),
         "history_games": len(history),
+        "candidate_quote_coverage": candidate_capture,
     }

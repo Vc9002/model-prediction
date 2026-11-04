@@ -7,8 +7,10 @@ import json
 import re
 import unicodedata
 from datetime import date
+from pathlib import Path
 from typing import Any
 
+from .college_contract_evidence import build_candidate_evidence, save_candidate_evidence
 from .config import PROJECT_ROOT
 from .data_sources.espn import ESPNClient
 from .data_sources.polymarket_us import PolymarketUSClient, probability_to_american
@@ -230,6 +232,7 @@ def forecast_ncaab_sport(
         ]
     ] = []
     upcoming_batch: list[UpcomingGame] = []
+    market_game_keys: dict[str, tuple[str, str]] = {}
 
     for event in events:
         identity = event.get("event_id") or event.get("id")
@@ -285,7 +288,8 @@ def forecast_ncaab_sport(
         away = _resolve_ncaab_team(away_school, away_mascot, names, normalized_names)
         home = _resolve_ncaab_team(home_school, home_mascot, names, normalized_names)
 
-        for market_def in _main_line_markets(event.get("markets", [])):
+        main_market_ids = {id(m) for m in _main_line_markets(event.get("markets", []))}
+        for market_def in event.get("markets", []):
             kind = market_def.get("market_type")
             if kind not in {"moneyline", "spread", "total"}:
                 continue
@@ -297,6 +301,7 @@ def forecast_ncaab_sport(
             if kind == "total" and line is None:
                 continue
 
+            slug = str(market_def.get("market_slug") or "")
             game_key = f"{identity}_{len(upcoming_batch)}"
             upcoming = UpcomingGame(
                 str(game_key),
@@ -307,11 +312,25 @@ def forecast_ncaab_sport(
                 total_line=line if kind == "total" else None,
             )
             upcoming_batch.append(upcoming)
-            planned.append(
-                (event, market_def, kind, line, sides, away, home, str(start), str(identity), game_key)
-            )
+            if slug:
+                market_game_keys[slug] = (game_key, kind)
+            if id(market_def) in main_market_ids:
+                planned.append(
+                    (event, market_def, kind, line, sides, away, home, str(start), str(identity), game_key)
+                )
 
     if not upcoming_batch:
+        archive_root = Path(data_root)
+        candidate_rows, candidate_summary = build_candidate_evidence(
+            sport="ncaab",
+            day=args_date,
+            events=events,
+            probabilities={},
+            archive_root=archive_root,
+            decision_at=observed,
+        )
+        packet = save_candidate_evidence(candidate_rows, candidate_summary, archive_root)
+        result["candidate_quote_coverage"] = {**candidate_summary, "packet_path": str(packet)}
         result["logged"] = 0
         result["status"] = "ok"
         return result
@@ -325,6 +344,40 @@ def forecast_ncaab_sport(
             for i, p in enumerate(predictions)
             if i < len(planned)
         }
+
+    candidate_probabilities: dict[str, dict[str, Any]] = {}
+    for slug, (game_key, kind) in market_game_keys.items():
+        prediction = pred_lookup.get((game_key, kind))
+        if prediction is None:
+            continue
+        basis = getattr(prediction, "feature_basis", None) or {}
+        candidate_probabilities[slug] = {
+            "model_version": model.version,
+            "model_event_id": game_key,
+            "feature_packet_hash": hashlib.sha256(
+                json.dumps(
+                    {"features": basis, "history_scores_sha256": history_digest, "cutoff_date": args_date},
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode()
+            ).hexdigest(),
+            "probabilities": {
+                key: value
+                for key, value in prediction.probabilities.items()
+                if key in ({"over", "under"} if kind == "total" else {"home", "away"})
+            },
+        }
+    archive_root = Path(data_root)
+    candidate_rows, candidate_summary = build_candidate_evidence(
+        sport="ncaab",
+        day=args_date,
+        events=events,
+        probabilities=candidate_probabilities,
+        archive_root=archive_root,
+        decision_at=observed,
+    )
+    candidate_by_slug = {row["market_slug"]: row for row in candidate_rows}
+    candidate_summary["serving_decision_joins"] = []
 
     with defer_sqlite_xlsx_exports():
         for event, market_def, kind, line, sides, away, home, start, identity, game_key in planned:
@@ -352,6 +405,23 @@ def forecast_ncaab_sport(
                 selection, ask = side["selection"], side["price_probability"]
                 probability = prediction.probabilities[selection]
                 edge = probability - float(ask)
+                candidate_row = candidate_by_slug.get(str(market_def.get("market_slug") or ""))
+                candidate_side = (
+                    next((s for s in candidate_row["sides"] if s["selection"] == selection), None)
+                    if candidate_row
+                    else None
+                )
+                candidate_summary["serving_decision_joins"].append(
+                    {
+                        "event_id": str(identity),
+                        "market_slug": market_def.get("market_slug"),
+                        "selection": selection,
+                        "indicative_ask": float(ask),
+                        "executable_ask": candidate_side.get("executable_ask") if candidate_side else None,
+                        "quote_hash": candidate_row.get("quote_hash") if candidate_row else None,
+                        "quote_reason": candidate_row.get("quote_reason") if candidate_row else "not_listed",
+                    }
+                )
                 decision_line = (
                     (side.get("line") if side.get("line") is not None else line)
                     if kind != "moneyline"
@@ -370,6 +440,23 @@ def forecast_ncaab_sport(
                             "history_games": len(history),
                             "history_scores_sha256": history_digest,
                             "history_cutoff_date": args_date,
+                            "research_quote_join": {
+                                "status": candidate_row.get("quote_reason")
+                                if candidate_row
+                                else "not_listed",
+                                "market_slug": market_def.get("market_slug"),
+                                "quote_hash": candidate_row.get("quote_hash") if candidate_row else None,
+                                "quote_archive_path": (
+                                    candidate_row.get("quote_archive_path") if candidate_row else None
+                                ),
+                                "quote_observed_at_utc": (
+                                    candidate_row.get("quote_observed_at_utc") if candidate_row else None
+                                ),
+                                "executable_ask": (
+                                    candidate_side.get("executable_ask") if candidate_side else None
+                                ),
+                                "indicative_ask": float(ask),
+                            },
                         },
                     },
                     sport="NCAAB",
@@ -437,5 +524,22 @@ def forecast_ncaab_sport(
                         result["errors"].append({"event_id": identity, "ledger": counter, "reason": str(exc)})
 
     result["logged"] = result["flat_logged"] or result["main_logged"]
+    packet = save_candidate_evidence(candidate_rows, candidate_summary, archive_root)
+    result["candidate_quote_coverage"] = {
+        **{
+            key: candidate_summary[key]
+            for key in (
+                "listed_contracts",
+                "quote_matched",
+                "quote_coverage",
+                "model_scored",
+                "complete",
+                "quote_reasons",
+                "by_market",
+            )
+        },
+        "serving_decisions": len(candidate_summary["serving_decision_joins"]),
+        "packet_path": str(packet),
+    }
     result["status"] = "error" if result["errors"] else "ok"
     return result
