@@ -183,6 +183,8 @@ def _polymarket_slate(args, config) -> dict:
     # shortlist per event while preserving every moneyline contract.
     if ladder_keep is None and "NBA" in events:
         ladder_keep = 3
+    if ladder_keep is None and "NCAAB" in events:
+        ladder_keep = 1
     snapshot_root = Path(ledger_path(config)).parent
     bbo_capture = (
         {"status": "disabled"}
@@ -194,7 +196,7 @@ def _polymarket_slate(args, config) -> dict:
             args.date,
             horizon_hours=_capture_horizon_hours(),
             ladder_keep=ladder_keep,
-            ladder_leagues=frozenset({"NBA", "NCAAF"}),
+            ladder_leagues=frozenset({"NBA", "NCAAF", "NCAAB"}),
             ladder_keep_slugs=(
                 _open_pick_slugs(snapshot_root) | _open_pick_slugs(snapshot_root, "nba")
                 if ladder_keep
