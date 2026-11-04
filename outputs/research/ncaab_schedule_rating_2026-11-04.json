@@ -1,0 +1,52 @@
+{
+  "generated_at_utc": "2026-11-04T16:04:01.541455+00:00",
+  "coefficients": [
+    3.6124098757491794,
+    -0.1576937527746989
+  ],
+  "intercept": -7.564085933269386,
+  "historical": {
+    "train": {
+      "n": 4308,
+      "incumbent_mae": 13.847502321262768,
+      "challenger_mae": 12.500560113458826
+    },
+    "validation": {
+      "n": 1448,
+      "incumbent_mae": 8.860006906077349,
+      "challenger_mae": 10.59641819864681
+    },
+    "later": {
+      "n": 525,
+      "incumbent_mae": 9.026666666666667,
+      "challenger_mae": 13.472248043335611
+    }
+  },
+  "settled": {
+    "spread": {
+      "n": 151,
+      "incumbent_pnl": -32.00039999999998,
+      "challenger_calls": 97,
+      "challenger_pnl": 5.572700000000003,
+      "incumbent_brier": 0.43447430864290715,
+      "challenger_brier": 0.2708374015944239
+    },
+    "total": {
+      "n": 167,
+      "incumbent_pnl": 35.248799999999996,
+      "challenger_calls": 163,
+      "challenger_pnl": 37.22859999999998,
+      "incumbent_brier": 0.23040950199301177,
+      "challenger_brier": 0.23040950199301177
+    },
+    "moneyline": {
+      "n": 100,
+      "incumbent_pnl": -32.803399999999996,
+      "challenger_calls": 50,
+      "challenger_pnl": -16.2634,
+      "incumbent_brier": 0.1757043969006399,
+      "challenger_brier": 0.1022500431466189
+    }
+  },
+  "note": "Same-selection retrospective settled P&L; no opposite-side or missing prices reconstructed."
+}

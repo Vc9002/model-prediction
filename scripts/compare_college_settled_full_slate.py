@@ -81,6 +81,9 @@ def compare() -> dict:
                     "challenger_losses": 0,
                     "challenger_pushes": 0,
                     "challenger_pnl_units": 0.0,
+                    "replayed_scored": 0,
+                    "incumbent_brier_sum": 0.0,
+                    "challenger_brier_sum": 0.0,
                 }
             )
             for row in rows:
@@ -101,11 +104,19 @@ def compare() -> dict:
                 metric["incumbent_pnl_units"] += pnl
                 suffix = {"win": "wins", "loss": "losses", "push": "pushes"}[row["result"]]
                 metric[f"incumbent_{suffix}"] += 1
+                if (source is not None or snapshot is not None) and row["result"] != "push":
+                    outcome = float(row["result"] == "win")
+                    metric["replayed_scored"] += 1
+                    metric["incumbent_brier_sum"] += (float(row["model_probability"]) - outcome) ** 2
+                    metric["challenger_brier_sum"] += (probability - outcome) ** 2
                 if probability > float(row["market_probability"]):
                     metric["challenger_calls"] += 1
                     metric["challenger_pnl_units"] += pnl
                     metric[f"challenger_{suffix}"] += 1
             for metric in markets.values():
+                scored = metric["replayed_scored"]
+                metric["incumbent_brier"] = metric.pop("incumbent_brier_sum") / scored if scored else None
+                metric["challenger_brier"] = metric.pop("challenger_brier_sum") / scored if scored else None
                 for field in ("incumbent_pnl_units", "challenger_pnl_units"):
                     metric[field] = round(metric[field], 4)
             result["tiers"][f"{sport}_{tier}"] = dict(markets)

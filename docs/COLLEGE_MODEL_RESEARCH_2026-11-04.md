@@ -75,3 +75,34 @@ already uses Elo, blending Elo win and margin signals with recent trends; Elo
 alone is not the missing fix. NCAAF needs complete quote and feature snapshots
 before an all-row challenger can be claimed. Any new fit must beat market
 baseline calibration and loss on chronological data before promotion.
+
+## Follow-up test: score-based schedule rating
+
+`scripts/test_ncaab_schedule_rating.py` constructs an opponent-adjusted score
+margin rating from prior complete UTC dates. The available processed games do
+not contain possessions, so this is not adjusted offensive/defensive
+efficiency. A fixed-point opponent adjustment is fit on 4,308 pre-February
+games and combined with the incumbent margin using ridge regression. The
+entire 418-call settled Flat slate is replayed at recorded lines and prices.
+
+| NCAAB cohort | Incumbent margin MAE | Challenger margin MAE |
+|---|---:|---:|
+| Fit games, 4,308 | 13.85 | 12.50 |
+| Chronological validation, 1,448 | **8.86** | 10.60 |
+| Later games, 525 | **9.03** | 13.47 |
+
+The settled-slate decision diagnostic rises from -29.56u across all 418 Flat
+calls to +26.54u across 310 retained calls. Its moneyline Brier improves
+0.1757 to 0.1023 and spread Brier 0.4345 to 0.2708. That result is tempting
+but the fitted schedule-rating coefficient is **negative** (-0.158), and the
+challenger fails both later chronological splits by large margins. This is an
+unstable retrospective result, not a promotable improvement. Full numbers are
+in `outputs/research/ncaab_schedule_rating_2026-11-04.json`.
+
+The NCAAF variance challenger was also rescored on the Main ledger's 1,011
+reconstructable settled calls. Spread Brier worsens 0.3247 to 0.3257 (361
+nonpush calls) and total Brier worsens 0.2594 to 0.2668 (365 calls). Its
+same-contract Main decision P&L is -66.22u versus the incumbent -58.41u over
+all 1,014 settled rows. Three rows retain the incumbent probability because
+their pregame inference snapshot is missing. This independently rejects the
+football variance change.
