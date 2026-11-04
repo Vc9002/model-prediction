@@ -1,0 +1,114 @@
+{
+  "database": "E:\\model-prediction-runtime\\ledgers\\ledgers.db",
+  "flat_all_graded": {
+    "calls": 1370,
+    "events": 474,
+    "pnl_units": -55.881,
+    "units": 1656.48
+  },
+  "flat_status_settled": {
+    "calls": 395,
+    "events": 168,
+    "pnl_units": 8.0296,
+    "units": 494.19
+  },
+  "flat_status_superseded_but_graded": {
+    "calls": 975,
+    "events": 386,
+    "pnl_units": -63.9106,
+    "units": 1162.29
+  },
+  "generated_at_utc": "2026-11-04T19:38:32.529262+00:00",
+  "main_different_line": {
+    "calls": 8,
+    "events": 8,
+    "pnl_units": -2.4684,
+    "units": 11.0
+  },
+  "main_exact_flat_graded": {
+    "calls": 1006,
+    "events": 414,
+    "pnl_units": -55.9457,
+    "units": 1207.49
+  },
+  "main_status_settled": {
+    "calls": 1014,
+    "events": 416,
+    "pnl_units": -58.4141,
+    "units": 1218.49
+  },
+  "months_main_settled": {
+    "2026-09": {
+      "calls": 654,
+      "events": 233,
+      "pnl_units": -60.6448,
+      "units": 779.25
+    },
+    "2026-10": {
+      "calls": 357,
+      "events": 180,
+      "pnl_units": -1.7454,
+      "units": 434.69
+    },
+    "2026-11": {
+      "calls": 3,
+      "events": 3,
+      "pnl_units": 3.9761,
+      "units": 4.55
+    }
+  },
+  "note": "Flat status=settled is a current-view subset. Superseded rows with final results are retained as historical graded evidence. Main and Flat overlap; never sum their units.",
+  "reasons_main_settled": {
+    "PAPER_CALL_LOW_EDGE": {
+      "calls": 344,
+      "events": 215,
+      "pnl_units": 20.4995,
+      "units": 344.0
+    },
+    "QUALIFIED": {
+      "calls": 670,
+      "events": 389,
+      "pnl_units": -78.9136,
+      "units": 874.49
+    }
+  },
+  "superseded_flat_exact_main_units_and_pnl": 975,
+  "versions_main_settled": {
+    "cfb-spread-v1": {
+      "calls": 292,
+      "events": 292,
+      "pnl_units": -30.1398,
+      "units": 401.75
+    },
+    "cfb-structural-v2": {
+      "calls": 108,
+      "events": 64,
+      "pnl_units": 9.2159,
+      "units": 124.0
+    },
+    "cfb-structural-v3": {
+      "calls": 57,
+      "events": 41,
+      "pnl_units": 4.2043,
+      "units": 92.27
+    },
+    "cfb-structural-v4": {
+      "calls": 19,
+      "events": 18,
+      "pnl_units": -0.9866,
+      "units": 28.47
+    },
+    "cfb-total-v1": {
+      "calls": 293,
+      "events": 293,
+      "pnl_units": -3.2451,
+      "units": 296.0
+    },
+    "college-football-v1": {
+      "calls": 245,
+      "events": 245,
+      "pnl_units": -37.4628,
+      "units": 276.0
+    }
+  }
+}

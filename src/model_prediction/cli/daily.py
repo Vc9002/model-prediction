@@ -425,6 +425,20 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             logger.warning("NHL injury report capture failed for %s", args.date, exc_info=True)
             nhl_injuries_result = {"status": "error"}
 
+    ncaab_boxscores_result: dict[str, Any] = {"status": "skipped"}
+
+    def _capture_ncaab_boxscores():
+        nonlocal ncaab_boxscores_result
+        from ..data_sources.ncaab_boxscores import capture_completed_boxscores
+
+        previous_date = (datetime.fromisoformat(args.date).date() - timedelta(days=1)).isoformat()
+        try:
+            ncaab_boxscores_result = capture_completed_boxscores(data_root, previous_date)
+            ncaab_boxscores_result["status"] = "ok" if not ncaab_boxscores_result["missing"] else "partial"
+        except Exception:
+            logger.warning("NCAAB box-score capture failed for %s", previous_date, exc_info=True)
+            ncaab_boxscores_result = {"status": "error", "date": previous_date}
+
     cfb_injuries_result: dict[str, Any] = {"status": "skipped"}
 
     def _capture_cfb_injuries():
@@ -607,7 +621,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         f12 = io_pool.submit(_timed, "cfb_injuries", _capture_cfb_injuries)
         f13 = io_pool.submit(_timed, "cfb_weather", _capture_cfb_weather)
         f14 = io_pool.submit(_timed, "nfl_efficiency", _capture_nfl_efficiency)
-        for f in (f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14):
+        f15 = io_pool.submit(_timed, "ncaab_boxscores", _capture_ncaab_boxscores)
+        for f in (f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15):
             f.result()  # Wait for all, surface exceptions
         try:
             slate = f0.result()
@@ -1564,6 +1579,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     _lap("fallback_reconcile_12b")
 
     report = {
+        "ncaab_boxscores_capture": ncaab_boxscores_result,
         "timing": {
             "post_step_seconds": post_step_seconds,
             "total_seconds": round(time.monotonic() - _t_start, 1),

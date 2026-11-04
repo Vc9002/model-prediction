@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import unicodedata
 from datetime import date
@@ -13,13 +15,14 @@ from .data_sources.polymarket_us import PolymarketUSClient, probability_to_ameri
 from .domain import League, MarketType, ModelOrigin, ModelState, PickRequest, parse_utc, utc_now
 from .eligibility import EligibilityResult, RecordType
 from .entities import CanonicalTeam
+from .feature_capture import contract_snapshot_json
 from .features.base import FeatureStore
 from .ledger import DuplicatePickError, defer_sqlite_xlsx_exports
 from .models.basketball import UpcomingGame
-from .models.basketball_leagues import ncaab_v2_model
+from .models.basketball_leagues import ncaab_v3_model
 from .production_registry import ProductionModelRegistry
 
-ncaab_model = ncaab_v2_model
+ncaab_model = ncaab_v3_model
 
 
 def _normalize_name(s: str) -> str:
@@ -174,9 +177,9 @@ def forecast_ncaab_sport(
     main_ledger=None,
 ):
     board = ESPNClient().scoreboard("NCAAB", args_date)
-    result = {
+    result: dict[str, Any] = {
         "sport": "ncaab",
-        "model_version": "ncaab-tempo-v2",
+        "model_version": "ncaab-tempo-v3",
         "scheduled_games": len(board.get("events", [])),
         "logged": 0,
         "flat_logged": 0,
@@ -193,6 +196,14 @@ def forecast_ncaab_sport(
     if not history:
         result.update(status="data_unavailable", reason="no_completed_ncaab_history")
         return result
+    history_digest = hashlib.sha256(
+        json.dumps(
+            sorted(
+                (game.event_id, game.event_start_utc, game.home_score, game.away_score) for game in history
+            ),
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
     events = PolymarketUSClient().slate("NCAAB", date.fromisoformat(args_date))
     model, observed = ncaab_model(), utc_now()
     registry = ProductionModelRegistry.load(PROJECT_ROOT)
@@ -205,7 +216,18 @@ def forecast_ncaab_sport(
     normalized_names = {_normalize_name(name): name for name in names}
 
     planned: list[
-        tuple[dict[str, Any], dict[str, Any], str, float | None, list[dict[str, Any]], str, str, str, str]
+        tuple[
+            dict[str, Any],
+            dict[str, Any],
+            str,
+            float | None,
+            list[dict[str, Any]],
+            str,
+            str,
+            str,
+            str,
+            str,
+        ]
     ] = []
     upcoming_batch: list[UpcomingGame] = []
 
@@ -263,13 +285,13 @@ def forecast_ncaab_sport(
         away = _resolve_ncaab_team(away_school, away_mascot, names, normalized_names)
         home = _resolve_ncaab_team(home_school, home_mascot, names, normalized_names)
 
-        for market in _main_line_markets(event.get("markets", [])):
-            kind = market.get("market_type")
+        for market_def in _main_line_markets(event.get("markets", [])):
+            kind = market_def.get("market_type")
             if kind not in {"moneyline", "spread", "total"}:
                 continue
-            sides = market.get("sides", [])
-            away_side = next((s for s in sides if s.get("selection") == "away"), {})
-            line = market.get("line")
+            sides = market_def.get("sides", [])
+            away_side: dict[str, Any] = next((s for s in sides if s.get("selection") == "away"), {})
+            line = market_def.get("line")
             if kind == "spread" and away_side.get("line") is None:
                 continue
             if kind == "total" and line is None:
@@ -285,7 +307,9 @@ def forecast_ncaab_sport(
                 total_line=line if kind == "total" else None,
             )
             upcoming_batch.append(upcoming)
-            planned.append((event, market, kind, line, sides, away, home, start, str(identity), game_key))
+            planned.append(
+                (event, market_def, kind, line, sides, away, home, str(start), str(identity), game_key)
+            )
 
     if not upcoming_batch:
         result["logged"] = 0
@@ -303,7 +327,7 @@ def forecast_ncaab_sport(
         }
 
     with defer_sqlite_xlsx_exports():
-        for event, market, kind, line, sides, away, home, start, identity, game_key in planned:
+        for event, market_def, kind, line, sides, away, home, start, identity, game_key in planned:
             prediction = pred_lookup.get((game_key, kind))
             if prediction is None:
                 continue
@@ -328,17 +352,41 @@ def forecast_ncaab_sport(
                 selection, ask = side["selection"], side["price_probability"]
                 probability = prediction.probabilities[selection]
                 edge = probability - float(ask)
+                decision_line = (
+                    (side.get("line") if side.get("line") is not None else line)
+                    if kind != "moneyline"
+                    else None
+                )
+                snapshot = contract_snapshot_json(
+                    {
+                        "market_type": kind,
+                        "model_version": model.version,
+                        "event_id": str(identity),
+                        "event_start_utc": str(start),
+                        "home_team": home,
+                        "away_team": away,
+                        "feature_basis": {
+                            **(getattr(prediction, "feature_basis", None) or {}),
+                            "history_games": len(history),
+                            "history_scores_sha256": history_digest,
+                            "history_cutoff_date": args_date,
+                        },
+                    },
+                    sport="NCAAB",
+                    selection=selection,
+                    line=decision_line,
+                    probability=float(probability),
+                    observed_at_utc=observed.isoformat(),
+                )
                 request = PickRequest(
-                    event_start_utc=start,
-                    event_id=identity,
+                    event_start_utc=str(start),
+                    event_id=str(identity),
                     league=League.NCAAB,
                     away_team=away,
                     home_team=home,
                     market_type=MarketType(kind),
                     selection=selection,
-                    line=(side.get("line") if side.get("line") is not None else line)
-                    if kind != "moneyline"
-                    else None,
+                    line=decision_line,
                     sportsbook="model_opinion_indicative_market",
                     american_odds=probability_to_american(float(ask)),
                     model_probability=probability,
@@ -349,6 +397,7 @@ def forecast_ncaab_sport(
                     model_origin=ModelOrigin.STATISTICAL_MODEL,
                     model_state=ModelState.SHADOW_QUALIFIED,
                     observed_at_utc=observed.isoformat(),
+                    model_input_snapshot_json=snapshot,
                 )
                 teams = [
                     CanonicalTeam(name, League.NCAAB, name, name[:3], True, None, None, ())

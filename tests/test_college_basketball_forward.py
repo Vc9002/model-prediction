@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
@@ -57,8 +58,14 @@ def test_ncaab_records_real_model_output_and_rerun_deduplicates(tmp_path, monkey
     main_rows = main_ledger.rows()
     assert len(flat_rows) == len(main_rows) == 1
     assert flat_rows[0]["selection"] == main_rows[0]["selection"] == "home"
-    assert all(r["model_version"] in ("ncaab-tempo-v1", "ncaab-tempo-v2") for r in flat_rows + main_rows)
+    assert all(r["model_version"] == "ncaab-tempo-v3" for r in flat_rows + main_rows)
     assert all(r["sportsbook"] == "model_opinion_indicative_market" for r in flat_rows + main_rows)
+    for row in flat_rows + main_rows:
+        snapshot = json.loads(row["model_input_snapshot_json"])
+        assert snapshot["schema"] == "feature-capture-v1"
+        assert snapshot["replay_verified"] is False
+        assert snapshot["features"]["history_games"] == len(games)
+        assert len(snapshot["features"]["history_scores_sha256"]) == 64
     rerun = forecast_ncaab_sport(**args)
     assert rerun["flat_logged"] == 0
     assert rerun["main_logged"] == 0
@@ -109,7 +116,7 @@ def test_ncaab_selects_best_market_edge_not_favorite(tmp_path, monkeypatch):
     )
 
     class Model:
-        version = "ncaab-tempo-v2"
+        version = "ncaab-tempo-v3"
 
         def predict_games(self, history, upcoming):
             return [

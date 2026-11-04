@@ -677,7 +677,7 @@ models:
     family: elo_trend_normal_approximation
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: ncaab-tempo-v2
+    active_production_version: ncaab-tempo-v3
     active_research_version: ncaab-tempo-v1
     min_edge: 0.035
     spread_sd: 10.5
