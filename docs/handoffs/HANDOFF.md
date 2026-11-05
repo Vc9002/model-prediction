@@ -43,13 +43,38 @@ priced as near-dead.
   `ELO_CONFIG`. Verified: `tests/test_elo_ratings.py`, `tests/test_basketball_leagues.py`,
   `tests/test_college_basketball_forward.py` all pass (no fixture pinned the old
   generic-fallback value).
-- **Still open**: (1) same missing-entry gap exists for `wncaab`, `euroleague`,
-  `acb`, `bbl`, `lnb`, `aba`, `nbl` -- no historical data file exists yet for any of
-  them to validate a real number, so they were left on `generic` rather than guessed;
-  (2) the structural home-underrating finding above is the real lever and is
-  unaddressed; (3) watch the next ~50 settled NCAAB moneyline picks against the
-  2026-11-05 fix -- 60 vs 50 is a small, validated nudge, not a claim that the
-  bleed stops.
+- **2026-11-05 follow-up, same day**: pulled Kaggle data to validate the other
+  leagues that shared the same missing-entry gap (none of this was committed to
+  the repo -- Kaggle CSVs live in the session scratchpad, re-download if rerunning):
+  - `euroleague` (babissamothrakis/euroleague-datasets, `euroleague_header.csv`,
+    5,099 games, same 60/20/20 method): holdout Brier 0.2262 (generic 50) ->
+    0.2218 (100, selected on validation). Added.
+  - `acb` and `lnb` (archangel0x01/european-club-basketball-results-and-odds,
+    `games.csv`, filtered to "Spain ACB" / "France Pro A", 5,984 / 5,429 games):
+    acb 0.1999->0.1976 (80), lnb 0.2097->0.2072 (90). Both added.
+  - `bbl` (same dataset, "Germany BBL", 6,089 games): checked the same way and
+    the generic 50 **won** on holdout (the validation-selected 40 made it worse,
+    0.2130->0.2143). Left on `generic` deliberately -- not every sport needed a
+    correction, this is evidence it doesn't, not an oversight.
+  - No usable dataset found for `aba`, `nbl`, `wncaab` in a reasonable search
+    (NBL has shot-chart/stats data on Kaggle but not game-by-game home/away
+    scores; nothing found for ABA League or women's college basketball game
+    results). They stay on `generic` until a real source turns up.
+  - Also ran a joint `home_advantage` x `offseason_regression` grid for NCAAB
+    (same validation split): `offseason_regression` had **zero** measurable
+    effect at any value (0.0-0.70, all identical Brier) -- the historical file
+    only covers one season, so no offseason gap ever fires in this dataset. Can't
+    rule it in or out without multi-season history; not a lever that can be tuned
+    with what's available locally.
+- **Still open**: (1) the structural home-underrating finding above (worst in the
+  p_home 0.4-0.5 bucket, consistent across ncaab/euroleague/acb/lnb/bbl -- every
+  league's calibration-bucket printout shows actual home-win rate running ahead
+  of predicted through the middle of the range) is the real lever and needs the
+  full margin-model ablation (`elo_weight`, `coherent_moneyline`), not just this
+  session's single-constant fixes; (2) `aba`/`nbl`/`wncaab` still need a data
+  source; (3) watch the next batch of settled NCAAB/EUROLEAGUE/ACB/LNB moneyline
+  picks against these fixes -- each is a small, validated nudge (holdout Brier
+  moves of ~0.002-0.005), not a claim that the live bleed stops.
 - NCAAF (`cfb-structural-v4`, Flat tier) was checked in the same session and is
   healthy -- no bias, 73% win rate on 15 settled picks, model/market probabilities
   track closely. No bug found there.

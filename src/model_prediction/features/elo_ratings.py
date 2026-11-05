@@ -44,6 +44,19 @@ ELO_CONFIG: dict[str, dict[str, float]] = {
     # worst at p_home 0.4-0.5 where actual home win rate is ~60%; 60 does not fully
     # fix that, it is only the best single-constant value found).
     "ncaab": {"k": 20.0, "home_advantage": 60.0, "offseason_regression": 0.50},
+    # Walk-forward grid search on Kaggle data (2026-11-05, same method/split as ncaab
+    # above -- see docs/handoffs/HANDOFF.md): euroleague (babissamothrakis/
+    # euroleague-datasets, 5,099 games) holdout Brier 0.2262 (generic 50) vs 0.2218
+    # (100, selected on validation). acb and lnb (archangel0x01/
+    # european-club-basketball-results-and-odds, "Spain ACB" / "France Pro A",
+    # 5,984 / 5,429 games) holdout Brier 0.1999->0.1976 (acb, 80) and
+    # 0.2097->0.2072 (lnb, 90). bbl ("Germany BBL", 6,089 games) was checked the
+    # same way and generic 50 already won on holdout (proposed 40 made it worse,
+    # 0.2130->0.2143) -- left on the generic row deliberately, not an oversight.
+    # No dataset found yet for aba/nbl/wncaab; they stay on generic until one is.
+    "euroleague": {"k": 20.0, "home_advantage": 100.0, "offseason_regression": 0.50},
+    "acb": {"k": 20.0, "home_advantage": 80.0, "offseason_regression": 0.50},
+    "lnb": {"k": 20.0, "home_advantage": 90.0, "offseason_regression": 0.50},
     "soccer": {"k": 20.0, "home_advantage": 60.0, "offseason_regression": 0.50},
     "tennis": {"k": 32.0, "home_advantage": 0.0, "offseason_regression": 0.50},
     "generic": {"k": 20.0, "home_advantage": 50.0, "offseason_regression": 0.50},
