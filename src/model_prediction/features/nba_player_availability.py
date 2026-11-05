@@ -129,6 +129,53 @@ def _estimate_player_impact(player_name: str, position: str) -> float:
     return 1.1
 
 
+def _estimate_player_impact_real(
+    player_name: str,
+    position: str,
+    player_value_lookup: Mapping[str, float] | None,
+) -> float:
+    """v8 candidate (Phase 2, real-data variant): looks up a box-score-derived
+    rolling per-player point-impact value (``features.nba_player_logs.rolling_player_values``)
+    keyed by player name, built from real ESPN boxscore history instead of the
+    hardcoded franchise-anchor/key-starter name lists.
+
+    Falls back to the static tier value when the player has no rolling
+    history (rookie, name-matching miss, or boxscore capture gap) -- a
+    strict superset of the old behavior, never a guess for missing data.
+    """
+    if player_value_lookup:
+        clean_name = " ".join(player_name.casefold().split())
+        value = player_value_lookup.get(clean_name)
+        if value is not None:
+            return value
+    return _estimate_player_impact(player_name, position)
+
+
+def _estimate_player_impact_dynamic(
+    player_name: str,
+    position: str,
+    team_off_rating: float | None,
+    league_avg_off_rating: float | None,
+) -> float:
+    """v8 candidate: scales the static tier value by the player's own team's current
+    offensive strength relative to league average, instead of returning a flat constant
+    for every team a tiered player happens to play on.
+
+    Rationale (Phase 2 of the NBA v8 overhaul research): a franchise-anchor injury on a
+    106-point-per-game offense should not cost the same expected points as the same tier
+    on a 120-point-per-game offense. This is a structural improvement over the fully flat
+    lookup, not a per-player-rated replacement for it (no NBA box-score/player data source
+    exists in this repo to build a real RAPM/EPM-style rating -- see deviation note).
+    Falls back to the flat static value when team context is unavailable, so it is a
+    strict superset of the old behavior rather than a new unvalidated number for every case.
+    """
+    base = _estimate_player_impact(player_name, position)
+    if not team_off_rating or not league_avg_off_rating or league_avg_off_rating <= 0:
+        return base
+    scale = max(0.6, min(1.4, team_off_rating / league_avg_off_rating))
+    return round(base * scale, 3)
+
+
 def load_latest_nba_injury_snapshot(
     data_root: str | Path,
     observed_at: datetime | None = None,
@@ -189,8 +236,21 @@ def compute_nba_matchup_availability(
     away_team: str,
     observed_at: datetime | None = None,
     snapshot: Mapping[str, Any] | None = None,
+    home_off_rating: float | None = None,
+    away_off_rating: float | None = None,
+    league_avg_off_rating: float | None = None,
+    use_dynamic_impact: bool = False,
+    use_real_player_ratings: bool = False,
+    player_value_lookup: Mapping[str, float] | None = None,
 ) -> dict[str, Any]:
     """Calculates point-in-time availability point adjustments for an NBA matchup.
+
+    ``use_dynamic_impact`` (v8 candidate, default off so v7 serving stays byte-identical):
+    scales each injured player's static tier value by their own team's current offensive
+    rating relative to league average (see ``_estimate_player_impact_dynamic``), instead of
+    a flat constant regardless of team context. Requires ``home_off_rating``/
+    ``away_off_rating``/``league_avg_off_rating``; silently falls back to the static value
+    for any side missing context.
 
     Returns:
         availability_points_gap: Positive means Home margin increases.
@@ -200,7 +260,11 @@ def compute_nba_matchup_availability(
         home_injuries: List of injured home players.
         away_injuries: List of injured away players.
     """
-    snap = snapshot if snapshot is not None else load_latest_nba_injury_snapshot(data_root, observed_at=observed_at)
+    snap = (
+        snapshot
+        if snapshot is not None
+        else load_latest_nba_injury_snapshot(data_root, observed_at=observed_at)
+    )
     if not snap:
         return {
             "availability_points_gap": 0.0,
@@ -229,7 +293,7 @@ def compute_nba_matchup_availability(
         elif is_away:
             away_injuries.append(entry)
 
-    def _team_loss(injury_list: list[dict[str, Any]]) -> float:
+    def _team_loss(injury_list: list[dict[str, Any]], team_off_rating: float | None) -> float:
         total_loss = 0.0
         for item in injury_list:
             status = str(item.get("status") or item.get("raw_status") or "Available")
@@ -238,13 +302,20 @@ def compute_nba_matchup_availability(
                 continue
             player_name = str(item.get("player_name", ""))
             position = str(item.get("position", ""))
-            impact = _estimate_player_impact(player_name, position)
+            if use_real_player_ratings:
+                impact = _estimate_player_impact_real(player_name, position, player_value_lookup)
+            elif use_dynamic_impact:
+                impact = _estimate_player_impact_dynamic(
+                    player_name, position, team_off_rating, league_avg_off_rating
+                )
+            else:
+                impact = _estimate_player_impact(player_name, position)
             player_loss = (1.0 - prob) * impact
             total_loss += player_loss
         return min(MAX_TEAM_LOSS_PTS, total_loss)
 
-    home_loss = _team_loss(home_injuries)
-    away_loss = _team_loss(away_injuries)
+    home_loss = _team_loss(home_injuries, home_off_rating)
+    away_loss = _team_loss(away_injuries, away_off_rating)
 
     # Away loss minus home loss: If away loses 4 pts and home loses 1 pt,
     # Home's expected margin increases by +3.0 pts.

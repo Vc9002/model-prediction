@@ -63,6 +63,8 @@ class NBAStructuralV7Engine:
         offseason_retention: float = 0.40,
         isolate_postseason: bool = True,
         elo_home_advantage: float = 38.0,
+        market_blend_weight: float = 0.0,
+        moneyline_margin_weight: float | None = None,
         spread_version: str = NBA_SPREAD_V7_VERSION,
         total_version: str = NBA_TOTAL_V7_VERSION,
         moneyline_version: str = NBA_MONEYLINE_V7_VERSION,
@@ -88,6 +90,10 @@ class NBAStructuralV7Engine:
         self.offseason_retention = offseason_retention
         self.isolate_postseason = isolate_postseason
         self.elo_home_advantage = elo_home_advantage
+        self.market_blend_weight = market_blend_weight
+        self.moneyline_margin_weight = (
+            moneyline_margin_weight if moneyline_margin_weight is not None else (1.0 - elo_weight)
+        )
         self.spread_version = spread_version
         self.total_version = total_version
         self.moneyline_version = moneyline_version
@@ -117,6 +123,10 @@ class NBAStructuralV7Engine:
             offseason_retention=float(artifact.get("offseason_retention", 0.40)),
             isolate_postseason=bool(artifact.get("isolate_postseason", True)),
             elo_home_advantage=float(artifact.get("elo_home_advantage", 38.0)),
+            market_blend_weight=float(artifact.get("market_blend_weight", 0.0)),
+            moneyline_margin_weight=(
+                float(artifact["moneyline_margin_weight"]) if "moneyline_margin_weight" in artifact else None
+            ),
             spread_version=str(artifact.get("spread_version", NBA_SPREAD_V7_VERSION)),
             total_version=str(artifact.get("total_version", NBA_TOTAL_V7_VERSION)),
             moneyline_version=str(artifact.get("moneyline_version", NBA_MONEYLINE_V7_VERSION)),
@@ -226,6 +236,15 @@ class NBAStructuralV7Engine:
             # Full margin impact from star/starter availability differential
             expected_margin += game.availability_points_gap
 
+            # v8: shrink toward the market's own posted spread (home margin = -away_line),
+            # the market line already embeds information (injuries, public line moves, sharp
+            # action) this model never sees. Weight 0.0 reproduces v7 exactly.
+            if self.market_blend_weight > 0.0 and game.spread_away_line is not None:
+                market_home_margin = -game.spread_away_line
+                expected_margin = (
+                    1.0 - self.market_blend_weight
+                ) * expected_margin + self.market_blend_weight * market_home_margin
+
             # Overtime close game adjustment
             margin_proxy = abs(expected_margin)
             if self.overtime_risk_adjustment:
@@ -256,7 +275,13 @@ class NBAStructuralV7Engine:
 
             # 1. Moneyline
             p_margin_home = 1.0 / (1.0 + 10.0 ** (-expected_margin / self.logistic_scale))
-            p_home = self.elo_weight * home_win + (1.0 - self.elo_weight) * p_margin_home
+            # v8: moneyline_margin_weight is independently tunable from elo_weight (which
+            # still governs the spread-margin blend above), so how much the moneyline price
+            # trusts the margin signal (which already carries rest/B2B/availability/market
+            # blend) can be ablated separately from how much the spread trusts it.
+            p_home = (
+                1.0 - self.moneyline_margin_weight
+            ) * home_win + self.moneyline_margin_weight * p_margin_home
             p_h = max(0.0001, min(0.9999, p_home))
             p_a = max(0.0001, min(0.9999, 1.0 - p_home))
 

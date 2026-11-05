@@ -1,0 +1,36 @@
+{
+  "artifact_hash": "research-nba-moneyline-v8-20261102",
+  "feature_schema_version": "1",
+  "market_models": {
+    "moneyline": {
+      "coefficients": [
+        0.6001044692457492,
+        0.1022828242067072,
+        0.10069623846637565
+      ],
+      "confidence_threshold": 0.5,
+      "feature_names": [
+        "elo_probability",
+        "trend_gap",
+        "defensive_trend_gap"
+      ],
+      "intercept": -0.13117042487331987,
+      "positive_class": "home"
+    }
+  },
+  "method": "nba_structural_v8_joint_engine",
+  "model_version": "nba-moneyline-v8",
+  "note": "Legacy LR coefficients kept for schema compatibility only -- NBA moneyline pricing is actually produced by NBAStructuralV7Engine/v8 (p_home = (1-moneyline_margin_weight)*elo_win + moneyline_margin_weight*sigmoid(expected_margin)), not by this logistic regression. v8 adds moneyline_margin_weight as an independently-tunable knob (default 0.3 reproduces v7). Research-status, 2026-11-02 overhaul investigation; not wired into config/production.yaml.",
+  "qualification": {
+    "ablation_note": "See config/models/nba-spread-margin-v8.json qualification.ablation_note.",
+    "framework": "nba_structural_v8_joint_engine",
+    "holdout_moneyline_accuracy_v7_baseline": 0.6943,
+    "holdout_moneyline_accuracy_v8_best_candidate": 0.6959,
+    "locked_holdout": true,
+    "model_version": "nba-moneyline-v8",
+    "qualified": false,
+    "sample_size": 651,
+    "status": "research"
+  },
+  "sport": "nba"
+}
