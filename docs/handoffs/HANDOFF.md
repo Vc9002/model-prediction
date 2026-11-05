@@ -1,6 +1,58 @@
-# Handoff — open work (updated 2026-10-26)
+# Handoff — open work (updated 2026-11-05)
 
 **Status: OPEN.** Delete this file when every item below is done or explicitly dropped.
+
+## 0. NCAAB moneyline systematically losing (investigated + partial fix 2026-11-05)
+
+Vincent asked for a performance review; Main-tier NCAAB moneyline was -45.8u over
+2026-11-02 → 2026-11-05 (15W/88L, 14.6%), both under the old champion
+`ncaab-tempo-v2` and the new one `ncaab-tempo-v3` (promoted 2026-11-03). 93 of 103
+picks were on the **away** side with avg market-implied prob 13.4% vs model's 37.7%
+-- the model kept finding "value" on road underdogs that the market correctly
+priced as near-dead.
+
+- **Root cause found**: `ELO_CONFIG` in
+  [elo_ratings.py](../../src/model_prediction/features/elo_ratings.py#L33) had every
+  other sport (`nba`, `nfl`, `ncaaf`, `wnba`, …) explicitly tuned, but **no `"ncaab"`
+  entry** -- it silently fell back to `generic` (50 Elo-point home advantage, K=20).
+  `basketball.py`'s moneyline price is `elo_weight=0.50` of this raw Elo win
+  probability even for the current champion v3 (`coherent_moneyline=True`), so the
+  undertuned Elo component poisons half of every live NCAAB moneyline price.
+- **Walk-forward calibration run** (script, not committed --
+  `C:\Users\Vince\AppData\Local\Temp\claude\...\scratchpad\calibrate_ncaab_home_advantage.py`,
+  rerun it from `data/historical/ncaab_games_all.jsonl`, 6,538 games, 60/20/20 split,
+  fit on train/val, locked holdout only for the final number): grid search over
+  home_advantage 30-160 is **flat** on aggregate Brier (0.2034-0.2048 on validation);
+  60 edges out 50 marginally (holdout Brier 0.1936 vs 0.1946, home-pick accuracy
+  70.4% vs 70.0%).
+- **Deeper finding, not yet fixed**: calibration-bucket breakdown on the holdout
+  shows the pure-Elo model underrates home teams across *nearly every* probability
+  bucket, worst at predicted p_home 0.4-0.5 where the **actual** home win rate is
+  ~60%. This is not a single-constant problem (the flat grid search proves that) --
+  it looks structural, possibly early-season rating convergence (NCAAB's
+  `offseason_regression` is still the generic 0.5, resetting ratings hard toward
+  1500 every November when actual team quality is already knowable from returning
+  rosters) or `coherent_moneyline`'s 50/50 elo/margin blend weighting the broken
+  Elo half too heavily. Needs a real ablation (vary `elo_weight` and
+  `offseason_regression` together, same walk-forward harness) before touching
+  `elo_weight` in production -- that's a model-probability change, not a config
+  constant, and needs the promotion-gate treatment per `docs/ROADMAP.md`.
+- **Applied** (committed, low-risk -- additive config constant, backed by the
+  walk-forward run above, not a weighting/promotion change): added
+  `"ncaab": {"k": 20.0, "home_advantage": 60.0, "offseason_regression": 0.50}` to
+  `ELO_CONFIG`. Verified: `tests/test_elo_ratings.py`, `tests/test_basketball_leagues.py`,
+  `tests/test_college_basketball_forward.py` all pass (no fixture pinned the old
+  generic-fallback value).
+- **Still open**: (1) same missing-entry gap exists for `wncaab`, `euroleague`,
+  `acb`, `bbl`, `lnb`, `aba`, `nbl` -- no historical data file exists yet for any of
+  them to validate a real number, so they were left on `generic` rather than guessed;
+  (2) the structural home-underrating finding above is the real lever and is
+  unaddressed; (3) watch the next ~50 settled NCAAB moneyline picks against the
+  2026-11-05 fix -- 60 vs 50 is a small, validated nudge, not a claim that the
+  bleed stops.
+- NCAAF (`cfb-structural-v4`, Flat tier) was checked in the same session and is
+  healthy -- no bias, 73% win rate on 15 settled picks, model/market probabilities
+  track closely. No bug found there.
 
 ## 1. Rename project folder to `E:\MP` (DONE 2026-10-21)
 

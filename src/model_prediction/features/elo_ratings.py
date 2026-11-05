@@ -36,6 +36,14 @@ ELO_CONFIG: dict[str, dict[str, float]] = {
     "wnba": {"k": 20.0, "home_advantage": 60.0, "offseason_regression": 0.40},
     "nfl": {"k": 20.0, "home_advantage": 55.0, "offseason_regression": 0.50},
     "ncaaf": {"k": 25.0, "home_advantage": 75.0, "offseason_regression": 0.40},
+    # Walk-forward grid search on data/historical/ncaab_games_all.jsonl (6,538 games,
+    # 60/20/20 split): previously had no entry here, so it silently fell back to the
+    # "generic" row below. holdout Brier 0.1946 (generic 50) vs 0.1936 (60, selected
+    # on validation) -- see docs/handoffs/HANDOFF.md for the full calibration-bucket
+    # finding (home teams win more than Elo predicts across nearly every bucket,
+    # worst at p_home 0.4-0.5 where actual home win rate is ~60%; 60 does not fully
+    # fix that, it is only the best single-constant value found).
+    "ncaab": {"k": 20.0, "home_advantage": 60.0, "offseason_regression": 0.50},
     "soccer": {"k": 20.0, "home_advantage": 60.0, "offseason_regression": 0.50},
     "tennis": {"k": 32.0, "home_advantage": 0.0, "offseason_regression": 0.50},
     "generic": {"k": 20.0, "home_advantage": 50.0, "offseason_regression": 0.50},
