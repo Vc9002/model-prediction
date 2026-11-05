@@ -19,8 +19,8 @@ import yaml
 from .domain import RETIRED_STATUSES
 from .runtime_paths import RuntimePaths
 
-ROUTES = {
-    ("MLB", "moneyline"): ("mlb", "mlb-elo-trend-lr-v8"),
+ROUTES: dict[tuple[str, str], tuple[str, str | None]] = {
+    ("MLB", "moneyline"): ("mlb", "mlb-moneyline-v9-residual"),
     ("MLB", "spread"): ("mlb_totals", "mlb-structural-runline-v4"),
     ("MLB", "total"): ("mlb_totals", "mlb-structural-v10-frozen"),
     ("MLB", "nrfi"): ("mlb_nrfi", "mlb-nrfi-v4"),
@@ -99,7 +99,7 @@ def build_report(root: Path, database: Path, day: str, run: dict) -> dict:
             generated_counts = dict(Counter(r["ledger_tier"] for r in generated))
             flat_events = {str(r["event_id"]) for r in matching if r["ledger_tier"] == "flat"}
             main_events = {str(r["event_id"]) for r in matching if r["ledger_tier"] == "main"}
-            priced = next(
+            priced: list = next(
                 (
                     result[key]
                     for key in ("priced_contracts", "candidates", "priced")
