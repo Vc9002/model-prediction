@@ -79,7 +79,7 @@ from ..mlb_baseline_refresh import refresh_if_due
 from ..models import MODEL_SPECS
 from ..models.market_residual import MarketResidualModel, ResidualTrainingRow
 from ..models.registry import model_spec
-from ..runtime_paths import rolling_models_root
+from ..runtime_paths import RuntimePaths, rolling_models_root
 from ..total_score import validate_all_total_score_models
 from ..units import edge_scaled_units
 from ..validation import run_validation_audit, write_production_artifacts
@@ -186,6 +186,17 @@ def _polymarket_slate(args, config) -> dict:
     if ladder_keep is None and "NCAAB" in events:
         ladder_keep = 1
     snapshot_root = Path(ledger_path(config)).parent
+    # Mirror snapshot_archives.snapshot_paths's read-side reroute: forecast.py
+    # looks for captured quotes under the external runtime root once one is
+    # configured, rerouting the checkout's legacy repo-local data/ path to it.
+    # Without the same reroute here, capture silently wrote every BBO
+    # snapshot to the repo-local data/odds/ tree while every forecast read
+    # looked in the runtime root -- a write/read split-brain that made NBA
+    # (and every other sport) report "missing quote" for games whose quotes
+    # had, in fact, been captured, just to the wrong directory.
+    _runtime_paths = RuntimePaths.resolve()
+    if snapshot_root.resolve() == (_runtime_paths.repo_root / "data").resolve():
+        snapshot_root = _runtime_paths.runtime_root
     bbo_capture = (
         {"status": "disabled"}
         if getattr(args, "no_snapshot_bbo", False)
