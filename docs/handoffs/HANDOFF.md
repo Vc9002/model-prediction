@@ -91,7 +91,33 @@ priced as near-dead.
 
 Steps, in order: stop the dashboard; remove the `E:\MP` junction by hand; rename `E:\model-prediction` to `E:\MP`; update the seven task actions; verify the dashboard and the next scheduled run start from the new path.
 
-## 2. NCAAF ledger duplicate settled picks (script ready, run manually)
+## 2. NCAAF ledger duplicate settled picks (DONE 2026-11-05)
+
+Re-checked before running: only 32 duplicate keys remained (not the 1,026 from
+2026-10-26 -- most had already cleared as `b77a563d`'s superseding fix kept new
+re-forecasts from creating fresh ones, and the ones logged in October had already
+settled out). Daily lock file showed a stale entry (PID no longer running), so no
+scheduled job was writing. Fresh backup taken:
+`E:\model-prediction-runtime\backups\ledgers\ledgers_20261105T195835_pre-ncaaf-dedup2.db`.
+Ran `scripts/dedup_ncaaf_settled_picks.py` for real (dry-run matched first): 32
+rows marked `superseded`, 0 remaining duplicate keys. Nothing deleted.
+
+**Also checked while focused on NCAAF this session**: whether NCAAF's home-field
+model has the same missing-`ELO_CONFIG`-entry bug found in NCAAB/EuroLeague/ACB/LNB.
+It does not need the same fix, but for a different reason than expected --
+`ELO_CONFIG["ncaaf"]` (home_advantage=75, in `elo_ratings.py`) is **dead code**:
+grepped every call site of `build_elo(...)` in the repo (including `rebuild/`) and
+none passes `"ncaaf"` or `"cfb"` as the sport key. The live NCAAF model
+(`features/cfb_features.py`) has its own, separate, already-tuned home-field
+advantage (`CFB_DEFAULT_HOME_ADVANTAGE_POINTS = 2.5`, commented "Calibrated to 2026
+Empirical Reality") and computes its own Elo-equivalent HFA directly
+(`elo_hfa = home_advantage_points * 24.5`) rather than going through
+`elo_ratings.build_elo`. So there's no live bug here, just an orphaned,
+never-read config row -- left in place rather than deleted since this session's
+focus was NCAAF, not an unrelated cleanup, but worth removing next time
+`elo_ratings.py` is touched.
+
+(Original note, kept for reference: script ready, run manually)
 
 Settled Main rows in `E:\model-prediction-runtime\ledgers\ledgers.db`:
 
