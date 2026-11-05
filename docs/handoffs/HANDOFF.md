@@ -250,6 +250,54 @@ Target, to be confirmed after step 2: zero exit-1 runs over a week, and a daily 
 
 Verification: run a single sport's forecast with timing enabled and compare its output rows to the current code. Do not run the full suite, per the repo's fast-iteration rule.
 
+## 7. NCAAF improvement research (2026-11-05, read-only -- no model changes)
+
+Vincent asked for in-depth research on improving NCAAF. Findings (full detail
+and tables in `docs/CFB_PREDICTION_SYSTEM.md` §§0, 8-9, which this session
+updated):
+
+- **Doc was stale**: `docs/CFB_PREDICTION_SYSTEM.md` said champion was
+  `cfb-structural-v3` (as of 2026-10-26); `config/production.yaml`'s
+  `champions.NCAAF` has actually been `cfb-structural-v4` since then, with a
+  real holdout improvement over v3 (`delta_brier_vs_v3: -0.005`, n=3,250
+  games). Fixed.
+- **No active NCAAF challenger**: `config/production.yaml`'s `challengers.NCAAF`
+  is all `null`. Nothing is being validated behind v4 right now -- if NCAAF is
+  a priority, the next concrete step is standing up a v5 research candidate,
+  not just re-running the same validated model.
+- **Governance gap on two retired models**: `college-football-v1` and
+  `cfb-spread-v1` both carry `"qualification": {"status": "FLAT_LEDGER_ONLY",
+  "qualified": false}` in their own artifact JSON, yet 245 and 292 settled rows
+  respectively exist in the **Main** ledger (2026-09-07 to 2026-10-07, before
+  today's registry took over). Not a live bug -- both stopped firing weeks ago
+  and neither is in the current registry -- but it means part of Main's NCAAF
+  history was never actually gated the way its own artifact says it should
+  have been. `cfb-spread-v1` in particular: 144W/144L on 288 Main picks (-30.1u,
+  exactly 50%) despite the artifact showing ~20pp of model-vs-market "edge" on
+  every bet -- a real overconfidence signature worth remembering if anyone
+  considers reviving that artifact's method.
+- **First-ever real market-relative backtest for NCAAF** (previously every
+  number in this project's NCAAF docs was scored against a constant line --
+  see `docs/CFB_PREDICTION_SYSTEM.md` §5's correction). Pulled
+  `eddieglush/closing-odds-vs-results-14-sports-leagues` from Kaggle (real
+  no-vig closing moneyline prices, 363 games, current 2026 season). A bare
+  walk-forward Elo baseline built from local history scored Brier 0.2397 /
+  60.2% accuracy against the market's own 0.1849 / 72.3% -- the market wins
+  clearly. Useful as a sanity check that `cfb-structural-v4`'s much richer
+  feature set is doing real work, not proof either way about v4 itself.
+- **Natural next step, not done this session**: replay `cfb-structural-v4`'s
+  own point-in-time predictions (not a generic Elo stand-in) against this same
+  363-game no-vig closing data, matched by `home_team`/`away_team`/`date_utc`.
+  That would be the first real Brier/calibration number for the actual champion
+  against real market prices, closing the gap every doc in this project has
+  flagged for months. The data's already downloaded to the session scratchpad;
+  re-download via `kaggle datasets download
+  eddieglush/closing-odds-vs-results-14-sports-leagues -f
+  ncaaf_2026_closing_prices_vs_results.csv` if starting fresh.
+- **No dataset found with real spread/total closing lines** for NCAAF (only
+  moneyline no-vig prices were available) -- the spread/total side of §5's
+  invalid backtest is still unresolved.
+
 ## Done when
 
 Items 1 through 6 are each either resolved or explicitly dropped, and this file has been deleted.

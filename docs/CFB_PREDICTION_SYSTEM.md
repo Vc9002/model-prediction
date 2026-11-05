@@ -1,8 +1,9 @@
 # College Football (NCAAF) Prediction System
 
-**Status (updated 2026-10-26)**: Wired to production. Champion is **`cfb-structural-v3`** for all three markets (moneyline, spread, total) — `serving_status: production` in `config/production.yaml`. `cfb-structural-v2` is the rollback.  
+**Status (updated 2026-11-05)**: Wired to production. Champion is **`cfb-structural-v4`** for all three markets (moneyline, spread, total) — `champions.NCAAF` in `config/production.yaml` (this line was stale: it said `cfb-structural-v3` as of 2026-10-26, but v4 superseded it; v4's own artifact records a real holdout improvement over v3, `delta_brier_vs_v3: -0.005`, n=3,250). `cfb-structural-v3` is the rollback. There is currently **no active NCAAF challenger** (`challengers.NCAAF` in `config/production.yaml` is all `null`) -- nothing is being validated behind v4 right now.
 **Earlier documents named `cfb-total-v1` as totals champion.** That claim rests on the 2020–2024 backtest in §5, which was scored against constant lines, not market prices, and so is invalid (see §5 and §7).  
-**Older models**: `college-football-v1` (moneyline) and `cfb-spread-v1` (spread) remain in the ledgers as history. `cfb-spread-v1` is losing on the Main ledger.  
+**Older models**: `college-football-v1` (moneyline) and `cfb-spread-v1` (spread) remain in the ledgers as history. Both of those two artifacts' own metadata says `"qualification": {"status": "FLAT_LEDGER_ONLY", "qualified": false}` -- they were never supposed to write to Main, but 245 (`college-football-v1`) and 292 (`cfb-spread-v1`) settled rows exist there anyway, dated 2026-09-07 to 2026-10-07, before the current champion/challenger registry took over. Not an active bug (both stopped firing weeks ago and aren't in the current registry), but it means part of Main's historical NCAAF record was never actually gated the way its own artifact said it should be. `cfb-spread-v1` is losing on the Main ledger (144W/144L on 288 settled picks, -30.1u -- exactly 50% despite the artifact showing ~20pp of "edge" over market on every bet, which is a real overconfidence signature, not noise).
+**First real market-relative evaluation (2026-11-05, see §8)**: every number in §5 below was scored against a constant line because no historical closing-line data existed in this repo. Kaggle dataset `eddieglush/closing-odds-vs-results-14-sports-leagues` (`ncaaf_2026_closing_prices_vs_results.csv`) has real no-vig closing moneyline probabilities for 364 games in the current season. A bare walk-forward Elo baseline (no structural features) scored against those real market prices: Brier 0.2397 vs the market's own 0.1849, accuracy 60.2% vs 72.3%, and on the 126 games where Elo and the market picked different favorites, the market's favorite won 65.9% of the time. The market is a long way ahead of plain Elo here -- which is a useful sanity check on `cfb-structural-v4`'s much richer feature set (PPP efficiency, travel/altitude, weather, QB starters) actually being necessary, not a reason to revive the (currently dead-code) `ELO_CONFIG["ncaaf"]` entry on its own.
 **Historical Dataset**: 8,146 completed games spanning 2016-2024 seasons (Structural 2016+, Market-relative 2020+)  
 **Primary Module Entrypoints**:
 - Data & Venue Geography: [`src/model_prediction/data_sources/cfb_data.py`](src/model_prediction/data_sources/cfb_data.py)
@@ -148,3 +149,49 @@ What this means:
 | `college-football-v1` | Moneyline | 2 | `config/models/college-football-v1.json` | `f5b95acd6676fe7a...` | `FLAT_LEDGER_ONLY` |
 | `cfb-spread-v1` | Spread | 2 | `config/models/cfb-spread-v1.json` | `7dc5b3428abfdb93...` | `FLAT_LEDGER_ONLY` |
 | `cfb-total-v1` | Total | 2 | `config/models/cfb-total-v1.json` | `6831c96cc379860b...` | Champion status contested (see §7) |
+| `cfb-structural-v4` | Moneyline, Spread, Total | 2 | `config/models/cfb-structural-v4.json` | `21a9390c663a5131...` | **Current champion**, `config/production.yaml` `champions.NCAAF` |
+
+---
+
+## 9. First Real Market-Relative Backtest (2026-11-05)
+
+Every prior backtest in this document (§5, and the `college-football-v1` /
+`cfb-spread-v1` figures) was scored against a constant line because
+`data/historical/ncaaf_games_all.jsonl` has no `total_line`, `spread_home_line`
+or `market_ml_home_prob` field, and no other source of historical closing lines
+existed in this repo. That gap is now partially closed.
+
+**Source**: Kaggle `eddieglush/closing-odds-vs-results-14-sports-leagues`,
+`ncaaf_2026_closing_prices_vs_results.csv` -- 363 games from the actual current
+(2026) season with real no-vig closing moneyline probabilities and final scores.
+No spread/total lines in this file, moneyline only.
+
+**Method**: built a plain walk-forward Elo book (`features/elo_ratings.py`,
+`ELO_CONFIG["ncaaf"]`: k=25, home_advantage=75 -- note this config entry is
+otherwise dead code, see `docs/handoffs/HANDOFF.md`) from
+`data/historical/ncaaf_games_all.jsonl` using every game strictly before the
+earliest date in the market file, then scored its implied home-win probability
+against the market's close and the actual outcome for each of the 363 games
+(329 matched by team name after mascot normalization; 34 unmatched, mostly
+FBS-vs-FCS games our own feed doesn't carry under the same name).
+
+| | Brier | Accuracy |
+| :--- | :---: | :---: |
+| Plain Elo baseline | 0.2397 | 60.2% |
+| Real market close | **0.1849** | **72.3%** |
+
+On the 126 games (of 329) where Elo and the market disagreed on the favorite,
+the **market's** pick won 65.9% of the time (43/126 for Elo's pick).
+
+**What this means**: the market is a long way ahead of a bare Elo model for
+NCAAF. That's a useful sanity check in both directions -- it's evidence
+`cfb-structural-v4`'s much larger feature set (opponent-adjusted PPP, travel,
+altitude, weather, QB-starter mixture) is doing real work the market itself
+already prices in, not evidence that the project should invest in reviving the
+dead `ELO_CONFIG["ncaaf"]` entry as a standalone signal. It does **not** by
+itself validate or invalidate `cfb-structural-v4` -- that needs the same
+no-vig-close data matched against the model's own historical predictions
+(not done here; this run only built a generic Elo baseline, not a replay of
+`college_football.py`). That replay is the natural next step and does not
+require new data -- this file's `home_team`/`away_team`/`date_utc` columns are
+enough to match into the existing point-in-time feature pipeline.
