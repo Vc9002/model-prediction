@@ -5,6 +5,7 @@ from __future__ import annotations
 from model_prediction.features.base import GameRecord
 from model_prediction.models.basketball import UpcomingGame
 from model_prediction.models.ncaab_spread_v4 import NCAABSpreadModelV4
+from model_prediction.models.ncaab_total_v4 import NCAABTotalModelV4
 
 
 def _game(event_id, start, away, home, away_score, home_score):
@@ -79,3 +80,49 @@ def test_ncaab_spread_v4_standalone():
     assert 0.0 < ml_pred.probabilities["home"] < 1.0
     assert 0.0 < spread_pred.probabilities["away"] < 1.0
     assert abs(spread_pred.probabilities["away"] + spread_pred.probabilities["home"] - 1.0) < 1e-4
+
+
+def test_ncaab_total_v4_uses_current_season_sample_not_lifetime():
+    model = NCAABTotalModelV4()
+    history = []
+    for i in range(30):
+        history.append(
+            _game(
+                f"last_season_total_{i}",
+                f"2026-01-{(i % 28) + 1:02d}T00:00:00Z",
+                "Team C",
+                "Team D",
+                65 + i % 5,
+                70 + i % 5,
+            )
+        )
+    history.append(_game("this_season_total_1", "2026-11-03T00:00:00Z", "Team C", "Team D", 68, 72))
+
+    upcoming = UpcomingGame(
+        event_id="test_total_game",
+        event_start_utc="2026-11-05T00:00:00Z",
+        away_team="Team C",
+        home_team="Team D",
+        total_line=145.5,
+    )
+    preds = model.predict_totals(history, [upcoming])
+    total_pred = next(p for p in preds if p.market_type == "total")
+    assert total_pred.uncertainty >= 0.15
+
+
+def test_ncaab_total_v4_standalone():
+    model = NCAABTotalModelV4()
+    game = UpcomingGame(
+        event_id="test_standalone_total",
+        event_start_utc="2026-11-05T20:00:00Z",
+        away_team="Duke",
+        home_team="Kansas",
+        total_line=148.5,
+    )
+    preds = model.predict_totals([], [game])
+    assert len(preds) == 1
+    total_pred = preds[0]
+    assert total_pred.market_type == "total"
+    assert 0.0 < total_pred.probabilities["over"] < 1.0
+    assert abs(total_pred.probabilities["over"] + total_pred.probabilities["under"] - 1.0) < 1e-4
+    assert total_pred.feature_basis["est_possessions"] > 55.0
