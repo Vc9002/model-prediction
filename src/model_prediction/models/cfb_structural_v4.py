@@ -42,6 +42,8 @@ CFB_V4_BASELINE_MARGIN_SD = 16.2
 CFB_V4_BASELINE_TOTAL_SD = 16.0
 CFB_BLOWOUT_SPREAD_THRESHOLD = 21.5
 CFB_BLOWOUT_MARGIN_SCALE = 0.025
+CFB_TOTAL_DEVIATION_THRESHOLD = 8.0
+CFB_TOTAL_DEVIATION_SCALE = 0.025
 STANDARD_LAY_ASK = round(implied_probability(-110), 6)
 
 
@@ -68,6 +70,7 @@ class CFBStructuralForecastV4:
     altitude_travel_adj: float
     weather_points_adj: float
     effective_margin_sd: float
+    effective_total_sd: float
 
 
 class CFBStructuralV4Model:
@@ -112,6 +115,29 @@ class CFBStructuralV4Model:
             sd *= 1.0 + CFB_BLOWOUT_MARGIN_SCALE * excess
         return round(sd, 3)
 
+    def compute_effective_total_sd(
+        self,
+        projected_total: float,
+        total_line: float,
+        uncertainty: float = 0.04,
+    ) -> float:
+        """Compute effective total standard deviation with uncertainty and large-deviation scaling.
+
+        Mirrors compute_effective_margin_sd's shape (same uncertainty response; the
+        margin side widens on an extreme *spread line*, this side widens on an extreme
+        *projected deviation from the total line* -- the actual driver of the old
+        post-hoc >0.60 probability clamp this replaces). A fixed-width distribution
+        understates tail risk exactly when the model and the total line disagree a
+        lot; widening total_sd here lets the simulated distribution express that
+        disagreement instead of clamping the resulting probability after the fact.
+        """
+        sd = self.total_sd * (1.0 + 2.0 * max(0.0, uncertainty - 0.04))
+        deviation = abs(projected_total - total_line)
+        if deviation > CFB_TOTAL_DEVIATION_THRESHOLD:
+            excess = min(20.0, deviation - CFB_TOTAL_DEVIATION_THRESHOLD)
+            sd *= 1.0 + CFB_TOTAL_DEVIATION_SCALE * excess
+        return round(sd, 3)
+
     def forecast_game(
         self,
         matchup_features: CFBMatchupFeatures,
@@ -128,8 +154,16 @@ class CFBStructuralV4Model:
             is_conference_matchup=getattr(matchup_features, "is_conference_matchup", False),
         )
 
+        effective_total_sd = self.compute_effective_total_sd(
+            projected_total=mu_home + mu_away,
+            total_line=total_line,
+            uncertainty=matchup_features.uncertainty,
+        )
+
         orig_margin_sd = self.distribution_engine.margin_sd
+        orig_total_sd = self.distribution_engine.total_sd
         self.distribution_engine.margin_sd = effective_margin_sd
+        self.distribution_engine.total_sd = effective_total_sd
         try:
             joint_probs = self.distribution_engine.compute_market_probabilities(
                 mu_away=mu_away,
@@ -139,6 +173,7 @@ class CFBStructuralV4Model:
             )
         finally:
             self.distribution_engine.margin_sd = orig_margin_sd
+            self.distribution_engine.total_sd = orig_total_sd
 
         return CFBStructuralForecastV4(
             home_expected_points=round(mu_home, 2),
@@ -164,6 +199,7 @@ class CFBStructuralV4Model:
             ),
             weather_points_adj=round(matchup_features.weather_total_adjustment, 2),
             effective_margin_sd=effective_margin_sd,
+            effective_total_sd=effective_total_sd,
         )
 
     def predict_matchup(
@@ -257,16 +293,8 @@ class CFBStructuralV4Model:
             )
         )
 
-        # 3. Total (with calibrated pace & tail shrinkage on extreme probabilities > 0.60)
-        p_over_val = fc.prob_over
-        p_under_val = fc.prob_under
-        if p_over_val > 0.60:
-            p_over_val = 0.60 + 0.35 * (p_over_val - 0.60)
-            p_under_val = 1.0 - p_over_val
-        elif p_under_val > 0.60:
-            p_under_val = 0.60 + 0.35 * (p_under_val - 0.60)
-            p_over_val = 1.0 - p_under_val
-
+        # 3. Total (tail risk is expressed via effective_total_sd widening in forecast_game,
+        # not a post-hoc probability clamp -- see compute_effective_total_sd)
         predictions.append(
             GamePrediction(
                 event_id=game.event_id,
@@ -277,8 +305,8 @@ class CFBStructuralV4Model:
                 market_type="total",
                 line=tot_line,
                 probabilities={
-                    "over": round(p_over_val, 6),
-                    "under": round(p_under_val, 6),
+                    "over": round(fc.prob_over, 6),
+                    "under": round(fc.prob_under, 6),
                     "push": round(fc.prob_push_total, 6),
                 },
                 uncertainty=feat.uncertainty,
@@ -287,7 +315,7 @@ class CFBStructuralV4Model:
                 rationale=(
                     f"CFB Structural v4 Total: line {tot_line:.1f} "
                     f"(P(Over)={fc.prob_over:.4f}, P(Under)={fc.prob_under:.4f}, "
-                    f"P(Push)={fc.prob_push_total:.4f})."
+                    f"P(Push)={fc.prob_push_total:.4f}). Eff total SD: {fc.effective_total_sd:.1f}."
                 ),
             )
         )
