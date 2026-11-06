@@ -147,6 +147,41 @@ locked-holdout gate described above — that remains a separate, more
 rigorous validation step before any promotion decision. No config changes
 were made as part of recording this result.
 
+Note: `GRADE_FROM = 2026-09-01` does not grade a true in-season control
+group — the historical data file has a gap from April to November, so the
+238 graded games above are all from early November 2026-27 season-start
+(2026-11-01 through 2026-11-05). That window is exactly the thin-current-
+season-sample regime C1 (season-opener confidence bug) addresses.
+
+### 2026-11-05 (later) — re-run after the C1 season-opener fix
+
+Finding C1 (final whole-branch review) found that `current_season_games_played`
+can't see the gap between a team's last historical game and the game being
+predicted now, so true season openers (0 games played this season) were
+getting near-MAXIMUM confidence instead of near-minimum. Both v4 models were
+fixed to override the sample to 0 in that case (see `ncaab_spread_v4.py`'s
+and `ncaab_total_v4.py`'s `_effective_current_season_games` helper). Re-ran
+`scripts/ncaab_v4_walkforward.py` verbatim after the fix:
+
+```
+total completed games: 6538
+
+graded games: 238
+v3: total MAE=14.42  moneyline Brier=0.1358
+v4: total MAE=14.58  moneyline Brier=0.1233
+```
+
+Numbers are unchanged from the pre-fix run above — this script's two graded
+metrics (`expected_total`'s MAE and moneyline Brier, which uses the logistic
+moneyline path) don't depend on `effective_margin_sd`/`effective_total_sd` or
+`uncertainty`, so C1's fix (which only widens those) doesn't move them. The
+fix is nonetheless real and load-bearing for anything downstream that reads
+`uncertainty` or the spread/total `sd` (e.g. `eligibility.py`'s edge/
+confidence gate) on a season opener — see the new regression tests
+(`test_ncaab_spread_v4_season_opener_gets_max_uncertainty`,
+`test_ncaab_total_v4_season_opener_gets_max_uncertainty`) in
+`tests/test_ncaab_v4_walkforward.py`.
+
 ## Testing
 
 - Unit tests mirroring `test_nba_v6_walkforward.py`'s structure:

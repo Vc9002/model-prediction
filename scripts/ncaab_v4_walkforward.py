@@ -23,7 +23,9 @@ from model_prediction.models.ncaab_spread_v4 import NCAABSpreadModelV4
 from model_prediction.models.ncaab_total_v4 import NCAABTotalModelV4
 
 ROOT = Path(".")
-GRADE_FROM = "2026-09-01"  # covers both in-season control and the 2026-27 season-start boundary
+GRADE_FROM = "2026-09-01"  # the historical data file has a gap from April to November; the
+# graded window in practice only contains early-November 2026-27 season-start games (2026-11-01
+# through 2026-11-05), not a true in-season control group.
 
 
 def _load_games() -> list[dict]:
