@@ -298,6 +298,70 @@ updated):
   moneyline no-vig prices were available) -- the spread/total side of §5's
   invalid backtest is still unresolved.
 
+## 7b. NCAAF overhaul execution (2026-11-06, follow-on to item 7, real code changes)
+
+Executed the calibration-fixes half of the overhaul plan approved this
+session (`C:\Users\Vince\.claude\plans\starry-frolicking-minsky.md`). Two
+real, committed changes to the live champion `cfb-structural-v4`:
+
+- **Removed the post-hoc total-probability clamp** (`cfb_structural_v4.py`,
+  commit `7f34ff8e`). The old code clamped `p_over`/`p_under` to a hard
+  0.60/0.735 kink whenever either exceeded 0.60 -- cosmetic, not a
+  calibrated distribution. Replaced with `compute_effective_total_sd(...)`,
+  mirroring the existing `compute_effective_margin_sd`, which widens
+  `total_sd` (via the distribution engine's existing common-pace noise
+  mechanism, confirmed by reading `cfb_distribution.py`) when uncertainty is
+  high or the model's projected total diverges sharply from the line.
+- **Retuned `margin_sd` 16.2 -> 14.5** (commit `8d18f726`), the only one of
+  the plan's five flagged unvalidated constants that showed a real,
+  bootstrap-confirmed improvement. Walk-forward grid search on
+  `data/historical/ncaaf_games_all.jsonl` (7,896 games, train 2016-2021 /
+  val 2022 / holdout 2023-2024): selected on validation (moneyline Brier
+  0.19721 vs 0.19760), confirmed on holdout (0.18779 vs 0.18848) and via
+  date-clustered bootstrap (95% CI [0.00007, 0.00131] excludes zero,
+  P(improvement)=98.5%). `home_advantage_points` (2.5) showed **no** net
+  benefit once combined and was left unchanged -- don't re-flip it without
+  new evidence. Effect size is small; this is a real but modest fix, not a
+  structural rebuild. Artifact hash recomputed in
+  `config/models/cfb-structural-v4.json` for the margin_sd field change only
+  -- its `calibration` block (brier_holdout, delta_brier_vs_v3, etc.) was
+  **not** refreshed, since that came from a different, broader evaluation
+  methodology than this narrow margin_sd grid search; a full recalibration
+  pass is still owed before those numbers can be trusted post-change.
+  `CFB_BLOWOUT_MARGIN_SCALE`, `CFB_BLOWOUT_SPREAD_THRESHOLD`, and the
+  `0.9135` conference-matchup discount were **not** retuned this session --
+  still flagged unvalidated, not yet disproven or confirmed.
+
+**Blocked / descoped, with evidence, not guesses:**
+
+- **Market-anchor blend (plan item 3) is blocked on real data.**
+  `scripts/audit_ncaaf_market_calibration.py` was read and run live: only
+  **51 quote-verified picks exist in the entire ledger** (all
+  `cfb-structural-v2`/`v3`; **zero quote-verified rows for v4 at all** --
+  v4 has never had a single real-market-quote-verified settled pick).
+  `data/historical/ncaaf_games_all.jsonl` (the training history) has zero
+  market fields. There is no real point-in-time NCAAF market-price history
+  usable for fitting `asof_market_weight`'s least-squares blend (the
+  `nfl_market_anchor_v1.py` pattern this was meant to follow) -- do not
+  build this module on synthetic/defaulted market data. Revisit only once
+  v4 (or a challenger) has accumulated real quote-verified volume.
+- **`scripts/cfb_research_pipeline.py` is not a trustworthy ablation
+  source (plan item 4) -- found to contain fabricated results, not
+  computed ones.** Its "Structural Feature Ablation Battery" section
+  (lines ~218-227) is a literal hardcoded Python list of numbers, not
+  computed from any replay. Its "Market-Relative Economic Evaluation"
+  section defaults every game's `market_ml_home_prob` to a hardcoded `0.50`
+  whenever the field is absent (line ~291) -- and since the dataset has no
+  market fields at all, **every game in that section silently used a fake
+  50/50 market**, which is exactly the constant-line-proxy flaw this
+  project's own docs have warned about elsewhere. Do not cite any number
+  from that script's output as real evidence, and do not extend it as-is.
+  Feature ablation (QB mixture, altitude/travel, weather) for v4 is still
+  open and needs a from-scratch replay against real outcomes only (no
+  synthetic market defaulting), following this session's
+  `cfb_v4_constant_calibration.py` pattern (train/val/holdout + date-
+  clustered bootstrap) rather than that script.
+
 ## Done when
 
 Items 1 through 6 are each either resolved or explicitly dropped, and this file has been deleted.
