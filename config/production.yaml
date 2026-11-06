@@ -60,16 +60,14 @@ prediction_service:
     rollback_model: mlb-elo-trend-lr-v8
     promotion_basis: operator_override
     promotion_evidence_level: historical_only
-    promotion_note: >-
-      Operator-confirmed override 2026-11-02: own offline evaluation
+    promotion_note: 'Operator-confirmed override 2026-11-02: own offline evaluation
       (outputs/research/mlb_moneyline_market_residual_v10_offline_evaluation.json)
-      shows verdict MECHANICS_VALIDATED, p_bootstrap_beats_market=0.332
-      (loses to market-only baseline more often than it wins), recommendation
-      explicitly states additional feature layers required before freeze.
-      Wired anyway at Vincent's explicit direction after being shown these
-      numbers. Not a validated promotion under docs/PROMOTION_POLICY.md's
-      own evidentiary bar -- revisit if real paper results confirm the
-      negative signal.
+      shows verdict MECHANICS_VALIDATED, p_bootstrap_beats_market=0.332 (loses to
+      market-only baseline more often than it wins), recommendation explicitly states
+      additional feature layers required before freeze. Wired anyway at Vincent''s
+      explicit direction after being shown these numbers. Not a validated promotion
+      under docs/PROMOTION_POLICY.md''s own evidentiary bar -- revisit if real paper
+      results confirm the negative signal.'
   - model_id: mlb-elo-trend-lr-v8
     sport: MLB
     market: moneyline
@@ -681,10 +679,20 @@ prediction_service:
     implementation: code_backed_model
     entry: model_prediction.models.basketball_leagues:ncaab_v2_model
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: ncaab-tempo-v1
+  - model_id: ncaab-tempo-v3
+    sport: NCAAB
+    market: multi
+    implementation: code_backed_model
+    entry: model_prediction.models.basketball_leagues:ncaab_v3_model
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: ncaab-tempo-v2
   - model_id: ncaab-tempo-v1
     sport: NCAAB
     market: multi
@@ -837,9 +845,9 @@ prediction_service:
     rollback_model: null
   champions:
     NCAAB:
-      moneyline: ncaab-tempo-v2
-      spread: ncaab-tempo-v2
-      total: ncaab-tempo-v2
+      moneyline: ncaab-tempo-v3
+      spread: ncaab-tempo-v3
+      total: ncaab-tempo-v3
     EUROLEAGUE:
       moneyline: eurolg-tempo-v2
       spread: eurolg-tempo-v2
@@ -1130,6 +1138,7 @@ prediction_service:
   - darts-markov-v2
   - darts-markov-v1
   - ncaab-tempo-v2
+  - ncaab-tempo-v3
   - ncaab-tempo-v1
   - eurolg-tempo-v2
   - eurolg-tempo-v1
