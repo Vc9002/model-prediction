@@ -41,6 +41,8 @@ class BasketballLeagueConfig:
     team_total_weight: float = 0.20
     elo_k_factor: float = 20.0
     elo_margin_scale: float = 28.0
+    coherent_moneyline: bool = False
+    elo_home_advantage: float | None = None
 
 
 NBA_CONFIG = BasketballLeagueConfig(
@@ -99,6 +101,26 @@ NCAAB_V2_CONFIG = BasketballLeagueConfig(
     elo_weight=0.50,
     trend_weight=0.50,
     rest_weight=0.15,
+)
+
+NCAAB_V3_CONFIG = BasketballLeagueConfig(
+    league_code="NCAAB",
+    model_version="ncaab-tempo-v3",
+    game_duration_minutes=40,
+    pace=68.1,
+    margin_sd=10.5,
+    total_sd=13.8,
+    # Backtest-measured correction: v1/v2 underpredicted home margin by ~3.8-4.0
+    # points on average (see docs/handoffs backtest 2026-11-02); this also turns
+    # on coherent_moneyline so the Elo/margin blend actually reaches moneyline
+    # pricing, which v1/v2 never did (home_court_points/margin_sd had zero
+    # effect on moneyline since coherent_moneyline was never wired through).
+    home_court_points=7.2,
+    baseline_points_per_team=71.4,
+    elo_weight=0.50,
+    trend_weight=0.50,
+    rest_weight=0.15,
+    coherent_moneyline=True,
 )
 
 WNCAAB_CONFIG = BasketballLeagueConfig(
@@ -266,6 +288,8 @@ class DedicatedBasketballLeagueModel:
             home_court_points=config.home_court_points,
             trend_total_weight=config.trend_total_weight,
             team_total_weight=config.team_total_weight,
+            coherent_moneyline=config.coherent_moneyline,
+            elo_home_advantage=config.elo_home_advantage,
         )
 
     def predict_games(
@@ -428,3 +452,7 @@ def euroleague_v2_model() -> DedicatedBasketballLeagueModel:
 
 def nbl_v2_model() -> DedicatedBasketballLeagueModel:
     return DedicatedBasketballLeagueModel(NBL_V2_CONFIG)
+
+
+def ncaab_v3_model() -> DedicatedBasketballLeagueModel:
+    return DedicatedBasketballLeagueModel(NCAAB_V3_CONFIG)
