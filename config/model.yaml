@@ -678,7 +678,7 @@ models:
     status: shadow_qualified
     origin: statistical_model
     active_production_version: ncaab-tempo-v3
-    active_research_version: ncaab-tempo-v1
+    active_research_version: ncaab-tempo-v4
     min_edge: 0.035
     spread_sd: 10.5
     total_sd: 14.0
