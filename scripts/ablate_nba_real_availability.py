@@ -43,6 +43,7 @@ from nba_v5_pit_walkforward import split_complete_dates
 from model_prediction.features.nba_player_availability import MAX_TEAM_LOSS_PTS
 from model_prediction.features.nba_player_logs import (
     box_plus_minus_proxy,
+    is_confirmed_unavailable,
     load_nba_player_boxscores,
     rolling_player_values,
 )
@@ -72,7 +73,10 @@ def team_loss_from_window(window: list[tuple[str, list[dict]]]) -> float:
     if len(window) < 2:
         return 0.0
     _, most_recent_rows = window[-1]
-    recent_minutes = {r["player_id"]: r["minutes"] for r in most_recent_rows}
+    # ESPN tags every DNP with its own reason; most ("COACH'S DECISION") are
+    # ordinary rotation rest, not a real absence -- only a non-coach's-decision
+    # DNP in the most recently completed game counts as "out" tonight.
+    recent_out = {r["player_id"] for r in most_recent_rows if is_confirmed_unavailable(r)}
 
     logs_by_player: dict[str, list[tuple[str, float]]] = defaultdict(list)
     minutes_by_player: dict[str, list[float]] = defaultdict(list)
@@ -86,7 +90,7 @@ def team_loss_from_window(window: list[tuple[str, list[dict]]]) -> float:
     loss = 0.0
     for pid, val in values.items():
         mean_minutes = sum(minutes_by_player[pid]) / len(minutes_by_player[pid])
-        if mean_minutes >= MEAN_MINUTES_FLOOR and recent_minutes.get(pid, 0.0) == 0.0:
+        if mean_minutes >= MEAN_MINUTES_FLOOR and pid in recent_out:
             loss += val
     return min(MAX_TEAM_LOSS_PTS, loss)
 

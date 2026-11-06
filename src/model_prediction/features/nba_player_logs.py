@@ -81,6 +81,8 @@ def parse_nba_player_boxscore(payload: dict[str, Any]) -> dict[str, list[dict[st
                     "turnovers": _stat_value(raw, index, "turnovers"),
                     "starter": bool(athlete.get("starter")),
                     "active": bool(athlete.get("active")) and minutes > 0,
+                    "did_not_play": bool(athlete.get("didNotPlay")),
+                    "dnp_reason": athlete.get("reason"),
                 }
             )
         if rows:
@@ -115,6 +117,22 @@ def load_nba_player_boxscores(directory: str | Path) -> dict[str, dict[str, Any]
         if parsed:
             out[path.stem] = parsed
     return out
+
+
+def is_confirmed_unavailable(row: dict[str, Any]) -> bool:
+    """True when ESPN's own DNP reason is a real absence, not normal rotation rest.
+
+    ESPN tags every did-not-play row with a ``reason``; roughly 82% of all
+    historical DNPs are ``"COACH'S DECISION"`` -- ordinary bench rotation,
+    rest, or garbage-time management, not a real absence. The remainder
+    carry a specific injury/illness/suspension/personal reason. Treating
+    the "COACH'S DECISION" bucket as available is what distinguishes a real
+    historical injury signal from rotation noise.
+    """
+    if not row.get("did_not_play"):
+        return False
+    reason = (row.get("dnp_reason") or "").strip().upper()
+    return reason not in ("", "COACH'S DECISION")
 
 
 def box_plus_minus_proxy(row: dict[str, Any]) -> float:
