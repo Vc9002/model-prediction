@@ -39,6 +39,18 @@ class TeamTrend:
 
     team: str
     games_played: int
+    # Games played since the most recent offseason gap (same gap used by
+    # ewm_level's dates/offseason_gap_days discounting). Equal to games_played
+    # when no offseason_gap_days is configured for this engine. games_played
+    # itself is lifetime/cumulative across season boundaries and must never be
+    # used as a "has this team played enough real games this season" gate --
+    # a team can clear games_played>=10 in its first week of a new season
+    # purely from last season's carried-over row count, while its hl3 EWM
+    # level is already almost entirely driven by 1-2 new-season games. That
+    # mismatch is what let early-season defensive_trend_gap blow out to +-8-9
+    # (vs a normal in-season range of about +-1) and swing nba-moneyline-v7's
+    # logistic output by over 35 points on two Nov 2026 games.
+    current_season_games_played: int
     # Offense/defense levels per half-life key ("hl3", "hl10", "hl25"),
     # opponent-adjusted and shrunk toward the league baseline.
     offense: dict[str, float]
@@ -294,9 +306,18 @@ class TrendEngine:
                 )
                 hot_cold = (raw_recent - season_mean) / season_sd
         wins_recent = [row["won"] for row in rows[-10:]]
+        current_season_games = len(rows)
+        if self.offseason_gap_days is not None and dates_seq is not None and len(dates_seq) > 1:
+            current_season_games = 1
+            for index in range(len(dates_seq) - 2, -1, -1):
+                gap_days = (dates_seq[index + 1] - dates_seq[index]).total_seconds() / 86400.0
+                if gap_days > self.offseason_gap_days:
+                    break
+                current_season_games += 1
         return TeamTrend(
             team=team,
             games_played=len(rows),
+            current_season_games_played=current_season_games,
             offense=offense,
             defense=defense,
             offensive_momentum=round(offense[short_key] - offense[long_key], 6),
