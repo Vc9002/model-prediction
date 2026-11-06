@@ -126,6 +126,14 @@ def test_cfb_slate_spread_total_interaction(tmp_path):
                         "overUnder": 52.5,
                         "homeTeamOdds": {"pointSpread": {"american": "-28.5"}},
                         "awayTeamOdds": {"pointSpread": {"american": "+28.5"}},
+                        "total": {
+                            "over": {"close": {"line": "52.5", "odds": "-110"}},
+                            "under": {"close": {"line": "52.5", "odds": "-110"}},
+                        },
+                        "pointSpread": {
+                            "home": {"close": {"line": "-28.5", "odds": "-110"}},
+                            "away": {"close": {"line": "28.5", "odds": "-110"}},
+                        },
                     }
                 ],
             }
