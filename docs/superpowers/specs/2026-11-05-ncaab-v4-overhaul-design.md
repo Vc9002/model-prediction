@@ -124,6 +124,29 @@ Report real numbers, not just "it correlates." `config/model.yaml`'s
 exists; `active_production_version` stays `ncaab-tempo-v3` until a
 separate, explicit promotion decision reviews this evidence.
 
+### 2026-11-05 — walk-forward comparison result (`scripts/ncaab_v4_walkforward.py`)
+
+Day-by-day walk-forward over the full `data/historical/ncaab_games_all.jsonl`
+history (6,538 completed games), grading every game on or after
+`GRADE_FROM = 2026-09-01` with the TrendEngine rebuilt from all strictly-prior
+history at each day. Printed output, verbatim:
+
+```
+total completed games: 6538
+
+graded games: 238
+v3: total MAE=14.42  moneyline Brier=0.1358
+v4: total MAE=14.58  moneyline Brier=0.1233
+```
+
+v4 (`NCAABSpreadModelV4` + `NCAABTotalModelV4`) shows a small moneyline Brier
+improvement over incumbent v3 (0.1233 vs 0.1358) but a slightly worse total
+MAE (14.58 vs 14.42) on this 238-game graded sample. This is the raw
+v3-vs-v4 comparison only, not the full 60/20/20 chronological-split /
+locked-holdout gate described above — that remains a separate, more
+rigorous validation step before any promotion decision. No config changes
+were made as part of recording this result.
+
 ## Testing
 
 - Unit tests mirroring `test_nba_v6_walkforward.py`'s structure:
