@@ -21,7 +21,7 @@ def test_cfb_structural_v4_model_instantiation():
     model = CFBStructuralV4Model()
     assert model.version == CFB_V4_MODEL_VERSION
     assert model.home_advantage_points == 2.5
-    assert model.margin_sd == 16.2
+    assert model.margin_sd == 14.5
     assert model.total_sd == 16.0
     assert cfb_structural_v4_model.version == CFB_V4_MODEL_VERSION
 
@@ -30,10 +30,10 @@ def test_cfb_structural_v4_blowout_margin_expansion():
     model = CFBStructuralV4Model()
     normal_sd = model.compute_effective_margin_sd(spread_home_line=-7.5, uncertainty=0.04)
     blowout_sd = model.compute_effective_margin_sd(spread_home_line=-31.5, uncertainty=0.04)
-    assert normal_sd == 16.2
+    assert normal_sd == 14.5
     assert blowout_sd > normal_sd
     # Excess spread is 31.5 - 21.5 = 10.0 pts -> 1.0 + 0.025 * 10 = 1.25x
-    assert round(blowout_sd, 1) == round(16.2 * (1.0 + 0.025 * (31.5 - CFB_BLOWOUT_SPREAD_THRESHOLD)), 1)
+    assert round(blowout_sd, 1) == round(14.5 * (1.0 + 0.025 * (31.5 - CFB_BLOWOUT_SPREAD_THRESHOLD)), 1)
 
 
 def test_cfb_structural_v4_forecast_coherence():
@@ -81,7 +81,7 @@ def test_cfb_structural_v4_artifact_and_registry_wiring():
     assert artifact_path.exists()
     artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
     assert artifact["model_version"] == CFB_V4_MODEL_VERSION
-    assert artifact["margin_sd"] == 16.2
+    assert artifact["margin_sd"] == 14.5
     assert artifact["total_sd"] == 16.0
 
     prod_cfg = yaml.safe_load((PROJECT_ROOT / "config/production.yaml").read_text(encoding="utf-8"))

@@ -7,7 +7,7 @@
   "positive_class": "home_win",
   "distribution": "negative_binomial",
   "home_advantage_points": 2.5,
-  "margin_sd": 16.2,
+  "margin_sd": 14.5,
   "total_sd": 16.0,
   "features": [
     "elo_away",
@@ -52,5 +52,5 @@
     "locked_holdout": true,
     "framework": "cfb_structural_v4_bivariate_engine"
   },
-  "artifact_hash": "21a9390c663a5131d0708670b4bb96587cfa8b71816f1cf9c4845f7c1341389e"
+  "artifact_hash": "5d1c1b3bf32a679d45304463e26d4f534fe797f9c7fb6d6d52e850bb9ef00835"
 }

@@ -38,7 +38,14 @@ from .cfb_distribution import (
 
 CFB_V4_MODEL_VERSION = "cfb-structural-v4"
 CFB_V4_DEFAULT_HOME_ADVANTAGE = 2.5
-CFB_V4_BASELINE_MARGIN_SD = 16.2
+# Walk-forward grid search on data/historical/ncaaf_games_all.jsonl (7,896 games,
+# train 2016-2021 / val 2022 / holdout 2023-2024 -- see docs/handoffs/HANDOFF.md):
+# margin_sd=14.5 (selected on validation, moneyline Brier 0.19721 vs 0.19760 at the
+# prior 16.2) beat the prior value on the 2023-2024 holdout too (0.18779 vs 0.18848),
+# confirmed via date-clustered bootstrap (95% CI [0.00007, 0.00131] excludes zero,
+# P(improvement)=98.5%). Effect size is small; home_advantage_points showed no net
+# benefit once combined with this change and was left at 2.5.
+CFB_V4_BASELINE_MARGIN_SD = 14.5
 CFB_V4_BASELINE_TOTAL_SD = 16.0
 CFB_BLOWOUT_SPREAD_THRESHOLD = 21.5
 CFB_BLOWOUT_MARGIN_SCALE = 0.025
