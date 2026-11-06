@@ -171,7 +171,12 @@ class BasketballModel:
             home_win = elo.expected_home_win(game.home_team, game.away_team)
             away_trend = trend.team_trend(game.away_team)
             home_trend = trend.team_trend(game.home_team)
-            sample = min(away_trend.games_played, home_trend.games_played)
+            # current_season_games_played, not lifetime games_played -- a team's
+            # lifetime count stays large across a season boundary while its hl10
+            # level is already dominated by 1-2 new-season games (see TeamTrend's
+            # games_played docstring; this is the same bug class that swung
+            # nba-moneyline-v7's spread by 35 points in Nov 2026).
+            sample = min(away_trend.current_season_games_played, home_trend.current_season_games_played)
             # Expected points per team from opponent-adjusted hl10 levels.
             away_points = (away_trend.offense["hl10"] + home_trend.defense["hl10"]) / 2 or baseline
             home_points = (home_trend.offense["hl10"] + away_trend.defense["hl10"]) / 2 or baseline
