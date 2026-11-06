@@ -21,6 +21,20 @@ from .basketball import UpcomingGame
 NCAAB_TOTAL_V4_VERSION = "ncaab-total-v4"
 
 
+def _effective_current_season_games(team_trend, team_prev, game_start_dt, offseason_gap_days):
+    """A team's prior-season game count still shows up in
+    TeamTrend.current_season_games_played because that field only sees gaps
+    WITHIN the history list -- it can't see the gap between the team's last
+    historical game and the upcoming game being predicted now. A true season
+    opener (last game more than offseason_gap_days ago) must report 0, not
+    whatever stale lifetime count current_season_games_played returns."""
+    if game_start_dt is not None and team_prev:
+        last_gap_days = (game_start_dt - team_prev[-1].start).total_seconds() / 86400.0
+        if last_gap_days > offseason_gap_days:
+            return 0
+    return team_trend.current_season_games_played
+
+
 def _normal_cdf(x: float, mean: float, sd: float) -> float:
     if isnan(x) or isnan(mean) or isnan(sd):
         raise ValueError(f"NaN passed to _normal_cdf: x={x}, mean={mean}, sd={sd}")
@@ -101,16 +115,6 @@ class NCAABTotalModelV4:
         for game in upcoming:
             away_trend = trend.team_trend(game.away_team)
             home_trend = trend.team_trend(game.home_team)
-            # Fix: current-season sample, not lifetime (see ncaab_spread_v4.py).
-            sample = min(away_trend.current_season_games_played, home_trend.current_season_games_played)
-
-            away_off = away_trend.offense["hl10"] if away_trend.games_played > 0 else baseline
-            away_def = away_trend.defense["hl10"] if away_trend.games_played > 0 else baseline
-            home_off = home_trend.offense["hl10"] if home_trend.games_played > 0 else baseline
-            home_def = home_trend.defense["hl10"] if home_trend.games_played > 0 else baseline
-
-            away_points = (away_off + home_def) / 2.0
-            home_points = (home_off + away_def) / 2.0
 
             game_start_dt = None
             try:
@@ -125,6 +129,25 @@ class NCAABTotalModelV4:
                 away_prev = [g for g in away_prev if g.start < game_start_dt]
             home_prev.sort(key=lambda g: g.start)
             away_prev.sort(key=lambda g: g.start)
+
+            # Fix: current-season sample, not lifetime (see ncaab_spread_v4.py),
+            # including the true-season-opener override that
+            # current_season_games_played alone can't detect.
+            away_sample = _effective_current_season_games(
+                away_trend, away_prev, game_start_dt, self.offseason_gap_days
+            )
+            home_sample = _effective_current_season_games(
+                home_trend, home_prev, game_start_dt, self.offseason_gap_days
+            )
+            sample = min(away_sample, home_sample)
+
+            away_off = away_trend.offense["hl10"] if away_trend.games_played > 0 else baseline
+            away_def = away_trend.defense["hl10"] if away_trend.games_played > 0 else baseline
+            home_off = home_trend.offense["hl10"] if home_trend.games_played > 0 else baseline
+            home_def = home_trend.defense["hl10"] if home_trend.games_played > 0 else baseline
+
+            away_points = (away_off + home_def) / 2.0
+            home_points = (home_off + away_def) / 2.0
 
             home_short_rest = False
             away_short_rest = False

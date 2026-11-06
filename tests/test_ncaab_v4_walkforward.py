@@ -62,6 +62,49 @@ def test_ncaab_spread_v4_uses_current_season_sample_not_lifetime():
         "-- this means the model is reading lifetime games_played instead of "
         "current_season_games_played"
     )
+    # The widened uncertainty must actually reach the margin_sd feeding the
+    # CDF -- not just the reported metadata (the exact mechanism gap C1/the
+    # dynamic_volatility fix addresses).
+    assert spread_pred.inference_inputs["sd"] >= 15.0
+
+
+def test_ncaab_spread_v4_season_opener_gets_max_uncertainty():
+    """A true season opener (0 games played so far this season, prior
+    season's games all more than offseason_gap_days in the past) must get
+    uncertainty at/near the 0.20 maximum. TeamTrend.current_season_games_played
+    alone can't see this -- it only sees gaps WITHIN the history list, not the
+    gap between the last historical game and the game being predicted now."""
+    model = NCAABSpreadModelV4()
+
+    # 30 games last season, all ending more than 150 days (offseason_gap_days)
+    # before the predicted game -- a true opener, nothing in the new season.
+    history = []
+    for i in range(30):
+        history.append(
+            _game(
+                f"last_season_opener_{i}",
+                f"2026-01-{(i % 28) + 1:02d}T00:00:00Z",
+                "Team A",
+                "Team B",
+                65 + i % 5,
+                70 + i % 5,
+            )
+        )
+
+    upcoming = UpcomingGame(
+        event_id="test_opener_game",
+        event_start_utc="2026-11-05T00:00:00Z",
+        away_team="Team A",
+        home_team="Team B",
+        spread_away_line=5.5,
+    )
+    preds = model.predict_spreads(history, [upcoming])
+    spread_pred = next(p for p in preds if p.market_type == "spread")
+
+    assert spread_pred.feature_basis["current_season_sample"] == 0
+    assert spread_pred.uncertainty >= 0.19, (
+        f"expected max uncertainty for a true season opener, got {spread_pred.uncertainty}"
+    )
 
 
 def test_ncaab_spread_v4_standalone():
@@ -108,6 +151,44 @@ def test_ncaab_total_v4_uses_current_season_sample_not_lifetime():
     preds = model.predict_totals(history, [upcoming])
     total_pred = next(p for p in preds if p.market_type == "total")
     assert total_pred.uncertainty >= 0.15
+    # The widened uncertainty must actually reach the total_sd feeding the
+    # CDF -- not just the reported metadata.
+    assert total_pred.inference_inputs["sd"] >= 15.0
+
+
+def test_ncaab_total_v4_season_opener_gets_max_uncertainty():
+    """True season opener for the total model -- see
+    test_ncaab_spread_v4_season_opener_gets_max_uncertainty for why
+    current_season_games_played alone can't detect this case."""
+    model = NCAABTotalModelV4()
+
+    history = []
+    for i in range(30):
+        history.append(
+            _game(
+                f"last_season_total_opener_{i}",
+                f"2026-01-{(i % 28) + 1:02d}T00:00:00Z",
+                "Team C",
+                "Team D",
+                65 + i % 5,
+                70 + i % 5,
+            )
+        )
+
+    upcoming = UpcomingGame(
+        event_id="test_total_opener_game",
+        event_start_utc="2026-11-05T00:00:00Z",
+        away_team="Team C",
+        home_team="Team D",
+        total_line=145.5,
+    )
+    preds = model.predict_totals(history, [upcoming])
+    total_pred = next(p for p in preds if p.market_type == "total")
+
+    assert total_pred.feature_basis["current_season_sample"] == 0
+    assert total_pred.uncertainty >= 0.19, (
+        f"expected max uncertainty for a true season opener, got {total_pred.uncertainty}"
+    )
 
 
 def test_ncaab_total_v4_standalone():

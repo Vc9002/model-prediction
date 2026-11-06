@@ -26,6 +26,20 @@ from .basketball import UpcomingGame
 NCAAB_SPREAD_V4_VERSION = "ncaab-spread-v4"
 
 
+def _effective_current_season_games(team_trend, team_prev, game_start_dt, offseason_gap_days):
+    """A team's prior-season game count still shows up in
+    TeamTrend.current_season_games_played because that field only sees gaps
+    WITHIN the history list -- it can't see the gap between the team's last
+    historical game and the upcoming game being predicted now. A true season
+    opener (last game more than offseason_gap_days ago) must report 0, not
+    whatever stale lifetime count current_season_games_played returns."""
+    if game_start_dt is not None and team_prev:
+        last_gap_days = (game_start_dt - team_prev[-1].start).total_seconds() / 86400.0
+        if last_gap_days > offseason_gap_days:
+            return 0
+    return team_trend.current_season_games_played
+
+
 def _normal_cdf(x: float, mean: float, sd: float) -> float:
     if isnan(x) or isnan(mean) or isnan(sd):
         raise ValueError(f"NaN passed to _normal_cdf: x={x}, mean={mean}, sd={sd}")
@@ -123,17 +137,6 @@ class NCAABSpreadModelV4:
             home_win = elo.expected_home_win(game.home_team, game.away_team)
             away_trend = trend.team_trend(game.away_team)
             home_trend = trend.team_trend(game.home_team)
-            # Fix: current-season sample, not lifetime -- a team's lifetime
-            # count stays large across a season boundary while its hl10 level
-            # is already dominated by 1-2 new-season games.
-            sample = min(away_trend.current_season_games_played, home_trend.current_season_games_played)
-
-            away_points = (away_trend.offense["hl10"] + home_trend.defense["hl10"]) / 2 or baseline
-            home_points = (home_trend.offense["hl10"] + away_trend.defense["hl10"]) / 2 or baseline
-
-            r_home = elo.rating(game.home_team) + elo.home_advantage
-            r_away = elo.rating(game.away_team)
-            elo_margin = (r_home - r_away) / 28.0
 
             rest_diff = 0.0
             game_start_dt = None
@@ -149,6 +152,26 @@ class NCAABSpreadModelV4:
                 away_prev = [g for g in away_prev if g.start < game_start_dt]
             home_prev.sort(key=lambda g: g.start)
             away_prev.sort(key=lambda g: g.start)
+
+            # Fix: current-season sample, not lifetime -- a team's lifetime
+            # count stays large across a season boundary while its hl10 level
+            # is already dominated by 1-2 new-season games. Also override to 0
+            # for a true season opener, which current_season_games_played
+            # can't detect on its own (see _effective_current_season_games).
+            away_sample = _effective_current_season_games(
+                away_trend, away_prev, game_start_dt, self.offseason_gap_days
+            )
+            home_sample = _effective_current_season_games(
+                home_trend, home_prev, game_start_dt, self.offseason_gap_days
+            )
+            sample = min(away_sample, home_sample)
+
+            away_points = (away_trend.offense["hl10"] + home_trend.defense["hl10"]) / 2 or baseline
+            home_points = (home_trend.offense["hl10"] + away_trend.defense["hl10"]) / 2 or baseline
+
+            r_home = elo.rating(game.home_team) + elo.home_advantage
+            r_away = elo.rating(game.away_team)
+            elo_margin = (r_home - r_away) / 28.0
 
             home_short_rest = False
             away_short_rest = False
