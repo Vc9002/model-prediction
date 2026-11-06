@@ -182,6 +182,50 @@ confidence gate) on a season opener — see the new regression tests
 `test_ncaab_total_v4_season_opener_gets_max_uncertainty`) in
 `tests/test_ncaab_v4_walkforward.py`.
 
+### 2026-11-06 — full-season walk-forward (`scripts/ncaab_v4_full_season_walkforward.py`)
+
+The two runs above only graded 238 games (the early-November 2026-27
+season-start window) — not a statistically meaningful sample. Reran over
+every settled game in `data/historical/ncaab_games_all.jsonl`
+(2025-11-03 → 2026-11-05) with only a 14-day warmup, point-in-time
+correct (each game predicted from strictly-prior history, history
+extended after grading). Printed output, verbatim:
+
+```
+total completed games: 6538
+grading from 2025-11-17 onward (14-day warmup)
+
+graded games: 5712 (took 413s)
+v3: total MAE=14.55  moneyline Brier=0.1945
+v4: total MAE=14.11  moneyline Brier=0.1928
+
+By current-season sample bucket (total MAE only):
+  early_season (n=611): v3 MAE=14.44  v4 MAE=14.44
+  in_season (n=5101): v3 MAE=14.56  v4 MAE=14.07
+```
+
+v4 beats incumbent v3 on both total MAE (14.11 vs 14.55) and moneyline
+Brier (0.1928 vs 0.1945) across the full season — a much larger, more
+credible sample than the earlier 238-game window. The early-season bucket
+is identical between v3 and v4 (14.44 vs 14.44), exactly as expected: the
+calibration fix only widens `uncertainty`/`sd`, it never touches the point
+estimate (`expected_total`), so it cannot and does not move MAE in that
+bucket. The real gain is entirely in the in-season bucket (14.56 → 14.07,
+n=5101) — attributable to v4's other tuning (NCAAB-specific rest/schedule-
+density thresholds, logistic moneyline, `elo_home_advantage=55.0`), not the
+sample-size/calibration fix itself.
+
+This is still not the full 60/20/20 chronological-split + locked-holdout
+gate described above (no train/validation/holdout partitioning, no
+calibration-specific metric beyond MAE/Brier, spread market untested since
+the walk-forward script fixes `total_line=150.0` and never passes a
+spread line). It is, however, a real, large-sample, point-in-time-correct
+result in v4's favor on both markets measured — a meaningfully stronger
+signal than the earlier window. Promotion to `active_production_version`
+is still a separate, explicit decision this result alone does not make;
+the full gate (spread market, proper chronological split, calibration
+curves) remains the recommended next step before that decision.
+
 ## Testing
 
 - Unit tests mirroring `test_nba_v6_walkforward.py`'s structure:
