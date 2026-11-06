@@ -333,3 +333,53 @@ def test_dynamic_matchup_pace_adjusts_possessions():
 
     assert tot_dynamic.feature_basis["expected_total"] > tot_base.feature_basis["expected_total"]
     assert tot_dynamic.probability("over") > tot_base.probability("over")
+
+
+def test_ncaab_v3_model_configures_offseason_gap_fix():
+    """ncaab_v3_model must wire offseason_gap_days/offseason_retention through to
+    the underlying BasketballModel -- without this, current_season_games_played
+    silently falls back to lifetime games_played (the 2026-11-05 incident's
+    production-side bug: the live model never got the fix applied to
+    ncaab-spread-v4/ncaab-total-v4, because DedicatedBasketballLeagueModel never
+    passed these through at all)."""
+    from model_prediction.models.basketball_leagues import ncaab_v3_model
+
+    model = ncaab_v3_model()
+    assert model._underlying.offseason_gap_days == 150.0
+    assert model._underlying.offseason_retention == 0.25
+
+
+def test_ncaab_v3_model_season_opener_gets_wide_uncertainty():
+    """End-to-end: a team with a full prior season but zero current-season games
+    must get wide (low-confidence) uncertainty, not the near-max confidence the
+    live bug produced before offseason_gap_days was wired through."""
+    from model_prediction.models.basketball_leagues import ncaab_v3_model
+
+    model = ncaab_v3_model()
+    history = [
+        GameRecord(
+            event_id=f"last_season_{i}",
+            event_start_utc=f"2026-01-{(i % 28) + 1:02d}T00:00:00Z",
+            league="NCAAB",
+            away_team="Team A",
+            home_team="Team B",
+            away_score=65 + i % 5,
+            home_score=70 + i % 5,
+        )
+        for i in range(30)
+    ]
+    upcoming = [
+        UpcomingGame(
+            event_id="opener",
+            event_start_utc="2026-11-05T00:00:00Z",
+            away_team="Team A",
+            home_team="Team B",
+            total_line=150.0,
+        )
+    ]
+    preds = model.predict_games(history, upcoming)
+    total_pred = next(p for p in preds if p.market_type == "total")
+    assert total_pred.uncertainty >= 0.15, (
+        f"expected wide (opener) uncertainty, got {total_pred.uncertainty} -- "
+        "offseason_gap_days is not reaching current_season_games_played"
+    )

@@ -43,6 +43,13 @@ class BasketballLeagueConfig:
     elo_margin_scale: float = 28.0
     coherent_moneyline: bool = False
     elo_home_advantage: float | None = None
+    # None preserves the pre-existing (buggy) default of treating lifetime
+    # games_played as current-season sample -- only leagues that explicitly
+    # set these get the current_season_games_played fix. See ncaab-spread-v4
+    # for the incident this fixes (basketball.py's confidence-width `sample`
+    # read lifetime games_played, giving max confidence on season openers).
+    offseason_gap_days: float | None = None
+    offseason_retention: float = 0.50
 
 
 NBA_CONFIG = BasketballLeagueConfig(
@@ -121,6 +128,13 @@ NCAAB_V3_CONFIG = BasketballLeagueConfig(
     trend_weight=0.50,
     rest_weight=0.15,
     coherent_moneyline=True,
+    # Fixes the live-production version of the sample-size bug found
+    # 2026-11-05 (see ncaab_spread_v4.py): without this, current_season_games_played
+    # falls back to lifetime games_played, giving season openers near-max
+    # confidence instead of near-min. Matches ncaab-spread-v4/ncaab-total-v4's
+    # tuning for consistency.
+    offseason_gap_days=150.0,
+    offseason_retention=0.25,
 )
 
 WNCAAB_CONFIG = BasketballLeagueConfig(
@@ -290,6 +304,8 @@ class DedicatedBasketballLeagueModel:
             team_total_weight=config.team_total_weight,
             coherent_moneyline=config.coherent_moneyline,
             elo_home_advantage=config.elo_home_advantage,
+            offseason_gap_days=config.offseason_gap_days,
+            offseason_retention=config.offseason_retention,
         )
 
     def predict_games(

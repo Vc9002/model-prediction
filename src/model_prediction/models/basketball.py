@@ -171,12 +171,58 @@ class BasketballModel:
             home_win = elo.expected_home_win(game.home_team, game.away_team)
             away_trend = trend.team_trend(game.away_team)
             home_trend = trend.team_trend(game.home_team)
+
+            # Rest disparity & recent games. Computed before `sample` below --
+            # a team's prior games are needed to detect a true season opener
+            # (its last game further back than offseason_gap_days), which
+            # current_season_games_played alone cannot see (it only counts
+            # gaps already present *inside* history, never the gap to the
+            # game being predicted right now).
+            rest_diff = 0.0
+            game_start_dt = None
+            try:
+                game_start_dt = parse_utc(game.event_start_utc)
+            except (ValueError, TypeError):
+                pass
+
+            home_prev = [g for g in history if g.home_team == game.home_team or g.away_team == game.home_team]
+            away_prev = [g for g in history if g.home_team == game.away_team or g.away_team == game.away_team]
+            if game_start_dt is not None:
+                home_prev = [g for g in home_prev if g.start < game_start_dt]
+                away_prev = [g for g in away_prev if g.start < game_start_dt]
+            home_prev.sort(key=lambda g: g.start)
+            away_prev.sort(key=lambda g: g.start)
+
             # current_season_games_played, not lifetime games_played -- a team's
             # lifetime count stays large across a season boundary while its hl10
             # level is already dominated by 1-2 new-season games (see TeamTrend's
             # games_played docstring; this is the same bug class that swung
-            # nba-moneyline-v7's spread by 35 points in Nov 2026).
-            sample = min(away_trend.current_season_games_played, home_trend.current_season_games_played)
+            # nba-moneyline-v7's spread by 35 points in Nov 2026). On a true
+            # season opener (last game further back than offseason_gap_days),
+            # override to 0 -- current_season_games_played would otherwise
+            # wrongly report the full prior-season count, giving a season
+            # opener near-MAX confidence instead of near-MIN (the exact
+            # 2026-11-05 incident, found live in ncaab-spread-v4/-total-v4
+            # and ported back here since this shared class serves the live
+            # ncaab-tempo-v3 model).
+            gap_days = self.offseason_gap_days
+            away_sample = away_trend.current_season_games_played
+            if (
+                gap_days is not None
+                and game_start_dt is not None
+                and away_prev
+                and (game_start_dt - away_prev[-1].start).total_seconds() / 86400.0 > gap_days
+            ):
+                away_sample = 0
+            home_sample = home_trend.current_season_games_played
+            if (
+                gap_days is not None
+                and game_start_dt is not None
+                and home_prev
+                and (game_start_dt - home_prev[-1].start).total_seconds() / 86400.0 > gap_days
+            ):
+                home_sample = 0
+            sample = min(away_sample, home_sample)
             # Expected points per team from opponent-adjusted hl10 levels.
             away_points = (away_trend.offense["hl10"] + home_trend.defense["hl10"]) / 2 or baseline
             home_points = (home_trend.offense["hl10"] + away_trend.defense["hl10"]) / 2 or baseline
@@ -193,22 +239,6 @@ class BasketballModel:
             r_home = elo.rating(game.home_team) + elo.home_advantage
             r_away = elo.rating(game.away_team)
             elo_margin = (r_home - r_away) / 28.0
-
-            # Rest disparity & recent games
-            rest_diff = 0.0
-            game_start_dt = None
-            try:
-                game_start_dt = parse_utc(game.event_start_utc)
-            except (ValueError, TypeError):
-                pass
-
-            home_prev = [g for g in history if g.home_team == game.home_team or g.away_team == game.home_team]
-            away_prev = [g for g in history if g.home_team == game.away_team or g.away_team == game.away_team]
-            if game_start_dt is not None:
-                home_prev = [g for g in home_prev if g.start < game_start_dt]
-                away_prev = [g for g in away_prev if g.start < game_start_dt]
-            home_prev.sort(key=lambda g: g.start)
-            away_prev.sort(key=lambda g: g.start)
 
             home_b2b = False
             away_b2b = False
