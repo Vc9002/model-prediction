@@ -1,0 +1,25 @@
+{
+  "model_version": "ncaab-total-v5",
+  "sport": "NCAAB",
+  "schema_version": "basketball-total-v5",
+  "model_type": "pace_scaled_dynamic_total",
+  "status": "production",
+  "qualified_for_betting": true,
+  "confidence_threshold": 0.035,
+  "min_edge": 0.035,
+  "max_edge": 0.08,
+  "league_pace": 68.1,
+  "total_sd": 13.5,
+  "min_sample_games": 8,
+  "offseason_retention": 0.2,
+  "offseason_gap_days": 150,
+  "dynamic_sizing": {
+    "enabled": true,
+    "base_units": 1.0,
+    "max_units": 2.0,
+    "edge_slope": 16.67
+  },
+  "target": "NCAAB Men's College Basketball pace-scaled multiplicative scoring model",
+  "trained_through_date": "2026-11-07",
+  "artifact_hash": "8586182cf014dd60115a01a44fc714121323edc19d81a3d0d2ebf4920eaf23f2"
+}

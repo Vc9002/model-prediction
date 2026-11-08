@@ -86,7 +86,7 @@ def test_ncaab_records_real_model_output_and_rerun_deduplicates(tmp_path, monkey
     main_rows = main_ledger.rows()
     assert len(flat_rows) == len(main_rows) == 1
     assert flat_rows[0]["selection"] == main_rows[0]["selection"] == "home"
-    assert all(r["model_version"] == "ncaab-tempo-v3" for r in flat_rows + main_rows)
+    assert all(r["model_version"] == "ncaab-spread-v6" for r in flat_rows + main_rows)
     assert all(r["sportsbook"] == "model_opinion_indicative_market" for r in flat_rows + main_rows)
     for row in flat_rows + main_rows:
         snapshot = json.loads(row["model_input_snapshot_json"])
@@ -112,7 +112,7 @@ def test_no_games_does_not_construct_market_quotes(tmp_path, monkeypatch):
     assert report["logged"] == 0
 
 
-def test_ncaab_selects_best_market_edge_not_favorite(tmp_path, monkeypatch):
+def test_ncaab_picks_projected_winner_not_underdog_on_edge(tmp_path, monkeypatch):
     monkeypatch.setenv("MODEL_PREDICTION_LEDGER_MIRROR", "0")
     monkeypatch.setenv("MODEL_PREDICTION_LEDGER_AUTHORITY", "xlsx")
     now = datetime.now(UTC)
@@ -137,8 +137,18 @@ def test_ncaab_selects_best_market_edge_not_favorite(tmp_path, monkeypatch):
                     {
                         "market_type": "moneyline",
                         "sides": [
-                            {"selection": "away", "description": "Away", "price_probability": 0.20},
-                            {"selection": "home", "description": "Home", "price_probability": 0.80},
+                            {
+                                "selection": "away",
+                                "team": "Away",
+                                "description": "Away",
+                                "price_probability": 0.20,
+                            },
+                            {
+                                "selection": "home",
+                                "team": "Home",
+                                "description": "Home",
+                                "price_probability": 0.80,
+                            },
                         ],
                     }
                 ],
@@ -147,7 +157,7 @@ def test_ncaab_selects_best_market_edge_not_favorite(tmp_path, monkeypatch):
     )
 
     class Model:
-        version = "ncaab-tempo-v3"
+        version = "ncaab-spread-v6"
 
         def predict_games(self, history, upcoming):
             return [
@@ -167,6 +177,148 @@ def test_ncaab_selects_best_market_edge_not_favorite(tmp_path, monkeypatch):
         config={"models": {"NCAAB": {}}},
         flat_ledger=flat,
     )
-    assert report["flat_logged"] == 1
-    assert flat.rows()[0]["selection"] == "away"
-    assert int(float(flat.rows()[0]["american_odds"])) == 400
+    # Underdog (away, 40%) is NOT picked on moneyline even with positive edge
+    # Favorite (home, 60%) has negative edge (0.60 - 0.80), so no pick is logged
+    assert report["flat_logged"] == 0
+
+
+def test_ncaab_gates_non_d1_and_extreme_lines(tmp_path, monkeypatch):
+    monkeypatch.setenv("MODEL_PREDICTION_LEDGER_MIRROR", "0")
+    monkeypatch.setenv("MODEL_PREDICTION_LEDGER_AUTHORITY", "xlsx")
+    now = datetime.now(UTC)
+    start = (now + timedelta(days=1)).isoformat()
+    monkeypatch.setattr(
+        "model_prediction.college_basketball_forward.ESPNClient.scoreboard",
+        lambda *a: {"events": [{"id": "fixture_d1"}, {"id": "fixture_non_d1"}]},
+    )
+    # Only D1 team has 20 games; NonD1 has 2 games
+    games = [
+        GameRecord(
+            f"d1_{i}", (now - timedelta(days=i + 1)).isoformat(), "NCAAB", "MajorAway", "MajorHome", 70, 75
+        )
+        for i in range(20)
+    ] + [
+        GameRecord(
+            "n1", (now - timedelta(days=1)).isoformat(), "NCAAB", "SmallCollege", "MajorHome", 50, 100
+        ),
+        GameRecord("n2", (now - timedelta(days=2)).isoformat(), "NCAAB", "SmallCollege", "MajorAway", 55, 95),
+    ]
+    monkeypatch.setattr(
+        "model_prediction.college_basketball_forward.FeatureStore.games_before",
+        lambda *a: games,
+    )
+    monkeypatch.setattr(
+        "model_prediction.college_basketball_forward.PolymarketUSClient.slate",
+        lambda *a: [
+            # Non-D1 game (should be skipped)
+            {
+                "event_id": "fixture_non_d1",
+                "event_start_utc": start,
+                "markets": [
+                    {
+                        "market_type": "moneyline",
+                        "sides": [
+                            {
+                                "selection": "away",
+                                "team": "SmallCollege",
+                                "description": "SmallCollege",
+                                "price_probability": 0.05,
+                            },
+                            {
+                                "selection": "home",
+                                "team": "MajorHome",
+                                "description": "MajorHome",
+                                "price_probability": 0.95,
+                            },
+                        ],
+                    }
+                ],
+            },
+            # D1 game with extreme longshot ML and blowout spread (both should be filtered)
+            {
+                "event_id": "fixture_d1",
+                "event_start_utc": start,
+                "markets": [
+                    {
+                        "market_type": "moneyline",
+                        "sides": [
+                            {
+                                "selection": "away",
+                                "team": "MajorAway",
+                                "description": "MajorAway",
+                                "price_probability": 0.05,
+                            },
+                            {
+                                "selection": "home",
+                                "team": "MajorHome",
+                                "description": "MajorHome",
+                                "price_probability": 0.95,
+                            },
+                        ],
+                    },
+                    {
+                        "market_type": "spread",
+                        "line": 28.5,
+                        "sides": [
+                            {
+                                "selection": "away",
+                                "team": "MajorAway",
+                                "description": "MajorAway",
+                                "price_probability": 0.50,
+                                "line": 28.5,
+                            },
+                            {
+                                "selection": "home",
+                                "team": "MajorHome",
+                                "description": "MajorHome",
+                                "price_probability": 0.50,
+                                "line": -28.5,
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+    )
+
+    class Model:
+        version = "ncaab-spread-v6"
+
+        def predict_games(self, history, upcoming):
+            return [
+                SimpleNamespace(
+                    market_type="moneyline",
+                    probabilities={"home": 0.70, "away": 0.30},
+                    uncertainty=0.1,
+                    rationale="fixture",
+                ),
+                SimpleNamespace(
+                    market_type="spread",
+                    probabilities={"home": 0.10, "away": 0.90},
+                    uncertainty=0.1,
+                    rationale="fixture",
+                    inference_inputs={"mean": 8.0, "sd": 10.5, "line": 28.5},
+                ),
+            ]
+
+    monkeypatch.setattr("model_prediction.college_basketball_forward.ncaab_model", Model)
+    flat = MultiSportPickLedger(tmp_path, flat=True)
+    report = forecast_ncaab_sport(
+        data_root=tmp_path,
+        args_date=now.date().isoformat(),
+        config={
+            "models": {
+                "NCAAB": {
+                    "min_team_games": 15,
+                    "min_moneyline_ask": 0.20,
+                    "max_spread_line": 16.0,
+                    "max_margin_divergence": 12.0,
+                    "min_edge": 0.035,
+                }
+            }
+        },
+        flat_ledger=flat,
+    )
+    # Non-D1 game skipped; D1 extreme ML and blowout spread filtered out
+    assert report["flat_logged"] == 0
+    assert any(s["reason"] == "insufficient_history_non_d1" for s in report["skipped"])

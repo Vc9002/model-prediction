@@ -21,10 +21,14 @@ from .feature_capture import contract_snapshot_json
 from .features.base import FeatureStore
 from .ledger import DuplicatePickError, defer_sqlite_xlsx_exports
 from .models.basketball import UpcomingGame
-from .models.basketball_leagues import ncaab_v3_model
+from .models.ncaab_spread_v5 import ncaab_spread_v5_model
+from .models.ncaab_spread_v6 import ncaab_spread_v6_model
+from .models.ncaab_total_v6 import ncaab_total_v6_model
 from .production_registry import ProductionModelRegistry
 
-ncaab_model = ncaab_v3_model
+ncaab_spread_model = ncaab_spread_v6_model
+ncaab_total_model = ncaab_total_v6_model
+ncaab_model = ncaab_spread_v6_model
 
 
 def _normalize_name(s: str) -> str:
@@ -179,9 +183,15 @@ def forecast_ncaab_sport(
     main_ledger=None,
 ):
     board = ESPNClient().scoreboard("NCAAB", args_date)
+    spread_model = (
+        ncaab_spread_model()
+        if ncaab_model in (ncaab_spread_v5_model, ncaab_spread_v6_model)
+        else ncaab_model()
+    )
+    total_model = ncaab_total_model()
     result: dict[str, Any] = {
         "sport": "ncaab",
-        "model_version": "ncaab-tempo-v3",
+        "model_version": f"{spread_model.version}+{total_model.version}",
         "scheduled_games": len(board.get("events", [])),
         "logged": 0,
         "flat_logged": 0,
@@ -207,15 +217,48 @@ def forecast_ncaab_sport(
         ).encode()
     ).hexdigest()
     events = PolymarketUSClient().slate("NCAAB", date.fromisoformat(args_date))
-    model, observed = ncaab_model(), utc_now()
+    observed = utc_now()
     registry = ProductionModelRegistry.load(PROJECT_ROOT)
-    for market in ("moneyline", "spread", "total"):
+    for market, expected_model in (
+        ("moneyline", spread_model),
+        ("spread", spread_model),
+        ("total", total_model),
+    ):
         champion = registry.champion("NCAAB", market)
-        if champion is None or not champion.available or champion.model_id != model.version:
-            raise ValueError(f"NCAAB {market} champion does not match executable model {model.version}")
+        if champion is None or not champion.available or champion.model_id != expected_model.version:
+            raise ValueError(
+                f"NCAAB {market} champion {champion.model_id if champion else None} does not match executable model {expected_model.version}"
+            )
     policy = config.get("models", {}).get("NCAAB", {})
+    min_edge = float(policy.get("min_edge", 0.035))
+    min_team_games = int(policy.get("min_team_games", 0))
+    min_moneyline_ask = float(policy.get("min_moneyline_ask", 0.20))
+    max_spread_line = float(policy.get("max_spread_line", 16.0))
+    max_margin_divergence = float(policy.get("max_margin_divergence", 12.0))
+    games_by_team: dict[str, int] = {}
+    for game in history:
+        for name in (game.home_team, game.away_team):
+            games_by_team[name] = games_by_team.get(name, 0) + 1
     names = {name for game in history for name in (game.home_team, game.away_team)}
     normalized_names = {_normalize_name(name): name for name in names}
+
+    espn_neutral_pairs: set[frozenset[str]] = set()
+    for espn_ev in board.get("events", []):
+        comps = espn_ev.get("competitions", [])
+        if comps and comps[0].get("neutralSite", False):
+            competitors = comps[0].get("competitors", [])
+            pair = frozenset(
+                _resolve_ncaab_team(
+                    c.get("team", {}).get("location") or c.get("team", {}).get("displayName", ""),
+                    c.get("team", {}).get("name", ""),
+                    names,
+                    normalized_names,
+                )
+                for c in competitors
+                if c.get("team")
+            )
+            if len(pair) == 2:
+                espn_neutral_pairs.add(pair)
 
     planned: list[
         tuple[
@@ -288,6 +331,18 @@ def forecast_ncaab_sport(
         away = _resolve_ncaab_team(away_school, away_mascot, names, normalized_names)
         home = _resolve_ncaab_team(home_school, home_mascot, names, normalized_names)
 
+        is_neutral = (
+            bool(event.get("neutral_site", False))
+            or bool(event.get("is_neutral", False))
+            or frozenset({away, home}) in espn_neutral_pairs
+        )
+
+        if min_team_games > 0 and (
+            games_by_team.get(away, 0) < min_team_games or games_by_team.get(home, 0) < min_team_games
+        ):
+            result["skipped"].append({"event_id": identity, "reason": "insufficient_history_non_d1"})
+            continue
+
         main_market_ids = {id(m) for m in _main_line_markets(event.get("markets", []))}
         for market_def in event.get("markets", []):
             kind = market_def.get("market_type")
@@ -310,6 +365,7 @@ def forecast_ncaab_sport(
                 home,
                 spread_away_line=away_side.get("line") if kind == "spread" else None,
                 total_line=line if kind == "total" else None,
+                neutral_site=is_neutral,
             )
             upcoming_batch.append(upcoming)
             if slug:
@@ -335,7 +391,9 @@ def forecast_ncaab_sport(
         result["status"] = "ok"
         return result
 
-    predictions = model.predict_games(history, upcoming_batch)
+    predictions = spread_model.predict_games(history, upcoming_batch) + total_model.predict_games(
+        history, upcoming_batch
+    )
     if predictions and all(hasattr(p, "event_id") for p in predictions):
         pred_lookup = {(p.event_id, p.market_type): p for p in predictions}
     else:
@@ -350,9 +408,10 @@ def forecast_ncaab_sport(
         prediction = pred_lookup.get((game_key, kind))
         if prediction is None:
             continue
+        model_version = total_model.version if kind == "total" else spread_model.version
         basis = getattr(prediction, "feature_basis", None) or {}
         candidate_probabilities[slug] = {
-            "model_version": model.version,
+            "model_version": model_version,
             "model_event_id": game_key,
             "feature_packet_hash": hashlib.sha256(
                 json.dumps(
@@ -395,12 +454,28 @@ def forecast_ncaab_sport(
             ]
             if not valid_sides:
                 continue
-            best_side = max(
-                valid_sides,
-                key=lambda side: (
-                    prediction.probabilities[side["selection"]] - float(side["price_probability"])
-                ),
-            )
+            if kind == "moneyline":
+                # Pure Probability Winner Selection: pick the projected winner (model_prob >= 0.50).
+                # Do NOT pick underdogs to win straight-up when the model projects them to lose.
+                winner_side = max(
+                    valid_sides, key=lambda s: prediction.probabilities.get(s["selection"], 0.0)
+                )
+                if prediction.probabilities.get(winner_side["selection"], 0.0) < 0.50:
+                    continue
+                best_side = winner_side
+            else:
+                # Spread / total: only consider sides the model projects to cover/hit (prob >= 0.50)
+                cover_sides = [
+                    s for s in valid_sides if prediction.probabilities.get(s["selection"], 0.0) >= 0.50
+                ]
+                if not cover_sides:
+                    continue
+                best_side = max(
+                    cover_sides,
+                    key=lambda side: (
+                        prediction.probabilities[side["selection"]] - float(side["price_probability"])
+                    ),
+                )
             for side in (best_side,):
                 selection, ask = side["selection"], side["price_probability"]
                 probability = prediction.probabilities[selection]
@@ -427,10 +502,34 @@ def forecast_ncaab_sport(
                     if kind != "moneyline"
                     else None
                 )
+
+                model_inst = total_model if kind == "total" else spread_model
+                model_version = model_inst.version
+
+                # Gating for moneyline: do not bet extreme longshots where model lacks predictive resolution
+                if kind == "moneyline" and float(ask) < min_moneyline_ask:
+                    continue
+
+                # Gating for spread: do not bet blowout spreads or severe model divergence
+                if kind == "spread":
+                    if decision_line is not None and abs(float(decision_line)) > max_spread_line:
+                        continue
+                    exp_margin = (getattr(prediction, "inference_inputs", {}) or {}).get("mean")
+                    if (
+                        exp_margin is not None
+                        and decision_line is not None
+                        and abs(float(exp_margin) - float(decision_line)) > max_margin_divergence
+                    ):
+                        continue
+
+                # Minimum edge check
+                if edge < min_edge:
+                    continue
+
                 snapshot = contract_snapshot_json(
                     {
                         "market_type": kind,
-                        "model_version": model.version,
+                        "model_version": model_version,
                         "event_id": str(identity),
                         "event_start_utc": str(start),
                         "home_team": home,
@@ -478,7 +577,7 @@ def forecast_ncaab_sport(
                     american_odds=probability_to_american(float(ask)),
                     model_probability=probability,
                     model_uncertainty=prediction.uncertainty,
-                    model_version=model.version,
+                    model_version=model_version,
                     rationale=prediction.rationale,
                     risks="Paper tempo model; live market quote is an indicative reference, not verified executable BBO.",
                     model_origin=ModelOrigin.STATISTICAL_MODEL,
@@ -491,10 +590,8 @@ def forecast_ncaab_sport(
                     for name in (away, home)
                 ]
                 dynamic_units = (
-                    getattr(model, "compute_dynamic_units", None)
-                    and model.compute_dynamic_units(
-                        edge, min_edge=policy.get("min_edge", 0.02), max_edge=0.08
-                    )
+                    getattr(model_inst, "compute_dynamic_units", None)
+                    and model_inst.compute_dynamic_units(edge, min_edge=min_edge, max_edge=0.08)
                 ) or 1.00
                 eligibility = EligibilityResult(
                     RecordType.RESEARCH_OBSERVATION,
@@ -508,9 +605,9 @@ def forecast_ncaab_sport(
                 )
                 destinations = (
                     ("flat_logged", flat_ledger, True),
-                    ("research_ledger_logged", research_ledger, edge >= policy.get("min_edge", 0.02)),
-                    ("gated_ledger_logged", gated_ledger, edge >= policy.get("min_edge", 0.02)),
-                    ("main_logged", main_ledger, edge >= policy.get("min_edge", 0.02)),
+                    ("research_ledger_logged", research_ledger, edge >= min_edge),
+                    ("gated_ledger_logged", gated_ledger, edge >= min_edge),
+                    ("main_logged", main_ledger, edge >= min_edge),
                 )
                 for counter, destination, eligible in destinations:
                     if destination is None or not eligible:

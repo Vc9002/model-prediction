@@ -1,0 +1,15 @@
+{
+  "baseline_brier": 0.11238423287265913,
+  "calibrated_at_utc": "2026-11-08T06:31:18.924697+00:00",
+  "calibrated_oof_brier": 0.10672780774234261,
+  "champion_method": "beta",
+  "market": "moneyline",
+  "model_version": "ncaab-spread-v6",
+  "parameters": {
+    "a": 1.9207040988658683,
+    "b": 0.0001,
+    "c": 0.9818006271370318
+  },
+  "sample_size": 487,
+  "sport": "ncaab"
+}

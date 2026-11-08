@@ -1,0 +1,15 @@
+{
+  "baseline_brier": 0.206968,
+  "calibrated_at_utc": "2026-11-08T05:34:00.251402+00:00",
+  "calibrated_oof_brier": 0.2029795699181514,
+  "champion_method": "beta",
+  "market": "total",
+  "model_version": "ncaab-tempo-v2",
+  "parameters": {
+    "a": 2.3264,
+    "b": 0.4718,
+    "c": 0.8125
+  },
+  "sample_size": 155,
+  "sport": "ncaab"
+}

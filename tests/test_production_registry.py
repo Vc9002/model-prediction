@@ -99,12 +99,12 @@ def test_real_production_yaml_resolves_every_model() -> None:
     registry = ProductionModelRegistry.load(REPO)
 
     assert registry.schema_version == "3"
-    assert len(registry.entries) == 78
+    assert len(registry.entries) == 84
     # Under the permanent champion-challenger framework, all models
     # across supported markets are available contracts (champions + rollbacks).
     # Weak evidence models have evidence_status=degraded and
     # replacement_priority=critical rather than being disabled.
-    assert len(registry.available_entries()) == 78
+    assert len(registry.available_entries()) == 84
     assert len(registry.problem_entries()) == 0
     assert registry.primary.model_id == "wnba-elo-trend-lr-v4"
     assert registry.primary.artifact_hash
@@ -192,8 +192,9 @@ def test_real_production_yaml_resolves_every_model() -> None:
     ncaab = registry.entries["ncaab-tempo-v1"]
     assert ncaab.implementation == IMPLEMENTATION_CODE_BACKED
     assert ncaab.entry == "model_prediction.models.basketball_leagues:ncaab_model"
-    for market in ("moneyline", "spread", "total"):
-        assert registry.champion("NCAAB", market).model_id == "ncaab-tempo-v2"
+    assert registry.champion("NCAAB", "moneyline").model_id == "ncaab-spread-v6"
+    assert registry.champion("NCAAB", "spread").model_id == "ncaab-spread-v6"
+    assert registry.champion("NCAAB", "total").model_id == "ncaab-total-v6"
 
     config = yaml.safe_load((REPO / "config/production.yaml").read_text(encoding="utf-8"))
     service = config["prediction_service"]

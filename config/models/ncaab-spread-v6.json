@@ -1,0 +1,19 @@
+{
+  "artifact_hash": "a8d3b8d54d2132cf42ced1fd4e3fc5350e642168308cf742eef6d94367ccdc5f",
+  "elo_weight": 0.5,
+  "home_court_points": 7.2,
+  "implementation_type": "code_backed_model",
+  "logistic_scale": 9.5,
+  "margin_sd": 10.5,
+  "markets": [
+    "spread",
+    "moneyline"
+  ],
+  "model_id": "ncaab-spread-v6",
+  "model_version": "ncaab-spread-v6",
+  "sport": "ncaab",
+  "status": "candidate",
+  "student_t_df": 8.0,
+  "trend_weight": 0.5,
+  "use_student_t_spreads": true
+}

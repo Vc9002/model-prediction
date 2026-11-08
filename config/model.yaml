@@ -674,15 +674,22 @@ models:
     - DARTS_PDC
     - DARTS_MODUS
   NCAAB:
-    family: elo_trend_normal_approximation
+    family: tiered_elo_heavy_tail_distribution
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: ncaab-tempo-v3
-    active_research_version: ncaab-tempo-v4
+    active_production_version: ncaab-spread-v6
+    active_total_production_version: ncaab-total-v6
+    rollback_production_version: ncaab-spread-v5
     min_edge: 0.035
     spread_sd: 10.5
-    total_sd: 14.0
-    home_court_points: 3.6
+    total_sd: 13.5
+    home_court_points: 7.2
+    logistic_scale: 9.5
+    min_team_games: 8
+    min_moneyline_ask: 0.20
+    max_spread_line: 16.0
+    max_margin_divergence: 12.0
+    max_moneyline_margin: 10.0
     markets:
     - moneyline
     - spread

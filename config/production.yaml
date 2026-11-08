@@ -689,10 +689,50 @@ prediction_service:
     implementation: code_backed_model
     entry: model_prediction.models.basketball_leagues:ncaab_v3_model
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: ncaab-tempo-v2
+  - model_id: ncaab-spread-v6
+    sport: NCAAB
+    market: multi
+    implementation: code_backed_model
+    entry: model_prediction.models.ncaab_spread_v6:ncaab_spread_v6_model
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: ncaab-spread-v5
+  - model_id: ncaab-total-v6
+    sport: NCAAB
+    market: total
+    implementation: code_backed_model
+    entry: model_prediction.models.ncaab_total_v6:ncaab_total_v6_model
+    enabled: true
+    serving_status: production
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: ncaab-total-v5
+  - model_id: ncaab-spread-v5
+    sport: NCAAB
+    market: multi
+    implementation: code_backed_model
+    entry: model_prediction.models.ncaab_spread_v5:ncaab_spread_v5_model
+    enabled: true
+    serving_status: rollback
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: ncaab-tempo-v3
+  - model_id: ncaab-total-v5
+    sport: NCAAB
+    market: total
+    implementation: code_backed_model
+    entry: model_prediction.models.ncaab_total_v5:ncaab_total_v5_model
+    enabled: true
+    serving_status: rollback
+    evidence_status: predictively_qualified
+    replacement_priority: low
+    rollback_model: ncaab-tempo-v3
   - model_id: ncaab-tempo-v1
     sport: NCAAB
     market: multi
@@ -845,9 +885,9 @@ prediction_service:
     rollback_model: null
   champions:
     NCAAB:
-      moneyline: ncaab-tempo-v3
-      spread: ncaab-tempo-v3
-      total: ncaab-tempo-v3
+      moneyline: ncaab-spread-v6
+      spread: ncaab-spread-v6
+      total: ncaab-total-v6
     EUROLEAGUE:
       moneyline: eurolg-tempo-v2
       spread: eurolg-tempo-v2
@@ -1139,6 +1179,10 @@ prediction_service:
   - darts-markov-v1
   - ncaab-tempo-v2
   - ncaab-tempo-v3
+  - ncaab-spread-v6
+  - ncaab-total-v6
+  - ncaab-spread-v5
+  - ncaab-total-v5
   - ncaab-tempo-v1
   - eurolg-tempo-v2
   - eurolg-tempo-v1

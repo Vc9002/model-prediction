@@ -1,0 +1,13 @@
+{
+  "baseline_brier": 0.2130719485642789,
+  "calibrated_at_utc": "2026-11-08T00:15:47.194896+00:00",
+  "calibrated_oof_brier": 0.21425318858572923,
+  "champion_method": "temperature",
+  "market": "total",
+  "model_version": "ncaab-total-v5",
+  "parameters": {
+    "temperature": 0.8
+  },
+  "sample_size": 604,
+  "sport": "ncaab"
+}

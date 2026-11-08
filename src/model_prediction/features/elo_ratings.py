@@ -70,9 +70,13 @@ class EloBook:
     home_advantage: float
     qb_ratings: dict[str, float] = field(default_factory=dict)
     qb_starts: dict[str, int] = field(default_factory=dict)
+    team_priors: dict[str, float] = field(default_factory=dict)
+    default_prior: float = DEFAULT_ELO
 
     def rating(self, team: str) -> float:
-        return self.ratings.get(team, DEFAULT_ELO)
+        if team in self.ratings:
+            return self.ratings[team]
+        return self.team_priors.get(team, self.default_prior)
 
     def expected_home_win(self, home: str, away: str) -> float:
         return expected_win_probability(self.rating(home), self.rating(away), self.home_advantage)
@@ -147,26 +151,36 @@ def build_elo(
     offseason_regression: float | None = None,
     offseason_gap_days: int = 90,
     home_advantage: float | None = None,
+    team_priors: dict[str, float] | None = None,
+    default_prior: float = DEFAULT_ELO,
 ) -> EloBook:
     """Build chronological Elo ratings with offseason regression.
 
     When more than ``offseason_gap_days`` pass between consecutive games for
     the same sport (or when a new season is detected), all team ratings are
-    regressed ``offseason_regression`` fraction toward DEFAULT_ELO before the
+    regressed ``offseason_regression`` fraction toward their baseline prior before the
     next game is processed.
 
     Args:
         games: game records sorted chronologically by start time
         sport: sport key for config lookup
-        offseason_regression: fraction to pull toward DEFAULT_ELO (0.0=none, 1.0=full reset)
+        offseason_regression: fraction to pull toward baseline prior (0.0=none, 1.0=full reset)
         offseason_gap_days: consecutive-day gap that triggers regression
         home_advantage: optional explicit home advantage (overriding sport config default)
+        team_priors: optional mapping from team names to their baseline initial Elo rating
+        default_prior: fallback baseline rating for teams not in team_priors
     """
     config = ELO_CONFIG.get(sport.lower(), ELO_CONFIG["generic"])
     if offseason_regression is None:
         offseason_regression = float(config.get("offseason_regression", 0.5))
     adv = float(config["home_advantage"]) if home_advantage is None else float(home_advantage)
-    book = EloBook(ratings={}, k=config["k"], home_advantage=adv)
+    book = EloBook(
+        ratings={},
+        k=config["k"],
+        home_advantage=adv,
+        team_priors=team_priors or {},
+        default_prior=default_prior,
+    )
     sorted_games = sorted(games, key=lambda item: item.start)
     if not sorted_games:
         return book
@@ -197,15 +211,15 @@ def _parse_game_date(game: GameRecord) -> datetime | None:
 
 
 def _apply_offseason_regression(book: EloBook, regression: float) -> None:
-    """Regress all team and QB ratings toward DEFAULT_ELO by the given fraction."""
+    """Regress all team and QB ratings toward their prior baseline by the given fraction."""
     if regression <= 0 or not book.ratings:
         return
-    target = DEFAULT_ELO
     factor = 1.0 - regression
     for team in list(book.ratings.keys()):
+        target = book.team_priors.get(team, book.default_prior)
         book.ratings[team] = target * regression + book.ratings[team] * factor
     for qb in list(book.qb_ratings.keys()):
-        book.qb_ratings[qb] = target * regression + book.qb_ratings[qb] * factor
+        book.qb_ratings[qb] = DEFAULT_ELO * regression + book.qb_ratings[qb] * factor
 
 
 @register_feature("ratings")

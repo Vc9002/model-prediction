@@ -1,0 +1,15 @@
+{
+  "artifact_hash": "3cc38129194e95765cbc868276618e457305534e6f83b7a2bc5591a0162e34e4",
+  "home_tempo_control": 0.6,
+  "implementation_type": "code_backed_model",
+  "league_pace": 68.1,
+  "markets": [
+    "total"
+  ],
+  "model_id": "ncaab-total-v6",
+  "model_version": "ncaab-total-v6",
+  "sport": "ncaab",
+  "status": "candidate",
+  "total_sd": 13.5,
+  "trend_total_weight": 0.85
+}

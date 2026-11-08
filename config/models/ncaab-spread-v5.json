@@ -1,0 +1,26 @@
+{
+  "model_version": "ncaab-spread-v5",
+  "sport": "NCAAB",
+  "schema_version": "basketball-spread-v5",
+  "model_type": "coherent_logistic_spread_moneyline",
+  "status": "production",
+  "qualified_for_betting": true,
+  "confidence_threshold": 0.035,
+  "min_edge": 0.035,
+  "max_edge": 0.08,
+  "home_court_points": 7.2,
+  "margin_sd": 10.5,
+  "logistic_scale": 9.5,
+  "min_sample_games": 8,
+  "offseason_retention": 0.2,
+  "offseason_gap_days": 150,
+  "dynamic_sizing": {
+    "enabled": true,
+    "base_units": 1.0,
+    "max_units": 2.0,
+    "edge_slope": 16.67
+  },
+  "target": "NCAAB Men's College Basketball point spread and coherent logistic moneyline model",
+  "trained_through_date": "2026-11-07",
+  "artifact_hash": "9fad4a341ae02d402b80d9b2b2af51a4af0a15a553702d23bdf85b05fe721806"
+}
