@@ -670,7 +670,7 @@ class CFBFeatureExtractor:
 
         # 3. Dynamic shrinkage between Elo prior and in-season sample efficiency
         n_games_min = min(away_state.games_played, home_state.games_played)
-        eff_weight = min(0.35, 0.04 * n_games_min)
+        eff_weight = min(0.70, 0.07 * n_games_min)
         proj_margin = (
             (1.0 - eff_weight) * elo_margin
             + eff_weight * raw_eff_margin
@@ -688,8 +688,19 @@ class CFBFeatureExtractor:
         epa_total_adj = (home_state.adj_offense_epa + away_state.adj_offense_epa) * 12.0
         structural_total = proj_possessions * (exp_home_ppp + exp_away_ppp) + epa_total_adj
         sample_games = min(away_state.games_played, home_state.games_played)
-        macro_weight = max(0.20, 0.60 - 0.05 * sample_games)
-        conf_macro_base = 49.5 if is_conf_matchup else 54.0
+        macro_weight = max(0.05, 0.60 - 0.06 * sample_games)
+        if sample_games >= 5:
+            team_scoring_avg = (
+                (home_state.raw_offense_ppg + home_state.raw_defense_ppg)
+                + (away_state.raw_offense_ppg + away_state.raw_defense_ppg)
+            ) / 2.0
+            conf_macro_base = (
+                (0.4 * 49.5 + 0.6 * team_scoring_avg)
+                if is_conf_matchup
+                else (0.4 * 54.0 + 0.6 * team_scoring_avg)
+            )
+        else:
+            conf_macro_base = 49.5 if is_conf_matchup else 54.0
         macro_baseline = conf_macro_base + weather_total_adj + (proj_possessions - 11.2) * 1.8
         proj_total = max(
             24.0,

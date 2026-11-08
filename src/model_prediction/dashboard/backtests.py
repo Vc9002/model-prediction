@@ -51,13 +51,39 @@ def backtests() -> list[dict]:
     return items
 
 
+def _resolve_snapshot_path(sport_name: str, day_str: str) -> Path:
+    """Resolve the location of polymarket_snapshots.jsonl, prioritizing live runtime storage."""
+    try:
+        from model_prediction.runtime_paths import RuntimePaths
+
+        runtime_root = RuntimePaths.resolve().runtime_root
+        candidate_sports = [sport_name]
+        if sport_name in ("nbl", "euroleague"):
+            candidate_sports.append("basketball")
+        elif sport_name in ("cfb", "college_football"):
+            candidate_sports.append("ncaaf")
+        elif sport_name in ("r6", "rainbow_six"):
+            candidate_sports.append("esports")
+
+        for s in candidate_sports:
+            runtime_path = runtime_root / "odds" / s / day_str / "polymarket_snapshots.jsonl"
+            if runtime_path.exists():
+                return runtime_path
+            data_path = DATA / "odds" / s / day_str / "polymarket_snapshots.jsonl"
+            if data_path.exists():
+                return data_path
+    except (OSError, RuntimeError):
+        pass
+    return DATA / "odds" / sport_name / day_str / "polymarket_snapshots.jsonl"
+
+
 def odds_summary(sport: str | None = None) -> dict:
     """Per-sport summary of stored Polymarket odds snapshots for today."""
     today = _today()
     sports = [sport] if sport else list(SPORTS)
     result: dict = {}
     for s in sports:
-        path = DATA / "odds" / s / today / "polymarket_snapshots.jsonl"
+        path = _resolve_snapshot_path(s, today)
         if not path.exists():
             result[s] = {"snapshots": 0, "status": "no_data"}
             continue
@@ -94,7 +120,7 @@ def market_snapshots(sport: str, day: str) -> dict:
     # module-level import here would be circular.
     from model_prediction.dashboard.orders import _human_market_name
 
-    path = DATA / "odds" / sport / day / "polymarket_snapshots.jsonl"
+    path = _resolve_snapshot_path(sport, day)
     latest: dict[str, dict] = {}
     first_ask: dict[str, float] = {}
     if path.exists():
@@ -183,7 +209,41 @@ _TEAM_NAME_ALIASES = {
     "san jos� state spartans": "san jose state",
     "ul monroe warhawks": "louisiana monroe",
     "ul monroe": "louisiana monroe",
+    "nm state": "new mexico state",
+    "nm state aggies": "new mexico state",
+    "k-state": "kansas state",
+    "k state": "kansas state",
+    "k state wildcats": "kansas state",
+    "ole miss": "mississippi",
+    "ole miss rebels": "mississippi",
+    "sam houston": "sam houston state",
+    "sam houston bearkats": "sam houston state",
+    "jax state": "jacksonville state",
+    "jax state gamecocks": "jacksonville state",
+    "fiu": "florida international",
+    "fiu panthers": "florida international",
+    "fau": "florida atlantic",
+    "fau owls": "florida atlantic",
+    "usf": "south florida",
+    "usf bulls": "south florida",
+    "ucf": "central florida",
+    "ucf knights": "central florida",
+    "pitt": "pittsburgh",
+    "pitt panthers": "pittsburgh",
+    "la tech": "louisiana tech",
+    "la tech bulldogs": "louisiana tech",
+    "nc state": "north carolina state",
+    "nc state wolfpack": "north carolina state",
+    "uconn": "connecticut",
+    "uconn huskies": "connecticut",
 }
+
+_DISQUALIFYING_TEAM_PREFIXES = frozenset(
+    {"western", "eastern", "northern", "southern", "central", "middle", "north", "south", "east", "west"}
+)
+_DISQUALIFYING_TEAM_SUFFIXES = frozenset(
+    {"state", "tech", "a&m", "am", "christian", "baptist", "methodist", "valley"}
+)
 
 
 @lru_cache(maxsize=4096)
@@ -202,7 +262,28 @@ def _team_matches(team_name: str, side_description: str) -> bool:
     if team == description:
         return True
     shorter, longer = (description, team) if len(description) <= len(team) else (team, description)
-    return f" {shorter} " in f" {longer} "
+    l_tokens = longer.split()
+    s_tokens = shorter.split()
+    s_len = len(s_tokens)
+    for i in range(len(l_tokens) - s_len + 1):
+        if l_tokens[i : i + s_len] == s_tokens:
+            if i > 0 and l_tokens[i - 1] in _DISQUALIFYING_TEAM_PREFIXES:
+                continue
+            if i + s_len < len(l_tokens) and l_tokens[i + s_len] in _DISQUALIFYING_TEAM_SUFFIXES:
+                continue
+            return True
+    # Franchise mascot / distinctive token match (e.g. "DEN Nuggets" vs "Denver Nuggets", "GS Warriors" vs "Golden State Warriors")
+    t_tokens = [tok for tok in _RE_NAME_PUNCT.sub(" ", team).split() if tok]
+    d_tokens = set(_RE_NAME_PUNCT.sub(" ", description).split())
+    if t_tokens and d_tokens:
+        mascot = t_tokens[-1]
+        if (
+            len(mascot) > 3
+            and mascot not in {"club", "city", "team", "state", "united"}
+            and mascot in d_tokens
+        ):
+            return True
+    return False
 
 
 _RE_WORD = re.compile(r"\w+")
@@ -426,14 +507,14 @@ def _pick_quote(row: dict) -> dict | None:
     day = event_start.astimezone(EASTERN).date().isoformat()
     odds_sport = (
         "esports"
-        if sport in ("cs2", "lol", "dota2", "valorant", "r6", "cod", "ow", "rl")
-        else ("ncaaf" if sport == "cfb" else sport)
+        if sport in ("cs2", "lol", "dota2", "valorant", "r6", "rainbow_six", "cod", "ow", "rl")
+        else ("ncaaf" if sport in ("cfb", "college_football") else sport)
     )
-    path = DATA / "odds" / odds_sport / day / "polymarket_snapshots.jsonl"
+    path = _resolve_snapshot_path(odds_sport, day)
     if path in _MISSING_PATHS or not path.exists():
         if path not in _MISSING_PATHS:
             _MISSING_PATHS.add(path)
-        path = DATA / "odds" / sport / day / "polymarket_snapshots.jsonl"
+        path = _resolve_snapshot_path(sport, day)
     snapshots = _load_snapshot_file(path)
     if not snapshots:
         return None

@@ -33,6 +33,8 @@ def normalize_event(event: dict[str, Any]) -> dict[str, Any] | None:
         return None
     sides = {c.get("homeAway"): c for c in competition.get("competitors", [])}
     home, away = sides.get("home"), sides.get("away")
+    if home is None or away is None:
+        return None
     try:
         home_score = int(float((home["score"] or {}).get("value", home["score"])))
         away_score = int(float((away["score"] or {}).get("value", away["score"])))

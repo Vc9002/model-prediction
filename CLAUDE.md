@@ -12,6 +12,9 @@ This file is about *how to work here*, not *what's currently true*.
 - **Micro-Targeted Testing Only**: When core mathematical or pricing algorithms change, run ONLY the single directly affected test file with `-o addopts='' -q` (e.g. `pytest tests/test_nba_nfl_v5.py -o addopts='' -q` in < 0.5s).
 - **Batch Before Verifying**: Complete all planned code modifications across all files before running any verification.
 
+## Pricing & Odds Format (Operator Directive 2026-11-07)
+- **Percentages Only, No American Odds**: NEVER use, display, or communicate prices using American odds (e.g. -110, +120, -310). ALWAYS express market prices, quotes, contract lines, and break-even levels as percentages / implied probabilities (e.g. 52.4%, 45.5%, 75.6%) or probability cents (e.g. 52¢). All user-facing tables, pick summaries, forecasts, and reports must use percentages exclusively.
+
 ## 2026-08-15 — consolidation K (runtime singularity)
 
 - **Rolling vs frozen model artifacts.** `config/models/*.json` are frozen

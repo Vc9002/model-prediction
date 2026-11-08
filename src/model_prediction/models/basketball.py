@@ -67,6 +67,7 @@ class UpcomingGame:
     availability_points_gap: float = 0.0
     availability_total_loss: float = 0.0
     league: str = "NBA"
+    neutral_site: bool = False
 
 
 class BasketballModel:
@@ -314,6 +315,11 @@ class BasketballModel:
                 effective_margin_sd = max(
                     12.0, min(17.5, self.margin_sd * (1.0 + 0.25 * (1.0 - avg_c / 0.055)))
                 )
+                if sample < 8:
+                    sample_factor = max(0.0, min(1.0, 1.0 - sample / 8.0))
+                    effective_margin_sd = max(
+                        effective_margin_sd, self.margin_sd * (1.0 + 0.5 * sample_factor)
+                    )
 
             # Composite total prediction
             raw_trend_total = away_points + home_points
@@ -387,6 +393,13 @@ class BasketballModel:
                     expected_total += 1.2
                 elif abs(expected_margin) <= 6.5:
                     expected_total += 0.6
+
+            effective_total_sd = self.total_sd
+            if self.dynamic_volatility and sample < 8:
+                sample_factor = max(0.0, min(1.0, 1.0 - sample / 8.0))
+                effective_total_sd = max(
+                    self.total_sd, min(self.total_sd * 1.5, self.total_sd * (1.0 + 0.4 * sample_factor))
+                )
 
             uncertainty = max(0.03, min(0.20, 0.20 - 0.005 * sample))
             base: GamePredictionBase = {
@@ -464,19 +477,19 @@ class BasketballModel:
                     )
                 )
             if game.total_line is not None:
-                over = 1 - _normal_cdf(game.total_line, expected_total, self.total_sd)
+                over = 1 - _normal_cdf(game.total_line, expected_total, effective_total_sd)
                 predictions.append(
                     GamePrediction(
                         market_type="total",
                         inference_inputs={
                             "mean": expected_total,
-                            "sd": self.total_sd,
+                            "sd": effective_total_sd,
                             "line": game.total_line,
                         },
                         line=game.total_line,
                         probabilities={"over": round(over, 6), "under": round(1 - over, 6)},
                         rationale=(
-                            f"Projected total {expected_total:.1f}, sd {self.total_sd:.1f}."
+                            f"Projected total {expected_total:.1f}, sd {effective_total_sd:.1f}."
                             + (
                                 f" Availability loss: -{game.availability_total_loss:.1f}."
                                 if game.availability_total_loss != 0.0

@@ -686,7 +686,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     # Main/Flat clears above already cover them; the legacy research/gated ledgers
     # are no longer written and are not cleared.
     # Compute forecasts once, log to both ledgers (compute > log main > log research > log flat)
-    forecast_result = {}
+    forecast_result: dict[str, Any] = {}
     workers = min(len(DAILY_LEARNED_SPORTS), 5)
     # Seconds from pool start to each sport's completion (a queued sport's
     # figure includes its wait for a free worker).

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import math
+import re
 import time
 import unicodedata
 from datetime import date
@@ -27,6 +28,7 @@ from ..config import (
 )
 from ..data_sources.espn import ESPNClient
 from ..data_sources.mlb_market_odds import MarketOddsSnapshotStore
+from ..data_sources.polymarket_execute import _team_name_matches
 from ..data_sources.polymarket_us import (
     PolymarketSnapshotStore,
     probability_to_american,
@@ -137,7 +139,14 @@ def _settle_all_unsettled(
                 row, ledger, config, data_root=data_root
             ) or _settle_by_resolution(row, ledger)
             if result is None:
-                pending.append(row["pick_id"])
+                if (now - start).total_seconds() > 36 * 3600:
+                    try:
+                        v = ledger.void(row["pick_id"], "international baseball postponed or unrecorded >36h")
+                        voided.append(v["pick_id"])
+                    except (KeyError, ValueError, OSError) as e:
+                        failures.append({"pick_id": row["pick_id"], "reason": str(e)})
+                else:
+                    pending.append(row["pick_id"])
             elif result.get("voided"):
                 voided.append(result["pick_id"])
             elif result.get("settled"):
@@ -309,10 +318,21 @@ def _settle_all_unsettled(
         if row.get("market_type") in ("nrfi", "yrfi") and not all(
             key in match for key in ("away_1st", "home_1st")
         ):
-            pending.append(row["pick_id"])
-            logger.warning(
-                "NRFI settlement pending for %s: explicit first-inning scores unavailable", row["pick_id"]
-            )
+            if (now - start).total_seconds() > 36 * 3600:
+                try:
+                    voided.append(
+                        ledger.void(
+                            row["pick_id"],
+                            "NRFI/YRFI voided: explicit first-inning scores unrecorded on ESPN >36h after game completion",
+                        )["pick_id"]
+                    )
+                except (KeyError, ValueError, OSError) as error:
+                    failures.append({"pick_id": row["pick_id"], "reason": str(error)})
+            else:
+                pending.append(row["pick_id"])
+                logger.warning(
+                    "NRFI settlement pending for %s: explicit first-inning scores unavailable", row["pick_id"]
+                )
             continue
         closing_line = closing_odds = closing_probability = None
         quote = market_store.closing_quote(
@@ -325,7 +345,7 @@ def _settle_all_unsettled(
                 closing_line = float(quote["line"])
         else:
             # Fallback to per-sport Polymarket snapshot history (WNBA, Soccer, etc.)
-            slug = _extract_market_slug(str(row.get("rationale", "")))
+            slug = _extract_market_slug(str(row.get("rationale", "")), row)
             if slug is not None and data_root is not None:
                 sport_dir = str(row.get("league", "")).lower()
                 try:
@@ -415,6 +435,52 @@ def _extract_espn_record(status: dict, away: dict, home: dict) -> dict:
     return record
 
 
+_SETTLE_TEAM_ALIASES = {
+    "mich state": "michigan state",
+    "mich. state": "michigan state",
+    "grace ca talons": "grace",
+    "grace ca": "grace",
+    "grace university lancers": "grace",
+    "app state": "appalachian state",
+    "se louisiana": "southeastern louisiana",
+    "k-state": "kansas state",
+    "k state": "kansas state",
+}
+
+
+def _normalize_settle_name(name: str) -> str:
+    folded = "".join(ch for ch in unicodedata.normalize("NFKD", name) if not unicodedata.combining(ch))
+    cleaned = re.sub(r"[(),.\-_]", " ", folded)
+    normalized = " ".join(cleaned.casefold().split())
+    return _SETTLE_TEAM_ALIASES.get(normalized, normalized)
+
+
+def _team_matches_espn_competitor(target_names: set[str], espn_team: dict) -> bool:
+    """Check if an ESPN competitor team matches any target name for a ledger side."""
+    candidates = [
+        espn_team.get("displayName", ""),
+        espn_team.get("shortDisplayName", ""),
+        espn_team.get("location", ""),
+        espn_team.get("name", ""),
+    ]
+    candidates = [c for c in candidates if c]
+    for target in target_names:
+        if not target:
+            continue
+        t_cf = target.casefold()
+        for cand in candidates:
+            if t_cf == cand.casefold():
+                return True
+        norm_target = _normalize_settle_name(target)
+        for cand in candidates:
+            norm_cand = _normalize_settle_name(cand)
+            if norm_target == norm_cand:
+                return True
+            if _team_name_matches(norm_target, norm_cand) or _team_name_matches(norm_cand, norm_target):
+                return True
+    return False
+
+
 def _find_espn_result(
     espn: ESPNClient,
     leagues,
@@ -431,6 +497,10 @@ def _find_espn_result(
     """
     away_names = {row["away_team"].casefold(), row["original_away_team"].casefold()}
     home_names = {row["home_team"].casefold(), row["original_home_team"].casefold()}
+    if row.get("canonical_away_team_name"):
+        away_names.add(str(row["canonical_away_team_name"]).casefold())
+    if row.get("canonical_home_team_name"):
+        home_names.add(str(row["canonical_home_team_name"]).casefold())
     row_event_id = str(row.get("event_id") or "").strip()
 
     events_to_check: list[tuple[dict, dict, dict, dict]] = []
@@ -452,10 +522,19 @@ def _find_espn_result(
 
     name_matched: list[tuple[dict, dict, dict, dict]] = []
     for event, competition, away, home in events_to_check:
-        away_team_name = away["team"].get("displayName", "").casefold()
-        home_team_name = home["team"].get("displayName", "").casefold()
-        if away_team_name in away_names and home_team_name in home_names:
+        away_team = away["team"]
+        home_team = home["team"]
+        if _team_matches_espn_competitor(away_names, away_team) and _team_matches_espn_competitor(
+            home_names, home_team
+        ):
             name_matched.append((event, competition, away, home))
+        elif _team_matches_espn_competitor(away_names, home_team) and _team_matches_espn_competitor(
+            home_names, away_team
+        ):
+            # Inverted / neutral-site match: ESPN away is row's home, and ESPN home is row's away.
+            # Store (home, away) so chosen_away corresponds to row's away team and chosen_home
+            # corresponds to row's home team for _extract_espn_record.
+            name_matched.append((event, competition, home, away))
 
     if not name_matched:
         return None
@@ -566,9 +645,24 @@ def _closing_probability_for_moneyline_pick(
     return round(float(ask), 6), probability_to_american(float(ask))
 
 
-def _extract_market_slug(rationale: str) -> str | None:
-    """Recover the Polymarket market slug embedded in a row's rationale text."""
+def _extract_market_slug(rationale: str, row: dict | None = None) -> str | None:
+    """Recover the Polymarket market slug from explicit fields, snapshots, or rationale text."""
+    import json
     import re
+
+    if row is not None:
+        explicit_slug = str(row.get("market_slug") or "").strip()
+        if explicit_slug and "-" in explicit_slug:
+            return explicit_slug
+        snap_raw = row.get("model_input_snapshot_json")
+        if snap_raw and isinstance(snap_raw, str):
+            try:
+                snap = json.loads(snap_raw)
+                snap_slug = snap.get("features", {}).get("research_quote_join.market_slug")
+                if snap_slug and isinstance(snap_slug, str) and "-" in snap_slug:
+                    return snap_slug.strip()
+            except (json.JSONDecodeError, TypeError):
+                pass
 
     match = re.search(r"market_slug=([a-z0-9_\-]+)", rationale)
     if match:
@@ -576,8 +670,10 @@ def _extract_market_slug(rationale: str) -> str | None:
     for m in re.findall(r"\(([a-z0-9_\-]+)\)", rationale):
         if "-" in m or m.startswith(("atc", "tsc", "asc", "mkt", "aec")):
             return m
-    match = re.search(r"\(([a-z0-9_\-]+)\)", rationale)
-    return match.group(1) if match else None
+    # No candidate looked like a real slug (e.g. only "(home)"/"(away)" in
+    # parens) -- returning that garbage caused repeated 404s against
+    # Polymarket (`/v1/market/slug/home`). Decline rather than guess.
+    return None
 
 
 def _settle_darts_pick(row: dict, ledger, data_root=None) -> dict | None:
@@ -599,7 +695,7 @@ def _settle_darts_pick(row: dict, ledger, data_root=None) -> dict | None:
             home_legs, away_legs = record.legs_b, record.legs_a
         else:
             continue
-        slug = _extract_market_slug(str(row.get("rationale", "")))
+        slug = _extract_market_slug(str(row.get("rationale", "")), row)
         closing_probability = closing_odds = None
         if slug is not None:
             try:
@@ -680,7 +776,7 @@ def _settle_by_resolution(row: dict, ledger, client=None) -> dict | None:
     """
     from ..data_sources.polymarket_us import PolymarketUSClient, _amount
 
-    slug = _extract_market_slug(str(row.get("rationale", "")))
+    slug = _extract_market_slug(str(row.get("rationale", "")), row)
     market_type = str(row.get("market_type") or "").lower().split(".")[-1]
     if slug is None or market_type not in {"moneyline", "spread", "total"}:
         return None
@@ -1009,7 +1105,7 @@ def _settle_international_baseball_pick(row: dict, ledger, config, data_root=Non
         return None
     away_score, home_score = result
     closing_probability = closing_odds = None
-    slug = _extract_market_slug(str(row.get("rationale", "")))
+    slug = _extract_market_slug(str(row.get("rationale", "")), row)
     if slug is not None and data_root is not None:
         sport_dir = str(row.get("league", "")).lower()
         try:
@@ -1248,7 +1344,7 @@ def _settle_tennis_pick(
     if match is None or not match.get("completed"):
         return None
     market_type = str(row.get("market_type") or "").casefold()
-    slug = _extract_market_slug(str(row.get("rationale", "")))
+    slug = _extract_market_slug(str(row.get("rationale", "")), row)
     if market_type != "moneyline" and slug is not None and _is_tennis_subperiod_slug(slug):
         return {
             "pick_id": row["pick_id"],

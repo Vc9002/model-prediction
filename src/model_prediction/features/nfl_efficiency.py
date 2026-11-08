@@ -10,7 +10,7 @@ import logging
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import polars as pl
@@ -250,7 +250,7 @@ class NFLEfficiencyStore:
         a_code = normalize_nfl_team_code(away_team)
 
         # Auto-resolve starting QBs if not explicitly passed
-        manifest_qbs = (self.source_manifest or {}).get("projected_qbs", {})
+        manifest_qbs = cast("dict[str, Any]", (self.source_manifest or {}).get("projected_qbs", {}) or {})
         if not home_qb and manifest_qbs:
             home_qb = manifest_qbs.get(h_code)
         if not away_qb and manifest_qbs:

@@ -152,9 +152,9 @@ def forecast_basketball_lane(
         if not moneyline_markets:
             result["skipped"].append({"event_id": identity, "reason": "moneyline_team_identity_unavailable"})
             continue
-        away, home = _parse_teams_from_event({**event, "markets": moneyline_markets})
-        away_name, home_name = away, home
-        away, home = spec.resolver(away_name, data_root, known), spec.resolver(home_name, data_root, known)
+        away_name, home_name = _parse_teams_from_event({**event, "markets": moneyline_markets})
+        away: str | None = spec.resolver(away_name, data_root, known)
+        home: str | None = spec.resolver(home_name, data_root, known)
         if away is None or home is None:
             result["skipped"].append(
                 {"event_id": identity, "reason": "team_history_unmatched", "teams": [away_name, home_name]}
@@ -163,13 +163,13 @@ def forecast_basketball_lane(
         if min(games_by_team[away], games_by_team[home]) < min_team_games:
             result["skipped"].append({"event_id": identity, "reason": "insufficient_team_history"})
             continue
-        for market in _main_line_markets(event.get("markets", [])):
-            kind = market.get("market_type")
+        for market_def in _main_line_markets(event.get("markets", [])):
+            kind = market_def.get("market_type")
             if kind not in MARKETS:
                 continue
-            sides = market.get("sides", [])
-            away_side = next((s for s in sides if s.get("selection") == "away"), {})
-            line = market.get("line")
+            sides = market_def.get("sides", [])
+            away_side: dict[str, Any] = next((s for s in sides if s.get("selection") == "away"), {})
+            line = market_def.get("line")
             if kind == "spread" and away_side.get("line") is None:
                 continue
             if kind == "total" and line is None:
@@ -205,7 +205,7 @@ def forecast_basketball_lane(
             probability = prediction.probabilities[selection]
             edge = probability - ask
             request = PickRequest(
-                event_start_utc=start,
+                event_start_utc=str(start),
                 event_id=str(identity),
                 league=spec.league,
                 away_team=away,
@@ -220,7 +220,7 @@ def forecast_basketball_lane(
                 model_probability=probability,
                 model_uncertainty=prediction.uncertainty,
                 model_version=model.version,
-                rationale=f"{prediction.rationale} ({market.get('market_slug', '')}).",
+                rationale=f"{prediction.rationale} ({market_def.get('market_slug', '')}).",
                 risks="Paper tempo model; live market quote is an indicative reference, not verified executable BBO.",
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
                 model_state=ModelState.SHADOW_QUALIFIED,

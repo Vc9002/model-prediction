@@ -191,7 +191,6 @@ class CFBJointDistributionEngine:
         """Derive calibrated Moneyline, Spread, and Total probabilities."""
         home_scores, away_scores = self.simulate_joint_scores(mu_home, mu_away)
         margins = home_scores - away_scores  # Home - Away
-        totals = home_scores + away_scores  # Home + Away
 
         # 1. Moneyline
         # Overtime tie resolution in CFB (home wins ~52% in OT)
@@ -224,20 +223,19 @@ class CFBJointDistributionEngine:
             p_home_cover = 1.0 - p_away_cover
             p_push_spread = 0.0
 
-        # 3. Total
+        # 3. Total: calibrated symmetric normal CDF around expected total mean
+        # eliminates discrete count-skewness bias where Mean > Median manufactures artificial Under edge
         tot_line = total_line if total_line is not None else round((mu_home + mu_away) * 2.0) / 2.0
         is_integer_total = float(tot_line).is_integer()
+        tot_mean = float(mu_home + mu_away)
+        tot_sd = max(1.0, float(self.total_sd or 16.0))
         if is_integer_total:
-            overs = np.sum(totals > tot_line)
-            unders = np.sum(totals < tot_line)
-            pushes_total = np.sum(totals == tot_line)
-            p_over = float(overs) / float(self.n_simulations)
-            p_under = float(unders) / float(self.n_simulations)
-            p_push_total = float(pushes_total) / float(self.n_simulations)
+            p_under = _normal_cdf(tot_line - 0.5, tot_mean, tot_sd)
+            p_over = 1.0 - _normal_cdf(tot_line + 0.5, tot_mean, tot_sd)
+            p_push_total = max(0.0, 1.0 - p_over - p_under)
         else:
-            overs = np.sum(totals > tot_line)
-            p_over = float(overs) / float(self.n_simulations)
-            p_under = 1.0 - p_over
+            p_under = _normal_cdf(tot_line, tot_mean, tot_sd)
+            p_over = 1.0 - p_under
             p_push_total = 0.0
 
         return CFBJointMarketProbabilities(

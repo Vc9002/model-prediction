@@ -38,7 +38,11 @@ def enable_background_priority(idle_only: bool = False) -> bool:
             kernel32.SetPriorityClass.restype = ctypes.c_bool
 
             handle = kernel32.GetCurrentProcess()
-            priority = _IDLE_PRIORITY_CLASS if idle_only else _PROCESS_MODE_BACKGROUND_BEGIN
+            # Use BELOW_NORMAL_PRIORITY_CLASS rather than PROCESS_MODE_BACKGROUND_BEGIN.
+            # PROCESS_MODE_BACKGROUND_BEGIN forces I/O priority to Very Low (priority 0),
+            # which starves disk reads when scanning multi-MB ledger workbooks and snapshot
+            # files, turning an 8s cycle into a 15-minute freeze.
+            priority = _IDLE_PRIORITY_CLASS if idle_only else _BELOW_NORMAL_PRIORITY_CLASS
 
             success = bool(kernel32.SetPriorityClass(handle, priority))
             if not success and not idle_only:

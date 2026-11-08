@@ -1,11 +1,11 @@
 {
-  "baseline_brier": 0.288222,
-  "calibrated_at_utc": "2026-11-02T21:04:51.778488+00:00",
-  "calibrated_oof_brier": 0.28822200047245716,
+  "baseline_brier": 0.289259,
+  "calibrated_at_utc": "2026-11-08T21:01:44.643328+00:00",
+  "calibrated_oof_brier": 0.2892594214405517,
   "champion_method": "identity",
   "market": "total",
   "model_version": "cfb-structural-v4",
   "parameters": {},
-  "sample_size": 35,
+  "sample_size": 87,
   "sport": "ncaaf"
 }

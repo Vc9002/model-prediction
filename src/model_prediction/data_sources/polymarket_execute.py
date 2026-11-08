@@ -84,7 +84,41 @@ _TEAM_NAME_ALIASES = {
     "san jos� state spartans": "san jose state",
     "ul monroe warhawks": "louisiana monroe",
     "ul monroe": "louisiana monroe",
+    "nm state": "new mexico state",
+    "nm state aggies": "new mexico state",
+    "k-state": "kansas state",
+    "k state": "kansas state",
+    "k state wildcats": "kansas state",
+    "ole miss": "mississippi",
+    "ole miss rebels": "mississippi",
+    "sam houston": "sam houston state",
+    "sam houston bearkats": "sam houston state",
+    "jax state": "jacksonville state",
+    "jax state gamecocks": "jacksonville state",
+    "fiu": "florida international",
+    "fiu panthers": "florida international",
+    "fau": "florida atlantic",
+    "fau owls": "florida atlantic",
+    "usf": "south florida",
+    "usf bulls": "south florida",
+    "ucf": "central florida",
+    "ucf knights": "central florida",
+    "pitt": "pittsburgh",
+    "pitt panthers": "pittsburgh",
+    "la tech": "louisiana tech",
+    "la tech bulldogs": "louisiana tech",
+    "nc state": "north carolina state",
+    "nc state wolfpack": "north carolina state",
+    "uconn": "connecticut",
+    "uconn huskies": "connecticut",
 }
+
+_DISQUALIFYING_TEAM_PREFIXES = frozenset(
+    {"western", "eastern", "northern", "southern", "central", "middle", "north", "south", "east", "west"}
+)
+_DISQUALIFYING_TEAM_SUFFIXES = frozenset(
+    {"state", "tech", "a&m", "am", "christian", "baptist", "methodist", "valley"}
+)
 
 
 def _normalize_name_tokens(name: str) -> str:
@@ -106,7 +140,28 @@ def _team_name_matches(team_name: str, side_description: str) -> bool:
     if team == description:
         return True
     shorter, longer = (description, team) if len(description) <= len(team) else (team, description)
-    return f" {shorter} " in f" {longer} "
+    l_tokens = longer.split()
+    s_tokens = shorter.split()
+    s_len = len(s_tokens)
+    for i in range(len(l_tokens) - s_len + 1):
+        if l_tokens[i : i + s_len] == s_tokens:
+            if i > 0 and l_tokens[i - 1] in _DISQUALIFYING_TEAM_PREFIXES:
+                continue
+            if i + s_len < len(l_tokens) and l_tokens[i + s_len] in _DISQUALIFYING_TEAM_SUFFIXES:
+                continue
+            return True
+    # Franchise mascot / distinctive token match (e.g. "DEN Nuggets" vs "Denver Nuggets", "GS Warriors" vs "Golden State Warriors")
+    t_tokens = team.split()
+    d_tokens = set(description.split())
+    if t_tokens and d_tokens:
+        mascot = t_tokens[-1]
+        if (
+            len(mascot) > 3
+            and mascot not in {"club", "city", "team", "state", "united"}
+            and mascot in d_tokens
+        ):
+            return True
+    return False
 
 
 def _tennis_player_matches(player_name: str, exchange_name: str) -> bool:

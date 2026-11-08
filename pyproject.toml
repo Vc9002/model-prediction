@@ -71,6 +71,10 @@ filterwarnings = [
 markers = [
   "slow: long-running simulation or historical replay",
   "rebuild: clean-slate rebuild sandbox tests",
+  "unit: fast unit tests with zero I/O",
+  "contracts: schema and hash verification contracts",
+  "integration: database and multi-module integration",
+  "replay: historical replay and simulation",
 ]
 
 [tool.ruff]

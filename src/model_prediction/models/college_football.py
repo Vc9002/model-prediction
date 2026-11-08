@@ -448,6 +448,8 @@ def _match_cfb_moneyline(
             p1, p2 = title.split(" vs ", 1)
         elif " @ " in title:
             p1, p2 = title.split(" @ ", 1)
+        elif " at " in title:
+            p1, p2 = title.split(" at ", 1)
         else:
             continue
 
@@ -496,8 +498,8 @@ def _match_cfb_spread(
     cands: list[dict[str, Any]] = []
     away_res = resolve_team(_clean_cfb_school(away_team))
     home_res = resolve_team(_clean_cfb_school(home_team))
-    away_words = [w for w in away_team.casefold().split() if len(w) > 2]
-    home_words = [w for w in home_team.casefold().split() if len(w) > 2]
+    away_canon = away_res.canonical_name if away_res else away_team
+    home_canon = home_res.canonical_name if home_res else home_team
 
     for r in rows:
         if r.get("market_type") != "spread":
@@ -505,30 +507,52 @@ def _match_cfb_spread(
         slug = str(r.get("market_slug", "")).lower()
         if any(token in slug for token in partial_tokens):
             continue
-        if r.get("line") is None or (r.get("long") or {}).get("ask") is None:
+        if r.get("line") is None:
+            continue
+        l_ask = (r.get("long") or {}).get("ask")
+        s_ask = (r.get("short") or {}).get("ask")
+        if l_ask is None and s_ask is None:
             continue
 
-        team = str(r.get("team") or "")
         title = str(r.get("event_title") or "")
-        team_res = resolve_team(_clean_cfb_school(team)) if team else None
+        if " vs. " in title:
+            p1, p2 = title.split(" vs. ", 1)
+        elif " vs " in title:
+            p1, p2 = title.split(" vs ", 1)
+        elif " @ " in title:
+            p1, p2 = title.split(" @ ", 1)
+        elif " at " in title:
+            p1, p2 = title.split(" at ", 1)
+        else:
+            continue
 
-        matched_matchup = bool(
-            (team_res and (team_res == away_res or team_res == home_res))
-            or _team_matches(away_team, team)
-            or _team_matches(home_team, team)
-            or (
-                any(w in title.casefold() or w in slug for w in away_words)
-                and any(w in title.casefold() or w in slug for w in home_words)
-            )
+        p1_res = resolve_team(_clean_cfb_school(p1))
+        p2_res = resolve_team(_clean_cfb_school(p2))
+        p1_c = p1_res.canonical_name if p1_res else p1
+        p2_c = p2_res.canonical_name if p2_res else p2
+
+        match_normal = ((p1_c == away_canon) or _team_matches(away_team, p1)) and (
+            (p2_c == home_canon) or _team_matches(home_team, p2)
         )
-
-        if matched_matchup:
+        match_reverse = ((p1_c == home_canon) or _team_matches(home_team, p1)) and (
+            (p2_c == away_canon) or _team_matches(away_team, p2)
+        )
+        if match_normal or match_reverse:
             cands.append(r)
 
     if not cands:
         return None, None
 
-    best = min(cands, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
+    def _spread_ask_balance(row: dict[str, Any]) -> float:
+        l = (row.get("long") or {}).get("ask")
+        s = (row.get("short") or {}).get("ask")
+        if l is not None:
+            return abs(float(l) - 0.5)
+        if s is not None:
+            return abs(float(s) - 0.5)
+        return 1.0
+
+    best = min(cands, key=_spread_ask_balance)
     anchor_team = str(best.get("team") or "")
     anchor_res = resolve_team(_clean_cfb_school(anchor_team)) if anchor_team else None
     if anchor_res and anchor_res == away_res:
@@ -556,8 +580,8 @@ def _match_cfb_total(
     cands: list[dict[str, Any]] = []
     away_res = resolve_team(_clean_cfb_school(away_team))
     home_res = resolve_team(_clean_cfb_school(home_team))
-    away_words = [w for w in away_team.casefold().split() if len(w) > 2]
-    home_words = [w for w in home_team.casefold().split() if len(w) > 2]
+    away_canon = away_res.canonical_name if away_res else away_team
+    home_canon = home_res.canonical_name if home_res else home_team
 
     for r in rows:
         if r.get("market_type") not in ("total", "over_under"):
@@ -565,30 +589,52 @@ def _match_cfb_total(
         slug = str(r.get("market_slug", "")).lower()
         if any(token in slug for token in partial_tokens):
             continue
-        if r.get("line") is None or (r.get("long") or {}).get("ask") is None:
+        if r.get("line") is None:
+            continue
+        l_ask = (r.get("long") or {}).get("ask")
+        s_ask = (r.get("short") or {}).get("ask")
+        if l_ask is None and s_ask is None:
             continue
 
-        team = str(r.get("team") or "")
         title = str(r.get("event_title") or "")
-        team_res = resolve_team(_clean_cfb_school(team)) if team else None
+        if " vs. " in title:
+            p1, p2 = title.split(" vs. ", 1)
+        elif " vs " in title:
+            p1, p2 = title.split(" vs ", 1)
+        elif " @ " in title:
+            p1, p2 = title.split(" @ ", 1)
+        elif " at " in title:
+            p1, p2 = title.split(" at ", 1)
+        else:
+            continue
 
-        matched_matchup = bool(
-            (team_res and (team_res == away_res or team_res == home_res))
-            or _team_matches(away_team, team)
-            or _team_matches(home_team, team)
-            or (
-                any(w in title.casefold() or w in slug for w in away_words)
-                and any(w in title.casefold() or w in slug for w in home_words)
-            )
+        p1_res = resolve_team(_clean_cfb_school(p1))
+        p2_res = resolve_team(_clean_cfb_school(p2))
+        p1_c = p1_res.canonical_name if p1_res else p1
+        p2_c = p2_res.canonical_name if p2_res else p2
+
+        match_normal = ((p1_c == away_canon) or _team_matches(away_team, p1)) and (
+            (p2_c == home_canon) or _team_matches(home_team, p2)
         )
-
-        if matched_matchup:
+        match_reverse = ((p1_c == home_canon) or _team_matches(home_team, p1)) and (
+            (p2_c == away_canon) or _team_matches(away_team, p2)
+        )
+        if match_normal or match_reverse:
             cands.append(r)
 
     if not cands:
         return None
 
-    return min(cands, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
+    def _total_ask_balance(row: dict[str, Any]) -> float:
+        l = (row.get("long") or {}).get("ask")
+        s = (row.get("short") or {}).get("ask")
+        if l is not None:
+            return abs(float(l) - 0.5)
+        if s is not None:
+            return abs(float(s) - 0.5)
+        return 1.0
+
+    return min(cands, key=_total_ask_balance)
 
 
 def build_cfb_slate(
@@ -699,12 +745,12 @@ def build_cfb_slate(
             sp_line = float(pm_sp["line"])
             pm_spread_away_line = sp_line if sp_anchor_side == "away" else -sp_line
             pm_spread_home_line = -sp_line if sp_anchor_side == "away" else sp_line
-            pm_spread_away_prob = (
-                float(pm_sp["long"]["ask"]) if sp_anchor_side == "away" else float(pm_sp["short"]["ask"])
-            )
-            pm_spread_home_prob = (
-                float(pm_sp["short"]["ask"]) if sp_anchor_side == "away" else float(pm_sp["long"]["ask"])
-            )
+            l_a = (pm_sp.get("long") or {}).get("ask")
+            s_a = (pm_sp.get("short") or {}).get("ask")
+            long_ask = float(l_a) if l_a is not None else (1.0 - float(s_a) if s_a is not None else None)
+            short_ask = float(s_a) if s_a is not None else (1.0 - float(l_a) if l_a is not None else None)
+            pm_spread_away_prob = long_ask if sp_anchor_side == "away" else short_ask
+            pm_spread_home_prob = short_ask if sp_anchor_side == "away" else long_ask
             pm_spread_lineage = _canonical_market_snapshot_lineage(pm_sp, snapshot_path)
 
         pm_total_line = None
@@ -713,8 +759,14 @@ def build_cfb_slate(
         pm_total_lineage = None
         if pm_tot is not None:
             pm_total_line = float(pm_tot["line"])
-            pm_total_over_prob = float(pm_tot["long"]["ask"])
-            pm_total_under_prob = float(pm_tot["short"]["ask"])
+            l_a = (pm_tot.get("long") or {}).get("ask")
+            s_a = (pm_tot.get("short") or {}).get("ask")
+            pm_total_over_prob = (
+                float(l_a) if l_a is not None else (1.0 - float(s_a) if s_a is not None else None)
+            )
+            pm_total_under_prob = (
+                float(s_a) if s_a is not None else (1.0 - float(l_a) if l_a is not None else None)
+            )
             pm_total_lineage = _canonical_market_snapshot_lineage(pm_tot, snapshot_path)
 
         # 3b. Extract fallback sportsbook odds if available from ESPN
@@ -965,29 +1017,10 @@ def build_cfb_slate(
             else:  # total
                 p_ov = float(p.probabilities.get("over", 0.5))
                 p_un = float(p.probabilities.get("under", 0.5))
-                eff_tot = float(pm_total_line if pm_tot is not None else (total_line or 52.5))
-                spread_mag = (
-                    abs(float(effective_spread_home))
-                    if effective_spread_home is not None
-                    else (abs(float(pm_spread_home_line)) if pm_spread_home_line is not None else 7.0)
-                )
                 if pm_tot is not None and pm_total_over_prob is not None and pm_total_under_prob is not None:
                     edge_o = p_ov - float(pm_total_over_prob)
                     edge_u = p_un - float(pm_total_under_prob)
-                    if eff_tot > 56.5:
-                        pick_under = (edge_u >= edge_o) or (edge_u > 0.03)
-                    elif eff_tot <= 46.5:
-                        # Low totals: do not blind-buy Overs; require decisive edge > 0.06
-                        pick_under = not (edge_o > 0.06 and edge_o > edge_u)
-                    elif spread_mag > 14.5:
-                        # Blowout mismatches (>14.5) go Over 58.2%
-                        pick_under = edge_u > (edge_o + 0.02)
-                    elif spread_mag <= 7.0:
-                        # Tight competitive games (<=7.0) go Under 52.3%
-                        pick_under = (edge_u + 0.01) >= edge_o
-                    else:
-                        # Asymmetric Over hurdle: require decisive edge >= 0.04 to buy Over; otherwise default to Under
-                        pick_under = not (edge_o >= 0.04 and edge_o > edge_u)
+                    pick_under = edge_u >= edge_o
 
                     if not pick_under:
                         selection, prob, ask = "over", p_ov, float(pm_total_over_prob)
@@ -1007,20 +1040,7 @@ def build_cfb_slate(
                     u_ask = market_total_under_prob
                     edge_o = p_ov - float(o_ask)
                     edge_u = p_un - float(u_ask)
-                    if eff_tot > 56.5:
-                        pick_under = (edge_u >= edge_o) or (edge_u > 0.03)
-                    elif eff_tot <= 46.5:
-                        # Low totals: do not blind-buy Overs; require decisive edge > 0.06
-                        pick_under = not (edge_o > 0.06 and edge_o > edge_u)
-                    elif spread_mag > 14.5:
-                        # Blowout mismatches (>14.5) go Over 58.2%
-                        pick_under = edge_u > (edge_o + 0.02)
-                    elif spread_mag <= 7.0:
-                        # Tight competitive games (<=7.0) go Under 52.3%
-                        pick_under = (edge_u + 0.01) >= edge_o
-                    else:
-                        # Asymmetric Over hurdle: require decisive edge >= 0.04 to buy Over; otherwise default to Under
-                        pick_under = not (edge_o >= 0.04 and edge_o > edge_u)
+                    pick_under = edge_u >= edge_o
 
                     if not pick_under:
                         selection, prob, ask = "over", p_ov, float(o_ask)

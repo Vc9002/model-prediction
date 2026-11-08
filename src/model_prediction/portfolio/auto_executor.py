@@ -100,12 +100,33 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     "hockey-poisson-dc-v1",
     "darts-markov-v2",
     "darts-markov-v1",
+    "ncaab-spread-v6",
+    "ncaab-total-v6",
+    "ncaab-spread-v5",
+    "ncaab-total-v5",
+    "ncaab-tempo-v4",
+    "ncaab-tempo-v3",
     "ncaab-tempo-v2",
     "ncaab-tempo-v1",
     "eurolg-tempo-v2",
     "eurolg-tempo-v1",
     "nbl-tempo-v2",
     "nbl-tempo-v1",
+    "nba-moneyline-v8",
+    "nba-spread-margin-v8",
+    "nba-total-margin-v8",
+    "nba-moneyline-v9",
+    "nba-spread-margin-v9",
+    "nba-total-margin-v9",
+    "nfl-elo-trend-lr-v4",
+    "mlb-moneyline-v9-residual",
+    "mlb-structural-v10-frozen",
+    "dota2-contextual-v7",
+    "valorant-contextual-v7",
+    "lol-contextual-v7",
+    "soccer-market-residual-v1",
+    "soccer-total-market-residual-v1",
+    "tennis-market-residual-v1",
 )
 
 EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
@@ -166,11 +187,11 @@ EXECUTABLE_AUTO_BUYER_MARKET_TYPES = frozenset({"moneyline", "spread", "total", 
 ESPORTS_LEAGUES = frozenset({"cs2", "lol", "dota2", "valorant", "r6", "rainbow_six", "cod", "ow", "rl"})
 DISABLED_AUTO_BUYER_SPORT_MARKETS = frozenset({("mlb", "moneyline")})
 DEFAULT_AUTO_BUYER_UNIT_VALUE_USD = 0.50
-DEFAULT_AUTO_BUYER_MAX_EDGE = 0.08
+DEFAULT_AUTO_BUYER_MAX_EDGE = 0.25
 DEFAULT_MAX_DAILY_SPEND_UNITS = 50.0
 DEFAULT_MAX_GAME_STAKE_UNITS = 5.0
 DEFAULT_MAX_EVENT_LOOKAHEAD_HOURS = 24.0
-DEFAULT_MAX_MODEL_AGE_MINUTES = 12 * 60
+DEFAULT_MAX_MODEL_AGE_MINUTES = 24 * 60
 MAX_AUTO_BUYER_QUOTE_AGE_SECONDS = 300
 
 
@@ -178,8 +199,8 @@ MAX_AUTO_BUYER_QUOTE_AGE_SECONDS = 300
 class AutoExecutionConfig:
     unit_value_usd: float = DEFAULT_AUTO_BUYER_UNIT_VALUE_USD
     min_model_probability: float = 0.50  # Must be favored outcome (>= 50% win probability)
-    min_edge: float = 0.035  # Minimum +3.5% edge over market ask
-    max_edge: float = DEFAULT_AUTO_BUYER_MAX_EDGE  # Maximum +8.0% edge (roadmap hard edge ceiling)
+    min_edge: float = 0.035  # Minimum edge over market ask
+    max_edge: float = DEFAULT_AUTO_BUYER_MAX_EDGE  # Maximum edge
     max_daily_spend_usd: float = 25.0  # Daily budget cap
     max_game_stake_usd: float = 2.50  # Max dollars per game/pick
     min_shares: float = 1.0  # Polymarket minimum share size
@@ -199,7 +220,7 @@ class AutoExecutionConfig:
     min_tennis_edge: float | None = None  # Sport-specific tightened edge for Tennis (e.g. 0.08)
     max_tennis_price: float | None = None  # Sport-specific ceiling on market price for Tennis (e.g. 0.75)
     min_ncaaf_edge: float | None = 0.02  # Sport-specific calibrated edge for NCAAF (2.0%)
-    max_ncaaf_edge: float | None = 0.08  # Sport-specific blowout edge cap for NCAAF (8.0%)
+    max_ncaaf_edge: float | None = 0.15  # Sport-specific blowout edge cap for NCAAF (15.0%)
     max_moneyline_price: float | None = 0.72  # Ceiling on moneyline buy price (odds <= -260 / implied > 72%)
     auto_quarantine_underperforming: bool = True  # Dynamic circuit breaker against underperforming models
     auto_quarantine_min_picks: int = 15  # Minimum sample before evaluating rolling drawdown
@@ -295,6 +316,8 @@ def _capture_missing_active_snapshot_slates(
         return []
 
     root = Path(data_root)
+    if root.resolve() == (_paths.repo_root / "data").resolve():
+        root = _paths.runtime_root
     eastern = ZoneInfo("America/New_York")
     missing: set[tuple[str, str]] = set()
     for row in picks:
@@ -328,10 +351,8 @@ def _capture_missing_active_snapshot_slates(
             continue
         game_date = event_start.astimezone(eastern).date().isoformat()
         snapshot_path = root / "odds" / sport / game_date / "polymarket_snapshots.jsonl"
-        if data_root is None and not snapshot_path.exists():
-            runtime_snap = (
-                Path(r"E:\model-prediction-runtime\odds") / sport / game_date / "polymarket_snapshots.jsonl"
-            )
+        if not snapshot_path.exists():
+            runtime_snap = _paths.runtime_root / "odds" / sport / game_date / "polymarket_snapshots.jsonl"
             if runtime_snap.exists():
                 snapshot_path = runtime_snap
         is_missing = not snapshot_path.exists()
@@ -354,10 +375,13 @@ def _capture_missing_active_snapshot_slates(
     if not missing:
         return []
 
+    from model_prediction.cli.settle import _extract_market_slug
     from model_prediction.data_sources.polymarket_us import (
         PolymarketUSClient,
         capture_slate_snapshots,
     )
+
+    open_slugs = {slug for r in picks if (slug := _extract_market_slug(str(r.get("rationale", "")), r))}
 
     market_client = client or PolymarketUSClient()
     capture = capture_fn or capture_slate_snapshots
@@ -369,7 +393,16 @@ def _capture_missing_active_snapshot_slates(
                 date.fromisoformat(game_date),
                 "America/New_York",
             )
-            capture_result = capture(market_client, slate.events, root, game_date)
+            capture_kwargs: dict[str, Any] = {
+                "horizon_hours": config.max_event_lookahead_hours,
+                "ladder_keep": 2,
+                "ladder_leagues": frozenset({"NBA", "NCAAF", "NCAAB", "NFL", "NHL", "AHL"}),
+                "ladder_keep_slugs": frozenset(open_slugs),
+            }
+            try:
+                capture_result = capture(market_client, slate.events, root, game_date, **capture_kwargs)
+            except TypeError:
+                capture_result = capture(market_client, slate.events, root, game_date)
             results.append(
                 {
                     "sport": sport,
@@ -765,6 +798,9 @@ def run_auto_buyer_cycle(
         max_tennis_price=state.get("max_tennis_price"),
         min_ncaaf_edge=(float(state["min_ncaaf_edge"]) if state.get("min_ncaaf_edge") is not None else 0.02),
         max_ncaaf_edge=(float(state["max_ncaaf_edge"]) if state.get("max_ncaaf_edge") is not None else 0.08),
+        max_moneyline_price=(
+            float(state["max_moneyline_price"]) if state.get("max_moneyline_price") is not None else 0.72
+        ),
     )
 
     buyer = AutoPolymarketBuyer(config=config)
@@ -1289,7 +1325,7 @@ class AutoPolymarketBuyer:
 
         if (
             self._live_quote_fn is None
-            and (self.config.mode == "live" or self.config.execute_live)
+            and (self.config.mode in AUTO_BUYER_MODES or self.config.execute_live)
             and self.config.capture_missing_slates
         ):
             result.snapshot_captures = _capture_missing_active_snapshot_slates(

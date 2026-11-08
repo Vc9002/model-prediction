@@ -50,6 +50,7 @@ class BasketballLeagueConfig:
     # read lifetime games_played, giving max confidence on season openers).
     offseason_gap_days: float | None = None
     offseason_retention: float = 0.50
+    dynamic_volatility: bool = False
 
 
 NBA_CONFIG = BasketballLeagueConfig(
@@ -117,12 +118,7 @@ NCAAB_V3_CONFIG = BasketballLeagueConfig(
     pace=68.1,
     margin_sd=10.5,
     total_sd=13.8,
-    # Backtest-measured correction: v1/v2 underpredicted home margin by ~3.8-4.0
-    # points on average (see docs/handoffs backtest 2026-11-02); this also turns
-    # on coherent_moneyline so the Elo/margin blend actually reaches moneyline
-    # pricing, which v1/v2 never did (home_court_points/margin_sd had zero
-    # effect on moneyline since coherent_moneyline was never wired through).
-    home_court_points=7.2,
+    home_court_points=3.6,  # Calibrated modern NCAAB HCA (avoids double-counting with elo.home_advantage 60.0)
     baseline_points_per_team=71.4,
     elo_weight=0.50,
     trend_weight=0.50,
@@ -135,6 +131,7 @@ NCAAB_V3_CONFIG = BasketballLeagueConfig(
     # tuning for consistency.
     offseason_gap_days=150.0,
     offseason_retention=0.25,
+    dynamic_volatility=True,
 )
 
 WNCAAB_CONFIG = BasketballLeagueConfig(
@@ -306,6 +303,7 @@ class DedicatedBasketballLeagueModel:
             elo_home_advantage=config.elo_home_advantage,
             offseason_gap_days=config.offseason_gap_days,
             offseason_retention=config.offseason_retention,
+            dynamic_volatility=config.dynamic_volatility,
         )
 
     def predict_games(

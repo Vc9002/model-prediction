@@ -1844,7 +1844,7 @@ CFB_TEAMS: dict[str, CFBTeam] = {
         -106.7411,
         3980,
         False,
-        aliases=("New Mexico State", "NMSU"),
+        aliases=("New Mexico State", "NMSU", "NM State"),
     ),
     "Sam Houston Bearkats": CFBTeam(
         "Sam Houston Bearkats",

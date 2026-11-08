@@ -25,12 +25,12 @@ def main() -> int:
     if lock is None:
         # A forecast currently owns the writer lock. The next interval will
         # retry; this is an expected coordination skip, not a buyer failure.
-        print(json.dumps({"status": "skipped", "reason": "DAILY_WRITER_ALREADY_RUNNING"}))
+        print(json.dumps({"status": "skipped", "reason": "DAILY_WRITER_ALREADY_RUNNING"}), flush=True)
         return 0
     try:
         eastern_date = utc_now().astimezone(ZoneInfo("America/New_York")).date().isoformat()
         result = run_auto_buyer_cycle(forecast_date=eastern_date)
-        print(json.dumps({"status": "ok", **result}, default=str))
+        print(json.dumps({"status": "ok", **result}, default=str), flush=True)
         return 0
     finally:
         lock.close()

@@ -17,7 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -766,7 +766,7 @@ def _predict(
                 except (ValueError, TypeError):
                     pass
         if result_availability:
-            book._pending_results = pending
+            setattr(book, "_pending_results", pending)  # noqa: B010 - external state cache on book
     return output
 
 
@@ -1365,14 +1365,14 @@ def forecast_esports_slate(
         from .models.esports_derivatives import price_esports_bo3_derivatives, price_esports_bo5_derivatives
 
         match_bo, format_source = _explicit_series_format(event)
-        series_context = {"status": "not_requested", "best_of": None}
+        series_context: dict[str, Any] = {"status": "not_requested", "best_of": None}
         if schedule_context is not None:
             series_context = (
                 resolve_format(schedule_context, team_ids, event_start, observed_now)
                 if source_teams_resolved
                 else {"status": "source_identity_unresolved", "best_of": None}
             )
-            source_bo = series_context.get("best_of")
+            source_bo: int | None = series_context.get("best_of")
             if series_context["status"] == "matched":
                 if format_source == "conflicting_or_unsupported_format" or (
                     match_bo is not None and match_bo != source_bo
@@ -1442,7 +1442,7 @@ def forecast_esports_slate(
                     continue
                 raw_line = market.get("line") if market.get("line") is not None else snapshot.get("line")
                 try:
-                    exact_line = float(raw_line)
+                    exact_line = float(cast(Any, raw_line))
                 except (TypeError, ValueError):
                     exact_line = float("nan")
                 allowed_lines = (
@@ -1462,7 +1462,7 @@ def forecast_esports_slate(
             elif m_type == "total":
                 raw_line = market.get("line") if market.get("line") is not None else snapshot.get("line")
                 try:
-                    line_val = float(raw_line)
+                    line_val = float(cast(Any, raw_line))
                 except (ValueError, TypeError):
                     continue
                 if abs(line_val - 2.5) <= 0.1:
@@ -1491,7 +1491,7 @@ def forecast_esports_slate(
             elif m_type == "spread":
                 raw_line = market.get("line") if market.get("line") is not None else snapshot.get("line")
                 try:
-                    line_val = float(raw_line)
+                    line_val = float(cast(Any, raw_line))
                 except (ValueError, TypeError):
                     continue
                 abs_line = abs(line_val)

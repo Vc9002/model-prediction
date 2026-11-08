@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from .domain import parse_utc
 from .learned_replay import replay_snapshot as replay_learned
@@ -24,8 +24,10 @@ def _verified_model(market: str, row: dict[str, Any], captured_at: str) -> dict[
         artifact = snapshot["artifact"]
         if snapshot["artifact_hash"] != compute_artifact_hash(artifact):
             raise ValueError("artifact_hash_mismatch")
-        if not parse_utc(snapshot["observed_at_utc"]) <= parse_utc(captured_at) < parse_utc(
-            snapshot["event_start_utc"]
+        if (
+            not parse_utc(snapshot["observed_at_utc"])
+            <= parse_utc(captured_at)
+            < parse_utc(snapshot["event_start_utc"])
         ):
             raise ValueError("snapshot_timing_invalid")
         if market == "moneyline":
@@ -59,7 +61,10 @@ def _verified_quote(
         observed = parse_utc(lineage["market_quote_observed_at_utc"])
         if not observed <= parse_utc(captured_at) < parse_utc(event_start):
             return None
-        if lineage["market_quote_timestamp_valid"] is not True or lineage["market_quote_reconstructed"] is not False:
+        if (
+            lineage["market_quote_timestamp_valid"] is not True
+            or lineage["market_quote_reconstructed"] is not False
+        ):
             return None
         if lineage["market_quote_source"] != "polymarket_us":
             return None
@@ -87,9 +92,12 @@ def _verified_quote(
             return None
         if original.get("observed_at_utc") != lineage["market_quote_observed_at_utc"]:
             return None
-        if any(float((original.get(side) or {}).get("ask")) != float(quote[f"{side}_ask"]) for side in ("long", "short")):
+        if any(
+            float(cast(Any, (original.get(side) or {}).get("ask"))) != float(quote[f"{side}_ask"])
+            for side in ("long", "short")
+        ):
             return None
-        if "line" in quote and float(original.get("line")) != float(quote["line"]):
+        if "line" in quote and float(cast(Any, original.get("line"))) != float(quote["line"]):
             return None
     except (KeyError, TypeError, ValueError, OSError):
         return None
@@ -114,7 +122,7 @@ def capture_packets(
         event_start = str(first["event_start_utc"])
         if parse_utc(captured_at) >= parse_utc(event_start):
             continue
-        entries = {}
+        entries: dict[str, dict[str, Any]] = {}
         for market in ("moneyline", "spread", "total"):
             row = markets.get(market)
             if row is None:

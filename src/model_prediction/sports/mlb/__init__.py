@@ -3,5 +3,6 @@
 from __future__ import annotations
 
 from . import derivatives, moneyline, spread, total
+from .adapter import MLBAdapter
 
-__all__ = ["derivatives", "moneyline", "spread", "total"]
+__all__ = ["MLBAdapter", "derivatives", "moneyline", "spread", "total"]

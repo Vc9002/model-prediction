@@ -3,5 +3,6 @@
 from __future__ import annotations
 
 from . import moneyline, spread, total
+from .adapter import BasketballAdapter
 
-__all__ = ["moneyline", "spread", "total"]
+__all__ = ["BasketballAdapter", "moneyline", "spread", "total"]

@@ -27,7 +27,7 @@ import json
 import re
 from datetime import date, datetime, time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from .data_sources.espn import _infer_tennis_surface
 from .domain import EASTERN, parse_utc
@@ -409,7 +409,7 @@ def build_tennis_slate(
                 home_side_key = "short" if away_side_key == "long" else "long"
 
                 # Two-sided value evaluation: evaluate both sides and select highest edge
-                candidates = []
+                candidates: list[dict[str, Any]] = []
                 for side_sel, side_prob, side_key in (
                     ("away", p_away, away_side_key),
                     ("home", p_home, home_side_key),
@@ -476,7 +476,7 @@ def build_tennis_slate(
                 except (KeyError, TypeError, ValueError):
                     continue
 
-                best_of = int((prediction.inference_inputs or {}).get("best_of", 3))
+                best_of = int(cast(Any, (prediction.inference_inputs or {}).get("best_of", 3)))
                 match_surface = str((prediction.feature_basis or {}).get("surface") or "Hard")
                 p_serve_a, p_serve_b = serve_pair_for_win_probability(
                     p_away, prediction.league, best_of, surface=match_surface
@@ -524,11 +524,13 @@ def build_tennis_slate(
                     continue
 
                 if edge_long >= edge_short:
+                    assert long_ask is not None
                     selection = "away" if is_team_away else "home"
                     selection_line = c_line
                     prob = p_long
                     ask = float(long_ask)
                 else:
+                    assert short_ask is not None
                     selection = "home" if is_team_away else "away"
                     selection_line = -c_line
                     prob = p_short
@@ -568,7 +570,7 @@ def build_tennis_slate(
                 except (KeyError, TypeError, ValueError):
                     continue
 
-                best_of = int((prediction.inference_inputs or {}).get("best_of", 3))
+                best_of = int(cast(Any, (prediction.inference_inputs or {}).get("best_of", 3)))
                 match_surface = str((prediction.feature_basis or {}).get("surface") or "Hard")
                 p_serve_a, p_serve_b = serve_pair_for_win_probability(
                     p_away, prediction.league, best_of, surface=match_surface
@@ -602,10 +604,12 @@ def build_tennis_slate(
                     continue
 
                 if edge_over >= edge_under:
+                    assert long_ask is not None
                     selection = "over"
                     prob = p_over
                     ask = float(long_ask)
                 else:
+                    assert short_ask is not None
                     selection = "under"
                     prob = p_under
                     ask = float(short_ask)

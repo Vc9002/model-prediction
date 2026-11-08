@@ -3,5 +3,6 @@
 from __future__ import annotations
 
 from . import moneyline, spread, total
+from .adapter import NCAAFAdapter
 
-__all__ = ["moneyline", "spread", "total"]
+__all__ = ["NCAAFAdapter", "moneyline", "spread", "total"]

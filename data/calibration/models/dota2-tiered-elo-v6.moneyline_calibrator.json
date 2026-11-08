@@ -1,11 +1,43 @@
 {
-  "baseline_brier": 0.24278,
-  "calibrated_at_utc": "2026-11-02T21:04:51.778488+00:00",
-  "calibrated_oof_brier": 0.24277975812841013,
-  "champion_method": "identity",
+  "baseline_brier": 0.245018,
+  "calibrated_at_utc": "2026-11-08T21:01:44.643328+00:00",
+  "calibrated_oof_brier": 0.24362060754088588,
+  "champion_method": "isotonic",
   "market": "moneyline",
   "model_version": "dota2-tiered-elo-v6",
-  "parameters": {},
-  "sample_size": 217,
+  "parameters": {
+    "max_val": 1.0,
+    "min_val": 0.3333,
+    "num_thresholds": 12,
+    "thresholds": [
+      0.501945,
+      0.534269,
+      0.536059,
+      0.536188,
+      0.548995,
+      0.55826,
+      0.57645,
+      0.57834,
+      0.677164,
+      0.779894,
+      0.798889,
+      0.805779
+    ],
+    "values": [
+      0.333333,
+      0.391892,
+      0.5,
+      0.5,
+      0.533333,
+      0.533333,
+      0.535714,
+      0.6,
+      0.626667,
+      0.692308,
+      1.0,
+      1.0
+    ]
+  },
+  "sample_size": 250,
   "sport": "dota2"
 }

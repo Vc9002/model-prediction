@@ -112,6 +112,12 @@ SPORTS = (
     "rainbow_six",
     "kbo",
     "npb",
+    "hockey",
+    "darts",
+    "ncaab",
+    "euroleague",
+    "nbl",
+    "wncaab",
 )
 GATEWAY = "https://gateway.polymarket.us"
 
@@ -260,6 +266,8 @@ _REFRESHING: set[str] = set()
 
 
 def _refresh_in_background(key: str, ttl: float, builder) -> None:
+    if _WARMING.get("on"):
+        return
     with _CACHE_LOCK:
         if key in _REFRESHING:
             return
@@ -289,25 +297,34 @@ def _cache_rebuild(key: str, builder):
 
 
 _SNAPSHOT_FILE = DASH_DIR / "cache_snapshot.pkl"
+_SNAPSHOT_LOCK = threading.Lock()
 
 
 def _cache_snapshot_save(keys) -> None:
     """Persist warmed entries so the next start serves them instantly (as stale)."""
     import pickle
 
-    now_m, now_w = time.monotonic(), time.time()
-    with _CACHE_LOCK:
-        payload = {k: (now_w - (now_m - _CACHE[k][0]), _CACHE[k][1]) for k in keys if k in _CACHE}
-    tmp = _SNAPSHOT_FILE.with_suffix(".tmp")
-    tmp.write_bytes(pickle.dumps(payload, protocol=pickle.HIGHEST_PROTOCOL))
-    for attempt in range(5):
+    with _SNAPSHOT_LOCK:
+        now_m, now_w = time.monotonic(), time.time()
+        with _CACHE_LOCK:
+            payload = {k: (now_w - (now_m - _CACHE[k][0]), _CACHE[k][1]) for k in keys if k in _CACHE}
+        tmp = _SNAPSHOT_FILE.with_suffix(f".{os.getpid()}_{threading.get_ident()}.tmp")
         try:
-            os.replace(tmp, _SNAPSHOT_FILE)
-            break
-        except (PermissionError, OSError):
-            if attempt == 4:
-                raise
-            time.sleep(0.05 * (attempt + 1))
+            tmp.write_bytes(pickle.dumps(payload, protocol=pickle.HIGHEST_PROTOCOL))
+            for attempt in range(5):
+                try:
+                    os.replace(tmp, _SNAPSHOT_FILE)
+                    break
+                except (PermissionError, OSError):
+                    if attempt == 4:
+                        raise
+                    time.sleep(0.05 * (attempt + 1))
+        finally:
+            if tmp.exists():
+                try:
+                    tmp.unlink()
+                except OSError:
+                    pass
 
 
 def _cache_snapshot_load() -> int:
@@ -401,7 +418,7 @@ def _runtime_paths():
 
 def rebuild_view(name: str) -> dict:
     """Return one isolated rebuild projection without importing writer classes."""
-    from dashboard.rebuild_status import read_rebuild_view  # type: ignore[import-not-found]
+    from dashboard.rebuild_status import read_rebuild_view
 
     try:
         paths = _runtime_paths()

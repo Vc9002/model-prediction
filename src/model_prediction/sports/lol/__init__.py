@@ -1,7 +1,8 @@
-"""LOL Sport Module."""
+"""LoL Sport Module."""
 
 from __future__ import annotations
 
 from . import moneyline, spread, total
+from .adapter import LoLAdapter
 
-__all__ = ["moneyline", "spread", "total"]
+__all__ = ["LoLAdapter", "moneyline", "spread", "total"]

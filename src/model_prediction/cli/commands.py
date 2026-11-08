@@ -89,13 +89,14 @@ logger = logging.getLogger("model_prediction.cli")
 
 
 def _capture_horizon_hours() -> float | None:
-    """Hours ahead to price books for (env POLYMARKET_CAPTURE_HORIZON_HOURS, default 12).
+    """Hours ahead to price books for (env POLYMARKET_CAPTURE_HORIZON_HOURS, default 24).
 
-    With four daily runs every game starts inside the horizon of at least two
-    runs. Zero, negative or invalid disables the filter.
+    With 24h default horizon, Saturday and Sunday slates spanning noon to late night
+    are captured in full rather than truncated by an early morning cycle.
+    Zero, negative or invalid disables the filter.
     """
     try:
-        hours = float(os.environ.get("POLYMARKET_CAPTURE_HORIZON_HOURS", "12"))
+        hours = float(os.environ.get("POLYMARKET_CAPTURE_HORIZON_HOURS", "24"))
     except ValueError:
         return None
     return hours if hours > 0 else None
@@ -115,23 +116,30 @@ def _capture_ladder_keep() -> int | None:
     return keep if keep > 0 else None
 
 
-def _open_pick_slugs(data_root: Path, sport: str = "ncaaf") -> frozenset[str]:
+def _open_pick_slugs(data_root: Path, sport: str | None = None) -> frozenset[str]:
     """Market slugs of open Main/Flat picks, so ladder pruning never starves their CLV history.
 
     Fail-soft: a ledger read error only loses the safeguard, it must not stop capture.
     """
-    from ..main_ledgers import flat_ledger, main_ledger
+    from ..main_ledgers import existing_flat_ledgers, existing_main_ledgers, flat_ledger, main_ledger
     from .settle import _extract_market_slug
 
     slugs: set[str] = set()
-    for open_ledger in (main_ledger, flat_ledger):
+    if sport is not None:
+        target_ledgers = [main_ledger(data_root, sport), flat_ledger(data_root, sport)]
+    else:
+        target_ledgers = existing_main_ledgers(data_root) + existing_flat_ledgers(data_root)
+
+    for open_ledger in target_ledgers:
         try:
-            for row in open_ledger(data_root, sport).rows({"status": "open"}):
-                slug = _extract_market_slug(str(row.get("rationale", "")))
+            for row in open_ledger.rows({"status": "open"}):
+                slug = _extract_market_slug(str(row.get("rationale", "")), row)
                 if slug:
                     slugs.add(slug)
         except Exception:
-            logger.warning("open-pick slug lookup failed for %s", open_ledger.__name__, exc_info=True)
+            logger.warning(
+                "open-pick slug lookup failed for %s", getattr(open_ledger, "sport", "ledger"), exc_info=True
+            )
     return frozenset(slugs)
 
 
@@ -185,6 +193,10 @@ def _polymarket_slate(args, config) -> dict:
         ladder_keep = 3
     if ladder_keep is None and "NCAAB" in events:
         ladder_keep = 1
+    if ladder_keep is None and "NCAAF" in events:
+        ladder_keep = 2
+    if ladder_keep is None and "NFL" in events:
+        ladder_keep = 2
     snapshot_root = Path(ledger_path(config)).parent
     # Mirror snapshot_archives.snapshot_paths's read-side reroute: forecast.py
     # looks for captured quotes under the external runtime root once one is
@@ -207,12 +219,8 @@ def _polymarket_slate(args, config) -> dict:
             args.date,
             horizon_hours=_capture_horizon_hours(),
             ladder_keep=ladder_keep,
-            ladder_leagues=frozenset({"NBA", "NCAAF", "NCAAB"}),
-            ladder_keep_slugs=(
-                _open_pick_slugs(snapshot_root) | _open_pick_slugs(snapshot_root, "nba")
-                if ladder_keep
-                else frozenset()
-            ),
+            ladder_leagues=frozenset({"NBA", "NCAAF", "NCAAB", "NFL"}),
+            ladder_keep_slugs=(_open_pick_slugs(snapshot_root, None) if ladder_keep else frozenset()),
         )
     )
     missing_nba = bbo_capture.get("nba_missing_quote_event_ids", {})

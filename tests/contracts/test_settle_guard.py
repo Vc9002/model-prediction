@@ -18,9 +18,14 @@ from model_prediction.cli import settle as settle_module
 class _FakeLedger:
     def __init__(self, rows: list[dict]) -> None:
         self._rows = rows
+        self.voided_calls: list[tuple[str, str]] = []
 
     def rows(self) -> list[dict]:
         return list(self._rows)
+
+    def void(self, pick_id: str, reason: str) -> dict:
+        self.voided_calls.append((pick_id, reason))
+        return {"pick_id": pick_id, "status": "void", "reason": reason}
 
 
 class _FakeESPNClient:
@@ -65,6 +70,10 @@ def _open_row(league: str, event_start_utc: str) -> dict:
 def _run_settle(monkeypatch, tmp_path, rows: list[dict]) -> dict:
     monkeypatch.setattr(settle_module, "ESPNClient", _FakeESPNClient)
     monkeypatch.setattr(settle_module, "MarketOddsSnapshotStore", _FakeSnapshotStore)
+    monkeypatch.setattr(
+        "model_prediction.international_baseball.find_international_baseball_result",
+        lambda *args, **kwargs: None,
+    )
     config = {
         "project": {
             "ledger_path": str(tmp_path / "ledgers.db"),
@@ -346,3 +355,114 @@ def test_doubleheader_fallback_disambiguates_by_start_time():
     assert res_afternoon is not None
     assert res_afternoon["away_score"] == 3
     assert res_afternoon["home_score"] == 5
+
+
+def test_find_espn_result_matches_inverted_neutral_site():
+    """When a game has inverted home/away (e.g. neutral site or sportsbook flip),
+    _find_espn_result aligns scores so away_score matches row's away team."""
+    scoreboard = {
+        "events": [
+            {
+                "id": "neutral-game-id",
+                "date": "2026-11-02T19:00:00Z",
+                "competitions": [
+                    {
+                        "status": {"type": {"name": "STATUS_FINAL", "completed": True}},
+                        "competitors": [
+                            {"homeAway": "away", "score": "59", "team": {"displayName": "Team Beta"}},
+                            {"homeAway": "home", "score": "68", "team": {"displayName": "Team Alpha"}},
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+    espn = _CountingESPNClient(scoreboard)
+    # Row has Team Alpha as away, Team Beta as home
+    row = {
+        "league": "NCAAB",
+        "away_team": "Team Alpha",
+        "original_away_team": "Team Alpha",
+        "home_team": "Team Beta",
+        "original_home_team": "Team Beta",
+        "event_id": "non-matching-id",
+        "event_start_utc": "2026-11-02T19:00:00Z",
+    }
+    res = settle_module._find_espn_result(espn, ("NCAAB",), "2026-11-02", row)
+    assert res is not None
+    assert res["completed"] is True
+    # Row's away team is Team Alpha, which scored 68 (ESPN home)
+    assert res["away_score"] == 68
+    # Row's home team is Team Beta, which scored 59 (ESPN away)
+    assert res["home_score"] == 59
+
+
+def test_kbo_stale_game_voids_after_36_hours(monkeypatch, tmp_path) -> None:
+    old_start = (datetime.now(UTC) - timedelta(hours=40)).isoformat()
+    result = _run_settle(monkeypatch, tmp_path, [_open_row("KBO", old_start)])
+
+    assert "p-KBO" in result["voided"]
+    assert result["still_open"] == []
+
+
+def test_kbo_recent_game_stays_pending(monkeypatch, tmp_path) -> None:
+    recent_start = (datetime.now(UTC) - timedelta(hours=2)).isoformat()
+    result = _run_settle(monkeypatch, tmp_path, [_open_row("KBO", recent_start)])
+
+    assert "p-KBO" in result["still_open"]
+    assert "p-KBO" not in result["voided"]
+
+
+def test_find_espn_result_matches_common_college_aliases():
+    """Verify that _find_espn_result handles college team alias and mascot variations."""
+    scoreboard = {
+        "events": [
+            {
+                "id": "game-msu-toledo",
+                "date": "2026-11-05T23:00:00Z",
+                "competitions": [
+                    {
+                        "status": {"type": {"name": "STATUS_FINAL", "completed": True}},
+                        "competitors": [
+                            {
+                                "homeAway": "away",
+                                "score": "61",
+                                "team": {
+                                    "displayName": "Toledo Rockets",
+                                    "shortDisplayName": "Toledo",
+                                    "location": "Toledo",
+                                    "name": "Rockets",
+                                },
+                            },
+                            {
+                                "homeAway": "home",
+                                "score": "91",
+                                "team": {
+                                    "displayName": "Michigan State Spartans",
+                                    "shortDisplayName": "Michigan St",
+                                    "location": "Michigan State",
+                                    "name": "Spartans",
+                                },
+                            },
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+    espn = _CountingESPNClient(scoreboard)
+    # Row has "Mich. State" vs "Toledo Rockets"
+    row = {
+        "league": "NCAAB",
+        "away_team": "Toledo Rockets",
+        "original_away_team": "Toledo Rockets",
+        "home_team": "Mich. State",
+        "original_home_team": "Mich. State",
+        "event_id": "non-matching-id",
+        "event_start_utc": "2026-11-05T23:00:00Z",
+    }
+    res = settle_module._find_espn_result(espn, ("NCAAB",), "2026-11-05", row)
+    assert res is not None
+    assert res["completed"] is True
+    assert res["home_score"] == 91
+    assert res["away_score"] == 61

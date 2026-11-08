@@ -1,7 +1,8 @@
-"""RAINBOW_SIX Sport Module."""
+"""Rainbow Six Sport Module."""
 
 from __future__ import annotations
 
 from . import moneyline, spread, total
+from .adapter import RainbowSixAdapter
 
-__all__ = ["moneyline", "spread", "total"]
+__all__ = ["RainbowSixAdapter", "moneyline", "spread", "total"]

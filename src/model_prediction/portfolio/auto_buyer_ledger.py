@@ -46,6 +46,57 @@ AUTO_BUYER_JSONL_PATH = DATA / "auto_buyer_ledger.jsonl"
 AUTO_BUYER_XLSX_PATH = DATA / "auto_buyer_picks.xlsx"
 AUTO_BUYER_LOG_PATH = LOGS_DIR / "auto_buyer.log"
 
+
+def resolve_auto_buyer_paths(
+    data_root: Path | str | None = None,
+    jsonl_path: Path | str | None = None,
+    xlsx_path: Path | str | None = None,
+) -> tuple[Path, Path]:
+    """Resolve JSONL and XLSX paths for the Auto-Buyer ledger.
+
+    Checks direct path, paper_auto_buyer subdirectory under data_root/DATA,
+    and runtime_root fallback.
+    """
+    if jsonl_path and xlsx_path:
+        return Path(jsonl_path), Path(xlsx_path)
+    if jsonl_path and not xlsx_path:
+        j = Path(jsonl_path)
+        x = j.with_name(j.name.replace(".jsonl", ".xlsx")).with_suffix(".xlsx")
+        return j, x
+
+    root = Path(data_root) if data_root else None
+    paths = RuntimePaths.resolve()
+
+    if root is not None:
+        # 1. Check subfolder under specified root
+        j_sub = root / "paper_auto_buyer" / "auto_buyer_ledger.jsonl"
+        x_sub = root / "paper_auto_buyer" / "auto_buyer_picks.xlsx"
+        if j_sub.exists():
+            return j_sub, x_sub
+        # 2. Check direct path under specified root
+        j_cand = root / "auto_buyer_ledger.jsonl"
+        x_cand = root / "auto_buyer_picks.xlsx"
+        if j_cand.exists():
+            return j_cand, x_cand
+
+    # 3. Prefer live runtime_root / paper_auto_buyer
+    try:
+        j_rt = paths.runtime_root / "paper_auto_buyer" / "auto_buyer_ledger.jsonl"
+        x_rt = paths.runtime_root / "paper_auto_buyer" / "auto_buyer_picks.xlsx"
+        if j_rt.exists():
+            return j_rt, x_rt
+    except (OSError, RuntimeError, ValueError):
+        pass
+
+    # 4. Fallback to DATA (repo_root / data)
+    repo_sub_j = DATA / "paper_auto_buyer" / "auto_buyer_ledger.jsonl"
+    repo_sub_x = DATA / "paper_auto_buyer" / "auto_buyer_picks.xlsx"
+    if repo_sub_j.exists():
+        return repo_sub_j, repo_sub_x
+
+    return DATA / "auto_buyer_ledger.jsonl", DATA / "auto_buyer_picks.xlsx"
+
+
 logger = logging.getLogger("model_prediction.auto_buyer")
 
 AUTO_BUYER_UNIT_VALUE_USD = 0.50  # 1U = 50 cents
@@ -455,9 +506,8 @@ def reconcile_pending_auto_buyer_fallbacks(
       below the minimum threshold or turned negative, the resting order is
       cancelled to prevent adverse fills.
     """
-    root = Path(data_root) if data_root else DATA
-    j_path = root / "auto_buyer_ledger.jsonl"
-    x_path = root / "auto_buyer_picks.xlsx"
+    j_path, x_path = resolve_auto_buyer_paths(data_root=data_root)
+    root = j_path.parent
     empty = {"reconciled_filled": 0, "cancelled_expired": 0, "still_pending": 0, "errors": 0}
     if not j_path.exists():
         return empty
@@ -735,7 +785,7 @@ def read_auto_buyer_ledger(
     jsonl_path: Path | str | None = None,
 ) -> list[dict[str, Any]]:
     """Read all entries from the Auto-Buyer JSONL ledger."""
-    j_path = Path(jsonl_path) if jsonl_path else AUTO_BUYER_JSONL_PATH
+    j_path = Path(jsonl_path) if jsonl_path else resolve_auto_buyer_paths()[0]
     if not j_path.exists():
         return []
     records = []
@@ -1000,8 +1050,8 @@ def manually_settle_auto_buyer_order(
     if settlement_price is not None and not 0.0 <= float(settlement_price) <= 1.0:
         raise ValueError("settlement_price must be between 0 and 1")
 
-    root = Path(data_root) if data_root else DATA
-    j_path = root / "auto_buyer_ledger.jsonl"
+    j_path, _ = resolve_auto_buyer_paths(data_root=data_root)
+    root = j_path.parent
     records = read_auto_buyer_ledger(jsonl_path=j_path)
     target = None
     for r in records:
@@ -1075,9 +1125,8 @@ def settle_auto_buyer_ledger(
     esports_client: Any | None = None,
 ) -> dict[str, Any]:
     """Settle completed matches in the Auto-Buyer Ledger and compute realized PnL."""
-    root = Path(data_root) if data_root else DATA
-    j_path = root / "auto_buyer_ledger.jsonl"
-    x_path = root / "auto_buyer_picks.xlsx"
+    j_path, x_path = resolve_auto_buyer_paths(data_root=data_root)
+    root = j_path.parent
     _esports_cache: dict[str, dict[str, Any]] = {}
     _polymarket_market_cache: dict[str, dict[str, Any]] = {}
     _polymarket_market_client: Any | None = polymarket_client
@@ -1446,8 +1495,18 @@ def settle_auto_buyer_ledger(
                     elif (
                         len(prices) == 2
                         and token_side in {"long", "short"}
-                        and sport not in ESPORTS_TITLE_BY_SPORT
-                        and "last fair market price" in str(m_info.get("description") or "").lower()
+                        and (
+                            len(terminal_winners) == 0
+                            or any(
+                                term in str(m_info.get("description") or "").lower()
+                                for term in (
+                                    "fair market price",
+                                    "fair price",
+                                    "last fair market price",
+                                    "settle to fair",
+                                )
+                            )
+                        )
                     ):
                         settlement_index = 0 if token_side == "long" else 1
                         r["settlement_type"] = "fair_value"
@@ -1570,14 +1629,31 @@ def settle_auto_buyer_ledger(
                         break
             except (httpx.HTTPError, OSError, ValueError, KeyError, TypeError, RuntimeError):
                 pass
-        elif result is None and sport in ("MLB", "WNBA", "NBA", "NFL", "SOCCER", "NCAAF", "CFB"):
+        elif result is None and sport in (
+            "MLB",
+            "WNBA",
+            "NBA",
+            "NFL",
+            "SOCCER",
+            "NCAAF",
+            "CFB",
+            "NCAAB",
+            "CBB",
+            "NHL",
+            "HOCKEY",
+        ):
             try:
                 game_day = start_dt.strftime("%Y%m%d")
-                espn_lg = (
-                    "soccer_all"
-                    if sport == "SOCCER"
-                    else ("ncaaf" if sport in ("NCAAF", "CFB") else sport.lower())
-                )
+                if sport == "SOCCER":
+                    espn_lg = "soccer_all"
+                elif sport in ("NCAAF", "CFB"):
+                    espn_lg = "ncaaf"
+                elif sport in ("NCAAB", "CBB"):
+                    espn_lg = "ncaab"
+                elif sport in ("NHL", "HOCKEY"):
+                    espn_lg = "nhl"
+                else:
+                    espn_lg = sport.lower()
                 sb = _get_scoreboard(espn_lg, game_day)
                 for ev in sb.get("events", []):
                     comp = (ev.get("competitions") or [{}])[0]
@@ -1668,7 +1744,18 @@ def settle_auto_buyer_ledger(
                         m_info.get("status") == "MARKET_STATUS_RESOLVED"
                         and len(prices) == 2
                         and token_side in {"long", "short"}
-                        and "last fair market price" in str(m_info.get("description") or "").lower()
+                        and (
+                            len(terminal_winners) == 0
+                            or any(
+                                term in str(m_info.get("description") or "").lower()
+                                for term in (
+                                    "fair market price",
+                                    "fair price",
+                                    "last fair market price",
+                                    "settle to fair",
+                                )
+                            )
+                        )
                     ):
                         # Sports markets explicitly use the final fair price
                         # for walkovers, cancellations, forfeits, and other

@@ -1,13 +1,13 @@
 {
-  "baseline_brier": 0.17996,
-  "calibrated_at_utc": "2026-11-02T21:04:51.778488+00:00",
-  "calibrated_oof_brier": 0.17971448309345897,
+  "baseline_brier": 0.181438,
+  "calibrated_at_utc": "2026-11-08T21:01:44.643328+00:00",
+  "calibrated_oof_brier": 0.18164696017320206,
   "champion_method": "temperature",
   "market": "double_chance",
   "model_version": "soccer-poisson-dc-v3",
   "parameters": {
-    "temperature": 0.8
+    "temperature": 0.9
   },
-  "sample_size": 153,
+  "sample_size": 164,
   "sport": "soccer"
 }

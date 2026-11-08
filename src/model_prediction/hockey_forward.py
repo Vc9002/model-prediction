@@ -323,7 +323,7 @@ def build_hockey_slate(
 
             if m_type == "moneyline" and pred_ml:
                 # Evaluate both home and away
-                candidates = []
+                ml_candidates: list[dict[str, Any]] = []
                 for side in sides:
                     sel = side.get("selection", "").lower()
                     desc = side.get("description", "")
@@ -339,7 +339,7 @@ def build_hockey_slate(
                     side_key = "home" if is_home else "away"
                     model_prob = pred_ml.probabilities[side_key]
                     edge = model_prob - ask
-                    candidates.append(
+                    ml_candidates.append(
                         {
                             "selection": side_key,
                             "market_slug": m_slug,
@@ -350,9 +350,9 @@ def build_hockey_slate(
                         }
                     )
 
-                if candidates:
+                if ml_candidates:
                     # Select side with highest edge
-                    best = max(candidates, key=lambda c: (c["edge"], c["model_probability"]))
+                    best = max(ml_candidates, key=lambda c: (c["edge"], c["model_probability"]))
                     priced.append(
                         {
                             "event_id": ev_id,
@@ -378,11 +378,11 @@ def build_hockey_slate(
                     )
 
             elif m_type == "spread" and market is main_spread and spreads_by_line:
-                candidates = []
+                spread_candidates: list[tuple[float, str, float, float, float, Any]] = []
                 for side in sides:
                     ask = side.get("price_probability")
-                    line = side.get("line")
-                    if ask is None or not (0 < ask < 1) or line is None:
+                    side_line = side.get("line")
+                    if ask is None or not (0 < ask < 1) or side_line is None:
                         continue
                     sample_pred = next(iter(spreads_by_line.values()))
                     sel = side.get("selection", "").lower()
@@ -393,29 +393,33 @@ def build_hockey_slate(
                         continue
                     # Model lines are home handicaps: a home side at L is the home cover at L;
                     # an away side at L covers exactly when home fails at -L.
-                    pred = spreads_by_line.get(float(line) if home_match else -float(line))
-                    if pred is None:
+                    line_pred = spreads_by_line.get(float(side_line) if home_match else -float(side_line))
+                    if line_pred is None:
                         continue
                     side_key = "home" if home_match else "away"
-                    model_prob = pred.probabilities[side_key]
-                    candidates.append((model_prob - ask, side_key, float(line), model_prob, ask, pred))
-                if candidates:
-                    edge, side_key, line, model_prob, ask, pred = max(candidates, key=lambda c: (c[0], c[3]))
+                    model_prob = line_pred.probabilities[side_key]
+                    spread_candidates.append(
+                        (model_prob - ask, side_key, float(side_line), model_prob, ask, line_pred)
+                    )
+                if spread_candidates:
+                    edge, side_key, line, model_prob, ask, line_pred = max(
+                        spread_candidates, key=lambda c: (c[0], c[3])
+                    )
                     priced.append(
                         {
                             "event_id": ev_id,
-                            "league": pred.league,
-                            "event_start_utc": pred.event_start_utc,
-                            "away_team": pred.away_team,
-                            "home_team": pred.home_team,
+                            "league": line_pred.league,
+                            "event_start_utc": line_pred.event_start_utc,
+                            "away_team": line_pred.away_team,
+                            "home_team": line_pred.home_team,
                             "market_type": "spread",
                             "selection": side_key,
                             "line": line,
                             "model_probability": round(model_prob, 6),
-                            "model_uncertainty": pred.uncertainty,
-                            "model_version": pred.model_version,
-                            "feature_basis": pred.feature_basis,
-                            "rationale": pred.rationale,
+                            "model_uncertainty": line_pred.uncertainty,
+                            "model_version": line_pred.model_version,
+                            "feature_basis": line_pred.feature_basis,
+                            "rationale": line_pred.rationale,
                             "market_slug": m_slug,
                             "executable_ask": round(ask, 4),
                             "observed_at_utc": observed.isoformat(),
@@ -426,22 +430,23 @@ def build_hockey_slate(
                     )
 
             elif m_type == "total" and market is main_total and totals_by_line:
+                assert market is not None
                 market_line = market.get("line")
                 if market_line is None:
                     continue
                 pred_tot = totals_by_line.get(float(market_line))
                 if pred_tot is None:
                     continue
-                candidates = []
+                total_candidates: list[tuple[float, str, float, float]] = []
                 for side in sides:
                     sel = side.get("selection", "").lower()
                     ask = side.get("price_probability")
                     if ask is None or not (0 < ask < 1) or sel not in {"over", "under"}:
                         continue
                     model_prob = pred_tot.probabilities.get(sel, 0.5)
-                    candidates.append((model_prob - ask, sel, model_prob, ask))
-                if candidates:
-                    edge, sel, model_prob, ask = max(candidates, key=lambda c: (c[0], c[2]))
+                    total_candidates.append((model_prob - ask, sel, model_prob, ask))
+                if total_candidates:
+                    edge, sel, model_prob, ask = max(total_candidates, key=lambda c: (c[0], c[2]))
                     priced.append(
                         {
                             "event_id": ev_id,

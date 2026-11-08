@@ -27,6 +27,7 @@ SUPPORTED_SPORTS: tuple[str, ...] = (
     "hockey",
     "darts",
     "basketball",
+    "ncaab",
 )
 
 
@@ -43,6 +44,7 @@ def get_bet_type_module(sport: str, bet_type: str) -> ModuleType:
     return importlib.import_module(f"model_prediction.sports.{normalized_sport}.{normalized_bet}")
 
 
+from .base import SportAdapter, SportRegistry
 from .naming import (
     MODEL_ALIASES,
     MODEL_CATALOG,
@@ -59,6 +61,8 @@ __all__ = [
     "MODEL_CATALOG",
     "SUPPORTED_SPORTS",
     "ModelDescriptor",
+    "SportAdapter",
+    "SportRegistry",
     "canonical_model_id",
     "display_model_name",
     "get_bet_type_module",

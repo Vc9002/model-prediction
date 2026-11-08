@@ -151,7 +151,12 @@ def promote(
     if not candidate.available:
         raise ValueError(f"model '{new_model_id}' failed contract validation: {candidate.load_error}")
     # The candidate must be registered for the sport/market it will serve.
-    if candidate.sport.lower() != sport.lower() or candidate.market.lower() != market.lower():
+    # A "multi"/"all" entry (one code-backed model serving every market for a
+    # sport, e.g. the basketball leagues) matches any requested market --
+    # same semantics as ProductionModelRegistry.resolve()/champion().
+    candidate_markets = {m.strip().lower() for m in candidate.market.split(",")}
+    serves_market = market.lower() in candidate_markets or candidate.market.lower() in ("multi", "all")
+    if candidate.sport.lower() != sport.lower() or not serves_market:
         raise ValueError(
             f"'{new_model_id}' is registered for {candidate.sport} {candidate.market}, not {sport} {market}"
         )

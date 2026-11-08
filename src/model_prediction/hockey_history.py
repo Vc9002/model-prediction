@@ -124,10 +124,10 @@ def backfill_nhl_seasons(existing: dict, game_date: date, client: NHLClient | No
     for row, home_abbrev, away_abbrev in collected:
         # One franchise, one rating: a renamed club (Utah) takes its latest name.
         row["home_team"], row["away_team"] = latest[home_abbrev][1], latest[away_abbrev][1]
-        key = (row["start"][:10], row["home_team"], row["away_team"])
-        if key in present:
+        dedupe_key = (row["start"][:10], row["home_team"], row["away_team"])
+        if dedupe_key in present:
             continue
-        present.add(key)
+        present.add(dedupe_key)
         existing[row["event_id"]] = row
         added += 1
     return {"added": added, "errors": errors}

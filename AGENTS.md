@@ -27,6 +27,7 @@ Current work/results: `docs/GENERATION_2026-09-09.md` and the latest section of
 Diagnose → Implement → Fast Lint (`ruff check` <0.2s) → Targeted Test (ONLY if core math changed) → Commit
 
 ## RULES
+- **No American Odds, Percentages Only (Operator Directive 2026-11-07)**: NEVER use, display, or communicate prices using American odds (e.g. -110, +120, -310). ALWAYS express market prices, quotes, and contract values as percentages / implied probabilities (e.g. 52.4%, 45.5%, 75.6%) or probability cents (e.g. 52¢). All user-facing tables, pick summaries, forecasts, and reports must use percentages exclusively.
 - Walk-forward only. Locked holdout. Never peek.
 - Never hardcode weights or confidence thresholds. Load them from hash-verified artifacts.
 - A monthly gate binds only for a complete calendar month with at least 10 called picks. Keep partial and insufficient months visible but non-binding.

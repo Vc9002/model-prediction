@@ -3,5 +3,6 @@
 from __future__ import annotations
 
 from . import moneyline, spread, total
+from .adapter import DartsAdapter
 
-__all__ = ["moneyline", "spread", "total"]
+__all__ = ["DartsAdapter", "moneyline", "spread", "total"]

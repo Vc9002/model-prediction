@@ -98,6 +98,15 @@ WORKERS: dict[str, list[str]] = {
 _RUN_STATUSES = ("started", "completed", "failed", "skipped")
 _LOCK_BUSY_EXIT = 75  # matches daily_lock.py's convention
 
+DEFAULT_WORKER_TIMEOUTS: dict[str, float] = {
+    "auto-buyer": 300.0,  # 5 minutes max
+    "manual-bet-sync": 300.0,  # 5 minutes max
+    "production": 900.0,  # 15 minutes max
+    "calibrate": 1800.0,  # 30 minutes max
+    "daily": 3600.0,  # 60 minutes max
+    "rebuild-shadow": 3600.0,  # 60 minutes max
+}
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
     run_id            TEXT PRIMARY KEY,
@@ -242,6 +251,9 @@ class RunSupervisor:
         if not cmd:
             raise ValueError(f"unknown worker: {worker}; expected one of {sorted(WORKERS)}")
 
+        if timeout_seconds is None:
+            timeout_seconds = DEFAULT_WORKER_TIMEOUTS.get(worker, 3600.0)
+
         lease = self._acquire_lease(worker)
         if lease is None:
             # The lease proves another live supervisor owns this worker.
@@ -323,8 +335,18 @@ class RunSupervisor:
                 try:
                     exit_code = proc.wait(timeout=timeout_seconds)
                 except subprocess.TimeoutExpired:
-                    proc.kill()
-                    exit_code = proc.wait()
+                    if sys.platform == "win32":
+                        subprocess.run(
+                            ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                            check=False,
+                            capture_output=True,
+                        )
+                    else:
+                        proc.kill()
+                    try:
+                        exit_code = proc.wait(timeout=5.0)
+                    except subprocess.TimeoutExpired:
+                        exit_code = -9
                     note = f"worker exceeded timeout {timeout_seconds}s and was killed"
                 else:
                     note = None

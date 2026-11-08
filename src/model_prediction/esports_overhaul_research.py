@@ -19,7 +19,7 @@ from collections import Counter, defaultdict
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from scipy.optimize import minimize
@@ -130,7 +130,7 @@ def canonical_cohort(rows: list[dict]) -> tuple[list[dict], dict]:
 
 def audit_history(raw: list[dict]) -> tuple[list[dict], dict]:
     groups = defaultdict(list)
-    excluded = Counter()
+    excluded: Counter = Counter()
     for row in raw:
         if not row.get("match_id"):
             excluded["missing_match_id"] += 1
@@ -357,7 +357,7 @@ def resolve_git_sources(repo: Path, wanted: dict[str, set[str]]) -> dict:
     collection may leave the exact blob unreachable while it still exists in
     the object database, so history lookup alone is insufficient.
     """
-    resolved = {}
+    resolved: dict[tuple[str, str], dict[str, Any]] = {}
     for relative, hashes in wanted.items():
         if relative not in {"esports.py", "features/elo_ratings.py"}:
             raise ValueError("unsupported_incumbent_source_path")
@@ -541,9 +541,9 @@ def audit_ledger(db: Path, out: Path, incumbent_source: Path, source_repo: Path)
     ]
     cohort, overlap = canonical_cohort(active)
     control = archived_control_replays(cohort, incumbent_source, source_repo, out)
-    parity = []
-    reasons = Counter()
-    by_title = {}
+    parity: list[dict[str, Any]] = []
+    reasons: Counter = Counter()
+    by_title: dict[str, Any] = {}
     for row in cohort:
         record = {
             k: row.get(k)
@@ -567,7 +567,7 @@ def audit_ledger(db: Path, out: Path, incumbent_source: Path, source_repo: Path)
                 p = reproduced["probability"]
                 record.update(
                     reproduced_probability=p,
-                    probability_delta=None if p is None else p - float(stored),
+                    probability_delta=None if p is None else p - float(cast(Any, stored)),
                     per_feature_deltas=reproduced["feature_deltas"],
                     mismatch_class=reproduced["mismatch"],
                 )
@@ -589,7 +589,7 @@ def audit_ledger(db: Path, out: Path, incumbent_source: Path, source_repo: Path)
         selected = [r for r in cohort if r["sport"].lower() == title]
         flat = [r for r in active if r["sport"].lower() == title and str(r["ledger_tier"]).lower() == "flat"]
         flat, _ = canonical_cohort(flat)
-        title_report = {
+        title_report: dict[str, Any] = {
             "canonical_pick_keys": len(selected),
             "unique_events": len({r["event_id"] for r in selected}),
             "flat_proposal_cohort_n": len(flat),
@@ -661,7 +661,7 @@ class LogisticResidual:
     def __init__(self, c: float):
         self.c = c
         self.scaler = StandardScaler()
-        self.coef = None
+        self.coef: np.ndarray | None = None
 
     def fit(self, x, y):
         residual = self.scaler.fit_transform(x[:, 1:])
@@ -682,6 +682,7 @@ class LogisticResidual:
         return self
 
     def decision_function(self, x):
+        assert self.coef is not None, "decision_function called before fit"
         return x[:, 0] + self.coef[0] + self.scaler.transform(x[:, 1:]) @ self.coef[1:]
 
     def predict_proba(self, x):
@@ -689,6 +690,7 @@ class LogisticResidual:
         return np.column_stack([1 - p, p])
 
     def parameters(self):
+        assert self.coef is not None, "parameters called before fit"
         return {
             "fixed_elo_offset_coefficient": 1.0,
             "residual_feature_names": FEATURES[1:],
@@ -770,6 +772,7 @@ def research_title(rows: list[dict], out: Path, title: str) -> dict:
         fit_end = timestamp(cal_date + "T00:00:00Z")
         fit_indices = train[(start_array[train] < fit_end) & (end_array[train] < fit_end)]
         cal_indices = train[start_array[train] >= fit_end]
+        assert selected_c is not None
         base_model = LogisticResidual(selected_c).fit(x[fit_indices], y[fit_indices])
         oof_residual = base_model.decision_function(x[cal_indices])[:, None]
         residual_cal = fit_logistic(oof_residual, y[cal_indices], 1.0)

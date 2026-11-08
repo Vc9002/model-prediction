@@ -780,11 +780,19 @@ def build_learned_moneyline_slate(
 
             home_trend = trends.team_trend(home_team)
             away_trend = trends.team_trend(away_team)
-            if min(home_trend.games_played, away_trend.games_played) < minimum_team_history_games:
+            # Gate on current-season games, not lifetime games_played -- a team
+            # can clear games_played>=10 in week 1 of a new season purely from
+            # last season's carried-over row count while its short-half-life
+            # trend is already dominated by 1-2 new-season games (see
+            # TeamTrend.current_season_games_played for the full incident).
+            if (
+                min(home_trend.current_season_games_played, away_trend.current_season_games_played)
+                < minimum_team_history_games
+            ):
                 raise ValueError(
                     "insufficient_team_history: "
-                    f"{away_team}={away_trend.games_played}, "
-                    f"{home_team}={home_trend.games_played}, "
+                    f"{away_team}={away_trend.current_season_games_played}, "
+                    f"{home_team}={home_trend.current_season_games_played}, "
                     f"required={minimum_team_history_games}"
                 )
             features, unavailable_features = _compute_features(
@@ -1082,12 +1090,21 @@ def match_executable_quote(
     }
 
 
+_DISQUALIFYING_TEAM_PREFIXES = frozenset(
+    {"western", "eastern", "northern", "southern", "central", "middle", "north", "south", "east", "west"}
+)
+_DISQUALIFYING_TEAM_SUFFIXES = frozenset(
+    {"state", "tech", "a&m", "am", "christian", "baptist", "methodist", "valley"}
+)
+
+
 def _team_matches(team_name: str, side_description: str) -> bool:
     """True when a Polymarket side description denotes this team.
 
     Handles nickname vs full-name mismatches: "Storm" ~ "Seattle Storm",
     "Toronto" ~ "Toronto Tempo". Exact match first; otherwise the shorter
-    string must appear as a whole-word phrase inside the longer one.
+    string must appear as a whole-word phrase inside the longer one, without
+    bridging distinct institutions differing by directional prefix or state/tech suffix.
     """
     team = " ".join(team_name.casefold().split())
     desc = " ".join(side_description.casefold().split())
@@ -1096,7 +1113,17 @@ def _team_matches(team_name: str, side_description: str) -> bool:
     if team == desc:
         return True
     shorter, longer = (desc, team) if len(desc) <= len(team) else (team, desc)
-    return f" {shorter} " in f" {longer} "
+    l_tokens = longer.split()
+    s_tokens = shorter.split()
+    s_len = len(s_tokens)
+    for i in range(len(l_tokens) - s_len + 1):
+        if l_tokens[i : i + s_len] == s_tokens:
+            if i > 0 and l_tokens[i - 1] in _DISQUALIFYING_TEAM_PREFIXES:
+                continue
+            if i + s_len < len(l_tokens) and l_tokens[i + s_len] in _DISQUALIFYING_TEAM_SUFFIXES:
+                continue
+            return True
+    return False
 
 
 def _feature_hash(

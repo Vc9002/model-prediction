@@ -27,6 +27,8 @@ def champion_candidates(candidates, data_root: Path, root: Path, observed):
         raise ValueError("MLB structural total champion unavailable")
     if not spread or not spread.available or spread.model_id != "mlb-structural-runline-v4":
         raise ValueError("MLB structural spread champion unavailable")
+    if not total.artifact:
+        raise ValueError("MLB structural total champion has no artifact path")
     artifact = json.loads((root / total.artifact).read_text(encoding="utf-8"))
     source = data_root / "mlb_statsapi/game_snapshots.jsonl"
     snapshots = []
