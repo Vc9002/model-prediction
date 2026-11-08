@@ -3292,6 +3292,9 @@ def _forecast_nfl_spread_sport(
         return forecast
 
     observed_now = decision_observed_at
+    model_config = config.get("models", {}).get("NFL", {})
+    min_edge = float(model_config.get("min_edge", 0.05))
+    max_disagreement = float(config.get("project", {}).get("maximum_unreviewed_market_disagreement", 0.10))
     logged: list[dict] = []
     duplicates: list[str] = []
     main_duplicates: list[str] = []
@@ -3400,7 +3403,7 @@ def _forecast_nfl_spread_sport(
                 if (
                     main_ledger is not None
                     and eligibility.decision == "CALL"
-                    and 0.02 <= contract_edge <= 0.08
+                    and min_edge <= contract_edge <= max_disagreement
                     and _append_secondary_ledger(
                         main_ledger, request, eligibility, observed_now, "nfl_spread:main_ledger"
                     )
@@ -3836,6 +3839,9 @@ def _forecast_nfl_total_sport(
         return forecast
 
     observed_now = decision_observed_at
+    model_config = config.get("models", {}).get("NFL", {})
+    min_edge = float(model_config.get("min_edge", 0.05))
+    max_disagreement = float(config.get("project", {}).get("maximum_unreviewed_market_disagreement", 0.10))
     logged: list[dict] = []
     duplicates: list[str] = []
     main_duplicates: list[str] = []
@@ -3914,10 +3920,14 @@ def _forecast_nfl_total_sport(
                 ):
                     duplicates.append(contract["event_id"])
                 contract_edge = float(contract["model_probability"]) - float(contract["executable_ask"])
+                is_high_total_over = (
+                    str(request.selection).lower() == "over" and float(request.line or 0.0) >= 47.0
+                )
+                effective_min_edge = min_edge + 0.02 if is_high_total_over else min_edge
                 if (
                     main_ledger is not None
                     and eligibility.decision == "CALL"
-                    and 0.02 <= contract_edge <= 0.08
+                    and effective_min_edge <= contract_edge <= max_disagreement
                     and _append_secondary_ledger(
                         main_ledger, request, eligibility, observed_now, "nfl_total:main_ledger"
                     )

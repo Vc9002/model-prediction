@@ -185,6 +185,11 @@ class NFLTotalModelV7:
         # QB impact on scoring
         qb_pts = (home_qb_tier_adj + away_qb_tier_adj) * 0.4
 
+        # Clock-Burn Attrition Drag on high totals (>= 47.0)
+        # As total lines reach 47+, lead-protecting clock burn, 40-second play clocks,
+        # and finite 60-minute game time create negative scoring skew that penalizes high overs.
+        high_total_drag = max(0.0, total_line - 46.5) * 0.40 if total_line >= 47.0 else 0.0
+
         # 3. Market Delta Total Projection
         tot_delta = (
             self.pass_weight * pass_edge
@@ -196,6 +201,7 @@ class NFLTotalModelV7:
             + pace_edge
             + qb_pts
             + self.bias
+            - high_total_drag
         )
 
         exp_total = round(total_line + tot_delta, 2)
