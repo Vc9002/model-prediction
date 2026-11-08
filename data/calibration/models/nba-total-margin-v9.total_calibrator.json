@@ -1,0 +1,15 @@
+{
+  "sport": "nba",
+  "market": "total",
+  "model_version": "nba-total-margin-v9",
+  "champion_method": "beta",
+  "parameters": {
+    "a": 1.2820334328837135,
+    "b": 1.2476752257842374,
+    "c": -0.622352591014599
+  },
+  "sample_size": 125,
+  "baseline_brier": 0.247349,
+  "calibrated_oof_brier": 0.241831,
+  "calibrated_at_utc": "2026-11-08T08:24:06.407269+00:00"
+}

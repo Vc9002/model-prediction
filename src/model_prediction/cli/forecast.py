@@ -17,7 +17,7 @@ import logging
 from dataclasses import asdict, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from ..config import (
     PROJECT_ROOT,
@@ -2022,7 +2022,9 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
         availability_diagnostics[event_id] = {
             "estimated_margin_adjustment": float(avail.get("availability_points_gap", 0.0)),
             "estimated_total_adjustment": float(avail.get("availability_total_loss", 0.0)),
-            "applied_to_qualified_model": bool(model_version == "nba-spread-margin-v7"),
+            "applied_to_qualified_model": bool(
+                model_version in ("nba-spread-margin-v7", "nba-spread-margin-v9")
+            ),
         }
         upcoming.append(
             UpcomingGame(
@@ -2033,12 +2035,12 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
                 spread_away_line=float(market["line"]),
                 availability_points_gap=(
                     float(avail.get("availability_points_gap", 0.0))
-                    if model_version == "nba-spread-margin-v7"
+                    if model_version in ("nba-spread-margin-v7", "nba-spread-margin-v9")
                     else 0.0
                 ),
                 availability_total_loss=(
                     float(avail.get("availability_total_loss", 0.0))
-                    if model_version == "nba-spread-margin-v7"
+                    if model_version in ("nba-spread-margin-v7", "nba-spread-margin-v9")
                     else 0.0
                 ),
                 league="NBA",
@@ -2046,7 +2048,14 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
         )
         market_by_event_id[event_id] = market
 
-    if model_version == "nba-spread-margin-v7":
+    if model_version == "nba-spread-margin-v9":
+        from ..models.nba_v9 import NBASpreadModelV9
+
+        spread_v9_model = NBASpreadModelV9.from_artifact(artifact)
+        predictions = [
+            p for p in spread_v9_model.predict_spreads(history, upcoming) if p.market_type == "spread"
+        ]
+    elif model_version == "nba-spread-margin-v7":
         from ..models.nba_v7 import NBASpreadModelV7
 
         spread_v7_model = NBASpreadModelV7.from_artifact(artifact)
@@ -2440,7 +2449,9 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
         availability_diagnostics[event_id] = {
             "estimated_margin_adjustment": float(avail.get("availability_points_gap", 0.0)),
             "estimated_total_adjustment": float(avail.get("availability_total_loss", 0.0)),
-            "applied_to_qualified_model": bool(model_version == "nba-total-margin-v7"),
+            "applied_to_qualified_model": bool(
+                model_version in ("nba-total-margin-v7", "nba-total-margin-v9")
+            ),
         }
         upcoming.append(
             UpcomingGame(
@@ -2451,12 +2462,12 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
                 total_line=t_line,
                 availability_points_gap=(
                     float(avail.get("availability_points_gap", 0.0))
-                    if model_version == "nba-total-margin-v7"
+                    if model_version in ("nba-total-margin-v7", "nba-total-margin-v9")
                     else 0.0
                 ),
                 availability_total_loss=(
                     float(avail.get("availability_total_loss", 0.0))
-                    if model_version == "nba-total-margin-v7"
+                    if model_version in ("nba-total-margin-v7", "nba-total-margin-v9")
                     else 0.0
                 ),
                 league="NBA",
@@ -2464,7 +2475,14 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
         )
         market_by_event_id[event_id] = market
 
-    if model_version == "nba-total-margin-v7":
+    if model_version == "nba-total-margin-v9":
+        from ..models.nba_v9 import NBATotalModelV9
+
+        total_v9_model = NBATotalModelV9.from_artifact(artifact)
+        predictions = [
+            p for p in total_v9_model.predict_totals(history, upcoming) if p.market_type == "total"
+        ]
+    elif model_version == "nba-total-margin-v7":
         from ..models.nba_v7 import NBATotalModelV7
 
         total_v7_model = NBATotalModelV7.from_artifact(artifact)
@@ -2644,10 +2662,19 @@ def _forecast_nba_total_sport(
                 ):
                     eligibility = _downgrade_unserved(eligibility)
                 edge = float(contract["model_probability"]) - float(ask)
+                effective_min_total_edge = min_edge
+                if contract.get("selection") == "over":
+                    min_games = 15
+                    if contract.get("model_input_snapshot"):
+                        fb = contract["model_input_snapshot"].get("feature_basis", {})
+                        min_games = fb.get("current_season_games_min", 15)
+                    if min_games < 12:
+                        effective_min_total_edge = max(effective_min_total_edge, 0.075)
+
                 main_eligible = (
                     eligibility.decision == "CALL"
                     and eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
-                    and min_edge <= edge <= max_disagreement
+                    and effective_min_total_edge <= edge <= max_disagreement
                 )
                 if edge > max_disagreement:
                     main_rejections.append(
@@ -2872,6 +2899,29 @@ def _load_nfl_injuries_known_at(
     return entries, {"observed_at_utc": obs.isoformat(), "sha256": digest, "path": path}
 
 
+def _espn_spread_no_vig_ask(first_odds: dict[str, Any], selection: str) -> float:
+    """De-vigged ESPN consensus spread price for `selection`, falling back to the raw
+    one-sided implied probability when the other side's close odds aren't available --
+    ESPN's two-sided spread odds carry the same vig as moneyline, so pricing off one
+    side alone (as this previously did) systematically overstates edge."""
+    from ..learned_forward import _safe_odds_int
+
+    ps_obj = first_odds.get("pointSpread") or {}
+    sel_odds = _safe_odds_int((ps_obj.get(selection) or {}).get("close", {}).get("odds"))
+    other_side = "away" if selection == "home" else "home"
+    other_odds = _safe_odds_int((ps_obj.get(other_side) or {}).get("close", {}).get("odds"))
+    if sel_odds is None:
+        return STANDARD_LAY_ASK
+    sel_prob = round(implied_probability(sel_odds), 6)
+    if other_odds is None:
+        return sel_prob
+    other_prob = round(implied_probability(other_odds), 6)
+    total = sel_prob + other_prob
+    if total <= 0:
+        return sel_prob
+    return round(sel_prob / total, 6)
+
+
 def _forecast_nfl_spread_slate(
     data_root, args_date: str, client, *, observed_at: datetime | None = None
 ) -> dict:
@@ -2973,7 +3023,7 @@ def _forecast_nfl_spread_slate(
             anchor_is_away = _team_matches(away_team, anchor_team)
             spread_home_line = -anchor_line if anchor_is_away else anchor_line
             sportsbook = "polymarket_us"
-            market_slug = market.get("market_slug")
+            market_slug = str(market.get("market_slug"))
 
         is_neutral_site = _nfl_is_neutral_site(event)
         is_dome, wind_mph, temperature_f = _nfl_venue_weather(event)
@@ -2985,8 +3035,12 @@ def _forecast_nfl_spread_slate(
         home_rest_days = max(4, min(14, (event_date - h_last).days)) if h_last else 7
         away_rest_days = max(4, min(14, (event_date - a_last).days)) if a_last else 7
 
-        projected_qbs = (efficiency_store.source_manifest or {}).get("projected_qbs") or {}
-        qb_updates = (efficiency_store.source_manifest or {}).get("projected_qb_updated_utc") or {}
+        projected_qbs = cast(
+            "dict[str, Any]", (efficiency_store.source_manifest or {}).get("projected_qbs") or {}
+        )
+        qb_updates = cast(
+            "dict[str, Any]", (efficiency_store.source_manifest or {}).get("projected_qb_updated_utc") or {}
+        )
         h_qb = projected_qbs.get(normalize_nfl_team_code(home_team))
         a_qb = projected_qbs.get(normalize_nfl_team_code(away_team))
         h_qb_update = qb_updates.get(normalize_nfl_team_code(home_team))
@@ -3010,14 +3064,15 @@ def _forecast_nfl_spread_slate(
             and efficiency_store.covers_last_game(away_team, a_last)
             and bool(h_qb and a_qb)
             and bool(h_qb_update and a_qb_update)
-            and parse_utc(h_qb_update).date() == observed_at.date()
-            and parse_utc(a_qb_update).date() == observed_at.date()
+            and parse_utc(str(h_qb_update)).date() == observed_at.date()
+            and parse_utc(str(a_qb_update)).date() == observed_at.date()
             and _h_stat not in ("Out", "IR")
             and _a_stat not in ("Out", "IR")
             and injury_source is not None
             and parse_utc(injury_source["observed_at_utc"]).date() == observed_at.date()
         )
 
+        fc: Any
         if model_version == "nfl-spread-structural-v7":
             from ..models.nfl_spread_v7 import NFLSpreadModelV7
 
@@ -3106,17 +3161,7 @@ def _forecast_nfl_spread_slate(
             if market is not None:
                 ask = market["long"]["ask"]
             else:
-                ps_obj = first_odds.get("pointSpread") or {}
-                sel_ps = ps_obj.get("away") if selection == "away" else ps_obj.get("home")
-                close_odds = (sel_ps or {}).get("close", {}).get("odds")
-                try:
-                    ask = (
-                        round(implied_probability(int(close_odds)), 6)
-                        if close_odds and str(close_odds).lstrip("-+").isdigit()
-                        else STANDARD_LAY_ASK
-                    )
-                except (ValueError, TypeError):
-                    ask = STANDARD_LAY_ASK
+                ask = _espn_spread_no_vig_ask(first_odds, selection)
             line = anchor_line
         else:
             selection = "home" if anchor_is_away else "away"
@@ -3124,17 +3169,7 @@ def _forecast_nfl_spread_slate(
             if market is not None:
                 ask = market["short"]["ask"]
             else:
-                ps_obj = first_odds.get("pointSpread") or {}
-                sel_ps = ps_obj.get("home") if selection == "home" else ps_obj.get("away")
-                close_odds = (sel_ps or {}).get("close", {}).get("odds")
-                try:
-                    ask = (
-                        round(implied_probability(int(close_odds)), 6)
-                        if close_odds and str(close_odds).lstrip("-+").isdigit()
-                        else STANDARD_LAY_ASK
-                    )
-                except (ValueError, TypeError):
-                    ask = STANDARD_LAY_ASK
+                ask = _espn_spread_no_vig_ask(first_odds, selection)
             line = -anchor_line
 
         if ask is None or not 0 < float(ask) < 1:
@@ -3510,7 +3545,7 @@ def _forecast_nfl_total_slate(
                 continue
             market_lineage = market.get("_lineage")
             sportsbook = "polymarket_us"
-            market_slug = market.get("market_slug")
+            market_slug = str(market.get("market_slug"))
 
         is_neutral_site = _nfl_is_neutral_site(event)
         is_dome, wind_mph, temperature_f = _nfl_venue_weather(event)
@@ -3522,8 +3557,12 @@ def _forecast_nfl_total_slate(
         home_rest_days = max(4, min(14, (event_date - h_last).days)) if h_last else 7
         away_rest_days = max(4, min(14, (event_date - a_last).days)) if a_last else 7
 
-        projected_qbs = (efficiency_store.source_manifest or {}).get("projected_qbs") or {}
-        qb_updates = (efficiency_store.source_manifest or {}).get("projected_qb_updated_utc") or {}
+        projected_qbs = cast(
+            "dict[str, Any]", (efficiency_store.source_manifest or {}).get("projected_qbs") or {}
+        )
+        qb_updates = cast(
+            "dict[str, Any]", (efficiency_store.source_manifest or {}).get("projected_qb_updated_utc") or {}
+        )
         h_qb = projected_qbs.get(normalize_nfl_team_code(home_team))
         a_qb = projected_qbs.get(normalize_nfl_team_code(away_team))
         h_qb_update = qb_updates.get(normalize_nfl_team_code(home_team))
@@ -3547,14 +3586,15 @@ def _forecast_nfl_total_slate(
             and efficiency_store.covers_last_game(away_team, a_last)
             and bool(h_qb and a_qb)
             and bool(h_qb_update and a_qb_update)
-            and parse_utc(h_qb_update).date() == observed_at.date()
-            and parse_utc(a_qb_update).date() == observed_at.date()
+            and parse_utc(str(h_qb_update)).date() == observed_at.date()
+            and parse_utc(str(a_qb_update)).date() == observed_at.date()
             and _h_stat not in ("Out", "IR")
             and _a_stat not in ("Out", "IR")
             and injury_source is not None
             and parse_utc(injury_source["observed_at_utc"]).date() == observed_at.date()
         )
 
+        fc: Any
         if model_version == "nfl-total-structural-v7":
             from ..models.nfl_total_v7 import NFLTotalModelV7
 
@@ -4584,15 +4624,15 @@ def _log_esports_forecast(
             elif m_type_str == "spread":
                 import re
 
-                label = re.fullmatch(r"(.+?)\s+([+-](?:1\.5|2\.5))", selected_team.strip())
-                if label is None:
+                spread_match = re.fullmatch(r"(.+?)\s+([+-](?:1\.5|2\.5))", selected_team.strip())
+                if spread_match is None:
                     raise ValueError("unresolved signed spread selection")
-                selected_key = _identity_key(label.group(1))
+                selected_key = _identity_key(spread_match.group(1))
                 team_keys = [_identity_key(home_team), _identity_key(away_team)]
                 if team_keys.count(selected_key) != 1:
                     raise ValueError("unresolved spread team")
                 selection = "home" if selected_key == team_keys[0] else "away"
-                m_line = float(label.group(2))
+                m_line = float(spread_match.group(2))
                 if abs(float(contract["line"])) != abs(m_line):
                     raise ValueError("spread selection/contract line mismatch")
             else:
@@ -5711,6 +5751,14 @@ def _forecast_cfb_sport(
                             and contract.get("line") is not None
                             and float(contract["line"]) >= 56.5
                         )
+                        or (
+                            contract.get("line") is not None
+                            and (contract.get("feature_basis") or {}).get("projected_total") is not None
+                            and abs(
+                                float(contract["feature_basis"]["projected_total"]) - float(contract["line"])
+                            )
+                            < 1.5
+                        )
                     )
                 ):
                     genuinely_eligible = False
@@ -6380,7 +6428,7 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
         # now raises ValueError for a sport outside RESEARCH_LEDGER_SPORTS,
         # so clearing them here would crash rather than no-op. Removed.
         _clear_today_open(ledger, args.date, by_event_date=True, leagues=dual_ledger_sports)
-    results = {}
+    results: dict[str, Any] = {}
     for sport in sports:
         if sport == "esports":
             continue  # handled individually as lol/cs2

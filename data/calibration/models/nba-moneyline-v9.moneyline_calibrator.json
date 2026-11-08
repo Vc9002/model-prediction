@@ -1,0 +1,11 @@
+{
+  "sport": "nba",
+  "market": "moneyline",
+  "model_version": "nba-moneyline-v9",
+  "champion_method": "identity",
+  "parameters": {},
+  "sample_size": 118,
+  "baseline_brier": 0.226594,
+  "calibrated_oof_brier": 0.226594,
+  "calibrated_at_utc": "2026-11-08T08:24:06.407269+00:00"
+}

@@ -26,21 +26,24 @@ def test_nba_v7_artifacts_hash_validity():
         assert artifact["artifact_hash"] == expected_hash, f"Hash mismatch in {name}"
 
 
-def test_nba_v7_registry_champions():
+def test_nba_v7_registry_entries():
     reg = ProductionModelRegistry.load(Path("."))
-    ml_champ = reg.champion("NBA", "moneyline")
+    ml_champ = reg.entries.get("nba-moneyline-v7")
     assert ml_champ is not None
     assert ml_champ.model_id == "nba-moneyline-v7"
+    assert ml_champ.serving_status in ("production", "rollback")
     assert ml_champ.evidence_status == "predictively_qualified"
 
-    sp_champ = reg.champion("NBA", "spread")
+    sp_champ = reg.entries.get("nba-spread-margin-v7")
     assert sp_champ is not None
     assert sp_champ.model_id == "nba-spread-margin-v7"
+    assert sp_champ.serving_status in ("production", "rollback")
     assert sp_champ.evidence_status == "predictively_qualified"
 
-    tot_champ = reg.champion("NBA", "total")
+    tot_champ = reg.entries.get("nba-total-margin-v7")
     assert tot_champ is not None
     assert tot_champ.model_id == "nba-total-margin-v7"
+    assert tot_champ.serving_status in ("production", "rollback")
     assert tot_champ.evidence_status == "predictively_qualified"
 
 

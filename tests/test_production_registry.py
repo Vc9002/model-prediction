@@ -99,21 +99,21 @@ def test_real_production_yaml_resolves_every_model() -> None:
     registry = ProductionModelRegistry.load(REPO)
 
     assert registry.schema_version == "3"
-    assert len(registry.entries) == 84
+    assert len(registry.entries) == 87
     # Under the permanent champion-challenger framework, all models
     # across supported markets are available contracts (champions + rollbacks).
     # Weak evidence models have evidence_status=degraded and
     # replacement_priority=critical rather than being disabled.
-    assert len(registry.available_entries()) == 84
+    assert len(registry.available_entries()) == 87
     assert len(registry.problem_entries()) == 0
     assert registry.primary.model_id == "wnba-elo-trend-lr-v4"
     assert registry.primary.artifact_hash
-    assert registry.champion("NBA", "moneyline").model_id == "nba-moneyline-v7"
-    assert registry.champion("NBA", "moneyline").rollback_model == "nba-elo-trend-lr-v4"
-    assert registry.champion("NBA", "spread").model_id == "nba-spread-margin-v7"
-    assert registry.champion("NBA", "spread").rollback_model == "nba-spread-margin-v6"
-    assert registry.champion("NBA", "total").model_id == "nba-total-margin-v7"
-    assert registry.champion("NBA", "total").rollback_model == "nba-total-margin-v6"
+    assert registry.champion("NBA", "moneyline").model_id == "nba-moneyline-v9"
+    assert registry.champion("NBA", "moneyline").rollback_model == "nba-moneyline-v7"
+    assert registry.champion("NBA", "spread").model_id == "nba-spread-margin-v9"
+    assert registry.champion("NBA", "spread").rollback_model == "nba-spread-margin-v7"
+    assert registry.champion("NBA", "total").model_id == "nba-total-margin-v9"
+    assert registry.champion("NBA", "total").rollback_model == "nba-total-margin-v7"
     assert registry.champion("NFL", "spread").model_id == "nfl-spread-structural-v7"
     assert registry.champion("NFL", "spread").rollback_model == "nfl-spread-structural-v6"
     assert registry.champion("NFL", "total").model_id == "nfl-total-structural-v7"
