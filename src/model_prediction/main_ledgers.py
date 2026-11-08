@@ -358,7 +358,10 @@ class MultiSportPickLedger:
     ) -> list[str]:
         by_ledger: dict[int, tuple[PickLedger, list[str]]] = {}
         for pick_id in pick_ids:
-            ledger = self._ledger_for_pick_id(pick_id)
+            try:
+                ledger = self._ledger_for_pick_id(pick_id)
+            except KeyError:
+                continue
             by_ledger.setdefault(id(ledger), (ledger, []))[1].append(pick_id)
         removed: list[str] = []
         for ledger, ids in by_ledger.values():
@@ -370,7 +373,10 @@ class MultiSportPickLedger:
     ) -> list[str]:
         by_ledger: dict[int, tuple[PickLedger, list[str]]] = {}
         for pick_id in pick_ids:
-            ledger = self._ledger_for_pick_id(pick_id)
+            try:
+                ledger = self._ledger_for_pick_id(pick_id)
+            except KeyError:
+                continue
             by_ledger.setdefault(id(ledger), (ledger, []))[1].append(pick_id)
         removed: list[str] = []
         for ledger, ids in by_ledger.values():

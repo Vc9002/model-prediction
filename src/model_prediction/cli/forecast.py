@@ -4019,6 +4019,7 @@ def _forecast_learned_sport(
         # passes leagues=None. config/model.yaml's models.SOCCER.leagues is
         # the single source of truth for which competitions are in scope.
         configured_leagues = model_config.get("leagues")
+        min_team_history = int(model_config.get("minimum_team_history_games", 10))
         candidates, skipped, scheduled = build_learned_moneyline_slate(
             sport=sport,
             game_date=args_date,
@@ -4026,6 +4027,7 @@ def _forecast_learned_sport(
             client=ESPNClient(),
             artifact_path=artifact_path,
             observed_at=decision_observed_at,
+            minimum_team_history_games=min_team_history,
             leagues=tuple(configured_leagues) if configured_leagues else None,
         )
     except ValueError as error:

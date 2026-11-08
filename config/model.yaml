@@ -259,6 +259,7 @@ models:
     status: shadow_qualified
     origin: statistical_model
     min_edge: 0.05
+    minimum_team_history_games: 8
     active_production_version: nba-moneyline-v9
     production_artifact: config/models/nba-moneyline-v9.json
     spread_production_artifact: config/models/nba-spread-margin-v9.json
