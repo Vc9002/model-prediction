@@ -1117,6 +1117,92 @@ def manually_settle_auto_buyer_order(
     }
 
 
+def _resolve_closing_probability_for_auto_buyer(
+    data_root: Path | str,
+    sport: str,
+    slug: str,
+    event_start_utc: str,
+    token_side: str,
+    selection: str = "",
+    home_team: str = "",
+    away_team: str = "",
+) -> float | None:
+    """Resolve pregame closing ask probability for an auto-buyer order."""
+    if not slug or not event_start_utc:
+        return None
+    try:
+        from datetime import timedelta
+
+        from ..data_sources.polymarket_us import PolymarketSnapshotStore
+        from ..domain import EASTERN, parse_utc
+        from ..learned_forward import _team_matches
+
+        start = parse_utc(event_start_utc)
+        sport_dir = sport.lower()
+        dates_to_try = [
+            start.astimezone(EASTERN).date().isoformat(),
+            start.date().isoformat(),
+            (start - timedelta(days=1)).date().isoformat(),
+            (start + timedelta(days=1)).date().isoformat(),
+        ]
+        snap = None
+        seen: set[str] = set()
+        for d in dates_to_try:
+            if d in seen:
+                continue
+            seen.add(d)
+            store = PolymarketSnapshotStore.for_sport_date(data_root, sport_dir, d)
+            snap = store.closing_snapshot(slug, event_start_utc)
+            if snap is not None:
+                break
+        if snap is None:
+            return None
+
+        side_obj = None
+        ts = str(token_side).strip().lower()
+        if ts in ("long", "short"):
+            side_obj = snap.get(ts)
+        else:
+            sel = str(selection).strip().lower()
+            long_desc = str((snap.get("long") or {}).get("description", ""))
+            short_desc = str((snap.get("short") or {}).get("description", ""))
+            if snap.get("market_type") == "spread" or (
+                long_desc.startswith(("+", "-")) and short_desc.startswith(("+", "-"))
+            ):
+                ref_team = snap.get("team")
+                if ref_team:
+                    if _team_matches(home_team, ref_team):
+                        side_obj = snap.get("long") if sel in ("home", "1") else snap.get("short")
+                    elif _team_matches(away_team, ref_team):
+                        side_obj = snap.get("long") if sel in ("away", "2") else snap.get("short")
+            elif (
+                long_desc.strip().lower() in ("yes", "over")
+                or short_desc.strip().lower() in ("no", "under")
+                or "over" in long_desc.lower()
+                or "under" in short_desc.lower()
+            ):
+                if sel in ("under", "no", "away", "short") and (
+                    short_desc.strip().lower() in ("no", "under") or "under" in short_desc.lower()
+                ):
+                    side_obj = snap.get("short")
+                else:
+                    side_obj = snap.get("long")
+            else:
+                sel_name = home_team if sel == "home" else away_team
+                if _team_matches(sel_name, long_desc):
+                    side_obj = snap.get("long")
+                elif _team_matches(sel_name, short_desc):
+                    side_obj = snap.get("short")
+
+        if side_obj and side_obj.get("ask") is not None:
+            ask = float(side_obj["ask"])
+            if 0 < ask < 1:
+                return round(ask, 6)
+    except (KeyError, ValueError, OSError, TypeError):
+        logger.debug("Failed closing lookup for %s", slug, exc_info=True)
+    return None
+
+
 def settle_auto_buyer_ledger(
     data_root: Path | str | None = None,
     espn: ESPNClient | None = None,
@@ -1127,6 +1213,9 @@ def settle_auto_buyer_ledger(
     """Settle completed matches in the Auto-Buyer Ledger and compute realized PnL."""
     j_path, x_path = resolve_auto_buyer_paths(data_root=data_root)
     root = j_path.parent
+    odds_root = root.parent if root.name == "paper_auto_buyer" else root
+    if not (odds_root / "odds").exists() and (DATA / "odds").exists():
+        odds_root = DATA
     _esports_cache: dict[str, dict[str, Any]] = {}
     _polymarket_market_cache: dict[str, dict[str, Any]] = {}
     _polymarket_market_client: Any | None = polymarket_client
@@ -1231,6 +1320,20 @@ def settle_auto_buyer_ledger(
             r["pnl_units"] = 0.0
             if not r.get("settled_at_utc"):
                 r["settled_at_utc"] = iso_utc(now)
+            if not r.get("probability_clv") or r.get("probability_clv") == "0.0":
+                c_prob = _resolve_closing_probability_for_auto_buyer(
+                    odds_root,
+                    sport,
+                    slug,
+                    str(r.get("event_start_utc") or ""),
+                    r.get("token_side") or "",
+                    selection=sel,
+                    home_team=home,
+                    away_team=away,
+                )
+                if c_prob is not None:
+                    r["closing_price"] = f"{c_prob:.6f}"
+                    r["probability_clv"] = f"{c_prob - price:+.6f}"
             settled_count += 1
             updated_records.append(r)
             continue
@@ -1428,6 +1531,20 @@ def settle_auto_buyer_ledger(
                             h_sc,
                             line,
                         )
+            if not r.get("probability_clv") or r.get("probability_clv") == "0.0":
+                c_prob = _resolve_closing_probability_for_auto_buyer(
+                    odds_root,
+                    sport,
+                    slug,
+                    str(r.get("event_start_utc") or ""),
+                    r.get("token_side") or "",
+                    selection=sel,
+                    home_team=home,
+                    away_team=away,
+                )
+                if c_prob is not None:
+                    r["closing_price"] = f"{c_prob:.6f}"
+                    r["probability_clv"] = f"{c_prob - price:+.6f}"
             settled_count += 1
             updated_records.append(r)
             continue
@@ -1805,6 +1922,22 @@ def settle_auto_buyer_ledger(
             r["away_score"] = away_score
             r["home_score"] = home_score
 
+            c_prob = _resolve_closing_probability_for_auto_buyer(
+                odds_root,
+                sport,
+                slug,
+                start_str,
+                r.get("token_side") or "",
+                selection=sel,
+                home_team=home,
+                away_team=away,
+            )
+            if c_prob is not None:
+                r["closing_price"] = f"{c_prob:.6f}"
+                r["probability_clv"] = f"{c_prob - price:+.6f}"
+            elif r.get("probability_clv") in (None, "", "0.0"):
+                r["probability_clv"] = ""
+
             if _uses_live_auto_buyer_ledger(j_path):
                 log_auto_buyer_event(
                     f"SETTLED [{sport}] {away} @ {home} | Result: {result.upper()} | PnL: ${pnl_usd:+.2f} ({pnl_units:+.1f}U) | Order: {r.get('order_id')}"
@@ -1853,6 +1986,8 @@ def settle_auto_buyer_ledger(
                     "result": str(r.get("result") or ""),
                     "away_score": str(r.get("away_score") or ""),
                     "home_score": str(r.get("home_score") or ""),
+                    "closing_implied_probability": str(r.get("closing_price") or ""),
+                    "probability_clv": str(r.get("probability_clv") or ""),
                     "pnl_units": f"{float(r.get('pnl_units') or 0.0):.2f}",
                     "settled_at_utc": str(r.get("settled_at_utc") or ""),
                     "record_type": "decision",

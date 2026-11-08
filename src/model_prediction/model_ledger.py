@@ -174,11 +174,35 @@ MODEL_ID_BY_LEAGUE_AND_MARKET: dict[tuple[str, str], str] = {
     ("CFB", "moneyline"): "ncaaf-moneyline-baseline",
     ("CFB", "spread"): "ncaaf-spread-baseline",
     ("CFB", "total"): "ncaaf-total-baseline",
+    ("NCAAB", "moneyline"): "ncaab-tempo-v2",
+    ("NCAAB", "spread"): "ncaab-spread-v6",
+    ("NCAAB", "total"): "ncaab-total-v6",
+    ("CBB", "moneyline"): "ncaab-tempo-v2",
+    ("CBB", "spread"): "ncaab-spread-v6",
+    ("CBB", "total"): "ncaab-total-v6",
+    ("NHL", "moneyline"): "hockey-poisson-dc-v2",
+    ("NHL", "spread"): "hockey-poisson-dc-v2",
+    ("NHL", "total"): "hockey-poisson-dc-v2",
+    ("HOCKEY", "moneyline"): "hockey-poisson-dc-v2",
+    ("HOCKEY", "spread"): "hockey-poisson-dc-v2",
+    ("HOCKEY", "total"): "hockey-poisson-dc-v2",
+    ("DARTS", "moneyline"): "darts-markov-v2",
+    ("DARTS_PDC", "moneyline"): "darts-markov-v2",
+    ("DARTS_MODUS", "moneyline"): "darts-markov-v2",
+    ("EUROLEAGUE", "moneyline"): "eurolg-tempo-v2",
+    ("NBL", "moneyline"): "nbl-tempo-v2",
+    ("TENNIS", "spread"): "tennis-games-markov-v4",
+    ("TENNIS", "total"): "tennis-games-markov-v4",
 }
 
 
-def model_id_for(league: str, market_type: str) -> str | None:
-    return MODEL_ID_BY_LEAGUE_AND_MARKET.get((str(league).upper(), str(market_type)))
+def model_id_for(league: str, market_type: str, model_version: str | None = None) -> str | None:
+    res = MODEL_ID_BY_LEAGUE_AND_MARKET.get((str(league).upper(), str(market_type).lower()))
+    if res is not None:
+        return res
+    if model_version and str(model_version).strip():
+        return str(model_version).strip()
+    return None
 
 
 def _normalized_line(row: dict[str, str]) -> str:
@@ -293,7 +317,9 @@ def record_from_pick_request(
     *same* blank-keyed row again, defeating the very fix that added
     `observed_at_utc` to the key in the first place.
     """
-    model_id = model_id_for(request.league.value, request.market_type.value)
+    model_id = model_id_for(
+        request.league.value, request.market_type.value, getattr(request, "model_version", None)
+    )
     if model_id is None:
         return None
     ledger = ModelLedger(Path(model_ledgers_dir) / f"{model_id}.xlsx")
@@ -362,7 +388,11 @@ def settle_from_pick_row(model_ledgers_dir: str | Path, row: dict[str, Any]) -> 
     silent-evidence-starvation failure this hook was added to fix in the
     first place, one layer down.
     """
-    model_id = model_id_for(str(row.get("league", "")), str(row.get("market_type", "")))
+    model_id = model_id_for(
+        str(row.get("league", "")),
+        str(row.get("market_type", "")),
+        str(row.get("model_version", "")),
+    )
     if model_id is None:
         return []
     path = Path(model_ledgers_dir) / f"{model_id}.xlsx"
@@ -542,12 +572,26 @@ class ModelLedger:
             rows = self._read_unlocked()
             stamp = iso_utc(settled_at or utc_now())
             for row in rows:
-                # Only OPEN rows are gradeable. A `failed` row is an
-                # integrity-gate record (append_failure) that says the model
-                # never made a call -- settling it with a win/loss and pnl
-                # would fabricate a bet that never existed. Found by code
-                # review 2026-08-19.
-                if row["status"] != "open" or _event_settlement_key(row) != key:
+                if _event_settlement_key(row) != key:
+                    continue
+                if row["status"] == "settled":
+                    # Attach missing closing line value to already settled rows
+                    changed = False
+                    if closing_price is not None and not row.get("closing_price"):
+                        row["closing_price"] = f"{closing_price:.6f}"
+                        changed = True
+                    if probability_clv is not None and not row.get("probability_clv"):
+                        row["probability_clv"] = f"{probability_clv:.6f}"
+                        changed = True
+                    if changed:
+                        settled_rows.append(row)
+                    continue
+                if row["status"] != "open":
+                    # Only OPEN rows are gradeable. A `failed` row is an
+                    # integrity-gate record (append_failure) that says the model
+                    # never made a call -- settling it with a win/loss and pnl
+                    # would fabricate a bet that never existed. Found by code
+                    # review 2026-08-19.
                     continue
                 row["status"] = "settled"
                 row["result"] = result

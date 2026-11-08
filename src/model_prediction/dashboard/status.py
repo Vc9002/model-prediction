@@ -366,6 +366,29 @@ def _clv_summary(sport: str | None = None) -> dict:
 
     clv_records: list[dict[str, Any]] = []
     for p in picks:
+        raw_clv = p.get("probability_clv")
+        if raw_clv not in (None, ""):
+            try:
+                clv_delta = float(raw_clv)
+                raw_dec = p.get("decision_raw_implied_probability") or p.get("market_implied_probability")
+                raw_close = p.get("closing_raw_implied_probability") or p.get("closing_implied_probability")
+                dec_p = float(raw_dec) if raw_dec not in (None, "") else 0.5
+                close_p = float(raw_close) if raw_close not in (None, "") else (dec_p + clv_delta)
+                clv_records.append(
+                    {
+                        "event_id": p.get("event_id"),
+                        "date": str(p.get("event_start_utc") or p.get("created_at_utc") or "")[:10],
+                        "sport": p.get("sport") or p.get("league"),
+                        "decision_prob": round(dec_p, 4),
+                        "closing_prob": round(close_p, 4),
+                        "clv_pct": round(clv_delta * 100, 2),
+                        "beat_close": clv_delta > 0,
+                    }
+                )
+                continue
+            except (ValueError, TypeError):
+                pass
+
         dec_odds = p.get("decision_american_odds") or p.get("american_odds")
         close_odds = p.get("closing_american_odds")
         if dec_odds is not None and close_odds is not None:

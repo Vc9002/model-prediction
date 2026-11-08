@@ -62,7 +62,13 @@ from .domain import (
 )
 from .eligibility import EligibilityResult
 from .model_ledger import record_from_pick_request, settle_from_pick_row
-from .pricing import american_to_decimal, grade_pick, implied_probability, profit_units
+from .pricing import (
+    american_to_decimal,
+    grade_pick,
+    implied_probability,
+    probability_to_american,
+    profit_units,
+)
 from .runtime_ledger_store import LedgerMutation, RuntimeLedgerDuplicateError, RuntimeLedgerStore
 from .units import Exposure, edge_scaled_units
 from .xlsx_ledger import read_xlsx_rows, write_xlsx_rows_atomic
@@ -1134,7 +1140,7 @@ class PickLedger:
             from .learned_replay import validate_decision_snapshot
 
             snapshot = json.loads(row["model_input_snapshot_json"])
-            if event_type in ("settle", "void"):
+            if event_type in ("settle", "void", "update"):
                 try:
                     validate_decision_snapshot(snapshot, row)
                 except ValueError as exc:
@@ -1777,15 +1783,26 @@ class PickLedger:
         self,
         pick_id: str,
         closing_line: float | None,
-        closing_american_odds: int,
+        closing_american_odds: int | None = None,
         *,
+        closing_raw_probability: float | None = None,
         closing_no_vig_probability: float | None = None,
         closing_consensus_probability: float | None = None,
         closing_consensus_line: float | None = None,
     ) -> dict[str, str]:
         self.initialize()
-        closing_decimal = american_to_decimal(closing_american_odds)
-        closing_probability = implied_probability(closing_american_odds)
+        if closing_american_odds is None and closing_raw_probability is not None:
+            closing_american_odds = probability_to_american(closing_raw_probability)
+        if closing_american_odds is None and closing_raw_probability is None:
+            raise ValueError("closing odds or closing raw probability required")
+        closing_decimal = (
+            american_to_decimal(closing_american_odds) if closing_american_odds is not None else None
+        )
+        closing_probability = (
+            closing_raw_probability
+            if closing_raw_probability is not None
+            else implied_probability(closing_american_odds)
+        )
         with self._lock():
             self._migrate_if_needed()
             rows = self._read_unlocked()
@@ -1793,8 +1810,12 @@ class PickLedger:
             if row["status"] != PickStatus.SETTLED.value:
                 raise ValueError("closing data can be attached only after result settlement")
             proposed_line = "" if closing_line is None else str(closing_line)
-            proposed_odds = str(closing_american_odds)
-            if row["closing_american_odds"] and row["closing_american_odds"] != proposed_odds:
+            proposed_odds = "" if closing_american_odds is None else str(closing_american_odds)
+            if (
+                proposed_odds
+                and row["closing_american_odds"]
+                and row["closing_american_odds"] != proposed_odds
+            ):
                 raise ValueError("verified closing odds already exist with a different value")
             if row["closing_line"] and row["closing_line"] != proposed_line:
                 raise ValueError("verified closing line already exists with a different value")
@@ -1807,7 +1828,7 @@ class PickLedger:
                     "closing_line": proposed_line,
                     "closing_american_odds": proposed_odds,
                     "closing_implied_probability": f"{closing_probability:.6f}",
-                    "closing_decimal_odds": f"{closing_decimal:.6f}",
+                    "closing_decimal_odds": "" if closing_decimal is None else f"{closing_decimal:.6f}",
                     "closing_raw_implied_probability": f"{closing_probability:.6f}",
                     "closing_no_vig_probability": ""
                     if closing_no_vig_probability is None
@@ -1836,6 +1857,15 @@ class PickLedger:
                 self._mirror_row(updated, "update", f"op-closing-{pick_id}")
             self._write_rows(rows)
         self._mirror_row(updated, "update", f"op-closing-{pick_id}")
+        if not self.retired:
+            try:
+                settle_from_pick_row(self.model_ledgers_dir, updated)
+            except Exception:
+                logging.getLogger(__name__).warning(
+                    "model_ledger update_closing failed for pick %s",
+                    pick_id,
+                    exc_info=True,
+                )
         return updated
 
     def review_loss(

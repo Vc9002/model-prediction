@@ -581,10 +581,11 @@ def _closing_probability_for_moneyline_pick(
     away_team: str,
     selection: str,
 ) -> tuple[float | None, int | None]:
-    """Best-effort closing (last pregame) probability for a team/player-vs-
-    team/player moneyline pick, read from the same per-sport-date Polymarket
-    snapshot history the forecast pipeline already captures every day via
-    capture_slate_snapshots (data/odds/{sport}/{date}/polymarket_snapshots.jsonl).
+    """Best-effort closing (last pregame) probability for a pick, read from
+    the same per-sport-date Polymarket snapshot history the forecast pipeline
+    already captures every day via capture_slate_snapshots
+    (data/odds/{sport}/{date}/polymarket_snapshots.jsonl). Supports moneylines,
+    spreads, and totals.
 
     Returns (raw_probability, american_odds) for the row's own selection, or
     (None, None) if no matching pregame snapshot was ever captured for this
@@ -616,12 +617,45 @@ def _closing_probability_for_moneyline_pick(
         return None, None
     long_desc = str((snapshot.get("long") or {}).get("description", ""))
     short_desc = str((snapshot.get("short") or {}).get("description", ""))
+    sel = str(selection).strip().lower()
 
-    # Binary Yes/No or Over/Under markets (common in soccer, totals, spreads)
-    if long_desc.strip().lower() in ("yes", "over") or short_desc.strip().lower() in ("no", "under"):
-        sel = str(selection).strip().lower()
-        if sel in ("under", "no", "away") and short_desc.strip().lower() in ("no", "under"):
+    # 1. Spread markets (e.g., long: "-5.50", short: "+5.50", team: "Detroit Lions")
+    if snapshot.get("market_type") == "spread" or (
+        long_desc.startswith(("+", "-")) and short_desc.startswith(("+", "-"))
+    ):
+        side = None
+        if sel in ("long", "short"):
+            side = snapshot.get(sel)
+        else:
+            ref_team = snapshot.get("team")
+            if ref_team:
+                ref_is_home = _team_matches(home_team, ref_team)
+                ref_is_away = _team_matches(away_team, ref_team)
+                if ref_is_home:
+                    side = snapshot.get("long") if sel in ("home", "1") else snapshot.get("short")
+                elif ref_is_away:
+                    side = snapshot.get("long") if sel in ("away", "2") else snapshot.get("short")
+        if side is not None:
+            ask = side.get("ask")
+            if ask is not None and 0 < float(ask) < 1:
+                return round(float(ask), 6), probability_to_american(float(ask))
+        return None, None
+
+    # 2. Binary Yes/No or Over/Under markets (common in soccer, totals, spreads)
+    if (
+        long_desc.strip().lower() in ("yes", "over")
+        or short_desc.strip().lower() in ("no", "under")
+        or "over" in long_desc.lower()
+        or "under" in short_desc.lower()
+    ):
+        if sel in ("under", "no", "away", "short") and (
+            short_desc.strip().lower() in ("no", "under") or "under" in short_desc.lower()
+        ):
             side = snapshot.get("short") or {}
+        elif sel in ("over", "yes", "home", "long") and (
+            long_desc.strip().lower() in ("yes", "over") or "over" in long_desc.lower()
+        ):
+            side = snapshot.get("long") or {}
         else:
             side = snapshot.get("long") or {}
         ask = side.get("ask")
@@ -737,8 +771,30 @@ def _settle_euroleague_pick(row: dict, ledger, data_root=None) -> dict | None:
             continue
         if abs((parse_utc(record["event_start_utc"]) - start).total_seconds()) > 2 * 86400:
             continue
+        slug = _extract_market_slug(str(row.get("rationale", "")), row)
+        closing_probability = closing_odds = None
+        if slug is not None:
+            try:
+                closing_probability, closing_odds = _closing_probability_for_moneyline_pick(
+                    data_root,
+                    "euroleague",
+                    slug,
+                    row["event_start_utc"],
+                    home,
+                    away,
+                    row.get("selection", ""),
+                )
+            except (OSError, ValueError):
+                logger.warning("euroleague closing-snapshot lookup failed for slug %s", slug, exc_info=True)
         try:
-            settled = ledger.settle(row["pick_id"], record["away_score"], record["home_score"], None, None)
+            settled = ledger.settle(
+                row["pick_id"],
+                record["away_score"],
+                record["home_score"],
+                None,
+                closing_odds,
+                closing_raw_probability=closing_probability,
+            )
         except (KeyError, ValueError) as error:
             return {"pick_id": row["pick_id"], "reason": str(error)}
         return {"pick_id": row["pick_id"], "settled": True, "result": settled["result"]}
@@ -767,7 +823,7 @@ def _scores_for_outcome(market_type: str, selection: str, line, won: bool) -> tu
     return (other, sel_score) if selection == "home" else (sel_score, other)
 
 
-def _settle_by_resolution(row: dict, ledger, client=None) -> dict | None:
+def _settle_by_resolution(row: dict, ledger, client=None, data_root=None) -> dict | None:
     """Settle any pick from its Polymarket contract's terminal resolution.
 
     Used when no results API covers the league. None while the market is unresolved or
@@ -837,8 +893,31 @@ def _settle_by_resolution(row: dict, ledger, client=None) -> dict | None:
         return {"pick_id": row["pick_id"], "reason": f"resolution side unresolved for {slug}"}
     won = next(price for side, price in prices if side is own) == 1.0
     away, home = _scores_for_outcome(market_type, selection, row.get("line"), won)
+    closing_probability = closing_odds = None
+    if slug is not None:
+        try:
+            d_root = data_root or (PROJECT_ROOT / "data")
+            sport_dir = str(row.get("league", "")).lower()
+            closing_probability, closing_odds = _closing_probability_for_moneyline_pick(
+                d_root,
+                sport_dir,
+                slug,
+                row["event_start_utc"],
+                row.get("home_team", ""),
+                row.get("away_team", ""),
+                row.get("selection", ""),
+            )
+        except (OSError, ValueError):
+            pass
     try:
-        settled = ledger.settle(row["pick_id"], away, home, None, None)
+        settled = ledger.settle(
+            row["pick_id"],
+            away,
+            home,
+            None,
+            closing_odds,
+            closing_raw_probability=closing_probability,
+        )
     except (KeyError, ValueError) as error:
         return {"pick_id": row["pick_id"], "reason": str(error)}
     return {
@@ -913,7 +992,28 @@ def _settle_esports_pick(row: dict, ledger, data_root=None, bo3_client=None) -> 
                 if bo3_res is not None:
                     away_score = bo3_res.get("away_score", 1 if bo3_res["away_win"] else 0)
                     home_score = bo3_res.get("home_score", 1 if bo3_res["home_win"] else 0)
-                    result = ledger.settle(row["pick_id"], away_score, home_score, None, None)
+                    closing_probability = closing_odds = None
+                    if slug is not None and data_root is not None:
+                        try:
+                            closing_probability, closing_odds = _closing_probability_for_moneyline_pick(
+                                data_root,
+                                "esports",
+                                slug,
+                                row["event_start_utc"],
+                                str(row["home_team"]),
+                                str(row["away_team"]),
+                                str(row["selection"]),
+                            )
+                        except (OSError, ValueError):
+                            pass
+                    result = ledger.settle(
+                        row["pick_id"],
+                        away_score,
+                        home_score,
+                        None,
+                        closing_odds,
+                        closing_raw_probability=closing_probability,
+                    )
                     return {"pick_id": row["pick_id"], "result": result["result"], "settled": True}
                 voided = ledger.void(
                     row["pick_id"],
@@ -955,8 +1055,29 @@ def _settle_esports_pick(row: dict, ledger, data_root=None, bo3_client=None) -> 
         if bo3_result is not None:
             away_score = bo3_result.get("away_score", 1 if bo3_result["away_win"] else 0)
             home_score = bo3_result.get("home_score", 1 if bo3_result["home_win"] else 0)
+            closing_probability = closing_odds = None
+            if slug is not None and data_root is not None:
+                try:
+                    closing_probability, closing_odds = _closing_probability_for_moneyline_pick(
+                        data_root,
+                        "esports",
+                        slug,
+                        row["event_start_utc"],
+                        str(row["home_team"]),
+                        str(row["away_team"]),
+                        str(row["selection"]),
+                    )
+                except (OSError, ValueError):
+                    pass
             try:
-                result = ledger.settle(row["pick_id"], away_score, home_score, None, None)
+                result = ledger.settle(
+                    row["pick_id"],
+                    away_score,
+                    home_score,
+                    None,
+                    closing_odds,
+                    closing_raw_probability=closing_probability,
+                )
                 return {"pick_id": row["pick_id"], "result": result["result"], "settled": True}
             except (KeyError, ValueError) as error:
                 return {"pick_id": row["pick_id"], "reason": str(error)}
