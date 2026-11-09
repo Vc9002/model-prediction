@@ -57,44 +57,21 @@ if _env_file.exists():
         pass
 
 DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
-    # WNBA (proven +22.3% ROI historical, +39.5u)
-    "wnba-elo-trend-lr-v4",
-    "wnba-total-margin-v2",
-    "wnba-spread-margin-v2",
-    # NBA
-    "nba-moneyline-v7",
-    "nba-spread-margin-v7",
-    "nba-total-margin-v7",
-    "nba-spread-margin-v6",
-    "nba-total-margin-v6",
-    "nba-moneyline-v8",
-    "nba-spread-margin-v8",
-    "nba-total-margin-v8",
+    # NBA (Latest Generation v9 Champions)
     "nba-moneyline-v9",
     "nba-spread-margin-v9",
     "nba-total-margin-v9",
-    # NFL & NCAAF (proven +25.6% ROI in auto-buyer)
+    # NFL (Latest Generation v7 & v4 Champions)
     "nfl-spread-structural-v7",
     "nfl-total-structural-v7",
-    "nfl-spread-structural-v6",
-    "nfl-total-structural-v6",
     "nfl-elo-trend-lr-v4",
+    # NCAAF (Latest Generation v4 Champion)
     "cfb-structural-v4",
-    "cfb-structural-v3",
-    "cfb-structural-v2",
-    # Soccer (positive ROI +5.4% auto-buyer)
-    "soccer-poisson-dc-v3",
-    "soccer-poisson-dc-v2",
-    "soccer-total-v1",
-    "soccer-market-residual-v1",
-    "soccer-total-market-residual-v1",
-    # Tennis
-    "tennis-surface-elo-v6",
-    "tennis-games-markov-v4",
-    "tennis-surface-elo-v5",
-    "tennis-games-markov-v3",
-    "tennis-market-residual-v1",
-    # MLB (major domestic baseball; off-season hold)
+    # WNBA (Dormant off-season)
+    "wnba-elo-trend-lr-v4",
+    "wnba-total-margin-v2",
+    "wnba-spread-margin-v2",
+    # MLB (Dormant off-season)
     "mlb-structural-runline-v4",
     "mlb-nrfi-v4",
     "mlb-nrfi-v3",
@@ -187,6 +164,19 @@ EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
     "eurolg-tempo-v1",
     "nbl-tempo-v2",
     "nbl-tempo-v1",
+    # Legacy deprecated versions decommissioned in favor of latest champions:
+    "nba-moneyline-v7",
+    "nba-spread-margin-v7",
+    "nba-total-margin-v7",
+    "nba-spread-margin-v6",
+    "nba-total-margin-v6",
+    "nba-moneyline-v8",
+    "nba-spread-margin-v8",
+    "nba-total-margin-v8",
+    "nfl-spread-structural-v6",
+    "nfl-total-structural-v6",
+    "cfb-structural-v3",
+    "cfb-structural-v2",
 )
 
 AUTO_BUYER_STATE_FILE = DATA / "auto_buyer_state.json"
@@ -202,7 +192,11 @@ DISABLED_AUTO_BUYER_SPORT_MARKETS = frozenset(
     {
         ("mlb", "moneyline"),
         ("soccer", "moneyline"),
+        ("soccer", "total"),
+        ("soccer", "spread"),
         ("tennis", "spread"),
+        ("tennis", "moneyline"),
+        ("tennis", "total"),
         ("ncaab", "total"),
         ("ncaab", "spread"),
         ("ncaab", "moneyline"),
@@ -324,7 +318,17 @@ def _is_disabled_auto_buyer_sport_market(
     disabled_markets: tuple[tuple[str, str], ...] | frozenset[tuple[str, str]] = (),
 ) -> bool:
     target = _auto_buyer_sport_market(row)
-    if target[0] in ("ncaab", "hockey", "nhl", "darts", "euroleague", "nbl", "intl_basketball"):
+    if target[0] in (
+        "ncaab",
+        "hockey",
+        "nhl",
+        "darts",
+        "euroleague",
+        "nbl",
+        "intl_basketball",
+        "tennis",
+        "soccer",
+    ):
         return True
     if target in DISABLED_AUTO_BUYER_SPORT_MARKETS:
         return True

@@ -482,7 +482,8 @@ body.hide-col-order .c-order,body.hide-col-matchup .c-matchup{display:none}
       <button data-tab="picks">Model Picks Ledger</button>
       <button data-tab="flat">Flat Ledger</button>
       <button data-tab="v9-ledger">MLB v9 Ledger</button>
-      <button data-tab="auto-buyer-ledger">Auto-Buyer Ledger</button>
+      <button data-tab="auto-buyer-live-ledger">Auto-Buyer Live Ledger</button>
+      <button data-tab="auto-buyer-paper-ledger">Auto-Buyer Paper Ledger</button>
       <button data-tab="manual-bets">Manual Bets Ledger</button>
       <button data-tab="audit">Validation &amp; Audit</button>
     </div>
@@ -773,91 +774,93 @@ body.hide-col-order .c-order,body.hide-col-matchup .c-matchup{display:none}
     </div>
   </section>
 
-  <section id="tab-auto-buyer-ledger" style="display:none">
+  <section id="tab-auto-buyer-live-ledger" style="display:none">
     <div class="row-head">
-      <h2 class="section-head">Auto-Buyer Ledger — Execution & Realized Settlement</h2>
-      <span class="chip dim">Live automated Polymarket executions · configurable future-order unit value · ESPN official outcome settlement · Realized ROI & P&L accounting</span>
+      <h2 class="section-head">Auto-Buyer Live Ledger — Execution & Realized Settlement</h2>
+      <span class="chip dim" style="border-color:rgba(224,49,49,0.35);color:var(--red);font-weight:700">LIVE POLARIS EXECUTION</span>
+      <span class="chip dim">Real Polymarket executions · real capital orders · ESPN official settlement</span>
       <span class="flex-1"></span>
-      <label class="chip" title="Changes future Auto-Buyer sizing only; historical rows retain their execution-time unit value">Auto-Buyer 1U = $<input id="autoBuyerUnitValueInput" aria-label="Auto-Buyer dollar value of one unit" type="number" min="0.01" max="100000" step="0.01" value="0.50" style="width:68px;padding:2px 4px" onkeydown="if(event.key==='Enter')saveAutoBuyerUnitValue()"><button onclick="saveAutoBuyerUnitValue()" style="padding:2px 7px">Set</button></label>
-      <button onclick="renderAutoBuyer(true)">↻ Refresh</button>
-      <button onclick="runAutoBuyerNow()" style="background:rgba(51,209,126,0.15);color:var(--green);font-weight:700">Run Auto-Buyer</button>
-      <button class="primary fw-7" id="btnSettleAutoBuyerNow" onclick="settleAutoBuyerTrades(true)"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M3 14h10M3 5h10M3 5l-2 5a2 2 0 0 0 4 0L3 5zm10 0l-2 5a2 2 0 0 0 4 0l-2-5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg> Settle Auto-Buyer Positions</button>
+      <label class="chip" title="Changes future Auto-Buyer sizing only">Live 1U = $<input id="liveAutoBuyerUnitValueInput" aria-label="Auto-Buyer dollar value of one unit" type="number" min="0.01" max="100000" step="0.01" value="10.00" style="width:68px;padding:2px 4px" onkeydown="if(event.key==='Enter')saveAutoBuyerUnitValue('live')"><button onclick="saveAutoBuyerUnitValue('live')" style="padding:2px 7px">Set</button></label>
+      <button onclick="renderAutoBuyerLiveLedger(true)">↻ Refresh</button>
+      <button onclick="runAutoBuyerNow('live')" style="background:rgba(224,49,49,0.15);color:var(--red);font-weight:700">Run Live Check</button>
+      <button class="primary fw-7" id="liveBtnSettleAutoBuyerNow" onclick="settleAutoBuyerTrades('live', true)"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M3 14h10M3 5h10M3 5l-2 5a2 2 0 0 0 4 0L3 5zm10 0l-2 5a2 2 0 0 0 4 0l-2-5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg> Settle Live Positions</button>
     </div>
-    <div id="autoBuyerKpis" class="kpis mb-16"></div>
-    <div id="autoBuyerSettleKpis" class="kpis" style="display:none"></div>
+    <div id="liveAutoBuyerKpis" class="kpis mb-16"></div>
 
     <div class="filter-bar" style="margin-bottom:14px;display:flex;gap:8px;align-items:center">
-      <button class="primary" id="btnAutoBuyerLedgerView" onclick="setAutoBuyerView('ledger')">Ledger</button>
-      <button id="btnAutoBuyerPerformanceView" onclick="setAutoBuyerView('performance')">Performance</button>
+      <button class="primary" id="liveBtnAutoBuyerLedgerView" onclick="setAutoBuyerView('live','ledger')">Ledger</button>
+      <button id="liveBtnAutoBuyerPerformanceView" onclick="setAutoBuyerView('live','performance')">Performance</button>
       <span class="flex-1"></span>
-      <span class="small dim">Source:</span>
-      <button class="primary" id="btnAutoBuyerSourceLive" onclick="setAutoBuyerLedgerSource('live')" title="Real Polymarket executions">Live</button>
-      <button id="btnAutoBuyerSourcePaper" onclick="setAutoBuyerLedgerSource('paper')" title="Simulated paper fills, no real orders">Paper</button>
+      <button onclick="gotoTab('auto-buyer-paper-ledger')" class="chip" style="cursor:pointer;font-weight:600">Open Paper Ledger (51 Positions) →</button>
       <span class="small dim">Settled-only performance · event dates in America/New_York</span>
     </div>
 
-    <div id="autoBuyerLedgerPanel">
+    <div id="liveAutoBuyerLedgerPanel">
+      <div class="filter-bar" style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="primary" id="liveBtnAbsSettled" onclick="setAbsFilter('live','settled')">Settled (<span id="liveAbsSettledCount">0</span>)</button>
+        <button id="liveBtnAbsPending" onclick="setAbsFilter('live','pending')">Pending / Open (<span id="liveAbsPendingCount">0</span>)</button>
+        <button id="liveBtnAbsAll" onclick="setAbsFilter('live','all')">All Positions (<span id="liveAbsAllCount">0</span>)</button>
+        <span style="width:8px"></span>
+        <select id="liveFSport_ABS" onchange="onAbsFilterChange('live')"><option value="">all sports</option></select>
+        <select id="liveFResult_ABS" onchange="onAbsFilterChange('live')"><option value="">all results</option><option value="win">win</option><option value="loss">loss</option><option value="push">push</option></select>
+        <input id="liveFSearch_ABS" placeholder="search team / slug / order ID..." size="26" oninput="onAbsFilterChange('live')">
+        <input id="liveFFrom_ABS" type="date" onchange="onAbsFilterChange('live')">
+        <input id="liveFTo_ABS" type="date" onchange="onAbsFilterChange('live')">
+        <button onclick="resetAbsFilters('live')">Reset</button>
+        <button onclick="exportAbsCsv('live')">Export CSV</button>
+      </div>
 
-    <div class="filter-bar" style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <button class="primary" id="btnAbsSettled" onclick="setAbsFilter('settled')">Settled (<span id="absSettledCount">0</span>)</button>
-      <button id="btnAbsPending" onclick="setAbsFilter('pending')">Pending / Open (<span id="absPendingCount">0</span>)</button>
-      <button id="btnAbsAll" onclick="setAbsFilter('all')">All Positions (<span id="absAllCount">0</span>)</button>
-      <span style="width:8px"></span>
-      <select id="fSport_ABS" onchange="onAbsFilterChange()"><option value="">all sports</option></select>
-      <select id="fResult_ABS" onchange="onAbsFilterChange()"><option value="">all results</option><option value="win">win</option><option value="loss">loss</option><option value="push">push</option></select>
-      <input id="fSearch_ABS" placeholder="search team / slug / order ID..." size="26" oninput="onAbsFilterChange()">
-      <input id="fFrom_ABS" type="date" onchange="onAbsFilterChange()">
-      <input id="fTo_ABS" type="date" onchange="onAbsFilterChange()">
-      <button onclick="resetAbsFilters()">Reset</button>
-      <button onclick="exportAbsCsv()">Export CSV</button>
+      <div class="card mb-16" id="liveEmptyBanner" style="display:none;padding:28px;text-align:center;background:rgba(255,255,255,0.02);border:1px solid var(--border)">
+        <div style="font-size:16px;font-weight:600;margin-bottom:8px">No Live Polymarket Executions Placed</div>
+        <div class="dim small" style="max-width:540px;margin:0 auto 16px">The system is currently running in <b>PAPER mode</b> by operator directive to protect real capital. Automated trading checks and simulated fills are recorded in the Paper Ledger.</div>
+        <button class="primary" onclick="gotoTab('auto-buyer-paper-ledger')">View Auto-Buyer Paper Ledger →</button>
+      </div>
+
+      <div class="card" id="liveAbsPendingCard" style="margin-bottom:16px;display:none">
+        <div class="row-between">
+          <h3 class="m-0">Pending Live Settlement Queue (<span id="liveAbsPendingBadge">0</span>)</h3>
+          <span class="small dim">Awaiting match completion</span>
+        </div>
+        <div class="ledger-scroll">
+          <table class="ledger" id="liveAbsPendingTable"><tr><td>No pending live orders.</td></tr></table>
+        </div>
+      </div>
+
+      <div class="card mb-16" id="liveAbsSettledCard">
+        <div class="row-between">
+          <h3 class="m-0" id="liveAbsTableTitle">Settled Live Positions & Realized Trade Log</h3>
+          <span class="small dim" id="liveAbsSettledSummary">Showing 0 positions</span>
+        </div>
+        <div class="ledger-scroll">
+          <table class="ledger" id="liveAbsSettledTable"><tr><td>Loading live auto-buyer trades…</td></tr></table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row-between">
+          <h3 class="m-0">Operational Execution Log (data/logs/auto_buyer.log)</h3>
+          <button onclick="loadAutoBuyerLog('live')" style="padding:2px 8px;font-size:11px">↻ Refresh Log</button>
+        </div>
+        <pre id="liveAutoBuyerLogBox" style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:var(--mono);font-size:11px;max-height:260px;overflow-y:auto;white-space:pre-wrap;color:var(--text)">Loading operational log…</pre>
+      </div>
     </div>
 
-    <div class="card" id="absPendingCard" style="margin-bottom:16px;display:none">
-      <div class="row-between">
-        <h3 class="m-0">Pending Settlement Queue (<span id="absPendingBadge">0</span>)</h3>
-        <span class="small dim">Awaiting match completion or official box score ingest</span>
-      </div>
-      <div class="ledger-scroll">
-        <table class="ledger" id="absPendingTable"><tr><td>Loading pending settlements…</td></tr></table>
-      </div>
-    </div>
-
-    <div class="card mb-16">
-      <div class="row-between">
-        <h3 class="m-0" id="absTableTitle">Settled Positions & Realized Trade Log</h3>
-        <span class="small dim" id="absSettledSummary">Showing settled contracts</span>
-      </div>
-      <div class="ledger-scroll">
-        <table class="ledger" id="absSettledTable"><tr><td>Loading auto-buyer trades…</td></tr></table>
-        <table class="data" id="autoBuyerTable" style="display:none"></table>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="row-between">
-        <h3 class="m-0">Operational Execution Log (data/logs/auto_buyer.log)</h3>
-        <button onclick="loadAutoBuyerLog()" style="padding:2px 8px;font-size:11px">↻ Refresh Log</button>
-      </div>
-      <pre id="autoBuyerLogBox" style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:var(--mono);font-size:11px;max-height:260px;overflow-y:auto;white-space:pre-wrap;color:var(--text)">Loading operational log…</pre>
-    </div>
-    </div>
-
-    <div id="autoBuyerPerformancePanel" style="display:none">
-      <div id="autoBuyerPerformanceCohorts" class="kpis mb-16"></div>
+    <div id="liveAutoBuyerPerformancePanel" style="display:none">
+      <div id="liveAutoBuyerPerformanceCohorts" class="kpis mb-16"></div>
       <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
         <div class="card" style="flex:2;min-width:320px">
           <h3 style="margin:0 0 8px">Cumulative Realized P&amp;L</h3>
-          <canvas id="autoBuyerCumulativePnl" height="180"></canvas>
+          <canvas id="liveAutoBuyerCumulativePnl" height="180"></canvas>
         </div>
         <div class="card" style="flex:1;min-width:220px">
           <h3 style="margin:0 0 8px">P&amp;L by Sport</h3>
-          <canvas id="autoBuyerSportPnl" height="180"></canvas>
+          <canvas id="liveAutoBuyerSportPnl" height="180"></canvas>
         </div>
       </div>
       <div class="card mb-16">
         <h3 style="margin:0 0 10px">By Sport</h3>
         <div class="ox-auto">
-          <table class="data" id="autoBuyerSportTable"><tr><td>Loading sport breakdown…</td></tr></table>
+          <table class="data" id="liveAutoBuyerSportTable"><tr><td>Loading sport breakdown…</td></tr></table>
         </div>
       </div>
       <div class="card">
@@ -866,12 +869,108 @@ body.hide-col-order .c-order,body.hide-col-matchup .c-matchup{display:none}
           <span class="small dim">Pending positions excluded</span>
         </div>
         <div class="ox-auto">
-          <table class="data" id="autoBuyerDailyPerformanceTable"><tr><td>Loading settled performance…</td></tr></table>
+          <table class="data" id="liveAutoBuyerDailyPerformanceTable"><tr><td>Loading settled performance…</td></tr></table>
         </div>
       </div>
     </div>
   </section>
 
+  <section id="tab-auto-buyer-paper-ledger" style="display:none">
+    <div class="row-head">
+      <h2 class="section-head">Auto-Buyer Paper Ledger — Simulated Execution & Realized Settlement</h2>
+      <span class="chip dim" style="border-color:rgba(51,209,126,0.35);color:var(--green);font-weight:700">PAPER SIMULATION (>= 2026-11-06)</span>
+      <span class="chip dim">Live automated Polymarket executions · 1U = $10.00 · ESPN official outcome settlement · Realized ROI & P&L</span>
+      <span class="flex-1"></span>
+      <label class="chip" title="Changes future Auto-Buyer sizing only; historical rows retain their execution-time unit value">Paper 1U = $<input id="paperAutoBuyerUnitValueInput" aria-label="Auto-Buyer dollar value of one unit" type="number" min="0.01" max="100000" step="0.01" value="10.00" style="width:68px;padding:2px 4px" onkeydown="if(event.key==='Enter')saveAutoBuyerUnitValue('paper')"><button onclick="saveAutoBuyerUnitValue('paper')" style="padding:2px 7px">Set</button></label>
+      <button onclick="renderAutoBuyerPaperLedger(true)">↻ Refresh</button>
+      <button onclick="runAutoBuyerNow('paper')" style="background:rgba(51,209,126,0.15);color:var(--green);font-weight:700">Run Paper Auto-Buyer</button>
+      <button class="primary fw-7" id="paperBtnSettleAutoBuyerNow" onclick="settleAutoBuyerTrades('paper', true)"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M3 14h10M3 5h10M3 5l-2 5a2 2 0 0 0 4 0L3 5zm10 0l-2 5a2 2 0 0 0 4 0l-2-5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg> Settle Paper Positions</button>
+    </div>
+    <div id="paperAutoBuyerKpis" class="kpis mb-16"></div>
+
+    <div class="filter-bar" style="margin-bottom:14px;display:flex;gap:8px;align-items:center">
+      <button class="primary" id="paperBtnAutoBuyerLedgerView" onclick="setAutoBuyerView('paper','ledger')">Ledger</button>
+      <button id="paperBtnAutoBuyerPerformanceView" onclick="setAutoBuyerView('paper','performance')">Performance</button>
+      <span class="flex-1"></span>
+      <button onclick="gotoTab('auto-buyer-live-ledger')" class="chip" style="cursor:pointer;font-weight:600">Switch to Live Ledger →</button>
+      <span class="small dim">Settled-only performance · event dates in America/New_York</span>
+    </div>
+
+    <div id="paperAutoBuyerLedgerPanel">
+      <div class="filter-bar" style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="primary" id="paperBtnAbsSettled" onclick="setAbsFilter('paper','settled')">Settled (<span id="paperAbsSettledCount">0</span>)</button>
+        <button id="paperBtnAbsPending" onclick="setAbsFilter('paper','pending')">Pending / Open (<span id="paperAbsPendingCount">0</span>)</button>
+        <button id="paperBtnAbsAll" onclick="setAbsFilter('paper','all')">All Positions (<span id="paperAbsAllCount">0</span>)</button>
+        <span style="width:8px"></span>
+        <select id="paperFSport_ABS" onchange="onAbsFilterChange('paper')"><option value="">all sports</option></select>
+        <select id="paperFResult_ABS" onchange="onAbsFilterChange('paper')"><option value="">all results</option><option value="win">win</option><option value="loss">loss</option><option value="push">push</option></select>
+        <input id="paperFSearch_ABS" placeholder="search team / slug / order ID..." size="26" oninput="onAbsFilterChange('paper')">
+        <input id="paperFFrom_ABS" type="date" onchange="onAbsFilterChange('paper')">
+        <input id="paperFTo_ABS" type="date" onchange="onAbsFilterChange('paper')">
+        <button onclick="resetAbsFilters('paper')">Reset</button>
+        <button onclick="exportAbsCsv('paper')">Export CSV</button>
+      </div>
+
+      <div class="card" id="paperAbsPendingCard" style="margin-bottom:16px;display:none">
+        <div class="row-between">
+          <h3 class="m-0">Pending Settlement Queue (<span id="paperAbsPendingBadge">0</span>)</h3>
+          <span class="small dim">Awaiting match completion or official box score ingest</span>
+        </div>
+        <div class="ledger-scroll">
+          <table class="ledger" id="paperAbsPendingTable"><tr><td>Loading pending settlements…</td></tr></table>
+        </div>
+      </div>
+
+      <div class="card mb-16">
+        <div class="row-between">
+          <h3 class="m-0" id="paperAbsTableTitle">Settled Positions & Realized Trade Log</h3>
+          <span class="small dim" id="paperAbsSettledSummary">Showing settled contracts</span>
+        </div>
+        <div class="ledger-scroll">
+          <table class="ledger" id="paperAbsSettledTable"><tr><td>Loading auto-buyer trades…</td></tr></table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row-between">
+          <h3 class="m-0">Operational Execution Log (data/logs/auto_buyer.log)</h3>
+          <button onclick="loadAutoBuyerLog('paper')" style="padding:2px 8px;font-size:11px">↻ Refresh Log</button>
+        </div>
+        <pre id="paperAutoBuyerLogBox" style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:var(--mono);font-size:11px;max-height:260px;overflow-y:auto;white-space:pre-wrap;color:var(--text)">Loading operational log…</pre>
+      </div>
+    </div>
+
+    <div id="paperAutoBuyerPerformancePanel" style="display:none">
+      <div id="paperAutoBuyerPerformanceCohorts" class="kpis mb-16"></div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
+        <div class="card" style="flex:2;min-width:320px">
+          <h3 style="margin:0 0 8px">Cumulative Realized P&amp;L</h3>
+          <canvas id="paperAutoBuyerCumulativePnl" height="180"></canvas>
+        </div>
+        <div class="card" style="flex:1;min-width:220px">
+          <h3 style="margin:0 0 8px">P&amp;L by Sport</h3>
+          <canvas id="paperAutoBuyerSportPnl" height="180"></canvas>
+        </div>
+      </div>
+      <div class="card mb-16">
+        <h3 style="margin:0 0 10px">By Sport</h3>
+        <div class="ox-auto">
+          <table class="data" id="paperAutoBuyerSportTable"><tr><td>Loading sport breakdown…</td></tr></table>
+        </div>
+      </div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+          <h3 class="m-0">Day-by-Day Settled Performance</h3>
+          <span class="small dim">Pending positions excluded</span>
+        </div>
+        <div class="ox-auto">
+          <table class="data" id="paperAutoBuyerDailyPerformanceTable"><tr><td>Loading settled performance…</td></tr></table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-auto-buyer-ledger" style="display:none"></section>
   <!-- Legacy Tab Alias Anchor (Maintains Full Routing Parity) -->
 
   <section id="tab-manual-bets" style="display:none">
@@ -1127,7 +1226,9 @@ $$("#tabs button").forEach(b=>b.onclick=()=>{
   if(b.dataset.tab==="rebuild")loadRebuild();
   if(b.dataset.tab==="polymarket")loadPolymarketScanner();
   if(b.dataset.tab==="poly-ledger")renderPolyLedger(true);
-  if(b.dataset.tab==="auto-buyer-ledger")renderAutoBuyerLedger(false);
+  if(b.dataset.tab==="auto-buyer-live-ledger")renderAutoBuyerLiveLedger(true);
+  if(b.dataset.tab==="auto-buyer-paper-ledger")renderAutoBuyerPaperLedger(true);
+  if(b.dataset.tab==="auto-buyer-ledger")gotoTab("auto-buyer-paper-ledger");
   if(b.dataset.tab==="manual-bets")renderManualBets(false);
 });
 
@@ -3658,7 +3759,7 @@ function renderOverview(){
     {tab:"picks",label:"Open picks",value:p.open??"—",sub:s.unit_value_usd!=null?`1U = $${Number(s.unit_value_usd).toFixed(2)}`:""},
     {tab:"health",label:"Alerts",value:alerts.length,level:errs?"bad":warns?"warn":"",sub:errs?`${errs} error${errs>1?"s":""}`:warns?`${warns} warning${warns>1?"s":""}`:"all clear"},
     {tab:"health",label:"Pipeline",value:dp.last_run_at_utc?(dp.stale?"STALE":"OK"):"—",level:dp.stale?"bad":"",sub:dp.age_hours!=null?`${dp.age_hours}h ago`:""},
-    {tab:"auto-buyer-ledger",label:"Auto-Buyer",value:ab.enabled?abMode.toUpperCase():"OFF",level:ab.enabled&&abMode==="live"?"bad":"",sub:ab.enabled?"enabled":"disabled"}
+    {tab:abMode==="live"?"auto-buyer-live-ledger":"auto-buyer-paper-ledger",label:"Auto-Buyer",value:ab.enabled?abMode.toUpperCase():"OFF",level:ab.enabled&&abMode==="live"?"bad":"",sub:ab.enabled?"enabled":"disabled"}
   ];
   el.innerHTML=items.map(i=>`<button class="ov-item ${i.level||""}" onclick="gotoTab('${i.tab}')" title="Open ${esc(i.label)} details">
     <span class="ov-label">${esc(i.label)}</span><span class="ov-value ${i.cls||""}">${esc(i.value)}</span><span class="ov-sub">${esc(i.sub||"")}</span></button>`).join("");
@@ -3880,7 +3981,10 @@ function updateAutoBuyerUI(data){
   const mode=(data.mode||"paper").toLowerCase();
   const isLive=mode==="live";
   if(unitBadge)unitBadge.textContent=unitValue<1?`${Math.round(unitValue*100)}¢/U`:`$${unitValue.toFixed(2)}/U`;
-  if(unitInput&&document.activeElement!==unitInput)unitInput.value=unitValue.toFixed(2);
+  const unitInputs = [$("#paperAutoBuyerUnitValueInput"), $("#liveAutoBuyerUnitValueInput"), $("#autoBuyerUnitValueInput")];
+  unitInputs.forEach(inp => {
+    if(inp && document.activeElement !== inp) inp.value = unitValue.toFixed(2);
+  });
   const on=!!data.enabled;
   const state=on?(isLive?"live":"paper"):(isLive?"armed":"off");
   btn.className="ab-toggle "+(on?(isLive?"live":"paper"):"off");
@@ -3949,8 +4053,8 @@ async function setAutoBuyerMode(nextMode){
     alert("Failed to switch Auto-Buyer mode: "+e);
   }
 }
-async function saveAutoBuyerUnitValue(){
-  const input=$("#autoBuyerUnitValueInput"),value=Number(input&&input.value);
+async function saveAutoBuyerUnitValue(mode = "paper"){
+  const input=$(`#${mode}AutoBuyerUnitValueInput`)||$("#autoBuyerUnitValueInput")||$("#paperAutoBuyerUnitValueInput"),value=Number(input&&input.value);
   if(!Number.isFinite(value)||value<0.01||value>100000){
     showModal('<h2 class="red">Invalid Auto-Buyer unit value</h2><p>Enter a dollar amount from $0.01 to $100,000.00.</p>');return;
   }
@@ -4106,68 +4210,35 @@ async function runAutoBuyerNow(){
     const data=await res.json();
     alert(`Auto-Buyer run completed!\n\nMode: ${data.mode}\nPicks Evaluated: ${data.total_evaluated}\nWhitelisted: ${data.whitelisted_count}\nOrders: ${data.orders_count}\nTotal Spend: $${Number(data.total_spend_usd).toFixed(2)}`);
     refreshAll();
-    if ($("#tab-auto-buyer-ledger") && $("#tab-auto-buyer-ledger").style.display !== "none") {
-      renderAutoBuyerLedger(true);
+    if ($("#tab-auto-buyer-live-ledger") && $("#tab-auto-buyer-live-ledger").style.display !== "none") {
+      renderAutoBuyerLiveLedger(true);
+    }
+    if ($("#tab-auto-buyer-paper-ledger") && $("#tab-auto-buyer-paper-ledger").style.display !== "none") {
+      renderAutoBuyerPaperLedger(true);
     }
   }catch(e){
     alert("Auto-Buyer execution failed: "+e);
   }
 }
 
-/* ---------- Auto-Buyer Consolidated Execution & Settlement ---------- */
-let _autoBuyerLedgerCache = [];
-let _absFilterMode = "settled";
-let _autoBuyerView = "ledger";
-let _autoBuyerLedgerSource = "live"; // "live" (real orders) or "paper" (simulated fills)
-
-function setAutoBuyerLedgerSource(source){
-  _autoBuyerLedgerSource = source === "paper" ? "paper" : "live";
-  const liveBtn=$("#btnAutoBuyerSourceLive"), paperBtn=$("#btnAutoBuyerSourcePaper");
-  if(liveBtn)liveBtn.className=_autoBuyerLedgerSource==="live"?"primary":"";
-  if(paperBtn)paperBtn.className=_autoBuyerLedgerSource==="paper"?"primary":"";
-  renderAutoBuyer(true);
-}
-window.setAutoBuyerLedgerSource=setAutoBuyerLedgerSource;
-
-async function loadAutoBuyerLedgerCache(force = false) {
-  if (!force && _autoBuyerLedgerCache && _autoBuyerLedgerCache.length) return;
-  const endpoint = _autoBuyerLedgerSource === "paper" ? "/api/auto-buyer/paper-ledger" : "/api/auto-buyer/ledger";
-  try {
-    const res = await fetch(endpoint, {
-      headers: { "X-Dashboard-Token": window._DASHBOARD_TOKEN || "" }
-    });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    _autoBuyerLedgerCache = await res.json();
-  } catch (e) {
-    _autoBuyerLedgerCache = [];
+/* ---------- Auto-Buyer Consolidated Execution & Settlement (Live & Paper) ---------- */
+const _autoBuyerStore = {
+  live: {
+    cache: [],
+    filterMode: "settled",
+    viewMode: "ledger",
+    endpoint: "/api/auto-buyer/ledger"
+  },
+  paper: {
+    cache: [],
+    filterMode: "settled",
+    viewMode: "ledger",
+    endpoint: "/api/auto-buyer/paper-ledger"
   }
-}
+};
 
-async function renderAutoBuyer(force = false) {
-  await loadAutoBuyerLedgerCache(force);
-  await loadAutoBuyerStatus();
-  renderAutoBuyerKpis();
-  renderAutoBuyerPerformance();
-  populateAbsSportDropdown();
-  renderAutoBuyerTables();
-  await loadAutoBuyerLog();
-}
-
-const renderAutoBuyerLedger = renderAutoBuyer;
-const renderAutoBuyerSettle = renderAutoBuyer;
-
-function setAutoBuyerView(view) {
-  _autoBuyerView = view === "performance" ? "performance" : "ledger";
-  const showingPerformance = _autoBuyerView === "performance";
-  const ledgerPanel = $("#autoBuyerLedgerPanel");
-  const performancePanel = $("#autoBuyerPerformancePanel");
-  const ledgerButton = $("#btnAutoBuyerLedgerView");
-  const performanceButton = $("#btnAutoBuyerPerformanceView");
-  if (ledgerPanel) ledgerPanel.style.display = showingPerformance ? "none" : "";
-  if (performancePanel) performancePanel.style.display = showingPerformance ? "" : "none";
-  if (ledgerButton) ledgerButton.classList.toggle("primary", !showingPerformance);
-  if (performanceButton) performanceButton.classList.toggle("primary", showingPerformance);
-  if (showingPerformance) renderAutoBuyerPerformance();
+function getAutoBuyerMode(mode) {
+  return (mode === "live" || mode === "paper") ? mode : "paper";
 }
 
 function isSettledAutoBuyerRow(row) {
@@ -4198,73 +4269,86 @@ function autoBuyerCohortMetrics(rows) {
   const pnlUsd = settled.reduce((sum, row) => sum + (Number(row.pnl_usd) || 0), 0);
   const pnlUnits = settled.reduce((sum, row) => {
     const stored = row.pnl_units;
-    const unitValue = Number(row.unit_value_usd) > 0 ? Number(row.unit_value_usd) : 0.50;
-    return sum + (stored === null || stored === undefined || stored === "" ? (Number(row.pnl_usd) || 0) / unitValue : Number(stored) || 0);
+    if (stored !== undefined && stored !== null && Number.isFinite(Number(stored))) {
+      return sum + Number(stored);
+    }
+    const unitVal = Number(row.unit_value_usd) || 10.0;
+    return sum + (unitVal > 0 ? (Number(row.pnl_usd) || 0) / unitVal : 0);
   }, 0);
-  const grossWinUsd = settled.filter(row => String(row.result || "").toLowerCase() === "win")
+  const totalDecided = wins + losses;
+  const winRatePct = totalDecided > 0 ? (wins / totalDecided) * 100 : 0;
+  const roiPct = stakeUsd > 0 ? (pnlUsd / stakeUsd) * 100 : 0;
+  const grossWinUsd = settled
+    .filter(row => String(row.result || "").toLowerCase() === "win")
     .reduce((sum, row) => sum + (Number(row.pnl_usd) || 0), 0);
-  const grossLossUsd = settled.filter(row => String(row.result || "").toLowerCase() === "loss")
+  const grossLossUsd = settled
+    .filter(row => String(row.result || "").toLowerCase() === "loss")
     .reduce((sum, row) => sum + (Number(row.pnl_usd) || 0), 0);
+  const profitFactor = grossLossUsd < 0
+    ? grossWinUsd / Math.abs(grossLossUsd)
+    : (grossWinUsd > 0 ? null : 0);
+  const avgWinUsd = wins > 0 ? grossWinUsd / wins : 0;
+  const avgLossUsd = losses > 0 ? grossLossUsd / losses : 0;
   return {
     settled: settled.length,
     wins,
     losses,
     pushes,
+    winRatePct,
     stakeUsd,
     pnlUsd,
     pnlUnits,
-    winRatePct: wins + losses ? wins / (wins + losses) * 100 : null,
-    roiPct: stakeUsd > 0 ? pnlUsd / stakeUsd * 100 : null,
-    profitFactor: grossLossUsd < 0 ? grossWinUsd / Math.abs(grossLossUsd) : (grossWinUsd > 0 ? null : 0),
-    avgWinUsd: wins ? grossWinUsd / wins : null,
-    avgLossUsd: losses ? grossLossUsd / losses : null
+    roiPct,
+    profitFactor,
+    avgWinUsd,
+    avgLossUsd
   };
 }
 
 function autoBuyerRecordText(metrics) {
-  return `${metrics.wins}W - ${metrics.losses}L${metrics.pushes ? ` - ${metrics.pushes}P` : ""}`;
+  return `${metrics.wins}W - ${metrics.losses}L${metrics.pushes ? ` - ${metrics.pushes}P` : ''} (${metrics.winRatePct.toFixed(1)}%)`;
 }
 
 function autoBuyerPct(value) {
-  return value === null ? "—" : `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
+  return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
 }
 
 function autoBuyerPerformanceCell(metrics) {
-  if (!metrics.settled) return '<td class="dim">—</td><td class="dim">—</td><td class="dim">—</td>';
   return `
     <td class="mono">${autoBuyerRecordText(metrics)}</td>
-    <td class="mono ${metrics.pnlUsd >= 0 ? 'green' : 'red'}">$${metrics.pnlUsd >= 0 ? '+' : ''}${metrics.pnlUsd.toFixed(2)}</td>
+    <td class="mono ${metrics.pnlUsd >= 0 ? 'green' : 'red'}">$${metrics.pnlUsd >= 0 ? '+' : ''}${metrics.pnlUsd.toFixed(2)} (${metrics.pnlUnits >= 0 ? '+' : ''}${metrics.pnlUnits.toFixed(2)}U)</td>
     <td class="mono ${metrics.roiPct >= 0 ? 'green' : 'red'}">${autoBuyerPct(metrics.roiPct)}</td>
   `;
 }
 
 function autoBuyerCurrentStreak(rows) {
   const sorted = [...rows].sort((a, b) => autoBuyerEventDateEt(b).localeCompare(autoBuyerEventDateEt(a)));
-  let result = null;
-  let streak = 0;
-  for (const row of sorted) {
-    const r = String(row.result || "").toLowerCase();
-    if (r !== "win" && r !== "loss") continue;
-    if (result === null) result = r;
-    if (r !== result) break;
-    streak++;
+  if (!sorted.length) return null;
+  const firstResult = String(sorted[0].result || "").toLowerCase();
+  if (!["win", "loss"].includes(firstResult)) return null;
+  let count = 0;
+  for (const r of sorted) {
+    if (String(r.result || "").toLowerCase() === firstResult) count++;
+    else break;
   }
-  return result ? { result, streak } : null;
+  return { result: firstResult, streak: count };
 }
 
 function autoBuyerBestWorstDay(rows) {
-  const byDate = {};
+  const byDay = {};
   rows.forEach(row => {
     const d = autoBuyerEventDateEt(row);
-    byDate[d] = (byDate[d] || 0) + (Number(row.pnl_usd) || 0);
+    if (d === "Unknown") return;
+    byDay[d] = (byDay[d] || 0) + (Number(row.pnl_usd) || 0);
   });
-  const entries = Object.entries(byDate).sort((a, b) => b[1] - a[1]);
-  if (!entries.length) return { best: null, worst: null };
-  return { best: entries[0], worst: entries[entries.length - 1] };
+  const days = Object.entries(byDay);
+  if (!days.length) return { best: null, worst: null };
+  days.sort((a, b) => b[1] - a[1]);
+  return { best: days[0], worst: days[days.length - 1] };
 }
 
 function autoBuyerPnlFormat(value) {
-  return value === null || value === undefined ? "—" : `$${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
+  return `$${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
 }
 
 function autoBuyerProfitFactorText(value) {
@@ -4273,195 +4357,66 @@ function autoBuyerProfitFactorText(value) {
   return value.toFixed(2);
 }
 
-function renderAutoBuyerPerformance() {
-  const settled = (_autoBuyerLedgerCache || []).filter(isSettledAutoBuyerRow);
-
-  const sportOf = row => (row.sport || "Unknown").toString().toUpperCase();
-  const sports = Array.from(new Set(settled.map(sportOf))).sort();
-  const cohorts = [
-    ["All Auto-Buys", settled],
-    ...sports.map(sp => [sp, settled.filter(row => sportOf(row) === sp)])
-  ];
-  const cohortEl = $("#autoBuyerPerformanceCohorts");
-  if (cohortEl) {
-    cohortEl.innerHTML = cohorts.map(([label, rows]) => {
-      const metrics = autoBuyerCohortMetrics(rows);
-      const pnlClass = metrics.pnlUsd >= 0 ? "green" : "red";
-      return `<div class="k">
-        <b class="${pnlClass}">$${metrics.pnlUsd >= 0 ? '+' : ''}${metrics.pnlUsd.toFixed(2)}</b>
-        <span>${esc(label)} · ${autoBuyerRecordText(metrics)} · ${autoBuyerPct(metrics.roiPct)} ROI · ${metrics.pnlUnits >= 0 ? '+' : ''}${metrics.pnlUnits.toFixed(2)}U</span>
-      </div>`;
-    }).join("");
-  }
-
-  const dates = Array.from(new Set(settled.map(autoBuyerEventDateEt))).sort((a, b) => {
-    if (a === "Unknown") return 1;
-    if (b === "Unknown") return -1;
-    return b.localeCompare(a);
-  });
-  const datesAsc = dates.filter(d => d !== "Unknown").slice().reverse();
-
-  // Cumulative realized P&L curve, oldest to newest.
-  let running = 0;
-  const curve = datesAsc.map(date => {
-    const dayPnl = settled.filter(row => autoBuyerEventDateEt(row) === date)
-      .reduce((sum, row) => sum + (Number(row.pnl_usd) || 0), 0);
-    running += dayPnl;
-    return { x: date, pnl: running };
-  });
-  if ($("#autoBuyerCumulativePnl")) lineChart("#autoBuyerCumulativePnl", curve);
-
-  // P&L by sport bar chart, largest magnitude first.
-  const sportBars = sports.map(sp => [sp, autoBuyerCohortMetrics(settled.filter(row => sportOf(row) === sp)).pnlUsd])
-    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
-  if ($("#autoBuyerSportPnl")) barChart("#autoBuyerSportPnl", sportBars.map(s => s[0]), sportBars.map(s => s[1]), { signed: true });
-
-  // By-sport detail table.
-  const sportTableEl = $("#autoBuyerSportTable");
-  if (sportTableEl) {
-    let sportHtml = `<thead><tr><th>Sport</th><th>Settled</th><th>Record</th><th>Stake</th><th>P&amp;L</th><th>ROI</th><th>Profit Factor</th><th>Avg Win</th><th>Avg Loss</th></tr></thead><tbody>`;
-    if (!sports.length) {
-      sportHtml += '<tr><td colspan="9" class="dim" style="text-align:center;padding:24px">No settled Auto-Buyer positions.</td></tr>';
-    } else {
-      sports.slice().sort((a, b) => {
-        const ma = autoBuyerCohortMetrics(settled.filter(row => sportOf(row) === a));
-        const mb = autoBuyerCohortMetrics(settled.filter(row => sportOf(row) === b));
-        return mb.pnlUsd - ma.pnlUsd;
-      }).forEach(sp => {
-        const m = autoBuyerCohortMetrics(settled.filter(row => sportOf(row) === sp));
-        sportHtml += `<tr>
-          <td class="mono font-bold">${esc(sp)}</td>
-          <td class="mono">${m.settled}</td>
-          <td class="mono">${autoBuyerRecordText(m)}</td>
-          <td class="mono">$${m.stakeUsd.toFixed(2)}</td>
-          <td class="mono ${m.pnlUsd >= 0 ? 'green' : 'red'}">${autoBuyerPnlFormat(m.pnlUsd)}</td>
-          <td class="mono ${m.roiPct >= 0 ? 'green' : 'red'}">${autoBuyerPct(m.roiPct)}</td>
-          <td class="mono">${autoBuyerProfitFactorText(m.profitFactor)}</td>
-          <td class="mono green">${autoBuyerPnlFormat(m.avgWinUsd)}</td>
-          <td class="mono red">${autoBuyerPnlFormat(m.avgLossUsd)}</td>
-        </tr>`;
-      });
-    }
-    sportTableEl.innerHTML = sportHtml + "</tbody>";
-  }
-
-  const tableEl = $("#autoBuyerDailyPerformanceTable");
-  if (!tableEl) return;
-  let html = `<thead>
-    <tr><th>Event Date (ET)</th><th>Record</th><th>P&amp;L</th><th>ROI</th></tr>
-  </thead><tbody>`;
-  if (!dates.length) {
-    html += '<tr><td colspan="4" class="dim" style="text-align:center;padding:24px">No settled Auto-Buyer positions.</td></tr>';
-  } else {
-    dates.forEach(date => {
-      const daily = settled.filter(row => autoBuyerEventDateEt(row) === date);
-      const allMetrics = autoBuyerCohortMetrics(daily);
-      html += `<tr><td class="mono font-bold">${esc(date)}</td>${autoBuyerPerformanceCell(allMetrics)}</tr>`;
-    });
-  }
-  tableEl.innerHTML = html + "</tbody>";
+function setAutoBuyerView(mode, view) {
+  const m = getAutoBuyerMode(mode);
+  _autoBuyerStore[m].viewMode = view === "performance" ? "performance" : "ledger";
+  const showingPerf = _autoBuyerStore[m].viewMode === "performance";
+  const ledgerPanel = $(`#${m}AutoBuyerLedgerPanel`);
+  const perfPanel = $(`#${m}AutoBuyerPerformancePanel`);
+  const ledgerBtn = $(`#${m}BtnAutoBuyerLedgerView`);
+  const perfBtn = $(`#${m}BtnAutoBuyerPerformanceView`);
+  if (ledgerPanel) ledgerPanel.style.display = showingPerf ? "none" : "";
+  if (perfPanel) perfPanel.style.display = showingPerf ? "" : "none";
+  if (ledgerBtn) ledgerBtn.classList.toggle("primary", !showingPerf);
+  if (perfBtn) perfBtn.classList.toggle("primary", showingPerf);
+  if (showingPerf) renderAutoBuyerPerformanceFor(m);
 }
 
-function populateAbsSportDropdown() {
-  const select = $("#fSport_ABS");
-  if (!select) return;
-  const curr = select.value;
-  const sports = new Set();
-  (_autoBuyerLedgerCache || []).forEach(r => {
-    const sp = (r.sport || "").toUpperCase();
-    if (sp) sports.add(sp);
-  });
-  let html = '<option value="">all sports</option>';
-  Array.from(sports).sort().forEach(sp => {
-    html += `<option value="${esc(sp)}" ${sp === curr ? 'selected' : ''}>${esc(sp)}</option>`;
-  });
-  select.innerHTML = html;
-}
-
-function renderAutoBuyerKpis() {
-  const rows = _autoBuyerLedgerCache || [];
-  const settledRows = rows.filter(r => String(r.status || "").toLowerCase() === "settled" || ["win", "loss", "push"].includes(String(r.result || "").toLowerCase()));
-  const openRows = rows.filter(r => !settledRows.includes(r));
-  const wins = settledRows.filter(r => r.result === "win").length;
-  const losses = settledRows.filter(r => r.result === "loss").length;
-  const pushes = settledRows.filter(r => r.result === "push").length;
-  const settledTotal = wins + losses + pushes;
-
-  const totalCostSettled = settledRows.reduce((s, r) => s + (Number(r.cost_usd) || 0), 0);
-  const totalCostAll = rows.reduce((s, r) => s + (Number(r.cost_usd) || 0), 0);
-  const totalPnlUsd = settledRows.reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
-  const totalPnlUnits = settledRows.reduce((s, r) => s + (Number(r.pnl_units) || 0), 0);
-  const roiPct = totalCostSettled > 0 ? (totalPnlUsd / totalCostSettled) * 100 : 0;
-  const avgEdge = settledRows.length ? (settledRows.reduce((s, r) => s + (Number(r.edge) || 0), 0) / settledRows.length) * 100 : 0;
-  const avgStakeUsd = settledTotal > 0 ? totalCostSettled / settledTotal : 0;
-  const streak = autoBuyerCurrentStreak(settledRows);
-  const { best, worst } = autoBuyerBestWorstDay(settledRows);
-  const grossWinUsd = settledRows.filter(r => r.result === "win").reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
-  const grossLossUsd = settledRows.filter(r => r.result === "loss").reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
-  const profitFactor = grossLossUsd < 0 ? grossWinUsd / Math.abs(grossLossUsd) : (grossWinUsd > 0 ? null : 0);
-
-  if ($("#absSettledCount")) $("#absSettledCount").textContent = settledRows.length;
-  if ($("#absPendingCount")) $("#absPendingCount").textContent = openRows.length;
-  if ($("#absAllCount")) $("#absAllCount").textContent = rows.length;
-  if ($("#absPendingBadge")) $("#absPendingBadge").textContent = openRows.length;
-
-  const kpisHtml = `
-    <div class="k"><b class="${totalPnlUsd >= 0 ? 'green' : 'red'}">$${totalPnlUsd >= 0 ? '+' : ''}${totalPnlUsd.toFixed(2)}</b><span>Realized P&L (${totalPnlUnits >= 0 ? '+' : ''}${totalPnlUnits.toFixed(2)}U)</span></div>
-    <div class="k"><b class="green">${wins}W - ${losses}L${pushes ? ` - ${pushes}P` : ''}</b><span>Settled Record (${settledTotal > 0 ? ((wins / (wins + losses || 1)) * 100).toFixed(1) : 0}%)</span></div>
-    <div class="k"><b class="${roiPct >= 0 ? 'green' : 'red'}">${roiPct >= 0 ? '+' : ''}${roiPct.toFixed(1)}%</b><span>Realized ROI on Staked</span></div>
-    <div class="k"><b>$${totalCostSettled.toFixed(2)}</b><span>Settled Capital ($${totalCostAll.toFixed(2)} total)</span></div>
-    <div class="k"><b class="${openRows.length > 0 ? 'yellow' : 'dim'}">${openRows.length}</b><span>Pending Settlement</span></div>
-    <div class="k"><b class="green">+${avgEdge.toFixed(1)}%</b><span>Avg Settlement Edge</span></div>
-    <div class="k"><b>$${avgStakeUsd.toFixed(2)}</b><span>Avg Stake / Bet</span></div>
-    <div class="k"><b class="${streak ? (streak.result === 'win' ? 'green' : 'red') : 'dim'}">${streak ? `${streak.streak}${streak.result === 'win' ? 'W' : 'L'}` : '—'}</b><span>Current Streak</span></div>
-    <div class="k"><b class="green">${best ? `$+${best[1].toFixed(2)}` : '—'}</b><span>Best Day${best ? ` (${esc(best[0])})` : ''}</span></div>
-    <div class="k"><b class="${worst && worst[1] < 0 ? 'red' : 'dim'}">${worst ? `$${worst[1] >= 0 ? '+' : ''}${worst[1].toFixed(2)}` : '—'}</b><span>Worst Day${worst ? ` (${esc(worst[0])})` : ''}</span></div>
-    <div class="k"><b class="${profitFactor === null || profitFactor >= 1 ? 'green' : 'red'}">${profitFactor === null ? '∞' : profitFactor.toFixed(2)}</b><span>Profit Factor (gross win / gross loss)</span></div>
-  `;
-
-  if ($("#autoBuyerKpis")) $("#autoBuyerKpis").innerHTML = kpisHtml;
-  if ($("#autoBuyerSettleKpis")) $("#autoBuyerSettleKpis").innerHTML = kpisHtml;
-}
-
-function setAbsFilter(mode) {
-  _absFilterMode = mode;
-  ["settled", "pending", "all"].forEach(m => {
-    const btn = $("#btnAbs" + m.charAt(0).toUpperCase() + m.slice(1));
+function setAbsFilter(mode, filterMode) {
+  const m = getAutoBuyerMode(mode);
+  _autoBuyerStore[m].filterMode = filterMode;
+  ["settled", "pending", "all"].forEach(fm => {
+    const btn = $(`#${m}BtnAbs` + fm.charAt(0).toUpperCase() + fm.slice(1));
     if (btn) {
-      if (m === mode) btn.classList.add("primary");
+      if (fm === filterMode) btn.classList.add("primary");
       else btn.classList.remove("primary");
     }
   });
-  renderAutoBuyerTables();
+  renderAutoBuyerTablesFor(m);
 }
 
-function onAbsFilterChange() {
-  renderAutoBuyerTables();
+function onAbsFilterChange(mode) {
+  const m = getAutoBuyerMode(mode);
+  renderAutoBuyerTablesFor(m);
 }
 
-function resetAbsFilters() {
-  if ($("#fSport_ABS")) $("#fSport_ABS").value = "";
-  if ($("#fResult_ABS")) $("#fResult_ABS").value = "";
-  if ($("#fSearch_ABS")) $("#fSearch_ABS").value = "";
-  if ($("#fFrom_ABS")) $("#fFrom_ABS").value = "";
-  if ($("#fTo_ABS")) $("#fTo_ABS").value = "";
-  setAbsFilter("settled");
+function resetAbsFilters(mode) {
+  const m = getAutoBuyerMode(mode);
+  if ($(`#${m}FSport_ABS`)) $(`#${m}FSport_ABS`).value = "";
+  if ($(`#${m}FResult_ABS`)) $(`#${m}FResult_ABS`).value = "";
+  if ($(`#${m}FSearch_ABS`)) $(`#${m}FSearch_ABS`).value = "";
+  if ($(`#${m}FFrom_ABS`)) $(`#${m}FFrom_ABS`).value = "";
+  if ($(`#${m}FTo_ABS`)) $(`#${m}FTo_ABS`).value = "";
+  setAbsFilter(m, "settled");
 }
 
-function getFilteredAbsRows() {
-  const rows = _autoBuyerLedgerCache || [];
-  const sport = ($("#fSport_ABS") ? $("#fSport_ABS").value : "").toUpperCase();
-  const resFilter = ($("#fResult_ABS") ? $("#fResult_ABS").value : "").toLowerCase();
-  const search = ($("#fSearch_ABS") ? $("#fSearch_ABS").value : "").toLowerCase().trim();
-  const fromDate = $("#fFrom_ABS") ? $("#fFrom_ABS").value : "";
-  const toDate = $("#fTo_ABS") ? $("#fTo_ABS").value : "";
+function getFilteredAbsRowsFor(mode) {
+  const m = getAutoBuyerMode(mode);
+  const rows = _autoBuyerStore[m].cache || [];
+  const sport = ($(`#${m}FSport_ABS`) ? $(`#${m}FSport_ABS`).value : "").toUpperCase();
+  const resFilter = ($(`#${m}FResult_ABS`) ? $(`#${m}FResult_ABS`).value : "").toLowerCase();
+  const search = ($(`#${m}FSearch_ABS`) ? $(`#${m}FSearch_ABS`).value : "").toLowerCase().trim();
+  const fromDate = $(`#${m}FFrom_ABS`) ? $(`#${m}FFrom_ABS`).value : "";
+  const toDate = $(`#${m}FTo_ABS`) ? $(`#${m}FTo_ABS`).value : "";
+  const filterMode = _autoBuyerStore[m].filterMode;
 
   return rows.filter(r => {
-    const isSettled = String(r.status || "").toLowerCase() === "settled" || ["win", "loss", "push"].includes(String(r.result || "").toLowerCase());
+    const isSettled = String(r.status || "").toLowerCase() === "settled" ||
+      ["win", "loss", "push"].includes(String(r.result || "").toLowerCase());
     const isOpen = !isSettled;
 
-    if (_absFilterMode === "settled" && !isSettled) return false;
-    if (_absFilterMode === "pending" && !isOpen) return false;
+    if (filterMode === "settled" && !isSettled) return false;
+    if (filterMode === "pending" && !isOpen) return false;
 
     if (sport && (r.sport || "").toUpperCase() !== sport) return false;
     if (resFilter) {
@@ -4481,31 +4436,171 @@ function getFilteredAbsRows() {
   });
 }
 
-function renderAutoBuyerTables() {
-  const filtered = getFilteredAbsRows();
-  const openRows = (_autoBuyerLedgerCache || []).filter(r => String(r.status || "").toLowerCase() !== "settled" && !["win", "loss", "push"].includes(String(r.result || "").toLowerCase()));
+function populateAbsSportDropdownFor(mode) {
+  const m = getAutoBuyerMode(mode);
+  const select = $(`#${m}FSport_ABS`);
+  if (!select) return;
+  const curr = select.value;
+  const sports = new Set();
+  (_autoBuyerStore[m].cache || []).forEach(r => {
+    const sp = (r.sport || "").toUpperCase();
+    if (sp) sports.add(sp);
+  });
+  let html = '<option value="">all sports</option>';
+  Array.from(sports).sort().forEach(sp => {
+    html += `<option value="${esc(sp)}" ${sp === curr ? 'selected' : ''}>${esc(sp)}</option>`;
+  });
+  select.innerHTML = html;
+}
 
-  const pendingCard = $("#absPendingCard");
+function renderAutoBuyerKpisFor(mode) {
+  const m = getAutoBuyerMode(mode);
+  const rows = _autoBuyerStore[m].cache || [];
+  const settledRows = rows.filter(r => isSettledAutoBuyerRow(r));
+  const openRows = rows.filter(r => !settledRows.includes(r));
+  const wins = settledRows.filter(r => r.result === "win").length;
+  const losses = settledRows.filter(r => r.result === "loss").length;
+  const pushes = settledRows.filter(r => r.result === "push").length;
+  const settledTotal = wins + losses + pushes;
+
+  const totalCostSettled = settledRows.reduce((s, r) => s + (Number(r.cost_usd) || 0), 0);
+  const totalCostAll = rows.reduce((s, r) => s + (Number(r.cost_usd) || 0), 0);
+  const totalPnlUsd = settledRows.reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
+  const totalPnlUnits = settledRows.reduce((s, r) => {
+    const stored = r.pnl_units;
+    if (stored !== undefined && stored !== null && Number.isFinite(Number(stored))) return s + Number(stored);
+    const unitVal = Number(r.unit_value_usd) || 10.0;
+    return s + (unitVal > 0 ? (Number(r.pnl_usd) || 0) / unitVal : 0);
+  }, 0);
+  const roiPct = totalCostSettled > 0 ? (totalPnlUsd / totalCostSettled) * 100 : 0;
+  const avgEdge = settledRows.length ? (settledRows.reduce((s, r) => s + (Number(r.edge) || 0), 0) / settledRows.length) * 100 : 0;
+  const avgStakeUsd = settledTotal > 0 ? totalCostSettled / settledTotal : 0;
+  const streak = autoBuyerCurrentStreak(settledRows);
+  const { best, worst } = autoBuyerBestWorstDay(settledRows);
+  const grossWinUsd = settledRows.filter(r => r.result === "win").reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
+  const grossLossUsd = settledRows.filter(r => r.result === "loss").reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
+  const profitFactor = grossLossUsd < 0 ? grossWinUsd / Math.abs(grossLossUsd) : (grossWinUsd > 0 ? null : 0);
+
+  if ($(`#${m}AbsSettledCount`)) $(`#${m}AbsSettledCount`).textContent = settledRows.length;
+  if ($(`#${m}AbsPendingCount`)) $(`#${m}AbsPendingCount`).textContent = openRows.length;
+  if ($(`#${m}AbsAllCount`)) $(`#${m}AbsAllCount`).textContent = rows.length;
+  if ($(`#${m}AbsPendingBadge`)) $(`#${m}AbsPendingBadge`).textContent = openRows.length;
+
+  const kpisHtml = `
+    <div class="k"><b class="${totalPnlUsd >= 0 ? 'green' : 'red'}">$${totalPnlUsd >= 0 ? '+' : ''}${totalPnlUsd.toFixed(2)}</b><span>Realized P&L (${totalPnlUnits >= 0 ? '+' : ''}${totalPnlUnits.toFixed(2)}U)</span></div>
+    <div class="k"><b class="green">${wins}W - ${losses}L${pushes ? ` - ${pushes}P` : ''}</b><span>Settled Record (${settledTotal > 0 ? ((wins / (wins + losses || 1)) * 100).toFixed(1) : 0}%)</span></div>
+    <div class="k"><b class="${roiPct >= 0 ? 'green' : 'red'}">${roiPct >= 0 ? '+' : ''}${roiPct.toFixed(1)}%</b><span>Realized ROI on Staked</span></div>
+    <div class="k"><b>$${totalCostSettled.toFixed(2)}</b><span>Settled Capital ($${totalCostAll.toFixed(2)} total)</span></div>
+    <div class="k"><b class="${openRows.length > 0 ? 'yellow' : 'dim'}">${openRows.length}</b><span>Pending Settlement</span></div>
+    <div class="k"><b class="green">+${avgEdge.toFixed(1)}%</b><span>Avg Settlement Edge</span></div>
+    <div class="k"><b>$${avgStakeUsd.toFixed(2)}</b><span>Avg Stake / Bet</span></div>
+    <div class="k"><b class="${streak ? (streak.result === 'win' ? 'green' : 'red') : 'dim'}">${streak ? `${streak.streak}${streak.result === 'win' ? 'W' : 'L'}` : '—'}</b><span>Current Streak</span></div>
+    <div class="k"><b class="green">${best ? `$+${best[1].toFixed(2)}` : '—'}</b><span>Best Day${best ? ` (${esc(best[0])})` : ''}</span></div>
+    <div class="k"><b class="${worst && worst[1] < 0 ? 'red' : 'dim'}">${worst ? `$${worst[1] >= 0 ? '+' : ''}${worst[1].toFixed(2)}` : '—'}</b><span>Worst Day${worst ? ` (${esc(worst[0])})` : ''}</span></div>
+    <div class="k"><b class="${profitFactor === null || profitFactor >= 1 ? 'green' : 'red'}">${profitFactor === null ? '∞' : profitFactor.toFixed(2)}</b><span>Profit Factor</span></div>
+  `;
+
+  if ($(`#${m}AutoBuyerKpis`)) $(`#${m}AutoBuyerKpis`).innerHTML = kpisHtml;
+}
+
+function formatAutoBuyerPickText(r) {
+  if (!r) return "";
+  const sel = (r.selection || "").toString().trim().toLowerCase();
+  const mkt = (r.market_type || "").toString().trim().toLowerCase();
+  const slug = (r.market_slug || "").toString().toLowerCase();
+  const away = r.away_team || "";
+  const home = r.home_team || "";
+  let line = r.target_line != null ? r.target_line : r.line;
+
+  const isSpread = mkt.includes("spread") || sel.includes("spread") || slug.includes("-pos-") || slug.includes("-neg-") || slug.startsWith("asc-");
+  const isTotal = mkt.includes("total") || sel.includes("total") || sel.includes("over") || sel.includes("under") || slug.startsWith("tsc-");
+
+  if (isTotal) {
+    const side = sel.includes("over") ? "Over" : (sel.includes("under") ? "Under" : (sel.charAt(0).toUpperCase() + sel.slice(1)));
+    if (line == null) {
+      const m = slug.match(/(\d+)pt(\d+)/);
+      if (m) line = `${m[1]}.${m[2]}`;
+      else {
+        const m2 = slug.match(/total-(\d+)/);
+        if (m2) line = m2[1];
+      }
+    }
+    return line != null ? `${side} ${line}` : side;
+  }
+
+  if (isSpread) {
+    const isAway = sel.includes("away");
+    const isHome = sel.includes("home");
+    const team = isAway ? away : (isHome ? home : (r.selection || ""));
+    let spreadVal = "";
+    if (slug.includes("-pos-")) {
+      const m = slug.match(/-pos-(\d+)pt(\d+)/);
+      if (m) spreadVal = `+${m[1]}.${m[2]}`;
+      else {
+        const m2 = slug.match(/-pos-(\d+)/);
+        if (m2) spreadVal = `+${m2[1]}`;
+      }
+    } else if (slug.includes("-neg-")) {
+      const m = slug.match(/-neg-(\d+)pt(\d+)/);
+      if (m) spreadVal = `-${m[1]}.${m[2]}`;
+      else {
+        const m2 = slug.match(/-neg-(\d+)/);
+        if (m2) spreadVal = `-${m2[1]}`;
+      }
+    } else if (line != null) {
+      const fl = Number(line);
+      spreadVal = fl > 0 ? `+${fl}` : `${fl}`;
+    }
+    return spreadVal ? `${team} ${spreadVal}` : team;
+  }
+
+  // Moneyline / Head to Head
+  const isAway = sel.includes("away");
+  const isHome = sel.includes("home");
+  const team = isAway ? away : (isHome ? home : (r.selection || ""));
+  return team ? `${team} ML` : (r.selection || "ML");
+}
+
+function renderAutoBuyerTablesFor(mode) {
+  const m = getAutoBuyerMode(mode);
+  const rows = _autoBuyerStore[m].cache || [];
+  const filtered = getFilteredAbsRowsFor(m);
+  const openRows = rows.filter(r => !isSettledAutoBuyerRow(r));
+
+  // If live mode has 0 rows, display the informative notice
+  if (m === "live") {
+    const emptyNotice = $("#liveEmptyBanner");
+    const settledCard = $("#liveAbsSettledCard");
+    if (emptyNotice && settledCard) {
+      if (rows.length === 0) {
+        emptyNotice.style.display = "";
+      } else {
+        emptyNotice.style.display = "none";
+      }
+    }
+  }
+
+  const pendingCard = $(`#${m}AbsPendingCard`);
   if (pendingCard) {
-    if (_absFilterMode === "pending" || (openRows.length > 0 && _absFilterMode === "all")) {
+    if (_autoBuyerStore[m].filterMode === "pending" || (openRows.length > 0 && _autoBuyerStore[m].filterMode === "all")) {
       pendingCard.style.display = "";
-      renderAbsPendingTable(openRows);
+      renderAbsPendingTableFor(m, openRows);
     } else {
       pendingCard.style.display = "none";
     }
   }
 
-  const tableTitle = $("#absTableTitle");
+  const tableTitle = $(`#${m}AbsTableTitle`);
   if (tableTitle) {
-    tableTitle.textContent = _absFilterMode === "pending" ? "Pending Unsettled Orders" : _absFilterMode === "all" ? "All Auto-Buyer Orders" : "Settled Positions & Realized P&L";
+    tableTitle.textContent = _autoBuyerStore[m].filterMode === "pending" ? "Pending Unsettled Orders" : _autoBuyerStore[m].filterMode === "all" ? `All ${m.toUpperCase()} Auto-Buyer Orders` : "Settled Positions & Realized P&L";
   }
 
-  const summary = $("#absSettledSummary");
+  const summary = $(`#${m}AbsSettledSummary`);
   if (summary) {
     summary.textContent = `Showing ${filtered.length} positions`;
   }
 
-  const tableEl = $("#absSettledTable");
+  const tableEl = $(`#${m}AbsSettledTable`);
   if (!tableEl) return;
 
   let html = `
@@ -4530,7 +4625,7 @@ function renderAutoBuyerTables() {
   `;
 
   if (!filtered.length) {
-    html += '<tr><td colspan=13 class="dim" style="text-align:center;padding:24px">No auto-buyer positions matching the current settlement filter.</td></tr>';
+    html += `<tr><td colspan=13 class="dim" style="text-align:center;padding:24px">No ${m} auto-buyer positions matching the current settlement filter.</td></tr>`;
   } else {
     const sorted = [...filtered].reverse();
     sorted.forEach(r => {
@@ -4541,7 +4636,10 @@ function renderAutoBuyerTables() {
       const resBadge = isWin ? '<span class="badge green">WIN</span>' : isLoss ? '<span class="badge red">LOSS</span>' : isPush ? '<span class="badge yellow">PUSH</span>' : '<span class="badge yellow">PENDING</span>';
 
       const pnlUsd = Number(r.pnl_usd) || 0;
-      const pnlUnits = Number(r.pnl_units) || 0;
+      const unitVal = Number(r.unit_value_usd) || 10.0;
+      const pnlUnits = (r.pnl_units !== undefined && r.pnl_units !== null && Number.isFinite(Number(r.pnl_units)))
+        ? Number(r.pnl_units)
+        : (unitVal > 0 ? pnlUsd / unitVal : 0);
       const pnlStr = isOpen ? '<span class="dim">—</span>' : `<span class="${pnlUsd >= 0 ? 'green' : 'red'}" style="font-weight:700">$${pnlUsd >= 0 ? '+' : ''}${pnlUsd.toFixed(2)} (${pnlUnits >= 0 ? '+' : ''}${pnlUnits.toFixed(2)}U)</span>`;
 
       const scoreStr = (r.home_score !== undefined && r.home_score !== null && r.away_score !== undefined && r.away_score !== null)
@@ -4558,7 +4656,7 @@ function renderAutoBuyerTables() {
           <td><span class="chip dim">${esc(r.sport || '')}</span></td>
           <td style="font-weight:600">${esc(r.away_team || '')} @ ${esc(r.home_team || '')}</td>
           <td>${scoreStr}</td>
-          <td><span class="chip ${r.token_side === 'long' ? 'green' : 'red'}">${esc(r.selection || '')} (${esc(r.market_type || 'ML')})</span></td>
+          <td><span class="chip ${r.token_side === 'long' ? 'green' : 'red'}" style="font-weight:700">${esc(formatAutoBuyerPickText(r))}</span></td>
           <td class="mono small dim">${esc(r.market_slug || '')}</td>
           <td class="mono">${Number(r.shares || 1).toFixed(1)}</td>
           <td class="mono">$${Number(r.entry_price || 0).toFixed(2)}</td>
@@ -4574,8 +4672,9 @@ function renderAutoBuyerTables() {
   tableEl.innerHTML = html;
 }
 
-function renderAbsPendingTable(openRows) {
-  const tableEl = $("#absPendingTable");
+function renderAbsPendingTableFor(mode, openRows) {
+  const m = getAutoBuyerMode(mode);
+  const tableEl = $(`#${m}AbsPendingTable`);
   if (!tableEl) return;
   let html = `
     <thead>
@@ -4596,7 +4695,7 @@ function renderAbsPendingTable(openRows) {
     <tbody>
   `;
   if (!openRows.length) {
-    html += '<tr><td colspan=11 class="dim" style="text-align:center;padding:16px">No pending positions awaiting settlement.</td></tr>';
+    html += `<tr><td colspan=11 class="dim" style="text-align:center;padding:16px">No pending ${m} positions awaiting settlement.</td></tr>`;
   } else {
     openRows.forEach(r => {
       const dateStr = (r.event_start_utc || '').slice(0, 16).replace('T', ' ');
@@ -4607,7 +4706,7 @@ function renderAbsPendingTable(openRows) {
           <td class="mono font-bold">${esc(r.order_id || '—')}</td>
           <td><span class="chip dim">${esc(r.sport || '')}</span></td>
           <td style="font-weight:600">${esc(r.away_team || '')} @ ${esc(r.home_team || '')}</td>
-          <td><span class="chip ${r.token_side === 'long' ? 'green' : 'red'}">${esc(r.selection || '')} (${esc(r.market_type || 'ML')})</span></td>
+          <td><span class="chip ${r.token_side === 'long' ? 'green' : 'red'}" style="font-weight:700">${esc(formatAutoBuyerPickText(r))}</span></td>
           <td class="mono small dim">${esc(r.market_slug || '')}</td>
           <td class="mono">${Number(r.shares || 1).toFixed(1)}</td>
           <td class="mono">$${Number(r.entry_price || 0).toFixed(2)}</td>
@@ -4622,8 +4721,95 @@ function renderAbsPendingTable(openRows) {
   tableEl.innerHTML = html;
 }
 
-async function loadAutoBuyerLog() {
-  const box = $("#autoBuyerLogBox");
+function renderAutoBuyerPerformanceFor(mode) {
+  const m = getAutoBuyerMode(mode);
+  const settled = (_autoBuyerStore[m].cache || []).filter(isSettledAutoBuyerRow);
+  const sportOf = row => (row.sport || "Unknown").toString().toUpperCase();
+  const sports = Array.from(new Set(settled.map(sportOf))).sort();
+  const cohorts = [
+    [`All ${m.toUpperCase()} Auto-Buys`, settled],
+    ...sports.map(sp => [sp, settled.filter(row => sportOf(row) === sp)])
+  ];
+  const cohortEl = $(`#${m}AutoBuyerPerformanceCohorts`);
+  if (cohortEl) {
+    cohortEl.innerHTML = cohorts.map(([label, rows]) => {
+      const metrics = autoBuyerCohortMetrics(rows);
+      const pnlClass = metrics.pnlUsd >= 0 ? "green" : "red";
+      return `<div class="k">
+        <b class="${pnlClass}">$${metrics.pnlUsd >= 0 ? '+' : ''}${metrics.pnlUsd.toFixed(2)}</b>
+        <span>${esc(label)} · ${autoBuyerRecordText(metrics)} · ${autoBuyerPct(metrics.roiPct)} ROI · ${metrics.pnlUnits >= 0 ? '+' : ''}${metrics.pnlUnits.toFixed(2)}U</span>
+      </div>`;
+    }).join("");
+  }
+
+  const dates = Array.from(new Set(settled.map(autoBuyerEventDateEt))).sort((a, b) => {
+    if (a === "Unknown") return 1;
+    if (b === "Unknown") return -1;
+    return b.localeCompare(a);
+  });
+  const datesAsc = dates.filter(d => d !== "Unknown").slice().reverse();
+
+  let running = 0;
+  const curve = datesAsc.map(date => {
+    const dayPnl = settled.filter(row => autoBuyerEventDateEt(row) === date)
+      .reduce((sum, row) => sum + (Number(row.pnl_usd) || 0), 0);
+    running += dayPnl;
+    return { x: date, pnl: running };
+  });
+  if ($(`#${m}AutoBuyerCumulativePnl`)) lineChart(`#${m}AutoBuyerCumulativePnl`, curve);
+
+  const sportBars = sports.map(sp => [sp, autoBuyerCohortMetrics(settled.filter(row => sportOf(row) === sp)).pnlUsd])
+    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+  if ($(`#${m}AutoBuyerSportPnl`)) barChart(`#${m}AutoBuyerSportPnl`, sportBars.map(s => s[0]), sportBars.map(s => s[1]), { signed: true });
+
+  const sportTableEl = $(`#${m}AutoBuyerSportTable`);
+  if (sportTableEl) {
+    let sportHtml = `<thead><tr><th>Sport</th><th>Settled</th><th>Record</th><th>Stake</th><th>P&amp;L</th><th>ROI</th><th>Profit Factor</th><th>Avg Win</th><th>Avg Loss</th></tr></thead><tbody>`;
+    if (!sports.length) {
+      sportHtml += `<tr><td colspan="9" class="dim" style="text-align:center;padding:24px">No settled ${m} positions.</td></tr>`;
+    } else {
+      sports.slice().sort((a, b) => {
+        const ma = autoBuyerCohortMetrics(settled.filter(row => sportOf(row) === a));
+        const mb = autoBuyerCohortMetrics(settled.filter(row => sportOf(row) === b));
+        return mb.pnlUsd - ma.pnlUsd;
+      }).forEach(sp => {
+        const sm = autoBuyerCohortMetrics(settled.filter(row => sportOf(row) === sp));
+        sportHtml += `<tr>
+          <td class="mono font-bold">${esc(sp)}</td>
+          <td class="mono">${sm.settled}</td>
+          <td class="mono">${autoBuyerRecordText(sm)}</td>
+          <td class="mono">$${sm.stakeUsd.toFixed(2)}</td>
+          <td class="mono ${sm.pnlUsd >= 0 ? 'green' : 'red'}">${autoBuyerPnlFormat(sm.pnlUsd)}</td>
+          <td class="mono ${sm.roiPct >= 0 ? 'green' : 'red'}">${autoBuyerPct(sm.roiPct)}</td>
+          <td class="mono">${autoBuyerProfitFactorText(sm.profitFactor)}</td>
+          <td class="mono green">${autoBuyerPnlFormat(sm.avgWinUsd)}</td>
+          <td class="mono red">${autoBuyerPnlFormat(sm.avgLossUsd)}</td>
+        </tr>`;
+      });
+    }
+    sportTableEl.innerHTML = sportHtml + "</tbody>";
+  }
+
+  const tableEl = $(`#${m}AutoBuyerDailyPerformanceTable`);
+  if (!tableEl) return;
+  let html = `<thead>
+    <tr><th>Event Date (ET)</th><th>Record</th><th>P&amp;L</th><th>ROI</th></tr>
+  </thead><tbody>`;
+  if (!dates.length) {
+    html += `<tr><td colspan="4" class="dim" style="text-align:center;padding:24px">No settled ${m} positions.</td></tr>`;
+  } else {
+    dates.forEach(date => {
+      const daily = settled.filter(row => autoBuyerEventDateEt(row) === date);
+      const allMetrics = autoBuyerCohortMetrics(daily);
+      html += `<tr><td class="mono font-bold">${esc(date)}</td>${autoBuyerPerformanceCell(allMetrics)}</tr>`;
+    });
+  }
+  tableEl.innerHTML = html + "</tbody>";
+}
+
+async function loadAutoBuyerLog(mode = "paper") {
+  const m = getAutoBuyerMode(mode);
+  const box = $(`#${m}AutoBuyerLogBox`);
   if (!box) return;
   try {
     const res = await fetch("/api/auto-buyer/log", {
@@ -4643,60 +4829,104 @@ async function loadAutoBuyerLog() {
   }
 }
 
-async function settleAutoBuyerTrades(fromButton = false) {
-  if (!confirm("Settle all completed matches in the Auto-Buyer ledger and update realized P&L?")) return;
-  const btn = $("#btnSettleAutoBuyerNow");
+async function renderAutoBuyerSection(mode, force = false) {
+  const m = getAutoBuyerMode(mode);
+  if (force || !_autoBuyerStore[m].cache.length) {
+    try {
+      const res = await fetch(_autoBuyerStore[m].endpoint, {
+        headers: { "X-Dashboard-Token": window._DASHBOARD_TOKEN || "" }
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      _autoBuyerStore[m].cache = await res.json();
+    } catch (e) {
+      _autoBuyerStore[m].cache = [];
+    }
+  }
+  await loadAutoBuyerStatus();
+  renderAutoBuyerKpisFor(m);
+  renderAutoBuyerPerformanceFor(m);
+  populateAbsSportDropdownFor(m);
+  renderAutoBuyerTablesFor(m);
+  await loadAutoBuyerLog(m);
+}
+
+async function renderAutoBuyerLiveLedger(force = false) {
+  await renderAutoBuyerSection("live", force);
+}
+
+async function renderAutoBuyerPaperLedger(force = false) {
+  await renderAutoBuyerSection("paper", force);
+}
+
+const renderAutoBuyer = renderAutoBuyerPaperLedger;
+const renderAutoBuyerLedger = renderAutoBuyerPaperLedger;
+
+async function settleAutoBuyerTrades(mode = "paper", fromButton = false) {
+  const m = getAutoBuyerMode(mode);
+  const btnId = m === "live" ? "liveBtnSettleAutoBuyerNow" : "paperBtnSettleAutoBuyerNow";
+  const label = m === "live" ? "Live" : "Paper";
+  if (!confirm(`Settle all completed matches in the ${label} Auto-Buyer ledger and update realized P&L?`)) return;
+  const btn = $("#" + btnId);
   if (btn) { btn.disabled = true; btn.textContent = "⏳ Settling..."; }
   try {
-    const res = await fetch("/api/auto-buyer/settle", {
+    const res = await fetch(`/api/auto-buyer/settle?mode=${m}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-Dashboard-Token": window._DASHBOARD_TOKEN || ""
       },
-      body: JSON.stringify({ confirm: true })
+      body: JSON.stringify({ confirm: true, mode: m })
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
     const remainingPending = Number(data.remaining_pending);
-    if (!Number.isFinite(remainingPending) || remainingPending < 0) {
-      throw new Error("Settlement response is missing the authoritative remaining-pending count");
-    }
     const changedRows = Array.isArray(data.changes) ? data.changes : [];
     const newlySettled = Number(data.newly_settled ?? data.settled ?? 0);
     const corrected = Number(data.corrected ?? 0);
     const reopened = Number(data.reopened ?? 0);
     const headline = changedRows.length
-      ? `${changedRows.length} position${changedRows.length === 1 ? "" : "s"} changed.`
-      : "No positions changed.";
+      ? `${changedRows.length} ${label} position${changedRows.length === 1 ? "" : "s"} changed.`
+      : `No ${label} positions changed.`;
     const summary = [headline];
-    if(newlySettled) summary.push(`Moved from pending: ${newlySettled}`);
-    if(corrected) summary.push(`Corrected: ${corrected}`);
-    if(reopened) summary.push(`Reopened: ${reopened}`);
+    if (newlySettled) summary.push(`Moved from pending: ${newlySettled}`);
+    if (corrected) summary.push(`Corrected: ${corrected}`);
+    if (reopened) summary.push(`Reopened: ${reopened}`);
     summary.push(`Still pending: ${remainingPending}`);
-    const details = changedRows.slice(0, 8).map(row => {
-      const result = String(row.to_result || row.to_status || "updated").toUpperCase();
-      const pnl = Number(row.pnl_usd || 0);
-      return `${result} · ${row.market_slug || row.order_id || "position"} · ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)}`;
-    });
-    const more = changedRows.length > details.length ? [`…and ${changedRows.length - details.length} more`] : [];
-    alert([
-      "Settlement update",
-      "",
-      ...summary,
-      ...(details.length ? ["", "Changed positions:", ...details, ...more] : []),
-    ].join("\n"));
-    await renderAutoBuyer(true);
+    alert(["Settlement update (" + label + ")", "", ...summary].join("\n"));
+    await renderAutoBuyerSection(m, true);
   } catch (e) {
-    alert("Auto-Buyer settlement failed: " + e);
+    alert(`${label} Auto-Buyer settlement failed: ` + e);
   } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = ICON_SCALE+" Settle Auto-Buyer Positions"; }
+    if (btn) { btn.disabled = false; btn.innerHTML = ICON_SCALE + ` Settle ${label} Positions`; }
   }
 }
 
-function exportAbsCsv() {
-  const rows = getFilteredAbsRows();
-  if (!rows.length) { alert("No auto-buyer settlement rows to export."); return; }
+async function runAutoBuyerNow(mode = "paper") {
+  const m = getAutoBuyerMode(mode);
+  const isLive = m === "live";
+  const msg = isLive
+    ? "Trigger LIVE Auto-Buyer execution cycle now against current open model picks?\n\nWARNING: This will attempt REAL Polymarket orders if live keys are enabled!"
+    : "Trigger Auto-Buyer check now in PAPER mode (simulated fills only, no real orders)?";
+  if (!confirm(msg)) return;
+  try {
+    const res = await fetch("/api/auto-buyer/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Dashboard-Token": window._DASHBOARD_TOKEN || "" },
+      body: JSON.stringify({ confirm: true, execute: isLive })
+    });
+    const data = await res.json();
+    alert(`Auto-Buyer run completed!\n\nMode: ${data.mode}\nPicks Evaluated: ${data.total_evaluated}\nWhitelisted: ${data.whitelisted_count}\nOrders: ${data.orders_count}\nTotal Spend: $${Number(data.total_spend_usd).toFixed(2)}`);
+    refreshAll();
+    await renderAutoBuyerSection(m, true);
+  } catch (e) {
+    alert("Auto-Buyer execution failed: " + e);
+  }
+}
+
+function exportAbsCsv(mode = "paper") {
+  const m = getAutoBuyerMode(mode);
+  const rows = getFilteredAbsRowsFor(m);
+  if (!rows.length) { alert(`No ${m} auto-buyer settlement rows to export.`); return; }
   const cols = Object.keys(rows[0] || {});
   const csv = [cols.join(",")].concat(rows.map(r => cols.map(c => {
     let v = r[c] == null ? "" : typeof r[c] === "object" ? JSON.stringify(r[c]) : String(r[c]).replace(/"/g, '""');
@@ -4704,7 +4934,7 @@ function exportAbsCsv() {
   }).join(","))).join("\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-  a.download = "autobuyer_settlement_export.csv";
+  a.download = `autobuyer_${m}_settlement_export.csv`;
   a.click();
 }
 
@@ -4736,7 +4966,8 @@ setControlFromUrl("folioFrom","folio_from");setControlFromUrl("folioTo","folio_t
 setControlFromUrl("folioType","folio_type");setControlFromUrl("folioAttribution","folio_attribution");
 setControlFromUrl("folioPageSize","folio_rows");
 let savedTab=null;try{savedTab=localStorage.getItem("mp.tab");}catch(e){}
-const requestedTab=initialUrlState.get("tab")||savedTab;
+const rawTab=initialUrlState.get("tab")||savedTab;
+const requestedTab=rawTab==="auto-buyer-ledger"?"auto-buyer-paper-ledger":rawTab;
 if(requestedTab&&$("#tab-"+requestedTab))gotoTab(requestedTab);
 else gotoTab("production");
 refreshAll();resetTimer();
