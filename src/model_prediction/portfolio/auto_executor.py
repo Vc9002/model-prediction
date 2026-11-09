@@ -57,83 +57,93 @@ if _env_file.exists():
         pass
 
 DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
+    # WNBA (proven +22.3% ROI historical, +39.5u)
     "wnba-elo-trend-lr-v4",
     "wnba-total-margin-v2",
     "wnba-spread-margin-v2",
+    # NBA
     "nba-moneyline-v7",
     "nba-spread-margin-v7",
     "nba-total-margin-v7",
     "nba-spread-margin-v6",
     "nba-total-margin-v6",
-    "nfl-spread-structural-v7",
-    "nfl-total-structural-v7",
-    "nfl-spread-structural-v6",
-    "nfl-total-structural-v6",
-    "soccer-poisson-dc-v3",
-    "soccer-poisson-dc-v2",
-    "soccer-total-v1",
-    "tennis-surface-elo-v6",
-    "tennis-games-markov-v4",
-    "tennis-surface-elo-v5",
-    "tennis-games-markov-v3",
-    "valorant-tiered-elo-v6",
-    "valorant-spread-tiered-elo-v6",
-    "valorant-total-tiered-elo-v6",
-    "lol-tiered-elo-v6",
-    "lol-spread-tiered-elo-v6",
-    "lol-total-tiered-elo-v6",
-    "dota2-tiered-elo-v6",
-    "dota2-spread-tiered-elo-v6",
-    "dota2-total-tiered-elo-v6",
-    "r6-contextual-v7",
-    "rainbow_six-spread-tiered-elo-v6",
-    "rainbow_six-total-tiered-elo-v6",
-    "cfb-structural-v4",
-    "cfb-structural-v3",
-    "cfb-structural-v2",
-    "mlb-structural-runline-v4",
-    "mlb-nrfi-v4",
-    "mlb-nrfi-v3",
-    "kbo-baseball-v3",
-    "npb-baseball-v3",
-    "hockey-poisson-dc-v2",
-    "hockey-poisson-dc-v1",
-    "darts-markov-v2",
-    "darts-markov-v1",
-    "ncaab-spread-v6",
-    "ncaab-total-v6",
-    "ncaab-spread-v5",
-    "ncaab-total-v5",
-    "ncaab-tempo-v4",
-    "ncaab-tempo-v3",
-    "ncaab-tempo-v2",
-    "ncaab-tempo-v1",
-    "eurolg-tempo-v2",
-    "eurolg-tempo-v1",
-    "nbl-tempo-v2",
-    "nbl-tempo-v1",
     "nba-moneyline-v8",
     "nba-spread-margin-v8",
     "nba-total-margin-v8",
     "nba-moneyline-v9",
     "nba-spread-margin-v9",
     "nba-total-margin-v9",
+    # NFL & NCAAF (proven +25.6% ROI in auto-buyer)
+    "nfl-spread-structural-v7",
+    "nfl-total-structural-v7",
+    "nfl-spread-structural-v6",
+    "nfl-total-structural-v6",
     "nfl-elo-trend-lr-v4",
-    "mlb-moneyline-v9-residual",
-    "mlb-structural-v10-frozen",
-    "dota2-contextual-v7",
-    "valorant-contextual-v7",
-    "lol-contextual-v7",
+    "cfb-structural-v4",
+    "cfb-structural-v3",
+    "cfb-structural-v2",
+    # College Basketball (NCAAB)
+    "ncaab-spread-v6",
+    "ncaab-spread-v5",
+    "ncaab-tempo-v4",
+    "ncaab-tempo-v3",
+    "ncaab-tempo-v2",
+    "ncaab-tempo-v1",
+    # International Basketball
+    "eurolg-tempo-v2",
+    "eurolg-tempo-v1",
+    "nbl-tempo-v2",
+    "nbl-tempo-v1",
+    # Soccer (positive ROI +5.4% auto-buyer)
+    "soccer-poisson-dc-v3",
+    "soccer-poisson-dc-v2",
+    "soccer-total-v1",
     "soccer-market-residual-v1",
     "soccer-total-market-residual-v1",
+    # Tennis
+    "tennis-surface-elo-v6",
+    "tennis-games-markov-v4",
+    "tennis-surface-elo-v5",
+    "tennis-games-markov-v3",
     "tennis-market-residual-v1",
+    # MLB (major domestic baseball; off-season hold)
+    "mlb-structural-runline-v4",
+    "mlb-nrfi-v4",
+    "mlb-nrfi-v3",
+    "mlb-moneyline-v9-residual",
+    "mlb-structural-v10-frozen",
+    # Hockey & Darts
+    "hockey-poisson-dc-v2",
+    "hockey-poisson-dc-v1",
+    "darts-markov-v2",
+    "darts-markov-v1",
 )
 
 EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
-    # CS / CS2 pulled per operator directive 2026-10-24
+    # CS / CS2 pulled per operator directive 2026-10-24 & 2026-11-08 audit (50 pushes, -0.1% ROI)
     "cs2-tiered-elo-v6",
     "cs2-spread-tiered-elo-v6",
     "cs2-total-tiered-elo-v6",
+    # Esports decommissioned per operator audit 2026-11-08 (net -$24.23 across all esports, wide spreads, high push rate)
+    "lol-tiered-elo-v6",
+    "lol-spread-tiered-elo-v6",
+    "lol-total-tiered-elo-v6",
+    "lol-contextual-v7",
+    "dota2-tiered-elo-v6",
+    "dota2-spread-tiered-elo-v6",
+    "dota2-total-tiered-elo-v6",
+    "dota2-contextual-v7",
+    "valorant-tiered-elo-v6",
+    "valorant-spread-tiered-elo-v6",
+    "valorant-total-tiered-elo-v6",
+    "valorant-contextual-v7",
+    "r6-contextual-v7",
+    "rainbow_six-spread-tiered-elo-v6",
+    "rainbow_six-total-tiered-elo-v6",
+    # International Baseball decommissioned per operator audit 2026-11-08 (season ended, negative ROI, ESPN settlement friction)
+    "kbo-baseball-v3",
+    "npb-baseball-v3",
+    # Prior model decommissions
     "measured-edge-totals-v3",  # MLB totals (degraded, negative CLV vs market close)
     "measured-edge-margin-v3",  # MLB run line (negative EV)
     "wnba-spread-margin-v1",  # Legacy WNBA spread (severe miscalibration)
@@ -174,6 +184,9 @@ EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
     "soccer-poisson-dc-v1",
     # Esports underperformer pulled:
     "rainbow_six-tiered-elo-v6",  # 2W-8L (-68.1% ROI) in production ledgers
+    # NCAAB totals disabled per operator directive 2026-11-09:
+    "ncaab-total-v6",  # 4W-7L in auto-buyer (-25.3% ROI), 6W-14L in ledgers (-77.7% ROI)
+    "ncaab-total-v5",
 )
 
 AUTO_BUYER_STATE_FILE = DATA / "auto_buyer_state.json"
@@ -185,9 +198,16 @@ AUTO_BUYER_MODES = frozenset({"paper", "live"})
 DEFAULT_AUTO_BUYER_MODE = "paper"
 EXECUTABLE_AUTO_BUYER_MARKET_TYPES = frozenset({"moneyline", "spread", "total", "nrfi"})
 ESPORTS_LEAGUES = frozenset({"cs2", "lol", "dota2", "valorant", "r6", "rainbow_six", "cod", "ow", "rl"})
-DISABLED_AUTO_BUYER_SPORT_MARKETS = frozenset({("mlb", "moneyline")})
+DISABLED_AUTO_BUYER_SPORT_MARKETS = frozenset(
+    {
+        ("mlb", "moneyline"),
+        ("soccer", "moneyline"),
+        ("tennis", "spread"),
+        ("ncaab", "total"),
+    }
+)
 DEFAULT_AUTO_BUYER_UNIT_VALUE_USD = 0.50
-DEFAULT_AUTO_BUYER_MAX_EDGE = 0.25
+DEFAULT_AUTO_BUYER_MAX_EDGE = 0.12
 DEFAULT_MAX_DAILY_SPEND_UNITS = 50.0
 DEFAULT_MAX_GAME_STAKE_UNITS = 5.0
 DEFAULT_MAX_EVENT_LOOKAHEAD_HOURS = 24.0
@@ -200,7 +220,7 @@ class AutoExecutionConfig:
     unit_value_usd: float = DEFAULT_AUTO_BUYER_UNIT_VALUE_USD
     min_model_probability: float = 0.50  # Must be favored outcome (>= 50% win probability)
     min_edge: float = 0.035  # Minimum edge over market ask
-    max_edge: float = DEFAULT_AUTO_BUYER_MAX_EDGE  # Maximum edge
+    max_edge: float = DEFAULT_AUTO_BUYER_MAX_EDGE  # Maximum edge (capped at 12% to prevent phantom edges)
     max_daily_spend_usd: float = 25.0  # Daily budget cap
     max_game_stake_usd: float = 2.50  # Max dollars per game/pick
     min_shares: float = 1.0  # Polymarket minimum share size
@@ -213,15 +233,15 @@ class AutoExecutionConfig:
     max_model_age_minutes: float = DEFAULT_MAX_MODEL_AGE_MINUTES
     require_model_timestamp: bool = False
     max_daily_loss_usd: float | None = None  # Drawdown circuit breaker; None = disabled
-    edge_scaled_sizing_enabled: bool = False  # Off by default: scales stake by edge within the per-game cap
+    edge_scaled_sizing_enabled: bool = True  # Optimized: scales stake by edge within the per-game cap
     edge_scaling_min_fraction: float = (
         0.5  # Stake fraction of the per-game cap used at min_edge, when enabled
     )
-    min_tennis_edge: float | None = None  # Sport-specific tightened edge for Tennis (e.g. 0.08)
-    max_tennis_price: float | None = None  # Sport-specific ceiling on market price for Tennis (e.g. 0.75)
+    min_tennis_edge: float | None = 0.05  # Sport-specific tightened edge for Tennis (5.0%)
+    max_tennis_price: float | None = 0.68  # Sport-specific ceiling on market price for Tennis (68¢)
     min_ncaaf_edge: float | None = 0.02  # Sport-specific calibrated edge for NCAAF (2.0%)
-    max_ncaaf_edge: float | None = 0.15  # Sport-specific blowout edge cap for NCAAF (15.0%)
-    max_moneyline_price: float | None = 0.72  # Ceiling on moneyline buy price (odds <= -260 / implied > 72%)
+    max_ncaaf_edge: float | None = 0.12  # Sport-specific blowout edge cap for NCAAF (12.0%)
+    max_moneyline_price: float | None = 0.65  # Ceiling on moneyline buy price (odds <= -185 / implied > 65%)
     auto_quarantine_underperforming: bool = True  # Dynamic circuit breaker against underperforming models
     auto_quarantine_min_picks: int = 15  # Minimum sample before evaluating rolling drawdown
     auto_quarantine_max_loss_roi: float = (
@@ -1259,6 +1279,52 @@ class AutoPolymarketBuyer:
             event_id and selection and (str(event_id), str(selection).lower()) in index["event_selections"]
         )
 
+    def _effective_min_edge(
+        self,
+        sport: str,
+        market_type: str,
+        line: Any = None,
+    ) -> float:
+        """Resolve sport- and market-specific edge hurdles matching Main Ledger gating."""
+        s = sport.strip().lower()
+        m = market_type.strip().lower()
+
+        # Moneyline market hurdle: moneylines have higher vig and asymmetric risk; require >= 7.5%
+        if m == "moneyline" and s in ("nba", "nfl", "wnba", "mlb", "ncaab"):
+            return 0.075
+
+        # 1. NFL: 5.0% base hurdle; heavy dogs (spread >= 8.0 pts) require 7.0% (Main Ledger gating)
+        if s == "nfl":
+            base = 0.05
+            try:
+                if m == "spread" and line is not None and abs(float(line)) >= 8.0:
+                    return base + 0.02
+            except (ValueError, TypeError):
+                pass
+            return base
+
+        # 2. Major pro sports (NBA, WNBA, MLB): 5.0% for spreads/totals
+        if s in ("nba", "wnba", "mlb"):
+            return 0.05
+
+        # 3. College basketball / international basketball: 3.5%
+        if s in ("ncaab", "euroleague", "nbl"):
+            return 0.035
+
+        # 4. Low-variance / calibrated structural sports: 2.0% for CFB & Soccer Totals; 5.0% for Tennis
+        if s == "tennis":
+            return float(self.config.min_tennis_edge if self.config.min_tennis_edge is not None else 0.05)
+        if s in ("ncaaf", "cfb"):
+            return float(self.config.min_ncaaf_edge if self.config.min_ncaaf_edge is not None else 0.02)
+        if s in ("soccer", "hockey", "darts"):
+            return 0.02
+
+        # 5. Tactical / high-variance esports (blacklisted by default; 5.0% safeguard)
+        if s in ("r6", "rainbow_six", "lol", "cs2", "dota2", "valorant"):
+            return 0.05
+
+        return float(self.config.min_edge)
+
     def evaluate_and_execute(
         self,
         picks: list[dict[str, Any]] | None = None,
@@ -1374,6 +1440,18 @@ class AutoPolymarketBuyer:
             # live-candidate funnel instead of being diluted by historical rows.
             if row.get("status") != "open":
                 result.rejected_not_open += 1
+                continue
+
+            # Mirror Main Ledger qualification: reject paper calls and non-qualified research calls
+            decision = str(row.get("decision") or "").upper()
+            reason_code = str(row.get("reason_code") or "").upper()
+            record_type = str(row.get("record_type") or "").upper()
+            if (
+                (decision and decision != "CALL")
+                or reason_code.startswith("PAPER_CALL_")
+                or record_type == "RESEARCH_OBSERVATION"
+            ):
+                result.rejected_not_whitelisted += 1
                 continue
 
             if model_id in quarantined:
@@ -1620,16 +1698,12 @@ class AutoPolymarketBuyer:
                 result.rejected_below_win_probability += 1
                 continue
 
-            # 10. Sizing & Edge check against real Polymarket CLOB ask
+            # 10. Sizing & Edge check against real Polymarket CLOB ask (mirrors Main Ledger sport hurdles)
             edge = model_prob - clob_ask
-            effective_min_edge = (
-                self.config.min_tennis_edge
-                if sport_norm == "tennis" and self.config.min_tennis_edge is not None
-                else (
-                    self.config.min_ncaaf_edge
-                    if sport_norm in ("ncaaf", "cfb") and self.config.min_ncaaf_edge is not None
-                    else self.config.min_edge
-                )
+            effective_min_edge = self._effective_min_edge(
+                sport_norm,
+                market_type,
+                row.get("line"),
             )
             if edge < effective_min_edge:
                 result.rejected_low_edge += 1
