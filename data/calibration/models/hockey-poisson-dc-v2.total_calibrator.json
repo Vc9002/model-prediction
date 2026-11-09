@@ -1,15 +1,11 @@
 {
-  "baseline_brier": 0.264768,
-  "calibrated_at_utc": "2026-11-08T21:01:44.643328+00:00",
-  "calibrated_oof_brier": 0.2589171257475796,
-  "champion_method": "beta",
+  "baseline_brier": 0.266847,
+  "calibrated_at_utc": "2026-11-09T01:31:23.309763+00:00",
+  "calibrated_oof_brier": 0.26684716425147437,
+  "champion_method": "identity",
   "market": "total",
   "model_version": "hockey-poisson-dc-v2",
-  "parameters": {
-    "a": 1.7971,
-    "b": 0.0001,
-    "c": 0.7786
-  },
-  "sample_size": 76,
+  "parameters": {},
+  "sample_size": 78,
   "sport": "hockey"
 }

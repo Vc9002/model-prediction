@@ -1,6 +1,6 @@
 {
   "status": "error",
-  "generated_at_utc": "2026-11-08T21:10:09.046777+00:00",
+  "generated_at_utc": "2026-11-09T01:41:22.183554+00:00",
   "date_et": "2026-11-08",
   "lanes": [
     {
@@ -30,77 +30,29 @@
         "QUALIFIED": 15
       },
       "source_exclusions": {
-        "missing_identity_or_event_started": 14,
-        "insufficient_history_non_d1": 3
+        "missing_identity_or_event_started": 4,
+        "insufficient_history_non_d1": 1
       },
       "forecast": {
         "status": "ok",
         "scheduled_games": 36,
-        "logged": 11,
+        "logged": 2,
         "skipped": [
           {
-            "event_id": "203221",
+            "event_id": "203254",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "203224",
+            "event_id": "229926",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "203226",
+            "event_id": "203256",
             "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203228",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203232",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203234",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "229922",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203236",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203237",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203240",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203230",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "229924",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203242",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203244",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "229925",
-            "reason": "insufficient_history_non_d1"
           },
           {
             "event_id": "203258",
-            "reason": "insufficient_history_non_d1"
+            "reason": "missing_identity_or_event_started"
           },
           {
             "event_id": "203260",
@@ -137,77 +89,29 @@
         "QUALIFIED": 18
       },
       "source_exclusions": {
-        "missing_identity_or_event_started": 14,
-        "insufficient_history_non_d1": 3
+        "missing_identity_or_event_started": 4,
+        "insufficient_history_non_d1": 1
       },
       "forecast": {
         "status": "ok",
         "scheduled_games": 36,
-        "logged": 11,
+        "logged": 2,
         "skipped": [
           {
-            "event_id": "203221",
+            "event_id": "203254",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "203224",
+            "event_id": "229926",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "203226",
+            "event_id": "203256",
             "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203228",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203232",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203234",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "229922",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203236",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203237",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203240",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203230",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "229924",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203242",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203244",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "229925",
-            "reason": "insufficient_history_non_d1"
           },
           {
             "event_id": "203258",
-            "reason": "insufficient_history_non_d1"
+            "reason": "missing_identity_or_event_started"
           },
           {
             "event_id": "203260",
@@ -244,77 +148,29 @@
         "QUALIFIED": 21
       },
       "source_exclusions": {
-        "missing_identity_or_event_started": 14,
-        "insufficient_history_non_d1": 3
+        "missing_identity_or_event_started": 4,
+        "insufficient_history_non_d1": 1
       },
       "forecast": {
         "status": "ok",
         "scheduled_games": 36,
-        "logged": 11,
+        "logged": 2,
         "skipped": [
           {
-            "event_id": "203221",
+            "event_id": "203254",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "203224",
+            "event_id": "229926",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "203226",
+            "event_id": "203256",
             "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203228",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203232",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203234",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "229922",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203236",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203237",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203240",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203230",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "229924",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203242",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "203244",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "229925",
-            "reason": "insufficient_history_non_d1"
           },
           {
             "event_id": "203258",
-            "reason": "insufficient_history_non_d1"
+            "reason": "missing_identity_or_event_started"
           },
           {
             "event_id": "203260",
@@ -702,7 +558,7 @@
         "FLAT_CALL": 4
       },
       "source_exclusions": {
-        "event_started": 1
+        "event_started": 5
       },
       "forecast": {
         "status": "learned_forecast_complete",
@@ -711,6 +567,22 @@
         "skipped": [
           {
             "event_id": "401909945",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401909946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401909947",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401909948",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401909949",
             "reason": "event_started"
           }
         ]
@@ -724,28 +596,29 @@
       "status": "recorded",
       "ledger_counts": {
         "flat": 7,
-        "main": 4
+        "main": 2
       },
       "generated_today_ledger_counts": {
         "flat": 7,
-        "main": 4
+        "main": 2
       },
       "flat_coverage": {
         "recorded_games": 7,
-        "priced_games": 6,
+        "priced_games": 2,
         "off_date_priced_count": 0,
         "missing_priced_event_ids": [],
         "main_only": false,
         "main_without_flat_event_ids": []
       },
       "reasons": {
-        "QUALIFIED": 11
+        "QUALIFIED": 5,
+        "FLAT_CALL": 4
       },
       "source_exclusions": {},
       "forecast": {
         "scheduled_games": 7,
-        "market_candidates": 6,
-        "logged": 6,
+        "market_candidates": 2,
+        "logged": 2,
         "unmatched": [],
         "skipped": []
       }
@@ -758,28 +631,29 @@
       "status": "recorded",
       "ledger_counts": {
         "flat": 7,
-        "main": 3
+        "main": 2
       },
       "generated_today_ledger_counts": {
         "flat": 7,
-        "main": 3
+        "main": 2
       },
       "flat_coverage": {
         "recorded_games": 7,
-        "priced_games": 6,
+        "priced_games": 2,
         "off_date_priced_count": 0,
         "missing_priced_event_ids": [],
         "main_only": false,
         "main_without_flat_event_ids": []
       },
       "reasons": {
-        "QUALIFIED": 10
+        "QUALIFIED": 6,
+        "FLAT_CALL": 3
       },
       "source_exclusions": {},
       "forecast": {
         "scheduled_games": 7,
-        "market_candidates": 6,
-        "logged": 6,
+        "market_candidates": 2,
+        "logged": 2,
         "unmatched": [],
         "skipped": []
       }
@@ -808,7 +682,7 @@
         "FLAT_CALL": 13
       },
       "source_exclusions": {
-        "event_started": 8
+        "event_started": 13
       },
       "forecast": {
         "status": "learned_forecast_complete",
@@ -816,11 +690,19 @@
         "logged": 0,
         "skipped": [
           {
+            "event_id": "401873038",
+            "reason": "event_started"
+          },
+          {
             "event_id": "401873040",
             "reason": "event_started"
           },
           {
             "event_id": "401873045",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401873042",
             "reason": "event_started"
           },
           {
@@ -840,11 +722,23 @@
             "reason": "event_started"
           },
           {
-            "event_id": "401873038",
+            "event_id": "401873046",
             "reason": "event_started"
           },
           {
-            "event_id": "401873042",
+            "event_id": "401873049",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401873047",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401873048",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401873050",
             "reason": "event_started"
           }
         ]
@@ -866,7 +760,7 @@
       },
       "flat_coverage": {
         "recorded_games": 13,
-        "priced_games": 5,
+        "priced_games": 0,
         "off_date_priced_count": 0,
         "missing_priced_event_ids": [],
         "main_only": false,
@@ -879,8 +773,8 @@
       "source_exclusions": {},
       "forecast": {
         "scheduled_games": 13,
-        "market_candidates": 5,
-        "logged": 5,
+        "market_candidates": 0,
+        "logged": 0,
         "unmatched": [],
         "skipped": []
       }
@@ -893,29 +787,29 @@
       "status": "recorded",
       "ledger_counts": {
         "flat": 13,
-        "main": 7
+        "main": 6
       },
       "generated_today_ledger_counts": {
         "flat": 13,
-        "main": 7
+        "main": 6
       },
       "flat_coverage": {
         "recorded_games": 13,
-        "priced_games": 5,
+        "priced_games": 0,
         "off_date_priced_count": 0,
         "missing_priced_event_ids": [],
         "main_only": false,
         "main_without_flat_event_ids": []
       },
       "reasons": {
-        "QUALIFIED": 18,
+        "QUALIFIED": 17,
         "FLAT_CALL": 2
       },
       "source_exclusions": {},
       "forecast": {
         "scheduled_games": 13,
-        "market_candidates": 5,
-        "logged": 5,
+        "market_candidates": 0,
+        "logged": 0,
         "unmatched": [],
         "skipped": []
       }
@@ -1010,56 +904,20 @@
       },
       "reasons": {},
       "source_exclusions": {
-        "event_started": 107,
-        "no unique timestamp-valid full-game 2.5 total matched": 11,
-        "no timestamp-valid team_win market matched": 11,
-        "no unique timestamp-valid draw market matched": 11,
-        "no unique timestamp-valid BTTS market matched": 11
+        "event_started": 106,
+        "no unique timestamp-valid full-game 2.5 total matched": 2,
+        "no timestamp-valid team_win market matched": 2,
+        "no unique timestamp-valid draw market matched": 2,
+        "no unique timestamp-valid BTTS market matched": 2
       },
       "forecast": {
         "status": "shadow_qualified",
-        "scheduled_games": 11,
+        "scheduled_games": 2,
         "priced_count": 0,
         "logged": 0,
         "unmatched": [
           {
-            "event_id": "401841668",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401878067",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401878070",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401878031",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
             "event_id": "401877908",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401850685",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401921321",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401886139",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401886140",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401876903",
             "reason": "no unique timestamp-valid full-game 2.5 total matched"
           },
           {
@@ -1067,43 +925,7 @@
             "reason": "no unique timestamp-valid full-game 2.5 total matched"
           },
           {
-            "event_id": "401841668",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401878067",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401878070",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401878031",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
             "event_id": "401877908",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401850685",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401921321",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401886139",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401886140",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401876903",
             "reason": "no timestamp-valid team_win market matched"
           },
           {
@@ -1111,43 +933,7 @@
             "reason": "no timestamp-valid team_win market matched"
           },
           {
-            "event_id": "401841668",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401878067",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401878070",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401878031",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
             "event_id": "401877908",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401850685",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401921321",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401886139",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401886140",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401876903",
             "reason": "no unique timestamp-valid draw market matched"
           },
           {
@@ -1155,43 +941,7 @@
             "reason": "no unique timestamp-valid draw market matched"
           },
           {
-            "event_id": "401841668",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401878067",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401878070",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401878031",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
             "event_id": "401877908",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401850685",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401921321",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401886139",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401886140",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401876903",
             "reason": "no unique timestamp-valid BTTS market matched"
           },
           {
@@ -1509,47 +1259,23 @@
             "reason": "event_started"
           },
           {
+            "event_id": "401841668",
+            "reason": "event_started"
+          },
+          {
             "event_id": "401877958",
             "reason": "event_started"
           },
           {
-            "event_id": "401877770",
+            "event_id": "401878067",
             "reason": "event_started"
           },
           {
-            "event_id": "401877917",
+            "event_id": "401878070",
             "reason": "event_started"
           },
           {
-            "event_id": "401878029",
-            "reason": "event_started"
-          },
-          {
-            "event_id": "401878043",
-            "reason": "event_started"
-          },
-          {
-            "event_id": "401877893",
-            "reason": "event_started"
-          },
-          {
-            "event_id": "401878034",
-            "reason": "event_started"
-          },
-          {
-            "event_id": "401877919",
-            "reason": "event_started"
-          },
-          {
-            "event_id": "401877838",
-            "reason": "event_started"
-          },
-          {
-            "event_id": "401877890",
-            "reason": "event_started"
-          },
-          {
-            "event_id": "401878024",
+            "event_id": "401878031",
             "reason": "event_started"
           },
           {
@@ -1573,6 +1299,10 @@
             "reason": "event_started"
           },
           {
+            "event_id": "401850685",
+            "reason": "event_started"
+          },
+          {
             "event_id": "401921322",
             "reason": "event_started"
           },
@@ -1585,11 +1315,27 @@
             "reason": "event_started"
           },
           {
+            "event_id": "401921321",
+            "reason": "event_started"
+          },
+          {
             "event_id": "401886122",
             "reason": "event_started"
           },
           {
             "event_id": "401886123",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401886139",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401886140",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401876903",
             "reason": "event_started"
           },
           {
@@ -1650,56 +1396,20 @@
       },
       "reasons": {},
       "source_exclusions": {
-        "event_started": 107,
-        "no unique timestamp-valid full-game 2.5 total matched": 11,
-        "no timestamp-valid team_win market matched": 11,
-        "no unique timestamp-valid draw market matched": 11,
-        "no unique timestamp-valid BTTS market matched": 11
+        "event_started": 106,
+        "no unique timestamp-valid full-game 2.5 total matched": 2,
+        "no timestamp-valid team_win market matched": 2,
+        "no unique timestamp-valid draw market matched": 2,
+        "no unique timestamp-valid BTTS market matched": 2
       },
       "forecast": {
         "status": "shadow_qualified",
-        "scheduled_games": 11,
+        "scheduled_games": 2,
         "priced_count": 0,
         "logged": 0,
         "unmatched": [
           {
-            "event_id": "401841668",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401878067",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401878070",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401878031",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
             "event_id": "401877908",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401850685",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401921321",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401886139",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401886140",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401876903",
             "reason": "no unique timestamp-valid full-game 2.5 total matched"
           },
           {
@@ -1707,43 +1417,7 @@
             "reason": "no unique timestamp-valid full-game 2.5 total matched"
           },
           {
-            "event_id": "401841668",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401878067",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401878070",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401878031",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
             "event_id": "401877908",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401850685",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401921321",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401886139",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401886140",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401876903",
             "reason": "no timestamp-valid team_win market matched"
           },
           {
@@ -1751,43 +1425,7 @@
             "reason": "no timestamp-valid team_win market matched"
           },
           {
-            "event_id": "401841668",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401878067",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401878070",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401878031",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
             "event_id": "401877908",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401850685",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401921321",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401886139",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401886140",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401876903",
             "reason": "no unique timestamp-valid draw market matched"
           },
           {
@@ -1795,43 +1433,7 @@
             "reason": "no unique timestamp-valid draw market matched"
           },
           {
-            "event_id": "401841668",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401878067",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401878070",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401878031",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
             "event_id": "401877908",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401850685",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401921321",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401886139",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401886140",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401876903",
             "reason": "no unique timestamp-valid BTTS market matched"
           },
           {
@@ -2149,47 +1751,23 @@
             "reason": "event_started"
           },
           {
+            "event_id": "401841668",
+            "reason": "event_started"
+          },
+          {
             "event_id": "401877958",
             "reason": "event_started"
           },
           {
-            "event_id": "401877770",
+            "event_id": "401878067",
             "reason": "event_started"
           },
           {
-            "event_id": "401877917",
+            "event_id": "401878070",
             "reason": "event_started"
           },
           {
-            "event_id": "401878029",
-            "reason": "event_started"
-          },
-          {
-            "event_id": "401878043",
-            "reason": "event_started"
-          },
-          {
-            "event_id": "401877893",
-            "reason": "event_started"
-          },
-          {
-            "event_id": "401878034",
-            "reason": "event_started"
-          },
-          {
-            "event_id": "401877919",
-            "reason": "event_started"
-          },
-          {
-            "event_id": "401877838",
-            "reason": "event_started"
-          },
-          {
-            "event_id": "401877890",
-            "reason": "event_started"
-          },
-          {
-            "event_id": "401878024",
+            "event_id": "401878031",
             "reason": "event_started"
           },
           {
@@ -2213,6 +1791,10 @@
             "reason": "event_started"
           },
           {
+            "event_id": "401850685",
+            "reason": "event_started"
+          },
+          {
             "event_id": "401921322",
             "reason": "event_started"
           },
@@ -2225,11 +1807,27 @@
             "reason": "event_started"
           },
           {
+            "event_id": "401921321",
+            "reason": "event_started"
+          },
+          {
             "event_id": "401886122",
             "reason": "event_started"
           },
           {
             "event_id": "401886123",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401886139",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401886140",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401876903",
             "reason": "event_started"
           },
           {
@@ -2290,56 +1888,20 @@
       },
       "reasons": {},
       "source_exclusions": {
-        "event_started": 107,
-        "no unique timestamp-valid full-game 2.5 total matched": 11,
-        "no timestamp-valid team_win market matched": 11,
-        "no unique timestamp-valid draw market matched": 11,
-        "no unique timestamp-valid BTTS market matched": 11
+        "event_started": 106,
+        "no unique timestamp-valid full-game 2.5 total matched": 2,
+        "no timestamp-valid team_win market matched": 2,
+        "no unique timestamp-valid draw market matched": 2,
+        "no unique timestamp-valid BTTS market matched": 2
       },
       "forecast": {
         "status": "shadow_qualified",
-        "scheduled_games": 11,
+        "scheduled_games": 2,
         "priced_count": 0,
         "logged": 0,
         "unmatched": [
           {
-            "event_id": "401841668",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401878067",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401878070",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401878031",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
             "event_id": "401877908",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401850685",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401921321",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401886139",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401886140",
-            "reason": "no unique timestamp-valid full-game 2.5 total matched"
-          },
-          {
-            "event_id": "401876903",
             "reason": "no unique timestamp-valid full-game 2.5 total matched"
           },
           {
@@ -2347,43 +1909,7 @@
             "reason": "no unique timestamp-valid full-game 2.5 total matched"
           },
           {
-            "event_id": "401841668",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401878067",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401878070",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401878031",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
             "event_id": "401877908",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401850685",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401921321",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401886139",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401886140",
-            "reason": "no timestamp-valid team_win market matched"
-          },
-          {
-            "event_id": "401876903",
             "reason": "no timestamp-valid team_win market matched"
           },
           {
@@ -2391,43 +1917,7 @@
             "reason": "no timestamp-valid team_win market matched"
           },
           {
-            "event_id": "401841668",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401878067",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401878070",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401878031",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
             "event_id": "401877908",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401850685",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401921321",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401886139",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401886140",
-            "reason": "no unique timestamp-valid draw market matched"
-          },
-          {
-            "event_id": "401876903",
             "reason": "no unique timestamp-valid draw market matched"
           },
           {
@@ -2435,43 +1925,7 @@
             "reason": "no unique timestamp-valid draw market matched"
           },
           {
-            "event_id": "401841668",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401878067",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401878070",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401878031",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
             "event_id": "401877908",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401850685",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401921321",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401886139",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401886140",
-            "reason": "no unique timestamp-valid BTTS market matched"
-          },
-          {
-            "event_id": "401876903",
             "reason": "no unique timestamp-valid BTTS market matched"
           },
           {
@@ -2789,47 +2243,23 @@
             "reason": "event_started"
           },
           {
+            "event_id": "401841668",
+            "reason": "event_started"
+          },
+          {
             "event_id": "401877958",
             "reason": "event_started"
           },
           {
-            "event_id": "401877770",
+            "event_id": "401878067",
             "reason": "event_started"
           },
           {
-            "event_id": "401877917",
+            "event_id": "401878070",
             "reason": "event_started"
           },
           {
-            "event_id": "401878029",
-            "reason": "event_started"
-          },
-          {
-            "event_id": "401878043",
-            "reason": "event_started"
-          },
-          {
-            "event_id": "401877893",
-            "reason": "event_started"
-          },
-          {
-            "event_id": "401878034",
-            "reason": "event_started"
-          },
-          {
-            "event_id": "401877919",
-            "reason": "event_started"
-          },
-          {
-            "event_id": "401877838",
-            "reason": "event_started"
-          },
-          {
-            "event_id": "401877890",
-            "reason": "event_started"
-          },
-          {
-            "event_id": "401878024",
+            "event_id": "401878031",
             "reason": "event_started"
           },
           {
@@ -2853,6 +2283,10 @@
             "reason": "event_started"
           },
           {
+            "event_id": "401850685",
+            "reason": "event_started"
+          },
+          {
             "event_id": "401921322",
             "reason": "event_started"
           },
@@ -2865,11 +2299,27 @@
             "reason": "event_started"
           },
           {
+            "event_id": "401921321",
+            "reason": "event_started"
+          },
+          {
             "event_id": "401886122",
             "reason": "event_started"
           },
           {
             "event_id": "401886123",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401886139",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401886140",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401876903",
             "reason": "event_started"
           },
           {
@@ -2930,21 +2380,17 @@
       },
       "reasons": {},
       "source_exclusions": {
-        "event_started": 217,
-        "no snapshot matched": 37
+        "event_started": 218,
+        "no snapshot matched": 36
       },
       "forecast": {
         "status": "research",
-        "scheduled_games": 71,
+        "scheduled_games": 70,
         "priced_count": 0,
         "logged": 0,
         "unmatched": [
           {
             "event_id": "889-2026:186598",
-            "reason": "no snapshot matched"
-          },
-          {
-            "event_id": "382-2026:187374",
             "reason": "no snapshot matched"
           },
           {
@@ -3579,6 +3025,10 @@
           },
           {
             "event_id": "382-2026:187373",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "382-2026:187374",
             "reason": "event_started"
           },
           {
@@ -3979,21 +3429,17 @@
       },
       "reasons": {},
       "source_exclusions": {
-        "event_started": 217,
-        "no snapshot matched": 37
+        "event_started": 218,
+        "no snapshot matched": 36
       },
       "forecast": {
         "status": "research",
-        "scheduled_games": 71,
+        "scheduled_games": 70,
         "priced_count": 0,
         "logged": 0,
         "unmatched": [
           {
             "event_id": "889-2026:186598",
-            "reason": "no snapshot matched"
-          },
-          {
-            "event_id": "382-2026:187374",
             "reason": "no snapshot matched"
           },
           {
@@ -4628,6 +4074,10 @@
           },
           {
             "event_id": "382-2026:187373",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "382-2026:187374",
             "reason": "event_started"
           },
           {
@@ -5028,21 +4478,17 @@
       },
       "reasons": {},
       "source_exclusions": {
-        "event_started": 217,
-        "no snapshot matched": 37
+        "event_started": 218,
+        "no snapshot matched": 36
       },
       "forecast": {
         "status": "research",
-        "scheduled_games": 71,
+        "scheduled_games": 70,
         "priced_count": 0,
         "logged": 0,
         "unmatched": [
           {
             "event_id": "889-2026:186598",
-            "reason": "no snapshot matched"
-          },
-          {
-            "event_id": "382-2026:187374",
             "reason": "no snapshot matched"
           },
           {
@@ -5677,6 +5123,10 @@
           },
           {
             "event_id": "382-2026:187373",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "382-2026:187374",
             "reason": "event_started"
           },
           {
@@ -6070,13 +5520,13 @@
         "main": 15
       },
       "generated_today_ledger_counts": {
-        "flat": 27,
-        "main": 27
+        "flat": 31,
+        "main": 31
       },
       "flat_coverage": {
         "recorded_games": 15,
-        "priced_games": 1,
-        "off_date_priced_count": 12,
+        "priced_games": 0,
+        "off_date_priced_count": 16,
         "missing_priced_event_ids": [],
         "main_only": false,
         "main_without_flat_event_ids": []
@@ -6086,80 +5536,15 @@
         "QUALIFIED": 18
       },
       "source_exclusions": {
-        "NO_CALL_EVENT_STARTED": 3,
-        "NO_CALL_SERIES_FORMAT_UNRESOLVED": 9,
-        "NO_CALL_THIN_MARKET_EXTREME_ASK": 16,
-        "NO_CALL_THIN_MARKET_WIDE_SPREAD": 2
+        "NO_CALL_THIN_MARKET_EXTREME_ASK": 22,
+        "NO_CALL_THIN_MARKET_WIDE_SPREAD": 5,
+        "NO_CALL_SERIES_FORMAT_UNRESOLVED": 6,
+        "NO_CALL_ENTITY_UNRESOLVED": 1
       },
       "forecast": {
         "status": "ok",
         "reason": null,
         "no_calls": [
-          {
-            "event_id": "243370",
-            "event_start_utc": "2026-11-08T18:00:00Z",
-            "market_slug": "aec-cs2-ryvex-drama-2026-11-08",
-            "teams": [
-              "Ryvex",
-              "Drama eSports"
-            ],
-            "reason": "NO_CALL_EVENT_STARTED"
-          },
-          {
-            "event_id": "243780",
-            "event_start_utc": "2026-11-08T20:30:00Z",
-            "market_slug": "aec-cs2-elu-mars-2026-11-08",
-            "teams": [
-              "Elusive",
-              "Marsborne"
-            ],
-            "reason": "NO_CALL_EVENT_STARTED"
-          },
-          {
-            "event_id": "243892",
-            "event_start_utc": "2026-11-08T20:30:00Z",
-            "market_slug": "aec-cs2-fei-dtn-2026-11-08",
-            "teams": [
-              "Feistein",
-              "Detonate"
-            ],
-            "reason": "NO_CALL_EVENT_STARTED"
-          },
-          {
-            "event_id": "240319",
-            "event_start_utc": "2026-11-08T22:00:00Z",
-            "market_slug": "aec-cs2-lco-rush-2026-11-09",
-            "teams": [
-              "Low Cortisol",
-              "Rush"
-            ],
-            "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED",
-            "detail": "provider_format_not_available"
-          },
-          {
-            "event_id": "240319",
-            "event_start_utc": "2026-11-08T22:00:00Z",
-            "market_slug": "asc-cs2-lco-rush-2026-11-09-hcap-neg-1pt5",
-            "market_type": "spread",
-            "line": -1.5,
-            "teams": [
-              "Low Cortisol",
-              "Rush"
-            ],
-            "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED"
-          },
-          {
-            "event_id": "240319",
-            "event_start_utc": "2026-11-08T22:00:00Z",
-            "market_slug": "tsc-cs2-lco-rush-2026-11-09-tot-2pt5",
-            "market_type": "total",
-            "line": 2.5,
-            "teams": [
-              "Low Cortisol",
-              "Rush"
-            ],
-            "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED"
-          },
           {
             "event_id": "237261",
             "event_start_utc": "2026-11-09T09:00:00Z",
@@ -6172,24 +5557,24 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.91,
-              0.1
+              0.94,
+              0.07
             ]
           },
           {
-            "event_id": "245428",
+            "event_id": "247303",
             "event_start_utc": "2026-11-09T09:00:00Z",
-            "market_slug": "aec-cs2-forzer-maybe-2026-11-09",
+            "market_slug": "aec-cs2-skr-pre-2026-11-09",
             "market_type": "moneyline",
             "line": null,
             "teams": [
-              "FORZE Reload",
-              "maybe"
+              "S\u00f6kerorg",
+              "Prestige"
             ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
             "asks": [
-              0.85,
-              0.8
+              0.59,
+              0.54
             ]
           },
           {
@@ -6204,8 +5589,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
             "asks": [
-              0.54,
-              0.66
+              0.53,
+              0.59
             ]
           },
           {
@@ -6260,19 +5645,83 @@
             "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED"
           },
           {
-            "event_id": "247156",
-            "event_start_utc": "2026-11-09T14:00:00Z",
-            "market_slug": "aec-cs2-fokus-all-2026-11-09",
+            "event_id": "247304",
+            "event_start_utc": "2026-11-09T12:00:00Z",
+            "market_slug": "aec-cs2-maybe-msc-2026-11-09",
             "market_type": "moneyline",
             "line": null,
+            "teams": [
+              "maybe",
+              "MASONIC"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.98,
+              0.98
+            ]
+          },
+          {
+            "event_id": "247156",
+            "event_start_utc": "2026-11-09T14:00:00Z",
+            "market_slug": "tsc-cs2-fokus-all-2026-11-09-tot-2pt5",
+            "market_type": "total",
+            "line": 2.5,
+            "teams": [
+              "FOKUS",
+              "Alliance"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
+            "asks": [
+              0.6,
+              0.64
+            ]
+          },
+          {
+            "event_id": "247156",
+            "event_start_utc": "2026-11-09T14:00:00Z",
+            "market_slug": "asc-cs2-fokus-all-2026-11-09-hcap-neg-1pt5",
+            "market_type": "spread",
+            "line": -1.5,
             "teams": [
               "FOKUS",
               "Alliance"
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.68,
+              0.59,
+              0.99
+            ]
+          },
+          {
+            "event_id": "247178",
+            "event_start_utc": "2026-11-09T14:00:00Z",
+            "market_slug": "aec-cs2-aimc-9ine-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              "aimclub",
+              "9INE"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.27,
               0.74
+            ]
+          },
+          {
+            "event_id": "247178",
+            "event_start_utc": "2026-11-09T14:00:00Z",
+            "market_slug": "tsc-cs2-aimc-9ine-2026-11-09-tot-2pt5",
+            "market_type": "total",
+            "line": 2.5,
+            "teams": [
+              "aimclub",
+              "9INE"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.99,
+              0.75
             ]
           },
           {
@@ -6308,6 +5757,22 @@
             ]
           },
           {
+            "event_id": "247305",
+            "event_start_utc": "2026-11-09T15:00:00Z",
+            "market_slug": "aec-cs2-phtmac-ill-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              " Phantom Academy",
+              "ILLYRIANS"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.76,
+              0.77
+            ]
+          },
+          {
             "event_id": "238098",
             "event_start_utc": "2026-11-09T15:30:00Z",
             "market_slug": "aec-cs2-havu-bjng-2026-11-09",
@@ -6319,8 +5784,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.92,
-              0.13
+              0.93,
+              0.11
             ]
           },
           {
@@ -6335,8 +5800,40 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.75,
+              0.61,
               0.99
+            ]
+          },
+          {
+            "event_id": "247515",
+            "event_start_utc": "2026-11-09T16:00:00Z",
+            "market_slug": "aec-cs2-ytigeres-din-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              "Young TigeRES",
+              "DINERO"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.93,
+              0.91
+            ]
+          },
+          {
+            "event_id": "247518",
+            "event_start_utc": "2026-11-09T16:00:00Z",
+            "market_slug": "aec-cs2-sinqu-rgg-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              "SINQU",
+              "ROUNDS"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
+            "asks": [
+              0.55,
+              0.6
             ]
           },
           {
@@ -6351,8 +5848,54 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.89,
-              0.12
+              0.9,
+              0.11
+            ]
+          },
+          {
+            "event_id": "247521",
+            "event_start_utc": "2026-11-09T17:00:00Z",
+            "market_slug": "aec-cs2-hec-zotix-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              "Hermine Esports Club",
+              "ZOTIX"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.54,
+              0.91
+            ]
+          },
+          {
+            "event_id": "247524",
+            "event_start_utc": "2026-11-09T17:00:00Z",
+            "market_slug": "aec-cs2-dxe-wnt-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              "DimoniX Esports",
+              "wnT"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
+            "asks": [
+              0.55,
+              0.56
+            ]
+          },
+          {
+            "event_id": "247527",
+            "event_start_utc": "2026-11-09T17:00:00Z",
+            "market_slug": "aec-cs2-tg-mtx-2026-11-09",
+            "teams": [
+              "TEAM GELO",
+              "MTX"
+            ],
+            "reason": "NO_CALL_ENTITY_UNRESOLVED",
+            "candidate_counts": [
+              1,
+              2
             ]
           },
           {
@@ -6367,7 +5910,7 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.8,
+              0.65,
               0.99
             ]
           },
@@ -6384,7 +5927,7 @@
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
               0.99,
-              0.99
+              0.73
             ]
           },
           {
@@ -6399,24 +5942,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.34,
-              0.78
-            ]
-          },
-          {
-            "event_id": "238645",
-            "event_start_utc": "2026-11-09T18:00:00Z",
-            "market_slug": "aec-cs2-lle-ecs-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
-            "teams": [
-              "Linx Legacy Esport",
-              "ECSTATIC"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
-            "asks": [
-              0.7,
-              0.54
+              0.29,
+              0.73
             ]
           },
           {
@@ -6433,6 +5960,22 @@
             "asks": [
               0.96,
               0.96
+            ]
+          },
+          {
+            "event_id": "247306",
+            "event_start_utc": "2026-11-09T18:00:00Z",
+            "market_slug": "aec-cs2-hon-ryvex-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              "Honv\u00e9d",
+              "Ryvex"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.69,
+              0.8
             ]
           },
           {
@@ -6469,8 +6012,24 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.92,
-              0.81
+              0.82,
+              0.65
+            ]
+          },
+          {
+            "event_id": "247530",
+            "event_start_utc": "2026-11-09T19:30:00Z",
+            "market_slug": "aec-cs2-maybe-phtmac-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              "maybe",
+              " Phantom Academy"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.98,
+              0.98
             ]
           },
           {
@@ -6497,27 +6056,11 @@
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
               0.7,
-              0.91
-            ]
-          },
-          {
-            "event_id": "238898",
-            "event_start_utc": "2026-11-09T20:00:00Z",
-            "market_slug": "aec-cs2-ecs-st0ny-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
-            "teams": [
-              "ECSTATIC",
-              "struggletony"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.71,
-              0.35
+              0.89
             ]
           }
         ],
-        "priced_count": 13,
+        "priced_count": 16,
         "errors": []
       }
     },
@@ -6538,7 +6081,7 @@
       "flat_coverage": {
         "recorded_games": 1,
         "priced_games": 0,
-        "off_date_priced_count": 12,
+        "off_date_priced_count": 16,
         "missing_priced_event_ids": [],
         "main_only": false,
         "main_without_flat_event_ids": []
@@ -6548,80 +6091,15 @@
         "QUALIFIED": 1
       },
       "source_exclusions": {
-        "NO_CALL_EVENT_STARTED": 3,
-        "NO_CALL_SERIES_FORMAT_UNRESOLVED": 9,
-        "NO_CALL_THIN_MARKET_EXTREME_ASK": 16,
-        "NO_CALL_THIN_MARKET_WIDE_SPREAD": 2
+        "NO_CALL_THIN_MARKET_EXTREME_ASK": 22,
+        "NO_CALL_THIN_MARKET_WIDE_SPREAD": 5,
+        "NO_CALL_SERIES_FORMAT_UNRESOLVED": 6,
+        "NO_CALL_ENTITY_UNRESOLVED": 1
       },
       "forecast": {
         "status": "ok",
         "reason": null,
         "no_calls": [
-          {
-            "event_id": "243370",
-            "event_start_utc": "2026-11-08T18:00:00Z",
-            "market_slug": "aec-cs2-ryvex-drama-2026-11-08",
-            "teams": [
-              "Ryvex",
-              "Drama eSports"
-            ],
-            "reason": "NO_CALL_EVENT_STARTED"
-          },
-          {
-            "event_id": "243780",
-            "event_start_utc": "2026-11-08T20:30:00Z",
-            "market_slug": "aec-cs2-elu-mars-2026-11-08",
-            "teams": [
-              "Elusive",
-              "Marsborne"
-            ],
-            "reason": "NO_CALL_EVENT_STARTED"
-          },
-          {
-            "event_id": "243892",
-            "event_start_utc": "2026-11-08T20:30:00Z",
-            "market_slug": "aec-cs2-fei-dtn-2026-11-08",
-            "teams": [
-              "Feistein",
-              "Detonate"
-            ],
-            "reason": "NO_CALL_EVENT_STARTED"
-          },
-          {
-            "event_id": "240319",
-            "event_start_utc": "2026-11-08T22:00:00Z",
-            "market_slug": "aec-cs2-lco-rush-2026-11-09",
-            "teams": [
-              "Low Cortisol",
-              "Rush"
-            ],
-            "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED",
-            "detail": "provider_format_not_available"
-          },
-          {
-            "event_id": "240319",
-            "event_start_utc": "2026-11-08T22:00:00Z",
-            "market_slug": "asc-cs2-lco-rush-2026-11-09-hcap-neg-1pt5",
-            "market_type": "spread",
-            "line": -1.5,
-            "teams": [
-              "Low Cortisol",
-              "Rush"
-            ],
-            "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED"
-          },
-          {
-            "event_id": "240319",
-            "event_start_utc": "2026-11-08T22:00:00Z",
-            "market_slug": "tsc-cs2-lco-rush-2026-11-09-tot-2pt5",
-            "market_type": "total",
-            "line": 2.5,
-            "teams": [
-              "Low Cortisol",
-              "Rush"
-            ],
-            "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED"
-          },
           {
             "event_id": "237261",
             "event_start_utc": "2026-11-09T09:00:00Z",
@@ -6634,24 +6112,24 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.91,
-              0.1
+              0.94,
+              0.07
             ]
           },
           {
-            "event_id": "245428",
+            "event_id": "247303",
             "event_start_utc": "2026-11-09T09:00:00Z",
-            "market_slug": "aec-cs2-forzer-maybe-2026-11-09",
+            "market_slug": "aec-cs2-skr-pre-2026-11-09",
             "market_type": "moneyline",
             "line": null,
             "teams": [
-              "FORZE Reload",
-              "maybe"
+              "S\u00f6kerorg",
+              "Prestige"
             ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
             "asks": [
-              0.85,
-              0.8
+              0.59,
+              0.54
             ]
           },
           {
@@ -6666,8 +6144,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
             "asks": [
-              0.54,
-              0.66
+              0.53,
+              0.59
             ]
           },
           {
@@ -6722,19 +6200,83 @@
             "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED"
           },
           {
-            "event_id": "247156",
-            "event_start_utc": "2026-11-09T14:00:00Z",
-            "market_slug": "aec-cs2-fokus-all-2026-11-09",
+            "event_id": "247304",
+            "event_start_utc": "2026-11-09T12:00:00Z",
+            "market_slug": "aec-cs2-maybe-msc-2026-11-09",
             "market_type": "moneyline",
             "line": null,
+            "teams": [
+              "maybe",
+              "MASONIC"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.98,
+              0.98
+            ]
+          },
+          {
+            "event_id": "247156",
+            "event_start_utc": "2026-11-09T14:00:00Z",
+            "market_slug": "tsc-cs2-fokus-all-2026-11-09-tot-2pt5",
+            "market_type": "total",
+            "line": 2.5,
+            "teams": [
+              "FOKUS",
+              "Alliance"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
+            "asks": [
+              0.6,
+              0.64
+            ]
+          },
+          {
+            "event_id": "247156",
+            "event_start_utc": "2026-11-09T14:00:00Z",
+            "market_slug": "asc-cs2-fokus-all-2026-11-09-hcap-neg-1pt5",
+            "market_type": "spread",
+            "line": -1.5,
             "teams": [
               "FOKUS",
               "Alliance"
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.68,
+              0.59,
+              0.99
+            ]
+          },
+          {
+            "event_id": "247178",
+            "event_start_utc": "2026-11-09T14:00:00Z",
+            "market_slug": "aec-cs2-aimc-9ine-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              "aimclub",
+              "9INE"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.27,
               0.74
+            ]
+          },
+          {
+            "event_id": "247178",
+            "event_start_utc": "2026-11-09T14:00:00Z",
+            "market_slug": "tsc-cs2-aimc-9ine-2026-11-09-tot-2pt5",
+            "market_type": "total",
+            "line": 2.5,
+            "teams": [
+              "aimclub",
+              "9INE"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.99,
+              0.75
             ]
           },
           {
@@ -6770,6 +6312,22 @@
             ]
           },
           {
+            "event_id": "247305",
+            "event_start_utc": "2026-11-09T15:00:00Z",
+            "market_slug": "aec-cs2-phtmac-ill-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              " Phantom Academy",
+              "ILLYRIANS"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.76,
+              0.77
+            ]
+          },
+          {
             "event_id": "238098",
             "event_start_utc": "2026-11-09T15:30:00Z",
             "market_slug": "aec-cs2-havu-bjng-2026-11-09",
@@ -6781,8 +6339,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.92,
-              0.13
+              0.93,
+              0.11
             ]
           },
           {
@@ -6797,8 +6355,40 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.75,
+              0.61,
               0.99
+            ]
+          },
+          {
+            "event_id": "247515",
+            "event_start_utc": "2026-11-09T16:00:00Z",
+            "market_slug": "aec-cs2-ytigeres-din-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              "Young TigeRES",
+              "DINERO"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.93,
+              0.91
+            ]
+          },
+          {
+            "event_id": "247518",
+            "event_start_utc": "2026-11-09T16:00:00Z",
+            "market_slug": "aec-cs2-sinqu-rgg-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              "SINQU",
+              "ROUNDS"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
+            "asks": [
+              0.55,
+              0.6
             ]
           },
           {
@@ -6813,8 +6403,54 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.89,
-              0.12
+              0.9,
+              0.11
+            ]
+          },
+          {
+            "event_id": "247521",
+            "event_start_utc": "2026-11-09T17:00:00Z",
+            "market_slug": "aec-cs2-hec-zotix-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              "Hermine Esports Club",
+              "ZOTIX"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.54,
+              0.91
+            ]
+          },
+          {
+            "event_id": "247524",
+            "event_start_utc": "2026-11-09T17:00:00Z",
+            "market_slug": "aec-cs2-dxe-wnt-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              "DimoniX Esports",
+              "wnT"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
+            "asks": [
+              0.55,
+              0.56
+            ]
+          },
+          {
+            "event_id": "247527",
+            "event_start_utc": "2026-11-09T17:00:00Z",
+            "market_slug": "aec-cs2-tg-mtx-2026-11-09",
+            "teams": [
+              "TEAM GELO",
+              "MTX"
+            ],
+            "reason": "NO_CALL_ENTITY_UNRESOLVED",
+            "candidate_counts": [
+              1,
+              2
             ]
           },
           {
@@ -6829,7 +6465,7 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.8,
+              0.65,
               0.99
             ]
           },
@@ -6846,7 +6482,7 @@
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
               0.99,
-              0.99
+              0.73
             ]
           },
           {
@@ -6861,24 +6497,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.34,
-              0.78
-            ]
-          },
-          {
-            "event_id": "238645",
-            "event_start_utc": "2026-11-09T18:00:00Z",
-            "market_slug": "aec-cs2-lle-ecs-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
-            "teams": [
-              "Linx Legacy Esport",
-              "ECSTATIC"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
-            "asks": [
-              0.7,
-              0.54
+              0.29,
+              0.73
             ]
           },
           {
@@ -6895,6 +6515,22 @@
             "asks": [
               0.96,
               0.96
+            ]
+          },
+          {
+            "event_id": "247306",
+            "event_start_utc": "2026-11-09T18:00:00Z",
+            "market_slug": "aec-cs2-hon-ryvex-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              "Honv\u00e9d",
+              "Ryvex"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.69,
+              0.8
             ]
           },
           {
@@ -6931,8 +6567,24 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.92,
-              0.81
+              0.82,
+              0.65
+            ]
+          },
+          {
+            "event_id": "247530",
+            "event_start_utc": "2026-11-09T19:30:00Z",
+            "market_slug": "aec-cs2-maybe-phtmac-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              "maybe",
+              " Phantom Academy"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.98,
+              0.98
             ]
           },
           {
@@ -6959,27 +6611,11 @@
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
               0.7,
-              0.91
-            ]
-          },
-          {
-            "event_id": "238898",
-            "event_start_utc": "2026-11-09T20:00:00Z",
-            "market_slug": "aec-cs2-ecs-st0ny-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
-            "teams": [
-              "ECSTATIC",
-              "struggletony"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.71,
-              0.35
+              0.89
             ]
           }
         ],
-        "priced_count": 13,
+        "priced_count": 16,
         "errors": []
       }
     },
@@ -7000,7 +6636,7 @@
       "flat_coverage": {
         "recorded_games": 3,
         "priced_games": 0,
-        "off_date_priced_count": 12,
+        "off_date_priced_count": 16,
         "missing_priced_event_ids": [],
         "main_only": false,
         "main_without_flat_event_ids": []
@@ -7010,80 +6646,15 @@
         "QUALIFIED": 3
       },
       "source_exclusions": {
-        "NO_CALL_EVENT_STARTED": 3,
-        "NO_CALL_SERIES_FORMAT_UNRESOLVED": 9,
-        "NO_CALL_THIN_MARKET_EXTREME_ASK": 16,
-        "NO_CALL_THIN_MARKET_WIDE_SPREAD": 2
+        "NO_CALL_THIN_MARKET_EXTREME_ASK": 22,
+        "NO_CALL_THIN_MARKET_WIDE_SPREAD": 5,
+        "NO_CALL_SERIES_FORMAT_UNRESOLVED": 6,
+        "NO_CALL_ENTITY_UNRESOLVED": 1
       },
       "forecast": {
         "status": "ok",
         "reason": null,
         "no_calls": [
-          {
-            "event_id": "243370",
-            "event_start_utc": "2026-11-08T18:00:00Z",
-            "market_slug": "aec-cs2-ryvex-drama-2026-11-08",
-            "teams": [
-              "Ryvex",
-              "Drama eSports"
-            ],
-            "reason": "NO_CALL_EVENT_STARTED"
-          },
-          {
-            "event_id": "243780",
-            "event_start_utc": "2026-11-08T20:30:00Z",
-            "market_slug": "aec-cs2-elu-mars-2026-11-08",
-            "teams": [
-              "Elusive",
-              "Marsborne"
-            ],
-            "reason": "NO_CALL_EVENT_STARTED"
-          },
-          {
-            "event_id": "243892",
-            "event_start_utc": "2026-11-08T20:30:00Z",
-            "market_slug": "aec-cs2-fei-dtn-2026-11-08",
-            "teams": [
-              "Feistein",
-              "Detonate"
-            ],
-            "reason": "NO_CALL_EVENT_STARTED"
-          },
-          {
-            "event_id": "240319",
-            "event_start_utc": "2026-11-08T22:00:00Z",
-            "market_slug": "aec-cs2-lco-rush-2026-11-09",
-            "teams": [
-              "Low Cortisol",
-              "Rush"
-            ],
-            "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED",
-            "detail": "provider_format_not_available"
-          },
-          {
-            "event_id": "240319",
-            "event_start_utc": "2026-11-08T22:00:00Z",
-            "market_slug": "asc-cs2-lco-rush-2026-11-09-hcap-neg-1pt5",
-            "market_type": "spread",
-            "line": -1.5,
-            "teams": [
-              "Low Cortisol",
-              "Rush"
-            ],
-            "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED"
-          },
-          {
-            "event_id": "240319",
-            "event_start_utc": "2026-11-08T22:00:00Z",
-            "market_slug": "tsc-cs2-lco-rush-2026-11-09-tot-2pt5",
-            "market_type": "total",
-            "line": 2.5,
-            "teams": [
-              "Low Cortisol",
-              "Rush"
-            ],
-            "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED"
-          },
           {
             "event_id": "237261",
             "event_start_utc": "2026-11-09T09:00:00Z",
@@ -7096,24 +6667,24 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.91,
-              0.1
+              0.94,
+              0.07
             ]
           },
           {
-            "event_id": "245428",
+            "event_id": "247303",
             "event_start_utc": "2026-11-09T09:00:00Z",
-            "market_slug": "aec-cs2-forzer-maybe-2026-11-09",
+            "market_slug": "aec-cs2-skr-pre-2026-11-09",
             "market_type": "moneyline",
             "line": null,
             "teams": [
-              "FORZE Reload",
-              "maybe"
+              "S\u00f6kerorg",
+              "Prestige"
             ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
             "asks": [
-              0.85,
-              0.8
+              0.59,
+              0.54
             ]
           },
           {
@@ -7128,8 +6699,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
             "asks": [
-              0.54,
-              0.66
+              0.53,
+              0.59
             ]
           },
           {
@@ -7184,19 +6755,83 @@
             "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED"
           },
           {
-            "event_id": "247156",
-            "event_start_utc": "2026-11-09T14:00:00Z",
-            "market_slug": "aec-cs2-fokus-all-2026-11-09",
+            "event_id": "247304",
+            "event_start_utc": "2026-11-09T12:00:00Z",
+            "market_slug": "aec-cs2-maybe-msc-2026-11-09",
             "market_type": "moneyline",
             "line": null,
+            "teams": [
+              "maybe",
+              "MASONIC"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.98,
+              0.98
+            ]
+          },
+          {
+            "event_id": "247156",
+            "event_start_utc": "2026-11-09T14:00:00Z",
+            "market_slug": "tsc-cs2-fokus-all-2026-11-09-tot-2pt5",
+            "market_type": "total",
+            "line": 2.5,
+            "teams": [
+              "FOKUS",
+              "Alliance"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
+            "asks": [
+              0.6,
+              0.64
+            ]
+          },
+          {
+            "event_id": "247156",
+            "event_start_utc": "2026-11-09T14:00:00Z",
+            "market_slug": "asc-cs2-fokus-all-2026-11-09-hcap-neg-1pt5",
+            "market_type": "spread",
+            "line": -1.5,
             "teams": [
               "FOKUS",
               "Alliance"
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.68,
+              0.59,
+              0.99
+            ]
+          },
+          {
+            "event_id": "247178",
+            "event_start_utc": "2026-11-09T14:00:00Z",
+            "market_slug": "aec-cs2-aimc-9ine-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              "aimclub",
+              "9INE"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.27,
               0.74
+            ]
+          },
+          {
+            "event_id": "247178",
+            "event_start_utc": "2026-11-09T14:00:00Z",
+            "market_slug": "tsc-cs2-aimc-9ine-2026-11-09-tot-2pt5",
+            "market_type": "total",
+            "line": 2.5,
+            "teams": [
+              "aimclub",
+              "9INE"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.99,
+              0.75
             ]
           },
           {
@@ -7232,6 +6867,22 @@
             ]
           },
           {
+            "event_id": "247305",
+            "event_start_utc": "2026-11-09T15:00:00Z",
+            "market_slug": "aec-cs2-phtmac-ill-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              " Phantom Academy",
+              "ILLYRIANS"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.76,
+              0.77
+            ]
+          },
+          {
             "event_id": "238098",
             "event_start_utc": "2026-11-09T15:30:00Z",
             "market_slug": "aec-cs2-havu-bjng-2026-11-09",
@@ -7243,8 +6894,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.92,
-              0.13
+              0.93,
+              0.11
             ]
           },
           {
@@ -7259,8 +6910,40 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.75,
+              0.61,
               0.99
+            ]
+          },
+          {
+            "event_id": "247515",
+            "event_start_utc": "2026-11-09T16:00:00Z",
+            "market_slug": "aec-cs2-ytigeres-din-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              "Young TigeRES",
+              "DINERO"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.93,
+              0.91
+            ]
+          },
+          {
+            "event_id": "247518",
+            "event_start_utc": "2026-11-09T16:00:00Z",
+            "market_slug": "aec-cs2-sinqu-rgg-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              "SINQU",
+              "ROUNDS"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
+            "asks": [
+              0.55,
+              0.6
             ]
           },
           {
@@ -7275,8 +6958,54 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.89,
-              0.12
+              0.9,
+              0.11
+            ]
+          },
+          {
+            "event_id": "247521",
+            "event_start_utc": "2026-11-09T17:00:00Z",
+            "market_slug": "aec-cs2-hec-zotix-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              "Hermine Esports Club",
+              "ZOTIX"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.54,
+              0.91
+            ]
+          },
+          {
+            "event_id": "247524",
+            "event_start_utc": "2026-11-09T17:00:00Z",
+            "market_slug": "aec-cs2-dxe-wnt-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              "DimoniX Esports",
+              "wnT"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
+            "asks": [
+              0.55,
+              0.56
+            ]
+          },
+          {
+            "event_id": "247527",
+            "event_start_utc": "2026-11-09T17:00:00Z",
+            "market_slug": "aec-cs2-tg-mtx-2026-11-09",
+            "teams": [
+              "TEAM GELO",
+              "MTX"
+            ],
+            "reason": "NO_CALL_ENTITY_UNRESOLVED",
+            "candidate_counts": [
+              1,
+              2
             ]
           },
           {
@@ -7291,7 +7020,7 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.8,
+              0.65,
               0.99
             ]
           },
@@ -7308,7 +7037,7 @@
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
               0.99,
-              0.99
+              0.73
             ]
           },
           {
@@ -7323,24 +7052,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.34,
-              0.78
-            ]
-          },
-          {
-            "event_id": "238645",
-            "event_start_utc": "2026-11-09T18:00:00Z",
-            "market_slug": "aec-cs2-lle-ecs-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
-            "teams": [
-              "Linx Legacy Esport",
-              "ECSTATIC"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
-            "asks": [
-              0.7,
-              0.54
+              0.29,
+              0.73
             ]
           },
           {
@@ -7357,6 +7070,22 @@
             "asks": [
               0.96,
               0.96
+            ]
+          },
+          {
+            "event_id": "247306",
+            "event_start_utc": "2026-11-09T18:00:00Z",
+            "market_slug": "aec-cs2-hon-ryvex-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              "Honv\u00e9d",
+              "Ryvex"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.69,
+              0.8
             ]
           },
           {
@@ -7393,8 +7122,24 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.92,
-              0.81
+              0.82,
+              0.65
+            ]
+          },
+          {
+            "event_id": "247530",
+            "event_start_utc": "2026-11-09T19:30:00Z",
+            "market_slug": "aec-cs2-maybe-phtmac-2026-11-09",
+            "market_type": "moneyline",
+            "line": null,
+            "teams": [
+              "maybe",
+              " Phantom Academy"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.98,
+              0.98
             ]
           },
           {
@@ -7421,27 +7166,11 @@
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
               0.7,
-              0.91
-            ]
-          },
-          {
-            "event_id": "238898",
-            "event_start_utc": "2026-11-09T20:00:00Z",
-            "market_slug": "aec-cs2-ecs-st0ny-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
-            "teams": [
-              "ECSTATIC",
-              "struggletony"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.71,
-              0.35
+              0.89
             ]
           }
         ],
-        "priced_count": 13,
+        "priced_count": 16,
         "errors": []
       }
     },
@@ -7456,13 +7185,13 @@
         "main": 13
       },
       "generated_today_ledger_counts": {
-        "flat": 13,
-        "main": 13
+        "flat": 22,
+        "main": 22
       },
       "flat_coverage": {
         "recorded_games": 13,
         "priced_games": 0,
-        "off_date_priced_count": 0,
+        "off_date_priced_count": 9,
         "missing_priced_event_ids": [],
         "main_only": false,
         "main_without_flat_event_ids": []
@@ -7472,45 +7201,13 @@
         "FLAT_CALL": 11
       },
       "source_exclusions": {
-        "NO_CALL_EVENT_STARTED": 3,
-        "NO_CALL_THIN_MARKET_EXTREME_ASK": 17,
-        "NO_CALL_SERIES_FORMAT_UNRESOLVED": 3,
-        "NO_CALL_THIN_MARKET_WIDE_SPREAD": 3
+        "NO_CALL_THIN_MARKET_EXTREME_ASK": 19,
+        "NO_CALL_SERIES_FORMAT_UNRESOLVED": 4
       },
       "forecast": {
         "status": "ok",
         "reason": null,
         "no_calls": [
-          {
-            "event_id": "235030",
-            "event_start_utc": "2026-11-08T19:00:00Z",
-            "market_slug": "aec-dota2-fro-cyxariki-2026-11-08",
-            "teams": [
-              "Froglings",
-              "Ka4kanarskie cyxariki"
-            ],
-            "reason": "NO_CALL_EVENT_STARTED"
-          },
-          {
-            "event_id": "235034",
-            "event_start_utc": "2026-11-08T19:00:00Z",
-            "market_slug": "aec-dota2-hul-iac-2026-11-08",
-            "teams": [
-              "HULIGANI",
-              "InterActive Philippines"
-            ],
-            "reason": "NO_CALL_EVENT_STARTED"
-          },
-          {
-            "event_id": "226832",
-            "event_start_utc": "2026-11-08T21:00:00Z",
-            "market_slug": "aec-dota2-ch-lynx-2026-11-06",
-            "teams": [
-              "CyberHero",
-              "Team Lynx"
-            ],
-            "reason": "NO_CALL_EVENT_STARTED"
-          },
           {
             "event_id": "237340",
             "event_start_utc": "2026-11-09T10:00:00Z",
@@ -7523,24 +7220,40 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.95,
-              0.43
+              0.91,
+              0.1
             ]
           },
           {
             "event_id": "237341",
             "event_start_utc": "2026-11-09T10:00:00Z",
-            "market_slug": "aec-dota2-fro-tsea-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
+            "market_slug": "tsc-dota2-fro-tsea-2026-11-09-tot-2pt5",
+            "market_type": "total",
+            "line": 2.5,
             "teams": [
               "Froglings",
               "Team Synapse"
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.89,
-              0.62
+              0.9,
+              0.68
+            ]
+          },
+          {
+            "event_id": "237341",
+            "event_start_utc": "2026-11-09T10:00:00Z",
+            "market_slug": "asc-dota2-fro-tsea-2026-11-09-hcap-neg-1pt5",
+            "market_type": "spread",
+            "line": -1.5,
+            "teams": [
+              "Froglings",
+              "Team Synapse"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.99,
+              0.99
             ]
           },
           {
@@ -7555,24 +7268,24 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.89,
-              0.52
+              0.72,
+              0.29
             ]
           },
           {
             "event_id": "239293",
             "event_start_utc": "2026-11-09T10:00:00Z",
-            "market_slug": "aec-dota2-xe-hul-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
+            "market_slug": "tsc-dota2-xe-hul-2026-11-09-tot-2pt5",
+            "market_type": "total",
+            "line": 2.5,
             "teams": [
               "Xipto Esports",
               "HULIGANI"
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.59,
-              0.77
+              0.99,
+              0.67
             ]
           },
           {
@@ -7598,8 +7311,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.62,
-              0.94
+              0.59,
+              0.92
             ]
           },
           {
@@ -7614,40 +7327,72 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.83,
-              0.42
+              0.87,
+              0.14
+            ]
+          },
+          {
+            "event_id": "237697",
+            "event_start_utc": "2026-11-09T13:00:00Z",
+            "market_slug": "asc-dota2-nemiga-zen-2026-11-09-hcap-neg-1pt5",
+            "market_type": "spread",
+            "line": -1.5,
+            "teams": [
+              "Nemiga Gaming",
+              "Zenith"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.99,
+              0.99
+            ]
+          },
+          {
+            "event_id": "237697",
+            "event_start_utc": "2026-11-09T13:00:00Z",
+            "market_slug": "tsc-dota2-nemiga-zen-2026-11-09-tot-2pt5",
+            "market_type": "total",
+            "line": 2.5,
+            "teams": [
+              "Nemiga Gaming",
+              "Zenith"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.99,
+              0.99
             ]
           },
           {
             "event_id": "237699",
             "event_start_utc": "2026-11-09T13:00:00Z",
-            "market_slug": "aec-dota2-xe-tsea-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
+            "market_slug": "asc-dota2-xe-tsea-2026-11-09-hcap-neg-1pt5",
+            "market_type": "spread",
+            "line": -1.5,
             "teams": [
               "Xipto Esports",
               "Team Synapse"
             ],
-            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.61,
-              0.66
+              0.99,
+              0.99
             ]
           },
           {
             "event_id": "237701",
             "event_start_utc": "2026-11-09T13:00:00Z",
-            "market_slug": "aec-dota2-fro-pla-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
+            "market_slug": "asc-dota2-fro-pla-2026-11-09-hcap-pos-1pt5",
+            "market_type": "spread",
+            "line": 1.5,
             "teams": [
               "Froglings",
               "PlayTime"
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.63,
-              0.9
+              0.99,
+              0.99
             ]
           },
           {
@@ -7662,8 +7407,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.95,
-              0.95
+              0.89,
+              0.86
             ]
           },
           {
@@ -7683,22 +7428,6 @@
             ]
           },
           {
-            "event_id": "238203",
-            "event_start_utc": "2026-11-09T16:00:00Z",
-            "market_slug": "aec-dota2-pr-cyxariki-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
-            "teams": [
-              "Power Rangers",
-              "Ka4kanarskie cyxariki"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.98,
-              0.98
-            ]
-          },
-          {
             "event_id": "238205",
             "event_start_utc": "2026-11-09T16:00:00Z",
             "market_slug": "aec-dota2-iac-ch-2026-11-09",
@@ -7710,24 +7439,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.51,
-              0.81
-            ]
-          },
-          {
-            "event_id": "238208",
-            "event_start_utc": "2026-11-09T16:00:00Z",
-            "market_slug": "aec-dota2-agm-pckcp-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
-            "teams": [
-              "Amaru Gaming",
-              "PuckChamp"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
-            "asks": [
-              0.65,
-              0.61
+              0.22,
+              0.83
             ]
           },
           {
@@ -7742,8 +7455,24 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.78,
-              0.58
+              0.77,
+              0.42
+            ]
+          },
+          {
+            "event_id": "238211",
+            "event_start_utc": "2026-11-09T16:00:00Z",
+            "market_slug": "asc-dota2-hul-icxi-2026-11-09-hcap-neg-1pt5",
+            "market_type": "spread",
+            "line": -1.5,
+            "teams": [
+              "HULIGANI",
+              "Inner Circle x Insanity"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.99,
+              0.99
             ]
           },
           {
@@ -7766,44 +7495,24 @@
             "event_id": "237337",
             "event_start_utc": "2026-11-09T19:00:00Z",
             "market_slug": "aec-dota2-xe-yes-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
             "teams": [
               "Xipto Esports",
               "Yellow Submarine"
             ],
-            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
-            "asks": [
-              0.53,
-              0.67
-            ]
-          },
-          {
-            "event_id": "238736",
-            "event_start_utc": "2026-11-09T19:00:00Z",
-            "market_slug": "aec-dota2-pckcp-z10-2026-11-09",
-            "teams": [
-              "PuckChamp",
-              "Zero Tenacity"
-            ],
             "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED",
             "detail": "provider_format_not_available"
           },
           {
-            "event_id": "238736",
+            "event_id": "237337",
             "event_start_utc": "2026-11-09T19:00:00Z",
-            "market_slug": "aec-dota2-pckcp-z10-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
+            "market_slug": "tsc-dota2-xe-yes-2026-11-09-tot-2pt5",
+            "market_type": "total",
+            "line": 2.5,
             "teams": [
-              "PuckChamp",
-              "Zero Tenacity"
+              "Xipto Esports",
+              "Yellow Submarine"
             ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.54,
-              0.79
-            ]
+            "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED"
           },
           {
             "event_id": "238738",
@@ -7828,24 +7537,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.48,
-              0.88
-            ]
-          },
-          {
-            "event_id": "238740",
-            "event_start_utc": "2026-11-09T19:00:00Z",
-            "market_slug": "aec-dota2-hul-ch-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
-            "teams": [
-              "HULIGANI",
-              "CyberHero"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.75,
-              0.67
+              0.23,
+              0.84
             ]
           },
           {
@@ -7860,12 +7553,12 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.98,
-              0.98
+              0.97,
+              0.96
             ]
           }
         ],
-        "priced_count": 0,
+        "priced_count": 9,
         "errors": []
       }
     },
@@ -7874,58 +7567,26 @@
       "market": "spread",
       "model_id": "dota2-spread-tiered-elo-v6",
       "route": "dota2",
-      "status": "no_priced_contracts",
+      "status": "priced_for_other_event_date",
       "ledger_counts": {},
       "generated_today_ledger_counts": {},
       "flat_coverage": {
         "recorded_games": 0,
         "priced_games": 0,
-        "off_date_priced_count": 0,
+        "off_date_priced_count": 9,
         "missing_priced_event_ids": [],
         "main_only": false,
         "main_without_flat_event_ids": []
       },
       "reasons": {},
       "source_exclusions": {
-        "NO_CALL_EVENT_STARTED": 3,
-        "NO_CALL_THIN_MARKET_EXTREME_ASK": 17,
-        "NO_CALL_SERIES_FORMAT_UNRESOLVED": 3,
-        "NO_CALL_THIN_MARKET_WIDE_SPREAD": 3
+        "NO_CALL_THIN_MARKET_EXTREME_ASK": 19,
+        "NO_CALL_SERIES_FORMAT_UNRESOLVED": 4
       },
       "forecast": {
         "status": "ok",
         "reason": null,
         "no_calls": [
-          {
-            "event_id": "235030",
-            "event_start_utc": "2026-11-08T19:00:00Z",
-            "market_slug": "aec-dota2-fro-cyxariki-2026-11-08",
-            "teams": [
-              "Froglings",
-              "Ka4kanarskie cyxariki"
-            ],
-            "reason": "NO_CALL_EVENT_STARTED"
-          },
-          {
-            "event_id": "235034",
-            "event_start_utc": "2026-11-08T19:00:00Z",
-            "market_slug": "aec-dota2-hul-iac-2026-11-08",
-            "teams": [
-              "HULIGANI",
-              "InterActive Philippines"
-            ],
-            "reason": "NO_CALL_EVENT_STARTED"
-          },
-          {
-            "event_id": "226832",
-            "event_start_utc": "2026-11-08T21:00:00Z",
-            "market_slug": "aec-dota2-ch-lynx-2026-11-06",
-            "teams": [
-              "CyberHero",
-              "Team Lynx"
-            ],
-            "reason": "NO_CALL_EVENT_STARTED"
-          },
           {
             "event_id": "237340",
             "event_start_utc": "2026-11-09T10:00:00Z",
@@ -7938,24 +7599,40 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.95,
-              0.43
+              0.91,
+              0.1
             ]
           },
           {
             "event_id": "237341",
             "event_start_utc": "2026-11-09T10:00:00Z",
-            "market_slug": "aec-dota2-fro-tsea-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
+            "market_slug": "tsc-dota2-fro-tsea-2026-11-09-tot-2pt5",
+            "market_type": "total",
+            "line": 2.5,
             "teams": [
               "Froglings",
               "Team Synapse"
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.89,
-              0.62
+              0.9,
+              0.68
+            ]
+          },
+          {
+            "event_id": "237341",
+            "event_start_utc": "2026-11-09T10:00:00Z",
+            "market_slug": "asc-dota2-fro-tsea-2026-11-09-hcap-neg-1pt5",
+            "market_type": "spread",
+            "line": -1.5,
+            "teams": [
+              "Froglings",
+              "Team Synapse"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.99,
+              0.99
             ]
           },
           {
@@ -7970,24 +7647,24 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.89,
-              0.52
+              0.72,
+              0.29
             ]
           },
           {
             "event_id": "239293",
             "event_start_utc": "2026-11-09T10:00:00Z",
-            "market_slug": "aec-dota2-xe-hul-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
+            "market_slug": "tsc-dota2-xe-hul-2026-11-09-tot-2pt5",
+            "market_type": "total",
+            "line": 2.5,
             "teams": [
               "Xipto Esports",
               "HULIGANI"
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.59,
-              0.77
+              0.99,
+              0.67
             ]
           },
           {
@@ -8013,8 +7690,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.62,
-              0.94
+              0.59,
+              0.92
             ]
           },
           {
@@ -8029,40 +7706,72 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.83,
-              0.42
+              0.87,
+              0.14
+            ]
+          },
+          {
+            "event_id": "237697",
+            "event_start_utc": "2026-11-09T13:00:00Z",
+            "market_slug": "asc-dota2-nemiga-zen-2026-11-09-hcap-neg-1pt5",
+            "market_type": "spread",
+            "line": -1.5,
+            "teams": [
+              "Nemiga Gaming",
+              "Zenith"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.99,
+              0.99
+            ]
+          },
+          {
+            "event_id": "237697",
+            "event_start_utc": "2026-11-09T13:00:00Z",
+            "market_slug": "tsc-dota2-nemiga-zen-2026-11-09-tot-2pt5",
+            "market_type": "total",
+            "line": 2.5,
+            "teams": [
+              "Nemiga Gaming",
+              "Zenith"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.99,
+              0.99
             ]
           },
           {
             "event_id": "237699",
             "event_start_utc": "2026-11-09T13:00:00Z",
-            "market_slug": "aec-dota2-xe-tsea-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
+            "market_slug": "asc-dota2-xe-tsea-2026-11-09-hcap-neg-1pt5",
+            "market_type": "spread",
+            "line": -1.5,
             "teams": [
               "Xipto Esports",
               "Team Synapse"
             ],
-            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.61,
-              0.66
+              0.99,
+              0.99
             ]
           },
           {
             "event_id": "237701",
             "event_start_utc": "2026-11-09T13:00:00Z",
-            "market_slug": "aec-dota2-fro-pla-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
+            "market_slug": "asc-dota2-fro-pla-2026-11-09-hcap-pos-1pt5",
+            "market_type": "spread",
+            "line": 1.5,
             "teams": [
               "Froglings",
               "PlayTime"
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.63,
-              0.9
+              0.99,
+              0.99
             ]
           },
           {
@@ -8077,8 +7786,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.95,
-              0.95
+              0.89,
+              0.86
             ]
           },
           {
@@ -8098,22 +7807,6 @@
             ]
           },
           {
-            "event_id": "238203",
-            "event_start_utc": "2026-11-09T16:00:00Z",
-            "market_slug": "aec-dota2-pr-cyxariki-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
-            "teams": [
-              "Power Rangers",
-              "Ka4kanarskie cyxariki"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.98,
-              0.98
-            ]
-          },
-          {
             "event_id": "238205",
             "event_start_utc": "2026-11-09T16:00:00Z",
             "market_slug": "aec-dota2-iac-ch-2026-11-09",
@@ -8125,24 +7818,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.51,
-              0.81
-            ]
-          },
-          {
-            "event_id": "238208",
-            "event_start_utc": "2026-11-09T16:00:00Z",
-            "market_slug": "aec-dota2-agm-pckcp-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
-            "teams": [
-              "Amaru Gaming",
-              "PuckChamp"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
-            "asks": [
-              0.65,
-              0.61
+              0.22,
+              0.83
             ]
           },
           {
@@ -8157,8 +7834,24 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.78,
-              0.58
+              0.77,
+              0.42
+            ]
+          },
+          {
+            "event_id": "238211",
+            "event_start_utc": "2026-11-09T16:00:00Z",
+            "market_slug": "asc-dota2-hul-icxi-2026-11-09-hcap-neg-1pt5",
+            "market_type": "spread",
+            "line": -1.5,
+            "teams": [
+              "HULIGANI",
+              "Inner Circle x Insanity"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.99,
+              0.99
             ]
           },
           {
@@ -8181,44 +7874,24 @@
             "event_id": "237337",
             "event_start_utc": "2026-11-09T19:00:00Z",
             "market_slug": "aec-dota2-xe-yes-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
             "teams": [
               "Xipto Esports",
               "Yellow Submarine"
             ],
-            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
-            "asks": [
-              0.53,
-              0.67
-            ]
-          },
-          {
-            "event_id": "238736",
-            "event_start_utc": "2026-11-09T19:00:00Z",
-            "market_slug": "aec-dota2-pckcp-z10-2026-11-09",
-            "teams": [
-              "PuckChamp",
-              "Zero Tenacity"
-            ],
             "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED",
             "detail": "provider_format_not_available"
           },
           {
-            "event_id": "238736",
+            "event_id": "237337",
             "event_start_utc": "2026-11-09T19:00:00Z",
-            "market_slug": "aec-dota2-pckcp-z10-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
+            "market_slug": "tsc-dota2-xe-yes-2026-11-09-tot-2pt5",
+            "market_type": "total",
+            "line": 2.5,
             "teams": [
-              "PuckChamp",
-              "Zero Tenacity"
+              "Xipto Esports",
+              "Yellow Submarine"
             ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.54,
-              0.79
-            ]
+            "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED"
           },
           {
             "event_id": "238738",
@@ -8243,24 +7916,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.48,
-              0.88
-            ]
-          },
-          {
-            "event_id": "238740",
-            "event_start_utc": "2026-11-09T19:00:00Z",
-            "market_slug": "aec-dota2-hul-ch-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
-            "teams": [
-              "HULIGANI",
-              "CyberHero"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.75,
-              0.67
+              0.23,
+              0.84
             ]
           },
           {
@@ -8275,12 +7932,12 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.98,
-              0.98
+              0.97,
+              0.96
             ]
           }
         ],
-        "priced_count": 0,
+        "priced_count": 9,
         "errors": []
       }
     },
@@ -8301,7 +7958,7 @@
       "flat_coverage": {
         "recorded_games": 2,
         "priced_games": 0,
-        "off_date_priced_count": 0,
+        "off_date_priced_count": 9,
         "missing_priced_event_ids": [],
         "main_only": false,
         "main_without_flat_event_ids": []
@@ -8311,45 +7968,13 @@
         "QUALIFIED": 2
       },
       "source_exclusions": {
-        "NO_CALL_EVENT_STARTED": 3,
-        "NO_CALL_THIN_MARKET_EXTREME_ASK": 17,
-        "NO_CALL_SERIES_FORMAT_UNRESOLVED": 3,
-        "NO_CALL_THIN_MARKET_WIDE_SPREAD": 3
+        "NO_CALL_THIN_MARKET_EXTREME_ASK": 19,
+        "NO_CALL_SERIES_FORMAT_UNRESOLVED": 4
       },
       "forecast": {
         "status": "ok",
         "reason": null,
         "no_calls": [
-          {
-            "event_id": "235030",
-            "event_start_utc": "2026-11-08T19:00:00Z",
-            "market_slug": "aec-dota2-fro-cyxariki-2026-11-08",
-            "teams": [
-              "Froglings",
-              "Ka4kanarskie cyxariki"
-            ],
-            "reason": "NO_CALL_EVENT_STARTED"
-          },
-          {
-            "event_id": "235034",
-            "event_start_utc": "2026-11-08T19:00:00Z",
-            "market_slug": "aec-dota2-hul-iac-2026-11-08",
-            "teams": [
-              "HULIGANI",
-              "InterActive Philippines"
-            ],
-            "reason": "NO_CALL_EVENT_STARTED"
-          },
-          {
-            "event_id": "226832",
-            "event_start_utc": "2026-11-08T21:00:00Z",
-            "market_slug": "aec-dota2-ch-lynx-2026-11-06",
-            "teams": [
-              "CyberHero",
-              "Team Lynx"
-            ],
-            "reason": "NO_CALL_EVENT_STARTED"
-          },
           {
             "event_id": "237340",
             "event_start_utc": "2026-11-09T10:00:00Z",
@@ -8362,24 +7987,40 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.95,
-              0.43
+              0.91,
+              0.1
             ]
           },
           {
             "event_id": "237341",
             "event_start_utc": "2026-11-09T10:00:00Z",
-            "market_slug": "aec-dota2-fro-tsea-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
+            "market_slug": "tsc-dota2-fro-tsea-2026-11-09-tot-2pt5",
+            "market_type": "total",
+            "line": 2.5,
             "teams": [
               "Froglings",
               "Team Synapse"
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.89,
-              0.62
+              0.9,
+              0.68
+            ]
+          },
+          {
+            "event_id": "237341",
+            "event_start_utc": "2026-11-09T10:00:00Z",
+            "market_slug": "asc-dota2-fro-tsea-2026-11-09-hcap-neg-1pt5",
+            "market_type": "spread",
+            "line": -1.5,
+            "teams": [
+              "Froglings",
+              "Team Synapse"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.99,
+              0.99
             ]
           },
           {
@@ -8394,24 +8035,24 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.89,
-              0.52
+              0.72,
+              0.29
             ]
           },
           {
             "event_id": "239293",
             "event_start_utc": "2026-11-09T10:00:00Z",
-            "market_slug": "aec-dota2-xe-hul-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
+            "market_slug": "tsc-dota2-xe-hul-2026-11-09-tot-2pt5",
+            "market_type": "total",
+            "line": 2.5,
             "teams": [
               "Xipto Esports",
               "HULIGANI"
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.59,
-              0.77
+              0.99,
+              0.67
             ]
           },
           {
@@ -8437,8 +8078,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.62,
-              0.94
+              0.59,
+              0.92
             ]
           },
           {
@@ -8453,40 +8094,72 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.83,
-              0.42
+              0.87,
+              0.14
+            ]
+          },
+          {
+            "event_id": "237697",
+            "event_start_utc": "2026-11-09T13:00:00Z",
+            "market_slug": "asc-dota2-nemiga-zen-2026-11-09-hcap-neg-1pt5",
+            "market_type": "spread",
+            "line": -1.5,
+            "teams": [
+              "Nemiga Gaming",
+              "Zenith"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.99,
+              0.99
+            ]
+          },
+          {
+            "event_id": "237697",
+            "event_start_utc": "2026-11-09T13:00:00Z",
+            "market_slug": "tsc-dota2-nemiga-zen-2026-11-09-tot-2pt5",
+            "market_type": "total",
+            "line": 2.5,
+            "teams": [
+              "Nemiga Gaming",
+              "Zenith"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.99,
+              0.99
             ]
           },
           {
             "event_id": "237699",
             "event_start_utc": "2026-11-09T13:00:00Z",
-            "market_slug": "aec-dota2-xe-tsea-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
+            "market_slug": "asc-dota2-xe-tsea-2026-11-09-hcap-neg-1pt5",
+            "market_type": "spread",
+            "line": -1.5,
             "teams": [
               "Xipto Esports",
               "Team Synapse"
             ],
-            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.61,
-              0.66
+              0.99,
+              0.99
             ]
           },
           {
             "event_id": "237701",
             "event_start_utc": "2026-11-09T13:00:00Z",
-            "market_slug": "aec-dota2-fro-pla-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
+            "market_slug": "asc-dota2-fro-pla-2026-11-09-hcap-pos-1pt5",
+            "market_type": "spread",
+            "line": 1.5,
             "teams": [
               "Froglings",
               "PlayTime"
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.63,
-              0.9
+              0.99,
+              0.99
             ]
           },
           {
@@ -8501,8 +8174,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.95,
-              0.95
+              0.89,
+              0.86
             ]
           },
           {
@@ -8522,22 +8195,6 @@
             ]
           },
           {
-            "event_id": "238203",
-            "event_start_utc": "2026-11-09T16:00:00Z",
-            "market_slug": "aec-dota2-pr-cyxariki-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
-            "teams": [
-              "Power Rangers",
-              "Ka4kanarskie cyxariki"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.98,
-              0.98
-            ]
-          },
-          {
             "event_id": "238205",
             "event_start_utc": "2026-11-09T16:00:00Z",
             "market_slug": "aec-dota2-iac-ch-2026-11-09",
@@ -8549,24 +8206,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.51,
-              0.81
-            ]
-          },
-          {
-            "event_id": "238208",
-            "event_start_utc": "2026-11-09T16:00:00Z",
-            "market_slug": "aec-dota2-agm-pckcp-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
-            "teams": [
-              "Amaru Gaming",
-              "PuckChamp"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
-            "asks": [
-              0.65,
-              0.61
+              0.22,
+              0.83
             ]
           },
           {
@@ -8581,8 +8222,24 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.78,
-              0.58
+              0.77,
+              0.42
+            ]
+          },
+          {
+            "event_id": "238211",
+            "event_start_utc": "2026-11-09T16:00:00Z",
+            "market_slug": "asc-dota2-hul-icxi-2026-11-09-hcap-neg-1pt5",
+            "market_type": "spread",
+            "line": -1.5,
+            "teams": [
+              "HULIGANI",
+              "Inner Circle x Insanity"
+            ],
+            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
+            "asks": [
+              0.99,
+              0.99
             ]
           },
           {
@@ -8605,44 +8262,24 @@
             "event_id": "237337",
             "event_start_utc": "2026-11-09T19:00:00Z",
             "market_slug": "aec-dota2-xe-yes-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
             "teams": [
               "Xipto Esports",
               "Yellow Submarine"
             ],
-            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
-            "asks": [
-              0.53,
-              0.67
-            ]
-          },
-          {
-            "event_id": "238736",
-            "event_start_utc": "2026-11-09T19:00:00Z",
-            "market_slug": "aec-dota2-pckcp-z10-2026-11-09",
-            "teams": [
-              "PuckChamp",
-              "Zero Tenacity"
-            ],
             "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED",
             "detail": "provider_format_not_available"
           },
           {
-            "event_id": "238736",
+            "event_id": "237337",
             "event_start_utc": "2026-11-09T19:00:00Z",
-            "market_slug": "aec-dota2-pckcp-z10-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
+            "market_slug": "tsc-dota2-xe-yes-2026-11-09-tot-2pt5",
+            "market_type": "total",
+            "line": 2.5,
             "teams": [
-              "PuckChamp",
-              "Zero Tenacity"
+              "Xipto Esports",
+              "Yellow Submarine"
             ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.54,
-              0.79
-            ]
+            "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED"
           },
           {
             "event_id": "238738",
@@ -8667,24 +8304,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.48,
-              0.88
-            ]
-          },
-          {
-            "event_id": "238740",
-            "event_start_utc": "2026-11-09T19:00:00Z",
-            "market_slug": "aec-dota2-hul-ch-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
-            "teams": [
-              "HULIGANI",
-              "CyberHero"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.75,
-              0.67
+              0.23,
+              0.84
             ]
           },
           {
@@ -8699,12 +8320,12 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.98,
-              0.98
+              0.97,
+              0.96
             ]
           }
         ],
-        "priced_count": 0,
+        "priced_count": 9,
         "errors": []
       }
     },
@@ -8724,7 +8345,7 @@
       },
       "flat_coverage": {
         "recorded_games": 1,
-        "priced_games": 1,
+        "priced_games": 0,
         "off_date_priced_count": 0,
         "missing_priced_event_ids": [],
         "main_only": false,
@@ -8734,79 +8355,12 @@
         "FLAT_CALL": 1,
         "QUALIFIED": 1
       },
-      "source_exclusions": {
-        "NO_CALL_THIN_MARKET_EXTREME_ASK": 4
-      },
+      "source_exclusions": {},
       "forecast": {
         "status": "ok",
         "reason": null,
-        "no_calls": [
-          {
-            "event_id": "240085",
-            "event_start_utc": "2026-11-08T22:00:00Z",
-            "market_slug": "asc-lol-blg-t1-2026-11-08-hcap-pos-2pt5",
-            "market_type": "spread",
-            "line": 2.5,
-            "teams": [
-              "BILIBILI GAMING",
-              "T1"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.9,
-              0.13
-            ]
-          },
-          {
-            "event_id": "240085",
-            "event_start_utc": "2026-11-08T22:00:00Z",
-            "market_slug": "tsc-lol-blg-t1-2026-11-08-tot-3pt5",
-            "market_type": "total",
-            "line": 3.5,
-            "teams": [
-              "BILIBILI GAMING",
-              "T1"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.75,
-              0.26
-            ]
-          },
-          {
-            "event_id": "240085",
-            "event_start_utc": "2026-11-08T22:00:00Z",
-            "market_slug": "asc-lol-blg-t1-2026-11-08-hcap-pos-1pt5",
-            "market_type": "spread",
-            "line": 1.5,
-            "teams": [
-              "BILIBILI GAMING",
-              "T1"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.74,
-              0.3
-            ]
-          },
-          {
-            "event_id": "240085",
-            "event_start_utc": "2026-11-08T22:00:00Z",
-            "market_slug": "asc-lol-blg-t1-2026-11-08-hcap-neg-2pt5",
-            "market_type": "spread",
-            "line": -2.5,
-            "teams": [
-              "BILIBILI GAMING",
-              "T1"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.18,
-              0.85
-            ]
-          }
-        ],
-        "priced_count": 3,
+        "no_calls": [],
+        "priced_count": 0,
         "errors": []
       }
     },
@@ -8826,7 +8380,7 @@
       },
       "flat_coverage": {
         "recorded_games": 1,
-        "priced_games": 1,
+        "priced_games": 0,
         "off_date_priced_count": 0,
         "missing_priced_event_ids": [],
         "main_only": false,
@@ -8836,79 +8390,12 @@
         "FLAT_CALL": 1,
         "QUALIFIED": 1
       },
-      "source_exclusions": {
-        "NO_CALL_THIN_MARKET_EXTREME_ASK": 4
-      },
+      "source_exclusions": {},
       "forecast": {
         "status": "ok",
         "reason": null,
-        "no_calls": [
-          {
-            "event_id": "240085",
-            "event_start_utc": "2026-11-08T22:00:00Z",
-            "market_slug": "asc-lol-blg-t1-2026-11-08-hcap-pos-2pt5",
-            "market_type": "spread",
-            "line": 2.5,
-            "teams": [
-              "BILIBILI GAMING",
-              "T1"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.9,
-              0.13
-            ]
-          },
-          {
-            "event_id": "240085",
-            "event_start_utc": "2026-11-08T22:00:00Z",
-            "market_slug": "tsc-lol-blg-t1-2026-11-08-tot-3pt5",
-            "market_type": "total",
-            "line": 3.5,
-            "teams": [
-              "BILIBILI GAMING",
-              "T1"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.75,
-              0.26
-            ]
-          },
-          {
-            "event_id": "240085",
-            "event_start_utc": "2026-11-08T22:00:00Z",
-            "market_slug": "asc-lol-blg-t1-2026-11-08-hcap-pos-1pt5",
-            "market_type": "spread",
-            "line": 1.5,
-            "teams": [
-              "BILIBILI GAMING",
-              "T1"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.74,
-              0.3
-            ]
-          },
-          {
-            "event_id": "240085",
-            "event_start_utc": "2026-11-08T22:00:00Z",
-            "market_slug": "asc-lol-blg-t1-2026-11-08-hcap-neg-2pt5",
-            "market_type": "spread",
-            "line": -2.5,
-            "teams": [
-              "BILIBILI GAMING",
-              "T1"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.18,
-              0.85
-            ]
-          }
-        ],
-        "priced_count": 3,
+        "no_calls": [],
+        "priced_count": 0,
         "errors": []
       }
     },
@@ -8928,7 +8415,7 @@
       },
       "flat_coverage": {
         "recorded_games": 1,
-        "priced_games": 1,
+        "priced_games": 0,
         "off_date_priced_count": 0,
         "missing_priced_event_ids": [],
         "main_only": false,
@@ -8938,79 +8425,12 @@
         "FLAT_CALL": 1,
         "QUALIFIED": 1
       },
-      "source_exclusions": {
-        "NO_CALL_THIN_MARKET_EXTREME_ASK": 4
-      },
+      "source_exclusions": {},
       "forecast": {
         "status": "ok",
         "reason": null,
-        "no_calls": [
-          {
-            "event_id": "240085",
-            "event_start_utc": "2026-11-08T22:00:00Z",
-            "market_slug": "asc-lol-blg-t1-2026-11-08-hcap-pos-2pt5",
-            "market_type": "spread",
-            "line": 2.5,
-            "teams": [
-              "BILIBILI GAMING",
-              "T1"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.9,
-              0.13
-            ]
-          },
-          {
-            "event_id": "240085",
-            "event_start_utc": "2026-11-08T22:00:00Z",
-            "market_slug": "tsc-lol-blg-t1-2026-11-08-tot-3pt5",
-            "market_type": "total",
-            "line": 3.5,
-            "teams": [
-              "BILIBILI GAMING",
-              "T1"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.75,
-              0.26
-            ]
-          },
-          {
-            "event_id": "240085",
-            "event_start_utc": "2026-11-08T22:00:00Z",
-            "market_slug": "asc-lol-blg-t1-2026-11-08-hcap-pos-1pt5",
-            "market_type": "spread",
-            "line": 1.5,
-            "teams": [
-              "BILIBILI GAMING",
-              "T1"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.74,
-              0.3
-            ]
-          },
-          {
-            "event_id": "240085",
-            "event_start_utc": "2026-11-08T22:00:00Z",
-            "market_slug": "asc-lol-blg-t1-2026-11-08-hcap-neg-2pt5",
-            "market_type": "spread",
-            "line": -2.5,
-            "teams": [
-              "BILIBILI GAMING",
-              "T1"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.18,
-              0.85
-            ]
-          }
-        ],
-        "priced_count": 3,
+        "no_calls": [],
+        "priced_count": 0,
         "errors": []
       }
     },
@@ -9112,9 +8532,8 @@
       },
       "reasons": {},
       "source_exclusions": {
-        "NO_CALL_THIN_MARKET_EXTREME_ASK": 5,
-        "NO_CALL_THIN_MARKET_WIDE_SPREAD": 1,
-        "NO_CALL_SERIES_FORMAT_UNRESOLVED": 1
+        "NO_CALL_EVENT_STARTED": 3,
+        "NO_CALL_THIN_MARKET_EXTREME_ASK": 2
       },
       "forecast": {
         "status": "ok",
@@ -9124,49 +8543,21 @@
             "event_id": "245754",
             "event_start_utc": "2026-11-09T00:30:00Z",
             "market_slug": "aec-r6-sharper-los-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
             "teams": [
               "Sharper Esport",
               "LOS"
             ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.53,
-              0.86
-            ]
-          },
-          {
-            "event_id": "245756",
-            "event_start_utc": "2026-11-09T00:30:00Z",
-            "market_slug": "aec-r6-m80-wbg-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
-            "teams": [
-              "M80",
-              "Weibo Gaming"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.82,
-              0.54
-            ]
+            "reason": "NO_CALL_EVENT_STARTED"
           },
           {
             "event_id": "245757",
             "event_start_utc": "2026-11-09T01:30:00Z",
             "market_slug": "aec-r6-c9-vp-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
             "teams": [
               "Cloud9",
               "Virtus.pro"
             ],
-            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
-            "asks": [
-              0.49,
-              0.69
-            ]
+            "reason": "NO_CALL_EVENT_STARTED"
           },
           {
             "event_id": "245758",
@@ -9176,24 +8567,7 @@
               "G2 Esports",
               "DarkZero Esports"
             ],
-            "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED",
-            "detail": "provider_format_not_available"
-          },
-          {
-            "event_id": "245758",
-            "event_start_utc": "2026-11-09T01:30:00Z",
-            "market_slug": "aec-r6-g2-dz-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
-            "teams": [
-              "G2 Esports",
-              "DarkZero Esports"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.8,
-              0.71
-            ]
+            "reason": "NO_CALL_EVENT_STARTED"
           },
           {
             "event_id": "245331",
@@ -9207,8 +8581,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.75,
-              0.35
+              0.74,
+              0.33
             ]
           },
           {
@@ -9223,8 +8597,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.85,
-              0.22
+              0.84,
+              0.21
             ]
           }
         ],
@@ -9250,9 +8624,8 @@
       },
       "reasons": {},
       "source_exclusions": {
-        "NO_CALL_THIN_MARKET_EXTREME_ASK": 5,
-        "NO_CALL_THIN_MARKET_WIDE_SPREAD": 1,
-        "NO_CALL_SERIES_FORMAT_UNRESOLVED": 1
+        "NO_CALL_EVENT_STARTED": 3,
+        "NO_CALL_THIN_MARKET_EXTREME_ASK": 2
       },
       "forecast": {
         "status": "ok",
@@ -9262,49 +8635,21 @@
             "event_id": "245754",
             "event_start_utc": "2026-11-09T00:30:00Z",
             "market_slug": "aec-r6-sharper-los-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
             "teams": [
               "Sharper Esport",
               "LOS"
             ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.53,
-              0.86
-            ]
-          },
-          {
-            "event_id": "245756",
-            "event_start_utc": "2026-11-09T00:30:00Z",
-            "market_slug": "aec-r6-m80-wbg-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
-            "teams": [
-              "M80",
-              "Weibo Gaming"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.82,
-              0.54
-            ]
+            "reason": "NO_CALL_EVENT_STARTED"
           },
           {
             "event_id": "245757",
             "event_start_utc": "2026-11-09T01:30:00Z",
             "market_slug": "aec-r6-c9-vp-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
             "teams": [
               "Cloud9",
               "Virtus.pro"
             ],
-            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
-            "asks": [
-              0.49,
-              0.69
-            ]
+            "reason": "NO_CALL_EVENT_STARTED"
           },
           {
             "event_id": "245758",
@@ -9314,24 +8659,7 @@
               "G2 Esports",
               "DarkZero Esports"
             ],
-            "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED",
-            "detail": "provider_format_not_available"
-          },
-          {
-            "event_id": "245758",
-            "event_start_utc": "2026-11-09T01:30:00Z",
-            "market_slug": "aec-r6-g2-dz-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
-            "teams": [
-              "G2 Esports",
-              "DarkZero Esports"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.8,
-              0.71
-            ]
+            "reason": "NO_CALL_EVENT_STARTED"
           },
           {
             "event_id": "245331",
@@ -9345,8 +8673,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.75,
-              0.35
+              0.74,
+              0.33
             ]
           },
           {
@@ -9361,8 +8689,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.85,
-              0.22
+              0.84,
+              0.21
             ]
           }
         ],
@@ -9388,9 +8716,8 @@
       },
       "reasons": {},
       "source_exclusions": {
-        "NO_CALL_THIN_MARKET_EXTREME_ASK": 5,
-        "NO_CALL_THIN_MARKET_WIDE_SPREAD": 1,
-        "NO_CALL_SERIES_FORMAT_UNRESOLVED": 1
+        "NO_CALL_EVENT_STARTED": 3,
+        "NO_CALL_THIN_MARKET_EXTREME_ASK": 2
       },
       "forecast": {
         "status": "ok",
@@ -9400,49 +8727,21 @@
             "event_id": "245754",
             "event_start_utc": "2026-11-09T00:30:00Z",
             "market_slug": "aec-r6-sharper-los-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
             "teams": [
               "Sharper Esport",
               "LOS"
             ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.53,
-              0.86
-            ]
-          },
-          {
-            "event_id": "245756",
-            "event_start_utc": "2026-11-09T00:30:00Z",
-            "market_slug": "aec-r6-m80-wbg-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
-            "teams": [
-              "M80",
-              "Weibo Gaming"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.82,
-              0.54
-            ]
+            "reason": "NO_CALL_EVENT_STARTED"
           },
           {
             "event_id": "245757",
             "event_start_utc": "2026-11-09T01:30:00Z",
             "market_slug": "aec-r6-c9-vp-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
             "teams": [
               "Cloud9",
               "Virtus.pro"
             ],
-            "reason": "NO_CALL_THIN_MARKET_WIDE_SPREAD",
-            "asks": [
-              0.49,
-              0.69
-            ]
+            "reason": "NO_CALL_EVENT_STARTED"
           },
           {
             "event_id": "245758",
@@ -9452,24 +8751,7 @@
               "G2 Esports",
               "DarkZero Esports"
             ],
-            "reason": "NO_CALL_SERIES_FORMAT_UNRESOLVED",
-            "detail": "provider_format_not_available"
-          },
-          {
-            "event_id": "245758",
-            "event_start_utc": "2026-11-09T01:30:00Z",
-            "market_slug": "aec-r6-g2-dz-2026-11-09",
-            "market_type": "moneyline",
-            "line": null,
-            "teams": [
-              "G2 Esports",
-              "DarkZero Esports"
-            ],
-            "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
-            "asks": [
-              0.8,
-              0.71
-            ]
+            "reason": "NO_CALL_EVENT_STARTED"
           },
           {
             "event_id": "245331",
@@ -9483,8 +8765,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.75,
-              0.35
+              0.74,
+              0.33
             ]
           },
           {
@@ -9499,8 +8781,8 @@
             ],
             "reason": "NO_CALL_THIN_MARKET_EXTREME_ASK",
             "asks": [
-              0.85,
-              0.22
+              0.84,
+              0.21
             ]
           }
         ],
@@ -9580,7 +8862,7 @@
       },
       "flat_coverage": {
         "recorded_games": 7,
-        "priced_games": 6,
+        "priced_games": 4,
         "off_date_priced_count": 0,
         "missing_priced_event_ids": [],
         "main_only": false,
@@ -9591,32 +8873,60 @@
         "QUALIFIED": 1
       },
       "source_exclusions": {
-        "event_started": 5
+        "event_started": 12
       },
       "forecast": {
-        "total_events_discovered": 7,
-        "priced_count": 18,
-        "logged": 13,
+        "total_events_discovered": 4,
+        "priced_count": 12,
+        "logged": 0,
         "unmatched": [],
         "skipped": [
           {
-            "event_id": "228936",
+            "event_id": "229022",
             "reason": "event_started"
           },
           {
-            "event_id": "228936",
+            "event_id": "229022",
             "reason": "event_started"
           },
           {
-            "event_id": "228962",
+            "event_id": "229022",
             "reason": "event_started"
           },
           {
-            "event_id": "228962",
+            "event_id": "229059",
             "reason": "event_started"
           },
           {
-            "event_id": "228962",
+            "event_id": "229059",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "229059",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "229060",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "229060",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "229060",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "229061",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "229061",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "229061",
             "reason": "event_started"
           }
         ],
@@ -9637,7 +8947,7 @@
       },
       "flat_coverage": {
         "recorded_games": 6,
-        "priced_games": 6,
+        "priced_games": 4,
         "off_date_priced_count": 0,
         "missing_priced_event_ids": [],
         "main_only": false,
@@ -9647,32 +8957,60 @@
         "FLAT_CALL": 6
       },
       "source_exclusions": {
-        "event_started": 5
+        "event_started": 12
       },
       "forecast": {
-        "total_events_discovered": 7,
-        "priced_count": 18,
-        "logged": 13,
+        "total_events_discovered": 4,
+        "priced_count": 12,
+        "logged": 0,
         "unmatched": [],
         "skipped": [
           {
-            "event_id": "228936",
+            "event_id": "229022",
             "reason": "event_started"
           },
           {
-            "event_id": "228936",
+            "event_id": "229022",
             "reason": "event_started"
           },
           {
-            "event_id": "228962",
+            "event_id": "229022",
             "reason": "event_started"
           },
           {
-            "event_id": "228962",
+            "event_id": "229059",
             "reason": "event_started"
           },
           {
-            "event_id": "228962",
+            "event_id": "229059",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "229059",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "229060",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "229060",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "229060",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "229061",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "229061",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "229061",
             "reason": "event_started"
           }
         ],
@@ -9693,7 +9031,7 @@
       },
       "flat_coverage": {
         "recorded_games": 6,
-        "priced_games": 6,
+        "priced_games": 4,
         "off_date_priced_count": 0,
         "missing_priced_event_ids": [],
         "main_only": false,
@@ -9703,32 +9041,60 @@
         "FLAT_CALL": 6
       },
       "source_exclusions": {
-        "event_started": 5
+        "event_started": 12
       },
       "forecast": {
-        "total_events_discovered": 7,
-        "priced_count": 18,
-        "logged": 13,
+        "total_events_discovered": 4,
+        "priced_count": 12,
+        "logged": 0,
         "unmatched": [],
         "skipped": [
           {
-            "event_id": "228936",
+            "event_id": "229022",
             "reason": "event_started"
           },
           {
-            "event_id": "228936",
+            "event_id": "229022",
             "reason": "event_started"
           },
           {
-            "event_id": "228962",
+            "event_id": "229022",
             "reason": "event_started"
           },
           {
-            "event_id": "228962",
+            "event_id": "229059",
             "reason": "event_started"
           },
           {
-            "event_id": "228962",
+            "event_id": "229059",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "229059",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "229060",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "229060",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "229060",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "229061",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "229061",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "229061",
             "reason": "event_started"
           }
         ],
@@ -9743,7 +9109,7 @@
     "recorded": 19,
     "off_season": 7,
     "all_events_started": 6,
-    "no_priced_contracts": 1,
+    "priced_for_other_event_date": 1,
     "missing_flat_records": 1,
     "no_records_review_reasons": 2
   },

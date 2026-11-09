@@ -1,5 +1,12 @@
 # Project status and source of truth
 
+## 2026-11-08 — routine rolling artifact sync
+
+Daily-cycle retrain output for esports/KBO/NPB ratings (`config/models/*.json`)
+and calibration health/audit snapshots (`data/calibration/`, `outputs/calibration/`,
+`outputs/health/`) refreshed and committed. No model logic, formula, or
+production routing changed.
+
 ## 2026-10-26 — NBA v5 evidence and edge safeguards repaired
 
 NBA spread and total v5 remain the active champion identities. Their artifact

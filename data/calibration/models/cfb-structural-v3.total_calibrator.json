@@ -1,6 +1,6 @@
 {
   "baseline_brier": 0.256649,
-  "calibrated_at_utc": "2026-11-08T21:01:44.643328+00:00",
+  "calibrated_at_utc": "2026-11-09T01:31:23.309763+00:00",
   "calibrated_oof_brier": 0.256648877138975,
   "champion_method": "identity",
   "market": "total",

@@ -1,11 +1,15 @@
 {
-  "baseline_brier": 0.222284,
-  "calibrated_at_utc": "2026-11-08T21:01:44.643328+00:00",
-  "calibrated_oof_brier": 0.222284013735125,
-  "champion_method": "identity",
+  "baseline_brier": 0.217422,
+  "calibrated_at_utc": "2026-11-09T01:31:23.309763+00:00",
+  "calibrated_oof_brier": 0.21755219917152427,
+  "champion_method": "beta",
   "market": "moneyline",
   "model_version": "nfl-elo-trend-lr-v4",
-  "parameters": {},
-  "sample_size": 72,
+  "parameters": {
+    "a": 3.6635,
+    "b": 1.2535,
+    "c": 1.2625
+  },
+  "sample_size": 82,
   "sport": "nfl"
 }

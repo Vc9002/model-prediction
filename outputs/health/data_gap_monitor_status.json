@@ -1,6 +1,6 @@
 {
   "overall_status": "WARNING",
-  "generated_at_utc": "2026-11-08T21:10:42.742568+00:00",
+  "generated_at_utc": "2026-11-09T01:41:46.820750+00:00",
   "odds_freshness": {
     "status": "WARN",
     "stale_active_sports": [
@@ -19,8 +19,8 @@
       },
       "esports": {
         "status": "FRESH",
-        "latest_date": "2026-11-08",
-        "file_count": 108
+        "latest_date": "2026-11-09",
+        "file_count": 109
       },
       "hockey": {
         "status": "FRESH",
@@ -83,11 +83,11 @@
       },
       "wncaab": {
         "status": "FRESH",
-        "latest_date": "2026-11-07",
-        "file_count": 4
+        "latest_date": "2026-11-08",
+        "file_count": 5
       }
     },
-    "total_snapshot_files": 730
+    "total_snapshot_files": 732
   },
   "market_quotes_warehouse": {
     "status": "HEALTHY",
@@ -219,8 +219,8 @@
       },
       "nba-moneyline-v9": {
         "hash_valid": true,
-        "settled_picks": 0,
-        "open_picks": 4,
+        "settled_picks": 1,
+        "open_picks": 3,
         "removed_picks": 0,
         "evidence_status": "predictively_qualified"
       },
@@ -240,8 +240,8 @@
       },
       "nba-spread-margin-v9": {
         "hash_valid": true,
-        "settled_picks": 0,
-        "open_picks": 11,
+        "settled_picks": 2,
+        "open_picks": 7,
         "removed_picks": 0,
         "evidence_status": "predictively_qualified"
       },
@@ -289,8 +289,8 @@
       },
       "nba-total-margin-v9": {
         "hash_valid": true,
-        "settled_picks": 0,
-        "open_picks": 10,
+        "settled_picks": 2,
+        "open_picks": 7,
         "removed_picks": 0,
         "evidence_status": "predictively_qualified"
       },
@@ -338,15 +338,15 @@
       },
       "nfl-elo-trend-lr-v4": {
         "hash_valid": true,
-        "settled_picks": 112,
-        "open_picks": 11,
+        "settled_picks": 122,
+        "open_picks": 1,
         "removed_picks": 0,
         "evidence_status": "predictively_qualified"
       },
       "nfl-spread-structural-v7": {
         "hash_valid": true,
-        "settled_picks": 7,
-        "open_picks": 15,
+        "settled_picks": 21,
+        "open_picks": 1,
         "removed_picks": 0,
         "evidence_status": "predictively_qualified"
       },
@@ -366,8 +366,8 @@
       },
       "nfl-total-structural-v7": {
         "hash_valid": true,
-        "settled_picks": 7,
-        "open_picks": 18,
+        "settled_picks": 23,
+        "open_picks": 1,
         "removed_picks": 0,
         "evidence_status": "predictively_qualified"
       },
@@ -422,15 +422,15 @@
       },
       "cs2-tiered-elo-v6": {
         "hash_valid": true,
-        "settled_picks": 4428,
+        "settled_picks": 4436,
         "open_picks": 32,
         "removed_picks": 0,
         "evidence_status": "historical_only"
       },
       "dota2-tiered-elo-v6": {
         "hash_valid": true,
-        "settled_picks": 647,
-        "open_picks": 6,
+        "settled_picks": 651,
+        "open_picks": 20,
         "removed_picks": 0,
         "evidence_status": "historical_only"
       },
@@ -474,7 +474,7 @@
   "daily_worker": {
     "status": "started",
     "exit_code": null,
-    "started_at_utc": "2026-11-08T21:00:01.845139+00:00"
+    "started_at_utc": "2026-11-09T01:30:01.706207+00:00"
   },
   "self_healing": {
     "healed_actions": [],
@@ -486,6 +486,6 @@
         "captured": 0
       }
     ],
-    "timestamp_utc": "2026-11-08T21:10:42.721523+00:00"
+    "timestamp_utc": "2026-11-09T01:41:46.791354+00:00"
   }
 }

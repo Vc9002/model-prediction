@@ -1,6 +1,6 @@
 {
-  "calibration_drift": 2.3331,
-  "last_checked_utc": "2026-11-08T21:01:44.643328+00:00",
+  "calibration_drift": 2.3788,
+  "last_checked_utc": "2026-11-09T01:31:23.309763+00:00",
   "models_count": 120,
   "moderate_drift_models": [
     "cs2:moneyline:cs2-tiered-elo-v6",
@@ -17,7 +17,7 @@
     "ncaaf:moneyline:cfb-structural-v2"
   ],
   "raw_status": "SEVERE_DRIFT",
-  "recalibrated_count": 9,
+  "recalibrated_count": 10,
   "recalibrated_models": [
     "cs2:moneyline:cs2-tiered-elo-v6",
     "mlb:moneyline:mlb-elo-trend-lr-v8",
@@ -26,6 +26,7 @@
     "soccer:double_chance:soccer-poisson-dc-v3",
     "kbo:moneyline:kbo-tie-aware-elo-v2",
     "wnba:moneyline:wnba-elo-trend-lr-v4",
+    "nfl:moneyline:nfl-elo-trend-lr-v4",
     "rainbow_six:moneyline:rainbow_six-tiered-elo-v6",
     "dota2:moneyline:dota2-tiered-elo-v6"
   ],
@@ -61,14 +62,14 @@
     "tennis:total:tennis-learned-v3",
     "ncaaf:spread:cfb-structural-v4",
     "ncaaf:total:cfb-structural-v4",
-    "soccer:moneyline:soccer-poisson-dc-v2",
+    "nfl:moneyline:nfl-elo-trend-lr-v4",
     "hockey:spread:hockey-poisson-dc-v2",
     "hockey:total:hockey-poisson-dc-v2",
-    "nfl:moneyline:nfl-elo-trend-lr-v4",
+    "soccer:moneyline:soccer-poisson-dc-v2",
     "ncaab:moneyline:ncaab-tempo-v2",
     "rainbow_six:moneyline:rainbow_six-tiered-elo-v6",
-    "soccer:spread:soccer-poisson-dc-v3",
     "cs2:total:cs2-total-tiered-elo-v6",
+    "soccer:spread:soccer-poisson-dc-v3",
     "wnba:spread:wnba-spread-margin-v1",
     "ncaaf:total:cfb-structural-v2",
     "ncaaf:moneyline:cfb-structural-v3",
