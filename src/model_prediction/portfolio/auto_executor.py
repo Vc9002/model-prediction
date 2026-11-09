@@ -82,11 +82,6 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     "cfb-structural-v4",
     "cfb-structural-v3",
     "cfb-structural-v2",
-    # International Basketball
-    "eurolg-tempo-v2",
-    "eurolg-tempo-v1",
-    "nbl-tempo-v2",
-    "nbl-tempo-v1",
     # Soccer (positive ROI +5.4% auto-buyer)
     "soccer-poisson-dc-v3",
     "soccer-poisson-dc-v2",
@@ -187,6 +182,11 @@ EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
     # Darts decommissioned per operator directive 2026-11-09:
     "darts-markov-v2",
     "darts-markov-v1",
+    # International Basketball decommissioned per operator directive 2026-11-09:
+    "eurolg-tempo-v2",
+    "eurolg-tempo-v1",
+    "nbl-tempo-v2",
+    "nbl-tempo-v1",
 )
 
 AUTO_BUYER_STATE_FILE = DATA / "auto_buyer_state.json"
@@ -213,6 +213,12 @@ DISABLED_AUTO_BUYER_SPORT_MARKETS = frozenset(
         ("nhl", "spread"),
         ("nhl", "moneyline"),
         ("darts", "moneyline"),
+        ("euroleague", "moneyline"),
+        ("euroleague", "spread"),
+        ("euroleague", "total"),
+        ("nbl", "moneyline"),
+        ("nbl", "spread"),
+        ("nbl", "total"),
     }
 )
 DEFAULT_AUTO_BUYER_UNIT_VALUE_USD = 0.50
@@ -318,7 +324,7 @@ def _is_disabled_auto_buyer_sport_market(
     disabled_markets: tuple[tuple[str, str], ...] | frozenset[tuple[str, str]] = (),
 ) -> bool:
     target = _auto_buyer_sport_market(row)
-    if target[0] in ("ncaab", "hockey", "nhl", "darts"):
+    if target[0] in ("ncaab", "hockey", "nhl", "darts", "euroleague", "nbl", "intl_basketball"):
         return True
     if target in DISABLED_AUTO_BUYER_SPORT_MARKETS:
         return True
