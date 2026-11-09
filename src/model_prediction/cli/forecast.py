@@ -3400,10 +3400,12 @@ def _forecast_nfl_spread_sport(
                 ):
                     duplicates.append(contract["event_id"])
                 contract_edge = float(contract["model_probability"]) - float(contract["executable_ask"])
+                is_heavy_dog = abs(float(contract.get("line") or 0.0)) >= 8.0
+                effective_min_edge = min_edge + 0.02 if is_heavy_dog else min_edge
                 if (
                     main_ledger is not None
                     and eligibility.decision == "CALL"
-                    and min_edge <= contract_edge <= max_disagreement
+                    and effective_min_edge <= contract_edge <= max_disagreement
                     and _append_secondary_ledger(
                         main_ledger, request, eligibility, observed_now, "nfl_spread:main_ledger"
                     )

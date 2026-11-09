@@ -213,7 +213,7 @@ class NFLSpreadModelV7:
 
         # Heavy Underdog Blowout Variance Expansion:
         # Large underdogs (>= 8.0 pts) face asymmetric game-script collapse risk.
-        effective_margin_sd = self.margin_sd * 1.18 if abs(spread_home_line) >= 8.0 else self.margin_sd
+        effective_margin_sd = self.margin_sd * 1.25 if abs(spread_home_line) >= 8.0 else self.margin_sd
         p_raw_home_cover = 1.0 - _normal_cdf(cutoff, exp_margin, effective_margin_sd)
 
         key_bump = 0.0
