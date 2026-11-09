@@ -13,7 +13,7 @@ This document establishes the architecture for rapid developer and agent iterati
 
 ## 2. Deconstruction of the 3,200-Test Monolith
 
-An audit of all 341 test files across `tests/` revealed four distinct categories that inflated test volume to 3,199 tests:
+An audit of all test files across `tests/` revealed four distinct categories that inflated test volume to approximately 3,200 tests (the file count below is as of the original audit; `tests/` has grown since — check `find tests -name 'test_*.py' | wc -l` for the current count rather than trusting this number):
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -74,20 +74,24 @@ The pytest configuration is optimized for fast, quiet, zero-noise execution:
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = [".", "src"]
-addopts = ["-q", "--disable-warnings"]
+addopts = ["-q", "--disable-warnings", "-m", "not slow"]
+norecursedirs = ["rebuild", "archive", "data", "dist", "build", ".venv", ".git"]
 filterwarnings = [
   "ignore::DeprecationWarning",
 ]
 markers = [
   "slow: long-running simulation or historical replay",
   "rebuild: clean-slate rebuild sandbox tests",
+  "unit: fast unit tests with zero I/O",
+  "contracts: schema and hash verification contracts",
 ]
 ```
 
 ### What Changed:
 - **Removed forced `-n auto`**: Individual test files run in **0.4s to 0.7s** without spawning 12 worker processes.
 - **Added `--disable-warnings`**: Eliminates 54,000+ line terminal buffer dumps from legacy numpy joblib pickles.
-- **Markers Defined**: Allows selective inclusion/exclusion via `-m "not slow"`.
+- **`-m "not slow"` is now in `addopts` itself**, not just available as an opt-in flag — slow tests are excluded by default, not merely selectable.
+- **`norecursedirs` excludes `rebuild` outright**: `tests/rebuild/` is never collected by a default `pytest tests/` run, not just conventionally skipped.
 
 ---
 

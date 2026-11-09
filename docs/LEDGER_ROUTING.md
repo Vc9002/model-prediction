@@ -69,11 +69,15 @@ Only rows with `decision == "CALL"` (genuinely eligible picks that pass trust-bo
 | Sport | Markets | Gate |
 |---|---|---|
 | MLB | moneyline, spread, total | `evaluate_eligibility` |
+| NBA | moneyline, spread, total | `evaluate_eligibility` |
 | WNBA | moneyline | `evaluate_eligibility` |
+| NFL | moneyline, spread, total | `evaluate_eligibility` |
 | SOCCER | moneyline, total | `evaluate_gated_research_eligibility` |
 | TENNIS | moneyline (WTA + ATP) | `evaluate_gated_research_eligibility` |
 
-`PRODUCTION_SPORTS = ("mlb", "wnba")` in `domain.py`.
+`PRODUCTION_SPORTS = ("mlb", "nba", "wnba", "nfl")` in `domain.py` (NBA and NFL added since
+this table was first written; `MAIN_LEDGER_SPORTS` in `main_ledgers.py` is the fuller list
+covering every sport routed into Main, including esports/KBO/NPB merged 2026-10-22).
 
 ## Flat (`flat_picks.xlsx`)
 
@@ -113,7 +117,9 @@ ATP wired into `tennis_forward.py` alongside WTA. Dual-tour loop with per-tour E
 ## Code references
 
 - `domain.py`: `PRODUCTION_SPORTS`, `LEARNED_PRODUCTION_SPORTS`
+- `main_ledgers.py`: `MAIN_LEDGER_SPORTS`
+- `cli/state.py`: `DUAL_LEDGER_SPORTS`
 - `research_ledgers.py`: `RESEARCH_LEDGER_SPORTS`
-- `cli.py`: `_forecast_learned_sport`, `_forecast_mlb_totals_flat`, `_forecast_soccer_sport`, `_forecast_tennis_sport`, `_log_esports_forecast`, `_forecast_international_sport`
+- `cli/forecast.py`: `_forecast_learned_sport`, `_forecast_mlb_totals_flat`, `_forecast_soccer_sport`, `_forecast_tennis_sport`, `_log_esports_forecast`, `_forecast_international_sport`
 - `polymarket_us.py`: `POLYMARKET_SPORT_LEAGUES`, `LEAGUE_SLUGS`
 - `espn.py`: `LEAGUE_PATHS`, `SPORT_LEAGUES`

@@ -1,5 +1,19 @@
 # Production Canary
 
+**Note (verified 2026-11-08 against `config/production.yaml` and `docs/PROMOTION_POLICY.md`):**
+the "single canary, everything else research/shadow" framing below describes the
+2026-08-13 era of this system. Per the 2026-10-16 direct-wiring policy
+(`docs/PROMOTION_POLICY.md`), the "shadow-qualified" quarantine this doc describes
+has been eliminated — `config/production.yaml` is now schema v3 with roughly 80+
+registered models across all sports (`allowed_models` is a long list, not one
+entry), and `prediction_service.primary` (still `wnba-elo-trend-lr-v4` / WNBA
+moneyline) selects which model the canary *predict cycle* runs, not the only model
+serving production. See `docs/CHAMPION_CHALLENGER.md` and `docs/PROMOTION_POLICY.md`
+for the current champion/challenger and direct-wiring model. The mechanics below
+(health check states, module reference, rollback procedure shape) still match the
+code; the schema version, scheduler, and "only model" framing do not — corrected
+inline below.
+
 The production canary is the first real model whose predictions may eventually
 drive live decisions. Every other model in the system remains research or shadow
 only. The canary runs alongside the main rebuild shadow pipeline, exposing its
@@ -15,8 +29,11 @@ predictions through a separate, independently health-checked path.
 ## Configuration
 
 - **Config file:** `config/production.yaml`
-- **Schema version:** `1`
-- **Mode:** canary (single-model, manual-only)
+- **Schema version:** `3` (was `1` when this doc was written; see note above — v3 adds
+  `models:`/`champions:` and multiple `implementation` types, not just the single
+  canary artifact)
+- **Mode:** canary (manual-only for this one model; other models serve directly per
+  `docs/PROMOTION_POLICY.md`)
 
 ## Runtime
 
@@ -31,14 +48,15 @@ When this variable is not set, the system falls back to `<repo_root>/data`.
 
 ## Scheduler
 
-The combined `com.modelprediction.daily` worker runs at 08:30 and 12:00 local time.
+Stale: this section describes the single-daily-run, launchd-only, macOS era.
+The daily worker now runs 4x/day (00:30, 06:00, 12:00, 18:00) via the Windows
+Daily scheduled task that invokes `run_supervisor run daily` (see
+`docs/LEDGER_ROUTING.md`'s "NBA operational wiring" note and `docs/PROJECT_STATUS.md`).
 It settles open picks first and then produces the day's unified forecasts.
 
-The separate `com.modelprediction.production` and
-`com.modelprediction.rebuild-shadow` launchd jobs are disabled. Their commands
-remain available for explicit manual use, but they do not run automatically.
-This avoids duplicate forecast work and continuous research rebuilds on a
-battery-powered workstation.
+Whether the separate `production` and `rebuild-shadow` jobs are currently enabled
+is a volatile operational fact — check `docs/PROJECT_STATUS.md`, not this doc, for
+current state.
 
 ## Execution Policy
 
