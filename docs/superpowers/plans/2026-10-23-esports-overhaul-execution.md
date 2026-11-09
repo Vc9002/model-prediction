@@ -1,6 +1,6 @@
 # Esports Overhaul Execution Plan
 
-Spec: docs/esports-overhaul-proposal-2026-10-22.md. Approved by operator: execute, 2026-10-23.
+Spec: docs/ESPORTS_OVERHAUL_2026-10.md (originally docs/esports-overhaul-proposal-2026-10-22.md). Approved by operator: execute, 2026-10-23.
 
 Goal: execute the evidence-first overhaul, produce corrected serving/replay and series pricing foundations, evaluate learned challengers where evidence allows, and expose unavailable evidence without inventing features or profitability.
 
@@ -37,4 +37,4 @@ Architecture: preserve v6 identity and all protected artifacts. New research eng
 
 Ruling: user requested execution of staged proposal. Complete all feasible code/evaluation phases; when observational data or reproduction fails, keep the corresponding statistical/promotion gate unsatisfied and publish explicit blocked evidence instead of asserting model improvement. Promotion remains a separate operator decision under approved spec.
 
-Outcome: implementation/evidence deliverables complete; comparative model activation remains BLOCKED_REPRODUCTION (380 exact, 71 source mismatches). See docs/ESPORTS_OVERHAUL_2026-10-23.md.
+Outcome: implementation/evidence deliverables complete; comparative model activation remains BLOCKED_REPRODUCTION (380 exact, 71 source mismatches). See docs/ESPORTS_OVERHAUL_2026-10.md.

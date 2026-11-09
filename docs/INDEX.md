@@ -41,14 +41,11 @@ Welcome to the unified documentation directory for the `model-prediction` platfo
 | Document | Purpose |
 | :--- | :--- |
 | [`PHASE_F_EXECUTION_PROTOCOL.md`](PHASE_F_EXECUTION_PROTOCOL.md) | **Phase F Execution Protocol**: Market-relative edge discovery, preregistered gates, empirical distribution shifting, and F1–F8 stage gates. |
-| [`RESEARCH_LITERATURE_DIVE_4_2026-08-20.md`](RESEARCH_LITERATURE_DIVE_4_2026-08-20.md) | **Literature Dive #4**: Plate-Appearance Monte Carlo, Catcher Framing, and 15–30m Lineup Alpha Window. |
+| [`RESEARCH_LITERATURE_DIVE_2026-08.md`](RESEARCH_LITERATURE_DIVE_2026-08.md) | **Literature Dives #1–4** (consolidated): baseline quantitative sports betting research, quantitative/statistical modeling surveys, prior modeling and sport-specific feature research, and Plate-Appearance Monte Carlo / Catcher Framing / 15–30m Lineup Alpha Window. |
 | [`V8_REPRODUCTION.md`](V8_REPRODUCTION.md) | Forensic reproduction report and holdout cohort definitions for MLB v8. |
 | [`FEATURE_MODEL_AUDIT.md`](FEATURE_MODEL_AUDIT.md) | Comprehensive model and feature audit across all active sport models. |
 | [`PRODUCTION_MODEL_AUDIT.md`](PRODUCTION_MODEL_AUDIT.md) | Multi-sport production artifact and calibration verification audit. |
 | [`V8_PARITY_BASELINE_2026-08-17.md`](V8_PARITY_BASELINE_2026-08-17.md) | MLB v8 parity baseline and feature parity verification sample. |
-| [`RESEARCH_LITERATURE_DIVE_3_2026-08-17.md`](RESEARCH_LITERATURE_DIVE_3_2026-08-17.md) | **Literature Dive #3**: Prior quantitative modeling and sport-specific feature research. |
-| [`RESEARCH_LITERATURE_DIVE_2_2026-08-17.md`](RESEARCH_LITERATURE_DIVE_2_2026-08-17.md) | **Literature Dive #2**: Quantitative methods and statistical modeling surveys. |
-| [`RESEARCH_LITERATURE_DIVE_2026-08-17.md`](RESEARCH_LITERATURE_DIVE_2026-08-17.md) | **Literature Dive #1**: Baseline quantitative sports betting research review. |
 | [`DISTRIBUTION_MIGRATION_PLAN.md`](DISTRIBUTION_MIGRATION_PLAN.md) | Migration from decoupled GLMs to unified joint score distributions (Poisson / Negative Binomial). |
 
 ---

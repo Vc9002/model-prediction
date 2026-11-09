@@ -20,7 +20,7 @@ incomplete WNBA contexts lack `defensive_trend_gap` during July 28–August 3.
 Also fitted the new incumbent-anchored MLB residual v2; it has no reliable
 gain and is not promoted. Verification: 203 focused tests; scoped Ruff/mypy;
 repeat training reproduces model bytes and results. See
-`docs/MODEL_ITERATION_2026-09-09.md`. No historical ledger repair was applied.
+`docs/REBUILD_SPRINT_2026-09.md`. No historical ledger repair was applied.
 
 ## 2026-09-09 — Incumbent replay and quote lineage follow-up
 
@@ -41,7 +41,7 @@ WNBA's two distinct probability mismatches remain unresolved and block its
 comparison. MLB replay passes but its candidate offers no reliable predictive
 gain; both common-policy simulations lose money. Five incumbent cohorts have
 no decisions; fourteen need replay inputs/state and adapters. See
-`docs/INCUMBENT_COMPARISON_2026-09-09.md` and the verified output directory.
+`docs/REBUILD_SPRINT_2026-09.md` and the verified output directory.
 Final focused verification: 126 passed; scoped Ruff and mypy passed; existing
 production artifacts/config hashes unchanged. No full-suite or profit claim.
 
@@ -61,7 +61,7 @@ refusal, signed home spreads, and push handling. Final focused verification:
 24 passed; scoped Ruff and mypy clean. Existing production config/artifacts
 hash unchanged. No full-suite, PIT, incumbent-superiority, or profit claim.
 
-See `docs/GENERATION_2026-09-09.md` and
+See `docs/REBUILD_SPRINT_2026-09.md` and
 `outputs/research/generation_20260909_v1_verified/{manifest,verification}.json`.
 
 **Last audited**: 2026-09-08 (see new section directly below)

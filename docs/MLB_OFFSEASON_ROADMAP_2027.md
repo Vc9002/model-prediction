@@ -8,7 +8,7 @@
 ## 1. Executive Context & Motivation
 
 Throughout the 2026 regular season, MLB models presented a dangerous divergence between paper accounting and real-market execution:
-1. **Paper Margin vs. Polymarket Truth**: In the local pick ledger at flat $-110$ odds, `mlb-elo-trend-lr-v8` logged $+34.25\text{U}$ ($58.5\%$ hit rate on $487$ picks). However, in realistic fee-aware order-book simulations on Polymarket US (`docs/INCUMBENT_COMPARISON_2026-09-09.md`), v8 produced **$-91.40$ ($-14.27\%$ ROI)** over $194$ quotes and **$-14.34$ ($-6.82\%$ ROI)** over $68$ quotes.
+1. **Paper Margin vs. Polymarket Truth**: In the local pick ledger at flat $-110$ odds, `mlb-elo-trend-lr-v8` logged $+34.25\text{U}$ ($58.5\%$ hit rate on $487$ picks). However, in realistic fee-aware order-book simulations on Polymarket US (`docs/REBUILD_SPRINT_2026-09.md`), v8 produced **$-91.40$ ($-14.27\%$ ROI)** over $194$ quotes and **$-14.34$ ($-6.82\%$ ROI)** over $68$ quotes.
 2. **Missing Calibration**: The v8 artifact carries no calibration sub-object, systematically overpredicting favorite win rates by $\sim 8\text{pp}$ (pricing $57\%$ actual occurrences at $\sim 65\%$). In exchange pricing with a $6\%$ taker fee coefficient, buying expensive favorite contracts resulted in persistent negative CLV.
 3. **Data Gaps & Lookahead Leakage**: Older v8 features relied on a static $7,926$-game park factor table (2024–2026 retroactive averages) and unaligned Open-Meteo forecasts vs. historical weather.
 4. **Postseason Breakdown**: During the October postseason (Division & Championship Series), starter IP dropped below $4.0$ innings, and manager high-leverage bullpen usage invalidated regular-season starter rolling stats (totals fell to $37.5\%$ win rate, $-6.78\text{U}$).

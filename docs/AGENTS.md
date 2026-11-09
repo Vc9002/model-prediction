@@ -7,7 +7,7 @@ for the all-model accuracy and profitability rebuild. Old Phase F locks and
 the v11 prohibition are historical, not binding on new research. Preserve
 earlier artifacts for comparison, label reused historical data honestly, and
 keep research separate from live champion changes and orders. See the current
-repo-root `AGENTS.md`, `GENERATION_2026-09-09.md`, and `ROADMAP.md`.
+repo-root `AGENTS.md`, `REBUILD_SPRINT_2026-09.md`, and `ROADMAP.md`.
 
 ## FAST ITERATION & WORKFLOW SPEED (OPERATOR DIRECTIVE 2026-10-18)
 - **Zero Test Overhead for Minor Changes**: NEVER run pytest suites for refactors, dead code cleanup, variable renames, formatting, comments, or documentation. Rely strictly on `ruff check` (runs in < 0.2s).

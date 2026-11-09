@@ -95,7 +95,7 @@ hash-checked regression fixture, with its statistics independently recomputed.
 Auto-Buyer is currently enabled in **paper mode**, but its code still does not
 consume the global production execution flags. Phase F capture still lacks a
 canonical supervised worker. Those gaps are not resolved by passing tests.
-See [verified findings and P0/P1/P2 implementation queue](CONTROL_PLANE_CONSOLIDATION_2026-09-14.md).
+See [verified findings and P0/P1/P2 implementation queue](REBUILD_SPRINT_2026-09.md).
 Test logs and exact source snapshots are under
 `outputs/research/control_plane_verification_20260914/`.
 Full suite: **2,990 passed, 3 skipped**. The affected 65-test suite passed after
@@ -121,7 +121,7 @@ At the earlier saved source snapshot: 2,964 passed, 3 skipped. The final pricing
 CLI check passed 139 focused tests and six scoped type checks. Additional local
 edits arrived afterward; the evening receipt above supersedes this snapshot for
 current-tree verification.
-See [complete per-model results and evidence](REBUILD_STATUS_2026-09-14.md).
+See [complete per-model results and evidence](REBUILD_SPRINT_2026-09.md).
 
 ## 2026-09-12 — Corrected NRFI generation and first scored paired returns
 
@@ -137,7 +137,7 @@ without restoring them. On 24 verified quote opportunities the candidate loses
 $13.925 versus the incumbent's $26.130; both are losing simulations on one game
 date. The observer is terminal: 49 captures, 19 unavailable, no pending work.
 Full suite: 2,897 passed, 3 skipped. All 21 candidate inference checks pass.
-See [NRFI corrections, results and remaining scope](NRFI_AND_SETTLED_REBUILD_2026-09-12.md).
+See [NRFI corrections, results and remaining scope](REBUILD_SPRINT_2026-09.md).
 
 
 ## 2026-09-11 midday — Recency iteration tested; captured quote economics ready
@@ -152,7 +152,7 @@ Twenty-four event-market opportunities across 14 MLB games have verified quotes
 for identical fee-aware policies. P&L remains null before settlement. The spread
 archive adapter and a late-arriving ledger-mirror pairing bug are fixed.
 118 focused tests, scoped Ruff and mypy pass. No champions or orders changed.
-See [recency and quote evidence](RECENCY_AND_QUOTE_ITERATION_2026-09-11.md).
+See [recency and quote evidence](REBUILD_SPRINT_2026-09.md).
 
 
 ## 2026-09-11 UTC — Three fitted CFB updates, shared inference, active observer
@@ -168,7 +168,7 @@ history. Exact legacy-name/provider-ID mapping is now enforced.
 The old observer was stopped before any capture. The corrected 24-hour observer
 is `outputs/research/paired_observer_20260911_v2/report.json`, monitoring 68
 prepared MLB/NCAAF contracts. Its live counts are authoritative. See
-[CFB fitted iteration and verification](CFB_JOINT_ITERATION_2026-09-11.md).
+[CFB fitted iteration and verification](REBUILD_SPRINT_2026-09.md).
 
 ## 2026-09-10 evening — Outcomes scored; paired capture implemented
 
@@ -185,7 +185,7 @@ contracts across 20 MLB/NCAAF games, with a 24-hour limit. Its live output is
 be checked there, not inferred from preparation.
 NRFI settlement now stays pending when first-inning scores are missing.
 Broad tests plus focused failure resolutions pass; full evidence and exact
-limitations: [paired rebuild checkpoint](PAIRED_REBUILD_2026-09-10.md).
+limitations: [paired rebuild checkpoint](REBUILD_SPRINT_2026-09.md).
 
 ## 2026-09-10 — All 21 candidate and incumbent paths are replayable
 
@@ -196,7 +196,7 @@ Historical missing state remains missing. The legacy comparison command now
 uses canonical SQLite and exact decision contexts with a reproduction gate.
 Market-aware paired economics beyond learned moneyline and sport-specific
 iterations remain open. No reliable accuracy/profit improvement is established.
-See [current rebuild evidence and limitations](FORWARD_REBUILD_2026-09-09.md).
+See [current rebuild evidence and limitations](REBUILD_SPRINT_2026-09.md).
 Final complete-suite verification: 2,821 passed, 3 skipped, no failures.
 All 57 changed/new Python files pass Ruff; 20 rebuild modules pass mypy.
 
@@ -215,7 +215,7 @@ The improvement interval crosses zero. On 68 archived quote opportunities,
 the common-policy simulation loses $16.065 vs the incumbent's $14.335.
 No reliable predictive or profitable upgrade is established. 203 focused tests
 pass; scoped Ruff/mypy pass. No new-model promotion or order submission.
-See [second iteration](MODEL_ITERATION_2026-09-09.md).
+See [second iteration](REBUILD_SPRINT_2026-09.md).
 
 ## 2026-09-09 — Incumbent comparison completed; no replacement supported
 
@@ -232,7 +232,7 @@ have no settled current-model records; fourteen other markets need stored
 inputs/model state and replay adapters. Future moneyline quote hashes now bind
 the full archived record. 126 focused tests, scoped Ruff/mypy pass. Production
 artifacts and champion registration are unchanged; no orders or promotions.
-See [comparison report](INCUMBENT_COMPARISON_2026-09-09.md).
+See [comparison report](REBUILD_SPRINT_2026-09.md).
 
 ## 2026-09-09 — First all-market fitted research generation
 
@@ -246,7 +246,7 @@ were changed. All 21 repeated-run metrics match, serialization predictions
 match, 24 focused tests pass, and scoped Ruff/mypy pass. This is not a new
 full-suite verification.
 
-See [generation results and limitations](GENERATION_2026-09-09.md) and the
+See [generation results and limitations](REBUILD_SPRINT_2026-09.md) and the
 current [rebuild queue](ROADMAP.md). Older freeze restrictions below are
 historical context; current operator authorization is recorded in `AGENTS.md`.
 
@@ -939,4 +939,4 @@ NCAAF's three incumbent markets now preserve their advancing simulator RNG
 state through ledger settlement. The initial 7/21 incumbent coverage was
 completed to 21/21 on September 10; see the latest entry and linked report.
 No accuracy/profit superiority or promotion is established.
-Details and exact evidence: `FORWARD_REBUILD_2026-09-09.md`.
+Details and exact evidence: `REBUILD_SPRINT_2026-09.md`.
