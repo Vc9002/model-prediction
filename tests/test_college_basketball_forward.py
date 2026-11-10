@@ -87,7 +87,10 @@ def test_ncaab_records_real_model_output_and_rerun_deduplicates(tmp_path, monkey
     assert len(flat_rows) == len(main_rows) == 1
     assert flat_rows[0]["selection"] == main_rows[0]["selection"] == "home"
     assert all(r["model_version"] == "ncaab-spread-v6" for r in flat_rows + main_rows)
-    assert all(r["sportsbook"] == "model_opinion_indicative_market" for r in flat_rows + main_rows)
+    assert all(r["sportsbook"] == "polymarket_us_executable_ask" for r in flat_rows + main_rows)
+    assert all(abs(float(r["market_implied_probability"]) - 0.56) < 0.001 for r in flat_rows + main_rows)
+    assert all(r["market_snapshot_hash"] for r in flat_rows + main_rows)
+    assert all(r["market_quote_timestamp_valid"] for r in flat_rows + main_rows)
     for row in flat_rows + main_rows:
         snapshot = json.loads(row["model_input_snapshot_json"])
         assert snapshot["schema"] == "feature-capture-v1"
@@ -101,6 +104,27 @@ def test_ncaab_records_real_model_output_and_rerun_deduplicates(tmp_path, monkey
     assert rerun["flat_logged"] == 0
     assert rerun["main_logged"] == 0
     assert len(flat_ledger.rows()) == len(main_ledger.rows()) == 1
+    worse_quote = json.loads(archive.read_text(encoding="utf-8"))
+    worse_quote["long"]["ask"] = 0.99
+    archive.write_text(json.dumps(worse_quote) + "\n", encoding="utf-8")
+    worse = forecast_ncaab_sport(
+        **{**args, "flat_ledger": MultiSportPickLedger(tmp_path / "worse", flat=True), "main_ledger": None}
+    )
+    assert worse["flat_logged"] == 0
+    assert worse["candidate_quote_coverage"]["serving_decisions"] == 1
+    archive.unlink()
+    missing = forecast_ncaab_sport(
+        **{**args, "flat_ledger": MultiSportPickLedger(tmp_path / "missing", flat=True), "main_ledger": None}
+    )
+    assert missing["flat_logged"] == 0
+    assert any(s["reason"] == "executable_quote_unavailable" for s in missing["skipped"])
+    stale_quote = {**worse_quote, "observed_at_utc": (now - timedelta(hours=1)).isoformat()}
+    archive.write_text(json.dumps(stale_quote) + "\n", encoding="utf-8")
+    stale = forecast_ncaab_sport(
+        **{**args, "flat_ledger": MultiSportPickLedger(tmp_path / "stale", flat=True), "main_ledger": None}
+    )
+    assert stale["flat_logged"] == 0
+    assert any(s["reason"] == "stale_executable_quote" for s in stale["skipped"])
 
 
 def test_no_games_does_not_construct_market_quotes(tmp_path, monkeypatch):

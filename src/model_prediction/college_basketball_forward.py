@@ -6,7 +6,7 @@ import hashlib
 import json
 import re
 import unicodedata
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -237,6 +237,7 @@ def forecast_ncaab_sport(
     max_spread_line = float(policy.get("max_spread_line", 16.0))
     max_margin_divergence = float(policy.get("max_margin_divergence", 12.0))
     max_total_divergence = float(policy.get("max_total_divergence", 14.0))
+    max_quote_age_seconds = float(policy.get("max_quote_age_seconds", 300.0))
     games_by_team: dict[str, int] = {}
     for game in history:
         for name in (game.home_team, game.away_team):
@@ -458,15 +459,35 @@ def forecast_ncaab_sport(
             if prediction is None:
                 continue
 
+            candidate_row = candidate_by_slug.get(str(market_def.get("market_slug") or ""))
+            if not candidate_row or candidate_row.get("quote_reason") != "matched":
+                result["skipped"].append(
+                    {"event_id": identity, "market_type": kind, "reason": "executable_quote_unavailable"}
+                )
+                continue
+            quote_time = parse_utc(str(candidate_row["quote_observed_at_utc"]))
+            if max_quote_age_seconds <= 0 or observed - quote_time > timedelta(seconds=max_quote_age_seconds):
+                result["skipped"].append(
+                    {"event_id": identity, "market_type": kind, "reason": "stale_executable_quote"}
+                )
+                continue
+            quoted_sides = {side["selection"]: side for side in candidate_row["sides"]}
             selections = {"over", "under"} if kind == "total" else {"home", "away"}
             valid_sides = [
                 side
                 for side in sides
                 if side.get("selection") in selections
-                and side.get("price_probability") is not None
-                and 0 < float(side["price_probability"]) < 1
+                and isinstance(side.get("is_long"), bool)
+                and (quoted := quoted_sides.get(side["selection"])) is not None
+                and quoted.get("is_long") == side["is_long"]
+                and quoted.get("line") == side.get("line")
+                and quoted.get("executable_ask") is not None
+                and 0 < float(quoted["executable_ask"]) < 1
             ]
             if not valid_sides:
+                result["skipped"].append(
+                    {"event_id": identity, "market_type": kind, "reason": "executable_side_unavailable"}
+                )
                 continue
             if kind == "moneyline":
                 # Pure Probability Winner Selection: pick the projected winner (model_prob >= 0.50).
@@ -487,7 +508,8 @@ def forecast_ncaab_sport(
                 best_side = max(
                     cover_sides,
                     key=lambda side: (
-                        prediction.probabilities[side["selection"]] - float(side["price_probability"])
+                        prediction.probabilities[side["selection"]]
+                        - float(quoted_sides[side["selection"]]["executable_ask"])
                     ),
                 )
             model_inst = total_model if kind == "total" else spread_model
@@ -495,25 +517,22 @@ def forecast_ncaab_sport(
             calibrator = calibrators.get(kind, IdentityCalibrator(model_version))
 
             for side in (best_side,):
-                selection, ask = side["selection"], side["price_probability"]
+                selection = side["selection"]
+                candidate_side = quoted_sides[selection]
+                ask = float(candidate_side["executable_ask"])
+                indicative_ask = side.get("price_probability")
                 raw_probability = prediction.probabilities[selection]
                 probability = calibrator.transform(raw_probability)
                 edge = probability - float(ask)
-                candidate_row = candidate_by_slug.get(str(market_def.get("market_slug") or ""))
-                candidate_side = (
-                    next((s for s in candidate_row["sides"] if s["selection"] == selection), None)
-                    if candidate_row
-                    else None
-                )
                 candidate_summary["serving_decision_joins"].append(
                     {
                         "event_id": str(identity),
                         "market_slug": market_def.get("market_slug"),
                         "selection": selection,
-                        "indicative_ask": float(ask),
-                        "executable_ask": candidate_side.get("executable_ask") if candidate_side else None,
-                        "quote_hash": candidate_row.get("quote_hash") if candidate_row else None,
-                        "quote_reason": candidate_row.get("quote_reason") if candidate_row else "not_listed",
+                        "indicative_ask": indicative_ask,
+                        "executable_ask": ask,
+                        "quote_hash": candidate_row["quote_hash"],
+                        "quote_reason": candidate_row["quote_reason"],
                     }
                 )
                 decision_line = (
@@ -567,21 +586,13 @@ def forecast_ncaab_sport(
                             "history_scores_sha256": history_digest,
                             "history_cutoff_date": args_date,
                             "research_quote_join": {
-                                "status": candidate_row.get("quote_reason")
-                                if candidate_row
-                                else "not_listed",
+                                "status": candidate_row["quote_reason"],
                                 "market_slug": market_def.get("market_slug"),
-                                "quote_hash": candidate_row.get("quote_hash") if candidate_row else None,
-                                "quote_archive_path": (
-                                    candidate_row.get("quote_archive_path") if candidate_row else None
-                                ),
-                                "quote_observed_at_utc": (
-                                    candidate_row.get("quote_observed_at_utc") if candidate_row else None
-                                ),
-                                "executable_ask": (
-                                    candidate_side.get("executable_ask") if candidate_side else None
-                                ),
-                                "indicative_ask": float(ask),
+                                "quote_hash": candidate_row["quote_hash"],
+                                "quote_archive_path": candidate_row["quote_archive_path"],
+                                "quote_observed_at_utc": candidate_row["quote_observed_at_utc"],
+                                "executable_ask": ask,
+                                "indicative_ask": indicative_ask,
                             },
                         },
                     },
@@ -605,19 +616,29 @@ def forecast_ncaab_sport(
                     market_type=MarketType(kind),
                     selection=selection,
                     line=decision_line,
-                    sportsbook="model_opinion_indicative_market",
+                    sportsbook="polymarket_us_executable_ask",
                     american_odds=probability_to_american(float(ask)),
                     model_probability=probability,
                     model_uncertainty=prediction.uncertainty,
                     model_version=model_version,
                     rationale=prediction.rationale,
-                    risks="Paper tempo model; live market quote is an indicative reference, not verified executable BBO.",
+                    risks="Paper model; executable quote is a predecision snapshot, not a guaranteed fill.",
                     model_origin=ModelOrigin.STATISTICAL_MODEL,
                     model_state=ModelState.SHADOW_QUALIFIED,
                     calibration_method=cal_method,
                     calibration_version=cal_version,
                     calibration_artifact_hash=cal_hash,
                     observed_at_utc=observed.isoformat(),
+                    market_quote_observed_at_utc=candidate_row["quote_observed_at_utc"],
+                    market_quote_timestamp_valid=True,
+                    market_quote_source="polymarket_us",
+                    market_quote_provenance="archived_two_sided_bbo",
+                    market_quote_reconstructed=False,
+                    market_snapshot_hash=candidate_row["quote_hash"],
+                    market_snapshot_archive_path=candidate_row["quote_archive_path"],
+                    model_probability_raw=raw_probability,
+                    market_probability_at_decision=ask,
+                    serving_probability=probability,
                     model_input_snapshot_json=snapshot,
                 )
                 teams = [
