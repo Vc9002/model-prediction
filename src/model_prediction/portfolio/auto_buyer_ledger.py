@@ -39,7 +39,7 @@ ESPORTS_TITLE_BY_SPORT: dict[str, str] = {
 }
 
 _paths = RuntimePaths.resolve()
-DATA = _paths.repo_root / "data"
+DATA = _paths.runtime_root
 LOGS_DIR = DATA / "logs"
 
 AUTO_BUYER_JSONL_PATH = DATA / "auto_buyer_ledger.jsonl"
@@ -54,8 +54,8 @@ def resolve_auto_buyer_paths(
 ) -> tuple[Path, Path]:
     """Resolve JSONL and XLSX paths for the Auto-Buyer ledger.
 
-    Checks direct path, paper_auto_buyer subdirectory under data_root/DATA,
-    and runtime_root fallback.
+    An explicit file path wins. The production default is the runtime live
+    root; an explicitly named paper_auto_buyer root stays separate.
     """
     if jsonl_path and xlsx_path:
         return Path(jsonl_path), Path(xlsx_path)
@@ -67,34 +67,19 @@ def resolve_auto_buyer_paths(
     root = Path(data_root) if data_root else None
     paths = RuntimePaths.resolve()
 
-    if root is not None:
-        # 1. Check subfolder under specified root
-        j_sub = root / "paper_auto_buyer" / "auto_buyer_ledger.jsonl"
-        x_sub = root / "paper_auto_buyer" / "auto_buyer_picks.xlsx"
-        if j_sub.exists():
-            return j_sub, x_sub
-        # 2. Check direct path under specified root
-        j_cand = root / "auto_buyer_ledger.jsonl"
-        x_cand = root / "auto_buyer_picks.xlsx"
-        if j_cand.exists():
-            return j_cand, x_cand
-
-    # 3. Prefer live runtime_root / paper_auto_buyer
-    try:
-        j_rt = paths.runtime_root / "paper_auto_buyer" / "auto_buyer_ledger.jsonl"
-        x_rt = paths.runtime_root / "paper_auto_buyer" / "auto_buyer_picks.xlsx"
-        if j_rt.exists():
-            return j_rt, x_rt
-    except (OSError, RuntimeError, ValueError):
-        pass
-
-    # 4. Fallback to DATA (repo_root / data)
-    repo_sub_j = DATA / "paper_auto_buyer" / "auto_buyer_ledger.jsonl"
-    repo_sub_x = DATA / "paper_auto_buyer" / "auto_buyer_picks.xlsx"
-    if repo_sub_j.exists():
-        return repo_sub_j, repo_sub_x
-
-    return DATA / "auto_buyer_ledger.jsonl", DATA / "auto_buyer_picks.xlsx"
+    if root is None or root.resolve() == (paths.repo_root / "data").resolve():
+        root = paths.runtime_root
+    elif root.resolve() == (paths.repo_root / "data" / "paper_auto_buyer").resolve():
+        root = paths.runtime_root / "paper_auto_buyer"
+    elif (
+        root.resolve() != paths.runtime_root.resolve()
+        and root.name != "paper_auto_buyer"
+        and not (root / "auto_buyer_ledger.jsonl").exists()
+    ):
+        paper_root = root / "paper_auto_buyer"
+        if (paper_root / "auto_buyer_ledger.jsonl").exists():
+            root = paper_root
+    return root / "auto_buyer_ledger.jsonl", root / "auto_buyer_picks.xlsx"
 
 
 logger = logging.getLogger("model_prediction.auto_buyer")
@@ -103,8 +88,25 @@ AUTO_BUYER_UNIT_VALUE_USD = 0.50  # 1U = 50 cents
 AUTO_BUYER_TERMINAL_RESULTS = frozenset({"win", "loss", "push"})
 
 
-def _write_jsonl_atomic(j_path: Path, records: list[dict[str, Any]]) -> None:
-    """Safely rewrite JSONL file via temporary file + atomic rename to prevent 0-byte truncation."""
+def _write_jsonl_atomic(j_path: Path, records: list[dict[str, Any]], *, allow_shrink: bool = False) -> None:
+    """Safely rewrite JSONL file via temporary file + atomic rename to prevent 0-byte truncation.
+
+    Refuses to shrink the record count unless allow_shrink is set. Every caller in this module
+    only appends or mutates existing records, so a write with fewer rows than are currently on
+    disk means the read that produced `records` silently dropped data (e.g. a corrupted line
+    swallowed by read_auto_buyer_ledger's bare `except json.JSONDecodeError: continue`) -- not a
+    legitimate removal. This guards against repeating the 2026-11-10 incident where exactly this
+    path silently truncated the live ledger to 0 bytes.
+    """
+    if not allow_shrink and j_path.exists():
+        with j_path.open(encoding="utf-8") as f:
+            existing_count = sum(1 for line in f if line.strip())
+        if len(records) < existing_count:
+            raise ValueError(
+                f"refusing to overwrite {j_path} ({existing_count} records on disk) with only "
+                f"{len(records)} records -- likely a parse failure dropped data; pass allow_shrink=True "
+                "if this is a deliberate removal"
+            )
     tmp_path = j_path.with_name(f"{j_path.name}.{os.getpid()}.tmp")
     with tmp_path.open("w", encoding="utf-8") as f:
         for r in records:
@@ -135,6 +137,29 @@ def _resolve_esports_team(
     return _fuzzy_match_team(name, teams, team_index)
 
 
+def _normalized_team_name(name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", name.casefold())
+
+
+def _scoreboard_team_key(name: str, league: str) -> str:
+    """Resolve only whole, unambiguous names or registered aliases."""
+    normalized = _normalized_team_name(name)
+    registry = _paths.repo_root / "data" / "entities" / "teams.json"
+    try:
+        teams = json.loads(registry.read_text(encoding="utf-8"))["teams"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return normalized
+    candidates = set()
+    for team in teams:
+        if str(team.get("league", "")).upper() != league:
+            continue
+        names = [team.get("canonical_name", ""), team.get("abbreviation", "")]
+        names.extend(alias.get("source_name", "") for alias in team.get("aliases", []))
+        if normalized in {_normalized_team_name(str(value)) for value in names if value}:
+            candidates.add(str(team["canonical_team_id"]))
+    return next(iter(candidates)) if len(candidates) == 1 else normalized
+
+
 def _is_settled_auto_buyer_record(record: dict[str, Any]) -> bool:
     return (
         str(record.get("status") or "").lower() == "settled"
@@ -143,15 +168,32 @@ def _is_settled_auto_buyer_record(record: dict[str, Any]) -> bool:
 
 
 def _uses_live_auto_buyer_ledger(path: Path) -> bool:
-    """Return whether a writer targets the production Auto-Buyer ledger."""
-    return path.resolve() == AUTO_BUYER_JSONL_PATH.resolve()
+    """Return whether a writer targets the production Auto-Buyer ledger.
+
+    Resolve against the same runtime root used by the executor.
+    """
+    live_j_path, _ = resolve_auto_buyer_paths()
+    return path.resolve() == live_j_path.resolve()
+
+
+def resolve_auto_buyer_log_path() -> Path:
+    """Resolve the Auto-Buyer operational log path, mirroring the live ledger's root."""
+    live_j_path, _ = resolve_auto_buyer_paths()
+    return live_j_path.parent / "logs" / "auto_buyer.log"
 
 
 def _get_logger() -> logging.Logger:
-    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    log_path = resolve_auto_buyer_log_path()
+    log_path.parent.mkdir(parents=True, exist_ok=True)
     log = logging.getLogger("auto_buyer_logger")
-    if not log.handlers:
-        handler = logging.FileHandler(AUTO_BUYER_LOG_PATH, encoding="utf-8")
+    # Re-point the handler if the resolved log path has moved (e.g. the live ledger
+    # started existing under runtime_root after this process already logged once).
+    current_handler = log.handlers[0] if log.handlers else None
+    if current_handler is None or getattr(current_handler, "baseFilename", None) != str(log_path):
+        for handler in list(log.handlers):
+            log.removeHandler(handler)
+            handler.close()
+        handler = logging.FileHandler(log_path, encoding="utf-8")
         formatter = logging.Formatter("[%(asctime)s] %(levelname)s: %(message)s")
         handler.setFormatter(formatter)
         log.addHandler(handler)
@@ -227,6 +269,7 @@ def record_auto_buy_execution(
     pick = pick_row or {}
     oid = str(order_id or order_payload.get("order_id") or "")
     pid = str(order_payload.get("pick_id") or pick.get("pick_id") or "")
+    ev_id = str(order_payload.get("event_id") or pick.get("event_id") or "")
     sport = str(order_payload.get("sport") or pick.get("sport") or pick.get("league") or "UNKNOWN").upper()
     away = str(pick.get("away_team") or "")
     home = str(pick.get("home_team") or "")
@@ -325,8 +368,8 @@ def record_auto_buy_execution(
 
             try:
                 _write_jsonl_atomic(j_path, records)
-            except OSError as err:
-                logger.warning(f"Failed to update auto_buyer_ledger.jsonl on topup: {err}")
+            except (OSError, ValueError) as err:
+                logger.error(f"Failed to update auto_buyer_ledger.jsonl on topup: {err}")
 
             try:
                 if x_path.exists():
@@ -361,6 +404,7 @@ def record_auto_buy_execution(
         "order_id": oid,
         "order_ids": order_payload.get("order_ids") or [oid],
         "pick_id": pid,
+        "event_id": ev_id or None,
         "executed_at_utc": exec_utc,
         "event_start_utc": start_utc,
         "sport": sport,
@@ -759,8 +803,8 @@ def reconcile_pending_auto_buyer_fallbacks(
     if changed:
         try:
             _write_jsonl_atomic(j_path, records)
-        except OSError as err:
-            logger.warning(f"Failed to rewrite auto_buyer_ledger.jsonl during fallback reconciliation: {err}")
+        except (OSError, ValueError) as err:
+            logger.error(f"Failed to rewrite auto_buyer_ledger.jsonl during fallback reconciliation: {err}")
         try:
             if x_path.exists():
                 _, existing_rows = read_xlsx_rows(x_path)
@@ -1098,8 +1142,8 @@ def manually_settle_auto_buyer_order(
 
     try:
         _write_jsonl_atomic(j_path, records)
-    except OSError as err:
-        logger.warning(f"Failed to rewrite auto_buyer_ledger.jsonl: {err}")
+    except (OSError, ValueError) as err:
+        logger.error(f"Failed to rewrite auto_buyer_ledger.jsonl: {err}")
         raise
 
     # Reuse the settlement pass to rebuild the derived xlsx export from the
@@ -1746,7 +1790,7 @@ def settle_auto_buyer_ledger(
                         break
             except (httpx.HTTPError, OSError, ValueError, KeyError, TypeError, RuntimeError):
                 pass
-        elif result is None and sport in (
+        if (result is None or home_score is None or away_score is None) and sport in (
             "MLB",
             "WNBA",
             "NBA",
@@ -1761,6 +1805,8 @@ def settle_auto_buyer_ledger(
         ):
             try:
                 game_day = start_dt.strftime("%Y%m%d")
+                prev_day = (start_dt - timedelta(days=1)).strftime("%Y%m%d")
+                next_day = (start_dt + timedelta(days=1)).strftime("%Y%m%d")
                 if sport == "SOCCER":
                     espn_lg = "soccer_all"
                 elif sport in ("NCAAF", "CFB"):
@@ -1771,29 +1817,39 @@ def settle_auto_buyer_ledger(
                     espn_lg = "nhl"
                 else:
                     espn_lg = sport.lower()
-                sb = _get_scoreboard(espn_lg, game_day)
-                for ev in sb.get("events", []):
-                    comp = (ev.get("competitions") or [{}])[0]
-                    if not comp.get("status", {}).get("type", {}).get("completed"):
-                        continue
-                    comps = comp.get("competitors", [])
-                    if len(comps) != 2:
-                        continue
-                    c_map = {c.get("homeAway"): c for c in comps}
-                    a_c, h_c = c_map.get("away"), c_map.get("home")
-                    if not a_c or not h_c:
-                        continue
-                    a_team = str((a_c.get("team") or {}).get("displayName", "")).casefold()
-                    h_team = str((h_c.get("team") or {}).get("displayName", "")).casefold()
-                    if not a_team or not h_team or not home.casefold() or not away.casefold():
-                        continue
-                    if (away.casefold() in a_team or a_team in away.casefold()) and (
-                        home.casefold() in h_team or h_team in home.casefold()
-                    ):
-                        a_sc = float(a_c.get("score") or 0)
-                        h_sc = float(h_c.get("score") or 0)
-                        away_score = int(a_sc)
-                        home_score = int(h_sc)
+
+                away_key = _scoreboard_team_key(away, espn_lg.upper())
+                home_key = _scoreboard_team_key(home, espn_lg.upper())
+                candidates: dict[str, tuple[float, float]] = {}
+                for d_check in (game_day, prev_day, next_day):
+                    sb = _get_scoreboard(espn_lg, d_check)
+                    for ev in sb.get("events", []):
+                        comp = (ev.get("competitions") or [{}])[0]
+                        if not comp.get("status", {}).get("type", {}).get("completed"):
+                            continue
+                        comps = comp.get("competitors", [])
+                        if len(comps) != 2:
+                            continue
+                        c_map = {c.get("homeAway"): c for c in comps}
+                        a_c, h_c = c_map.get("away"), c_map.get("home")
+                        if not a_c or not h_c:
+                            continue
+                        a_team = str((a_c.get("team") or {}).get("displayName", ""))
+                        h_team = str((h_c.get("team") or {}).get("displayName", ""))
+                        if not a_team or not h_team or not home_key or not away_key:
+                            continue
+                        if (
+                            _scoreboard_team_key(a_team, espn_lg.upper()) == away_key
+                            and _scoreboard_team_key(h_team, espn_lg.upper()) == home_key
+                        ):
+                            event_key = str(ev.get("id") or f"{a_team}:{h_team}")
+                            candidates[event_key] = (float(a_c["score"]), float(h_c["score"]))
+                if len(candidates) == 1:
+                    a_sc, h_sc = next(iter(candidates.values()))
+                    away_score = int(a_sc)
+                    home_score = int(h_sc)
+
+                    if result is None:
                         mtype = str(r.get("market_type") or "moneyline").lower()
                         if mtype == "total":
                             line = _extract_line_from_record(r) or 0.0
@@ -1828,7 +1884,6 @@ def settle_auto_buyer_ledger(
                                     result = "loss"
                                 else:
                                     result = "push"
-                        break
             except (httpx.HTTPError, OSError, ValueError, KeyError, TypeError, RuntimeError):
                 pass
 
@@ -1950,8 +2005,8 @@ def settle_auto_buyer_ledger(
     # Rewrite JSONL atomically
     try:
         _write_jsonl_atomic(j_path, updated_records)
-    except OSError as err:
-        logger.warning(f"Failed to rewrite auto_buyer_ledger.jsonl: {err}")
+    except (OSError, ValueError) as err:
+        logger.error(f"Failed to rewrite auto_buyer_ledger.jsonl: {err}")
 
     # Rewrite Excel atomically
     try:
