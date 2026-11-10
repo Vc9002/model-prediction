@@ -1317,6 +1317,9 @@ def settle_auto_buyer_ledger(
             pass
 
     for r in records:
+        if _is_settled_auto_buyer_record(r):
+            updated_records.append(r)
+            continue
         sport = str(r.get("sport") or "").upper()
         away = str(r.get("away_team") or "")
         home = str(r.get("home_team") or "")

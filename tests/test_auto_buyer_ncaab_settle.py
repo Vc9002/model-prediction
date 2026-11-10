@@ -60,6 +60,11 @@ def test_settle_auto_buyer_ledger_grades_ncaab_from_espn(tmp_path: Path):
     assert res["newly_settled"] == 1
     assert res["changes"][0]["to_result"] == "win"
     assert res["changes"][0]["pnl_usd"] == 5.0
+    settled_bytes = j_path.read_bytes()
+    second = settle_auto_buyer_ledger(data_root=tmp_path, espn=mock_espn)
+    assert second["newly_settled"] == 0
+    assert second["changes"] == []
+    assert j_path.read_bytes() == settled_bytes
 
 
 def test_settlement_refuses_shared_words_and_multiple_games(tmp_path: Path):
