@@ -322,3 +322,83 @@ def test_ncaab_gates_non_d1_and_extreme_lines(tmp_path, monkeypatch):
     # Non-D1 game skipped; D1 extreme ML and blowout spread filtered out
     assert report["flat_logged"] == 0
     assert any(s["reason"] == "insufficient_history_non_d1" for s in report["skipped"])
+
+
+def test_ncaab_gates_total_divergence(tmp_path, monkeypatch):
+    monkeypatch.setenv("MODEL_PREDICTION_LEDGER_MIRROR", "0")
+    monkeypatch.setenv("MODEL_PREDICTION_LEDGER_AUTHORITY", "xlsx")
+    now = datetime.now(UTC)
+    start = (now + timedelta(days=1)).isoformat()
+    monkeypatch.setattr(
+        "model_prediction.college_basketball_forward.ESPNClient.scoreboard",
+        lambda *a: {"events": [{"id": "fixture_tot"}]},
+    )
+    games = [
+        GameRecord(f"g_{i}", (now - timedelta(days=i + 1)).isoformat(), "NCAAB", "TeamA", "TeamB", 70, 75)
+        for i in range(20)
+    ]
+    monkeypatch.setattr(
+        "model_prediction.college_basketball_forward.FeatureStore.games_before",
+        lambda *a: games,
+    )
+    monkeypatch.setattr(
+        "model_prediction.college_basketball_forward.PolymarketUSClient.slate",
+        lambda *a: [
+            {
+                "event_id": "fixture_tot",
+                "event_start_utc": start,
+                "markets": [
+                    {
+                        "market_type": "total",
+                        "line": 165.5,
+                        "sides": [
+                            {"selection": "under", "price_probability": 0.50, "line": 165.5},
+                            {"selection": "over", "price_probability": 0.50, "line": 165.5},
+                        ],
+                    }
+                ],
+            }
+        ],
+    )
+
+    class SpreadModel:
+        version = "ncaab-spread-v6"
+
+        def predict_spreads(self, history, upcoming):
+            return []
+
+    class TotalModel:
+        version = "ncaab-total-v6"
+
+        def predict_totals(self, history, upcoming):
+            return [
+                SimpleNamespace(
+                    market_type="total",
+                    probabilities={"under": 0.70, "over": 0.30},
+                    uncertainty=0.1,
+                    rationale="fixture",
+                    line=165.5,
+                    inference_inputs={"mean": 145.0, "sd": 14.5, "line": 165.5},
+                )
+            ]
+
+    monkeypatch.setattr("model_prediction.college_basketball_forward.ncaab_spread_model", SpreadModel)
+    monkeypatch.setattr("model_prediction.college_basketball_forward.ncaab_total_model", TotalModel)
+    monkeypatch.setattr("model_prediction.college_basketball_forward.ncaab_model", SpreadModel)
+
+    flat = MultiSportPickLedger(tmp_path, flat=True)
+    report = forecast_ncaab_sport(
+        data_root=tmp_path,
+        args_date=now.date().isoformat(),
+        config={
+            "models": {
+                "NCAAB": {
+                    "max_total_divergence": 8.5,
+                    "min_edge": 0.035,
+                }
+            }
+        },
+        flat_ledger=flat,
+    )
+    # Divergence is 165.5 - 145.0 = 20.5 > 8.5, so pick is gated
+    assert report["flat_logged"] == 0

@@ -1,15 +1,34 @@
 {
-  "artifact_hash": "3cc38129194e95765cbc868276618e457305534e6f83b7a2bc5591a0162e34e4",
+  "artifact_hash": "f05c4d6ce109ac0a6b6b1392d0d58cbb409d0f0044a79fd8ac8b5ac17c262cd0",
+  "baseline_points_per_team": 76.06,
+  "confidence_threshold": 0.035,
+  "credibility_constant": 4.0,
+  "dynamic_sizing": {
+    "base_units": 1.0,
+    "edge_slope": 16.67,
+    "enabled": true,
+    "max_units": 2.0
+  },
   "home_tempo_control": 0.6,
   "implementation_type": "code_backed_model",
   "league_pace": 68.1,
   "markets": [
     "total"
   ],
+  "max_edge": 0.08,
+  "min_edge": 0.035,
+  "min_sample_games": 8,
   "model_id": "ncaab-total-v6",
   "model_version": "ncaab-total-v6",
+  "offseason_gap_days": 150,
+  "offseason_retention": 0.2,
+  "qualified_for_betting": true,
+  "schema_version": "basketball-total-v6",
   "sport": "ncaab",
-  "status": "candidate",
+  "status": "production",
+  "target": "NCAAB Men's College Basketball conference-tiered dynamic total model with Bayesian credibility shrinkage",
   "total_sd": 13.5,
-  "trend_total_weight": 0.85
+  "trained_through_date": "2026-11-09",
+  "trend_total_weight": 0.85,
+  "use_bayesian_credibility": true
 }

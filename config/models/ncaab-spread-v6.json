@@ -1,5 +1,12 @@
 {
-  "artifact_hash": "a8d3b8d54d2132cf42ced1fd4e3fc5350e642168308cf742eef6d94367ccdc5f",
+  "artifact_hash": "2c3121e41f8ab7bdf704e0f6352e3d792bbbde74fc5776327ff1047c72e27a01",
+  "confidence_threshold": 0.035,
+  "dynamic_sizing": {
+    "base_units": 1.0,
+    "edge_slope": 16.67,
+    "enabled": true,
+    "max_units": 2.0
+  },
   "elo_weight": 0.5,
   "home_court_points": 7.2,
   "implementation_type": "code_backed_model",
@@ -9,11 +16,20 @@
     "spread",
     "moneyline"
   ],
+  "max_edge": 0.08,
+  "min_edge": 0.035,
+  "min_sample_games": 8,
   "model_id": "ncaab-spread-v6",
   "model_version": "ncaab-spread-v6",
+  "offseason_gap_days": 150,
+  "offseason_retention": 0.2,
+  "qualified_for_betting": true,
+  "schema_version": "basketball-spread-v6",
   "sport": "ncaab",
-  "status": "candidate",
+  "status": "production",
   "student_t_df": 8.0,
+  "target": "NCAAB Men's College Basketball Student-t point spread and coherent logistic moneyline model",
+  "trained_through_date": "2026-11-09",
   "trend_weight": 0.5,
   "use_student_t_spreads": true
 }

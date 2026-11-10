@@ -633,3 +633,45 @@ def _logistic_calibration(
         if abs(da) + abs(db) < 1e-8:
             break
     return a, b
+
+
+def load_calibrator_artifact(path: str | Path) -> Calibrator:
+    """Load a calibrated model artifact from disk and return the instantiated Calibrator."""
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"Calibrator artifact not found at {p}")
+    payload = json.loads(p.read_text(encoding="utf-8"))
+    method = str(payload.get("champion_method") or payload.get("method") or "identity").lower()
+    model_version = str(payload.get("model_version", "unknown"))
+    params = payload.get("parameters", {})
+    art_hash = hashlib.sha256(p.read_bytes()).hexdigest()
+    sample_size = int(payload.get("sample_size", 0))
+
+    metadata = CalibrationMetadata(
+        calibration_method=method,
+        calibration_version=f"{method}-artifact-v1",
+        base_model_version=model_version,
+        training_window_start=None,
+        training_window_end=payload.get("calibrated_at_utc"),
+        sample_size=sample_size,
+        artifact_hash=art_hash,
+    )
+
+    if method == "identity":
+        return IdentityCalibrator(base_model_version=model_version)
+    if method == "temperature":
+        return TemperatureCalibrator(temperature=float(params["temperature"]), metadata=metadata)
+    if method == "platt":
+        return TrainablePlattCalibrator(
+            intercept=float(params["intercept"]), slope=float(params["slope"]), metadata=metadata
+        )
+    if method == "beta":
+        return BetaCalibrator(
+            a=float(params["a"]), b=float(params["b"]), c=float(params["c"]), metadata=metadata
+        )
+    if method == "isotonic":
+        thresholds = [float(t) for t in params.get("thresholds", [])]
+        values = [float(v) for v in params.get("values", [])]
+        return IsotonicCalibrator(thresholds=thresholds, values=values, metadata=metadata)
+
+    raise ValueError(f"Unsupported calibrator method: {method}")

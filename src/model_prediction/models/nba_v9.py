@@ -181,8 +181,18 @@ class NBAStructuralV9Engine:
 
             # Rest disparity calculation
             game_start_dt = parse_utc(game.event_start_utc)
-            home_prev = [p for p in history if p.home_team == game.home_team or p.away_team == game.home_team]
-            away_prev = [p for p in history if p.home_team == game.away_team or p.away_team == game.away_team]
+            home_prev = [
+                p
+                for p in history
+                if p.start < game_start_dt
+                and (p.home_team == game.home_team or p.away_team == game.home_team)
+            ]
+            away_prev = [
+                p
+                for p in history
+                if p.start < game_start_dt
+                and (p.home_team == game.away_team or p.away_team == game.away_team)
+            ]
             home_prev.sort(key=lambda p: p.start)
             away_prev.sort(key=lambda p: p.start)
 

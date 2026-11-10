@@ -10,6 +10,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from .calibration import IdentityCalibrator, load_calibrator_artifact
 from .college_contract_evidence import build_candidate_evidence, save_candidate_evidence
 from .config import PROJECT_ROOT
 from .data_sources.espn import ESPNClient
@@ -235,6 +236,7 @@ def forecast_ncaab_sport(
     min_moneyline_ask = float(policy.get("min_moneyline_ask", 0.20))
     max_spread_line = float(policy.get("max_spread_line", 16.0))
     max_margin_divergence = float(policy.get("max_margin_divergence", 12.0))
+    max_total_divergence = float(policy.get("max_total_divergence", 14.0))
     games_by_team: dict[str, int] = {}
     for game in history:
         for name in (game.home_team, game.away_team):
@@ -427,6 +429,18 @@ def forecast_ncaab_sport(
             },
         }
     archive_root = Path(data_root)
+    calibrators: dict[str, Any] = {}
+    for kind_key in ("moneyline", "spread", "total"):
+        mv = total_model.version if kind_key == "total" else spread_model.version
+        cal_path = archive_root / "calibration" / "models" / f"{mv}.{kind_key}_calibrator.json"
+        if cal_path.exists():
+            try:
+                calibrators[kind_key] = load_calibrator_artifact(cal_path)
+            except (OSError, json.JSONDecodeError, ValueError):
+                calibrators[kind_key] = IdentityCalibrator(mv)
+        else:
+            calibrators[kind_key] = IdentityCalibrator(mv)
+
     candidate_rows, candidate_summary = build_candidate_evidence(
         sport="ncaab",
         day=args_date,
@@ -476,9 +490,14 @@ def forecast_ncaab_sport(
                         prediction.probabilities[side["selection"]] - float(side["price_probability"])
                     ),
                 )
+            model_inst = total_model if kind == "total" else spread_model
+            model_version = model_inst.version
+            calibrator = calibrators.get(kind, IdentityCalibrator(model_version))
+
             for side in (best_side,):
                 selection, ask = side["selection"], side["price_probability"]
-                probability = prediction.probabilities[selection]
+                raw_probability = prediction.probabilities[selection]
+                probability = calibrator.transform(raw_probability)
                 edge = probability - float(ask)
                 candidate_row = candidate_by_slug.get(str(market_def.get("market_slug") or ""))
                 candidate_side = (
@@ -503,9 +522,6 @@ def forecast_ncaab_sport(
                     else None
                 )
 
-                model_inst = total_model if kind == "total" else spread_model
-                model_version = model_inst.version
-
                 # Gating for moneyline: do not bet extreme longshots where model lacks predictive resolution
                 if kind == "moneyline" and float(ask) < min_moneyline_ask:
                     continue
@@ -519,6 +535,16 @@ def forecast_ncaab_sport(
                         exp_margin is not None
                         and decision_line is not None
                         and abs(float(exp_margin) - float(decision_line)) > max_margin_divergence
+                    ):
+                        continue
+
+                # Gating for total: do not bet severe tempo divergence
+                if kind == "total":
+                    exp_tot = (getattr(prediction, "inference_inputs", {}) or {}).get("mean")
+                    if (
+                        exp_tot is not None
+                        and decision_line is not None
+                        and abs(float(exp_tot) - float(decision_line)) > max_total_divergence
                     ):
                         continue
 
@@ -536,6 +562,7 @@ def forecast_ncaab_sport(
                         "away_team": away,
                         "feature_basis": {
                             **(getattr(prediction, "feature_basis", None) or {}),
+                            "model_probability_raw": round(raw_probability, 6),
                             "history_games": len(history),
                             "history_scores_sha256": history_digest,
                             "history_cutoff_date": args_date,
@@ -564,6 +591,11 @@ def forecast_ncaab_sport(
                     probability=float(probability),
                     observed_at_utc=observed.isoformat(),
                 )
+                cal_meta = getattr(calibrator, "metadata", None)
+                cal_method = cal_meta.calibration_method if cal_meta else "identity"
+                cal_version = cal_meta.calibration_version if cal_meta else "identity-v1"
+                cal_hash = cal_meta.artifact_hash if cal_meta else ""
+
                 request = PickRequest(
                     event_start_utc=str(start),
                     event_id=str(identity),
@@ -582,6 +614,9 @@ def forecast_ncaab_sport(
                     risks="Paper tempo model; live market quote is an indicative reference, not verified executable BBO.",
                     model_origin=ModelOrigin.STATISTICAL_MODEL,
                     model_state=ModelState.SHADOW_QUALIFIED,
+                    calibration_method=cal_method,
+                    calibration_version=cal_version,
+                    calibration_artifact_hash=cal_hash,
                     observed_at_utc=observed.isoformat(),
                     model_input_snapshot_json=snapshot,
                 )
@@ -607,7 +642,7 @@ def forecast_ncaab_sport(
                     ("flat_logged", flat_ledger, True),
                     ("research_ledger_logged", research_ledger, edge >= min_edge),
                     ("gated_ledger_logged", gated_ledger, edge >= min_edge),
-                    ("main_logged", main_ledger, edge >= min_edge),
+                    ("main_logged", main_ledger, edge >= min_edge and kind != "total"),
                 )
                 for counter, destination, eligible in destinations:
                     if destination is None or not eligible:

@@ -94,7 +94,11 @@ def _load_team_priors(
     tiers = tier_map or DEFAULT_CONFERENCE_TIER_PRIORS
     priors: dict[str, float] = {}
 
-    path = Path(conference_file) if conference_file else Path("data/entities/ncaab_conferences.json")
+    path = (
+        Path(conference_file)
+        if conference_file
+        else Path(__file__).resolve().parents[3] / "data/entities/ncaab_conferences.json"
+    )
     if path.exists():
         try:
             with open(path, encoding="utf-8") as f:

@@ -90,3 +90,45 @@ def test_ncaab_total_v6_venue_tempo_control():
     assert len(preds_neu) == 1
     assert "expected_pace" in preds_home[0].feature_basis
     assert model.compute_dynamic_units(0.05) > 1.0
+
+
+def test_ncaab_total_v6_bayesian_credibility_shrinkage():
+    now = datetime.now(UTC)
+    up = UpcomingGame("g1", now.isoformat(), "Away", "Home", total_line=140.0)
+
+    # 1. Zero sample: expected_total must shrink 100% to line (z=0.0)
+    model = NCAABTotalModelV6(credibility_constant=4.0)
+    preds_zero = model.predict_totals([], [up])
+    assert abs(preds_zero[0].inference_inputs["mean"] - 140.0) < 1e-4
+    assert preds_zero[0].feature_basis["credibility_factor"] == 0.0
+    # Probabilities must be exactly 50/50
+    assert abs(preds_zero[0].probabilities["over"] - 0.50) < 0.01
+
+    # 2. Sample = 12 games: z = 12 / (12 + 4) = 0.75 (model dominates)
+    history_12 = [
+        GameRecord(str(i), (now - timedelta(days=i + 1)).isoformat(), "NCAAB", "Away", "Home", 80, 85)
+        for i in range(12)
+    ]
+    preds_mature = model.predict_totals(history_12, [up])
+    z = preds_mature[0].feature_basis["credibility_factor"]
+    assert 0.70 <= z <= 0.80
+    # Expected total moves toward high-scoring history (>150), not pinned to 140
+    assert preds_mature[0].inference_inputs["mean"] > 145.0
+
+
+def test_ncaab_total_v6_conference_scoring_baselines():
+    now = datetime.now(UTC)
+    # Matchup between two SEC teams vs two NEC teams
+    up_sec = UpcomingGame(
+        "g_sec", now.isoformat(), "Alabama Crimson Tide", "Arkansas Razorbacks", total_line=None
+    )
+    up_nec = UpcomingGame("g_nec", now.isoformat(), "Wagner Seahawks", "LIU Sharks", total_line=None)
+
+    model = NCAABTotalModelV6()
+    pred_sec = model.predict_totals([], [up_sec])
+    pred_nec = model.predict_totals([], [up_nec])
+
+    # SEC expected total should be significantly higher than NEC expected total
+    sec_total = pred_sec[0].inference_inputs["mean"]
+    nec_total = pred_nec[0].inference_inputs["mean"]
+    assert sec_total > nec_total + 15.0

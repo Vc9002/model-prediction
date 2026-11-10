@@ -1,21 +1,29 @@
 """Dedicated NCAAB Over/Under Total Points Model v6.
 
 Advances ncaab-total-v5 with:
-1. Venue-Aware Tempo Control:
+1. Division-1 Conference-Tiered Scoring Baselines:
+   Replaces the uniform 71.4 defect with empirical conference scoring baselines
+   (SEC: 83.4 down to Northeast: 69.0 pts/team), reflecting the 28.8-pt empirical
+   spread between up-tempo power conferences and slow-tempo mid-major grinders.
+2. Bayesian Sample Credibility Shrinkage (Bühlmann Credibility):
+   Continuously contracts expected game totals toward market consensus line on thin
+   samples (sample < 5) via Z = sample / (sample + K), eliminating the need for
+   arbitrary binary divergence gating.
+3. Venue-Aware Tempo Control:
    Empirically weights home court team tempo at 60% controlling share on home court
    (50/50 on neutral venues), preventing fast road teams from falsely inflating
-   possession projections against methodical home defenses (Virginia, Saint Mary's).
-2. Retains all v5 empirical total advantages:
-   - Dynamic possessions & multiplicative pace scaling (+19.2% ROI, 60.8% win rate).
-   - Pace-scaled standard deviation (proportional to sqrt(possessions)).
-   - Overtime risk margin closeness adjustment.
-   - Schedule density & rest fatigue drag.
+   possession projections against methodical home defenses.
+4. Heteroskedastic Pace & Credibility-Scaled Volatility:
+   Adjusts standard deviation proportionally to sqrt(matchup_pace) and sample thinness.
 """
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from math import erf, isnan, sqrt
+from pathlib import Path
+from typing import Any
 
 from ..domain import parse_utc
 from ..features.base import GameRecord
@@ -24,6 +32,65 @@ from .base import GamePrediction, GamePredictionBase
 from .basketball import UpcomingGame
 
 NCAAB_TOTAL_V6_VERSION = "ncaab-total-v6"
+
+DEFAULT_BASELINE_POINTS: float = 76.06
+DEFAULT_LEAGUE_PACE: float = 68.1
+
+DEFAULT_CONFERENCE_SCORING_BASELINES: dict[str, float] = {
+    # High-tempo / High-scoring Tier
+    "Southeastern Conference": 83.41,
+    "Big 12 Conference": 79.42,
+    "Mid-American Conference": 78.82,
+    "Atlantic Coast Conference": 78.52,
+    "Horizon League": 78.34,
+    "Big South Conference": 78.26,
+    "Atlantic Sun Conference": 78.18,
+    "Pac-12 Conference": 77.76,
+    "Big Sky Conference": 77.71,
+    "Big West Conference": 77.68,
+    "Big Ten Conference": 77.61,
+    "Conference USA": 77.50,
+    "Southern Conference": 77.02,
+    "Big East Conference": 76.87,
+    "American Conference": 76.66,
+    "West Coast Conference": 76.63,
+    "Summit League": 76.56,
+    # Mid-scoring Tier
+    "Ivy League": 75.95,
+    "Mountain West Conference": 75.77,
+    "Missouri Valley Conference": 75.38,
+    "Atlantic 10 Conference": 75.30,
+    "United Athletic Conference": 75.26,
+    "Sun Belt Conference": 74.85,
+    "Coastal Athletic Association": 74.63,
+    # Low-tempo / Grinding Defensive Tier
+    "Ohio Valley Conference": 72.87,
+    "Southwestern Athletic Conference": 72.70,
+    "Southland Conference": 72.58,
+    "Patriot League": 72.40,
+    "Mid-Eastern Athletic Conference": 70.27,
+    "America East Conference": 69.77,
+    "Metro Conference": 69.76,
+    "Northeast Conference": 69.01,
+}
+
+
+def _load_team_conference_map(
+    conference_file: Path | str | None = None,
+) -> dict[str, str]:
+    """Map team display names to conference names."""
+    path = (
+        Path(conference_file)
+        if conference_file
+        else Path(__file__).resolve().parents[3] / "data/entities/ncaab_conferences.json"
+    )
+    if path.exists():
+        try:
+            with open(path, encoding="utf-8") as f:
+                return json.load(f)
+        except (OSError, json.JSONDecodeError):
+            pass
+    return {}
 
 
 def _effective_current_season_games(team_trend, team_prev, game_start_dt, offseason_gap_days):
@@ -50,8 +117,8 @@ class NCAABTotalModelV6:
     def __init__(
         self,
         total_sd: float = 13.5,
-        baseline_points_per_team: float = 71.4,
-        league_pace: float = 68.1,
+        baseline_points_per_team: float = DEFAULT_BASELINE_POINTS,
+        league_pace: float = DEFAULT_LEAGUE_PACE,
         trend_total_weight: float = 0.85,
         team_total_weight: float = 0.15,
         dynamic_matchup_pace: bool = True,
@@ -59,9 +126,13 @@ class NCAABTotalModelV6:
         schedule_density_drag: bool = True,
         overtime_risk_adjustment: bool = True,
         offseason_gap_days: float = 150.0,
-        offseason_retention: float = 0.35,
+        offseason_retention: float = 0.20,
         isolate_postseason: bool = True,
         home_tempo_control: float = 0.60,
+        use_bayesian_credibility: bool = True,
+        credibility_constant: float = 4.0,
+        conference_file: Path | str | None = None,
+        conference_baselines: dict[str, float] | None = None,
         version: str = NCAAB_TOTAL_V6_VERSION,
     ) -> None:
         self.total_sd = total_sd
@@ -77,9 +148,34 @@ class NCAABTotalModelV6:
         self.offseason_retention = offseason_retention
         self.isolate_postseason = isolate_postseason
         self.home_tempo_control = home_tempo_control
+        self.use_bayesian_credibility = use_bayesian_credibility
+        self.credibility_constant = credibility_constant
+        self.conference_baselines = conference_baselines or DEFAULT_CONFERENCE_SCORING_BASELINES
+        self.team_conferences = _load_team_conference_map(conference_file)
         self.version = version
         self.league = "NCAAB"
         self.sport = "ncaab"
+
+    @classmethod
+    def from_artifact(cls, artifact: dict[str, Any]) -> NCAABTotalModelV6:
+        return cls(
+            total_sd=float(artifact.get("total_sd", 13.5)),
+            baseline_points_per_team=float(artifact.get("baseline_points_per_team", DEFAULT_BASELINE_POINTS)),
+            league_pace=float(artifact.get("league_pace", DEFAULT_LEAGUE_PACE)),
+            trend_total_weight=float(artifact.get("trend_total_weight", 0.85)),
+            team_total_weight=float(artifact.get("team_total_weight", 0.15)),
+            dynamic_matchup_pace=bool(artifact.get("dynamic_matchup_pace", True)),
+            pace_drag=float(artifact.get("pace_drag", 0.5)),
+            schedule_density_drag=bool(artifact.get("schedule_density_drag", True)),
+            overtime_risk_adjustment=bool(artifact.get("overtime_risk_adjustment", True)),
+            offseason_gap_days=float(artifact.get("offseason_gap_days", 150.0)),
+            offseason_retention=float(artifact.get("offseason_retention", 0.20)),
+            isolate_postseason=bool(artifact.get("isolate_postseason", True)),
+            home_tempo_control=float(artifact.get("home_tempo_control", 0.60)),
+            use_bayesian_credibility=bool(artifact.get("use_bayesian_credibility", True)),
+            credibility_constant=float(artifact.get("credibility_constant", 4.0)),
+            version=str(artifact.get("model_version", NCAAB_TOTAL_V6_VERSION)),
+        )
 
     def predict_totals(
         self,
@@ -92,7 +188,6 @@ class NCAABTotalModelV6:
             offseason_retention=self.offseason_retention,
             isolate_postseason=self.isolate_postseason,
         )
-        baseline = trend.league_baseline or self.baseline_points_per_team
 
         predictions: list[GamePrediction] = []
 
@@ -122,8 +217,14 @@ class NCAABTotalModelV6:
             )
             sample = min(away_sample, home_sample)
 
-            away_points = (away_trend.offense["hl10"] + home_trend.defense["hl10"]) / 2.0 or baseline
-            home_points = (home_trend.offense["hl10"] + away_trend.defense["hl10"]) / 2.0 or baseline
+            away_conf = self.team_conferences.get(game.away_team)
+            home_conf = self.team_conferences.get(game.home_team)
+            away_base = self.conference_baselines.get(away_conf, self.baseline_points_per_team)
+            home_base = self.conference_baselines.get(home_conf, self.baseline_points_per_team)
+            baseline = (away_base + home_base) / 2.0
+
+            away_points = (away_trend.offense["hl10"] + home_trend.defense["hl10"]) / 2.0 or away_base
+            home_points = (home_trend.offense["hl10"] + away_trend.defense["hl10"]) / 2.0 or home_base
 
             home_rest_days = None
             away_rest_days = None
@@ -166,11 +267,11 @@ class NCAABTotalModelV6:
             expected_pace = self.league_pace
             is_neutral = bool(getattr(game, "neutral_site", False))
             if self.dynamic_matchup_pace and baseline > 0.0:
-                pf_away = 1.0 + 0.45 * (
-                    ((away_trend.offense["hl10"] + away_trend.defense["hl10"]) / 2.0 - baseline) / baseline
+                pf_away = 1.0 + 0.55 * (
+                    ((away_trend.offense["hl10"] + away_trend.defense["hl10"]) / 2.0 - away_base) / away_base
                 )
-                pf_home = 1.0 + 0.45 * (
-                    ((home_trend.offense["hl10"] + home_trend.defense["hl10"]) / 2.0 - baseline) / baseline
+                pf_home = 1.0 + 0.55 * (
+                    ((home_trend.offense["hl10"] + home_trend.defense["hl10"]) / 2.0 - home_base) / home_base
                 )
                 home_w = 0.50 if is_neutral else self.home_tempo_control
                 away_w = 0.50 if is_neutral else (1.0 - self.home_tempo_control)
@@ -208,16 +309,29 @@ class NCAABTotalModelV6:
                 elif abs(expected_margin) <= 6.5:
                     expected_total += 0.6
 
-            # Pace-scaled dynamic total standard deviation
-            effective_total_sd = self.total_sd * sqrt(expected_pace / self.league_pace)
-            if sample < 8:
-                sample_factor = max(0.0, min(1.0, 1.0 - sample / 8.0))
-                effective_total_sd = max(
-                    self.total_sd, min(self.total_sd * 1.5, effective_total_sd * (1.0 + 0.35 * sample_factor))
-                )
+            # Bayesian Sample Credibility Shrinkage (Bühlmann Credibility):
+            # Smoothly contracts the model's projected total toward the market line on thin samples
+            # Eliminates reliance on arbitrary post-hoc binary total divergence gates
+            raw_model_total = expected_total
+            target_line = game.total_line if game.total_line is not None else expected_total
+            if self.use_bayesian_credibility and game.total_line is not None:
+                cred_k = self.credibility_constant
+                z = sample / (sample + cred_k)
+                expected_total = z * raw_model_total + (1.0 - z) * float(game.total_line)
+            else:
+                z = 1.0
+
+            # Pace-scaled dynamic total standard deviation with credibility widening
+            credibility_drag = (
+                self.credibility_constant / (sample + self.credibility_constant)
+                if self.use_bayesian_credibility
+                else 0.0
+            )
+            effective_total_sd = (
+                self.total_sd * sqrt(expected_pace / self.league_pace) * (1.0 + 0.40 * credibility_drag)
+            )
 
             uncertainty = max(0.03, min(0.20, 0.20 - 0.02 * sample))
-            target_line = game.total_line if game.total_line is not None else expected_total
             over_prob = 1.0 - _normal_cdf(target_line, expected_total, effective_total_sd)
             under_prob = 1.0 - over_prob
 
@@ -232,9 +346,13 @@ class NCAABTotalModelV6:
                 "feature_basis": {
                     "away_points_hl10": round(away_points, 2),
                     "home_points_hl10": round(home_points, 2),
+                    "away_conference": away_conf,
+                    "home_conference": home_conf,
                     "expected_pace": round(expected_pace, 1),
                     "league_pace": self.league_pace,
+                    "raw_model_total": round(raw_model_total, 2),
                     "expected_total": round(expected_total, 2),
+                    "credibility_factor": round(z, 3),
                     "effective_total_sd": round(effective_total_sd, 2),
                     "current_season_sample": sample,
                     "history_games": len(history),
@@ -249,12 +367,17 @@ class NCAABTotalModelV6:
                         "mean": round(expected_total, 2),
                         "sd": round(effective_total_sd, 2),
                         "line": game.total_line,
+                        "raw_model_mean": round(raw_model_total, 2),
+                        "credibility_z": round(z, 3),
                     },
                     probabilities={
                         "over": round(max(0.0001, min(0.9999, over_prob)), 6),
                         "under": round(max(0.0001, min(0.9999, under_prob)), 6),
                     },
-                    rationale=f"Projected total {expected_total:.1f}, pace {expected_pace:.1f}, sd {effective_total_sd:.1f}.",
+                    rationale=(
+                        f"Projected total {expected_total:.1f} (raw {raw_model_total:.1f}, "
+                        f"z={z:.2f}, pace {expected_pace:.1f}, sd {effective_total_sd:.1f})."
+                    ),
                     **base,
                 )
             )
