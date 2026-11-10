@@ -7,6 +7,7 @@ from pathlib import Path
 
 from model_prediction.features.nfl_efficiency import NFLEfficiencyStore
 from model_prediction.models.nfl_spread_v7 import NFLSpreadModelV7
+from model_prediction.models.nfl_spread_v8 import NFLSpreadModelV8
 from model_prediction.models.nfl_total_v7 import NFLTotalModelV7
 from model_prediction.production_canary import _compute_artifact_hash
 
@@ -81,6 +82,27 @@ def test_nfl_spread_v7_contract_and_hash() -> None:
         spread_home_line=-3.5,
     )
     assert fc_below_key.prob_home_cover > fc_above_key.prob_home_cover
+
+
+def test_nfl_spread_v8_discrete_margin_symmetry_and_push() -> None:
+    model = NFLSpreadModelV8(market_weight=1.0, use_scoring_simulation=False)
+    for line in (3.0, 3.5, 8.0):
+        home_dog = model.forecast_spread(home_team="A", away_team="B", spread_home_line=line)
+        home_favorite = model.forecast_spread(home_team="A", away_team="B", spread_home_line=-line)
+        assert abs(home_dog.prob_home_cover - home_favorite.prob_away_cover) < 0.001
+        assert abs(home_dog.prob_spread_push - home_favorite.prob_spread_push) < 0.001
+        assert (
+            abs(home_dog.prob_home_cover + home_dog.prob_away_cover + home_dog.prob_spread_push - 1) < 0.001
+        )
+    at_three = model.forecast_spread(home_team="A", away_team="B", spread_home_line=-3.0)
+    past_three = model.forecast_spread(home_team="A", away_team="B", spread_home_line=-3.5)
+    assert at_three.prob_spread_push > 0.0
+    assert past_three.prob_spread_push == 0.0
+    assert at_three.prob_home_cover != past_three.prob_home_cover
+    assert (
+        model.forecast_spread(home_team="A", away_team="B", spread_home_line=8.0).effective_sd
+        == model.margin_sd * 1.25
+    )
 
 
 def test_nfl_total_v7_contract_and_hash() -> None:

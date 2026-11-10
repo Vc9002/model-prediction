@@ -1,0 +1,34 @@
+{
+  "artifact_hash": "4548797be9ddb90ddc03084087dcd045c587117e777bfc768cb6067c041a215c",
+  "edsr_weight": 4.0,
+  "gates": {
+    "max_uncertainty": 0.15,
+    "min_edge": 0.035,
+    "sizing": "flat_1u_gated"
+  },
+  "home_field_advantage_points": 1.35,
+  "key_number_weight": 0.2,
+  "league": "NFL",
+  "logistic_scale": 13.5,
+  "margin_pmf_artifact": "config/models/nfl-margin-pmf-v1.json",
+  "margin_sd": 13.8,
+  "market_weight": 0.8,
+  "max_cover_prob": 0.65,
+  "method": "nfl_empirical_discrete_margin_pmf_v8",
+  "min_cover_prob": 0.35,
+  "model_version": "nfl-spread-structural-v8",
+  "note": "Empirical discrete NFL margin PMF challenger with explicit push mass and frozen pre-2023 fit.",
+  "positive_class": "away_cover",
+  "qualification": {
+    "note": "Changed serving formula; requires walk-forward replay, CLV and prospective qualification.",
+    "qualified": false,
+    "status": "candidate_unqualified"
+  },
+  "rho": 0.08,
+  "schema_version": "2",
+  "simulation_weight": 0.2,
+  "sport": "nfl",
+  "turnover_luck_weight": 0.5,
+  "use_logistic_moneyline": true,
+  "use_scoring_simulation": true
+}
