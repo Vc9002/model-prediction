@@ -160,8 +160,8 @@ prediction_service:
     implementation: json_artifact
     artifact: config/models/nba-moneyline-v9.json
     enabled: true
-    serving_status: production
-    evidence_status: predictively_qualified
+    serving_status: rollback
+    evidence_status: unverified
     replacement_priority: low
     rollback_model: nba-moneyline-v7
   - model_id: nba-moneyline-v7
@@ -180,7 +180,7 @@ prediction_service:
     implementation: json_artifact
     artifact: config/models/nba-elo-trend-lr-v4.json
     enabled: true
-    serving_status: rollback
+    serving_status: production
     evidence_status: historical_only
     replacement_priority: medium
     rollback_model: nba-elo-trend-lr-v3
@@ -938,7 +938,7 @@ prediction_service:
       total: mlb-structural-v10-frozen
       nrfi: mlb-nrfi-v4
     NBA:
-      moneyline: nba-moneyline-v9
+      moneyline: nba-elo-trend-lr-v4
       spread: nba-spread-margin-v9
       total: nba-total-margin-v9
     NFL:

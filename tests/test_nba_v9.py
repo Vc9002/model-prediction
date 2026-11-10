@@ -7,6 +7,7 @@ from pathlib import Path
 
 from model_prediction.features.base import GameRecord
 from model_prediction.models.basketball import UpcomingGame
+from model_prediction.models.learned_market import LearnedMarketArtifact
 from model_prediction.models.nba_v9 import (
     NBAMoneylineModelV9,
     NBASpreadModelV9,
@@ -133,5 +134,22 @@ def test_nba_v9_production_registry():
 
     champ_ml = reg.champion("NBA", "moneyline")
     assert champ_ml is not None
-    assert champ_ml.model_id == "nba-moneyline-v9"
+    assert champ_ml.model_id == "nba-elo-trend-lr-v4"
     assert champ_ml.serving_status == "production"
+    assert champ_ml.evidence_status == "historical_only"
+
+
+def test_nba_moneyline_rollback_prices_open_underdog_examples():
+    artifact = LearnedMarketArtifact.load("config/models/nba-elo-trend-lr-v4.json")
+    examples = (
+        (
+            {"elo_probability": 0.25046569238974953, "trend_gap": -2.489431, "defensive_trend_gap": 4.10874},
+            0.2574,
+        ),
+        (
+            {"elo_probability": 0.3659979290081694, "trend_gap": 1.355369, "defensive_trend_gap": 3.369983},
+            0.3426,
+        ),
+    )
+    for features, expected in examples:
+        assert abs(artifact.probability("moneyline", features) - expected) < 0.0001
