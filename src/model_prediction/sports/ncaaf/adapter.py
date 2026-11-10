@@ -10,7 +10,7 @@ from typing import Any
 from model_prediction.core.time_context import TimeContext
 from model_prediction.domain import MarketType
 from model_prediction.features.base import GameRecord
-from model_prediction.models.cfb_structural_v2 import CFBStructuralV2Model
+from model_prediction.models.cfb_structural_v4 import CFBStructuralV4Model
 from model_prediction.sports.base import SportAdapter, SportRegistry
 
 
@@ -19,7 +19,7 @@ class NCAAFAdapter(SportAdapter):
 
     def __init__(self, data_root: Path | str = "data") -> None:
         self.data_root = Path(data_root)
-        self._model = CFBStructuralV2Model()
+        self._model = CFBStructuralV4Model()
 
     @property
     def sport_name(self) -> str:
@@ -41,8 +41,10 @@ class NCAAFAdapter(SportAdapter):
                         "event_start_utc": str(g["event_start_utc"]),
                         "away_team": str(g["away_team"]),
                         "home_team": str(g["home_team"]),
-                        "spread_home_line": float(g.get("spread_home_line", -3.5)),
-                        "total_line": float(g.get("total_line", 52.5)),
+                        "spread_home_line": float(g["spread_home_line"])
+                        if g.get("spread_home_line") is not None
+                        else None,
+                        "total_line": float(g["total_line"]) if g.get("total_line") is not None else None,
                     }
                 )
             return slate
@@ -68,8 +70,12 @@ class NCAAFAdapter(SportAdapter):
                             "event_start_utc": str(start_utc),
                             "away_team": str(row["away_team"]),
                             "home_team": str(row["home_team"]),
-                            "spread_home_line": float(row.get("spread_home_line", -3.5)),
-                            "total_line": float(row.get("total_line", 52.5)),
+                            "spread_home_line": float(row["spread_home_line"])
+                            if row.get("spread_home_line") is not None
+                            else None,
+                            "total_line": float(row["total_line"])
+                            if row.get("total_line") is not None
+                            else None,
                         }
                     )
         return slate
@@ -117,13 +123,15 @@ class NCAAFAdapter(SportAdapter):
         predictions: list[dict[str, Any]] = []
 
         for game in slate:
+            if game.get("spread_home_line") is None or game.get("total_line") is None:
+                continue
             obj = SimpleNamespace(
                 event_id=game["event_id"],
                 event_start_utc=game["event_start_utc"],
                 away_team=game["away_team"],
                 home_team=game["home_team"],
-                spread_home_line=float(game.get("spread_home_line", -3.5)),
-                total_line=float(game.get("total_line", 52.5)),
+                spread_home_line=float(game["spread_home_line"]),
+                total_line=float(game["total_line"]),
             )
 
             preds = self._model.predict_matchup(history, obj)

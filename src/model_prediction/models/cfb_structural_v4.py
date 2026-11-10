@@ -148,8 +148,8 @@ class CFBStructuralV4Model:
     def forecast_game(
         self,
         matchup_features: CFBMatchupFeatures,
-        spread_home_line: float = -3.5,
-        total_line: float = 52.5,
+        spread_home_line: float,
+        total_line: float,
     ) -> CFBStructuralForecastV4:
         """Compute structural home/away point expectations and joint market probabilities."""
         mu_home = matchup_features.projected_home_points
@@ -167,20 +167,17 @@ class CFBStructuralV4Model:
             uncertainty=matchup_features.uncertainty,
         )
 
-        orig_margin_sd = self.distribution_engine.margin_sd
-        orig_total_sd = self.distribution_engine.total_sd
-        self.distribution_engine.margin_sd = effective_margin_sd
-        self.distribution_engine.total_sd = effective_total_sd
-        try:
-            joint_probs = self.distribution_engine.compute_market_probabilities(
-                mu_away=mu_away,
-                mu_home=mu_home,
-                spread_home_line=spread_home_line,
-                total_line=total_line,
-            )
-        finally:
-            self.distribution_engine.margin_sd = orig_margin_sd
-            self.distribution_engine.total_sd = orig_total_sd
+        engine = type(self.distribution_engine)(
+            distribution_type=self.distribution_type,
+            margin_sd=effective_margin_sd,
+            total_sd=effective_total_sd,
+        )
+        joint_probs = engine.compute_market_probabilities(
+            mu_away=mu_away,
+            mu_home=mu_home,
+            spread_home_line=spread_home_line,
+            total_line=total_line,
+        )
 
         return CFBStructuralForecastV4(
             home_expected_points=round(mu_home, 2),
@@ -240,9 +237,12 @@ class CFBStructuralV4Model:
             qb_starter_prob_home=getattr(game, "qb_starter_prob_home", 1.0),
         )
         supplied_spread = getattr(game, "spread_home_line", None)
-        spread_home_line = -3.5 if supplied_spread is None else supplied_spread
+        tot_line = getattr(game, "total_line", None)
+        if supplied_spread is None or tot_line is None:
+            return []
+        spread_home_line = float(supplied_spread)
         sp_away_line = -spread_home_line
-        tot_line = getattr(game, "total_line", 52.5) or 52.5
+        tot_line = float(tot_line)
 
         fc = self.forecast_game(feat, spread_home_line=spread_home_line, total_line=tot_line)
 

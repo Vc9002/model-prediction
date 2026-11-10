@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 
 import yaml
 
@@ -74,6 +75,25 @@ def test_cfb_structural_v4_preserves_pickem_spread():
     )
     spread = next(p for p in model.predict_matchup([], game) if p.market_type == "spread")
     assert spread.line == 0.0
+
+
+def test_cfb_structural_v4_refuses_missing_lines_and_preserves_engine_state():
+    model = CFBStructuralV4Model()
+    game = UpcomingCFBGame(
+        event_id="missing-lines",
+        event_start_utc="2026-10-24T19:00:00Z",
+        away_team="Pittsburgh Panthers",
+        home_team="Miami Hurricanes",
+        spread_home_line=None,
+        total_line=None,
+    )
+    assert model.predict_matchup([], game) == []
+    game = replace(game, spread_home_line=-21.5, total_line=55.5)
+    original = model.distribution_engine
+    model.predict_matchup([], game)
+    assert model.distribution_engine is original
+    assert original.margin_sd == model.margin_sd
+    assert original.total_sd == model.total_sd
 
 
 def test_cfb_structural_v4_artifact_and_registry_wiring():
