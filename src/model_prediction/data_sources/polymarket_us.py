@@ -836,6 +836,15 @@ class PolymarketUSClient:
         }
 
 
+def _slug_prefilter(slug: str) -> bool:
+    """True when ``slug in raw_line`` is a safe necessary condition for a match.
+
+    A line whose market_slug equals ``slug`` contains ``slug`` verbatim unless
+    JSON (ASCII-escaping, as append() writes) altered any character in it, so skip the raw-substring shortcut then.
+    """
+    return bool(slug) and json.dumps(slug)[1:-1] == slug
+
+
 class PolymarketSnapshotStore:
     """Append-only BBO snapshot store.
 
@@ -861,8 +870,11 @@ class PolymarketSnapshotStore:
         if not self.path.exists():
             return None
         latest: dict[str, Any] | None = None
+        prefilter = _slug_prefilter(slug)
         with self.path.open(encoding="utf-8") as handle:
             for line in handle:
+                if prefilter and slug not in line:
+                    continue
                 try:
                     item = json.loads(line)
                 except json.JSONDecodeError:
@@ -880,8 +892,11 @@ class PolymarketSnapshotStore:
             return None
         event_start = parse_utc(event_start_utc)
         candidates = []
+        prefilter = _slug_prefilter(slug)
         with self.path.open(encoding="utf-8") as handle:
             for line in handle:
+                if prefilter and slug not in line:
+                    continue
                 try:
                     item = json.loads(line)
                 except (json.JSONDecodeError, ValueError):
