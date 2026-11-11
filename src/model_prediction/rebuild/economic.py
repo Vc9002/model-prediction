@@ -127,12 +127,6 @@ class Exposure:
         self.team_daily[team] = self.team_daily.get(team, 0) + units
         self.event_units[event_id] = self.event_units.get(event_id, 0) + units
 
-    def reset_daily(self) -> None:
-        self.daily_total = 0.0
-        self.sport_daily.clear()
-        self.team_daily.clear()
-        self.event_units.clear()
-
 
 # ── Economic Evaluation ──────────────────────────────────────────────────────
 

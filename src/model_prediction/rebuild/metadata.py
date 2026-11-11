@@ -200,72 +200,9 @@ class MetadataDB:
             )
         self.conn.commit()
 
-    def register_source_sport(
-        self,
-        source_id: str,
-        sport: str,
-        data_type: str,
-        coverage_start: str | None = None,
-        coverage_end: str | None = None,
-    ) -> None:
-        self.conn.execute(
-            """INSERT OR REPLACE INTO source_sports(source_id, sport, data_type, coverage_start, coverage_end)
-               VALUES(?, ?, ?, ?, ?)""",
-            (source_id, sport, data_type, coverage_start, coverage_end),
-        )
-        self.conn.commit()
-
     # ── schema registration ────────────────────────────────────────────
 
-    def register_schema(
-        self,
-        schema_id: str,
-        source_id: str,
-        table_name: str,
-        columns: list[dict[str, str]],
-        schema_version: str = "1",
-    ) -> None:
-        self.conn.execute(
-            """INSERT OR REPLACE INTO schemas(schema_id, source_id, table_name, schema_version, columns_json, created_utc)
-               VALUES(?, ?, ?, ?, ?, ?)""",
-            (schema_id, source_id, table_name, schema_version, json.dumps(columns), utc_now()),
-        )
-        self.conn.commit()
-
     # ── model registry ─────────────────────────────────────────────────
-
-    def register_model(
-        self,
-        model_id: str,
-        sport: str,
-        market_type: str,
-        family: str,
-        version: str,
-        artifact_hash: str,
-        artifact_path: str | None = None,
-        qualified: bool = False,
-        status: str = "research",
-        notes: str | None = None,
-    ) -> None:
-        self.conn.execute(
-            """INSERT OR REPLACE INTO models(model_id, sport, market_type, family, version,
-               artifact_hash, artifact_path, qualified, status, created_utc, notes)
-               VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                model_id,
-                sport,
-                market_type,
-                family,
-                version,
-                artifact_hash,
-                artifact_path,
-                int(qualified),
-                status,
-                utc_now(),
-                notes,
-            ),
-        )
-        self.conn.commit()
 
     # ── entity registry ────────────────────────────────────────────────
 
@@ -352,14 +289,6 @@ class MetadataDB:
 
     def source_status(self) -> list[dict[str, Any]]:
         return [dict(r) for r in self.conn.execute("SELECT * FROM sources ORDER BY source_id").fetchall()]
-
-    def models_by_sport(self, sport: str) -> list[dict[str, Any]]:
-        return [
-            dict(r)
-            for r in self.conn.execute(
-                "SELECT * FROM models WHERE sport=? ORDER BY version", (sport,)
-            ).fetchall()
-        ]
 
     def entity_by_source(self, source_id: str, source_entity_id: str) -> dict[str, Any] | None:
         row = self.conn.execute(

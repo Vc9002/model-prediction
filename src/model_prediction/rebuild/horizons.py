@@ -14,7 +14,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any
 
 import polars as pl
 
@@ -120,69 +119,4 @@ def horizon_specs_for_sport(sport: str) -> dict[str, HorizonSpec]:
         "early": HorizonSpec("early", 36, common_early),
         "mid": HorizonSpec("mid", 6, common_mid),
         "late": HorizonSpec("late", 1.0, common_late),
-    }
-
-
-def horizon_from_time_to_start(hours_to_start: float) -> str:
-    """Map hours-before-start to the appropriate horizon name."""
-    if hours_to_start >= 18:
-        return "early"
-    if hours_to_start >= 3:
-        return "mid"
-    return "late"
-
-
-def validate_horizon_separation(
-    early_predictions: list[dict[str, Any]],
-    mid_predictions: list[dict[str, Any]],
-    late_predictions: list[dict[str, Any]],
-) -> dict[str, Any]:
-    """Ensure late information hasn't leaked into early predictions.
-
-    Returns a report with any violations found.
-    """
-    violations: list[str] = []
-    early_event_ids = {p.get("event_id") for p in early_predictions}
-    mid_event_ids = {p.get("event_id") for p in mid_predictions}
-    late_event_ids = {p.get("event_id") for p in late_predictions}
-
-    # Check that predictions have timestamp metadata and that
-    # late-only features don't appear in early/mid predictions
-    late_only_features = {
-        "confirmed_batting_order",
-        "wind_vector",
-        "final_lineups",
-        "inactive_list",
-        "game_time_weather",
-        "withdrawal_risk",
-    }
-
-    for p in early_predictions:
-        features = set(p.get("features_used", []))
-        leaked = features & late_only_features
-        if leaked:
-            violations.append(
-                f"Early prediction {p.get('event_id', '?')} contains late-only features: {leaked}"
-            )
-        observed = p.get("observed_at_utc", "")
-        event_start = p.get("event_start_utc", "")
-        if observed and event_start and observed > event_start:
-            violations.append(
-                f"Early prediction {p.get('event_id', '?')} observed {observed} after event start {event_start}"
-            )
-
-    for p in mid_predictions:
-        features = set(p.get("features_used", []))
-        leaked = features & late_only_features
-        if leaked:
-            violations.append(
-                f"Mid prediction {p.get('event_id', '?')} contains late-only features: {leaked}"
-            )
-
-    return {
-        "horizon_separation_valid": len(violations) == 0,
-        "violations": violations,
-        "early_events": len(early_event_ids),
-        "mid_events": len(mid_event_ids),
-        "late_events": len(late_event_ids),
     }

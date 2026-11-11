@@ -1411,13 +1411,6 @@ class ShadowLedger:
         row = self.conn.execute("SELECT * FROM trade_decisions WHERE id=?", (id_,)).fetchone()
         return dict(row) if row else None
 
-    def trade_decisions_for_event(self, sport: str, event_id: str) -> list[dict[str, Any]]:
-        rows = self.conn.execute(
-            "SELECT * FROM trade_decisions WHERE sport=? AND event_id=? ORDER BY id",
-            (sport, event_id),
-        ).fetchall()
-        return [dict(r) for r in rows]
-
     # ── paper_orders (append-only) ───────────────────────────────────
 
     def record_paper_order(

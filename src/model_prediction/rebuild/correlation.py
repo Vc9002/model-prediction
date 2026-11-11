@@ -44,36 +44,6 @@ class CorrelationTracker:
         self.trades: list[dict[str, Any]] = []
         self.event_groups: dict[str, CorrelationGroup] = {}
 
-    def add_trade(
-        self,
-        event_id: str,
-        team: str,
-        sport: str,
-        market_type: str,
-        units: float,
-        model_version: str = "",
-        date_str: str = "",
-    ) -> None:
-        self.trades.append(
-            {
-                "event_id": event_id,
-                "team": team,
-                "sport": sport,
-                "market_type": market_type,
-                "units": units,
-                "model_version": model_version,
-                "date": date_str,
-            }
-        )
-        if event_id not in self.event_groups:
-            self.event_groups[event_id] = CorrelationGroup(
-                group_id=event_id,
-                reason="same_event",
-                correlation_factor=CORRELATION_TYPES["same_event"]["correlation"],
-            )
-        self.event_groups[event_id].trades.append(event_id)
-        self.event_groups[event_id].nominal_exposure += units
-
     def correlation_adjusted_exposure(self) -> float:
         """Compute exposure adjusted for within-event correlations.
 

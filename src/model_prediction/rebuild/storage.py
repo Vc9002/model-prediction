@@ -460,13 +460,6 @@ class FeatureStore:
             return []
         return list(json.loads(p.read_text())["history"])
 
-    def available_horizons(self, sport: str) -> list[str]:
-        if not self.root.joinpath(sport).exists():
-            return []
-        return sorted(
-            d.name for d in self.root.joinpath(sport).iterdir() if d.is_dir() and (d / "latest.json").exists()
-        )
-
 
 # ── Market storage ──────────────────────────────────────────────────────────
 
@@ -538,9 +531,3 @@ class MarketStore:
 
     def read(self, sport: str, date_str: str) -> pl.DataFrame:
         return pl.read_parquet(str(self.path(sport, date_str)))
-
-    def available_dates(self, sport: str) -> list[str]:
-        sport_dir = self.root / sport
-        if not sport_dir.exists():
-            return []
-        return sorted(p.stem for p in sport_dir.glob("*.parquet"))

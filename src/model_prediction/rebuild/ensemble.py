@@ -28,27 +28,6 @@ def equal_weight_ensemble(prob_matrices: Sequence[Sequence[float]]) -> list[floa
     return arr.mean(axis=0).tolist()
 
 
-def inverse_log_loss_weights(
-    prob_matrices: Sequence[Sequence[float]],
-    y_true: Sequence[int],
-) -> list[float]:
-    """Weight models by inverse of their individual log loss.
-
-    w_i ∝ 1 / (log_loss_i + epsilon)
-    """
-    arr = np.array(prob_matrices)
-    eps = 1e-6
-    n_models = arr.shape[0]
-    losses = np.zeros(n_models)
-    for i in range(n_models):
-        probs = np.clip(arr[i], eps, 1 - eps)
-        losses[i] = -np.mean(np.array(y_true) * np.log(probs) + (1 - np.array(y_true)) * np.log(1 - probs))
-    weights = 1.0 / (losses + eps)
-    weights /= weights.sum()
-    weighted = np.dot(weights, arr)
-    return weighted.tolist()
-
-
 def logistic_stacking(
     prob_matrices: Sequence[Sequence[float]],
     y_true: Sequence[int],
@@ -99,9 +78,6 @@ class Ensemble:
         self._fitted = False
         self._lr_model: Any = None
         self._lr_feature_order: list[str] = []
-
-    def add_model(self, name: str, oof_probs: Sequence[float]) -> None:
-        """Register a model's out-of-fold predictions. Not used during predict."""
 
     def fit(
         self,
