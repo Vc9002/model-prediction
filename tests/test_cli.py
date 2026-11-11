@@ -2427,7 +2427,14 @@ def test_international_forecast_gated_blocked_when_team_lacks_real_history(monke
     assert len(gated.appended) == 1
 
 
-def _log_pick(ledger: PickLedger, *, event_start_utc: str, created_at, units: float = 1.0) -> dict:
+def _log_pick(
+    ledger: PickLedger,
+    *,
+    event_start_utc: str,
+    created_at,
+    units: float = 1.0,
+    model_version: str = "v1",
+) -> dict:
     request = PickRequest(
         event_start_utc=event_start_utc,
         event_id="event-1",
@@ -2441,7 +2448,7 @@ def _log_pick(ledger: PickLedger, *, event_start_utc: str, created_at, units: fl
         american_odds=-110,
         model_probability=0.6,
         model_uncertainty=0.05,
-        model_version="v1",
+        model_version=model_version,
         rationale="test",
         risks="",
         model_origin=ModelOrigin.STATISTICAL_MODEL,
@@ -2517,6 +2524,32 @@ def test_clear_today_open_removes_a_not_yet_started_pick_by_creation_date(tmp_pa
     removed = _clear_today_open(ledger, "2026-07-25")
     assert removed == [row["pick_id"]]
     assert ledger.rows() == []
+
+
+def test_refresh_restores_a_pick_when_no_replacement_was_logged(tmp_path) -> None:
+    ledger = _ledger(tmp_path)
+    row = _log_pick(
+        ledger,
+        event_start_utc="2099-01-01T00:00:00Z",
+        created_at=datetime(2026, 7, 25, 10, tzinfo=UTC),
+    )
+    prior = ledger.rows()
+    assert _clear_today_open(ledger, "2026-07-25") == [row["pick_id"]]
+    assert ledger.restore_unreplaced_picks(prior) == [row["pick_id"]]
+    assert ledger.rows()[0]["status"] == "open"
+    assert ledger.restore_unreplaced_picks(prior) == []
+
+
+def test_refresh_keeps_prior_superseded_when_replacement_was_logged(tmp_path) -> None:
+    ledger = _ledger(tmp_path)
+    start = "2099-01-01T00:00:00Z"
+    created = datetime(2026, 7, 25, 10, tzinfo=UTC)
+    old = _log_pick(ledger, event_start_utc=start, created_at=created)
+    prior = ledger.rows()
+    assert _clear_today_open(ledger, "2026-07-25") == [old["pick_id"]]
+    new = _log_pick(ledger, event_start_utc=start, created_at=created, model_version="v2")
+    assert ledger.restore_unreplaced_picks(prior) == []
+    assert [row["pick_id"] for row in ledger.rows()] == [new["pick_id"]]
 
 
 def test_clear_today_open_by_event_date_matches_on_event_start_not_creation(tmp_path) -> None:

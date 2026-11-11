@@ -1518,6 +1518,47 @@ class PickLedger:
         """
         return self._retire_open_rows(pick_ids, reason, allow_staked_removal, superseded=True)
 
+    def restore_unreplaced_picks(self, prior_rows: list[dict[str, str]]) -> list[str]:
+        """Reopen pre-refresh calls only where no new event/market call landed."""
+        restored: list[str] = []
+        with self._lock():
+            current = self._read_unlocked()
+            retired_ids = (
+                {
+                    item["pick_id"]
+                    for item in self.mirror.pick_rows(tier=self.tier, sport=self.sport)
+                    if item.get("status") == "superseded"
+                }
+                if self.mirror is not None and self.tier
+                else None
+            )
+            active_slots = {
+                (row["league"].casefold(), row["event_id"], row["market_type"])
+                for row in current
+                if row["status"] in ("open", "settled")
+            }
+            for row in prior_rows:
+                slot = (row["league"].casefold(), row["event_id"], row["market_type"])
+                if slot in active_slots:
+                    continue
+                # Only the rows this refresh actually retired are eligible.
+                if retired_ids is not None and row["pick_id"] not in retired_ids:
+                    continue
+                self._mirror_row(
+                    {**row, "status": "open"},
+                    "update",
+                    f"op-restore-unreplaced-{row['pick_id']}",
+                    note="refresh produced no replacement for event and market",
+                )
+                self.audit.append("pick_restored_unreplaced", row["pick_id"], {"slot": slot})
+                restored.append(row["pick_id"])
+                active_slots.add(slot)
+                if self.authority != "sqlite":
+                    current.append({**row, "status": "open"})
+            if restored:
+                self._write_rows(self._read_unlocked() if self.authority == "sqlite" else current)
+        return restored
+
     def _retire_open_rows(
         self, pick_ids: list[str], reason: str, allow_staked_removal: bool, *, superseded: bool
     ) -> list[str]:

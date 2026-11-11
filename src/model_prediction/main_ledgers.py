@@ -389,6 +389,20 @@ class MultiSportPickLedger:
             sport_rows = [row for row in rows if str(row.get("league", "")).casefold() == sport]
             ledger.restore_rows_for_rollback(sport_rows, reason)
 
+    def restore_unreplaced_picks(self, prior_rows: list[dict[str, str]]) -> list[str]:
+        """Reconcile refresh gaps within each sport's canonical ledger."""
+        restored: list[str] = []
+        for sport in {str(row.get("league", "")).casefold() for row in prior_rows}:
+            if not sport:
+                continue
+            ledger = self._ledger_for_league(sport)
+            restored.extend(
+                ledger.restore_unreplaced_picks(
+                    [row for row in prior_rows if str(row.get("league", "")).casefold() == sport]
+                )
+            )
+        return restored
+
     def archive_settled_rows(
         self, pick_ids: list[str], reason: str, archive_reference: str
     ) -> list[dict[str, str]]:

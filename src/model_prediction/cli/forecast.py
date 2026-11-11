@@ -6438,6 +6438,14 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
     # too, with nothing in this run to regenerate them. See
     # _clear_today_open's docstring for the 2026-08-03 incident.
     main_ledger_sport_scope = {s.casefold() for s in sports} & set(MAIN_LEDGER_SPORTS)
+    ncaab_prior = {}
+    if log and replace_today and "ncaab" in main_ledger_sport_scope:
+        for tier_name, source in (("main", ledger), ("flat", flat_ledger)):
+            ncaab_prior[tier_name] = [
+                row
+                for row in source.rows()
+                if row.get("status") == "open" and str(row.get("league", "")).casefold() == "ncaab"
+            ]
     if is_flat:
         if replace_today and log:
             _clear_today_open(flat_ledger, args.date, by_event_date=True, leagues=main_ledger_sport_scope)
@@ -6729,6 +6737,10 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
             results[sport] = _forecast_research_sport(sport, args.date, config)
     for sport in sports:
         if sport in results:
+            if sport == "ncaab" and ncaab_prior:
+                for tier_name, source in (("main", ledger), ("flat", flat_ledger)):
+                    restored = source.restore_unreplaced_picks(ncaab_prior[tier_name])
+                    results[sport][f"{tier_name}_unreplaced_restored"] = len(restored)
             results[sport]["existing_started_picks"] = [
                 row for row in saved if str(row.get("league", "")).casefold() == sport.casefold()
             ]
