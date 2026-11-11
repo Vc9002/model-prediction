@@ -1885,9 +1885,12 @@ def _select_nba_spread_market(rows: list[dict], *, as_of: datetime | None = None
         and not any(token in str(row.get("market_slug", "")).lower() for token in partial_tokens)
     ]
     if as_of is not None:
-        from ..portfolio.auto_executor import MAX_AUTO_BUYER_QUOTE_AGE_SECONDS
+        from ..portfolio.auto_executor import (
+            MAX_AUTO_BUYER_QUOTE_AGE_SECONDS,
+            MAX_SOURCE_QUOTE_AGE_SECONDS,
+        )
 
-        candidates = [
+        recent = [
             row
             for row in candidates
             if row.get("observed_at_utc")
@@ -1895,6 +1898,15 @@ def _select_nba_spread_market(rows: list[dict], *, as_of: datetime | None = None
             <= (as_of - parse_utc(str(row["observed_at_utc"]))).total_seconds()
             <= MAX_AUTO_BUYER_QUOTE_AGE_SECONDS
         ]
+        fallback = [
+            row
+            for row in candidates
+            if row.get("observed_at_utc")
+            and 0
+            <= (as_of - parse_utc(str(row["observed_at_utc"]))).total_seconds()
+            <= MAX_SOURCE_QUOTE_AGE_SECONDS
+        ]
+        candidates = recent or fallback
     latest_by_slug: dict[str, dict] = {}
     for row in candidates:
         slug = str(row.get("market_slug") or row.get("line"))

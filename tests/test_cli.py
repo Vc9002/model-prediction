@@ -2734,6 +2734,24 @@ def test_select_nba_spread_market_ignores_old_balanced_quote() -> None:
     assert cli._select_nba_spread_market(rows[:1], as_of=as_of) is None
 
 
+def test_select_nba_spread_market_uses_six_hour_fallback_only_without_fresh_quote() -> None:
+    as_of = datetime(2026, 11, 11, 0, 20, tzinfo=UTC)
+    old = {
+        "line": -9.5,
+        "market_slug": "miami-neg-9pt5",
+        "observed_at_utc": "2026-11-10T22:20:00Z",
+        "long": {"ask": 0.50},
+    }
+    fresh = {
+        "line": -6.5,
+        "market_slug": "miami-neg-6pt5",
+        "observed_at_utc": "2026-11-11T00:19:00Z",
+        "long": {"ask": 0.53},
+    }
+    assert cli._select_nba_spread_market([old], as_of=as_of) == old
+    assert cli._select_nba_spread_market([old, fresh], as_of=as_of) == fresh
+
+
 def test_select_nba_spread_market_returns_none_for_no_candidates() -> None:
     assert cli._select_nba_spread_market([]) is None
     assert cli._select_nba_spread_market([{"line": 1.5, "long": {}}]) is None

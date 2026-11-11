@@ -222,6 +222,7 @@ DEFAULT_MAX_GAME_STAKE_UNITS = 5.0
 DEFAULT_MAX_EVENT_LOOKAHEAD_HOURS = 24.0
 DEFAULT_MAX_MODEL_AGE_MINUTES = 24 * 60
 MAX_AUTO_BUYER_QUOTE_AGE_SECONDS = 300
+MAX_SOURCE_QUOTE_AGE_SECONDS = 6 * 3600
 
 
 @dataclass(frozen=True)
@@ -1558,6 +1559,7 @@ class AutoPolymarketBuyer:
             # A fresh executable ask cannot repair a pick priced from an old
             # source quote: the model may have selected the wrong main line.
             source_quote_at = row.get("market_quote_observed_at_utc")
+            source_quote_age = 0.0
             if source_quote_at:
                 try:
                     source_quote_age = (
@@ -1565,7 +1567,7 @@ class AutoPolymarketBuyer:
                     ).total_seconds()
                 except (TypeError, ValueError):
                     source_quote_age = float("inf")
-                if not 0 <= source_quote_age <= self.config.max_quote_age_seconds:
+                if not 0 <= source_quote_age <= MAX_SOURCE_QUOTE_AGE_SECONDS:
                     result.rejected_stale_quote += 1
                     continue
 
@@ -1608,10 +1610,11 @@ class AutoPolymarketBuyer:
             # 7. Quote Staleness & Market State Check (with live refresh fallback)
             age_sec = float(quote.get("age_seconds") or 999999)
             max_quote_age = self.config.max_quote_age_seconds
+            fallback_requires_live_refresh = source_quote_age > max_quote_age
             if (
                 self.config.refresh_stale_quotes
-                and not quote.get("fresh", False)
-                and age_sec > max_quote_age
+                and (not quote.get("fresh", False) or fallback_requires_live_refresh)
+                and (age_sec > max_quote_age or fallback_requires_live_refresh)
                 and self._live_quote_fn is None
                 and not gateway_rate_limited
             ):
@@ -1632,7 +1635,12 @@ class AutoPolymarketBuyer:
                     side = str(quote.get("side") or "long").lower()
                     side_data = live_snap.get(side) or {}
                     fresh_ask = side_data.get("ask") or side_data.get("price")
-                    if fresh_ask is not None and float(fresh_ask) > 0:
+                    live_quote_age = (now - parse_utc(str(live_snap["observed_at_utc"]))).total_seconds()
+                    if (
+                        fresh_ask is not None
+                        and float(fresh_ask) > 0
+                        and 0 <= live_quote_age <= max_quote_age
+                    ):
                         quote = {
                             **quote,
                             "ask": float(fresh_ask),
@@ -1641,6 +1649,7 @@ class AutoPolymarketBuyer:
                             "market_state": live_snap.get("market_state", "MARKET_STATE_OPEN"),
                         }
                         age_sec = 0.0
+                        fallback_requires_live_refresh = False
                 except httpx.HTTPStatusError as throttled_again:
                     if throttled_again.response.status_code == 429:
                         gateway_rate_limited = True
@@ -1668,7 +1677,7 @@ class AutoPolymarketBuyer:
                         refresh_error,
                     )
 
-            if not quote.get("fresh", False) and age_sec > max_quote_age:
+            if fallback_requires_live_refresh or (not quote.get("fresh", False) and age_sec > max_quote_age):
                 result.rejected_stale_quote += 1
                 continue
 
