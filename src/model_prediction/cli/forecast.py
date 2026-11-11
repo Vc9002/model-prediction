@@ -170,6 +170,39 @@ def _retire_conflicting_side_calls(
             )
 
 
+def _supersede_incoherent_moneyline_calls(
+    ledgers: tuple[Any, ...],
+    *,
+    event_id: str,
+    selection: str,
+    line: float | None,
+) -> None:
+    """Supersede open moneyline CALLs that contradict a new structural spread CALL."""
+    for ldg in ledgers:
+        if ldg is None:
+            continue
+        conflicting_ml_ids = []
+        for ex_pick in ldg.rows(filters={"event_id": event_id}):
+            if str(ex_pick.get("status", "")).lower() == "open":
+                raw_mkt = ex_pick.get("market_type")
+                ex_mkt = str(getattr(raw_mkt, "value", raw_mkt) or "").lower()
+                if ex_mkt == "moneyline" and ex_pick.get("decision") == "CALL":
+                    coherent, _ = validate_cross_market_pick_coherence(
+                        candidate_market_type="spread",
+                        candidate_selection=selection,
+                        candidate_line=line,
+                        existing_picks_for_event=[ex_pick],
+                    )
+                    if not coherent:
+                        conflicting_ml_ids.append(ex_pick.get("pick_id"))
+        if conflicting_ml_ids:
+            ldg.supersede_open_rows(
+                conflicting_ml_ids,
+                reason="Superseded by structural spread pick (cross-market coherence)",
+                allow_staked_removal=True,
+            )
+
+
 def _canonical_market_snapshot_lineage(row: dict[str, Any], archive_path: Path) -> dict[str, Any] | None:
     """Bind a parsed prospective quote to its exact archived JSON record."""
     row = row.get("_archive_record", row)
@@ -1450,29 +1483,12 @@ def _forecast_wnba_spread_sport(
                 ):
                     eligibility = _downgrade_unserved(eligibility)
                 if eligibility.decision == "CALL":
-                    for ldg in (flat_ledger, main_ledger):
-                        if ldg is None:
-                            continue
-                        conflicting_ml_ids = []
-                        for ex_pick in ldg.rows(filters={"event_id": str(contract["event_id"])}):
-                            if str(ex_pick.get("status", "")).lower() == "open":
-                                raw_mkt = ex_pick.get("market_type")
-                                ex_mkt = str(getattr(raw_mkt, "value", raw_mkt) or "").lower()
-                                if ex_mkt == "moneyline" and ex_pick.get("decision") == "CALL":
-                                    coherent, _ = validate_cross_market_pick_coherence(
-                                        candidate_market_type="spread",
-                                        candidate_selection=request.selection,
-                                        candidate_line=request.line,
-                                        existing_picks_for_event=[ex_pick],
-                                    )
-                                    if not coherent:
-                                        conflicting_ml_ids.append(ex_pick.get("pick_id"))
-                        if conflicting_ml_ids:
-                            ldg.supersede_open_rows(
-                                conflicting_ml_ids,
-                                reason="Superseded by structural spread pick (cross-market coherence)",
-                                allow_staked_removal=True,
-                            )
+                    _supersede_incoherent_moneyline_calls(
+                        (flat_ledger, main_ledger),
+                        event_id=str(contract["event_id"]),
+                        selection=request.selection,
+                        line=request.line,
+                    )
                 if (
                     flat_ledger is not None
                     and _append_secondary_ledger(
@@ -2265,29 +2281,12 @@ def _forecast_nba_spread_sport(
                 ):
                     eligibility = _downgrade_unserved(eligibility)
                 if eligibility.decision == "CALL":
-                    for ldg in (flat_ledger, main_ledger):
-                        if ldg is None:
-                            continue
-                        conflicting_ml_ids = []
-                        for ex_pick in ldg.rows(filters={"event_id": str(contract["event_id"])}):
-                            if str(ex_pick.get("status", "")).lower() == "open":
-                                raw_mkt = ex_pick.get("market_type")
-                                ex_mkt = str(getattr(raw_mkt, "value", raw_mkt) or "").lower()
-                                if ex_mkt == "moneyline" and ex_pick.get("decision") == "CALL":
-                                    coherent, _ = validate_cross_market_pick_coherence(
-                                        candidate_market_type="spread",
-                                        candidate_selection=request.selection,
-                                        candidate_line=request.line,
-                                        existing_picks_for_event=[ex_pick],
-                                    )
-                                    if not coherent:
-                                        conflicting_ml_ids.append(ex_pick.get("pick_id"))
-                        if conflicting_ml_ids:
-                            ldg.supersede_open_rows(
-                                conflicting_ml_ids,
-                                reason="Superseded by structural spread pick (cross-market coherence)",
-                                allow_staked_removal=True,
-                            )
+                    _supersede_incoherent_moneyline_calls(
+                        (flat_ledger, main_ledger),
+                        event_id=str(contract["event_id"]),
+                        selection=request.selection,
+                        line=request.line,
+                    )
                 if (
                     flat_ledger is not None
                     and _append_secondary_ledger(
