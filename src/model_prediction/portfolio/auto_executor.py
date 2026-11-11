@@ -1796,7 +1796,9 @@ class AutoPolymarketBuyer:
                     side = str(quote.get("side") or "long").lower()
                     side_data = live_snap.get(side) or {}
                     fresh_ask = side_data.get("ask") or side_data.get("price")
-                    live_quote_age = (now - parse_utc(str(live_snap["observed_at_utc"]))).total_seconds()
+                    live_quote_age = (
+                        utc_now() - parse_utc(str(live_snap["observed_at_utc"]))
+                    ).total_seconds()
                     if (
                         fresh_ask is not None
                         and float(fresh_ask) > 0
