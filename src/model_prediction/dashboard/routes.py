@@ -490,6 +490,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._send({"ok": True, "at": datetime.now(UTC).isoformat()[:19]})
             elif route == "/api/auto-buyer/status":
                 self._send(load_auto_buyer_state())
+            elif route == "/api/auto-buyer/ncaab-paper/status":
+                from model_prediction.portfolio.ncaab_paper_trial import paper_trial_status
+
+                self._send(paper_trial_status())
             elif route == "/api/auto-buyer/summary":
                 self._send(_cached("auto-buyer-summary", 5, summarize_auto_buyer_performance))
             elif route == "/api/auto-buyer/ledger":
@@ -702,8 +706,21 @@ class Handler(BaseHTTPRequestHandler):
             except (OSError, RuntimeError, TypeError, ValueError) as error:
                 self._send({"status": "refused", "error": str(error)}, code=400)
         elif parsed.path == "/api/auto-buyer/run":
-            exec_override = payload.get("execute")
-            self._send(run_auto_buyer_cycle(execute_override=exec_override, force=True))
+            self._send(run_auto_buyer_cycle(force=True))
+        elif parsed.path == "/api/auto-buyer/ncaab-paper/toggle":
+            from model_prediction.portfolio.ncaab_paper_trial import set_paper_trial_enabled
+
+            try:
+                self._send(set_paper_trial_enabled(payload.get("enabled")))
+            except (OSError, TypeError, ValueError) as error:
+                self._send({"status": "refused", "error": str(error)}, code=400)
+        elif parsed.path == "/api/auto-buyer/ncaab-paper/run":
+            from model_prediction.portfolio.ncaab_paper_trial import run_ncaab_spread_paper_trial
+
+            try:
+                self._send(run_ncaab_spread_paper_trial())
+            except (OSError, TypeError, ValueError, RuntimeError) as error:
+                self._send({"status": "error", "error": str(error)}, code=500)
         elif parsed.path == "/api/auto-buyer/settle":
             state = load_auto_buyer_state()
             root = PAPER_AUTO_BUYER_DATA_ROOT if str(state.get("mode")) == "paper" else None

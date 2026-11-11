@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import math
+import os
+from pathlib import Path
 from typing import Any
 
 from model_prediction.dashboard.picks import read_flat_picks, read_picks
@@ -16,6 +18,30 @@ from .auto_executor import PAPER_AUTO_BUYER_DATA_ROOT, AutoExecutionConfig, Auto
 # saved decision-time edge; this ceiling exists so a corrupt quote cannot mint an
 # implausible paper fill, not to re-define the cohort.
 _PAPER_EXECUTION_SANITY_MAX_EDGE = 0.25
+
+
+def paper_trial_status() -> dict[str, Any]:
+    path = RuntimePaths.resolve().runtime_root / "auto_buyer_ncaab_spread_paper_trial.json"
+    if not path.is_file():
+        return {"enabled": False, "model_id": "ncaab-spread-v6", "market_type": "spread"}
+    settings = json.loads(path.read_text(encoding="utf-8"))
+    if settings.get("model_id") != "ncaab-spread-v6" or settings.get("market_type") != "spread":
+        raise ValueError("NCAAB paper trial config must name only ncaab-spread-v6 spread")
+    return settings
+
+
+def set_paper_trial_enabled(enabled: bool) -> dict[str, Any]:
+    if not isinstance(enabled, bool):
+        raise TypeError("enabled must be a boolean")
+    path = RuntimePaths.resolve().runtime_root / "auto_buyer_ncaab_spread_paper_trial.json"
+    settings = paper_trial_status()
+    if "min_saved_edge" not in settings or "max_saved_edge_exclusive" not in settings:
+        raise ValueError("NCAAB paper trial config is missing its saved-edge band")
+    settings["enabled"] = enabled
+    temporary = Path(str(path) + f".{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
+    os.replace(temporary, path)
+    return settings
 
 
 def eligible_trial_pick(row: dict[str, Any], *, min_edge: float, max_edge: float) -> bool:
