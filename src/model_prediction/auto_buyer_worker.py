@@ -18,14 +18,21 @@ from .portfolio.ncaab_paper_trial import run_ncaab_spread_paper_trial
 from .runtime_paths import RuntimePaths
 from .stealth_runtime import enable_background_priority
 
+# The forecast holds the writer lock for 13-38 minutes and this worker starts
+# ten minutes after it. Skipping outright meant picks written by a refresh waited
+# for a later slot before any buyer saw them -- every post-forecast cycle from
+# 2026-11-09 to 11-11 was a skip. Waiting runs the cycle the moment the forecast
+# releases the lock; the bound keeps it clear of the next 30-minute trigger.
+FORECAST_LOCK_WAIT_SECONDS = 1200.0
+
 
 def main() -> int:
     enable_background_priority()
     paths = RuntimePaths.resolve(require_external_runtime=False)
-    lock = acquire_lock(paths.lock_root / "daily.lock")
+    lock = acquire_lock(paths.lock_root / "daily.lock", wait_seconds=FORECAST_LOCK_WAIT_SECONDS)
     if lock is None:
-        # A forecast currently owns the writer lock. The next interval will
-        # retry; this is an expected coordination skip, not a buyer failure.
+        # A forecast still owns the writer lock after the wait. The next interval
+        # will retry; this is an expected coordination skip, not a buyer failure.
         print(json.dumps({"status": "skipped", "reason": "DAILY_WRITER_ALREADY_RUNNING"}), flush=True)
         return 0
     try:

@@ -53,7 +53,11 @@ class EdgeTierStats:
 
 def get_edge_bucket(edge: float) -> str:
     pct = edge * 100.0
-    if pct < 2.0:
+    # Negative-edge flat calls are mostly favourites, so pooling them with 0-2% edges made
+    # that bucket look like a high-win-rate profit centre for picks the model itself dislikes.
+    if pct < 0.0:
+        return "< 0%"
+    elif pct < 2.0:
         return "< 2%"
     elif pct < 5.0:
         return "2.0% - 4.9%"
@@ -70,6 +74,14 @@ class HistoricalAuditEngine:
         self.db_path = db_path
         self.stats_by_sport_mkt_bucket: dict[tuple[str, str, str], EdgeTierStats] = defaultdict(EdgeTierStats)
         self.stats_by_sport_dir_bucket: dict[tuple[str, str, str], EdgeTierStats] = defaultdict(EdgeTierStats)
+        # A pooled bucket mixes retired models with the serving one, so a bucket can look
+        # profitable purely on a predecessor's record; these hold the candidate's own model.
+        self.stats_by_model_mkt_bucket: dict[tuple[str, str, str, str], EdgeTierStats] = defaultdict(
+            EdgeTierStats
+        )
+        self.stats_by_model_dir_bucket: dict[tuple[str, str, str, str], EdgeTierStats] = defaultdict(
+            EdgeTierStats
+        )
         self._load_historical_settlements()
 
     def _load_historical_settlements(self) -> None:
@@ -80,19 +92,30 @@ class HistoricalAuditEngine:
         rows = conn.execute(
             """
             SELECT sport, market_type, model_probability, market_probability, 
-                   selection, line, pnl_units, result, units
+                   selection, line, pnl_units, result, units, event_id, model_id
             FROM ledger_records
             WHERE status = 'settled'
+            ORDER BY CASE ledger_tier WHEN 'main' THEN 0 ELSE 1 END, created_at_utc
             """
         ).fetchall()
         conn.close()
 
+        # The same call is logged once per ledger tier (Main and Flat); counting both rows
+        # inflates n and double-weights those games. Main's row wins when both exist.
+        seen: set[tuple[str, str, str, str, str]] = set()
         for r in rows:
             res = str(r["result"] or "").upper()
             if res not in ("WIN", "LOSS", "PUSH"):
                 continue
             sport = str(r["sport"] or "").lower()
             mkt = str(r["market_type"] or "").lower()
+            model_id = str(r["model_id"] or "").lower()
+            event_id = str(r["event_id"] or "")
+            if event_id:
+                key = (sport, event_id, mkt, str(r["selection"] or "").lower(), model_id)
+                if key in seen:
+                    continue
+                seen.add(key)
             mod_p = float(r["model_probability"] or 0.0)
             mkt_p = float(r["market_probability"] or 0.0)
             edge = mod_p - mkt_p
@@ -101,26 +124,22 @@ class HistoricalAuditEngine:
             staked = float(r["units"] or 1.0)
             sel = str(r["selection"] or "").lower()
 
-            entry = self.stats_by_sport_mkt_bucket[(sport, mkt, bucket)]
-            if res == "WIN":
-                entry.wins += 1
-            elif res == "LOSS":
-                entry.losses += 1
-            elif res == "PUSH":
-                entry.pushes += 1
-            entry.pnl += pnl
-            entry.staked += staked
-
+            entries = [
+                self.stats_by_sport_mkt_bucket[(sport, mkt, bucket)],
+                self.stats_by_model_mkt_bucket[(sport, mkt, bucket, model_id)],
+            ]
             if mkt == "total" and sel in ("over", "under"):
-                dir_entry = self.stats_by_sport_dir_bucket[(sport, sel, bucket)]
+                entries.append(self.stats_by_sport_dir_bucket[(sport, sel, bucket)])
+                entries.append(self.stats_by_model_dir_bucket[(sport, sel, bucket, model_id)])
+            for entry in entries:
                 if res == "WIN":
-                    dir_entry.wins += 1
+                    entry.wins += 1
                 elif res == "LOSS":
-                    dir_entry.losses += 1
+                    entry.losses += 1
                 elif res == "PUSH":
-                    dir_entry.pushes += 1
-                dir_entry.pnl += pnl
-                dir_entry.staked += staked
+                    entry.pushes += 1
+                entry.pnl += pnl
+                entry.staked += staked
 
     def audit_candidate(
         self,
@@ -130,16 +149,28 @@ class HistoricalAuditEngine:
         edge: float,
         model_prob: float,
         market_prob: float,
+        model_id: str | None = None,
     ) -> dict[str, Any]:
         sp = sport.lower()
         mkt = market_type.lower()
         sel = selection.lower()
         bucket = get_edge_bucket(edge)
+        mid = (model_id or "").lower()
 
-        mkt_stats = self.stats_by_sport_mkt_bucket.get((sp, mkt, bucket), EdgeTierStats())
+        pooled_stats = self.stats_by_sport_mkt_bucket.get((sp, mkt, bucket), EdgeTierStats())
+        model_stats = self.stats_by_model_mkt_bucket.get((sp, mkt, bucket, mid), EdgeTierStats())
+        # Judge on the candidate's own model when it has enough graded history; otherwise the
+        # pooled bucket is the only evidence there is, and a flag says so.
+        use_model = bool(mid) and model_stats.total_graded >= 4
+        mkt_stats = model_stats if use_model else pooled_stats
+        basis = f"{model_id} only" if use_model else "all models pooled"
         dir_stats = None
         if mkt == "total" and sel in ("over", "under"):
-            dir_stats = self.stats_by_sport_dir_bucket.get((sp, sel, bucket), EdgeTierStats())
+            dir_stats = (
+                self.stats_by_model_dir_bucket.get((sp, sel, bucket, mid), EdgeTierStats())
+                if use_model
+                else self.stats_by_sport_dir_bucket.get((sp, sel, bucket), EdgeTierStats())
+            )
 
         # Determine verdict
         verdict = "QUALIFIED_MODERATE"
@@ -148,9 +179,23 @@ class HistoricalAuditEngine:
         # 1. Check Totals directional bias
         if mkt == "total":
             if sp == "nba" and sel == "over":
-                # NBA Overs historically bleed heavily (1-8, 11% WR)
+                # NBA Overs bleed heavily all-time (7W-24L, 22.6% WR, -19.67u, -53.0% ROI)
                 verdict = "DOWNGRADE_TRAP"
-                flags.append("NBA Overs across all edges hit only 11% WR (-7.80u). Early market over-totals.")
+                flags.append(
+                    "NBA Overs bleed heavily (7W-24L, 22.6% WR, -19.67u, -53.0% ROI). Market totals inflated."
+                )
+            elif sp == "nba" and sel == "under" and bucket in ("5.0% - 7.9%", "8.0% - 11.9%", ">= 12.0%"):
+                # NBA Unders with >= 5% edge are a confirmed profit center (35W-25L, 58.3% WR, +14.86u, +15.2% ROI)
+                verdict = "CONFIRMED_BEST"
+                flags.append(
+                    "NBA Unders >= 5% edge hit 58.3% WR (35W-25L, +14.86u, +15.2% ROI); Unders >= 9% hit 56.6% WR (+11.34u)."
+                )
+            elif sp == "nba" and sel == "under" and bucket in ("< 2%", "2.0% - 4.9%"):
+                # Sub-5% NBA Unders are near-breakeven vig churn (15W-18L, 45.5% WR, -6.82u)
+                verdict = "DOWNGRADE_TRAP"
+                flags.append(
+                    "NBA Unders < 5% edge hit only 45.5% WR (15W-18L, -6.82u, -16.8% ROI) - sub-vig noise."
+                )
             elif sp == "nfl" and bucket == "5.0% - 7.9%":
                 # NFL 5-8% totals are 6-0 all-time
                 verdict = "CONFIRMED_BEST"
@@ -193,24 +238,46 @@ class HistoricalAuditEngine:
             if mkt_stats.win_rate >= 60.0 and mkt_stats.roi >= 15.0:
                 verdict = "CONFIRMED_BEST"
                 flags.append(
-                    f"Bucket {bucket} meets Gold Standard: {mkt_stats.win_rate:.1f}% WR, {mkt_stats.roi:+.1f}% ROI ({mkt_stats.wins}W-{mkt_stats.losses}L)."
+                    f"Bucket {bucket} meets Gold Standard ({basis}): {mkt_stats.win_rate:.1f}% WR, {mkt_stats.roi:+.1f}% ROI ({mkt_stats.wins}W-{mkt_stats.losses}L)."
                 )
             elif mkt_stats.win_rate < 55.0 or mkt_stats.roi < 5.0:
                 verdict = "DOWNGRADE_TRAP"
                 flags.append(
-                    f"Bucket {bucket} fails Best Pick criteria: {mkt_stats.win_rate:.1f}% WR, {mkt_stats.roi:+.1f}% ROI (near-breakeven or negative)."
+                    f"Bucket {bucket} fails Best Pick criteria ({basis}): {mkt_stats.win_rate:.1f}% WR, {mkt_stats.roi:+.1f}% ROI ({mkt_stats.wins}W-{mkt_stats.losses}L; near-breakeven or negative)."
                 )
+        if edge < 0:
+            # A pick the model prices below the market can never be a best pick, whatever
+            # the bucket's win rate says.
+            verdict = "DOWNGRADE_TRAP"
+            flags = [
+                (
+                    f"Negative edge ({edge * 100:+.1f}%): model probability is below the market price; "
+                    f"bucket record {mkt_stats.wins}W-{mkt_stats.losses}L, {mkt_stats.roi:+.1f}% ROI ({basis})."
+                )
+            ]
+        elif mid and not use_model:
+            flags.append(
+                f"{model_id} has only {model_stats.total_graded} graded picks in bucket {bucket}; verdict rests on the pooled bucket."
+            )
+        elif use_model and pooled_stats.total_graded:
+            flags.append(
+                f"Context, all models pooled: {pooled_stats.win_rate:.1f}% WR, {pooled_stats.roi:+.1f}% ROI ({pooled_stats.wins}W-{pooled_stats.losses}L)."
+            )
 
         return {
             "verdict": verdict,
             "flags": flags,
             "bucket": bucket,
             "mkt_stats": mkt_stats,
+            "pooled_stats": pooled_stats,
+            "model_stats": model_stats,
             "dir_stats": dir_stats,
         }
 
 
-def audit_open_picks(db_path: Path = DB_PATH, only_unstarted: bool = True) -> None:
+def audit_open_picks(
+    db_path: Path = DB_PATH, only_unstarted: bool = True, pick_id: str | None = None
+) -> None:
     engine = HistoricalAuditEngine(db_path)
     now_utc = datetime.now(UTC)
 
@@ -219,7 +286,8 @@ def audit_open_picks(db_path: Path = DB_PATH, only_unstarted: bool = True) -> No
     rows = conn.execute(
         """
         SELECT pick_id, sport, ledger_tier, market_type, selection, line, 
-               model_probability, market_probability, units, event_start_utc, decision_payload_json
+               model_probability, market_probability, units, event_start_utc, decision_payload_json,
+               model_id
         FROM ledger_records
         WHERE status = 'open'
         ORDER BY event_start_utc, sport, market_type
@@ -231,6 +299,8 @@ def audit_open_picks(db_path: Path = DB_PATH, only_unstarted: bool = True) -> No
     for r in rows:
         start_utc_str = r["event_start_utc"]
         if not start_utc_str:
+            continue
+        if pick_id and r["pick_id"] != pick_id:
             continue
         dt_utc = datetime.fromisoformat(start_utc_str)
         if only_unstarted and dt_utc <= now_utc:
@@ -250,6 +320,7 @@ def audit_open_picks(db_path: Path = DB_PATH, only_unstarted: bool = True) -> No
             edge=edge,
             model_prob=mod_p,
             market_prob=mkt_p,
+            model_id=r["model_id"],
         )
 
         dt_et = dt_utc.astimezone(ET_TZ)
@@ -350,6 +421,8 @@ def audit_open_picks(db_path: Path = DB_PATH, only_unstarted: bool = True) -> No
         print(
             f"  [{p['tier']}] [{p['start_et']}] {p['sport']:<5} | {p['away']} @ {p['home']} | {p['market']} {sel_name} {line_str} | Edge: {p['edge'] * 100:+.1f}% | Stake: {p['units']:.2f}u"
         )
+        for f in p["flags"]:
+            print(f"      >>> NOTE: {f}")
     if len(moderate_picks) > 10:
         print(f"  ... and {len(moderate_picks) - 10} more.")
 
@@ -361,9 +434,10 @@ def main() -> None:
     parser.add_argument(
         "--all-open", action="store_true", help="Audit all open picks including games already underway."
     )
+    parser.add_argument("--pick-id", help="Audit only this open pick_id.")
     args = parser.parse_args()
 
-    audit_open_picks(only_unstarted=not args.all_open)
+    audit_open_picks(only_unstarted=not args.all_open, pick_id=args.pick_id)
 
 
 if __name__ == "__main__":

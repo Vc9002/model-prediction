@@ -3,12 +3,20 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
+from collections.abc import Callable
+from datetime import date
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
+import httpx
+
+from model_prediction.dashboard.backtests import _lines_match, _pick_quote, _row_line, _team_matches
 from model_prediction.dashboard.picks import read_flat_picks, read_picks
+from model_prediction.domain import parse_utc
 from model_prediction.runtime_paths import RuntimePaths
 
 from .auto_buyer_ledger import record_auto_buy_execution, settle_auto_buyer_ledger
@@ -18,6 +26,8 @@ from .auto_executor import PAPER_AUTO_BUYER_DATA_ROOT, AutoExecutionConfig, Auto
 # saved decision-time edge; this ceiling exists so a corrupt quote cannot mint an
 # implausible paper fill, not to re-define the cohort.
 _PAPER_EXECUTION_SANITY_MAX_EDGE = 0.25
+
+_logger = logging.getLogger(__name__)
 
 
 def paper_trial_status() -> dict[str, Any]:
@@ -57,6 +67,82 @@ def eligible_trial_pick(row: dict[str, Any], *, min_edge: float, max_edge: float
     except (KeyError, TypeError, ValueError):
         return False
     return math.isfinite(edge) and min_edge <= edge < max_edge
+
+
+def _cohort_market(row: dict[str, Any], events: list[dict[str, Any]]) -> tuple[dict, dict] | None:
+    """The one exchange spread contract carrying this pick's teams, side and line."""
+    selection = str(row.get("selection") or "").lower()
+    line = _row_line(row)
+    for event in events:
+        for market in event.get("markets", []):
+            if market.get("market_type") != "spread":
+                continue
+            sides = {str(side.get("selection") or "").lower(): side for side in market.get("sides", [])}
+            if not all(
+                key in sides
+                and _team_matches(str(row.get(f"{key}_team") or ""), str(sides[key].get("team") or ""))
+                for key in ("away", "home")
+            ):
+                continue
+            if selection in sides and _lines_match(line, sides[selection].get("line")):
+                return event, market
+    return None
+
+
+def capture_unmapped_cohort_markets(
+    picks: list[dict[str, Any]],
+    runtime_root: Path,
+    *,
+    client: Any | None = None,
+    capture_fn: Callable[..., dict[str, Any]] | None = None,
+    quote_fn: Callable[[dict[str, Any]], dict[str, Any] | None] = _pick_quote,
+) -> int:
+    """Snapshot the exact contract for each cohort pick the buyer cannot map yet.
+
+    NCAAB forecasts price off an indicative slate, so a pick only becomes
+    mappable once something writes its contract to the executable snapshot file.
+    Nothing did for picks that entered the band on a later refresh at a moved
+    line: on 2026-11-11 four of eight cohort picks were rejected as unmapped on
+    every cycle while their markets were open on the exchange. This fetches
+    market data only -- one contract per pick, never an order.
+    """
+    from model_prediction.data_sources.polymarket_us import PolymarketUSClient, capture_slate_snapshots
+
+    eastern = ZoneInfo("America/New_York")
+    by_date: dict[str, list[dict[str, Any]]] = {}
+    for row in picks:
+        if quote_fn(row) is not None:
+            continue
+        try:
+            game_date = (
+                parse_utc(str(row.get("event_start_utc") or "")).astimezone(eastern).date().isoformat()
+            )
+        except (TypeError, ValueError):
+            continue
+        by_date.setdefault(game_date, []).append(row)
+    captured = 0
+    market_client = client
+    for game_date, rows in sorted(by_date.items()):
+        try:
+            market_client = market_client or PolymarketUSClient()
+            slate = market_client.sport_slate("ncaab", date.fromisoformat(game_date), "America/New_York")
+            wanted: dict[str, list[dict[str, Any]]] = {}
+            for league, events in slate.events.items():
+                for row in rows:
+                    match = _cohort_market(row, events)
+                    if match is not None:
+                        event, market = match
+                        wanted.setdefault(league, []).append({**event, "markets": [market]})
+            if wanted:
+                result = (capture_fn or capture_slate_snapshots)(
+                    market_client, wanted, runtime_root, game_date
+                )
+                captured += int(result.get("captured") or 0)
+        except (httpx.HTTPError, OSError, RuntimeError, TypeError, ValueError):
+            # Quotes are a best-effort input to a paper cohort; an exchange hiccup
+            # must not fail the cycle that also runs the live buyer.
+            _logger.warning("NCAAB paper trial market capture failed for %s", game_date, exc_info=True)
+    return captured
 
 
 def _recorded_paper_pick_ids(paper_root: Any) -> set[str]:
@@ -115,6 +201,7 @@ def run_ncaab_spread_paper_trial() -> dict[str, Any]:
         seen.add(pick_id)
         picks.append(row)
 
+    captured_markets = capture_unmapped_cohort_markets(picks, runtime)
     config = AutoExecutionConfig(
         mode="paper",
         execute_live=False,
@@ -150,4 +237,9 @@ def run_ncaab_spread_paper_trial() -> dict[str, Any]:
             jsonl_path=paper_root / "auto_buyer_ledger.jsonl",
             xlsx_path=paper_root / "auto_buyer_picks.xlsx",
         )
-    return {"status": "paper", "candidates": len(picks), "paper_orders": len(result.dry_run_orders)}
+    return {
+        "status": "paper",
+        "candidates": len(picks),
+        "captured_markets": captured_markets,
+        "paper_orders": len(result.dry_run_orders),
+    }

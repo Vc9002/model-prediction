@@ -264,7 +264,7 @@ def test_buyer_categorically_rejects_mlb_moneyline_even_when_model_is_whiteliste
 
     buyer = AutoPolymarketBuyer(
         config=AutoExecutionConfig(
-            whitelisted_models=("mlb-moneyline-v99", "tennis-surface-elo-v1"),
+            whitelisted_models=("mlb-moneyline-v99", "nba-moneyline-v9"),
             blacklisted_models=(),
         ),
         live_quote_fn=quote_lookup,
@@ -283,21 +283,24 @@ def test_buyer_categorically_rejects_mlb_moneyline_even_when_model_is_whiteliste
                 "market_probability": 0.50,
             },
             {
-                "pick_id": "tennis-ml-allowed",
-                "model_id": "tennis-surface-elo-v1",
+                "pick_id": "nba-ml-allowed",
+                "model_id": "nba-moneyline-v9",
                 "status": "open",
-                "league": "TENNIS",
+                "league": "NBA",
                 "market_type": "moneyline",
                 "event_start_utc": event_start,
-                "model_probability": 0.55,
+                # NBA moneyline has an elevated 7.5% min-edge hurdle (_effective_min_edge);
+                # 0.10 edge clears it so this control pick's own rejection is isolated to
+                # what the test is about (MLB categorically blocked, NBA is not).
+                "model_probability": 0.60,
                 "market_probability": 0.50,
             },
         ]
     )
 
     assert result.rejected_disabled_sport_market == 1
-    assert quote_calls == ["slug-tennis-ml-allowed"]
-    assert [order["pick_id"] for order in result.dry_run_orders] == ["tennis-ml-allowed"]
+    assert quote_calls == ["slug-nba-ml-allowed"]
+    assert [order["pick_id"] for order in result.dry_run_orders] == ["nba-ml-allowed"]
 
 
 def test_buyer_filters_low_edge_and_past_games():
@@ -343,7 +346,7 @@ def test_buyer_rejects_unrealistic_edge_outliers():
     picks = [
         {
             "pick_id": "p_anomalous_outlier",
-            "model_id": "soccer-poisson-dc-v2",
+            "model_id": "nba-moneyline-v9",
             "status": "open",
             "event_start_utc": today_start,
             "model_probability": 0.5514,
@@ -351,7 +354,7 @@ def test_buyer_rejects_unrealistic_edge_outliers():
         },
         {
             "pick_id": "p_valid_edge",
-            "model_id": "soccer-poisson-dc-v2",
+            "model_id": "nba-moneyline-v9",
             "status": "open",
             "event_start_utc": today_start,
             "model_probability": 0.28,
@@ -376,7 +379,7 @@ def test_buyer_rejects_below_win_probability():
     picks = [
         {
             "pick_id": "p_underdog_positive_edge",
-            "model_id": "soccer-poisson-dc-v2",
+            "model_id": "nba-moneyline-v9",
             "status": "open",
             "event_start_utc": today_start,
             "model_probability": 0.40,
@@ -653,7 +656,15 @@ def test_live_buyer_preflight_captures_missing_next_day_slate(tmp_path: Path):
                 "event_start_utc": iso_utc(event_start),
             }
         ],
-        config=AutoExecutionConfig(execute_live=True),
+        config=AutoExecutionConfig(
+            execute_live=True,
+            # lol-tiered-elo-v6 is decommissioned in the real default
+            # whitelist/blacklist (2026-11-08 audit); this test is about
+            # snapshot-capture discovery, not model gating, so isolate it
+            # from that default explicitly.
+            whitelisted_models=("lol-tiered-elo-v6",),
+            blacklisted_models=(),
+        ),
         now=now,
         data_root=tmp_path,
         client=client,
@@ -708,7 +719,11 @@ def test_preflight_refreshes_snapshot_older_than_quote_freshness_limit(tmp_path:
                 "event_start_utc": iso_utc(event_start),
             }
         ],
-        config=AutoExecutionConfig(execute_live=True),
+        config=AutoExecutionConfig(
+            execute_live=True,
+            whitelisted_models=("lol-tiered-elo-v6",),
+            blacklisted_models=(),
+        ),
         now=now,
         data_root=tmp_path,
         client=client,
@@ -767,7 +782,10 @@ def test_buyer_sizes_fractional_units(tmp_path: Path):
         unit_value_usd=0.50,
         min_edge=0.03,
         max_edge=0.20,
-        whitelisted_models=("tennis-surface-elo-v1",),
+        whitelisted_models=("nba-moneyline-v9",),
+        # This test is about fractional-unit sizing math, not edge-scaled
+        # sizing (default True since f9d077e0) -- isolate it explicitly.
+        edge_scaled_sizing_enabled=False,
     )
     buyer = AutoPolymarketBuyer(
         config=config,
@@ -777,8 +795,8 @@ def test_buyer_sizes_fractional_units(tmp_path: Path):
     picks = [
         {
             "pick_id": "p_qual",
-            "model_id": "tennis-surface-elo-v1",
-            "sport": "tennis",
+            "model_id": "nba-moneyline-v9",
+            "sport": "nba",
             "selection": "Alcaraz",
             "status": "open",
             "event_start_utc": today_start,
@@ -844,6 +862,10 @@ def test_live_buyer_sets_resting_fallback_and_records_actual_fill(monkeypatch, t
             max_daily_spend_usd=250.0,
             execute_live=True,
             whitelisted_models=("lol-tiered-elo-v6",),
+            # lol-tiered-elo-v6 is decommissioned in the real default blacklist
+            # (2026-11-08 audit) -- this test is about resting-fallback order
+            # handling, not model gating, so isolate it explicitly.
+            blacklisted_models=(),
         ),
         audit=AuditLog(tmp_path / "audit.jsonl"),
         live_quote_fn=lambda _slug: {
@@ -936,6 +958,10 @@ def test_live_buyer_records_zero_fill_primary_with_resting_fallback(monkeypatch,
             max_daily_spend_usd=250.0,
             execute_live=True,
             whitelisted_models=("lol-tiered-elo-v6",),
+            # lol-tiered-elo-v6 is decommissioned in the real default blacklist
+            # (2026-11-08 audit) -- this test is about resting-fallback order
+            # handling, not model gating, so isolate it explicitly.
+            blacklisted_models=(),
         ),
         audit=AuditLog(tmp_path / "audit.jsonl"),
         live_quote_fn=lambda _slug: {
@@ -1018,7 +1044,7 @@ def test_buyer_respects_daily_budget(tmp_path: Path):
     today_start = iso_utc(now + timedelta(hours=2))
     config = AutoExecutionConfig(
         max_daily_spend_usd=0.80,
-        whitelisted_models=("tennis-surface-elo-v1",),
+        whitelisted_models=("nba-moneyline-v9",),
     )
     buyer = AutoPolymarketBuyer(
         config=config,
@@ -1029,7 +1055,7 @@ def test_buyer_respects_daily_budget(tmp_path: Path):
         {
             "pick_id": "p_1",
             "market_slug": "slug-1",
-            "model_id": "tennis-surface-elo-v1",
+            "model_id": "nba-moneyline-v9",
             "status": "open",
             "event_start_utc": today_start,
             "model_probability": 0.55,
@@ -1038,7 +1064,7 @@ def test_buyer_respects_daily_budget(tmp_path: Path):
         {
             "pick_id": "p_2",
             "market_slug": "slug-2",
-            "model_id": "tennis-surface-elo-v1",
+            "model_id": "nba-moneyline-v9",
             "status": "open",
             "event_start_utc": today_start,
             "model_probability": 0.55,
@@ -1053,7 +1079,7 @@ def test_buyer_respects_daily_budget(tmp_path: Path):
 
 def test_buyer_default_lookahead_window_is_24_hours():
     now = utc_now()
-    config = AutoExecutionConfig(whitelisted_models=("tennis-surface-elo-v1",))
+    config = AutoExecutionConfig(whitelisted_models=("nba-moneyline-v9",))
     buyer = AutoPolymarketBuyer(
         config=config,
         live_quote_fn=lambda slug: {"ask": 0.50, "market_slug": slug, "side": "long"},
@@ -1061,7 +1087,7 @@ def test_buyer_default_lookahead_window_is_24_hours():
     picks = [
         {
             "pick_id": "p_within_24h",
-            "model_id": "tennis-surface-elo-v1",
+            "model_id": "nba-moneyline-v9",
             "status": "open",
             "event_start_utc": iso_utc(now + timedelta(hours=20)),
             "model_probability": 0.55,
@@ -1069,7 +1095,7 @@ def test_buyer_default_lookahead_window_is_24_hours():
         },
         {
             "pick_id": "p_beyond_24h",
-            "model_id": "tennis-surface-elo-v1",
+            "model_id": "nba-moneyline-v9",
             "status": "open",
             "event_start_utc": iso_utc(now + timedelta(hours=30)),
             "model_probability": 0.55,
@@ -1085,7 +1111,7 @@ def test_buyer_default_lookahead_window_is_24_hours():
 def test_buyer_rejects_events_beyond_configured_lookahead_window():
     now = utc_now()
     config = AutoExecutionConfig(
-        whitelisted_models=("tennis-surface-elo-v1",),
+        whitelisted_models=("nba-moneyline-v9",),
         max_event_lookahead_hours=6.0,
     )
     buyer = AutoPolymarketBuyer(
@@ -1095,7 +1121,7 @@ def test_buyer_rejects_events_beyond_configured_lookahead_window():
     picks = [
         {
             "pick_id": "p_within_6h",
-            "model_id": "tennis-surface-elo-v1",
+            "model_id": "nba-moneyline-v9",
             "status": "open",
             "event_start_utc": iso_utc(now + timedelta(hours=5)),
             "model_probability": 0.55,
@@ -1103,7 +1129,7 @@ def test_buyer_rejects_events_beyond_configured_lookahead_window():
         },
         {
             "pick_id": "p_beyond_6h",
-            "model_id": "tennis-surface-elo-v1",
+            "model_id": "nba-moneyline-v9",
             "status": "open",
             "event_start_utc": iso_utc(now + timedelta(hours=7)),
             "model_probability": 0.55,
@@ -1194,7 +1220,7 @@ def test_evaluate_and_execute_seeds_daily_cap_from_ledger(monkeypatch):
     )
     config = AutoExecutionConfig(
         max_daily_spend_usd=250.0,
-        whitelisted_models=("tennis-surface-elo-v1",),
+        whitelisted_models=("nba-moneyline-v9",),
     )
     buyer = AutoPolymarketBuyer(
         config=config,
@@ -1203,7 +1229,7 @@ def test_evaluate_and_execute_seeds_daily_cap_from_ledger(monkeypatch):
     picks = [
         {
             "pick_id": "p_1",
-            "model_id": "tennis-surface-elo-v1",
+            "model_id": "nba-moneyline-v9",
             "status": "open",
             "event_start_utc": iso_utc(now + timedelta(hours=2)),
             "model_probability": 0.55,
@@ -1211,7 +1237,7 @@ def test_evaluate_and_execute_seeds_daily_cap_from_ledger(monkeypatch):
         },
         {
             "pick_id": "p_2",
-            "model_id": "tennis-surface-elo-v1",
+            "model_id": "nba-moneyline-v9",
             "status": "open",
             "event_start_utc": iso_utc(now + timedelta(hours=2)),
             "model_probability": 0.55,
@@ -1262,7 +1288,7 @@ def test_daily_loss_circuit_breaker_disabled_by_default(monkeypatch, tmp_path: P
         lambda *_a, **_k: (50.0, -10_000.0),  # catastrophic loss, but breaker is off (None)
     )
     config = AutoExecutionConfig(
-        whitelisted_models=("tennis-surface-elo-v1",),
+        whitelisted_models=("nba-moneyline-v9",),
         max_daily_loss_usd=None,
         max_daily_spend_usd=1000.0,  # generous, so the unrelated spend cap can't interfere
     )
@@ -1274,7 +1300,7 @@ def test_daily_loss_circuit_breaker_disabled_by_default(monkeypatch, tmp_path: P
     picks = [
         {
             "pick_id": "p_1",
-            "model_id": "tennis-surface-elo-v1",
+            "model_id": "nba-moneyline-v9",
             "status": "open",
             "event_start_utc": iso_utc(now + timedelta(hours=2)),
             "model_probability": 0.55,
@@ -1289,11 +1315,16 @@ def test_daily_loss_circuit_breaker_disabled_by_default(monkeypatch, tmp_path: P
 def test_edge_scaled_sizing_disabled_by_default_uses_full_stake(tmp_path: Path):
     now = utc_now()
     config = AutoExecutionConfig(
-        whitelisted_models=("tennis-surface-elo-v1",),
+        whitelisted_models=("nba-moneyline-v9",),
         min_edge=0.035,
         max_edge=0.20,
         unit_value_usd=10.0,
         max_game_stake_usd=25.0,
+        # edge_scaled_sizing_enabled defaults to True since f9d077e0 (2026-11-09
+        # live optimization directive); set explicitly so this test still
+        # isolates the "scaling off" case rather than relying on a default
+        # that's since flipped.
+        edge_scaled_sizing_enabled=False,
     )
     buyer = AutoPolymarketBuyer(
         config=config,
@@ -1305,7 +1336,7 @@ def test_edge_scaled_sizing_disabled_by_default_uses_full_stake(tmp_path: Path):
     picks = [
         {
             "pick_id": "p_1",
-            "model_id": "tennis-surface-elo-v1",
+            "model_id": "nba-moneyline-v9",
             "status": "open",
             "event_start_utc": iso_utc(now + timedelta(hours=2)),
             "model_probability": 0.54,
@@ -1321,7 +1352,7 @@ def test_edge_scaled_sizing_disabled_by_default_uses_full_stake(tmp_path: Path):
 def test_edge_scaled_sizing_enabled_scales_stake_by_edge(tmp_path: Path):
     now = utc_now()
     config = AutoExecutionConfig(
-        whitelisted_models=("tennis-surface-elo-v1",),
+        whitelisted_models=("nba-moneyline-v9",),
         min_edge=0.035,
         max_edge=0.20,
         unit_value_usd=10.0,
@@ -1333,7 +1364,7 @@ def test_edge_scaled_sizing_enabled_scales_stake_by_edge(tmp_path: Path):
     def make_pick(model_probability: float) -> dict:
         return {
             "pick_id": "p_1",
-            "model_id": "tennis-surface-elo-v1",
+            "model_id": "nba-moneyline-v9",
             "status": "open",
             "event_start_utc": iso_utc(now + timedelta(hours=2)),
             "model_probability": model_probability,
@@ -1559,7 +1590,7 @@ def test_auto_buyer_dashboard_routes(tmp_path: Path):
 def test_auto_buyer_multi_source_deduplication(tmp_path: Path):
     now = utc_now()
     today_start = iso_utc(now + timedelta(hours=2))
-    config = AutoExecutionConfig(min_edge=0.03, whitelisted_models=("tennis-surface-elo-v1",))
+    config = AutoExecutionConfig(min_edge=0.03, whitelisted_models=("nba-moneyline-v9",))
 
     audit_file = tmp_path / "audit.jsonl"
     audit = AuditLog(audit_file)
@@ -1592,7 +1623,7 @@ def test_auto_buyer_multi_source_deduplication(tmp_path: Path):
         # 1. Matches pick_id in audit log
         {
             "pick_id": "p_already_bought_audit",
-            "model_id": "tennis-surface-elo-v1",
+            "model_id": "nba-moneyline-v9",
             "status": "open",
             "event_start_utc": today_start,
             "model_probability": 0.55,
@@ -1603,7 +1634,7 @@ def test_auto_buyer_multi_source_deduplication(tmp_path: Path):
             "pick_id": "p_different_id_same_market",
             "market_slug": "slug-audit-bought",
             "token_side": "long",
-            "model_id": "tennis-surface-elo-v1",
+            "model_id": "nba-moneyline-v9",
             "status": "open",
             "event_start_utc": today_start,
             "model_probability": 0.55,
@@ -1614,7 +1645,7 @@ def test_auto_buyer_multi_source_deduplication(tmp_path: Path):
             "pick_id": "p_different_id_same_event",
             "event_id": "ev_100",
             "selection": "home",
-            "model_id": "tennis-surface-elo-v1",
+            "model_id": "nba-moneyline-v9",
             "status": "open",
             "event_start_utc": today_start,
             "model_probability": 0.55,
@@ -1627,7 +1658,7 @@ def test_auto_buyer_multi_source_deduplication(tmp_path: Path):
             "token_side": "long",
             "event_id": "ev_200",
             "selection": "away",
-            "model_id": "tennis-surface-elo-v1",
+            "model_id": "nba-moneyline-v9",
             "status": "open",
             "event_start_utc": today_start,
             "model_probability": 0.55,
@@ -1640,7 +1671,7 @@ def test_auto_buyer_multi_source_deduplication(tmp_path: Path):
             "token_side": "long",
             "event_id": "ev_200",
             "selection": "away",
-            "model_id": "tennis-surface-elo-v1",
+            "model_id": "nba-moneyline-v9",
             "status": "open",
             "event_start_utc": today_start,
             "model_probability": 0.55,
@@ -2098,7 +2129,7 @@ def test_reconcile_cancels_resting_order_when_edge_drops_below_min(tmp_path):
 def test_reconcile_preserves_resting_order_when_edge_remains_strong(tmp_path):
     j_path, _ = _record_pending_fallback(tmp_path, event_start_utc=iso_utc(utc_now() + timedelta(hours=12)))
     records = read_auto_buyer_ledger(j_path)
-    records[0]["model_probability"] = 0.65
+    records[0]["model_probability"] = 0.60
     records[0]["entry_price"] = 0.51
     with j_path.open("w", encoding="utf-8") as f:
         for r in records:
@@ -2119,7 +2150,8 @@ def test_reconcile_preserves_resting_order_when_edge_remains_strong(tmp_path):
             cancelled.append(order_id)
             return {"status": "cancelled", "order_id": order_id}
 
-    # Market is 0.51 bid / 0.52 ask: edge at ask is 0.65 - 0.52 = 0.13 (> 0.035), market near resting price
+    # Market is 0.51 bid / 0.52 ask: edge at ask is 0.60 - 0.52 = 0.08, within
+    # (min_edge 0.035, max_edge 0.12) so it isn't treated as phantom/anomalous
     quote_fn = lambda _slug: {
         "market_state": "MARKET_STATE_OPEN",
         "long": {"ask": 0.52, "bid": 0.51},
@@ -2140,7 +2172,7 @@ def test_reconcile_preserves_resting_order_when_edge_remains_strong(tmp_path):
 def test_reconcile_cancels_resting_order_when_market_moves_up_significantly(tmp_path):
     j_path, _ = _record_pending_fallback(tmp_path, event_start_utc=iso_utc(utc_now() + timedelta(hours=12)))
     records = read_auto_buyer_ledger(j_path)
-    records[0]["model_probability"] = 0.70
+    records[0]["model_probability"] = 0.62
     records[0]["entry_price"] = 0.50
     with j_path.open("w", encoding="utf-8") as f:
         for r in records:
@@ -2161,7 +2193,9 @@ def test_reconcile_cancels_resting_order_when_market_moves_up_significantly(tmp_
             cancelled.append(order_id)
             return {"status": "cancelled", "order_id": order_id}
 
-    # Market moved to 0.55 bid / 0.56 ask: bid is 5 cents above limit price 0.50
+    # Market moved to 0.55 bid / 0.56 ask: bid is 5 cents above limit price 0.50.
+    # Edge at ask is 0.62 - 0.56 = 0.06, inside (0.035, 0.12) so the market-moved
+    # branch fires rather than the max-edge/anomalous-edge guard.
     quote_fn = lambda _slug: {
         "market_state": "MARKET_STATE_OPEN",
         "long": {"ask": 0.56, "bid": 0.55},
@@ -2266,6 +2300,9 @@ def test_partial_fill_topup_sizes_exact_remainder(tmp_path):
             max_game_stake_usd=25.0,
             max_daily_spend_usd=250.0,
             execute_live=False,
+            # This test is about exact-remainder topup math, not edge-scaled
+            # sizing (default True since f9d077e0) -- isolate it explicitly.
+            edge_scaled_sizing_enabled=False,
         ),
         data_root=tmp_path,
         live_quote_fn=lambda _slug: {
@@ -2575,3 +2612,84 @@ def test_buyer_auto_quarantines_underperforming_model(tmp_path: Path):
     assert res.rejected_quarantined_model == 1
     assert "lol-tiered-elo-v6" in res.quarantined_models
     assert len(res.dry_run_orders) == 0
+
+
+@pytest.mark.parametrize(
+    "sold_fields",
+    [
+        {"status": "settled", "result": "loss", "settlement_source": "manual_sell"},
+        # Half sold: the row is still open and partially filled, which without the
+        # operator-exit flag is exactly the shape the buyer tops up.
+        {"status": "open", "result": "open", "manual_exit_shares": 19.0},
+    ],
+)
+def test_position_the_operator_sold_is_never_rebought(tmp_path: Path, sold_fields: dict):
+    row = {
+        "pick_id": "old-pick",
+        "order_id": "DNHZH9JG14ET",
+        "market_slug": "asc-nba-okc-por-2026-11-11-neg-1pt5",
+        "token_side": "short",
+        "event_id": "401909975",
+        "selection": "home",
+        "market_type": "spread",
+        "away_team": "Oklahoma City Thunder",
+        "home_team": "Portland Trail Blazers",
+        "event_start_utc": "2026-11-12T03:00Z",
+        "order_state": "ORDER_STATE_PARTIALLY_FILLED",
+        "fallback_reconciled": True,
+        "shares": 38.87,
+        "cost_usd": 20.21,
+        **sold_fields,
+    }
+    (tmp_path / "auto_buyer_ledger.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
+    buyer = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(),
+        audit=AuditLog(tmp_path / "audit.jsonl"),
+        data_root=tmp_path,
+    )
+    index = buyer._build_bought_index()
+
+    assert index["partially_filled"] == {}
+    # A refreshed forecast arrives as a new pick_id, and may sit on another line or side.
+    assert buyer._is_already_bought(
+        "new-pick",
+        market_slug="asc-nba-okc-por-2026-11-11-neg-1pt5",
+        token_side="short",
+        event_id="401909975",
+        selection="home",
+        market_type="spread",
+        bought_index=index,
+    )
+    assert buyer._is_already_bought(
+        "new-pick-other-line",
+        market_slug="asc-nba-okc-por-2026-11-11-neg-2pt5",
+        token_side="long",
+        event_id="401909975",
+        selection="away",
+        market_type="spread",
+        bought_index=index,
+    )
+
+
+def test_holding_one_line_of_a_spread_blocks_the_other_line(tmp_path: Path):
+    row = {
+        "pick_id": "p",
+        "market_slug": "asc-cbb-char-templ-2026-11-11-neg-1pt5",
+        "token_side": "long",
+        "manual": True,
+        "status": "open",
+        "result": "open",
+        "shares": 19.1,
+        "order_state": "ORDER_STATE_FILLED",
+    }
+    (tmp_path / "auto_buyer_ledger.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
+    buyer = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(), audit=AuditLog(tmp_path / "audit.jsonl"), data_root=tmp_path
+    )
+    index = buyer._build_bought_index()
+    assert buyer._is_already_bought(
+        "new", market_slug="asc-cbb-char-templ-2026-11-11-pos-1pt5", token_side="short", bought_index=index
+    )
+    assert not buyer._is_already_bought(
+        "new", market_slug="asc-cbb-other-game-2026-11-11-pos-1pt5", token_side="short", bought_index=index
+    )
