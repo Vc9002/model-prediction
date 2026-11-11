@@ -1610,111 +1610,22 @@ def _forecast_wnba_total_sport(
     flat_ledger=None,
 ) -> dict:
     """Log WNBA total picks to Main (CALL only) + Flat (every candidate)."""
-    from ..data_sources.polymarket_us import probability_to_american
-
     forecast = _forecast_wnba_total_slate(data_root, args_date, ESPNClient())
-    exposure_source = flat_ledger or main_ledger
-    if exposure_source is None:
-        forecast["logged"] = 0
-        return forecast
-
-    observed_now = utc_now()
-    logged: list[dict] = []
-    duplicates: list[str] = []
-    main_duplicates: list[str] = []
-    skipped: list[dict] = []
-    for contract in forecast["priced_contracts"]:
-        ask = contract["executable_ask"]
-        request = PickRequest(
-            event_start_utc=contract["event_start_utc"],
-            event_id=contract["event_id"],
-            league=League.WNBA,
-            away_team=contract["away_team"],
-            home_team=contract["home_team"],
-            market_type=MarketType.TOTAL,
-            selection=contract["selection"],
-            line=contract["line"],
-            sportsbook="polymarket_us",
-            american_odds=probability_to_american(ask),
-            model_probability=contract["model_probability"],
-            model_uncertainty=contract["model_uncertainty"],
-            model_version=contract["model_version"],
-            rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
-            risks="Research-baseline total model; not yet locked-holdout qualified.",
-            model_origin=ModelOrigin.STATISTICAL_MODEL,
-            model_state=ModelState.RESEARCH,
-            observed_at_utc=contract["observed_at_utc"],
-            model_artifact_hash=contract["model_artifact_hash"],
-            calibration_method=contract.get("calibration_method", "total_normal"),
-            calibration_version=contract.get("calibration_version", contract["model_version"]),
-            calibration_artifact_hash=contract.get(
-                "calibration_artifact_hash", contract["model_artifact_hash"]
-            ),
-            feature_schema_version="wnba-total-margin-v2",
-            code_revision=contract["model_artifact_hash"],
-            model_input_snapshot_json=json.dumps(
-                contract["model_input_snapshot"], sort_keys=True, allow_nan=False
-            )
-            if contract.get("model_input_snapshot") is not None
-            else None,
-            **(contract.get("market_lineage") or {}),
-        )
-        try:
-            request.validate(now=observed_now)
-            away = registry.resolve(request.league, request.away_team, request.event_start_utc)
-            home = registry.resolve(request.league, request.home_team, request.event_start_utc)
-            with _LEDGER_LOCK:
-                eligibility = evaluate_eligibility(
-                    request,
-                    registry,
-                    bans,
-                    exposure_source.exposure(
-                        request,
-                        now=observed_now,
-                        canonical_team_ids=(away.canonical_team_id, home.canonical_team_id),
-                    ),
-                    unit_policy(config),
-                    now=observed_now,
-                )
-                if (
-                    contract.get("model_qualified") is not True
-                    or contract.get("market_lineage") is None
-                    or not _is_registered_serving_model(
-                        request.model_version,
-                        request.league.value,
-                        request.market_type.value,
-                    )
-                ):
-                    eligibility = _downgrade_unserved(eligibility)
-                if (
-                    flat_ledger is not None
-                    and _append_secondary_ledger(
-                        flat_ledger, request, eligibility, observed_now, "wnba_total:flat_ledger"
-                    )
-                    is not None
-                ):
-                    duplicates.append(contract["event_id"])
-                if (
-                    main_ledger is not None
-                    and eligibility.decision == "CALL"
-                    and _append_secondary_ledger(
-                        main_ledger, request, eligibility, observed_now, "wnba_total:main_ledger"
-                    )
-                    is not None
-                ):
-                    main_duplicates.append(contract["event_id"])
-            logged.append(contract["event_id"])
-        except DuplicatePickError as error:
-            duplicates.append(error.pick_id)
-        except (EntityResolutionError, ValueError) as error:
-            skipped.append({"event_id": contract["event_id"], "reason": str(error)[:200]})
-
-    forecast["logged"] = len(logged)
-    forecast["logged_event_ids"] = logged
-    forecast["duplicate_pick_ids"] = duplicates
-    forecast["main_ledger_duplicate_event_ids"] = main_duplicates
-    forecast["skipped"] = forecast.get("unmatched", []) + skipped
-    return forecast
+    return _log_basketball_total_picks(
+        league=League.WNBA,
+        forecast=forecast,
+        tag="wnba_total",
+        risks="Research-baseline total model; not yet locked-holdout qualified.",
+        nba_rules=False,
+        min_edge=0.0,
+        max_disagreement=1.0,
+        feature_schema_version="wnba-total-margin-v2",
+        config=config,
+        registry=registry,
+        bans=bans,
+        main_ledger=main_ledger,
+        flat_ledger=flat_ledger,
+    )
 
 
 def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
@@ -2443,12 +2354,49 @@ def _forecast_nba_total_sport(
     flat_ledger=None,
 ) -> dict:
     """Log NBA total picks to Main (CALL only) + Flat (every candidate)."""
-    from ..data_sources.polymarket_us import probability_to_american
-
     forecast = _forecast_nba_total_slate(data_root, args_date, ESPNClient())
     model_config = config.get("models", {}).get("NBA", {})
-    min_edge = float(model_config.get("min_edge", 0.05))
-    max_disagreement = float(config["project"]["maximum_unreviewed_market_disagreement"])
+    return _log_basketball_total_picks(
+        league=League.NBA,
+        forecast=forecast,
+        tag="nba_total",
+        risks="Point-in-time composite trend + team rolling total-normal model.",
+        nba_rules=True,
+        min_edge=float(model_config.get("min_edge", 0.05)),
+        max_disagreement=float(config["project"]["maximum_unreviewed_market_disagreement"]),
+        feature_schema_version=None,
+        config=config,
+        registry=registry,
+        bans=bans,
+        main_ledger=main_ledger,
+        flat_ledger=flat_ledger,
+    )
+
+
+def _log_basketball_total_picks(
+    *,
+    league: League,
+    forecast: dict,
+    tag: str,
+    risks: str,
+    nba_rules: bool,
+    min_edge: float,
+    max_disagreement: float,
+    feature_schema_version: str | None,
+    config: dict,
+    registry,
+    bans,
+    main_ledger=None,
+    flat_ledger=None,
+) -> dict:
+    """Shared Main (CALL only) + Flat (every candidate) logging for NBA/WNBA total slates.
+
+    ``nba_rules`` carries the NBA-only behaviour: SHADOW_QUALIFIED model state for qualified
+    contracts, the Main edge band (incl. the thin-sample over bump), and disagreement rejections.
+    WNBA stays RESEARCH-state and Main takes every CALL.
+    """
+    from ..data_sources.polymarket_us import probability_to_american
+
     exposure_source = flat_ledger or main_ledger
     if exposure_source is None:
         forecast["logged"] = 0
@@ -2465,7 +2413,7 @@ def _forecast_nba_total_sport(
         request = PickRequest(
             event_start_utc=contract["event_start_utc"],
             event_id=contract["event_id"],
-            league=League.NBA,
+            league=league,
             away_team=contract["away_team"],
             home_team=contract["home_team"],
             market_type=MarketType.TOTAL,
@@ -2477,10 +2425,10 @@ def _forecast_nba_total_sport(
             model_uncertainty=contract["model_uncertainty"],
             model_version=contract["model_version"],
             rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
-            risks="Point-in-time composite trend + team rolling total-normal model.",
+            risks=risks,
             model_origin=ModelOrigin.STATISTICAL_MODEL,
             model_state=ModelState.SHADOW_QUALIFIED
-            if contract.get("model_qualified")
+            if nba_rules and contract.get("model_qualified")
             else ModelState.RESEARCH,
             observed_at_utc=contract["observed_at_utc"],
             model_artifact_hash=contract["model_artifact_hash"],
@@ -2489,7 +2437,7 @@ def _forecast_nba_total_sport(
             calibration_artifact_hash=contract.get(
                 "calibration_artifact_hash", contract["model_artifact_hash"]
             ),
-            feature_schema_version=contract["model_version"],
+            feature_schema_version=feature_schema_version or contract["model_version"],
             code_revision=contract["model_artifact_hash"],
             model_input_snapshot_json=json.dumps(
                 contract["model_input_snapshot"], sort_keys=True, allow_nan=False
@@ -2535,19 +2483,21 @@ def _forecast_nba_total_sport(
                     if min_games < 15:
                         effective_min_total_edge = max(effective_min_total_edge, 0.09)
 
-                main_eligible = (
-                    eligibility.decision == "CALL"
-                    and eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
-                    and effective_min_total_edge <= edge <= max_disagreement
+                main_eligible = eligibility.decision == "CALL" and (
+                    not nba_rules
+                    or (
+                        eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
+                        and effective_min_total_edge <= edge <= max_disagreement
+                    )
                 )
-                if edge > max_disagreement:
+                if nba_rules and edge > max_disagreement:
                     main_rejections.append(
                         {"event_id": contract["event_id"], "reason": "market_disagreement_exceeds_limit"}
                     )
                 if (
                     flat_ledger is not None
                     and _append_secondary_ledger(
-                        flat_ledger, request, eligibility, observed_now, "nba_total:flat_ledger"
+                        flat_ledger, request, eligibility, observed_now, f"{tag}:flat_ledger"
                     )
                     is not None
                 ):
@@ -2556,7 +2506,7 @@ def _forecast_nba_total_sport(
                     main_ledger is not None
                     and main_eligible
                     and _append_secondary_ledger(
-                        main_ledger, request, eligibility, observed_now, "nba_total:main_ledger"
+                        main_ledger, request, eligibility, observed_now, f"{tag}:main_ledger"
                     )
                     is not None
                 ):
@@ -2569,7 +2519,8 @@ def _forecast_nba_total_sport(
 
     forecast["logged"] = len(logged)
     forecast["logged_event_ids"] = logged
-    forecast["main_rejections"] = main_rejections
+    if nba_rules:
+        forecast["main_rejections"] = main_rejections
     forecast["duplicate_pick_ids"] = duplicates
     forecast["main_ledger_duplicate_event_ids"] = main_duplicates
     forecast["skipped"] = forecast.get("unmatched", []) + skipped
