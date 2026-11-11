@@ -2,9 +2,17 @@ import json
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
-from model_prediction.college_basketball_forward import forecast_ncaab_sport
+from model_prediction.college_basketball_forward import _main_sample_eligible, forecast_ncaab_sport
 from model_prediction.features.base import GameRecord
 from model_prediction.main_ledgers import MultiSportPickLedger
+
+
+def test_main_sample_gate_uses_current_season_and_fails_closed():
+    assert not _main_sample_eligible(None, 8)
+    assert not _main_sample_eligible(True, 8)
+    assert not _main_sample_eligible(2, 8)
+    assert _main_sample_eligible(8, 8)
+    assert _main_sample_eligible(None, 0)
 
 
 def test_ncaab_records_real_model_output_and_rerun_deduplicates(tmp_path, monkeypatch):

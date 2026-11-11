@@ -32,6 +32,17 @@ ncaab_total_model = ncaab_total_v6_model
 ncaab_model = ncaab_spread_v6_model
 
 
+def _main_sample_eligible(current_season_sample: object, required_games: int) -> bool:
+    """Require the configured current-season sample before Main admission."""
+    if required_games <= 0:
+        return True
+    return (
+        isinstance(current_season_sample, (int, float))
+        and not isinstance(current_season_sample, bool)
+        and current_season_sample >= required_games
+    )
+
+
 def _normalize_name(s: str) -> str:
     s = unicodedata.normalize("NFKD", s).encode("ASCII", "ignore").decode("utf-8")
     s = s.lower().replace("&", "and").replace(".", "").replace("'", "").replace("-", " ")
@@ -659,11 +670,32 @@ def forecast_ncaab_sport(
                     edge,
                     *teams,
                 )
+                # The configured history floor also applies to the current season
+                # before a probability can enter Main. Lifetime games only establish
+                # team identity; they do not validate a season-opening estimate.
+                current_season_sample = (getattr(prediction, "feature_basis", None) or {}).get(
+                    "current_season_sample"
+                )
+                main_sample_eligible = _main_sample_eligible(current_season_sample, min_team_games)
+                if kind != "total" and edge >= min_edge and not main_sample_eligible:
+                    result["skipped"].append(
+                        {
+                            "event_id": identity,
+                            "market_type": kind,
+                            "reason": "insufficient_current_season_sample_for_main",
+                            "current_season_sample": current_season_sample,
+                            "required_games": min_team_games,
+                        }
+                    )
                 destinations = (
                     ("flat_logged", flat_ledger, True),
                     ("research_ledger_logged", research_ledger, edge >= min_edge),
                     ("gated_ledger_logged", gated_ledger, edge >= min_edge),
-                    ("main_logged", main_ledger, edge >= min_edge and kind != "total"),
+                    (
+                        "main_logged",
+                        main_ledger,
+                        edge >= min_edge and kind != "total" and main_sample_eligible,
+                    ),
                 )
                 for counter, destination, eligible in destinations:
                     if destination is None or not eligible:
