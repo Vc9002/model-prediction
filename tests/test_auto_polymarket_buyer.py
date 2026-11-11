@@ -275,6 +275,46 @@ def test_buyer_rejects_stale_quotes_and_closed_markets():
     assert len(res.dry_run_orders) == 0
 
 
+def test_buyer_rejects_pick_created_from_old_source_quote():
+    quote_calls = []
+
+    def live_quote(slug):
+        quote_calls.append(slug)
+        return {"ask": 0.40, "market_slug": slug, "side": "long"}
+
+    now = utc_now()
+    buyer = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(
+            whitelisted_models=("nba-spread-margin-v9",),
+            blacklisted_models=(),
+        ),
+        live_quote_fn=live_quote,
+    )
+    result = buyer.evaluate_and_execute(
+        [
+            {
+                "pick_id": "miami-stale-source-quote",
+                "model_id": "nba-spread-margin-v9",
+                "status": "open",
+                "decision": "CALL",
+                "league": "NBA",
+                "market_type": "spread",
+                "selection": "away",
+                "line": -9.5,
+                "market_slug": "asc-nba-mia-uta-neg-9pt5",
+                "event_start_utc": iso_utc(now + timedelta(hours=2)),
+                "created_at_utc": iso_utc(now - timedelta(minutes=1)),
+                "market_quote_observed_at_utc": iso_utc(now - timedelta(hours=18)),
+                "model_probability": 0.5166,
+                "market_probability": 0.50,
+            }
+        ]
+    )
+    assert result.rejected_stale_quote == 1
+    assert result.dry_run_orders == []
+    assert quote_calls == []
+
+
 def test_buyer_fails_closed_when_stale_quote_refresh_has_network_error():
     buyer = AutoPolymarketBuyer()
     stale_quote = {

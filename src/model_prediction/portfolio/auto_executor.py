@@ -1555,6 +1555,20 @@ class AutoPolymarketBuyer:
                 result.rejected_stale_model += 1
                 continue
 
+            # A fresh executable ask cannot repair a pick priced from an old
+            # source quote: the model may have selected the wrong main line.
+            source_quote_at = row.get("market_quote_observed_at_utc")
+            if source_quote_at:
+                try:
+                    source_quote_age = (
+                        parse_utc(str(model_timestamp)) - parse_utc(str(source_quote_at))
+                    ).total_seconds()
+                except (TypeError, ValueError):
+                    source_quote_age = float("inf")
+                if not 0 <= source_quote_age <= self.config.max_quote_age_seconds:
+                    result.rejected_stale_quote += 1
+                    continue
+
             # 5. Fast Deduplication check (pick_id or event_id + selection)
             if self._is_already_bought(
                 pick_id=pick_id,
