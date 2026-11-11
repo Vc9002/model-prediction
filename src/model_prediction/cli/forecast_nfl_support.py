@@ -1,0 +1,247 @@
+"""Leaf helpers split out of forecast.py (no clock/slate call sites, so no test-patch targets)."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+from ..domain import (
+    EASTERN,
+    parse_utc,
+)
+from ..pricing import implied_probability
+
+logger = logging.getLogger("model_prediction.cli")
+
+
+STANDARD_LAY_ASK = round(implied_probability(-110), 6)
+
+
+def _select_nfl_spread_market(candidates: list[dict]) -> dict | None:
+    """Select the most balanced spread market line for an NFL game."""
+    partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")
+    latest_by_contract: dict[str, dict] = {}
+    for row in candidates:
+        slug = str(row.get("market_slug") or "")
+        if (
+            not slug
+            or any(token in slug.lower() for token in partial_tokens)
+            or row.get("line") is None
+            or not isinstance(row.get("long"), dict)
+            or not isinstance(row.get("short"), dict)
+            or row["long"].get("ask") is None
+            or row["short"].get("ask") is None
+        ):
+            continue
+        try:
+            long_ask = float(row["long"]["ask"])
+            short_ask = float(row["short"]["ask"])
+            observed = parse_utc(str(row.get("observed_at_utc") or ""))
+        except (TypeError, ValueError):
+            continue
+        if not (0 < long_ask < 1 and 0 < short_ask < 1):
+            continue
+        previous = latest_by_contract.get(slug)
+        if previous is None or observed > parse_utc(str(previous["observed_at_utc"])):
+            latest_by_contract[slug] = row
+    if not latest_by_contract:
+        return None
+    return min(latest_by_contract.values(), key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
+
+
+def _nfl_is_neutral_site(event: dict) -> bool:
+    """Determine whether an NFL game is played at a neutral site (international series, etc.)."""
+    comp = (event.get("competitions") or [{}])[0]
+    is_neutral_site = bool(comp.get("neutralSite", False))
+    if not is_neutral_site:
+        venue = comp.get("venue") or {}
+        address = venue.get("address") or {}
+        country = str(address.get("country") or "").strip().upper()
+        city = str(address.get("city") or "").strip().lower()
+        venue_name = str(venue.get("fullName") or "").strip().lower()
+        if (
+            country
+            and country not in ("USA", "US", "UNITED STATES")
+            or any(
+                kw in city
+                for kw in ("london", "munich", "frankfurt", "são paulo", "sao paulo", "mexico city")
+            )
+            or any(
+                kw in venue_name
+                for kw in (
+                    "tottenham",
+                    "wembley",
+                    "twickenham",
+                    "allianz arena",
+                    "deutsche bank park",
+                    "arena corinthians",
+                    "estadio azteca",
+                )
+            )
+        ):
+            is_neutral_site = True
+    return is_neutral_site
+
+
+def _nfl_situational_features(
+    history: list,
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """Extract point-in-time last game dates and starting QBs for NFL teams."""
+    team_last_date: dict[str, Any] = {}
+    team_starters: dict[str, str] = {}
+    for g in history:
+        try:
+            g_dt = parse_utc(str(g.event_start_utc)).astimezone(EASTERN).date()
+            team_last_date[g.home_team] = g_dt
+            team_last_date[g.away_team] = g_dt
+            if getattr(g, "home_starter_name", None) and g.home_starter_name != "Unknown":
+                team_starters[g.home_team] = g.home_starter_name
+            if getattr(g, "away_starter_name", None) and g.away_starter_name != "Unknown":
+                team_starters[g.away_team] = g.away_starter_name
+        except (AttributeError, KeyError, TypeError, ValueError):
+            continue
+    return team_last_date, team_starters
+
+
+def _nfl_venue_weather(event: dict) -> tuple[bool, float, float]:
+    """Extract dome status, wind speed, and temperature from NFL event."""
+    comp = (event.get("competitions") or [{}])[0]
+    venue = comp.get("venue") or {}
+    is_dome = bool(venue.get("indoor", False)) or any(
+        d in str(venue.get("fullName") or "").lower()
+        for d in (
+            "dome",
+            "mercedes-benz",
+            "ford field",
+            "allegiant",
+            "at&t stadium",
+            "lucas oil",
+            "nrg stadium",
+            "u.s. bank",
+            "state farm",
+            "sofi",
+        )
+    )
+    weather = comp.get("weather") or {}
+    wind_mph = float(weather.get("windSpeed") or (0.0 if is_dome else 5.0))
+    temperature_f = float(weather.get("temperature") or (70.0 if is_dome else 65.0))
+    return is_dome, wind_mph, temperature_f
+
+
+NFL_DIVISIONS: dict[str, str] = {
+    "Buffalo Bills": "AFC_East",
+    "Miami Dolphins": "AFC_East",
+    "New England Patriots": "AFC_East",
+    "New York Jets": "AFC_East",
+    "Baltimore Ravens": "AFC_North",
+    "Cincinnati Bengals": "AFC_North",
+    "Cleveland Browns": "AFC_North",
+    "Pittsburgh Steelers": "AFC_North",
+    "Houston Texans": "AFC_South",
+    "Indianapolis Colts": "AFC_South",
+    "Jacksonville Jaguars": "AFC_South",
+    "Tennessee Titans": "AFC_South",
+    "Denver Broncos": "AFC_West",
+    "Kansas City Chiefs": "AFC_West",
+    "Las Vegas Raiders": "AFC_West",
+    "Los Angeles Chargers": "AFC_West",
+    "Dallas Cowboys": "NFC_East",
+    "New York Giants": "NFC_East",
+    "Philadelphia Eagles": "NFC_East",
+    "Washington Commanders": "NFC_East",
+    "Chicago Bears": "NFC_North",
+    "Detroit Lions": "NFC_North",
+    "Green Bay Packers": "NFC_North",
+    "Minnesota Vikings": "NFC_North",
+    "Atlanta Falcons": "NFC_South",
+    "Carolina Panthers": "NFC_South",
+    "New Orleans Saints": "NFC_South",
+    "Tampa Bay Buccaneers": "NFC_South",
+    "Arizona Cardinals": "NFC_West",
+    "Los Angeles Rams": "NFC_West",
+    "San Francisco 49ers": "NFC_West",
+    "Seattle Seahawks": "NFC_West",
+}
+
+
+def _nfl_is_division_game(home_team: str, away_team: str) -> bool:
+    """Return True if both teams belong to the same NFL division."""
+    h_div = NFL_DIVISIONS.get(home_team)
+    a_div = NFL_DIVISIONS.get(away_team)
+    return h_div is not None and h_div == a_div
+
+
+def _load_nfl_injuries_known_at(
+    data_root: str | Path, observed_at: datetime
+) -> tuple[list[dict[str, Any]], dict[str, str] | None]:
+    """Return only verified, as-of injury entries and their source identity."""
+    snap_dir = Path(data_root) / "availability" / "nfl" / "espn_injury_snapshots"
+    if not snap_dir.exists():
+        return [], None
+    candidates = []
+    for p in snap_dir.glob("*/*.json"):
+        try:
+            with open(p, encoding="utf-8") as f:
+                data = json.load(f)
+            expected_hash = data.pop("snapshot_sha256", None)
+            if (
+                not expected_hash
+                or hashlib.sha256(
+                    json.dumps(data, sort_keys=True, separators=(",", ":")).encode()
+                ).hexdigest()
+                != expected_hash
+            ):
+                continue
+            obs = parse_utc(data.get("observed_at_utc", ""))
+            if obs <= observed_at:
+                candidates.append((obs, data.get("entries", []), expected_hash, str(p)))
+        except (json.JSONDecodeError, KeyError, ValueError, OSError):
+            continue
+    if not candidates:
+        return [], None
+    candidates.sort(key=lambda c: c[0])
+    obs, entries, digest, path = candidates[-1]
+    return entries, {"observed_at_utc": obs.isoformat(), "sha256": digest, "path": path}
+
+
+def _espn_spread_no_vig_ask(first_odds: dict[str, Any], selection: str) -> float:
+    """De-vigged ESPN consensus spread price for `selection`, falling back to the raw
+    one-sided implied probability when the other side's close odds aren't available --
+    ESPN's two-sided spread odds carry the same vig as moneyline, so pricing off one
+    side alone (as this previously did) systematically overstates edge."""
+    from ..learned_forward import _safe_odds_int
+
+    ps_obj = first_odds.get("pointSpread") or {}
+    sel_odds = _safe_odds_int((ps_obj.get(selection) or {}).get("close", {}).get("odds"))
+    other_side = "away" if selection == "home" else "home"
+    other_odds = _safe_odds_int((ps_obj.get(other_side) or {}).get("close", {}).get("odds"))
+    if sel_odds is None:
+        return STANDARD_LAY_ASK
+    sel_prob = round(implied_probability(sel_odds), 6)
+    if other_odds is None:
+        return sel_prob
+    other_prob = round(implied_probability(other_odds), 6)
+    total = sel_prob + other_prob
+    if total <= 0:
+        return sel_prob
+    return round(sel_prob / total, 6)
+
+
+def _select_nfl_total_market(candidates: list[dict]) -> dict | None:
+    """Select the most balanced total market line for an NFL game."""
+    partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")
+    valid = [
+        row
+        for row in candidates
+        if isinstance(row.get("long"), dict)
+        and row["long"].get("ask") is not None
+        and row.get("line") is not None
+        and not any(token in str(row.get("market_slug", "")).lower() for token in partial_tokens)
+    ]
+    if not valid:
+        return None
+    return min(valid, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))

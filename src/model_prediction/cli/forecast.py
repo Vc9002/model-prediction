@@ -69,7 +69,6 @@ from ..learned_forward import build_learned_moneyline_slate, match_executable_qu
 from ..ledger import DuplicatePickError
 from ..main_ledgers import MAIN_LEDGER_SPORTS, MultiSportPickLedger
 from ..market_blend import MarketBlendBlockedError, MarketBlendPolicy, canonical_config_logical_hash
-from ..models.market_residual import MarketResidualModel
 from ..models.mlb import canonical_mlb_artifact_hash, load_formula_spec
 from ..pricing import implied_probability
 from ..production_registry import ProductionModelRegistry, compute_artifact_hash
@@ -77,6 +76,28 @@ from ..runtime_paths import RuntimePaths
 from ..soccer_forward import build_soccer_total_slate
 from ..tennis_forward import build_tennis_slate
 from .commands import _clear_today_open, _research_models_dir
+from .forecast_market_select import (
+    _load_market_residual_model,
+    _nba_volatility_features,
+    _quotes_known_at,
+    _select_mlb_nrfi_market,
+    _select_nba_spread_market,
+    _select_nba_total_market,
+    _select_wnba_spread_market,
+    _select_wnba_total_market,
+)
+from .forecast_nfl_support import (  # noqa: F401 -- re-exported: tests and callers import these from forecast
+    NFL_DIVISIONS,
+    STANDARD_LAY_ASK,
+    _espn_spread_no_vig_ask,
+    _load_nfl_injuries_known_at,
+    _nfl_is_division_game,
+    _nfl_is_neutral_site,
+    _nfl_situational_features,
+    _nfl_venue_weather,
+    _select_nfl_spread_market,
+    _select_nfl_total_market,
+)
 from .state import (
     _LEDGER_LOCK,
     DAILY_INTERNATIONAL_BASEBALL_SPORTS,
@@ -87,8 +108,6 @@ from .state import (
 )
 
 logger = logging.getLogger("model_prediction.cli")
-
-STANDARD_LAY_ASK = round(implied_probability(-110), 6)
 
 
 def _load_exact_artifact_contract(model_version: str) -> tuple[dict[str, Any] | None, str | None]:
@@ -269,23 +288,6 @@ def _read_single_snapshot_archive(snapshot_path: Path, sport: str) -> list[dict[
                 row["_lineage"] = lineage
             rows.append(row)
     return rows
-
-
-def _nba_volatility_features(artifact: dict, history, prediction) -> dict:
-    """Capture exact replay inputs without changing the protected NBA engine."""
-    features = dict(prediction.feature_basis)
-    if artifact.get("dynamic_volatility"):
-        from ..features.trends import TrendEngine
-
-        trend = TrendEngine(
-            history,
-            offseason_gap_days=artifact.get("offseason_gap_days"),
-            offseason_retention=float(artifact.get("offseason_retention", 0.50)),
-            isolate_postseason=bool(artifact.get("isolate_postseason", False)),
-        )
-        features["volatility_away_consistency"] = trend.team_trend(prediction.away_team).consistency
-        features["volatility_home_consistency"] = trend.team_trend(prediction.home_team).consistency
-    return features
 
 
 def _forecast_mlb(args_date: str, log: bool, config, registry, bans, ledger, audit) -> dict:
@@ -745,26 +747,6 @@ def _forecast_mlb_totals_flat(
     }
 
 
-def _select_mlb_nrfi_market(rows: list[dict]) -> dict | None:
-    """Select the latest prospective executable Polymarket NRFI market."""
-    valid = [
-        row
-        for row in rows
-        if isinstance(row.get("short"), dict)
-        and row["short"].get("ask") is not None
-        and isinstance(row.get("long"), dict)
-        and row["long"].get("ask") is not None
-        and 0 < float(row["short"]["ask"]) < 1
-        and 0 < float(row["long"]["ask"]) < 1
-    ]
-    if not valid:
-        return None
-    return max(
-        valid,
-        key=lambda row: str(row.get("observed_at_utc") or row.get("transact_time_utc") or ""),
-    )
-
-
 def _forecast_mlb_nrfi_flat(
     args_date: str,
     log: bool,
@@ -1158,26 +1140,6 @@ def _forecast_mlb_nrfi_flat(
     }
 
 
-def _select_wnba_spread_market(rows: list[dict]) -> dict | None:
-    """Among alternate WNBA spread lines for one event, the main line is the
-    one whose long-side ask sits closest to a coin flip -- same "most
-    balanced line wins" rule mlb_market_odds._market_balance uses for MLB's
-    alternate lines, adapted to this snapshot format's embedded long/short
-    asks instead of a two-sided quote list."""
-    partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-")
-    candidates = [
-        row
-        for row in rows
-        if isinstance(row.get("long"), dict)
-        and row["long"].get("ask") is not None
-        and row.get("line") is not None
-        and not any(token in str(row.get("market_slug", "")).lower() for token in partial_tokens)
-    ]
-    if not candidates:
-        return None
-    return min(candidates, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
-
-
 def _forecast_wnba_spread_slate(data_root, args_date: str, client) -> dict:
     """Price WNBA spreads with BasketballModel's normal-CDF margin approach
     (wnba-spread-margin-v1), matched against the main (most-balanced)
@@ -1520,22 +1482,6 @@ def _forecast_wnba_spread_sport(
     return forecast
 
 
-def _select_wnba_total_market(rows: list[dict]) -> dict | None:
-    """Select the most balanced total market line for a WNBA game."""
-    partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")
-    candidates = [
-        row
-        for row in rows
-        if isinstance(row.get("long"), dict)
-        and row["long"].get("ask") is not None
-        and row.get("line") is not None
-        and not any(token in str(row.get("market_slug", "")).lower() for token in partial_tokens)
-    ]
-    if not candidates:
-        return None
-    return min(candidates, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
-
-
 def _forecast_wnba_total_slate(data_root, args_date: str, client) -> dict:
     """Price WNBA totals with BasketballModel's normal-CDF score approach
     (wnba-total-margin-v1), matched against the main (most-balanced)
@@ -1867,72 +1813,6 @@ def _forecast_wnba_total_sport(
     forecast["main_ledger_duplicate_event_ids"] = main_duplicates
     forecast["skipped"] = forecast.get("unmatched", []) + skipped
     return forecast
-
-
-def _quotes_known_at(rows: list[dict], cutoff: datetime) -> list[dict]:
-    """Keep only quotes observed at or before ``cutoff``.
-
-    The day's snapshot file keeps growing after a run starts, so rows stamped
-    later than the run would otherwise be priced and then rejected as future.
-    """
-    known = []
-    for row in rows:
-        try:
-            observed = parse_utc(str(row.get("observed_at_utc") or ""))
-        except ValueError:
-            continue
-        if observed <= cutoff:
-            known.append(row)
-    return known
-
-
-def _select_nba_spread_market(rows: list[dict], *, as_of: datetime | None = None) -> dict | None:
-    """Among alternate NBA spread lines for one event, the main line is the
-    one whose long-side ask sits closest to a coin flip -- most balanced line wins."""
-    partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-")
-    candidates = [
-        row
-        for row in rows
-        if isinstance(row.get("long"), dict)
-        and row["long"].get("ask") is not None
-        and row.get("line") is not None
-        and not any(token in str(row.get("market_slug", "")).lower() for token in partial_tokens)
-    ]
-    if as_of is not None:
-        from ..portfolio.auto_executor import (
-            MAX_AUTO_BUYER_QUOTE_AGE_SECONDS,
-            MAX_SOURCE_QUOTE_AGE_SECONDS,
-        )
-
-        recent = [
-            row
-            for row in candidates
-            if row.get("observed_at_utc")
-            and 0
-            <= (as_of - parse_utc(str(row["observed_at_utc"]))).total_seconds()
-            <= MAX_AUTO_BUYER_QUOTE_AGE_SECONDS
-        ]
-        fallback = [
-            row
-            for row in candidates
-            if row.get("observed_at_utc")
-            and 0
-            <= (as_of - parse_utc(str(row["observed_at_utc"]))).total_seconds()
-            <= MAX_SOURCE_QUOTE_AGE_SECONDS
-        ]
-        candidates = recent or fallback
-    latest_by_slug: dict[str, dict] = {}
-    for row in candidates:
-        slug = str(row.get("market_slug") or row.get("line"))
-        previous = latest_by_slug.get(slug)
-        if previous is None or str(row.get("observed_at_utc") or "") > str(
-            previous.get("observed_at_utc") or ""
-        ):
-            latest_by_slug[slug] = row
-    candidates = list(latest_by_slug.values())
-    if not candidates:
-        return None
-    return min(candidates, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
 
 
 def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
@@ -2322,22 +2202,6 @@ def _forecast_nba_spread_sport(
     forecast["main_rejections"] = main_rejections
     forecast["skipped"] = forecast.get("unmatched", []) + skipped
     return forecast
-
-
-def _select_nba_total_market(rows: list[dict]) -> dict | None:
-    """Select the most balanced total market line for an NBA game."""
-    partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")
-    candidates = [
-        row
-        for row in rows
-        if isinstance(row.get("long"), dict)
-        and row["long"].get("ask") is not None
-        and row.get("line") is not None
-        and not any(token in str(row.get("market_slug", "")).lower() for token in partial_tokens)
-    ]
-    if not candidates:
-        return None
-    return min(candidates, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
 
 
 def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
@@ -2772,216 +2636,6 @@ def _forecast_nba_total_sport(
     forecast["main_ledger_duplicate_event_ids"] = main_duplicates
     forecast["skipped"] = forecast.get("unmatched", []) + skipped
     return forecast
-
-
-def _select_nfl_spread_market(candidates: list[dict]) -> dict | None:
-    """Select the most balanced spread market line for an NFL game."""
-    partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")
-    latest_by_contract: dict[str, dict] = {}
-    for row in candidates:
-        slug = str(row.get("market_slug") or "")
-        if (
-            not slug
-            or any(token in slug.lower() for token in partial_tokens)
-            or row.get("line") is None
-            or not isinstance(row.get("long"), dict)
-            or not isinstance(row.get("short"), dict)
-            or row["long"].get("ask") is None
-            or row["short"].get("ask") is None
-        ):
-            continue
-        try:
-            long_ask = float(row["long"]["ask"])
-            short_ask = float(row["short"]["ask"])
-            observed = parse_utc(str(row.get("observed_at_utc") or ""))
-        except (TypeError, ValueError):
-            continue
-        if not (0 < long_ask < 1 and 0 < short_ask < 1):
-            continue
-        previous = latest_by_contract.get(slug)
-        if previous is None or observed > parse_utc(str(previous["observed_at_utc"])):
-            latest_by_contract[slug] = row
-    if not latest_by_contract:
-        return None
-    return min(latest_by_contract.values(), key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
-
-
-def _nfl_is_neutral_site(event: dict) -> bool:
-    """Determine whether an NFL game is played at a neutral site (international series, etc.)."""
-    comp = (event.get("competitions") or [{}])[0]
-    is_neutral_site = bool(comp.get("neutralSite", False))
-    if not is_neutral_site:
-        venue = comp.get("venue") or {}
-        address = venue.get("address") or {}
-        country = str(address.get("country") or "").strip().upper()
-        city = str(address.get("city") or "").strip().lower()
-        venue_name = str(venue.get("fullName") or "").strip().lower()
-        if (
-            country
-            and country not in ("USA", "US", "UNITED STATES")
-            or any(
-                kw in city
-                for kw in ("london", "munich", "frankfurt", "são paulo", "sao paulo", "mexico city")
-            )
-            or any(
-                kw in venue_name
-                for kw in (
-                    "tottenham",
-                    "wembley",
-                    "twickenham",
-                    "allianz arena",
-                    "deutsche bank park",
-                    "arena corinthians",
-                    "estadio azteca",
-                )
-            )
-        ):
-            is_neutral_site = True
-    return is_neutral_site
-
-
-def _nfl_situational_features(
-    history: list,
-) -> tuple[dict[str, Any], dict[str, str]]:
-    """Extract point-in-time last game dates and starting QBs for NFL teams."""
-    team_last_date: dict[str, Any] = {}
-    team_starters: dict[str, str] = {}
-    for g in history:
-        try:
-            g_dt = parse_utc(str(g.event_start_utc)).astimezone(EASTERN).date()
-            team_last_date[g.home_team] = g_dt
-            team_last_date[g.away_team] = g_dt
-            if getattr(g, "home_starter_name", None) and g.home_starter_name != "Unknown":
-                team_starters[g.home_team] = g.home_starter_name
-            if getattr(g, "away_starter_name", None) and g.away_starter_name != "Unknown":
-                team_starters[g.away_team] = g.away_starter_name
-        except (AttributeError, KeyError, TypeError, ValueError):
-            continue
-    return team_last_date, team_starters
-
-
-def _nfl_venue_weather(event: dict) -> tuple[bool, float, float]:
-    """Extract dome status, wind speed, and temperature from NFL event."""
-    comp = (event.get("competitions") or [{}])[0]
-    venue = comp.get("venue") or {}
-    is_dome = bool(venue.get("indoor", False)) or any(
-        d in str(venue.get("fullName") or "").lower()
-        for d in (
-            "dome",
-            "mercedes-benz",
-            "ford field",
-            "allegiant",
-            "at&t stadium",
-            "lucas oil",
-            "nrg stadium",
-            "u.s. bank",
-            "state farm",
-            "sofi",
-        )
-    )
-    weather = comp.get("weather") or {}
-    wind_mph = float(weather.get("windSpeed") or (0.0 if is_dome else 5.0))
-    temperature_f = float(weather.get("temperature") or (70.0 if is_dome else 65.0))
-    return is_dome, wind_mph, temperature_f
-
-
-NFL_DIVISIONS: dict[str, str] = {
-    "Buffalo Bills": "AFC_East",
-    "Miami Dolphins": "AFC_East",
-    "New England Patriots": "AFC_East",
-    "New York Jets": "AFC_East",
-    "Baltimore Ravens": "AFC_North",
-    "Cincinnati Bengals": "AFC_North",
-    "Cleveland Browns": "AFC_North",
-    "Pittsburgh Steelers": "AFC_North",
-    "Houston Texans": "AFC_South",
-    "Indianapolis Colts": "AFC_South",
-    "Jacksonville Jaguars": "AFC_South",
-    "Tennessee Titans": "AFC_South",
-    "Denver Broncos": "AFC_West",
-    "Kansas City Chiefs": "AFC_West",
-    "Las Vegas Raiders": "AFC_West",
-    "Los Angeles Chargers": "AFC_West",
-    "Dallas Cowboys": "NFC_East",
-    "New York Giants": "NFC_East",
-    "Philadelphia Eagles": "NFC_East",
-    "Washington Commanders": "NFC_East",
-    "Chicago Bears": "NFC_North",
-    "Detroit Lions": "NFC_North",
-    "Green Bay Packers": "NFC_North",
-    "Minnesota Vikings": "NFC_North",
-    "Atlanta Falcons": "NFC_South",
-    "Carolina Panthers": "NFC_South",
-    "New Orleans Saints": "NFC_South",
-    "Tampa Bay Buccaneers": "NFC_South",
-    "Arizona Cardinals": "NFC_West",
-    "Los Angeles Rams": "NFC_West",
-    "San Francisco 49ers": "NFC_West",
-    "Seattle Seahawks": "NFC_West",
-}
-
-
-def _nfl_is_division_game(home_team: str, away_team: str) -> bool:
-    """Return True if both teams belong to the same NFL division."""
-    h_div = NFL_DIVISIONS.get(home_team)
-    a_div = NFL_DIVISIONS.get(away_team)
-    return h_div is not None and h_div == a_div
-
-
-def _load_nfl_injuries_known_at(
-    data_root: str | Path, observed_at: datetime
-) -> tuple[list[dict[str, Any]], dict[str, str] | None]:
-    """Return only verified, as-of injury entries and their source identity."""
-    snap_dir = Path(data_root) / "availability" / "nfl" / "espn_injury_snapshots"
-    if not snap_dir.exists():
-        return [], None
-    candidates = []
-    for p in snap_dir.glob("*/*.json"):
-        try:
-            with open(p, encoding="utf-8") as f:
-                data = json.load(f)
-            expected_hash = data.pop("snapshot_sha256", None)
-            if (
-                not expected_hash
-                or hashlib.sha256(
-                    json.dumps(data, sort_keys=True, separators=(",", ":")).encode()
-                ).hexdigest()
-                != expected_hash
-            ):
-                continue
-            obs = parse_utc(data.get("observed_at_utc", ""))
-            if obs <= observed_at:
-                candidates.append((obs, data.get("entries", []), expected_hash, str(p)))
-        except (json.JSONDecodeError, KeyError, ValueError, OSError):
-            continue
-    if not candidates:
-        return [], None
-    candidates.sort(key=lambda c: c[0])
-    obs, entries, digest, path = candidates[-1]
-    return entries, {"observed_at_utc": obs.isoformat(), "sha256": digest, "path": path}
-
-
-def _espn_spread_no_vig_ask(first_odds: dict[str, Any], selection: str) -> float:
-    """De-vigged ESPN consensus spread price for `selection`, falling back to the raw
-    one-sided implied probability when the other side's close odds aren't available --
-    ESPN's two-sided spread odds carry the same vig as moneyline, so pricing off one
-    side alone (as this previously did) systematically overstates edge."""
-    from ..learned_forward import _safe_odds_int
-
-    ps_obj = first_odds.get("pointSpread") or {}
-    sel_odds = _safe_odds_int((ps_obj.get(selection) or {}).get("close", {}).get("odds"))
-    other_side = "away" if selection == "home" else "home"
-    other_odds = _safe_odds_int((ps_obj.get(other_side) or {}).get("close", {}).get("odds"))
-    if sel_odds is None:
-        return STANDARD_LAY_ASK
-    sel_prob = round(implied_probability(sel_odds), 6)
-    if other_odds is None:
-        return sel_prob
-    other_prob = round(implied_probability(other_odds), 6)
-    total = sel_prob + other_prob
-    if total <= 0:
-        return sel_prob
-    return round(sel_prob / total, 6)
 
 
 def _forecast_nfl_spread_slate(
@@ -3486,22 +3140,6 @@ def _forecast_nfl_spread_sport(
     forecast["main_ledger_duplicate_event_ids"] = main_duplicates
     forecast["skipped"] = forecast.get("unmatched", []) + skipped
     return forecast
-
-
-def _select_nfl_total_market(candidates: list[dict]) -> dict | None:
-    """Select the most balanced total market line for an NFL game."""
-    partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")
-    valid = [
-        row
-        for row in candidates
-        if isinstance(row.get("long"), dict)
-        and row["long"].get("ask") is not None
-        and row.get("line") is not None
-        and not any(token in str(row.get("market_slug", "")).lower() for token in partial_tokens)
-    ]
-    if not valid:
-        return None
-    return min(valid, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
 
 
 def _forecast_nfl_total_slate(
@@ -4012,26 +3650,6 @@ def _forecast_nfl_total_sport(
     forecast["main_ledger_duplicate_event_ids"] = main_duplicates
     forecast["skipped"] = forecast.get("unmatched", []) + skipped
     return forecast
-
-
-def _load_market_residual_model(config) -> MarketResidualModel | None:
-    """Fail-soft load of the market-residual artifact (P0-4), diagnostic use only.
-
-    A missing config block, missing file, or hash mismatch all fall back to
-    None (no market_residual_probability recorded on the row) rather than
-    raising into the primary forecast path -- this layer must never be able
-    to block a real pick from being logged.
-    """
-    artifact_value = (config.get("models", {}).get("market_residual") or {}).get("artifact")
-    if not artifact_value:
-        return None
-    artifact_path = Path(artifact_value)
-    if not artifact_path.is_absolute():
-        artifact_path = PROJECT_ROOT / artifact_path
-    try:
-        return MarketResidualModel.load(artifact_path)
-    except (FileNotFoundError, ValueError, KeyError, json.JSONDecodeError):
-        return None
 
 
 def _forecast_learned_sport(
