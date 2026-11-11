@@ -62,22 +62,22 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     "nba-moneyline-v9",
     "nba-spread-margin-v9",
     "nba-total-margin-v9",
-    # NFL (Latest Generation v7 & v4 Champions)
+    # NFL (Latest Generation v7 Champions; NFL moneyline currently has no
+    # active whitelisted champion -- nfl-elo-trend-lr-v4 is blacklisted below)
     "nfl-spread-structural-v7",
     "nfl-total-structural-v7",
-    "nfl-elo-trend-lr-v4",
     # NCAAF (Latest Generation v4 Champion)
     "cfb-structural-v4",
     # WNBA (Dormant off-season)
     "wnba-elo-trend-lr-v4",
     "wnba-total-margin-v2",
     "wnba-spread-margin-v2",
-    # MLB (Dormant off-season)
+    # MLB (Dormant off-season). mlb-structural-v10-frozen is blacklisted below
+    # (pulled 2026-09-02 pending qualification review) -- not whitelisted here.
     "mlb-structural-runline-v4",
     "mlb-nrfi-v4",
     "mlb-nrfi-v3",
     "mlb-moneyline-v9-residual",
-    "mlb-structural-v10-frozen",
 )
 
 EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
@@ -1961,7 +1961,8 @@ class AutoPolymarketBuyer:
             target_spend = raw_units * self.config.unit_value_usd
             target_spend = min(target_spend, self.config.max_game_stake_usd)
 
-            # Optional edge-scaled sizing (off by default -- see edge_scaled_sizing_enabled).
+            # Optional edge-scaled sizing (on by default since f9d077e0; see
+            # edge_scaled_sizing_enabled).
             # Scales the already-capped stake linearly between edge_scaling_min_fraction
             # (at min_edge) and 1.0 (at max_edge), so a bare-minimum-edge pick risks less
             # than a near-max-edge one. Never increases stake above the per-game cap above.

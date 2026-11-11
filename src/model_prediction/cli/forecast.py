@@ -1450,29 +1450,25 @@ def _forecast_wnba_spread_sport(
                 ):
                     eligibility = _downgrade_unserved(eligibility)
                 if eligibility.decision == "CALL":
-                    conflicting_ml_ids = []
-                    for ex_pick in exposure_source.rows(filters={"event_id": str(contract["event_id"])}):
-                        if str(ex_pick.get("status", "")).lower() == "open":
-                            raw_mkt = ex_pick.get("market_type")
-                            ex_mkt = str(getattr(raw_mkt, "value", raw_mkt) or "").lower()
-                            if ex_mkt == "moneyline" and ex_pick.get("decision") == "CALL":
-                                coherent, _ = validate_cross_market_pick_coherence(
-                                    candidate_market_type="spread",
-                                    candidate_selection=request.selection,
-                                    candidate_line=request.line,
-                                    existing_picks_for_event=[ex_pick],
-                                )
-                                if not coherent:
-                                    conflicting_ml_ids.append(ex_pick.get("pick_id"))
-                    if conflicting_ml_ids:
-                        if flat_ledger is not None:
-                            flat_ledger.supersede_open_rows(
-                                conflicting_ml_ids,
-                                reason="Superseded by structural spread pick (cross-market coherence)",
-                                allow_staked_removal=True,
-                            )
-                        if main_ledger is not None:
-                            main_ledger.supersede_open_rows(
+                    for ldg in (flat_ledger, main_ledger):
+                        if ldg is None:
+                            continue
+                        conflicting_ml_ids = []
+                        for ex_pick in ldg.rows(filters={"event_id": str(contract["event_id"])}):
+                            if str(ex_pick.get("status", "")).lower() == "open":
+                                raw_mkt = ex_pick.get("market_type")
+                                ex_mkt = str(getattr(raw_mkt, "value", raw_mkt) or "").lower()
+                                if ex_mkt == "moneyline" and ex_pick.get("decision") == "CALL":
+                                    coherent, _ = validate_cross_market_pick_coherence(
+                                        candidate_market_type="spread",
+                                        candidate_selection=request.selection,
+                                        candidate_line=request.line,
+                                        existing_picks_for_event=[ex_pick],
+                                    )
+                                    if not coherent:
+                                        conflicting_ml_ids.append(ex_pick.get("pick_id"))
+                        if conflicting_ml_ids:
+                            ldg.supersede_open_rows(
                                 conflicting_ml_ids,
                                 reason="Superseded by structural spread pick (cross-market coherence)",
                                 allow_staked_removal=True,
@@ -1785,9 +1781,11 @@ def _forecast_wnba_total_sport(
             model_state=ModelState.RESEARCH,
             observed_at_utc=contract["observed_at_utc"],
             model_artifact_hash=contract["model_artifact_hash"],
-            calibration_method="total_normal",
-            calibration_version=contract["model_version"],
-            calibration_artifact_hash=contract["model_artifact_hash"],
+            calibration_method=contract.get("calibration_method", "total_normal"),
+            calibration_version=contract.get("calibration_version", contract["model_version"]),
+            calibration_artifact_hash=contract.get(
+                "calibration_artifact_hash", contract["model_artifact_hash"]
+            ),
             feature_schema_version="wnba-total-margin-v2",
             code_revision=contract["model_artifact_hash"],
             model_input_snapshot_json=json.dumps(
@@ -2267,29 +2265,25 @@ def _forecast_nba_spread_sport(
                 ):
                     eligibility = _downgrade_unserved(eligibility)
                 if eligibility.decision == "CALL":
-                    conflicting_ml_ids = []
-                    for ex_pick in exposure_source.rows(filters={"event_id": str(contract["event_id"])}):
-                        if str(ex_pick.get("status", "")).lower() == "open":
-                            raw_mkt = ex_pick.get("market_type")
-                            ex_mkt = str(getattr(raw_mkt, "value", raw_mkt) or "").lower()
-                            if ex_mkt == "moneyline" and ex_pick.get("decision") == "CALL":
-                                coherent, _ = validate_cross_market_pick_coherence(
-                                    candidate_market_type="spread",
-                                    candidate_selection=request.selection,
-                                    candidate_line=request.line,
-                                    existing_picks_for_event=[ex_pick],
-                                )
-                                if not coherent:
-                                    conflicting_ml_ids.append(ex_pick.get("pick_id"))
-                    if conflicting_ml_ids:
-                        if flat_ledger is not None:
-                            flat_ledger.supersede_open_rows(
-                                conflicting_ml_ids,
-                                reason="Superseded by structural spread pick (cross-market coherence)",
-                                allow_staked_removal=True,
-                            )
-                        if main_ledger is not None:
-                            main_ledger.supersede_open_rows(
+                    for ldg in (flat_ledger, main_ledger):
+                        if ldg is None:
+                            continue
+                        conflicting_ml_ids = []
+                        for ex_pick in ldg.rows(filters={"event_id": str(contract["event_id"])}):
+                            if str(ex_pick.get("status", "")).lower() == "open":
+                                raw_mkt = ex_pick.get("market_type")
+                                ex_mkt = str(getattr(raw_mkt, "value", raw_mkt) or "").lower()
+                                if ex_mkt == "moneyline" and ex_pick.get("decision") == "CALL":
+                                    coherent, _ = validate_cross_market_pick_coherence(
+                                        candidate_market_type="spread",
+                                        candidate_selection=request.selection,
+                                        candidate_line=request.line,
+                                        existing_picks_for_event=[ex_pick],
+                                    )
+                                    if not coherent:
+                                        conflicting_ml_ids.append(ex_pick.get("pick_id"))
+                        if conflicting_ml_ids:
+                            ldg.supersede_open_rows(
                                 conflicting_ml_ids,
                                 reason="Superseded by structural spread pick (cross-market coherence)",
                                 allow_staked_removal=True,
@@ -2531,21 +2525,48 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
     else:
         predictions = [p for p in model.predict_games(history, upcoming) if p.market_type == "total"]
 
+    calibrator = None
+    cal_paths = [
+        Path(data_root) / "calibration" / "models" / f"{model_version}.total_calibrator.json",
+        PROJECT_ROOT / "data" / "calibration" / "models" / f"{model_version}.total_calibrator.json",
+    ]
+    for cp in cal_paths:
+        if cp.exists():
+            try:
+                from ..calibration import load_calibrator_artifact
+
+                calibrator = load_calibrator_artifact(cp)
+                break
+            except (OSError, json.JSONDecodeError, ValueError, KeyError, TypeError):
+                # A malformed artifact must degrade to the raw probability, not abort the slate.
+                calibrator = None
+
     priced_contracts = []
     for prediction in predictions:
         market = market_by_event_id[prediction.event_id]
         market_lineage = market.get("_lineage")
         over_prob = prediction.probability("over")
         if over_prob >= 0.5:
-            selection, model_probability = "over", over_prob
+            selection, raw_prob = "over", over_prob
             ask = market["long"]["ask"]
             line = float(market["line"])
         else:
-            selection, model_probability = "under", 1 - over_prob
+            selection, raw_prob = "under", 1 - over_prob
             ask = market["short"]["ask"]
             line = float(market["line"])
         if ask is None or not 0 < float(ask) < 1:
             continue
+
+        if calibrator is not None:
+            model_probability = float(calibrator.transform(raw_prob))
+        else:
+            model_probability = raw_prob
+
+        cal_meta = getattr(calibrator, "metadata", None) if calibrator else None
+        cal_method = cal_meta.calibration_method if cal_meta else "total_normal"
+        cal_version = cal_meta.calibration_version if cal_meta else model_version
+        cal_hash = cal_meta.artifact_hash if cal_meta else model_artifact_hash
+
         from ..scalar_artifact_replay import build_snapshot as build_scalar_snapshot
 
         model_snapshot = (
@@ -2571,12 +2592,20 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
                 "line": line,
                 "executable_ask": float(ask),
                 "model_probability": round(model_probability, 6),
+                "model_probability_raw": round(raw_prob, 6),
+                "calibration_method": cal_method,
+                "calibration_version": cal_version,
+                "calibration_artifact_hash": cal_hash,
                 "model_uncertainty": prediction.uncertainty,
                 "model_version": model_version,
                 "model_artifact_hash": model_artifact_hash,
                 "model_qualified": model_qualified,
                 "research_availability": availability_diagnostics[prediction.event_id],
-                "rationale": prediction.rationale,
+                "rationale": (
+                    f"{prediction.rationale} Calibrated {raw_prob * 100:.1f}% -> {model_probability * 100:.1f}%."
+                    if calibrator is not None
+                    else prediction.rationale
+                ),
                 "market_slug": market.get("market_slug"),
                 "observed_at_utc": (
                     market_lineage["market_quote_observed_at_utc"]
@@ -2654,9 +2683,11 @@ def _forecast_nba_total_sport(
             else ModelState.RESEARCH,
             observed_at_utc=contract["observed_at_utc"],
             model_artifact_hash=contract["model_artifact_hash"],
-            calibration_method="total_normal",
-            calibration_version=contract["model_version"],
-            calibration_artifact_hash=contract["model_artifact_hash"],
+            calibration_method=contract.get("calibration_method", "total_normal"),
+            calibration_version=contract.get("calibration_version", contract["model_version"]),
+            calibration_artifact_hash=contract.get(
+                "calibration_artifact_hash", contract["model_artifact_hash"]
+            ),
             feature_schema_version=contract["model_version"],
             code_revision=contract["model_artifact_hash"],
             model_input_snapshot_json=json.dumps(
@@ -2700,8 +2731,8 @@ def _forecast_nba_total_sport(
                     if contract.get("model_input_snapshot"):
                         fb = contract["model_input_snapshot"].get("feature_basis", {})
                         min_games = fb.get("current_season_games_min", 15)
-                    if min_games < 12:
-                        effective_min_total_edge = max(effective_min_total_edge, 0.075)
+                    if min_games < 15:
+                        effective_min_total_edge = max(effective_min_total_edge, 0.09)
 
                 main_eligible = (
                     eligibility.decision == "CALL"
@@ -3906,9 +3937,11 @@ def _forecast_nfl_total_sport(
             else ModelState.RESEARCH,
             observed_at_utc=contract["observed_at_utc"],
             model_artifact_hash=contract["model_artifact_hash"],
-            calibration_method="total_normal",
-            calibration_version=contract["model_version"],
-            calibration_artifact_hash=contract["model_artifact_hash"],
+            calibration_method=contract.get("calibration_method", "total_normal"),
+            calibration_version=contract.get("calibration_version", contract["model_version"]),
+            calibration_artifact_hash=contract.get(
+                "calibration_artifact_hash", contract["model_artifact_hash"]
+            ),
             feature_schema_version="2",
             code_revision=contract["model_artifact_hash"],
             model_input_snapshot_json=json.dumps(

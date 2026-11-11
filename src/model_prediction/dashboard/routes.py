@@ -95,8 +95,8 @@ from model_prediction.dashboard.status import (
     status,
 )
 from model_prediction.portfolio.auto_buyer_ledger import (
-    AUTO_BUYER_LOG_PATH,
     read_auto_buyer_ledger,
+    resolve_auto_buyer_log_path,
     settle_auto_buyer_ledger,
     summarize_auto_buyer_performance,
 )
@@ -509,9 +509,10 @@ class Handler(BaseHTTPRequestHandler):
                     )
                 )
             elif route == "/api/auto-buyer/log":
-                if AUTO_BUYER_LOG_PATH.exists():
+                log_path = resolve_auto_buyer_log_path()
+                if log_path.exists():
                     try:
-                        lines = AUTO_BUYER_LOG_PATH.read_text(encoding="utf-8").splitlines()
+                        lines = log_path.read_text(encoding="utf-8").splitlines()
                         self._send({"lines": lines[-200:]})
                     except OSError:
                         self._send({"lines": []})
@@ -722,8 +723,15 @@ class Handler(BaseHTTPRequestHandler):
             except (OSError, TypeError, ValueError, RuntimeError) as error:
                 self._send({"status": "error", "error": str(error)}, code=500)
         elif parsed.path == "/api/auto-buyer/settle":
-            state = load_auto_buyer_state()
-            root = PAPER_AUTO_BUYER_DATA_ROOT if str(state.get("mode")) == "paper" else None
+            query = parse_qs(parsed.query)
+            req_mode = (query.get("mode") or [None])[0] or (
+                payload.get("mode") if isinstance(payload, dict) else None
+            )
+            if not req_mode:
+                state = load_auto_buyer_state()
+                req_mode = str(state.get("mode", "paper"))
+            req_mode = str(req_mode).lower()
+            root = PAPER_AUTO_BUYER_DATA_ROOT if req_mode == "paper" else None
             self._send(settle_auto_buyer_ledger(data_root=root))
         else:
             self._send({"error": "unknown route"}, code=404)

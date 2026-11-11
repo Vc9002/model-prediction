@@ -864,8 +864,11 @@ def test_live_buyer_sets_resting_fallback_and_records_actual_fill(monkeypatch, t
             whitelisted_models=("lol-tiered-elo-v6",),
             # lol-tiered-elo-v6 is decommissioned in the real default blacklist
             # (2026-11-08 audit) -- this test is about resting-fallback order
-            # handling, not model gating, so isolate it explicitly.
+            # handling, not model gating, so isolate it explicitly. Same for
+            # edge-scaled sizing (default True since f9d077e0): this test
+            # asserts exact cost figures unrelated to that feature.
             blacklisted_models=(),
+            edge_scaled_sizing_enabled=False,
         ),
         audit=AuditLog(tmp_path / "audit.jsonl"),
         live_quote_fn=lambda _slug: {
@@ -960,8 +963,11 @@ def test_live_buyer_records_zero_fill_primary_with_resting_fallback(monkeypatch,
             whitelisted_models=("lol-tiered-elo-v6",),
             # lol-tiered-elo-v6 is decommissioned in the real default blacklist
             # (2026-11-08 audit) -- this test is about resting-fallback order
-            # handling, not model gating, so isolate it explicitly.
+            # handling, not model gating, so isolate it explicitly. Same for
+            # edge-scaled sizing (default True since f9d077e0): this test
+            # asserts exact cost figures unrelated to that feature.
             blacklisted_models=(),
+            edge_scaled_sizing_enabled=False,
         ),
         audit=AuditLog(tmp_path / "audit.jsonl"),
         live_quote_fn=lambda _slug: {
