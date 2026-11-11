@@ -13,7 +13,6 @@ Zero-Load Design:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from collections.abc import Callable
@@ -113,19 +112,6 @@ class PolymarketBookStreamer:
                 logger.error("Error invoking qualified ticket callback: %s", exc)
 
         return ticket
-
-    async def run_listener(self) -> None:
-        """Async event loop listening to stream. Yields cleanly to system when idle."""
-        self._running = True
-        logger.info("Polymarket stream listener started in background stealth mode")
-        while self._running:
-            if not self._slug_to_pick:
-                # No active markets registered (e.g. overnight) -> sleep deeply
-                await asyncio.sleep(self.idle_sleep_seconds)
-                continue
-
-            # Sleep cooperatively to ensure 0% CPU consumption
-            await asyncio.sleep(0.5)
 
     def stop(self) -> None:
         """Stop the streamer."""

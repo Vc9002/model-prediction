@@ -492,44 +492,6 @@ class ProductionLedger:
 
     # ── health checks ───────────────────────────────────────────────────
 
-    def record_health_check(
-        self,
-        run_id: str,
-        sport: str,
-        status: str,
-        *,
-        market: str | None = None,
-        model_id: str | None = None,
-        reason: str | None = None,
-        details: dict[str, Any] | None = None,
-        checked_at_utc: str | None = None,
-    ) -> int:
-        """Record a health check snapshot."""
-        now = utc_now()
-        cursor = self.conn.execute(
-            """INSERT INTO health_checks(
-                created_at, run_id, schema_version,
-                sport, market, model_id, status, reason, details_json,
-                checked_at_utc
-            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            RETURNING id""",
-            (
-                now,
-                run_id,
-                SCHEMA_VERSION,
-                sport,
-                market,
-                model_id,
-                status,
-                reason,
-                json.dumps(details, sort_keys=True) if details else None,
-                checked_at_utc or now,
-            ),
-        )
-        row = cursor.fetchone()
-        self.conn.commit()
-        return row["id"]
-
     def latest_health(self, sport: str | None = None) -> list[dict[str, Any]]:
         """Return the most recent health check for each sport/market.
 

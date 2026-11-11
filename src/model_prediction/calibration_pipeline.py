@@ -620,18 +620,6 @@ def load_model_calibrator(
         return None
 
 
-def calibrate_model_probability(
-    model_version: str,
-    probability: float,
-    data_root: str | Path | None = None,
-) -> float:
-    """Apply the model's fitted champion calibrator to a raw probability."""
-    cal = load_model_calibrator(model_version, data_root=data_root)
-    if cal is None:
-        return probability
-    return float(cal.transform(probability))
-
-
 # A fitted calibrator is applied to live probabilities only when it is trustworthy:
 # enough settled picks, and an out-of-fold Brier that actually beats the raw model.
 # The tournament's champion can lose to the raw model (wnba-elo-trend-lr-v4,

@@ -330,12 +330,6 @@ class MatchGameDistribution:
     def expected_games_b(self) -> float:
         return sum(gb * prob for (sa, sb, ga, gb), prob in self.states.items())
 
-    def total_pmf(self) -> dict[int, float]:
-        totals: dict[int, float] = {}
-        for (_, _, ga, gb), prob in self.states.items():
-            totals[ga + gb] = totals.get(ga + gb, 0.0) + prob
-        return totals
-
     def p_total_over(self, line: float) -> float:
         """P(total games > line). Half lines settle without a push."""
         return sum(prob for (sa, sb, ga, gb), prob in self.states.items() if ga + gb > line)

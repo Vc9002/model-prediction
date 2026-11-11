@@ -513,10 +513,6 @@ class PointInTimeBullpenEngine:
         for r in relievers:
             self._reliever_profiles[r.player_id] = r
 
-    def register_reliever_profile(self, profile: RelieverProfile) -> None:
-        """Register or update a reliever profile (role, leverage weight)."""
-        self._reliever_profiles[profile.player_id] = profile
-
     def _get_active_roster(self, team_id: str, as_of_date: str) -> list[RelieverProfile]:
         """Get active bullpen roster for team, falling back to recent active relievers."""
         as_of_key = (team_id, as_of_date[:10])

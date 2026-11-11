@@ -834,12 +834,5 @@ class TennisModel:
         return predictions
 
 
-class TennisV3Model(TennisModel):
-    """Tennis v3 learned fundamental and market residual model."""
-
-    def __init__(self) -> None:
-        super().__init__(version=TENNIS_V3_VERSION)
-
-
 def tennis_model(version: str = TENNIS_MODEL_VERSION) -> TennisModel:
     return TennisModel(version=version)

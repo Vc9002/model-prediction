@@ -125,7 +125,3 @@ def can_create_qualified_call(state: ModelState, origin: ModelOrigin) -> bool:
     qualification gate this directive removes.
     """
     return state not in (ModelState.RETIRED, ModelState.SUSPENDED) and origin is ModelOrigin.STATISTICAL_MODEL
-
-
-def can_create_observation(state: ModelState) -> bool:
-    return state is not ModelState.RETIRED

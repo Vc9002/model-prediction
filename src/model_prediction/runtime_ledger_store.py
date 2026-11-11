@@ -669,27 +669,6 @@ def verify_runtime_ledger_connection(conn: sqlite3.Connection) -> dict[str, Any]
     }
 
 
-def verify_runtime_ledger_read_only(paths: RuntimePaths) -> dict[str, Any]:
-    """Verify the canonical event chain and replay it against its projection.
-
-    This verifier deliberately opens a read-only transaction snapshot. It does not
-    instantiate :class:`RuntimeLedgerStore`, because that writer bootstraps
-    schema/WAL state and is therefore inappropriate at a research gate.
-    """
-    db_path = paths.ledgers_db.resolve()
-    if db_path.parent != paths.ledgers_root.resolve() or not db_path.is_file():
-        return {"status": "failed", "problems": ["canonical_ledger_db_missing"]}
-    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-    try:
-        conn.execute("PRAGMA query_only=ON")
-        conn.execute("BEGIN")
-        return verify_runtime_ledger_connection(conn)
-    finally:
-        if conn.in_transaction:
-            conn.rollback()
-        conn.close()
-
-
 def _mutation_row(m: LedgerMutation) -> dict[str, Any]:
     return {
         "pick_id": m.pick_id,

@@ -20,7 +20,12 @@ from model_prediction.domain import parse_utc
 from model_prediction.runtime_paths import RuntimePaths
 
 from .auto_buyer_ledger import record_auto_buy_execution, settle_auto_buyer_ledger
-from .auto_executor import PAPER_AUTO_BUYER_DATA_ROOT, AutoExecutionConfig, AutoPolymarketBuyer
+from .auto_executor import (
+    PAPER_AUTO_BUYER_DATA_ROOT,
+    AutoExecutionConfig,
+    AutoPolymarketBuyer,
+    load_auto_buyer_state,
+)
 
 # Phantom-edge guard only. Cohort selection happens in eligible_trial_pick() on the
 # saved decision-time edge; this ceiling exists so a corrupt quote cannot mint an
@@ -218,6 +223,10 @@ def run_ncaab_spread_paper_trial() -> dict[str, Any]:
         # bought it. Keep only a sanity ceiling here (a phantom-edge guard).
         min_edge=0.0,
         max_edge=_PAPER_EXECUTION_SANITY_MAX_EDGE,
+        # Same window as the live buyer. Without it this cohort fell back to the
+        # 24h default and could buy hours before tip-off, off a pick that a later
+        # forecast run would supersede.
+        max_event_lookahead_hours=float(load_auto_buyer_state()["max_event_lookahead_hours"]),
         capture_missing_slates=False,
         refresh_stale_quotes=True,
         require_model_timestamp=True,

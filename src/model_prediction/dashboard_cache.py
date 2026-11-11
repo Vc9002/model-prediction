@@ -192,37 +192,6 @@ class DashboardCache:
         finally:
             conn.close()
 
-    def read_model_ledger(self, model_id: str) -> list[dict[str, Any]]:
-        """Read model-ledger rows from SQLite."""
-        conn = sqlite3.connect(str(self.db_path))
-        conn.row_factory = sqlite3.Row
-        try:
-            rows = conn.execute(
-                "SELECT * FROM model_picks WHERE model_id = ? ORDER BY row_index",
-                (model_id,),
-            ).fetchall()
-            return [_row_to_dict(r) for r in rows]
-        except sqlite3.OperationalError:
-            return []
-        finally:
-            conn.close()
-
-    def read_research(self, gated: bool = False) -> list[dict[str, Any]]:
-        """Read research/gated-research picks from SQLite."""
-        conn = sqlite3.connect(str(self.db_path))
-        conn.row_factory = sqlite3.Row
-        try:
-            tier = "gated_research" if gated else "research"
-            rows = conn.execute(
-                "SELECT * FROM picks WHERE tier = ? ORDER BY row_index",
-                (tier,),
-            ).fetchall()
-            return [_row_to_dict(r) for r in rows]
-        except sqlite3.OperationalError:
-            return []
-        finally:
-            conn.close()
-
     # ── schema ──────────────────────────────────────────────────────────
 
     def _init_schema(self, conn: sqlite3.Connection) -> None:

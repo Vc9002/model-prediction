@@ -14,7 +14,6 @@ Calculates point-in-time umpire strike-zone tendencies and run-environment adjus
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -84,11 +83,6 @@ class PointInTimeUmpireEngine:
     def record_game(self, rec: UmpireGameRecord) -> None:
         """Record an umpire game log chronologically."""
         self._records.setdefault(rec.umpire_id, []).append(rec)
-
-    def record_games(self, records: Sequence[UmpireGameRecord]) -> None:
-        """Batch record umpire game logs."""
-        for r in records:
-            self.record_game(r)
 
     def evaluate_umpire(
         self,

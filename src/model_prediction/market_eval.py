@@ -119,18 +119,6 @@ def no_vig(long_mid: float, short_mid: float) -> float:
     return min(1 - 1e-12, max(1e-12, p))
 
 
-def expected_roi_after_costs(
-    model_prob: float,
-    executable_price: float,
-    fee_rate: float = 0.0,
-) -> float:
-    """Expected ROI on capital paid after platform fee deduction."""
-    if executable_price <= 0.0:
-        return -1.0
-    net_payout = model_prob * (1.0 - fee_rate)
-    return (net_payout - executable_price) / executable_price
-
-
 def decide_sides(
     rows_by_event: dict[str, list[MarketEvalRow]],
     *,

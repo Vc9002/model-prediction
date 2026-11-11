@@ -680,13 +680,6 @@ class ProductionModelRegistry:
         """The lifecycle contract for a sport+market, or None."""
         return (self.contracts.get(sport.upper()) or {}).get(market)
 
-    def all_lifecycle_contracts(self) -> list[ModelLifecycleContract]:
-        """All registered lifecycle contracts across sports and markets."""
-        result: list[ModelLifecycleContract] = []
-        for sport_contracts in self.contracts.values():
-            result.extend(sport_contracts.values())
-        return result
-
     def validate_lifecycle_invariants(
         self,
         supported_markets: dict[str, set[str]] = SUPPORTED_MARKETS,

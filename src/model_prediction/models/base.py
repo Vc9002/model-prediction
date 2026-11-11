@@ -7,10 +7,6 @@ from typing import Protocol, TypedDict, runtime_checkable
 from ..domain import MarketType
 
 
-class ArtifactNotTrainedError(RuntimeError):
-    pass
-
-
 @dataclass(frozen=True)
 class ScoreSimulation:
     away_scores: Sequence[int]

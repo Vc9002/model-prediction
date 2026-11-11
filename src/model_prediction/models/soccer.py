@@ -407,165 +407,21 @@ def bundesliga_soccer_model() -> DedicatedSoccerLeagueModel:
     return DedicatedSoccerLeagueModel("BUNDESLIGA")
 
 
-def serie_a_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("SERIE_A")
-
-
-def ligue_1_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("LIGUE_1")
-
-
 def mls_soccer_model() -> DedicatedSoccerLeagueModel:
     return DedicatedSoccerLeagueModel("MLS")
-
-
-def ucl_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("UCL")
-
-
-def championship_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("CHAMPIONSHIP")
-
-
-def eredivisie_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("EREDIVISIE")
-
-
-def primeira_liga_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("PRIMEIRA_LIGA")
-
-
-def liga_mx_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("LIGA_MX")
-
-
-def brasileirao_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("BRASILEIRAO")
 
 
 def uel_soccer_model() -> DedicatedSoccerLeagueModel:
     return DedicatedSoccerLeagueModel("UEL")
 
 
-def uecl_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("UECL")
-
-
-def fa_cup_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("FA_CUP")
-
-
-def efl_cup_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("EFL_CUP")
-
-
-def copa_del_rey_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("COPA_DEL_REY")
-
-
-def dfb_pokal_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("DFB_POKAL")
-
-
-def coppa_italia_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("COPPA_ITALIA")
-
-
 def scottish_prem_soccer_model() -> DedicatedSoccerLeagueModel:
     return DedicatedSoccerLeagueModel("SCOTTISH_PREM")
-
-
-def belgian_pro_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("BELGIAN_PRO")
-
-
-def turkish_super_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("TURKISH_SUPER")
 
 
 def saudi_pro_soccer_model() -> DedicatedSoccerLeagueModel:
     return DedicatedSoccerLeagueModel("SAUDI_PRO")
 
 
-def swiss_super_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("SWISS_SUPER")
-
-
-def austrian_bund_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("AUSTRIAN_BUND")
-
-
-def danish_super_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("DANISH_SUPER")
-
-
-def allsvenskan_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("ALLSVENSKAN")
-
-
-def norwegian_elite_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("NORWEGIAN_ELITE")
-
-
-def greek_super_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("GREEK_SUPER")
-
-
-def la_liga_2_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("LA_LIGA_2")
-
-
-def segunda_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("SEGUNDA")
-
-
-def serie_b_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("SERIE_B")
-
-
-def ligue_2_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("LIGUE_2")
-
-
 def libertadores_soccer_model() -> DedicatedSoccerLeagueModel:
     return DedicatedSoccerLeagueModel("LIBERTADORES")
-
-
-def sudamericana_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("SUDAMERICANA")
-
-
-def argentina_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("ARGENTINA")
-
-
-def colombia_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("COLOMBIA")
-
-
-def chile_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("CHILE")
-
-
-def j_league_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("J_LEAGUE")
-
-
-def a_league_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("A_LEAGUE")
-
-
-def csl_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("CSL")
-
-
-def nwsl_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("NWSL")
-
-
-def polish_ekstraklasa_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("POLISH_EKSTRAKLASA")
-
-
-def brazil_serie_b_soccer_model() -> DedicatedSoccerLeagueModel:
-    return DedicatedSoccerLeagueModel("BRAZIL_SERIE_B")

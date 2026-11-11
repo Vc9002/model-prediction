@@ -131,14 +131,6 @@ class LifecycleRole(StrEnum):
     ROLLBACK = "rollback"
 
 
-class ChallengerDecision(StrEnum):
-    """Terminal or interim outcome of a challenger evaluation."""
-
-    PROMOTE = "promote"
-    CONTINUE = "continue"
-    REJECT = "reject"
-
-
 def parse_iso_datetime(val: Any) -> datetime | None:
     """Parse string or timestamp into timezone-aware UTC datetime."""
     if val is None or val == "":

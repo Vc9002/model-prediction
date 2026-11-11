@@ -418,26 +418,6 @@ def validate_total_score_model(store: FeatureStore, sport: str) -> dict[str, Any
     }
 
 
-def predict_total(game: GameRecord, model_data: dict[str, Any]) -> float | None:
-    """Predict combined total for a single game using a trained model artifact."""
-    features = list(model_data["feature_names"])
-    coeffs = list(model_data["coefficients"])
-    intercept = float(model_data["intercept"])
-    if len(features) != len(coeffs):
-        return None
-    # Simple prediction: baseline * park factor, adjust for scoring rates
-    league_avg = 9.0  # default MLB
-    pf = PARK_FACTORS.get(game.home_team, 1.0)
-    return round(
-        intercept
-        + sum(
-            c * (league_avg if f == "league_total_mean" else pf if f == "park_factor" else 1.0)
-            for f, c in zip(features, coeffs)
-        ),
-        4,
-    )
-
-
 class TotalScoreArtifact:
     """Hash-verified total-score artifact, compatible with v1 and v2 payloads."""
 

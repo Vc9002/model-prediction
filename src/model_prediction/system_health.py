@@ -282,25 +282,6 @@ def _get_clv_summary() -> dict:
         return {}
 
 
-def _status_transitioned(runtime_root: Path, status: str) -> bool:
-    """True iff `status` differs from the last-recorded status, and records it.
-
-    Persisted under runtime_root so debounce survives process restarts
-    (each dashboard poll / cron run is a fresh Python process).
-    """
-    state_file = runtime_root / "system_health_last_status.txt"
-    try:
-        last = state_file.read_text(encoding="utf-8").strip() if state_file.exists() else None
-    except OSError:
-        last = None
-    try:
-        state_file.parent.mkdir(parents=True, exist_ok=True)
-        state_file.write_text(status, encoding="utf-8")
-    except OSError:
-        pass
-    return last != status
-
-
 def _age_minutes(iso_utc: str) -> float:
     try:
         dt = datetime.fromisoformat(iso_utc)
