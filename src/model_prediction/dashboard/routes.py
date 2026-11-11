@@ -326,7 +326,7 @@ class Handler(BaseHTTPRequestHandler):
                     _cached(
                         f"odds:{odds_sport or 'all'}",
                         30,
-                        lambda: odds_summary(odds_sport if odds_sport else None),
+                        lambda: odds_summary(odds_sport or None),
                     )
                 )
             elif route == "/api/open":

@@ -428,7 +428,7 @@ def _feature_attribution(rows: list[dict], feature_names: list[str]) -> dict:
             "status": "no_exact_version_rows",
             "rows_with_complete_values": 0,
             "rows_missing_values": 0,
-            "missing_by_feature": {name: 0 for name in feature_names},
+            "missing_by_feature": dict.fromkeys(feature_names, 0),
         }
     if not feature_names:
         return {
@@ -437,7 +437,7 @@ def _feature_attribution(rows: list[dict], feature_names: list[str]) -> dict:
             "rows_missing_values": len(rows),
             "missing_by_feature": {},
         }
-    missing_by_feature = {name: 0 for name in feature_names}
+    missing_by_feature = dict.fromkeys(feature_names, 0)
     complete = 0
     for row in rows:
         feature_values = row.get("feature_values")

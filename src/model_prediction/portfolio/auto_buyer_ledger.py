@@ -235,7 +235,7 @@ def _extract_line_from_record(r: dict[str, Any]) -> float | None:
         if last.isdigit():
             if parts[-2] == "neg":
                 return -float(last)
-            elif parts[-2] == "pos":
+            if parts[-2] == "pos":
                 return float(last)
             return float(last)
     return None
@@ -460,7 +460,7 @@ def record_auto_buy_execution(
         american = _probability_to_american(price)
         decimal_odds = american_to_decimal(american)
 
-        xlsx_row: dict[str, Any] = {f: "" for f in FIELDNAMES}
+        xlsx_row: dict[str, Any] = dict.fromkeys(FIELDNAMES, "")
         xlsx_row.update(
             {
                 "pick_id": pid or oid,
@@ -2213,7 +2213,7 @@ def settle_auto_buyer_ledger(
             decimal_odds = american_to_decimal(american)
             line_val = r.get("line")
             line_str = f"{float(str(line_val)):.2f}" if line_val not in (None, "") else ""
-            x_row = {f: "" for f in FIELDNAMES}
+            x_row = dict.fromkeys(FIELDNAMES, "")
             x_row.update(
                 {
                     "pick_id": str(r.get("pick_id") or r.get("order_id")),

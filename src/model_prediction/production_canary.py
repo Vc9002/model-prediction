@@ -58,7 +58,7 @@ def load_production_config(*, repo_root: Path | str | None = None) -> dict[str, 
     config_path = root / "config" / "production.yaml"
     if not config_path.is_file():
         raise FileNotFoundError(f"production config not found at {config_path}")
-    with open(config_path, "r", encoding="utf-8") as fh:
+    with open(config_path, encoding="utf-8") as fh:
         config: dict[str, Any] = yaml.safe_load(fh) or {}
     return config
 
@@ -202,7 +202,7 @@ def health_check(
 
     # 3. Parse the artifact
     try:
-        with open(artifact_path, "r", encoding="utf-8") as fh:
+        with open(artifact_path, encoding="utf-8") as fh:
             artifact: dict[str, Any] = json.load(fh)
     except Exception as exc:  # noqa: BLE001
         return {

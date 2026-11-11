@@ -90,19 +90,19 @@ def horizon_specs_for_sport(sport: str) -> dict[str, HorizonSpec]:
             "mid": HorizonSpec("mid", 6, common_mid + ["starter_k_bb_pct", "bullpen_availability"]),
             "late": HorizonSpec("late", 1.0, common_late + ["confirmed_batting_order", "wind_vector"]),
         }
-    elif sport in ("nba", "wnba"):
+    if sport in ("nba", "wnba"):
         return {
             "early": HorizonSpec("early", 36, common_early + ["team_ortg", "team_drtg", "pace"]),
             "mid": HorizonSpec("mid", 6, common_mid + ["player_availability", "lineup_continuity"]),
             "late": HorizonSpec("late", 1.0, common_late + ["starting_lineup_confirmed", "referee_crew"]),
         }
-    elif sport in ("nfl",):
+    if sport in ("nfl",):
         return {
             "early": HorizonSpec("early", 36, common_early + ["qb_status", "team_epa", "drive_efficiency"]),
             "mid": HorizonSpec("mid", 6, common_mid + ["injury_report", "weather_forecast"]),
             "late": HorizonSpec("late", 1.0, common_late + ["inactive_list", "game_time_weather"]),
         }
-    elif sport in ("soccer",):
+    if sport in ("soccer",):
         return {
             "early": HorizonSpec(
                 "early", 36, common_early + ["xg_form", "attack_strength", "defense_strength"]
@@ -110,25 +110,24 @@ def horizon_specs_for_sport(sport: str) -> dict[str, HorizonSpec]:
             "mid": HorizonSpec("mid", 6, common_mid + ["starting_xi", "goalkeeper_confirmed"]),
             "late": HorizonSpec("late", 1.0, common_late + ["final_lineup", "market_depth"]),
         }
-    elif sport in ("tennis",):
+    if sport in ("tennis",):
         return {
             "early": HorizonSpec("early", 36, common_early + ["surface_elo", "overall_elo"]),
             "mid": HorizonSpec("mid", 6, common_mid + ["serve_pct", "return_pct", "recent_workload"]),
             "late": HorizonSpec("late", 1.0, common_late + ["withdrawal_risk"]),
         }
-    else:
-        return {
-            "early": HorizonSpec("early", 36, common_early),
-            "mid": HorizonSpec("mid", 6, common_mid),
-            "late": HorizonSpec("late", 1.0, common_late),
-        }
+    return {
+        "early": HorizonSpec("early", 36, common_early),
+        "mid": HorizonSpec("mid", 6, common_mid),
+        "late": HorizonSpec("late", 1.0, common_late),
+    }
 
 
 def horizon_from_time_to_start(hours_to_start: float) -> str:
     """Map hours-before-start to the appropriate horizon name."""
     if hours_to_start >= 18:
         return "early"
-    elif hours_to_start >= 3:
+    if hours_to_start >= 3:
         return "mid"
     return "late"
 

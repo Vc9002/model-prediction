@@ -379,7 +379,7 @@ class JointScoreDistribution:
                 pushes = (away_scores == home_scores).sum()
             return float((wins + 0.5 * pushes) / self.n_sim)
 
-        elif market_type == "spread":
+        if market_type == "spread":
             if line is None:
                 raise ValueError("spread requires a line")
             if selection == "home":
@@ -390,7 +390,7 @@ class JointScoreDistribution:
             pushes = (margin == 0).sum()
             return float((wins + 0.5 * pushes) / self.n_sim)
 
-        elif market_type == "total":
+        if market_type == "total":
             if line is None:
                 raise ValueError("total requires a line")
             totals = away_scores + home_scores

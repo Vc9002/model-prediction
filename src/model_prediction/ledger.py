@@ -861,7 +861,7 @@ class PickLedger:
                 )
                 if item_key == key:
                     raise DuplicatePickError(item["pick_id"])
-            row = {field: "" for field in FIELDNAMES}
+            row = dict.fromkeys(FIELDNAMES, "")
             request_values = request.as_dict()
             row.update(
                 {
@@ -2178,7 +2178,7 @@ class PickLedger:
             for projected in self.mirror.pick_rows(tier=self.tier, sport=self.sport):
                 if projected.get("status") in RETIRED_STATUSES:
                     continue
-                row = {field: "" for field in FIELDNAMES}
+                row = dict.fromkeys(FIELDNAMES, "")
                 row.update(
                     {
                         key: "" if value is None else str(value)

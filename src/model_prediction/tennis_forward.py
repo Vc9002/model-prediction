@@ -436,7 +436,7 @@ def build_tennis_slate(
                 valid_candidates = [
                     c for c in candidates if not (c["prob"] < 0.50 and (c["prob"] < 0.38 or c["ask"] < 0.35))
                 ]
-                pool = valid_candidates if valid_candidates else candidates
+                pool = valid_candidates or candidates
                 best = max(pool, key=lambda c: (c["edge"], c["prob"]))
                 selection = best["selection"]
                 prob = best["prob"]

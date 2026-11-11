@@ -316,7 +316,7 @@ class CFBFeatureExtractor:
             if dt and dt.month in (1, 2):
                 if sy is not None and int(sy) == dt.year:
                     return dt.year - 1
-                elif sy is not None:
+                if sy is not None:
                     return int(sy)
                 return dt.year - 1
             if sy is not None:

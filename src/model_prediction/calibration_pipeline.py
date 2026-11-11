@@ -598,23 +598,22 @@ def load_model_calibrator(
         if method == "temperature":
             temp = float(params.get("temperature") or 1.0)
             return TemperatureCalibrator(temp, metadata)
-        elif method == "platt":
+        if method == "platt":
             intercept = float(params.get("intercept") or 0.0)
             slope = float(params.get("slope") or 1.0)
             return TrainablePlattCalibrator(intercept, slope, metadata)
-        elif method == "beta":
+        if method == "beta":
             a = float(params.get("a") or 1.0)
             b = float(params.get("b") or 1.0)
             c = float(params.get("c") or 0.0)
             return BetaCalibrator(a, b, c, metadata)
-        elif method == "isotonic":
+        if method == "isotonic":
             thresholds = [float(t) for t in params.get("thresholds", [])]
             values = [float(v) for v in params.get("values", [])]
             if thresholds and values:
                 return IsotonicCalibrator(thresholds, values, metadata)
             return IdentityCalibrator(model_version, "isotonic-fallback-identity")
-        else:
-            return IdentityCalibrator(model_version, "identity")
+        return IdentityCalibrator(model_version, "identity")
     except (OSError, ValueError, TypeError, KeyError) as exc:
         logger.warning("Failed to load calibrator for %s: %s", model_version, exc)
         return None

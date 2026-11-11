@@ -2939,7 +2939,7 @@ def _load_nfl_injuries_known_at(
     candidates = []
     for p in snap_dir.glob("*/*.json"):
         try:
-            with open(p, "r", encoding="utf-8") as f:
+            with open(p, encoding="utf-8") as f:
                 data = json.load(f)
             expected_hash = data.pop("snapshot_sha256", None)
             if (

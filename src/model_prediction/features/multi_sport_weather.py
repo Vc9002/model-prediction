@@ -320,7 +320,7 @@ def store_weather_observations(
 
     existing_keys: set[tuple[str, str, str, str, str]] = set()
     if out_path.exists():
-        with open(out_path, "r", encoding="utf-8") as f:
+        with open(out_path, encoding="utf-8") as f:
             for line in f:
                 if not line.strip():
                     continue
@@ -494,7 +494,7 @@ def resolve_cfb_game_weather(
 
     latest = None
     try:
-        with open(weather_file, "r", encoding="utf-8") as f:
+        with open(weather_file, encoding="utf-8") as f:
             for line in f:
                 if not line.strip():
                     continue

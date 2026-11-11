@@ -94,7 +94,7 @@ def _config_path(repo_root: Path) -> Path:
 
 
 def _load_yaml_dict(repo_root: Path) -> dict[str, Any]:
-    with open(_config_path(repo_root), "r", encoding="utf-8") as fh:
+    with open(_config_path(repo_root), encoding="utf-8") as fh:
         data = yaml.safe_load(fh)
         return dict(data) if isinstance(data, dict) else {}
 

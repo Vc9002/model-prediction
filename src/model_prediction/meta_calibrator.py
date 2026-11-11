@@ -98,7 +98,7 @@ class SharedMetaCalibrator:
         p = min(1.0 - eps, max(eps, raw_probability))
         if self.method == "isotonic" and self.isotonic_model is not None:
             return float(self.isotonic_model.predict([p])[0])
-        elif self.platt_model is not None:
+        if self.platt_model is not None:
             logit = np.array([[math.log(p / (1.0 - p))]])
             return float(self.platt_model.predict_proba(logit)[0, 1])
         return raw_probability
@@ -111,7 +111,7 @@ class SharedMetaCalibrator:
         arr = np.clip(np.array(raw_probabilities, dtype=float), eps, 1.0 - eps)
         if self.method == "isotonic" and self.isotonic_model is not None:
             return self.isotonic_model.predict(arr)
-        elif self.platt_model is not None:
+        if self.platt_model is not None:
             logits = np.log(arr / (1.0 - arr)).reshape(-1, 1)
             return self.platt_model.predict_proba(logits)[:, 1]
         return arr

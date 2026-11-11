@@ -643,7 +643,7 @@ def load_auto_buyer_state() -> dict[str, Any]:
     if (
         not state_file.exists()
         and state_file == canonical_runtime_file
-        and DATA == _paths.runtime_root
+        and _paths.runtime_root == DATA
         and repo_seed_file.exists()
     ):
         state_file = repo_seed_file
