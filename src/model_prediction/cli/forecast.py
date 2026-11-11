@@ -1872,7 +1872,7 @@ def _quotes_known_at(rows: list[dict], cutoff: datetime) -> list[dict]:
     return known
 
 
-def _select_nba_spread_market(rows: list[dict]) -> dict | None:
+def _select_nba_spread_market(rows: list[dict], *, as_of: datetime | None = None) -> dict | None:
     """Among alternate NBA spread lines for one event, the main line is the
     one whose long-side ask sits closest to a coin flip -- most balanced line wins."""
     partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-")
@@ -1884,6 +1884,26 @@ def _select_nba_spread_market(rows: list[dict]) -> dict | None:
         and row.get("line") is not None
         and not any(token in str(row.get("market_slug", "")).lower() for token in partial_tokens)
     ]
+    if as_of is not None:
+        from ..portfolio.auto_executor import MAX_AUTO_BUYER_QUOTE_AGE_SECONDS
+
+        candidates = [
+            row
+            for row in candidates
+            if row.get("observed_at_utc")
+            and 0
+            <= (as_of - parse_utc(str(row["observed_at_utc"]))).total_seconds()
+            <= MAX_AUTO_BUYER_QUOTE_AGE_SECONDS
+        ]
+    latest_by_slug: dict[str, dict] = {}
+    for row in candidates:
+        slug = str(row.get("market_slug") or row.get("line"))
+        previous = latest_by_slug.get(slug)
+        if previous is None or str(row.get("observed_at_utc") or "") > str(
+            previous.get("observed_at_utc") or ""
+        ):
+            latest_by_slug[slug] = row
+    candidates = list(latest_by_slug.values())
     if not candidates:
         return None
     return min(candidates, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
@@ -2011,7 +2031,7 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
             if _team_matches(away_team, str(row.get("team") or ""))
             and str(row.get("event_start_utc") or "")[:16] == str(event["date"])[:16]
         ]
-        market = _select_nba_spread_market(candidates)
+        market = _select_nba_spread_market(candidates, as_of=observed_at)
         if market is None:
             unmatched.append({"event_id": event_id, "reason": "no matched spread market"})
             continue

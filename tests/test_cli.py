@@ -2706,6 +2706,34 @@ def test_select_nba_spread_market_picks_the_most_balanced_line() -> None:
     assert picked["line"] == 5.5
 
 
+def test_select_nba_spread_market_ignores_old_balanced_quote() -> None:
+    as_of = datetime(2026, 11, 11, 0, 20, tzinfo=UTC)
+    rows = [
+        {
+            "line": -9.5,
+            "market_slug": "miami-neg-9pt5",
+            "observed_at_utc": "2026-11-10T05:32:04Z",
+            "long": {"ask": 0.50},
+        },
+        {
+            "line": -9.5,
+            "market_slug": "miami-neg-9pt5",
+            "observed_at_utc": "2026-11-11T00:19:50Z",
+            "long": {"ask": 0.40},
+        },
+        {
+            "line": -6.5,
+            "market_slug": "miami-neg-6pt5",
+            "observed_at_utc": "2026-11-11T00:19:55Z",
+            "long": {"ask": 0.50},
+        },
+    ]
+    picked = cli._select_nba_spread_market(rows, as_of=as_of)
+    assert picked is not None
+    assert picked["line"] == -6.5
+    assert cli._select_nba_spread_market(rows[:1], as_of=as_of) is None
+
+
 def test_select_nba_spread_market_returns_none_for_no_candidates() -> None:
     assert cli._select_nba_spread_market([]) is None
     assert cli._select_nba_spread_market([{"line": 1.5, "long": {}}]) is None

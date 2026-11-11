@@ -609,9 +609,9 @@ prediction_service:
     implementation: code_backed_model
     entry: model_prediction.models.esports_contextual_v7:EsportsContextualV7Model
     enabled: true
-    serving_status: production
-    evidence_status: predictively_qualified
-    replacement_priority: low
+    serving_status: research
+    evidence_status: historical_only
+    replacement_priority: high
     rollback_model: rainbow_six-tiered-elo-v6
   - model_id: rainbow_six-tiered-elo-v6
     sport: RAINBOW_SIX
@@ -974,7 +974,7 @@ prediction_service:
       spread: valorant-spread-tiered-elo-v6
       total: valorant-total-tiered-elo-v6
     RAINBOW_SIX:
-      moneyline: r6-contextual-v7
+      moneyline: rainbow_six-tiered-elo-v6
       spread: rainbow_six-spread-tiered-elo-v6
       total: rainbow_six-total-tiered-elo-v6
     KBO:

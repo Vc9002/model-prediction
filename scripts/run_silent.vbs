@@ -8,5 +8,5 @@ For i = 0 To args.Count - 1
     cmd = cmd & args(i)
 Next
 If Len(cmd) > 0 Then
-    WshShell.Run cmd, 0, False
+    WScript.Quit WshShell.Run(cmd, 0, True)
 End If

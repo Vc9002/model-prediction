@@ -155,14 +155,27 @@ def audit_market_quotes_warehouse(runtime_paths: RuntimePaths) -> dict[str, Any]
 
     cur.execute("SELECT sport, count(*), max(observed_at_utc) FROM market_quotes GROUP BY sport")
     sports_breakdown = {}
+    today = datetime.now(ZoneInfo("America/New_York")).date()
+    yesterday_iso = (today - timedelta(days=1)).isoformat()
+    stale_active_sports = []
     for r in cur.fetchall():
-        sports_breakdown[r[0]] = {"count": r[1], "latest_observed": r[2]}
+        sport, count, latest = r
+        off_season, _ = is_sport_off_season(sport, today)
+        stale = not off_season and (not latest or str(latest)[:10] < yesterday_iso)
+        if stale:
+            stale_active_sports.append(sport)
+        sports_breakdown[sport] = {
+            "count": count,
+            "latest_observed": latest,
+            "status": "OFF_SEASON" if off_season else ("STALE" if stale else "FRESH"),
+        }
     conn.close()
 
     depth_ratio = (with_depth / total_quotes) if total_quotes > 0 else 0.0
 
     return {
-        "status": "HEALTHY" if total_quotes > 0 else "EMPTY",
+        "status": "EMPTY" if total_quotes == 0 else ("STALE" if stale_active_sports else "HEALTHY"),
+        "stale_active_sports": stale_active_sports,
         "total_quotes": total_quotes,
         "quotes_with_depth": with_depth,
         "depth_coverage_pct": round(depth_ratio * 100, 2),
@@ -247,27 +260,21 @@ def audit_daily_worker(runtime_paths: RuntimePaths) -> dict[str, Any]:
 
 
 def auto_heal_data_gaps(
-    runtime_paths: RuntimePaths, odds_report: dict[str, Any] | None = None
+    runtime_paths: RuntimePaths,
+    odds_report: dict[str, Any] | None = None,
+    warehouse_report: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Execute automated self-healing procedures for detected data gaps."""
     healed_actions = []
     healing_failures: list[dict[str, Any]] = []
 
     # 1. Self-heal Market Quotes Warehouse depth if needed
-    db_path = runtime_paths.market_quotes_db
-    if db_path.exists():
-        conn = sqlite3.connect(str(db_path))
-        cur = conn.cursor()
-        cur.execute("SELECT count(*) FROM market_quotes WHERE depth_liquidity_usd > 0")
-        with_depth = cur.fetchone()[0]
-        conn.close()
+    if (warehouse_report or {}).get("status") in {"MISSING", "EMPTY", "STALE"}:
+        logger.info("Executing automatic multi-sport quote backfill...")
+        from scripts.backfill_multi_sport_market_quotes import backfill_multi_sport_quotes
 
-        if with_depth == 0:
-            logger.info("Executing automatic multi-sport quote backfill...")
-            from scripts.backfill_multi_sport_market_quotes import backfill_multi_sport_quotes
-
-            res = backfill_multi_sport_quotes(limit_files_per_sport=10)
-            healed_actions.append(f"Ingested {res['total_quotes_ingested']} quotes with depth liquidity")
+        res = backfill_multi_sport_quotes(limit_files_per_sport=1)
+        healed_actions.append(f"Ingested {res['total_quotes_ingested']} quotes with depth liquidity")
 
     # 2. Check soccer matches freshness
     soccer_file = PROJECT_ROOT / "data" / "soccer_matches.jsonl"
@@ -342,8 +349,11 @@ def run_health_and_data_gap_monitor(auto_heal: bool = False) -> dict[str, Any]:
     daily_worker = audit_daily_worker(runtime_paths)
 
     if auto_heal:
-        healing_report = auto_heal_data_gaps(runtime_paths, odds_report=odds_report)
+        healing_report = auto_heal_data_gaps(
+            runtime_paths, odds_report=odds_report, warehouse_report=warehouse_report
+        )
         odds_report = audit_odds_freshness(runtime_paths)
+        warehouse_report = audit_market_quotes_warehouse(runtime_paths)
     else:
         healing_report = {
             "status": "skipped",
@@ -354,7 +364,7 @@ def run_health_and_data_gap_monitor(auto_heal: bool = False) -> dict[str, Any]:
     overall_status = "HEALTHY"
     if (
         models_report.get("status") != "PASS"
-        or warehouse_report.get("status") in {"MISSING", "EMPTY"}
+        or warehouse_report.get("status") != "HEALTHY"
         or odds_report.get("status") != "OK"
         or healing_report.get("healing_failures")
         or daily_worker.get("status") != "completed"

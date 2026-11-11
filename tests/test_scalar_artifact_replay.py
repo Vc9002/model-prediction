@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import json
 from dataclasses import replace
 from pathlib import Path
@@ -6,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from model_prediction.calibration import load_calibrator_artifact
 from model_prediction.domain import League, MarketType
 from model_prediction.ledger import PickLedger
 from model_prediction.models.basketball import BasketballModel, UpcomingGame
@@ -30,6 +32,52 @@ def artifact(version):
     return json.loads(
         (Path(__file__).resolve().parents[1] / "config/models" / (version + ".json")).read_text()
     )
+
+
+def test_scalar_replay_validates_exact_calibrated_probability(tmp_path, monkeypatch):
+    from model_prediction import scalar_artifact_replay as replay_module
+
+    art = artifact("nba-total-margin-v9")
+    path = tmp_path / "data/calibration/models/nba-total-margin-v9.total_calibrator.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        json.dumps(
+            {
+                "model_version": art["model_version"],
+                "champion_method": "beta",
+                "parameters": {"a": 1.2, "b": 1.1, "c": -0.4},
+                "sample_size": 125,
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(replay_module, "PROJECT_ROOT", tmp_path)
+    snap = build_snapshot(
+        art,
+        {},
+        {"mean": 220.0, "sd": float(art["total_sd"]), "line": 225.5},
+        event_id="calibrated",
+        event_start_utc="2026-11-12T00:00:00Z",
+        observed_at_utc="2026-11-11T20:00:00Z",
+    )
+    raw = replay_snapshot(snap)["under"]
+    calibrated = load_calibrator_artifact(path).transform(raw)
+    row = {
+        "model_version": art["model_version"],
+        "model_artifact_hash": art["artifact_hash"],
+        "league": "NBA",
+        "event_id": "calibrated",
+        "event_start_utc": "2026-11-12T00:00:00Z",
+        "market_type": "total",
+        "selection": "under",
+        "line": 225.5,
+        "model_probability": calibrated,
+        "calibration_method": "beta",
+        "calibration_artifact_hash": hashlib.sha256(path.read_bytes()).hexdigest(),
+    }
+    assert validate_decision_snapshot(snap, row) == pytest.approx(calibrated)
+    with pytest.raises(ValueError, match="calibration_artifact_hash_mismatch"):
+        validate_decision_snapshot(snap, {**row, "calibration_artifact_hash": "wrong"})
 
 
 @pytest.mark.parametrize("market", ["spread", "total"])

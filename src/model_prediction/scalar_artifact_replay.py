@@ -8,9 +8,12 @@ import math
 from pathlib import Path
 from typing import Any
 
+from .calibration import load_calibrator_artifact
+from .config import PROJECT_ROOT
 from .domain import parse_utc
 from .learned_replay import snapshot_hash
 from .production_registry import compute_artifact_hash
+from .runtime_paths import RuntimePaths
 
 SCHEMA = "scalar-artifact-replay-v1"
 
@@ -322,7 +325,31 @@ def validate_decision_snapshot(payload: dict[str, Any], row: dict[str, Any]) -> 
     )
     if float(row["line"]) != line:
         raise ValueError("scalar_replay_line_mismatch")
+    expected = values[row["selection"]]
+    calibration_method = str(row.get("calibration_method") or "").lower()
+    if calibration_method in {"beta", "platt", "temperature", "isotonic"}:
+        filename = f"{artifact['model_version']}.{market}_calibrator.json"
+        paths = (
+            RuntimePaths.resolve(repo_root=PROJECT_ROOT).runtime_root / "calibration" / "models" / filename,
+            PROJECT_ROOT / "data" / "calibration" / "models" / filename,
+        )
+        calibrator = None
+        for path in paths:
+            if not path.is_file():
+                continue
+            candidate = load_calibrator_artifact(path)
+            metadata = candidate.metadata
+            if (
+                metadata.artifact_hash == row.get("calibration_artifact_hash")
+                and metadata.calibration_method == calibration_method
+                and metadata.base_model_version == artifact["model_version"]
+            ):
+                calibrator = candidate
+                break
+        if calibrator is None:
+            raise ValueError("scalar_replay_calibration_artifact_hash_mismatch")
+        expected = calibrator.transform(expected)
     stored = float(row["model_probability"])
-    if not math.isfinite(stored) or abs(stored - values[row["selection"]]) > 2e-6:
+    if not math.isfinite(stored) or abs(stored - expected) > 2e-6:
         raise ValueError("scalar_replay_probability_mismatch")
-    return values[row["selection"]]
+    return expected

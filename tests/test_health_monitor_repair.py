@@ -1,7 +1,7 @@
 """Scheduled health monitor reads and repairs the canonical runtime odds store."""
 
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
@@ -78,3 +78,20 @@ def test_monitor_reports_failed_daily_worker_from_runtime(tmp_path):
         "exit_code": 1,
         "started_at_utc": "2026-10-26T11:30:00Z",
     }
+
+
+def test_warehouse_rows_do_not_hide_stale_active_quotes(tmp_path):
+    paths = RuntimePaths(tmp_path / "repo", tmp_path / "runtime")
+    paths.market_quotes_db.parent.mkdir(parents=True)
+    yesterday = (datetime.now(ZoneInfo("America/New_York")).date() - timedelta(days=1)).isoformat()
+    with sqlite3.connect(paths.market_quotes_db) as conn:
+        conn.execute(
+            "CREATE TABLE market_quotes (sport TEXT, observed_at_utc TEXT, depth_liquidity_usd REAL)"
+        )
+        conn.execute("INSERT INTO market_quotes VALUES ('nba', '2026-10-24T20:00:00Z', 100)")
+    result = monitor.audit_market_quotes_warehouse(paths)
+    assert result["status"] == "STALE"
+    assert result["stale_active_sports"] == ["nba"]
+    with sqlite3.connect(paths.market_quotes_db) as conn:
+        conn.execute("INSERT INTO market_quotes VALUES (?, ?, 100)", ("nba", yesterday + "T20:00:00Z"))
+    assert monitor.audit_market_quotes_warehouse(paths)["status"] == "HEALTHY"

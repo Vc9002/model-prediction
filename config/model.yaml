@@ -580,8 +580,8 @@ models:
     family: neutral_series_elo
     status: shadow_qualified
     origin: statistical_model
-    active_production_version: r6-contextual-v7
-    active_research_version: rainbow_six-tiered-elo-v6
+    active_production_version: rainbow_six-tiered-elo-v6
+    active_research_version: r6-contextual-v7
     production_artifact: config/models/rainbow_six-tiered-elo-v6.json
     markets:
     - moneyline

@@ -21,6 +21,7 @@ from typing import Any
 from model_prediction.config import PROJECT_ROOT
 from model_prediction.data_sources.market_warehouse import MarketQuoteWarehouse
 from model_prediction.domain import MarketQuote
+from model_prediction.runtime_paths import RuntimePaths
 
 
 def calculate_executable_depth(side: dict[str, Any]) -> float | None:
@@ -56,10 +57,14 @@ def backfill_multi_sport_quotes(
     batch_size: int = 5000,
     limit_files_per_sport: int | None = None,
 ) -> dict[str, Any]:
-    warehouse = MarketQuoteWarehouse()
+    runtime_paths = RuntimePaths.resolve(repo_root=PROJECT_ROOT)
+    warehouse = MarketQuoteWarehouse(db_path=runtime_paths.market_quotes_db)
     db_path = warehouse.db_path
 
-    odds_root = PROJECT_ROOT / "data" / "odds"
+    odds_root = runtime_paths.runtime_root / "odds"
+    if not odds_root.exists():
+        warehouse.close()
+        raise FileNotFoundError(f"runtime odds archive missing: {odds_root}")
     available_sports = [p.name for p in odds_root.iterdir() if p.is_dir() and p.name not in {"historical"}]
 
     target_sports = sports or sorted(available_sports)
