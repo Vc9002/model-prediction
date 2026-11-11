@@ -33,4 +33,5 @@ def test_dashboard_uses_separate_paper_route_without_live_override():
     assert '"/api/auto-buyer/ncaab-paper/toggle"' in html
     assert '"/api/auto-buyer/ncaab-paper/status"' in html
     assert '"/api/auto-buyer/ncaab-paper/run"' in html
+    assert "body:JSON.stringify({confirm:true,enabled})" in html
     assert "body: JSON.stringify({ confirm: true, execute: isLive })" not in html

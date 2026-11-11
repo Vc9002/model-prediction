@@ -4023,7 +4023,7 @@ async function toggleNcaabPaperTrial(){
   const enabled=!_ncaabPaperStatusCache.enabled;
   if(!(await customConfirm(`${enabled?"Enable":"Disable"} the NCAAB v6 spread paper trial?\n\nThis controls simulated fills only. The live buyer keeps its own setting.`)))return;
   try{
-    const res=await fetch("/api/auto-buyer/ncaab-paper/toggle",{method:"POST",headers:{"Content-Type":"application/json","X-Dashboard-Token":window._DASHBOARD_TOKEN||""},body:JSON.stringify({enabled})});
+    const res=await fetch("/api/auto-buyer/ncaab-paper/toggle",{method:"POST",headers:{"Content-Type":"application/json","X-Dashboard-Token":window._DASHBOARD_TOKEN||""},body:JSON.stringify({confirm:true,enabled})});
     const data=await res.json();
     if(!res.ok)throw new Error(data.error||"paper trial toggle failed");
     updateNcaabPaperUI(data);
