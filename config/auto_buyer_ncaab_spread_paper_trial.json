@@ -1,0 +1,7 @@
+{
+  "enabled": true,
+  "model_id": "ncaab-spread-v6",
+  "market_type": "spread",
+  "min_saved_edge": 0.05,
+  "max_saved_edge_exclusive": 0.08
+}

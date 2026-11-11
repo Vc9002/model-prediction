@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 from .daily_lock import acquire_lock
 from .domain import utc_now
 from .portfolio.auto_executor import run_auto_buyer_cycle
+from .portfolio.ncaab_paper_trial import run_ncaab_spread_paper_trial
 from .runtime_paths import RuntimePaths
 from .stealth_runtime import enable_background_priority
 
@@ -30,6 +31,10 @@ def main() -> int:
     try:
         eastern_date = utc_now().astimezone(ZoneInfo("America/New_York")).date().isoformat()
         result = run_auto_buyer_cycle(forecast_date=eastern_date)
+        try:
+            result["ncaab_spread_paper_trial"] = run_ncaab_spread_paper_trial()
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError) as exc:
+            result["ncaab_spread_paper_trial"] = {"status": "error", "reason": str(exc)}
         print(json.dumps({"status": "ok", **result}, default=str), flush=True)
         return 0
     finally:

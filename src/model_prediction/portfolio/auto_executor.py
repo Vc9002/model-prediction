@@ -260,6 +260,7 @@ class AutoExecutionConfig:
     max_quote_age_seconds: float = MAX_AUTO_BUYER_QUOTE_AGE_SECONDS
     refresh_stale_quotes: bool = True
     capture_missing_slates: bool = True
+    paper_ncaab_spread_v6_trial: bool = False
 
     def __post_init__(self) -> None:
         if self.execute_live and self.mode != "live":
@@ -312,6 +313,18 @@ def _auto_buyer_sport_market(row: dict[str, Any]) -> tuple[str, str]:
     if market_type == "ml":
         market_type = "moneyline"
     return sport, market_type
+
+
+def _is_paper_ncaab_spread_v6_trial(row: dict[str, Any], config: AutoExecutionConfig) -> bool:
+    """Allow one quarantined model through only in the isolated paper run."""
+    model_id = str(row.get("model_id") or row.get("model_version") or "")
+    return (
+        config.paper_ncaab_spread_v6_trial
+        and config.mode == "paper"
+        and not config.execute_live
+        and model_id == "ncaab-spread-v6"
+        and _auto_buyer_sport_market(row) == ("ncaab", "spread")
+    )
 
 
 def _is_disabled_auto_buyer_sport_market(
@@ -1507,7 +1520,10 @@ class AutoPolymarketBuyer:
             # Operator-level categorical block. This deliberately takes precedence
             # over persisted model whitelists so renamed or replacement MLB models
             # cannot restore moneyline execution without a reviewed code change.
-            if _is_disabled_auto_buyer_sport_market(row, self.config.disabled_sport_markets):
+            paper_ncaab_trial = _is_paper_ncaab_spread_v6_trial(row, self.config)
+            if not paper_ncaab_trial and _is_disabled_auto_buyer_sport_market(
+                row, self.config.disabled_sport_markets
+            ):
                 result.rejected_disabled_sport_market += 1
                 continue
 
