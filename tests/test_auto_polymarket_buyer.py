@@ -26,12 +26,181 @@ from model_prediction.portfolio.auto_executor import (
     AutoPolymarketBuyer,
     _capture_missing_active_snapshot_slates,
     _get_quarantined_underperforming_models,
+    _is_live_ncaab_spread_v6_bucket,
+    _merge_auto_buyer_pick_sources,
+    _ncaab_spread_v6_live_bucket_from_state,
     _today_auto_buyer_totals,
     load_auto_buyer_state,
     run_auto_buyer_cycle,
     set_auto_buyer_unit_value,
     toggle_auto_buyer,
 )
+
+
+def test_merge_preserves_distinct_markets_and_deduplicates_tier_copies():
+    base = {"event_id": "game-1", "selection": "home", "model_id": "model-v1"}
+    moneyline = {**base, "pick_id": "ml-main", "market_type": "moneyline", "line": None}
+    moneyline_flat = {**moneyline, "pick_id": "ml-flat"}
+    spread = {**base, "pick_id": "spread-main", "market_type": "spread", "line": -3.5}
+    alternate_spread = {**spread, "pick_id": "spread-alt", "line": -4.5}
+    merged = _merge_auto_buyer_pick_sources([moneyline, spread], [moneyline_flat], [alternate_spread])
+    assert [pick["pick_id"] for pick in merged] == ["ml-main", "spread-main", "spread-alt"]
+
+
+def test_live_cycle_stops_when_precycle_reconciliation_fails(monkeypatch):
+    monkeypatch.setattr(
+        "model_prediction.portfolio.auto_executor.load_auto_buyer_state",
+        lambda: {"enabled": True, "mode": "live"},
+    )
+    monkeypatch.setattr(
+        "model_prediction.portfolio.auto_buyer_ledger.reconcile_pending_auto_buyer_fallbacks",
+        lambda: (_ for _ in ()).throw(OSError("exchange unavailable")),
+    )
+    with pytest.raises(RuntimeError, match="pre-cycle reconciliation failed"):
+        run_auto_buyer_cycle()
+
+
+def test_ncaab_live_bucket_exact_scope_and_quote_evidence():
+    bucket = _ncaab_spread_v6_live_bucket_from_state(
+        {
+            "ncaab_spread_v6_live_bucket": {
+                "enabled": True,
+                "min_saved_edge": 0.05,
+                "max_saved_edge_exclusive": 0.08,
+            }
+        }
+    )
+    assert bucket == (0.05, 0.08)
+    config = AutoExecutionConfig(mode="live", execute_live=True, ncaab_spread_v6_live_bucket=bucket)
+    row = {
+        "model_id": "ncaab-spread-v6",
+        "sport": "ncaab",
+        "market_type": "spread",
+        "status": "open",
+        "edge": "0.06",
+        "line": -3.5,
+        "market_quote_provenance": "archived_two_sided_bbo",
+        "market_quote_timestamp_valid": "True",
+        "market_quote_observed_at_utc": iso_utc(utc_now()),
+        "market_snapshot_hash": "abc",
+        "market_snapshot_archive_path": "archive.jsonl",
+    }
+    assert _is_live_ncaab_spread_v6_bucket(row, config)
+    for change in (
+        {"model_id": "ncaab-total-v6"},
+        {"market_type": "moneyline"},
+        {"edge": "0.0499"},
+        {"edge": "0.08"},
+        {"status": "superseded"},
+        {"market_quote_timestamp_valid": "False"},
+        {"market_snapshot_hash": None},
+    ):
+        assert not _is_live_ncaab_spread_v6_bucket({**row, **change}, config)
+    assert _is_live_ncaab_spread_v6_bucket(
+        {
+            **row,
+            "market_quote_provenance": "indicative_slate",
+            "market_quote_timestamp_valid": "False",
+            "market_quote_observed_at_utc": None,
+            "market_snapshot_hash": None,
+            "market_snapshot_archive_path": None,
+        },
+        config,
+    )
+    assert not _is_live_ncaab_spread_v6_bucket(
+        row, AutoExecutionConfig(mode="paper", ncaab_spread_v6_live_bucket=bucket)
+    )
+    assert (
+        _ncaab_spread_v6_live_bucket_from_state(
+            {
+                "ncaab_spread_v6_live_bucket": {
+                    "enabled": True,
+                    "min_saved_edge": 0.04,
+                    "max_saved_edge_exclusive": 0.08,
+                }
+            }
+        )
+        is None
+    )
+
+
+def test_ncaab_live_bucket_uses_normal_stake_sizing(tmp_path, monkeypatch):
+    tickets = []
+
+    class FakeExecutor:
+        def __init__(self, **_kwargs):
+            pass
+
+        def execute(self, ticket, **_kwargs):
+            tickets.append(ticket)
+            return {
+                "status": "submitted",
+                "order_id": "simulated-only",
+                "order_ids": ["simulated-only"],
+                "order_state": "ORDER_STATE_FILLED",
+                "filled_size_shares": ticket.size_shares,
+                "estimated_filled_cost_usd": ticket.estimated_cost_usd,
+            }
+
+    monkeypatch.setattr("model_prediction.portfolio.auto_executor.PolymarketExecutor", FakeExecutor)
+    monkeypatch.setattr(
+        "model_prediction.portfolio.auto_buyer_ledger.record_auto_buy_execution",
+        lambda **_kwargs: None,
+    )
+    now = utc_now()
+    config = AutoExecutionConfig(
+        mode="live",
+        execute_live=True,
+        unit_value_usd=15.0,
+        max_game_stake_usd=75.0,
+        max_daily_spend_usd=750.0,
+        whitelisted_models=(),
+        blacklisted_models=("ncaab-spread-v6",),
+        disabled_sport_markets=(("ncaab", "spread"),),
+        ncaab_spread_v6_live_bucket=(0.05, 0.08),
+        edge_scaled_sizing_enabled=False,
+        require_model_timestamp=True,
+        capture_missing_slates=False,
+    )
+    base = {
+        "pick_id": "approved",
+        "event_id": "game-1",
+        "model_id": "ncaab-spread-v6",
+        "sport": "ncaab",
+        "market_type": "spread",
+        "selection": "home",
+        "status": "open",
+        "decision": "CALL",
+        "reason_code": "FLAT_CALL",
+        "edge": "0.06",
+        "line": -3.5,
+        "model_probability": 0.56,
+        "market_probability": 0.50,
+        "units": 2.0,
+        "home_team": "Home",
+        "away_team": "Away",
+        "market_slug": "game-1-spread",
+        "token_side": "long",
+        "created_at_utc": iso_utc(now),
+        "event_start_utc": iso_utc(now + timedelta(hours=2)),
+        "market_quote_provenance": "archived_two_sided_bbo",
+        "market_quote_timestamp_valid": "True",
+        "market_quote_observed_at_utc": iso_utc(now),
+        "market_snapshot_hash": "abc",
+        "market_snapshot_archive_path": "archive.jsonl",
+    }
+    buyer = AutoPolymarketBuyer(
+        config=config,
+        audit=AuditLog(tmp_path / "audit.jsonl"),
+        live_quote_fn=lambda slug: {"market_slug": slug, "ask": 0.50, "side": "long"},
+        data_root=tmp_path,
+    )
+    result = buyer.evaluate_and_execute(
+        [base, {**base, "pick_id": "unverified", "event_id": "game-2", "market_quote_provenance": None}]
+    )
+    assert len(tickets) == 1
+    assert tickets[0].estimated_cost_usd == 30.0
+    assert result.rejected_blacklist == 1
 
 
 @pytest.fixture(autouse=True)

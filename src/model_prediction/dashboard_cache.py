@@ -11,6 +11,7 @@ Usage:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sqlite3
@@ -46,6 +47,11 @@ DASHBOARD_COLUMNS = [
     "closing_line",
     "market_implied_probability",
     "market_probability_at_decision",
+    "market_quote_observed_at_utc",
+    "market_quote_timestamp_valid",
+    "market_quote_provenance",
+    "market_snapshot_hash",
+    "market_snapshot_archive_path",
     "model_probability",
     "model_uncertainty",
     "edge",
@@ -160,7 +166,8 @@ class DashboardCache:
                     for row in store.pick_rows(tier=tier)
                     if row.get("status") not in RETIRED_STATUSES
                 ]
-                state_key = f"sqlite-events:{event_count}:tier:{tier}"
+                column_key = hashlib.sha256("\0".join(DASHBOARD_COLUMNS).encode()).hexdigest()[:12]
+                state_key = f"sqlite-events:{event_count}:tier:{tier}:columns:{column_key}"
                 if not force and self._is_fresh(conn, tier, state_key):
                     continue
                 self._replace_tier(conn, tier, rows, state_key)

@@ -261,6 +261,7 @@ class AutoExecutionConfig:
     refresh_stale_quotes: bool = True
     capture_missing_slates: bool = True
     paper_ncaab_spread_v6_trial: bool = False
+    ncaab_spread_v6_live_bucket: tuple[float, float] | None = None
 
     def __post_init__(self) -> None:
         if self.execute_live and self.mode != "live":
@@ -327,6 +328,58 @@ def _is_paper_ncaab_spread_v6_trial(row: dict[str, Any], config: AutoExecutionCo
     )
 
 
+def _is_live_ncaab_spread_v6_bucket(row: dict[str, Any], config: AutoExecutionConfig) -> bool:
+    """Exact operator-approved live cohort, with decision-time quote evidence."""
+    bucket = config.ncaab_spread_v6_live_bucket
+    if not (bucket and config.execute_live and config.mode == "live"):
+        return False
+    if str(row.get("model_id") or row.get("model_version") or "") != "ncaab-spread-v6":
+        return False
+    if _auto_buyer_sport_market(row) != ("ncaab", "spread"):
+        return False
+    if str(row.get("status") or "").lower() != "open":
+        return False
+    provenance = str(row.get("market_quote_provenance") or "")
+    if provenance not in {"archived_two_sided_bbo", "indicative_slate"}:
+        return False
+    if provenance == "archived_two_sided_bbo":
+        if str(row.get("market_quote_timestamp_valid") or "").lower() not in {"true", "1"}:
+            return False
+        if not all(
+            row.get(key)
+            for key in (
+                "market_quote_observed_at_utc",
+                "market_snapshot_hash",
+                "market_snapshot_archive_path",
+            )
+        ):
+            return False
+    elif str(row.get("market_quote_timestamp_valid") or "").lower() not in {"false", "0"}:
+        return False
+    try:
+        edge = float(row["edge"])
+        line = float(row["line"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    return math.isfinite(edge) and math.isfinite(line) and bucket[0] <= edge < bucket[1]
+
+
+def _ncaab_spread_v6_live_bucket_from_state(state: dict[str, Any]) -> tuple[float, float] | None:
+    raw = state.get("ncaab_spread_v6_live_bucket")
+    if not isinstance(raw, dict) or raw.get("enabled") is not True:
+        return None
+    try:
+        minimum = float(raw["min_saved_edge"])
+        maximum = float(raw["max_saved_edge_exclusive"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not all(math.isfinite(value) for value in (minimum, maximum)):
+        return None
+    if not (minimum == 0.05 and maximum == 0.08):
+        return None
+    return minimum, maximum
+
+
 def _is_disabled_auto_buyer_sport_market(
     row: dict[str, Any],
     disabled_markets: tuple[tuple[str, str], ...] | frozenset[tuple[str, str]] = (),
@@ -377,9 +430,14 @@ def _capture_missing_active_snapshot_slates(
     missing: set[tuple[str, str]] = set()
     for row in picks:
         model_id = str(row.get("model_id") or row.get("model_version") or "")
-        if model_id in config.blacklisted_models or model_id not in config.whitelisted_models:
+        approved_ncaab_bucket = _is_live_ncaab_spread_v6_bucket(row, config)
+        if not approved_ncaab_bucket and (
+            model_id in config.blacklisted_models or model_id not in config.whitelisted_models
+        ):
             continue
-        if _is_disabled_auto_buyer_sport_market(row, config.disabled_sport_markets):
+        if not approved_ncaab_bucket and _is_disabled_auto_buyer_sport_market(
+            row, config.disabled_sport_markets
+        ):
             continue
         if row.get("status") != "open":
             continue
@@ -803,6 +861,7 @@ def run_auto_buyer_cycle(
             settle_auto_buyer_ledger()
         except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError) as exc:
             logger.warning("Pre-cycle resting order reconciliation or settlement failed: %s", exc)
+            raise RuntimeError("Live auto-buyer stopped: pre-cycle reconciliation failed") from exc
     elif cycle_enabled and mode == "paper":
         try:
             from .auto_buyer_ledger import settle_auto_buyer_ledger
@@ -842,6 +901,7 @@ def run_auto_buyer_cycle(
         whitelisted_models=tuple(whitelisted) if whitelisted is not None else DEFAULT_WHITELIST_MODELS,
         blacklisted_models=tuple(blacklisted) if blacklisted is not None else EXPLICIT_BLACKLIST_MODELS,
         disabled_sport_markets=_parse_disabled_sport_markets(state),
+        ncaab_spread_v6_live_bucket=_ncaab_spread_v6_live_bucket_from_state(state),
         max_daily_loss_usd=(
             float(state["max_daily_loss_usd"])
             if state.get("max_daily_loss_usd") is not None
@@ -996,6 +1056,36 @@ def _get_quarantined_underperforming_models(
     return quarantined
 
 
+def _merge_auto_buyer_pick_sources(*sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Deduplicate tier copies without collapsing distinct event contracts."""
+    seen: set[Any] = set()
+    merged: list[dict[str, Any]] = []
+    for source in sources:
+        for pick in source:
+            pick_id = str(pick.get("pick_id") or "")
+            event_id = str(pick.get("event_id") or f"{pick.get('away_team')}@{pick.get('home_team')}")
+            selection = str(pick.get("selection") or "").lower()
+            model = str(pick.get("model_id") or pick.get("model_version") or "")
+            market = str(pick.get("market_type") or "").lower()
+            line = "" if pick.get("line") is None else str(pick["line"])
+            key = (event_id, market, line, selection, model) if event_id and selection else pick_id
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(pick)
+    return merged
+
+
+def _auto_buyer_start_order(row: dict[str, Any]) -> tuple[float, str]:
+    """Spend the cycle's budget on earlier games before later ones."""
+    try:
+        start = parse_utc(str(row.get("event_start_utc") or ""))
+        timestamp = start.timestamp()
+    except (TypeError, ValueError, OverflowError):
+        timestamp = float("inf")
+    return timestamp, str(row.get("pick_id") or "")
+
+
 class AutoPolymarketBuyer:
     """Automated buyer executing qualified model picks with risk gates."""
 
@@ -1037,6 +1127,7 @@ class AutoPolymarketBuyer:
                 if blacklisted is not None
                 else EXPLICIT_BLACKLIST_MODELS,
                 disabled_sport_markets=_parse_disabled_sport_markets(state),
+                ncaab_spread_v6_live_bucket=_ncaab_spread_v6_live_bucket_from_state(state),
                 max_daily_loss_usd=(
                     float(state["max_daily_loss_usd"])
                     if state.get("max_daily_loss_usd") is not None
@@ -1057,12 +1148,17 @@ class AutoPolymarketBuyer:
         bought_pick_ids: set[str] = set()
         bought_market_sides: set[tuple[str, str]] = set()
         bought_event_selections: set[tuple[str, str]] = set()
+        bought_event_markets: set[tuple[str, str]] = set()
+        bought_matchup_markets: set[tuple[str, str, str, str]] = set()
+        bought_matchup_selections: set[tuple[str, str, str, str, str]] = set()
         held_slugs: set[str] = set()
 
         partially_filled: dict[str, dict[str, Any]] = {}
         partially_filled_pick_ids: set[str] = set()
         partially_filled_market_sides: set[tuple[str, str]] = set()
         partially_filled_event_selections: set[tuple[str, str]] = set()
+        partially_filled_event_markets: set[tuple[str, str]] = set()
+        partially_filled_matchup_markets: set[tuple[str, str, str, str]] = set()
         partially_filled_slugs: set[str] = set()
 
         # 1. Audit logs (self.audit, data_root / audit.jsonl, data_root / audit_log.jsonl)
@@ -1183,6 +1279,10 @@ class AutoPolymarketBuyer:
                     side = str(r.get("token_side") or "").lower()
                     ev_id = str(r.get("event_id") or "")
                     sel = str(r.get("selection") or "").lower()
+                    away = str(r.get("away_team") or "")
+                    home = str(r.get("home_team") or "")
+                    mtype = str(r.get("market_type") or "")
+                    start_utc = str(r.get("event_start_utc") or "")
                     is_reconciled = bool(r.get("fallback_reconciled", True))
 
                     # Detect partially filled orders whose resting fallbacks are not active
@@ -1214,6 +1314,17 @@ class AutoPolymarketBuyer:
                             partially_filled_market_sides.add((slug, side))
                         if ev_id and sel:
                             partially_filled_event_selections.add((ev_id, sel))
+                        if ev_id and mtype:
+                            partially_filled_event_markets.add((ev_id, mtype.lower()))
+                        if away and home and start_utc and mtype:
+                            partially_filled_matchup_markets.add(
+                                (
+                                    away.strip().lower(),
+                                    home.strip().lower(),
+                                    start_utc[:10],
+                                    mtype.strip().lower(),
+                                )
+                            )
                         if slug:
                             partially_filled_slugs.add(slug)
                         continue
@@ -1226,6 +1337,18 @@ class AutoPolymarketBuyer:
                         bought_market_sides.add((slug, side))
                     if ev_id and sel:
                         bought_event_selections.add((ev_id, sel))
+                    if ev_id and mtype:
+                        bought_event_markets.add((ev_id, mtype.lower()))
+                    if away and home and start_utc and mtype:
+                        m_key = (
+                            away.strip().lower(),
+                            home.strip().lower(),
+                            start_utc[:10],
+                            mtype.strip().lower(),
+                        )
+                        bought_matchup_markets.add(m_key)
+                        if sel:
+                            bought_matchup_selections.add((*m_key, sel.strip().lower()))
             except (OSError, ValueError, KeyError, TypeError, RuntimeError):
                 pass
 
@@ -1246,12 +1369,17 @@ class AutoPolymarketBuyer:
         bought_pick_ids.difference_update(partially_filled_pick_ids)
         bought_market_sides.difference_update(partially_filled_market_sides)
         bought_event_selections.difference_update(partially_filled_event_selections)
+        bought_event_markets.difference_update(partially_filled_event_markets)
+        bought_matchup_markets.difference_update(partially_filled_matchup_markets)
         held_slugs.difference_update(partially_filled_slugs)
 
         return {
             "pick_ids": bought_pick_ids,
             "market_sides": bought_market_sides,
             "event_selections": bought_event_selections,
+            "event_markets": bought_event_markets,
+            "matchup_markets": bought_matchup_markets,
+            "matchup_selections": bought_matchup_selections,
             "held_slugs": held_slugs,
             "partially_filled": partially_filled,
             "partially_filled_market_sides": partially_filled_market_sides,
@@ -1300,6 +1428,10 @@ class AutoPolymarketBuyer:
         token_side: str | None = None,
         event_id: str | None = None,
         selection: str | None = None,
+        market_type: str | None = None,
+        away_team: str | None = None,
+        home_team: str | None = None,
+        event_start_utc: str | None = None,
         bought_index: dict[str, Any] | None = None,
     ) -> bool:
         """Check if an order was already executed for this pick, event, market, or position."""
@@ -1310,9 +1442,28 @@ class AutoPolymarketBuyer:
             return True
         if market_slug and token_side and (market_slug, token_side.lower()) in index["market_sides"]:
             return True
-        return bool(
-            event_id and selection and (str(event_id), str(selection).lower()) in index["event_selections"]
-        )
+        if event_id and selection and (str(event_id), str(selection).lower()) in index["event_selections"]:
+            return True
+        if (
+            event_id
+            and market_type
+            and (str(event_id), str(market_type).lower()) in index.get("event_markets", set())
+        ):
+            return True
+        if away_team and home_team and event_start_utc and market_type:
+            m_key = (
+                str(away_team).strip().lower(),
+                str(home_team).strip().lower(),
+                str(event_start_utc)[:10],
+                str(market_type).strip().lower(),
+            )
+            if m_key in index.get("matchup_markets", set()):
+                return True
+            if selection and (*m_key, str(selection).strip().lower()) in index.get(
+                "matchup_selections", set()
+            ):
+                return True
+        return False
 
     def _effective_min_edge(
         self,
@@ -1386,22 +1537,7 @@ class AutoPolymarketBuyer:
                 else _parse_research_picks(gated=True)
             )
 
-            seen_pick_keys: set[Any] = set()
-            combined_picks: list[dict[str, Any]] = []
-
-            for p in main_picks + gated_picks + flat_picks:
-                p_id = str(p.get("pick_id") or "")
-                ev_id = str(p.get("event_id") or f"{p.get('away_team')}@{p.get('home_team')}")
-                sel = str(p.get("selection") or "").lower()
-                m_ver = str(p.get("model_id") or p.get("model_version") or "")
-
-                key = (ev_id, sel, m_ver) if (ev_id and sel) else p_id
-                if key in seen_pick_keys:
-                    continue
-                seen_pick_keys.add(key)
-                combined_picks.append(p)
-
-            picks = combined_picks
+            picks = _merge_auto_buyer_pick_sources(main_picks, gated_picks, flat_picks)
 
         now = utc_now()
         result = AutoExecutionResult()
@@ -1459,12 +1595,13 @@ class AutoPolymarketBuyer:
         current_spend = today_spend_usd
         bought_index = self._build_bought_index()
 
-        for row in picks:
+        for row in sorted(picks, key=_auto_buyer_start_order):
             result.total_evaluated += 1
             pick_id = str(row.get("pick_id") or "")
             model_id = str(row.get("model_id") or row.get("model_version") or "")
             event_id = str(row.get("event_id") or "")
             selection = str(row.get("selection") or "").lower()
+            approved_ncaab_bucket = _is_live_ncaab_spread_v6_bucket(row, self.config)
 
             # 1. Status filter (must be open). Checked first, ahead of every other
             # gate: the pick-source files (main/flat/gated/research) are append-only
@@ -1483,8 +1620,8 @@ class AutoPolymarketBuyer:
             record_type = str(row.get("record_type") or "").upper()
             if (
                 (decision and decision != "CALL")
-                or reason_code.startswith("PAPER_CALL_")
-                or record_type == "RESEARCH_OBSERVATION"
+                or (not approved_ncaab_bucket and reason_code.startswith("PAPER_CALL_"))
+                or (not approved_ncaab_bucket and record_type == "RESEARCH_OBSERVATION")
             ):
                 result.rejected_not_whitelisted += 1
                 continue
@@ -1506,12 +1643,12 @@ class AutoPolymarketBuyer:
                 continue
 
             # 2. Blacklist filter
-            if model_id in self.config.blacklisted_models:
+            if model_id in self.config.blacklisted_models and not approved_ncaab_bucket:
                 result.rejected_blacklist += 1
                 continue
 
             # 3. Whitelist filter
-            if model_id not in self.config.whitelisted_models:
+            if model_id not in self.config.whitelisted_models and not approved_ncaab_bucket:
                 result.rejected_not_whitelisted += 1
                 continue
 
@@ -1521,8 +1658,10 @@ class AutoPolymarketBuyer:
             # over persisted model whitelists so renamed or replacement MLB models
             # cannot restore moneyline execution without a reviewed code change.
             paper_ncaab_trial = _is_paper_ncaab_spread_v6_trial(row, self.config)
-            if not paper_ncaab_trial and _is_disabled_auto_buyer_sport_market(
-                row, self.config.disabled_sport_markets
+            if (
+                not paper_ncaab_trial
+                and not approved_ncaab_bucket
+                and _is_disabled_auto_buyer_sport_market(row, self.config.disabled_sport_markets)
             ):
                 result.rejected_disabled_sport_market += 1
                 continue
@@ -1532,6 +1671,8 @@ class AutoPolymarketBuyer:
             # total merely to increase volume when the exchange exposes no first-inning
             # contract for the event.
             market_type = str(row.get("market_type") or "").lower()
+            away_team = str(row.get("away_team") or "")
+            home_team = str(row.get("home_team") or "")
             if market_type and market_type not in EXECUTABLE_AUTO_BUYER_MARKET_TYPES:
                 result.rejected_unsupported_market += 1
                 continue
@@ -1587,11 +1728,15 @@ class AutoPolymarketBuyer:
                     result.rejected_stale_quote += 1
                     continue
 
-            # 5. Fast Deduplication check (pick_id or event_id + selection)
+            # 5. Fast Deduplication check (pick_id, event_id, or matchup + market)
             if self._is_already_bought(
                 pick_id=pick_id,
                 event_id=event_id,
                 selection=selection,
+                market_type=market_type,
+                away_team=away_team,
+                home_team=home_team,
+                event_start_utc=event_start_str,
                 bought_index=bought_index,
             ):
                 result.rejected_dedup += 1
@@ -1712,6 +1857,10 @@ class AutoPolymarketBuyer:
                 token_side=token_side,
                 event_id=event_id,
                 selection=selection,
+                market_type=market_type,
+                away_team=away_team,
+                home_team=home_team,
+                event_start_utc=event_start_str,
                 bought_index=bought_index,
             ):
                 result.rejected_dedup += 1
@@ -1760,6 +1909,13 @@ class AutoPolymarketBuyer:
 
             # 10. Sizing & Edge check against real Polymarket CLOB ask (mirrors Main Ledger sport hurdles)
             edge = model_prob - clob_ask
+            if approved_ncaab_bucket and not (
+                self.config.ncaab_spread_v6_live_bucket[0]
+                <= edge
+                < self.config.ncaab_spread_v6_live_bucket[1]
+            ):
+                result.rejected_low_edge += 1
+                continue
             effective_min_edge = self._effective_min_edge(
                 sport_norm,
                 market_type,
@@ -1903,6 +2059,18 @@ class AutoPolymarketBuyer:
             bought_index["market_sides"].add((market_slug, token_side))
             if event_id and selection:
                 bought_index["event_selections"].add((event_id, selection))
+            if event_id and market_type:
+                bought_index.setdefault("event_markets", set()).add((event_id, market_type.lower()))
+            if away_team and home_team and event_start_str and market_type:
+                m_key = (
+                    away_team.strip().lower(),
+                    home_team.strip().lower(),
+                    event_start_str[:10],
+                    market_type.lower(),
+                )
+                bought_index.setdefault("matchup_markets", set()).add(m_key)
+                if selection:
+                    bought_index.setdefault("matchup_selections", set()).add((*m_key, selection.lower()))
             bought_index["held_slugs"].add(market_slug)
             if "partially_filled" in bought_index and pick_id in bought_index["partially_filled"]:
                 del bought_index["partially_filled"][pick_id]

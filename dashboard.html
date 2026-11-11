@@ -4424,7 +4424,9 @@ function getFilteredAbsRowsFor(mode) {
       if (resFilter !== "open" && (r.result || "").toLowerCase() !== resFilter) return false;
     }
 
-    const dateStr = (r.event_start_utc || r.executed_at_utc || "").slice(0, 10);
+    const dateStr = (isSettled
+      ? (r.settled_at_utc || "")
+      : (r.event_start_utc || r.executed_at_utc || "")).slice(0, 10);
     if (fromDate && dateStr < fromDate) return false;
     if (toDate && dateStr > toDate) return false;
 
@@ -4627,7 +4629,10 @@ function renderAutoBuyerTablesFor(mode) {
   if (!filtered.length) {
     html += `<tr><td colspan=13 class="dim" style="text-align:center;padding:24px">No ${m} auto-buyer positions matching the current settlement filter.</td></tr>`;
   } else {
-    const sorted = [...filtered].reverse();
+    const sorted = [...filtered].sort((a, b) =>
+      (Date.parse(b.settled_at_utc || b.event_start_utc || b.executed_at_utc) || 0) -
+      (Date.parse(a.settled_at_utc || a.event_start_utc || a.executed_at_utc) || 0)
+    );
     sorted.forEach(r => {
       const isWin = r.result === "win";
       const isLoss = r.result === "loss";
