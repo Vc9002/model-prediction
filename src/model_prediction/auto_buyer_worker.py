@@ -30,13 +30,19 @@ def main() -> int:
         return 0
     try:
         eastern_date = utc_now().astimezone(ZoneInfo("America/New_York")).date().isoformat()
-        result = run_auto_buyer_cycle(forecast_date=eastern_date)
+        live_error = None
+        try:
+            result = run_auto_buyer_cycle(forecast_date=eastern_date)
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError) as exc:
+            live_error = str(exc)
+            result = {"live_auto_buyer": {"status": "error", "reason": live_error}}
         try:
             result["ncaab_spread_paper_trial"] = run_ncaab_spread_paper_trial()
         except (OSError, ValueError, KeyError, TypeError, RuntimeError) as exc:
             result["ncaab_spread_paper_trial"] = {"status": "error", "reason": str(exc)}
-        print(json.dumps({"status": "ok", **result}, default=str), flush=True)
-        return 0
+        failed = live_error is not None or result["ncaab_spread_paper_trial"]["status"] == "error"
+        print(json.dumps({"status": "error" if failed else "ok", **result}, default=str), flush=True)
+        return 1 if failed else 0
     finally:
         lock.close()
 

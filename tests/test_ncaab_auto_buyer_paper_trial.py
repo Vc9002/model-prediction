@@ -11,7 +11,7 @@ from model_prediction.portfolio.ncaab_paper_trial import eligible_trial_pick
 
 
 def test_trial_cohort_is_exact_model_market_and_saved_edge():
-    base = {"model_version": "ncaab-spread-v6", "sport": "ncaab", "market_type": "spread"}
+    base = {"model_version": "ncaab-spread-v6", "sport": "ncaab", "market_type": "spread", "status": "open"}
     assert eligible_trial_pick({**base, "edge": "0.050000"}, min_edge=0.05, max_edge=0.08)
     assert eligible_trial_pick({**base, "edge": "0.079999"}, min_edge=0.05, max_edge=0.08)
     for row in (
@@ -53,7 +53,7 @@ def test_trial_runner_passes_only_exact_cohort_to_paper_buyer(tmp_path, monkeypa
         encoding="utf-8",
     )
     monkeypatch.setattr(trial.RuntimePaths, "resolve", lambda: SimpleNamespace(runtime_root=tmp_path))
-    base = {"model_version": "ncaab-spread-v6", "sport": "ncaab", "market_type": "spread"}
+    base = {"model_version": "ncaab-spread-v6", "sport": "ncaab", "market_type": "spread", "status": "open"}
     monkeypatch.setattr(
         trial,
         "read_picks",
@@ -61,6 +61,7 @@ def test_trial_runner_passes_only_exact_cohort_to_paper_buyer(tmp_path, monkeypa
             {**base, "pick_id": "good", "edge": "0.06"},
             {**base, "pick_id": "too_high", "edge": "0.08"},
             {**base, "pick_id": "total", "market_type": "total", "edge": "0.06"},
+            {**base, "pick_id": "settled", "status": "settled", "edge": "0.06"},
         ],
     )
     monkeypatch.setattr(trial, "read_flat_picks", list)
