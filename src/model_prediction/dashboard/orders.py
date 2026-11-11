@@ -67,6 +67,7 @@ from model_prediction.dashboard.picks import (
     read_flat_picks,
     read_picks,
 )
+from model_prediction.domain import PickTag
 
 # ── SECTION: Orders & Execution ─────────────────────────────────────
 
@@ -1186,6 +1187,7 @@ def open_picks() -> dict:
                 "american_odds": row.get("american_odds"),
                 "units": _number(row.get("units")),
                 "record_type": str(row.get("record_type", "")),
+                "pick_tag": PickTag.RESEARCH.value,
                 "model_version": str(row.get("model_version", "")),
                 "reason_code": str(row.get("reason_code", "")),
             }
@@ -1240,6 +1242,7 @@ def history_picks(days: int = 30, sport: str | None = None) -> dict:
                 "settled_at_utc": str(row.get("settled_at_utc", "")),
                 "event_start_utc": str(row.get("event_start_utc", "")),
                 "record_type": str(row.get("record_type", "")),
+                "pick_tag": PickTag.RESEARCH.value,
                 "american_odds": row.get("american_odds"),
             }
         )

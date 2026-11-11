@@ -1627,14 +1627,13 @@ class AutoPolymarketBuyer:
                 result.rejected_not_open += 1
                 continue
 
-            # Mirror Main Ledger qualification: reject paper calls and non-qualified research calls
+            # Tags name destinations (operator directive 2026-11-11), so a row's legacy
+            # record_type no longer blocks it; the whitelist/blacklist/quarantine/caps
+            # below remain the operator's controls.
             decision = str(row.get("decision") or "").upper()
             reason_code = str(row.get("reason_code") or "").upper()
-            record_type = str(row.get("record_type") or "").upper()
-            if (
-                (decision and decision != "CALL")
-                or (not approved_ncaab_bucket and reason_code.startswith("PAPER_CALL_"))
-                or (not approved_ncaab_bucket and record_type == "RESEARCH_OBSERVATION")
+            if (decision and decision != "CALL") or (
+                not approved_ncaab_bucket and reason_code.startswith("PAPER_CALL_")
             ):
                 result.rejected_not_whitelisted += 1
                 continue

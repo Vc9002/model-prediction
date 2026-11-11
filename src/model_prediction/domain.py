@@ -144,6 +144,40 @@ class ModelState(StrEnum):
     RETIRED = "retired"
 
 
+class PickTag(StrEnum):
+    """The only three pick tags. A tag names where a pick is going, not how trusted its model is.
+
+    Operator directive 2026-11-11 (final): research = Main/Flat ledgers, shadow = paper
+    auto-buyer, qualified = live auto-buyer. Every pick, whatever its tag, carries units
+    and edge. Rows persisted before this keep their legacy ``record_type`` /
+    ``model_state_at_decision`` values; ``pick_tag_for`` derives the tag from destination,
+    so no stored column or ledger rewrite is involved.
+    """
+
+    RESEARCH = "research"
+    SHADOW = "shadow"
+    QUALIFIED = "qualified"
+
+
+def pick_tag_for(*, ledger_tier: str | None = None, buyer_mode: str | None = None) -> PickTag:
+    """Return the tag for a destination: a buyer mode wins, else the ledger tier means research."""
+    if buyer_mode is not None:
+        mode = str(buyer_mode).strip().lower()
+        if mode == "live":
+            return PickTag.QUALIFIED
+        if mode == "paper":
+            return PickTag.SHADOW
+        raise ValueError(f"unknown auto-buyer mode {buyer_mode!r}; expected 'paper' or 'live'")
+    if ledger_tier is not None and str(ledger_tier).strip().lower() in {
+        "main",
+        "flat",
+        "research",
+        "gated_research",
+    }:
+        return PickTag.RESEARCH
+    raise ValueError(f"cannot tag a pick for ledger_tier={ledger_tier!r}, buyer_mode={buyer_mode!r}")
+
+
 class NoCallReason(StrEnum):
     LOW_EDGE = "NO_CALL_LOW_EDGE"
     STALE_DATA = "NO_CALL_STALE_DATA"
