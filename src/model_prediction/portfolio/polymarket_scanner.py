@@ -77,12 +77,15 @@ def _get_logged_picks() -> list[dict]:
         return _PICKS_INDEX_CACHE
     try:
         from model_prediction.dashboard.picks import (
-            _parse_research_picks,
             read_flat_picks,
             read_picks,
         )
 
-        _PICKS_INDEX_CACHE = read_picks() + read_flat_picks() + _parse_research_picks(gated=False)
+        # The research tier has been frozen since 2026-10-22 and its settled
+        # history is already in Flat; _lookup_model_prob accepts cross-date
+        # matches, so frozen rows could otherwise price today's markets and
+        # double-weight the pooled Platt fit.
+        _PICKS_INDEX_CACHE = read_picks() + read_flat_picks()
     except Exception:  # noqa: BLE001
         _PICKS_INDEX_CACHE = []
     return _PICKS_INDEX_CACHE
