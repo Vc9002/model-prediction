@@ -295,20 +295,23 @@ def _event_already_started(row: dict) -> bool:
     return game_time < datetime.now(UTC)
 
 
+def _is_manual_order(row: dict) -> bool:
+    """Ledger rows are tagged ``research``; only a ``qualified`` pick skips manual authorization."""
+    tag = str(row.get("pick_tag") or PickTag.RESEARCH.value)
+    return tag != PickTag.QUALIFIED.value
+
+
 def _order_readiness(row: dict, quote: dict | None) -> tuple[bool, str]:
     if row.get("status") != "open":
         return False, "pick is not open"
-    if row.get("record_type") == "QUALIFIED_SHADOW_CALL":
-        if float(row.get("units") or 0) <= 0:
-            return False, "qualified pick has no authorized units"
-    elif row.get("record_type") == "RESEARCH_OBSERVATION":
+    if _is_manual_order(row):
         eligible, reason = _manual_research_eligibility(row)
         if not eligible:
             return False, reason
         if not _suggested_units(row):
             return False, "manual order has no authorized unit cap"
-    else:
-        return False, "unsupported ledger record type"
+    elif float(row.get("units") or 0) <= 0:
+        return False, "qualified pick has no authorized units"
     if quote is None:
         return False, "no exact executable Polymarket US market mapping"
     if not quote.get("fresh"):
@@ -561,7 +564,7 @@ def preview_order(payload: dict) -> dict:
     if not 0 < size_shares <= 100000:
         return {"status": "refused", "error": "shares must be greater than 0 and at most 100,000"}
     estimated_cost = round(price * size_shares, 2)
-    manual = row.get("record_type") == "RESEARCH_OBSERVATION"
+    manual = _is_manual_order(row)
 
     if action == "sell":
         # A resting SELL limit must sit AT OR ABOVE the current bid (post-only:
@@ -1194,8 +1197,8 @@ def open_picks() -> dict:
         )
     # Sort: earliest game first
     rows.sort(key=lambda r: r["event_start_utc"])
-    qualified = [r for r in rows if r["record_type"] == "QUALIFIED_SHADOW_CALL"]
-    research = [r for r in rows if r["record_type"] == "RESEARCH_OBSERVATION"]
+    qualified = [r for r in rows if r["pick_tag"] == PickTag.QUALIFIED.value]
+    research = [r for r in rows if r["pick_tag"] == PickTag.RESEARCH.value]
     return {
         "open": rows,
         "count": len(rows),
@@ -1938,9 +1941,7 @@ def archive_action(action: str, scope: Any) -> dict:
         exposed = {
             str(row.get("pick_id"))
             for row in all_rows
-            if row.get("status") == "open"
-            and row.get("record_type") == "QUALIFIED_SHADOW_CALL"
-            and float(row.get("units") or 0) > 0
+            if row.get("status") == "open" and float(row.get("units") or 0) > 0
         }
         blocked = sorted(expanded & exposed)
         allowed = expanded - exposed
@@ -1971,11 +1972,7 @@ def archive_action(action: str, scope: Any) -> dict:
     existing = set(archive["pick_ids"])
     added = protected = 0
     for row in read_picks():
-        if (
-            row.get("status") == "open"
-            and row.get("record_type") == "QUALIFIED_SHADOW_CALL"
-            and float(row.get("units") or 0) > 0
-        ):
+        if row.get("status") == "open" and float(row.get("units") or 0) > 0:
             protected += 1
             continue
         pick_id = str(row.get("pick_id"))

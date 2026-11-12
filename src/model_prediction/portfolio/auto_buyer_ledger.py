@@ -22,7 +22,7 @@ import httpx
 
 from ..data_sources.espn import ESPNClient
 from ..data_sources.polymarket_execute import ExecutionGateError
-from ..domain import iso_utc, parse_utc, utc_now
+from ..domain import PickTag, iso_utc, parse_utc, pick_tag_for, utc_now
 from ..esports import TITLE_SPECS as _ESPORTS_TITLE_SPECS
 from ..esports import Bo3EsportsClient, _fuzzy_match_team, _load_manual_aliases, _team_alias_index
 from ..ledger import FIELDNAMES
@@ -174,6 +174,11 @@ def _uses_live_auto_buyer_ledger(path: Path) -> bool:
     """
     live_j_path, _ = resolve_auto_buyer_paths()
     return path.resolve() == live_j_path.resolve()
+
+
+def _auto_buyer_pick_tag(path: Path) -> PickTag:
+    """Live ledger rows are ``qualified``; every other buyer ledger (paper, trials) is ``shadow``."""
+    return pick_tag_for(buyer_mode="live" if _uses_live_auto_buyer_ledger(path) else "paper")
 
 
 def resolve_auto_buyer_log_path() -> Path:
@@ -427,6 +432,7 @@ def record_auto_buy_execution(
         "calibration_method": pick.get("calibration_method"),
         "market_probability": round(market_p, 4),
         "edge": round(edge, 4),
+        "pick_tag": _auto_buyer_pick_tag(j_path).value,
         "order_state": order_state,
         "status": "open",
         "result": "open",
@@ -833,15 +839,20 @@ def read_auto_buyer_ledger(
     if not j_path.exists():
         return []
     records = []
+    tag = _auto_buyer_pick_tag(j_path).value
     with j_path.open(encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:
                 continue
             try:
-                records.append(json.loads(line))
+                record = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            # Rows written before tags existed get theirs from the ledger they live in.
+            if isinstance(record, dict):
+                record.setdefault("pick_tag", tag)
+            records.append(record)
     return records
 
 

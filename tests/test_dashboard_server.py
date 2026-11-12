@@ -448,6 +448,7 @@ def test_resting_order_preview_and_submit_persist_exchange_id(
         "pick_id": "qualified-1",
         "status": "open",
         "record_type": "QUALIFIED_SHADOW_CALL",
+        "pick_tag": "qualified",
         "units": 1.0,
     }
     quote = {
@@ -499,6 +500,7 @@ def test_submit_parses_success_after_interactive_prompt(monkeypatch, tmp_path: P
         "pick_id": "qualified-prompt",
         "status": "open",
         "record_type": "QUALIFIED_SHADOW_CALL",
+        "pick_tag": "qualified",
         "units": 1.0,
     }
     quote = {
@@ -739,6 +741,7 @@ def test_buy_at_current_ask_submits_marketable_ioc_limit(monkeypatch, tmp_path: 
         "pick_id": "qualified-2",
         "status": "open",
         "record_type": "QUALIFIED_SHADOW_CALL",
+        "pick_tag": "qualified",
         "units": 1.0,
     }
     patch_dash("read_picks", lambda: [pick])
@@ -790,6 +793,7 @@ def test_resting_order_enforces_seven_fifty_per_unit_cost_cap(monkeypatch, patch
         "pick_id": "qualified-cap",
         "status": "open",
         "record_type": "QUALIFIED_SHADOW_CALL",
+        "pick_tag": "qualified",
         "units": 1.0,
     }
     patch_dash("read_picks", lambda: [pick])
