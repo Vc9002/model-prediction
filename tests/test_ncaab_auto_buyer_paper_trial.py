@@ -66,6 +66,7 @@ def test_trial_runner_passes_only_exact_cohort_to_paper_buyer(tmp_path, monkeypa
     )
     monkeypatch.setattr(trial, "read_flat_picks", list)
     monkeypatch.setattr(trial, "settle_auto_buyer_ledger", lambda **_: None)
+    monkeypatch.setattr(trial, "load_auto_buyer_state", lambda: {"max_event_lookahead_hours": 1.0})
     captured = {}
 
     class PaperBuyer:
@@ -88,6 +89,140 @@ def test_trial_runner_passes_only_exact_cohort_to_paper_buyer(tmp_path, monkeypa
     assert captured["config"].mode == "paper"
     assert captured["config"].execute_live is False
     assert captured["config"].whitelisted_models == ("ncaab-spread-v6",)
+    # The cohort must share the live buyer's persisted window, not the 24h default.
+    assert captured["config"].max_event_lookahead_hours == 1.0
+
+
+def _install_cohort(tmp_path, monkeypatch, *, picks, flat_picks=()):
+    """Shared paper-trial harness: enabled settings, isolated roots, capturing fake buyer."""
+    (tmp_path / "auto_buyer_ncaab_spread_paper_trial.json").write_text(
+        json.dumps(
+            {
+                "enabled": True,
+                "model_id": "ncaab-spread-v6",
+                "market_type": "spread",
+                "min_saved_edge": 0.05,
+                "max_saved_edge_exclusive": 0.08,
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(trial.RuntimePaths, "resolve", lambda: SimpleNamespace(runtime_root=tmp_path))
+    paper_root = tmp_path / "paper_auto_buyer"
+    paper_root.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(trial, "PAPER_AUTO_BUYER_DATA_ROOT", paper_root)
+    monkeypatch.setattr(trial, "read_picks", lambda: list(picks))
+    monkeypatch.setattr(trial, "read_flat_picks", lambda: list(flat_picks))
+    monkeypatch.setattr(trial, "settle_auto_buyer_ledger", lambda **_: None)
+    monkeypatch.setattr(trial, "load_auto_buyer_state", lambda: {"max_event_lookahead_hours": 1.0})
+    monkeypatch.setattr(trial, "capture_unmapped_cohort_markets", lambda picks, root: 0)
+    captured: dict = {}
+
+    class PaperBuyer:
+        def __init__(self, *, config, data_root):
+            captured["config"] = config
+            captured["data_root"] = data_root
+
+        def evaluate_and_execute(self, picks):
+            captured["picks"] = picks
+            return SimpleNamespace(dry_run_orders=[])
+
+    monkeypatch.setattr(trial, "AutoPolymarketBuyer", PaperBuyer)
+    return paper_root, captured
+
+
+def _write_paper_ledger(paper_root, rows):
+    path = paper_root / "auto_buyer_ledger.jsonl"
+    path.write_text(
+        "\n".join(json.dumps(row) for row in rows) + ("\n" if rows else ""),
+        encoding="utf-8",
+    )
+
+
+# Identity fields copied from the real 2026-11-11 17:48Z trial fill
+# (PAPER-NCAAB-V6-3f661234757843c9, event_id 203460) that was re-bought at
+# 21:11Z under a new pick_id (PAPER-NCAAB-V6-09543e74f6354902).
+_VMI_FILL = {
+    "pick_id": "3f661234757843c9",
+    "order_id": "PAPER-NCAAB-V6-3f661234757843c9",
+    "event_id": "203460",
+    "sport": "NCAAB",
+    "model_id": "ncaab-spread-v6",
+    "market_type": "spread",
+    "selection": "away",
+    "line": 8.5,
+    "away_team": "North Carolina Central Eagles",
+    "home_team": "VMI Keydets",
+    "event_start_utc": "2026-11-11T23:00:00Z",
+    "market_slug": "asc-cbb-ncc-vamil-2026-11-11-pos-8pt5",
+    "token_side": "long",
+    "status": "open",
+    "order_state": "ORDER_STATE_FILLED",
+    "shares": 19.23,
+    "entry_price": 0.52,
+}
+
+
+def _vmi_pick(pick_id, **overrides):
+    row = {
+        "model_version": "ncaab-spread-v6",
+        "sport": "ncaab",
+        "league": "NCAAB",
+        "market_type": "spread",
+        "status": "open",
+        "edge": "0.06",
+        "event_id": "203460",
+        "selection": "away",
+        "line": "8.5",
+        "away_team": "North Carolina Central Eagles",
+        "home_team": "VMI Keydets",
+        "event_start_utc": "2026-11-11T23:00:00Z",
+        "pick_id": pick_id,
+    }
+    row.update(overrides)
+    return row
+
+
+def test_reforecast_of_recorded_paper_fill_is_not_bought_again(tmp_path, monkeypatch):
+    """Repro of the 2026-11-11 NC Central @ VMI duplicate (event_id 203460): the
+    17:48Z fill (order_id PAPER-NCAAB-V6-3f661234757843c9) was paper-bought again
+    at 21:11Z under a re-minted pick_id (order_id
+    PAPER-NCAAB-V6-09543e74f6354902) because the old dedup tracked pick_id only.
+    """
+    reforecast = _vmi_pick("09543e74f6354902")
+    unrelated = _vmi_pick(
+        "unrelated",
+        event_id="203999",
+        away_team="Some Other Team",
+        home_team="Another Team",
+    )
+    paper_root, captured = _install_cohort(tmp_path, monkeypatch, picks=[reforecast, unrelated])
+    _write_paper_ledger(paper_root, [_VMI_FILL])
+
+    result = trial.run_ncaab_spread_paper_trial()
+
+    assert result["candidates"] == 1
+    assert [p["pick_id"] for p in captured["picks"]] == ["unrelated"]
+
+
+def test_held_game_blocks_moved_line_opposite_side_and_missing_event_id(tmp_path, monkeypatch):
+    moved_line = _vmi_pick("moved_line", line="9.5")
+    opposite_side = _vmi_pick("opposite_side", selection="home", line="-8.5")
+    missing_event_id = _vmi_pick(
+        "missing_event_id",
+        event_id="",
+        away_team="  north carolina central eagles  ",
+        home_team="  vmi keydets  ",
+    )
+    paper_root, captured = _install_cohort(
+        tmp_path, monkeypatch, picks=[moved_line, opposite_side, missing_event_id]
+    )
+    _write_paper_ledger(paper_root, [_VMI_FILL])
+
+    result = trial.run_ncaab_spread_paper_trial()
+
+    assert result["candidates"] == 0
+    assert captured["picks"] == []
 
 
 def test_unmapped_cohort_pick_captures_only_its_own_contract(tmp_path):

@@ -19,7 +19,7 @@ from model_prediction.dashboard.picks import read_flat_picks, read_picks
 from model_prediction.domain import parse_utc
 from model_prediction.runtime_paths import RuntimePaths
 
-from .auto_buyer_ledger import record_auto_buy_execution, settle_auto_buyer_ledger
+from .auto_buyer_ledger import read_auto_buyer_ledger, record_auto_buy_execution, settle_auto_buyer_ledger
 from .auto_executor import (
     PAPER_AUTO_BUYER_DATA_ROOT,
     AutoExecutionConfig,
@@ -152,10 +152,44 @@ def capture_unmapped_cohort_markets(
     return captured
 
 
-def _recorded_paper_pick_ids(paper_root: Any) -> set[str]:
-    """Pick IDs already present in the dashboard's shared paper ledger."""
-    from .auto_buyer_ledger import read_auto_buyer_ledger
+def _paper_position_keys(row: dict[str, Any]) -> set[tuple[str, ...]]:
+    """Game-market identity for a ledger row or a candidate pick row.
 
+    This is the ONLY identity function for both sides of the dedup, so the two
+    sides cannot silently drift apart. Normalized exactly like the live
+    buyer's own bought-index (auto_executor.py _build_bought_index /
+    _is_already_bought): `str(x or "")` first so a None event_id (every
+    NBA/NFL row in the shared paper ledger carries one) never becomes the
+    literal string "None", then strip/lower team and market names and take
+    the UTC date (first 10 chars) of the start timestamp.
+
+    Selection and line are deliberately NOT part of the key:
+    - the live buyer locks the whole game-market on either line -- holding or
+      having sold one side also blocks the other (auto_executor.py
+      ~L1544-1547);
+    - pick rows store line as a string ("8.5") while ledger rows store a
+      float (8.5);
+    - for this spread-only cohort the live buyer's selection-level keys are
+      subsets of these game-market keys anyway.
+    """
+    keys: set[tuple[str, ...]] = set()
+    pick_id = str(row.get("pick_id") or "")
+    if pick_id:
+        keys.add(("pick", pick_id))
+    event_id = str(row.get("event_id") or "").strip()
+    market_type = str(row.get("market_type") or "").strip().lower()
+    if event_id and market_type:
+        keys.add(("event_market", event_id, market_type))
+    away = str(row.get("away_team") or "").strip().lower()
+    home = str(row.get("home_team") or "").strip().lower()
+    start_date = str(row.get("event_start_utc") or "")[:10]
+    if away and home and start_date and market_type:
+        keys.add(("matchup_market", away, home, start_date, market_type))
+    return keys
+
+
+def _recorded_paper_dedup_keys(paper_root: Any) -> set[tuple[str, ...]]:
+    """Game-market identity of every fill already recorded in the shared paper ledger."""
     path = paper_root / "auto_buyer_ledger.jsonl"
     if not path.exists():
         return set()
@@ -163,7 +197,12 @@ def _recorded_paper_pick_ids(paper_root: Any) -> set[str]:
         rows = read_auto_buyer_ledger(path)
     except (OSError, ValueError, KeyError, TypeError):
         return set()
-    return {str(r.get("pick_id")) for r in rows if r.get("pick_id")}
+    keys: set[tuple[str, ...]] = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        keys |= _paper_position_keys(row)
+    return keys
 
 
 def run_ncaab_spread_paper_trial() -> dict[str, Any]:
@@ -191,10 +230,13 @@ def run_ncaab_spread_paper_trial() -> dict[str, Any]:
     paper_root = PAPER_AUTO_BUYER_DATA_ROOT
     paper_root.mkdir(parents=True, exist_ok=True)
     settle_auto_buyer_ledger(data_root=paper_root)
-    # The buyer's own dedup index only sees its scratch root, so an already
-    # recorded paper fill would otherwise be re-appended on every 30-minute
-    # cycle. Seed the exclusion set from the shared paper ledger itself.
-    already_recorded = _recorded_paper_pick_ids(paper_root)
+    # The buyer's own dedup index only sees its scratch root, AND the forecast
+    # mints a fresh pick_id on every re-forecast, so pick_id alone cannot be
+    # the identity -- it re-bought NC Central @ VMI away +8.5 twice (event_id
+    # 203460, 17:48Z then 21:11Z) and home -8.5 on event_id 203509 the same
+    # way on 2026-11-11. Seed the exclusion set from the shared paper
+    # ledger's own game-market identity instead.
+    already_recorded = _recorded_paper_dedup_keys(paper_root)
     seen: set[str] = set()
     picks: list[dict[str, Any]] = []
     for row in read_picks() + read_flat_picks():
@@ -203,7 +245,9 @@ def run_ncaab_spread_paper_trial() -> dict[str, Any]:
         if not eligible_trial_pick(row, min_edge=min_edge, max_edge=max_edge):
             continue
         pick_id = str(row.get("pick_id") or "")
-        if not pick_id or pick_id in seen or pick_id in already_recorded:
+        if not pick_id or pick_id in seen:
+            continue
+        if _paper_position_keys(row) & already_recorded:
             continue
         seen.add(pick_id)
         picks.append(row)
