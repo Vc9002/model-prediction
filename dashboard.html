@@ -4305,6 +4305,14 @@ function isSettledAutoBuyerRow(row) {
     ["win", "loss", "push"].includes(String(row.result || "").toLowerCase());
 }
 
+function isManualAutoBuyerRow(row) {
+  // Mirrors is_manual_auto_buyer_record in auto_buyer_ledger.py -- the two must stay in sync.
+  if (row.manual === true) return true;
+  if (String(row.pick_id || "").startsWith("MANUAL-")) return true;
+  if (String(row.order_id || "").startsWith("MANUAL-")) return true;
+  return String(row.model_id || "").trim().toLowerCase() === "manual";
+}
+
 function autoBuyerEventDateEt(row) {
   const raw = row.event_start_utc || row.executed_at_utc || "";
   const date = new Date(raw);
@@ -4519,27 +4527,31 @@ function renderAutoBuyerKpisFor(mode) {
   const rows = _autoBuyerStore[m].cache || [];
   const settledRows = rows.filter(r => isSettledAutoBuyerRow(r));
   const openRows = rows.filter(r => !settledRows.includes(r));
-  const wins = settledRows.filter(r => r.result === "win").length;
-  const losses = settledRows.filter(r => r.result === "loss").length;
-  const pushes = settledRows.filter(r => r.result === "push").length;
+  // MANUAL rows (hand-placed exchange positions) stay visible in the ledger table and the
+  // counts just below, but carry no model edge and must not feed any metric past this point.
+  const modelRows = rows.filter(r => !isManualAutoBuyerRow(r));
+  const modelSettled = settledRows.filter(r => !isManualAutoBuyerRow(r));
+  const wins = modelSettled.filter(r => r.result === "win").length;
+  const losses = modelSettled.filter(r => r.result === "loss").length;
+  const pushes = modelSettled.filter(r => r.result === "push").length;
   const settledTotal = wins + losses + pushes;
 
-  const totalCostSettled = settledRows.reduce((s, r) => s + (Number(r.cost_usd) || 0), 0);
-  const totalCostAll = rows.reduce((s, r) => s + (Number(r.cost_usd) || 0), 0);
-  const totalPnlUsd = settledRows.reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
-  const totalPnlUnits = settledRows.reduce((s, r) => {
+  const totalCostSettled = modelSettled.reduce((s, r) => s + (Number(r.cost_usd) || 0), 0);
+  const totalCostAll = modelRows.reduce((s, r) => s + (Number(r.cost_usd) || 0), 0);
+  const totalPnlUsd = modelSettled.reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
+  const totalPnlUnits = modelSettled.reduce((s, r) => {
     const stored = r.pnl_units;
     if (stored !== undefined && stored !== null && Number.isFinite(Number(stored))) return s + Number(stored);
     const unitVal = Number(r.unit_value_usd) || 10.0;
     return s + (unitVal > 0 ? (Number(r.pnl_usd) || 0) / unitVal : 0);
   }, 0);
   const roiPct = totalCostSettled > 0 ? (totalPnlUsd / totalCostSettled) * 100 : 0;
-  const avgEdge = settledRows.length ? (settledRows.reduce((s, r) => s + (Number(r.edge) || 0), 0) / settledRows.length) * 100 : 0;
+  const avgEdge = modelSettled.length ? (modelSettled.reduce((s, r) => s + (Number(r.edge) || 0), 0) / modelSettled.length) * 100 : 0;
   const avgStakeUsd = settledTotal > 0 ? totalCostSettled / settledTotal : 0;
-  const streak = autoBuyerCurrentStreak(settledRows);
-  const { best, worst } = autoBuyerBestWorstDay(settledRows);
-  const grossWinUsd = settledRows.filter(r => r.result === "win").reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
-  const grossLossUsd = settledRows.filter(r => r.result === "loss").reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
+  const streak = autoBuyerCurrentStreak(modelSettled);
+  const { best, worst } = autoBuyerBestWorstDay(modelSettled);
+  const grossWinUsd = modelSettled.filter(r => r.result === "win").reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
+  const grossLossUsd = modelSettled.filter(r => r.result === "loss").reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
   const profitFactor = grossLossUsd < 0 ? grossWinUsd / Math.abs(grossLossUsd) : (grossWinUsd > 0 ? null : 0);
 
   if ($(`#${m}AbsSettledCount`)) $(`#${m}AbsSettledCount`).textContent = settledRows.length;
@@ -4787,7 +4799,7 @@ function renderAbsPendingTableFor(mode, openRows) {
 
 function renderAutoBuyerPerformanceFor(mode) {
   const m = getAutoBuyerMode(mode);
-  const settled = (_autoBuyerStore[m].cache || []).filter(isSettledAutoBuyerRow);
+  const settled = (_autoBuyerStore[m].cache || []).filter(isSettledAutoBuyerRow).filter(row => !isManualAutoBuyerRow(row));
   const sportOf = row => (row.sport || "Unknown").toString().toUpperCase();
   const sports = Array.from(new Set(settled.map(sportOf))).sort();
   const cohorts = [
