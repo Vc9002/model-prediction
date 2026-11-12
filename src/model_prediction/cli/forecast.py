@@ -91,6 +91,8 @@ from .forecast_nfl_support import (  # noqa: F401 -- re-exported: tests and call
     STANDARD_LAY_ASK,
     _espn_spread_no_vig_ask,
     _load_nfl_injuries_known_at,
+    _main_call_eligible,
+    _nfl_inputs_fresh,
     _nfl_is_division_game,
     _nfl_is_neutral_site,
     _nfl_situational_features,
@@ -2528,7 +2530,12 @@ def _log_basketball_total_picks(
 
 
 def _forecast_nfl_spread_slate(
-    data_root, args_date: str, client, *, observed_at: datetime | None = None
+    data_root,
+    args_date: str,
+    client,
+    *,
+    observed_at: datetime | None = None,
+    max_input_age_hours: float = 12.0,
 ) -> dict:
     """Price NFL spreads using vintaged-input v6 research challenger."""
     from ..features.base import FeatureStore
@@ -2676,13 +2683,22 @@ def _forecast_nfl_spread_slate(
             and efficiency_store.covers_last_game(home_team, h_last)
             and efficiency_store.covers_last_game(away_team, a_last)
             and bool(h_qb and a_qb)
-            and bool(h_qb_update and a_qb_update)
-            and parse_utc(str(h_qb_update)).date() == observed_at.date()
-            and parse_utc(str(a_qb_update)).date() == observed_at.date()
+            and _nfl_inputs_fresh(
+                qb_update_utc=h_qb_update,
+                last_game_date=h_last,
+                injury_observed_utc=(injury_source or {}).get("observed_at_utc"),
+                observed_at=observed_at,
+                max_age_hours=max_input_age_hours,
+            )
+            and _nfl_inputs_fresh(
+                qb_update_utc=a_qb_update,
+                last_game_date=a_last,
+                injury_observed_utc=(injury_source or {}).get("observed_at_utc"),
+                observed_at=observed_at,
+                max_age_hours=max_input_age_hours,
+            )
             and _h_stat not in ("Out", "IR")
             and _a_stat not in ("Out", "IR")
-            and injury_source is not None
-            and parse_utc(injury_source["observed_at_utc"]).date() == observed_at.date()
         )
 
         fc: Any
@@ -2790,7 +2806,11 @@ def _forecast_nfl_spread_slate(
 
         inference_inputs = {
             "mean": fc.projected_margin_home,
-            "sd": margin_sd,
+            # The v7 engine widens margin_sd 1.25x on |line| >= 8. The replay recomputes
+            # the probability from THIS sd, so storing the artifact's base sd made every
+            # heavy-line candidate fail validate() (scalar_replay_probability_mismatch)
+            # and vanish into `skipped` with no log line (2026-11-11).
+            "sd": getattr(fc, "effective_sd", margin_sd),
             "line": -spread_home_line,
         }
         feature_basis = {
@@ -2897,7 +2917,11 @@ def _forecast_nfl_spread_sport(
         utc_now() if not force else datetime.strptime(args_date, "%Y-%m-%d").replace(tzinfo=UTC)
     )
     forecast = _forecast_nfl_spread_slate(
-        data_root, args_date, ESPNClient(), observed_at=decision_observed_at
+        data_root,
+        args_date,
+        ESPNClient(),
+        observed_at=decision_observed_at,
+        max_input_age_hours=float(config.get("project", {}).get("maximum_data_age_hours", 12)),
     )
     exposure_source = flat_ledger or main_ledger
     if exposure_source is None:
@@ -3017,8 +3041,12 @@ def _forecast_nfl_spread_sport(
                 effective_min_edge = min_edge + 0.02 if is_heavy_dog else min_edge
                 if (
                     main_ledger is not None
-                    and eligibility.decision == "CALL"
-                    and effective_min_edge <= contract_edge <= max_disagreement
+                    and _main_call_eligible(
+                        eligibility,
+                        edge=contract_edge,
+                        min_edge=effective_min_edge,
+                        max_edge=max_disagreement,
+                    )
                     and _append_secondary_ledger(
                         main_ledger, request, eligibility, observed_now, "nfl_spread:main_ledger"
                     )
@@ -3040,7 +3068,12 @@ def _forecast_nfl_spread_sport(
 
 
 def _forecast_nfl_total_slate(
-    data_root, args_date: str, client, *, observed_at: datetime | None = None
+    data_root,
+    args_date: str,
+    client,
+    *,
+    observed_at: datetime | None = None,
+    max_input_age_hours: float = 12.0,
 ) -> dict:
     """Price NFL totals using vintaged-input v6 research challenger."""
 
@@ -3195,13 +3228,22 @@ def _forecast_nfl_total_slate(
             and efficiency_store.covers_last_game(home_team, h_last)
             and efficiency_store.covers_last_game(away_team, a_last)
             and bool(h_qb and a_qb)
-            and bool(h_qb_update and a_qb_update)
-            and parse_utc(str(h_qb_update)).date() == observed_at.date()
-            and parse_utc(str(a_qb_update)).date() == observed_at.date()
+            and _nfl_inputs_fresh(
+                qb_update_utc=h_qb_update,
+                last_game_date=h_last,
+                injury_observed_utc=(injury_source or {}).get("observed_at_utc"),
+                observed_at=observed_at,
+                max_age_hours=max_input_age_hours,
+            )
+            and _nfl_inputs_fresh(
+                qb_update_utc=a_qb_update,
+                last_game_date=a_last,
+                injury_observed_utc=(injury_source or {}).get("observed_at_utc"),
+                observed_at=observed_at,
+                max_age_hours=max_input_age_hours,
+            )
             and _h_stat not in ("Out", "IR")
             and _a_stat not in ("Out", "IR")
-            and injury_source is not None
-            and parse_utc(injury_source["observed_at_utc"]).date() == observed_at.date()
         )
 
         fc: Any
@@ -3439,7 +3481,13 @@ def _forecast_nfl_total_sport(
     decision_observed_at = observed_at or (
         utc_now() if not force else datetime.strptime(args_date, "%Y-%m-%d").replace(tzinfo=UTC)
     )
-    forecast = _forecast_nfl_total_slate(data_root, args_date, ESPNClient(), observed_at=decision_observed_at)
+    forecast = _forecast_nfl_total_slate(
+        data_root,
+        args_date,
+        ESPNClient(),
+        observed_at=decision_observed_at,
+        max_input_age_hours=float(config.get("project", {}).get("maximum_data_age_hours", 12)),
+    )
     exposure_source = flat_ledger or main_ledger
     if exposure_source is None:
         forecast["logged"] = 0
@@ -3535,8 +3583,12 @@ def _forecast_nfl_total_sport(
                 effective_min_edge = min_edge + 0.02 if is_high_total_over else min_edge
                 if (
                     main_ledger is not None
-                    and eligibility.decision == "CALL"
-                    and effective_min_edge <= contract_edge <= max_disagreement
+                    and _main_call_eligible(
+                        eligibility,
+                        edge=contract_edge,
+                        min_edge=effective_min_edge,
+                        max_edge=max_disagreement,
+                    )
                     and _append_secondary_ledger(
                         main_ledger, request, eligibility, observed_now, "nfl_total:main_ledger"
                     )

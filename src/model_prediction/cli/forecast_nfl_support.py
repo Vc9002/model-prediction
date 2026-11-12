@@ -5,12 +5,13 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from ..domain import (
     EASTERN,
+    RecordType,
     parse_utc,
 )
 from ..pricing import implied_probability
@@ -21,9 +22,47 @@ logger = logging.getLogger("model_prediction.cli")
 STANDARD_LAY_ASK = round(implied_probability(-110), 6)
 
 
+def _main_call_eligible(eligibility: Any, *, edge: float, min_edge: float, max_edge: float) -> bool:
+    """Main-ledger admission predicate for the NFL spread/total paths.
+
+    A ``_downgrade_unserved()`` eligibility keeps ``decision == "CALL"`` so the
+    row still logs to Flat with units, but marks it ``RESEARCH_OBSERVATION``.
+    ``ledger.append_evaluated``'s Main branch then relabels whatever reaches it
+    as QUALIFIED, so a Main gate that tested only ``decision`` admitted
+    unqualified-input and unregistered-model research rows as QUALIFIED calls
+    (21 such Main rows, 2026-11-02..09). The downgrade is only visible here,
+    before the ledger, so this is where the record type must be checked.
+    """
+    return (
+        eligibility.decision == "CALL"
+        and eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
+        and min_edge <= edge <= max_edge
+    )
+
+
+_NFL_PARTIAL_MARKET_TOKENS = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")
+
+
 def _select_nfl_spread_market(candidates: list[dict]) -> dict | None:
     """Select the most balanced spread market line for an NFL game."""
-    partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")
+    return _select_latest_balanced_market(candidates)
+
+
+def _select_nfl_total_market(candidates: list[dict]) -> dict | None:
+    """Select the most balanced full-game total line for an NFL game.
+
+    Shares the spread selector's rules. Until 2026-11-11 this picked the
+    ask nearest 50% over every observation of the day (the daily job captures
+    4x/day into an append-only archive), so a stale morning quote could beat
+    the current one and be stamped as the decision-time ask; it also accepted
+    one-sided rows, which the under branch then dropped silently.
+    """
+    return _select_latest_balanced_market(candidates)
+
+
+def _select_latest_balanced_market(candidates: list[dict]) -> dict | None:
+    """Latest two-sided quote per contract, then the line whose long ask is nearest 50%."""
+    partial_tokens = _NFL_PARTIAL_MARKET_TOKENS
     latest_by_contract: dict[str, dict] = {}
     for row in candidates:
         slug = str(row.get("market_slug") or "")
@@ -105,6 +144,41 @@ def _nfl_situational_features(
         except (AttributeError, KeyError, TypeError, ValueError):
             continue
     return team_last_date, team_starters
+
+
+def _nfl_inputs_fresh(
+    *,
+    qb_update_utc: str | None,
+    last_game_date: date | None,
+    injury_observed_utc: str | None,
+    observed_at: datetime,
+    max_age_hours: float,
+) -> bool:
+    """Are one team's projected-QB and injury inputs current enough to qualify a call?
+
+    The projected QB1 comes from nflverse's depth chart, which publishes at its
+    own cadence (one timestamp per week is normal), so the right test is
+    ordering, not recency: it must be known at the decision time and published
+    on/after the team's last game, so it reflects post-game changes. Injury
+    captures run every daily cycle, so they get a plain age window.
+
+    Replaces ``parse_utc(x).date() == observed_at.date()`` on both fields,
+    which qualified or disqualified the same inputs depending on the run's
+    time of day (the 00:30 ET run could never qualify; a 23:00Z run crossing
+    midnight flipped mid-cycle) -- a date-granularity test on datetime data.
+    """
+    if not qb_update_utc or not injury_observed_utc:
+        return False
+    try:
+        qb_update = parse_utc(str(qb_update_utc))
+        injuries = parse_utc(str(injury_observed_utc))
+    except (TypeError, ValueError):
+        return False
+    if qb_update > observed_at or injuries > observed_at:
+        return False  # future-dated inputs are a PIT violation, never "fresh"
+    if last_game_date is not None and qb_update.astimezone(EASTERN).date() < last_game_date:
+        return False
+    return (observed_at - injuries) <= timedelta(hours=max_age_hours)
 
 
 def _nfl_venue_weather(event: dict) -> tuple[bool, float, float]:
@@ -229,19 +303,3 @@ def _espn_spread_no_vig_ask(first_odds: dict[str, Any], selection: str) -> float
     if total <= 0:
         return sel_prob
     return round(sel_prob / total, 6)
-
-
-def _select_nfl_total_market(candidates: list[dict]) -> dict | None:
-    """Select the most balanced total market line for an NFL game."""
-    partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")
-    valid = [
-        row
-        for row in candidates
-        if isinstance(row.get("long"), dict)
-        and row["long"].get("ask") is not None
-        and row.get("line") is not None
-        and not any(token in str(row.get("market_slug", "")).lower() for token in partial_tokens)
-    ]
-    if not valid:
-        return None
-    return min(valid, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))

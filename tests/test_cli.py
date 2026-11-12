@@ -2708,18 +2708,21 @@ def test_select_nfl_total_market_ignores_partial_and_team_totals() -> None:
             "long": {"ask": 0.50},
             "short": {"ask": 0.50},
             "market_slug": "nfl-total-phi-dal-1h-23pt5",
+            "observed_at_utc": "2026-09-13T12:00:00Z",
         },
         {
             "line": 24.5,
             "long": {"ask": 0.50},
             "short": {"ask": 0.50},
             "market_slug": "nfl-total-phi-dal-tt-24pt5",
+            "observed_at_utc": "2026-09-13T12:00:00Z",
         },
         {
             "line": 47.5,
             "long": {"ask": 0.53},
             "short": {"ask": 0.47},
             "market_slug": "nfl-total-phi-dal-47pt5",
+            "observed_at_utc": "2026-09-13T12:00:00Z",
         },
     ]
     picked = cli._select_nfl_total_market(rows)
@@ -3398,14 +3401,23 @@ def test_quotes_known_at_drops_rows_observed_after_the_run() -> None:
 
 
 def test_select_nfl_total_market_picks_the_most_balanced_line() -> None:
+    def _row(line: float, long_ask: float, slug: str) -> dict:
+        return {
+            "line": line,
+            "long": {"ask": long_ask},
+            "short": {"ask": round(1.0 - long_ask, 2)},
+            "market_slug": slug,
+            "observed_at_utc": "2026-09-13T12:00:00Z",
+        }
+
     best = cli_forecast._select_nfl_total_market(
         [
-            {"line": 41.5, "long": {"ask": 0.85}},
-            {"line": 48.5, "long": {"ask": 0.49}},
-            {"line": 54.5, "long": {"ask": 0.18}},
+            _row(41.5, 0.85, "nfl-total-a-41pt5"),
+            _row(48.5, 0.49, "nfl-total-a-48pt5"),
+            _row(54.5, 0.18, "nfl-total-a-54pt5"),
         ]
     )
-    assert best == {"line": 48.5, "long": {"ask": 0.49}}
+    assert best is not None and best["line"] == 48.5
 
 
 def test_nfl_spread_flat_ledger_logs_contract(monkeypatch, registry, ban_list) -> None:
