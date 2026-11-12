@@ -50,6 +50,7 @@ from model_prediction.dashboard.common import (
     SPORTS,
     _cached,
     _config_payload,
+    _count_lines,
     _log,
     _manual_research_eligibility,
     _number,
@@ -2031,21 +2032,19 @@ def _suggested_units(row: dict) -> float | None:
 
 def _audit_tail() -> dict:
     path = DATA / "events.jsonl"
+    if not path.exists():
+        return {"total_events": 0, "tail": []}
+    from model_prediction.audit import AuditLog
+
     events = []
-    if path.exists():
-        with path.open(encoding="utf-8") as handle:
-            lines = [line for line in handle if line.strip()]
-        for line in lines[-25:]:
-            try:
-                item = json.loads(line)
-                events.append(
-                    {
-                        "at": str(item.get("occurred_at_utc", ""))[:19],
-                        "type": item.get("event_type"),
-                        "subject": str(item.get("subject_id", ""))[:24],
-                    }
-                )
-            except json.JSONDecodeError:
-                continue
-        return {"total_events": len(lines), "tail": list(reversed(events))}
-    return {"total_events": 0, "tail": []}
+    for item in AuditLog(path).reversed_events():
+        events.append(
+            {
+                "at": str(item.get("occurred_at_utc", ""))[:19],
+                "type": item.get("event_type"),
+                "subject": str(item.get("subject_id", ""))[:24],
+            }
+        )
+        if len(events) >= 25:
+            break
+    return {"total_events": _count_lines(path), "tail": events}

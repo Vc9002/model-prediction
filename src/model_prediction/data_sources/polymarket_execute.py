@@ -453,7 +453,7 @@ class PolymarketExecutor:
             prior_buy = next(
                 (
                     event
-                    for event in reversed(self.audit.events())
+                    for event in self.audit.reversed_events()
                     if event.get("event_type") == "order_executed"
                     and event.get("subject_id") == ticket.pick_id
                     and event.get("payload", {}).get("action") == "buy"
