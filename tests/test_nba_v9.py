@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from model_prediction.features.base import GameRecord
 from model_prediction.models.basketball import UpcomingGame
 from model_prediction.models.learned_market import LearnedMarketArtifact
@@ -153,3 +155,69 @@ def test_nba_moneyline_rollback_prices_open_underdog_examples():
     )
     for features, expected in examples:
         assert abs(artifact.probability("moneyline", features) - expected) < 0.0001
+
+
+def _two_team_history() -> list[GameRecord]:
+    rows = []
+    for index in range(12):
+        home, away = ("Boston Celtics", "Miami Heat") if index % 2 else ("Miami Heat", "Boston Celtics")
+        rows.append(
+            GameRecord(
+                event_id=f"n{index}",
+                event_start_utc=f"2026-10-{10 + index:02d}T23:00:00Z",
+                league="NBA",
+                away_team=away,
+                home_team=home,
+                away_score=105 + index % 3,
+                home_score=110 + index % 2,
+                season_type="regular",
+                season_year=2026,
+            )
+        )
+    return rows
+
+
+def test_nba_v9_neutral_site_removes_home_court_from_both_halves():
+    """MODEL_REVIEW #14: NBA Cup knockout games in Las Vegas, Paris and Mexico City
+    were priced with full HCA because the spread/total UpcomingGame never set
+    neutral_site. On a neutral floor the Elo half drops elo.home_advantage and the
+    trend half drops home_court_points, so the home side's margin and win
+    probability both fall by exactly those amounts."""
+    engine = NBAStructuralV9Engine()
+    history = _two_team_history()
+    kwargs = {
+        "event_id": "cup",
+        "event_start_utc": "2026-12-13T02:00:00Z",
+        "away_team": "Miami Heat",
+        "home_team": "Boston Celtics",
+        "spread_away_line": 2.5,
+        "total_line": 224.5,
+    }
+    home = {p.market_type: p for p in engine.predict_games(history, [UpcomingGame(**kwargs)])}
+    neutral = {
+        p.market_type: p for p in engine.predict_games(history, [UpcomingGame(**kwargs, neutral_site=True)])
+    }
+    margin_home = home["spread"].feature_basis["expected_margin"]
+    margin_neutral = neutral["spread"].feature_basis["expected_margin"]
+    expected_drop = engine.elo_weight * (engine.elo_home_advantage / 28.0) + engine.trend_weight * (
+        engine.home_court_points
+    )
+    assert margin_home - margin_neutral == pytest.approx(expected_drop, abs=0.02)
+    assert neutral["moneyline"].probability("home") < home["moneyline"].probability("home")
+    # Totals do not depend on who is "home".
+    assert neutral["total"].feature_basis["expected_total"] == pytest.approx(
+        home["total"].feature_basis["expected_total"], abs=1e-9
+    )
+
+
+def test_nba_moneyline_v9_artifact_is_an_unqualified_placeholder():
+    """The v9 moneyline was rolled back 2026-11-10 (4d5624ed) because its coefficients
+    were placeholders. Its artifact must say so: a locked-holdout qualification
+    claim on numbers these coefficients never produced is a false governance record."""
+    with open("config/models/nba-moneyline-v9.json", "r", encoding="utf-8") as f:
+        artifact = json.load(f)
+    qualification = artifact["qualification"]
+    assert qualification["qualified"] is False
+    assert qualification["locked_holdout"] is False
+    assert "holdout_brier_score" not in qualification
+    assert "placeholder" in qualification["note"].lower()

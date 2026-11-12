@@ -1787,6 +1787,9 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
                     else 0.0
                 ),
                 league="NBA",
+                # ESPN neutralSite + international-venue heuristic; the helper is
+                # league-agnostic despite its NFL name (MODEL_REVIEW #14).
+                neutral_site=_nfl_is_neutral_site(event),
             )
         )
         market_by_event_id[event_id] = market
@@ -2174,7 +2177,7 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
             )
             and str(row.get("event_start_utc") or "")[:16] == str(event["date"])[:16]
         ]
-        market = _select_nba_total_market(candidates)
+        market = _select_nba_total_market(candidates, as_of=observed_at)
         if market is None:
             unmatched.append({"event_id": event_id, "reason": "no matched total market"})
             continue
@@ -2200,6 +2203,7 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
                 away_team=away_team,
                 home_team=home_team,
                 total_line=t_line,
+                neutral_site=_nfl_is_neutral_site(event),
                 availability_points_gap=(
                     float(avail.get("availability_points_gap", 0.0))
                     if model_version in ("nba-total-margin-v7", "nba-total-margin-v9")
@@ -2239,21 +2243,19 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
     else:
         predictions = [p for p in model.predict_games(history, upcoming) if p.market_type == "total"]
 
-    calibrator = None
-    cal_paths = [
-        Path(data_root) / "calibration" / "models" / f"{model_version}.total_calibrator.json",
-        PROJECT_ROOT / "data" / "calibration" / "models" / f"{model_version}.total_calibrator.json",
-    ]
-    for cp in cal_paths:
-        if cp.exists():
-            try:
-                from ..calibration import load_calibrator_artifact
+    from ..calibration_pipeline import load_serving_calibrator
 
-                calibrator = load_calibrator_artifact(cp)
-                break
-            except (OSError, json.JSONDecodeError, ValueError, KeyError, TypeError):
-                # A malformed artifact must degrade to the raw probability, not abort the slate.
-                calibrator = None
+    # Serving transforms go through the same guard every other serving path
+    # uses (own-model fit provenance, MIN_SERVING_SAMPLE, OOF improvement).
+    # The bare loader this replaced applied a Beta artifact fitted on 125
+    # v2-v7 picks but labelled v9 from 2026-11-11T01:32Z, pushing every served
+    # total to 35-46% and blacking out Main totals until the nightly pipeline
+    # happened to overwrite the file (MODEL_REVIEW_2026-11-11, NBA addendum).
+    calibrator, calibration_decision = load_serving_calibrator(
+        model_version,
+        "total",
+        roots=(Path(data_root) / "calibration", PROJECT_ROOT / "data" / "calibration"),
+    )
 
     priced_contracts = []
     for prediction in predictions:
@@ -2341,6 +2343,7 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
         "market_candidates": len(priced_contracts),
         "priced_contracts": priced_contracts,
         "unmatched": unmatched,
+        "calibration": calibration_decision,
         "observed_at_utc": observed_at.isoformat(),
     }
 

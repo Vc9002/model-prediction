@@ -2817,6 +2817,45 @@ def test_select_nba_spread_market_ignores_partial_game_tokens() -> None:
     assert picked["market_slug"] == "nba-spread-bos-nyk-6pt5"
 
 
+def test_select_nba_total_market_ignores_old_balanced_quote() -> None:
+    """MODEL_REVIEW #8d: totals must use the same fresh, latest-per-slug contract as
+    spreads. Before the fix an 18-hour-old 50% capture of a dead line beat the
+    live 53% capture of the real line."""
+    as_of = datetime(2026, 11, 11, 0, 20, tzinfo=UTC)
+    rows = [
+        {
+            "line": 228.5,
+            "market_slug": "nba-total-bos-nyk-228pt5",
+            "observed_at_utc": "2026-11-10T05:32:04Z",
+            "long": {"ask": 0.50},
+            "short": {"ask": 0.52},
+        },
+        {
+            "line": 228.5,
+            "market_slug": "nba-total-bos-nyk-228pt5",
+            "observed_at_utc": "2026-11-11T00:19:50Z",
+            "long": {"ask": 0.40},
+            "short": {"ask": 0.62},
+        },
+        {
+            "line": 231.5,
+            "market_slug": "nba-total-bos-nyk-231pt5",
+            "observed_at_utc": "2026-11-11T00:19:55Z",
+            "long": {"ask": 0.53},
+            "short": {"ask": 0.49},
+        },
+    ]
+    picked = cli._select_nba_total_market(rows, as_of=as_of)
+    assert picked is not None
+    assert picked["line"] == 231.5
+    # Only the stale capture available -> nothing fresh, nothing within the source window either.
+    assert cli._select_nba_total_market(rows[:1], as_of=as_of) is None
+    # Without as_of there is no freshness window, but latest-per-slug dedupe still
+    # applies (as it already did for spreads): the newest 228.5 capture (40%) is
+    # less balanced than 231.5 (53%), so the stale 50% capture cannot win.
+    assert cli._select_nba_total_market(rows)["line"] == 231.5
+
+
 def test_select_nba_total_market_ignores_partial_and_team_totals() -> None:
     rows = [
         {

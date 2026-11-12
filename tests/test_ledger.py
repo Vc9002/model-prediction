@@ -436,3 +436,31 @@ def test_a_retired_ledger_never_touches_disk(tmp_path) -> None:
     assert len(live.rows()) == 1
     assert events_path.exists()
     assert events_path.read_text(encoding="utf-8").strip()
+
+
+def test_main_ledger_keeps_a_downgraded_paper_call_unqualified(tmp_path) -> None:
+    """MODEL_REVIEW_2026-11-11 #3 (NBA moneyline path). Main takes every CALL, but the
+    Main branch of append_evaluated used to relabel whatever it received as QUALIFIED /
+    QUALIFIED_SHADOW_CALL -- including a call the forecast path had downgraded to
+    PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED because the champion was historical_only
+    (Main nba-elo-trend-lr-v4 row of 2026-11-11T05:51Z). A non-qualified eligibility
+    must keep its reason code and research record type; a qualified one still is promoted."""
+
+    def team(name: str) -> CanonicalTeam:
+        return CanonicalTeam(name, League.MLB, name, name, True, None, None, ())
+
+    ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl", tier="main")
+    downgraded = EligibilityResult(
+        False, "CALL", "PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED", 0.0, 60, 0.07, 0.05, team("NYY"), team("BOS")
+    )
+    row = ledger.append_evaluated(request(), downgraded)
+    assert row["reason_code"] == "PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED"
+    assert row["decision"] == "CALL"
+    assert not is_qualified_row(row)
+    assert float(row["units"]) > 0  # still a paper CALL with visible sizing
+
+    qualified = replace(downgraded, qualified=True, reason_code="QUALIFIED", units=1.0)
+    second = replace(request(), event_id="event-2")
+    row = ledger.append_evaluated(second, qualified)
+    assert row["reason_code"] == "QUALIFIED"
+    assert is_qualified_row(row)

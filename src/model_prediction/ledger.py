@@ -789,8 +789,18 @@ class PickLedger:
                 reason_code="QUALIFIED" if eligibility.reason_code == "QUALIFIED" else "FLAT_CALL",
                 units=dyn_units,
             )
+        elif self.tier == "main" and not eligibility.qualified:
+            # A CALL the forecast path downgraded (PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED,
+            # PAPER_CALL_BELOW_LEARNED_CONFIDENCE, ...) stays visible on Main as a
+            # paper call -- every candidate is a CALL pick (operator directive
+            # 2026-10-11) -- but it must keep its reason code and research
+            # record_type. The unconditional relabel below (ccc842b6) turned an
+            # nba-elo-trend-lr-v4 research observation into QUALIFIED /
+            # QUALIFIED_SHADOW_CALL on Main on 2026-11-11 while the champion was
+            # historical_only (MODEL_REVIEW_2026-11-11 #3, NBA moneyline path).
+            eligibility = enforce_universal_paper_call(request, eligibility)
         elif self.tier == "main":
-            # Main ledger is the gated ledger. Calls reaching Main are qualified calls.
+            # Main ledger is the gated ledger. Calls reaching Main as qualified stay qualified.
             # Hybrid edge-scaling: spreads and totals scale dynamically (1.0U-2.0U); moneyline capped at 1.0U.
             is_moneyline = str(getattr(request, "market_type", "")).strip().lower() in ("moneyline", "ml")
             is_cfb_over = (

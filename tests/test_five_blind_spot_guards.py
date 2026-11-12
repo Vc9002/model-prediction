@@ -415,6 +415,7 @@ def test_nba_v5_historical_evidence_is_not_reported_as_qualified(monkeypatch, tm
         "market_type": "total",
         "team": "Miami Heat",
         "event_start_utc": start,
+        "observed_at_utc": "2026-10-30T11:58:00Z",
         "line": 228.5,
         "market_slug": "game-1-total",
         "long": {"ask": 0.49},
@@ -515,6 +516,113 @@ def test_nba_moneyline_forecast_surfaces_unverified_evidence(monkeypatch, tmp_pa
     assert result["candidates"][0]["action"] == "PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED"
 
 
+def _run_nba_learned_main_write(monkeypatch, tmp_path, *, predictively_qualified: bool):
+    """Drive _forecast_learned_sport's Main write for one NBA moneyline candidate with a
+    matched executable quote, returning (result, rows the Main ledger received)."""
+    from model_prediction.eligibility import EligibilityResult
+    from model_prediction.entities import CanonicalTeam
+    from model_prediction.learned_forward import LearnedForwardCandidate
+
+    def team(name: str) -> CanonicalTeam:
+        return CanonicalTeam(name, "NBA", name, name, True, None, None, ())
+
+    candidate = LearnedForwardCandidate(
+        event_id="nba-ml-main",
+        event_start_utc="2026-10-31T23:00:00Z",
+        away_team="Miami Heat",
+        home_team="Boston Celtics",
+        market_type="moneyline",
+        selection="home",
+        model_probability=0.62,
+        home_probability=0.62,
+        confidence_threshold=0.55,
+        call=True,
+        action="QUALIFIED_SHADOW_CALL",
+        reason="above threshold",
+        model_version="nba-elo-trend-lr-v4",
+        model_artifact_hash="hash",
+        model_qualified=True,
+        feature_basis={},
+        feature_snapshot_hash="snapshot" * 10,
+    )
+    monkeypatch.setattr(forecast_cli, "build_learned_moneyline_slate", lambda **kwargs: ([candidate], [], 1))
+    monkeypatch.setattr(
+        forecast_cli,
+        "match_executable_quote",
+        lambda *args: {
+            "executable_ask": 0.55,
+            "market_slug": "nba-bos-mia-ml",
+            "observed_at_utc": "2026-10-31T11:00:00Z",
+            "timestamp_valid": True,
+        },
+    )
+    monkeypatch.setattr(forecast_cli, "_canonical_market_snapshot_lineage", lambda *args: {})
+    monkeypatch.setattr(forecast_cli, "unit_policy", lambda config: object())
+    monkeypatch.setattr(forecast_cli, "_is_registered_serving_model", lambda *args: True)
+    monkeypatch.setattr(
+        forecast_cli, "_is_predictively_qualified_serving_model", lambda *args: predictively_qualified
+    )
+
+    def qualified_eligibility(request, *args, **kwargs):
+        return EligibilityResult(
+            True, "CALL", "QUALIFIED", 1.0, 70, 0.07, 0.05, team(request.away_team), team(request.home_team)
+        )
+
+    monkeypatch.setattr(forecast_cli, "evaluate_eligibility", qualified_eligibility)
+
+    main_rows: list[tuple[str, str, bool]] = []
+
+    class MainLedger:
+        def exposure(self, *args, **kwargs):
+            return object()
+
+        def rows(self, filters=None):
+            return []
+
+        def append_evaluated(self, request, eligibility, now=None):
+            main_rows.append((request.event_id, eligibility.reason_code, eligibility.qualified))
+            return {"pick_id": "main-1"}
+
+    registry = SimpleNamespace(resolve=lambda league, name, start: team(name), version="test-entities")
+    result = forecast_cli._forecast_learned_sport(
+        "nba",
+        "2026-10-31",
+        True,
+        {
+            "project": {"ledger_path": str(tmp_path / "picks.xlsx")},
+            "models": {
+                "NBA": {
+                    "production_artifact": "config/models/nba-elo-trend-lr-v4.json",
+                    "min_edge": 0.02,
+                    "max_edge": 0.30,
+                }
+            },
+        },
+        registry=registry,
+        bans=object(),
+        ledger=MainLedger(),
+        observed_at=datetime(2026, 10, 31, 12, tzinfo=UTC),
+    )
+    return result, main_rows
+
+
+def test_nba_learned_downgraded_call_reaches_main_as_a_paper_call_not_qualified(monkeypatch, tmp_path):
+    """MODEL_REVIEW_2026-11-11 #3, moneyline path. Every candidate is a CALL pick
+    (operator directive 2026-10-11), so a downgraded call still goes to Main -- but the
+    eligibility handed over must carry qualified=False and the PAPER_CALL_* reason, which
+    ledger.py's Main branch now preserves instead of relabelling to QUALIFIED (the
+    2026-11-11T05:51Z Main lr-v4 row shows that relabel)."""
+    result, main_rows = _run_nba_learned_main_write(monkeypatch, tmp_path, predictively_qualified=False)
+    assert main_rows == [("nba-ml-main", "PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED", False)]
+    assert result["logged"] == 1 and result["zero_unit_research_calls"] == 1
+
+
+def test_nba_learned_main_still_receives_a_predictively_qualified_call(monkeypatch, tmp_path):
+    result, main_rows = _run_nba_learned_main_write(monkeypatch, tmp_path, predictively_qualified=True)
+    assert main_rows == [("nba-ml-main", "QUALIFIED", True)]
+    assert result["logged"] == 1 and result["qualified_shadow_calls"] == 1
+
+
 def test_nba_injury_reader_rejects_tampered_and_late_snapshots(tmp_path):
     directory = tmp_path / "availability" / "nba" / "espn_injury_snapshots" / "2026-10-30"
     directory.mkdir(parents=True)
@@ -565,6 +673,7 @@ def test_qualified_nba_slate_keeps_unvalidated_availability_diagnostic_only(monk
         "market_type": "total",
         "team": "Miami Heat",
         "event_start_utc": start,
+        "observed_at_utc": "2026-10-30T11:58:00Z",
         "line": 228.5,
         "market_slug": "game-1-total",
         "long": {"ask": 0.49},

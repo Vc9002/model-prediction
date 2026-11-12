@@ -120,28 +120,34 @@ def _select_nba_spread_market(rows: list[dict], *, as_of: datetime | None = None
         and row.get("line") is not None
         and not any(token in str(row.get("market_slug", "")).lower() for token in partial_tokens)
     ]
+    candidates = _fresh_latest_per_slug(candidates, as_of)
+    if not candidates:
+        return None
+    return min(candidates, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
+
+
+def _fresh_latest_per_slug(candidates: list[dict], as_of: datetime | None) -> list[dict]:
+    """Keep only the newest capture of each market slug, and -- when ``as_of`` is
+    given -- only captures inside the auto-buyer freshness window (falling back to
+    the wider source window when nothing fresh exists). Without this, the
+    "closest to 50%" pick could land on a stale morning capture whose ask no
+    longer exists, which then trips STALE_DATA downstream or prices a dead quote
+    (spread fixed in 6c078b08; totals had the same hole, MODEL_REVIEW #8d)."""
     if as_of is not None:
         from ..portfolio.auto_executor import (
             MAX_AUTO_BUYER_QUOTE_AGE_SECONDS,
             MAX_SOURCE_QUOTE_AGE_SECONDS,
         )
 
-        recent = [
-            row
-            for row in candidates
-            if row.get("observed_at_utc")
-            and 0
-            <= (as_of - parse_utc(str(row["observed_at_utc"]))).total_seconds()
-            <= MAX_AUTO_BUYER_QUOTE_AGE_SECONDS
-        ]
-        fallback = [
-            row
-            for row in candidates
-            if row.get("observed_at_utc")
-            and 0
-            <= (as_of - parse_utc(str(row["observed_at_utc"]))).total_seconds()
-            <= MAX_SOURCE_QUOTE_AGE_SECONDS
-        ]
+        def _within(row: dict, limit: float) -> bool:
+            observed = row.get("observed_at_utc")
+            if not observed:
+                return False
+            age = (as_of - parse_utc(str(observed))).total_seconds()
+            return 0 <= age <= limit
+
+        recent = [row for row in candidates if _within(row, MAX_AUTO_BUYER_QUOTE_AGE_SECONDS)]
+        fallback = [row for row in candidates if _within(row, MAX_SOURCE_QUOTE_AGE_SECONDS)]
         candidates = recent or fallback
     latest_by_slug: dict[str, dict] = {}
     for row in candidates:
@@ -151,14 +157,12 @@ def _select_nba_spread_market(rows: list[dict], *, as_of: datetime | None = None
             previous.get("observed_at_utc") or ""
         ):
             latest_by_slug[slug] = row
-    candidates = list(latest_by_slug.values())
-    if not candidates:
-        return None
-    return min(candidates, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
+    return list(latest_by_slug.values())
 
 
-def _select_nba_total_market(rows: list[dict]) -> dict | None:
-    """Select the most balanced total market line for an NBA game."""
+def _select_nba_total_market(rows: list[dict], *, as_of: datetime | None = None) -> dict | None:
+    """Select the most balanced total market line for an NBA game, using only
+    fresh, latest-per-slug captures (same contract as the spread selector)."""
     partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")
     candidates = [
         row
@@ -168,6 +172,7 @@ def _select_nba_total_market(rows: list[dict]) -> dict | None:
         and row.get("line") is not None
         and not any(token in str(row.get("market_slug", "")).lower() for token in partial_tokens)
     ]
+    candidates = _fresh_latest_per_slug(candidates, as_of)
     if not candidates:
         return None
     return min(candidates, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
