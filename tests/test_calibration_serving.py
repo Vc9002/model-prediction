@@ -11,6 +11,7 @@ import pytest
 from model_prediction.calibration_pipeline import (
     MIN_SERVING_SAMPLE,
     calibrate_for_serving,
+    load_serving_calibrator,
     run_full_calibration_pipeline,
 )
 from model_prediction.domain import iso_utc, utc_now
@@ -30,6 +31,8 @@ def _write_artifact(root: Path, model: str = "m-v1", market: str = "moneyline", 
         "baseline_brier": 0.2400,
         "calibrated_oof_brier": 0.2350,
         "calibrated_at_utc": "2026-10-21T00:00:00Z",
+        "fit_model_versions": [model],
+        "fit_source": "settled_live_rows",
     } | overrides
     directory = root / "calibration" / "models"
     directory.mkdir(parents=True, exist_ok=True)
@@ -52,6 +55,11 @@ def test_calibrate_for_serving_applies_a_trustworthy_calibrator(tmp_path):
         ({"calibrated_oof_brier": 0.2600}, "no_oof_improvement"),  # champion worse than raw model
         ({"calibrated_oof_brier": None}, "no_oof_improvement"),
         ({"champion_method": "identity"}, "identity_champion"),
+        # Provenance: the 2026-11-08 nba-total-margin-v9 Beta artifact was fitted on
+        # 125 picks made by v2-v7 and labelled v9; it declared nothing about its fit.
+        ({"fit_model_versions": None, "fit_source": None}, "unknown_fit_provenance"),
+        ({"fit_model_versions": ["m-v0", "m-v1"]}, "foreign_fit_provenance"),
+        ({"fit_source": "retrospective_replay"}, "foreign_fit_provenance"),
     ],
 )
 def test_calibrate_for_serving_leaves_untrusted_calibrators_unapplied(tmp_path, overrides, reason):
@@ -77,6 +85,38 @@ def test_calibrate_for_serving_never_raises_on_missing_or_corrupt_artifacts(tmp_
     path.mkdir(parents=True)
     (path / "m-v1.moneyline_calibrator.json").write_text("{not json", encoding="utf-8")
     assert calibrate_for_serving("m-v1", "moneyline", 0.6, data_root=tmp_path).reason == "unreadable_artifact"
+
+
+def test_load_serving_calibrator_applies_the_same_guard_for_slates(tmp_path):
+    """Slate-level loader used by the NBA total slate and the NFL slates: first root
+    with an artifact decides, the guard is shared with calibrate_for_serving, and
+    the decision dict says why so a transform change is visible per run."""
+    calibrator, decision = load_serving_calibrator(
+        "m-v1", "moneyline", roots=(tmp_path / "calibration", tmp_path / "other" / "calibration")
+    )
+    assert calibrator is None and decision["reason"] == "no_artifact"
+    _write_artifact(tmp_path)
+    calibrator, decision = load_serving_calibrator("m-v1", "moneyline", roots=(tmp_path / "calibration",))
+    assert calibrator is not None and decision["applied"] and decision["reason"] == "applied"
+    assert decision["fit_model_versions"] == ["m-v1"] and decision["champion_method"] == "platt"
+    assert calibrator.transform(0.54) == pytest.approx(0.52, abs=0.002)
+    _write_artifact(tmp_path, fit_model_versions=["m-v0"])
+    calibrator, decision = load_serving_calibrator("m-v1", "moneyline", roots=(tmp_path / "calibration",))
+    assert calibrator is None and decision["reason"] == "foreign_fit_provenance"
+
+
+def test_pipeline_artifacts_declare_own_model_fit_provenance(tmp_path, monkeypatch):
+    groups = {("tennis", "moneyline", "m-v1", "main"): _overconfident_group(240, 1)}
+    monkeypatch.setattr(
+        "model_prediction.calibration_pipeline.extract_settled_model_predictions", lambda *a, **k: groups
+    )
+    run_full_calibration_pipeline(
+        data_root=tmp_path, output_dir=tmp_path / "out", min_sample=20, update_artifacts=True
+    )
+    payload = json.loads(
+        (tmp_path / "calibration" / "models" / "m-v1.moneyline_calibrator.json").read_text(encoding="utf-8")
+    )
+    assert payload["fit_model_versions"] == ["m-v1"] and payload["fit_source"] == "settled_live_rows"
 
 
 def test_calibrate_for_serving_is_keyed_by_market(tmp_path):

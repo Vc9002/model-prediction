@@ -110,6 +110,8 @@ def _write_calibrator(root, *, method: str, sample: int, baseline: float, oof: f
                 "baseline_brier": baseline,
                 "calibrated_oof_brier": oof,
                 "calibrated_at_utc": "2026-11-11T00:00:00+00:00",
+                "fit_model_versions": ["nfl-spread-structural-v7"],
+                "fit_source": "point_in_time_replay",
             },
             sort_keys=True,
         ),

@@ -54,27 +54,12 @@ def _nfl_serving_calibrator(model_version: str, market: str, data_root: str | Pa
     and the raw engine probability is served. Returns the load_calibrator_artifact object so
     the row carries the artifact's file hash, which validate_decision_snapshot re-checks at
     request time and at settlement."""
-    from ..calibration import load_calibrator_artifact
-    from ..calibration_pipeline import MIN_SERVING_BRIER_IMPROVEMENT, MIN_SERVING_SAMPLE
+    from ..calibration_pipeline import load_serving_calibrator
 
-    path = Path(data_root) / "calibration" / "models" / f"{model_version}.{market}_calibrator.json"
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    try:
-        if str(payload.get("champion_method") or "identity").lower() == "identity":
-            return None
-        if str(payload.get("market")) != market or str(payload.get("model_version")) != model_version:
-            return None
-        if int(payload.get("sample_size") or 0) < MIN_SERVING_SAMPLE:
-            return None
-        baseline, oof = payload.get("baseline_brier"), payload.get("calibrated_oof_brier")
-        if baseline is None or oof is None or float(baseline) - float(oof) < MIN_SERVING_BRIER_IMPROVEMENT:
-            return None
-        return load_calibrator_artifact(path)
-    except (TypeError, ValueError, KeyError, FileNotFoundError):
-        return None
+    calibrator, _decision = load_serving_calibrator(
+        model_version, market, roots=(Path(data_root) / "calibration",)
+    )
+    return calibrator
 
 
 def _apply_serving_calibrator(

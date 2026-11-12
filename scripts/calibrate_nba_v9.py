@@ -230,6 +230,14 @@ def run_nba_v9_calibration():
                 float(methods_scorecard.get(champ_method, {}).get("oof_brier_score", 0)), 6
             ),
             "calibrated_at_utc": now_iso,
+            # Provenance the serving guard checks: these probabilities are the v9
+            # engine replayed on games that EARLIER models happened to pick, not
+            # settled live v9 rows. load_serving_calibrator refuses anything but
+            # fit_source == "settled_live_rows", so an artifact from this script
+            # is for analysis only and never reaches a served probability.
+            "fit_model_versions": [model_ver],
+            "fit_source": "retrospective_replay",
+            "fit_pick_model_ids": sorted({str(r["model_id"]) for r in data["rows"] if r["model_id"]}),
         }
 
         art_path.write_text(json.dumps(art_payload, indent=2))
