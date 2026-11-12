@@ -95,6 +95,7 @@ None yet.
 | 261112-112 | Add AuditLog.reversed_events() bounded backward reader; fix dashboard audit-tail and polymarket_execute single_order gate to stop fully materializing events.jsonl (428MB) | 2026-11-12 | d06d8db5 | [261112-112-the-events-jsonl-bug-audit-py-fixed-2026](./quick/261112-112-the-events-jsonl-bug-audit-py-fixed-2026/) |
 | 261112-111 | Make audit_ledger_pnl.py fail its exit code on unresolved model-ledger drift it already computed; remove corrupt stray xlsx; document generated-on-demand rejection rationale | 2026-11-12 | cafbe94c | [261112-111-evaluate-whether-the-per-model-xlsx-mirr](./quick/261112-111-evaluate-whether-the-per-model-xlsx-mirr/) |
 | 261112-0xd | NCAAF: close every open CFB finding of the 2026-11-11 model review (serve v4 from artifact, ask integrity, artifact Main gates, venue weather, postseason week, QB channel, 200k sims, source code_revision) | 2026-11-12 | f6fa91d1 | [261112-0xd-ncaaf-fix-all-open-cfb-findings-from-the](./quick/261112-0xd-ncaaf-fix-all-open-cfb-findings-from-the/) |
+| 261112-nc6 | Close the NCAAB findings of the 2026-11-11 model review: total baseline mismatch, artifact drift, coherent moneyline, early-season compression, push mass; validation-selected parameters | 2026-11-12 | e32335c7 | [261112-nc6-ncaab-model-review-fixes](./quick/261112-nc6-ncaab-model-review-fixes/) |
 
 ## Milestone History
 
