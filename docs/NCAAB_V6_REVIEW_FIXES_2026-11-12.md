@@ -98,6 +98,61 @@ Red-without-fix evidence: the artifact tests failed on the pre-fix artifacts
 missing); the old `test_ncaab_total_v6_bayesian_credibility_shrinkage` assertion failed on the
 integer-line push fix and was rewritten to assert symmetry + push.
 
+## Settled-ledger replay (operator request, 2026-11-12)
+
+`scripts/replay_ncaab_v6_all_settled.py` → `outputs/ncaab/ncaab_v6_settled_replay.{md,json}`.
+Every settled NCAAB Flat row (1,167 rows, all model versions, events 2026-11-02 → 2026-11-12,
+0 skipped) re-priced at its own line and recorded ask with history before the row's decision
+date, by the fixed champions and by the pre-fix control, and compared with the logged
+probability. Neutral flags from the archived ESPN scoreboards (144 rows unresolved → home
+court). These dates sit inside the ablation's locked holdout, so nothing here was selected on.
+
+Two facts frame every number: **every row has a current-season sample of 0–3 games** (577 at
+zero), so none of them would pass today's Main gate (≥ 8), and 1,157 of 1,167 asks are indicative
+slate prices, not executable quotes. Units are paper, 1u per row. "Forward rule" = the live
+selection logic: the model must favour the recorded side (p ≥ 0.5) and clear the edge hurdle;
+the raw "any edge" count is misleading here because 224 of the 305 moneyline rows are away dogs
+at a 13.6% ask that the forward would never pick (it only takes the projected winner).
+
+| forward rule, hurdle 3.5% | as logged | pre-fix control | fixed |
+|---|---|---|---|
+| moneyline (n=305) | 76 bets, 34 W, −1.27u | 71 bets, 30 W, −0.90u | **46 bets, 19 W, +1.60u** |
+| spread (n=408) | 367 bets, 180 W, −11.66u | 329 bets, 158 W, −18.59u | **303 bets, 147 W, −13.91u** |
+| spread, hurdle 8% | 315 bets, −16.85u | 282 bets, −22.23u | **252 bets, 127 W, −2.24u** |
+| total (n=454) | 347 bets, 181 W, +7.48u | 142 bets, 60 W, −16.92u | **79 bets, 32 W, −9.36u** |
+
+| Brier on the recorded side | as logged | control | fixed |
+|---|---|---|---|
+| moneyline | 0.1862 | **0.1529** | 0.1616 |
+| spread | 0.3556 | 0.3008 | **0.2911** |
+| total | 0.2502 | 0.2535 | **0.2512** |
+
+Reading:
+
+- **Spread and total**: the fixed model fires less often and loses less on every hurdle, and is
+  the best-calibrated of the three (total ECE 0.019). It still loses on these contracts: mean
+  spread probability 0.644 against a 50.0% hit rate. That is the season-opener regime (samples
+  0–3) where the ablation holdout already showed every variant under-predicts favourites by
+  ~12 points; the fixes narrowed it (holdout margin MAE 17.8 → 16.5), they did not close it.
+- **Moneyline**: the fixed model's Brier is worse than the control's because the coherent
+  moneyline gives early-season away dogs ~29% where the control gave ~21% and they won 12.5%.
+  The forward never takes those sides, so under the live rule the fixed model made 46 calls
+  (+1.60u) against the control's 71 (−0.90u); on the 81 home-side rows it is the best of the
+  three (27 bets, 16 W, +10.2u). The dog over-pricing is the same under-dispersion/bias issue
+  and is the first thing to re-test once a non-opener window exists.
+- **On the v6-era rows only** (what the champion itself called 11-08 → 11-12): spread-v6 rows
+  86 → 68 bets, +6.4u → +4.8u; total-v6 rows 91 → 40 bets, −13.7u → −6.1u; home moneylines
+  30 → 11 bets, +3.9u → +1.6u. Fewer calls, smaller losses on totals, slightly fewer units
+  on spreads.
+- The tempo-v2 total rows (cutoff 2026-11-02, sample 0) price at exactly 0.5 under both v6
+  variants: credibility shrinkage puts a zero-sample total on the line, so v6 never fires there.
+
+Verdict: on everything the system has ever called, the fixed model is an improvement over the
+model it replaces and over what was logged, but the settled cohort is entirely season-opener
+games and the fixed model still would have lost paper units on spreads and totals there. It
+does not validate Main NCAAB; it validates that the change moved in the right direction. The
+forward check in HANDOFF §1 (quoted picks, sample ≥ 8) remains the test that matters.
+
 ## Not changed / open
 
 - Early-season dispersion (both markets) and the Elo ramp: need a second cross-season window
