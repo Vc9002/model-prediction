@@ -25,6 +25,7 @@ from .auto_executor import (
     AutoExecutionConfig,
     AutoPolymarketBuyer,
     load_auto_buyer_state,
+    write_versioned_state_file,
 )
 
 # Phantom-edge guard only. Cohort selection happens in eligible_trial_pick() on the
@@ -53,9 +54,10 @@ def set_paper_trial_enabled(enabled: bool) -> dict[str, Any]:
     if "min_saved_edge" not in settings or "max_saved_edge_exclusive" not in settings:
         raise ValueError("NCAAB paper trial config is missing its saved-edge band")
     settings["enabled"] = enabled
-    temporary = Path(str(path) + f".{os.getpid()}.tmp")
-    temporary.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
-    os.replace(temporary, path)
+    # Raises StateVersionConflictError (a RuntimeError) if another writer saved
+    # this file since paper_trial_status() above read it -- same conflict
+    # semantics as the live auto-buyer state file, via the shared helper.
+    write_versioned_state_file(path, settings, temp_path=Path(str(path) + f".{os.getpid()}.tmp"))
     return settings
 
 

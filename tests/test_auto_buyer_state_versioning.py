@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 
+from model_prediction.portfolio import ncaab_paper_trial as trial
 from model_prediction.portfolio.auto_executor import (
     AutoExecutionResult,
     StateVersionConflictError,
@@ -113,3 +115,37 @@ def test_cycle_end_save_preserves_mid_cycle_operator_change(tmp_path: Path):
     assert on_disk["_state_version"] == 5
     assert on_disk["last_daily_date"] == "2026-11-11"
     assert on_disk["last_run"]["total_evaluated"] == 2
+
+
+def test_paper_trial_concurrent_write_between_read_and_save_raises_conflict(tmp_path: Path, monkeypatch):
+    path = tmp_path / "auto_buyer_ncaab_spread_paper_trial.json"
+    settings = {
+        "enabled": True,
+        "model_id": "ncaab-spread-v6",
+        "market_type": "spread",
+        "min_saved_edge": 0.05,
+        "max_saved_edge_exclusive": 0.08,
+    }
+    path.write_text(json.dumps(settings), encoding="utf-8")
+    monkeypatch.setattr(trial.RuntimePaths, "resolve", lambda: SimpleNamespace(runtime_root=tmp_path))
+
+    original_status = trial.paper_trial_status
+
+    def _stale_status_with_concurrent_write():
+        stale = original_status()
+        # Out-of-band write simulating a concurrent dashboard/worker save.
+        path.write_text(
+            json.dumps({**settings, "min_saved_edge": 0.06, "_state_version": 1}),
+            encoding="utf-8",
+        )
+        return stale
+
+    monkeypatch.setattr(trial, "paper_trial_status", _stale_status_with_concurrent_write)
+
+    with pytest.raises(StateVersionConflictError):
+        trial.set_paper_trial_enabled(False)
+
+    on_disk = json.loads(path.read_text(encoding="utf-8"))
+    assert on_disk["min_saved_edge"] == 0.06
+    assert on_disk["enabled"] is True
+    assert on_disk["_state_version"] == 1

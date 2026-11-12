@@ -19,11 +19,15 @@ def test_paper_trial_toggle_is_independent_and_preserves_bucket(tmp_path, monkey
     path.write_text(json.dumps(settings), encoding="utf-8")
     monkeypatch.setattr(trial.RuntimePaths, "resolve", lambda: SimpleNamespace(runtime_root=tmp_path))
 
-    assert trial.set_paper_trial_enabled(False) == {**settings, "enabled": False}
-    assert trial.paper_trial_status() == {**settings, "enabled": False}
+    assert trial.set_paper_trial_enabled(False) == {**settings, "enabled": False, "_state_version": 1}
+    assert trial.paper_trial_status() == {**settings, "enabled": False, "_state_version": 1}
     with pytest.raises(TypeError, match="boolean"):
         trial.set_paper_trial_enabled("true")
-    assert json.loads(path.read_text(encoding="utf-8")) == {**settings, "enabled": False}
+    assert json.loads(path.read_text(encoding="utf-8")) == {
+        **settings,
+        "enabled": False,
+        "_state_version": 1,
+    }
 
 
 def test_dashboard_uses_separate_paper_route_without_live_override():

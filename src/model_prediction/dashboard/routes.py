@@ -716,7 +716,7 @@ class Handler(BaseHTTPRequestHandler):
 
             try:
                 self._send(set_paper_trial_enabled(payload.get("enabled")))
-            except (OSError, TypeError, ValueError) as error:
+            except (OSError, RuntimeError, TypeError, ValueError) as error:
                 self._send({"status": "refused", "error": str(error)}, code=400)
         elif parsed.path == "/api/auto-buyer/ncaab-paper/run":
             from model_prediction.portfolio.ncaab_paper_trial import run_ncaab_spread_paper_trial
