@@ -1537,6 +1537,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                     "rejected_not_open": buyer_run.get("rejected_not_open", 0),
                     "whitelisted_evaluated": buyer_run.get("whitelisted_count", 0),
                     "rejected_not_whitelisted": buyer_run.get("rejected_not_whitelisted", 0),
+                    "rejected_not_qualified_decision": buyer_run.get("rejected_not_qualified_decision", 0),
                     "rejected_blacklist": buyer_run.get("rejected_blacklist", 0),
                     "rejected_disabled_sport_market": buyer_run.get("rejected_disabled_sport_market", 0),
                     "rejected_unsupported_market": buyer_run.get("rejected_unsupported_market", 0),

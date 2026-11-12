@@ -301,6 +301,63 @@ def test_buyer_categorically_rejects_mlb_moneyline_even_when_model_is_whiteliste
     assert result.rejected_disabled_sport_market == 1
     assert quote_calls == ["slug-nba-ml-allowed"]
     assert [order["pick_id"] for order in result.dry_run_orders] == ["nba-ml-allowed"]
+    # MLB moneyline is whitelisted but categorically blocked, so only the NBA
+    # pick clears every categorical gate (blacklist, whitelist, disabled
+    # sport/market) -- whitelisted_count must not also credit the MLB pick.
+    assert result.whitelisted_count == 1
+
+
+def test_buyer_counts_non_call_decisions_separately_from_whitelist_rejections():
+    """Decision-qualification rejections (non-CALL decision, PAPER_CALL_ reason
+    code) must land in rejected_not_qualified_decision, never in
+    rejected_not_whitelisted -- that counter is reserved for picks whose model
+    is not on the whitelist. whitelisted_count must stay 0 since none of these
+    picks reach the whitelist check (the qualification check runs first) or
+    clear it (the fourth pick's model is not whitelisted)."""
+    now = utc_now()
+    event_start = iso_utc(now + timedelta(hours=2))
+
+    def quote_lookup(slug):
+        return {"ask": 0.50, "market_slug": slug, "side": "long"}
+
+    buyer = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(
+            whitelisted_models=("nba-moneyline-v9",),
+            blacklisted_models=(),
+        ),
+        live_quote_fn=quote_lookup,
+    )
+    base = {
+        "model_id": "nba-moneyline-v9",
+        "status": "open",
+        "league": "NBA",
+        "market_type": "moneyline",
+        "event_start_utc": event_start,
+        "model_probability": 0.60,
+        "market_probability": 0.50,
+    }
+    result = buyer.evaluate_and_execute(
+        [
+            {**base, "pick_id": "pass-decision", "decision": "PASS"},
+            {**base, "pick_id": "hold-decision", "decision": "HOLD"},
+            {
+                **base,
+                "pick_id": "paper-call-low-edge",
+                "decision": "CALL",
+                "reason_code": "PAPER_CALL_LOW_EDGE",
+            },
+            {
+                **base,
+                "pick_id": "not-whitelisted-model",
+                "model_id": "nba-moneyline-v1-legacy",
+                "decision": "CALL",
+            },
+        ]
+    )
+
+    assert result.rejected_not_whitelisted == 1
+    assert result.rejected_not_qualified_decision == 3
+    assert result.whitelisted_count == 0
 
 
 def test_buyer_filters_low_edge_and_past_games():
@@ -1720,7 +1777,9 @@ def test_auto_buyer_cycle_tracking(tmp_path: Path):
                 "model_prediction.portfolio.auto_buyer_ledger.reconcile_pending_auto_buyer_fallbacks"
             ) as mock_rec,
         ):
-            mock_eval.return_value = AutoExecutionResult(total_evaluated=5, whitelisted_count=2)
+            mock_eval.return_value = AutoExecutionResult(
+                total_evaluated=5, whitelisted_count=2, rejected_not_qualified_decision=3
+            )
             mock_rec.return_value = {
                 "reconciled_filled": 0,
                 "cancelled_expired": 0,
@@ -1735,6 +1794,7 @@ def test_auto_buyer_cycle_tracking(tmp_path: Path):
             assert load_auto_buyer_state()["last_daily_date"] == "2026-08-30"
             assert "executed_at_utc" in run1
             assert "reconciliation" in run1
+            assert run1.get("rejected_not_qualified_decision") == 3
 
 
 def test_auto_buyer_ledger_recording_and_backfill(tmp_path: Path):

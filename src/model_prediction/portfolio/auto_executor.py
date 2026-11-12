@@ -275,6 +275,7 @@ class AutoExecutionResult:
     rejected_not_open: int = 0
     whitelisted_count: int = 0
     rejected_not_whitelisted: int = 0
+    rejected_not_qualified_decision: int = 0
     rejected_blacklist: int = 0
     rejected_future_slate: int = 0
     rejected_started: int = 0
@@ -986,6 +987,7 @@ def run_auto_buyer_cycle(
         "rejected_not_open": res.rejected_not_open,
         "whitelisted_count": res.whitelisted_count,
         "rejected_not_whitelisted": res.rejected_not_whitelisted,
+        "rejected_not_qualified_decision": res.rejected_not_qualified_decision,
         "rejected_blacklist": res.rejected_blacklist,
         "rejected_future_slate": res.rejected_future_slate,
         "rejected_started": res.rejected_started,
@@ -1629,13 +1631,17 @@ class AutoPolymarketBuyer:
 
             # Tags name destinations (operator directive 2026-11-11), so a row's legacy
             # record_type no longer blocks it; the whitelist/blacklist/quarantine/caps
-            # below remain the operator's controls.
+            # below remain the operator's controls. This is a decision-qualification
+            # rejection, not a whitelist rejection -- it fires on picks the model
+            # itself never called, regardless of whether model_id is whitelisted, so
+            # folding it into rejected_not_whitelisted would misattribute the reason
+            # in the operator's rejection funnel.
             decision = str(row.get("decision") or "").upper()
             reason_code = str(row.get("reason_code") or "").upper()
             if (decision and decision != "CALL") or (
                 not approved_ncaab_bucket and reason_code.startswith("PAPER_CALL_")
             ):
-                result.rejected_not_whitelisted += 1
+                result.rejected_not_qualified_decision += 1
                 continue
 
             if model_id in quarantined:
@@ -1664,8 +1670,6 @@ class AutoPolymarketBuyer:
                 result.rejected_not_whitelisted += 1
                 continue
 
-            result.whitelisted_count += 1
-
             # Operator-level categorical block. This deliberately takes precedence
             # over persisted model whitelists so renamed or replacement MLB models
             # cannot restore moneyline execution without a reviewed code change.
@@ -1677,6 +1681,13 @@ class AutoPolymarketBuyer:
             ):
                 result.rejected_disabled_sport_market += 1
                 continue
+
+            # whitelisted_count counts only picks that cleared every categorical
+            # gate (blacklist, whitelist, disabled sport/market) -- incrementing it
+            # right after the whitelist check would also credit picks later blocked
+            # by the disabled-sport-market gate (e.g. a whitelisted MLB moneyline
+            # model), inflating the "how many picks had a real shot" telemetry.
+            result.whitelisted_count += 1
 
             # Only markets with a proven contract representation may reach mapping.
             # In particular, an NRFI/YRFI model must never be attached to a full-game
