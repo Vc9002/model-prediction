@@ -21,6 +21,7 @@ from model_prediction.portfolio.auto_buyer_ledger import (
     record_auto_buy_execution,
 )
 from model_prediction.portfolio.auto_executor import (
+    PAPER_AUTO_BUYER_DATA_ROOT,
     AutoExecutionConfig,
     AutoExecutionResult,
     AutoPolymarketBuyer,
@@ -2883,4 +2884,105 @@ def test_holding_one_line_of_a_spread_blocks_the_other_line(tmp_path: Path):
     )
     assert not buyer._is_already_bought(
         "new", market_slug="asc-cbb-other-game-2026-11-11-pos-1pt5", token_side="short", bought_index=index
+    )
+
+
+def test_main_buyer_dedup_index_reads_the_shared_paper_ledger_root(tmp_path: Path):
+    # The NCAAB paper-trial duplicate (fixed in b7a25ddf/69856d6b) was rooted in a
+    # buyer constructed against a scratch data_root, so its own dedup index could
+    # never see the shared paper ledger. The main paper buyer records fills to
+    # PAPER_AUTO_BUYER_DATA_ROOT; pin that its default paper_data_root is that same
+    # path, so a future refactor cannot silently re-point it at a root the shared
+    # index doesn't read.
+    buyer = AutoPolymarketBuyer(config=AutoExecutionConfig(), audit=AuditLog(tmp_path / "audit.jsonl"))
+    assert buyer.paper_data_root == PAPER_AUTO_BUYER_DATA_ROOT
+
+
+@pytest.mark.parametrize("ledger_subdir", ["", "paper_auto_buyer"])
+def test_reforecast_total_on_moved_line_is_blocked_on_both_ledger_roots(tmp_path: Path, ledger_subdir: str):
+    # Real 2026-11-07 paper duplicate: NBA Orlando Magic @ Golden State Warriors
+    # total. First fill (pick aa1ce475e1b440a5, under 222.5) was written before
+    # 39625934 added matchup_markets; a re-forecast minted a fresh pick_id
+    # (0416f6963152426e) on the opposite side (over) and a moved line (220.5).
+    # Neither row carries an event_id (NBA/NFL paper rows record none), and
+    # event_key_from_slug is spread-only by its own docstring, so for a
+    # totals market with no event_id, matchup_markets is the sole guard.
+    ledger_dir = tmp_path / ledger_subdir if ledger_subdir else tmp_path
+    ledger_dir.mkdir(parents=True, exist_ok=True)
+    row = {
+        "pick_id": "aa1ce475e1b440a5",
+        "order_id": "PAPER-aa1ce475e1b440a5",
+        "sport": "NBA",
+        "event_id": None,
+        "model_id": "nba-total-margin-v7",
+        "market_type": "total",
+        "selection": "under",
+        "line": 222.5,
+        "away_team": "Orlando Magic",
+        "home_team": "Golden State Warriors",
+        "event_start_utc": "2026-11-08T01:30Z",
+        "market_slug": "tsc-nba-orl-gs-2026-11-07-222pt5",
+        "token_side": "short",
+        "status": "settled",
+        "result": "loss",
+        "order_state": "ORDER_STATE_FILLED",
+        "shares": 12.6,
+        "cost_usd": 6.3,
+    }
+    (ledger_dir / "auto_buyer_ledger.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
+    buyer = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(), audit=AuditLog(tmp_path / "audit.jsonl"), data_root=tmp_path
+    )
+    index = buyer._build_bought_index()
+
+    # (a) step-5 shape: no slug resolved yet. event_id normalized to "" the way
+    # the real call site does: str(row.get("event_id") or "").
+    assert buyer._is_already_bought(
+        "0416f6963152426e",
+        event_id="",
+        selection="over",
+        market_type="total",
+        away_team="Orlando Magic",
+        home_team="Golden State Warriors",
+        event_start_utc="2026-11-08T01:30Z",
+        bought_index=index,
+    )
+
+    # (b) step-8 shape: resolved market_slug and token_side added.
+    assert buyer._is_already_bought(
+        "0416f6963152426e",
+        market_slug="tsc-nba-orl-gs-2026-11-07-220pt5",
+        token_side="long",
+        event_id="",
+        selection="over",
+        market_type="total",
+        away_team="Orlando Magic",
+        home_team="Golden State Warriors",
+        event_start_utc="2026-11-08T01:30Z",
+        bought_index=index,
+    )
+
+    # (c) control: a different game on the same UTC date is not blocked.
+    assert not buyer._is_already_bought(
+        "fresh-pick-other-game",
+        event_id="",
+        selection="over",
+        market_type="total",
+        away_team="Brooklyn Nets",
+        home_team="Boston Celtics",
+        event_start_utc="2026-11-08T01:30Z",
+        bought_index=index,
+    )
+
+    # (d) control: the lock is per game-market, not per game — a different
+    # market_type on the same matchup is not blocked.
+    assert not buyer._is_already_bought(
+        "fresh-pick-other-market",
+        event_id="",
+        selection="home",
+        market_type="spread",
+        away_team="Orlando Magic",
+        home_team="Golden State Warriors",
+        event_start_utc="2026-11-08T01:30Z",
+        bought_index=index,
     )
