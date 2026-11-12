@@ -2640,6 +2640,17 @@ def _forecast_nfl_spread_slate(
         is_neutral_site = _nfl_is_neutral_site(event)
         is_dome, wind_mph, temperature_f = _nfl_venue_weather(event)
         is_division_game = _nfl_is_division_game(home_team, away_team)
+        # Operator decision 2026-11-11: consensus-priced contracts stay Main-eligible, but
+        # the row must say so -- a de-vigged sportsbook number is not an executable ask,
+        # and CLV/PnL against it means something different.
+        quote_provenance = (
+            "polymarket_executable_ask" if sportsbook == "polymarket_us" else "espn_consensus_indicative"
+        )
+        quote_note = (
+            ""
+            if sportsbook == "polymarket_us"
+            else " Priced off ESPN sportsbook consensus (no Polymarket market matched); not an executable CLOB ask."
+        )
 
         event_date = start.astimezone(EASTERN).date()
         h_last = team_last_date.get(home_team)
@@ -2826,6 +2837,7 @@ def _forecast_nfl_spread_slate(
             "efficiency_source": efficiency_store.source_manifest,
             "injury_source": injury_source,
             "input_qualified": input_qualified,
+            "quote_provenance": quote_provenance,
         }
         model_snapshot = build_scalar_snapshot(
             artifact,
@@ -2854,7 +2866,7 @@ def _forecast_nfl_spread_slate(
                 "model_qualified": model_qualified and input_qualified,
                 "rationale": (
                     f"NFL Structural v6 Spread projection. Projected margin {fc.projected_margin_home:+.1f} "
-                    f"(Rest: {home_rest_days}v{away_rest_days}d, Dome: {is_dome})."
+                    f"(Rest: {home_rest_days}v{away_rest_days}d, Dome: {is_dome}).{quote_note}"
                 ),
                 "joint_packet_quote": (
                     {
@@ -3185,6 +3197,17 @@ def _forecast_nfl_total_slate(
         is_neutral_site = _nfl_is_neutral_site(event)
         is_dome, wind_mph, temperature_f = _nfl_venue_weather(event)
         is_division_game = _nfl_is_division_game(home_team, away_team)
+        # Operator decision 2026-11-11: consensus-priced contracts stay Main-eligible, but
+        # the row must say so -- a de-vigged sportsbook number is not an executable ask,
+        # and CLV/PnL against it means something different.
+        quote_provenance = (
+            "polymarket_executable_ask" if sportsbook == "polymarket_us" else "espn_consensus_indicative"
+        )
+        quote_note = (
+            ""
+            if sportsbook == "polymarket_us"
+            else " Priced off ESPN sportsbook consensus (no Polymarket market matched); not an executable CLOB ask."
+        )
 
         event_date = start.astimezone(EASTERN).date()
         h_last = team_last_date.get(home_team)
@@ -3391,6 +3414,7 @@ def _forecast_nfl_total_slate(
             "efficiency_source": efficiency_store.source_manifest,
             "injury_source": injury_source,
             "input_qualified": input_qualified,
+            "quote_provenance": quote_provenance,
         }
         model_snapshot = build_scalar_snapshot(
             artifact,
@@ -3425,7 +3449,7 @@ def _forecast_nfl_total_slate(
                 "model_qualified": model_qualified and input_qualified,
                 "rationale": (
                     f"NFL Structural v6 Total projection. Projected total {fc.projected_total:.1f} "
-                    f"(Dome: {is_dome}, Weather: {wind_mph:.0f}mph/{temperature_f:.0f}F).{tnf_note}"
+                    f"(Dome: {is_dome}, Weather: {wind_mph:.0f}mph/{temperature_f:.0f}F).{tnf_note}{quote_note}"
                 ),
                 "joint_packet_quote": (
                     {
