@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "f6a4eab2bab1d34a367fa0a70786c681a216d4ca070bf1c94aa0a8c2ddef0b85",
+  "artifact_hash": "f1031f97ae162f29d103a1a1763e073495a7dd87f94ca53c65e61b8f7f88fbd7",
   "bias": 0.8,
   "dome_boost": 0.8,
   "explosive_weight": 10.0,
@@ -20,6 +20,26 @@
     "model_version": "nfl-total-structural-v7",
     "note": "Point-in-time walk-forward validated on modern NFL holdout games.",
     "qualified": true,
+    "replay": {
+      "brier": 0.25059647965067955,
+      "calibration_intercept": -0.07434881246312419,
+      "calibration_slope": 0.42836194108670367,
+      "cohort": "games.jsonl completed games with nflverse closing lines, 2021 -> today; point-in-time inputs; scripts/replay_nfl_v7_all_settled.py",
+      "generated_at_utc": "2026-11-12T04:44:44.456260+00:00",
+      "locked_holdout": {
+        "brier_score": 0.2508661637538311,
+        "calibration_intercept": 0.0890116133016035,
+        "calibration_slope": 0.1259446330346926,
+        "expected_calibration_error": 0.016653277027027024,
+        "log_loss": 0.694930411199233,
+        "n": 296,
+        "start": "2025-09-28T13:00:00+00:00"
+      },
+      "log_loss": 0.6943582237285263,
+      "market_brier_at_closing_line": 0.25,
+      "n": 1476,
+      "serving_calibrator": "identity"
+    },
     "sample_size": 197,
     "status": "qualified"
   },
