@@ -9,9 +9,15 @@ Evaluates picks beyond nominal edge using:
 4. Market Disagreement Limits (avoiding injury/weather information traps)
 
 Classification Verdicts:
-- CONFIRMED_BEST: Proven empirical sweet spot (Win Rate >= 60%, positive ROI, n >= 5)
-- QUALIFIED_MODERATE: Positive historical baseline, normal sizing recommended
-- DOWNGRADE_TRAP: Negative historical ROI or win rate < 48% despite positive nominal edge
+- CONFIRMED_BEST: evidence counts only verified-quote rows (see VERIFIED_QUOTE_PROVENANCE
+  below) in the candidate's bucket, reaching >= BEST_MIN_WIN_RATE WR and >= BEST_MIN_ROI
+  ROI, AND the candidate's own quote is itself verified. A mechanical bucket verdict of
+  CONFIRMED_BEST computed from an unverified candidate quote is withheld and reported as
+  QUALIFIED_MODERATE instead (the bucket_verdict key still carries the mechanical verdict).
+- QUALIFIED_MODERATE: neither confirmed nor a trap -- positive or inconclusive evidence,
+  normal sizing recommended.
+- DOWNGRADE_TRAP: verified WR < TRAP_WIN_RATE or verified ROI < TRAP_ROI, or negative
+  nominal edge.
 """
 
 from __future__ import annotations
@@ -21,13 +27,26 @@ import json
 import sqlite3
 import zoneinfo
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 DB_PATH = Path("E:/model-prediction-runtime/ledgers/ledgers.db")
 ET_TZ = zoneinfo.ZoneInfo("America/New_York")
+
+# forecast.py stamps this provenance only after a timestamp-valid, non-reconstructed
+# Polymarket US snapshot taken at decision time. Every other value (empty, missing,
+# indicative_slate, archived_two_sided_bbo, decision_time_sportsbook_quote) means the
+# recorded price was not verified as executable at decision time, so it is excluded from
+# any verdict evidence -- this is a literal operator rule, not a quality heuristic to widen.
+VERIFIED_QUOTE_PROVENANCE = "decision_time_executable_quote"
+
+MIN_GRADED = 4
+BEST_MIN_WIN_RATE = 60.0
+BEST_MIN_ROI = 15.0
+TRAP_WIN_RATE = 55.0
+TRAP_ROI = 5.0
 
 
 @dataclass
@@ -69,30 +88,53 @@ def get_edge_bucket(edge: float) -> str:
         return ">= 12.0%"
 
 
+@dataclass
+class BucketStats:
+    """All settled rows in a bucket, split by whether the row's own quote was verified.
+
+    Only `.verified` counts toward any verdict; `.all_rows` is retained for context so a
+    report can show "0 verified of N graded" instead of silently dropping the bucket.
+    """
+
+    all_rows: EdgeTierStats = field(default_factory=EdgeTierStats)
+    verified: EdgeTierStats = field(default_factory=EdgeTierStats)
+
+
+def _connect_ro(db_path: Path) -> sqlite3.Connection:
+    # ledgers.db is the canonical ledger; this report must never mutate it, and opening a
+    # plain sqlite3.connect() on a path that doesn't yet exist silently creates an empty
+    # file there instead of erroring -- mode=ro refuses both failure modes.
+    conn = sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
 class HistoricalAuditEngine:
     def __init__(self, db_path: Path = DB_PATH) -> None:
         self.db_path = db_path
-        self.stats_by_sport_mkt_bucket: dict[tuple[str, str, str], EdgeTierStats] = defaultdict(EdgeTierStats)
-        self.stats_by_sport_dir_bucket: dict[tuple[str, str, str], EdgeTierStats] = defaultdict(EdgeTierStats)
+        self.stats_by_sport_mkt_bucket: dict[tuple[str, str, str], BucketStats] = defaultdict(BucketStats)
+        self.stats_by_sport_dir_bucket: dict[tuple[str, str, str], BucketStats] = defaultdict(BucketStats)
         # A pooled bucket mixes retired models with the serving one, so a bucket can look
         # profitable purely on a predecessor's record; these hold the candidate's own model.
-        self.stats_by_model_mkt_bucket: dict[tuple[str, str, str, str], EdgeTierStats] = defaultdict(
-            EdgeTierStats
+        self.stats_by_model_mkt_bucket: dict[tuple[str, str, str, str], BucketStats] = defaultdict(
+            BucketStats
         )
-        self.stats_by_model_dir_bucket: dict[tuple[str, str, str, str], EdgeTierStats] = defaultdict(
-            EdgeTierStats
+        self.stats_by_model_dir_bucket: dict[tuple[str, str, str, str], BucketStats] = defaultdict(
+            BucketStats
         )
         self._load_historical_settlements()
 
     def _load_historical_settlements(self) -> None:
         if not self.db_path.exists():
             return
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
+        conn = _connect_ro(self.db_path)
         rows = conn.execute(
             """
-            SELECT sport, market_type, model_probability, market_probability, 
-                   selection, line, pnl_units, result, units, event_id, model_id
+            SELECT sport, market_type, model_probability, market_probability,
+                   selection, line, pnl_units, result, units, event_id, model_id,
+                   CASE WHEN json_valid(decision_payload_json)
+                        THEN json_extract(decision_payload_json, '$.market_quote_provenance')
+                   END AS quote_provenance
             FROM ledger_records
             WHERE status = 'settled'
             ORDER BY CASE ledger_tier WHEN 'main' THEN 0 ELSE 1 END, created_at_utc
@@ -123,23 +165,29 @@ class HistoricalAuditEngine:
             pnl = float(r["pnl_units"] or 0.0)
             staked = float(r["units"] or 1.0)
             sel = str(r["selection"] or "").lower()
+            is_verified = r["quote_provenance"] == VERIFIED_QUOTE_PROVENANCE
 
-            entries = [
+            entries: list[BucketStats] = [
                 self.stats_by_sport_mkt_bucket[(sport, mkt, bucket)],
                 self.stats_by_model_mkt_bucket[(sport, mkt, bucket, model_id)],
             ]
             if mkt == "total" and sel in ("over", "under"):
                 entries.append(self.stats_by_sport_dir_bucket[(sport, sel, bucket)])
                 entries.append(self.stats_by_model_dir_bucket[(sport, sel, bucket, model_id)])
-            for entry in entries:
-                if res == "WIN":
-                    entry.wins += 1
-                elif res == "LOSS":
-                    entry.losses += 1
-                elif res == "PUSH":
-                    entry.pushes += 1
-                entry.pnl += pnl
-                entry.staked += staked
+            for bucket_stats in entries:
+                for entry in (
+                    (bucket_stats.all_rows,)
+                    if not is_verified
+                    else (bucket_stats.all_rows, bucket_stats.verified)
+                ):
+                    if res == "WIN":
+                        entry.wins += 1
+                    elif res == "LOSS":
+                        entry.losses += 1
+                    elif res == "PUSH":
+                        entry.pushes += 1
+                    entry.pnl += pnl
+                    entry.staked += staked
 
     def audit_candidate(
         self,
@@ -150,27 +198,23 @@ class HistoricalAuditEngine:
         model_prob: float,
         market_prob: float,
         model_id: str | None = None,
+        quote_provenance: str | None = None,
     ) -> dict[str, Any]:
         sp = sport.lower()
         mkt = market_type.lower()
         sel = selection.lower()
         bucket = get_edge_bucket(edge)
         mid = (model_id or "").lower()
+        prov = quote_provenance or ""
+        quote_verified = prov == VERIFIED_QUOTE_PROVENANCE
 
-        pooled_stats = self.stats_by_sport_mkt_bucket.get((sp, mkt, bucket), EdgeTierStats())
-        model_stats = self.stats_by_model_mkt_bucket.get((sp, mkt, bucket, mid), EdgeTierStats())
-        # Judge on the candidate's own model when it has enough graded history; otherwise the
-        # pooled bucket is the only evidence there is, and a flag says so.
-        use_model = bool(mid) and model_stats.total_graded >= 4
-        mkt_stats = model_stats if use_model else pooled_stats
+        pooled = self.stats_by_sport_mkt_bucket.get((sp, mkt, bucket), BucketStats())
+        model = self.stats_by_model_mkt_bucket.get((sp, mkt, bucket, mid), BucketStats())
+        # Judge on the candidate's own model when it has enough VERIFIED graded history;
+        # otherwise the pooled bucket is the only evidence there is, and a flag says so.
+        use_model = bool(mid) and model.verified.total_graded >= MIN_GRADED
+        evidence = model if use_model else pooled
         basis = f"{model_id} only" if use_model else "all models pooled"
-        dir_stats = None
-        if mkt == "total" and sel in ("over", "under"):
-            dir_stats = (
-                self.stats_by_model_dir_bucket.get((sp, sel, bucket, mid), EdgeTierStats())
-                if use_model
-                else self.stats_by_sport_dir_bucket.get((sp, sel, bucket), EdgeTierStats())
-            )
 
         # Determine verdict
         verdict = "QUALIFIED_MODERATE"
@@ -233,17 +277,25 @@ class HistoricalAuditEngine:
                     "NBA Spreads >= 8% edge hit 63.2% WR (+9.47u, +26.7% ROI) on double-digit cushions."
                 )
 
-        # 3. Check empirical edge bucket overall if no override
-        if verdict == "QUALIFIED_MODERATE" and mkt_stats.total_graded >= 4:
-            if mkt_stats.win_rate >= 60.0 and mkt_stats.roi >= 15.0:
-                verdict = "CONFIRMED_BEST"
+        # 3. Check empirical edge bucket overall if no override. Only VERIFIED rows count
+        # toward a verdict; an unverified-but-large all-rows record is shown as context only.
+        if verdict == "QUALIFIED_MODERATE":
+            v = evidence.verified
+            a = evidence.all_rows
+            if v.total_graded >= MIN_GRADED:
+                if v.win_rate >= BEST_MIN_WIN_RATE and v.roi >= BEST_MIN_ROI:
+                    verdict = "CONFIRMED_BEST"
+                    flags.append(
+                        f"Bucket {bucket} meets Gold Standard ({basis}): verified {v.win_rate:.1f}% WR, {v.roi:+.1f}% ROI ({v.wins}W-{v.losses}L)."
+                    )
+                elif v.win_rate < TRAP_WIN_RATE or v.roi < TRAP_ROI:
+                    verdict = "DOWNGRADE_TRAP"
+                    flags.append(
+                        f"Bucket {bucket} fails Best Pick criteria ({basis}): verified {v.win_rate:.1f}% WR, {v.roi:+.1f}% ROI ({v.wins}W-{v.losses}L; near-breakeven or negative)."
+                    )
+            else:
                 flags.append(
-                    f"Bucket {bucket} meets Gold Standard ({basis}): {mkt_stats.win_rate:.1f}% WR, {mkt_stats.roi:+.1f}% ROI ({mkt_stats.wins}W-{mkt_stats.losses}L)."
-                )
-            elif mkt_stats.win_rate < 55.0 or mkt_stats.roi < 5.0:
-                verdict = "DOWNGRADE_TRAP"
-                flags.append(
-                    f"Bucket {bucket} fails Best Pick criteria ({basis}): {mkt_stats.win_rate:.1f}% WR, {mkt_stats.roi:+.1f}% ROI ({mkt_stats.wins}W-{mkt_stats.losses}L; near-breakeven or negative)."
+                    f"insufficient verified history in bucket {bucket} ({basis}): {v.total_graded} verified of {a.total_graded} graded; all-rows record {a.wins}W-{a.losses}L"
                 )
         if edge < 0:
             # A pick the model prices below the market can never be a best pick, whatever
@@ -252,40 +304,80 @@ class HistoricalAuditEngine:
             flags = [
                 (
                     f"Negative edge ({edge * 100:+.1f}%): model probability is below the market price; "
-                    f"bucket record {mkt_stats.wins}W-{mkt_stats.losses}L, {mkt_stats.roi:+.1f}% ROI ({basis})."
+                    f"verified bucket record {evidence.verified.wins}W-{evidence.verified.losses}L, {evidence.verified.roi:+.1f}% ROI ({basis})."
                 )
             ]
         elif mid and not use_model:
             flags.append(
-                f"{model_id} has only {model_stats.total_graded} graded picks in bucket {bucket}; verdict rests on the pooled bucket."
+                f"{model_id} has only {model.verified.total_graded} verified graded picks in bucket {bucket}; verdict rests on the pooled bucket."
             )
-        elif use_model and pooled_stats.total_graded:
+        elif use_model and pooled.verified.total_graded:
             flags.append(
-                f"Context, all models pooled: {pooled_stats.win_rate:.1f}% WR, {pooled_stats.roi:+.1f}% ROI ({pooled_stats.wins}W-{pooled_stats.losses}L)."
+                f"Context, all models pooled: verified {pooled.verified.win_rate:.1f}% WR, {pooled.verified.roi:+.1f}% ROI ({pooled.verified.wins}W-{pooled.verified.losses}L)."
+            )
+
+        bucket_verdict = verdict
+        if bucket_verdict == "CONFIRMED_BEST" and not quote_verified:
+            # The mechanical bucket evidence qualifies, but the candidate's own quote was
+            # never verified as executable at decision time -- withhold the label rather than
+            # present an unverified-quote pick as a proven best pick.
+            verdict = "QUALIFIED_MODERATE"
+            flags.append(
+                f"mechanical bucket verdict CONFIRMED_BEST withheld: candidate quote provenance is '{prov or 'missing'}', not {VERIFIED_QUOTE_PROVENANCE}"
             )
 
         return {
             "verdict": verdict,
+            "bucket_verdict": bucket_verdict,
             "flags": flags,
             "bucket": bucket,
-            "mkt_stats": mkt_stats,
-            "pooled_stats": pooled_stats,
-            "model_stats": model_stats,
-            "dir_stats": dir_stats,
+            "basis": basis,
+            "evidence": evidence,
+            "pooled": pooled,
+            "model": model,
+            "quote_provenance": prov,
+            "quote_verified": quote_verified,
         }
 
 
-def audit_open_picks(
+def _sel_name(p: dict[str, Any]) -> str:
+    return (
+        p["home"]
+        if p["selection"] == "home"
+        else (p["away"] if p["selection"] == "away" else p["selection"].upper())
+    )
+
+
+def _line_str(p: dict[str, Any]) -> str:
+    if p["line"] is None:
+        return ""
+    return f"{p['line']:+.1f}" if p["market"] == "SPREAD" else f"{p['line']:.1f}"
+
+
+def _evidence_line(p: dict[str, Any]) -> str:
+    # Live-only line: basis, verified W-L, verified-of-graded, verified WR/ROI (percentages
+    # only, never American odds -- CLAUDE.md directive), and the candidate's own quote
+    # provenance, so every printed pick shows exactly what evidence backed its verdict.
+    v = p["evidence"].verified
+    a = p["evidence"].all_rows
+    prov = p["quote_provenance"] or "missing"
+    return (
+        f"      >>> live evidence ({p['basis']}): verified {v.wins}W-{v.losses}L "
+        f"({v.total_graded} verified of {a.total_graded} graded), {v.win_rate:.1f}% WR, "
+        f"{v.roi:+.1f}% ROI | quote: {prov}"
+    )
+
+
+def collect_open_pick_audits(
     db_path: Path = DB_PATH, only_unstarted: bool = True, pick_id: str | None = None
-) -> None:
+) -> list[dict[str, Any]]:
     engine = HistoricalAuditEngine(db_path)
     now_utc = datetime.now(UTC)
 
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+    conn = _connect_ro(db_path)
     rows = conn.execute(
         """
-        SELECT pick_id, sport, ledger_tier, market_type, selection, line, 
+        SELECT pick_id, sport, ledger_tier, market_type, selection, line,
                model_probability, market_probability, units, event_start_utc, decision_payload_json,
                model_id
         FROM ledger_records
@@ -306,9 +398,15 @@ def audit_open_picks(
         if only_unstarted and dt_utc <= now_utc:
             continue
 
-        p = json.loads(r["decision_payload_json"] or "{}")
+        try:
+            p = json.loads(r["decision_payload_json"] or "{}")
+        except (ValueError, TypeError):
+            # A malformed open-pick payload must not abort the audit; it just means this
+            # candidate's own quote provenance is unknown and is reported as "missing".
+            p = {}
         away = p.get("away_team") or p.get("original_away_team") or ""
         home = p.get("home_team") or p.get("original_home_team") or ""
+        quote_provenance = p.get("market_quote_provenance") or ""
         mod_p = float(r["model_probability"] or 0.0)
         mkt_p = float(r["market_probability"] or 0.0)
         edge = mod_p - mkt_p
@@ -321,6 +419,7 @@ def audit_open_picks(
             model_prob=mod_p,
             market_prob=mkt_p,
             model_id=r["model_id"],
+            quote_provenance=quote_provenance,
         )
 
         dt_et = dt_utc.astimezone(ET_TZ)
@@ -340,12 +439,22 @@ def audit_open_picks(
                 "edge": edge,
                 "units": float(r["units"] or 1.0),
                 "verdict": audit["verdict"],
+                "bucket_verdict": audit["bucket_verdict"],
                 "flags": audit["flags"],
                 "bucket": audit["bucket"],
-                "mkt_stats": audit["mkt_stats"],
-                "dir_stats": audit["dir_stats"],
+                "basis": audit["basis"],
+                "evidence": audit["evidence"],
+                "quote_provenance": audit["quote_provenance"],
             }
         )
+    return audited_picks
+
+
+def audit_open_picks(
+    db_path: Path = DB_PATH, only_unstarted: bool = True, pick_id: str | None = None
+) -> None:
+    audited_picks = collect_open_pick_audits(db_path, only_unstarted=only_unstarted, pick_id=pick_id)
+    now_utc = datetime.now(UTC)
 
     # Group by verdict
     best_picks = [p for p in audited_picks if p["verdict"] == "CONFIRMED_BEST"]
@@ -359,27 +468,24 @@ def audit_open_picks(
     )
     print("=" * 80)
 
-    print(f"\n[1] CONFIRMED BEST PICKS ({len(best_picks)} verified high-alpha picks)")
+    print(
+        f"\n[1] CONFIRMED BEST PICKS ({len(best_picks)} picks; verified bucket evidence and verified candidate quote)"
+    )
     print("-" * 80)
     if not best_picks:
         print("  None found.")
     for p in sorted(best_picks, key=lambda x: (x["tier"] != "Main", -x["edge"])):
-        sel_name = (
-            p["home"]
-            if p["selection"] == "home"
-            else (p["away"] if p["selection"] == "away" else p["selection"].upper())
-        )
-        line_str = (
-            f"{p['line']:+.1f}"
-            if p["line"] is not None and p["market"] == "SPREAD"
-            else (f"{p['line']:.1f}" if p["line"] is not None else "")
-        )
+        sel_name = _sel_name(p)
+        line_str = _line_str(p)
         print(f"  [{p['tier']}] [{p['start_et']}] {p['sport']} | {p['away']} @ {p['home']}")
         print(
             f"      {p['market']} -> {sel_name} {line_str} | Mod: {p['model_prob'] * 100:.1f}% | Mkt: {p['market_prob'] * 100:.1f}% | Edge: {p['edge'] * 100:+.1f}% | Stake: {p['units']:.2f}u"
         )
         for f in p["flags"]:
             print(f"      >>> EVIDENCE: {f}")
+        print(_evidence_line(p))
+        if p["bucket_verdict"] != p["verdict"]:
+            print(f"      >>> mechanical bucket verdict: {p['bucket_verdict']}")
         print()
 
     print(f"\n[2] DOWNGRADE / FADE CANDIDATES ({len(trap_picks)} nominal edge traps)")
@@ -387,42 +493,32 @@ def audit_open_picks(
     if not trap_picks:
         print("  None found.")
     for p in trap_picks:
-        sel_name = (
-            p["home"]
-            if p["selection"] == "home"
-            else (p["away"] if p["selection"] == "away" else p["selection"].upper())
-        )
-        line_str = (
-            f"{p['line']:+.1f}"
-            if p["line"] is not None and p["market"] == "SPREAD"
-            else (f"{p['line']:.1f}" if p["line"] is not None else "")
-        )
+        sel_name = _sel_name(p)
+        line_str = _line_str(p)
         print(f"  [{p['tier']}] [{p['start_et']}] {p['sport']} | {p['away']} @ {p['home']}")
         print(
             f"      {p['market']} -> {sel_name} {line_str} | Nominal Edge: {p['edge'] * 100:+.1f}% | Stake: {p['units']:.2f}u"
         )
         for f in p["flags"]:
             print(f"      >>> WARNING: {f}")
+        print(_evidence_line(p))
+        if p["bucket_verdict"] != p["verdict"]:
+            print(f"      >>> mechanical bucket verdict: {p['bucket_verdict']}")
         print()
 
     print(f"\n[3] QUALIFIED MODERATE PICKS ({len(moderate_picks)} baseline picks)")
     print("-" * 80)
     for p in moderate_picks[:10]:
-        sel_name = (
-            p["home"]
-            if p["selection"] == "home"
-            else (p["away"] if p["selection"] == "away" else p["selection"].upper())
-        )
-        line_str = (
-            f"{p['line']:+.1f}"
-            if p["line"] is not None and p["market"] == "SPREAD"
-            else (f"{p['line']:.1f}" if p["line"] is not None else "")
-        )
+        sel_name = _sel_name(p)
+        line_str = _line_str(p)
         print(
             f"  [{p['tier']}] [{p['start_et']}] {p['sport']:<5} | {p['away']} @ {p['home']} | {p['market']} {sel_name} {line_str} | Edge: {p['edge'] * 100:+.1f}% | Stake: {p['units']:.2f}u"
         )
         for f in p["flags"]:
             print(f"      >>> NOTE: {f}")
+        print(_evidence_line(p))
+        if p["bucket_verdict"] != p["verdict"]:
+            print(f"      >>> mechanical bucket verdict: {p['bucket_verdict']}")
     if len(moderate_picks) > 10:
         print(f"  ... and {len(moderate_picks) - 10} more.")
 
