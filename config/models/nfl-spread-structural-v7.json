@@ -1,11 +1,6 @@
 {
-  "artifact_hash": "3a49ab9fde569edcb2f2c8ba72d2e87f9d7f694bc3111e3f2c3046dc3688157c",
+  "artifact_hash": "6fb773b9425f66ee97fc7d06c40344fda0900682816896b9ba08c85c8bf8d6b4",
   "edsr_weight": 4.0,
-  "gates": {
-    "max_uncertainty": 0.15,
-    "min_edge": 0.035,
-    "sizing": "flat_1u_gated"
-  },
   "home_field_advantage_points": 1.35,
   "key_number_weight": 0.2,
   "league": "NFL",

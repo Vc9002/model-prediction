@@ -1,5 +1,11 @@
 """Dedicated NFL Game Total (Over/Under) Model v7 (nfl-total-structural-v7).
 
+The projection is total_line + a feature delta, i.e. fully market-anchored; there is
+no market_weight. Rest/neutral-site inputs are not modelled here (the spread engine
+owns rest). Parameters that the code does not read are deliberately absent from both
+this class and the artifact -- a config key nothing consumes reads as a validated
+feature to anyone auditing the artifact (2026-11-11 review).
+
 State-of-the-art quantitative NFL game scoring engine:
 1. Two-Sided Team Scoring & Market Delta Anchoring: preserves closing total line as true baseline.
 2. Explosive Play Rate Edge: passes >= 20 yds + rushes >= 12 yds drive fast scores and avoid clock bleed.
@@ -19,7 +25,6 @@ from typing import Any
 NFL_TOTAL_V7_VERSION = "nfl-total-structural-v7"
 NFL_EMPIRICAL_TOTAL_SD = 13.80
 NFL_LEAGUE_AVG_TOTAL = 45.5
-NFL_DEFAULT_MARKET_WEIGHT = 0.60
 
 
 def _normal_cdf(x: float, mean: float, sd: float) -> float:
@@ -52,7 +57,6 @@ class NFLTotalModelV7:
         self,
         total_sd: float = NFL_EMPIRICAL_TOTAL_SD,
         league_avg_total: float = NFL_LEAGUE_AVG_TOTAL,
-        market_weight: float = NFL_DEFAULT_MARKET_WEIGHT,
         max_total_prob: float = 0.65,
         min_total_prob: float = 0.35,
         version: str = NFL_TOTAL_V7_VERSION,
@@ -68,7 +72,6 @@ class NFLTotalModelV7:
     ) -> None:
         self.total_sd = total_sd
         self.league_avg_total = league_avg_total
-        self.market_weight = market_weight
         self.max_total_prob = max_total_prob
         self.min_total_prob = min_total_prob
         self.version = version
@@ -89,7 +92,6 @@ class NFLTotalModelV7:
         return cls(
             total_sd=float(artifact.get("total_sd", NFL_EMPIRICAL_TOTAL_SD)),
             league_avg_total=float(artifact.get("league_avg_total", NFL_LEAGUE_AVG_TOTAL)),
-            market_weight=float(artifact.get("market_weight", NFL_DEFAULT_MARKET_WEIGHT)),
             max_total_prob=float(artifact.get("max_total_prob", 0.65)),
             min_total_prob=float(artifact.get("min_total_prob", 0.35)),
             version=str(artifact.get("model_version", NFL_TOTAL_V7_VERSION)),
@@ -120,12 +122,8 @@ class NFLTotalModelV7:
         temperature_f: float = 65.0,
         is_dome: bool = False,
         total_line: float = 45.5,
-        market_weight: float | None = None,
         home_qb_tier_adj: float = 0.0,
         away_qb_tier_adj: float = 0.0,
-        home_rest_days: int = 7,
-        away_rest_days: int = 7,
-        is_neutral_site: bool = False,
         home_explosive_rate: float = 0.08,
         away_explosive_rate: float = 0.08,
         home_def_explosive_rate: float = 0.08,
@@ -245,7 +243,6 @@ class NFLTotalModelV7:
         is_dome: bool = False,
         wind_mph: float = 0.0,
         temperature_f: float = 65.0,
-        market_weight: float | None = None,
     ) -> NFLTotalForecast:
         """Forecast total directly from point-in-time NFLEfficiencyMatchup guaranteeing QB pass-through."""
         return self.forecast_total(
@@ -263,7 +260,6 @@ class NFLTotalModelV7:
             temperature_f=temperature_f,
             is_dome=is_dome,
             total_line=total_line,
-            market_weight=market_weight,
             home_qb_tier_adj=eff.home_qb_tier_adj,
             away_qb_tier_adj=eff.away_qb_tier_adj,
             home_explosive_rate=eff.home_explosive_rate,

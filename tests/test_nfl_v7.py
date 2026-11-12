@@ -118,7 +118,6 @@ def test_nfl_total_v7_contract_and_hash() -> None:
     model = NFLTotalModelV7.from_artifact(artifact)
     assert model.version == "nfl-total-structural-v7"
     assert model.league_avg_total == 45.5
-    assert model.market_weight == 0.60
     assert model.ngsp_weight == 0.35
 
     # NGSP pass-ratio pace acceleration check
@@ -322,3 +321,54 @@ def test_nfl_spread_v7_heavy_line_replays_from_effective_sd() -> None:
     assert abs(replayed - fc.prob_home_cover) <= 2e-6
     with pytest.raises(ValueError, match="scalar_replay_probability_mismatch"):
         validate_decision_snapshot(_snapshot(model.margin_sd), row)
+
+
+class _RecordingArtifact(dict):
+    """dict that records which keys from_artifact actually consulted."""
+
+    def __init__(self, payload: dict) -> None:
+        super().__init__(payload)
+        self.seen: set[str] = set()
+
+    def get(self, key, default=None):  # type: ignore[override]
+        self.seen.add(key)
+        return super().get(key, default)
+
+    def __getitem__(self, key):
+        self.seen.add(key)
+        return super().__getitem__(key)
+
+    def __contains__(self, key) -> bool:
+        self.seen.add(key)
+        return super().__contains__(key)
+
+
+_ARTIFACT_METADATA_KEYS = {
+    "artifact_hash",
+    "model_version",
+    "method",
+    "note",
+    "league",
+    "sport",
+    "schema_version",
+    "positive_class",
+    "qualification",
+}
+
+
+@pytest.mark.parametrize(
+    ("filename", "loader"),
+    [
+        ("nfl-spread-structural-v7.json", NFLSpreadModelV7.from_artifact),
+        ("nfl-total-structural-v7.json", NFLTotalModelV7.from_artifact),
+    ],
+)
+def test_every_nfl_v7_artifact_parameter_is_consumed_by_the_served_model(filename: str, loader) -> None:
+    """A parameter key nothing reads is a false claim to anyone auditing the artifact: the
+    total artifact carried market_weight / wind_* / cold_temp_penalty / short_week_drag that
+    from_artifact never looked at while the code used different hardcoded values."""
+    artifact = json.loads((REPO / "config" / "models" / filename).read_text(encoding="utf-8"))
+    recorder = _RecordingArtifact(artifact)
+    loader(recorder)
+    unread = set(artifact) - _ARTIFACT_METADATA_KEYS - recorder.seen
+    assert not unread, f"{filename} carries parameters the served model never reads: {sorted(unread)}"
