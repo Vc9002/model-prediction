@@ -176,6 +176,11 @@ flowchart TD
 - **Online Bayesian Drift Correction (P1)**: [`src/model_prediction/online_bayesian.py`](file:///E:/MP/src/model_prediction/online_bayesian.py) tracks dynamic form for high-velocity sports (Tennis, Esports) using $O(1)$ recursive Kalman scalar updating upon settlement, preventing calibration drift without heavy retrains.
 - **WebSocket Order Book Streaming (P2)**: [`src/model_prediction/polymarket_stream.py`](file:///E:/MP/src/model_prediction/polymarket_stream.py) provides event-driven async streaming to Stage 2 with automatic idle sleep.
 
+#### 5. Edge scanner cross-date p_model fallback (OPEN)
+- `_lookup_model_prob` in `portfolio/polymarket_scanner.py` gives a same-date match only a +10 score bonus, so a stale earlier-date Main/Flat pick for the same team pair can supply `p_model` for a different, current event.
+- Found during quick task 261112-01r and not fixed there, because changing it alters which markets the daily edge scanner records.
+- Fail closed when no same-date pick exists.
+
 ---
 
 ## 5. Document Map & Reference Directory
