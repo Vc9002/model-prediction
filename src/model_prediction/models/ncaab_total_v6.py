@@ -15,6 +15,18 @@ Advances ncaab-total-v5 with:
    possession projections against methodical home defenses.
 4. Heteroskedastic Pace & Credibility-Scaled Volatility:
    Adjusts standard deviation proportionally to sqrt(matchup_pace) and sample thinness.
+
+2026-11-12 review fixes (docs/MODEL_REVIEW_2026-11-11.md #7, #9, LOW push mass):
+- ``conference_trend_priors``: the trend engine shrinks each team's scoring level toward its
+  conference baseline, the same reference the pace factor divides by. Before, ``hl10`` was
+  shrunk toward the league mean and then compared to the conference mean, so every team in a
+  high-scoring conference looked slow and every team in a low-scoring one looked fast (#7).
+- ``pace_baseline``: which reference the pace factor uses ("conference" or "league").
+- ``league_total_weight``: explicit weight on the conference-baseline total (was derived as
+  ``1 - trend - team`` and therefore silently zero).
+- Integer total lines exclude the push mass from both over and under.
+- ``from_artifact`` / ``ncaab_total_v6_model`` load ``config/models/ncaab-total-v6.json``
+  (hash-verified) so the artifact and the served parameters cannot drift (#9).
 """
 
 from __future__ import annotations
@@ -30,8 +42,10 @@ from ..features.base import GameRecord
 from ..features.trends import TrendEngine
 from .base import GamePrediction, GamePredictionBase
 from .basketball import UpcomingGame
+from .ncaab_spread_v6 import load_verified_artifact
 
 NCAAB_TOTAL_V6_VERSION = "ncaab-total-v6"
+ARTIFACT_PATH = Path(__file__).resolve().parents[3] / "config" / "models" / "ncaab-total-v6.json"
 
 DEFAULT_BASELINE_POINTS: float = 76.06
 DEFAULT_LEAGUE_PACE: float = 68.1
@@ -121,6 +135,7 @@ class NCAABTotalModelV6:
         league_pace: float = DEFAULT_LEAGUE_PACE,
         trend_total_weight: float = 0.85,
         team_total_weight: float = 0.15,
+        league_total_weight: float = 0.0,
         dynamic_matchup_pace: bool = True,
         pace_drag: float = 0.5,
         schedule_density_drag: bool = True,
@@ -131,15 +146,24 @@ class NCAABTotalModelV6:
         home_tempo_control: float = 0.60,
         use_bayesian_credibility: bool = True,
         credibility_constant: float = 4.0,
+        conference_trend_priors: bool = False,
+        pace_baseline: str = "conference",
+        max_edge: float = 0.08,
+        base_units: float = 1.0,
+        max_units: float = 2.0,
+        dynamic_sizing_enabled: bool = True,
         conference_file: Path | str | None = None,
         conference_baselines: dict[str, float] | None = None,
         version: str = NCAAB_TOTAL_V6_VERSION,
     ) -> None:
+        if pace_baseline not in {"conference", "league"}:
+            raise ValueError(f"pace_baseline must be 'conference' or 'league', got {pace_baseline!r}")
         self.total_sd = total_sd
         self.baseline_points_per_team = baseline_points_per_team
         self.league_pace = league_pace
         self.trend_total_weight = trend_total_weight
         self.team_total_weight = team_total_weight
+        self.league_total_weight = league_total_weight
         self.dynamic_matchup_pace = dynamic_matchup_pace
         self.pace_drag = pace_drag
         self.schedule_density_drag = schedule_density_drag
@@ -150,6 +174,12 @@ class NCAABTotalModelV6:
         self.home_tempo_control = home_tempo_control
         self.use_bayesian_credibility = use_bayesian_credibility
         self.credibility_constant = credibility_constant
+        self.conference_trend_priors = conference_trend_priors
+        self.pace_baseline = pace_baseline
+        self.max_edge = max_edge
+        self.base_units = base_units
+        self.max_units = max_units
+        self.dynamic_sizing_enabled = dynamic_sizing_enabled
         self.conference_baselines = conference_baselines or DEFAULT_CONFERENCE_SCORING_BASELINES
         self.team_conferences = _load_team_conference_map(conference_file)
         self.version = version
@@ -157,37 +187,70 @@ class NCAABTotalModelV6:
         self.sport = "ncaab"
 
     @classmethod
-    def from_artifact(cls, artifact: dict[str, Any]) -> NCAABTotalModelV6:
-        return cls(
-            total_sd=float(artifact.get("total_sd", 13.5)),
-            baseline_points_per_team=float(artifact.get("baseline_points_per_team", DEFAULT_BASELINE_POINTS)),
-            league_pace=float(artifact.get("league_pace", DEFAULT_LEAGUE_PACE)),
-            trend_total_weight=float(artifact.get("trend_total_weight", 0.85)),
-            team_total_weight=float(artifact.get("team_total_weight", 0.15)),
-            dynamic_matchup_pace=bool(artifact.get("dynamic_matchup_pace", True)),
-            pace_drag=float(artifact.get("pace_drag", 0.5)),
-            schedule_density_drag=bool(artifact.get("schedule_density_drag", True)),
-            overtime_risk_adjustment=bool(artifact.get("overtime_risk_adjustment", True)),
-            offseason_gap_days=float(artifact.get("offseason_gap_days", 150.0)),
-            offseason_retention=float(artifact.get("offseason_retention", 0.20)),
-            isolate_postseason=bool(artifact.get("isolate_postseason", True)),
-            home_tempo_control=float(artifact.get("home_tempo_control", 0.60)),
-            use_bayesian_credibility=bool(artifact.get("use_bayesian_credibility", True)),
-            credibility_constant=float(artifact.get("credibility_constant", 4.0)),
-            version=str(artifact.get("model_version", NCAAB_TOTAL_V6_VERSION)),
-        )
+    def from_artifact(cls, artifact: dict[str, Any], **overrides: Any) -> NCAABTotalModelV6:
+        """Construct the served model from its artifact; every model parameter is read here.
+
+        tests/test_ncaab_v6.py asserts that no artifact key goes unread.
+        """
+        sizing = dict(artifact.get("dynamic_sizing") or {})
+        params: dict[str, Any] = {
+            "total_sd": float(artifact.get("total_sd", 13.5)),
+            "baseline_points_per_team": float(
+                artifact.get("baseline_points_per_team", DEFAULT_BASELINE_POINTS)
+            ),
+            "league_pace": float(artifact.get("league_pace", DEFAULT_LEAGUE_PACE)),
+            "trend_total_weight": float(artifact.get("trend_total_weight", 0.85)),
+            "team_total_weight": float(artifact.get("team_total_weight", 0.15)),
+            "league_total_weight": float(artifact.get("league_total_weight", 0.0)),
+            "dynamic_matchup_pace": bool(artifact.get("dynamic_matchup_pace", True)),
+            "pace_drag": float(artifact.get("pace_drag", 0.5)),
+            "schedule_density_drag": bool(artifact.get("schedule_density_drag", True)),
+            "overtime_risk_adjustment": bool(artifact.get("overtime_risk_adjustment", True)),
+            "offseason_gap_days": float(artifact.get("offseason_gap_days", 150.0)),
+            "offseason_retention": float(artifact.get("offseason_retention", 0.20)),
+            "isolate_postseason": bool(artifact.get("isolate_postseason", True)),
+            "home_tempo_control": float(artifact.get("home_tempo_control", 0.60)),
+            "use_bayesian_credibility": bool(artifact.get("use_bayesian_credibility", True)),
+            "credibility_constant": float(artifact.get("credibility_constant", 4.0)),
+            "conference_trend_priors": bool(artifact.get("conference_trend_priors", False)),
+            "pace_baseline": str(artifact.get("pace_baseline", "conference")),
+            "max_edge": float(artifact.get("max_edge", 0.08)),
+            "base_units": float(sizing.get("base_units", 1.0)),
+            "max_units": float(sizing.get("max_units", 2.0)),
+            "dynamic_sizing_enabled": bool(sizing.get("enabled", True)),
+            "version": str(artifact.get("model_version", NCAAB_TOTAL_V6_VERSION)),
+        }
+        params.update(overrides)
+        return cls(**params)
+
+    def _trend_baselines(self, history: Sequence[GameRecord]) -> dict[str, float] | None:
+        """Conference scoring baseline per team (shrinkage target for offense and defense)."""
+        if not self.conference_trend_priors:
+            return None
+        teams = {name for game in history for name in (game.home_team, game.away_team)}
+        out: dict[str, float] = {}
+        for team in teams | set(self.team_conferences):
+            conf = self.team_conferences.get(team)
+            prior = self.conference_baselines.get(conf) if conf is not None else None
+            if prior is not None:
+                out[team] = float(prior)
+        return out
 
     def predict_totals(
         self,
         history: Sequence[GameRecord],
         upcoming: Sequence[UpcomingGame],
     ) -> list[GamePrediction]:
+        team_baselines = self._trend_baselines(history)
         trend = TrendEngine(
             history,
             offseason_gap_days=self.offseason_gap_days,
             offseason_retention=self.offseason_retention,
             isolate_postseason=self.isolate_postseason,
+            offense_baselines=team_baselines,
+            defense_baselines=team_baselines,
         )
+        league_baseline = trend.league_baseline or self.baseline_points_per_team
 
         predictions: list[GamePrediction] = []
 
@@ -266,12 +329,19 @@ class NCAABTotalModelV6:
 
             expected_pace = self.league_pace
             is_neutral = bool(getattr(game, "neutral_site", False))
+            # The pace factor compares each team's shrunk scoring level with a reference. That
+            # reference must be the same one the trend engine shrinks toward, or a team with no
+            # information looks fast/slow purely because of its conference label (#7).
+            pace_ref_away = away_base if self.pace_baseline == "conference" else league_baseline
+            pace_ref_home = home_base if self.pace_baseline == "conference" else league_baseline
             if self.dynamic_matchup_pace and baseline > 0.0:
                 pf_away = 1.0 + 0.55 * (
-                    ((away_trend.offense["hl10"] + away_trend.defense["hl10"]) / 2.0 - away_base) / away_base
+                    ((away_trend.offense["hl10"] + away_trend.defense["hl10"]) / 2.0 - pace_ref_away)
+                    / pace_ref_away
                 )
                 pf_home = 1.0 + 0.55 * (
-                    ((home_trend.offense["hl10"] + home_trend.defense["hl10"]) / 2.0 - home_base) / home_base
+                    ((home_trend.offense["hl10"] + home_trend.defense["hl10"]) / 2.0 - pace_ref_home)
+                    / pace_ref_home
                 )
                 home_w = 0.50 if is_neutral else self.home_tempo_control
                 away_w = 0.50 if is_neutral else (1.0 - self.home_tempo_control)
@@ -296,7 +366,12 @@ class NCAABTotalModelV6:
 
             w_trend = self.trend_total_weight
             w_team = self.team_total_weight
-            w_league = max(0.0, 1.0 - (w_trend + w_team))
+            if self.league_total_weight > 0.0:
+                w_league = self.league_total_weight
+                norm = w_trend + w_team + w_league
+                w_trend, w_team, w_league = w_trend / norm, w_team / norm, w_league / norm
+            else:
+                w_league = max(0.0, 1.0 - (w_trend + w_team))
             expected_total = w_trend * raw_trend_total + w_team * team_avg_total + w_league * (baseline * 2.0)
 
             expected_total -= getattr(game, "availability_total_loss", 0.0)
@@ -332,8 +407,15 @@ class NCAABTotalModelV6:
             )
 
             uncertainty = max(0.03, min(0.20, 0.20 - 0.02 * sample))
-            over_prob = 1.0 - _normal_cdf(target_line, expected_total, effective_total_sd)
-            under_prob = 1.0 - over_prob
+            # Totals are integers: on an integer line the exact-total mass is a push and belongs
+            # to neither side.
+            if game.total_line is not None and float(game.total_line).is_integer():
+                over_prob = 1.0 - _normal_cdf(float(target_line) + 0.5, expected_total, effective_total_sd)
+                under_prob = _normal_cdf(float(target_line) - 0.5, expected_total, effective_total_sd)
+            else:
+                over_prob = 1.0 - _normal_cdf(target_line, expected_total, effective_total_sd)
+                under_prob = 1.0 - over_prob
+            push_prob = max(0.0, 1.0 - over_prob - under_prob)
 
             base: GamePredictionBase = {
                 "event_id": game.event_id,
@@ -349,7 +431,10 @@ class NCAABTotalModelV6:
                     "away_conference": away_conf,
                     "home_conference": home_conf,
                     "expected_pace": round(expected_pace, 1),
+                    "neutral_site": is_neutral,
                     "league_pace": self.league_pace,
+                    "pace_baseline": self.pace_baseline,
+                    "league_baseline": round(league_baseline, 2),
                     "raw_model_total": round(raw_model_total, 2),
                     "expected_total": round(expected_total, 2),
                     "credibility_factor": round(z, 3),
@@ -373,6 +458,7 @@ class NCAABTotalModelV6:
                     probabilities={
                         "over": round(max(0.0001, min(0.9999, over_prob)), 6),
                         "under": round(max(0.0001, min(0.9999, under_prob)), 6),
+                        "push": round(push_prob, 6),
                     },
                     rationale=(
                         f"Projected total {expected_total:.1f} (raw {raw_model_total:.1f}, "
@@ -387,14 +473,20 @@ class NCAABTotalModelV6:
     # Alias predict_games to predict_totals for polymarket slate runner
     predict_games = predict_totals
 
-    @staticmethod
-    def compute_dynamic_units(edge: float, min_edge: float = 0.02, max_edge: float = 0.08) -> float:
-        """Dynamic unit sizing scaling with edge: 1.00U up to 2.00U."""
-        if edge <= min_edge:
-            return 1.00
-        scaled = 1.00 + (edge - min_edge) * (2.00 - 1.00) / (max_edge - min_edge)
-        return round(min(2.00, max(1.00, scaled)), 2)
+    def compute_dynamic_units(
+        self, edge: float, min_edge: float = 0.02, max_edge: float | None = None
+    ) -> float:
+        """Unit sizing scaling linearly with edge from ``base_units`` at ``min_edge`` to
+        ``max_units`` at ``max_edge`` (the artifact's values unless overridden)."""
+        if not self.dynamic_sizing_enabled:
+            return round(self.base_units, 2)
+        top = self.max_edge if max_edge is None else max_edge
+        if edge <= min_edge or top <= min_edge:
+            return round(self.base_units, 2)
+        scaled = self.base_units + (edge - min_edge) * (self.max_units - self.base_units) / (top - min_edge)
+        return round(min(self.max_units, max(self.base_units, scaled)), 2)
 
 
 def ncaab_total_v6_model() -> NCAABTotalModelV6:
-    return NCAABTotalModelV6()
+    """Production factory: the served parameters are the hash-verified artifact's, nothing else."""
+    return NCAABTotalModelV6.from_artifact(load_verified_artifact(ARTIFACT_PATH))

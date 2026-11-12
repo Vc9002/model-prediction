@@ -83,3 +83,53 @@ def test_trend_engine_isolate_postseason() -> None:
     assert bos_iso.games_played == 1
     assert bos_post.games_played == 2
     assert bos_iso.offense["hl10"] > bos_post.offense["hl10"]
+
+
+def _two_team_games(n: int = 3) -> list[GameRecord]:
+    return [
+        GameRecord(
+            event_id=f"g{i}",
+            event_start_utc=f"2026-01-{10 + i:02d}T00:00:00Z",
+            league="NCAAB",
+            away_team="Fast",
+            home_team="Slow",
+            away_score=80,
+            home_score=70,
+        )
+        for i in range(n)
+    ]
+
+
+def test_trend_engine_without_team_baselines_is_unchanged() -> None:
+    games = _two_team_games()
+    plain = TrendEngine(games, offseason_gap_days=150.0, offseason_retention=0.35)
+    explicit_none = TrendEngine(
+        games,
+        offseason_gap_days=150.0,
+        offseason_retention=0.35,
+        offense_baselines=None,
+        defense_baselines=None,
+    )
+    assert plain.team_trend("Fast") == explicit_none.team_trend("Fast")
+    assert plain.team_trend("Unknown").offense["hl10"] == plain.league_baseline
+
+
+def test_trend_engine_team_baselines_set_the_shrinkage_target() -> None:
+    games = _two_team_games()
+    engine = TrendEngine(
+        games,
+        offseason_gap_days=150.0,
+        offseason_retention=0.35,
+        offense_baselines={"Unknown": 90.0, "Fast": 95.0},
+        defense_baselines={"Unknown": 60.0},
+    )
+    # A team with no games sits exactly on its own prior, not the league mean.
+    unknown = engine.team_trend("Unknown")
+    assert unknown.offense["hl10"] == 90.0
+    assert unknown.defense["hl10"] == 60.0
+    # A team with games is pulled toward its prior: a higher prior gives a higher level
+    # than the league-mean shrinkage, with the same observed scores.
+    plain = TrendEngine(games, offseason_gap_days=150.0, offseason_retention=0.35)
+    assert engine.team_trend("Fast").offense["hl10"] > plain.team_trend("Fast").offense["hl10"]
+    # Teams without an entry keep the league mean (defense for Fast was not given).
+    assert engine.team_trend("Fast").defense["hl10"] == plain.team_trend("Fast").defense["hl10"]

@@ -101,8 +101,12 @@ def test_ncaab_total_v6_bayesian_credibility_shrinkage():
     preds_zero = model.predict_totals([], [up])
     assert abs(preds_zero[0].inference_inputs["mean"] - 140.0) < 1e-4
     assert preds_zero[0].feature_basis["credibility_factor"] == 0.0
-    # Probabilities must be exactly 50/50
-    assert abs(preds_zero[0].probabilities["over"] - 0.50) < 0.01
+    # Probabilities must be symmetric; 140.0 is an integer line so the exact-140 push mass is
+    # excluded from both sides instead of being credited to the under.
+    probs = preds_zero[0].probabilities
+    assert abs(probs["over"] - probs["under"]) < 1e-6
+    assert probs["push"] > 0.0
+    assert abs(probs["over"] + probs["under"] + probs["push"] - 1.0) < 1e-5
 
     # 2. Sample = 12 games: z = 12 / (12 + 4) = 0.75 (model dominates)
     history_12 = [

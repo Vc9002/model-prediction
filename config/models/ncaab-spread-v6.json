@@ -1,15 +1,52 @@
 {
-  "artifact_hash": "2c3121e41f8ab7bdf704e0f6352e3d792bbbde74fc5776327ff1047c72e27a01",
-  "confidence_threshold": 0.035,
+  "additive_matchup": true,
+  "artifact_hash": "7704c5800b883441b1d1749932328ffde409a7a4c4a6eb934c724a86409a8e45",
+  "coherent_moneyline": true,
   "dynamic_sizing": {
-    "base_units": 1.0,
-    "edge_slope": 16.67,
     "enabled": true,
+    "base_units": 1.0,
     "max_units": 2.0
   },
+  "dynamic_volatility": true,
+  "elo_home_advantage": 45.0,
   "elo_weight": 0.5,
-  "home_court_points": 7.2,
+  "elo_weight_ramp_games": null,
+  "evidence": {
+    "source": "outputs/ncaab/ncaab_v6_review_ablation.md (variant shipped vs control)",
+    "method": "point-in-time day-by-day walk-forward over data/historical/ncaab_games_all.jsonl, graded days 2025-12-01..2026-11-11 split 60/20/20 by complete ET dates; parameters selected on validation only; reproduction gate 68/68 live Flat rows",
+    "validation": {
+      "n": 1043,
+      "moneyline_brier": 0.202,
+      "control_moneyline_brier": 0.2058,
+      "moneyline_logloss": 0.5877,
+      "control_moneyline_logloss": 0.5964,
+      "margin_mae": 8.844,
+      "control_margin_mae": 9.046,
+      "margin_bias": -0.867,
+      "control_margin_bias": -1.918,
+      "cover_brier_pseudo_lines": 0.2111,
+      "control_cover_brier_pseudo_lines": 0.2133,
+      "pit_coverage_50_80_90": [
+        0.517,
+        0.812,
+        0.915
+      ]
+    },
+    "holdout": {
+      "n": 742,
+      "moneyline_brier": 0.1217,
+      "control_moneyline_brier": 0.1112,
+      "margin_mae": 16.515,
+      "control_margin_mae": 17.76,
+      "cover_brier_pseudo_lines": 0.2346,
+      "control_cover_brier_pseudo_lines": 0.2365,
+      "note": "holdout is 2026-03-19..2026-11-11; 657 of 742 games are the 2026-11 early-season window where home teams won 84.6% and all variants under-disperse (served scale ~15 vs realised 22-24)"
+    },
+    "not_market_relative": true
+  },
+  "home_court_points": 5.0,
   "implementation_type": "code_backed_model",
+  "isolate_postseason": true,
   "logistic_scale": 9.5,
   "margin_sd": 10.5,
   "markets": [
@@ -17,19 +54,25 @@
     "moneyline"
   ],
   "max_edge": 0.08,
-  "min_edge": 0.035,
-  "min_sample_games": 8,
   "model_id": "ncaab-spread-v6",
   "model_version": "ncaab-spread-v6",
+  "non_d1_prior": 1180.0,
   "offseason_gap_days": 150,
-  "offseason_retention": 0.2,
+  "offseason_retention": 0.35,
   "qualified_for_betting": true,
+  "rest_penalty_away": 2.0,
+  "rest_penalty_home": 1.6,
+  "rest_weight": 0.15,
+  "schedule_density_drag": true,
   "schema_version": "basketball-spread-v6",
   "sport": "ncaab",
   "status": "production",
   "student_t_df": 8.0,
-  "target": "NCAAB Men's College Basketball Student-t point spread and coherent logistic moneyline model",
-  "trained_through_date": "2026-11-09",
+  "student_t_scale_matches_sd": false,
+  "target": "NCAAB Men's College Basketball Student-t point spread and coherent moneyline model",
+  "tiered_trend_priors": true,
+  "trained_through_date": "2026-11-12",
   "trend_weight": 0.5,
+  "use_logistic_moneyline": true,
   "use_student_t_spreads": true
 }

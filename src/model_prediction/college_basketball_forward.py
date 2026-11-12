@@ -660,7 +660,7 @@ def forecast_ncaab_sport(
                 ]
                 dynamic_units = (
                     getattr(model_inst, "compute_dynamic_units", None)
-                    and model_inst.compute_dynamic_units(edge, min_edge=min_edge, max_edge=0.08)
+                    and model_inst.compute_dynamic_units(edge, min_edge=min_edge)
                 ) or 1.00
                 eligibility = EligibilityResult(
                     False,

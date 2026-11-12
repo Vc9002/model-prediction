@@ -1,0 +1,108 @@
+# NCAAB v6 review fixes — 2026-11-12
+
+Closes the NCAAB findings of `docs/MODEL_REVIEW_2026-11-11.md` (#7, #9 NCAAB part, #10 NCAAB
+part, #11, LOW push mass, cross-cutting test gaps #1 and #4) under operator directive
+"focus on NCAAB, fix all bugs and issues, and fix features". Quick task `quick-261112-nc6`.
+
+Both champions (`ncaab-spread-v6`, `ncaab-total-v6`) are fixed **in place under the same
+version string**, following the NFL v7 precedent (`03faf30d` → `a2d9a43c`). Every fix is a
+constructor parameter whose default reproduces the pre-fix model bit-for-bit; the artifacts
+now declare the served values and the factories load them hash-verified. Rollback is
+`git revert` of the commits listed in `docs/DEBUG.md` (2026-11-12 NCAAB entry).
+
+## Evidence
+
+`scripts/ncaab_v6_review_ablation.py` → `outputs/ncaab/ncaab_v6_review_ablation.{md,json}`.
+
+- Point-in-time day-by-day walk-forward over `data/historical/ncaab_games_all.jsonl`
+  (6,957 completed games, 2025-11-03 → 2026-11-12). Graded days from 2025-12-01, split
+  60/20/20 by complete ET dates: train 2025-12-01 → 2026-02-19, validation 2026-02-20 →
+  2026-03-18, holdout 2026-03-19 → 2026-11-11 (742 games, 657 of them the 2026-11
+  early-season window). Nothing is fitted; "train" only reports residual SDs. Every
+  parameter choice below was made on validation; the holdout is reported once.
+- **Reproduction gate passed**: the control variant re-derives all 68 Flat rows the live
+  daily wrote at 2026-11-12T05:40Z (same history digest, 0 feature deltas, 0 probability
+  deltas) before any candidate number is read.
+- The file has no market lines, so the evaluation is distributional (moneyline Brier /
+  log loss, margin and total error, PIT coverage of the served distribution, cover/over
+  Brier at pseudo-lines around the projection), **not market-relative**. CLV / executable
+  ROI remain the forward check pinned in `docs/handoffs/HANDOFF.md` §1.
+
+### Shipped vs control, validation (n = 1,043)
+
+| metric | control | shipped |
+|---|---|---|
+| moneyline Brier | 0.2058 | **0.2020** |
+| moneyline log loss | 0.5964 | **0.5877** |
+| moneyline intercept (0 = calibrated) | −0.277 | **+0.041** |
+| mean P(home) vs home win rate 62.3% | 67.9% | **61.0%** |
+| margin MAE | 9.046 | **8.844** |
+| margin bias (home over-predicted when negative) | −1.92 | **−0.87** |
+| spread cover Brier (pseudo-lines) | 0.2133 | **0.2111** |
+| margin PIT coverage 50/80/90 | 0.507/0.807/0.907 | 0.517/0.812/0.915 |
+| total MAE | 14.302 | **13.784** |
+| total PIT coverage 50/80/90 | 0.402/0.682/0.808 | **0.489/0.816/0.919** |
+| over Brier (pseudo-lines) | 0.2364 | 0.2363 |
+
+### Holdout (n = 742, reported once)
+
+| metric | control | shipped |
+|---|---|---|
+| margin MAE | 17.76 | **16.52** |
+| spread cover Brier | 0.2365 | **0.2346** |
+| moneyline Brier | **0.1112** | 0.1217 |
+| total MAE | 15.11 | **14.48** |
+| total bias | +2.26 | **+0.63** |
+| over Brier | 0.2355 | **0.2344** |
+
+The holdout is dominated by the 2026-11 early-season window (home teams won 84.6%, mean
+absolute margin error 17–19 for every variant, realised margin SD 22–24 against a served
+scale of ~15). The coherent moneyline inherits that under-dispersion and is worse there than
+the legacy logistic, which stayed sharp by accident. Main NCAAB does not trade that regime
+(current-season sample gate ≥ 8, `37c9212d`); Flat does. Widening the thin-sample volatility
+cannot be selected on validation (every validation game has a sample ≥ 8) and is left open.
+
+## What changed and why
+
+| # | finding | fix | validation effect |
+|---|---|---|---|
+| 7 | total: level shrunk to league mean, pace factor divided by conference baseline; `w_league` silently 0 | `conference_trend_priors=True` (TrendEngine per-team shrinkage targets), `pace_baseline="league"`, `league_total_weight` explicit (0.0 — 0.15 was worse) | MAE 14.30 → 13.78 |
+| 9 | artifact said retention 0.2, served 0.35; factory ignored the artifact; unread policy keys | `from_artifact` + hash-verified factory; artifact lists every served parameter; `confidence_threshold`/`min_edge`/`min_sample_games` removed (policy lives in `config/model.yaml`); `max_edge`/`dynamic_sizing` now consumed by `compute_dynamic_units` | — (retention 0.35 kept: validation has no offseason gap, so 0.2 vs 0.35 is not selectable) |
+| 10 | logistic s=9.5 moneyline vs Student-t margin | `coherent_moneyline=True`: P(home) = 1 − T((0.5 − μ)/scale) | ML Brier 0.2058 → 0.2020, intercept −0.28 → +0.04 |
+| 10 | t(df=8) scale 10.5 has true SD 12.1 | **tested and rejected**: scale 10.5 already gives 0.51/0.81/0.91 coverage; matching the scale to the SD gives 0.44/0.74/0.87 | — |
+| 11 | early-season compression of the trend half | `tiered_trend_priors=True` (offense/defense shrink toward the conference-tier strength) and `additive_matchup=True` (`offense + opponent defense − league mean` instead of their average, which halved every strength gap even with full samples) | margin MAE 9.046 → 8.973; holdout 17.76 → 16.02 for this pair alone |
+| 11 | sample-scheduled Elo weight | implemented (`elo_weight_ramp_games`), **left off**: inert on validation; on the holdout it undoes part of the priors' gain | — |
+| HCA | margin bias −1.9 on validation | grid 7.2 / 6.0 / 5.0 (+ Elo HCA 70 / 55 / 45): 5.0 & 45 selected (bias −0.87, best cover Brier, ML Brier within 0.0001 of 6.0) | see table |
+| total SD | PIT 0.40/0.68/0.81 at `total_sd` 13.5 | grid 13.5 / 15.5 / 16.5 / 17.5: 16.5 selected (0.489/0.816/0.919) | — |
+| LOW | integer-line push mass credited to one side | spread and total exclude the (line ± 0.5) band on integer lines; `push` reported | — |
+
+## Tests (`tests/test_ncaab_v6_review_fixes.py`, `tests/test_trends.py`, `tests/test_ncaab_v6.py`)
+
+- Coherent moneyline equals the margin-distribution mass; legacy logistic differs by > 2 pp.
+- Matched Student-t scale has SD = `margin_sd` (documents the rejected option).
+- Integer spread/total lines: `home + away + push = 1`, `push > 0`; half-point lines unchanged.
+- Elo ramp: weight 1.0 at sample 0, exactly the control margin at sample ≥ 8.
+- Tiered priors + additive matchup: Tier-1 host vs Tier-5 visitor projects the Elo-implied
+  gap (HCA + (1680 − 1270)/28) instead of HCA only.
+- #7 direction: legacy makes a Northeast pair faster than an SEC pair on identical scoring;
+  fixed does not.
+- Artifact contracts: every artifact key is read by `from_artifact` (recording dict, NFL
+  `4dd3034e` pattern); hashes verify against `compute_artifact_hash`; a tampered artifact is
+  refused; the object `college_basketball_forward` actually calls carries the artifact's
+  parameters (review cross-cutting gap #1).
+- TrendEngine: `offense_baselines`/`defense_baselines=None` is byte-identical; a given
+  baseline is the shrinkage target.
+
+Red-without-fix evidence: the artifact tests failed on the pre-fix artifacts
+(`confidence_threshold`, `min_edge`, `min_sample_games` unread; `coherent_moneyline`
+missing); the old `test_ncaab_total_v6_bayesian_credibility_shrinkage` assertion failed on the
+integer-line push fix and was rewritten to assert symmetry + push.
+
+## Not changed / open
+
+- Early-season dispersion (both markets) and the Elo ramp: need a second cross-season window
+  or market lines to select on; see HANDOFF §1.
+- `offseason_retention` 0.2 vs 0.35: same reason.
+- The live calibrators for both models are identity (`champion_method: identity`,
+  n = 50/90/110), so no fitted transform is stale after this change.
+- Main NCAAB totals remain paused (`93aa093c`); nothing here restores them.
