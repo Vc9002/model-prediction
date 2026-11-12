@@ -1,9 +1,27 @@
+---
+gsd_state_version: "1.0"
+current_phase: 1
+current_phase_name: Portfolio Circuit Breaker
+status: planning
+stopped_at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated to 4-phase structure
+last_updated: "2026-11-12T02:32:19.479Z"
+last_activity: 2026-09-22
+last_activity_desc: ROADMAP.md and STATE.md created from REQUIREMENTS.md and research/SUMMARY.md
+state_head: d349715bc3483d8535fcd99abcaecdb21724eefc
+progress:
+  total_phases: 4
+  completed_phases: 0
+  total_plans: 2
+  completed_plans: 0
+  percent: 0
+---
+
 <!-- STATE-MD-SCHEMA:START:frontmatter — generated scripts/gen-state-md-docs.cjs src/state-md-schema.cts; do not edit by hand -->
 ```markdown
 ---
 gsd_state_version: '1.0'
 status: planning
-progress:
+progress:[░░░░░░░░░░] 0%
   total_phases: 4
   completed_phases: 0
   total_plans: 0
@@ -62,6 +80,12 @@ None yet.
 **Blockers/Concerns:**
 - Phase 4 (Measurement/Alerting) research flag: no notification channel (Slack/webhook/email) has been selected yet — needs a short scoping decision during Phase 4 planning, not deep research.
 - Phase 3 (Archive Linkage) research flag: per-sport team-alias/market-slug matching risk is real (soccer's ~45-competition collision history) — each sport's rollout may need a short targeted verification pass on its own identifier quirks.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 261111-o7p | Fix auto-buyer rejection telemetry miscategorization and add state-file conflict detection | 2026-11-11 | d349715b | [261111-o7p-fix-auto-buyer-rejection-telemetry-misca](./quick/261111-o7p-fix-auto-buyer-rejection-telemetry-misca/) |
 
 ## Milestone History
 
