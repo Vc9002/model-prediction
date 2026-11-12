@@ -4309,7 +4309,7 @@ def _log_esports_forecast(
         # Research preserves every safely priced candidate, including a
         # synthetic-1500-prior candidate for an unvalidated/new team --
         # evaluate_gated_research_eligibility downgrades those to a
-        # RESEARCH_OBSERVATION/NO_CALL row below rather than dropping them.
+        # unqualified NO_CALL row below rather than dropping them.
         # Gated research is the curated subset: positive executable edge, a
         # real model opinion, and both teams resolved to ratings learned by
         # this exact artifact. Exposure and model/market disagreement

@@ -144,7 +144,7 @@ def test_full_mlb_forward_slate_produces_home_call(tmp_path):
     c = candidates[0]
     assert c.selection == "home"
     assert c.call is True
-    assert c.action == "QUALIFIED_SHADOW_CALL"
+    assert c.action == "CALL"
     assert c.reason == "CALL_LEARNED_CONFIDENCE"
     assert c.model_version == "mlb-test-v1"
     assert c.model_qualified is True
@@ -370,7 +370,7 @@ def test_below_threshold_still_produces_a_real_call(tmp_path):
 
     c = candidates[0]
     assert c.call is True
-    assert c.action == "QUALIFIED_SHADOW_CALL"
+    assert c.action == "CALL"
     assert c.reason == "CALL_BELOW_LEARNED_CONFIDENCE_OPERATOR_REVIEW"
     assert c.confidence_threshold == 0.95  # still reported, just not a gate
 

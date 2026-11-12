@@ -288,7 +288,7 @@ def _clear_today_open(
 
     Passes allow_staked_removal=True on every call: this project is
     shadow-only (no real orders are ever placed from a forecast run — see
-    POLICY.md), so a "QUALIFIED_SHADOW_CALL, units > 0" row is never actual
+    POLICY.md), so a qualified, units > 0 row is never actual
     staked money on EITHER ledger. Without this, an MLB pick strong enough to
     independently clear real eligibility (not just the flat-mode diagnostic
     override) would get silently frozen forever — never replaced by any

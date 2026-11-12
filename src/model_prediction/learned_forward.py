@@ -891,7 +891,7 @@ def build_learned_moneyline_slate(
             model_probability = home_probability if selection == "home" else (1 - home_probability)
             call = True
             cleared_confidence_threshold = model_probability >= confidence_threshold
-            action = "QUALIFIED_SHADOW_CALL"
+            action = "CALL"
             reason = (
                 "CALL_LEARNED_CONFIDENCE"
                 if cleared_confidence_threshold

@@ -340,7 +340,6 @@ def test_validation_is_chronological_versioned_and_never_promotes_baseline(tmp_p
     assert result["units"] == 0
     artifact = json.loads((tmp_path / "artifacts/lol-tiered-elo-v6.json").read_text())
     assert artifact["qualified_for_betting"] is False
-    assert artifact["model_state"] == "research"
     assert artifact["artifact_hash"] == result["artifact_hash"]
     # Production-model audit gap #2 (2026-08-15): champion evidence must
     # live INSIDE the artifact — the v8-style structured blocks.

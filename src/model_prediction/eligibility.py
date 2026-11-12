@@ -286,7 +286,7 @@ def _call_result(
     home: CanonicalTeam,
     policy: UnitPolicy,
 ) -> EligibilityResult:
-    """Build a QUALIFIED_SHADOW_CALL once every trust-boundary gate has
+    """Build a qualified result (``qualified=True``) once every trust-boundary gate has
     passed. Sizes via the proven edge-scaled method (edge_scaled_units,
     "+34.1U vs +13.3U flat" walk-forward) rather than the exposure-aware
     Kelly engine in recommend_units -- that engine's is_call decision isn't
@@ -331,8 +331,8 @@ def _research(
 ) -> EligibilityResult:
     """Create a research-only paper CALL for an untrusted decision.
 
-    Trust failures still prevent execution because ``record_type`` remains
-    ``RESEARCH_OBSERVATION``. They no longer produce a NO_CALL or zero-unit
+    Trust failures still prevent execution because ``qualified`` remains
+    False. They no longer produce a NO_CALL or zero-unit
     row: the operator's universal-ledger contract requires every stored
     prediction to carry a model-derived paper size and settle P&L.
     """

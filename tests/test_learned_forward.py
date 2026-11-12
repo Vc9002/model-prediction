@@ -134,7 +134,7 @@ def test_forward_slate_uses_artifact_gate_and_point_in_time_features(tmp_path) -
     candidate = candidates[0]
     assert candidate.selection == "home"
     assert candidate.call is True
-    assert candidate.action == "QUALIFIED_SHADOW_CALL"
+    assert candidate.action == "CALL"
     assert candidate.feature_basis["history_games"] == 60
     assert len(candidate.feature_snapshot_hash) == 64
 
@@ -153,7 +153,7 @@ def test_unqualified_artifact_can_only_create_research_observation(tmp_path) -> 
         observed_at=datetime(2026, 7, 17, 12, tzinfo=UTC),
     )
 
-    assert candidates[0].action == "QUALIFIED_SHADOW_CALL"  # All calls treated equally; user decides
+    assert candidates[0].action == "CALL"  # All calls treated equally; user decides
 
 
 def test_pitcher_gap_served_from_history_and_starter_gap_defaults_neutral_when_unresolved(
