@@ -25,3 +25,10 @@ Not touched: `rebuild/` (39 unreferenced definitions listed by the scan), interf
 Failing before this work (same failures at `0af19ecd`): 9 in `tests/test_cli.py`, 1 in
 `tests/test_five_blind_spot_guards.py`, 1 in `tests/test_forecast_runtime_regressions.py`,
 1 in `tests/test_tennis_markov.py`.
+
+## Pick-tag stages (2026-11-11/12)
+
+- `PickTag` (research/shadow/qualified) derives from destination: Main/Flat ledger -> research, paper buyer -> shadow, live buyer -> qualified. Buyer jsonl rows store `pick_tag`; old rows are backfilled on read.
+- Stage 1 (`3fbbf16a`): `ModelState` -> `PickRequest.model_enabled` (`lifecycle.model_enabled` reads `enabled:` then legacy `status:`; only retired/suspended mean off).
+- Stage 2 (`0080f5bd`): `RecordType` -> `EligibilityResult.qualified`; stored `record_type` column spelled only in `domain.py` (`legacy_record_type`, `is_qualified_row`, `is_research_row`).
+- Deliberately NOT done: config `status: shadow_qualified` -> `enabled: true`. `dashboard/evidence.py` reads config `status` as "config_qualified" and compares it with the artifact's locked-holdout result; migrating the yaml would raise mismatch warnings on every qualified artifact. Needs a decision on that evidence check first.
