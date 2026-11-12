@@ -2,6 +2,7 @@ import pytest
 import yaml
 
 from model_prediction.config import PROJECT_ROOT, load_config
+from model_prediction.lifecycle import model_enabled
 from model_prediction.models.learned_market import LearnedMarketArtifact
 
 
@@ -165,10 +166,10 @@ def test_configured_production_artifact_state_matches_locked_audit() -> None:
         "WNBA": ("shadow_qualified", True),
         "NFL": ("shadow_qualified", True),  # v4 (ET cohorts) qualifies: 71.3% on 87 locked calls
     }
-    for sport, (status, qualified) in expected.items():
+    for sport, (_legacy_status, qualified) in expected.items():
         model = config["models"][sport]
         artifact = LearnedMarketArtifact.load(PROJECT_ROOT / model["production_artifact"])
-        assert model["status"] == status
+        assert model_enabled(model)
         assert artifact.qualified is qualified
 
 

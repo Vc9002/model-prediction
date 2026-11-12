@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from ..domain import is_qualified_row
+from ..lifecycle import model_enabled
 
 try:
     from openpyxl import load_workbook
@@ -412,6 +413,22 @@ def _deduplicate_ledger_rows(rows: list[dict]) -> tuple[list[dict], int]:
     for row in rows:
         unique.setdefault(_ledger_deduplication_key(row), row)
     return list(unique.values()), len(rows) - len(unique)
+
+
+def _config_qualified(model_config: dict) -> bool:
+    """Whether config marks the model as serving. ``enabled:`` wins; a legacy ``status:`` only counts when it named a qualified tier."""
+    if "enabled" in model_config:
+        return model_enabled(model_config)
+    return str(model_config.get("status") or "").casefold() in {"qualified", "shadow_qualified", "production"}
+
+
+def _config_status_label(model_config: dict) -> str | None:
+    """Display string for the config entry: the raw legacy status if present, else enabled/disabled."""
+    if model_config.get("status") is not None:
+        return model_config.get("status")
+    if "enabled" in model_config:
+        return "enabled" if model_enabled(model_config) else "disabled"
+    return None
 
 
 def _model_owns_row(sport: str, model_config: dict, row: dict) -> bool:
@@ -1054,11 +1071,7 @@ def production_evidence() -> dict:
                     }
                 )
 
-        config_qualified = str(model_config.get("status") or "").casefold() in {
-            "qualified",
-            "shadow_qualified",
-            "production",
-        }
+        config_qualified = _config_qualified(model_config)
         artifact_qualified = (
             (raw.get("qualification") or {}).get("qualified")
             if raw.get("method") == "logistic_regression"
@@ -1074,7 +1087,7 @@ def production_evidence() -> dict:
                 {
                     "code": "config_artifact_qualification_mismatch",
                     "scope": "qualification",
-                    "config_status": model_config.get("status"),
+                    "config_status": _config_status_label(model_config),
                     "artifact_qualified": artifact_qualified,
                 }
             )
@@ -1132,7 +1145,7 @@ def production_evidence() -> dict:
         return {
             "sport": str(sport).lower(),
             "model_version": version or None,
-            "status": model_config.get("status"),
+            "status": _config_status_label(model_config),
             "features": spec.get("features") or [],
             "feature_registry": registry_features,
             "backfill": locked,
@@ -1141,7 +1154,7 @@ def production_evidence() -> dict:
             "research_ledger": research_ledger,
             "profitability": profitability,
             "warnings": warnings,
-            "configured_status": model_config.get("status"),
+            "configured_status": _config_status_label(model_config),
             "active_model_version": version or None,
             "production_artifact": str(model_config["production_artifact"]),
             "artifact": artifact,

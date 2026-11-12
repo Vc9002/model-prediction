@@ -160,7 +160,7 @@ def status() -> dict:
 
     # Check qualification using the same artifact fallback as _ml_cell and matrix().
     # kbo/npb are zero-unit research baselines tracked via baseball_grid, checked
-    # separately below. lol/cs2 are now shadow_qualified production.
+    # separately below. lol/cs2 are now enabled production.
     sports_meta = validation.get("sports") or {}
     for sport in ("mlb", "nba", "wnba", "nfl", "soccer", "lol", "cs2", "dota2", "valorant"):
         meta = sports_meta.get(sport) or {}

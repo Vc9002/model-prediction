@@ -40,6 +40,7 @@ from model_prediction.features.cfb_features import (
     CFB_UNCERTAINTY_FLOOR,
     CFBFeatureExtractor,
 )
+from model_prediction.lifecycle import model_enabled
 from model_prediction.models.cfb_distribution import (
     CFBDistributionType,
     CFBJointDistributionEngine,
@@ -732,7 +733,7 @@ def test_cfb_models_serving_with_degraded_evidence():
 
     with (root / "config/model.yaml").open() as f:
         model_cfg = yaml.safe_load(f)
-    assert model_cfg["models"]["NCAAF"]["status"] == "shadow_qualified"
+    assert model_enabled(model_cfg["models"]["NCAAF"])
 
 
 def test_cfb_talent_disparity_shrinkage_above_21_5():
