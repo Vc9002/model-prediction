@@ -90,12 +90,14 @@ from .forecast_market_select import (
 from .forecast_nfl_support import (  # noqa: F401 -- re-exported: tests and callers import these from forecast
     NFL_DIVISIONS,
     STANDARD_LAY_ASK,
+    _apply_serving_calibrator,
     _espn_spread_no_vig_ask,
     _load_nfl_injuries_known_at,
     _main_call_eligible,
     _nfl_inputs_fresh,
     _nfl_is_division_game,
     _nfl_is_neutral_site,
+    _nfl_serving_calibrator,
     _nfl_situational_features,
     _nfl_venue_weather,
     _select_nfl_spread_market,
@@ -2548,6 +2550,7 @@ def _forecast_nfl_spread_slate(
     observed_at = observed_at or utc_now()
     injury_entries, injury_source = _load_nfl_injuries_known_at(data_root, observed_at)
     model_version = "nfl-spread-structural-v7"
+    serving_calibrator = _nfl_serving_calibrator(model_version, "spread", data_root)
     artifact, artifact_error = _load_exact_artifact_contract(model_version)
     if artifact is None:
         return {
@@ -2849,6 +2852,15 @@ def _forecast_nfl_spread_slate(
             observed_at_utc=observed_at.isoformat(),
         )
 
+        served_probability, calibration_method, calibration_version, calibration_artifact_hash = (
+            _apply_serving_calibrator(
+                model_probability,
+                serving_calibrator,
+                default_method="margin_normal",
+                model_version=model_version,
+                model_artifact_hash=model_artifact_hash,
+            )
+        )
         priced_contracts.append(
             {
                 "event_id": event_id,
@@ -2860,7 +2872,11 @@ def _forecast_nfl_spread_slate(
                 "line": line,
                 "executable_ask": float(ask),
                 "sportsbook": sportsbook,
-                "model_probability": round(model_probability, 6),
+                "model_probability": round(served_probability, 6),
+                "model_probability_raw": round(model_probability, 6),
+                "calibration_method": calibration_method,
+                "calibration_version": calibration_version,
+                "calibration_artifact_hash": calibration_artifact_hash,
                 "model_uncertainty": 0.08,
                 "model_version": model_version,
                 "model_artifact_hash": model_artifact_hash,
@@ -2975,9 +2991,11 @@ def _forecast_nfl_spread_sport(
             else ModelState.RESEARCH,
             observed_at_utc=contract["observed_at_utc"],
             model_artifact_hash=contract["model_artifact_hash"],
-            calibration_method="margin_normal",
-            calibration_version=contract["model_version"],
-            calibration_artifact_hash=contract["model_artifact_hash"],
+            calibration_method=contract.get("calibration_method", "margin_normal"),
+            calibration_version=contract.get("calibration_version", contract["model_version"]),
+            calibration_artifact_hash=contract.get(
+                "calibration_artifact_hash", contract["model_artifact_hash"]
+            ),
             feature_schema_version="2",
             code_revision=contract["model_artifact_hash"],
             model_input_snapshot_json=json.dumps(
@@ -3099,6 +3117,7 @@ def _forecast_nfl_total_slate(
     observed_at = observed_at or utc_now()
     injury_entries, injury_source = _load_nfl_injuries_known_at(data_root, observed_at)
     model_version = "nfl-total-structural-v7"
+    serving_calibrator = _nfl_serving_calibrator(model_version, "total", data_root)
     artifact, artifact_error = _load_exact_artifact_contract(model_version)
     if artifact is None:
         return {
@@ -3457,6 +3476,15 @@ def _forecast_nfl_total_slate(
             if short_week_pen > 0
             else ""
         )
+        served_probability, calibration_method, calibration_version, calibration_artifact_hash = (
+            _apply_serving_calibrator(
+                model_probability,
+                serving_calibrator,
+                default_method="total_normal",
+                model_version=model_version,
+                model_artifact_hash=model_artifact_hash,
+            )
+        )
         priced_contracts.append(
             {
                 "event_id": event_id,
@@ -3468,7 +3496,11 @@ def _forecast_nfl_total_slate(
                 "line": line,
                 "executable_ask": float(ask),
                 "sportsbook": sportsbook,
-                "model_probability": round(model_probability, 6),
+                "model_probability": round(served_probability, 6),
+                "model_probability_raw": round(model_probability, 6),
+                "calibration_method": calibration_method,
+                "calibration_version": calibration_version,
+                "calibration_artifact_hash": calibration_artifact_hash,
                 "model_uncertainty": 0.08,
                 "model_version": model_version,
                 "model_artifact_hash": model_artifact_hash,

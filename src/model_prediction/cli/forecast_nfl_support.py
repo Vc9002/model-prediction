@@ -43,6 +43,62 @@ def _main_call_eligible(eligibility: Any, *, edge: float, min_edge: float, max_e
 _NFL_PARTIAL_MARKET_TOKENS = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")
 
 
+def _nfl_serving_calibrator(model_version: str, market: str, data_root: str | Path) -> Any | None:
+    """The fitted calibrator for (model, market) if -- and only if -- its own artifact passes
+    the serving guard that calibration_pipeline.calibrate_for_serving applies for the buyer:
+    a non-identity champion, at least MIN_SERVING_SAMPLE outcomes, and an out-of-fold Brier
+    that beats the raw model by MIN_SERVING_BRIER_IMPROVEMENT. Anything else returns None
+    and the raw engine probability is served. Returns the load_calibrator_artifact object so
+    the row carries the artifact's file hash, which validate_decision_snapshot re-checks at
+    request time and at settlement."""
+    from ..calibration import load_calibrator_artifact
+    from ..calibration_pipeline import MIN_SERVING_BRIER_IMPROVEMENT, MIN_SERVING_SAMPLE
+
+    path = Path(data_root) / "calibration" / "models" / f"{model_version}.{market}_calibrator.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    try:
+        if str(payload.get("champion_method") or "identity").lower() == "identity":
+            return None
+        if str(payload.get("market")) != market or str(payload.get("model_version")) != model_version:
+            return None
+        if int(payload.get("sample_size") or 0) < MIN_SERVING_SAMPLE:
+            return None
+        baseline, oof = payload.get("baseline_brier"), payload.get("calibrated_oof_brier")
+        if baseline is None or oof is None or float(baseline) - float(oof) < MIN_SERVING_BRIER_IMPROVEMENT:
+            return None
+        return load_calibrator_artifact(path)
+    except (TypeError, ValueError, KeyError, FileNotFoundError):
+        return None
+
+
+def _apply_serving_calibrator(
+    raw_probability: float,
+    calibrator: Any | None,
+    *,
+    default_method: str,
+    model_version: str,
+    model_artifact_hash: str,
+) -> tuple[float, str, str, str]:
+    """(served_probability, calibration_method, calibration_version, calibration_artifact_hash).
+
+    Without a calibrator the row keeps the engine's own identity labels so the scalar
+    replay knows no transform was applied. The served value is NOT clamped: the replay
+    recomputes raw -> transform and compares to 2e-6, so any extra step here would make
+    every calibrated pick fail validate() and vanish into `skipped`."""
+    if calibrator is None:
+        return raw_probability, default_method, model_version, model_artifact_hash
+    meta = calibrator.metadata
+    return (
+        float(calibrator.transform(raw_probability)),
+        meta.calibration_method,
+        meta.calibration_version,
+        meta.artifact_hash,
+    )
+
+
 def _select_nfl_spread_market(candidates: list[dict]) -> dict | None:
     """Select the most balanced spread market line for an NFL game."""
     return _select_latest_balanced_market(candidates)

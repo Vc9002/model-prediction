@@ -225,6 +225,27 @@ class NFLEfficiencyStore:
             logger.warning("Could not read local NFL efficiency parquets: %s", exc)
 
     @classmethod
+    def from_frames(
+        cls,
+        team_df: pl.DataFrame,
+        qb_df: pl.DataFrame,
+        *,
+        source_manifest: dict[str, object] | None = None,
+    ) -> NFLEfficiencyStore:
+        """Replay/backtest constructor for frames the caller assembled (e.g. legacy
+        seasons plus a snapshot-built current season). Bypasses disk discovery; the
+        frames still have to satisfy TEAM_FRAME_REQUIRED_COLUMNS or every lookup
+        fails closed exactly as in production."""
+        store = cls.__new__(cls)
+        store.data_root = Path(".")
+        store.team_parquet = Path(".")
+        store.qb_parquet = Path(".")
+        store._team_df = team_df
+        store._qb_df = qb_df
+        store.source_manifest = source_manifest
+        return store
+
+    @classmethod
     def get_default(
         cls, data_root: Path | None = None, *, observed_at: datetime | None = None
     ) -> NFLEfficiencyStore:
