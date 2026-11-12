@@ -30,7 +30,7 @@ from model_prediction.domain import (
     ModelOrigin,
     PickRequest,
 )
-from model_prediction.eligibility import EligibilityResult, RecordType
+from model_prediction.eligibility import EligibilityResult
 from model_prediction.entities import CanonicalTeam
 from model_prediction.forward import MLBForwardCandidate
 from model_prediction.learned_forward import LearnedForwardCandidate
@@ -1360,7 +1360,7 @@ def test_tennis_settlement_populates_clv_from_captured_closing_snapshot(tmp_path
         "Beta Player", League.TENNIS, "Beta Player", "Beta Player", True, None, None, ()
     )
     eligibility = EligibilityResult(
-        RecordType.QUALIFIED_SHADOW_CALL,
+        True,
         "CALL",
         "QUALIFIED",
         0.5,
@@ -1442,7 +1442,7 @@ def test_invalid_quote_timestamp_keeps_mlb_model_opinion_off_main(
         cli_forecast,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
-            RecordType.QUALIFIED_SHADOW_CALL,
+            True,
             "CALL",
             "QUALIFIED",
             1.0,
@@ -1482,7 +1482,7 @@ def test_invalid_quote_timestamp_keeps_mlb_model_opinion_off_main(
 
     assert result["logged"] == 1
     assert len(ledger.appended) == 1
-    assert ledger.appended[0][1].record_type is RecordType.RESEARCH_OBSERVATION
+    assert not ledger.appended[0][1].qualified
     assert any("timestamp is invalid" in row["reason"] for row in result["unmatched_quotes"])
 
 
@@ -1547,7 +1547,7 @@ def test_below_min_edge_vs_market_still_gets_logged_not_skipped(monkeypatch, tmp
         cli_forecast,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
-            RecordType.QUALIFIED_SHADOW_CALL,
+            True,
             "CALL",
             "QUALIFIED",
             1.0,
@@ -1661,7 +1661,7 @@ def test_learned_sport_gated_ledger_duplicate_is_tracked_not_silently_dropped(mo
         cli_forecast,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
-            RecordType.QUALIFIED_SHADOW_CALL,
+            True,
             "CALL",
             "QUALIFIED",
             1.0,
@@ -1757,7 +1757,7 @@ def test_below_learned_confidence_threshold_downgraded_and_kept_off_main(monkeyp
         cli_forecast,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
-            RecordType.QUALIFIED_SHADOW_CALL,
+            True,
             "CALL",
             "QUALIFIED",
             1.0,
@@ -1798,7 +1798,7 @@ def test_below_learned_confidence_threshold_downgraded_and_kept_off_main(monkeyp
     assert result["logged"] == 1
     assert len(ledger.appended) == 1
     assert ledger.appended[0][1].decision == "CALL"
-    assert ledger.appended[0][1].record_type is RecordType.RESEARCH_OBSERVATION
+    assert not ledger.appended[0][1].qualified
 
     # Flat is explicitly the every-game paper benchmark. The row retains a
     # positive paper size even when its artifact is not production validated.
@@ -1816,7 +1816,7 @@ def test_below_learned_confidence_threshold_downgraded_and_kept_off_main(monkeyp
 
     assert flat_result["logged"] == 1
     flat_eligibility = flat_ledger.appended[0][1]
-    assert flat_eligibility.record_type is RecordType.RESEARCH_OBSERVATION
+    assert not flat_eligibility.qualified
     assert flat_eligibility.decision == "CALL"
     assert flat_eligibility.reason_code == "PAPER_CALL_MODEL_UNVALIDATED"
     assert flat_eligibility.units == pytest.approx(1.0)
@@ -1908,7 +1908,7 @@ def test_market_residual_probability_recorded_when_artifact_configured(monkeypat
         cli_forecast,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
-            RecordType.QUALIFIED_SHADOW_CALL,
+            True,
             "CALL",
             "QUALIFIED",
             1.0,
@@ -2003,7 +2003,7 @@ def test_market_residual_probability_none_without_configured_artifact(monkeypatc
         cli_forecast,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
-            RecordType.QUALIFIED_SHADOW_CALL,
+            True,
             "CALL",
             "QUALIFIED",
             1.0,
@@ -2085,7 +2085,7 @@ def test_forecast_learned_sport_hard_edge_gate(monkeypatch, tmp_path) -> None:
         cli_forecast,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
-            RecordType.QUALIFIED_SHADOW_CALL,
+            True,
             "CALL",
             "QUALIFIED",
             1.0,
@@ -2276,7 +2276,7 @@ def test_international_forecast_logs_low_edge_to_research_but_not_gated(monkeypa
 
     assert result["logged"] == 1
     assert len(research.appended) == 1
-    assert research.appended[0][1].record_type is RecordType.RESEARCH_OBSERVATION
+    assert not research.appended[0][1].qualified
     assert research.appended[0][1].reason_code == "PAPER_CALL_LOW_EDGE"
     assert len(gated.appended) == 1
 
@@ -2453,9 +2453,7 @@ def _log_pick(
         model_origin=ModelOrigin.STATISTICAL_MODEL,
         model_enabled=True,
     )
-    eligibility = EligibilityResult(
-        RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", units, 60, 0.05, 0.05, AWAY, HOME
-    )
+    eligibility = EligibilityResult(True, "CALL", "QUALIFIED", units, 60, 0.05, 0.05, AWAY, HOME)
     return ledger.append_evaluated(request, eligibility, now=created_at)
 
 
@@ -2939,7 +2937,7 @@ def test_unqualified_wnba_spread_reaches_main_as_research_only_call(monkeypatch,
     assert len(flat_ledger.appended) == 1
     _request, eligibility = flat_ledger.appended[0]
     assert eligibility.decision == "CALL"
-    assert eligibility.record_type is RecordType.RESEARCH_OBSERVATION
+    assert not eligibility.qualified
     assert len(main_ledger.appended) == 1
 
 
@@ -3226,7 +3224,7 @@ def test_nrfi_unregistered_model_is_research_only_paper_call_in_both_ledgers(
     assert result["logged"] == 1
     assert len(flat.appended) == 1
     assert flat.appended[0][1].decision == "CALL"
-    assert flat.appended[0][1].record_type is RecordType.RESEARCH_OBSERVATION
+    assert not flat.appended[0][1].qualified
     assert flat.appended[0][1].reason_code == "PAPER_CALL_MODEL_UNVALIDATED"
     assert len(main.appended) == 1
     assert main.appended[0][1].decision == "CALL"

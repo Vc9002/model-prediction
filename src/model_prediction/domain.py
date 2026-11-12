@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from enum import StrEnum
@@ -123,9 +124,25 @@ class PickResult(StrEnum):
     PUSH = "push"
 
 
-class RecordType(StrEnum):
-    RESEARCH_OBSERVATION = "RESEARCH_OBSERVATION"
-    QUALIFIED_SHADOW_CALL = "QUALIFIED_SHADOW_CALL"
+# Stored ``record_type`` column values. The enum is gone: whether a decision cleared
+# the trust gates is a bool (``EligibilityResult.qualified``); these literals exist
+# only so rows written before the tag directive stay readable and exports keep their
+# column. Nothing outside this block should spell them.
+_LEGACY_QUALIFIED_ROW = "QUALIFIED_SHADOW_CALL"
+_LEGACY_RESEARCH_ROW = "RESEARCH_OBSERVATION"
+
+
+def legacy_record_type(qualified: bool) -> str:
+    """The value persisted in the ledger's ``record_type`` column."""
+    return _LEGACY_QUALIFIED_ROW if qualified else _LEGACY_RESEARCH_ROW
+
+
+def is_qualified_row(row: Mapping[str, Any]) -> bool:
+    return row.get("record_type") == _LEGACY_QUALIFIED_ROW
+
+
+def is_research_row(row: Mapping[str, Any]) -> bool:
+    return row.get("record_type") == _LEGACY_RESEARCH_ROW
 
 
 class ModelOrigin(StrEnum):

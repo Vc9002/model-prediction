@@ -11,7 +11,6 @@ from typing import Any
 
 from ..domain import (
     EASTERN,
-    RecordType,
     parse_utc,
 )
 from ..pricing import implied_probability
@@ -33,11 +32,7 @@ def _main_call_eligible(eligibility: Any, *, edge: float, min_edge: float, max_e
     (21 such Main rows, 2026-11-02..09). The downgrade is only visible here,
     before the ledger, so this is where the record type must be checked.
     """
-    return (
-        eligibility.decision == "CALL"
-        and eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
-        and min_edge <= edge <= max_edge
-    )
+    return eligibility.decision == "CALL" and eligibility.qualified and min_edge <= edge <= max_edge
 
 
 _NFL_PARTIAL_MARKET_TOKENS = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")

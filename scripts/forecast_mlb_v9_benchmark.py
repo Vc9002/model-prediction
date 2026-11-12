@@ -36,7 +36,6 @@ from model_prediction.domain import (
     MarketType,
     ModelOrigin,
     PickRequest,
-    RecordType,
     eastern_today,
     parse_utc,
 )
@@ -267,7 +266,7 @@ def run_v9_flat_forecast(date_str: str | None = None) -> list[dict]:
         home_canonical = registry.resolve(League.MLB, home_team, start_str)
 
         elig = EligibilityResult(
-            record_type=RecordType.QUALIFIED_SHADOW_CALL,
+            qualified=True,
             decision="CALL",
             reason_code="FLAT_BENCHMARK_TRACK",
             units=1.0,

@@ -4,7 +4,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 
 from .bans import TeamBanList
-from .domain import NoCallReason, PickRequest, RecordType, parse_utc, utc_now
+from .domain import NoCallReason, PickRequest, parse_utc, utc_now
 from .entities import CanonicalTeam, EntityRegistry
 from .lifecycle import can_create_qualified_call
 from .pricing import implied_probability
@@ -13,7 +13,7 @@ from .units import Exposure, UnitPolicy, edge_scaled_units, recommend_units
 
 @dataclass(frozen=True)
 class EligibilityResult:
-    record_type: RecordType
+    qualified: bool
     decision: str
     reason_code: str
     units: float
@@ -46,7 +46,7 @@ def evaluate_eligibility(
         if banned:
             research = _research(request, away, home, NoCallReason.TEAM_BANNED, policy)
             return EligibilityResult(
-                research.record_type,
+                research.qualified,
                 research.decision,
                 research.reason_code,
                 research.units,
@@ -133,7 +133,7 @@ def evaluate_esports_eligibility(
             if banned:
                 research = _research(request, away, home, NoCallReason.TEAM_BANNED, policy)
                 return EligibilityResult(
-                    research.record_type,
+                    research.qualified,
                     research.decision,
                     research.reason_code,
                     research.units,
@@ -267,7 +267,7 @@ def _downgrade_research_call(
         market_type=request.market_type,
     )
     return EligibilityResult(
-        RecordType.RESEARCH_OBSERVATION,
+        False,
         "CALL",
         _paper_call_reason(reason_code),
         units,
@@ -310,7 +310,7 @@ def _call_result(
         market_type=request.market_type,
     )
     return EligibilityResult(
-        RecordType.QUALIFIED_SHADOW_CALL,
+        True,
         "CALL",
         "QUALIFIED",
         units,
@@ -354,7 +354,7 @@ def _research(
         market_type=request.market_type,
     )
     return EligibilityResult(
-        RecordType.RESEARCH_OBSERVATION,
+        False,
         "CALL",
         _paper_call_reason(reason.value),
         units,

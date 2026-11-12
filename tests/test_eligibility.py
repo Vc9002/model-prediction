@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from model_prediction.domain import League, MarketType, ModelOrigin, PickRequest, RecordType
+from model_prediction.domain import League, MarketType, ModelOrigin, PickRequest
 from model_prediction.eligibility import evaluate_eligibility
 from model_prediction.units import Exposure, UnitPolicy
 
@@ -56,7 +56,7 @@ def test_ban_keeps_every_market_research_only_but_records_a_paper_call(
         home="NYY" if banned_side == "home" else "BOS",
     )
     result = evaluate_eligibility(req, registry, ban_list, Exposure(), UnitPolicy(), NOW)
-    assert result.record_type is RecordType.RESEARCH_OBSERVATION
+    assert not result.qualified
     assert result.decision == "CALL"
     assert result.reason_code == "PAPER_CALL_TEAM_BANNED"
     assert result.units > 0
@@ -82,7 +82,7 @@ def test_promotion_tier_no_longer_gates_qualified_calls(registry, ban_list) -> N
     RETIRED and SUSPENDED remain hard stops (explicit "off" states, not
     promotion tiers -- see lifecycle.can_create_qualified_call)."""
     result = evaluate_eligibility(request(home="BAL"), registry, ban_list, Exposure(), UnitPolicy(), NOW)
-    assert result.record_type is RecordType.QUALIFIED_SHADOW_CALL and result.units > 0
+    assert result.qualified and result.units > 0
 
     for enabled in (False,):
         result = evaluate_eligibility(
@@ -92,7 +92,7 @@ def test_promotion_tier_no_longer_gates_qualified_calls(registry, ban_list) -> N
         # paper size (operator directive, 2026-07-31: "every pick should
         # have units and pnl, hard code this") -- only a banned team stays
         # hard-zero, and none of these states are that.
-        assert result.record_type is RecordType.RESEARCH_OBSERVATION and result.units > 0
+        assert not result.qualified and result.units > 0
 
 
 def test_future_observed_at_becomes_research(registry, ban_list) -> None:
@@ -111,7 +111,7 @@ def test_future_observed_at_becomes_research(registry, ban_list) -> None:
     )
     assert future.decision == "CALL"
     assert future.reason_code == "PAPER_CALL_STALE_DATA"
-    assert future.record_type is RecordType.RESEARCH_OBSERVATION
+    assert not future.qualified
     assert future.units > 0
 
 

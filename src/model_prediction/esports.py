@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
-from .domain import eastern_today, parse_utc
+from .domain import eastern_today, legacy_record_type, parse_utc
 from .features.elo_ratings import expected_win_probability
 from .research_io import atomic_write as _atomic_write
 from .research_io import backup_before_overwrite as _backup_before_overwrite
@@ -1652,7 +1652,7 @@ def forecast_esports_slate(
                     "artifact_hash": artifact["artifact_hash"],
                     "observed_at_utc": snapshot["observed_at_utc"],
                     "sides": sides,
-                    "record_type": "RESEARCH_OBSERVATION",
+                    "record_type": legacy_record_type(False),
                     "qualification": "NO_CALL_MODEL_UNVALIDATED",
                     "units": 0,
                 }

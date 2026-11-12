@@ -18,8 +18,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from model_prediction.config import load_config
-from model_prediction.domain import League, MarketType, PickRequest
-from model_prediction.eligibility import EligibilityResult, RecordType
+from model_prediction.domain import League, MarketType, PickRequest, is_qualified_row
+from model_prediction.eligibility import EligibilityResult
 from model_prediction.entities import CanonicalTeam
 from model_prediction.ledger import FIELDNAMES, PickLedger, defer_sqlite_xlsx_exports
 from model_prediction.main_ledgers import (
@@ -55,9 +55,7 @@ def _request(event_id: str) -> PickRequest:
 
 
 def _qualified_call() -> EligibilityResult:
-    return EligibilityResult(
-        RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", 1.5, 70, 0.08, 0.08, AWAY, HOME
-    )
+    return EligibilityResult(True, "CALL", "QUALIFIED", 1.5, 70, 0.08, 0.08, AWAY, HOME)
 
 
 def test_real_config_has_main_ledger_enabled() -> None:
@@ -247,12 +245,11 @@ def test_flat_and_main_ledgers_eliminate_shadow_downgrades_and_ensure_real_calls
     tmp_path, monkeypatch
 ) -> None:
     monkeypatch.setenv("MODEL_PREDICTION_LEDGER_MIRROR", "0")
-    from model_prediction.ledger import RecordType
 
     # Flat ledger: everything is called flat (1.0U) with QUALIFIED_SHADOW_CALL, visible in reporting
     flat_ledger = MultiSportPickLedger(tmp_path, flat=True)
     obs_eligibility = EligibilityResult(
-        RecordType.RESEARCH_OBSERVATION,
+        False,
         "NO_CALL",
         "NO_CALL_LOW_EDGE",
         0.0,
@@ -265,7 +262,7 @@ def test_flat_and_main_ledgers_eliminate_shadow_downgrades_and_ensure_real_calls
     flat_row = flat_ledger.append_evaluated(
         _request("event-flat-cov"), obs_eligibility, now=datetime.now(UTC)
     )
-    assert flat_row["record_type"] == "QUALIFIED_SHADOW_CALL"
+    assert is_qualified_row(flat_row)
     assert flat_row["decision"] == "CALL"
     # Dynamic edge-scaled units -- never flat at 1.0 (operator directive 2026-10-23)
     assert float(flat_row["units"]) > 0.0
@@ -277,7 +274,7 @@ def test_flat_and_main_ledgers_eliminate_shadow_downgrades_and_ensure_real_calls
     main_row = main_ledger.append_evaluated(
         _request("event-main-gated"), qual_eligibility, now=datetime.now(UTC)
     )
-    assert main_row["record_type"] == "QUALIFIED_SHADOW_CALL"
+    assert is_qualified_row(main_row)
     assert main_row["decision"] == "CALL"
     assert main_row["reason_code"] == "QUALIFIED"
     assert float(main_row["units"]) > 0.0

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .audit import AuditLog
-from .domain import parse_utc
+from .domain import is_qualified_row, is_research_row, legacy_record_type, parse_utc
 from .esports import (
     _fuzzy_match_team,
     _identity_key,
@@ -55,6 +55,9 @@ class CleanupPlan:
             "research_duplicates_removed": len(self.duplicate_research),
             "gated_duplicates_removed": len(self.duplicate_gated),
         }
+
+
+_STORED_RECORD_TYPES = {legacy_record_type(True), legacy_record_type(False)}
 
 
 def _decision_key(row: dict[str, str]) -> tuple[str, ...]:
@@ -201,24 +204,24 @@ def _row_rejection_reasons(
     if gated:
         if decision != "CALL":
             reasons.append("gated_row_not_call")
-        if record_type not in {"QUALIFIED_SHADOW_CALL", "RESEARCH_OBSERVATION"}:
+        if record_type not in _STORED_RECORD_TYPES:
             reasons.append("gated_row_invalid_record_type")
         if units is not None and units <= 0:
             reasons.append("gated_row_nonpositive_units")
     elif decision == "CALL":
-        if record_type not in {"QUALIFIED_SHADOW_CALL", "RESEARCH_OBSERVATION"}:
+        if record_type not in _STORED_RECORD_TYPES:
             reasons.append("call_invalid_record_type")
         if units is not None and units <= 0:
             reasons.append("call_nonpositive_units")
     elif decision == "NO_CALL":
-        if record_type != "RESEARCH_OBSERVATION":
+        if not is_research_row(row):
             reasons.append("no_call_not_research_record")
         if units is not None and units != 0:
             reasons.append("no_call_has_units")
     else:
         reasons.append("invalid_decision")
 
-    if (decision == "CALL" or gated) and record_type == "QUALIFIED_SHADOW_CALL":
+    if (decision == "CALL" or gated) and is_qualified_row(row):
         model_config = config.get("models", {}).get(sport.upper(), {})
         minimum_edge = float(model_config.get("min_edge", 0.0))
         minimum_confidence = float(model_config.get("research_confidence_gate", 0.0))

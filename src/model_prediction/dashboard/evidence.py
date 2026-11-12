@@ -15,6 +15,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from ..domain import is_qualified_row
+
 try:
     from openpyxl import load_workbook
 except ImportError:  # pragma: no cover
@@ -480,7 +482,7 @@ def _pnl_evidence(rows: list[dict]) -> dict:
                 "status": "not_available_no_execution_attribution_in_ledgers",
             },
         }
-    shadow = [row for row in rows if row.get("record_type") == "QUALIFIED_SHADOW_CALL"]
+    shadow = [row for row in rows if is_qualified_row(row)]
     shadow_staked = sum(_number(row.get("units")) for row in shadow)
     shadow_pnl = sum(_number(row.get("pnl_units")) for row in shadow)
     hypothetical = [row for row in rows if _number(row.get("research_score_units")) > 0]

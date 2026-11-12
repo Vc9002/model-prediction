@@ -28,7 +28,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-from .domain import eastern_today
+from .domain import eastern_today, legacy_record_type
 from .features.elo_ratings import expected_win_probability
 from .research_io import atomic_write as _atomic_write
 from .research_io import backup_before_overwrite as _backup_before_overwrite
@@ -1585,7 +1585,7 @@ def forecast_international_baseball_slate(
                     "artifact_hash": artifact["artifact_hash"],
                     "observed_at_utc": snapshot["observed_at_utc"],
                     "sides": sides,
-                    "record_type": "RESEARCH_OBSERVATION",
+                    "record_type": legacy_record_type(False),
                     "qualification": "PAPER_CALL_MODEL_UNVALIDATED",
                     "units": compute_international_baseball_dynamic_units(best_side_edge),
                     # Real per-team game count, not just "present in ratings"

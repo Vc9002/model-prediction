@@ -10,7 +10,7 @@ from model_prediction.domain import (
     ModelOrigin,
     PickRequest,
     PickResult,
-    RecordType,
+    is_research_row,
 )
 from model_prediction.eligibility import evaluate_eligibility
 from model_prediction.ledger import FIELDNAMES, LEGACY_FIELDNAMES, PickLedger, _settlement_pnl
@@ -58,7 +58,7 @@ def test_research_is_zero_unit_excluded_from_exposure_roi_but_in_calibration(
     research_request = request("research", enabled=False)
     research_gate = evaluate_eligibility(research_request, registry, ban_list, Exposure(), UnitPolicy(), NOW)
     research_row = ledger.append_evaluated(research_request, research_gate, NOW)
-    assert research_row["record_type"] == RecordType.RESEARCH_OBSERVATION.value
+    assert is_research_row(research_row)
     # Every logged pick carries a real paper size now (operator directive,
     # 2026-07-31) -- what stays excluded is exposure/ROI accounting below,
     # which filters on record_type, not on units being zero.
@@ -202,7 +202,7 @@ def test_older_excel_schema_migrates_with_backup_and_preserved_units(tmp_path) -
     ledger = PickLedger(path, tmp_path / "events.jsonl")
     row = ledger.rows()[0]
     assert path.with_suffix(".xlsx.bak-v1").exists()
-    assert row["record_type"] == "RESEARCH_OBSERVATION"
+    assert is_research_row(row)
     assert row["units"] == "0.00" and row["legacy_units"] == "0.25"
     headers, _ = read_xlsx_rows(path)
     assert headers == FIELDNAMES

@@ -23,9 +23,7 @@ def parser() -> argparse.ArgumentParser:
     commands.add_parser("init-ledger")
 
     report = commands.add_parser("report")
-    report.add_argument(
-        "--record-type", choices=["qualified", "research", "QUALIFIED_SHADOW_CALL", "RESEARCH_OBSERVATION"]
-    )
+    report.add_argument("--record-type", choices=["qualified", "research"])
     report.add_argument("--origin", choices=[item.value for item in ModelOrigin])
     report.add_argument("--model-version")
     report.add_argument("--calibration-version")

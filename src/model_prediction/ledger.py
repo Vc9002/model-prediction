@@ -55,8 +55,10 @@ from .domain import (
     PickRequest,
     PickResult,
     PickStatus,
-    RecordType,
+    is_qualified_row,
+    is_research_row,
     iso_utc,
+    legacy_record_type,
     parse_utc,
     utc_now,
 )
@@ -671,7 +673,7 @@ class PickLedger:
         if canonical_team_ids:
             request_teams.update(team_id.casefold() for team_id in canonical_team_ids)
         for row in self.rows():
-            if row["record_type"] != RecordType.QUALIFIED_SHADOW_CALL.value or row["decision"] != "CALL":
+            if not is_qualified_row(row) or row["decision"] != "CALL":
                 continue
             # An OPEN row for this exact same bet (event + market + selection)
             # is this decision's own still-pending prior instance, not
@@ -748,7 +750,7 @@ class PickLedger:
                     dyn_units = round(1.0 + min(1.0, calc_edge / 0.08), 2)
             eligibility = replace(
                 eligibility,
-                record_type=RecordType.QUALIFIED_SHADOW_CALL,
+                qualified=True,
                 decision="CALL",
                 reason_code="QUALIFIED" if eligibility.reason_code == "QUALIFIED" else "FLAT_CALL",
                 units=dyn_units,
@@ -781,7 +783,7 @@ class PickLedger:
                     dyn_units = round(1.0 + min(1.0, calc_edge / 0.08), 2)
             eligibility = replace(
                 eligibility,
-                record_type=RecordType.QUALIFIED_SHADOW_CALL,
+                qualified=True,
                 decision="CALL",
                 reason_code="QUALIFIED",
                 units=dyn_units,
@@ -812,7 +814,7 @@ class PickLedger:
             request.home_team, request.league, request.home_team, request.home_team, True, None, None, ()
         )
         eligibility = EligibilityResult(
-            RecordType.RESEARCH_OBSERVATION if research else RecordType.QUALIFIED_SHADOW_CALL,
+            not research,
             "CALL",
             "PAPER_CALL_MODEL_UNVALIDATED" if research else "QUALIFIED",
             (units if units > 0 else 1.0) if research else units,
@@ -872,12 +874,8 @@ class PickLedger:
             )
             pick_id = uuid.uuid4().hex[:16]
             operation_id = f"op-append-{pick_id}"
-            call_type = (
-                "model_qualified"
-                if eligibility.record_type is RecordType.QUALIFIED_SHADOW_CALL
-                else "research_observation"
-            )
-            if eligibility.record_type is RecordType.RESEARCH_OBSERVATION:
+            call_type = "model_qualified" if eligibility.qualified else "research_observation"
+            if not eligibility.qualified:
                 call_type = "paper_call"
             row.update(
                 {
@@ -905,7 +903,7 @@ class PickLedger:
                     "review_status": "not_applicable",
                     "call_type": call_type,
                     "ledger_schema_version": LEDGER_SCHEMA_VERSION,
-                    "record_type": eligibility.record_type.value,
+                    "record_type": legacy_record_type(eligibility.qualified),
                     "decision": eligibility.decision,
                     "reason_code": eligibility.reason_code,
                     "banned_team_id": eligibility.banned_team.canonical_team_id
@@ -951,11 +949,7 @@ class PickLedger:
             # id -- but that's still strictly better than a real ledger
             # mutation with no audit trail at all (previously possible, and
             # permanent -- no retry can recreate a dropped audit event).
-            event_type = (
-                "pick_created"
-                if eligibility.record_type is RecordType.QUALIFIED_SHADOW_CALL
-                else "research_observation_created"
-            )
+            event_type = "pick_created" if eligibility.qualified else "research_observation_created"
             self.audit.append(event_type, pick_id, self._decision_audit_payload(row))
             if self.authority == "sqlite":
                 # Canonical store commits first — its failure aborts the
@@ -1269,10 +1263,7 @@ class PickLedger:
                 binary_contract_settlement_value=binary_contract_settlement_value,
             )
             research_units = None
-            if (
-                row["record_type"] == RecordType.RESEARCH_OBSERVATION.value
-                and self.research_score_units is not None
-            ):
+            if is_research_row(row) and self.research_score_units is not None:
                 research_units = self.research_score_units
                 if self.research_scoring_mode == "model_recommended":
                     raw_uncertainty = row["model_uncertainty"]
@@ -1422,7 +1413,7 @@ class PickLedger:
             self._migrate_if_needed()
             rows = self._read_unlocked()
             for row in rows:
-                if row["record_type"] != RecordType.RESEARCH_OBSERVATION.value:
+                if not is_research_row(row):
                     continue
                 if reason_codes is not None and row.get("reason_code") not in reason_codes:
                     continue
@@ -1576,11 +1567,7 @@ class PickLedger:
             keep: list[dict[str, str]] = []
             for row in rows:
                 if row["pick_id"] in requested and row["status"] == PickStatus.OPEN.value:
-                    if (
-                        not allow_staked_removal
-                        and float(row["units"] or 0) > 0
-                        and row["record_type"] == RecordType.QUALIFIED_SHADOW_CALL.value
-                    ):
+                    if not allow_staked_removal and float(row["units"] or 0) > 0 and is_qualified_row(row):
                         keep.append(row)  # never delete open staked exposure
                         continue
                     removed.append(row)
@@ -1963,7 +1950,7 @@ class PickLedger:
             rows = self._read_unlocked()
             for pick_id in pick_ids:
                 row = self._find(rows, pick_id)
-                if row["record_type"] != RecordType.RESEARCH_OBSERVATION.value:
+                if not is_research_row(row):
                     raise ValueError(f"{pick_id} is not a research observation")
                 if row["status"] != PickStatus.SETTLED.value:
                     raise ValueError(f"{pick_id} must be settled before research scoring")
@@ -1999,8 +1986,8 @@ class PickLedger:
         by_odds_range: bool = False,
     ) -> dict[str, object]:
         rows = self.rows(filters)
-        qualified = [row for row in rows if row["record_type"] == RecordType.QUALIFIED_SHADOW_CALL.value]
-        research = [row for row in rows if row["record_type"] == RecordType.RESEARCH_OBSERVATION.value]
+        qualified = [row for row in rows if is_qualified_row(row)]
+        research = [row for row in rows if is_research_row(row)]
         settled_qualified = [row for row in qualified if row["status"] == PickStatus.SETTLED.value]
         wagered = sum(float(row["units"] or 0) for row in settled_qualified)
         pnl = sum(float(row["pnl_units"] or 0) for row in settled_qualified)
@@ -2093,12 +2080,12 @@ class PickLedger:
             if not row["record_type"] and forced:
                 row["legacy_units"] = row["units"]
                 row["units"] = "0.00"
-                row["record_type"] = RecordType.RESEARCH_OBSERVATION.value
+                row["record_type"] = legacy_record_type(False)
                 row["decision"] = "RESEARCH_OBSERVATION"
                 row["reason_code"] = "NO_CALL_MODEL_UNVALIDATED"
                 row["call_type"] = "research_observation"
             elif not row["record_type"]:
-                row["record_type"] = RecordType.QUALIFIED_SHADOW_CALL.value
+                row["record_type"] = legacy_record_type(True)
                 row["decision"] = "CALL"
                 row["reason_code"] = "QUALIFIED"
             row["ledger_schema_version"] = LEDGER_SCHEMA_VERSION
@@ -2297,8 +2284,8 @@ class PickLedger:
             field = aliases.get(key, key)
             if field == "record_type":
                 value = {
-                    "qualified": RecordType.QUALIFIED_SHADOW_CALL.value,
-                    "research": RecordType.RESEARCH_OBSERVATION.value,
+                    "qualified": legacy_record_type(True),
+                    "research": legacy_record_type(False),
                 }.get(value, value)
             normalized[field] = value
         return [row for row in rows if all(row.get(field) == value for field, value in normalized.items())]

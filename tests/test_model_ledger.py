@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from model_prediction.domain import League, MarketType, ModelOrigin, PickRequest
-from model_prediction.eligibility import EligibilityResult, RecordType
+from model_prediction.eligibility import EligibilityResult
 from model_prediction.entities import CanonicalTeam
 from model_prediction.model_ledger import (
     FIELDNAMES,
@@ -47,9 +47,7 @@ def _pick_request(**overrides) -> PickRequest:
 
 
 def _eligibility(edge: float = 0.08, units: float = 1.5) -> EligibilityResult:
-    return EligibilityResult(
-        RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", units, 70, edge, edge, _AWAY, _HOME
-    )
+    return EligibilityResult(True, "CALL", "QUALIFIED", units, 70, edge, edge, _AWAY, _HOME)
 
 
 def _prediction(**overrides) -> dict:

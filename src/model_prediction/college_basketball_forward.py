@@ -16,7 +16,7 @@ from .config import PROJECT_ROOT
 from .data_sources.espn import ESPNClient
 from .data_sources.polymarket_us import PolymarketUSClient, probability_to_american
 from .domain import League, MarketType, ModelOrigin, PickRequest, parse_utc, utc_now
-from .eligibility import EligibilityResult, RecordType
+from .eligibility import EligibilityResult
 from .entities import CanonicalTeam
 from .feature_capture import contract_snapshot_json
 from .features.base import FeatureStore
@@ -663,7 +663,7 @@ def forecast_ncaab_sport(
                     and model_inst.compute_dynamic_units(edge, min_edge=min_edge, max_edge=0.08)
                 ) or 1.00
                 eligibility = EligibilityResult(
-                    RecordType.RESEARCH_OBSERVATION,
+                    False,
                     "CALL",
                     "PAPER_CALL_MODEL_UNVALIDATED",
                     dynamic_units,

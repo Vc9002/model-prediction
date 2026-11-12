@@ -1,5 +1,6 @@
 """Tests for Esports Contextual v7 Models."""
 
+from model_prediction.domain import legacy_record_type
 from model_prediction.models.esports_contextual_v7 import (
     EsportsContextFeatures,
     EsportsContextualV7Model,
@@ -82,4 +83,4 @@ def test_gated_research_eligibility_downgrades_large_disagreement():
     )
     assert res.decision == "CALL"
     assert res.reason_code == "PAPER_CALL_LARGE_DISAGREEMENT_REVIEW"
-    assert res.record_type.value == "RESEARCH_OBSERVATION"
+    assert legacy_record_type(res.qualified) == "RESEARCH_OBSERVATION"

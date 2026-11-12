@@ -43,7 +43,6 @@ from ..domain import (
     MarketType,
     ModelOrigin,
     PickRequest,
-    RecordType,
     iso_utc,
     parse_utc,
     utc_now,
@@ -163,7 +162,7 @@ def _is_predictively_qualified_serving_model(model_version: str, sport: str, mar
 def _downgrade_unserved(eligibility: Any, reason_code: str = "PAPER_CALL_MODEL_UNVALIDATED") -> Any:
     return replace(
         eligibility,
-        record_type=RecordType.RESEARCH_OBSERVATION,
+        qualified=False,
         decision="CALL",
         reason_code=reason_code.replace("NO_CALL_", "PAPER_CALL_"),
     )
@@ -1062,7 +1061,7 @@ def _forecast_mlb_nrfi_flat(
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("Eligibility evaluation error for NRFI %s: %s", event_id, exc)
                     eligibility = EligibilityResult(
-                        record_type=RecordType.RESEARCH_OBSERVATION,
+                        qualified=False,
                         decision="CALL",
                         reason_code="PAPER_CALL_MODEL_UNVALIDATED",
                         units=1.0,
@@ -1074,7 +1073,7 @@ def _forecast_mlb_nrfi_flat(
                     )
             else:
                 eligibility = EligibilityResult(
-                    record_type=RecordType.RESEARCH_OBSERVATION,
+                    qualified=False,
                     decision="CALL",
                     reason_code="PAPER_CALL_MODEL_UNVALIDATED",
                     units=1.0,
@@ -2485,10 +2484,7 @@ def _log_basketball_total_picks(
 
                 main_eligible = eligibility.decision == "CALL" and (
                     not nba_rules
-                    or (
-                        eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
-                        and effective_min_total_edge <= edge <= max_disagreement
-                    )
+                    or (eligibility.qualified and effective_min_total_edge <= edge <= max_disagreement)
                 )
                 if nba_rules and edge > max_disagreement:
                     main_rejections.append(
@@ -3048,7 +3044,7 @@ def _forecast_nfl_spread_sport(
                         )
                         eligibility = replace(
                             eligibility,
-                            record_type=RecordType.RESEARCH_OBSERVATION,
+                            qualified=False,
                             decision="NO_CALL",
                             reason_code="REJECTED_CROSS_MARKET_CONFLICT",
                         )
@@ -4090,7 +4086,7 @@ def _forecast_learned_sport(
                     if quote_warning and eligibility.decision == "CALL":
                         eligibility = replace(
                             eligibility,
-                            record_type=RecordType.RESEARCH_OBSERVATION,
+                            qualified=False,
                             decision="NO_CALL" if not flat_mode else "CALL",
                             reason_code="PAPER_CALL_MARKET_UNAVAILABLE",
                             units=0.0 if not flat_mode else eligibility.units,
@@ -4114,7 +4110,7 @@ def _forecast_learned_sport(
                     ):
                         eligibility = replace(
                             eligibility,
-                            record_type=RecordType.RESEARCH_OBSERVATION,
+                            qualified=False,
                             decision="CALL",
                             reason_code="PAPER_CALL_BELOW_LEARNED_CONFIDENCE",
                         )
@@ -4125,7 +4121,7 @@ def _forecast_learned_sport(
                     ):
                         eligibility = replace(
                             eligibility,
-                            record_type=RecordType.RESEARCH_OBSERVATION,
+                            qualified=False,
                             decision="NO_CALL" if not flat_mode else "CALL",
                             reason_code="PAPER_CALL_EDGE_OUT_OF_BOUNDS",
                         )
@@ -4170,7 +4166,7 @@ def _forecast_learned_sport(
                             else:
                                 eligibility = replace(
                                     eligibility,
-                                    record_type=RecordType.RESEARCH_OBSERVATION,
+                                    qualified=False,
                                     decision="NO_CALL",
                                     reason_code="REJECTED_CROSS_MARKET_CONFLICT",
                                 )
@@ -5446,7 +5442,7 @@ def _forecast_cfb_sport(
                 contract_edge = float(contract.get("edge_vs_executable_ask", 0.0))
                 genuinely_eligible = (
                     eligibility.decision == "CALL"
-                    and eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
+                    and eligibility.qualified
                     and min_edge <= contract_edge <= max_edge
                 )
                 if contract_edge > max_edge:
@@ -5724,7 +5720,7 @@ def _forecast_hockey_sport(
                 else 0.0
             )
             eligibility = EligibilityResult(
-                record_type=RecordType.RESEARCH_OBSERVATION,
+                qualified=False,
                 decision="CALL" if edge_qualified else "NO_CALL",
                 reason_code=(
                     "PAPER_CALL_MODEL_QUALIFIED"
@@ -5931,7 +5927,7 @@ def _forecast_darts_sport(
                 else 0.0
             )
             eligibility = EligibilityResult(
-                record_type=RecordType.RESEARCH_OBSERVATION,
+                qualified=False,
                 decision="CALL" if not baseline_only and contract_edge >= min_edge else "NO_CALL",
                 reason_code=(
                     "NO_CALL_UNTRAINED_MODEL"

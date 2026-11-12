@@ -13,18 +13,17 @@ from model_prediction.cli.forecast_nfl_support import (
     _nfl_serving_calibrator,
     _select_nfl_total_market,
 )
-from model_prediction.domain import RecordType
 
 
 @dataclass(frozen=True)
 class _Eligibility:
     decision: str
-    record_type: RecordType
+    qualified: bool
     reason_code: str
 
 
 def test_downgraded_research_row_is_never_main_eligible() -> None:
-    qualified = _Eligibility("CALL", RecordType.QUALIFIED_SHADOW_CALL, "QUALIFIED")
+    qualified = _Eligibility("CALL", True, "QUALIFIED")
     assert _main_call_eligible(qualified, edge=0.06, min_edge=0.05, max_edge=0.10)
     assert not _main_call_eligible(qualified, edge=0.04, min_edge=0.05, max_edge=0.10)
     assert not _main_call_eligible(qualified, edge=0.11, min_edge=0.05, max_edge=0.10)
@@ -32,7 +31,7 @@ def test_downgraded_research_row_is_never_main_eligible() -> None:
     downgraded = _downgrade_unserved(qualified)
     # Still a CALL so Flat keeps the diagnostic row with units ...
     assert downgraded.decision == "CALL"
-    assert downgraded.record_type is RecordType.RESEARCH_OBSERVATION
+    assert not downgraded.qualified
     # ... but Main must refuse it even inside the edge band.
     assert not _main_call_eligible(downgraded, edge=0.06, min_edge=0.05, max_edge=0.10)
 
