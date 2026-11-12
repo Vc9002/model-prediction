@@ -294,3 +294,174 @@ def test_open_picks_end_to_end_gate(db, capsys):
     out = capsys.readouterr().out
     assert "CONFIRMED BEST PICKS (1" in out
     assert "quote: indicative_slate" in out
+
+
+# --- Task 2: no hardcoded sport/market overrides; live directional evidence -----------
+
+
+def test_nba_spread_bucket_was_hardcoded_confirmed_now_live_trap(db):
+    # Test 7: nba spread, 8.0-11.9% bucket, four verified LOSS rows. This bucket used to
+    # be a hardcoded CONFIRMED_BEST regardless of the ledger.
+    _bucket_rows(
+        db,
+        4,
+        result="loss",
+        provenance=abp.VERIFIED_QUOTE_PROVENANCE,
+        sport="nba",
+        market_type="spread",
+        selection="away",
+        edge=0.09,
+    )
+    engine = abp.HistoricalAuditEngine(db)
+    result = engine.audit_candidate(
+        sport="nba",
+        market_type="spread",
+        selection="away",
+        edge=0.09,
+        model_prob=0.59,
+        market_prob=0.5,
+        model_id="m1",
+        quote_provenance=abp.VERIFIED_QUOTE_PROVENANCE,
+    )
+    assert result["verdict"] == "DOWNGRADE_TRAP"
+    assert any("0W-4L" in f for f in result["flags"])
+
+
+def test_ncaab_total_over_unverified_bucket_not_confirmed(db):
+    # Test 8: ncaab total over, 8.0-11.9% bucket, six unverified WIN rows. This bucket used
+    # to be a hardcoded CONFIRMED_BEST.
+    _bucket_rows(
+        db,
+        6,
+        result="win",
+        provenance="",
+        sport="ncaab",
+        market_type="total",
+        selection="over",
+        edge=0.09,
+    )
+    engine = abp.HistoricalAuditEngine(db)
+    result = engine.audit_candidate(
+        sport="ncaab",
+        market_type="total",
+        selection="over",
+        edge=0.09,
+        model_prob=0.59,
+        market_prob=0.5,
+        model_id="m1",
+        quote_provenance=abp.VERIFIED_QUOTE_PROVENANCE,
+    )
+    assert result["verdict"] == "QUALIFIED_MODERATE"
+
+
+def test_ncaab_moneyline_thin_unverified_bucket_not_confirmed(db):
+    # Test 9: ncaab moneyline, >= 12% edge, four unverified WIN rows -- the thin-bucket
+    # path that produced the bogus NCAAB moneyline label.
+    _bucket_rows(
+        db,
+        4,
+        result="win",
+        provenance="",
+        sport="ncaab",
+        market_type="moneyline",
+        selection="home",
+        edge=0.15,
+    )
+    engine = abp.HistoricalAuditEngine(db)
+    result = engine.audit_candidate(
+        sport="ncaab",
+        market_type="moneyline",
+        selection="home",
+        edge=0.15,
+        model_prob=0.65,
+        market_prob=0.5,
+        model_id="m1",
+        quote_provenance=abp.VERIFIED_QUOTE_PROVENANCE,
+    )
+    assert result["verdict"] == "QUALIFIED_MODERATE"
+    assert any("0 verified of 4" in f for f in result["flags"])
+
+
+def test_nba_total_direction_bucket_not_pooled_total(db):
+    # Test 10: nba total, 5.0-7.9% bucket, four verified over WINs and four verified under
+    # LOSSes. The verdict must come from the direction bucket, not the pooled total record.
+    _bucket_rows(
+        db,
+        4,
+        result="win",
+        provenance=abp.VERIFIED_QUOTE_PROVENANCE,
+        sport="nba",
+        market_type="total",
+        selection="over",
+        edge=0.065,
+        model_id="m1",
+    )
+    _bucket_rows(
+        db,
+        4,
+        result="loss",
+        provenance=abp.VERIFIED_QUOTE_PROVENANCE,
+        sport="nba",
+        market_type="total",
+        selection="under",
+        edge=0.065,
+        model_id="m1",
+    )
+    engine = abp.HistoricalAuditEngine(db)
+    over_result = engine.audit_candidate(
+        sport="nba",
+        market_type="total",
+        selection="over",
+        edge=0.065,
+        model_prob=0.565,
+        market_prob=0.5,
+        model_id="m1",
+        quote_provenance=abp.VERIFIED_QUOTE_PROVENANCE,
+    )
+    assert over_result["verdict"] == "CONFIRMED_BEST"
+
+    under_result = engine.audit_candidate(
+        sport="nba",
+        market_type="total",
+        selection="under",
+        edge=0.065,
+        model_prob=0.565,
+        market_prob=0.5,
+        model_id="m1",
+        quote_provenance=abp.VERIFIED_QUOTE_PROVENANCE,
+    )
+    assert under_result["verdict"] == "DOWNGRADE_TRAP"
+
+
+def test_nfl_total_no_history_not_confirmed(db):
+    # Test 11: nfl total, 5.0-7.9% bucket, no history at all. This bucket used to be a
+    # hardcoded CONFIRMED_BEST regardless of the ledger.
+    engine = abp.HistoricalAuditEngine(db)
+    result = engine.audit_candidate(
+        sport="nfl",
+        market_type="total",
+        selection="under",
+        edge=0.065,
+        model_prob=0.565,
+        market_prob=0.5,
+        model_id="m1",
+        quote_provenance=abp.VERIFIED_QUOTE_PROVENANCE,
+    )
+    assert result["verdict"] == "QUALIFIED_MODERATE"
+
+
+def test_negative_edge_against_winning_bucket_is_still_a_trap(db):
+    # Test 12: negative-edge candidate against a verified winning bucket is always a trap.
+    _bucket_rows(db, 5, provenance=abp.VERIFIED_QUOTE_PROVENANCE)
+    engine = abp.HistoricalAuditEngine(db)
+    result = engine.audit_candidate(
+        sport="mlb",
+        market_type="moneyline",
+        selection="home",
+        edge=-0.02,
+        model_prob=0.48,
+        market_prob=0.5,
+        model_id="m1",
+        quote_provenance=abp.VERIFIED_QUOTE_PROVENANCE,
+    )
+    assert result["verdict"] == "DOWNGRADE_TRAP"

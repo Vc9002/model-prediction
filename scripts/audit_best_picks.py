@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """Best Picks Empirical Audit Tool.
 
-Audits candidate or open picks against 2,300+ historical settled records in ledgers.db.
-Evaluates picks beyond nominal edge using:
-1. Historical Edge Tier Win Rate & ROI
-2. Directional Asymmetry (Totals Over vs Under; Spread Favorites vs Underdogs)
-3. Regime/League Traps (e.g. early NBA Over inflation, early NCAAB 12%+ spread noise)
-4. Market Disagreement Limits (avoiding injury/weather information traps)
+Audits candidate or open picks against historical settled records in ledgers.db. Every
+verdict is recomputed live from that ledger at run time -- no sport or market is ever
+hard-labelled. Evaluates picks beyond nominal edge using:
+1. Historical Edge Tier Win Rate & ROI, counted only from rows whose own quote was a
+   verified decision-time executable quote (Pillar 1).
+2. Directional Asymmetry: a total candidate (over/under) is judged on its own direction's
+   bucket, never the pooled over+under record (Pillar 2).
+
+Pillars 3 (current-season sample maturity) and 4 (market disagreement bounds) are operator
+checks described in docs/BEST_PICKS_AUDIT_FRAMEWORK.md; this script does not enforce them.
 
 Classification Verdicts:
 - CONFIRMED_BEST: evidence counts only verified-quote rows (see VERIFIED_QUOTE_PROVENANCE
@@ -208,95 +212,45 @@ class HistoricalAuditEngine:
         prov = quote_provenance or ""
         quote_verified = prov == VERIFIED_QUOTE_PROVENANCE
 
-        pooled = self.stats_by_sport_mkt_bucket.get((sp, mkt, bucket), BucketStats())
-        model = self.stats_by_model_mkt_bucket.get((sp, mkt, bucket, mid), BucketStats())
+        # Totals (over/under) have real directional asymmetry (e.g. unders vs overs), so a
+        # total candidate is judged on the (sport, direction, bucket) record, never the
+        # pooled total record that mixes both directions together. Every other market uses
+        # the (sport, market, bucket) record. No sport name is ever compared to a literal
+        # here -- every verdict is recomputed live from whichever family applies.
+        is_directional_total = mkt == "total" and sel in ("over", "under")
+        if is_directional_total:
+            pooled = self.stats_by_sport_dir_bucket.get((sp, sel, bucket), BucketStats())
+            model = self.stats_by_model_dir_bucket.get((sp, sel, bucket, mid), BucketStats())
+        else:
+            pooled = self.stats_by_sport_mkt_bucket.get((sp, mkt, bucket), BucketStats())
+            model = self.stats_by_model_mkt_bucket.get((sp, mkt, bucket, mid), BucketStats())
         # Judge on the candidate's own model when it has enough VERIFIED graded history;
         # otherwise the pooled bucket is the only evidence there is, and a flag says so.
         use_model = bool(mid) and model.verified.total_graded >= MIN_GRADED
         evidence = model if use_model else pooled
         basis = f"{model_id} only" if use_model else "all models pooled"
+        bucket_label = f"{bucket} {sel}" if is_directional_total else bucket
 
-        # Determine verdict
+        # Determine verdict from the bucket's VERIFIED evidence only. An unverified-but-large
+        # all-rows record is shown as context only (see the "insufficient" flag below).
         verdict = "QUALIFIED_MODERATE"
         flags: list[str] = []
 
-        # 1. Check Totals directional bias
-        if mkt == "total":
-            if sp == "nba" and sel == "over":
-                # NBA Overs bleed heavily all-time (7W-24L, 22.6% WR, -19.67u, -53.0% ROI)
-                verdict = "DOWNGRADE_TRAP"
-                flags.append(
-                    "NBA Overs bleed heavily (7W-24L, 22.6% WR, -19.67u, -53.0% ROI). Market totals inflated."
-                )
-            elif sp == "nba" and sel == "under" and bucket in ("5.0% - 7.9%", "8.0% - 11.9%", ">= 12.0%"):
-                # NBA Unders with >= 5% edge are a confirmed profit center (35W-25L, 58.3% WR, +14.86u, +15.2% ROI)
+        v = evidence.verified
+        a = evidence.all_rows
+        if v.total_graded >= MIN_GRADED:
+            if v.win_rate >= BEST_MIN_WIN_RATE and v.roi >= BEST_MIN_ROI:
                 verdict = "CONFIRMED_BEST"
-                flags.append(
-                    "NBA Unders >= 5% edge hit 58.3% WR (35W-25L, +14.86u, +15.2% ROI); Unders >= 9% hit 56.6% WR (+11.34u)."
-                )
-            elif sp == "nba" and sel == "under" and bucket in ("< 2%", "2.0% - 4.9%"):
-                # Sub-5% NBA Unders are near-breakeven vig churn (15W-18L, 45.5% WR, -6.82u)
+            elif v.win_rate < TRAP_WIN_RATE or v.roi < TRAP_ROI:
                 verdict = "DOWNGRADE_TRAP"
-                flags.append(
-                    "NBA Unders < 5% edge hit only 45.5% WR (15W-18L, -6.82u, -16.8% ROI) - sub-vig noise."
-                )
-            elif sp == "nfl" and bucket == "5.0% - 7.9%":
-                # NFL 5-8% totals are 6-0 all-time
-                verdict = "CONFIRMED_BEST"
-                flags.append("NFL Totals 5-8% edge are 100% WR (6W-0L, +98.9% ROI) all-time.")
-            elif sp == "nfl" and sel == "over" and bucket == "2.0% - 4.9%":
-                verdict = "CONFIRMED_BEST"
-                flags.append("NFL Overs 2-5% edge hit 80% WR (4W-1L, +62.8% ROI).")
-            elif sp == "ncaab" and sel == "over" and bucket in ("8.0% - 11.9%", ">= 12.0%"):
-                verdict = "CONFIRMED_BEST"
-                flags.append("NCAAB Overs in 8-12% edge hit 62.5% WR (+22.4% ROI).")
-
-        # 2. Check Spread traps
-        if mkt == "spread":
-            if sp == "nfl" and bucket == "2.0% - 4.9%":
-                # 2-5% NFL spreads hit 54.5% WR (+0.35u, +2.9% ROI) - near-breakeven vig churn
-                verdict = "DOWNGRADE_TRAP"
-                flags.append(
-                    "NFL Spreads 2-5% edge hit only 54.5% WR (+2.9% ROI, +0.35u over 11 bets) - near-breakeven vig churn; insufficient alpha for Best Pick status."
-                )
-            elif sp == "nfl" and bucket in ("5.0% - 7.9%", "8.0% - 11.9%"):
-                # NFL 5-8% spread dogs hit only 33% WR
-                verdict = "DOWNGRADE_TRAP"
-                flags.append(
-                    "NFL Spreads 5-8% edge hit only 33.3% WR (2W-4L, -41% ROI) on heavy dogs - market information asymmetry."
-                )
-            elif sp == "ncaab" and bucket == ">= 12.0%":
-                # Early NCAAB 12%+ spreads hit 46% (-37.78u)
-                verdict = "DOWNGRADE_TRAP"
-                flags.append(
-                    "Early NCAAB Spreads >= 12% edge hit 46.0% WR (-37.78u) from early-season roster volatility."
-                )
-            elif sp == "nba" and bucket in ("8.0% - 11.9%", ">= 12.0%"):
-                verdict = "CONFIRMED_BEST"
-                flags.append(
-                    "NBA Spreads >= 8% edge hit 63.2% WR (+9.47u, +26.7% ROI) on double-digit cushions."
-                )
-
-        # 3. Check empirical edge bucket overall if no override. Only VERIFIED rows count
-        # toward a verdict; an unverified-but-large all-rows record is shown as context only.
-        if verdict == "QUALIFIED_MODERATE":
-            v = evidence.verified
-            a = evidence.all_rows
-            if v.total_graded >= MIN_GRADED:
-                if v.win_rate >= BEST_MIN_WIN_RATE and v.roi >= BEST_MIN_ROI:
-                    verdict = "CONFIRMED_BEST"
-                    flags.append(
-                        f"Bucket {bucket} meets Gold Standard ({basis}): verified {v.win_rate:.1f}% WR, {v.roi:+.1f}% ROI ({v.wins}W-{v.losses}L)."
-                    )
-                elif v.win_rate < TRAP_WIN_RATE or v.roi < TRAP_ROI:
-                    verdict = "DOWNGRADE_TRAP"
-                    flags.append(
-                        f"Bucket {bucket} fails Best Pick criteria ({basis}): verified {v.win_rate:.1f}% WR, {v.roi:+.1f}% ROI ({v.wins}W-{v.losses}L; near-breakeven or negative)."
-                    )
-            else:
-                flags.append(
-                    f"insufficient verified history in bucket {bucket} ({basis}): {v.total_graded} verified of {a.total_graded} graded; all-rows record {a.wins}W-{a.losses}L"
-                )
+            flags.append(
+                f"Bucket {bucket_label} ({basis}): verified {v.win_rate:.1f}% WR, {v.roi:+.1f}% ROI "
+                f"({v.wins}W-{v.losses}L, {v.total_graded} verified of {a.total_graded} graded)."
+            )
+        else:
+            flags.append(
+                f"insufficient verified history in bucket {bucket_label} ({basis}): {v.total_graded} verified of {a.total_graded} graded; all-rows record {a.wins}W-{a.losses}L"
+            )
         if edge < 0:
             # A pick the model prices below the market can never be a best pick, whatever
             # the bucket's win rate says.
