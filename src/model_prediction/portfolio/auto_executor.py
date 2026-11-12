@@ -616,6 +616,75 @@ def _parse_disabled_sport_markets(state: dict[str, Any]) -> tuple[tuple[str, str
     return tuple(disabled_parsed)
 
 
+STATE_VERSION_KEY = "_state_version"  # monotonic save counter for read-modify-write conflict detection
+
+
+class StateVersionConflictError(RuntimeError):
+    """Raised when a state file's on-disk ``_state_version`` advanced past the
+    version this process read, meaning another writer (dashboard, scheduled
+    worker, operator hand-edit) saved in between this process's load and save.
+    The caller must reload fresh state and retry rather than blindly overwrite it.
+    """
+
+
+def _coerce_state_version(value: Any) -> int:
+    """Legacy files have no ``_state_version`` key; a hand-edited or corrupt
+    value (string, bool, negative, float) is not a trustworthy version either --
+    both cases fall back to 0, the backward-compatible default."""
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int) and value >= 0:
+        return value
+    return 0
+
+
+def read_state_file_version(path: Path) -> int:
+    """Read the live on-disk ``_state_version`` without disturbing the caller's
+    own (possibly stale) in-memory copy. Any failure to read it -- missing file,
+    unreadable bytes, invalid JSON, or a JSON value that isn't an object -- is
+    treated as version 0 so a missing/older live file never blocks a save."""
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError:
+        return 0
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return 0
+    if not isinstance(data, dict):
+        return 0
+    return _coerce_state_version(data.get(STATE_VERSION_KEY))
+
+
+def write_versioned_state_file(path: Path, state: dict[str, Any], *, temp_path: Path) -> int:
+    """Atomically save ``state`` to ``path``, bumping its ``_state_version``.
+
+    Raises ``StateVersionConflictError`` when the live file's version is
+    strictly greater than the version this ``state`` dict was read at -- not
+    ``!=``, because ``load_auto_buyer_state`` can seed from the repo copy when
+    the runtime file is missing, so a missing or older live file must never
+    raise. The re-read/compare/replace sequence here is not lock-protected; it
+    closes the read-modify-write window that spans a whole multi-minute cycle,
+    not a sub-millisecond race between two near-simultaneous writers.
+    """
+    expected = _coerce_state_version(state.get(STATE_VERSION_KEY))
+    live = read_state_file_version(path)
+    if live > expected:
+        raise StateVersionConflictError(
+            f"{path} advanced to version {live} (read at {expected}); reload and retry"
+        )
+    new_version = expected + 1
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path.write_text(
+        json.dumps({**state, STATE_VERSION_KEY: new_version}, indent=2) + "\n", encoding="utf-8"
+    )
+    temp_path.replace(path)
+    # Reflect the bumped version back onto the caller's dict so a second save
+    # of the same object (e.g. two sequential set_* calls) does not self-conflict.
+    state[STATE_VERSION_KEY] = new_version
+    return new_version
+
+
 def load_auto_buyer_state() -> dict[str, Any]:
     """Load persistent auto-buyer configuration and runtime toggle state."""
     default_state = {
@@ -636,6 +705,7 @@ def load_auto_buyer_state() -> dict[str, Any]:
         ],
         "last_run": None,
         "last_daily_date": None,
+        STATE_VERSION_KEY: 0,
     }
     data: dict[str, Any] = {}
     state_file = AUTO_BUYER_STATE_FILE
@@ -656,6 +726,7 @@ def load_auto_buyer_state() -> dict[str, Any]:
     state = {**default_state, **data}
     normalized_mode = str(state.get("mode") or DEFAULT_AUTO_BUYER_MODE).lower()
     state["mode"] = normalized_mode if normalized_mode in AUTO_BUYER_MODES else DEFAULT_AUTO_BUYER_MODE
+    state[STATE_VERSION_KEY] = _coerce_state_version(state.get(STATE_VERSION_KEY))
     try:
         unit_value = float(state.get("unit_value_usd") or DEFAULT_AUTO_BUYER_UNIT_VALUE_USD)
     except (TypeError, ValueError):
@@ -739,11 +810,14 @@ def load_auto_buyer_state() -> dict[str, Any]:
 
 
 def save_auto_buyer_state(state: dict[str, Any]) -> None:
-    """Save auto-buyer toggle state and settings atomically."""
-    AUTO_BUYER_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    temp_file = AUTO_BUYER_STATE_FILE.with_suffix(".json.tmp")
-    temp_file.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
-    temp_file.replace(AUTO_BUYER_STATE_FILE)
+    """Save auto-buyer toggle state and settings atomically.
+
+    Raises ``StateVersionConflictError`` if another writer advanced the file
+    on disk since ``state`` was loaded -- see ``write_versioned_state_file``.
+    """
+    write_versioned_state_file(
+        AUTO_BUYER_STATE_FILE, state, temp_path=AUTO_BUYER_STATE_FILE.with_suffix(".json.tmp")
+    )
 
 
 def toggle_auto_buyer(enabled: bool | None = None) -> dict[str, Any]:
@@ -1024,7 +1098,21 @@ def run_auto_buyer_cycle(
     state["last_run"] = run_summary
     if forecast_date:
         state["last_daily_date"] = forecast_date
-    save_auto_buyer_state(state)
+    try:
+        save_auto_buyer_state(state)
+    except StateVersionConflictError as exc:
+        # The cycle holds its state snapshot for the whole run (minutes for a
+        # live cycle), so an operator toggle in that window is expected, not a
+        # rare race. Re-apply only the keys THIS cycle owns onto a fresh load --
+        # the operator's concurrent change (e.g. disabling the live buyer)
+        # wins, and the cycle's own telemetry is still recorded rather than
+        # silently dropped. A second consecutive conflict propagates.
+        logger.warning("Auto-buyer state conflict at end of cycle, re-applying onto fresh state: %s", exc)
+        fresh = load_auto_buyer_state()
+        fresh["last_run"] = run_summary
+        if forecast_date:
+            fresh["last_daily_date"] = forecast_date
+        save_auto_buyer_state(fresh)
     return run_summary
 
 

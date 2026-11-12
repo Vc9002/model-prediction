@@ -695,7 +695,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._send({"status": "refused", "error": str(error)}, code=400)
         elif parsed.path == "/api/auto-buyer/toggle":
             enabled = payload.get("enabled")
-            self._send(toggle_auto_buyer(enabled))
+            try:
+                self._send(toggle_auto_buyer(enabled))
+            except (OSError, RuntimeError, TypeError, ValueError) as error:
+                self._send({"status": "refused", "error": str(error)}, code=400)
         elif parsed.path == "/api/auto-buyer/unit-value":
             try:
                 self._send(set_auto_buyer_unit_value(payload.get("unit_value_usd")))
