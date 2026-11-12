@@ -110,3 +110,109 @@ def test_logged_picks_index_excludes_legacy_research_tier(monkeypatch):
     picks = scanner_mod._get_logged_picks()
 
     assert [p["pick_id"] for p in picks] == ["M1", "F1"]
+
+
+def test_lookup_model_prob_offset_timestamp_same_utc_date_beats_stale_cross_date_pick(monkeypatch):
+    # Pick A: an offset-notation timestamp that is the exact same UTC instant/
+    # calendar date as the market's "2026-10-20T00:00:00Z" query -- the real
+    # "crosses a timezone boundary" case the live-data audit found.
+    pick_a = {
+        "league": "NBA",
+        "market_type": "moneyline",
+        "home_team": "Lakers",
+        "away_team": "Celtics",
+        "event_start_utc": "2026-10-19T20:00:00-0400",
+        "model_probability": 0.58,
+        "selection": "home",
+        "created_at_utc": "2026-10-19T22:00:00Z",
+    }
+    # Pick B: a genuinely different, later real game for the same two teams,
+    # with a LATER created_at_utc than Pick A -- the pre-fix tie-break on
+    # created_at_utc alone would wrongly prefer this stale cross-date pick.
+    pick_b = {
+        "league": "NBA",
+        "market_type": "moneyline",
+        "home_team": "Lakers",
+        "away_team": "Celtics",
+        "event_start_utc": "2026-10-25T17:05:00Z",
+        "model_probability": 0.41,
+        "selection": "home",
+        "created_at_utc": "2026-10-25T10:00:00Z",
+    }
+    monkeypatch.setattr(scanner_mod, "_get_logged_picks", lambda: [pick_a, pick_b])
+
+    result = scanner_mod._lookup_model_prob(
+        "NBA",
+        "Lakers",
+        "Celtics",
+        event_start_utc="2026-10-20T00:00:00Z",
+        market_type="moneyline",
+        calibrate=False,
+    )
+
+    assert result == pytest.approx(0.58)
+
+
+def test_lookup_model_prob_returns_none_when_only_cross_date_pick_exists(monkeypatch):
+    # Same query as above, but only the genuinely-different-date pick exists --
+    # no same-UTC-date candidate at all. The fix must fail closed (None), not
+    # fall back to the stale cross-date pick.
+    pick_b = {
+        "league": "NBA",
+        "market_type": "moneyline",
+        "home_team": "Lakers",
+        "away_team": "Celtics",
+        "event_start_utc": "2026-10-25T17:05:00Z",
+        "model_probability": 0.41,
+        "selection": "home",
+        "created_at_utc": "2026-10-25T10:00:00Z",
+    }
+    monkeypatch.setattr(scanner_mod, "_get_logged_picks", lambda: [pick_b])
+
+    result = scanner_mod._lookup_model_prob(
+        "NBA",
+        "Lakers",
+        "Celtics",
+        event_start_utc="2026-10-20T00:00:00Z",
+        market_type="moneyline",
+        calibrate=False,
+    )
+
+    assert result is None
+
+
+def test_lookup_model_prob_same_day_tie_break_prefers_most_recent(monkeypatch):
+    # Pin (unchanged behavior before and after the fix): when two picks both
+    # match the query's UTC calendar date, the most-recently-created one wins.
+    pick_older = {
+        "league": "NBA",
+        "market_type": "moneyline",
+        "home_team": "Lakers",
+        "away_team": "Celtics",
+        "event_start_utc": "2026-10-20T00:00:00Z",
+        "model_probability": 0.52,
+        "selection": "home",
+        "created_at_utc": "2026-10-19T12:00:00Z",
+    }
+    pick_newer = {
+        "league": "NBA",
+        "market_type": "moneyline",
+        "home_team": "Lakers",
+        "away_team": "Celtics",
+        "event_start_utc": "2026-10-20T00:00:00Z",
+        "model_probability": 0.63,
+        "selection": "home",
+        "created_at_utc": "2026-10-19T23:00:00Z",
+    }
+    monkeypatch.setattr(scanner_mod, "_get_logged_picks", lambda: [pick_older, pick_newer])
+
+    result = scanner_mod._lookup_model_prob(
+        "NBA",
+        "Lakers",
+        "Celtics",
+        event_start_utc="2026-10-20T00:00:00Z",
+        market_type="moneyline",
+        calibrate=False,
+    )
+
+    assert result == pytest.approx(0.63)

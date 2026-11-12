@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -66,6 +67,28 @@ def _team_matches(team_name: str, side_description: str) -> bool:
     if len(shorter) < 4:
         return shorter == longer
     return f" {shorter} " in f" {longer} "
+
+
+def _event_utc_date(value: str | None) -> str | None:
+    """Parse an ISO-8601 timestamp and return its real-world UTC calendar date.
+
+    Main/Flat ledger rows and Polymarket snapshot rows don't consistently use
+    the same offset notation for the identical instant (an offset-notation
+    pick timestamp vs. a Z-notation market timestamp can describe the same
+    real game), so a raw substring slice of the first 10 characters can
+    disagree about the calendar day even when both describe the same event.
+    Returning None on anything unparsable lets the caller fail closed instead
+    of guessing.
+    """
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except (ValueError, TypeError):
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(UTC).date().isoformat()
 
 
 _PICKS_INDEX_CACHE: list[dict] | None = None
@@ -130,9 +153,13 @@ def _lookup_model_prob(
 ) -> float | None:
     picks = _get_logged_picks()
     lg_norm = _normalize_league(league)
-    target_date = event_start_utc[:10] if event_start_utc else None
+    target_utc_date = _event_utc_date(event_start_utc)
+    if target_utc_date is None:
+        # The market's own date can't be verified -- fail closed rather than
+        # match against an unbounded "any date" fallback.
+        return None
 
-    candidates: list[tuple[int, str, float]] = []
+    candidates: list[tuple[str, float]] = []
     for p in picks:
         p_lg = _normalize_league(str(p.get("league") or ""))
         if p_lg != lg_norm:
@@ -141,12 +168,18 @@ def _lookup_model_prob(
         if p_mtype != market_type.lower():
             continue
 
+        # Point-in-time correctness: a different-date pick may have been
+        # superseded, rained out/rescheduled, or (for esports) be a wholly
+        # different fixture months apart. The live-data audit found no case
+        # needing a multi-day tolerance -- an exact same-UTC-date match is
+        # required before a pick is even considered as a candidate.
+        if _event_utc_date(p.get("event_start_utc")) != target_utc_date:
+            continue
+
         p_home = str(p.get("home_team") or "")
         p_away = str(p.get("away_team") or "")
         if not p_home or not p_away:
             continue
-
-        p_date = str(p.get("event_start_utc") or "")[:10]
 
         match_direct = _team_matches(p_home, home_desc) and _team_matches(p_away, away_desc)
         match_reverse = _team_matches(p_away, home_desc) and _team_matches(p_home, away_desc)
@@ -171,16 +204,16 @@ def _lookup_model_prob(
 
                         p_win = p_home_prob if match_direct else (1.0 - p_home_prob)
 
-                    score = 0
-                    if target_date and p_date == target_date:
-                        score += 10
-                    candidates.append((score, str(p.get("created_at_utc") or ""), p_win))
+                    candidates.append((str(p.get("created_at_utc") or ""), p_win))
                 except (ValueError, TypeError):
                     pass
 
     if candidates:
-        candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
-        raw_prob = candidates[0][2]
+        # Every surviving candidate already passed the exact-UTC-date filter
+        # above, so the only remaining ordering is most-recently-created wins
+        # (same-day re-forecast churn) -- identical to the prior tie-break.
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        raw_prob = candidates[0][1]
         if calibrate:
             cal = _get_platt_calibrator()
             if cal is not None and hasattr(cal, "transform"):
