@@ -4,10 +4,10 @@ current_phase: 1
 current_phase_name: Portfolio Circuit Breaker
 status: planning
 stopped_at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated to 4-phase structure
-last_updated: "2026-11-12T06:37:29.753Z"
+last_updated: "2026-11-12T06:42:18.114Z"
 last_activity: 2026-11-12
 last_activity_desc: ROADMAP.md and STATE.md created from REQUIREMENTS.md and research/SUMMARY.md
-state_head: d06d8db5392b9e0caeb047cb34ffa1c2725ad742
+state_head: cafbe94c3fee466e18c72aacfbcdec7b5b138f7b
 progress:
   total_phases: 4
   completed_phases: 0
@@ -45,7 +45,7 @@ See: .planning/PROJECT.md (updated 2026-09-20 after initialization)
 Phase: 1 of 4 (Portfolio Circuit Breaker)
 Plan: None yet in current phase
 Status: Ready to plan
-Last activity: 2026-11-12 - Completed quick task 261112-112: Added AuditLog.reversed_events() bounded backward reader; fixed dashboard audit-tail and the real-money polymarket_execute single_order gate to stop fully materializing events.jsonl (428MB).
+Last activity: 2026-11-12 - Completed quick task 261112-111: Made audit_ledger_pnl.py fail its exit code on unresolved model-ledger drift (27 stranded rows, 8 settlement conflicts) it already computed but previously ignored; removed a corrupt stray xlsx; rejected full generated-on-demand conversion of the per-model mirror as unsafe for a quick task (schema gap vs canonical ledger_records), documented why. The ledger-improvement plan (C:\Users\Vince\.claude\plans\golden-whistling-haven.md) is now complete across all three phases.
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -93,6 +93,7 @@ None yet.
 | 261112-0li | Generalize NCAAB dedup fix audit: confirmed no other sport has the bug; added mutation-proven regression tests pinning main-buyer identity dedup | 2026-11-12 | b2ff76a1 | [261112-0li-commits-b7a25ddf-69856d6b-5e2212ef-fixed](./quick/261112-0li-commits-b7a25ddf-69856d6b-5e2212ef-fixed/) |
 | 261112-118 | Add process-local threading.Lock to ledger.py for intra-process mutation contention; document deferred XLSX-rebuild-split decision | 2026-11-12 | 222584ed | [261112-118-in-ledger-py-1-every-ledger-mutation-tak](./quick/261112-118-in-ledger-py-1-every-ledger-mutation-tak/) |
 | 261112-112 | Add AuditLog.reversed_events() bounded backward reader; fix dashboard audit-tail and polymarket_execute single_order gate to stop fully materializing events.jsonl (428MB) | 2026-11-12 | d06d8db5 | [261112-112-the-events-jsonl-bug-audit-py-fixed-2026](./quick/261112-112-the-events-jsonl-bug-audit-py-fixed-2026/) |
+| 261112-111 | Make audit_ledger_pnl.py fail its exit code on unresolved model-ledger drift it already computed; remove corrupt stray xlsx; document generated-on-demand rejection rationale | 2026-11-12 | cafbe94c | [261112-111-evaluate-whether-the-per-model-xlsx-mirr](./quick/261112-111-evaluate-whether-the-per-model-xlsx-mirr/) |
 
 ## Milestone History
 
