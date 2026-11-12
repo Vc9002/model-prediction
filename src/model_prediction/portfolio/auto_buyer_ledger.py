@@ -167,6 +167,24 @@ def _is_settled_auto_buyer_record(record: dict[str, Any]) -> bool:
     )
 
 
+def is_manual_auto_buyer_record(record: dict[str, Any]) -> bool:
+    """True for a hand-placed exchange position imported by ``_manual_position_rows``.
+
+    Those rows carry no model edge (no ``edge`` key, no real line/units), so they must
+    never be scored as a buyer or model win/loss. The prefix and model_id checks catch a
+    row that is missing the boolean ``manual`` flag; this must NOT look at
+    ``settlement_source`` or ``manual_exit_shares`` -- an operator-exited MODEL row
+    (settlement_source "manual_sell") carries real model edge and is a separate class.
+    """
+    if record.get("manual") is True:
+        return True
+    if str(record.get("pick_id") or "").startswith("MANUAL-"):
+        return True
+    if str(record.get("order_id") or "").startswith("MANUAL-"):
+        return True
+    return str(record.get("model_id") or "").strip().lower() == "manual"
+
+
 def _uses_live_auto_buyer_ledger(path: Path) -> bool:
     """Return whether a writer targets the production Auto-Buyer ledger.
 
@@ -2323,8 +2341,16 @@ def settle_auto_buyer_ledger(
 def summarize_auto_buyer_performance(
     records: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Compute consolidated performance metrics, ROI, and win-rate accounting for Auto-Buyer."""
-    rows = records if records is not None else read_auto_buyer_ledger()
+    """Compute consolidated performance metrics, ROI, and win-rate accounting for Auto-Buyer.
+
+    MANUAL rows (hand-placed exchange positions, see ``is_manual_auto_buyer_record``) carry
+    no model edge and are excluded from every metric below; they are reported separately
+    under ``manual_orders``/``manual_settled_orders``/``manual_realized_pnl_usd`` so they
+    stay visible instead of silently disappearing from the ledger total.
+    """
+    rows_all = records if records is not None else read_auto_buyer_ledger()
+    manual_rows = [r for r in rows_all if is_manual_auto_buyer_record(r)]
+    rows = [r for r in rows_all if not is_manual_auto_buyer_record(r)]
     settled_rows = [r for r in rows if _is_settled_auto_buyer_record(r)]
     open_rows = [r for r in rows if r not in settled_rows]
 
@@ -2351,6 +2377,9 @@ def summarize_auto_buyer_performance(
         else 0.0
     )
 
+    manual_settled_rows = [r for r in manual_rows if _is_settled_auto_buyer_record(r)]
+    manual_realized_pnl_usd = sum(float(r.get("pnl_usd") or 0.0) for r in manual_settled_rows)
+
     return {
         "total_orders": len(rows),
         "open_orders": len(open_rows),
@@ -2366,4 +2395,7 @@ def summarize_auto_buyer_performance(
         "settled_cost_usd": round(settled_cost_usd, 2),
         "total_cost_usd": round(total_cost_usd, 2),
         "avg_edge_pct": round(avg_edge_pct, 1),
+        "manual_orders": len(manual_rows),
+        "manual_settled_orders": len(manual_settled_rows),
+        "manual_realized_pnl_usd": round(manual_realized_pnl_usd, 2),
     }

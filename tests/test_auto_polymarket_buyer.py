@@ -1918,6 +1918,102 @@ def test_summarize_auto_buyer_performance():
     assert summary["avg_edge_pct"] == 8.0
 
 
+def _manual_position_snapshot():
+    """Real 2026-11-11 Charleston-Temple shape (tests/test_audit_fixes_regression.py L1654-1667)."""
+    return {
+        "positions": {
+            "asc-cbb-char-templ-2026-11-11-neg-1pt5": {
+                "netPosition": "19.1",
+                "cost": {"value": "9.55"},
+                "updateTime": iso_utc(utc_now()),
+                "marketMetadata": {
+                    "title": "CHAR Cougars vs. TEM Owls",
+                    "eventSlug": "cbb-char-templ-2026-11-11",
+                },
+            }
+        }
+    }
+
+
+def test_manual_position_row_is_classified_manual(tmp_path: Path):
+    from model_prediction.portfolio.auto_buyer_ledger import (
+        _manual_position_rows,
+        is_manual_auto_buyer_record,
+    )
+
+    rows = _manual_position_rows(_manual_position_snapshot(), [], tmp_path, iso_utc(utc_now()))
+    assert len(rows) == 1
+    assert is_manual_auto_buyer_record(rows[0]) is True
+
+    assert is_manual_auto_buyer_record({"pick_id": "MANUAL-x"}) is True
+    assert is_manual_auto_buyer_record({"model_id": "manual"}) is True
+
+    assert is_manual_auto_buyer_record({"pick_id": "P1", "model_id": "ncaab-spread-v6"}) is False
+    # Operator exits of model rows carry real model edge and must never be mistaken for MANUAL.
+    assert (
+        is_manual_auto_buyer_record(
+            {
+                "pick_id": "P1",
+                "model_id": "ncaab-spread-v6",
+                "settlement_source": "manual_sell",
+                "manual_exit_shares": 7.88,
+            }
+        )
+        is False
+    )
+
+
+def test_summarize_auto_buyer_performance_excludes_manual_rows(tmp_path: Path):
+    from model_prediction.portfolio.auto_buyer_ledger import (
+        _manual_position_rows,
+        summarize_auto_buyer_performance,
+    )
+
+    manual_row = _manual_position_rows(_manual_position_snapshot(), [], tmp_path, iso_utc(utc_now()))[0]
+    manual_row["status"] = "settled"
+    manual_row["result"] = "loss"
+    manual_row["pnl_usd"] = -9.55
+    manual_row["settled_at_utc"] = iso_utc(utc_now())
+
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    rows = [
+        {
+            "order_id": "1",
+            "status": "settled",
+            "result": "win",
+            "cost_usd": 0.50,
+            "pnl_usd": 0.50,
+            "edge": 0.10,
+        },
+        {
+            "order_id": "2",
+            "status": "settled",
+            "result": "loss",
+            "cost_usd": 0.50,
+            "pnl_usd": -0.50,
+            "edge": 0.08,
+        },
+        manual_row,
+    ]
+    j_path.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+
+    summary = summarize_auto_buyer_performance(read_auto_buyer_ledger(j_path))
+    assert summary["total_orders"] == 2
+    assert summary["settled_orders"] == 2
+    assert summary["open_orders"] == 0
+    assert summary["wins"] == 1
+    assert summary["losses"] == 1
+    assert summary["record"] == "1W - 1L"
+    assert summary["realized_pnl_usd"] == 0.0
+    assert summary["settled_cost_usd"] == 1.0
+    assert summary["total_cost_usd"] == 1.0
+    assert summary["realized_roi_pct"] == 0.0
+    assert summary["avg_edge_pct"] == 9.0
+    assert summary["manual_orders"] == 1
+    assert summary["manual_settled_orders"] == 1
+    assert summary["manual_realized_pnl_usd"] == -9.55
+
+
 def _record_pending_fallback(tmp_path, event_start_utc, fallback_resting_shares=11.37):
     j_path = tmp_path / "auto_buyer_ledger.jsonl"
     x_path = tmp_path / "auto_buyer_picks.xlsx"
