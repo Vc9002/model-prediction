@@ -95,8 +95,8 @@ from model_prediction.dashboard.status import (
     status,
 )
 from model_prediction.portfolio.auto_buyer_ledger import (
-    AUTO_BUYER_LOG_PATH,
     read_auto_buyer_ledger,
+    resolve_auto_buyer_log_path,
     settle_auto_buyer_ledger,
     summarize_auto_buyer_performance,
 )
@@ -326,7 +326,7 @@ class Handler(BaseHTTPRequestHandler):
                     _cached(
                         f"odds:{odds_sport or 'all'}",
                         30,
-                        lambda: odds_summary(odds_sport if odds_sport else None),
+                        lambda: odds_summary(odds_sport or None),
                     )
                 )
             elif route == "/api/open":
@@ -490,6 +490,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._send({"ok": True, "at": datetime.now(UTC).isoformat()[:19]})
             elif route == "/api/auto-buyer/status":
                 self._send(load_auto_buyer_state())
+            elif route == "/api/auto-buyer/ncaab-paper/status":
+                from model_prediction.portfolio.ncaab_paper_trial import paper_trial_status
+
+                self._send(paper_trial_status())
             elif route == "/api/auto-buyer/summary":
                 self._send(_cached("auto-buyer-summary", 5, summarize_auto_buyer_performance))
             elif route == "/api/auto-buyer/ledger":
@@ -505,9 +509,10 @@ class Handler(BaseHTTPRequestHandler):
                     )
                 )
             elif route == "/api/auto-buyer/log":
-                if AUTO_BUYER_LOG_PATH.exists():
+                log_path = resolve_auto_buyer_log_path()
+                if log_path.exists():
                     try:
-                        lines = AUTO_BUYER_LOG_PATH.read_text(encoding="utf-8").splitlines()
+                        lines = log_path.read_text(encoding="utf-8").splitlines()
                         self._send({"lines": lines[-200:]})
                     except OSError:
                         self._send({"lines": []})
@@ -690,7 +695,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._send({"status": "refused", "error": str(error)}, code=400)
         elif parsed.path == "/api/auto-buyer/toggle":
             enabled = payload.get("enabled")
-            self._send(toggle_auto_buyer(enabled))
+            try:
+                self._send(toggle_auto_buyer(enabled))
+            except (OSError, RuntimeError, TypeError, ValueError) as error:
+                self._send({"status": "refused", "error": str(error)}, code=400)
         elif parsed.path == "/api/auto-buyer/unit-value":
             try:
                 self._send(set_auto_buyer_unit_value(payload.get("unit_value_usd")))
@@ -702,11 +710,31 @@ class Handler(BaseHTTPRequestHandler):
             except (OSError, RuntimeError, TypeError, ValueError) as error:
                 self._send({"status": "refused", "error": str(error)}, code=400)
         elif parsed.path == "/api/auto-buyer/run":
-            exec_override = payload.get("execute")
-            self._send(run_auto_buyer_cycle(execute_override=exec_override, force=True))
+            self._send(run_auto_buyer_cycle(force=True))
+        elif parsed.path == "/api/auto-buyer/ncaab-paper/toggle":
+            from model_prediction.portfolio.ncaab_paper_trial import set_paper_trial_enabled
+
+            try:
+                self._send(set_paper_trial_enabled(payload.get("enabled")))
+            except (OSError, RuntimeError, TypeError, ValueError) as error:
+                self._send({"status": "refused", "error": str(error)}, code=400)
+        elif parsed.path == "/api/auto-buyer/ncaab-paper/run":
+            from model_prediction.portfolio.ncaab_paper_trial import run_ncaab_spread_paper_trial
+
+            try:
+                self._send(run_ncaab_spread_paper_trial())
+            except (OSError, TypeError, ValueError, RuntimeError) as error:
+                self._send({"status": "error", "error": str(error)}, code=500)
         elif parsed.path == "/api/auto-buyer/settle":
-            state = load_auto_buyer_state()
-            root = PAPER_AUTO_BUYER_DATA_ROOT if str(state.get("mode")) == "paper" else None
+            query = parse_qs(parsed.query)
+            req_mode = (query.get("mode") or [None])[0] or (
+                payload.get("mode") if isinstance(payload, dict) else None
+            )
+            if not req_mode:
+                state = load_auto_buyer_state()
+                req_mode = str(state.get("mode", "paper"))
+            req_mode = str(req_mode).lower()
+            root = PAPER_AUTO_BUYER_DATA_ROOT if req_mode == "paper" else None
             self._send(settle_auto_buyer_ledger(data_root=root))
         else:
             self._send({"error": "unknown route"}, code=404)

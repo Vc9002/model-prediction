@@ -92,15 +92,6 @@ class MarketResidualModel:
         X_scaled = self.scaler.transform(features.to_array().reshape(1, -1))
         return float(self.model.predict_proba(X_scaled)[0, 1])
 
-    def should_trade(
-        self,
-        features: MarketResidualFeatures,
-        threshold: float = 0.6,
-    ) -> tuple[bool, float]:
-        """Trade decision: genuine edge probability must exceed threshold."""
-        prob = self.predict_genuine_edge_prob(features)
-        return prob >= threshold, prob
-
 
 # ── Executable edge calculation ──────────────────────────────────────────────
 

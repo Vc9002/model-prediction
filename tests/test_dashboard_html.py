@@ -894,6 +894,94 @@ def test_auto_buyer_performance_cohorts_and_et_day_grouping() -> None:
     assert output["dates"] == ["2026-09-01", "2026-09-01", "2026-09-02"]
 
 
+def test_auto_buyer_metrics_exclude_manual_rows() -> None:
+    """MANUAL rows (hand-placed exchange positions) must not count as buyer wins/losses.
+
+    An operator-exited MODEL row (settlement_source manual_sell) is a different class and
+    must NOT match the predicate -- it carries real model edge."""
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node.js is unavailable")
+    html = (ROOT / "dashboard.html").read_text(encoding="utf-8")
+    match = re.search(
+        r"function isSettledAutoBuyerRow[\s\S]*?(?=function populateAbsSportDropdown)",
+        html,
+    )
+    assert match, "Auto-Buyer performance helpers are missing"
+    rows = [
+        {
+            "status": "settled",
+            "result": "loss",
+            "manual": True,
+            "pick_id": "MANUAL-asc-cbb-char-templ-2026-11-11-neg-1pt5",
+            "order_id": "MANUAL-asc-cbb-char-templ-2026-11-11-neg-1pt5",
+            "model_id": "manual",
+            "cost_usd": 9.55,
+            "pnl_usd": -9.55,
+        },
+        {
+            "status": "settled",
+            "result": "win",
+            "pick_id": "MANUAL-x",
+            "cost_usd": 1,
+            "pnl_usd": 5,
+        },
+        {
+            "status": "settled",
+            "result": "loss",
+            "model_id": "ncaab-spread-v6",
+            "settlement_source": "manual_sell",
+            "cost_usd": 0.5,
+            "pnl_usd": -0.2,
+        },
+        {
+            "status": "settled",
+            "result": "win",
+            "cost_usd": 0.5,
+            "pnl_usd": 0.5,
+        },
+    ]
+    script = (
+        match.group(0)
+        + "\nconst rows=JSON.parse(process.argv[1]);"
+        + "const predicate=rows.map(isManualAutoBuyerRow);"
+        + "const metrics=autoBuyerCohortMetrics(rows.filter(isSettledAutoBuyerRow).filter(r=>!isManualAutoBuyerRow(r)));"
+        + "process.stdout.write(JSON.stringify({predicate,metrics}));"
+    )
+    result = subprocess.run(
+        [node, "-e", script, json.dumps(rows)],
+        text=True,
+        encoding="utf-8",
+        check=True,
+        capture_output=True,
+    )
+    output = json.loads(result.stdout)
+    assert output["predicate"] == [True, True, False, False]
+    assert output["metrics"]["settled"] == 2
+    assert output["metrics"]["wins"] == 1
+    assert output["metrics"]["losses"] == 1
+    assert output["metrics"]["pnlUsd"] == pytest.approx(0.3)
+
+
+def test_auto_buyer_render_functions_filter_manual_rows() -> None:
+    html = (ROOT / "dashboard.html").read_text(encoding="utf-8")
+    kpi_match = re.search(
+        r"function renderAutoBuyerKpisFor[\s\S]*?(?=function formatAutoBuyerPickText)",
+        html,
+    )
+    assert kpi_match, "renderAutoBuyerKpisFor is missing"
+    kpi_body = kpi_match.group(0)
+    assert "isManualAutoBuyerRow" in kpi_body
+    assert "AbsAllCount`).textContent = rows.length" in kpi_body
+
+    perf_match = re.search(
+        r"function renderAutoBuyerPerformanceFor[\s\S]*?(?=async function loadAutoBuyerLog)",
+        html,
+    )
+    assert perf_match, "renderAutoBuyerPerformanceFor is missing"
+    assert "isManualAutoBuyerRow" in perf_match.group(0)
+
+
 def test_active_portfolio_tab_is_rendered_during_initial_refresh() -> None:
     html = (ROOT / "dashboard.html").read_text(encoding="utf-8")
     assert 'else if(active==="folio") renderFolio();' in html

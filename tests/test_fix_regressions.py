@@ -24,7 +24,7 @@ from model_prediction.data_sources.polymarket_execute import (
     OrderTicket,
     PolymarketExecutor,
 )
-from model_prediction.domain import EASTERN, League, MarketType, ModelOrigin, ModelState, PickRequest
+from model_prediction.domain import EASTERN, League, MarketType, ModelOrigin, PickRequest, legacy_record_type
 from model_prediction.eligibility import (
     evaluate_esports_eligibility,
     evaluate_gated_research_eligibility,
@@ -55,7 +55,7 @@ def _future_request(league=League.LOL, selection="home", **overrides) -> PickReq
         "rationale": "Neutral Elo baseline; executable ask 0.5000 (market_slug=aec-lol-a-b-2026).",
         "risks": "test",
         "model_origin": ModelOrigin.STATISTICAL_MODEL,
-        "model_state": ModelState.SHADOW_QUALIFIED,
+        "model_enabled": True,
         "observed_at_utc": datetime.now(UTC).isoformat(),
         "model_artifact_hash": "hash",
         "calibration_method": "neutral_elo",
@@ -343,21 +343,21 @@ def test_esports_eligibility_ban_check_arms_only_when_ban_list_provided():
     result = evaluate_esports_eligibility(
         request, Exposure(), UnitPolicy(), ban_list=_StubBanList({"Nobody"})
     )
-    assert result.record_type.value == "QUALIFIED_SHADOW_CALL"
+    assert legacy_record_type(result.qualified) == "QUALIFIED_SHADOW_CALL"
 
     # No ban_list at all: unchanged legacy behavior.
     result = evaluate_esports_eligibility(_future_request(), Exposure(), UnitPolicy())
-    assert result.record_type.value == "QUALIFIED_SHADOW_CALL"
+    assert legacy_record_type(result.qualified) == "QUALIFIED_SHADOW_CALL"
 
 
 def test_esports_eligibility_qualifies_only_with_full_provenance():
     result = evaluate_esports_eligibility(_future_request(model_probability=0.58), Exposure(), UnitPolicy())
-    assert result.record_type.value == "QUALIFIED_SHADOW_CALL"
+    assert legacy_record_type(result.qualified) == "QUALIFIED_SHADOW_CALL"
     assert result.units > 0
 
     incomplete = _future_request(model_artifact_hash="")
     result = evaluate_esports_eligibility(incomplete, Exposure(), UnitPolicy())
-    assert result.record_type.value == "RESEARCH_OBSERVATION"
+    assert legacy_record_type(result.qualified) == "RESEARCH_OBSERVATION"
     # Still gets a real paper size -- every logged pick has units and pnl
     # (operator directive, 2026-07-31).
     assert result.units > 0

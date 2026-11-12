@@ -206,9 +206,9 @@ def check_nfl_qb_injury_status(
             status = str(item.get("status") or "")
             if status in ("Out", "IR"):
                 return True, status, 4.5
-            elif status == "Doubtful":
+            if status == "Doubtful":
                 return False, "Doubtful", 2.5
-            elif status == "Questionable":
+            if status == "Questionable":
                 return False, "Questionable", 1.0
             return False, status, 0.0
 

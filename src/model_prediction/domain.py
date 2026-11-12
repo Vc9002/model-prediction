@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from enum import StrEnum
@@ -123,9 +124,25 @@ class PickResult(StrEnum):
     PUSH = "push"
 
 
-class RecordType(StrEnum):
-    RESEARCH_OBSERVATION = "RESEARCH_OBSERVATION"
-    QUALIFIED_SHADOW_CALL = "QUALIFIED_SHADOW_CALL"
+# Stored ``record_type`` column values. The enum is gone: whether a decision cleared
+# the trust gates is a bool (``EligibilityResult.qualified``); these literals exist
+# only so rows written before the tag directive stay readable and exports keep their
+# column. Nothing outside this block should spell them.
+_LEGACY_QUALIFIED_ROW = "QUALIFIED_SHADOW_CALL"
+_LEGACY_RESEARCH_ROW = "RESEARCH_OBSERVATION"
+
+
+def legacy_record_type(qualified: bool) -> str:
+    """The value persisted in the ledger's ``record_type`` column."""
+    return _LEGACY_QUALIFIED_ROW if qualified else _LEGACY_RESEARCH_ROW
+
+
+def is_qualified_row(row: Mapping[str, Any]) -> bool:
+    return row.get("record_type") == _LEGACY_QUALIFIED_ROW
+
+
+def is_research_row(row: Mapping[str, Any]) -> bool:
+    return row.get("record_type") == _LEGACY_RESEARCH_ROW
 
 
 class ModelOrigin(StrEnum):
@@ -135,13 +152,38 @@ class ModelOrigin(StrEnum):
     SYNTHETIC_TEST = "synthetic_test"
 
 
-class ModelState(StrEnum):
+class PickTag(StrEnum):
+    """The only three pick tags. A tag names where a pick is going, not how trusted its model is.
+
+    Operator directive 2026-11-11 (final): research = Main/Flat ledgers, shadow = paper
+    auto-buyer, qualified = live auto-buyer. Every pick, whatever its tag, carries units
+    and edge. Rows persisted before this keep their legacy ``record_type`` /
+    ``model_state_at_decision`` values; ``pick_tag_for`` derives the tag from destination,
+    so no stored column or ledger rewrite is involved.
+    """
+
     RESEARCH = "research"
-    SHADOW_CANDIDATE = "shadow_candidate"
-    SHADOW_QUALIFIED = "shadow_qualified"
-    DEGRADED = "degraded"
-    SUSPENDED = "suspended"
-    RETIRED = "retired"
+    SHADOW = "shadow"
+    QUALIFIED = "qualified"
+
+
+def pick_tag_for(*, ledger_tier: str | None = None, buyer_mode: str | None = None) -> PickTag:
+    """Return the tag for a destination: a buyer mode wins, else the ledger tier means research."""
+    if buyer_mode is not None:
+        mode = str(buyer_mode).strip().lower()
+        if mode == "live":
+            return PickTag.QUALIFIED
+        if mode == "paper":
+            return PickTag.SHADOW
+        raise ValueError(f"unknown auto-buyer mode {buyer_mode!r}; expected 'paper' or 'live'")
+    if ledger_tier is not None and str(ledger_tier).strip().lower() in {
+        "main",
+        "flat",
+        "research",
+        "gated_research",
+    }:
+        return PickTag.RESEARCH
+    raise ValueError(f"cannot tag a pick for ledger_tier={ledger_tier!r}, buyer_mode={buyer_mode!r}")
 
 
 class NoCallReason(StrEnum):
@@ -261,7 +303,7 @@ class PickRequest:
     rationale: str
     risks: str
     model_origin: ModelOrigin = ModelOrigin.ANALYST_ESTIMATE
-    model_state: ModelState = ModelState.RESEARCH
+    model_enabled: bool = True
     baseline_identifier: str | None = None
     observed_at_utc: str | None = None
     model_artifact_hash: str = ""
@@ -442,7 +484,7 @@ class PickRequest:
             "rationale": self.rationale,
             "risks": self.risks,
             "model_origin": self.model_origin.value,
-            "model_state_at_decision": self.model_state.value,
+            "model_state_at_decision": "enabled" if self.model_enabled else "disabled",
             "baseline_identifier": self.baseline_identifier,
             "observed_at_utc": self.observed_at_utc,
             "model_artifact_hash": self.model_artifact_hash,

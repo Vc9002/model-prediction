@@ -103,11 +103,11 @@ def _dixon_coles_tau(x: int, y: int, lambda_: float, mu_: float, rho: float) -> 
     """Dixon-Coles bivariate adjustment factor tau(x, y)."""
     if x == 0 and y == 0:
         return 1.0 - (lambda_ * mu_ * rho)
-    elif x == 0 and y == 1:
+    if x == 0 and y == 1:
         return 1.0 + (lambda_ * rho)
-    elif x == 1 and y == 0:
+    if x == 1 and y == 0:
         return 1.0 + (mu_ * rho)
-    elif x == 1 and y == 1:
+    if x == 1 and y == 1:
         return 1.0 - rho
     return 1.0
 

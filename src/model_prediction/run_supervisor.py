@@ -99,7 +99,9 @@ _RUN_STATUSES = ("started", "completed", "failed", "skipped")
 _LOCK_BUSY_EXIT = 75  # matches daily_lock.py's convention
 
 DEFAULT_WORKER_TIMEOUTS: dict[str, float] = {
-    "auto-buyer": 300.0,  # 5 minutes max
+    # 5 minutes of work, plus auto_buyer_worker.FORECAST_LOCK_WAIT_SECONDS spent
+    # idle waiting for a running forecast to release the writer lock.
+    "auto-buyer": 1500.0,
     "manual-bet-sync": 300.0,  # 5 minutes max
     "production": 900.0,  # 15 minutes max
     "calibrate": 1800.0,  # 30 minutes max

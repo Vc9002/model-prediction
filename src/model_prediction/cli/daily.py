@@ -463,6 +463,18 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             logger.warning("CFB pregame weather capture failed for %s", args.date, exc_info=True)
             cfb_weather_result = {"status": "error"}
 
+    nfl_weather_result: dict[str, Any] = {"status": "skipped"}
+
+    def _capture_nfl_weather():
+        nonlocal nfl_weather_result
+        try:
+            from ..features.multi_sport_weather import capture_nfl_pregame_weather
+
+            nfl_weather_result = capture_nfl_pregame_weather(data_root, args.date)
+        except Exception:
+            logger.warning("NFL pregame weather capture failed for %s", args.date, exc_info=True)
+            nfl_weather_result = {"status": "error"}
+
     def _capture_mlb_probables():
         nonlocal mlb_probables_result
         if not is_sport_daily_enabled(config, "MLB"):
@@ -622,7 +634,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         f13 = io_pool.submit(_timed, "cfb_weather", _capture_cfb_weather)
         f14 = io_pool.submit(_timed, "nfl_efficiency", _capture_nfl_efficiency)
         f15 = io_pool.submit(_timed, "ncaab_boxscores", _capture_ncaab_boxscores)
-        for f in (f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15):
+        f16 = io_pool.submit(_timed, "nfl_weather", _capture_nfl_weather)
+        for f in (f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16):
             f.result()  # Wait for all, surface exceptions
         try:
             slate = f0.result()
@@ -1537,6 +1550,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                     "rejected_not_open": buyer_run.get("rejected_not_open", 0),
                     "whitelisted_evaluated": buyer_run.get("whitelisted_count", 0),
                     "rejected_not_whitelisted": buyer_run.get("rejected_not_whitelisted", 0),
+                    "rejected_not_qualified_decision": buyer_run.get("rejected_not_qualified_decision", 0),
                     "rejected_blacklist": buyer_run.get("rejected_blacklist", 0),
                     "rejected_disabled_sport_market": buyer_run.get("rejected_disabled_sport_market", 0),
                     "rejected_unsupported_market": buyer_run.get("rejected_unsupported_market", 0),
@@ -1610,6 +1624,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         "step1h_nhl_injuries": nhl_injuries_result,
         "step1i_cfb_injuries": cfb_injuries_result,
         "step1j_cfb_weather": cfb_weather_result,
+        "step1k_nfl_weather": nfl_weather_result,
         "step1c_mlb_probable_starters": {
             "captured_events": len(mlb_probables_result),
             "archive": "data/point_in_time/mlb_probable_starters.jsonl",

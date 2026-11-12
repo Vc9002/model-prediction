@@ -227,46 +227,6 @@ def date_cluster_bootstrap(
     }
 
 
-def team_cluster_bootstrap(
-    values: Sequence[float],
-    teams: Sequence[str],
-    n_bootstrap: int = 1000,
-    seed: int = 42,
-) -> dict[str, float]:
-    """Bootstrap with team clusters (preserves within-team correlation --
-    e.g. a genuinely mispriced park factor or a systematically miscalibrated
-    matchup feature affects every game a given team plays in, not just one
-    independent observation). CLAUDE.md Part 2 SS2 names both "date-cluster
-    and team-cluster bootstrap intervals" as required; only the date-cluster
-    version existed until now. Same resampling shape as
-    date_cluster_bootstrap(), clustering on `teams` instead of `dates`.
-
-    `teams` should carry one cluster key per value -- for a two-team game,
-    callers report the same value under both team keys (one row per team
-    per game), matching how a team-level correlation risk actually shows
-    up (a bad Rockies-specific feature affects every Rockies game, home or
-    away)."""
-    rng = np.random.default_rng(seed)
-    team_groups: dict[str, list[float]] = defaultdict(list)
-    for t, v in zip(teams, values, strict=True):
-        team_groups[t].append(v)
-    group_keys = list(team_groups.keys())
-    means: list[float] = []
-    for _ in range(n_bootstrap):
-        sampled = rng.choice(group_keys, size=len(group_keys), replace=True)
-        sample_vals = [v for k in sampled for v in team_groups[k]]
-        if sample_vals:
-            means.append(float(np.mean(sample_vals)))
-    means_arr = np.array(means)
-    return {
-        "mean": float(np.mean(means_arr)),
-        "ci_lower": float(np.percentile(means_arr, 2.5)),
-        "ci_upper": float(np.percentile(means_arr, 97.5)),
-        "std": float(np.std(means_arr)),
-        "n_bootstrap": n_bootstrap,
-    }
-
-
 def season_block_bootstrap(
     values: Sequence[float],
     dates: Sequence[str],

@@ -121,12 +121,12 @@ class NFLCalibrator:
             logit_val = _logit(p)
             return round(_sigmoid(logit_val / effective_t), 4)
 
-        elif self.method == CalibrationMethod.PLATT:
+        if self.method == CalibrationMethod.PLATT:
             logit_val = _logit(p)
             scaled_logit = (self.platt_slope * logit_val + self.platt_intercept) / week_damp
             return round(_sigmoid(scaled_logit), 4)
 
-        elif self.method == CalibrationMethod.ISOTONIC and self._isotonic_model is not None:
+        if self.method == CalibrationMethod.ISOTONIC and self._isotonic_model is not None:
             cal_p = float(self._isotonic_model.predict([p])[0])
             if week_damp > 1.0:
                 logit_val = _logit(cal_p)

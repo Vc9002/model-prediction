@@ -12,8 +12,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-import numpy as np
-
 # ── Missingness ──────────────────────────────────────────────────────────────
 
 
@@ -77,33 +75,6 @@ class MissingnessReport:
             "mean_uncertainty": self.mean_uncertainty,
             "conflict_rate": self.conflict_rate,
         }
-
-
-def compute_missingness_report(
-    feature_group: str,
-    records: list[FeatureRecord],
-) -> MissingnessReport:
-    """Aggregate missingness statistics for a feature group."""
-    total = len(records)
-    available = [r for r in records if r.available]
-    missing = [r for r in records if not r.available]
-    reasons: dict[str, int] = {}
-    for r in missing:
-        if r.missing_reason:
-            reasons[r.missing_reason] = reasons.get(r.missing_reason, 0) + 1
-    avg_age = sum(r.observation_age_hours for r in available) / max(1, len(available))
-    avg_unc = sum(r.uncertainty for r in available) / max(1, len(available))
-    conflicts = sum(1 for r in records if r.conflict_count > 0) / max(1, total)
-    return MissingnessReport(
-        feature_group=feature_group,
-        total_rows=total,
-        available_rows=len(available),
-        missing_rows=len(missing),
-        missing_reasons=reasons,
-        mean_age_hours=avg_age,
-        mean_uncertainty=avg_unc,
-        conflict_rate=conflicts,
-    )
 
 
 # ── Player-rate shrinkage ────────────────────────────────────────────────────
@@ -211,27 +182,3 @@ def pitcher_clean_rate_shrink(
         prior_alpha=league_prior_alpha,
         prior_beta=league_prior_beta,
     )
-
-
-def empirical_bayes_shrink(
-    values: list[float],
-    std_errors: list[float],
-) -> tuple[float, list[float]]:
-    """Simple empirical Bayes shrinkage for continuous metrics.
-
-    Returns (prior_variance, shrunk_values) where each value is shrunk
-    toward the grand mean proportional to its standard error.
-    """
-    arr = np.array(values)
-    se = np.array(std_errors)
-    grand_mean = float(np.mean(arr))
-    total_var = float(np.var(arr))
-    avg_se2 = float(np.mean(se**2))
-    prior_var = max(0.0, total_var - avg_se2)
-    shrunk = []
-    for v, s in zip(values, std_errors, strict=True):
-        weight = prior_var / (prior_var + s**2) if prior_var > 0 else 0.0
-        # weight = trust in the observation (high weight = precise, keep value)
-        # (1 - weight) = trust in the prior (grand mean)
-        shrunk.append(float(weight * v + (1 - weight) * grand_mean))
-    return prior_var, shrunk

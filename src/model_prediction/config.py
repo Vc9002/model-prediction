@@ -46,7 +46,8 @@ def _project_root() -> Path:
 PROJECT_ROOT = _project_root()
 
 
-_VALID_MODEL_STATES = frozenset(
+# Legacy ``status:`` strings still accepted in config; ``lifecycle.model_enabled`` reads them.
+_LEGACY_MODEL_STATUSES = frozenset(
     {"research", "shadow_candidate", "shadow_qualified", "degraded", "suspended", "retired"}
 )
 _VALID_MODEL_ORIGINS = frozenset(
@@ -58,9 +59,8 @@ def validate_config(config: dict[str, Any]) -> None:
     """Fail loudly at load time on a structurally broken config.
 
     Real bug class this guards against: a typo like ``status: reserach``
-    previously surfaced as a cryptic ``ValueError: 'reserach' is not a valid
-    ModelState`` deep inside a forecast call (or, worse, inside
-    ``ModelState(configured_state)`` on a code path wrapped in a broad
+    previously surfaced as a cryptic error deep inside a forecast call (or,
+    worse, inside a status parse on a code path wrapped in a broad
     ``except (ValueError, KeyError): continue`` -- see the four cli.py
     forecast loops fixed 2026-08-02 -- which would have silently swallowed
     it and logged nothing for that entire sport). This is intentionally not
@@ -113,13 +113,15 @@ def validate_config(config: dict[str, Any]) -> None:
 
     models = require_section("models")
     for name, spec in models.items():
-        if not isinstance(spec, dict) or "status" not in spec:
+        if not isinstance(spec, dict) or not ("status" in spec or "enabled" in spec):
             continue  # not a per-sport model entry (e.g. shared_features, market_residual, promotion)
+        if "enabled" in spec and not isinstance(spec["enabled"], bool):
+            errors.append(f"models.{name}.enabled must be a boolean")
         status = spec.get("status")
-        if status not in _VALID_MODEL_STATES:
+        if "status" in spec and status not in _LEGACY_MODEL_STATUSES:
             errors.append(
-                f"models.{name}.status {status!r} is not a valid ModelState "
-                f"(expected one of {sorted(_VALID_MODEL_STATES)})"
+                f"models.{name}.status {status!r} is not a recognised legacy status "
+                f"(expected one of {sorted(_LEGACY_MODEL_STATUSES)}; prefer `enabled: true/false`)"
             )
         origin = spec.get("origin")
         if origin is not None and origin not in _VALID_MODEL_ORIGINS:

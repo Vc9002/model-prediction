@@ -286,16 +286,6 @@ def cfb_model() -> CollegeFootballModel:
     return CollegeFootballModel()
 
 
-def cfb_spread_model() -> CollegeFootballModel:
-    """Factory function for CFB Spread model."""
-    return CollegeFootballModel(version=CFB_SPREAD_MODEL_VERSION)
-
-
-def cfb_total_model() -> CollegeFootballModel:
-    """Factory function for CFB Total model."""
-    return CollegeFootballModel(version=CFB_TOTAL_MODEL_VERSION)
-
-
 def _load_cfb_history(data_root: Path, cutoff_dt: datetime | None = None) -> list[GameRecord]:
     """Load historical completed CFB games from local cache up to cutoff_dt."""
     records: list[GameRecord] = []

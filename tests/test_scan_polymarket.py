@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from model_prediction.dashboard import picks as picks_mod
+from model_prediction.portfolio import polymarket_scanner as scanner_mod
 from model_prediction.portfolio.polymarket_scanner import PolymarketSlateScanner
 
 
@@ -95,3 +97,16 @@ def test_scan_file_unmodeled_exclusion(tmp_path: Path):
     # With require_model=True (default), unmodeled games are excluded
     orders = scanner.scan_file(f_path, require_model=True)
     assert len(orders) == 0
+
+
+def test_logged_picks_index_excludes_legacy_research_tier(monkeypatch):
+    # Reset the module-level cache so this test's monkeypatched readers are
+    # actually consulted, and so the real cache is restored for later tests.
+    monkeypatch.setattr(scanner_mod, "_PICKS_INDEX_CACHE", None)
+    monkeypatch.setattr(picks_mod, "read_picks", lambda: [{"pick_id": "M1"}])
+    monkeypatch.setattr(picks_mod, "read_flat_picks", lambda: [{"pick_id": "F1"}])
+    monkeypatch.setattr(picks_mod, "_parse_research_picks", lambda *_, **__: [{"pick_id": "R1"}])
+
+    picks = scanner_mod._get_logged_picks()
+
+    assert [p["pick_id"] for p in picks] == ["M1", "F1"]

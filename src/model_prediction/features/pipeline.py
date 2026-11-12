@@ -16,10 +16,6 @@ from model_prediction.core.time_context import TimeContext
 from model_prediction.features.base import GameRecord
 
 
-class LookaheadBiasError(ValueError):
-    """Raised when a feature computation attempts to access post-decision data."""
-
-
 @runtime_checkable
 class FeatureTransform(Protocol):
     """Protocol for modular Point-in-Time feature generators."""
@@ -234,9 +230,6 @@ class UnifiedFeaturePipeline:
                 RecentFormTransform(),
             ]
         )
-
-    def add_transform(self, transform: FeatureTransform) -> None:
-        self.transforms.append(transform)
 
     def extract_features(
         self,

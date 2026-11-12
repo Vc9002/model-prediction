@@ -153,7 +153,7 @@ models:
       require_ablation_gain: true
   MLB:
     family: elo_trend_logistic_regression
-    status: shadow_qualified
+    enabled: true
     season_active: false
     daily_forecast_enabled: false
     origin: statistical_model
@@ -256,7 +256,7 @@ models:
     total_research_artifact: config/models/measured-edge-totals-v3.json
   NBA:
     family: elo_trend_normal_approximation
-    status: shadow_qualified
+    enabled: true
     origin: statistical_model
     min_edge: 0.05
     minimum_team_history_games: 8
@@ -278,7 +278,7 @@ models:
     - nba-total-margin-v2
   WNBA:
     family: elo_trend_normal_approximation
-    status: shadow_qualified
+    enabled: true
     season_active: false
     daily_forecast_enabled: false
     origin: statistical_model
@@ -303,7 +303,7 @@ models:
       edge magnitudes are small.'
   SOCCER:
     family: poisson_dixon_coles
-    status: shadow_qualified
+    enabled: true
     origin: statistical_model
     qualification_override: true
     qualification_override_reason: 'Operator directive, 2026-08-02: promote soccer
@@ -405,7 +405,7 @@ models:
     - btts
   NFL:
     family: nfl_structural_v7_bivariate_engine
-    status: shadow_qualified
+    enabled: true
     origin: statistical_model
     active_production_version: nfl-elo-trend-lr-v4
     production_artifact: config/models/nfl-elo-trend-lr-v4.json
@@ -429,7 +429,7 @@ models:
     - nfl-total-structural-v7
   NCAAF:
     family: cfb_structural_v4_bivariate_engine
-    status: shadow_qualified
+    enabled: true
     origin: statistical_model
     active_production_version: cfb-structural-v4
     production_artifact: config/models/cfb-structural-v4.json
@@ -451,7 +451,7 @@ models:
     note: Overhauled bivariate Negative Binomial score engine with blowout tail expansion (>21.5), key-number preservation, and dynamic unit sizing.
   TENNIS:
     family: surface_blended_elo
-    status: shadow_qualified
+    enabled: true
     origin: statistical_model
     qualification_override: true
     qualification_override_reason: 'Overhaul 2026-11-02: Promoted tennis-surface-elo-v6 and tennis-games-markov-v4
@@ -475,7 +475,7 @@ models:
       by Markov v4 with empirical grass ATP calibration (0.655) and set momentum (0.040).
   LOL:
     family: neutral_series_elo
-    status: shadow_qualified
+    enabled: true
     origin: statistical_model
     qualification_override: true
     qualification_override_reason: Esports v6 artifacts use Platt-scaled Elo; qualification
@@ -514,7 +514,7 @@ models:
     research_confidence_gate: 0.03
   CS2:
     family: neutral_series_elo
-    status: shadow_qualified
+    enabled: true
     origin: statistical_model
     qualification_override: true
     qualification_override_reason: Esports v6 artifacts use Platt-scaled Elo; qualification
@@ -535,7 +535,7 @@ models:
     research_confidence_gate: 0.03
   DOTA2:
     family: neutral_series_elo
-    status: shadow_qualified
+    enabled: true
     origin: statistical_model
     qualification_override: true
     qualification_override_reason: Esports v6 artifacts use Platt-scaled Elo; qualification
@@ -558,7 +558,7 @@ models:
     research_confidence_gate: 0.03
   VALORANT:
     family: neutral_series_elo
-    status: shadow_qualified
+    enabled: true
     origin: statistical_model
     qualification_override: true
     qualification_override_reason: Esports v6 artifacts use Platt-scaled Elo; qualification
@@ -578,7 +578,7 @@ models:
     research_confidence_gate: 0.03
   RAINBOW_SIX:
     family: neutral_series_elo
-    status: shadow_qualified
+    enabled: true
     origin: statistical_model
     active_production_version: rainbow_six-tiered-elo-v6
     active_research_version: r6-contextual-v7
@@ -592,7 +592,7 @@ models:
     research_confidence_gate: 0.04
   KBO:
     family: tie_aware_home_elo
-    status: shadow_qualified
+    enabled: true
     origin: statistical_model
     qualification_override: true
     qualification_override_reason: Tie-aware Elo model; standard moneyline qualification
@@ -611,7 +611,7 @@ models:
     research_confidence_gate: 0.02
   NPB:
     family: tie_aware_home_elo
-    status: shadow_qualified
+    enabled: true
     origin: statistical_model
     qualification_override: true
     qualification_override_reason: Tie-aware Elo model; standard moneyline qualification
@@ -636,7 +636,7 @@ models:
     research_confidence_gate: 0.090624
   HOCKEY:
     family: poisson_dixon_coles
-    status: shadow_qualified
+    enabled: true
     origin: statistical_model
     model_type: hockey_bivariate_poisson
     active_production_version: hockey-poisson-dc-v2
@@ -659,7 +659,7 @@ models:
     - LIIGA
   DARTS:
     family: exact_markov_leg_progression
-    status: shadow_qualified
+    enabled: true
     origin: statistical_model
     model_type: darts_markov
     active_production_version: darts-markov-v2
@@ -676,7 +676,7 @@ models:
     - DARTS_MODUS
   NCAAB:
     family: tiered_elo_heavy_tail_distribution
-    status: shadow_qualified
+    enabled: true
     origin: statistical_model
     active_production_version: ncaab-spread-v6
     active_total_production_version: ncaab-total-v6
@@ -699,7 +699,7 @@ models:
     - NCAAB
   EUROLEAGUE:
     family: elo_trend_normal_approximation
-    status: shadow_qualified
+    enabled: true
     origin: statistical_model
     active_production_version: eurolg-tempo-v2
     active_research_version: eurolg-tempo-v1
@@ -718,7 +718,7 @@ models:
     - EUROLEAGUE
   NBL:
     family: elo_trend_normal_approximation
-    status: shadow_qualified
+    enabled: true
     origin: statistical_model
     active_production_version: nbl-tempo-v2
     active_research_version: nbl-tempo-v1

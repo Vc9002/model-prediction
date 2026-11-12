@@ -15,8 +15,8 @@ from .college_contract_evidence import build_candidate_evidence, save_candidate_
 from .config import PROJECT_ROOT
 from .data_sources.espn import ESPNClient
 from .data_sources.polymarket_us import PolymarketUSClient, probability_to_american
-from .domain import League, MarketType, ModelOrigin, ModelState, PickRequest, parse_utc, utc_now
-from .eligibility import EligibilityResult, RecordType
+from .domain import League, MarketType, ModelOrigin, PickRequest, parse_utc, utc_now
+from .eligibility import EligibilityResult
 from .entities import CanonicalTeam
 from .feature_capture import contract_snapshot_json
 from .features.base import FeatureStore
@@ -471,33 +471,37 @@ def forecast_ncaab_sport(
                 continue
 
             candidate_row = candidate_by_slug.get(str(market_def.get("market_slug") or ""))
-            if not candidate_row or candidate_row.get("quote_reason") != "matched":
-                result["skipped"].append(
-                    {"event_id": identity, "market_type": kind, "reason": "executable_quote_unavailable"}
+            quote_matched = bool(candidate_row and candidate_row.get("quote_reason") == "matched")
+            if quote_matched:
+                quote_time = parse_utc(str(candidate_row["quote_observed_at_utc"]))
+                quote_matched = max_quote_age_seconds > 0 and observed - quote_time <= timedelta(
+                    seconds=max_quote_age_seconds
                 )
-                continue
-            quote_time = parse_utc(str(candidate_row["quote_observed_at_utc"]))
-            if max_quote_age_seconds <= 0 or observed - quote_time > timedelta(seconds=max_quote_age_seconds):
-                result["skipped"].append(
-                    {"event_id": identity, "market_type": kind, "reason": "stale_executable_quote"}
-                )
-                continue
-            quoted_sides = {side["selection"]: side for side in candidate_row["sides"]}
+            quoted_sides = (
+                {side["selection"]: side for side in candidate_row["sides"]} if quote_matched else {}
+            )
             selections = {"over", "under"} if kind == "total" else {"home", "away"}
             valid_sides = [
                 side
                 for side in sides
                 if side.get("selection") in selections
                 and isinstance(side.get("is_long"), bool)
-                and (quoted := quoted_sides.get(side["selection"])) is not None
-                and quoted.get("is_long") == side["is_long"]
-                and quoted.get("line") == side.get("line")
-                and quoted.get("executable_ask") is not None
-                and 0 < float(quoted["executable_ask"]) < 1
+                and (
+                    (
+                        (quoted := quoted_sides.get(side["selection"])) is not None
+                        and quoted.get("is_long") == side["is_long"]
+                        and quoted.get("line") == side.get("line")
+                        and quoted.get("executable_ask") is not None
+                        and 0 < float(quoted["executable_ask"]) < 1
+                    )
+                    or (
+                        side.get("price_probability") is not None and 0 < float(side["price_probability"]) < 1
+                    )
+                )
             ]
             if not valid_sides:
                 result["skipped"].append(
-                    {"event_id": identity, "market_type": kind, "reason": "executable_side_unavailable"}
+                    {"event_id": identity, "market_type": kind, "reason": "priced_side_unavailable"}
                 )
                 continue
             if kind == "moneyline":
@@ -520,7 +524,10 @@ def forecast_ncaab_sport(
                     cover_sides,
                     key=lambda side: (
                         prediction.probabilities[side["selection"]]
-                        - float(quoted_sides[side["selection"]]["executable_ask"])
+                        - float(
+                            quoted_sides.get(side["selection"], {}).get("executable_ask")
+                            or side["price_probability"]
+                        )
                     ),
                 )
             model_inst = total_model if kind == "total" else spread_model
@@ -529,8 +536,15 @@ def forecast_ncaab_sport(
 
             for side in (best_side,):
                 selection = side["selection"]
-                candidate_side = quoted_sides[selection]
-                ask = float(candidate_side["executable_ask"])
+                candidate_side = quoted_sides.get(selection, {})
+                has_executable_quote = bool(
+                    candidate_side.get("executable_ask") is not None
+                    and candidate_side.get("is_long") == side.get("is_long")
+                    and candidate_side.get("line") == side.get("line")
+                )
+                ask = float(
+                    candidate_side["executable_ask"] if has_executable_quote else side["price_probability"]
+                )
                 indicative_ask = side.get("price_probability")
                 raw_probability = prediction.probabilities[selection]
                 probability = calibrator.transform(raw_probability)
@@ -542,8 +556,8 @@ def forecast_ncaab_sport(
                         "selection": selection,
                         "indicative_ask": indicative_ask,
                         "executable_ask": ask,
-                        "quote_hash": candidate_row["quote_hash"],
-                        "quote_reason": candidate_row["quote_reason"],
+                        "quote_hash": candidate_row.get("quote_hash") if has_executable_quote else None,
+                        "quote_reason": "matched" if has_executable_quote else "indicative_only",
                     }
                 )
                 decision_line = (
@@ -551,36 +565,6 @@ def forecast_ncaab_sport(
                     if kind != "moneyline"
                     else None
                 )
-
-                # Gating for moneyline: do not bet extreme longshots where model lacks predictive resolution
-                if kind == "moneyline" and float(ask) < min_moneyline_ask:
-                    continue
-
-                # Gating for spread: do not bet blowout spreads or severe model divergence
-                if kind == "spread":
-                    if decision_line is not None and abs(float(decision_line)) > max_spread_line:
-                        continue
-                    exp_margin = (getattr(prediction, "inference_inputs", {}) or {}).get("mean")
-                    if (
-                        exp_margin is not None
-                        and decision_line is not None
-                        and abs(float(exp_margin) - float(decision_line)) > max_margin_divergence
-                    ):
-                        continue
-
-                # Gating for total: do not bet severe tempo divergence
-                if kind == "total":
-                    exp_tot = (getattr(prediction, "inference_inputs", {}) or {}).get("mean")
-                    if (
-                        exp_tot is not None
-                        and decision_line is not None
-                        and abs(float(exp_tot) - float(decision_line)) > max_total_divergence
-                    ):
-                        continue
-
-                # Minimum edge check
-                if edge < min_edge:
-                    continue
 
                 snapshot = contract_snapshot_json(
                     {
@@ -597,12 +581,18 @@ def forecast_ncaab_sport(
                             "history_scores_sha256": history_digest,
                             "history_cutoff_date": args_date,
                             "research_quote_join": {
-                                "status": candidate_row["quote_reason"],
+                                "status": "matched" if has_executable_quote else "indicative_only",
                                 "market_slug": market_def.get("market_slug"),
-                                "quote_hash": candidate_row["quote_hash"],
-                                "quote_archive_path": candidate_row["quote_archive_path"],
-                                "quote_observed_at_utc": candidate_row["quote_observed_at_utc"],
-                                "executable_ask": ask,
+                                "quote_hash": candidate_row.get("quote_hash")
+                                if has_executable_quote
+                                else None,
+                                "quote_archive_path": candidate_row.get("quote_archive_path")
+                                if has_executable_quote
+                                else None,
+                                "quote_observed_at_utc": candidate_row.get("quote_observed_at_utc")
+                                if has_executable_quote
+                                else None,
+                                "executable_ask": ask if has_executable_quote else None,
                                 "indicative_ask": indicative_ask,
                             },
                         },
@@ -627,26 +617,38 @@ def forecast_ncaab_sport(
                     market_type=MarketType(kind),
                     selection=selection,
                     line=decision_line,
-                    sportsbook="polymarket_us_executable_ask",
+                    sportsbook="polymarket_us_executable_ask"
+                    if has_executable_quote
+                    else "polymarket_us_indicative",
                     american_odds=probability_to_american(float(ask)),
                     model_probability=probability,
                     model_uncertainty=prediction.uncertainty,
                     model_version=model_version,
                     rationale=prediction.rationale,
-                    risks="Paper model; executable quote is a predecision snapshot, not a guaranteed fill.",
+                    risks=(
+                        "Paper model; executable quote is a predecision snapshot, not a guaranteed fill."
+                        if has_executable_quote
+                        else "Paper model; indicative market price, no executable quote."
+                    ),
                     model_origin=ModelOrigin.STATISTICAL_MODEL,
-                    model_state=ModelState.SHADOW_QUALIFIED,
+                    model_enabled=True,
                     calibration_method=cal_method,
                     calibration_version=cal_version,
                     calibration_artifact_hash=cal_hash,
                     observed_at_utc=observed.isoformat(),
-                    market_quote_observed_at_utc=candidate_row["quote_observed_at_utc"],
-                    market_quote_timestamp_valid=True,
+                    market_quote_observed_at_utc=candidate_row.get("quote_observed_at_utc")
+                    if has_executable_quote
+                    else None,
+                    market_quote_timestamp_valid=has_executable_quote,
                     market_quote_source="polymarket_us",
-                    market_quote_provenance="archived_two_sided_bbo",
+                    market_quote_provenance="archived_two_sided_bbo"
+                    if has_executable_quote
+                    else "indicative_slate",
                     market_quote_reconstructed=False,
-                    market_snapshot_hash=candidate_row["quote_hash"],
-                    market_snapshot_archive_path=candidate_row["quote_archive_path"],
+                    market_snapshot_hash=candidate_row.get("quote_hash") if has_executable_quote else None,
+                    market_snapshot_archive_path=candidate_row.get("quote_archive_path")
+                    if has_executable_quote
+                    else None,
                     model_probability_raw=raw_probability,
                     market_probability_at_decision=ask,
                     serving_probability=probability,
@@ -661,7 +663,7 @@ def forecast_ncaab_sport(
                     and model_inst.compute_dynamic_units(edge, min_edge=min_edge, max_edge=0.08)
                 ) or 1.00
                 eligibility = EligibilityResult(
-                    RecordType.RESEARCH_OBSERVATION,
+                    False,
                     "CALL",
                     "PAPER_CALL_MODEL_UNVALIDATED",
                     dynamic_units,
@@ -670,6 +672,38 @@ def forecast_ncaab_sport(
                     edge,
                     *teams,
                 )
+                if flat_ledger is not None:
+                    try:
+                        flat_ledger.append_evaluated(request, eligibility, now=observed)
+                        result["flat_logged"] += 1
+                    except DuplicatePickError:
+                        pass
+                    except (ValueError, OSError) as exc:
+                        result["errors"].append(
+                            {"event_id": identity, "ledger": "flat_logged", "reason": str(exc)}
+                        )
+
+                qualified = has_executable_quote and edge >= min_edge
+                if kind == "moneyline" and ask < min_moneyline_ask:
+                    qualified = False
+                if kind == "spread":
+                    exp_margin = (getattr(prediction, "inference_inputs", {}) or {}).get("mean")
+                    if decision_line is not None and abs(float(decision_line)) > max_spread_line:
+                        qualified = False
+                    if (
+                        exp_margin is not None
+                        and decision_line is not None
+                        and abs(float(exp_margin) - float(decision_line)) > max_margin_divergence
+                    ):
+                        qualified = False
+                if kind == "total":
+                    exp_tot = (getattr(prediction, "inference_inputs", {}) or {}).get("mean")
+                    if (
+                        exp_tot is not None
+                        and decision_line is not None
+                        and abs(float(exp_tot) - float(decision_line)) > max_total_divergence
+                    ):
+                        qualified = False
                 # The configured history floor also applies to the current season
                 # before a probability can enter Main. Lifetime games only establish
                 # team identity; they do not validate a season-opening estimate.
@@ -677,7 +711,7 @@ def forecast_ncaab_sport(
                     "current_season_sample"
                 )
                 main_sample_eligible = _main_sample_eligible(current_season_sample, min_team_games)
-                if kind != "total" and edge >= min_edge and not main_sample_eligible:
+                if kind != "total" and qualified and not main_sample_eligible:
                     result["skipped"].append(
                         {
                             "event_id": identity,
@@ -688,13 +722,12 @@ def forecast_ncaab_sport(
                         }
                     )
                 destinations = (
-                    ("flat_logged", flat_ledger, True),
-                    ("research_ledger_logged", research_ledger, edge >= min_edge),
-                    ("gated_ledger_logged", gated_ledger, edge >= min_edge),
+                    ("research_ledger_logged", research_ledger, qualified),
+                    ("gated_ledger_logged", gated_ledger, qualified),
                     (
                         "main_logged",
                         main_ledger,
-                        edge >= min_edge and kind != "total" and main_sample_eligible,
+                        qualified and kind != "total" and main_sample_eligible,
                     ),
                 )
                 for counter, destination, eligible in destinations:

@@ -39,9 +39,9 @@ def forecast_packet(
     packet: dict[str, Any], artifact: dict[str, Any], history: list[SettledQuote]
 ) -> dict[str, Any]:
     """Price the packet's original exact lines; issue no bet or unit decision."""
-    if artifact.get("model_version") != MODEL_VERSION or artifact.get("artifact_hash") != compute_artifact_hash(
-        artifact
-    ):
+    if artifact.get("model_version") != MODEL_VERSION or artifact.get(
+        "artifact_hash"
+    ) != compute_artifact_hash(artifact):
         raise ValueError("v3_artifact_hash_mismatch")
     if packet.get("schema") != "nfl-joint-decision-packet-v1" or packet.get("replay_ready") is not True:
         raise ValueError("incomplete_joint_packet")

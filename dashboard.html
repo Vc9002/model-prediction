@@ -429,14 +429,15 @@ body.hide-col-order .c-order,body.hide-col-matchup .c-matchup{display:none}
       <summary class="ab-pill" id="autoBuyerPill" aria-label="Auto-Buyer status and controls"><span class="dot gray" id="autoBuyerDot"></span><span id="autoBuyerPillTxt">Auto-Buyer OFF</span></summary>
       <div class="menu">
         <div class="menu-row"><span>Auto-Buyer (<span id="autoBuyerUnitBadge">50¢/U</span>)</span><button id="autoBuyerToggleBtn" class="ab-toggle off" onclick="toggleAutoBuyer()">OFF</button></div>
-        <div class="menu-row"><span>Order mode</span>
+        <div class="menu-row"><span>Main buyer mode</span>
           <div id="autoBuyerModeSeg" class="segmented ab-seg">
             <button id="autoBuyerPaperBtn" onclick="setAutoBuyerMode('paper')">PAPER</button>
             <button id="autoBuyerLiveBtn" class="is-live" onclick="setAutoBuyerMode('live')">LIVE</button>
           </div>
         </div>
-        <p class="menu-note">PAPER records simulated fills only. LIVE places real Polymarket orders whenever Auto-Buyer is ON.</p>
-        <button onclick="runAutoBuyerNow()" title="Trigger Auto-Buyer check now">Run check now</button>
+        <div class="menu-row"><span>NCAAB v6 spread paper trial</span><button id="ncaabPaperToggleBtn" class="ab-toggle off" onclick="toggleNcaabPaperTrial()">OFF</button></div>
+        <p class="menu-note">The NCAAB spread paper trial runs alongside the main buyer on the worker schedule. Its saved edge band is 5.0%–7.9%; it never places real orders.</p>
+        <button onclick="runAutoBuyerNow('live')" title="Trigger main Auto-Buyer check now">Run main buyer check</button>
       </div>
     </details>
     <details class="bar-menu unit-control">
@@ -884,6 +885,7 @@ body.hide-col-order .c-order,body.hide-col-matchup .c-matchup{display:none}
       <label class="chip" title="Changes future Auto-Buyer sizing only; historical rows retain their execution-time unit value">Paper 1U = $<input id="paperAutoBuyerUnitValueInput" aria-label="Auto-Buyer dollar value of one unit" type="number" min="0.01" max="100000" step="0.01" value="10.00" style="width:68px;padding:2px 4px" onkeydown="if(event.key==='Enter')saveAutoBuyerUnitValue('paper')"><button onclick="saveAutoBuyerUnitValue('paper')" style="padding:2px 7px">Set</button></label>
       <button onclick="renderAutoBuyerPaperLedger(true)">↻ Refresh</button>
       <button onclick="runAutoBuyerNow('paper')" style="background:rgba(51,209,126,0.15);color:var(--green);font-weight:700">Run Paper Auto-Buyer</button>
+      <span class="chip dim" id="ncaabPaperStatus">NCAAB spread paper trial: checking…</span>
       <button class="primary fw-7" id="paperBtnSettleAutoBuyerNow" onclick="settleAutoBuyerTrades('paper', true)"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M3 14h10M3 5h10M3 5l-2 5a2 2 0 0 0 4 0L3 5zm10 0l-2 5a2 2 0 0 0 4 0l-2-5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg> Settle Paper Positions</button>
     </div>
     <div id="paperAutoBuyerKpis" class="kpis mb-16"></div>
@@ -3595,6 +3597,34 @@ window.confirmAction=confirmAction; window.bootstrapDialog=bootstrapDialog;
 /* ---------- modal ---------- */
 function showModal(html){const b=$("#modalBody");b.innerHTML=html;delete b.dataset.job;$("#modal").style.display="flex";}
 const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+// Native confirm()/alert() can be permanently silenced by the browser (Chrome's
+// "Prevent this page from creating additional dialogs" checkbox) with zero visible
+// sign it happened -- confirm() then just returns false instantly. Real-money
+// Auto-Buyer actions (Run Live Check, Settle Live Positions, Run check now) use
+// these in-page replacements instead, since they can't be suppressed that way.
+function customConfirm(message,{danger=false}={}){
+  return new Promise(resolve=>{
+    showModal(`<div style="padding:2px">
+      <div style="white-space:pre-wrap;margin-bottom:18px;font-size:14px;line-height:1.5">${esc(message)}</div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button id="customConfirmCancel">Cancel</button>
+        <button id="customConfirmOk" class="primary"${danger?' style="background:var(--red)"':""}>Confirm</button>
+      </div>
+    </div>`);
+    const cleanup=result=>{$("#modal").style.display="none";resolve(result);};
+    $("#customConfirmOk").onclick=()=>cleanup(true);
+    $("#customConfirmCancel").onclick=()=>cleanup(false);
+  });
+}
+function customAlert(message){
+  showModal(`<div style="padding:2px">
+    <div style="white-space:pre-wrap;margin-bottom:18px;font-size:14px;line-height:1.5">${esc(message)}</div>
+    <div style="display:flex;justify-content:flex-end">
+      <button class="primary" onclick="$('#modal').style.display='none'">OK</button>
+    </div>
+  </div>`);
+}
 let drawerReturnFocus=null;
 function detailGrid(items){
   return `<dl class="detail-grid">${items.map(([label,value])=>`<dt>${esc(label)}</dt><dd>${value==null||value===""?"—":esc(value)}</dd>`).join("")}</dl>`;
@@ -3963,6 +3993,7 @@ function copyPolymarketOrdersJson() {
 
 /* ---------- Auto-Buyer Controls ---------- */
 let _autoBuyerStatusCache = {};
+let _ncaabPaperStatusCache = {};
 async function loadAutoBuyerStatus(){
   try{
     const res=await fetch("/api/auto-buyer/status",{headers:{"X-Dashboard-Token":window._DASHBOARD_TOKEN||""}});
@@ -3970,6 +4001,33 @@ async function loadAutoBuyerStatus(){
     const data=await res.json();
     updateAutoBuyerUI(data);
   }catch(e){}
+  try{
+    const res=await fetch("/api/auto-buyer/ncaab-paper/status",{headers:{"X-Dashboard-Token":window._DASHBOARD_TOKEN||""}});
+    if(res.ok)updateNcaabPaperUI(await res.json());
+  }catch(e){}
+}
+function updateNcaabPaperUI(data){
+  _ncaabPaperStatusCache=data||{};
+  const on=!!data.enabled;
+  const btn=$("#ncaabPaperToggleBtn");
+  if(btn){btn.textContent=on?"ON (PAPER)":"OFF";btn.className="ab-toggle "+(on?"paper":"off");btn.setAttribute("aria-pressed",String(on));}
+  const badge=$("#ncaabPaperStatus");
+  if(badge)badge.textContent=`NCAAB v6 spread paper trial: ${on?"ON":"OFF"} · saved edge 5.0%–7.9%`;
+  const mainOn=!!_autoBuyerStatusCache.enabled;
+  const mainLive=(_autoBuyerStatusCache.mode||"paper").toLowerCase()==="live";
+  const pillTxt=$("#autoBuyerPillTxt");
+  if(pillTxt&&on)pillTxt.textContent=mainOn&&mainLive?"LIVE + PAPER ON":mainOn?"MAIN + PAPER ON":"PAPER TRIAL ON";
+  if(on&&!mainOn){const pill=$("#autoBuyerTopControl"),dot=$("#autoBuyerDot");if(pill)pill.dataset.state="paper";if(dot)dot.className="dot g";}
+}
+async function toggleNcaabPaperTrial(){
+  const enabled=!_ncaabPaperStatusCache.enabled;
+  if(!(await customConfirm(`${enabled?"Enable":"Disable"} the NCAAB v6 spread paper trial?\n\nThis controls simulated fills only. The live buyer keeps its own setting.`)))return;
+  try{
+    const res=await fetch("/api/auto-buyer/ncaab-paper/toggle",{method:"POST",headers:{"Content-Type":"application/json","X-Dashboard-Token":window._DASHBOARD_TOKEN||""},body:JSON.stringify({confirm:true,enabled})});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error||"paper trial toggle failed");
+    updateNcaabPaperUI(data);
+  }catch(e){customAlert("NCAAB paper trial update failed: "+e);}
 }
 function updateAutoBuyerUI(data){
   _autoBuyerStatusCache=data||{};
@@ -4009,6 +4067,7 @@ function updateAutoBuyerUI(data){
       ?"LIVE: Auto-Buyer places REAL Polymarket orders when ON."
       :"PAPER: simulated fills only, recorded for tracking, no real orders.";
   }
+  updateNcaabPaperUI(_ncaabPaperStatusCache);
 }
 async function toggleAutoBuyer(){
   const btn=$("#autoBuyerToggleBtn");
@@ -4038,9 +4097,9 @@ async function setAutoBuyerMode(nextMode){
   const currentMode=(_autoBuyerStatusCache.mode||"paper").toLowerCase();
   if(nextMode===currentMode)return;
   const msg=nextMode==="live"
-    ?"Switch Auto-Buyer to LIVE mode?\n\nFuture cycles will place REAL Polymarket orders with real money whenever Auto-Buyer is ON."
-    :"Switch Auto-Buyer to PAPER mode?\n\nFuture cycles will only simulate fills and record them for tracking -- no real orders will be placed.";
-  if(!confirm(msg))return;
+    ?"Switch the main Auto-Buyer to LIVE mode?\n\nFuture main cycles will place REAL Polymarket orders whenever the main buyer is ON. The NCAAB paper trial has its own switch."
+    :"Switch the main Auto-Buyer to PAPER mode?\n\nFuture main cycles will simulate fills. The NCAAB paper trial has its own switch.";
+  if(!(await customConfirm(msg,{danger:nextMode==="live"})))return;
   try{
     const res=await fetch("/api/auto-buyer/mode",{
       method:"POST",
@@ -4246,6 +4305,14 @@ function isSettledAutoBuyerRow(row) {
     ["win", "loss", "push"].includes(String(row.result || "").toLowerCase());
 }
 
+function isManualAutoBuyerRow(row) {
+  // Mirrors is_manual_auto_buyer_record in auto_buyer_ledger.py -- the two must stay in sync.
+  if (row.manual === true) return true;
+  if (String(row.pick_id || "").startsWith("MANUAL-")) return true;
+  if (String(row.order_id || "").startsWith("MANUAL-")) return true;
+  return String(row.model_id || "").trim().toLowerCase() === "manual";
+}
+
 function autoBuyerEventDateEt(row) {
   const raw = row.event_start_utc || row.executed_at_utc || "";
   const date = new Date(raw);
@@ -4424,7 +4491,9 @@ function getFilteredAbsRowsFor(mode) {
       if (resFilter !== "open" && (r.result || "").toLowerCase() !== resFilter) return false;
     }
 
-    const dateStr = (r.event_start_utc || r.executed_at_utc || "").slice(0, 10);
+    const dateStr = (isSettled
+      ? (r.settled_at_utc || "")
+      : (r.event_start_utc || r.executed_at_utc || "")).slice(0, 10);
     if (fromDate && dateStr < fromDate) return false;
     if (toDate && dateStr > toDate) return false;
 
@@ -4458,27 +4527,31 @@ function renderAutoBuyerKpisFor(mode) {
   const rows = _autoBuyerStore[m].cache || [];
   const settledRows = rows.filter(r => isSettledAutoBuyerRow(r));
   const openRows = rows.filter(r => !settledRows.includes(r));
-  const wins = settledRows.filter(r => r.result === "win").length;
-  const losses = settledRows.filter(r => r.result === "loss").length;
-  const pushes = settledRows.filter(r => r.result === "push").length;
+  // MANUAL rows (hand-placed exchange positions) stay visible in the ledger table and the
+  // counts just below, but carry no model edge and must not feed any metric past this point.
+  const modelRows = rows.filter(r => !isManualAutoBuyerRow(r));
+  const modelSettled = settledRows.filter(r => !isManualAutoBuyerRow(r));
+  const wins = modelSettled.filter(r => r.result === "win").length;
+  const losses = modelSettled.filter(r => r.result === "loss").length;
+  const pushes = modelSettled.filter(r => r.result === "push").length;
   const settledTotal = wins + losses + pushes;
 
-  const totalCostSettled = settledRows.reduce((s, r) => s + (Number(r.cost_usd) || 0), 0);
-  const totalCostAll = rows.reduce((s, r) => s + (Number(r.cost_usd) || 0), 0);
-  const totalPnlUsd = settledRows.reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
-  const totalPnlUnits = settledRows.reduce((s, r) => {
+  const totalCostSettled = modelSettled.reduce((s, r) => s + (Number(r.cost_usd) || 0), 0);
+  const totalCostAll = modelRows.reduce((s, r) => s + (Number(r.cost_usd) || 0), 0);
+  const totalPnlUsd = modelSettled.reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
+  const totalPnlUnits = modelSettled.reduce((s, r) => {
     const stored = r.pnl_units;
     if (stored !== undefined && stored !== null && Number.isFinite(Number(stored))) return s + Number(stored);
     const unitVal = Number(r.unit_value_usd) || 10.0;
     return s + (unitVal > 0 ? (Number(r.pnl_usd) || 0) / unitVal : 0);
   }, 0);
   const roiPct = totalCostSettled > 0 ? (totalPnlUsd / totalCostSettled) * 100 : 0;
-  const avgEdge = settledRows.length ? (settledRows.reduce((s, r) => s + (Number(r.edge) || 0), 0) / settledRows.length) * 100 : 0;
+  const avgEdge = modelSettled.length ? (modelSettled.reduce((s, r) => s + (Number(r.edge) || 0), 0) / modelSettled.length) * 100 : 0;
   const avgStakeUsd = settledTotal > 0 ? totalCostSettled / settledTotal : 0;
-  const streak = autoBuyerCurrentStreak(settledRows);
-  const { best, worst } = autoBuyerBestWorstDay(settledRows);
-  const grossWinUsd = settledRows.filter(r => r.result === "win").reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
-  const grossLossUsd = settledRows.filter(r => r.result === "loss").reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
+  const streak = autoBuyerCurrentStreak(modelSettled);
+  const { best, worst } = autoBuyerBestWorstDay(modelSettled);
+  const grossWinUsd = modelSettled.filter(r => r.result === "win").reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
+  const grossLossUsd = modelSettled.filter(r => r.result === "loss").reduce((s, r) => s + (Number(r.pnl_usd) || 0), 0);
   const profitFactor = grossLossUsd < 0 ? grossWinUsd / Math.abs(grossLossUsd) : (grossWinUsd > 0 ? null : 0);
 
   if ($(`#${m}AbsSettledCount`)) $(`#${m}AbsSettledCount`).textContent = settledRows.length;
@@ -4627,7 +4700,10 @@ function renderAutoBuyerTablesFor(mode) {
   if (!filtered.length) {
     html += `<tr><td colspan=13 class="dim" style="text-align:center;padding:24px">No ${m} auto-buyer positions matching the current settlement filter.</td></tr>`;
   } else {
-    const sorted = [...filtered].reverse();
+    const sorted = [...filtered].sort((a, b) =>
+      (Date.parse(b.settled_at_utc || b.event_start_utc || b.executed_at_utc) || 0) -
+      (Date.parse(a.settled_at_utc || a.event_start_utc || a.executed_at_utc) || 0)
+    );
     sorted.forEach(r => {
       const isWin = r.result === "win";
       const isLoss = r.result === "loss";
@@ -4723,7 +4799,7 @@ function renderAbsPendingTableFor(mode, openRows) {
 
 function renderAutoBuyerPerformanceFor(mode) {
   const m = getAutoBuyerMode(mode);
-  const settled = (_autoBuyerStore[m].cache || []).filter(isSettledAutoBuyerRow);
+  const settled = (_autoBuyerStore[m].cache || []).filter(isSettledAutoBuyerRow).filter(row => !isManualAutoBuyerRow(row));
   const sportOf = row => (row.sport || "Unknown").toString().toUpperCase();
   const sports = Array.from(new Set(settled.map(sportOf))).sort();
   const cohorts = [
@@ -4903,23 +4979,27 @@ async function settleAutoBuyerTrades(mode = "paper", fromButton = false) {
 
 async function runAutoBuyerNow(mode = "paper") {
   const m = getAutoBuyerMode(mode);
-  const isLive = m === "live";
-  const msg = isLive
-    ? "Trigger LIVE Auto-Buyer execution cycle now against current open model picks?\n\nWARNING: This will attempt REAL Polymarket orders if live keys are enabled!"
-    : "Trigger Auto-Buyer check now in PAPER mode (simulated fills only, no real orders)?";
-  if (!confirm(msg)) return;
+  const paper=m==="paper";
+  const liveActive=!paper&&!!_autoBuyerStatusCache.enabled&&(_autoBuyerStatusCache.mode||"").toLowerCase()==="live";
+  const msg=paper
+    ?"Run the NCAAB v6 spread paper trial now? This records simulated fills only."
+    :liveActive?"Run the main LIVE Auto-Buyer now? This may place REAL Polymarket orders.":"Run the main Auto-Buyer check now using its saved mode and enabled state?";
+  if (!(await customConfirm(msg, { danger: liveActive }))) return;
   try {
-    const res = await fetch("/api/auto-buyer/run", {
+    const res = await fetch(paper?"/api/auto-buyer/ncaab-paper/run":"/api/auto-buyer/run", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Dashboard-Token": window._DASHBOARD_TOKEN || "" },
-      body: JSON.stringify({ confirm: true, execute: isLive })
+      body: JSON.stringify({ confirm: true })
     });
     const data = await res.json();
-    alert(`Auto-Buyer run completed!\n\nMode: ${data.mode}\nPicks Evaluated: ${data.total_evaluated}\nWhitelisted: ${data.whitelisted_count}\nOrders: ${data.orders_count}\nTotal Spend: $${Number(data.total_spend_usd).toFixed(2)}`);
+    if(!res.ok||data.status==="error")throw new Error(data.error||"buyer run failed");
+    customAlert(paper
+      ?`NCAAB paper trial completed.\nEligible new picks: ${data.candidates}\nNew simulated fills: ${data.paper_orders}`
+      :`Main Auto-Buyer completed.\nMode: ${data.mode}\nPicks evaluated: ${data.total_evaluated}\nOrders: ${data.orders_count}\nTotal spend: $${Number(data.total_spend_usd).toFixed(2)}`);
     refreshAll();
     await renderAutoBuyerSection(m, true);
   } catch (e) {
-    alert("Auto-Buyer execution failed: " + e);
+    customAlert("Auto-Buyer execution failed: " + e);
   }
 }
 

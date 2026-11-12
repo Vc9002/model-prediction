@@ -15,7 +15,7 @@ from typing import Any, cast
 import numpy as np
 import polars as pl
 
-from model_prediction.data_sources.nfl_efficiency_snapshot import load_efficiency_snapshot
+from model_prediction.data_sources.nfl_efficiency_snapshot import TEAM_COLUMNS, load_efficiency_snapshot
 from model_prediction.runtime_paths import RuntimePaths
 
 logger = logging.getLogger(__name__)
@@ -23,6 +23,20 @@ logger = logging.getLogger(__name__)
 NFL_LEAGUE_AVG_EPA_PLAY = 0.00
 DEFAULT_PRIOR_PLAYS = 120.0
 DEFAULT_PRIOR_DROPBACKS = 120.0
+# Imported from the snapshot builder so the capture schema and the engine's
+# reads are one contract (see TEAM_COLUMNS there for the outage this prevents).
+TEAM_FRAME_REQUIRED_COLUMNS: tuple[str, ...] = ("team", "opponent_team", "gameday", *TEAM_COLUMNS)
+
+
+class NFLEfficiencyInputError(RuntimeError):
+    """The efficiency frame cannot support the engine's inputs.
+
+    Deliberately not a ValueError/KeyError/PolarsError: those are exactly the
+    exceptions the old defaults path caught, and any broad handler that caught
+    this one would turn a data outage back into silent league-average inputs.
+    Callers answer NO_CALL for the game instead.
+    """
+
 
 # Canonical 3-letter team codes used in nflverse
 NFL_TEAM_NAME_TO_CODE: dict[str, str] = {
@@ -209,6 +223,27 @@ class NFLEfficiencyStore:
                 self._qb_df = pl.read_parquet(self.qb_parquet)
         except (OSError, pl.exceptions.PolarsError) as exc:
             logger.warning("Could not read local NFL efficiency parquets: %s", exc)
+
+    @classmethod
+    def from_frames(
+        cls,
+        team_df: pl.DataFrame,
+        qb_df: pl.DataFrame,
+        *,
+        source_manifest: dict[str, object] | None = None,
+    ) -> NFLEfficiencyStore:
+        """Replay/backtest constructor for frames the caller assembled (e.g. legacy
+        seasons plus a snapshot-built current season). Bypasses disk discovery; the
+        frames still have to satisfy TEAM_FRAME_REQUIRED_COLUMNS or every lookup
+        fails closed exactly as in production."""
+        store = cls.__new__(cls)
+        store.data_root = Path(".")
+        store.team_parquet = Path(".")
+        store.qb_parquet = Path(".")
+        store._team_df = team_df
+        store._qb_df = qb_df
+        store.source_manifest = source_manifest
+        return store
 
     @classmethod
     def get_default(
@@ -416,28 +451,20 @@ class NFLEfficiencyStore:
         float,
         float,
     ]:
-        """Compute shrunk, opponent-adjusted, and recency-decayed offensive/defensive metrics strictly before date_str."""
+        """Compute shrunk, opponent-adjusted, and recency-decayed offensive/defensive metrics strictly before date_str.
+
+        Fails closed: a missing or schema-incomplete frame raises
+        NFLEfficiencyInputError rather than returning league-average defaults,
+        because a default-valued input is indistinguishable downstream from a
+        real reading and silently prices every game off the market anchor alone.
+        A team that simply has no prior games before ``date_str`` (week 1) still
+        gets the explicit zero-count defaults -- that is data truth, not a fault.
+        """
         if self._team_df is None or len(self._team_df) == 0:
-            return (
-                NFL_LEAGUE_AVG_EPA_PLAY,
-                NFL_LEAGUE_AVG_EPA_PLAY,
-                0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.06,
-                0.06,
-                62.5,
-                0.08,
-                0.08,
-                0.60,
-                0.60,
-                0.30,
-                0.30,
-                0.0,
-                0.58,
-            )
+            raise NFLEfficiencyInputError("nfl_efficiency_frame_unavailable")
+        missing = [col for col in TEAM_FRAME_REQUIRED_COLUMNS if col not in self._team_df.columns]
+        if missing:
+            raise NFLEfficiencyInputError(f"nfl_efficiency_frame_missing_columns:{','.join(missing)}")
 
         try:
             # 1. Offensive EPA (this team on offense)
@@ -583,11 +610,11 @@ class NFLEfficiencyStore:
             else:
                 opp_attempts = float(def_prior["attempts"].sum() or 0.0)
                 opp_carries = float(def_prior["carries"].sum() or 0.0)
-                def_sacks = (
-                    float(def_prior["def_sacks"].sum() or 0.0)
-                    if "def_sacks" in def_prior.columns
-                    else 2.4 * count
-                )
+                # def_prior holds the OPPONENTS' offensive rows, so the sacks this
+                # team's pass rush produced are the opponents' sacks_suffered. The
+                # old read of def_sacks on those rows measured the opponents' own
+                # pass rush, i.e. this team's sacks allowed a second time.
+                def_sacks = float(def_prior["sacks_suffered"].sum() or 0.0)
                 opp_plays = opp_attempts + opp_carries
                 opp_pass_sum = float(def_prior["passing_epa"].sum() or 0.0)
                 opp_rush_sum = float(def_prior["rushing_epa"].sum() or 0.0)
@@ -691,27 +718,10 @@ class NFLEfficiencyStore:
                 pass_ratio,
             )
         except (KeyError, ValueError, TypeError, pl.exceptions.PolarsError) as exc:
-            logger.debug("Failed computing team efficiency for %s: %s", team_code, exc)
-            return (
-                NFL_LEAGUE_AVG_EPA_PLAY,
-                NFL_LEAGUE_AVG_EPA_PLAY,
-                0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.06,
-                0.06,
-                62.5,
-                0.08,
-                0.08,
-                0.60,
-                0.60,
-                0.30,
-                0.30,
-                0.0,
-                0.58,
-            )
+            # Never degrade to defaults here: that is how a schema gap hid for two
+            # weeks. Surface it and let the forecast path decline the game.
+            logger.warning("NFL team efficiency unavailable for %s: %s", team_code, exc)
+            raise NFLEfficiencyInputError(f"nfl_efficiency_compute_failed:{team_code}:{exc}") from exc
 
     def _qb_adjustment(self, qb_name: str, date_str: str) -> float:
         """Compute QB spread point value adjustment over average starter."""

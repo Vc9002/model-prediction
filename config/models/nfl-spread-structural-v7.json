@@ -1,11 +1,6 @@
 {
-  "artifact_hash": "3a49ab9fde569edcb2f2c8ba72d2e87f9d7f694bc3111e3f2c3046dc3688157c",
+  "artifact_hash": "856efa81fbe3cfafd7ffbc8bab2f0c76ec0982ca2c019e838af76dae9156c2c5",
   "edsr_weight": 4.0,
-  "gates": {
-    "max_uncertainty": 0.15,
-    "min_edge": 0.035,
-    "sizing": "flat_1u_gated"
-  },
   "home_field_advantage_points": 1.35,
   "key_number_weight": 0.2,
   "league": "NFL",
@@ -24,6 +19,26 @@
     "model_version": "nfl-spread-structural-v7",
     "note": "Point-in-time walk-forward validated with opponent-adjusted EPA and recency decay.",
     "qualified": true,
+    "replay": {
+      "brier": 0.24962139794669747,
+      "calibration_intercept": 0.01408783497397008,
+      "calibration_slope": 0.7891317029651002,
+      "cohort": "games.jsonl completed games with nflverse closing lines, 2021 -> today; point-in-time inputs; scripts/replay_nfl_v7_all_settled.py",
+      "generated_at_utc": "2026-11-12T04:44:44.456260+00:00",
+      "locked_holdout": {
+        "brier_score": 0.2504430498342302,
+        "calibration_intercept": 0.03722331636511858,
+        "calibration_slope": 0.24041156327755336,
+        "expected_calibration_error": 0.0180377697594502,
+        "log_loss": 0.694062616987653,
+        "n": 291,
+        "start": "2025-09-28T13:00:00+00:00"
+      },
+      "log_loss": 0.6923992859566794,
+      "market_brier_at_closing_line": 0.25,
+      "n": 1451,
+      "serving_calibrator": "identity"
+    },
     "sample_size": 197,
     "status": "qualified"
   },

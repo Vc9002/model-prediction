@@ -21,7 +21,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from model_prediction.daily_lock import acquire_lock
-from model_prediction.domain import PickResult
+from model_prediction.domain import PickResult, is_qualified_row
 from model_prediction.ledger import PickLedger
 from model_prediction.model_ledger import ModelLedger
 from model_prediction.pricing import american_to_decimal, profit_units
@@ -77,9 +77,7 @@ def normalize_pick_row(row: dict[str, str]) -> tuple[dict[str, str], list[str]]:
         return corrected, unresolved
     corrected["decision"] = "CALL"
     corrected["reason_code"] = _paper_reason(row.get("reason_code"))
-    corrected["call_type"] = (
-        "model_qualified" if row.get("record_type") == "QUALIFIED_SHADOW_CALL" else "paper_call"
-    )
+    corrected["call_type"] = "model_qualified" if is_qualified_row(row) else "paper_call"
     units = _number(row.get("units")) or 0.0
     if units <= 0:
         units = 1.0

@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from model_prediction.domain import League, MarketType, PickRequest, RecordType
+from model_prediction.domain import League, MarketType, PickRequest, is_qualified_row
 from model_prediction.eligibility import EligibilityResult
 from model_prediction.entities import CanonicalTeam
 from model_prediction.ledger import PickLedger
@@ -194,15 +194,11 @@ HOME = CanonicalTeam("mlb-bos", League.MLB, "BOS", "BOS", True, None, None, ())
 
 
 def _observation(reason_code: str, units: float) -> EligibilityResult:
-    return EligibilityResult(
-        RecordType.RESEARCH_OBSERVATION, "NO_CALL", reason_code, units, 55, 0.05, 0.05, AWAY, HOME
-    )
+    return EligibilityResult(False, "NO_CALL", reason_code, units, 55, 0.05, 0.05, AWAY, HOME)
 
 
 def _qualified_call(units: float) -> EligibilityResult:
-    return EligibilityResult(
-        RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", units, 70, 0.08, 0.08, AWAY, HOME
-    )
+    return EligibilityResult(True, "CALL", "QUALIFIED", units, 70, 0.08, 0.08, AWAY, HOME)
 
 
 def test_trade_candidate_reflects_positive_edge_not_record_type(tmp_path) -> None:
@@ -213,21 +209,15 @@ def test_trade_candidate_reflects_positive_edge_not_record_type(tmp_path) -> Non
     model favors this side" and "this is genuinely positive expected value"
     visibly distinct instead of both hiding behind one QUALIFIED label."""
     ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
-    positive_edge_call = EligibilityResult(
-        RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", 1.5, 70, 0.08, 0.08, AWAY, HOME
-    )
-    negative_edge_call = EligibilityResult(
-        RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", 1.5, 70, -0.03, -0.03, AWAY, HOME
-    )
-    zero_edge_call = EligibilityResult(
-        RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", 1.5, 70, 0.0, 0.0, AWAY, HOME
-    )
+    positive_edge_call = EligibilityResult(True, "CALL", "QUALIFIED", 1.5, 70, 0.08, 0.08, AWAY, HOME)
+    negative_edge_call = EligibilityResult(True, "CALL", "QUALIFIED", 1.5, 70, -0.03, -0.03, AWAY, HOME)
+    zero_edge_call = EligibilityResult(True, "CALL", "QUALIFIED", 1.5, 70, 0.0, 0.0, AWAY, HOME)
 
     positive_row = ledger.append_evaluated(request(), positive_edge_call)
     assert positive_row["trade_candidate"] == "True"
 
     negative_row = ledger.append_evaluated(replace(request(), event_id="event-2"), negative_edge_call)
-    assert negative_row["record_type"] == RecordType.QUALIFIED_SHADOW_CALL.value
+    assert is_qualified_row(negative_row)
     assert negative_row["trade_candidate"] == "False"  # QUALIFIED but not actually positive EV
 
     zero_row = ledger.append_evaluated(replace(request(), event_id="event-3"), zero_edge_call)
@@ -421,7 +411,7 @@ def test_a_retired_ledger_never_touches_disk(tmp_path) -> None:
 
     row = ledger.append_evaluated(request(), _qualified_call(1.5))
     assert row["pick_id"]  # real business logic still ran -- callers get a well-formed row
-    assert row["record_type"] == RecordType.QUALIFIED_SHADOW_CALL.value
+    assert is_qualified_row(row)
     assert not path.exists()  # ...but nothing was ever persisted
     assert not path.parent.exists()
     assert not path.with_suffix(".xlsx.lock").exists()

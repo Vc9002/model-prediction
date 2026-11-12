@@ -477,7 +477,7 @@ class ModelLedger:
         with self._lock():
             rows = self._read_unlocked()
             existing_ids = {row["prediction_id"] for row in rows}
-            row = {field: "" for field in FIELDNAMES}
+            row = dict.fromkeys(FIELDNAMES, "")
             row.update(
                 {key: "" if value is None else str(value) for key, value in record.items() if key in row}
             )

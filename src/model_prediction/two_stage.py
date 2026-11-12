@@ -132,13 +132,6 @@ class Stage1CacheStore:
         key = self._cache_key(prob.event_id, prob.market_type, prob.selection, prob.line)
         self._memory_cache[key] = prob
 
-    def put_batch(self, probs: list[Stage1Probability], persist: bool = True) -> None:
-        """Store multiple Stage 1 probabilities."""
-        for p in probs:
-            self.put(p)
-        if persist:
-            self.save()
-
     def clear(self) -> None:
         """Clear the cache."""
         self._memory_cache.clear()

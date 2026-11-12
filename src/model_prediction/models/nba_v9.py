@@ -487,15 +487,3 @@ class NBAMoneylineModelV9:
 
     predict_moneylines = predict_moneyline
     predict_games = predict_moneyline
-
-
-def nba_spread_v9_model() -> NBASpreadModelV9:
-    return NBASpreadModelV9()
-
-
-def nba_total_v9_model() -> NBATotalModelV9:
-    return NBATotalModelV9()
-
-
-def nba_moneyline_v9_model() -> NBAMoneylineModelV9:
-    return NBAMoneylineModelV9()

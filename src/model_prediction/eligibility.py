@@ -4,7 +4,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 
 from .bans import TeamBanList
-from .domain import ModelState, NoCallReason, PickRequest, RecordType, parse_utc, utc_now
+from .domain import NoCallReason, PickRequest, parse_utc, utc_now
 from .entities import CanonicalTeam, EntityRegistry
 from .lifecycle import can_create_qualified_call
 from .pricing import implied_probability
@@ -13,7 +13,7 @@ from .units import Exposure, UnitPolicy, edge_scaled_units, recommend_units
 
 @dataclass(frozen=True)
 class EligibilityResult:
-    record_type: RecordType
+    qualified: bool
     decision: str
     reason_code: str
     units: float
@@ -46,7 +46,7 @@ def evaluate_eligibility(
         if banned:
             research = _research(request, away, home, NoCallReason.TEAM_BANNED, policy)
             return EligibilityResult(
-                research.record_type,
+                research.qualified,
                 research.decision,
                 research.reason_code,
                 research.units,
@@ -57,7 +57,7 @@ def evaluate_eligibility(
                 home,
                 team,
             )
-    if request.model_state is ModelState.RETIRED:
+    if not request.model_enabled:
         return _research(request, away, home, NoCallReason.MODEL_INELIGIBLE, policy)
     if (
         request.observed_at_utc
@@ -71,7 +71,7 @@ def evaluate_eligibility(
         and (current - parse_utc(request.observed_at_utc)).total_seconds() > maximum_age_hours * 3600
     ):
         return _research(request, away, home, NoCallReason.STALE_DATA, policy)
-    if not can_create_qualified_call(request.model_state, request.model_origin):
+    if not can_create_qualified_call(request.model_enabled, request.model_origin):
         return _research(request, away, home, NoCallReason.MODEL_UNVALIDATED, policy)
     if (
         request.observed_at_utc is None
@@ -133,7 +133,7 @@ def evaluate_esports_eligibility(
             if banned:
                 research = _research(request, away, home, NoCallReason.TEAM_BANNED, policy)
                 return EligibilityResult(
-                    research.record_type,
+                    research.qualified,
                     research.decision,
                     research.reason_code,
                     research.units,
@@ -144,7 +144,7 @@ def evaluate_esports_eligibility(
                     home,
                     team,
                 )
-    if request.model_state is ModelState.RETIRED:
+    if not request.model_enabled:
         return _research(request, away, home, NoCallReason.MODEL_INELIGIBLE, policy)
     if (
         request.observed_at_utc
@@ -158,7 +158,7 @@ def evaluate_esports_eligibility(
         and (current - parse_utc(request.observed_at_utc)).total_seconds() > maximum_age_hours * 3600
     ):
         return _research(request, away, home, NoCallReason.STALE_DATA, policy)
-    if not can_create_qualified_call(request.model_state, request.model_origin):
+    if not can_create_qualified_call(request.model_enabled, request.model_origin):
         return _research(request, away, home, NoCallReason.MODEL_UNVALIDATED, policy)
     if (
         request.observed_at_utc is None
@@ -267,7 +267,7 @@ def _downgrade_research_call(
         market_type=request.market_type,
     )
     return EligibilityResult(
-        RecordType.RESEARCH_OBSERVATION,
+        False,
         "CALL",
         _paper_call_reason(reason_code),
         units,
@@ -286,7 +286,7 @@ def _call_result(
     home: CanonicalTeam,
     policy: UnitPolicy,
 ) -> EligibilityResult:
-    """Build a QUALIFIED_SHADOW_CALL once every trust-boundary gate has
+    """Build a qualified result (``qualified=True``) once every trust-boundary gate has
     passed. Sizes via the proven edge-scaled method (edge_scaled_units,
     "+34.1U vs +13.3U flat" walk-forward) rather than the exposure-aware
     Kelly engine in recommend_units -- that engine's is_call decision isn't
@@ -310,7 +310,7 @@ def _call_result(
         market_type=request.market_type,
     )
     return EligibilityResult(
-        RecordType.QUALIFIED_SHADOW_CALL,
+        True,
         "CALL",
         "QUALIFIED",
         units,
@@ -331,8 +331,8 @@ def _research(
 ) -> EligibilityResult:
     """Create a research-only paper CALL for an untrusted decision.
 
-    Trust failures still prevent execution because ``record_type`` remains
-    ``RESEARCH_OBSERVATION``. They no longer produce a NO_CALL or zero-unit
+    Trust failures still prevent execution because ``qualified`` remains
+    False. They no longer produce a NO_CALL or zero-unit
     row: the operator's universal-ledger contract requires every stored
     prediction to carry a model-derived paper size and settle P&L.
     """
@@ -354,7 +354,7 @@ def _research(
         market_type=request.market_type,
     )
     return EligibilityResult(
-        RecordType.RESEARCH_OBSERVATION,
+        False,
         "CALL",
         _paper_call_reason(reason.value),
         units,

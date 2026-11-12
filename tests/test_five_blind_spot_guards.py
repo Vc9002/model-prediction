@@ -7,7 +7,6 @@ from types import SimpleNamespace
 
 from model_prediction.cli import forecast as forecast_cli
 from model_prediction.data_sources.cfb_data import resolve_team
-from model_prediction.domain import RecordType
 from model_prediction.features import multi_sport_weather as weather
 from model_prediction.features.nba_player_availability import load_latest_nba_injury_snapshot
 
@@ -151,9 +150,7 @@ def test_cfb_main_requires_artifact_edge_and_pregame_weather(monkeypatch, tmp_pa
     monkeypatch.setattr(
         forecast_cli,
         "evaluate_gated_research_eligibility",
-        lambda *args, **kwargs: SimpleNamespace(
-            decision="CALL", record_type=RecordType.QUALIFIED_SHADOW_CALL, reason_code="QUALIFIED"
-        ),
+        lambda *args, **kwargs: SimpleNamespace(decision="CALL", qualified=True, reason_code="QUALIFIED"),
     )
     writes = []
     monkeypatch.setattr(
@@ -290,14 +287,12 @@ def test_nba_total_extreme_disagreement_stays_in_flat(monkeypatch, tmp_path):
     monkeypatch.setattr(
         forecast_cli,
         "evaluate_eligibility",
-        lambda *args, **kwargs: SimpleNamespace(
-            decision="CALL", record_type=RecordType.QUALIFIED_SHADOW_CALL
-        ),
+        lambda *args, **kwargs: SimpleNamespace(decision="CALL", qualified=True),
     )
     monkeypatch.setattr(
         forecast_cli,
         "_downgrade_unserved",
-        lambda eligibility: SimpleNamespace(decision="CALL", record_type=RecordType.RESEARCH_OBSERVATION),
+        lambda eligibility: SimpleNamespace(decision="CALL", qualified=False),
     )
     writes = []
     monkeypatch.setattr(
@@ -370,9 +365,7 @@ def test_nba_spread_extreme_disagreement_stays_in_flat(monkeypatch, tmp_path):
     monkeypatch.setattr(
         forecast_cli,
         "evaluate_eligibility",
-        lambda *args, **kwargs: SimpleNamespace(
-            decision="CALL", record_type=RecordType.QUALIFIED_SHADOW_CALL
-        ),
+        lambda *args, **kwargs: SimpleNamespace(decision="CALL", qualified=True),
     )
     monkeypatch.setattr(
         forecast_cli,

@@ -36,6 +36,7 @@ from model_prediction.data_sources.polymarket_execute import (
     PolymarketExecutor,
 )
 from model_prediction.domain import iso_utc, parse_utc, utc_now
+from model_prediction.portfolio.auto_buyer_ledger import event_key_from_slug
 from model_prediction.runtime_paths import RuntimePaths
 
 _paths = RuntimePaths.resolve()
@@ -61,22 +62,22 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     "nba-moneyline-v9",
     "nba-spread-margin-v9",
     "nba-total-margin-v9",
-    # NFL (Latest Generation v7 & v4 Champions)
+    # NFL (Latest Generation v7 Champions; NFL moneyline currently has no
+    # active whitelisted champion -- nfl-elo-trend-lr-v4 is blacklisted below)
     "nfl-spread-structural-v7",
     "nfl-total-structural-v7",
-    "nfl-elo-trend-lr-v4",
     # NCAAF (Latest Generation v4 Champion)
     "cfb-structural-v4",
     # WNBA (Dormant off-season)
     "wnba-elo-trend-lr-v4",
     "wnba-total-margin-v2",
     "wnba-spread-margin-v2",
-    # MLB (Dormant off-season)
+    # MLB (Dormant off-season). mlb-structural-v10-frozen is blacklisted below
+    # (pulled 2026-09-02 pending qualification review) -- not whitelisted here.
     "mlb-structural-runline-v4",
     "mlb-nrfi-v4",
     "mlb-nrfi-v3",
     "mlb-moneyline-v9-residual",
-    "mlb-structural-v10-frozen",
 )
 
 EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
@@ -260,6 +261,8 @@ class AutoExecutionConfig:
     max_quote_age_seconds: float = MAX_AUTO_BUYER_QUOTE_AGE_SECONDS
     refresh_stale_quotes: bool = True
     capture_missing_slates: bool = True
+    paper_ncaab_spread_v6_trial: bool = False
+    ncaab_spread_v6_live_bucket: tuple[float, float] | None = None
 
     def __post_init__(self) -> None:
         if self.execute_live and self.mode != "live":
@@ -272,6 +275,7 @@ class AutoExecutionResult:
     rejected_not_open: int = 0
     whitelisted_count: int = 0
     rejected_not_whitelisted: int = 0
+    rejected_not_qualified_decision: int = 0
     rejected_blacklist: int = 0
     rejected_future_slate: int = 0
     rejected_started: int = 0
@@ -312,6 +316,70 @@ def _auto_buyer_sport_market(row: dict[str, Any]) -> tuple[str, str]:
     if market_type == "ml":
         market_type = "moneyline"
     return sport, market_type
+
+
+def _is_paper_ncaab_spread_v6_trial(row: dict[str, Any], config: AutoExecutionConfig) -> bool:
+    """Allow one quarantined model through only in the isolated paper run."""
+    model_id = str(row.get("model_id") or row.get("model_version") or "")
+    return (
+        config.paper_ncaab_spread_v6_trial
+        and config.mode == "paper"
+        and not config.execute_live
+        and model_id == "ncaab-spread-v6"
+        and _auto_buyer_sport_market(row) == ("ncaab", "spread")
+    )
+
+
+def _is_live_ncaab_spread_v6_bucket(row: dict[str, Any], config: AutoExecutionConfig) -> bool:
+    """Exact operator-approved live cohort, with decision-time quote evidence."""
+    bucket = config.ncaab_spread_v6_live_bucket
+    if not (bucket and config.execute_live and config.mode == "live"):
+        return False
+    if str(row.get("model_id") or row.get("model_version") or "") != "ncaab-spread-v6":
+        return False
+    if _auto_buyer_sport_market(row) != ("ncaab", "spread"):
+        return False
+    if str(row.get("status") or "").lower() != "open":
+        return False
+    provenance = str(row.get("market_quote_provenance") or "")
+    if provenance not in {"archived_two_sided_bbo", "indicative_slate"}:
+        return False
+    if provenance == "archived_two_sided_bbo":
+        if str(row.get("market_quote_timestamp_valid") or "").lower() not in {"true", "1"}:
+            return False
+        if not all(
+            row.get(key)
+            for key in (
+                "market_quote_observed_at_utc",
+                "market_snapshot_hash",
+                "market_snapshot_archive_path",
+            )
+        ):
+            return False
+    elif str(row.get("market_quote_timestamp_valid") or "").lower() not in {"false", "0"}:
+        return False
+    try:
+        edge = float(row["edge"])
+        line = float(row["line"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    return math.isfinite(edge) and math.isfinite(line) and bucket[0] <= edge < bucket[1]
+
+
+def _ncaab_spread_v6_live_bucket_from_state(state: dict[str, Any]) -> tuple[float, float] | None:
+    raw = state.get("ncaab_spread_v6_live_bucket")
+    if not isinstance(raw, dict) or raw.get("enabled") is not True:
+        return None
+    try:
+        minimum = float(raw["min_saved_edge"])
+        maximum = float(raw["max_saved_edge_exclusive"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not all(math.isfinite(value) for value in (minimum, maximum)):
+        return None
+    if not (minimum == 0.05 and maximum == 0.08):
+        return None
+    return minimum, maximum
 
 
 def _is_disabled_auto_buyer_sport_market(
@@ -364,9 +432,14 @@ def _capture_missing_active_snapshot_slates(
     missing: set[tuple[str, str]] = set()
     for row in picks:
         model_id = str(row.get("model_id") or row.get("model_version") or "")
-        if model_id in config.blacklisted_models or model_id not in config.whitelisted_models:
+        approved_ncaab_bucket = _is_live_ncaab_spread_v6_bucket(row, config)
+        if not approved_ncaab_bucket and (
+            model_id in config.blacklisted_models or model_id not in config.whitelisted_models
+        ):
             continue
-        if _is_disabled_auto_buyer_sport_market(row, config.disabled_sport_markets):
+        if not approved_ncaab_bucket and _is_disabled_auto_buyer_sport_market(
+            row, config.disabled_sport_markets
+        ):
             continue
         if row.get("status") != "open":
             continue
@@ -506,7 +579,8 @@ def _today_auto_buyer_totals(data_root: Path | str = DATA) -> tuple[float, float
     j_path = Path(data_root) / "auto_buyer_ledger.jsonl"
     for row in read_auto_buyer_ledger(jsonl_path=j_path):
         executed_raw = row.get("executed_at_utc")
-        if executed_raw:
+        # Hand-placed positions are imported for visibility, not buyer spend.
+        if executed_raw and not row.get("manual"):
             try:
                 if parse_utc(str(executed_raw)).astimezone(EASTERN).date() == today:
                     spend += float(row.get("cost_usd") or 0.0)
@@ -542,6 +616,75 @@ def _parse_disabled_sport_markets(state: dict[str, Any]) -> tuple[tuple[str, str
     return tuple(disabled_parsed)
 
 
+STATE_VERSION_KEY = "_state_version"  # monotonic save counter for read-modify-write conflict detection
+
+
+class StateVersionConflictError(RuntimeError):
+    """Raised when a state file's on-disk ``_state_version`` advanced past the
+    version this process read, meaning another writer (dashboard, scheduled
+    worker, operator hand-edit) saved in between this process's load and save.
+    The caller must reload fresh state and retry rather than blindly overwrite it.
+    """
+
+
+def _coerce_state_version(value: Any) -> int:
+    """Legacy files have no ``_state_version`` key; a hand-edited or corrupt
+    value (string, bool, negative, float) is not a trustworthy version either --
+    both cases fall back to 0, the backward-compatible default."""
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int) and value >= 0:
+        return value
+    return 0
+
+
+def read_state_file_version(path: Path) -> int:
+    """Read the live on-disk ``_state_version`` without disturbing the caller's
+    own (possibly stale) in-memory copy. Any failure to read it -- missing file,
+    unreadable bytes, invalid JSON, or a JSON value that isn't an object -- is
+    treated as version 0 so a missing/older live file never blocks a save."""
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError:
+        return 0
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return 0
+    if not isinstance(data, dict):
+        return 0
+    return _coerce_state_version(data.get(STATE_VERSION_KEY))
+
+
+def write_versioned_state_file(path: Path, state: dict[str, Any], *, temp_path: Path) -> int:
+    """Atomically save ``state`` to ``path``, bumping its ``_state_version``.
+
+    Raises ``StateVersionConflictError`` when the live file's version is
+    strictly greater than the version this ``state`` dict was read at -- not
+    ``!=``, because ``load_auto_buyer_state`` can seed from the repo copy when
+    the runtime file is missing, so a missing or older live file must never
+    raise. The re-read/compare/replace sequence here is not lock-protected; it
+    closes the read-modify-write window that spans a whole multi-minute cycle,
+    not a sub-millisecond race between two near-simultaneous writers.
+    """
+    expected = _coerce_state_version(state.get(STATE_VERSION_KEY))
+    live = read_state_file_version(path)
+    if live > expected:
+        raise StateVersionConflictError(
+            f"{path} advanced to version {live} (read at {expected}); reload and retry"
+        )
+    new_version = expected + 1
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path.write_text(
+        json.dumps({**state, STATE_VERSION_KEY: new_version}, indent=2) + "\n", encoding="utf-8"
+    )
+    temp_path.replace(path)
+    # Reflect the bumped version back onto the caller's dict so a second save
+    # of the same object (e.g. two sequential set_* calls) does not self-conflict.
+    state[STATE_VERSION_KEY] = new_version
+    return new_version
+
+
 def load_auto_buyer_state() -> dict[str, Any]:
     """Load persistent auto-buyer configuration and runtime toggle state."""
     default_state = {
@@ -562,6 +705,7 @@ def load_auto_buyer_state() -> dict[str, Any]:
         ],
         "last_run": None,
         "last_daily_date": None,
+        STATE_VERSION_KEY: 0,
     }
     data: dict[str, Any] = {}
     state_file = AUTO_BUYER_STATE_FILE
@@ -570,7 +714,7 @@ def load_auto_buyer_state() -> dict[str, Any]:
     if (
         not state_file.exists()
         and state_file == canonical_runtime_file
-        and DATA == _paths.runtime_root
+        and _paths.runtime_root == DATA
         and repo_seed_file.exists()
     ):
         state_file = repo_seed_file
@@ -582,6 +726,7 @@ def load_auto_buyer_state() -> dict[str, Any]:
     state = {**default_state, **data}
     normalized_mode = str(state.get("mode") or DEFAULT_AUTO_BUYER_MODE).lower()
     state["mode"] = normalized_mode if normalized_mode in AUTO_BUYER_MODES else DEFAULT_AUTO_BUYER_MODE
+    state[STATE_VERSION_KEY] = _coerce_state_version(state.get(STATE_VERSION_KEY))
     try:
         unit_value = float(state.get("unit_value_usd") or DEFAULT_AUTO_BUYER_UNIT_VALUE_USD)
     except (TypeError, ValueError):
@@ -665,11 +810,14 @@ def load_auto_buyer_state() -> dict[str, Any]:
 
 
 def save_auto_buyer_state(state: dict[str, Any]) -> None:
-    """Save auto-buyer toggle state and settings atomically."""
-    AUTO_BUYER_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    temp_file = AUTO_BUYER_STATE_FILE.with_suffix(".json.tmp")
-    temp_file.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
-    temp_file.replace(AUTO_BUYER_STATE_FILE)
+    """Save auto-buyer toggle state and settings atomically.
+
+    Raises ``StateVersionConflictError`` if another writer advanced the file
+    on disk since ``state`` was loaded -- see ``write_versioned_state_file``.
+    """
+    write_versioned_state_file(
+        AUTO_BUYER_STATE_FILE, state, temp_path=AUTO_BUYER_STATE_FILE.with_suffix(".json.tmp")
+    )
 
 
 def toggle_auto_buyer(enabled: bool | None = None) -> dict[str, Any]:
@@ -754,6 +902,47 @@ def set_auto_buyer_unit_value(raw_value: Any) -> dict[str, Any]:
     }
 
 
+def _base_auto_execution_kwargs_from_state(state: dict[str, Any]) -> dict[str, Any]:
+    """Build the `AutoExecutionConfig` fields shared by every call site that
+    derives config from saved state (`run_auto_buyer_cycle`'s cycle config and
+    `AutoPolymarketBuyer.__init__`'s no-config fallback). Keeping this in one
+    place is what the 2026-11-10 settlement-immutability bug in
+    `auto_buyer_ledger.py` was a reminder of: two independently-maintained
+    copies of load-bearing logic drift apart silently. Callers still set their
+    own execute_live/mode/require_model_timestamp/max_quote_age_seconds/
+    refresh_stale_quotes -- those differ by call site on purpose.
+    """
+    whitelisted = state.get("whitelist_models")
+    blacklisted = state.get("blacklist_models")
+    return {
+        # `.get(key, default)`, not `.get(key) or default` -- a user-set 0.0
+        # (e.g. disabling the min-edge filter) must survive, not get silently
+        # replaced by the default.
+        "unit_value_usd": float(state.get("unit_value_usd", DEFAULT_AUTO_BUYER_UNIT_VALUE_USD)),
+        "min_edge": float(state.get("min_edge", 0.035)),
+        "max_edge": float(state.get("max_edge", DEFAULT_AUTO_BUYER_MAX_EDGE)),
+        "max_daily_spend_usd": float(state.get("max_daily_spend_usd", 250.0)),
+        "max_game_stake_usd": float(state.get("max_game_stake_usd", 25.0)),
+        "max_event_lookahead_hours": float(
+            state.get("max_event_lookahead_hours", DEFAULT_MAX_EVENT_LOOKAHEAD_HOURS)
+        ),
+        "max_model_age_minutes": float(state.get("max_model_age_minutes", DEFAULT_MAX_MODEL_AGE_MINUTES)),
+        "whitelisted_models": tuple(whitelisted) if whitelisted is not None else DEFAULT_WHITELIST_MODELS,
+        "blacklisted_models": tuple(blacklisted) if blacklisted is not None else EXPLICIT_BLACKLIST_MODELS,
+        "disabled_sport_markets": _parse_disabled_sport_markets(state),
+        "ncaab_spread_v6_live_bucket": _ncaab_spread_v6_live_bucket_from_state(state),
+        "max_daily_loss_usd": (
+            float(state["max_daily_loss_usd"])
+            if state.get("max_daily_loss_usd") is not None
+            else round(float(state.get("max_daily_spend_usd") or 250.0) * 0.5, 2)
+        ),
+        "edge_scaled_sizing_enabled": bool(state.get("edge_scaled_sizing_enabled", False)),
+        "edge_scaling_min_fraction": float(state.get("edge_scaling_min_fraction", 0.5)),
+        "min_tennis_edge": state.get("min_tennis_edge"),
+        "max_tennis_price": state.get("max_tennis_price"),
+    }
+
+
 def run_auto_buyer_cycle(
     execute_override: bool | None = None,
     forecast_date: str | None = None,
@@ -790,6 +979,7 @@ def run_auto_buyer_cycle(
             settle_auto_buyer_ledger()
         except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError) as exc:
             logger.warning("Pre-cycle resting order reconciliation or settlement failed: %s", exc)
+            raise RuntimeError("Live auto-buyer stopped: pre-cycle reconciliation failed") from exc
     elif cycle_enabled and mode == "paper":
         try:
             from .auto_buyer_ledger import settle_auto_buyer_ledger
@@ -798,20 +988,9 @@ def run_auto_buyer_cycle(
         except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError) as exc:
             logger.warning("Pre-cycle paper-ledger settlement failed: %s", exc)
 
-    whitelisted = state.get("whitelist_models")
-    blacklisted = state.get("blacklist_models")
-
     config = AutoExecutionConfig(
-        unit_value_usd=float(state.get("unit_value_usd", 0.50)),
+        **_base_auto_execution_kwargs_from_state(state),
         min_model_probability=float(state.get("min_model_probability", 0.50)),
-        min_edge=float(state.get("min_edge", 0.035)),
-        max_edge=float(state.get("max_edge", DEFAULT_AUTO_BUYER_MAX_EDGE)),
-        max_daily_spend_usd=float(state.get("max_daily_spend_usd", 250.0)),
-        max_game_stake_usd=float(state.get("max_game_stake_usd", 25.0)),
-        max_event_lookahead_hours=float(
-            state.get("max_event_lookahead_hours", DEFAULT_MAX_EVENT_LOOKAHEAD_HOURS)
-        ),
-        max_model_age_minutes=float(state.get("max_model_age_minutes", DEFAULT_MAX_MODEL_AGE_MINUTES)),
         require_model_timestamp=True,
         execute_live=should_execute,
         mode=mode,
@@ -826,18 +1005,6 @@ def run_auto_buyer_cycle(
             )
         ),
         refresh_stale_quotes=should_execute,
-        whitelisted_models=tuple(whitelisted) if whitelisted is not None else DEFAULT_WHITELIST_MODELS,
-        blacklisted_models=tuple(blacklisted) if blacklisted is not None else EXPLICIT_BLACKLIST_MODELS,
-        disabled_sport_markets=_parse_disabled_sport_markets(state),
-        max_daily_loss_usd=(
-            float(state["max_daily_loss_usd"])
-            if state.get("max_daily_loss_usd") is not None
-            else round(float(state.get("max_daily_spend_usd", 250.0)) * 0.5, 2)
-        ),
-        edge_scaled_sizing_enabled=bool(state.get("edge_scaled_sizing_enabled", False)),
-        edge_scaling_min_fraction=float(state.get("edge_scaling_min_fraction", 0.5)),
-        min_tennis_edge=state.get("min_tennis_edge"),
-        max_tennis_price=state.get("max_tennis_price"),
         min_ncaaf_edge=(float(state["min_ncaaf_edge"]) if state.get("min_ncaaf_edge") is not None else 0.02),
         max_ncaaf_edge=(float(state["max_ncaaf_edge"]) if state.get("max_ncaaf_edge") is not None else 0.08),
         max_moneyline_price=(
@@ -894,6 +1061,7 @@ def run_auto_buyer_cycle(
         "rejected_not_open": res.rejected_not_open,
         "whitelisted_count": res.whitelisted_count,
         "rejected_not_whitelisted": res.rejected_not_whitelisted,
+        "rejected_not_qualified_decision": res.rejected_not_qualified_decision,
         "rejected_blacklist": res.rejected_blacklist,
         "rejected_future_slate": res.rejected_future_slate,
         "rejected_started": res.rejected_started,
@@ -920,12 +1088,31 @@ def run_auto_buyer_cycle(
         "reconciliation": reconciliation_summary,
     }
 
-    _append_auto_buyer_cycle_history(run_summary)
+    history_path = (
+        PAPER_AUTO_BUYER_DATA_ROOT / "logs" / "auto_buyer_cycle_history.jsonl"
+        if mode == "paper"
+        else AUTO_BUYER_CYCLE_HISTORY_PATH
+    )
+    _append_auto_buyer_cycle_history(run_summary, history_path=history_path)
 
     state["last_run"] = run_summary
     if forecast_date:
         state["last_daily_date"] = forecast_date
-    save_auto_buyer_state(state)
+    try:
+        save_auto_buyer_state(state)
+    except StateVersionConflictError as exc:
+        # The cycle holds its state snapshot for the whole run (minutes for a
+        # live cycle), so an operator toggle in that window is expected, not a
+        # rare race. Re-apply only the keys THIS cycle owns onto a fresh load --
+        # the operator's concurrent change (e.g. disabling the live buyer)
+        # wins, and the cycle's own telemetry is still recorded rather than
+        # silently dropped. A second consecutive conflict propagates.
+        logger.warning("Auto-buyer state conflict at end of cycle, re-applying onto fresh state: %s", exc)
+        fresh = load_auto_buyer_state()
+        fresh["last_run"] = run_summary
+        if forecast_date:
+            fresh["last_daily_date"] = forecast_date
+        save_auto_buyer_state(fresh)
     return run_summary
 
 
@@ -941,6 +1128,7 @@ def _get_quarantined_underperforming_models(
     """
     from model_prediction.portfolio.auto_buyer_ledger import (
         _is_settled_auto_buyer_record,
+        is_manual_auto_buyer_record,
         read_auto_buyer_ledger,
     )
 
@@ -953,6 +1141,10 @@ def _get_quarantined_underperforming_models(
 
     by_model: dict[str, list[dict[str, Any]]] = {}
     for r in all_rows:
+        # MANUAL rows are hand-placed and carry no model edge; grouping them made a
+        # fake "manual" model that could show up in quarantined_models.
+        if is_manual_auto_buyer_record(r):
+            continue
         if _is_settled_auto_buyer_record(r):
             m = str(r.get("model_id") or r.get("model_version") or "")
             if m:
@@ -983,6 +1175,36 @@ def _get_quarantined_underperforming_models(
     return quarantined
 
 
+def _merge_auto_buyer_pick_sources(*sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Deduplicate tier copies without collapsing distinct event contracts."""
+    seen: set[Any] = set()
+    merged: list[dict[str, Any]] = []
+    for source in sources:
+        for pick in source:
+            pick_id = str(pick.get("pick_id") or "")
+            event_id = str(pick.get("event_id") or f"{pick.get('away_team')}@{pick.get('home_team')}")
+            selection = str(pick.get("selection") or "").lower()
+            model = str(pick.get("model_id") or pick.get("model_version") or "")
+            market = str(pick.get("market_type") or "").lower()
+            line = "" if pick.get("line") is None else str(pick["line"])
+            key = (event_id, market, line, selection, model) if event_id and selection else pick_id
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(pick)
+    return merged
+
+
+def _auto_buyer_start_order(row: dict[str, Any]) -> tuple[float, str]:
+    """Spend the cycle's budget on earlier games before later ones."""
+    try:
+        start = parse_utc(str(row.get("event_start_utc") or ""))
+        timestamp = start.timestamp()
+    except (TypeError, ValueError, OverflowError):
+        timestamp = float("inf")
+    return timestamp, str(row.get("pick_id") or "")
+
+
 class AutoPolymarketBuyer:
     """Automated buyer executing qualified model picks with risk gates."""
 
@@ -997,42 +1219,14 @@ class AutoPolymarketBuyer:
             self.config = config
         else:
             state = load_auto_buyer_state()
-            whitelisted = state.get("whitelist_models")
-            blacklisted = state.get("blacklist_models")
             state_mode = str(state.get("mode") or DEFAULT_AUTO_BUYER_MODE).lower()
             if state_mode not in AUTO_BUYER_MODES:
                 state_mode = DEFAULT_AUTO_BUYER_MODE
             state_should_execute = bool(state.get("enabled", False)) and state_mode == "live"
             self.config = AutoExecutionConfig(
-                unit_value_usd=float(state.get("unit_value_usd") or DEFAULT_AUTO_BUYER_UNIT_VALUE_USD),
-                min_edge=float(state.get("min_edge") or 0.035),
-                max_edge=float(state.get("max_edge") or DEFAULT_AUTO_BUYER_MAX_EDGE),
-                max_daily_spend_usd=float(state.get("max_daily_spend_usd") or 250.0),
-                max_game_stake_usd=float(state.get("max_game_stake_usd") or 25.0),
-                max_event_lookahead_hours=float(
-                    state.get("max_event_lookahead_hours") or DEFAULT_MAX_EVENT_LOOKAHEAD_HOURS
-                ),
-                max_model_age_minutes=float(
-                    state.get("max_model_age_minutes") or DEFAULT_MAX_MODEL_AGE_MINUTES
-                ),
+                **_base_auto_execution_kwargs_from_state(state),
                 execute_live=state_should_execute,
                 mode=state_mode,
-                whitelisted_models=tuple(whitelisted)
-                if whitelisted is not None
-                else DEFAULT_WHITELIST_MODELS,
-                blacklisted_models=tuple(blacklisted)
-                if blacklisted is not None
-                else EXPLICIT_BLACKLIST_MODELS,
-                disabled_sport_markets=_parse_disabled_sport_markets(state),
-                max_daily_loss_usd=(
-                    float(state["max_daily_loss_usd"])
-                    if state.get("max_daily_loss_usd") is not None
-                    else round(float(state.get("max_daily_spend_usd") or 250.0) * 0.5, 2)
-                ),
-                edge_scaled_sizing_enabled=bool(state.get("edge_scaled_sizing_enabled", False)),
-                edge_scaling_min_fraction=float(state.get("edge_scaling_min_fraction", 0.5)),
-                min_tennis_edge=state.get("min_tennis_edge"),
-                max_tennis_price=state.get("max_tennis_price"),
             )
         self.data_root = Path(data_root) if data_root else DATA
         self.paper_data_root = self.data_root / "paper_auto_buyer"
@@ -1044,12 +1238,18 @@ class AutoPolymarketBuyer:
         bought_pick_ids: set[str] = set()
         bought_market_sides: set[tuple[str, str]] = set()
         bought_event_selections: set[tuple[str, str]] = set()
+        bought_event_markets: set[tuple[str, str]] = set()
+        bought_matchup_markets: set[tuple[str, str, str, str]] = set()
+        bought_matchup_selections: set[tuple[str, str, str, str, str]] = set()
         held_slugs: set[str] = set()
+        held_events: set[str] = set()
 
         partially_filled: dict[str, dict[str, Any]] = {}
         partially_filled_pick_ids: set[str] = set()
         partially_filled_market_sides: set[tuple[str, str]] = set()
         partially_filled_event_selections: set[tuple[str, str]] = set()
+        partially_filled_event_markets: set[tuple[str, str]] = set()
+        partially_filled_matchup_markets: set[tuple[str, str, str, str]] = set()
         partially_filled_slugs: set[str] = set()
 
         # 1. Audit logs (self.audit, data_root / audit.jsonl, data_root / audit_log.jsonl)
@@ -1170,11 +1370,23 @@ class AutoPolymarketBuyer:
                     side = str(r.get("token_side") or "").lower()
                     ev_id = str(r.get("event_id") or "")
                     sel = str(r.get("selection") or "").lower()
+                    away = str(r.get("away_team") or "")
+                    home = str(r.get("home_team") or "")
+                    mtype = str(r.get("market_type") or "")
+                    start_utc = str(r.get("event_start_utc") or "")
                     is_reconciled = bool(r.get("fallback_reconciled", True))
+                    # The operator selling out of a position overrides the model: the
+                    # row must fall through to the hard lockout below and never count
+                    # as a partial fill, or the next cycle "tops up" the shares just sold.
+                    operator_sold = (
+                        str(r.get("settlement_source") or "") == "manual_sell"
+                        or float(r.get("manual_exit_shares") or 0.0) > 0
+                    )
 
                     # Detect partially filled orders whose resting fallbacks are not active
                     if (
                         status == "open"
+                        and not operator_sold
                         and order_st == "ORDER_STATE_PARTIALLY_FILLED"
                         and is_reconciled
                         and shares_cnt > 0
@@ -1201,10 +1413,23 @@ class AutoPolymarketBuyer:
                             partially_filled_market_sides.add((slug, side))
                         if ev_id and sel:
                             partially_filled_event_selections.add((ev_id, sel))
+                        if ev_id and mtype:
+                            partially_filled_event_markets.add((ev_id, mtype.lower()))
+                        if away and home and start_utc and mtype:
+                            partially_filled_matchup_markets.add(
+                                (
+                                    away.strip().lower(),
+                                    home.strip().lower(),
+                                    start_utc[:10],
+                                    mtype.strip().lower(),
+                                )
+                            )
                         if slug:
                             partially_filled_slugs.add(slug)
                         continue
 
+                    if slug:
+                        held_events.add(event_key_from_slug(slug))
                     if pid:
                         bought_pick_ids.add(pid)
                     if r.get("order_id"):
@@ -1213,6 +1438,18 @@ class AutoPolymarketBuyer:
                         bought_market_sides.add((slug, side))
                     if ev_id and sel:
                         bought_event_selections.add((ev_id, sel))
+                    if ev_id and mtype:
+                        bought_event_markets.add((ev_id, mtype.lower()))
+                    if away and home and start_utc and mtype:
+                        m_key = (
+                            away.strip().lower(),
+                            home.strip().lower(),
+                            start_utc[:10],
+                            mtype.strip().lower(),
+                        )
+                        bought_matchup_markets.add(m_key)
+                        if sel:
+                            bought_matchup_selections.add((*m_key, sel.strip().lower()))
             except (OSError, ValueError, KeyError, TypeError, RuntimeError):
                 pass
 
@@ -1224,6 +1461,8 @@ class AutoPolymarketBuyer:
                 for pos_slug, pos_data in (snap.get("positions") or {}).items():
                     if isinstance(pos_data, dict):
                         qty = float(pos_data.get("netPositionDecimal") or pos_data.get("netPosition") or 0.0)
+                        if abs(qty) > 0:
+                            held_events.add(event_key_from_slug(str(pos_slug)))
                         if qty > 0:
                             held_slugs.add(str(pos_slug))
             except (OSError, ValueError, KeyError, TypeError, ExecutionGateError, RuntimeError):
@@ -1233,13 +1472,19 @@ class AutoPolymarketBuyer:
         bought_pick_ids.difference_update(partially_filled_pick_ids)
         bought_market_sides.difference_update(partially_filled_market_sides)
         bought_event_selections.difference_update(partially_filled_event_selections)
+        bought_event_markets.difference_update(partially_filled_event_markets)
+        bought_matchup_markets.difference_update(partially_filled_matchup_markets)
         held_slugs.difference_update(partially_filled_slugs)
 
         return {
             "pick_ids": bought_pick_ids,
             "market_sides": bought_market_sides,
             "event_selections": bought_event_selections,
+            "event_markets": bought_event_markets,
+            "matchup_markets": bought_matchup_markets,
+            "matchup_selections": bought_matchup_selections,
             "held_slugs": held_slugs,
+            "held_events": held_events,
             "partially_filled": partially_filled,
             "partially_filled_market_sides": partially_filled_market_sides,
             "partially_filled_event_selections": partially_filled_event_selections,
@@ -1287,6 +1532,10 @@ class AutoPolymarketBuyer:
         token_side: str | None = None,
         event_id: str | None = None,
         selection: str | None = None,
+        market_type: str | None = None,
+        away_team: str | None = None,
+        home_team: str | None = None,
+        event_start_utc: str | None = None,
         bought_index: dict[str, Any] | None = None,
     ) -> bool:
         """Check if an order was already executed for this pick, event, market, or position."""
@@ -1297,9 +1546,32 @@ class AutoPolymarketBuyer:
             return True
         if market_slug and token_side and (market_slug, token_side.lower()) in index["market_sides"]:
             return True
-        return bool(
-            event_id and selection and (str(event_id), str(selection).lower()) in index["event_selections"]
-        )
+        # Either line of a spread counts: holding or having sold one side must also
+        # block the other, or a refreshed pick on the opposite line re-enters the game.
+        if market_slug and event_key_from_slug(market_slug) in index.get("held_events", set()):
+            return True
+        if event_id and selection and (str(event_id), str(selection).lower()) in index["event_selections"]:
+            return True
+        if (
+            event_id
+            and market_type
+            and (str(event_id), str(market_type).lower()) in index.get("event_markets", set())
+        ):
+            return True
+        if away_team and home_team and event_start_utc and market_type:
+            m_key = (
+                str(away_team).strip().lower(),
+                str(home_team).strip().lower(),
+                str(event_start_utc)[:10],
+                str(market_type).strip().lower(),
+            )
+            if m_key in index.get("matchup_markets", set()):
+                return True
+            if selection and (*m_key, str(selection).strip().lower()) in index.get(
+                "matchup_selections", set()
+            ):
+                return True
+        return False
 
     def _effective_min_edge(
         self,
@@ -1373,22 +1645,7 @@ class AutoPolymarketBuyer:
                 else _parse_research_picks(gated=True)
             )
 
-            seen_pick_keys: set[Any] = set()
-            combined_picks: list[dict[str, Any]] = []
-
-            for p in main_picks + gated_picks + flat_picks:
-                p_id = str(p.get("pick_id") or "")
-                ev_id = str(p.get("event_id") or f"{p.get('away_team')}@{p.get('home_team')}")
-                sel = str(p.get("selection") or "").lower()
-                m_ver = str(p.get("model_id") or p.get("model_version") or "")
-
-                key = (ev_id, sel, m_ver) if (ev_id and sel) else p_id
-                if key in seen_pick_keys:
-                    continue
-                seen_pick_keys.add(key)
-                combined_picks.append(p)
-
-            picks = combined_picks
+            picks = _merge_auto_buyer_pick_sources(main_picks, gated_picks, flat_picks)
 
         now = utc_now()
         result = AutoExecutionResult()
@@ -1446,12 +1703,13 @@ class AutoPolymarketBuyer:
         current_spend = today_spend_usd
         bought_index = self._build_bought_index()
 
-        for row in picks:
+        for row in sorted(picks, key=_auto_buyer_start_order):
             result.total_evaluated += 1
             pick_id = str(row.get("pick_id") or "")
             model_id = str(row.get("model_id") or row.get("model_version") or "")
             event_id = str(row.get("event_id") or "")
             selection = str(row.get("selection") or "").lower()
+            approved_ncaab_bucket = _is_live_ncaab_spread_v6_bucket(row, self.config)
 
             # 1. Status filter (must be open). Checked first, ahead of every other
             # gate: the pick-source files (main/flat/gated/research) are append-only
@@ -1464,16 +1722,19 @@ class AutoPolymarketBuyer:
                 result.rejected_not_open += 1
                 continue
 
-            # Mirror Main Ledger qualification: reject paper calls and non-qualified research calls
+            # Tags name destinations (operator directive 2026-11-11), so a row's legacy
+            # record_type no longer blocks it; the whitelist/blacklist/quarantine/caps
+            # below remain the operator's controls. This is a decision-qualification
+            # rejection, not a whitelist rejection -- it fires on picks the model
+            # itself never called, regardless of whether model_id is whitelisted, so
+            # folding it into rejected_not_whitelisted would misattribute the reason
+            # in the operator's rejection funnel.
             decision = str(row.get("decision") or "").upper()
             reason_code = str(row.get("reason_code") or "").upper()
-            record_type = str(row.get("record_type") or "").upper()
-            if (
-                (decision and decision != "CALL")
-                or reason_code.startswith("PAPER_CALL_")
-                or record_type == "RESEARCH_OBSERVATION"
+            if (decision and decision != "CALL") or (
+                not approved_ncaab_bucket and reason_code.startswith("PAPER_CALL_")
             ):
-                result.rejected_not_whitelisted += 1
+                result.rejected_not_qualified_decision += 1
                 continue
 
             if model_id in quarantined:
@@ -1493,29 +1754,41 @@ class AutoPolymarketBuyer:
                 continue
 
             # 2. Blacklist filter
-            if model_id in self.config.blacklisted_models:
+            if model_id in self.config.blacklisted_models and not approved_ncaab_bucket:
                 result.rejected_blacklist += 1
                 continue
 
             # 3. Whitelist filter
-            if model_id not in self.config.whitelisted_models:
+            if model_id not in self.config.whitelisted_models and not approved_ncaab_bucket:
                 result.rejected_not_whitelisted += 1
                 continue
-
-            result.whitelisted_count += 1
 
             # Operator-level categorical block. This deliberately takes precedence
             # over persisted model whitelists so renamed or replacement MLB models
             # cannot restore moneyline execution without a reviewed code change.
-            if _is_disabled_auto_buyer_sport_market(row, self.config.disabled_sport_markets):
+            paper_ncaab_trial = _is_paper_ncaab_spread_v6_trial(row, self.config)
+            if (
+                not paper_ncaab_trial
+                and not approved_ncaab_bucket
+                and _is_disabled_auto_buyer_sport_market(row, self.config.disabled_sport_markets)
+            ):
                 result.rejected_disabled_sport_market += 1
                 continue
+
+            # whitelisted_count counts only picks that cleared every categorical
+            # gate (blacklist, whitelist, disabled sport/market) -- incrementing it
+            # right after the whitelist check would also credit picks later blocked
+            # by the disabled-sport-market gate (e.g. a whitelisted MLB moneyline
+            # model), inflating the "how many picks had a real shot" telemetry.
+            result.whitelisted_count += 1
 
             # Only markets with a proven contract representation may reach mapping.
             # In particular, an NRFI/YRFI model must never be attached to a full-game
             # total merely to increase volume when the exchange exposes no first-inning
             # contract for the event.
             market_type = str(row.get("market_type") or "").lower()
+            away_team = str(row.get("away_team") or "")
+            home_team = str(row.get("home_team") or "")
             if market_type and market_type not in EXECUTABLE_AUTO_BUYER_MARKET_TYPES:
                 result.rejected_unsupported_market += 1
                 continue
@@ -1571,11 +1844,15 @@ class AutoPolymarketBuyer:
                     result.rejected_stale_quote += 1
                     continue
 
-            # 5. Fast Deduplication check (pick_id or event_id + selection)
+            # 5. Fast Deduplication check (pick_id, event_id, or matchup + market)
             if self._is_already_bought(
                 pick_id=pick_id,
                 event_id=event_id,
                 selection=selection,
+                market_type=market_type,
+                away_team=away_team,
+                home_team=home_team,
+                event_start_utc=event_start_str,
                 bought_index=bought_index,
             ):
                 result.rejected_dedup += 1
@@ -1635,7 +1912,9 @@ class AutoPolymarketBuyer:
                     side = str(quote.get("side") or "long").lower()
                     side_data = live_snap.get(side) or {}
                     fresh_ask = side_data.get("ask") or side_data.get("price")
-                    live_quote_age = (now - parse_utc(str(live_snap["observed_at_utc"]))).total_seconds()
+                    live_quote_age = (
+                        utc_now() - parse_utc(str(live_snap["observed_at_utc"]))
+                    ).total_seconds()
                     if (
                         fresh_ask is not None
                         and float(fresh_ask) > 0
@@ -1696,6 +1975,10 @@ class AutoPolymarketBuyer:
                 token_side=token_side,
                 event_id=event_id,
                 selection=selection,
+                market_type=market_type,
+                away_team=away_team,
+                home_team=home_team,
+                event_start_utc=event_start_str,
                 bought_index=bought_index,
             ):
                 result.rejected_dedup += 1
@@ -1744,6 +2027,13 @@ class AutoPolymarketBuyer:
 
             # 10. Sizing & Edge check against real Polymarket CLOB ask (mirrors Main Ledger sport hurdles)
             edge = model_prob - clob_ask
+            if approved_ncaab_bucket and not (
+                self.config.ncaab_spread_v6_live_bucket[0]
+                <= edge
+                < self.config.ncaab_spread_v6_live_bucket[1]
+            ):
+                result.rejected_low_edge += 1
+                continue
             effective_min_edge = self._effective_min_edge(
                 sport_norm,
                 market_type,
@@ -1774,7 +2064,8 @@ class AutoPolymarketBuyer:
             target_spend = raw_units * self.config.unit_value_usd
             target_spend = min(target_spend, self.config.max_game_stake_usd)
 
-            # Optional edge-scaled sizing (off by default -- see edge_scaled_sizing_enabled).
+            # Optional edge-scaled sizing (on by default since f9d077e0; see
+            # edge_scaled_sizing_enabled).
             # Scales the already-capped stake linearly between edge_scaling_min_fraction
             # (at min_edge) and 1.0 (at max_edge), so a bare-minimum-edge pick risks less
             # than a near-max-edge one. Never increases stake above the per-game cap above.
@@ -1887,7 +2178,20 @@ class AutoPolymarketBuyer:
             bought_index["market_sides"].add((market_slug, token_side))
             if event_id and selection:
                 bought_index["event_selections"].add((event_id, selection))
+            if event_id and market_type:
+                bought_index.setdefault("event_markets", set()).add((event_id, market_type.lower()))
+            if away_team and home_team and event_start_str and market_type:
+                m_key = (
+                    away_team.strip().lower(),
+                    home_team.strip().lower(),
+                    event_start_str[:10],
+                    market_type.lower(),
+                )
+                bought_index.setdefault("matchup_markets", set()).add(m_key)
+                if selection:
+                    bought_index.setdefault("matchup_selections", set()).add((*m_key, selection.lower()))
             bought_index["held_slugs"].add(market_slug)
+            bought_index.setdefault("held_events", set()).add(event_key_from_slug(market_slug))
             if "partially_filled" in bought_index and pick_id in bought_index["partially_filled"]:
                 del bought_index["partially_filled"][pick_id]
 

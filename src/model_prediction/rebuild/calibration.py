@@ -186,12 +186,11 @@ def fit_calibrator(
 ) -> Calibrator:
     if method == "platt":
         return PlattCalibrator().fit(y_prob, y_true, base_model_hash)
-    elif method == "isotonic":
+    if method == "isotonic":
         return IsotonicCalibrator().fit(y_prob, y_true, base_model_hash)
-    elif method == "temperature":
+    if method == "temperature":
         return TemperatureScaling().fit(y_prob, y_true, base_model_hash)
-    else:
-        return IdentityCalibrator()
+    return IdentityCalibrator()
 
 
 def load_calibrator(method: str, parameters: dict[str, float]) -> Calibrator:
@@ -209,9 +208,9 @@ def load_calibrator(method: str, parameters: dict[str, float]) -> Calibrator:
     scaling, which this function does support."""
     if method == "platt":
         return PlattCalibrator(intercept=parameters["intercept"], slope=parameters["slope"])
-    elif method == "temperature":
+    if method == "temperature":
         return TemperatureScaling(temperature=parameters["temperature"])
-    elif method == "identity":
+    if method == "identity":
         return IdentityCalibrator()
     raise ValueError(f"load_calibrator does not support method={method!r} (no reconstructible parameter set)")
 

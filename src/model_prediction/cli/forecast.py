@@ -42,9 +42,7 @@ from ..domain import (
     League,
     MarketType,
     ModelOrigin,
-    ModelState,
     PickRequest,
-    RecordType,
     iso_utc,
     parse_utc,
     utc_now,
@@ -59,7 +57,8 @@ from ..esports import (
 )
 from ..feature_capture import contract_snapshot_json
 from ..features.base import FeatureStore
-from ..features.nfl_efficiency import NFLEfficiencyStore, normalize_nfl_team_code
+from ..features.multi_sport_weather import resolve_nfl_game_weather
+from ..features.nfl_efficiency import NFLEfficiencyInputError, NFLEfficiencyStore, normalize_nfl_team_code
 from ..forward import build_mlb_slate
 from ..international_baseball import (
     refresh_recent_international_baseball_matches,
@@ -67,9 +66,9 @@ from ..international_baseball import (
 )
 from ..learned_forward import build_learned_moneyline_slate, match_executable_quote
 from ..ledger import DuplicatePickError
+from ..lifecycle import model_enabled
 from ..main_ledgers import MAIN_LEDGER_SPORTS, MultiSportPickLedger
 from ..market_blend import MarketBlendBlockedError, MarketBlendPolicy, canonical_config_logical_hash
-from ..models.market_residual import MarketResidualModel
 from ..models.mlb import canonical_mlb_artifact_hash, load_formula_spec
 from ..pricing import implied_probability
 from ..production_registry import ProductionModelRegistry, compute_artifact_hash
@@ -77,6 +76,32 @@ from ..runtime_paths import RuntimePaths
 from ..soccer_forward import build_soccer_total_slate
 from ..tennis_forward import build_tennis_slate
 from .commands import _clear_today_open, _research_models_dir
+from .forecast_market_select import (
+    _load_market_residual_model,
+    _nba_volatility_features,
+    _quotes_known_at,
+    _select_mlb_nrfi_market,
+    _select_nba_spread_market,
+    _select_nba_total_market,
+    _select_wnba_spread_market,
+    _select_wnba_total_market,
+)
+from .forecast_nfl_support import (  # noqa: F401 -- re-exported: tests and callers import these from forecast
+    NFL_DIVISIONS,
+    STANDARD_LAY_ASK,
+    _apply_serving_calibrator,
+    _espn_spread_no_vig_ask,
+    _load_nfl_injuries_known_at,
+    _main_call_eligible,
+    _nfl_inputs_fresh,
+    _nfl_is_division_game,
+    _nfl_is_neutral_site,
+    _nfl_serving_calibrator,
+    _nfl_situational_features,
+    _nfl_venue_weather,
+    _select_nfl_spread_market,
+    _select_nfl_total_market,
+)
 from .state import (
     _LEDGER_LOCK,
     DAILY_INTERNATIONAL_BASEBALL_SPORTS,
@@ -87,8 +112,6 @@ from .state import (
 )
 
 logger = logging.getLogger("model_prediction.cli")
-
-STANDARD_LAY_ASK = round(implied_probability(-110), 6)
 
 
 def _load_exact_artifact_contract(model_version: str) -> tuple[dict[str, Any] | None, str | None]:
@@ -139,7 +162,7 @@ def _is_predictively_qualified_serving_model(model_version: str, sport: str, mar
 def _downgrade_unserved(eligibility: Any, reason_code: str = "PAPER_CALL_MODEL_UNVALIDATED") -> Any:
     return replace(
         eligibility,
-        record_type=RecordType.RESEARCH_OBSERVATION,
+        qualified=False,
         decision="CALL",
         reason_code=reason_code.replace("NO_CALL_", "PAPER_CALL_"),
     )
@@ -166,6 +189,39 @@ def _retire_conflicting_side_calls(
             ledger.supersede_open_rows(
                 conflicting_ids,
                 reason="NFL moneyline/spread models disagree; no side call",
+                allow_staked_removal=True,
+            )
+
+
+def _supersede_incoherent_moneyline_calls(
+    ledgers: tuple[Any, ...],
+    *,
+    event_id: str,
+    selection: str,
+    line: float | None,
+) -> None:
+    """Supersede open moneyline CALLs that contradict a new structural spread CALL."""
+    for ldg in ledgers:
+        if ldg is None:
+            continue
+        conflicting_ml_ids = []
+        for ex_pick in ldg.rows(filters={"event_id": event_id}):
+            if str(ex_pick.get("status", "")).lower() == "open":
+                raw_mkt = ex_pick.get("market_type")
+                ex_mkt = str(getattr(raw_mkt, "value", raw_mkt) or "").lower()
+                if ex_mkt == "moneyline" and ex_pick.get("decision") == "CALL":
+                    coherent, _ = validate_cross_market_pick_coherence(
+                        candidate_market_type="spread",
+                        candidate_selection=selection,
+                        candidate_line=line,
+                        existing_picks_for_event=[ex_pick],
+                    )
+                    if not coherent:
+                        conflicting_ml_ids.append(ex_pick.get("pick_id"))
+        if conflicting_ml_ids:
+            ldg.supersede_open_rows(
+                conflicting_ml_ids,
+                reason="Superseded by structural spread pick (cross-market coherence)",
                 allow_staked_removal=True,
             )
 
@@ -238,23 +294,6 @@ def _read_single_snapshot_archive(snapshot_path: Path, sport: str) -> list[dict[
     return rows
 
 
-def _nba_volatility_features(artifact: dict, history, prediction) -> dict:
-    """Capture exact replay inputs without changing the protected NBA engine."""
-    features = dict(prediction.feature_basis)
-    if artifact.get("dynamic_volatility"):
-        from ..features.trends import TrendEngine
-
-        trend = TrendEngine(
-            history,
-            offseason_gap_days=artifact.get("offseason_gap_days"),
-            offseason_retention=float(artifact.get("offseason_retention", 0.50)),
-            isolate_postseason=bool(artifact.get("isolate_postseason", False)),
-        )
-        features["volatility_away_consistency"] = trend.team_trend(prediction.away_team).consistency
-        features["volatility_home_consistency"] = trend.team_trend(prediction.home_team).consistency
-    return features
-
-
 def _forecast_mlb(args_date: str, log: bool, config, registry, bans, ledger, audit) -> dict:
     """Legacy Measured Edge research path retained as an explicit rollback."""
     spec = load_formula_spec(PROJECT_ROOT / "config/models/mlb-analyst-poisson-trend-v0.3.yaml")
@@ -305,7 +344,7 @@ def _forecast_mlb(args_date: str, log: bool, config, registry, bans, ledger, aud
                 rationale=candidate.rationale,
                 risks=candidate.risks,
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
-                model_state=ModelState.RESEARCH,
+                model_enabled=True,
                 observed_at_utc=candidate.observed_at_utc,
                 model_artifact_hash=candidate.model_artifact_hash,
                 calibration_method="flat_probability_shrinkage_toward_half",
@@ -337,8 +376,7 @@ def _forecast_mlb(args_date: str, log: bool, config, registry, bans, ledger, aud
                 now=observed_at,
             )
             # Main holds only genuine qualified calls (see the same filter
-            # in _forecast_learned_sport) -- this path's model_state is
-            # hardcoded to RESEARCH, so it can never produce one anyway,
+            # in _forecast_learned_sport) -- this path never produces one,
             # but a NO_CALL row here would still be pure noise in main.
             if eligibility.decision != "CALL":
                 continue
@@ -606,7 +644,7 @@ def _forecast_mlb_totals_flat(
                 rationale=candidate.rationale,
                 risks=candidate.risks,
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
-                model_state=ModelState.RESEARCH,
+                model_enabled=True,
                 observed_at_utc=candidate.observed_at_utc,
                 model_artifact_hash=candidate.model_artifact_hash,
                 calibration_method="flat_probability_shrinkage_toward_half",
@@ -710,26 +748,6 @@ def _forecast_mlb_totals_flat(
             "the exact registered champion contract; unregistered workflows fail closed."
         ),
     }
-
-
-def _select_mlb_nrfi_market(rows: list[dict]) -> dict | None:
-    """Select the latest prospective executable Polymarket NRFI market."""
-    valid = [
-        row
-        for row in rows
-        if isinstance(row.get("short"), dict)
-        and row["short"].get("ask") is not None
-        and isinstance(row.get("long"), dict)
-        and row["long"].get("ask") is not None
-        and 0 < float(row["short"]["ask"]) < 1
-        and 0 < float(row["long"]["ask"]) < 1
-    ]
-    if not valid:
-        return None
-    return max(
-        valid,
-        key=lambda row: str(row.get("observed_at_utc") or row.get("transact_time_utc") or ""),
-    )
 
 
 def _forecast_mlb_nrfi_flat(
@@ -983,7 +1001,7 @@ def _forecast_mlb_nrfi_flat(
                 rationale=pick_rationale,
                 risks="1st inning variance, leadoff home run risk",
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
-                model_state=ModelState.SHADOW_QUALIFIED,
+                model_enabled=True,
                 observed_at_utc=observed_at_str,
                 model_artifact_hash=artifact["artifact_hash"],
                 calibration_method=artifact.get("method", "first_inning_logistic"),
@@ -1043,7 +1061,7 @@ def _forecast_mlb_nrfi_flat(
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("Eligibility evaluation error for NRFI %s: %s", event_id, exc)
                     eligibility = EligibilityResult(
-                        record_type=RecordType.RESEARCH_OBSERVATION,
+                        qualified=False,
                         decision="CALL",
                         reason_code="PAPER_CALL_MODEL_UNVALIDATED",
                         units=1.0,
@@ -1055,7 +1073,7 @@ def _forecast_mlb_nrfi_flat(
                     )
             else:
                 eligibility = EligibilityResult(
-                    record_type=RecordType.RESEARCH_OBSERVATION,
+                    qualified=False,
                     decision="CALL",
                     reason_code="PAPER_CALL_MODEL_UNVALIDATED",
                     units=1.0,
@@ -1123,26 +1141,6 @@ def _forecast_mlb_nrfi_flat(
         "duplicate_pick_ids": duplicates,
         "main_duplicates": main_duplicates,
     }
-
-
-def _select_wnba_spread_market(rows: list[dict]) -> dict | None:
-    """Among alternate WNBA spread lines for one event, the main line is the
-    one whose long-side ask sits closest to a coin flip -- same "most
-    balanced line wins" rule mlb_market_odds._market_balance uses for MLB's
-    alternate lines, adapted to this snapshot format's embedded long/short
-    asks instead of a two-sided quote list."""
-    partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-")
-    candidates = [
-        row
-        for row in rows
-        if isinstance(row.get("long"), dict)
-        and row["long"].get("ask") is not None
-        and row.get("line") is not None
-        and not any(token in str(row.get("market_slug", "")).lower() for token in partial_tokens)
-    ]
-    if not candidates:
-        return None
-    return min(candidates, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
 
 
 def _forecast_wnba_spread_slate(data_root, args_date: str, client) -> dict:
@@ -1373,155 +1371,20 @@ def _forecast_wnba_spread_sport(
     ``registry``/``bans`` are the same instances the daily dispatch already
     builds once for WNBA moneyline -- not reconstructed here.
     """
-    from ..data_sources.polymarket_us import probability_to_american
-
     forecast = _forecast_wnba_spread_slate(data_root, args_date, ESPNClient())
-    exposure_source = flat_ledger or main_ledger
-    if exposure_source is None:
-        forecast["logged"] = 0
-        return forecast
-
-    observed_now = utc_now()
-    logged: list[dict] = []
-    duplicates: list[str] = []
-    main_duplicates: list[str] = []
-    skipped: list[dict] = []
-    for contract in forecast["priced_contracts"]:
-        ask = contract["executable_ask"]
-        request = PickRequest(
-            event_start_utc=contract["event_start_utc"],
-            event_id=contract["event_id"],
-            league=League.WNBA,
-            away_team=contract["away_team"],
-            home_team=contract["home_team"],
-            market_type=MarketType.SPREAD,
-            selection=contract["selection"],
-            line=contract["line"],
-            sportsbook="polymarket_us",
-            american_odds=probability_to_american(ask),
-            model_probability=contract["model_probability"],
-            model_uncertainty=contract["model_uncertainty"],
-            model_version=contract["model_version"],
-            rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
-            risks="Point-in-time composite Elo + trend + rest margin-normal spread model.",
-            model_origin=ModelOrigin.STATISTICAL_MODEL,
-            model_state=ModelState.SHADOW_QUALIFIED
-            if contract.get("model_qualified")
-            else ModelState.RESEARCH,
-            observed_at_utc=contract["observed_at_utc"],
-            model_artifact_hash=contract["model_artifact_hash"],
-            calibration_method="margin_normal",
-            calibration_version=contract["model_version"],
-            calibration_artifact_hash=contract["model_artifact_hash"],
-            feature_schema_version=contract["model_version"],
-            code_revision=contract["model_artifact_hash"],
-            model_input_snapshot_json=json.dumps(
-                contract["model_input_snapshot"], sort_keys=True, allow_nan=False
-            )
-            if contract.get("model_input_snapshot") is not None
-            else None,
-            **(contract.get("market_lineage") or {}),
-        )
-        try:
-            request.validate(now=observed_now)
-            away = registry.resolve(request.league, request.away_team, request.event_start_utc)
-            home = registry.resolve(request.league, request.home_team, request.event_start_utc)
-            with _LEDGER_LOCK:
-                eligibility = evaluate_eligibility(
-                    request,
-                    registry,
-                    bans,
-                    exposure_source.exposure(
-                        request,
-                        now=observed_now,
-                        canonical_team_ids=(away.canonical_team_id, home.canonical_team_id),
-                    ),
-                    unit_policy(config),
-                    now=observed_now,
-                )
-                if (
-                    contract.get("model_qualified") is not True
-                    or contract.get("market_lineage") is None
-                    or not _is_registered_serving_model(
-                        request.model_version,
-                        request.league.value,
-                        request.market_type.value,
-                    )
-                ):
-                    eligibility = _downgrade_unserved(eligibility)
-                if eligibility.decision == "CALL":
-                    conflicting_ml_ids = []
-                    for ex_pick in exposure_source.rows(filters={"event_id": str(contract["event_id"])}):
-                        if str(ex_pick.get("status", "")).lower() == "open":
-                            raw_mkt = ex_pick.get("market_type")
-                            ex_mkt = str(getattr(raw_mkt, "value", raw_mkt) or "").lower()
-                            if ex_mkt == "moneyline" and ex_pick.get("decision") == "CALL":
-                                coherent, _ = validate_cross_market_pick_coherence(
-                                    candidate_market_type="spread",
-                                    candidate_selection=request.selection,
-                                    candidate_line=request.line,
-                                    existing_picks_for_event=[ex_pick],
-                                )
-                                if not coherent:
-                                    conflicting_ml_ids.append(ex_pick.get("pick_id"))
-                    if conflicting_ml_ids:
-                        if flat_ledger is not None:
-                            flat_ledger.supersede_open_rows(
-                                conflicting_ml_ids,
-                                reason="Superseded by structural spread pick (cross-market coherence)",
-                                allow_staked_removal=True,
-                            )
-                        if main_ledger is not None:
-                            main_ledger.supersede_open_rows(
-                                conflicting_ml_ids,
-                                reason="Superseded by structural spread pick (cross-market coherence)",
-                                allow_staked_removal=True,
-                            )
-                if (
-                    flat_ledger is not None
-                    and _append_secondary_ledger(
-                        flat_ledger, request, eligibility, observed_now, "wnba_spread:flat_ledger"
-                    )
-                    is not None
-                ):
-                    duplicates.append(contract["event_id"])
-                if (
-                    main_ledger is not None
-                    and eligibility.decision == "CALL"
-                    and _append_secondary_ledger(
-                        main_ledger, request, eligibility, observed_now, "wnba_spread:main_ledger"
-                    )
-                    is not None
-                ):
-                    main_duplicates.append(contract["event_id"])
-            logged.append(contract["event_id"])
-        except DuplicatePickError as error:
-            duplicates.append(error.pick_id)
-        except (EntityResolutionError, ValueError) as error:
-            skipped.append({"event_id": contract["event_id"], "reason": str(error)[:200]})
-
-    forecast["logged"] = len(logged)
-    forecast["logged_event_ids"] = logged
-    forecast["duplicate_pick_ids"] = duplicates
-    forecast["main_ledger_duplicate_event_ids"] = main_duplicates
-    forecast["skipped"] = forecast.get("unmatched", []) + skipped
-    return forecast
-
-
-def _select_wnba_total_market(rows: list[dict]) -> dict | None:
-    """Select the most balanced total market line for a WNBA game."""
-    partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")
-    candidates = [
-        row
-        for row in rows
-        if isinstance(row.get("long"), dict)
-        and row["long"].get("ask") is not None
-        and row.get("line") is not None
-        and not any(token in str(row.get("market_slug", "")).lower() for token in partial_tokens)
-    ]
-    if not candidates:
-        return None
-    return min(candidates, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
+    return _log_basketball_spread_picks(
+        league=League.WNBA,
+        forecast=forecast,
+        tag="wnba_spread",
+        edge_gated=False,
+        min_edge=0.0,
+        max_disagreement=1.0,
+        config=config,
+        registry=registry,
+        bans=bans,
+        main_ledger=main_ledger,
+        flat_ledger=flat_ledger,
+    )
 
 
 def _forecast_wnba_total_slate(data_root, args_date: str, client) -> dict:
@@ -1750,175 +1613,22 @@ def _forecast_wnba_total_sport(
     flat_ledger=None,
 ) -> dict:
     """Log WNBA total picks to Main (CALL only) + Flat (every candidate)."""
-    from ..data_sources.polymarket_us import probability_to_american
-
     forecast = _forecast_wnba_total_slate(data_root, args_date, ESPNClient())
-    exposure_source = flat_ledger or main_ledger
-    if exposure_source is None:
-        forecast["logged"] = 0
-        return forecast
-
-    observed_now = utc_now()
-    logged: list[dict] = []
-    duplicates: list[str] = []
-    main_duplicates: list[str] = []
-    skipped: list[dict] = []
-    for contract in forecast["priced_contracts"]:
-        ask = contract["executable_ask"]
-        request = PickRequest(
-            event_start_utc=contract["event_start_utc"],
-            event_id=contract["event_id"],
-            league=League.WNBA,
-            away_team=contract["away_team"],
-            home_team=contract["home_team"],
-            market_type=MarketType.TOTAL,
-            selection=contract["selection"],
-            line=contract["line"],
-            sportsbook="polymarket_us",
-            american_odds=probability_to_american(ask),
-            model_probability=contract["model_probability"],
-            model_uncertainty=contract["model_uncertainty"],
-            model_version=contract["model_version"],
-            rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
-            risks="Research-baseline total model; not yet locked-holdout qualified.",
-            model_origin=ModelOrigin.STATISTICAL_MODEL,
-            model_state=ModelState.RESEARCH,
-            observed_at_utc=contract["observed_at_utc"],
-            model_artifact_hash=contract["model_artifact_hash"],
-            calibration_method="total_normal",
-            calibration_version=contract["model_version"],
-            calibration_artifact_hash=contract["model_artifact_hash"],
-            feature_schema_version="wnba-total-margin-v2",
-            code_revision=contract["model_artifact_hash"],
-            model_input_snapshot_json=json.dumps(
-                contract["model_input_snapshot"], sort_keys=True, allow_nan=False
-            )
-            if contract.get("model_input_snapshot") is not None
-            else None,
-            **(contract.get("market_lineage") or {}),
-        )
-        try:
-            request.validate(now=observed_now)
-            away = registry.resolve(request.league, request.away_team, request.event_start_utc)
-            home = registry.resolve(request.league, request.home_team, request.event_start_utc)
-            with _LEDGER_LOCK:
-                eligibility = evaluate_eligibility(
-                    request,
-                    registry,
-                    bans,
-                    exposure_source.exposure(
-                        request,
-                        now=observed_now,
-                        canonical_team_ids=(away.canonical_team_id, home.canonical_team_id),
-                    ),
-                    unit_policy(config),
-                    now=observed_now,
-                )
-                if (
-                    contract.get("model_qualified") is not True
-                    or contract.get("market_lineage") is None
-                    or not _is_registered_serving_model(
-                        request.model_version,
-                        request.league.value,
-                        request.market_type.value,
-                    )
-                ):
-                    eligibility = _downgrade_unserved(eligibility)
-                if (
-                    flat_ledger is not None
-                    and _append_secondary_ledger(
-                        flat_ledger, request, eligibility, observed_now, "wnba_total:flat_ledger"
-                    )
-                    is not None
-                ):
-                    duplicates.append(contract["event_id"])
-                if (
-                    main_ledger is not None
-                    and eligibility.decision == "CALL"
-                    and _append_secondary_ledger(
-                        main_ledger, request, eligibility, observed_now, "wnba_total:main_ledger"
-                    )
-                    is not None
-                ):
-                    main_duplicates.append(contract["event_id"])
-            logged.append(contract["event_id"])
-        except DuplicatePickError as error:
-            duplicates.append(error.pick_id)
-        except (EntityResolutionError, ValueError) as error:
-            skipped.append({"event_id": contract["event_id"], "reason": str(error)[:200]})
-
-    forecast["logged"] = len(logged)
-    forecast["logged_event_ids"] = logged
-    forecast["duplicate_pick_ids"] = duplicates
-    forecast["main_ledger_duplicate_event_ids"] = main_duplicates
-    forecast["skipped"] = forecast.get("unmatched", []) + skipped
-    return forecast
-
-
-def _quotes_known_at(rows: list[dict], cutoff: datetime) -> list[dict]:
-    """Keep only quotes observed at or before ``cutoff``.
-
-    The day's snapshot file keeps growing after a run starts, so rows stamped
-    later than the run would otherwise be priced and then rejected as future.
-    """
-    known = []
-    for row in rows:
-        try:
-            observed = parse_utc(str(row.get("observed_at_utc") or ""))
-        except ValueError:
-            continue
-        if observed <= cutoff:
-            known.append(row)
-    return known
-
-
-def _select_nba_spread_market(rows: list[dict], *, as_of: datetime | None = None) -> dict | None:
-    """Among alternate NBA spread lines for one event, the main line is the
-    one whose long-side ask sits closest to a coin flip -- most balanced line wins."""
-    partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-")
-    candidates = [
-        row
-        for row in rows
-        if isinstance(row.get("long"), dict)
-        and row["long"].get("ask") is not None
-        and row.get("line") is not None
-        and not any(token in str(row.get("market_slug", "")).lower() for token in partial_tokens)
-    ]
-    if as_of is not None:
-        from ..portfolio.auto_executor import (
-            MAX_AUTO_BUYER_QUOTE_AGE_SECONDS,
-            MAX_SOURCE_QUOTE_AGE_SECONDS,
-        )
-
-        recent = [
-            row
-            for row in candidates
-            if row.get("observed_at_utc")
-            and 0
-            <= (as_of - parse_utc(str(row["observed_at_utc"]))).total_seconds()
-            <= MAX_AUTO_BUYER_QUOTE_AGE_SECONDS
-        ]
-        fallback = [
-            row
-            for row in candidates
-            if row.get("observed_at_utc")
-            and 0
-            <= (as_of - parse_utc(str(row["observed_at_utc"]))).total_seconds()
-            <= MAX_SOURCE_QUOTE_AGE_SECONDS
-        ]
-        candidates = recent or fallback
-    latest_by_slug: dict[str, dict] = {}
-    for row in candidates:
-        slug = str(row.get("market_slug") or row.get("line"))
-        previous = latest_by_slug.get(slug)
-        if previous is None or str(row.get("observed_at_utc") or "") > str(
-            previous.get("observed_at_utc") or ""
-        ):
-            latest_by_slug[slug] = row
-    candidates = list(latest_by_slug.values())
-    if not candidates:
-        return None
-    return min(candidates, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
+    return _log_basketball_total_picks(
+        league=League.WNBA,
+        forecast=forecast,
+        tag="wnba_total",
+        risks="Research-baseline total model; not yet locked-holdout qualified.",
+        nba_rules=False,
+        min_edge=0.0,
+        max_disagreement=1.0,
+        feature_schema_version="wnba-total-margin-v2",
+        config=config,
+        registry=registry,
+        bans=bans,
+        main_ledger=main_ledger,
+        flat_ledger=flat_ledger,
+    )
 
 
 def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
@@ -2186,12 +1896,44 @@ def _forecast_nba_spread_sport(
     flat_ledger=None,
 ) -> dict:
     """Log NBA spread picks to Main (CALL only) + Flat (every candidate)."""
-    from ..data_sources.polymarket_us import probability_to_american
-
     forecast = _forecast_nba_spread_slate(data_root, args_date, ESPNClient())
     model_config = config.get("models", {}).get("NBA", {})
-    min_edge = float(model_config.get("min_edge", 0.05))
-    max_disagreement = float(config["project"]["maximum_unreviewed_market_disagreement"])
+    return _log_basketball_spread_picks(
+        league=League.NBA,
+        forecast=forecast,
+        tag="nba_spread",
+        edge_gated=True,
+        min_edge=float(model_config.get("min_edge", 0.05)),
+        max_disagreement=float(config["project"]["maximum_unreviewed_market_disagreement"]),
+        config=config,
+        registry=registry,
+        bans=bans,
+        main_ledger=main_ledger,
+        flat_ledger=flat_ledger,
+    )
+
+
+def _log_basketball_spread_picks(
+    *,
+    league: League,
+    forecast: dict,
+    tag: str,
+    edge_gated: bool,
+    min_edge: float,
+    max_disagreement: float,
+    config: dict,
+    registry,
+    bans,
+    main_ledger=None,
+    flat_ledger=None,
+) -> dict:
+    """Shared Main (CALL only) + Flat (every candidate) logging for NBA/WNBA spread slates.
+
+    ``edge_gated`` is the NBA-only Main-ledger rule (min_edge <= edge <= max disagreement,
+    over-limit rejections recorded); WNBA Main takes every CALL.
+    """
+    from ..data_sources.polymarket_us import probability_to_american
+
     exposure_source = flat_ledger or main_ledger
     if exposure_source is None:
         forecast["logged"] = 0
@@ -2208,7 +1950,7 @@ def _forecast_nba_spread_sport(
         request = PickRequest(
             event_start_utc=contract["event_start_utc"],
             event_id=contract["event_id"],
-            league=League.NBA,
+            league=league,
             away_team=contract["away_team"],
             home_team=contract["home_team"],
             market_type=MarketType.SPREAD,
@@ -2222,9 +1964,7 @@ def _forecast_nba_spread_sport(
             rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
             risks="Point-in-time composite Elo + trend + rest margin-normal spread model.",
             model_origin=ModelOrigin.STATISTICAL_MODEL,
-            model_state=ModelState.SHADOW_QUALIFIED
-            if contract.get("model_qualified")
-            else ModelState.RESEARCH,
+            model_enabled=True,
             observed_at_utc=contract["observed_at_utc"],
             model_artifact_hash=contract["model_artifact_hash"],
             calibration_method="margin_normal",
@@ -2267,37 +2007,16 @@ def _forecast_nba_spread_sport(
                 ):
                     eligibility = _downgrade_unserved(eligibility)
                 if eligibility.decision == "CALL":
-                    conflicting_ml_ids = []
-                    for ex_pick in exposure_source.rows(filters={"event_id": str(contract["event_id"])}):
-                        if str(ex_pick.get("status", "")).lower() == "open":
-                            raw_mkt = ex_pick.get("market_type")
-                            ex_mkt = str(getattr(raw_mkt, "value", raw_mkt) or "").lower()
-                            if ex_mkt == "moneyline" and ex_pick.get("decision") == "CALL":
-                                coherent, _ = validate_cross_market_pick_coherence(
-                                    candidate_market_type="spread",
-                                    candidate_selection=request.selection,
-                                    candidate_line=request.line,
-                                    existing_picks_for_event=[ex_pick],
-                                )
-                                if not coherent:
-                                    conflicting_ml_ids.append(ex_pick.get("pick_id"))
-                    if conflicting_ml_ids:
-                        if flat_ledger is not None:
-                            flat_ledger.supersede_open_rows(
-                                conflicting_ml_ids,
-                                reason="Superseded by structural spread pick (cross-market coherence)",
-                                allow_staked_removal=True,
-                            )
-                        if main_ledger is not None:
-                            main_ledger.supersede_open_rows(
-                                conflicting_ml_ids,
-                                reason="Superseded by structural spread pick (cross-market coherence)",
-                                allow_staked_removal=True,
-                            )
+                    _supersede_incoherent_moneyline_calls(
+                        (flat_ledger, main_ledger),
+                        event_id=str(contract["event_id"]),
+                        selection=request.selection,
+                        line=request.line,
+                    )
                 if (
                     flat_ledger is not None
                     and _append_secondary_ledger(
-                        flat_ledger, request, eligibility, observed_now, "nba_spread:flat_ledger"
+                        flat_ledger, request, eligibility, observed_now, f"{tag}:flat_ledger"
                     )
                     is not None
                 ):
@@ -2305,14 +2024,17 @@ def _forecast_nba_spread_sport(
                 if (
                     main_ledger is not None
                     and eligibility.decision == "CALL"
-                    and min_edge <= (float(contract["model_probability"]) - float(ask)) <= max_disagreement
+                    and (
+                        not edge_gated
+                        or min_edge <= (float(contract["model_probability"]) - float(ask)) <= max_disagreement
+                    )
                     and _append_secondary_ledger(
-                        main_ledger, request, eligibility, observed_now, "nba_spread:main_ledger"
+                        main_ledger, request, eligibility, observed_now, f"{tag}:main_ledger"
                     )
                     is not None
                 ):
                     main_duplicates.append(contract["event_id"])
-                if (float(contract["model_probability"]) - float(ask)) > max_disagreement:
+                if edge_gated and (float(contract["model_probability"]) - float(ask)) > max_disagreement:
                     main_rejections.append(
                         {"event_id": contract["event_id"], "reason": "market_disagreement_exceeds_limit"}
                     )
@@ -2326,25 +2048,10 @@ def _forecast_nba_spread_sport(
     forecast["logged_event_ids"] = logged
     forecast["duplicate_pick_ids"] = duplicates
     forecast["main_ledger_duplicate_event_ids"] = main_duplicates
-    forecast["main_rejections"] = main_rejections
+    if edge_gated:
+        forecast["main_rejections"] = main_rejections
     forecast["skipped"] = forecast.get("unmatched", []) + skipped
     return forecast
-
-
-def _select_nba_total_market(rows: list[dict]) -> dict | None:
-    """Select the most balanced total market line for an NBA game."""
-    partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")
-    candidates = [
-        row
-        for row in rows
-        if isinstance(row.get("long"), dict)
-        and row["long"].get("ask") is not None
-        and row.get("line") is not None
-        and not any(token in str(row.get("market_slug", "")).lower() for token in partial_tokens)
-    ]
-    if not candidates:
-        return None
-    return min(candidates, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
 
 
 def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
@@ -2531,21 +2238,48 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
     else:
         predictions = [p for p in model.predict_games(history, upcoming) if p.market_type == "total"]
 
+    calibrator = None
+    cal_paths = [
+        Path(data_root) / "calibration" / "models" / f"{model_version}.total_calibrator.json",
+        PROJECT_ROOT / "data" / "calibration" / "models" / f"{model_version}.total_calibrator.json",
+    ]
+    for cp in cal_paths:
+        if cp.exists():
+            try:
+                from ..calibration import load_calibrator_artifact
+
+                calibrator = load_calibrator_artifact(cp)
+                break
+            except (OSError, json.JSONDecodeError, ValueError, KeyError, TypeError):
+                # A malformed artifact must degrade to the raw probability, not abort the slate.
+                calibrator = None
+
     priced_contracts = []
     for prediction in predictions:
         market = market_by_event_id[prediction.event_id]
         market_lineage = market.get("_lineage")
         over_prob = prediction.probability("over")
         if over_prob >= 0.5:
-            selection, model_probability = "over", over_prob
+            selection, raw_prob = "over", over_prob
             ask = market["long"]["ask"]
             line = float(market["line"])
         else:
-            selection, model_probability = "under", 1 - over_prob
+            selection, raw_prob = "under", 1 - over_prob
             ask = market["short"]["ask"]
             line = float(market["line"])
         if ask is None or not 0 < float(ask) < 1:
             continue
+
+        if calibrator is not None:
+            model_probability = float(calibrator.transform(raw_prob))
+        else:
+            model_probability = raw_prob
+
+        cal_meta = getattr(calibrator, "metadata", None) if calibrator else None
+        cal_method = cal_meta.calibration_method if cal_meta else "total_normal"
+        cal_version = cal_meta.calibration_version if cal_meta else model_version
+        cal_hash = cal_meta.artifact_hash if cal_meta else model_artifact_hash
+
         from ..scalar_artifact_replay import build_snapshot as build_scalar_snapshot
 
         model_snapshot = (
@@ -2571,12 +2305,20 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
                 "line": line,
                 "executable_ask": float(ask),
                 "model_probability": round(model_probability, 6),
+                "model_probability_raw": round(raw_prob, 6),
+                "calibration_method": cal_method,
+                "calibration_version": cal_version,
+                "calibration_artifact_hash": cal_hash,
                 "model_uncertainty": prediction.uncertainty,
                 "model_version": model_version,
                 "model_artifact_hash": model_artifact_hash,
                 "model_qualified": model_qualified,
                 "research_availability": availability_diagnostics[prediction.event_id],
-                "rationale": prediction.rationale,
+                "rationale": (
+                    f"{prediction.rationale} Calibrated {raw_prob * 100:.1f}% -> {model_probability * 100:.1f}%."
+                    if calibrator is not None
+                    else prediction.rationale
+                ),
                 "market_slug": market.get("market_slug"),
                 "observed_at_utc": (
                     market_lineage["market_quote_observed_at_utc"]
@@ -2613,12 +2355,49 @@ def _forecast_nba_total_sport(
     flat_ledger=None,
 ) -> dict:
     """Log NBA total picks to Main (CALL only) + Flat (every candidate)."""
-    from ..data_sources.polymarket_us import probability_to_american
-
     forecast = _forecast_nba_total_slate(data_root, args_date, ESPNClient())
     model_config = config.get("models", {}).get("NBA", {})
-    min_edge = float(model_config.get("min_edge", 0.05))
-    max_disagreement = float(config["project"]["maximum_unreviewed_market_disagreement"])
+    return _log_basketball_total_picks(
+        league=League.NBA,
+        forecast=forecast,
+        tag="nba_total",
+        risks="Point-in-time composite trend + team rolling total-normal model.",
+        nba_rules=True,
+        min_edge=float(model_config.get("min_edge", 0.05)),
+        max_disagreement=float(config["project"]["maximum_unreviewed_market_disagreement"]),
+        feature_schema_version=None,
+        config=config,
+        registry=registry,
+        bans=bans,
+        main_ledger=main_ledger,
+        flat_ledger=flat_ledger,
+    )
+
+
+def _log_basketball_total_picks(
+    *,
+    league: League,
+    forecast: dict,
+    tag: str,
+    risks: str,
+    nba_rules: bool,
+    min_edge: float,
+    max_disagreement: float,
+    feature_schema_version: str | None,
+    config: dict,
+    registry,
+    bans,
+    main_ledger=None,
+    flat_ledger=None,
+) -> dict:
+    """Shared Main (CALL only) + Flat (every candidate) logging for NBA/WNBA total slates.
+
+    ``nba_rules`` carries the NBA-only behaviour: SHADOW_QUALIFIED model state for qualified
+    contracts, the Main edge band (incl. the thin-sample over bump), and disagreement rejections.
+    WNBA stays RESEARCH-state and Main takes every CALL.
+    """
+    from ..data_sources.polymarket_us import probability_to_american
+
     exposure_source = flat_ledger or main_ledger
     if exposure_source is None:
         forecast["logged"] = 0
@@ -2635,7 +2414,7 @@ def _forecast_nba_total_sport(
         request = PickRequest(
             event_start_utc=contract["event_start_utc"],
             event_id=contract["event_id"],
-            league=League.NBA,
+            league=league,
             away_team=contract["away_team"],
             home_team=contract["home_team"],
             market_type=MarketType.TOTAL,
@@ -2647,17 +2426,17 @@ def _forecast_nba_total_sport(
             model_uncertainty=contract["model_uncertainty"],
             model_version=contract["model_version"],
             rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
-            risks="Point-in-time composite trend + team rolling total-normal model.",
+            risks=risks,
             model_origin=ModelOrigin.STATISTICAL_MODEL,
-            model_state=ModelState.SHADOW_QUALIFIED
-            if contract.get("model_qualified")
-            else ModelState.RESEARCH,
+            model_enabled=True,
             observed_at_utc=contract["observed_at_utc"],
             model_artifact_hash=contract["model_artifact_hash"],
-            calibration_method="total_normal",
-            calibration_version=contract["model_version"],
-            calibration_artifact_hash=contract["model_artifact_hash"],
-            feature_schema_version=contract["model_version"],
+            calibration_method=contract.get("calibration_method", "total_normal"),
+            calibration_version=contract.get("calibration_version", contract["model_version"]),
+            calibration_artifact_hash=contract.get(
+                "calibration_artifact_hash", contract["model_artifact_hash"]
+            ),
+            feature_schema_version=feature_schema_version or contract["model_version"],
             code_revision=contract["model_artifact_hash"],
             model_input_snapshot_json=json.dumps(
                 contract["model_input_snapshot"], sort_keys=True, allow_nan=False
@@ -2700,22 +2479,21 @@ def _forecast_nba_total_sport(
                     if contract.get("model_input_snapshot"):
                         fb = contract["model_input_snapshot"].get("feature_basis", {})
                         min_games = fb.get("current_season_games_min", 15)
-                    if min_games < 12:
-                        effective_min_total_edge = max(effective_min_total_edge, 0.075)
+                    if min_games < 15:
+                        effective_min_total_edge = max(effective_min_total_edge, 0.09)
 
-                main_eligible = (
-                    eligibility.decision == "CALL"
-                    and eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
-                    and effective_min_total_edge <= edge <= max_disagreement
+                main_eligible = eligibility.decision == "CALL" and (
+                    not nba_rules
+                    or (eligibility.qualified and effective_min_total_edge <= edge <= max_disagreement)
                 )
-                if edge > max_disagreement:
+                if nba_rules and edge > max_disagreement:
                     main_rejections.append(
                         {"event_id": contract["event_id"], "reason": "market_disagreement_exceeds_limit"}
                     )
                 if (
                     flat_ledger is not None
                     and _append_secondary_ledger(
-                        flat_ledger, request, eligibility, observed_now, "nba_total:flat_ledger"
+                        flat_ledger, request, eligibility, observed_now, f"{tag}:flat_ledger"
                     )
                     is not None
                 ):
@@ -2724,7 +2502,7 @@ def _forecast_nba_total_sport(
                     main_ledger is not None
                     and main_eligible
                     and _append_secondary_ledger(
-                        main_ledger, request, eligibility, observed_now, "nba_total:main_ledger"
+                        main_ledger, request, eligibility, observed_now, f"{tag}:main_ledger"
                     )
                     is not None
                 ):
@@ -2737,225 +2515,21 @@ def _forecast_nba_total_sport(
 
     forecast["logged"] = len(logged)
     forecast["logged_event_ids"] = logged
-    forecast["main_rejections"] = main_rejections
+    if nba_rules:
+        forecast["main_rejections"] = main_rejections
     forecast["duplicate_pick_ids"] = duplicates
     forecast["main_ledger_duplicate_event_ids"] = main_duplicates
     forecast["skipped"] = forecast.get("unmatched", []) + skipped
     return forecast
 
 
-def _select_nfl_spread_market(candidates: list[dict]) -> dict | None:
-    """Select the most balanced spread market line for an NFL game."""
-    partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")
-    latest_by_contract: dict[str, dict] = {}
-    for row in candidates:
-        slug = str(row.get("market_slug") or "")
-        if (
-            not slug
-            or any(token in slug.lower() for token in partial_tokens)
-            or row.get("line") is None
-            or not isinstance(row.get("long"), dict)
-            or not isinstance(row.get("short"), dict)
-            or row["long"].get("ask") is None
-            or row["short"].get("ask") is None
-        ):
-            continue
-        try:
-            long_ask = float(row["long"]["ask"])
-            short_ask = float(row["short"]["ask"])
-            observed = parse_utc(str(row.get("observed_at_utc") or ""))
-        except (TypeError, ValueError):
-            continue
-        if not (0 < long_ask < 1 and 0 < short_ask < 1):
-            continue
-        previous = latest_by_contract.get(slug)
-        if previous is None or observed > parse_utc(str(previous["observed_at_utc"])):
-            latest_by_contract[slug] = row
-    if not latest_by_contract:
-        return None
-    return min(latest_by_contract.values(), key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
-
-
-def _nfl_is_neutral_site(event: dict) -> bool:
-    """Determine whether an NFL game is played at a neutral site (international series, etc.)."""
-    comp = (event.get("competitions") or [{}])[0]
-    is_neutral_site = bool(comp.get("neutralSite", False))
-    if not is_neutral_site:
-        venue = comp.get("venue") or {}
-        address = venue.get("address") or {}
-        country = str(address.get("country") or "").strip().upper()
-        city = str(address.get("city") or "").strip().lower()
-        venue_name = str(venue.get("fullName") or "").strip().lower()
-        if (
-            country
-            and country not in ("USA", "US", "UNITED STATES")
-            or any(
-                kw in city
-                for kw in ("london", "munich", "frankfurt", "são paulo", "sao paulo", "mexico city")
-            )
-            or any(
-                kw in venue_name
-                for kw in (
-                    "tottenham",
-                    "wembley",
-                    "twickenham",
-                    "allianz arena",
-                    "deutsche bank park",
-                    "arena corinthians",
-                    "estadio azteca",
-                )
-            )
-        ):
-            is_neutral_site = True
-    return is_neutral_site
-
-
-def _nfl_situational_features(
-    history: list,
-) -> tuple[dict[str, Any], dict[str, str]]:
-    """Extract point-in-time last game dates and starting QBs for NFL teams."""
-    team_last_date: dict[str, Any] = {}
-    team_starters: dict[str, str] = {}
-    for g in history:
-        try:
-            g_dt = parse_utc(str(g.event_start_utc)).astimezone(EASTERN).date()
-            team_last_date[g.home_team] = g_dt
-            team_last_date[g.away_team] = g_dt
-            if getattr(g, "home_starter_name", None) and g.home_starter_name != "Unknown":
-                team_starters[g.home_team] = g.home_starter_name
-            if getattr(g, "away_starter_name", None) and g.away_starter_name != "Unknown":
-                team_starters[g.away_team] = g.away_starter_name
-        except (AttributeError, KeyError, TypeError, ValueError):
-            continue
-    return team_last_date, team_starters
-
-
-def _nfl_venue_weather(event: dict) -> tuple[bool, float, float]:
-    """Extract dome status, wind speed, and temperature from NFL event."""
-    comp = (event.get("competitions") or [{}])[0]
-    venue = comp.get("venue") or {}
-    is_dome = bool(venue.get("indoor", False)) or any(
-        d in str(venue.get("fullName") or "").lower()
-        for d in (
-            "dome",
-            "mercedes-benz",
-            "ford field",
-            "allegiant",
-            "at&t stadium",
-            "lucas oil",
-            "nrg stadium",
-            "u.s. bank",
-            "state farm",
-            "sofi",
-        )
-    )
-    weather = comp.get("weather") or {}
-    wind_mph = float(weather.get("windSpeed") or (0.0 if is_dome else 5.0))
-    temperature_f = float(weather.get("temperature") or (70.0 if is_dome else 65.0))
-    return is_dome, wind_mph, temperature_f
-
-
-NFL_DIVISIONS: dict[str, str] = {
-    "Buffalo Bills": "AFC_East",
-    "Miami Dolphins": "AFC_East",
-    "New England Patriots": "AFC_East",
-    "New York Jets": "AFC_East",
-    "Baltimore Ravens": "AFC_North",
-    "Cincinnati Bengals": "AFC_North",
-    "Cleveland Browns": "AFC_North",
-    "Pittsburgh Steelers": "AFC_North",
-    "Houston Texans": "AFC_South",
-    "Indianapolis Colts": "AFC_South",
-    "Jacksonville Jaguars": "AFC_South",
-    "Tennessee Titans": "AFC_South",
-    "Denver Broncos": "AFC_West",
-    "Kansas City Chiefs": "AFC_West",
-    "Las Vegas Raiders": "AFC_West",
-    "Los Angeles Chargers": "AFC_West",
-    "Dallas Cowboys": "NFC_East",
-    "New York Giants": "NFC_East",
-    "Philadelphia Eagles": "NFC_East",
-    "Washington Commanders": "NFC_East",
-    "Chicago Bears": "NFC_North",
-    "Detroit Lions": "NFC_North",
-    "Green Bay Packers": "NFC_North",
-    "Minnesota Vikings": "NFC_North",
-    "Atlanta Falcons": "NFC_South",
-    "Carolina Panthers": "NFC_South",
-    "New Orleans Saints": "NFC_South",
-    "Tampa Bay Buccaneers": "NFC_South",
-    "Arizona Cardinals": "NFC_West",
-    "Los Angeles Rams": "NFC_West",
-    "San Francisco 49ers": "NFC_West",
-    "Seattle Seahawks": "NFC_West",
-}
-
-
-def _nfl_is_division_game(home_team: str, away_team: str) -> bool:
-    """Return True if both teams belong to the same NFL division."""
-    h_div = NFL_DIVISIONS.get(home_team)
-    a_div = NFL_DIVISIONS.get(away_team)
-    return h_div is not None and h_div == a_div
-
-
-def _load_nfl_injuries_known_at(
-    data_root: str | Path, observed_at: datetime
-) -> tuple[list[dict[str, Any]], dict[str, str] | None]:
-    """Return only verified, as-of injury entries and their source identity."""
-    snap_dir = Path(data_root) / "availability" / "nfl" / "espn_injury_snapshots"
-    if not snap_dir.exists():
-        return [], None
-    candidates = []
-    for p in snap_dir.glob("*/*.json"):
-        try:
-            with open(p, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            expected_hash = data.pop("snapshot_sha256", None)
-            if (
-                not expected_hash
-                or hashlib.sha256(
-                    json.dumps(data, sort_keys=True, separators=(",", ":")).encode()
-                ).hexdigest()
-                != expected_hash
-            ):
-                continue
-            obs = parse_utc(data.get("observed_at_utc", ""))
-            if obs <= observed_at:
-                candidates.append((obs, data.get("entries", []), expected_hash, str(p)))
-        except (json.JSONDecodeError, KeyError, ValueError, OSError):
-            continue
-    if not candidates:
-        return [], None
-    candidates.sort(key=lambda c: c[0])
-    obs, entries, digest, path = candidates[-1]
-    return entries, {"observed_at_utc": obs.isoformat(), "sha256": digest, "path": path}
-
-
-def _espn_spread_no_vig_ask(first_odds: dict[str, Any], selection: str) -> float:
-    """De-vigged ESPN consensus spread price for `selection`, falling back to the raw
-    one-sided implied probability when the other side's close odds aren't available --
-    ESPN's two-sided spread odds carry the same vig as moneyline, so pricing off one
-    side alone (as this previously did) systematically overstates edge."""
-    from ..learned_forward import _safe_odds_int
-
-    ps_obj = first_odds.get("pointSpread") or {}
-    sel_odds = _safe_odds_int((ps_obj.get(selection) or {}).get("close", {}).get("odds"))
-    other_side = "away" if selection == "home" else "home"
-    other_odds = _safe_odds_int((ps_obj.get(other_side) or {}).get("close", {}).get("odds"))
-    if sel_odds is None:
-        return STANDARD_LAY_ASK
-    sel_prob = round(implied_probability(sel_odds), 6)
-    if other_odds is None:
-        return sel_prob
-    other_prob = round(implied_probability(other_odds), 6)
-    total = sel_prob + other_prob
-    if total <= 0:
-        return sel_prob
-    return round(sel_prob / total, 6)
-
-
 def _forecast_nfl_spread_slate(
-    data_root, args_date: str, client, *, observed_at: datetime | None = None
+    data_root,
+    args_date: str,
+    client,
+    *,
+    observed_at: datetime | None = None,
+    max_input_age_hours: float = 12.0,
 ) -> dict:
     """Price NFL spreads using vintaged-input v6 research challenger."""
     from ..features.base import FeatureStore
@@ -2967,6 +2541,7 @@ def _forecast_nfl_spread_slate(
     observed_at = observed_at or utc_now()
     injury_entries, injury_source = _load_nfl_injuries_known_at(data_root, observed_at)
     model_version = "nfl-spread-structural-v7"
+    serving_calibrator = _nfl_serving_calibrator(model_version, "spread", data_root)
     artifact, artifact_error = _load_exact_artifact_contract(model_version)
     if artifact is None:
         return {
@@ -3060,6 +2635,17 @@ def _forecast_nfl_spread_slate(
         is_neutral_site = _nfl_is_neutral_site(event)
         is_dome, wind_mph, temperature_f = _nfl_venue_weather(event)
         is_division_game = _nfl_is_division_game(home_team, away_team)
+        # Operator decision 2026-11-11: consensus-priced contracts stay Main-eligible, but
+        # the row must say so -- a de-vigged sportsbook number is not an executable ask,
+        # and CLV/PnL against it means something different.
+        quote_provenance = (
+            "polymarket_executable_ask" if sportsbook == "polymarket_us" else "espn_consensus_indicative"
+        )
+        quote_note = (
+            ""
+            if sportsbook == "polymarket_us"
+            else " Priced off ESPN sportsbook consensus (no Polymarket market matched); not an executable CLOB ask."
+        )
 
         event_date = start.astimezone(EASTERN).date()
         h_last = team_last_date.get(home_team)
@@ -3081,27 +2667,44 @@ def _forecast_nfl_spread_slate(
         _, _h_stat, h_qb_pen = check_nfl_qb_injury_status(home_team, h_qb or "", injury_entries)
         _, _a_stat, a_qb_pen = check_nfl_qb_injury_status(away_team, a_qb or "", injury_entries)
 
-        eff = efficiency_store.get_matchup_efficiency(
-            home_team=home_team,
-            away_team=away_team,
-            as_of_date=start,
-            home_qb=h_qb,
-            away_qb=a_qb,
-        )
+        try:
+            eff = efficiency_store.get_matchup_efficiency(
+                home_team=home_team,
+                away_team=away_team,
+                as_of_date=start,
+                home_qb=h_qb,
+                away_qb=a_qb,
+            )
+        except NFLEfficiencyInputError as exc:
+            # Fail closed (NO_CALL): without real efficiency inputs the engine would
+            # price every game off the market anchor alone while labelling it a model call.
+            unmatched.append({"event_id": event_id, "reason": f"nfl_efficiency_inputs_unavailable: {exc}"})
+            continue
 
         h_qb_tier_adj = eff.home_qb_tier_adj - h_qb_pen
         a_qb_tier_adj = eff.away_qb_tier_adj - a_qb_pen
         input_qualified = (
-            efficiency_store.covers_last_game(home_team, h_last)
+            eff.home_prior_games > 0
+            and eff.away_prior_games > 0
+            and efficiency_store.covers_last_game(home_team, h_last)
             and efficiency_store.covers_last_game(away_team, a_last)
             and bool(h_qb and a_qb)
-            and bool(h_qb_update and a_qb_update)
-            and parse_utc(str(h_qb_update)).date() == observed_at.date()
-            and parse_utc(str(a_qb_update)).date() == observed_at.date()
+            and _nfl_inputs_fresh(
+                qb_update_utc=h_qb_update,
+                last_game_date=h_last,
+                injury_observed_utc=(injury_source or {}).get("observed_at_utc"),
+                observed_at=observed_at,
+                max_age_hours=max_input_age_hours,
+            )
+            and _nfl_inputs_fresh(
+                qb_update_utc=a_qb_update,
+                last_game_date=a_last,
+                injury_observed_utc=(injury_source or {}).get("observed_at_utc"),
+                observed_at=observed_at,
+                max_age_hours=max_input_age_hours,
+            )
             and _h_stat not in ("Out", "IR")
             and _a_stat not in ("Out", "IR")
-            and injury_source is not None
-            and parse_utc(injury_source["observed_at_utc"]).date() == observed_at.date()
         )
 
         fc: Any
@@ -3209,7 +2812,11 @@ def _forecast_nfl_spread_slate(
 
         inference_inputs = {
             "mean": fc.projected_margin_home,
-            "sd": margin_sd,
+            # The v7 engine widens margin_sd 1.25x on |line| >= 8. The replay recomputes
+            # the probability from THIS sd, so storing the artifact's base sd made every
+            # heavy-line candidate fail validate() (scalar_replay_probability_mismatch)
+            # and vanish into `skipped` with no log line (2026-11-11).
+            "sd": getattr(fc, "effective_sd", margin_sd),
             "line": -spread_home_line,
         }
         feature_basis = {
@@ -3225,6 +2832,7 @@ def _forecast_nfl_spread_slate(
             "efficiency_source": efficiency_store.source_manifest,
             "injury_source": injury_source,
             "input_qualified": input_qualified,
+            "quote_provenance": quote_provenance,
         }
         model_snapshot = build_scalar_snapshot(
             artifact,
@@ -3235,6 +2843,15 @@ def _forecast_nfl_spread_slate(
             observed_at_utc=observed_at.isoformat(),
         )
 
+        served_probability, calibration_method, calibration_version, calibration_artifact_hash = (
+            _apply_serving_calibrator(
+                model_probability,
+                serving_calibrator,
+                default_method="margin_normal",
+                model_version=model_version,
+                model_artifact_hash=model_artifact_hash,
+            )
+        )
         priced_contracts.append(
             {
                 "event_id": event_id,
@@ -3246,14 +2863,18 @@ def _forecast_nfl_spread_slate(
                 "line": line,
                 "executable_ask": float(ask),
                 "sportsbook": sportsbook,
-                "model_probability": round(model_probability, 6),
+                "model_probability": round(served_probability, 6),
+                "model_probability_raw": round(model_probability, 6),
+                "calibration_method": calibration_method,
+                "calibration_version": calibration_version,
+                "calibration_artifact_hash": calibration_artifact_hash,
                 "model_uncertainty": 0.08,
                 "model_version": model_version,
                 "model_artifact_hash": model_artifact_hash,
                 "model_qualified": model_qualified and input_qualified,
                 "rationale": (
                     f"NFL Structural v6 Spread projection. Projected margin {fc.projected_margin_home:+.1f} "
-                    f"(Rest: {home_rest_days}v{away_rest_days}d, Dome: {is_dome})."
+                    f"(Rest: {home_rest_days}v{away_rest_days}d, Dome: {is_dome}).{quote_note}"
                 ),
                 "joint_packet_quote": (
                     {
@@ -3316,7 +2937,11 @@ def _forecast_nfl_spread_sport(
         utc_now() if not force else datetime.strptime(args_date, "%Y-%m-%d").replace(tzinfo=UTC)
     )
     forecast = _forecast_nfl_spread_slate(
-        data_root, args_date, ESPNClient(), observed_at=decision_observed_at
+        data_root,
+        args_date,
+        ESPNClient(),
+        observed_at=decision_observed_at,
+        max_input_age_hours=float(config.get("project", {}).get("maximum_data_age_hours", 12)),
     )
     exposure_source = flat_ledger or main_ledger
     if exposure_source is None:
@@ -3352,14 +2977,14 @@ def _forecast_nfl_spread_sport(
             rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
             risks="NFL Structural v6 projected-QB research model; prospective validation pending.",
             model_origin=ModelOrigin.STATISTICAL_MODEL,
-            model_state=ModelState.SHADOW_QUALIFIED
-            if contract.get("model_qualified")
-            else ModelState.RESEARCH,
+            model_enabled=True,
             observed_at_utc=contract["observed_at_utc"],
             model_artifact_hash=contract["model_artifact_hash"],
-            calibration_method="margin_normal",
-            calibration_version=contract["model_version"],
-            calibration_artifact_hash=contract["model_artifact_hash"],
+            calibration_method=contract.get("calibration_method", "margin_normal"),
+            calibration_version=contract.get("calibration_version", contract["model_version"]),
+            calibration_artifact_hash=contract.get(
+                "calibration_artifact_hash", contract["model_artifact_hash"]
+            ),
             feature_schema_version="2",
             code_revision=contract["model_artifact_hash"],
             model_input_snapshot_json=json.dumps(
@@ -3419,7 +3044,7 @@ def _forecast_nfl_spread_sport(
                         )
                         eligibility = replace(
                             eligibility,
-                            record_type=RecordType.RESEARCH_OBSERVATION,
+                            qualified=False,
                             decision="NO_CALL",
                             reason_code="REJECTED_CROSS_MARKET_CONFLICT",
                         )
@@ -3436,8 +3061,12 @@ def _forecast_nfl_spread_sport(
                 effective_min_edge = min_edge + 0.02 if is_heavy_dog else min_edge
                 if (
                     main_ledger is not None
-                    and eligibility.decision == "CALL"
-                    and effective_min_edge <= contract_edge <= max_disagreement
+                    and _main_call_eligible(
+                        eligibility,
+                        edge=contract_edge,
+                        min_edge=effective_min_edge,
+                        max_edge=max_disagreement,
+                    )
                     and _append_secondary_ledger(
                         main_ledger, request, eligibility, observed_now, "nfl_spread:main_ledger"
                     )
@@ -3458,24 +3087,13 @@ def _forecast_nfl_spread_sport(
     return forecast
 
 
-def _select_nfl_total_market(candidates: list[dict]) -> dict | None:
-    """Select the most balanced total market line for an NFL game."""
-    partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")
-    valid = [
-        row
-        for row in candidates
-        if isinstance(row.get("long"), dict)
-        and row["long"].get("ask") is not None
-        and row.get("line") is not None
-        and not any(token in str(row.get("market_slug", "")).lower() for token in partial_tokens)
-    ]
-    if not valid:
-        return None
-    return min(valid, key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
-
-
 def _forecast_nfl_total_slate(
-    data_root, args_date: str, client, *, observed_at: datetime | None = None
+    data_root,
+    args_date: str,
+    client,
+    *,
+    observed_at: datetime | None = None,
+    max_input_age_hours: float = 12.0,
 ) -> dict:
     """Price NFL totals using vintaged-input v6 research challenger."""
 
@@ -3488,6 +3106,7 @@ def _forecast_nfl_total_slate(
     observed_at = observed_at or utc_now()
     injury_entries, injury_source = _load_nfl_injuries_known_at(data_root, observed_at)
     model_version = "nfl-total-structural-v7"
+    serving_calibrator = _nfl_serving_calibrator(model_version, "total", data_root)
     artifact, artifact_error = _load_exact_artifact_contract(model_version)
     if artifact is None:
         return {
@@ -3585,8 +3204,36 @@ def _forecast_nfl_total_slate(
             market_slug = str(market.get("market_slug"))
 
         is_neutral_site = _nfl_is_neutral_site(event)
-        is_dome, wind_mph, temperature_f = _nfl_venue_weather(event)
+        espn_dome, _, _ = _nfl_venue_weather(event)  # ESPN carries the roof flag only, no wind/temp
+        weather_evidence: dict[str, Any] = {}
+        w_temp, w_wind, w_precip, venue_dome = resolve_nfl_game_weather(
+            data_root,
+            home_team,
+            args_date,
+            event_start_utc=str(event["date"]),
+            observed_at_utc=observed_at.isoformat(),
+            provenance_out=weather_evidence,
+            is_neutral_site=is_neutral_site,
+        )
+        is_dome = bool(venue_dome or espn_dome)
+        # Only a hash-verified Open-Meteo forecast captured before the decision time counts.
+        # Until 2026-11-11 a 5 mph / 65F placeholder stood in for every outdoor game and was
+        # indistinguishable from a reading, so the engine's wind/cold terms never fired.
+        weather_verified = is_dome or None not in (w_temp, w_wind)
+        wind_mph = (0.0 if is_dome else w_wind) if weather_verified else None
+        temperature_f = (70.0 if is_dome else w_temp) if weather_verified else None
         is_division_game = _nfl_is_division_game(home_team, away_team)
+        # Operator decision 2026-11-11: consensus-priced contracts stay Main-eligible, but
+        # the row must say so -- a de-vigged sportsbook number is not an executable ask,
+        # and CLV/PnL against it means something different.
+        quote_provenance = (
+            "polymarket_executable_ask" if sportsbook == "polymarket_us" else "espn_consensus_indicative"
+        )
+        quote_note = (
+            ""
+            if sportsbook == "polymarket_us"
+            else " Priced off ESPN sportsbook consensus (no Polymarket market matched); not an executable CLOB ask."
+        )
 
         event_date = start.astimezone(EASTERN).date()
         h_last = team_last_date.get(home_team)
@@ -3608,27 +3255,44 @@ def _forecast_nfl_total_slate(
         _, _h_stat, h_qb_pen = check_nfl_qb_injury_status(home_team, h_qb or "", injury_entries)
         _, _a_stat, a_qb_pen = check_nfl_qb_injury_status(away_team, a_qb or "", injury_entries)
 
-        eff = efficiency_store.get_matchup_efficiency(
-            home_team=home_team,
-            away_team=away_team,
-            as_of_date=start,
-            home_qb=h_qb,
-            away_qb=a_qb,
-        )
+        try:
+            eff = efficiency_store.get_matchup_efficiency(
+                home_team=home_team,
+                away_team=away_team,
+                as_of_date=start,
+                home_qb=h_qb,
+                away_qb=a_qb,
+            )
+        except NFLEfficiencyInputError as exc:
+            # Fail closed (NO_CALL): without real efficiency inputs the engine would
+            # price every game off the market anchor alone while labelling it a model call.
+            unmatched.append({"event_id": event_id, "reason": f"nfl_efficiency_inputs_unavailable: {exc}"})
+            continue
 
         h_qb_tier_adj = eff.home_qb_tier_adj - h_qb_pen
         a_qb_tier_adj = eff.away_qb_tier_adj - a_qb_pen
         input_qualified = (
-            efficiency_store.covers_last_game(home_team, h_last)
+            eff.home_prior_games > 0
+            and eff.away_prior_games > 0
+            and efficiency_store.covers_last_game(home_team, h_last)
             and efficiency_store.covers_last_game(away_team, a_last)
             and bool(h_qb and a_qb)
-            and bool(h_qb_update and a_qb_update)
-            and parse_utc(str(h_qb_update)).date() == observed_at.date()
-            and parse_utc(str(a_qb_update)).date() == observed_at.date()
+            and _nfl_inputs_fresh(
+                qb_update_utc=h_qb_update,
+                last_game_date=h_last,
+                injury_observed_utc=(injury_source or {}).get("observed_at_utc"),
+                observed_at=observed_at,
+                max_age_hours=max_input_age_hours,
+            )
+            and _nfl_inputs_fresh(
+                qb_update_utc=a_qb_update,
+                last_game_date=a_last,
+                injury_observed_utc=(injury_source or {}).get("observed_at_utc"),
+                observed_at=observed_at,
+                max_age_hours=max_input_age_hours,
+            )
             and _h_stat not in ("Out", "IR")
             and _a_stat not in ("Out", "IR")
-            and injury_source is not None
-            and parse_utc(injury_source["observed_at_utc"]).date() == observed_at.date()
         )
 
         fc: Any
@@ -3659,9 +3323,6 @@ def _forecast_nfl_total_slate(
                 total_line=t_line,
                 home_qb_tier_adj=h_qb_tier_adj,
                 away_qb_tier_adj=a_qb_tier_adj,
-                home_rest_days=home_rest_days,
-                away_rest_days=away_rest_days,
-                is_neutral_site=is_neutral_site,
                 home_explosive_rate=eff.home_explosive_rate,
                 away_explosive_rate=eff.away_explosive_rate,
                 home_def_explosive_rate=eff.home_def_explosive_rate,
@@ -3709,8 +3370,8 @@ def _forecast_nfl_total_slate(
                 away_def_epa=eff.away_def_epa,
                 home_qb_tier_adj=h_qb_tier_adj,
                 away_qb_tier_adj=a_qb_tier_adj,
-                wind_mph=wind_mph,
-                temperature_f=temperature_f,
+                wind_mph=wind_mph if wind_mph is not None else 5.0,
+                temperature_f=temperature_f if temperature_f is not None else 65.0,
                 is_dome=is_dome,
                 home_rest_days=home_rest_days,
                 away_rest_days=away_rest_days,
@@ -3771,11 +3432,18 @@ def _forecast_nfl_total_slate(
             "home_rest_days": home_rest_days,
             "away_rest_days": away_rest_days,
             "is_dome": is_dome,
+            "wind_mph": wind_mph,
+            "temperature_f": temperature_f,
+            "precipitation_in": w_precip if weather_verified else None,
+            "weather_inputs_verified": weather_verified,
+            "weather_source": weather_evidence.get("source"),
+            "weather_observed_at_utc": weather_evidence.get("observed_at_utc"),
             "is_division_game": is_division_game,
             "short_week_penalty": getattr(fc, "short_week_penalty", 0.0),
             "efficiency_source": efficiency_store.source_manifest,
             "injury_source": injury_source,
             "input_qualified": input_qualified,
+            "quote_provenance": quote_provenance,
         }
         model_snapshot = build_scalar_snapshot(
             artifact,
@@ -3787,10 +3455,24 @@ def _forecast_nfl_total_slate(
         )
 
         short_week_pen = getattr(fc, "short_week_penalty", 0.0)
+        weather_note = (
+            f"{wind_mph:.0f}mph/{temperature_f:.0f}F"
+            if weather_verified and wind_mph is not None and temperature_f is not None
+            else "unavailable, no weather adjustment applied"
+        )
         tnf_note = (
             f" TNF short-week drag: -{short_week_pen:.1f} pts ({home_rest_days}d/{away_rest_days}d rest)."
             if short_week_pen > 0
             else ""
+        )
+        served_probability, calibration_method, calibration_version, calibration_artifact_hash = (
+            _apply_serving_calibrator(
+                model_probability,
+                serving_calibrator,
+                default_method="total_normal",
+                model_version=model_version,
+                model_artifact_hash=model_artifact_hash,
+            )
         )
         priced_contracts.append(
             {
@@ -3803,14 +3485,18 @@ def _forecast_nfl_total_slate(
                 "line": line,
                 "executable_ask": float(ask),
                 "sportsbook": sportsbook,
-                "model_probability": round(model_probability, 6),
+                "model_probability": round(served_probability, 6),
+                "model_probability_raw": round(model_probability, 6),
+                "calibration_method": calibration_method,
+                "calibration_version": calibration_version,
+                "calibration_artifact_hash": calibration_artifact_hash,
                 "model_uncertainty": 0.08,
                 "model_version": model_version,
                 "model_artifact_hash": model_artifact_hash,
                 "model_qualified": model_qualified and input_qualified,
                 "rationale": (
                     f"NFL Structural v6 Total projection. Projected total {fc.projected_total:.1f} "
-                    f"(Dome: {is_dome}, Weather: {wind_mph:.0f}mph/{temperature_f:.0f}F).{tnf_note}"
+                    f"(Dome: {is_dome}, Weather: {weather_note}).{tnf_note}{quote_note}"
                 ),
                 "joint_packet_quote": (
                     {
@@ -3866,7 +3552,13 @@ def _forecast_nfl_total_sport(
     decision_observed_at = observed_at or (
         utc_now() if not force else datetime.strptime(args_date, "%Y-%m-%d").replace(tzinfo=UTC)
     )
-    forecast = _forecast_nfl_total_slate(data_root, args_date, ESPNClient(), observed_at=decision_observed_at)
+    forecast = _forecast_nfl_total_slate(
+        data_root,
+        args_date,
+        ESPNClient(),
+        observed_at=decision_observed_at,
+        max_input_age_hours=float(config.get("project", {}).get("maximum_data_age_hours", 12)),
+    )
     exposure_source = flat_ledger or main_ledger
     if exposure_source is None:
         forecast["logged"] = 0
@@ -3901,14 +3593,14 @@ def _forecast_nfl_total_sport(
             rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
             risks="NFL Structural v6 projected-QB research model; prospective validation pending.",
             model_origin=ModelOrigin.STATISTICAL_MODEL,
-            model_state=ModelState.SHADOW_QUALIFIED
-            if contract.get("model_qualified")
-            else ModelState.RESEARCH,
+            model_enabled=True,
             observed_at_utc=contract["observed_at_utc"],
             model_artifact_hash=contract["model_artifact_hash"],
-            calibration_method="total_normal",
-            calibration_version=contract["model_version"],
-            calibration_artifact_hash=contract["model_artifact_hash"],
+            calibration_method=contract.get("calibration_method", "total_normal"),
+            calibration_version=contract.get("calibration_version", contract["model_version"]),
+            calibration_artifact_hash=contract.get(
+                "calibration_artifact_hash", contract["model_artifact_hash"]
+            ),
             feature_schema_version="2",
             code_revision=contract["model_artifact_hash"],
             model_input_snapshot_json=json.dumps(
@@ -3960,8 +3652,12 @@ def _forecast_nfl_total_sport(
                 effective_min_edge = min_edge + 0.02 if is_high_total_over else min_edge
                 if (
                     main_ledger is not None
-                    and eligibility.decision == "CALL"
-                    and effective_min_edge <= contract_edge <= max_disagreement
+                    and _main_call_eligible(
+                        eligibility,
+                        edge=contract_edge,
+                        min_edge=effective_min_edge,
+                        max_edge=max_disagreement,
+                    )
                     and _append_secondary_ledger(
                         main_ledger, request, eligibility, observed_now, "nfl_total:main_ledger"
                     )
@@ -3980,26 +3676,6 @@ def _forecast_nfl_total_sport(
     forecast["main_ledger_duplicate_event_ids"] = main_duplicates
     forecast["skipped"] = forecast.get("unmatched", []) + skipped
     return forecast
-
-
-def _load_market_residual_model(config) -> MarketResidualModel | None:
-    """Fail-soft load of the market-residual artifact (P0-4), diagnostic use only.
-
-    A missing config block, missing file, or hash mismatch all fall back to
-    None (no market_residual_probability recorded on the row) rather than
-    raising into the primary forecast path -- this layer must never be able
-    to block a real pick from being logged.
-    """
-    artifact_value = (config.get("models", {}).get("market_residual") or {}).get("artifact")
-    if not artifact_value:
-        return None
-    artifact_path = Path(artifact_value)
-    if not artifact_path.is_absolute():
-        artifact_path = PROJECT_ROOT / artifact_path
-    try:
-        return MarketResidualModel.load(artifact_path)
-    except (FileNotFoundError, ValueError, KeyError, json.JSONDecodeError):
-        return None
 
 
 def _forecast_learned_sport(
@@ -4137,7 +3813,6 @@ def _forecast_learned_sport(
                     "candidates": candidates,
                     "note": f"{sport} is research-only — not logged to main ledger",
                 }
-        configured_state = str(model_config.get("status", "research"))
         for candidate in to_log:
             if force:
                 try:
@@ -4354,7 +4029,7 @@ def _forecast_learned_sport(
                 rationale=rationale,
                 risks="Learned model; shadow-qualified via operator override.",
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
-                model_state=ModelState(configured_state),
+                model_enabled=model_enabled(model_config),
                 observed_at_utc=observed_at_utc,
                 model_artifact_hash=candidate.model_artifact_hash,
                 calibration_method="learned_lr",
@@ -4411,7 +4086,7 @@ def _forecast_learned_sport(
                     if quote_warning and eligibility.decision == "CALL":
                         eligibility = replace(
                             eligibility,
-                            record_type=RecordType.RESEARCH_OBSERVATION,
+                            qualified=False,
                             decision="NO_CALL" if not flat_mode else "CALL",
                             reason_code="PAPER_CALL_MARKET_UNAVAILABLE",
                             units=0.0 if not flat_mode else eligibility.units,
@@ -4435,7 +4110,7 @@ def _forecast_learned_sport(
                     ):
                         eligibility = replace(
                             eligibility,
-                            record_type=RecordType.RESEARCH_OBSERVATION,
+                            qualified=False,
                             decision="CALL",
                             reason_code="PAPER_CALL_BELOW_LEARNED_CONFIDENCE",
                         )
@@ -4446,7 +4121,7 @@ def _forecast_learned_sport(
                     ):
                         eligibility = replace(
                             eligibility,
-                            record_type=RecordType.RESEARCH_OBSERVATION,
+                            qualified=False,
                             decision="NO_CALL" if not flat_mode else "CALL",
                             reason_code="PAPER_CALL_EDGE_OUT_OF_BOUNDS",
                         )
@@ -4491,7 +4166,7 @@ def _forecast_learned_sport(
                             else:
                                 eligibility = replace(
                                     eligibility,
-                                    record_type=RecordType.RESEARCH_OBSERVATION,
+                                    qualified=False,
                                     decision="NO_CALL",
                                     reason_code="REJECTED_CROSS_MARKET_CONFLICT",
                                 )
@@ -4607,7 +4282,6 @@ def _log_esports_forecast(
         return 0
     model_config = config["models"].get(forecast["title"].upper(), {})
     min_edge = float(model_config.get("min_edge", 0.02))
-    configured_state = str(model_config.get("status", "research"))
     title = forecast["title"].upper()
     league = League(title)
     observed_now = utc_now()
@@ -4635,7 +4309,7 @@ def _log_esports_forecast(
         # Research preserves every safely priced candidate, including a
         # synthetic-1500-prior candidate for an unvalidated/new team --
         # evaluate_gated_research_eligibility downgrades those to a
-        # RESEARCH_OBSERVATION/NO_CALL row below rather than dropping them.
+        # unqualified NO_CALL row below rather than dropping them.
         # Gated research is the curated subset: positive executable edge, a
         # real model opinion, and both teams resolved to ratings learned by
         # this exact artifact. Exposure and model/market disagreement
@@ -4742,7 +4416,7 @@ def _log_esports_forecast(
                 f"team_resolution_methods={contract.get('team_resolution_methods') or 'not_recorded'}."
             ),
             model_origin=ModelOrigin.STATISTICAL_MODEL,
-            model_state=ModelState(configured_state),
+            model_enabled=model_enabled(model_config),
             observed_at_utc=str(contract.get("observed_at_utc") or "") or None,
             model_artifact_hash=str(contract.get("artifact_hash", "")),
             calibration_method="neutral_elo",
@@ -4873,7 +4547,6 @@ def _forecast_international_sport(
     # something" convention (validation.MINIMUM_MONTHLY_CALLS = 10), same
     # reasoning as soccer/tennis.
     MINIMUM_TEAM_GAMES = 10
-    configured_state = str(model_config.get("status", "research"))
     forecast = forecast_international_baseball_slate(
         data_root,
         artifact_dir,
@@ -4982,7 +4655,7 @@ def _forecast_international_sport(
             ),
             risks="Config-promoted international baseball baseline; gates enforced at log time.",
             model_origin=ModelOrigin.STATISTICAL_MODEL,
-            model_state=ModelState(configured_state),
+            model_enabled=model_enabled(model_config),
             observed_at_utc=str(contract.get("observed_at_utc") or "") or None,
             model_artifact_hash=str(contract.get("artifact_hash", "")),
             calibration_method="tie_aware_elo",
@@ -5225,7 +4898,7 @@ def _forecast_soccer_sport(
             rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
             risks=("Research-only soccer score model; draw-aware, but not yet locked-holdout qualified."),
             model_origin=ModelOrigin.STATISTICAL_MODEL,
-            model_state=ModelState(configured_state),
+            model_enabled=model_enabled(model_config),
             observed_at_utc=str(contract["observed_at_utc"]),
             model_artifact_hash=str(forecast["model_code_hash"]),
             calibration_method="poisson_dixon_coles",
@@ -5423,7 +5096,6 @@ def _forecast_tennis_sport(
     # "enough to say something" convention (validation.MINIMUM_MONTHLY_CALLS
     # = 10), same reasoning as soccer's MINIMUM_TEAM_GAMES.
     MINIMUM_PLAYER_MATCHES = 10
-    configured_state = str(model_config.get("status", "research"))
     observed_now = utc_now()
     logged = 0
     gated = 0
@@ -5489,7 +5161,7 @@ def _forecast_tennis_sport(
                 "explicit operator directive, not genuine walk-forward validation."
             ),
             model_origin=ModelOrigin.STATISTICAL_MODEL,
-            model_state=ModelState(configured_state),
+            model_enabled=model_enabled(model_config),
             observed_at_utc=str(contract["observed_at_utc"]),
             model_artifact_hash=str(forecast["model_code_hash"]),
             calibration_method=(
@@ -5738,7 +5410,7 @@ def _forecast_cfb_sport(
                 rationale=rationale_text,
                 risks="College football model; multi-market (moneyline, spread, total).",
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
-                model_state=ModelState(configured_state),
+                model_enabled=model_enabled(model_config),
                 observed_at_utc=contract_obs,
                 model_artifact_hash=serving_artifact_hash,
                 calibration_method="cfb_key_number_engine",
@@ -5770,7 +5442,7 @@ def _forecast_cfb_sport(
                 contract_edge = float(contract.get("edge_vs_executable_ask", 0.0))
                 genuinely_eligible = (
                     eligibility.decision == "CALL"
-                    and eligibility.record_type == RecordType.QUALIFIED_SHADOW_CALL
+                    and eligibility.qualified
                     and min_edge <= contract_edge <= max_edge
                 )
                 if contract_edge > max_edge:
@@ -5931,11 +5603,7 @@ def _forecast_hockey_sport(
     model_config = config.get("models", {}).get("HOCKEY", {})
     leagues = tuple(model_config.get("leagues") or ())
     min_edge = float(model_config.get("min_edge", 0.02))
-    configured_state = model_config.get("status", "shadow_qualified")
-    try:
-        model_state_val = ModelState(configured_state)
-    except (ValueError, KeyError):
-        model_state_val = ModelState.SHADOW_QUALIFIED
+    model_enabled_val = model_enabled(model_config)
 
     forecast = build_hockey_slate(
         data_root=data_root,
@@ -6006,7 +5674,7 @@ def _forecast_hockey_sport(
                 ),
                 risks=("Paper-mode hockey score model; bivariate Poisson with OT resolution."),
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
-                model_state=model_state_val,
+                model_enabled=model_enabled_val,
                 observed_at_utc=hockey_observed_at,
                 calibration_method="poisson_dixon_coles",
                 calibration_version=hockey_model_version,
@@ -6052,7 +5720,7 @@ def _forecast_hockey_sport(
                 else 0.0
             )
             eligibility = EligibilityResult(
-                record_type=RecordType.RESEARCH_OBSERVATION,
+                qualified=False,
                 decision="CALL" if edge_qualified else "NO_CALL",
                 reason_code=(
                     "PAPER_CALL_MODEL_QUALIFIED"
@@ -6145,11 +5813,7 @@ def _forecast_darts_sport(
     model_config = config.get("models", {}).get("DARTS", {})
     leagues = tuple(model_config.get("leagues") or ())
     min_edge = float(model_config.get("min_edge", 0.02))
-    configured_state = model_config.get("status", "shadow_qualified")
-    try:
-        model_state_val = ModelState(configured_state)
-    except (ValueError, KeyError):
-        model_state_val = ModelState.SHADOW_QUALIFIED
+    model_enabled_val = model_enabled(model_config)
 
     forecast = build_darts_slate(
         data_root=data_root,
@@ -6226,7 +5890,7 @@ def _forecast_darts_sport(
                 ),
                 risks=("Paper-mode darts score model; exact Markov leg-progression distribution."),
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
-                model_state=model_state_val,
+                model_enabled=model_enabled_val,
                 observed_at_utc=str(contract.get("observed_at_utc") or effective_now.isoformat()),
                 calibration_method="markov_leg_progression",
                 calibration_version=str(contract.get("model_version") or "darts-markov-v1"),
@@ -6263,7 +5927,7 @@ def _forecast_darts_sport(
                 else 0.0
             )
             eligibility = EligibilityResult(
-                record_type=RecordType.RESEARCH_OBSERVATION,
+                qualified=False,
                 decision="CALL" if not baseline_only and contract_edge >= min_edge else "NO_CALL",
                 reason_code=(
                     "NO_CALL_UNTRAINED_MODEL"
@@ -6438,6 +6102,14 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
     # too, with nothing in this run to regenerate them. See
     # _clear_today_open's docstring for the 2026-08-03 incident.
     main_ledger_sport_scope = {s.casefold() for s in sports} & set(MAIN_LEDGER_SPORTS)
+    ncaab_prior = {}
+    if log and replace_today and "ncaab" in main_ledger_sport_scope:
+        for tier_name, source in (("main", ledger), ("flat", flat_ledger)):
+            ncaab_prior[tier_name] = [
+                row
+                for row in source.rows()
+                if row.get("status") == "open" and str(row.get("league", "")).casefold() == "ncaab"
+            ]
     if is_flat:
         if replace_today and log:
             _clear_today_open(flat_ledger, args.date, by_event_date=True, leagues=main_ledger_sport_scope)
@@ -6729,6 +6401,10 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
             results[sport] = _forecast_research_sport(sport, args.date, config)
     for sport in sports:
         if sport in results:
+            if sport == "ncaab" and ncaab_prior:
+                for tier_name, source in (("main", ledger), ("flat", flat_ledger)):
+                    restored = source.restore_unreplaced_picks(ncaab_prior[tier_name])
+                    results[sport][f"{tier_name}_unreplaced_restored"] = len(restored)
             results[sport]["existing_started_picks"] = [
                 row for row in saved if str(row.get("league", "")).casefold() == sport.casefold()
             ]

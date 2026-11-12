@@ -18,7 +18,7 @@ from typing import Any
 
 import httpx
 
-from ..domain import League, parse_utc
+from ..domain import parse_utc
 from ..features.bullpen import bullpen_profile, team_recent_relief_lines
 from ..features.park_factors import park_factor
 from ..features.weather import resolve_weather
@@ -275,12 +275,6 @@ class ESPNClient:
     def roster(self, league: str, team_id: str, season: int) -> dict[str, Any]:
         return self._get(
             f"{SITE_API}/{self._league_path(league)}/teams/{team_id}/roster",
-            {"season": season},
-        )
-
-    def team_schedule(self, league: str, team_id: str, season: int) -> dict[str, Any]:
-        return self._get(
-            f"{SITE_API}/{self._league_path(league)}/teams/{team_id}/schedule",
             {"season": season},
         )
 
@@ -721,9 +715,3 @@ def _line(value: Any) -> float | None:
 
 def _payload_hash(payload: Any) -> str:
     return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-
-
-# Convenience re-export so League enum users can map to ESPN paths.
-def league_path(league: League | str) -> str:
-    key = league.value if isinstance(league, League) else str(league)
-    return LEAGUE_PATHS[key.upper()]

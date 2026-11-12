@@ -189,6 +189,11 @@ def _parse_picks(path: Path) -> list[dict]:
             "american_odds",
             "market_implied_probability",
             "market_probability_at_decision",
+            "market_quote_observed_at_utc",
+            "market_quote_timestamp_valid",
+            "market_quote_provenance",
+            "market_snapshot_hash",
+            "market_snapshot_archive_path",
             "model_probability",
             "model_uncertainty",
             "edge",
@@ -557,7 +562,7 @@ def performance(picks: list[dict]) -> dict:
         else:
             run_l, run_w = run_l + 1, 0
         longest_w, longest_l = max(longest_w, run_w), max(longest_l, run_l)
-    current = run_w if run_w else -run_l
+    current = run_w or -run_l
     clv = [
         _number(row.get("probability_clv"), None)
         for row in settled
@@ -649,7 +654,7 @@ def performance_for_sport(
         scoped = [] if requested else picks
     payload = performance(scoped)
     payload["available_sports"] = available
-    payload["selected_sport"] = selected or (requested if requested else None)
+    payload["selected_sport"] = selected or (requested or None)
     return payload
 
 

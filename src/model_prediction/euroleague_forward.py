@@ -19,8 +19,8 @@ import httpx
 from .config import PROJECT_ROOT
 from .data_sources.euroleague import club_names, refresh_euroleague_history, resolve_club
 from .data_sources.polymarket_us import PolymarketUSClient, probability_to_american
-from .domain import League, MarketType, ModelOrigin, ModelState, PickRequest, parse_utc, utc_now
-from .eligibility import EligibilityResult, RecordType
+from .domain import League, MarketType, ModelOrigin, PickRequest, parse_utc, utc_now
+from .eligibility import EligibilityResult
 from .entities import CanonicalTeam
 from .features.base import FeatureStore
 from .hockey_forward import _parse_teams_from_event
@@ -223,7 +223,7 @@ def forecast_basketball_lane(
                 rationale=f"{prediction.rationale} ({market_def.get('market_slug', '')}).",
                 risks="Paper tempo model; live market quote is an indicative reference, not verified executable BBO.",
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
-                model_state=ModelState.SHADOW_QUALIFIED,
+                model_enabled=True,
                 observed_at_utc=observed.isoformat(),
             )
             teams = [
@@ -235,7 +235,7 @@ def forecast_basketball_lane(
                 and model.compute_dynamic_units(edge, min_edge=min_edge, max_edge=0.08)
             ) or 1.00
             eligibility = EligibilityResult(
-                RecordType.RESEARCH_OBSERVATION,
+                False,
                 "CALL",
                 "PAPER_CALL_MODEL_UNVALIDATED",
                 dynamic_units,

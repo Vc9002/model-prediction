@@ -19,6 +19,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from model_prediction.domain import is_research_row
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from model_prediction.daily_lock import acquire_lock
@@ -35,7 +37,7 @@ def _targets(rows: list[dict[str, str]]) -> list[dict[str, str]]:
     return [
         row
         for row in rows
-        if row.get("record_type") == "RESEARCH_OBSERVATION"
+        if is_research_row(row)
         and row.get("reason_code") == REASON
         and float(row.get("units") or 0) == 0
         and row.get("status") not in {"archived", "removed"}

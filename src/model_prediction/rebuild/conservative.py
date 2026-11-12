@@ -16,8 +16,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-import numpy as np
-
 
 @dataclass
 class ConservativeProbability:
@@ -47,47 +45,6 @@ class ConservativeProbability:
             )
             self.lower_bound = max(0.01, self.raw_probability - total_uncertainty - self.safety_margin)
             self.conservative_probability = self.lower_bound
-
-    def clears_ask(
-        self,
-        best_ask: float,
-        fee_rate: float = 0.0,
-        slippage: float = 0.0,
-    ) -> tuple[bool, float]:
-        """Check if conservative probability clears the executable ask after costs."""
-        effective_ask = best_ask + slippage
-        edge = self.lower_bound - effective_ask - fee_rate
-        return edge > 0, float(edge)
-
-
-def compute_conservative_probability(
-    raw_prob: float,
-    model_bootstrap_std: float = 0.0,
-    calibration_unc: float = 0.0,
-    player_lineup_unc: float = 0.0,
-    data_quality_unc: float = 0.0,
-    model_disagreement: float = 0.0,
-    safety_margin: float = 0.02,
-    ensemble_models: int = 1,
-) -> ConservativeProbability:
-    """Compute a conservative lower-bound probability.
-
-    When multiple ensemble models exist, model_disagreement is the std of
-    their predictions divided by sqrt(n), giving a tighter bound for ensembles.
-    """
-    if ensemble_models > 1:
-        model_disagreement = model_disagreement / np.sqrt(ensemble_models)
-
-    return ConservativeProbability(
-        raw_probability=raw_prob,
-        conservative_probability=0.0,  # computed in __post_init__
-        model_bootstrap_uncertainty=model_bootstrap_std,
-        calibration_uncertainty=calibration_unc,
-        player_lineup_uncertainty=player_lineup_unc,
-        data_quality_uncertainty=data_quality_unc,
-        model_disagreement=model_disagreement,
-        safety_margin=safety_margin,
-    )
 
 
 # ── Threshold selection ──────────────────────────────────────────────────────
@@ -148,35 +105,3 @@ class TradeThreshold:
         if horizon != self.horizon and self.horizon != "any":
             return False, f"horizon {horizon} != {self.horizon}"
         return True, "ok"
-
-
-def apply_threshold(
-    threshold: TradeThreshold,
-    candidates: list[dict[str, Any]],
-) -> dict[str, Any]:
-    """Apply a frozen threshold to a set of trade candidates. Returns acceptance report."""
-    accepted: list[dict[str, Any]] = []
-    rejected: dict[str, int] = {}
-    for c in candidates:
-        ok, reason = threshold.filter(
-            cost_adjusted_edge=c.get("cost_adjusted_edge", 0),
-            expected_value=c.get("expected_value", 0),
-            residual_score=c.get("residual_score", 1.0),
-            quote_age_seconds=c.get("quote_age_seconds", 0),
-            depth_units=c.get("depth_units", 100),
-            model_uncertainty=c.get("model_uncertainty", 0),
-            missingness_frac=c.get("missingness_frac", 0),
-            horizon=c.get("horizon", "mid"),
-        )
-        if ok:
-            accepted.append(c)
-        else:
-            rejected[reason] = rejected.get(reason, 0) + 1
-
-    return {
-        "total": len(candidates),
-        "accepted": len(accepted),
-        "rejected": len(candidates) - len(accepted),
-        "acceptance_rate": len(accepted) / max(1, len(candidates)),
-        "rejection_reasons": rejected,
-    }

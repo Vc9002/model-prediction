@@ -28,7 +28,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-from .domain import eastern_today
+from .domain import eastern_today, legacy_record_type
 from .features.elo_ratings import expected_win_probability
 from .research_io import atomic_write as _atomic_write
 from .research_io import backup_before_overwrite as _backup_before_overwrite
@@ -993,7 +993,6 @@ def validate_international_baseball_baseline(
             "league": league,
             "observations": len(rows),
             "minimum_required": 500,
-            "model_state": "research",
             "promotion_eligible": False,
         }
     train, validation, test = _chronological_split(rows)
@@ -1134,7 +1133,6 @@ def validate_international_baseball_baseline(
     artifact = {
         "schema_version": "international-baseball-tie-aware-elo-v2",
         "model_version": f"{league}-tie-aware-elo-v2",
-        "model_state": "research",
         "league": league,
         "target": "expected moneyline settlement where a tie pays 0.50",
         "initial_rating": 1500.0,
@@ -1199,7 +1197,6 @@ def validate_international_baseball_baseline(
         "status": "ok",
         "league": league,
         "model_version": artifact["model_version"],
-        "model_state": "research",
         "promotion_eligible": False,
         "observations": len(rows),
         "tie_rate": round(_tie_rate(rows), 6),
@@ -1581,11 +1578,10 @@ def forecast_international_baseball_slate(
                     "inference_inputs": inference_inputs,
                     "model_inputs_observed_at_utc": observed_now.isoformat(),
                     "model_version": market_model_version,
-                    "model_state": "research",
                     "artifact_hash": artifact["artifact_hash"],
                     "observed_at_utc": snapshot["observed_at_utc"],
                     "sides": sides,
-                    "record_type": "RESEARCH_OBSERVATION",
+                    "record_type": legacy_record_type(False),
                     "qualification": "PAPER_CALL_MODEL_UNVALIDATED",
                     "units": compute_international_baseball_dynamic_units(best_side_edge),
                     # Real per-team game count, not just "present in ratings"
@@ -1605,7 +1601,6 @@ def forecast_international_baseball_slate(
         "priced_count": len(rows),
         "no_calls": no_calls,
         "no_call_count": len(no_calls),
-        "model_state": "research",
         "profitability": "not_established",
         "units": 0,
     }

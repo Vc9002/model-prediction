@@ -1,23 +1,19 @@
 import pytest
 
-from model_prediction.domain import ModelOrigin, ModelState
+from model_prediction.domain import ModelOrigin
 from model_prediction.lifecycle import (
     can_create_qualified_call,
     evaluate_locked_holdout,
-    validate_transition,
+    model_enabled,
 )
 
 
-def test_lifecycle_transitions_and_qualification() -> None:
-    validate_transition(ModelState.RESEARCH, ModelState.SHADOW_CANDIDATE)
-    validate_transition(ModelState.SHADOW_QUALIFIED, ModelState.DEGRADED)
-    validate_transition(ModelState.DEGRADED, ModelState.SUSPENDED)
-    validate_transition(ModelState.SUSPENDED, ModelState.RESEARCH)
-    validate_transition(ModelState.SUSPENDED, ModelState.RETIRED)
-    with pytest.raises(ValueError):
-        validate_transition(ModelState.RETIRED, ModelState.RESEARCH)
-    assert can_create_qualified_call(ModelState.SHADOW_QUALIFIED, ModelOrigin.STATISTICAL_MODEL)
-    assert not can_create_qualified_call(ModelState.SHADOW_QUALIFIED, ModelOrigin.ANALYST_ESTIMATE)
+def test_model_enabled_flag_and_qualification() -> None:
+    assert can_create_qualified_call(True, ModelOrigin.STATISTICAL_MODEL)
+    assert not can_create_qualified_call(False, ModelOrigin.STATISTICAL_MODEL)
+    assert model_enabled({"status": "shadow_qualified"}) and not model_enabled({"status": "retired"})
+    assert model_enabled({"enabled": True, "status": "retired"})
+    assert not can_create_qualified_call(True, ModelOrigin.ANALYST_ESTIMATE)
 
 
 def test_qualification_base_gate_is_locked_holdout_accuracy() -> None:

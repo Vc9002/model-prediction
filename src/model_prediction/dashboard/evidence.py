@@ -15,6 +15,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from ..domain import is_qualified_row
+from ..lifecycle import model_enabled
+
 try:
     from openpyxl import load_workbook
 except ImportError:  # pragma: no cover
@@ -412,6 +415,22 @@ def _deduplicate_ledger_rows(rows: list[dict]) -> tuple[list[dict], int]:
     return list(unique.values()), len(rows) - len(unique)
 
 
+def _config_qualified(model_config: dict) -> bool:
+    """Whether config marks the model as serving. ``enabled:`` wins; a legacy ``status:`` only counts when it named a qualified tier."""
+    if "enabled" in model_config:
+        return model_enabled(model_config)
+    return str(model_config.get("status") or "").casefold() in {"qualified", "shadow_qualified", "production"}
+
+
+def _config_status_label(model_config: dict) -> str | None:
+    """Display string for the config entry: the raw legacy status if present, else enabled/disabled."""
+    if model_config.get("status") is not None:
+        return model_config.get("status")
+    if "enabled" in model_config:
+        return "enabled" if model_enabled(model_config) else "disabled"
+    return None
+
+
 def _model_owns_row(sport: str, model_config: dict, row: dict) -> bool:
     version = str(row.get("model_version") or "").casefold()
     league = str(row.get("league") or "").casefold()
@@ -428,7 +447,7 @@ def _feature_attribution(rows: list[dict], feature_names: list[str]) -> dict:
             "status": "no_exact_version_rows",
             "rows_with_complete_values": 0,
             "rows_missing_values": 0,
-            "missing_by_feature": {name: 0 for name in feature_names},
+            "missing_by_feature": dict.fromkeys(feature_names, 0),
         }
     if not feature_names:
         return {
@@ -437,7 +456,7 @@ def _feature_attribution(rows: list[dict], feature_names: list[str]) -> dict:
             "rows_missing_values": len(rows),
             "missing_by_feature": {},
         }
-    missing_by_feature = {name: 0 for name in feature_names}
+    missing_by_feature = dict.fromkeys(feature_names, 0)
     complete = 0
     for row in rows:
         feature_values = row.get("feature_values")
@@ -480,7 +499,7 @@ def _pnl_evidence(rows: list[dict]) -> dict:
                 "status": "not_available_no_execution_attribution_in_ledgers",
             },
         }
-    shadow = [row for row in rows if row.get("record_type") == "QUALIFIED_SHADOW_CALL"]
+    shadow = [row for row in rows if is_qualified_row(row)]
     shadow_staked = sum(_number(row.get("units")) for row in shadow)
     shadow_pnl = sum(_number(row.get("pnl_units")) for row in shadow)
     hypothetical = [row for row in rows if _number(row.get("research_score_units")) > 0]
@@ -1052,11 +1071,7 @@ def production_evidence() -> dict:
                     }
                 )
 
-        config_qualified = str(model_config.get("status") or "").casefold() in {
-            "qualified",
-            "shadow_qualified",
-            "production",
-        }
+        config_qualified = _config_qualified(model_config)
         artifact_qualified = (
             (raw.get("qualification") or {}).get("qualified")
             if raw.get("method") == "logistic_regression"
@@ -1072,7 +1087,7 @@ def production_evidence() -> dict:
                 {
                     "code": "config_artifact_qualification_mismatch",
                     "scope": "qualification",
-                    "config_status": model_config.get("status"),
+                    "config_status": _config_status_label(model_config),
                     "artifact_qualified": artifact_qualified,
                 }
             )
@@ -1130,7 +1145,7 @@ def production_evidence() -> dict:
         return {
             "sport": str(sport).lower(),
             "model_version": version or None,
-            "status": model_config.get("status"),
+            "status": _config_status_label(model_config),
             "features": spec.get("features") or [],
             "feature_registry": registry_features,
             "backfill": locked,
@@ -1139,7 +1154,7 @@ def production_evidence() -> dict:
             "research_ledger": research_ledger,
             "profitability": profitability,
             "warnings": warnings,
-            "configured_status": model_config.get("status"),
+            "configured_status": _config_status_label(model_config),
             "active_model_version": version or None,
             "production_artifact": str(model_config["production_artifact"]),
             "artifact": artifact,

@@ -8,10 +8,29 @@ def test_nfl_total_imports():
 
 
 def test_select_nfl_total_market_ignores_quarter_and_team_totals():
+    observed = "2026-10-04T12:00:00Z"
     candidates = [
-        {"market_slug": "tsc-nfl-mia-min-2026-10-04-4q-11pt5", "line": 11.5, "long": {"ask": 0.50}},
-        {"market_slug": "tsc-nfl-mia-min-2026-10-04-tt-min-33pt5", "line": 33.5, "long": {"ask": 0.50}},
-        {"market_slug": "tsc-nfl-mia-min-2026-10-04-total-50pt5", "line": 50.5, "long": {"ask": 0.52}},
+        {
+            "market_slug": "tsc-nfl-mia-min-2026-10-04-4q-11pt5",
+            "line": 11.5,
+            "long": {"ask": 0.50},
+            "short": {"ask": 0.50},
+            "observed_at_utc": observed,
+        },
+        {
+            "market_slug": "tsc-nfl-mia-min-2026-10-04-tt-min-33pt5",
+            "line": 33.5,
+            "long": {"ask": 0.50},
+            "short": {"ask": 0.50},
+            "observed_at_utc": observed,
+        },
+        {
+            "market_slug": "tsc-nfl-mia-min-2026-10-04-total-50pt5",
+            "line": 50.5,
+            "long": {"ask": 0.52},
+            "short": {"ask": 0.48},
+            "observed_at_utc": observed,
+        },
     ]
     selected = _select_nfl_total_market(candidates)
     assert selected is not None

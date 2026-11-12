@@ -8,10 +8,9 @@ from model_prediction.domain import (
     League,
     MarketType,
     ModelOrigin,
-    ModelState,
     PickRequest,
     PickResult,
-    RecordType,
+    is_research_row,
 )
 from model_prediction.eligibility import evaluate_eligibility
 from model_prediction.ledger import FIELDNAMES, LEGACY_FIELDNAMES, PickLedger, _settlement_pnl
@@ -21,9 +20,7 @@ from model_prediction.xlsx_ledger import read_xlsx_rows
 NOW = datetime(2026, 7, 13, 12, tzinfo=UTC)
 
 
-def request(
-    event_id: str, probability: float = 0.6235, state: ModelState = ModelState.SHADOW_QUALIFIED
-) -> PickRequest:
+def request(event_id: str, probability: float = 0.6235, enabled: bool = True) -> PickRequest:
     return PickRequest(
         event_start_utc="2026-07-14T00:00:00Z",
         event_id=event_id,
@@ -41,7 +38,7 @@ def request(
         rationale="fixture",
         risks="",
         model_origin=ModelOrigin.STATISTICAL_MODEL,
-        model_state=state,
+        model_enabled=enabled,
         observed_at_utc="2026-07-13T11:00:00Z",
         calibration_version="cal-v1",
         model_artifact_hash="model-hash",
@@ -58,10 +55,10 @@ def test_research_is_zero_unit_excluded_from_exposure_roi_but_in_calibration(
     # tier no longer gates qualified calls, so RESEARCH now produces a real
     # QUALIFIED_SHADOW_CALL too. SUSPENDED remains a hard stop, so it's what
     # this test uses to reliably exercise a genuine RESEARCH_OBSERVATION row.
-    research_request = request("research", state=ModelState.SUSPENDED)
+    research_request = request("research", enabled=False)
     research_gate = evaluate_eligibility(research_request, registry, ban_list, Exposure(), UnitPolicy(), NOW)
     research_row = ledger.append_evaluated(research_request, research_gate, NOW)
-    assert research_row["record_type"] == RecordType.RESEARCH_OBSERVATION.value
+    assert is_research_row(research_row)
     # Every logged pick carries a real paper size now (operator directive,
     # 2026-07-31) -- what stays excluded is exposure/ROI accounting below,
     # which filters on record_type, not on units being zero.
@@ -93,9 +90,7 @@ def test_research_can_auto_score_one_hypothetical_unit_on_settlement(registry, b
         research_score_units=1.0,
         research_scoring_note="one-unit hypothetical policy",
     )
-    req = request(
-        "research-one-unit", state=ModelState.SUSPENDED
-    )  # see the note above on why SUSPENDED, not RESEARCH
+    req = request("research-one-unit", enabled=False)  # see the note above on why SUSPENDED, not RESEARCH
     gate = evaluate_eligibility(req, registry, ban_list, Exposure(), UnitPolicy(), NOW)
     row = ledger.append_evaluated(req, gate, NOW)
 
@@ -118,7 +113,7 @@ def test_research_can_keep_model_recommended_units_on_settlement(registry, ban_l
         research_scoring_mode="model_recommended",
         research_scoring_note="decision-time model size",
     )
-    req = request("research-model-size", probability=0.672, state=ModelState.SUSPENDED)
+    req = request("research-model-size", probability=0.672, enabled=False)
     gate = evaluate_eligibility(req, registry, ban_list, Exposure(), UnitPolicy(), NOW)
     row = ledger.append_evaluated(req, gate, NOW)
 
@@ -138,7 +133,7 @@ def test_research_model_recommended_skips_scoring_without_uncertainty(registry, 
         research_scoring_mode="model_recommended",
         research_scoring_note="decision-time model size",
     )
-    req = request("research-missing-uncertainty", probability=0.672, state=ModelState.SUSPENDED)
+    req = request("research-missing-uncertainty", probability=0.672, enabled=False)
     req = PickRequest(**{**req.__dict__, "model_uncertainty": None})
     gate = evaluate_eligibility(req, registry, ban_list, Exposure(), UnitPolicy(), NOW)
     row = ledger.append_evaluated(req, gate, NOW)
@@ -207,7 +202,7 @@ def test_older_excel_schema_migrates_with_backup_and_preserved_units(tmp_path) -
     ledger = PickLedger(path, tmp_path / "events.jsonl")
     row = ledger.rows()[0]
     assert path.with_suffix(".xlsx.bak-v1").exists()
-    assert row["record_type"] == "RESEARCH_OBSERVATION"
+    assert is_research_row(row)
     assert row["units"] == "0.00" and row["legacy_units"] == "0.25"
     headers, _ = read_xlsx_rows(path)
     assert headers == FIELDNAMES
@@ -327,7 +322,7 @@ def test_report_odds_range_includes_brier_flat_pnl_and_clv(tmp_path) -> None:
 
 def test_research_scoring_is_separate_from_qualified_units(tmp_path) -> None:
     ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
-    research = request("research-score", state=ModelState.RESEARCH)
+    research = request("research-score", enabled=True)
     row = ledger.append_call(research, 1.0, 60, call_type="forced_call", now=NOW)
     ledger.settle(row["pick_id"], 2, 3)
     scored = ledger.score_research([row["pick_id"]], 1.0)[0]

@@ -427,44 +427,6 @@ def starter_kbb_gap_live(
     return round(home["kbb_pct"] - away["kbb_pct"], 6)
 
 
-def starter_k_pct_gap_live(
-    home_starter_name: str,
-    away_starter_name: str,
-    decision: datetime,
-    *,
-    snapshot_path: str | Path = DEFAULT_SNAPSHOT_PATH,
-) -> float:
-    """home_starter's rolling K% minus away_starter's (home_k_pct - away_k_pct)."""
-    home = starter_rolling_rates(home_starter_name, decision, snapshot_path=snapshot_path)
-    away = starter_rolling_rates(away_starter_name, decision, snapshot_path=snapshot_path)
-    if home["status"] != "available" or away["status"] != "available":
-        raise ValueError(
-            "NO_CALL_STARTER_K_PCT_GAP_INSUFFICIENT_HISTORY: "
-            f"home={home_starter_name!r} status={home['status']}, "
-            f"away={away_starter_name!r} status={away['status']}"
-        )
-    return round(home["k_pct"] - away["k_pct"], 6)
-
-
-def starter_bb_pct_gap_live(
-    home_starter_name: str,
-    away_starter_name: str,
-    decision: datetime,
-    *,
-    snapshot_path: str | Path = DEFAULT_SNAPSHOT_PATH,
-) -> float:
-    """home_starter's rolling BB% minus away_starter's (home_bb_pct - away_bb_pct)."""
-    home = starter_rolling_rates(home_starter_name, decision, snapshot_path=snapshot_path)
-    away = starter_rolling_rates(away_starter_name, decision, snapshot_path=snapshot_path)
-    if home["status"] != "available" or away["status"] != "available":
-        raise ValueError(
-            "NO_CALL_STARTER_BB_PCT_GAP_INSUFFICIENT_HISTORY: "
-            f"home={home_starter_name!r} status={home['status']}, "
-            f"away={away_starter_name!r} status={away['status']}"
-        )
-    return round(home["bb_pct"] - away["bb_pct"], 6)
-
-
 def starter_sos_adjusted_era(
     starter_name: str,
     decision: datetime,

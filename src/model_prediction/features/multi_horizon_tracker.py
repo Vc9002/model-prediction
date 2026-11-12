@@ -115,11 +115,10 @@ class MultiHorizonTracker:
         """Classify minutes until game into canonical horizon bin."""
         if minutes_to_start >= 300:
             return "T-6h"
-        elif minutes_to_start >= 150:
+        if minutes_to_start >= 150:
             return "T-3h"
-        elif minutes_to_start >= 45:
+        if minutes_to_start >= 45:
             return "T-1h"
-        elif minutes_to_start >= 20:
+        if minutes_to_start >= 20:
             return "T-30m"
-        else:
-            return "T-10m"
+        return "T-10m"

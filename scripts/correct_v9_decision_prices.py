@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from model_prediction.daily_lock import acquire_lock
 from model_prediction.data_sources.mlb_market_odds import MarketOddsSnapshotStore
+from model_prediction.domain import legacy_record_type
 from model_prediction.ledger import PickLedger
 from model_prediction.model_ledger import ModelLedger
 from model_prediction.runtime_paths import RuntimePaths
@@ -115,7 +116,7 @@ def _correct_primary_row(row: dict[str, str], evidence: dict[str, Any]) -> dict[
             "market_snapshot_hash": str(snapshot["snapshot_hash"]),
             "market_snapshot_archive_path": str(snapshot["snapshot_archive_path"]),
             "market_snapshot_record_id": str(snapshot["snapshot_record_id"]),
-            "record_type": "QUALIFIED_SHADOW_CALL",
+            "record_type": legacy_record_type(True),
             "decision": "CALL",
             "reason_code": "FLAT_BENCHMARK_TRACK",
             "units": "1.00",

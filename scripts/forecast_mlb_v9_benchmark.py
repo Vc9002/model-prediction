@@ -35,9 +35,7 @@ from model_prediction.domain import (
     League,
     MarketType,
     ModelOrigin,
-    ModelState,
     PickRequest,
-    RecordType,
     eastern_today,
     parse_utc,
 )
@@ -249,7 +247,7 @@ def run_v9_flat_forecast(date_str: str | None = None) -> list[dict]:
             rationale="MLB v9 Flat Benchmark Candidate Forecast",
             risks="Model candidate under prospective shadow evaluation",
             model_origin=ModelOrigin.STATISTICAL_MODEL,
-            model_state=ModelState.RESEARCH,
+            model_enabled=True,
             observed_at_utc=observed_at_str,
             market_quote_observed_at_utc=decision_evidence["observed_at_utc"],
             market_quote_timestamp_valid=True,
@@ -268,7 +266,7 @@ def run_v9_flat_forecast(date_str: str | None = None) -> list[dict]:
         home_canonical = registry.resolve(League.MLB, home_team, start_str)
 
         elig = EligibilityResult(
-            record_type=RecordType.QUALIFIED_SHADOW_CALL,
+            qualified=True,
             decision="CALL",
             reason_code="FLAT_BENCHMARK_TRACK",
             units=1.0,

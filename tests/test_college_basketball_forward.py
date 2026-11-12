@@ -118,21 +118,32 @@ def test_ncaab_records_real_model_output_and_rerun_deduplicates(tmp_path, monkey
     worse = forecast_ncaab_sport(
         **{**args, "flat_ledger": MultiSportPickLedger(tmp_path / "worse", flat=True), "main_ledger": None}
     )
-    assert worse["flat_logged"] == 0
+    assert worse["flat_logged"] == 1
+    assert float(MultiSportPickLedger(tmp_path / "worse", flat=True).rows()[0]["edge"]) < 0
     assert worse["candidate_quote_coverage"]["serving_decisions"] == 1
     archive.unlink()
     missing = forecast_ncaab_sport(
-        **{**args, "flat_ledger": MultiSportPickLedger(tmp_path / "missing", flat=True), "main_ledger": None}
+        **{
+            **args,
+            "flat_ledger": MultiSportPickLedger(tmp_path / "missing", flat=True),
+            "main_ledger": MultiSportPickLedger(tmp_path / "missing_main"),
+        }
     )
-    assert missing["flat_logged"] == 0
-    assert any(s["reason"] == "executable_quote_unavailable" for s in missing["skipped"])
+    assert missing["flat_logged"] == 1
+    assert missing["main_logged"] == 0
+    missing_row = MultiSportPickLedger(tmp_path / "missing", flat=True).rows()[0]
+    assert missing_row["market_quote_provenance"] == "indicative_slate"
+    assert missing_row["market_quote_timestamp_valid"] == "False"
     stale_quote = {**worse_quote, "observed_at_utc": (now - timedelta(hours=1)).isoformat()}
     archive.write_text(json.dumps(stale_quote) + "\n", encoding="utf-8")
     stale = forecast_ncaab_sport(
         **{**args, "flat_ledger": MultiSportPickLedger(tmp_path / "stale", flat=True), "main_ledger": None}
     )
-    assert stale["flat_logged"] == 0
-    assert any(s["reason"] == "stale_executable_quote" for s in stale["skipped"])
+    assert stale["flat_logged"] == 1
+    assert (
+        MultiSportPickLedger(tmp_path / "stale", flat=True).rows()[0]["market_quote_provenance"]
+        == "indicative_slate"
+    )
 
 
 def test_no_games_does_not_construct_market_quotes(tmp_path, monkeypatch):
@@ -432,5 +443,5 @@ def test_ncaab_gates_total_divergence(tmp_path, monkeypatch):
         },
         flat_ledger=flat,
     )
-    # Divergence is 165.5 - 145.0 = 20.5 > 8.5, so pick is gated
-    assert report["flat_logged"] == 0
+    # Divergence gates qualified calls, but Flat retains the priced prediction.
+    assert report["flat_logged"] == 0  # This fixture has no archived executable quote.

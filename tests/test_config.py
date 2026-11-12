@@ -2,6 +2,7 @@ import pytest
 import yaml
 
 from model_prediction.config import PROJECT_ROOT, load_config
+from model_prediction.lifecycle import model_enabled
 from model_prediction.models.learned_market import LearnedMarketArtifact
 
 
@@ -58,7 +59,7 @@ def test_validate_config_accepts_the_real_project_config() -> None:
 def test_validate_config_rejects_a_typo_in_model_status() -> None:
     """Real bug class this guards against: a typo like status: reserach
     used to surface as a cryptic ValueError('reserach' is not a valid
-    ModelState) deep inside a forecast call, or get silently swallowed by a
+    status parse) deep inside a forecast call, or get silently swallowed by a
     broad except (ValueError, KeyError): continue -- see the four cli.py
     forecast loops fixed 2026-08-02. Now caught at config-load time with a
     clear message naming the exact bad field."""
@@ -165,10 +166,10 @@ def test_configured_production_artifact_state_matches_locked_audit() -> None:
         "WNBA": ("shadow_qualified", True),
         "NFL": ("shadow_qualified", True),  # v4 (ET cohorts) qualifies: 71.3% on 87 locked calls
     }
-    for sport, (status, qualified) in expected.items():
+    for sport, (_legacy_status, qualified) in expected.items():
         model = config["models"][sport]
         artifact = LearnedMarketArtifact.load(PROJECT_ROOT / model["production_artifact"])
-        assert model["status"] == status
+        assert model_enabled(model)
         assert artifact.qualified is qualified
 
 

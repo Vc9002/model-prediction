@@ -204,25 +204,6 @@ def load_frozen_mlb_v2_anchor(registry_path: str | Path | None = None) -> Frozen
     return parse_frozen_mlb_v2_anchor(raw)
 
 
-def current_code_revision(repo_root: str | Path | None = None) -> str:
-    """Return the exact checked-out revision or fail closed outside Git."""
-    root = Path(repo_root).resolve() if repo_root is not None else default_repo_root()
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=root,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except (OSError, subprocess.CalledProcessError) as exc:
-        raise ValueError("cannot verify frozen MLB v2 code revision") from exc
-    revision = result.stdout.strip()
-    if len(revision) != 40:
-        raise ValueError("invalid frozen MLB v2 code revision")
-    return revision
-
-
 @dataclass(frozen=True)
 class FrozenCalibratorBundle:
     calibrator: Calibrator

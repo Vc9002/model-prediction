@@ -11,7 +11,9 @@ def test_paper_mode_cannot_be_overridden_into_live_execution(tmp_path, monkeypat
     monkeypatch.setattr(auto_executor, "PAPER_AUTO_BUYER_DATA_ROOT", tmp_path / "paper")
     monkeypatch.setattr(auto_executor, "load_auto_buyer_state", lambda: {"mode": mode, "enabled": enabled})
     monkeypatch.setattr(auto_executor, "save_auto_buyer_state", lambda state: None)
-    monkeypatch.setattr(auto_executor, "_append_auto_buyer_cycle_history", lambda summary: None)
+    monkeypatch.setattr(
+        auto_executor, "_append_auto_buyer_cycle_history", lambda summary, history_path=None: None
+    )
     reconciled = []
     settled = []
     monkeypatch.setattr(

@@ -28,10 +28,9 @@ from model_prediction.domain import (
     League,
     MarketType,
     ModelOrigin,
-    ModelState,
     PickRequest,
 )
-from model_prediction.eligibility import EligibilityResult, RecordType
+from model_prediction.eligibility import EligibilityResult
 from model_prediction.entities import CanonicalTeam
 from model_prediction.forward import MLBForwardCandidate
 from model_prediction.learned_forward import LearnedForwardCandidate
@@ -1352,7 +1351,7 @@ def test_tennis_settlement_populates_clv_from_captured_closing_snapshot(tmp_path
         rationale="Surface-blended Elo; executable ask 0.4500 (market_slug=wta-alpha-beta-2026).",
         risks="",
         model_origin=ModelOrigin.STATISTICAL_MODEL,
-        model_state=ModelState.SHADOW_QUALIFIED,
+        model_enabled=True,
     )
     away_player = CanonicalTeam(
         "Alpha Player", League.TENNIS, "Alpha Player", "Alpha Player", True, None, None, ()
@@ -1361,7 +1360,7 @@ def test_tennis_settlement_populates_clv_from_captured_closing_snapshot(tmp_path
         "Beta Player", League.TENNIS, "Beta Player", "Beta Player", True, None, None, ()
     )
     eligibility = EligibilityResult(
-        RecordType.QUALIFIED_SHADOW_CALL,
+        True,
         "CALL",
         "QUALIFIED",
         0.5,
@@ -1443,7 +1442,7 @@ def test_invalid_quote_timestamp_keeps_mlb_model_opinion_off_main(
         cli_forecast,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
-            RecordType.QUALIFIED_SHADOW_CALL,
+            True,
             "CALL",
             "QUALIFIED",
             1.0,
@@ -1483,7 +1482,7 @@ def test_invalid_quote_timestamp_keeps_mlb_model_opinion_off_main(
 
     assert result["logged"] == 1
     assert len(ledger.appended) == 1
-    assert ledger.appended[0][1].record_type is RecordType.RESEARCH_OBSERVATION
+    assert not ledger.appended[0][1].qualified
     assert any("timestamp is invalid" in row["reason"] for row in result["unmatched_quotes"])
 
 
@@ -1548,7 +1547,7 @@ def test_below_min_edge_vs_market_still_gets_logged_not_skipped(monkeypatch, tmp
         cli_forecast,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
-            RecordType.QUALIFIED_SHADOW_CALL,
+            True,
             "CALL",
             "QUALIFIED",
             1.0,
@@ -1662,7 +1661,7 @@ def test_learned_sport_gated_ledger_duplicate_is_tracked_not_silently_dropped(mo
         cli_forecast,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
-            RecordType.QUALIFIED_SHADOW_CALL,
+            True,
             "CALL",
             "QUALIFIED",
             1.0,
@@ -1758,7 +1757,7 @@ def test_below_learned_confidence_threshold_downgraded_and_kept_off_main(monkeyp
         cli_forecast,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
-            RecordType.QUALIFIED_SHADOW_CALL,
+            True,
             "CALL",
             "QUALIFIED",
             1.0,
@@ -1799,7 +1798,7 @@ def test_below_learned_confidence_threshold_downgraded_and_kept_off_main(monkeyp
     assert result["logged"] == 1
     assert len(ledger.appended) == 1
     assert ledger.appended[0][1].decision == "CALL"
-    assert ledger.appended[0][1].record_type is RecordType.RESEARCH_OBSERVATION
+    assert not ledger.appended[0][1].qualified
 
     # Flat is explicitly the every-game paper benchmark. The row retains a
     # positive paper size even when its artifact is not production validated.
@@ -1817,7 +1816,7 @@ def test_below_learned_confidence_threshold_downgraded_and_kept_off_main(monkeyp
 
     assert flat_result["logged"] == 1
     flat_eligibility = flat_ledger.appended[0][1]
-    assert flat_eligibility.record_type is RecordType.RESEARCH_OBSERVATION
+    assert not flat_eligibility.qualified
     assert flat_eligibility.decision == "CALL"
     assert flat_eligibility.reason_code == "PAPER_CALL_MODEL_UNVALIDATED"
     assert flat_eligibility.units == pytest.approx(1.0)
@@ -1909,7 +1908,7 @@ def test_market_residual_probability_recorded_when_artifact_configured(monkeypat
         cli_forecast,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
-            RecordType.QUALIFIED_SHADOW_CALL,
+            True,
             "CALL",
             "QUALIFIED",
             1.0,
@@ -2004,7 +2003,7 @@ def test_market_residual_probability_none_without_configured_artifact(monkeypatc
         cli_forecast,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
-            RecordType.QUALIFIED_SHADOW_CALL,
+            True,
             "CALL",
             "QUALIFIED",
             1.0,
@@ -2086,7 +2085,7 @@ def test_forecast_learned_sport_hard_edge_gate(monkeypatch, tmp_path) -> None:
         cli_forecast,
         "evaluate_eligibility",
         lambda request, registry, bans, exposure, policy, **kwargs: EligibilityResult(
-            RecordType.QUALIFIED_SHADOW_CALL,
+            True,
             "CALL",
             "QUALIFIED",
             1.0,
@@ -2277,7 +2276,7 @@ def test_international_forecast_logs_low_edge_to_research_but_not_gated(monkeypa
 
     assert result["logged"] == 1
     assert len(research.appended) == 1
-    assert research.appended[0][1].record_type is RecordType.RESEARCH_OBSERVATION
+    assert not research.appended[0][1].qualified
     assert research.appended[0][1].reason_code == "PAPER_CALL_LOW_EDGE"
     assert len(gated.appended) == 1
 
@@ -2427,7 +2426,14 @@ def test_international_forecast_gated_blocked_when_team_lacks_real_history(monke
     assert len(gated.appended) == 1
 
 
-def _log_pick(ledger: PickLedger, *, event_start_utc: str, created_at, units: float = 1.0) -> dict:
+def _log_pick(
+    ledger: PickLedger,
+    *,
+    event_start_utc: str,
+    created_at,
+    units: float = 1.0,
+    model_version: str = "v1",
+) -> dict:
     request = PickRequest(
         event_start_utc=event_start_utc,
         event_id="event-1",
@@ -2441,15 +2447,13 @@ def _log_pick(ledger: PickLedger, *, event_start_utc: str, created_at, units: fl
         american_odds=-110,
         model_probability=0.6,
         model_uncertainty=0.05,
-        model_version="v1",
+        model_version=model_version,
         rationale="test",
         risks="",
         model_origin=ModelOrigin.STATISTICAL_MODEL,
-        model_state=ModelState.SHADOW_QUALIFIED,
+        model_enabled=True,
     )
-    eligibility = EligibilityResult(
-        RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", units, 60, 0.05, 0.05, AWAY, HOME
-    )
+    eligibility = EligibilityResult(True, "CALL", "QUALIFIED", units, 60, 0.05, 0.05, AWAY, HOME)
     return ledger.append_evaluated(request, eligibility, now=created_at)
 
 
@@ -2517,6 +2521,32 @@ def test_clear_today_open_removes_a_not_yet_started_pick_by_creation_date(tmp_pa
     removed = _clear_today_open(ledger, "2026-07-25")
     assert removed == [row["pick_id"]]
     assert ledger.rows() == []
+
+
+def test_refresh_restores_a_pick_when_no_replacement_was_logged(tmp_path) -> None:
+    ledger = _ledger(tmp_path)
+    row = _log_pick(
+        ledger,
+        event_start_utc="2099-01-01T00:00:00Z",
+        created_at=datetime(2026, 7, 25, 10, tzinfo=UTC),
+    )
+    prior = ledger.rows()
+    assert _clear_today_open(ledger, "2026-07-25") == [row["pick_id"]]
+    assert ledger.restore_unreplaced_picks(prior) == [row["pick_id"]]
+    assert ledger.rows()[0]["status"] == "open"
+    assert ledger.restore_unreplaced_picks(prior) == []
+
+
+def test_refresh_keeps_prior_superseded_when_replacement_was_logged(tmp_path) -> None:
+    ledger = _ledger(tmp_path)
+    start = "2099-01-01T00:00:00Z"
+    created = datetime(2026, 7, 25, 10, tzinfo=UTC)
+    old = _log_pick(ledger, event_start_utc=start, created_at=created)
+    prior = ledger.rows()
+    assert _clear_today_open(ledger, "2026-07-25") == [old["pick_id"]]
+    new = _log_pick(ledger, event_start_utc=start, created_at=created, model_version="v2")
+    assert ledger.restore_unreplaced_picks(prior) == []
+    assert [row["pick_id"] for row in ledger.rows()] == [new["pick_id"]]
 
 
 def test_clear_today_open_by_event_date_matches_on_event_start_not_creation(tmp_path) -> None:
@@ -2675,18 +2705,21 @@ def test_select_nfl_total_market_ignores_partial_and_team_totals() -> None:
             "long": {"ask": 0.50},
             "short": {"ask": 0.50},
             "market_slug": "nfl-total-phi-dal-1h-23pt5",
+            "observed_at_utc": "2026-09-13T12:00:00Z",
         },
         {
             "line": 24.5,
             "long": {"ask": 0.50},
             "short": {"ask": 0.50},
             "market_slug": "nfl-total-phi-dal-tt-24pt5",
+            "observed_at_utc": "2026-09-13T12:00:00Z",
         },
         {
             "line": 47.5,
             "long": {"ask": 0.53},
             "short": {"ask": 0.47},
             "market_slug": "nfl-total-phi-dal-47pt5",
+            "observed_at_utc": "2026-09-13T12:00:00Z",
         },
     ]
     picked = cli._select_nfl_total_market(rows)
@@ -2904,7 +2937,7 @@ def test_unqualified_wnba_spread_reaches_main_as_research_only_call(monkeypatch,
     assert len(flat_ledger.appended) == 1
     _request, eligibility = flat_ledger.appended[0]
     assert eligibility.decision == "CALL"
-    assert eligibility.record_type is RecordType.RESEARCH_OBSERVATION
+    assert not eligibility.qualified
     assert len(main_ledger.appended) == 1
 
 
@@ -3191,7 +3224,7 @@ def test_nrfi_unregistered_model_is_research_only_paper_call_in_both_ledgers(
     assert result["logged"] == 1
     assert len(flat.appended) == 1
     assert flat.appended[0][1].decision == "CALL"
-    assert flat.appended[0][1].record_type is RecordType.RESEARCH_OBSERVATION
+    assert not flat.appended[0][1].qualified
     assert flat.appended[0][1].reason_code == "PAPER_CALL_MODEL_UNVALIDATED"
     assert len(main.appended) == 1
     assert main.appended[0][1].decision == "CALL"
@@ -3214,8 +3247,6 @@ def test_research_models_dir_prefers_rolling_over_frozen(monkeypatch, tmp_path) 
 
 
 def test_qualified_wnba_spread_uses_valid_shadow_state(monkeypatch, registry, ban_list):
-    from model_prediction.domain import ModelState
-
     forecast = _wnba_spread_forecast(selection="home", line=10.5)
     forecast["priced_contracts"][0]["model_qualified"] = True
     monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 8, 13, 18, tzinfo=UTC))
@@ -3231,7 +3262,7 @@ def test_qualified_wnba_spread_uses_valid_shadow_state(monkeypatch, registry, ba
         main_ledger=None,
     )
     assert result["logged"] == 1
-    assert flat.appended[0][0].model_state is ModelState.SHADOW_QUALIFIED
+    assert flat.appended[0][0].model_enabled is True
 
 
 def _nfl_spread_forecast(*, selection: str, line: float) -> dict:
@@ -3365,19 +3396,26 @@ def test_quotes_known_at_drops_rows_observed_after_the_run() -> None:
 
 
 def test_select_nfl_total_market_picks_the_most_balanced_line() -> None:
+    def _row(line: float, long_ask: float, slug: str) -> dict:
+        return {
+            "line": line,
+            "long": {"ask": long_ask},
+            "short": {"ask": round(1.0 - long_ask, 2)},
+            "market_slug": slug,
+            "observed_at_utc": "2026-09-13T12:00:00Z",
+        }
+
     best = cli_forecast._select_nfl_total_market(
         [
-            {"line": 41.5, "long": {"ask": 0.85}},
-            {"line": 48.5, "long": {"ask": 0.49}},
-            {"line": 54.5, "long": {"ask": 0.18}},
+            _row(41.5, 0.85, "nfl-total-a-41pt5"),
+            _row(48.5, 0.49, "nfl-total-a-48pt5"),
+            _row(54.5, 0.18, "nfl-total-a-54pt5"),
         ]
     )
-    assert best == {"line": 48.5, "long": {"ask": 0.49}}
+    assert best is not None and best["line"] == 48.5
 
 
 def test_nfl_spread_flat_ledger_logs_contract(monkeypatch, registry, ban_list) -> None:
-    from model_prediction.domain import ModelState
-
     forecast = _nfl_spread_forecast(selection="away", line=-3.5)
     monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 9, 13, 14, tzinfo=UTC))
     monkeypatch.setattr(cli_forecast, "_forecast_nfl_spread_slate", lambda *a, **k: forecast)
@@ -3392,13 +3430,11 @@ def test_nfl_spread_flat_ledger_logs_contract(monkeypatch, registry, ban_list) -
         main_ledger=None,
     )
     assert result["logged"] == 1
-    assert flat.appended[0][0].model_state is ModelState.SHADOW_QUALIFIED
+    assert flat.appended[0][0].model_enabled is True
     assert flat.appended[0][0].model_version == "nfl-spread-structural-v5"
 
 
 def test_nfl_total_flat_ledger_logs_contract(monkeypatch, registry, ban_list) -> None:
-    from model_prediction.domain import ModelState
-
     forecast = _nfl_total_forecast(selection="over", line=48.5)
     monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 9, 13, 14, tzinfo=UTC))
     monkeypatch.setattr(cli_forecast, "_forecast_nfl_total_slate", lambda *a, **k: forecast)
@@ -3413,7 +3449,7 @@ def test_nfl_total_flat_ledger_logs_contract(monkeypatch, registry, ban_list) ->
         main_ledger=None,
     )
     assert result["logged"] == 1
-    assert flat.appended[0][0].model_state is ModelState.SHADOW_QUALIFIED
+    assert flat.appended[0][0].model_enabled is True
     assert flat.appended[0][0].model_version == "nfl-total-structural-v5"
 
 

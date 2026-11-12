@@ -681,16 +681,6 @@ class DixonColesEngine:
 
         return float(lambda_h), float(lambda_a)
 
-    def predict_score_grid(
-        self,
-        home_team: str,
-        away_team: str,
-        max_goals: int = MAX_GOALS,
-    ) -> BivariateScoreGrid:
-        """Generate full joint bivariate score grid for a matchup."""
-        lh, la = self.predict_expected_goals(home_team, away_team)
-        return build_score_grid(lh, la, rho=self.rho, max_goals=max_goals)
-
     def predict_match(
         self,
         home_team: str,

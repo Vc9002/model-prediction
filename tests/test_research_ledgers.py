@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import dashboard_server
-from model_prediction.domain import League, MarketType, ModelOrigin, ModelState, PickRequest
+from model_prediction.domain import League, MarketType, ModelOrigin, PickRequest
 from model_prediction.ledger import PickLedger
 from model_prediction.research_ledgers import (
     existing_research_ledgers,
@@ -31,7 +31,7 @@ def _request(event_id: str = "event-1") -> PickRequest:
         rationale="test",
         risks="test",
         model_origin=ModelOrigin.STATISTICAL_MODEL,
-        model_state=ModelState.SHADOW_QUALIFIED,
+        model_enabled=True,
         observed_at_utc=now.isoformat(),
         model_artifact_hash="artifact",
         calibration_method="neutral_elo",

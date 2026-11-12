@@ -51,7 +51,7 @@ def _load_production_config(*, repo_root: Path | str | None = None) -> dict[str,
     config_path = root / "config" / "production.yaml"
     if not config_path.is_file():
         raise FileNotFoundError(f"production config not found at {config_path}")
-    with open(config_path, "r", encoding="utf-8") as fh:
+    with open(config_path, encoding="utf-8") as fh:
         config: dict[str, Any] = yaml.safe_load(fh) or {}
     return config
 
@@ -965,62 +965,3 @@ def settled_champion_calibration(
         "wins": sum(outcomes),
         "losses": len(outcomes) - sum(outcomes),
     }
-
-
-def evaluate_challenger_on_settled_picks(
-    sport: str,
-    market: str,
-    challenger_predictions: Sequence[dict[str, Any]],
-    *,
-    min_events: int = 50,
-    min_dates: int = 2,
-    required_p_better: float = 0.90,
-    repo_root: Path | str | None = None,
-    champion_model_version: str | None = None,
-) -> PromotionVerdict:
-    """Evaluate a challenger directly against champion's real settled picks.
-
-    Loads the champion's real settled win/loss picks from the model ledger
-    (no backfill data) and runs a paired comparison across identical events.
-    """
-    from .production_registry import ProductionModelRegistry
-
-    root = Path(repo_root) if repo_root is not None else _repo_root()
-    registry = ProductionModelRegistry.load(root)
-    champ = registry.champion(sport, market)
-    if champ is None:
-        raise ValueError(f"no active champion serving {sport} {market}")
-
-    model_ver = champion_model_version or champ.model_id
-    champ_picks = load_settled_predictions(sport, market, repo_root=root, model_version=model_ver)
-    if not champ_picks:
-        return PromotionVerdict(
-            status="needs_more_data",
-            paired_metrics={},
-            bootstrap_ci={},
-            failures=[f"no settled picks found for champion {model_ver}"],
-            recommendation=f"No settled picks recorded in ledger for champion {model_ver}.",
-        )
-
-    champ_ids = {str(r["event_id"]) for r in champ_picks}
-    chall_by_id = {str(r["event_id"]): r for r in challenger_predictions}
-    common_ids = sorted(champ_ids & set(chall_by_id))
-
-    if not common_ids:
-        return PromotionVerdict(
-            status="needs_more_data",
-            paired_metrics={},
-            bootstrap_ci={},
-            failures=["zero overlapping events between champion settled picks and challenger predictions"],
-            recommendation="Challenger has no predictions on events where champion has settled picks.",
-        )
-
-    champ_common = [r for r in champ_picks if str(r["event_id"]) in set(common_ids)]
-    chall_common = [chall_by_id[eid] for eid in common_ids]
-
-    comparison = PairedComparison(champ_common, chall_common)
-    return comparison.promotion_eligible(
-        min_events=min_events,
-        min_dates=min_dates,
-        required_p_better=required_p_better,
-    )

@@ -10,12 +10,14 @@ from unittest.mock import MagicMock
 import httpx
 import pytest
 
+from model_prediction.domain import parse_utc
 from model_prediction.models.college_football import build_cfb_slate
 from model_prediction.models.mlb_first_inning import (
     build_first_inning_ledger,
 )
 from model_prediction.models.mlb_first_inning_live import live_first_inning_features
 from model_prediction.portfolio.auto_buyer_ledger import (
+    _exchange_sell_trades,
     manually_settle_auto_buyer_order,
     read_auto_buyer_ledger,
     record_auto_buy_execution,
@@ -647,6 +649,147 @@ def test_manual_sell_trade_settles_pending_position(tmp_path: Path):
     assert settled["settlement_source"] == "manual_sell"
     assert result["newly_settled"] == 1
     assert result["pending"] == 0
+
+
+def test_resting_limit_sell_filled_passively_settles_pending_position(tmp_path: Path):
+    """A resting limit sell is filled as the PASSIVE side of the trade: the
+    aggressor order in the record is the counterparty's BUY. Shape copied from
+    the real 2026-11-10 Kent State +5.5 exit, which stayed pending because only
+    the aggressor order's side was read."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    slug = "asc-cfb-kentst-bowlgr-2026-11-10-pos-5pt5"
+    record_auto_buy_execution(
+        order_payload={
+            "order_id": "DMKC2JSG14EX",
+            "pick_id": "PICK_PASSIVE_SELL",
+            "market_slug": slug,
+            "selection": "away",
+            "token_side": "long",
+            "limit_price": 0.51,
+            "cost_usd": 18.1815,
+            "shares": 35.65,
+            "sport": "NCAAF",
+            "event_start_utc": (datetime.now(UTC) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:00Z"),
+        },
+        pick_row={
+            "away_team": "Kent State Golden Flashes",
+            "home_team": "Bowling Green Falcons",
+            "market_type": "spread",
+            "units": 2.0,
+        },
+        jsonl_path=j_path,
+        xlsx_path=tmp_path / "auto_buyer_picks.xlsx",
+    )
+
+    def trade(is_aggressor: bool, realized: dict | None) -> dict:
+        return {
+            "type": "ACTIVITY_TYPE_TRADE",
+            "trade": {
+                "marketSlug": slug,
+                "updateTime": "2026-11-10T10:39:18Z",
+                "qtyDecimal": "35.6500",
+                "isAggressor": is_aggressor,
+                "realizedPnl": realized,
+                "aggressorExecution": {"order": {"side": "ORDER_SIDE_BUY", "price": {"value": "0.61"}}},
+                "passiveExecution": {"order": {"side": "ORDER_SIDE_SELL", "price": {"value": "0.51"}}},
+            },
+        }
+
+    # Our own opening buy has the same two order sides (we were the aggressor
+    # BUY against someone's resting SELL); it must not be read as an exit.
+    assert _exchange_sell_trades({"activities": [trade(True, None)]}) == {}
+
+    executor = MagicMock()
+    executor.portfolio_snapshot.return_value = {
+        "activities": [trade(False, {"value": "-0.85", "currency": "USD"})]
+    }
+    result = settle_auto_buyer_ledger(data_root=tmp_path, espn=MagicMock(), polymarket_executor=executor)
+
+    settled = read_auto_buyer_ledger(j_path)[0]
+    assert settled["status"] == "settled"
+    assert settled["result"] == "loss"
+    assert settled["pnl_usd"] == -0.85
+    assert settled["settlement_source"] == "manual_sell"
+    assert result["newly_settled"] == 1
+
+
+def test_closing_a_short_position_in_two_fills_settles_only_when_fully_exited(tmp_path: Path):
+    """Closing a short is an ORDER_SIDE_BUY with intent SELL_SHORT, and opening one
+    is an ORDER_SIDE_SELL. Shapes copied from the real 2026-11-11 South Dakota
+    State exit (order DNAHTZXG13ZK), sold in two fills and left pending."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    slug = "asc-cbb-valp-sdkst-2026-11-11-neg-1pt5"
+    record_auto_buy_execution(
+        order_payload={
+            "order_id": "DNA3QEN013YY",
+            "pick_id": "PICK_SHORT_EXIT",
+            "market_slug": slug,
+            "selection": "home",
+            "token_side": "short",
+            "limit_price": 0.50,
+            "cost_usd": 16.16,
+            "shares": 32.32,
+            "sport": "NCAAB",
+            "event_start_utc": (datetime.now(UTC) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:00Z"),
+        },
+        pick_row={
+            "away_team": "Valparaiso Beacons",
+            "home_team": "South Dakota State Jackrabbits",
+            "market_type": "spread",
+            "units": 1.62,
+        },
+        jsonl_path=j_path,
+        xlsx_path=tmp_path / "auto_buyer_picks.xlsx",
+    )
+
+    def trade(side: str, intent: str, qty: str, realized: str | None, when: str, aggressor: bool) -> dict:
+        own = {"order": {"side": side, "intent": intent, "price": {"value": "0.50"}}}
+        other = {"order": {"side": "ORDER_SIDE_SELL" if side == "ORDER_SIDE_BUY" else "ORDER_SIDE_BUY"}}
+        return {
+            "type": "ACTIVITY_TYPE_TRADE",
+            "trade": {
+                "marketSlug": slug,
+                "updateTime": when,
+                "price": {"value": "0.5000"},
+                "qtyDecimal": qty,
+                "isAggressor": aggressor,
+                "realizedPnl": {"value": realized} if realized is not None else None,
+                "aggressorExecution": own if aggressor else other,
+                "passiveExecution": other if aggressor else own,
+            },
+        }
+
+    entry = trade("ORDER_SIDE_SELL", "ORDER_INTENT_BUY_SHORT", "32.3200", None, "2026-11-11T08:19:39Z", True)
+    first = trade(
+        "ORDER_SIDE_BUY", "ORDER_INTENT_SELL_SHORT", "13.3500", "-0.32", "2026-11-11T14:09:27Z", False
+    )
+    second = trade(
+        "ORDER_SIDE_BUY", "ORDER_INTENT_SELL_SHORT", "18.9700", "-0.45", "2026-11-11T16:44:41Z", False
+    )
+
+    assert _exchange_sell_trades({"activities": [entry]}) == {}
+    assert _exchange_sell_trades({"activities": [second, first, entry]})[slug] == {
+        "realized_pnl_usd": -0.77,
+        "sell_price": 0.5,
+        "shares_sold": 32.32,
+        "update_time": "2026-11-11T16:44:41Z",
+    }
+
+    executor = MagicMock()
+    executor.portfolio_snapshot.return_value = {"activities": [first, entry]}
+    settle_auto_buyer_ledger(data_root=tmp_path, espn=MagicMock(), polymarket_executor=executor)
+    partial = read_auto_buyer_ledger(j_path)[0]
+    assert partial["status"] != "settled"
+    assert partial["manual_exit_shares"] == 13.35
+
+    executor.portfolio_snapshot.return_value = {"activities": [second, first, entry]}
+    result = settle_auto_buyer_ledger(data_root=tmp_path, espn=MagicMock(), polymarket_executor=executor)
+    settled = read_auto_buyer_ledger(j_path)[0]
+    assert settled["status"] == "settled"
+    assert settled["result"] == "loss"
+    assert settled["pnl_usd"] == -0.77
+    assert settled["settlement_source"] == "manual_sell"
+    assert result["newly_settled"] == 1
 
 
 def test_auto_buyer_tennis_settlement_and_scheduled_reversion(tmp_path: Path):
@@ -1458,3 +1601,82 @@ def test_settlement_falsy_zero_shares_not_treated_as_default(tmp_path: Path):
     # With genuinely 0 shares, a "win" can only ever be worth $0 -- never the
     # $0.58 that `shares=1.0` (the falsy-zero default) would fabricate.
     assert record["pnl_usd"] == 0.0
+
+
+def _trade(slug, side, intent, qty, price, when, realized=None):
+    own = {"order": {"side": side, "intent": intent}}
+    other = {"order": {"side": "ORDER_SIDE_SELL"}}
+    return {
+        "type": "ACTIVITY_TYPE_TRADE",
+        "trade": {
+            "marketSlug": slug,
+            "updateTime": when,
+            "price": {"value": price},
+            "qtyDecimal": qty,
+            "isAggressor": True,
+            "realizedPnl": {"value": realized} if realized else None,
+            "aggressorExecution": own,
+            "passiveExecution": other,
+        },
+    }
+
+
+def test_netting_fill_closes_a_row_and_manual_position_is_imported(tmp_path: Path):
+    """Real 2026-11-11 Charleston-Temple shapes: short 25.02 at 51c, 7.88 sold, then
+    17.14 closed by BUYING the long token; then a hand-placed 19.1 on the other line."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    slug = "asc-cbb-char-templ-2026-11-11-pos-1pt5"
+    other = "asc-cbb-char-templ-2026-11-11-neg-1pt5"
+    record_auto_buy_execution(
+        order_payload={
+            "order_id": "DN-CHAR",
+            "pick_id": "P1",
+            "market_slug": slug,
+            "selection": "away",
+            "token_side": "short",
+            "limit_price": 0.51,
+            "cost_usd": 12.76,
+            "shares": 25.02,
+            "sport": "NCAAB",
+            "event_start_utc": (datetime.now(UTC) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:00Z"),
+        },
+        pick_row={"away_team": "Charleston", "home_team": "Temple", "market_type": "spread"},
+        jsonl_path=j_path,
+        xlsx_path=tmp_path / "auto_buyer_picks.xlsx",
+    )
+    row = read_auto_buyer_ledger(j_path)[0]
+    after = (parse_utc(row["executed_at_utc"]) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    later = (parse_utc(row["executed_at_utc"]) + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    sold = _trade(slug, "ORDER_SIDE_BUY", "ORDER_INTENT_SELL_SHORT", "7.8800", "0.5600", after, "-0.76")
+    netted = _trade(slug, "ORDER_SIDE_BUY", "ORDER_INTENT_BUY_LONG", "17.1400", "0.5600", after)
+    manual = _trade(other, "ORDER_SIDE_BUY", "ORDER_INTENT_BUY_LONG", "19.1000", "0.5000", later)
+    executor = MagicMock()
+    executor.portfolio_snapshot.return_value = {
+        "activities": [sold, netted, manual],
+        "positions": {
+            other: {
+                "netPosition": "19.1",
+                "cost": {"value": "9.55"},
+                "updateTime": later,
+                "marketMetadata": {
+                    "title": "CHAR Cougars vs. TEM Owls",
+                    "eventSlug": "cbb-char-templ-2026-11-11",
+                },
+            }
+        },
+    }
+    result = settle_auto_buyer_ledger(data_root=tmp_path, espn=MagicMock(), polymarket_executor=executor)
+    rows = {r["market_slug"]: r for r in read_auto_buyer_ledger(j_path)}
+    closed = rows[slug]
+    assert closed["status"] == "settled" and closed["settlement_source"] == "manual_sell"
+    # exchange-reported -0.76 plus derived (0.44 - 0.51) * 17.14
+    assert closed["pnl_usd"] == round(-0.76 - 0.07 * 17.14, 4)
+    assert closed["settlement_pnl_derived_shares"] == 17.14
+    imported = rows[other]
+    assert imported["manual"] is True and imported["status"] == "open"
+    assert imported["token_side"] == "long" and imported["shares"] == 19.1 and imported["entry_price"] == 0.5
+    assert result["newly_settled"] == 1
+
+    # A second pass must not duplicate the imported row.
+    settle_auto_buyer_ledger(data_root=tmp_path, espn=MagicMock(), polymarket_executor=executor)
+    assert len(read_auto_buyer_ledger(j_path)) == 2

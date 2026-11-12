@@ -788,10 +788,3 @@ def _trend_cohorts(predictions: Sequence[dict[str, Any]]) -> list[dict[str, Any]
             }
         )
     return cohorts
-
-
-def rolling_window(end_date: str, days: int = 90) -> tuple[str, str]:
-    from datetime import date
-
-    end = date.fromisoformat(end_date)
-    return (end - timedelta(days=days)).isoformat(), end_date

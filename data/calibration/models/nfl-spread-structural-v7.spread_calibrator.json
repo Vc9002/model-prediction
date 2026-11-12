@@ -1,0 +1,31 @@
+{
+  "baseline_brier": 0.24962139794669747,
+  "calibrated_at_utc": "2026-11-12T04:45:03.151955+00:00",
+  "calibrated_oof_brier": 0.24962139794669747,
+  "champion_method": "identity",
+  "cohort": "games.jsonl completed games with nflverse closing lines, 2021 -> today, point-in-time replay (scripts/replay_nfl_v7_all_settled.py)",
+  "locked_holdout": {
+    "calibrated": {
+      "brier_score": 0.2504430498342302,
+      "calibration_intercept": 0.03722331636511858,
+      "calibration_slope": 0.24041156327755336,
+      "expected_calibration_error": 0.0180377697594502,
+      "log_loss": 0.694062616987653
+    },
+    "n": 291,
+    "raw": {
+      "brier_score": 0.2504430498342302,
+      "calibration_intercept": 0.03722331636511858,
+      "calibration_slope": 0.24041156327755336,
+      "expected_calibration_error": 0.0180377697594502,
+      "log_loss": 0.694062616987653
+    },
+    "start": "2025-09-28T13:00:00+00:00"
+  },
+  "market": "spread",
+  "model_version": "nfl-spread-structural-v7",
+  "parameters": {},
+  "sample_size": 1451,
+  "selection": "expanding-window OOF tournament on the first 80% by kickoff; champion refit on all games",
+  "sport": "nfl"
+}

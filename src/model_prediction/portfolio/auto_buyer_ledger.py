@@ -22,7 +22,7 @@ import httpx
 
 from ..data_sources.espn import ESPNClient
 from ..data_sources.polymarket_execute import ExecutionGateError
-from ..domain import iso_utc, parse_utc, utc_now
+from ..domain import PickTag, iso_utc, parse_utc, pick_tag_for, utc_now
 from ..esports import TITLE_SPECS as _ESPORTS_TITLE_SPECS
 from ..esports import Bo3EsportsClient, _fuzzy_match_team, _load_manual_aliases, _team_alias_index
 from ..ledger import FIELDNAMES
@@ -167,6 +167,24 @@ def _is_settled_auto_buyer_record(record: dict[str, Any]) -> bool:
     )
 
 
+def is_manual_auto_buyer_record(record: dict[str, Any]) -> bool:
+    """True for a hand-placed exchange position imported by ``_manual_position_rows``.
+
+    Those rows carry no model edge (no ``edge`` key, no real line/units), so they must
+    never be scored as a buyer or model win/loss. The prefix and model_id checks catch a
+    row that is missing the boolean ``manual`` flag; this must NOT look at
+    ``settlement_source`` or ``manual_exit_shares`` -- an operator-exited MODEL row
+    (settlement_source "manual_sell") carries real model edge and is a separate class.
+    """
+    if record.get("manual") is True:
+        return True
+    if str(record.get("pick_id") or "").startswith("MANUAL-"):
+        return True
+    if str(record.get("order_id") or "").startswith("MANUAL-"):
+        return True
+    return str(record.get("model_id") or "").strip().lower() == "manual"
+
+
 def _uses_live_auto_buyer_ledger(path: Path) -> bool:
     """Return whether a writer targets the production Auto-Buyer ledger.
 
@@ -174,6 +192,11 @@ def _uses_live_auto_buyer_ledger(path: Path) -> bool:
     """
     live_j_path, _ = resolve_auto_buyer_paths()
     return path.resolve() == live_j_path.resolve()
+
+
+def _auto_buyer_pick_tag(path: Path) -> PickTag:
+    """Live ledger rows are ``qualified``; every other buyer ledger (paper, trials) is ``shadow``."""
+    return pick_tag_for(buyer_mode="live" if _uses_live_auto_buyer_ledger(path) else "paper")
 
 
 def resolve_auto_buyer_log_path() -> Path:
@@ -235,7 +258,7 @@ def _extract_line_from_record(r: dict[str, Any]) -> float | None:
         if last.isdigit():
             if parts[-2] == "neg":
                 return -float(last)
-            elif parts[-2] == "pos":
+            if parts[-2] == "pos":
                 return float(last)
             return float(last)
     return None
@@ -427,6 +450,7 @@ def record_auto_buy_execution(
         "calibration_method": pick.get("calibration_method"),
         "market_probability": round(market_p, 4),
         "edge": round(edge, 4),
+        "pick_tag": _auto_buyer_pick_tag(j_path).value,
         "order_state": order_state,
         "status": "open",
         "result": "open",
@@ -460,7 +484,7 @@ def record_auto_buy_execution(
         american = _probability_to_american(price)
         decimal_odds = american_to_decimal(american)
 
-        xlsx_row: dict[str, Any] = {f: "" for f in FIELDNAMES}
+        xlsx_row: dict[str, Any] = dict.fromkeys(FIELDNAMES, "")
         xlsx_row.update(
             {
                 "pick_id": pid or oid,
@@ -833,15 +857,20 @@ def read_auto_buyer_ledger(
     if not j_path.exists():
         return []
     records = []
+    tag = _auto_buyer_pick_tag(j_path).value
     with j_path.open(encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:
                 continue
             try:
-                records.append(json.loads(line))
+                record = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            # Rows written before tags existed get theirs from the ledger they live in.
+            if isinstance(record, dict):
+                record.setdefault("pick_tag", tag)
+            records.append(record)
     return records
 
 
@@ -890,7 +919,7 @@ def _exchange_position_resolutions(snapshot: dict[str, Any]) -> dict[str, dict[s
 
 
 def _exchange_sell_trades(snapshot: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Index exchange SELL trades by slug, keyed to the most recent one per market.
+    """Index exchange position-closing trades by slug, totalled across fills.
 
     A position closed by selling out of it (manually, before the market resolves)
     never produces an ACTIVITY_TYPE_POSITION_RESOLUTION -- it just stops existing
@@ -900,40 +929,281 @@ def _exchange_sell_trades(snapshot: dict[str, Any]) -> dict[str, dict[str, Any]]
     carries an authoritative ``realizedPnl`` for the sell, so that's used directly
     rather than re-deriving P&L from buy/sell prices ourselves.
     """
+
+    def amount(value: Any) -> float | None:
+        if isinstance(value, dict):
+            value = value.get("value")
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
     sells: dict[str, dict[str, Any]] = {}
+    notional: dict[str, float] = {}
     for activity in snapshot.get("activities", []):
         if activity.get("type") != "ACTIVITY_TYPE_TRADE":
             continue
         trade = activity.get("trade") or {}
-        aggressor_order = (trade.get("aggressorExecution") or {}).get("order") or {}
-        if str(aggressor_order.get("side") or "") != "ORDER_SIDE_SELL":
+        # A trade record carries both counterparties' orders; ``isAggressor`` says which
+        # one is ours. A resting limit sell is filled as the PASSIVE side, with someone
+        # else's BUY as the aggressor -- reading only the aggressor order missed every
+        # such exit and left the row pending (order DMKMWVEG14ET, 2026-11-10).
+        own_key = "passiveExecution" if trade.get("isAggressor") is False else "aggressorExecution"
+        own_order = (trade.get(own_key) or {}).get("order") or {}
+        # Order SIDE is quoted in the long token, so it cannot tell an exit from an
+        # entry: opening a short is ORDER_SIDE_SELL and closing one is ORDER_SIDE_BUY.
+        # Only the intent says which. Side-only matching left both 2026-11-11 short
+        # exits (orders DNAJQQWG13YB, DNAHTZXG13ZK) pending after they were sold.
+        intent = str(own_order.get("intent") or "")
+        if intent:
+            if intent not in {"ORDER_INTENT_SELL_LONG", "ORDER_INTENT_SELL_SHORT"}:
+                continue
+        elif str(own_order.get("side") or "") != "ORDER_SIDE_SELL":
             continue
-        slug = trade.get("marketSlug") or (aggressor_order.get("marketMetadata") or {}).get("slug")
+        slug = trade.get("marketSlug") or (own_order.get("marketMetadata") or {}).get("slug")
         if not slug:
             continue
-
-        def amount(value: Any) -> float | None:
-            if isinstance(value, dict):
-                value = value.get("value")
-            try:
-                return float(value)
-            except (TypeError, ValueError):
-                return None
-
         realized = amount(trade.get("realizedPnl"))
         if realized is None:
             continue
+        price = amount(trade.get("price"))
+        if price is None:
+            price = amount(own_order.get("price"))
+        if price is not None and intent == "ORDER_INTENT_SELL_SHORT":
+            price = 1.0 - price
+        shares = amount(trade.get("qtyDecimal")) or amount(trade.get("qty")) or 0.0
         update_time = str(trade.get("updateTime") or trade.get("createTime") or "")
-        existing = sells.get(str(slug))
-        if existing is not None and str(existing.get("update_time") or "") >= update_time:
-            continue
-        sells[str(slug)] = {
-            "realized_pnl_usd": realized,
-            "sell_price": amount(aggressor_order.get("price")),
-            "shares_sold": amount(trade.get("qtyDecimal")) or amount(trade.get("qty")),
-            "update_time": update_time,
-        }
+        # One exit order routinely fills in several trades; keeping only the latest
+        # reported a fraction of the realized P&L as if it were the whole exit.
+        key = str(slug)
+        entry = sells.setdefault(
+            key, {"realized_pnl_usd": 0.0, "sell_price": None, "shares_sold": 0.0, "update_time": ""}
+        )
+        entry["realized_pnl_usd"] = round(entry["realized_pnl_usd"] + realized, 6)
+        entry["shares_sold"] = round(entry["shares_sold"] + shares, 6)
+        if price is not None:
+            notional[key] = notional.get(key, 0.0) + price * shares
+            entry["sell_price"] = (
+                round(notional[key] / entry["shares_sold"], 6) if entry["shares_sold"] else price
+            )
+        entry["update_time"] = max(entry["update_time"], update_time)
     return sells
+
+
+_OFFSET_INTENT = {"short": "ORDER_INTENT_BUY_LONG", "long": "ORDER_INTENT_BUY_SHORT"}
+_SPREAD_SIDE_SUFFIX = re.compile(r"-(?:pos|neg)-\d+pt\d+$")
+
+
+def event_key_from_slug(slug: str) -> str:
+    """Slug shared by both sides of one spread market, so the two lines of a game match.
+
+    Positions report ``nba-den-mem-2026-11-11`` while market slugs carry an ``asc-``
+    prefix and a ``-pos-4pt5`` suffix; both normalise to the former.
+    """
+    key = _SPREAD_SIDE_SUFFIX.sub("", str(slug or ""))
+    return key.removeprefix("asc-")
+
+
+def _exchange_offset_fills(snapshot: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    """Own entry-direction fills per slug, oldest first.
+
+    Buying the opposite token on a contract you already hold closes it by
+    netting out, with no sell order and no ``realizedPnl`` on the fill. Only a
+    row's own side and entry time say whether such a fill was an exit.
+    """
+
+    def amount(value: Any) -> float | None:
+        if isinstance(value, dict):
+            value = value.get("value")
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    fills: dict[str, list[dict[str, Any]]] = {}
+    for activity in snapshot.get("activities", []):
+        if activity.get("type") != "ACTIVITY_TYPE_TRADE":
+            continue
+        trade = activity.get("trade") or {}
+        own_key = "passiveExecution" if trade.get("isAggressor") is False else "aggressorExecution"
+        own_order = (trade.get(own_key) or {}).get("order") or {}
+        intent = str(own_order.get("intent") or "")
+        slug = trade.get("marketSlug") or (own_order.get("marketMetadata") or {}).get("slug")
+        shares = amount(trade.get("qtyDecimal")) or amount(trade.get("qty"))
+        price = amount(trade.get("price"))
+        if not slug or intent not in _OFFSET_INTENT.values() or not shares or price is None:
+            continue
+        fills.setdefault(str(slug), []).append(
+            {
+                "intent": intent,
+                "shares": shares,
+                "price": price,
+                "time": str(trade.get("updateTime") or trade.get("createTime") or ""),
+            }
+        )
+    for items in fills.values():
+        items.sort(key=lambda f: f["time"])
+    return fills
+
+
+def _with_offset_exits(
+    sell_trade: dict[str, Any] | None,
+    fills: list[dict[str, Any]] | None,
+    row: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Fold netting fills after the row's entry into its exit total.
+
+    The exchange reports no P&L for a netting fill, so it is derived from the row's
+    entry price and flagged ``derived_pnl_shares`` rather than passed off as exchange-reported.
+    """
+    side = str(row.get("token_side") or "").lower()
+    intent = _OFFSET_INTENT.get(side)
+    if not fills or intent is None:
+        return sell_trade
+    try:
+        held = float(row.get("shares"))
+        entry = float(row.get("entry_price"))
+        entered = parse_utc(str(row.get("executed_at_utc")))
+    except (TypeError, ValueError):
+        return sell_trade
+    merged = (
+        dict(sell_trade)
+        if sell_trade
+        else {
+            "realized_pnl_usd": 0.0,
+            "sell_price": None,
+            "shares_sold": 0.0,
+            "update_time": "",
+        }
+    )
+    derived = 0.0
+    for fill in fills:
+        if fill["intent"] != intent:
+            continue
+        try:
+            if parse_utc(fill["time"]) <= entered:
+                continue
+        except (TypeError, ValueError):
+            continue
+        take = min(fill["shares"], held - merged["shares_sold"])
+        if take <= 0:
+            break
+        # Price is quoted in the long token: a short is worth 1 - price when netted out.
+        exit_value = 1.0 - fill["price"] if side == "short" else fill["price"]
+        merged["realized_pnl_usd"] = round(merged["realized_pnl_usd"] + (exit_value - entry) * take, 6)
+        merged["shares_sold"] = round(merged["shares_sold"] + take, 6)
+        merged["update_time"] = max(merged["update_time"], fill["time"])
+        derived += take
+    if not derived:
+        return sell_trade
+    merged["derived_pnl_shares"] = round(derived, 6)
+    return merged
+
+
+def _manual_position_rows(
+    snapshot: dict[str, Any],
+    records: list[dict[str, Any]],
+    odds_root: Path,
+    now_iso: str,
+) -> list[dict[str, Any]]:
+    """Ledger rows for exchange positions the buyer never opened.
+
+    Without them a hand-placed position is invisible to settlement, to the dashboard,
+    and to the buyer's own dedup, which is how it re-entered a game the operator
+    had already traded by hand. Tagged ``manual`` so model audits can exclude them.
+    """
+    known = {(str(r.get("market_slug")), str(r.get("token_side")).lower()) for r in records}
+    new_rows: list[dict[str, Any]] = []
+    for slug, pos in (snapshot.get("positions") or {}).items():
+        if not isinstance(pos, dict):
+            continue
+        try:
+            net = float(pos.get("netPositionDecimal") or pos.get("netPosition") or 0.0)
+            cost = abs(float((pos.get("cost") or {}).get("value")))
+        except (TypeError, ValueError):
+            continue
+        if abs(net) < 0.01 or pos.get("expired"):
+            continue
+        side = "long" if net > 0 else "short"
+        if (str(slug), side) in known:
+            continue
+        shares = abs(net)
+        meta = pos.get("marketMetadata") or {}
+        title = str(meta.get("title") or "")
+        away, _, home = title.partition(" vs. ")
+        start = ""
+        line = None
+        match = re.search(r"(\d{4}-\d{2}-\d{2})", str(slug))
+        for path in (
+            sorted(odds_root.glob(f"odds/*/{match.group(1)}/polymarket_snapshots.jsonl")) if match else []
+        ):
+            with suppress(OSError, ValueError):
+                for text in path.read_text(encoding="utf-8").splitlines():
+                    if slug in text:
+                        rec = json.loads(text)
+                        if rec.get("market_slug") == slug:
+                            start = str(rec.get("event_start_utc") or start)
+                            line = rec.get("line", line)
+        # The other line of the same game is usually already in the ledger and carries
+        # the real start time and team names; without a start time the row never settles.
+        sibling = next(
+            (
+                r
+                for r in records
+                if event_key_from_slug(str(r.get("market_slug"))) == event_key_from_slug(slug)
+            ),
+            {},
+        )
+        start = start or str(sibling.get("event_start_utc") or "")
+        away = str(sibling.get("away_team") or away).strip()
+        home = str(sibling.get("home_team") or home).strip()
+        sport = str(sibling.get("sport") or str(meta.get("eventSlug") or slug).split("-")[0]).upper()
+        new_rows.append(
+            {
+                "order_id": f"MANUAL-{slug}",
+                "pick_id": f"MANUAL-{slug}",
+                "manual": True,
+                "model_id": "manual",
+                "sport": sport,
+                "event_id": str(sibling.get("event_id") or ""),
+                "market_slug": str(slug),
+                "market_type": "spread" if _SPREAD_SIDE_SUFFIX.search(str(slug)) else "",
+                "selection": "manual",
+                "token_side": side,
+                "away_team": away,
+                "home_team": home,
+                "line": line,
+                "event_start_utc": start,
+                "shares": round(shares, 4),
+                "cost_usd": round(cost, 4),
+                "entry_price": round(cost / shares, 4),
+                "executed_at_utc": str(pos.get("updateTime") or now_iso),
+                "status": "open",
+                "result": "open",
+                "order_state": "ORDER_STATE_FILLED",
+                "fill_known": True,
+                "fallback_reconciled": True,
+                "rationale": "Manually placed position imported from the exchange",
+            }
+        )
+    return new_rows
+
+
+def _position_fully_exited(sell_trade: dict[str, Any] | None, held_shares: Any) -> bool:
+    """Whether closing fills cover the whole recorded position.
+
+    Selling part of a position must not settle the row: the remainder is still
+    live and will be graded by the market's outcome.
+    """
+    if sell_trade is None:
+        return False
+    try:
+        held = float(held_shares)
+    except (TypeError, ValueError):
+        return True
+    # Both quantities are share-decimal; the slack only absorbs rounding, not a
+    # real residual holding.
+    return float(sell_trade.get("shares_sold") or 0.0) >= held - 0.05
 
 
 def _exchange_resolution_result(
@@ -989,71 +1259,6 @@ def _exchange_settlement_cost(
         # the full position cost to every ledger row.
         return recorded_cost
     return float(position_cost)
-
-
-def backfill_auto_buyer_ledger_from_audit(
-    audit_path: Path | str | None = None,
-    picks_cache: list[dict[str, Any]] | None = None,
-) -> int:
-    """Backfill the dedicated Auto-Buyer ledger from existing audit log execution events."""
-    a_path = Path(audit_path) if audit_path else DATA / "audit.jsonl"
-    if not a_path.exists():
-        return 0
-
-    if picks_cache is None:
-        from ..dashboard.picks import read_picks
-
-        try:
-            picks_cache = read_picks()
-        except (OSError, ValueError, KeyError, TypeError, RuntimeError):
-            picks_cache = []
-
-    picks_by_id = {str(p.get("pick_id")): p for p in (picks_cache or [])}
-
-    existing = {str(r.get("order_id")) for r in read_auto_buyer_ledger()}
-    count = 0
-
-    with a_path.open(encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                event = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-
-            if event.get("event_type") != "order_executed":
-                continue
-
-            payload = event.get("payload") or {}
-            oid = str(payload.get("order_id") or "")
-            if not oid or oid in existing:
-                continue
-
-            subj_id = str(event.get("subject_id") or "")
-            pick_row = picks_by_id.get(subj_id) or {}
-
-            record_auto_buy_execution(
-                order_payload={
-                    "order_id": oid,
-                    "pick_id": subj_id,
-                    "market_slug": payload.get("market_slug"),
-                    "token_side": payload.get("token_side") or payload.get("side"),
-                    "limit_price": payload.get("price") or payload.get("exchange_price"),
-                    "shares": payload.get("size_shares", 1.0),
-                    "cost_usd": payload.get("estimated_cost_usd"),
-                    "timestamp_utc": event.get("occurred_at_utc"),
-                },
-                order_id=oid,
-                order_state="FILLED",
-                pick_row=pick_row,
-            )
-            existing.add(oid)
-            count += 1
-
-    log_auto_buyer_event(f"Backfilled {count} historical auto-buy orders into auto_buyer_ledger.")
-    return count
 
 
 def manually_settle_auto_buyer_order(
@@ -1297,11 +1502,15 @@ def settle_auto_buyer_ledger(
 
     pm_resolutions: dict[str, dict[str, Any]] = {}
     sell_trades: dict[str, dict[str, Any]] = {}
+    offset_fills: dict[str, list[dict[str, Any]]] = {}
+    exchange_snapshot: dict[str, Any] | None = None
     if polymarket_executor is not None:
         try:
             snapshot = polymarket_executor.portfolio_snapshot()
+            exchange_snapshot = snapshot
             pm_resolutions.update(_exchange_position_resolutions(snapshot))
             sell_trades.update(_exchange_sell_trades(snapshot))
+            offset_fills.update(_exchange_offset_fills(snapshot))
         except (OSError, ValueError, KeyError, TypeError, RuntimeError):
             pass
     elif data_root is None:
@@ -1311,15 +1520,14 @@ def settle_auto_buyer_ledger(
 
             executor = PolymarketExecutor(audit=AuditLog(root / "audit.jsonl"))
             snapshot = executor.portfolio_snapshot()
+            exchange_snapshot = snapshot
             pm_resolutions.update(_exchange_position_resolutions(snapshot))
             sell_trades.update(_exchange_sell_trades(snapshot))
+            offset_fills.update(_exchange_offset_fills(snapshot))
         except (OSError, ValueError, KeyError, TypeError, RuntimeError):
             pass
 
     for r in records:
-        if _is_settled_auto_buyer_record(r):
-            updated_records.append(r)
-            continue
         sport = str(r.get("sport") or "").upper()
         away = str(r.get("away_team") or "")
         home = str(r.get("home_team") or "")
@@ -1605,6 +1813,14 @@ def settle_auto_buyer_ledger(
 
         exchange_resolution = pm_resolutions.get(slug)
         sell_trade = sell_trades.get(slug) if slug else None
+        if slug:
+            sell_trade = _with_offset_exits(sell_trade, offset_fills.get(slug), r)
+        if sell_trade is not None:
+            # Recorded even for a partial exit, which leaves the row open: the buyer
+            # reads this to stop adding to a position the operator is selling out of.
+            r["manual_exit_shares"] = sell_trade.get("shares_sold")
+        if not _position_fully_exited(sell_trade, r.get("shares")):
+            sell_trade = None
         if start_dt > now and exchange_resolution is None and sell_trade is None:
             pending_count += 1
             updated_records.append(r)
@@ -1955,6 +2171,8 @@ def settle_auto_buyer_ledger(
                 pnl_usd = round(sell_pnl_usd, 4)
                 pnl_units = _usd_to_auto_buyer_units(pnl_usd, unit_value_usd)
                 r["settlement_source"] = "manual_sell"
+                if sell_trade is not None and sell_trade.get("derived_pnl_shares"):
+                    r["settlement_pnl_derived_shares"] = sell_trade["derived_pnl_shares"]
             else:
                 exchange_resolution = pm_resolutions.get(slug)
                 settlement_cost = _exchange_settlement_cost(exchange_resolution, shares, cost)
@@ -2005,6 +2223,11 @@ def settle_auto_buyer_ledger(
 
         updated_records.append(r)
 
+    if exchange_snapshot is not None and root.name != "paper_auto_buyer":
+        updated_records.extend(
+            _manual_position_rows(exchange_snapshot, updated_records, odds_root, iso_utc(now))
+        )
+
     # Rewrite JSONL atomically
     try:
         _write_jsonl_atomic(j_path, updated_records)
@@ -2019,7 +2242,7 @@ def settle_auto_buyer_ledger(
             decimal_odds = american_to_decimal(american)
             line_val = r.get("line")
             line_str = f"{float(str(line_val)):.2f}" if line_val not in (None, "") else ""
-            x_row = {f: "" for f in FIELDNAMES}
+            x_row = dict.fromkeys(FIELDNAMES, "")
             x_row.update(
                 {
                     "pick_id": str(r.get("pick_id") or r.get("order_id")),
@@ -2118,8 +2341,16 @@ def settle_auto_buyer_ledger(
 def summarize_auto_buyer_performance(
     records: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Compute consolidated performance metrics, ROI, and win-rate accounting for Auto-Buyer."""
-    rows = records if records is not None else read_auto_buyer_ledger()
+    """Compute consolidated performance metrics, ROI, and win-rate accounting for Auto-Buyer.
+
+    MANUAL rows (hand-placed exchange positions, see ``is_manual_auto_buyer_record``) carry
+    no model edge and are excluded from every metric below; they are reported separately
+    under ``manual_orders``/``manual_settled_orders``/``manual_realized_pnl_usd`` so they
+    stay visible instead of silently disappearing from the ledger total.
+    """
+    rows_all = records if records is not None else read_auto_buyer_ledger()
+    manual_rows = [r for r in rows_all if is_manual_auto_buyer_record(r)]
+    rows = [r for r in rows_all if not is_manual_auto_buyer_record(r)]
     settled_rows = [r for r in rows if _is_settled_auto_buyer_record(r)]
     open_rows = [r for r in rows if r not in settled_rows]
 
@@ -2146,6 +2377,9 @@ def summarize_auto_buyer_performance(
         else 0.0
     )
 
+    manual_settled_rows = [r for r in manual_rows if _is_settled_auto_buyer_record(r)]
+    manual_realized_pnl_usd = sum(float(r.get("pnl_usd") or 0.0) for r in manual_settled_rows)
+
     return {
         "total_orders": len(rows),
         "open_orders": len(open_rows),
@@ -2161,4 +2395,7 @@ def summarize_auto_buyer_performance(
         "settled_cost_usd": round(settled_cost_usd, 2),
         "total_cost_usd": round(total_cost_usd, 2),
         "avg_edge_pct": round(avg_edge_pct, 1),
+        "manual_orders": len(manual_rows),
+        "manual_settled_orders": len(manual_settled_rows),
+        "manual_realized_pnl_usd": round(manual_realized_pnl_usd, 2),
     }

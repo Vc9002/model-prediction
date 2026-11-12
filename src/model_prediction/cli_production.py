@@ -276,7 +276,7 @@ def _cmd_predict() -> int:
 
     # 3. Compute artifact hash for reporting
     try:
-        with open(artifact_path, "r", encoding="utf-8") as fh:
+        with open(artifact_path, encoding="utf-8") as fh:
             artifact_payload: dict[str, Any] = json.load(fh)
         artifact_hash = _compute_artifact_hash(artifact_payload)
     except Exception as exc:  # noqa: BLE001
@@ -609,30 +609,29 @@ def main(argv: list[str] | None = None) -> int:
 
     if cmd == "predict":
         return _cmd_predict()
-    elif cmd == "export":
+    if cmd == "export":
         return _cmd_export(args[1:])
-    elif cmd == "health":
+    if cmd == "health":
         return _cmd_health()
-    elif cmd == "status":
+    if cmd == "status":
         return _cmd_status()
-    elif cmd == "ledger":
+    if cmd == "ledger":
         return _cmd_ledger(args[1:])
-    elif cmd == "settle":
+    if cmd == "settle":
         return _cmd_settle(args[1:])
-    elif cmd == "void":
+    if cmd == "void":
         return _cmd_void(args[1:])
-    elif cmd == "supersede":
+    if cmd == "supersede":
         return _cmd_supersede(args[1:])
-    elif cmd == "error":
+    if cmd == "error":
         return _cmd_error(args[1:])
-    else:
-        print(f"unknown command: {cmd}", file=sys.stderr)
-        print(
-            "usage: python -m model_prediction.cli_production "
-            "{predict|health|status|ledger|export|settle|void|supersede|error}",
-            file=sys.stderr,
-        )
-        return 2
+    print(f"unknown command: {cmd}", file=sys.stderr)
+    print(
+        "usage: python -m model_prediction.cli_production "
+        "{predict|health|status|ledger|export|settle|void|supersede|error}",
+        file=sys.stderr,
+    )
+    return 2
 
 
 if __name__ == "__main__":

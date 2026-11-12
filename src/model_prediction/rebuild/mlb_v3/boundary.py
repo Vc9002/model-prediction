@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from model_prediction.runtime_paths import RuntimePaths
 
@@ -55,6 +53,3 @@ class MLBV3GuardedRepository:
 
     def read_text(self, path: str | Path) -> str:
         return self.resolve(path).read_text()
-
-    def read_json(self, path: str | Path) -> Any:
-        return json.loads(self.read_text(path))

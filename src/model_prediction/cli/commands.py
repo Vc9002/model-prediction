@@ -55,9 +55,10 @@ from ..domain import (
     League,
     MarketType,
     ModelOrigin,
-    ModelState,
     PickRequest,
-    RecordType,
+    is_qualified_row,
+    is_research_row,
+    legacy_record_type,
     parse_utc,
     utc_now,
 )
@@ -287,7 +288,7 @@ def _clear_today_open(
 
     Passes allow_staked_removal=True on every call: this project is
     shadow-only (no real orders are ever placed from a forecast run — see
-    POLICY.md), so a "QUALIFIED_SHADOW_CALL, units > 0" row is never actual
+    POLICY.md), so a qualified, units > 0 row is never actual
     staked money on EITHER ledger. Without this, an MLB pick strong enough to
     independently clear real eligibility (not just the flat-mode diagnostic
     override) would get silently frozen forever — never replaced by any
@@ -447,9 +448,7 @@ def _summary(config, ledger) -> dict:
     created_today = [row for row in rows if _et_day(row["created_at_utc"]) == today]
     settled_today = [row for row in rows if row["settled_at_utc"] and _et_day(row["settled_at_utc"]) == today]
     open_rows = [row for row in rows if row["status"] == "open"]
-    settled_qualified = [
-        row for row in rows if row["status"] == "settled" and row["record_type"] == "QUALIFIED_SHADOW_CALL"
-    ]
+    settled_qualified = [row for row in rows if row["status"] == "settled" and is_qualified_row(row)]
     pnl = sum(float(row["pnl_units"] or 0) for row in settled_qualified)
     clv_values = [float(row["probability_clv"]) for row in rows if row["probability_clv"]]
     measured_edge_rows = [row for row in rows if row["model_version"].startswith("measured-edge")]
@@ -460,9 +459,7 @@ def _summary(config, ledger) -> dict:
         "picks_settled_today": len(settled_today),
         "open_picks": len(open_rows),
         "open_units": round(
-            sum(
-                float(row["units"] or 0) for row in open_rows if row["record_type"] == "QUALIFIED_SHADOW_CALL"
-            ),
+            sum(float(row["units"] or 0) for row in open_rows if is_qualified_row(row)),
             2,
         ),
         "qualified_pnl_units_all_time": round(pnl, 4),
@@ -1088,13 +1085,11 @@ def cmd_sell_position(args, config, registry, bans, ledger, audit, data_root) ->
 
 def cmd_exposure(args, config, registry, bans, ledger, audit, data_root) -> dict:
     rows = ledger.rows()
-    qualified_open = [
-        row for row in rows if row["record_type"] == "QUALIFIED_SHADOW_CALL" and row["status"] == "open"
-    ]
+    qualified_open = [row for row in rows if is_qualified_row(row) and row["status"] == "open"]
     output = {
         "open_units": round(sum(float(row["units"] or 0) for row in qualified_open), 2),
         "open_qualified_calls": len(qualified_open),
-        "zero_unit_research_observations": sum(row["record_type"] == "RESEARCH_OBSERVATION" for row in rows),
+        "zero_unit_research_observations": sum(is_research_row(row) for row in rows),
         "starting_bankroll_units": config["bankroll"]["reference_units"],
         "note": "Shadow research accounting only; no real-money authorization",
     }
@@ -1130,7 +1125,7 @@ def cmd_verify_checklist(args, config, registry, bans, ledger, audit, data_root)
     research_units = [
         float(row["units"] or 0)
         for row in ledger.rows()
-        if row["league"].lower() == sport and row["record_type"] == RecordType.RESEARCH_OBSERVATION.value
+        if row["league"].lower() == sport and is_research_row(row)
     ]
     results = run_checklist(
         source_keys=source_keys or None,
@@ -1154,9 +1149,7 @@ def cmd_score_research(args, config, registry, bans, ledger, audit, data_root) -
     if bool(args.pick_ids) == bool(args.all_research):
         raise ValueError("provide either --pick-id or --all-research")
     pick_ids = args.pick_ids or [
-        row["pick_id"]
-        for row in ledger.rows()
-        if row["record_type"] == "RESEARCH_OBSERVATION" and row["status"] == "settled"
+        row["pick_id"] for row in ledger.rows() if is_research_row(row) and row["status"] == "settled"
     ]
     rows = ledger.score_research(pick_ids, args.units, args.note)
     output = {
@@ -1186,7 +1179,7 @@ def cmd_call(args, config, registry, bans, ledger, audit, data_root) -> dict:
         rationale=args.rationale,
         risks=args.risks,
         model_origin=ModelOrigin(args.origin),
-        model_state=ModelState(args.model_state),
+        model_enabled=not args.model_disabled,
         baseline_identifier=args.baseline_id,
         observed_at_utc=args.observed_at,
         model_artifact_hash=args.model_artifact_hash,
@@ -1218,7 +1211,7 @@ def cmd_call(args, config, registry, bans, ledger, audit, data_root) -> dict:
     row = ledger.append_evaluated(request, eligibility)
     output = {
         "decision": eligibility.decision,
-        "record_type": eligibility.record_type.value,
+        "record_type": legacy_record_type(eligibility.qualified),
         "reason_code": eligibility.reason_code,
         "units": eligibility.units,
         "pick": row,

@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from model_prediction.features.nfl_efficiency import NFLEfficiencyStore
 from model_prediction.models.nfl_spread_v7 import NFLSpreadModelV7
 from model_prediction.models.nfl_spread_v8 import NFLSpreadModelV8
@@ -116,7 +118,6 @@ def test_nfl_total_v7_contract_and_hash() -> None:
     model = NFLTotalModelV7.from_artifact(artifact)
     assert model.version == "nfl-total-structural-v7"
     assert model.league_avg_total == 45.5
-    assert model.market_weight == 0.60
     assert model.ngsp_weight == 0.35
 
     # NGSP pass-ratio pace acceleration check
@@ -279,3 +280,95 @@ def test_forecast_from_efficiency_with_qb_injury_penalty() -> None:
     assert fc_sp_injured.projected_margin_home > fc_sp_healthy.projected_margin_home
     assert fc_sp_injured.prob_home_cover > fc_sp_healthy.prob_home_cover
     assert fc_tot_injured.projected_total < fc_tot_healthy.projected_total
+
+
+def test_nfl_spread_v7_heavy_line_replays_from_effective_sd() -> None:
+    """|line| >= 8 prices at 1.25x margin_sd. The decision snapshot must carry THAT sd:
+    with the artifact's base sd the scalar replay rejects the row and the forecast path
+    silently skips the candidate (found 2026-11-11, no heavy line had appeared since the
+    1.25x change landed)."""
+    from model_prediction.scalar_artifact_replay import build_snapshot, validate_decision_snapshot
+
+    artifact = json.loads(
+        (REPO / "config" / "models" / "nfl-spread-structural-v7.json").read_text(encoding="utf-8")
+    )
+    model = NFLSpreadModelV7.from_artifact(artifact)
+    fc = model.forecast_spread(home_team="A", away_team="B", spread_home_line=-9.5)
+    assert fc.effective_sd == model.margin_sd * 1.25
+
+    def _snapshot(sd: float) -> dict:
+        return build_snapshot(
+            artifact,
+            {},
+            {"mean": fc.projected_margin_home, "sd": sd, "line": 9.5},
+            event_id="e1",
+            event_start_utc="2026-11-16T18:00:00Z",
+            observed_at_utc="2026-11-16T12:00:00Z",
+        )
+
+    row = {
+        "model_version": model.version,
+        "model_artifact_hash": artifact["artifact_hash"],
+        "league": "NFL",
+        "market_type": "spread",
+        "selection": "home",
+        "event_id": "e1",
+        "event_start_utc": "2026-11-16T18:00:00Z",
+        "line": -9.5,
+        "model_probability": fc.prob_home_cover,
+    }
+    replayed = validate_decision_snapshot(_snapshot(fc.effective_sd), row)
+    assert abs(replayed - fc.prob_home_cover) <= 2e-6
+    with pytest.raises(ValueError, match="scalar_replay_probability_mismatch"):
+        validate_decision_snapshot(_snapshot(model.margin_sd), row)
+
+
+class _RecordingArtifact(dict):
+    """dict that records which keys from_artifact actually consulted."""
+
+    def __init__(self, payload: dict) -> None:
+        super().__init__(payload)
+        self.seen: set[str] = set()
+
+    def get(self, key, default=None):  # type: ignore[override]
+        self.seen.add(key)
+        return super().get(key, default)
+
+    def __getitem__(self, key):
+        self.seen.add(key)
+        return super().__getitem__(key)
+
+    def __contains__(self, key) -> bool:
+        self.seen.add(key)
+        return super().__contains__(key)
+
+
+_ARTIFACT_METADATA_KEYS = {
+    "artifact_hash",
+    "model_version",
+    "method",
+    "note",
+    "league",
+    "sport",
+    "schema_version",
+    "positive_class",
+    "qualification",
+}
+
+
+@pytest.mark.parametrize(
+    ("filename", "loader"),
+    [
+        ("nfl-spread-structural-v7.json", NFLSpreadModelV7.from_artifact),
+        ("nfl-total-structural-v7.json", NFLTotalModelV7.from_artifact),
+    ],
+)
+def test_every_nfl_v7_artifact_parameter_is_consumed_by_the_served_model(filename: str, loader) -> None:
+    """A parameter key nothing reads is a false claim to anyone auditing the artifact: the
+    total artifact carried market_weight / wind_* / cold_temp_penalty / short_week_drag that
+    from_artifact never looked at while the code used different hardcoded values."""
+    artifact = json.loads((REPO / "config" / "models" / filename).read_text(encoding="utf-8"))
+    recorder = _RecordingArtifact(artifact)
+    loader(recorder)
+    unread = set(artifact) - _ARTIFACT_METADATA_KEYS - recorder.seen
+    assert not unread, f"{filename} carries parameters the served model never reads: {sorted(unread)}"

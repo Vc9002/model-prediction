@@ -14,6 +14,8 @@ from openpyxl.styles.numbers import FORMAT_TEXT
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
+from .domain import legacy_record_type
+
 SHEET_NAME = "Picks"
 TABLE_NAME = "PicksLedger"
 
@@ -287,9 +289,9 @@ def _build_summary(sheet, fieldnames: list[str], row_count: int) -> None:
         "C9": ("Mean raw-probability CLV", f'=IFERROR(AVERAGEIF({clv},"<>",{clv}),0)'),
         "E9": (
             "Qualified calls",
-            f'=COUNTIFS({record_type},"QUALIFIED_SHADOW_CALL",{status},"settled")',
+            f'=COUNTIFS({record_type},"{legacy_record_type(True)}",{status},"settled")',
         ),
-        "G9": ("Qualified P&L", f'=SUMIFS({qualified_pnl},{record_type},"QUALIFIED_SHADOW_CALL")'),
+        "G9": ("Qualified P&L", f'=SUMIFS({qualified_pnl},{record_type},"{legacy_record_type(True)}")'),
     }
     for anchor, (label, formula) in labels_and_formulas.items():
         label_cell = sheet[anchor]

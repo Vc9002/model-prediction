@@ -583,8 +583,6 @@ def _row_has_banned_team(row: dict) -> bool:
 
 
 def _manual_research_eligibility(row: dict) -> tuple[bool, str]:
-    if row.get("record_type") != "RESEARCH_OBSERVATION":
-        return False, "not a research observation"
     config = _config_payload()
     execution = config.get("execution") or {}
     if not execution.get("allow_manual_research_orders", False):

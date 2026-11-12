@@ -1,5 +1,82 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
+## 2026-11-11 — NFL model review: efficiency inputs silently defaulted since 10-27, forecast-path integrity, weather, calibration replay
+
+Full review of the NFL spread/total champions (`nfl-spread-structural-v7`,
+`nfl-total-structural-v7`) plus the forecast path, triggered by a four-sport
+model review. Every finding below was reproduced against the live runtime
+ledger or live snapshots before it was fixed; every fix carries a regression
+test that was shown red without the fix.
+
+**Defect window: 2026-10-27 → 2026-11-12.** Every NFL v7 pick in that window was
+priced on league-average efficiency inputs. The 10-27 snapshot cutover
+(`6d95a709`) built `team.parquet` with four columns; `_team_efficiency` reads
+`sacks_suffered` and a dozen more, hit `ColumnNotFoundError`, and its broad
+`except` returned the defaults tuple for every team (reproduced on the
+`20261111T220940` snapshot: KC/BUF → `prior_games 0`, all defaults).
+`input_qualified` stayed True. Operator decision 2026-11-11: the 52 Main rows
+from that window are left in the ledger untouched; performance reviews should
+exclude or caveat NFL v7 rows with `event_start_utc` in that window.
+
+Fixes, one commit each (`03faf30d` → `37084668` + calibration wiring):
+
+- **Fail closed on an unusable efficiency frame** (`03faf30d`). `TEAM_COLUMNS`
+  is now the engine's full read set and is imported by the engine as its
+  required-column contract; `_team_efficiency` raises
+  `NFLEfficiencyInputError` (a `RuntimeError`, so no broad handler can turn it
+  back into defaults); both NFL slate builders decline the game (NO_CALL).
+  `def_sack_rate` now reads `sacks_suffered` on the opponents' rows (this
+  team's pass rush) instead of `def_sacks` (the opponents' rush). Existing
+  snapshots lack the new columns, so the next daily capture restores forecasts;
+  until then NFL declines rather than defaults.
+- **Forecast-path integrity** (`9cea0b73`, `e44b7117`): Main gate now requires
+  `record_type == QUALIFIED_SHADOW_CALL` (21 Main rows had reached Main as
+  research-state rows relabelled QUALIFIED); total market selector takes the
+  latest two-sided quote per contract (a stale 05:52Z capture could beat the
+  18:10Z one by looking more balanced); `input_qualified` tests ordering/age
+  instead of same-calendar-date (the 00:30 ET run could never qualify);
+  `inference_inputs.sd` stores the effective sd (heavy-line spreads failed
+  scalar replay and vanished into `skipped`). The shared basketball spread
+  helper is deliberately unchanged — a pinned test documents that downgraded
+  WNBA/NBA spreads do reach Main as research-only paper calls.
+- **Consensus labelling** (`5ffc2b40`): ESPN-consensus-priced rows (31 of 52
+  Main v7 rows) stay Main-eligible by operator decision but now carry
+  `quote_provenance` and say so in the rationale.
+- **Artifact hygiene** (`4dd3034e`): dead parameter keys removed from both v7
+  artifacts (hashes recomputed); a recording-dict test asserts every artifact
+  key is consulted by `from_artifact`.
+- **Weather** (`37084668`): ESPN carries no NFL wind/temp, so every outdoor
+  total had been priced at a 5 mph / 65 °F placeholder (all 69 outdoor rows).
+  Open-Meteo pregame capture for the 32 NFL venues joins the daily capture
+  pool; unavailable means no weather term, flagged in `feature_basis`.
+- **Serving calibrator**: both slate builders route through the same guarded
+  calibrator hook the auto-buyer uses (identity → raw served).
+
+**Replay and calibration** (`scripts/replay_nfl_v7_all_settled.py`, report in
+`outputs/nfl/nfl_v7_replay.md`): the fixed engines were run point-in-time over
+every completed game with nflverse closing lines from 2021 (1,489 games, 0
+failures) and over all 110 settled Flat spread/total picks at their own lines
+and asks (0 skipped). Result: **the engines sit at the closing line** — spread
+Brier 0.2496 (market 0.2500), total 0.2506; totals are over-confident
+(calibration slope 0.43 with recorded weather, 0.19 without) and the >60%
+tail is inverted (14 games at mean 61% hit 29%). The walk-forward tournament
+(select on first 80%, locked last 20%) picks **identity** for both markets —
+no monotone recalibration recovers information that is not there — so the
+serving guard leaves the raw probability in place. At the live 5% hurdle the
+spread engine would have fired 16 times in 1,451 games (hit 37.5%). On the
+Flat picks the fixed model's probabilities sit *below* the recorded asks on
+average and fire 8 times (6 wins). The artifacts' `qualification.replay`
+blocks now carry these numbers; `config/production.yaml` still says
+`predictively_qualified` for both — that label is contradicted by this
+evidence and is an operator decision to change.
+
+Inherited test failures not touched (all reproduce at pre-session `5e2212ef`):
+`test_cli.py` hard_edge_gate (v5 fixture unregistered), WNBA
+`_DuplicateLedger` stub lacks `.rows`, 7 soccer/tennis/MLB ledger-mirror
+tests, `test_five_blind_spot_guards.py::test_nba_spread_extreme_disagreement_stays_in_flat`,
+and the `tests/sports/nfl/*` end-to-end tests that assert the retired v5
+version string.
+
 ## 2026-09-09 — Complete learned replay inputs and immutable WNBA priors
 
 Root cause found in the recording path: WNBA probabilities can change after

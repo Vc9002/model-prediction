@@ -863,7 +863,7 @@ def create_sample_pitch_arsenal(
     pitches: dict[str, PitchMetrics] = {}
 
     # Normalize pitch distribution with custom primaries
-    usage_map: dict[str, float] = {p: 0.0 for p in CANONICAL_PITCH_TYPES}
+    usage_map: dict[str, float] = dict.fromkeys(CANONICAL_PITCH_TYPES, 0.0)
     usage_map[primary_type] = 0.48
     usage_map[secondary_type] = 0.32
     remaining_types = [p for p in CANONICAL_PITCH_TYPES if p not in (primary_type, secondary_type)]

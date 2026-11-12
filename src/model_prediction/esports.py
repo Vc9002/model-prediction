@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
-from .domain import eastern_today, parse_utc
+from .domain import eastern_today, legacy_record_type, parse_utc
 from .features.elo_ratings import expected_win_probability
 from .research_io import atomic_write as _atomic_write
 from .research_io import backup_before_overwrite as _backup_before_overwrite
@@ -805,7 +805,7 @@ def _metrics(rows: Sequence[dict[str, Any]], threshold: float = 0.0) -> dict[str
     # Diagnostic flat one-unit -110 P&L -- the same convention used by the
     # production MLB/NBA/WNBA/NFL validation pipeline (validation.py). This is
     # a comparability diagnostic, not real or Polymarket-executable
-    # profitability: model_state stays "research" and units stay 0 for any
+    # profitability: units stay 0 for any
     # actual forecast until explicit promotion (see model_improvements.md
     # section 2's economic gate).
     misses = len(selected) - correct
@@ -852,7 +852,6 @@ def validate_esports_baseline(
             "title": title,
             "observations": len(rows),
             "minimum_required": 300,
-            "model_state": "research",
             "promotion_eligible": False,
         }
     train_end = int(len(rows) * 0.60)
@@ -934,7 +933,6 @@ def validate_esports_baseline(
     artifact = {
         "schema_version": "esports-neutral-elo-v2",
         "model_version": f"{title}-tiered-elo-{ESPORTS_MODEL_LINEAGE}",
-        "model_state": "research",
         "title": title,
         "target": "best-of match/series winner",
         "initial_rating": 1500.0,
@@ -995,7 +993,6 @@ def validate_esports_baseline(
         "status": "ok",
         "title": title,
         "model_version": artifact["model_version"],
-        "model_state": "research",
         "promotion_eligible": False,
         "observations": len(rows),
         "chronological_split": {
@@ -1648,11 +1645,10 @@ def forecast_esports_slate(
                         else None
                     ),
                     "model_version": market_model_version,
-                    "model_state": "research",
                     "artifact_hash": artifact["artifact_hash"],
                     "observed_at_utc": snapshot["observed_at_utc"],
                     "sides": sides,
-                    "record_type": "RESEARCH_OBSERVATION",
+                    "record_type": legacy_record_type(False),
                     "qualification": "NO_CALL_MODEL_UNVALIDATED",
                     "units": 0,
                 }
@@ -1679,7 +1675,6 @@ def forecast_esports_slate(
             "source_pages_captured": len(schedule_context["pages"]) if schedule_context is not None else 0,
             "source_limit": "Prospective observations only; exact source IDs and exact start required. No historical format availability is inferred.",
         },
-        "model_state": "research",
         "profitability": "not_established",
         "units": 0,
     }

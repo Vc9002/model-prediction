@@ -1,21 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
 from datetime import date, timedelta
-from pathlib import Path
 
 import pandas as pd
 
 from ..models.tennis import TennisPlayerForm
 
 INVALID_SCORE_MARKERS = ("RET", "W/O", "DEF", "ABD")
-
-
-def load_match_csvs(paths: Iterable[str | Path]) -> pd.DataFrame:
-    frames = [pd.read_csv(path, low_memory=False) for path in paths]
-    if not frames:
-        raise ValueError("at least one tennis match CSV is required")
-    return pd.concat(frames, ignore_index=True)
 
 
 def player_form_from_matches(

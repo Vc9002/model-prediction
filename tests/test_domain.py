@@ -14,7 +14,6 @@ from model_prediction.domain import (
     League,
     MarketType,
     ModelOrigin,
-    ModelState,
     PickRequest,
 )
 
@@ -235,6 +234,6 @@ def test_as_dict_serializes_every_diagnostic_feature_field(field) -> None:
     assert payload[field] == 0.4242
 
 
-def test_model_state_defaults_to_research() -> None:
+def test_model_defaults_to_enabled() -> None:
     request = _request()
-    assert request.model_state is ModelState.RESEARCH
+    assert request.model_enabled is True

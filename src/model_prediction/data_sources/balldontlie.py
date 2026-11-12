@@ -101,25 +101,3 @@ class BallDontLieClient:
         if player_ids:
             params["player_ids[]"] = player_ids
         return self._paginated("/mlb/v1/plate_appearances", params)
-
-    def mlb_hitter_pitch_type_game_stats(
-        self, *, game_ids: list[int] | None = None, player_ids: list[int] | None = None
-    ) -> list[dict[str, Any]]:
-        """Per-game batter performance broken out by pitch type faced."""
-        params: dict[str, Any] = {"per_page": 100}
-        if game_ids:
-            params["game_ids[]"] = game_ids
-        if player_ids:
-            params["player_ids[]"] = player_ids
-        return self._paginated("/mlb/v1/hitter_pitch_type_game_stats", params)
-
-    def mlb_pitcher_pitch_type_game_stats(
-        self, *, game_ids: list[int] | None = None, player_ids: list[int] | None = None
-    ) -> list[dict[str, Any]]:
-        """Per-game pitcher arsenal usage/results broken out by pitch type."""
-        params: dict[str, Any] = {"per_page": 100}
-        if game_ids:
-            params["game_ids[]"] = game_ids
-        if player_ids:
-            params["player_ids[]"] = player_ids
-        return self._paginated("/mlb/v1/pitcher_pitch_type_game_stats", params)

@@ -33,7 +33,6 @@ from .calibration import (
 )
 from .config import PROJECT_ROOT
 from .main_ledgers import MultiSportPickLedger
-from .research_ledgers import existing_research_ledgers
 
 logger = logging.getLogger("model_prediction.calibration")
 
@@ -213,13 +212,9 @@ def extract_settled_model_predictions(
     except (OSError, ValueError, TypeError) as exc:
         logger.warning("Error reading flat ledgers: %s", exc)
 
-    # 3. Research Ledgers
-    try:
-        for r_ledger in existing_research_ledgers(root):
-            tier = "gated" if "gated" in str(r_ledger.path).lower() else "research"
-            _ingest_rows(r_ledger.rows(), tier)
-    except (OSError, ValueError, TypeError) as exc:
-        logger.warning("Error reading research ledgers: %s", exc)
+    # research/gated_research have been frozen since 2026-10-22; their settled
+    # history already lives in Flat/Main (merge dry-run 2026-11-12: to copy 0).
+    # Ingesting them here let a frozen cohort drive live drift status.
 
     return results
 
@@ -491,7 +486,7 @@ def run_full_calibration_pipeline(
     if update_artifacts:
         models_dir = cal_data_dir / "models"
         models_dir.mkdir(parents=True, exist_ok=True)
-        # The same settled picks sit in several ledger tiers (main/flat/research),
+        # The same settled picks sit in both ledger tiers ingested here (main/flat),
         # so a model has several records per market. One artifact per
         # (model_version, market): canonical Flat wins for esports, otherwise
         # the largest sample wins. Identity also replaces stale fitted files.
@@ -598,38 +593,25 @@ def load_model_calibrator(
         if method == "temperature":
             temp = float(params.get("temperature") or 1.0)
             return TemperatureCalibrator(temp, metadata)
-        elif method == "platt":
+        if method == "platt":
             intercept = float(params.get("intercept") or 0.0)
             slope = float(params.get("slope") or 1.0)
             return TrainablePlattCalibrator(intercept, slope, metadata)
-        elif method == "beta":
+        if method == "beta":
             a = float(params.get("a") or 1.0)
             b = float(params.get("b") or 1.0)
             c = float(params.get("c") or 0.0)
             return BetaCalibrator(a, b, c, metadata)
-        elif method == "isotonic":
+        if method == "isotonic":
             thresholds = [float(t) for t in params.get("thresholds", [])]
             values = [float(v) for v in params.get("values", [])]
             if thresholds and values:
                 return IsotonicCalibrator(thresholds, values, metadata)
             return IdentityCalibrator(model_version, "isotonic-fallback-identity")
-        else:
-            return IdentityCalibrator(model_version, "identity")
+        return IdentityCalibrator(model_version, "identity")
     except (OSError, ValueError, TypeError, KeyError) as exc:
         logger.warning("Failed to load calibrator for %s: %s", model_version, exc)
         return None
-
-
-def calibrate_model_probability(
-    model_version: str,
-    probability: float,
-    data_root: str | Path | None = None,
-) -> float:
-    """Apply the model's fitted champion calibrator to a raw probability."""
-    cal = load_model_calibrator(model_version, data_root=data_root)
-    if cal is None:
-        return probability
-    return float(cal.transform(probability))
 
 
 # A fitted calibrator is applied to live probabilities only when it is trustworthy:

@@ -186,7 +186,7 @@ class ProductionModelRegistry:
         config_path = root / "config" / "production.yaml"
         if not config_path.is_file():
             raise FileNotFoundError(f"production config not found at {config_path}")
-        with open(config_path, "r", encoding="utf-8") as fh:
+        with open(config_path, encoding="utf-8") as fh:
             config: dict[str, Any] = yaml.safe_load(fh) or {}
         return cls.from_config(config, repo_root=root)
 
@@ -679,13 +679,6 @@ class ProductionModelRegistry:
     def lifecycle_contract(self, sport: str, market: str) -> ModelLifecycleContract | None:
         """The lifecycle contract for a sport+market, or None."""
         return (self.contracts.get(sport.upper()) or {}).get(market)
-
-    def all_lifecycle_contracts(self) -> list[ModelLifecycleContract]:
-        """All registered lifecycle contracts across sports and markets."""
-        result: list[ModelLifecycleContract] = []
-        for sport_contracts in self.contracts.values():
-            result.extend(sport_contracts.values())
-        return result
 
     def validate_lifecycle_invariants(
         self,
