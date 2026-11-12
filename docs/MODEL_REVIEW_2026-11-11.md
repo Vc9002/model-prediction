@@ -213,6 +213,45 @@ by this evidence; operator decision.
 3. Train/serve parity for NBA/NFL/WNBA learned models, not just MLB v9 (#6).
 4. Generalised consumed-keys artifact test (#9) — done for NFL v7 and NCAAF v4.
 
+## NCAAF replay result (2026-11-12, `scripts/replay_cfb_v4_all_settled.py`)
+
+The fixed champion (v4 class from the artifact: margin_sd 14.5, 200k sims) replayed
+point-in-time over **all 7,960 completed games 2016→2026-11-12** (history strictly before
+kickoff; no market lines exist for this cohort) and over **all 1,610 settled Flat+Main
+ledger rows** re-priced at their recorded line and ask with history as of decision time.
+Report: `outputs/ncaaf/cfb_v4_replay.md` / `.json`. Nothing written to artifacts or ledgers.
+
+- **Moneyline adds nothing over its own Elo channel.** Brier 0.1893 vs 0.1894 for the bare
+  `elo_home_win_prob` feature (home-rate baseline 0.2424); 70.8% accuracy; reliability
+  slope 1.20 (underconfident: 80-90% bucket hits 89.9%). Season-by-season the two are
+  within ±0.003 every year.
+- **The served margin SD is too narrow where it matters.** Realized margin residual SD
+  17.15 vs mean effective 15.94 overall; on established FBS-vs-FBS (sample ≥ 4) 16.84 vs
+  14.76 (−12%); conference matchups 16.61 vs 14.43, so the 0.9135 conference scale widens
+  the gap. The uncertainty widening points the wrong way at the bottom: the lowest-uncertainty
+  bucket realizes 17.24 against an effective 14.27; only the 0.14-0.19 bucket matches
+  (17.64 vs 17.77). FBS-vs-FCS is over-widened (18.98 vs 21.12). Totals: realized 16.91 vs
+  effective 18.42 (the deviation widening inflates it; base 16.0 is about right).
+- **Home margin bias +0.84 overall, +2.0 in 2025 and 2026** — the 2.5-point HFA is
+  understated recently. Neutral-site games (580) score worse (Brier 0.2264).
+- **Settled rows: the recorded ask beats both models.** Flat (559 rows): Brier ask 0.2289,
+  old model 0.2448, fixed model 0.2449; the fixed model would have fired 98 times under the
+  artifact gates: 51.0%, −6.14u flat. By market: moneyline 20 fires 75.0% +4.90u; spread 34
+  fires 50.0% −1.53u; **total 44 fires 40.9% −9.52u**. Main (1,051 rows): 241 fires 47.3%
+  −28.44u, totals 126 fires 44.4% −18.45u. On the 143 Flat rows priced against Polymarket
+  the fixed model does beat the ask (0.2264 vs 0.2370); on the 416 consensus-priced rows it
+  does not (0.2513 vs 0.2261).
+- Caveats: no weather term in either cohort (placeholder history fields, no PIT forecast in
+  old snapshots); QB channel inert before 2026-11; history not vintaged; consensus asks
+  were never executable.
+
+Implications (operator decisions, promotion-gate class): pause Main NCAAF totals as was
+done for NCAAB; retune `margin_sd` against realized residual variance (≈16.8 on
+established matchups) with the conference scale and the low-uncertainty widening
+re-examined, as a versioned v5 challenger through the walk-forward contract; demote or
+re-evidence the `predictively_qualified` label, since the structural layer does not beat
+its own Elo channel on 7,960 games.
+
 ## Open operator decisions
 
 Supersede or leave Main rows priced on defaulted NFL inputs (left, annotated) and

@@ -372,6 +372,12 @@ real, committed changes to the live champion `cfb-structural-v4`:
 - Open decisions: supersede or keep the 243 Main `cfb-structural-v4` rows priced on the 16.2
   arithmetic (identifiable from snapshot `parameters.margin_sd`); whether ESPN-consensus rows
   (229 of 238 Main NCAAF) may reach Main at all — they are now labelled `espn_consensus_indicative`.
+- Replay 2026-11-12 (`scripts/replay_cfb_v4_all_settled.py`, `outputs/ncaaf/cfb_v4_replay.md`): on all
+  7,960 completed games the fixed model's moneyline Brier (0.1893) equals its own Elo channel (0.1894);
+  realized margin SD 16.8 vs served 14.8 on established FBS matchups; on 1,610 settled rows the recorded
+  ask beats both old and fixed model, fixed-model fires 98 Flat (51.0%, −6.14u), totals 40.9%.
+  Decisions owed: pause Main NCAAF totals; v5 margin_sd/HFA retune as a walk-forward challenger;
+  re-evidence the `predictively_qualified` label.
 
 ## Done when
 
