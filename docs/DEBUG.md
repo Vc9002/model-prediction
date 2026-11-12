@@ -164,7 +164,7 @@ which the transform did not change.
 
 Fixes, one commit each:
 
-- **lr-v4 serves on its fit construction** (`HASH_A`). `learned_forward.py`
+- **lr-v4 serves on its fit construction** (`62e0118c`). `learned_forward.py`
   injected NBA-only Elo/Trend knobs (HCA 38, offseason gap 60, retention 0.40,
   `isolate_postseason`) added in `a9315de4` and borrowed from the v9
   structural config; `validation.py` fit `nba-elo-trend-lr-v4` on bare
@@ -173,7 +173,7 @@ Fixes, one commit each:
   artifact's Brier 0.185 described a model that was not being served. Serving
   now passes only what the artifact declares and otherwise uses the library
   defaults training used. Test: `test_nba_learned_slate_rebuilds_elo_and_trends_exactly_as_training_did`.
-- **Serving calibrators require own-model fit provenance** (`HASH_D`). One
+- **Serving calibrators require own-model fit provenance** (`c5a6a5e9`). One
   shared guard, `calibration_pipeline.serving_guard_reason`, now backs the
   auto-buyer (`calibrate_for_serving`), the NFL slates
   (`_nfl_serving_calibrator`) and the NBA total slate
@@ -189,7 +189,7 @@ Fixes, one commit each:
   `test_calibrate_for_serving_leaves_untrusted_calibrators_unapplied`
   (provenance cases), `test_load_serving_calibrator_applies_the_same_guard_for_slates`,
   `test_pipeline_artifacts_declare_own_model_fit_provenance`.
-- **`nba-moneyline-v9` artifact is an unqualified placeholder** (`HASH_C`).
+- **`nba-moneyline-v9` artifact is an unqualified placeholder** (`df48e07d`).
   Rolled back from serving 2026-11-10 (`4d5624ed`, "placeholder coefficients")
   but its artifact still claimed `qualified: true`, `locked_holdout: true`,
   Brier 0.1945. Flat ledger 11-08..11-10: 8 of 11 settled rows priced the model
@@ -198,20 +198,23 @@ Fixes, one commit each:
   the auto-buyer `DEFAULT_WHITELIST_MODELS` drops it (`nba-elo-trend-lr-v4` is
   deliberately NOT added — operator decision, HANDOFF item 3). Registry test:
   an `unverified` entry may not carry a qualified artifact claim.
-- **NBA forecast path** (`HASH_B`). (a) MODEL_REVIEW #3, moneyline path: the
+- **NBA forecast path** (`83b76fc7`). (a) MODEL_REVIEW #3, moneyline path: the
   Main lr-v4 row created 2026-11-11T05:51Z carries `reason_code QUALIFIED`,
   `record_type QUALIFIED_SHADOW_CALL` although the champion had been
   `historical_only` since 11-10 17:42Z and `_downgrade_unserved` had marked it
-  `PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED`; `ledger.py`'s Main branch relabels
-  every row it receives as QUALIFIED. The learned path now keeps any
-  `PAPER_CALL_*`-downgraded CALL off Main (Flat still logs it) and reports them
-  as `paper_calls_kept_off_main`. (b) #8d: `_select_nba_total_market` shares
+  `PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED`; `ledger.py`'s Main branch
+  (`ccc842b6`, 2026-10-23) relabelled every row it received as QUALIFIED. Every
+  candidate is still a CALL pick on Main (operator directive 2026-10-11), but a
+  non-qualified eligibility now goes through `enforce_universal_paper_call`
+  and keeps its reason code and research `record_type`; only a qualified one
+  is promoted. (b) #8d: `_select_nba_total_market` shares
   the spread selector's freshness window + latest-per-slug dedupe
   (`_fresh_latest_per_slug`); the slate passes `as_of=observed_at`. (c) #14:
   `UpcomingGame.neutral_site` is set from ESPN `neutralSite` + the
   international-venue heuristic for NBA spread/total slates, and both
   basketball engines drop Elo HCA and trend home-court on neutral floors.
-  Tests: `test_nba_learned_main_never_receives_a_downgraded_paper_call`,
+  Tests: `test_main_ledger_keeps_a_downgraded_paper_call_unqualified`,
+  `test_nba_learned_downgraded_call_reaches_main_as_a_paper_call_not_qualified`,
   `test_select_nba_total_market_ignores_old_balanced_quote`,
   `test_nba_v9_neutral_site_removes_home_court_from_both_halves`.
 

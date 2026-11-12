@@ -7,9 +7,11 @@ verified against the live tree before being listed; ledger numbers come from
 
 **Status (2026-11-12):** the NFL findings (#2, #3 NFL part, #4, #5, #8d NFL, #9 NFL,
 #15) are **fixed** in commits `03faf30d` → `a2d9a43c` (see `docs/DEBUG.md`
-2026-11-11 entry and `outputs/nfl/nfl_v7_replay.md`). Everything else below is
-**open**. Open items belong in `docs/ROADMAP.md` when picked up; this file is the
-evidence record.
+2026-11-11 entry and `outputs/nfl/nfl_v7_replay.md`). The NBA findings (#3 moneyline
+path, #6, #8d NBA, #14) are **fixed** in `quick-261112-11j` (DEBUG.md 2026-11-12 entry), which
+also fixed three NBA defects found while re-verifying this file — see the **NBA
+addendum** at the end. Everything else below is **open**. Open items belong in
+`docs/ROADMAP.md` when picked up; this file is the evidence record.
 
 **NCAAB status (2026-11-12):** #7, #9 (NCAAB part), #10 (NCAAB part), #11 and the
 NCAAB push-mass item are **fixed** in `quick-261112-nc6` — `docs/DEBUG.md` 2026-11-12
@@ -61,8 +63,8 @@ tuple from the 10-27 snapshot cutover until 11-12. Reproduced on the live 11-11
 snapshot. Now fails closed (`NFLEfficiencyInputError` → NO_CALL); defect window
 annotated in `docs/DEBUG.md`; Main rows left in place (operator decision).
 
-**3. Research rows relabelled `QUALIFIED` on Main. (NFL FIXED `e44b7117`; NBA/WNBA
-spread helper OPEN-BY-DESIGN)** `_downgrade_unserved` keeps `decision="CALL"` with
+**3. Research rows relabelled `QUALIFIED` on Main. (NFL FIXED `e44b7117`; NBA moneyline
+path FIXED `quick-261112-11j`; NBA/WNBA spread helper OPEN-BY-DESIGN)** `_downgrade_unserved` keeps `decision="CALL"` with
 `record_type=RESEARCH_OBSERVATION`; spread Main gates checked only `decision`;
 `ledger.append_evaluated`'s Main branch relabels whatever arrives as QUALIFIED.
 21 Main NFL v7 rows carried `model_state_at_decision='research'`. NFL now gates on
@@ -81,7 +83,7 @@ the engine's wind/cold terms never fired. Open-Meteo PIT capture for 32 venues n
 runs in the daily capture pool; unavailable ⇒ no weather term, flagged.
 
 **6. `nba-elo-trend-lr-v4` is served on different features than it was fit on.
-(OPEN)** `learned_forward.py:671-698` injects NBA-only overrides (Elo HCA 38,
+(FIXED `quick-261112-11j` — serving overrides removed; refit still an operator option)** `learned_forward.py:671-698` injects NBA-only overrides (Elo HCA 38,
 offseason gap 60, retention 0.40, `isolate_postseason=True`; added in `a9315de4`
 10-24); training (`validation.py:393-394`) used `build_elo(history, sport)` (HCA 70,
 regression 0.35, gap 90) and `TrendEngine(history)` defaults. `elo_probability` for
@@ -114,7 +116,7 @@ asks fabricated as `1 − ask` (`:740-741`), overstating edge by the full spread
 (c) OPEN DECISION: **229 of 238 Main NCAAF rows and 31 of 52 Main NFL v7 rows are
 `espn_consensus`**, not Polymarket. NFL rows are now labelled (`5ffc2b40`) and stay
 Main-eligible by operator decision 2026-11-11; NCAAF rows are now labelled the same way (`quick-261112-0xd`), eligibility unchanged pending decision. (d) NFL total
-selector FIXED (`e44b7117`); NBA total selector OPEN (spread selectors were fixed
+selector FIXED (`e44b7117`); NBA total selector FIXED `quick-261112-11j` (spread selectors were fixed
 in `6c078b08`). Fix pattern: `PolymarketSnapshotStore.latest()`, require both asks,
 tag non-Polymarket rows.
 
@@ -153,7 +155,7 @@ stadium even for neutral sites; a dome-home team playing an outdoor bowl gets
 preseason-prior weight for bowl games (verify against a live payload).
 `qb_starter_prob_*` are never populated in production — the QB channel is inert.
 
-**14. NBA `neutral_site` never set for spread/total `UpcomingGame`. (OPEN)** NBA Cup
+**14. NBA `neutral_site` never set for spread/total `UpcomingGame`. (FIXED `quick-261112-11j`)** NBA Cup
 Vegas games, Paris, Mexico City get full HCA; the ML path does use it.
 
 **15. NFL `input_qualified` keyed on calendar-date equality. (FIXED `e44b7117`)**
@@ -218,3 +220,45 @@ on consensus asks (left); whether ESPN-consensus should ever reach Main for NCAA
 refit `nba-elo-trend-lr-v4` or revert its serving overrides; demote the NFL v7
 `predictively_qualified` label. All are promotion-gate-class changes per
 `docs/ROADMAP.md`.
+
+## NBA addendum — 2026-11-12 re-verification (`quick-261112-11j`)
+
+Re-read against HEAD `020767d8` and the runtime ledger. The four NBA findings above
+reproduced exactly. Three more surfaced that model code alone cannot show; all three
+are fixed in `quick-261112-11j` with regression tests (details and hashes: `docs/DEBUG.md`
+2026-11-12).
+
+**A1. A totals serving calibrator reshaped every served NBA total, then silently
+reverted.** The committed `nba-total-margin-v9.total_calibrator.json` was a Beta
+transform (a 1.2827, b 1.2591, c −0.6334) fitted 2026-11-08 on 125 settled picks made
+by v2–v7, labelled v9. `_forecast_nba_total_slate` loaded it from 2026-11-11T01:32Z
+(working-tree code, committed later in `0af19ecd`); rows carry
+`calibration_method=beta`. Served probabilities on the model's own side fell to
+35–46%, so every total had negative edge and Main totals went dark from 11-09. The
+nightly pipeline overwrote the file with identity at 2026-11-12T05:32Z (n = 28).
+Flat, v9 totals settled: raw era 9-6 +2.97u (avg served 56.3%); beta era 3-10 −7.08u
+(avg served 41.9%) on the same raw selections. **Fix:** one shared serving guard
+(`calibration_pipeline.serving_guard_reason`) for the buyer, NFL slates and the NBA
+total slate; artifacts must declare `fit_model_versions == [model_version]` and a
+`fit_source` of `settled_live_rows` or `point_in_time_replay`; the pipeline stamps
+both; the slate records the decision. Operator decision still open: the pipeline
+can still change a (now own-model) serving transform unattended.
+
+**A2. `nba-moneyline-v9` claimed a locked-holdout qualification it never earned.**
+Rolled back 2026-11-10 (`4d5624ed`, placeholder coefficients) but the artifact said
+`qualified: true`, Brier 0.1945; 8 of its 11 settled flat rows priced the model
+below the market ask (54% vs 87%). **Fix:** qualification block rewritten as an
+unverified placeholder with the rollback note, hash recomputed, dropped from the
+auto-buyer whitelist (lr-v4 deliberately not added — operator decision), registry
+test that `unverified` entries cannot carry a qualified artifact claim.
+
+**A3. #3 on the NBA moneyline path, with ledger evidence.** Main lr-v4 row created
+2026-11-11T05:51Z: `reason_code QUALIFIED`, `record_type QUALIFIED_SHADOW_CALL`,
+although lr-v4 had been `historical_only` since 11-10 17:42Z and the forecast path
+had downgraded it to `PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED`. `ledger.py`'s Main
+branch (`ccc842b6`) relabelled every row it received. **Fix:** Main still takes every
+CALL (operator directive 2026-10-11) but a non-qualified eligibility keeps its
+`PAPER_CALL_*` reason and research `record_type`; only a qualified one is promoted.
+
+Still open for NBA: #10 (latent until the v9 moneyline engine is a challenger), the
+LOW items, and the two operator decisions above.
