@@ -58,8 +58,11 @@ if _env_file.exists():
         pass
 
 DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
-    # NBA (Latest Generation v9 Champions)
-    "nba-moneyline-v9",
+    # NBA (v9 spread/total champions). nba-moneyline-v9 was removed 2026-11-12:
+    # it ran on placeholder coefficients and was rolled back from serving on
+    # 2026-11-10 (4d5624ed). The serving moneyline champion
+    # (nba-elo-trend-lr-v4, historical_only evidence) is deliberately NOT
+    # listed -- adding it is a trading-eligibility decision for the operator.
     "nba-spread-margin-v9",
     "nba-total-margin-v9",
     # NFL (Latest Generation v7 Champions; NFL moneyline currently has no

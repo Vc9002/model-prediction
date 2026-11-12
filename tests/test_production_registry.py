@@ -437,3 +437,22 @@ def test_health_check_healthy_registry_reports_all_models(tmp_path: Path) -> Non
 
     assert result["status"] == "HEALTHY"
     assert result["details"]["models"]["wnba-elo-trend-lr-v4"] == "ok"
+
+
+def test_unverified_registry_entries_never_carry_a_qualified_artifact_claim() -> None:
+    """Registry evidence and artifact self-description must agree. nba-moneyline-v9 sat
+    at evidence_status unverified (rolled back for placeholder coefficients) while its
+    artifact still claimed qualified / locked_holdout / Brier 0.1945 -- a false record
+    that the auto-buyer whitelist and future promotion requests could have trusted."""
+    config = yaml.safe_load((REPO / "config" / "production.yaml").read_text(encoding="utf-8"))
+    offenders = []
+    for entry in config.get("models", []):
+        if entry.get("implementation") != "json_artifact":
+            continue
+        if entry.get("evidence_status") != "unverified":
+            continue
+        artifact = json.loads((REPO / entry["artifact"]).read_text(encoding="utf-8"))
+        qualification = artifact.get("qualification") or {}
+        if qualification.get("qualified") is True or qualification.get("locked_holdout") is True:
+            offenders.append(entry["model_id"])
+    assert offenders == []
