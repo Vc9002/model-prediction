@@ -42,7 +42,6 @@ from ..domain import (
     League,
     MarketType,
     ModelOrigin,
-    ModelState,
     PickRequest,
     RecordType,
     iso_utc,
@@ -68,6 +67,7 @@ from ..international_baseball import (
 )
 from ..learned_forward import build_learned_moneyline_slate, match_executable_quote
 from ..ledger import DuplicatePickError
+from ..lifecycle import model_enabled
 from ..main_ledgers import MAIN_LEDGER_SPORTS, MultiSportPickLedger
 from ..market_blend import MarketBlendBlockedError, MarketBlendPolicy, canonical_config_logical_hash
 from ..models.mlb import canonical_mlb_artifact_hash, load_formula_spec
@@ -345,7 +345,7 @@ def _forecast_mlb(args_date: str, log: bool, config, registry, bans, ledger, aud
                 rationale=candidate.rationale,
                 risks=candidate.risks,
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
-                model_state=ModelState.RESEARCH,
+                model_enabled=True,
                 observed_at_utc=candidate.observed_at_utc,
                 model_artifact_hash=candidate.model_artifact_hash,
                 calibration_method="flat_probability_shrinkage_toward_half",
@@ -377,8 +377,7 @@ def _forecast_mlb(args_date: str, log: bool, config, registry, bans, ledger, aud
                 now=observed_at,
             )
             # Main holds only genuine qualified calls (see the same filter
-            # in _forecast_learned_sport) -- this path's model_state is
-            # hardcoded to RESEARCH, so it can never produce one anyway,
+            # in _forecast_learned_sport) -- this path never produces one,
             # but a NO_CALL row here would still be pure noise in main.
             if eligibility.decision != "CALL":
                 continue
@@ -646,7 +645,7 @@ def _forecast_mlb_totals_flat(
                 rationale=candidate.rationale,
                 risks=candidate.risks,
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
-                model_state=ModelState.RESEARCH,
+                model_enabled=True,
                 observed_at_utc=candidate.observed_at_utc,
                 model_artifact_hash=candidate.model_artifact_hash,
                 calibration_method="flat_probability_shrinkage_toward_half",
@@ -1003,7 +1002,7 @@ def _forecast_mlb_nrfi_flat(
                 rationale=pick_rationale,
                 risks="1st inning variance, leadoff home run risk",
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
-                model_state=ModelState.SHADOW_QUALIFIED,
+                model_enabled=True,
                 observed_at_utc=observed_at_str,
                 model_artifact_hash=artifact["artifact_hash"],
                 calibration_method=artifact.get("method", "first_inning_logistic"),
@@ -1966,9 +1965,7 @@ def _log_basketball_spread_picks(
             rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
             risks="Point-in-time composite Elo + trend + rest margin-normal spread model.",
             model_origin=ModelOrigin.STATISTICAL_MODEL,
-            model_state=ModelState.SHADOW_QUALIFIED
-            if contract.get("model_qualified")
-            else ModelState.RESEARCH,
+            model_enabled=True,
             observed_at_utc=contract["observed_at_utc"],
             model_artifact_hash=contract["model_artifact_hash"],
             calibration_method="margin_normal",
@@ -2432,9 +2429,7 @@ def _log_basketball_total_picks(
             rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
             risks=risks,
             model_origin=ModelOrigin.STATISTICAL_MODEL,
-            model_state=ModelState.SHADOW_QUALIFIED
-            if nba_rules and contract.get("model_qualified")
-            else ModelState.RESEARCH,
+            model_enabled=True,
             observed_at_utc=contract["observed_at_utc"],
             model_artifact_hash=contract["model_artifact_hash"],
             calibration_method=contract.get("calibration_method", "total_normal"),
@@ -2986,9 +2981,7 @@ def _forecast_nfl_spread_sport(
             rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
             risks="NFL Structural v6 projected-QB research model; prospective validation pending.",
             model_origin=ModelOrigin.STATISTICAL_MODEL,
-            model_state=ModelState.SHADOW_QUALIFIED
-            if contract.get("model_qualified")
-            else ModelState.RESEARCH,
+            model_enabled=True,
             observed_at_utc=contract["observed_at_utc"],
             model_artifact_hash=contract["model_artifact_hash"],
             calibration_method=contract.get("calibration_method", "margin_normal"),
@@ -3604,9 +3597,7 @@ def _forecast_nfl_total_sport(
             rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
             risks="NFL Structural v6 projected-QB research model; prospective validation pending.",
             model_origin=ModelOrigin.STATISTICAL_MODEL,
-            model_state=ModelState.SHADOW_QUALIFIED
-            if contract.get("model_qualified")
-            else ModelState.RESEARCH,
+            model_enabled=True,
             observed_at_utc=contract["observed_at_utc"],
             model_artifact_hash=contract["model_artifact_hash"],
             calibration_method=contract.get("calibration_method", "total_normal"),
@@ -3826,7 +3817,6 @@ def _forecast_learned_sport(
                     "candidates": candidates,
                     "note": f"{sport} is research-only — not logged to main ledger",
                 }
-        configured_state = str(model_config.get("status", "research"))
         for candidate in to_log:
             if force:
                 try:
@@ -4043,7 +4033,7 @@ def _forecast_learned_sport(
                 rationale=rationale,
                 risks="Learned model; shadow-qualified via operator override.",
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
-                model_state=ModelState(configured_state),
+                model_enabled=model_enabled(model_config),
                 observed_at_utc=observed_at_utc,
                 model_artifact_hash=candidate.model_artifact_hash,
                 calibration_method="learned_lr",
@@ -4296,7 +4286,6 @@ def _log_esports_forecast(
         return 0
     model_config = config["models"].get(forecast["title"].upper(), {})
     min_edge = float(model_config.get("min_edge", 0.02))
-    configured_state = str(model_config.get("status", "research"))
     title = forecast["title"].upper()
     league = League(title)
     observed_now = utc_now()
@@ -4431,7 +4420,7 @@ def _log_esports_forecast(
                 f"team_resolution_methods={contract.get('team_resolution_methods') or 'not_recorded'}."
             ),
             model_origin=ModelOrigin.STATISTICAL_MODEL,
-            model_state=ModelState(configured_state),
+            model_enabled=model_enabled(model_config),
             observed_at_utc=str(contract.get("observed_at_utc") or "") or None,
             model_artifact_hash=str(contract.get("artifact_hash", "")),
             calibration_method="neutral_elo",
@@ -4562,7 +4551,6 @@ def _forecast_international_sport(
     # something" convention (validation.MINIMUM_MONTHLY_CALLS = 10), same
     # reasoning as soccer/tennis.
     MINIMUM_TEAM_GAMES = 10
-    configured_state = str(model_config.get("status", "research"))
     forecast = forecast_international_baseball_slate(
         data_root,
         artifact_dir,
@@ -4671,7 +4659,7 @@ def _forecast_international_sport(
             ),
             risks="Config-promoted international baseball baseline; gates enforced at log time.",
             model_origin=ModelOrigin.STATISTICAL_MODEL,
-            model_state=ModelState(configured_state),
+            model_enabled=model_enabled(model_config),
             observed_at_utc=str(contract.get("observed_at_utc") or "") or None,
             model_artifact_hash=str(contract.get("artifact_hash", "")),
             calibration_method="tie_aware_elo",
@@ -4914,7 +4902,7 @@ def _forecast_soccer_sport(
             rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
             risks=("Research-only soccer score model; draw-aware, but not yet locked-holdout qualified."),
             model_origin=ModelOrigin.STATISTICAL_MODEL,
-            model_state=ModelState(configured_state),
+            model_enabled=model_enabled(model_config),
             observed_at_utc=str(contract["observed_at_utc"]),
             model_artifact_hash=str(forecast["model_code_hash"]),
             calibration_method="poisson_dixon_coles",
@@ -5112,7 +5100,6 @@ def _forecast_tennis_sport(
     # "enough to say something" convention (validation.MINIMUM_MONTHLY_CALLS
     # = 10), same reasoning as soccer's MINIMUM_TEAM_GAMES.
     MINIMUM_PLAYER_MATCHES = 10
-    configured_state = str(model_config.get("status", "research"))
     observed_now = utc_now()
     logged = 0
     gated = 0
@@ -5178,7 +5165,7 @@ def _forecast_tennis_sport(
                 "explicit operator directive, not genuine walk-forward validation."
             ),
             model_origin=ModelOrigin.STATISTICAL_MODEL,
-            model_state=ModelState(configured_state),
+            model_enabled=model_enabled(model_config),
             observed_at_utc=str(contract["observed_at_utc"]),
             model_artifact_hash=str(forecast["model_code_hash"]),
             calibration_method=(
@@ -5427,7 +5414,7 @@ def _forecast_cfb_sport(
                 rationale=rationale_text,
                 risks="College football model; multi-market (moneyline, spread, total).",
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
-                model_state=ModelState(configured_state),
+                model_enabled=model_enabled(model_config),
                 observed_at_utc=contract_obs,
                 model_artifact_hash=serving_artifact_hash,
                 calibration_method="cfb_key_number_engine",
@@ -5620,11 +5607,7 @@ def _forecast_hockey_sport(
     model_config = config.get("models", {}).get("HOCKEY", {})
     leagues = tuple(model_config.get("leagues") or ())
     min_edge = float(model_config.get("min_edge", 0.02))
-    configured_state = model_config.get("status", "shadow_qualified")
-    try:
-        model_state_val = ModelState(configured_state)
-    except (ValueError, KeyError):
-        model_state_val = ModelState.SHADOW_QUALIFIED
+    model_enabled_val = model_enabled(model_config)
 
     forecast = build_hockey_slate(
         data_root=data_root,
@@ -5695,7 +5678,7 @@ def _forecast_hockey_sport(
                 ),
                 risks=("Paper-mode hockey score model; bivariate Poisson with OT resolution."),
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
-                model_state=model_state_val,
+                model_enabled=model_enabled_val,
                 observed_at_utc=hockey_observed_at,
                 calibration_method="poisson_dixon_coles",
                 calibration_version=hockey_model_version,
@@ -5834,11 +5817,7 @@ def _forecast_darts_sport(
     model_config = config.get("models", {}).get("DARTS", {})
     leagues = tuple(model_config.get("leagues") or ())
     min_edge = float(model_config.get("min_edge", 0.02))
-    configured_state = model_config.get("status", "shadow_qualified")
-    try:
-        model_state_val = ModelState(configured_state)
-    except (ValueError, KeyError):
-        model_state_val = ModelState.SHADOW_QUALIFIED
+    model_enabled_val = model_enabled(model_config)
 
     forecast = build_darts_slate(
         data_root=data_root,
@@ -5915,7 +5894,7 @@ def _forecast_darts_sport(
                 ),
                 risks=("Paper-mode darts score model; exact Markov leg-progression distribution."),
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
-                model_state=model_state_val,
+                model_enabled=model_enabled_val,
                 observed_at_utc=str(contract.get("observed_at_utc") or effective_now.isoformat()),
                 calibration_method="markov_leg_progression",
                 calibration_version=str(contract.get("model_version") or "darts-markov-v1"),

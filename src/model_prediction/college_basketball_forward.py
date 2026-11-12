@@ -15,7 +15,7 @@ from .college_contract_evidence import build_candidate_evidence, save_candidate_
 from .config import PROJECT_ROOT
 from .data_sources.espn import ESPNClient
 from .data_sources.polymarket_us import PolymarketUSClient, probability_to_american
-from .domain import League, MarketType, ModelOrigin, ModelState, PickRequest, parse_utc, utc_now
+from .domain import League, MarketType, ModelOrigin, PickRequest, parse_utc, utc_now
 from .eligibility import EligibilityResult, RecordType
 from .entities import CanonicalTeam
 from .feature_capture import contract_snapshot_json
@@ -631,7 +631,7 @@ def forecast_ncaab_sport(
                         else "Paper model; indicative market price, no executable quote."
                     ),
                     model_origin=ModelOrigin.STATISTICAL_MODEL,
-                    model_state=ModelState.SHADOW_QUALIFIED,
+                    model_enabled=True,
                     calibration_method=cal_method,
                     calibration_version=cal_version,
                     calibration_artifact_hash=cal_hash,

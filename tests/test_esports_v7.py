@@ -45,7 +45,7 @@ def test_esports_v7_bo5_format_magnification():
 
 
 def test_gated_research_eligibility_downgrades_large_disagreement():
-    from model_prediction.domain import League, MarketType, ModelOrigin, ModelState, PickRequest
+    from model_prediction.domain import League, MarketType, ModelOrigin, PickRequest
     from model_prediction.eligibility import evaluate_gated_research_eligibility
     from model_prediction.units import Exposure, UnitPolicy
 
@@ -66,7 +66,7 @@ def test_gated_research_eligibility_downgrades_large_disagreement():
         rationale="test",
         risks="",
         model_origin=ModelOrigin.STATISTICAL_MODEL,
-        model_state=ModelState.SHADOW_QUALIFIED,
+        model_enabled=True,
         observed_at_utc="2026-07-13T11:00:00Z",
         model_artifact_hash="hash",
         calibration_artifact_hash="cal-hash",

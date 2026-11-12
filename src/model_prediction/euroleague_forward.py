@@ -19,7 +19,7 @@ import httpx
 from .config import PROJECT_ROOT
 from .data_sources.euroleague import club_names, refresh_euroleague_history, resolve_club
 from .data_sources.polymarket_us import PolymarketUSClient, probability_to_american
-from .domain import League, MarketType, ModelOrigin, ModelState, PickRequest, parse_utc, utc_now
+from .domain import League, MarketType, ModelOrigin, PickRequest, parse_utc, utc_now
 from .eligibility import EligibilityResult, RecordType
 from .entities import CanonicalTeam
 from .features.base import FeatureStore
@@ -223,7 +223,7 @@ def forecast_basketball_lane(
                 rationale=f"{prediction.rationale} ({market_def.get('market_slug', '')}).",
                 risks="Paper tempo model; live market quote is an indicative reference, not verified executable BBO.",
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
-                model_state=ModelState.SHADOW_QUALIFIED,
+                model_enabled=True,
                 observed_at_utc=observed.isoformat(),
             )
             teams = [

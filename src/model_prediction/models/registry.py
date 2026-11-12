@@ -12,7 +12,8 @@ from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
 
-from ..domain import League, ModelOrigin, ModelState
+from ..domain import League, ModelOrigin
+from ..lifecycle import model_enabled
 
 
 @dataclass(frozen=True)
@@ -22,7 +23,7 @@ class ModelSpec:
     target: str
     distribution: str
     trend_features: tuple[str, ...]
-    status: ModelState = ModelState.RESEARCH
+    enabled: bool = True
     origin: ModelOrigin = ModelOrigin.STATISTICAL_MODEL
 
 
@@ -33,7 +34,6 @@ MODEL_SPECS = {
         "moneyline home-win probability",
         "binary logistic regression",
         ("Elo home-win probability", "offensive momentum gap"),
-        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.NBA: ModelSpec(
         League.NBA,
@@ -41,7 +41,6 @@ MODEL_SPECS = {
         "moneyline, margin, and total via normal approximation",
         "Elo win probability; normal margin/total",
         ("adjusted efficiency", "pace", "lineup strength", "momentum"),
-        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.WNBA: ModelSpec(
         League.WNBA,
@@ -49,7 +48,6 @@ MODEL_SPECS = {
         "moneyline, margin, and total via normal approximation",
         "Elo win probability; normal margin/total",
         ("adjusted efficiency", "pace", "lineup strength", "momentum"),
-        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.SOCCER: ModelSpec(
         League.SOCCER,
@@ -57,7 +55,6 @@ MODEL_SPECS = {
         "three-way result, O/U 2.5, BTTS",
         "correlated Poisson score matrix",
         ("EWMA attack/defense strength", "home-goal boost", "low-score dependence"),
-        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.TENNIS: ModelSpec(
         League.TENNIS,
@@ -65,7 +62,6 @@ MODEL_SPECS = {
         "moneyline win probability, WTA only",
         "chronological Elo updated match-by-match, blended per surface",
         ("overall Elo", "per-surface Elo", "singles-only ESPN match history"),
-        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.NFL: ModelSpec(
         League.NFL,
@@ -73,7 +69,6 @@ MODEL_SPECS = {
         "moneyline, margin, and total via normal approximation",
         "Elo win probability; normal margin/total",
         ("scoring form", "opponent adjustment", "momentum"),
-        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.NCAAF: ModelSpec(
         League.NCAAF,
@@ -81,7 +76,6 @@ MODEL_SPECS = {
         "moneyline, spread margin, and total via calibrated continuous-discrete distribution",
         "Elo win probability; key-number adjusted margin/total",
         ("adjusted efficiency", "tempo", "conference strength", "rest disparity", "momentum"),
-        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.LOL: ModelSpec(
         League.LOL,
@@ -89,7 +83,6 @@ MODEL_SPECS = {
         "best-of match/series winner probability",
         "binary Elo expectation",
         ("point-in-time team Elo",),
-        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.CS2: ModelSpec(
         League.CS2,
@@ -97,7 +90,6 @@ MODEL_SPECS = {
         "best-of match/series winner probability",
         "binary Elo expectation",
         ("point-in-time team Elo",),
-        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.KBO: ModelSpec(
         League.KBO,
@@ -105,7 +97,6 @@ MODEL_SPECS = {
         "expected moneyline settlement (tie pays 0.50)",
         "decisive-result Elo plus empirical tie probability",
         ("point-in-time team Elo", "home field", "league tie rate"),
-        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.NPB: ModelSpec(
         League.NPB,
@@ -113,7 +104,6 @@ MODEL_SPECS = {
         "expected moneyline settlement (tie pays 0.50)",
         "decisive-result Elo plus empirical tie probability",
         ("point-in-time team Elo", "home field", "league tie rate"),
-        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.DOTA2: ModelSpec(
         League.DOTA2,
@@ -121,7 +111,6 @@ MODEL_SPECS = {
         "best-of match/series winner probability",
         "binary Elo expectation",
         ("point-in-time team Elo",),
-        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.VALORANT: ModelSpec(
         League.VALORANT,
@@ -129,7 +118,6 @@ MODEL_SPECS = {
         "best-of match/series winner probability",
         "binary Elo expectation",
         ("point-in-time team Elo",),
-        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.RAINBOW_SIX: ModelSpec(
         League.RAINBOW_SIX,
@@ -137,7 +125,6 @@ MODEL_SPECS = {
         "best-of match/series winner probability",
         "binary Elo expectation",
         ("point-in-time team Elo",),
-        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.HOCKEY: ModelSpec(
         League.HOCKEY,
@@ -145,7 +132,6 @@ MODEL_SPECS = {
         "two-way moneyline, puck line spread, and total goals",
         "correlated Poisson score matrix with sudden-death OT resolution",
         ("EWMA attack/defense strength", "home-ice boost", "low-score dependence"),
-        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.NHL: ModelSpec(
         League.NHL,
@@ -153,7 +139,6 @@ MODEL_SPECS = {
         "two-way moneyline, puck line spread, and total goals",
         "correlated Poisson score matrix with sudden-death OT resolution",
         ("EWMA attack/defense strength", "home-ice boost", "low-score dependence"),
-        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.DARTS: ModelSpec(
         League.DARTS,
@@ -161,7 +146,6 @@ MODEL_SPECS = {
         "match winner, leg spread, and total legs",
         "discrete Markov leg-state probability distribution",
         ("point-in-time player Elo rating", "leg hold expectancy", "break probability"),
-        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.DARTS_PDC: ModelSpec(
         League.DARTS_PDC,
@@ -169,7 +153,6 @@ MODEL_SPECS = {
         "match winner, leg spread, and total legs",
         "discrete Markov leg-state probability distribution",
         ("point-in-time player Elo rating", "leg hold expectancy", "break probability"),
-        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.DARTS_MODUS: ModelSpec(
         League.DARTS_MODUS,
@@ -177,7 +160,6 @@ MODEL_SPECS = {
         "match winner, leg spread, and total legs",
         "discrete Markov leg-state probability distribution",
         ("point-in-time player Elo rating", "leg hold expectancy", "break probability"),
-        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.NCAAB: ModelSpec(
         League.NCAAB,
@@ -185,7 +167,6 @@ MODEL_SPECS = {
         "moneyline, margin, and total via normal approximation (NCAAB constants)",
         "Elo win probability; 40-minute college possession margin/total",
         ("adjusted efficiency", "tempo", "conference strength", "home court advantage"),
-        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.WNCAAB: ModelSpec(
         League.WNCAAB,
@@ -193,7 +174,6 @@ MODEL_SPECS = {
         "moneyline, margin, and total via normal approximation",
         "Elo win probability; 40-minute women's college margin/total",
         ("adjusted efficiency", "tempo", "momentum"),
-        status=ModelState.SHADOW_QUALIFIED,
     ),
     League.EUROLEAGUE: ModelSpec(
         League.EUROLEAGUE,
@@ -201,21 +181,20 @@ MODEL_SPECS = {
         "moneyline, margin, and total via normal approximation (EuroLeague constants)",
         "Elo win probability; 40-minute FIBA margin/total",
         ("adjusted efficiency", "FIBA pace", "European home advantage"),
-        status=ModelState.SHADOW_QUALIFIED,
     ),
 }
 
-_CONFIG_STATUS_CACHE: dict[str, dict[str, ModelState]] = {}
+_CONFIG_STATUS_CACHE: dict[str, dict[str, bool]] = {}
 
 
-def _status_from_config(league: League) -> ModelState | None:
-    """Read a league's model state from config/model.yaml, if present."""
+def _enabled_from_config(league: League) -> bool | None:
+    """Read a league's enabled flag from config/model.yaml, if present."""
     cache_key = "main"
     if cache_key not in _CONFIG_STATUS_CACHE:
         from ..config import PROJECT_ROOT
 
         config_path = PROJECT_ROOT / "config/model.yaml"
-        statuses: dict[str, ModelState] = {}
+        statuses: dict[str, bool] = {}
         if config_path.exists():
             try:
                 import yaml
@@ -227,28 +206,26 @@ def _status_from_config(league: League) -> ModelState | None:
             for lk, v in models.items():
                 if lk not in League.__members__:
                     continue
-                # One league using a non-ModelState status string in the YAML
-                # (a stale placeholder, a typo, whatever) must not silently
-                # blank out every OTHER league's status -- a single bad value
-                # here previously poisoned the whole cache via one blanket
-                # try/except around the entire dict comprehension.
+                # One malformed league entry must not blank out every OTHER
+                # league's flag -- a single bad value here previously poisoned
+                # the whole cache via one blanket try/except.
                 with suppress(ValueError, AttributeError):
-                    statuses[lk] = ModelState(v.get("status", "research"))
+                    statuses[lk] = model_enabled(v)
         _CONFIG_STATUS_CACHE[cache_key] = statuses
     return _CONFIG_STATUS_CACHE[cache_key].get(league.value)
 
 
 def model_spec(league: League) -> ModelSpec:
     spec = MODEL_SPECS[league]
-    config_status = _status_from_config(league)
-    if config_status is not None and config_status != spec.status:
+    config_enabled = _enabled_from_config(league)
+    if config_enabled is not None and config_enabled != spec.enabled:
         return ModelSpec(
             league=spec.league,
             family=spec.family,
             target=spec.target,
             distribution=spec.distribution,
             trend_features=spec.trend_features,
-            status=config_status,
+            enabled=config_enabled,
             origin=spec.origin,
         )
     return spec

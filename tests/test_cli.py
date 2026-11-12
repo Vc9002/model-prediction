@@ -28,7 +28,6 @@ from model_prediction.domain import (
     League,
     MarketType,
     ModelOrigin,
-    ModelState,
     PickRequest,
 )
 from model_prediction.eligibility import EligibilityResult, RecordType
@@ -1352,7 +1351,7 @@ def test_tennis_settlement_populates_clv_from_captured_closing_snapshot(tmp_path
         rationale="Surface-blended Elo; executable ask 0.4500 (market_slug=wta-alpha-beta-2026).",
         risks="",
         model_origin=ModelOrigin.STATISTICAL_MODEL,
-        model_state=ModelState.SHADOW_QUALIFIED,
+        model_enabled=True,
     )
     away_player = CanonicalTeam(
         "Alpha Player", League.TENNIS, "Alpha Player", "Alpha Player", True, None, None, ()
@@ -2452,7 +2451,7 @@ def _log_pick(
         rationale="test",
         risks="",
         model_origin=ModelOrigin.STATISTICAL_MODEL,
-        model_state=ModelState.SHADOW_QUALIFIED,
+        model_enabled=True,
     )
     eligibility = EligibilityResult(
         RecordType.QUALIFIED_SHADOW_CALL, "CALL", "QUALIFIED", units, 60, 0.05, 0.05, AWAY, HOME
@@ -3250,8 +3249,6 @@ def test_research_models_dir_prefers_rolling_over_frozen(monkeypatch, tmp_path) 
 
 
 def test_qualified_wnba_spread_uses_valid_shadow_state(monkeypatch, registry, ban_list):
-    from model_prediction.domain import ModelState
-
     forecast = _wnba_spread_forecast(selection="home", line=10.5)
     forecast["priced_contracts"][0]["model_qualified"] = True
     monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 8, 13, 18, tzinfo=UTC))
@@ -3267,7 +3264,7 @@ def test_qualified_wnba_spread_uses_valid_shadow_state(monkeypatch, registry, ba
         main_ledger=None,
     )
     assert result["logged"] == 1
-    assert flat.appended[0][0].model_state is ModelState.SHADOW_QUALIFIED
+    assert flat.appended[0][0].model_enabled is True
 
 
 def _nfl_spread_forecast(*, selection: str, line: float) -> dict:
@@ -3421,8 +3418,6 @@ def test_select_nfl_total_market_picks_the_most_balanced_line() -> None:
 
 
 def test_nfl_spread_flat_ledger_logs_contract(monkeypatch, registry, ban_list) -> None:
-    from model_prediction.domain import ModelState
-
     forecast = _nfl_spread_forecast(selection="away", line=-3.5)
     monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 9, 13, 14, tzinfo=UTC))
     monkeypatch.setattr(cli_forecast, "_forecast_nfl_spread_slate", lambda *a, **k: forecast)
@@ -3437,13 +3432,11 @@ def test_nfl_spread_flat_ledger_logs_contract(monkeypatch, registry, ban_list) -
         main_ledger=None,
     )
     assert result["logged"] == 1
-    assert flat.appended[0][0].model_state is ModelState.SHADOW_QUALIFIED
+    assert flat.appended[0][0].model_enabled is True
     assert flat.appended[0][0].model_version == "nfl-spread-structural-v5"
 
 
 def test_nfl_total_flat_ledger_logs_contract(monkeypatch, registry, ban_list) -> None:
-    from model_prediction.domain import ModelState
-
     forecast = _nfl_total_forecast(selection="over", line=48.5)
     monkeypatch.setattr(cli_forecast, "utc_now", lambda: datetime(2026, 9, 13, 14, tzinfo=UTC))
     monkeypatch.setattr(cli_forecast, "_forecast_nfl_total_slate", lambda *a, **k: forecast)
@@ -3458,7 +3451,7 @@ def test_nfl_total_flat_ledger_logs_contract(monkeypatch, registry, ban_list) ->
         main_ledger=None,
     )
     assert result["logged"] == 1
-    assert flat.appended[0][0].model_state is ModelState.SHADOW_QUALIFIED
+    assert flat.appended[0][0].model_enabled is True
     assert flat.appended[0][0].model_version == "nfl-total-structural-v5"
 
 

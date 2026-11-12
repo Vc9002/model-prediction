@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from model_prediction.domain import League, MarketType, ModelOrigin, ModelState, PickRequest, RecordType
+from model_prediction.domain import League, MarketType, ModelOrigin, PickRequest, RecordType
 from model_prediction.eligibility import evaluate_eligibility
 from model_prediction.units import Exposure, UnitPolicy
 
@@ -14,7 +14,7 @@ def request(
     away: str = "BOS",
     home: str = "NYY",
     origin: ModelOrigin = ModelOrigin.STATISTICAL_MODEL,
-    state: ModelState = ModelState.SHADOW_QUALIFIED,
+    enabled: bool = True,
     probability: float = 0.6235,
     uncertainty: float | None = 0.004,
     observed_at: str = "2026-07-13T11:00:00Z",
@@ -36,7 +36,7 @@ def request(
         rationale="test",
         risks="",
         model_origin=origin,
-        model_state=state,
+        model_enabled=enabled,
         observed_at_utc=observed_at,
         model_artifact_hash="model-hash",
         calibration_artifact_hash="calibration-hash",
@@ -81,20 +81,12 @@ def test_promotion_tier_no_longer_gates_qualified_calls(registry, ban_list) -> N
     walk-forward/locked-holdout promotion tier no longer decides eligibility.
     RETIRED and SUSPENDED remain hard stops (explicit "off" states, not
     promotion tiers -- see lifecycle.can_create_qualified_call)."""
-    for state in (
-        ModelState.SHADOW_QUALIFIED,
-        ModelState.RESEARCH,
-        ModelState.SHADOW_CANDIDATE,
-        ModelState.DEGRADED,
-    ):
-        result = evaluate_eligibility(
-            request(home="BAL", state=state), registry, ban_list, Exposure(), UnitPolicy(), NOW
-        )
-        assert result.record_type is RecordType.QUALIFIED_SHADOW_CALL and result.units > 0
+    result = evaluate_eligibility(request(home="BAL"), registry, ban_list, Exposure(), UnitPolicy(), NOW)
+    assert result.record_type is RecordType.QUALIFIED_SHADOW_CALL and result.units > 0
 
-    for state in (ModelState.SUSPENDED, ModelState.RETIRED):
+    for enabled in (False,):
         result = evaluate_eligibility(
-            request(home="BAL", state=state), registry, ban_list, Exposure(), UnitPolicy(), NOW
+            request(home="BAL", enabled=enabled), registry, ban_list, Exposure(), UnitPolicy(), NOW
         )
         # Every research observation still carries a real, model-derived
         # paper size (operator directive, 2026-07-31: "every pick should

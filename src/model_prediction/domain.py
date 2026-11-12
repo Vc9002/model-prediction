@@ -135,15 +135,6 @@ class ModelOrigin(StrEnum):
     SYNTHETIC_TEST = "synthetic_test"
 
 
-class ModelState(StrEnum):
-    RESEARCH = "research"
-    SHADOW_CANDIDATE = "shadow_candidate"
-    SHADOW_QUALIFIED = "shadow_qualified"
-    DEGRADED = "degraded"
-    SUSPENDED = "suspended"
-    RETIRED = "retired"
-
-
 class PickTag(StrEnum):
     """The only three pick tags. A tag names where a pick is going, not how trusted its model is.
 
@@ -295,7 +286,7 @@ class PickRequest:
     rationale: str
     risks: str
     model_origin: ModelOrigin = ModelOrigin.ANALYST_ESTIMATE
-    model_state: ModelState = ModelState.RESEARCH
+    model_enabled: bool = True
     baseline_identifier: str | None = None
     observed_at_utc: str | None = None
     model_artifact_hash: str = ""
@@ -476,7 +467,7 @@ class PickRequest:
             "rationale": self.rationale,
             "risks": self.risks,
             "model_origin": self.model_origin.value,
-            "model_state_at_decision": self.model_state.value,
+            "model_state_at_decision": "enabled" if self.model_enabled else "disabled",
             "baseline_identifier": self.baseline_identifier,
             "observed_at_utc": self.observed_at_utc,
             "model_artifact_hash": self.model_artifact_hash,

@@ -4,7 +4,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 
 from .bans import TeamBanList
-from .domain import ModelState, NoCallReason, PickRequest, RecordType, parse_utc, utc_now
+from .domain import NoCallReason, PickRequest, RecordType, parse_utc, utc_now
 from .entities import CanonicalTeam, EntityRegistry
 from .lifecycle import can_create_qualified_call
 from .pricing import implied_probability
@@ -57,7 +57,7 @@ def evaluate_eligibility(
                 home,
                 team,
             )
-    if request.model_state is ModelState.RETIRED:
+    if not request.model_enabled:
         return _research(request, away, home, NoCallReason.MODEL_INELIGIBLE, policy)
     if (
         request.observed_at_utc
@@ -71,7 +71,7 @@ def evaluate_eligibility(
         and (current - parse_utc(request.observed_at_utc)).total_seconds() > maximum_age_hours * 3600
     ):
         return _research(request, away, home, NoCallReason.STALE_DATA, policy)
-    if not can_create_qualified_call(request.model_state, request.model_origin):
+    if not can_create_qualified_call(request.model_enabled, request.model_origin):
         return _research(request, away, home, NoCallReason.MODEL_UNVALIDATED, policy)
     if (
         request.observed_at_utc is None
@@ -144,7 +144,7 @@ def evaluate_esports_eligibility(
                     home,
                     team,
                 )
-    if request.model_state is ModelState.RETIRED:
+    if not request.model_enabled:
         return _research(request, away, home, NoCallReason.MODEL_INELIGIBLE, policy)
     if (
         request.observed_at_utc
@@ -158,7 +158,7 @@ def evaluate_esports_eligibility(
         and (current - parse_utc(request.observed_at_utc)).total_seconds() > maximum_age_hours * 3600
     ):
         return _research(request, away, home, NoCallReason.STALE_DATA, policy)
-    if not can_create_qualified_call(request.model_state, request.model_origin):
+    if not can_create_qualified_call(request.model_enabled, request.model_origin):
         return _research(request, away, home, NoCallReason.MODEL_UNVALIDATED, policy)
     if (
         request.observed_at_utc is None

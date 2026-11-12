@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from model_prediction.domain import League, MarketType, ModelOrigin, ModelState, PickRequest
+from model_prediction.domain import League, MarketType, ModelOrigin, PickRequest
 from model_prediction.eligibility import EligibilityResult, RecordType
 from model_prediction.entities import CanonicalTeam
 from model_prediction.model_ledger import (
@@ -36,7 +36,7 @@ def _pick_request(**overrides) -> PickRequest:
         "rationale": "test",
         "risks": "",
         "model_origin": ModelOrigin.STATISTICAL_MODEL,
-        "model_state": ModelState.SHADOW_QUALIFIED,
+        "model_enabled": True,
         "observed_at_utc": "2026-08-02T12:00:00Z",
         "model_artifact_hash": "hash1",
         "calibration_artifact_hash": "cal1",

@@ -916,7 +916,7 @@ class PickLedger:
                     else "",
                     "model_origin": request.model_origin.value,
                     "baseline_identifier": request.baseline_identifier or "",
-                    "model_state_at_decision": request.model_state.value,
+                    "model_state_at_decision": "enabled" if request.model_enabled else "disabled",
                     "model_artifact_hash": request.model_artifact_hash,
                     "calibration_method": request.calibration_method,
                     "calibration_version": request.calibration_version,
@@ -2112,9 +2112,7 @@ class PickLedger:
                     else ModelOrigin.STATISTICAL_MODEL.value
                 )
             )
-            row["model_state_at_decision"] = row["model_state_at_decision"] or (
-                "research" if forced else "shadow_qualified"
-            )
+            row["model_state_at_decision"] = row["model_state_at_decision"] or "enabled"
             row["calibration_method"] = row["calibration_method"] or "identity"
             row["calibration_version"] = row["calibration_version"] or "identity-v1"
             row["feature_schema_version"] = row["feature_schema_version"] or "legacy-1"

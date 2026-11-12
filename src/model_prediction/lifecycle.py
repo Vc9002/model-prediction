@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from .domain import ModelOrigin, ModelState
+from .domain import ModelOrigin
 
 QUALIFICATION_MINIMUM_HIT_RATE = 0.60
 QUALIFICATION_MINIMUM_CALLS = 50
@@ -96,32 +97,29 @@ def evaluate_locked_holdout(
     )
 
 
-ALLOWED_TRANSITIONS: dict[ModelState, set[ModelState]] = {
-    ModelState.RESEARCH: {ModelState.SHADOW_CANDIDATE, ModelState.RETIRED},
-    ModelState.SHADOW_CANDIDATE: {ModelState.SHADOW_QUALIFIED, ModelState.RESEARCH, ModelState.RETIRED},
-    ModelState.SHADOW_QUALIFIED: {ModelState.DEGRADED, ModelState.RETIRED},
-    ModelState.DEGRADED: {ModelState.SHADOW_QUALIFIED, ModelState.SUSPENDED, ModelState.RETIRED},
-    ModelState.SUSPENDED: {ModelState.RESEARCH, ModelState.RETIRED},
-    ModelState.RETIRED: set(),
-}
+# Legacy ``status:`` strings that mean "turned off". Every other legacy state
+# (research / shadow_candidate / shadow_qualified / degraded) never gated
+# anything since the 2026-08-02 directive, so they all read as enabled.
+_LEGACY_DISABLED_STATUSES = frozenset({"retired", "suspended"})
 
 
-def validate_transition(current: ModelState, target: ModelState) -> None:
-    if target not in ALLOWED_TRANSITIONS[current]:
-        raise ValueError(f"invalid model-state transition: {current.value} -> {target.value}")
+def model_enabled(model_config: Mapping[str, Any] | None) -> bool:
+    """Whether a model's config entry is switched on.
 
-
-def can_create_qualified_call(state: ModelState, origin: ModelOrigin) -> bool:
-    """Operator directive, 2026-08-02: "remove all promotion qualification,
-    its up to me". This no longer distinguishes RESEARCH / SHADOW_CANDIDATE
-    / SHADOW_QUALIFIED / DEGRADED -- a model's walk-forward/locked-holdout
-    promotion tier no longer decides whether it can produce a real,
-    QUALIFIED_SHADOW_CALL-eligible pick; that's the operator's call, made
-    per-pick against whatever evidence the dashboard/ledger surfaces (see
-    the record_type/reason_code/edge/trade_candidate fields every row
-    already carries). RETIRED and SUSPENDED remain hard stops -- those are
-    explicit "this model is turned off right now" operator decisions, not
-    promotion-tier classifications, and are kept distinct from the
-    qualification gate this directive removes.
+    ``enabled:`` wins; the legacy ``status:`` string is read only so configs and
+    stored artifacts written before the tag directive keep their meaning.
     """
-    return state not in (ModelState.RETIRED, ModelState.SUSPENDED) and origin is ModelOrigin.STATISTICAL_MODEL
+    cfg = model_config or {}
+    if "enabled" in cfg:
+        return bool(cfg["enabled"])
+    return str(cfg.get("status", "research")).strip().lower() not in _LEGACY_DISABLED_STATUSES
+
+
+def can_create_qualified_call(enabled: bool, origin: ModelOrigin) -> bool:
+    """A call needs an enabled model with a statistical origin.
+
+    Promotion tiers were removed 2026-08-02 ("its up to me"); turning a model
+    off is the one remaining hard stop, and the per-pick decision is the
+    operator's, made against the evidence each ledger row carries.
+    """
+    return enabled and origin is ModelOrigin.STATISTICAL_MODEL

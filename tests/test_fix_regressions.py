@@ -24,7 +24,7 @@ from model_prediction.data_sources.polymarket_execute import (
     OrderTicket,
     PolymarketExecutor,
 )
-from model_prediction.domain import EASTERN, League, MarketType, ModelOrigin, ModelState, PickRequest
+from model_prediction.domain import EASTERN, League, MarketType, ModelOrigin, PickRequest
 from model_prediction.eligibility import (
     evaluate_esports_eligibility,
     evaluate_gated_research_eligibility,
@@ -55,7 +55,7 @@ def _future_request(league=League.LOL, selection="home", **overrides) -> PickReq
         "rationale": "Neutral Elo baseline; executable ask 0.5000 (market_slug=aec-lol-a-b-2026).",
         "risks": "test",
         "model_origin": ModelOrigin.STATISTICAL_MODEL,
-        "model_state": ModelState.SHADOW_QUALIFIED,
+        "model_enabled": True,
         "observed_at_utc": datetime.now(UTC).isoformat(),
         "model_artifact_hash": "hash",
         "calibration_method": "neutral_elo",

@@ -58,7 +58,7 @@ def test_validate_config_accepts_the_real_project_config() -> None:
 def test_validate_config_rejects_a_typo_in_model_status() -> None:
     """Real bug class this guards against: a typo like status: reserach
     used to surface as a cryptic ValueError('reserach' is not a valid
-    ModelState) deep inside a forecast call, or get silently swallowed by a
+    status parse) deep inside a forecast call, or get silently swallowed by a
     broad except (ValueError, KeyError): continue -- see the four cli.py
     forecast loops fixed 2026-08-02. Now caught at config-load time with a
     clear message naming the exact bad field."""

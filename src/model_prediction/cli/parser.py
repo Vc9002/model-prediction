@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from ..domain import LOSS_CLASSIFICATIONS, League, MarketType, ModelOrigin, ModelState, eastern_today
+from ..domain import LOSS_CLASSIFICATIONS, League, MarketType, ModelOrigin, eastern_today
 from ..esports import TITLE_SPECS
 from ..international_baseball import LEAGUE_SPECS as INTERNATIONAL_BASEBALL_LEAGUE_SPECS
 from .state import ESPN_SPORTS, ESPORTS_TITLES, SPORTS
@@ -432,7 +432,7 @@ def parser() -> argparse.ArgumentParser:
         "--origin", choices=[item.value for item in ModelOrigin], default=ModelOrigin.ANALYST_ESTIMATE.value
     )
     call.add_argument(
-        "--model-state", choices=[item.value for item in ModelState], default=ModelState.RESEARCH.value
+        "--model-disabled", action="store_true", help="record the call as coming from a switched-off model"
     )
     call.add_argument("--baseline-id")
     call.add_argument("--observed-at")
