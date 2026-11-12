@@ -4,10 +4,10 @@ current_phase: 1
 current_phase_name: Portfolio Circuit Breaker
 status: planning
 stopped_at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated to 4-phase structure
-last_updated: "2026-11-12T05:25:27.338Z"
+last_updated: "2026-11-12T05:51:07.352Z"
 last_activity: 2026-11-12
 last_activity_desc: ROADMAP.md and STATE.md created from REQUIREMENTS.md and research/SUMMARY.md
-state_head: 8a544cbbfb3ec7d62cabefb737139a07513b54e1
+state_head: b2ff76a1a229c9b11e3089aa7ea6c888607b5db6
 progress:
   total_phases: 4
   completed_phases: 0
@@ -45,7 +45,7 @@ See: .planning/PROJECT.md (updated 2026-09-20 after initialization)
 Phase: 1 of 4 (Portfolio Circuit Breaker)
 Plan: None yet in current phase
 Status: Ready to plan
-Last activity: 2026-11-12 - Completed quick task 261112-01r: Audit legacy research/gated_research tier readers; fix calibration pipeline and edge scanner treating frozen rows as live evidence.
+Last activity: 2026-11-12 - Completed quick task 261112-0li: Generalize NCAAB dedup fix audit; confirmed no other sport has the bug, added mutation-proven regression tests pinning main-buyer identity dedup. Phase 1 (correctness) of the ledger-improvement plan is now complete.
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -90,6 +90,7 @@ None yet.
 | 261111-w1m | Fix scripts/audit_best_picks.py hardcoded CONFIRMED_BEST overrides; recompute verdicts live from ledgers.db with verified-quote gate | 2026-11-11 | 3ca0a4c5 | [261111-w1m-fix-scripts-audit-best-picks-py-audit-ca](./quick/261111-w1m-fix-scripts-audit-best-picks-py-audit-ca/) |
 | 261111-wv9 | Exclude MANUAL-* buyer-ledger rows from auto-buyer performance summary, model quarantine ROI, and dashboard KPIs | 2026-11-12 | b2ad1781 | [261111-wv9-audit-every-script-that-computes-model-e](./quick/261111-wv9-audit-every-script-that-computes-model-e/) |
 | 261112-01r | Audit legacy research/gated_research tier readers; fix calibration pipeline and edge scanner treating frozen rows as live evidence | 2026-11-12 | 8a544cbb | [261112-01r-audit-every-remaining-reader-of-the-lega](./quick/261112-01r-audit-every-remaining-reader-of-the-lega/) |
+| 261112-0li | Generalize NCAAB dedup fix audit: confirmed no other sport has the bug; added mutation-proven regression tests pinning main-buyer identity dedup | 2026-11-12 | b2ff76a1 | [261112-0li-commits-b7a25ddf-69856d6b-5e2212ef-fixed](./quick/261112-0li-commits-b7a25ddf-69856d6b-5e2212ef-fixed/) |
 
 ## Milestone History
 
