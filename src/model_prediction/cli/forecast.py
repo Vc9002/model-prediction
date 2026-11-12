@@ -16,6 +16,7 @@ import json
 import logging
 from dataclasses import asdict, replace
 from datetime import UTC, datetime, timedelta
+from functools import partial
 from pathlib import Path
 from typing import Any, cast
 
@@ -1696,7 +1697,10 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
     logistic_scale = float(artifact.get("logistic_scale", 11.2))
     pace_sd_scaling = bool(artifact.get("pace_sd_scaling", False))
 
-    model = BasketballModel(
+    # Only the pre-v6 fallback below runs this engine; v6-v9 slates used to build
+    # and discard it on every run (MODEL_REVIEW_2026-11-11, LOW). partial keeps it lazy.
+    legacy_model = partial(
+        BasketballModel,
         sport="nba",
         version=model_version,
         margin_sd=margin_sd,
@@ -1816,7 +1820,9 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
             p for p in spread_v6_model.predict_spreads(history, upcoming) if p.market_type == "spread"
         ]
     else:
-        predictions = [p for p in model.predict_games(history, upcoming) if p.market_type == "spread"]
+        predictions = [
+            p for p in legacy_model().predict_games(history, upcoming) if p.market_type == "spread"
+        ]
 
     priced_contracts = []
     for prediction in predictions:
@@ -2106,7 +2112,9 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
     schedule_density_drag = bool(artifact.get("schedule_density_drag", False))
     overtime_risk_adjustment = bool(artifact.get("overtime_risk_adjustment", False))
 
-    model = BasketballModel(
+    # Lazy for the same reason as the spread slate: only the pre-v6 fallback uses it.
+    legacy_model = partial(
+        BasketballModel,
         sport="nba",
         version=model_version,
         margin_sd=float(artifact.get("margin_sd", 12.0)),
@@ -2241,7 +2249,7 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
             p for p in total_v6_model.predict_totals(history, upcoming) if p.market_type == "total"
         ]
     else:
-        predictions = [p for p in model.predict_games(history, upcoming) if p.market_type == "total"]
+        predictions = [p for p in legacy_model().predict_games(history, upcoming) if p.market_type == "total"]
 
     from ..calibration_pipeline import load_serving_calibrator
 

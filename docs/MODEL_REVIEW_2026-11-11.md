@@ -299,5 +299,10 @@ branch (`ccc842b6`) relabelled every row it received. **Fix:** Main still takes 
 CALL (operator directive 2026-10-11) but a non-qualified eligibility keeps its
 `PAPER_CALL_*` reason and research `record_type`; only a qualified one is promoted.
 
-Still open for NBA: #10 (latent until the v9 moneyline engine is a challenger), the
-LOW items, and the two operator decisions above.
+Still open for NBA: #10 (latent until the v9 moneyline engine is a challenger) and
+the two operator decisions above. LOW items, checked 2026-11-12: integer-line push
+mass is moot for NBA -- all 341 settled/open NBA spread and total rows in the runtime
+ledger sit on half-point lines, so no change was made to the pricing/replay contract;
+the discarded `BasketballModel` construction in both NBA slates is now lazy
+(`quick-261112-11j`); the availability wiring still names v7/v9 explicitly (correct,
+brittle, left); the v9 `uncertainty` floor feeds sizing and needs its own evidence.
