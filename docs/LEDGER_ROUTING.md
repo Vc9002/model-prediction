@@ -310,6 +310,80 @@ that this task's exit-code fix now surfaces automatically on every dry run.
   the independent `ModelLedger` write path were removed. Not a quick-task
   default.
 
+## Atomic-write temp-file leak: exception asymmetry + crash-safe sweep (2026-11-12)
+
+Investigation of the "## Per-model XLSX mirror audit (2026-11-12)" section's
+own "Open follow-ups" item 2 above: the `except Exception` vs `except
+BaseException` asymmetry it flagged as the likely leak cause. **Verdict,
+confirmed against live code: the asymmetry is real, but it only explains the
+in-process-catchable slice of the leak -- it does not explain the dominant
+production failure mode.**
+
+### What the code actually showed
+
+Direct code read confirmed the flagged asymmetry exactly: `xlsx_ledger.py`
+(:133) caught `except Exception:` around its cleanup-and-reraise block (`if
+os.path.exists(temporary): os.unlink(temporary)` then `raise`);
+`model_ledger.py`'s `_write_predictions_atomic` (:741) caught `except
+BaseException:` around the equivalent block. `KeyboardInterrupt` and
+`SystemExit` are `BaseException` subclasses that are **not** `Exception`
+subclasses -- if either was raised between `workbook.save(temporary)` and
+`_replace_with_retry` inside `write_xlsx_rows_atomic`, the narrower clause
+really did skip the `os.unlink` and leak the temp file.
+
+### Why it is not the whole explanation
+
+This project's scheduled jobs (`run_supervisor.py`) kill a worker that
+exceeds its timeout with `taskkill /F /T /PID` on Windows (:341-345) or
+`proc.kill()`/SIGKILL on Unix (:347) -- both a hard, uncatchable process
+termination. A hard kill runs no Python code at all: no `except Exception`,
+no `except BaseException`, no `finally`. If the kill lands mid-`workbook.save`
+in either writer, both leak today, and no `except`-clause change, however
+wide, could ever fix that. The scheduled daily/production/rebuild-shadow jobs
+that most expose these two writers to this window run headless (non-
+interactive, via `subprocess.Popen` with `CREATE_NO_WINDOW` on Windows) --
+they have essentially no path to an interactive `KeyboardInterrupt` or an
+explicit `sys.exit()` at all, making a hard kill or crash the more likely
+real-world cause of this project's confirmed leaks than the except-clause
+asymmetry alone.
+
+### Live evidence
+
+A second orphaned temp file was found live during this investigation's own
+code read: `data/sports/cs2/picks-39cd77nx.xlsx` (3772 bytes, dated
+2026-11-08, confirmed `zipfile.BadZipFile`, gitignored/untracked, removed by
+this task). Its size is nearly identical to the previously-removed
+`data/main/picks-js40dfcf.xlsx` (3770 bytes) -- both tiny fragments of what a
+real workbook save produces (real sibling workbooks in the same directories
+run 300KB-1.5MB), consistent with both being interrupted at essentially the
+same early point inside `workbook.save`, which a hard kill explains at least
+as well as a `KeyboardInterrupt` would.
+
+### The fix shipped
+
+1. `xlsx_ledger.py`'s `except Exception` widened to `except BaseException`,
+   matching `model_ledger.py`'s already-correct clause -- closes the
+   confirmed in-process-catchable gap (e.g. a manual Ctrl-C during an ad hoc
+   interactive run).
+2. A new shared, age-gated `_sweep_orphaned_temp_files(directory, pattern,
+   min_age_seconds=7200.0)` helper in `xlsx_ledger.py`, called at the start of
+   both `write_xlsx_rows_atomic` (own `picks-*.xlsx` pattern) and
+   `_write_predictions_atomic` (own `.{name}.*` pattern) before either
+   creates its own temp file. The 7200s age gate is deliberately double
+   `run_supervisor.py`'s largest configured `DEFAULT_WORKER_TIMEOUTS` entry
+   (3600s for `daily`/`rebuild-shadow`), so a write genuinely still in flight
+   right now is never swept. This is what actually makes the dominant
+   hard-kill case self-healing -- the crash itself can never be caught, but
+   the next normal write to that same destination now cleans up what the
+   crash left behind, rather than letting it accumulate indefinitely (which
+   is exactly what let `data/main/picks-js40dfcf.xlsx` sit for ten days and
+   crash `audit_ledger_pnl.py`'s tier scan).
+3. The second live orphan, `data/sports/cs2/picks-39cd77nx.xlsx`, removed.
+
+This closes the "## Per-model XLSX mirror audit (2026-11-12)" section's
+"Open follow-ups" item on the `write_xlsx_rows_atomic`/`model_ledger.py`
+exception-handling asymmetry above -- resolved, not just narrowed.
+
 ## The four ledgers (2026-08-03 layout, historical)
 
 | Ledger | File(s) | Rule |
