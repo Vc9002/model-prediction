@@ -139,6 +139,105 @@ VENUE_CATALOG: dict[str, VenueProfile] = {
 }
 
 
+# ESPN displayName -> home venue. is_indoor covers fixed and retractable roofs (closed
+# for weather; nflverse also tags SoFi/AT&T/NRG/Lucas Oil/State Farm as dome/closed).
+# Shared tenants repeat the same profile. Elevation in metres, orientation unknown (0).
+NFL_TEAM_VENUES: dict[str, VenueProfile] = {
+    "Arizona Cardinals": VenueProfile(
+        "State Farm Stadium", "nfl", "Glendale", "AZ", 33.5276, -112.2626, 335.0, 0.0, True
+    ),
+    "Atlanta Falcons": VenueProfile(
+        "Mercedes-Benz Stadium", "nfl", "Atlanta", "GA", 33.7554, -84.4010, 300.0, 0.0, True
+    ),
+    "Baltimore Ravens": VenueProfile(
+        "M&T Bank Stadium", "nfl", "Baltimore", "MD", 39.2780, -76.6227, 10.0, 0.0, False
+    ),
+    "Buffalo Bills": VenueProfile(
+        "Highmark Stadium", "nfl", "Orchard Park", "NY", 42.7738, -78.7870, 183.0, 45.0, False
+    ),
+    "Carolina Panthers": VenueProfile(
+        "Bank of America Stadium", "nfl", "Charlotte", "NC", 35.2258, -80.8528, 220.0, 0.0, False
+    ),
+    "Chicago Bears": VenueProfile(
+        "Soldier Field", "nfl", "Chicago", "IL", 41.8623, -87.6167, 181.0, 0.0, False
+    ),
+    "Cincinnati Bengals": VenueProfile(
+        "Paycor Stadium", "nfl", "Cincinnati", "OH", 39.0954, -84.5160, 150.0, 0.0, False
+    ),
+    "Cleveland Browns": VenueProfile(
+        "Huntington Bank Field", "nfl", "Cleveland", "OH", 41.5061, -81.6995, 178.0, 70.0, False
+    ),
+    "Dallas Cowboys": VenueProfile(
+        "AT&T Stadium", "nfl", "Arlington", "TX", 32.7473, -97.0945, 165.0, 0.0, True
+    ),
+    "Denver Broncos": VenueProfile(
+        "Empower Field at Mile High", "nfl", "Denver", "CO", 39.7439, -105.0201, 1610.0, 0.0, False
+    ),
+    "Detroit Lions": VenueProfile("Ford Field", "nfl", "Detroit", "MI", 42.3400, -83.0456, 183.0, 0.0, True),
+    "Green Bay Packers": VenueProfile(
+        "Lambeau Field", "nfl", "Green Bay", "WI", 44.5013, -88.0622, 195.0, 0.0, False
+    ),
+    "Houston Texans": VenueProfile("NRG Stadium", "nfl", "Houston", "TX", 29.6847, -95.4107, 15.0, 0.0, True),
+    "Indianapolis Colts": VenueProfile(
+        "Lucas Oil Stadium", "nfl", "Indianapolis", "IN", 39.7601, -86.1639, 218.0, 0.0, True
+    ),
+    "Jacksonville Jaguars": VenueProfile(
+        "EverBank Stadium", "nfl", "Jacksonville", "FL", 30.3239, -81.6373, 5.0, 0.0, False
+    ),
+    "Kansas City Chiefs": VenueProfile(
+        "Arrowhead Stadium", "nfl", "Kansas City", "MO", 39.0489, -94.4839, 275.0, 0.0, False
+    ),
+    "Las Vegas Raiders": VenueProfile(
+        "Allegiant Stadium", "nfl", "Las Vegas", "NV", 36.0909, -115.1833, 610.0, 0.0, True
+    ),
+    "Los Angeles Chargers": VenueProfile(
+        "SoFi Stadium", "nfl", "Inglewood", "CA", 33.9535, -118.3390, 40.0, 0.0, True
+    ),
+    "Los Angeles Rams": VenueProfile(
+        "SoFi Stadium", "nfl", "Inglewood", "CA", 33.9535, -118.3390, 40.0, 0.0, True
+    ),
+    "Miami Dolphins": VenueProfile(
+        "Hard Rock Stadium", "nfl", "Miami Gardens", "FL", 25.9580, -80.2389, 3.0, 0.0, False
+    ),
+    "Minnesota Vikings": VenueProfile(
+        "U.S. Bank Stadium", "nfl", "Minneapolis", "MN", 44.9735, -93.2575, 255.0, 0.0, True
+    ),
+    "New England Patriots": VenueProfile(
+        "Gillette Stadium", "nfl", "Foxborough", "MA", 42.0909, -71.2643, 85.0, 345.0, False
+    ),
+    "New Orleans Saints": VenueProfile(
+        "Caesars Superdome", "nfl", "New Orleans", "LA", 29.9511, -90.0812, 1.0, 0.0, True
+    ),
+    "New York Giants": VenueProfile(
+        "MetLife Stadium", "nfl", "East Rutherford", "NJ", 40.8128, -74.0742, 2.0, 315.0, False
+    ),
+    "New York Jets": VenueProfile(
+        "MetLife Stadium", "nfl", "East Rutherford", "NJ", 40.8128, -74.0742, 2.0, 315.0, False
+    ),
+    "Philadelphia Eagles": VenueProfile(
+        "Lincoln Financial Field", "nfl", "Philadelphia", "PA", 39.9008, -75.1675, 12.0, 0.0, False
+    ),
+    "Pittsburgh Steelers": VenueProfile(
+        "Acrisure Stadium", "nfl", "Pittsburgh", "PA", 40.4468, -80.0158, 222.0, 345.0, False
+    ),
+    "San Francisco 49ers": VenueProfile(
+        "Levi's Stadium", "nfl", "Santa Clara", "CA", 37.4033, -121.9694, 5.0, 0.0, False
+    ),
+    "Seattle Seahawks": VenueProfile(
+        "Lumen Field", "nfl", "Seattle", "WA", 47.5952, -122.3316, 5.0, 0.0, False
+    ),
+    "Tampa Bay Buccaneers": VenueProfile(
+        "Raymond James Stadium", "nfl", "Tampa", "FL", 27.9759, -82.5033, 10.0, 0.0, False
+    ),
+    "Tennessee Titans": VenueProfile(
+        "Nissan Stadium", "nfl", "Nashville", "TN", 36.1665, -86.7713, 120.0, 0.0, False
+    ),
+    "Washington Commanders": VenueProfile(
+        "Northwest Stadium", "nfl", "Landover", "MD", 38.9076, -76.8645, 60.0, 0.0, False
+    ),
+}
+
+
 @dataclass(frozen=True, slots=True)
 class EnvironmentalPhysicsResult:
     venue_name: str
@@ -414,23 +513,7 @@ def capture_cfb_pregame_weather(
 
     def fetch(target):
         home_name, start, profile = target
-        with httpx.Client(timeout=4.0) as client:
-            row = fetch_venue_hourly_weather(profile, game_date, client=client)
-        if row is None:
-            return None
-        try:
-            captured = parse_utc(str(row["observed_at_utc"]))
-        except (KeyError, TypeError, ValueError):
-            return None
-        target_hour = start.strftime("%Y-%m-%dT%H:00")
-        if (
-            captured >= start
-            or row.get("source") != "open_meteo:forecast"
-            or target_hour not in (row.get("hourly", {}).get("time") or [])
-        ):
-            return None
-        row["home_team"] = home_name
-        return row
+        return _pregame_forecast_row(home_name, start, profile, game_date)
 
     with ThreadPoolExecutor(max_workers=6) as pool:
         observations = [row for row in pool.map(fetch, targets) if row is not None]
@@ -444,6 +527,146 @@ def capture_cfb_pregame_weather(
     }
 
 
+def _pregame_forecast_row(
+    home_name: str, start: datetime, profile: VenueProfile, game_date: str
+) -> dict[str, Any] | None:
+    """One Open-Meteo forecast row for an outdoor venue, or None when it cannot be a
+    pregame forecast (captured at/after kickoff, archive source, kickoff hour missing)."""
+    from ..domain import parse_utc
+
+    with httpx.Client(timeout=4.0) as client:
+        row = fetch_venue_hourly_weather(profile, game_date, client=client)
+    if row is None:
+        return None
+    try:
+        captured = parse_utc(str(row["observed_at_utc"]))
+    except (KeyError, TypeError, ValueError):
+        return None
+    target_hour = start.strftime("%Y-%m-%dT%H:00")
+    if (
+        captured >= start
+        or row.get("source") != "open_meteo:forecast"
+        or target_hour not in (row.get("hourly", {}).get("time") or [])
+    ):
+        return None
+    row["home_team"] = home_name
+    return row
+
+
+def capture_nfl_pregame_weather(
+    data_root: str | Path,
+    game_date: str,
+    *,
+    scoreboard: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Capture timestamped forecast weather for upcoming outdoor NFL games.
+
+    Mirrors capture_cfb_pregame_weather. ESPN's NFL scoreboard carries no wind or
+    temperature, so until 2026-11-11 every outdoor total was priced on a 5 mph / 65F
+    placeholder that looked like a reading. Neutral-site games (London, Munich, Sao
+    Paulo, ...) have no catalogued venue and are skipped: the total engine then runs
+    with weather marked unavailable rather than with the home stadium's forecast.
+    """
+    from ..data_sources.espn import ESPNClient
+    from ..domain import parse_utc
+
+    events = (scoreboard if scoreboard is not None else ESPNClient().scoreboard("NFL", game_date)).get(
+        "events", []
+    )
+    now = datetime.now(UTC)
+    targets = []
+    skipped = 0
+    neutral_skipped = 0
+    unknown_team = 0
+    seen = set()
+    for event in events:
+        try:
+            start = parse_utc(str(event["date"]))
+            competition = event["competitions"][0]
+            home_name = next(
+                item["team"]["displayName"]
+                for item in competition["competitors"]
+                if item["homeAway"] == "home"
+            )
+        except (KeyError, IndexError, StopIteration, TypeError, ValueError):
+            skipped += 1
+            continue
+        if start <= now:
+            skipped += 1
+            continue
+        if bool(competition.get("neutralSite", False)):
+            neutral_skipped += 1
+            continue
+        profile = NFL_TEAM_VENUES.get(home_name)
+        if profile is None:
+            unknown_team += 1
+            continue
+        if profile.is_indoor:
+            skipped += 1
+            continue
+        identity = (home_name, start.isoformat())
+        if identity in seen:
+            continue
+        seen.add(identity)
+        targets.append((home_name, start, profile))
+
+    def fetch(target):
+        home_name, start, profile = target
+        return _pregame_forecast_row(home_name, start, profile, game_date)
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        observations = [row for row in pool.map(fetch, targets) if row is not None]
+    appended = store_weather_observations(data_root, "nfl", observations)
+    return {
+        "status": "ok" if len(observations) == len(targets) else "partial",
+        "scheduled_outdoor": len(targets),
+        "captured": len(observations),
+        "appended": appended,
+        "skipped": skipped,
+        "neutral_skipped": neutral_skipped,
+        "unknown_team": unknown_team,
+    }
+
+
+def resolve_nfl_game_weather(
+    data_root: str | Path,
+    home_team: str,
+    game_date: str,
+    event_start_utc: str | None = None,
+    observed_at_utc: str | None = None,
+    provenance_out: dict[str, Any] | None = None,
+    *,
+    is_neutral_site: bool = False,
+) -> tuple[float | None, float | None, float | None, bool]:
+    """Resolves (temperature_f, wind_mph, precipitation_in, is_dome) for an NFL game.
+
+    None values mean no verified pregame forecast exists for this decision time;
+    callers must treat that as "weather unavailable", never substitute a default.
+    """
+    if is_neutral_site:
+        if provenance_out is not None:
+            provenance_out.update({"source": "neutral_site:venue_unknown", "home_team": home_team})
+        return (None, None, None, False)
+    venue = NFL_TEAM_VENUES.get(home_team)
+    if venue is None:
+        if provenance_out is not None:
+            provenance_out.update({"source": "nfl_venue_catalog:unknown_team", "home_team": home_team})
+        return (None, None, None, False)
+    if venue.is_indoor:
+        if provenance_out is not None:
+            provenance_out.update({"source": "nfl_venue_catalog:indoor", "venue_name": venue.venue_name})
+        return (70.0, 0.0, 0.0, True)
+    return _resolve_weather_from_file(
+        Path(data_root) / "weather" / "nfl_historical.jsonl",
+        venue.venue_name,
+        home_team,
+        game_date,
+        event_start_utc,
+        observed_at_utc,
+        provenance_out,
+    )
+
+
 def resolve_cfb_game_weather(
     data_root: str | Path,
     home_team: str,
@@ -454,7 +677,6 @@ def resolve_cfb_game_weather(
 ) -> tuple[float | None, float | None, float | None, bool]:
     """Resolves (temperature_f, wind_mph, precipitation_in, is_dome) for a CFB matchup."""
     from ..data_sources.cfb_data import resolve_team
-    from ..domain import parse_utc
 
     team_info = resolve_team(home_team)
     if team_info is not None and team_info.is_dome:
@@ -464,7 +686,30 @@ def resolve_cfb_game_weather(
             )
         return (70.0, 0.0, 0.0, True)
 
-    weather_file = Path(data_root) / "weather" / "ncaaf_historical.jsonl"
+    return _resolve_weather_from_file(
+        Path(data_root) / "weather" / "ncaaf_historical.jsonl",
+        team_info.stadium_name if team_info else home_team,
+        team_info.canonical_name if team_info else home_team,
+        game_date,
+        event_start_utc,
+        observed_at_utc,
+        provenance_out,
+    )
+
+
+def _resolve_weather_from_file(
+    weather_file: Path,
+    stadium_name: str,
+    expected_home: str,
+    game_date: str,
+    event_start_utc: str | None,
+    observed_at_utc: str | None,
+    provenance_out: dict[str, Any] | None,
+) -> tuple[float | None, float | None, float | None, bool]:
+    """Shared PIT weather lookup: the newest hash-verified Open-Meteo forecast for the
+    venue/date captured before the decision time and before kickoff, at the kickoff hour."""
+    from ..domain import parse_utc
+
     if not weather_file.exists():
         return (None, None, None, False)
 
@@ -481,7 +726,6 @@ def resolve_cfb_game_weather(
         if decision_time >= event_time:
             return (None, None, None, False)
 
-    stadium_name = team_info.stadium_name if team_info else home_team
     stadium_norm = stadium_name.casefold().strip()
 
     target_hour = 19  # Default ~3 PM EDT / 19:00 UTC
@@ -501,7 +745,6 @@ def resolve_cfb_game_weather(
                 rec = json.loads(line)
                 v_name = str(rec.get("venue_name", "")).casefold().strip()
                 v_date = str(rec.get("date", ""))
-                expected_home = team_info.canonical_name if team_info else home_team
                 team_matches = (
                     not rec.get("home_team") or str(rec["home_team"]).casefold() == expected_home.casefold()
                 )

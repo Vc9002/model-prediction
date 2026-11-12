@@ -59,6 +59,7 @@ from ..esports import (
 )
 from ..feature_capture import contract_snapshot_json
 from ..features.base import FeatureStore
+from ..features.multi_sport_weather import resolve_nfl_game_weather
 from ..features.nfl_efficiency import NFLEfficiencyInputError, NFLEfficiencyStore, normalize_nfl_team_code
 from ..forward import build_mlb_slate
 from ..international_baseball import (
@@ -3195,7 +3196,24 @@ def _forecast_nfl_total_slate(
             market_slug = str(market.get("market_slug"))
 
         is_neutral_site = _nfl_is_neutral_site(event)
-        is_dome, wind_mph, temperature_f = _nfl_venue_weather(event)
+        espn_dome, _, _ = _nfl_venue_weather(event)  # ESPN carries the roof flag only, no wind/temp
+        weather_evidence: dict[str, Any] = {}
+        w_temp, w_wind, w_precip, venue_dome = resolve_nfl_game_weather(
+            data_root,
+            home_team,
+            args_date,
+            event_start_utc=str(event["date"]),
+            observed_at_utc=observed_at.isoformat(),
+            provenance_out=weather_evidence,
+            is_neutral_site=is_neutral_site,
+        )
+        is_dome = bool(venue_dome or espn_dome)
+        # Only a hash-verified Open-Meteo forecast captured before the decision time counts.
+        # Until 2026-11-11 a 5 mph / 65F placeholder stood in for every outdoor game and was
+        # indistinguishable from a reading, so the engine's wind/cold terms never fired.
+        weather_verified = is_dome or None not in (w_temp, w_wind)
+        wind_mph = (0.0 if is_dome else w_wind) if weather_verified else None
+        temperature_f = (70.0 if is_dome else w_temp) if weather_verified else None
         is_division_game = _nfl_is_division_game(home_team, away_team)
         # Operator decision 2026-11-11: consensus-priced contracts stay Main-eligible, but
         # the row must say so -- a de-vigged sportsbook number is not an executable ask,
@@ -3344,8 +3362,8 @@ def _forecast_nfl_total_slate(
                 away_def_epa=eff.away_def_epa,
                 home_qb_tier_adj=h_qb_tier_adj,
                 away_qb_tier_adj=a_qb_tier_adj,
-                wind_mph=wind_mph,
-                temperature_f=temperature_f,
+                wind_mph=wind_mph if wind_mph is not None else 5.0,
+                temperature_f=temperature_f if temperature_f is not None else 65.0,
                 is_dome=is_dome,
                 home_rest_days=home_rest_days,
                 away_rest_days=away_rest_days,
@@ -3406,6 +3424,12 @@ def _forecast_nfl_total_slate(
             "home_rest_days": home_rest_days,
             "away_rest_days": away_rest_days,
             "is_dome": is_dome,
+            "wind_mph": wind_mph,
+            "temperature_f": temperature_f,
+            "precipitation_in": w_precip if weather_verified else None,
+            "weather_inputs_verified": weather_verified,
+            "weather_source": weather_evidence.get("source"),
+            "weather_observed_at_utc": weather_evidence.get("observed_at_utc"),
             "is_division_game": is_division_game,
             "short_week_penalty": getattr(fc, "short_week_penalty", 0.0),
             "efficiency_source": efficiency_store.source_manifest,
@@ -3423,6 +3447,11 @@ def _forecast_nfl_total_slate(
         )
 
         short_week_pen = getattr(fc, "short_week_penalty", 0.0)
+        weather_note = (
+            f"{wind_mph:.0f}mph/{temperature_f:.0f}F"
+            if weather_verified and wind_mph is not None and temperature_f is not None
+            else "unavailable, no weather adjustment applied"
+        )
         tnf_note = (
             f" TNF short-week drag: -{short_week_pen:.1f} pts ({home_rest_days}d/{away_rest_days}d rest)."
             if short_week_pen > 0
@@ -3446,7 +3475,7 @@ def _forecast_nfl_total_slate(
                 "model_qualified": model_qualified and input_qualified,
                 "rationale": (
                     f"NFL Structural v6 Total projection. Projected total {fc.projected_total:.1f} "
-                    f"(Dome: {is_dome}, Weather: {wind_mph:.0f}mph/{temperature_f:.0f}F).{tnf_note}{quote_note}"
+                    f"(Dome: {is_dome}, Weather: {weather_note}).{tnf_note}{quote_note}"
                 ),
                 "joint_packet_quote": (
                     {

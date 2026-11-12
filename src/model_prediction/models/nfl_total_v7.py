@@ -48,6 +48,8 @@ class NFLTotalForecast:
     weather_total_penalty: float
     is_dome: bool
     short_week_penalty: float = 0.0
+    # False when no verified pregame forecast existed: no wind/cold term was applied.
+    weather_inputs_available: bool = True
 
 
 class NFLTotalModelV7:
@@ -118,8 +120,8 @@ class NFLTotalModelV7:
         away_pace: float = 62.5,
         total_pass_epa: float | None = None,
         total_rush_epa: float | None = None,
-        wind_mph: float = 0.0,
-        temperature_f: float = 65.0,
+        wind_mph: float | None = None,
+        temperature_f: float | None = None,
         is_dome: bool = False,
         total_line: float = 45.5,
         home_qb_tier_adj: float = 0.0,
@@ -136,23 +138,27 @@ class NFLTotalModelV7:
         away_pass_ratio: float = 0.58,
         use_scoring_simulation: bool | None = None,
     ) -> NFLTotalForecast:
-        # 1. Environmental Adjustments
+        # 1. Environmental Adjustments. None means no verified pregame forecast: apply
+        # nothing and say so, rather than pricing a placeholder as a reading (the
+        # 5 mph / 65F ESPN fallback did exactly that for every outdoor game until 2026-11-11).
         weather_penalty = 0.0
         dome_boost = 0.0
+        weather_inputs_available = is_dome or (wind_mph is not None and temperature_f is not None)
         if is_dome:
             dome_boost = self.dome_boost
         else:
-            if wind_mph >= 18.0:
-                weather_penalty += 2.5
-            elif wind_mph >= 14.0:
-                weather_penalty += 1.2
-            elif wind_mph >= 12.0:
-                weather_penalty += 0.5
-
-            if temperature_f < 25.0:
-                weather_penalty += 1.2
-            elif temperature_f < 32.0:
-                weather_penalty += 0.5
+            if wind_mph is not None:
+                if wind_mph >= 18.0:
+                    weather_penalty += 2.5
+                elif wind_mph >= 14.0:
+                    weather_penalty += 1.2
+                elif wind_mph >= 12.0:
+                    weather_penalty += 0.5
+            if temperature_f is not None:
+                if temperature_f < 25.0:
+                    weather_penalty += 1.2
+                elif temperature_f < 32.0:
+                    weather_penalty += 0.5
 
         # 2. Matchup Feature Edges
         if total_pass_epa is not None:
@@ -234,6 +240,7 @@ class NFLTotalModelV7:
             effective_sd=self.total_sd,
             weather_total_penalty=weather_penalty,
             is_dome=is_dome,
+            weather_inputs_available=weather_inputs_available,
         )
 
     def forecast_from_efficiency(
@@ -241,8 +248,8 @@ class NFLTotalModelV7:
         eff: Any,
         total_line: float,
         is_dome: bool = False,
-        wind_mph: float = 0.0,
-        temperature_f: float = 65.0,
+        wind_mph: float | None = None,
+        temperature_f: float | None = None,
     ) -> NFLTotalForecast:
         """Forecast total directly from point-in-time NFLEfficiencyMatchup guaranteeing QB pass-through."""
         return self.forecast_total(
