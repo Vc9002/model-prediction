@@ -1,5 +1,56 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
+## 2026-11-12 — Full pipeline verification: odds-root split-brain in health/daily/dashboard, frozen artifacts rewritten by the schedule (quick-261112-mpz)
+
+Operator directive "verify and run through ALL pipeline and workflows". Commit `c96f28cf`.
+
+- **Health false alarm (real bug)**: `system_health._market_capture` read the checkout's `data/odds`
+  while `cli.commands` has written Polymarket snapshots under the runtime root since 2026-11-04.
+  Result: "market snapshots stale (8 days)" for every sport while capture was healthy (the data gap
+  monitor, which reads the runtime root, said FRESH). Fixed to read `runtime_root/odds`;
+  `tests/test_system_health.py::test_market_capture_reads_the_runtime_root_not_the_checkout`
+  fails on the old code, passes on the fix.
+- **Frozen artifacts rewritten every run (contract violation)**: `_research_models_dir()` returns the
+  rolling `runtime_root/models` only once it exists and is non-empty, else `config/models`. It was
+  also used as the WRITE target by `_refresh_esports_ratings`, `_refresh_international_baseball_ratings`
+  and the `--write-artifacts` commands, so nothing ever created the rolling dir and every daily run
+  rewrote `cs2/dota2/lol/rainbow_six/valorant-tiered-elo-v6.json`, `kbo/npb-tie-aware-elo-v2.json`
+  and their `.previous.json` in git (mtimes 16:08-16:10 during the 16:00 run). New
+  `_rolling_models_write_dir()` always targets and creates the rolling dir; reads unchanged.
+  Runtime `models/` seeded from the 16:08 copies, frozen files `git checkout`ed. Registry still
+  validates every model on the frozen copies.
+- **Same split-brain elsewhere**: `daily.py` step10 Polymarket edge scanner (`scan_directory(base_dir=
+  data_directory/"odds")`) and the `odds_by_sport` summary read the repo tree (scanner saw nothing since
+  11-04); `dashboard/routes.py` live capture wrote to `ROOT/"data"`. All rerouted through the new
+  `runtime_paths.rerouted_data_root()` (legacy repo `data/` -> runtime root, explicit roots untouched).
+  `settle.py`'s closing-snapshot lookup also passes the repo root, but settled rows since 11-04 still
+  carry closing prices that differ from decision prices, so it is fed by another path; left as is.
+- **00:30 ET daily failures**: 11-11 and 11-12 00:30 runs failed in ingestion with `MemoryError` /
+  `OpenBLAS error: Memory allocation still failed after 10 retries` (seven parallel interpreters on a
+  12-core box). `run_daily.ps1` ingest jobs now set `OPENBLAS_NUM_THREADS=1` / `OMP_NUM_THREADS=1`.
+  The 11-10 all-day `ledger_coverage` integrity exits and the 11-11 16:00 `0xC0000005` crash are the
+  earlier, already-documented failures. All five later runs on 11-12 exited 0 on every step.
+- **Test suite status (not fixed, triaged)**: full suite 2927 passed / 57 failed; 54 persist with the
+  `MODEL_PREDICTION_*` env cleared; 39 fail at clean HEAD, 36 at checkpoint `0af19ecd`. Regressed on the
+  branch: `test_auto_polymarket_buyer::test_buyer_rejects_below_win_probability`,
+  `::test_buyer_rejects_unrealistic_edge_outliers`,
+  `test_qualification_integrity::test_names_cannot_claim_prospective_capture[wnba-moneyline-v5]`.
+  Dirty-tree-only (18): `test_dashboard_polymarket` x2 pin `scanner_enabled: false` but the uncommitted
+  `config/model.yaml` enables it (operator directive 2026-11-10); `test_dashboard_server::test_pick_quote_*`
+  x6, `test_main_ledgers` x4, `test_research_ledger*` x4, `test_auto_polymarket_buyer::..._network_error`,
+  `test_research_pair_capture` read local runtime state. The remaining failures pin superseded versions
+  (`nfl-*-structural-v5` vs v7, `eurolg-tempo-v1` vs v2, NBA v9 sets, model catalog, CI import count
+  78 vs 88, `cfb_structural_v2` dispersion 19.2 vs 16.0) or stub drift (`Ledger.settle()` kwargs,
+  `_DuplicateLedger.rows`, `sqlite ledger authority requires a RuntimeLedgerStore`). Two look like
+  real code paths worth a look: `research_scoring.outcome_label` does `float(prediction["line"])` on a
+  `None` line for moneyline rows, and `settle._settle_by_resolution` indexes `row["event_start_utc"]`
+  on rows without it.
+- **Also observed, unchanged**: `data/calibration/**` (97 files) is git-tracked yet rewritten by the
+  calibrate step every run; health flags off-season kbo/mlb/npb/wnba snapshots as stale (2-day rule,
+  no season model); production canary primary is WNBA so `production.db` has no prediction since 10-31
+  (NO_EVENTS); auto-buyer had two `0xC0000005` crashes on 11-12 (known python312.dll fault);
+  `/api/bets` ~100 s and `/api/export/picks` ~19 s on a threaded server.
+
 ## 2026-11-12 — NCAAB feature round: history-derived non-D1 prior, AP-rank prior, attempts-based tempo (quick-261112-nc6, round 2)
 
 Operator directive "improve the model, add more features" after the review fixes. Full

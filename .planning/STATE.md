@@ -102,6 +102,7 @@ None yet.
 | 261112-2s6 | Require exact same-UTC-date match in edge scanner's _lookup_model_prob instead of an unbounded cross-date fallback; live data showed 1,070/6,037 matches (17.7%) were genuinely different events | 2026-11-12 | 9c022311 | [261112-2s6-src-model-prediction-portfolio-polymarke](./quick/261112-2s6-src-model-prediction-portfolio-polymarke/) |
 | 261112-kj3 | Refit NBA moneyline as nba-elo-trend-lr-v5 (walk-forward, restored fit construction); registered as challenger, not promoted; same-holdout Brier 0.1889 vs v4 0.1892 | 2026-11-12 | 9bf925e4 | [261112-kj3-refit-nba-moneyline-nba-elo-trend-lr-v5-](./quick/261112-kj3-refit-nba-moneyline-nba-elo-trend-lr-v5-/) |
 | 261112-m31 | NCAAF cfb-structural-v5 challenger: fitted margin/total mean calibration, slice SD table, residual total SD on walk-forward splits; artifact + class + harness, research status | 2026-11-12 | d86876e7 | [261112-m31-ncaaf-v5-challenger-fit-margin-calibrati](./quick/261112-m31-ncaaf-v5-challenger-fit-margin-calibrati/) |
+| 261112-mpz | Full pipeline verification: reroute health/daily/dashboard odds readers to the runtime root, stop the schedule rewriting frozen config/models artifacts, single-thread BLAS in ingestion | 2026-11-12 | c96f28cf | [261112-mpz-fix-odds-root-split-brain-and-frozen-art](./quick/261112-mpz-fix-odds-root-split-brain-and-frozen-art/) |
 
 ## Milestone History
 
