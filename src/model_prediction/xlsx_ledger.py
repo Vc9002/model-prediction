@@ -120,6 +120,7 @@ def write_xlsx_rows_atomic(
 ) -> None:
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
+    _sweep_orphaned_temp_files(destination.parent, "picks-*.xlsx")
     materialized = list(rows)
     workbook = _build_workbook(fieldnames, materialized)
     descriptor, temporary = tempfile.mkstemp(prefix="picks-", suffix=".xlsx", dir=destination.parent)
@@ -130,7 +131,14 @@ def write_xlsx_rows_atomic(
             os.fsync(handle.fileno())
         workbook.close()
         _replace_with_retry(temporary, destination)
-    except Exception:
+    # 261112-2s7: widened from `except Exception` -- confirmed asymmetry with
+    # model_ledger.py::_write_predictions_atomic's equivalent (already-correct)
+    # clause. KeyboardInterrupt/SystemExit are BaseException, not Exception, so
+    # the narrower clause let either skip this cleanup and leak `temporary`.
+    # This only closes the in-process-catchable gap (e.g. an interactive
+    # Ctrl-C); a hard process kill never reaches any Python `except` at all --
+    # that case is handled by the sweep below, not by widening this clause.
+    except BaseException:
         if os.path.exists(temporary):
             os.unlink(temporary)
         raise
@@ -156,6 +164,28 @@ def _replace_with_retry(temporary: str | Path, destination: Path, attempts: int 
                     os.unlink(temporary)
                 return
             time.sleep(min(3.0, 0.5 * (attempt + 1)))
+
+
+# 261112-2s7: a hard process kill (run_supervisor.py's `taskkill /F /T /PID` on
+# Windows or `proc.kill()`/SIGKILL on Unix, fired when a worker exceeds its
+# timeout) or an OS crash/power loss runs NO Python exception handler at all --
+# no `except Exception`, no `except BaseException`, no `finally`. No in-process
+# fix can ever catch that case. This sweep is what actually makes it
+# self-healing: it cannot stop the crash, but the NEXT normal write to the same
+# destination cleans up whatever the crash left behind, instead of letting it
+# accumulate indefinitely. 7200.0s is deliberately double run_supervisor.py's
+# largest configured DEFAULT_WORKER_TIMEOUTS entry (3600s for daily/
+# rebuild-shadow), so a write genuinely still in flight right now is never swept.
+def _sweep_orphaned_temp_files(directory: Path, pattern: str, min_age_seconds: float = 7200.0) -> None:
+    now = time.time()
+    for candidate in directory.glob(pattern):
+        try:
+            if now - candidate.stat().st_mtime >= min_age_seconds:
+                candidate.unlink()
+        except OSError:
+            # Another process may have already cleaned it up, or it vanished
+            # between glob and stat/unlink -- never let that block this write.
+            continue
 
 
 def _build_workbook(fieldnames: list[str], rows: list[dict[str, str]]) -> Workbook:
