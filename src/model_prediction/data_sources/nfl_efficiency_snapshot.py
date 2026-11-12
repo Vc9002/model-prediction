@@ -22,7 +22,30 @@ RELEASE_ROOT = "https://github.com/nflverse/nflverse-data/releases/download"
 PLAYER_URL = f"{RELEASE_ROOT}/stats_player/stats_player_week_{{season}}.parquet"
 SCHEDULE_URL = f"{RELEASE_ROOT}/schedules/games.parquet"
 DEPTH_URL = f"{RELEASE_ROOT}/depth_charts/depth_charts_{{season}}.parquet"
-TEAM_COLUMNS = ("attempts", "carries", "passing_epa", "rushing_epa")
+# Every column features/nfl_efficiency.py::_team_efficiency reads off the team
+# frame. The 2026-10-27 snapshot cutover shipped only the first four; the engine
+# then hit ColumnNotFoundError on sacks_suffered, its broad except swallowed it,
+# and every NFL team was priced on league-average defaults for two weeks with no
+# error anywhere (docs/DEBUG.md 2026-11-11). The engine now imports this tuple as
+# its required-column contract, so the two cannot drift apart again.
+TEAM_COLUMNS = (
+    "attempts",
+    "carries",
+    "sacks_suffered",
+    "passing_epa",
+    "rushing_epa",
+    "passing_first_downs",
+    "rushing_first_downs",
+    "passing_20",
+    "rushing_12",
+    "passing_tds",
+    "rushing_tds",
+    "fg_made",
+    "fumble_recovery_own",
+    "fumble_recovery_opp",
+    "fumbles_total",
+    "def_fumbles_forced",
+)
 QB_COLUMNS = ("attempts", "sacks_suffered", "passing_epa", "passing_cpoe")
 
 

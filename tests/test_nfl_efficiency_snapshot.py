@@ -12,12 +12,13 @@ import pytest
 
 from model_prediction.cli.forecast import _load_nfl_injuries_known_at, _nfl_situational_features
 from model_prediction.data_sources.nfl_efficiency_snapshot import (
+    TEAM_COLUMNS,
     build_efficiency_frames,
     capture_nfl_efficiency,
     load_efficiency_snapshot,
     projected_qbs,
 )
-from model_prediction.features.nfl_efficiency import NFLEfficiencyStore
+from model_prediction.features.nfl_efficiency import NFLEfficiencyInputError, NFLEfficiencyStore
 
 
 class _Response:
@@ -36,6 +37,9 @@ class _Client:
         return _Response(next(self.payloads))
 
 
+_CORE_COLUMNS = {"attempts", "carries", "passing_epa", "rushing_epa", "sacks_suffered"}
+
+
 def _fixtures() -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
     players = pl.DataFrame(
         {
@@ -50,6 +54,8 @@ def _fixtures() -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
             "rushing_epa": [1.0, 100.0],
             "sacks_suffered": [2, 5],
             "passing_cpoe": [1.0, 20.0],
+            # build_efficiency_frames requires the full engine column contract
+            **{col: [1, 1] for col in TEAM_COLUMNS if col not in _CORE_COLUMNS},
         }
     )
     schedule = pl.DataFrame(
@@ -134,3 +140,100 @@ def test_late_utc_game_uses_eastern_game_date_and_verified_injuries(tmp_path: Pa
     payload["entries"][0]["player_name"] = "Injected"
     path.write_text(json.dumps(payload), encoding="utf-8")
     assert _load_nfl_injuries_known_at(tmp_path, observed) == ([], None)
+
+
+def _two_sided_fixtures() -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
+    """Two completed DAL-PHI games with a QB row per side carrying every engine column."""
+    players = pl.DataFrame(
+        {
+            "game_id": ["g1", "g1", "g2", "g2"],
+            "team": ["DAL", "PHI", "DAL", "PHI"],
+            "opponent_team": ["PHI", "DAL", "PHI", "DAL"],
+            "player_display_name": ["Dak Prescott", "Jalen Hurts", "Dak Prescott", "Jalen Hurts"],
+            "position": ["QB"] * 4,
+            "attempts": [30, 28, 33, 25],
+            "carries": [20, 25, 18, 27],
+            "passing_epa": [6.0, -2.0, 4.0, 1.0],
+            "rushing_epa": [1.0, 2.0, -0.5, 1.5],
+            "sacks_suffered": [1, 4, 2, 3],
+            "passing_cpoe": [2.0, -1.0, 1.5, 0.5],
+            "passing_first_downs": [12, 9, 13, 8],
+            "rushing_first_downs": [5, 7, 4, 6],
+            "passing_20": [4, 2, 5, 2],
+            "rushing_12": [2, 3, 1, 3],
+            "passing_tds": [2, 1, 3, 1],
+            "rushing_tds": [1, 1, 0, 2],
+            "fg_made": [1, 2, 2, 1],
+            "fumble_recovery_own": [1, 0, 0, 1],
+            "fumble_recovery_opp": [1, 0, 1, 0],
+            "fumbles_total": [1, 1, 0, 1],
+            "def_fumbles_forced": [1, 1, 1, 0],
+        }
+    )
+    schedule = pl.DataFrame(
+        {
+            "game_id": ["g1", "g2"],
+            "gameday": ["2026-10-12", "2026-10-19"],
+            "home_score": [24, 20],
+            "away_score": [17, 27],
+            "season": [2026, 2026],
+        }
+    )
+    depth = pl.DataFrame(
+        {
+            "dt": ["2026-10-26T12:00:00Z", "2026-10-26T12:00:00Z"],
+            "team": ["DAL", "PHI"],
+            "player_name": ["Dak Prescott", "Jalen Hurts"],
+            "pos_abb": ["QB", "QB"],
+            "pos_rank": [1, 1],
+        }
+    )
+    return players, schedule, depth
+
+
+def test_snapshot_team_frame_feeds_engine_rather_than_defaults(tmp_path: Path) -> None:
+    """Regression for the 2026-10-27 -> 2026-11-11 outage: a snapshot-built team frame
+    must drive real efficiency inputs, never the league-average defaults tuple."""
+    players, schedule, depth = _two_sided_fixtures()
+    observed = datetime(2026, 10, 27, 17, tzinfo=UTC)
+    payloads = []
+    for frame in (players, schedule, depth):
+        buffer = BytesIO()
+        frame.write_parquet(buffer)
+        payloads.append(buffer.getvalue())
+    capture_nfl_efficiency(tmp_path, observed_at=observed, client=_Client(payloads))
+    store = NFLEfficiencyStore(tmp_path, observed_at=observed)
+    assert store.source_manifest is not None  # the snapshot, not the legacy parquet, is loaded
+    matchup = store.get_matchup_efficiency("Dallas Cowboys", "Philadelphia Eagles", as_of_date="2026-10-27")
+    assert matchup.home_prior_games == 2
+    assert matchup.away_prior_games == 2
+    # DAL: 63 attempts / 38 carries -> pass ratio 0.624, not the 0.58 default
+    assert abs(matchup.home_pass_ratio - 63 / 101) < 1e-3  # engine rounds to 4dp
+    # In a closed two-team fixture PHI's pass-rush rate equals DAL's sacks-allowed rate
+    # (both 3/66), so pressure disparity is 0 by construction; assert on inputs whose
+    # defaults differ from these fixtures instead: first-down rate (34/101 vs 0.30) and
+    # turnover luck (recoveries 3 of 5 fumbles -> -0.1667 vs 0.0).
+    assert abs(matchup.home_first_down_rate - 34 / 101) < 1e-3
+    assert matchup.home_turnover_luck != 0.0
+    assert matchup.home_pass_epa != 0.0
+
+
+def test_team_frame_missing_engine_column_fails_closed(tmp_path: Path) -> None:
+    """A schema-incomplete frame (the pre-fix four-column snapshot) must raise, not default."""
+    store = NFLEfficiencyStore(tmp_path)
+    with pytest.raises(NFLEfficiencyInputError, match="frame_unavailable"):
+        store.get_matchup_efficiency("Dallas Cowboys", "Philadelphia Eagles", as_of_date="2026-10-27")
+    store._team_df = pl.DataFrame(
+        {
+            "game_id": ["g1"],
+            "gameday": ["2026-10-12"],
+            "team": ["DAL"],
+            "opponent_team": ["PHI"],
+            "attempts": [30],
+            "carries": [20],
+            "passing_epa": [6.0],
+            "rushing_epa": [1.0],
+        }
+    )
+    with pytest.raises(NFLEfficiencyInputError, match="sacks_suffered"):
+        store.get_matchup_efficiency("Dallas Cowboys", "Philadelphia Eagles", as_of_date="2026-10-27")

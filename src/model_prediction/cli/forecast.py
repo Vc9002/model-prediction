@@ -59,7 +59,7 @@ from ..esports import (
 )
 from ..feature_capture import contract_snapshot_json
 from ..features.base import FeatureStore
-from ..features.nfl_efficiency import NFLEfficiencyStore, normalize_nfl_team_code
+from ..features.nfl_efficiency import NFLEfficiencyInputError, NFLEfficiencyStore, normalize_nfl_team_code
 from ..forward import build_mlb_slate
 from ..international_baseball import (
     refresh_recent_international_baseball_matches,
@@ -2654,18 +2654,26 @@ def _forecast_nfl_spread_slate(
         _, _h_stat, h_qb_pen = check_nfl_qb_injury_status(home_team, h_qb or "", injury_entries)
         _, _a_stat, a_qb_pen = check_nfl_qb_injury_status(away_team, a_qb or "", injury_entries)
 
-        eff = efficiency_store.get_matchup_efficiency(
-            home_team=home_team,
-            away_team=away_team,
-            as_of_date=start,
-            home_qb=h_qb,
-            away_qb=a_qb,
-        )
+        try:
+            eff = efficiency_store.get_matchup_efficiency(
+                home_team=home_team,
+                away_team=away_team,
+                as_of_date=start,
+                home_qb=h_qb,
+                away_qb=a_qb,
+            )
+        except NFLEfficiencyInputError as exc:
+            # Fail closed (NO_CALL): without real efficiency inputs the engine would
+            # price every game off the market anchor alone while labelling it a model call.
+            unmatched.append({"event_id": event_id, "reason": f"nfl_efficiency_inputs_unavailable: {exc}"})
+            continue
 
         h_qb_tier_adj = eff.home_qb_tier_adj - h_qb_pen
         a_qb_tier_adj = eff.away_qb_tier_adj - a_qb_pen
         input_qualified = (
-            efficiency_store.covers_last_game(home_team, h_last)
+            eff.home_prior_games > 0
+            and eff.away_prior_games > 0
+            and efficiency_store.covers_last_game(home_team, h_last)
             and efficiency_store.covers_last_game(away_team, a_last)
             and bool(h_qb and a_qb)
             and bool(h_qb_update and a_qb_update)
@@ -3165,18 +3173,26 @@ def _forecast_nfl_total_slate(
         _, _h_stat, h_qb_pen = check_nfl_qb_injury_status(home_team, h_qb or "", injury_entries)
         _, _a_stat, a_qb_pen = check_nfl_qb_injury_status(away_team, a_qb or "", injury_entries)
 
-        eff = efficiency_store.get_matchup_efficiency(
-            home_team=home_team,
-            away_team=away_team,
-            as_of_date=start,
-            home_qb=h_qb,
-            away_qb=a_qb,
-        )
+        try:
+            eff = efficiency_store.get_matchup_efficiency(
+                home_team=home_team,
+                away_team=away_team,
+                as_of_date=start,
+                home_qb=h_qb,
+                away_qb=a_qb,
+            )
+        except NFLEfficiencyInputError as exc:
+            # Fail closed (NO_CALL): without real efficiency inputs the engine would
+            # price every game off the market anchor alone while labelling it a model call.
+            unmatched.append({"event_id": event_id, "reason": f"nfl_efficiency_inputs_unavailable: {exc}"})
+            continue
 
         h_qb_tier_adj = eff.home_qb_tier_adj - h_qb_pen
         a_qb_tier_adj = eff.away_qb_tier_adj - a_qb_pen
         input_qualified = (
-            efficiency_store.covers_last_game(home_team, h_last)
+            eff.home_prior_games > 0
+            and eff.away_prior_games > 0
+            and efficiency_store.covers_last_game(home_team, h_last)
             and efficiency_store.covers_last_game(away_team, a_last)
             and bool(h_qb and a_qb)
             and bool(h_qb_update and a_qb_update)
