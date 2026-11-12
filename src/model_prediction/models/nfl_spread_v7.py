@@ -264,7 +264,9 @@ class NFLSpreadModelV7:
             prob_home_cover=round(p_home_cover, 6),
             prob_away_cover=round(p_away_cover, 6),
             spread_home_line=spread_home_line,
-            effective_sd=self.margin_sd,
+            # Report the sd the cover probability was actually priced with (1.25x on
+            # |line| >= 8); callers persist it for exact scalar replay.
+            effective_sd=effective_margin_sd,
         )
 
     def forecast_from_efficiency(
