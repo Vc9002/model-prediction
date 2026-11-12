@@ -4,10 +4,10 @@ current_phase: 1
 current_phase_name: Portfolio Circuit Breaker
 status: planning
 stopped_at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated to 4-phase structure
-last_updated: "2026-11-12T02:32:19.479Z"
+last_updated: "2026-11-12T02:47:41.147Z"
 last_activity: 2026-09-22
 last_activity_desc: ROADMAP.md and STATE.md created from REQUIREMENTS.md and research/SUMMARY.md
-state_head: d349715bc3483d8535fcd99abcaecdb21724eefc
+state_head: 69856d6bc9fdd745b69962653bda81622eb705a2
 progress:
   total_phases: 4
   completed_phases: 0
@@ -86,6 +86,7 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 261111-o7p | Fix auto-buyer rejection telemetry miscategorization and add state-file conflict detection | 2026-11-11 | d349715b | [261111-o7p-fix-auto-buyer-rejection-telemetry-misca](./quick/261111-o7p-fix-auto-buyer-rejection-telemetry-misca/) |
+| 261111-tx4 | Fix NCAAB paper-trial duplicate-buy bug: dedup keyed only on pick_id misses re-forecast churn of the same game/selection/line | 2026-11-11 | 69856d6b | [261111-tx4-fix-ncaab-paper-trial-duplicate-buy-bug-](./quick/261111-tx4-fix-ncaab-paper-trial-duplicate-buy-bug-/) |
 
 ## Milestone History
 
