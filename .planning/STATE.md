@@ -4,10 +4,10 @@ current_phase: 1
 current_phase_name: Portfolio Circuit Breaker
 status: planning
 stopped_at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated to 4-phase structure
-last_updated: "2026-11-12T07:13:59.217Z"
+last_updated: "2026-11-12T07:22:52.111Z"
 last_activity: 2026-11-12
 last_activity_desc: ROADMAP.md and STATE.md created from REQUIREMENTS.md and research/SUMMARY.md
-state_head: 83b76fc7ce626872240b8c5eee5e2631374ee9f0
+state_head: 0a934d6ecf1c1148ba438d93376916ddb53b7254
 progress:
   total_phases: 4
   completed_phases: 0
@@ -45,7 +45,7 @@ See: .planning/PROJECT.md (updated 2026-09-20 after initialization)
 Phase: 1 of 4 (Portfolio Circuit Breaker)
 Plan: None yet in current phase
 Status: Ready to plan
-Last activity: 2026-11-12 - Completed quick task 261112-11j: fixed the OPEN NBA findings of MODEL_REVIEW_2026-11-11 (lr-v4 serving skew, neutral floors, total quote freshness, Main paper-call relabel) and three new NBA defects (totals calibrator provenance, nba-moneyline-v9 false qualification, whitelist).
+Last activity: 2026-11-12 - Completed quick task 261112-2s7: widened xlsx_ledger.py's except clause to BaseException, added a crash-safe orphan temp-file sweep to both xlsx_ledger.py and model_ledger.py, and documented the real leak root cause (run_supervisor.py's hard worker-timeout kill, not just the except asymmetry).
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -97,6 +97,7 @@ None yet.
 | 261112-0xd | NCAAF: close every open CFB finding of the 2026-11-11 model review (serve v4 from artifact, ask integrity, artifact Main gates, venue weather, postseason week, QB channel, 200k sims, source code_revision) | 2026-11-12 | f6fa91d1 | [261112-0xd-ncaaf-fix-all-open-cfb-findings-from-the](./quick/261112-0xd-ncaaf-fix-all-open-cfb-findings-from-the/) |
 | 261112-nc6 | Close the NCAAB findings of the 2026-11-11 model review: total baseline mismatch, artifact drift, coherent moneyline, early-season compression, push mass; validation-selected parameters | 2026-11-12 | e32335c7 | [261112-nc6-ncaab-model-review-fixes](./quick/261112-nc6-ncaab-model-review-fixes/) |
 | 261112-11j | Fix OPEN NBA findings from MODEL_REVIEW_2026-11-11 (#3 moneyline path, #6, #8d, #14) plus three new: totals serving-calibrator provenance guard, nba-moneyline-v9 placeholder artifact + whitelist, Main no longer relabels downgraded paper calls | 2026-11-12 | 83b76fc7 | [261112-11j-fix-open-nba-findings-from-model-review-](./quick/261112-11j-fix-open-nba-findings-from-model-review-/) |
+| 261112-2s7 | Widen xlsx_ledger.py except clause to BaseException; add crash-safe orphan temp-file sweep to both xlsx_ledger.py and model_ledger.py; document real leak root cause (hard worker-timeout kill, not just the except asymmetry) | 2026-11-12 | 0a934d6e | [261112-2s7-an-except-exception-src-model-prediction](./quick/261112-2s7-an-except-exception-src-model-prediction/) |
 
 ## Milestone History
 
