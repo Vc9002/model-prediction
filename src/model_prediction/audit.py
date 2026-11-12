@@ -64,6 +64,47 @@ class AuditLog:
         with self.path.open(encoding="utf-8") as handle:
             return [json.loads(line) for line in handle if line.strip()]
 
+    def reversed_events(self) -> Iterator[dict[str, Any]]:
+        """Yield parsed events newest-first via a bounded backward-chunked read.
+
+        Unlike events(), never materializes or parses the whole file before
+        the caller sees the first item -- callers that only need the most
+        recent N events (a dashboard tail) or the first match scanning
+        backward (a real-money double-buy guard) should use this instead of
+        reversed(events()), which pays to parse the entire log regardless of
+        how little of it the caller actually needs. Independent of append()'s
+        own backward-chunk tail-read for the hash-chain previous-hash lookup
+        -- that logic is untouched by this method.
+        """
+        if not self.path.exists():
+            return
+        with self.path.open("rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            pos = handle.tell()
+            chunk_size = 65536
+            buffer = b""
+            while pos > 0:
+                read_size = min(chunk_size, pos)
+                pos -= read_size
+                handle.seek(pos)
+                buffer = handle.read(read_size) + buffer
+                segments = buffer.split(b"\n")
+                if pos == 0:
+                    batch = segments
+                elif len(segments) > 1:
+                    buffer = segments[0]
+                    batch = segments[1:]
+                else:
+                    continue
+                for segment in reversed(batch):
+                    stripped = segment.strip()
+                    if not stripped:
+                        continue
+                    try:
+                        yield json.loads(stripped)
+                    except json.JSONDecodeError:
+                        continue
+
     def append(
         self,
         event_type: str,
