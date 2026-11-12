@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "cbff479dbdb557e457f1f9287179a5b51d051961b3c73abb9df1189ce9ed0a3d",
+  "artifact_hash": "fe0155c5db84600a42cfc1077e2c7d3377d3888a637c80a02e3350a57b2cca61",
   "baseline_points_per_team": 76.06,
   "conference_trend_priors": true,
   "credibility_constant": 4.0,
@@ -10,40 +10,38 @@
     "max_units": 2.0
   },
   "evidence": {
-    "source": "outputs/ncaab/ncaab_v6_review_ablation.md (variant shipped vs control)",
-    "method": "same walk-forward; total_line=None so the raw projection is scored (credibility shrinkage needs a market line)",
-    "validation": {
+    "source": "outputs/ncaab/ncaab_v6_review_ablation.md",
+    "method": "same walk-forward; total_line=None so the raw projection is scored. Round 2 (variant shipped_attempts_1.5 vs shipped): attempts-based tempo selected on validation (grid 0.55..2.5; 1.5 is the interior optimum on residual SD, PIT coverage and over Brier, within 0.04 MAE of 2.0).",
+    "round1_validation": {
       "n": 1043,
       "total_mae": 13.784,
       "control_total_mae": 14.302,
-      "resid_sd": 16.928,
       "pit_coverage_50_80_90": [
         0.489,
         0.816,
         0.919
-      ],
-      "control_pit_coverage_50_80_90": [
-        0.402,
-        0.682,
-        0.808
-      ],
-      "over_brier_pseudo_lines": 0.2363,
-      "control_over_brier_pseudo_lines": 0.2364
+      ]
     },
-    "holdout": {
-      "n": 742,
-      "total_mae": 14.481,
-      "control_total_mae": 15.11,
-      "total_bias": 0.627,
-      "control_total_bias": 2.26,
-      "over_brier_pseudo_lines": 0.2344,
-      "control_over_brier_pseudo_lines": 0.2355,
+    "round2_validation": {
+      "n": 1043,
+      "total_mae": 13.376,
+      "round1_total_mae": 13.784,
+      "resid_sd": 16.564,
       "pit_coverage_50_80_90": [
-        0.58,
-        0.864,
-        0.949
+        0.507,
+        0.821,
+        0.921
       ],
-      "note": "early-season credibility widening (x1.4 at sample 0) is now too wide on top of total_sd 16.5; not selectable on validation"
+      "over_brier_pseudo_lines": 0.2345,
+      "round1_over_brier_pseudo_lines": 0.2363
+    },
+    "round2_holdout": {
+      "n": 743,
+      "total_mae": 14.303,
+      "round1_total_mae": 14.487,
+      "control_total_mae": 15.108,
+      "over_brier_pseudo_lines": 0.2335,
+      "round1_over_brier_pseudo_lines": 0.2344
     },
     "not_market_relative": true
   },
@@ -63,6 +61,7 @@
   "overtime_risk_adjustment": true,
   "pace_baseline": "league",
   "pace_drag": 0.5,
+  "pace_sensitivity": 1.5,
   "qualified_for_betting": true,
   "schedule_density_drag": true,
   "schema_version": "basketball-total-v6",
@@ -70,6 +69,8 @@
   "status": "production",
   "target": "NCAAB Men's College Basketball conference-tiered dynamic total model with Bayesian credibility shrinkage",
   "team_total_weight": 0.15,
+  "tempo_prior_games": 12.0,
+  "tempo_source": "attempts",
   "total_sd": 16.5,
   "trained_through_date": "2026-11-12",
   "trend_total_weight": 0.85,

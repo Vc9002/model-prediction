@@ -153,6 +153,73 @@ games and the fixed model still would have lost paper units on spreads and total
 does not validate Main NCAAB; it validates that the change moved in the right direction. The
 forward check in HANDOFF §1 (quoted picks, sample ≥ 8) remains the test that matters.
 
+## Feature round (operator request "improve the model, add more features", 2026-11-12)
+
+### Where the model was weakest
+
+Residuals of the round-1 model on the 658 November-2026 games (holdout), by matchup:
+
+| subset | n | bias (actual − predicted home margin) | MAE |
+|---|---|---|---|
+| all | 658 | +12.4 | 17.3 |
+| away team not Division 1 | 187 | **+29.3** | 30.0 |
+| Tier-1/2 host vs Tier-4/5 or non-D1 visitor | 196 | +13.4 | 15.7 |
+| Tier-1/2 vs Tier-1/2 | 55 | −1.1 | 10.3 |
+| mid-major vs mid-major | 121 | −2.2 | 8.7 |
+
+Two defects, not one: the non-D1 prior (1180 Elo, a 13-point gap) when D1 hosts actually win
+by 42, and conference tiers that understate the top of the sport in buy games.
+
+### Data that was already on disk
+
+The daily ingest archives `data/raw/ncaab/<date>/scores_ncaab.json` (182 days, 6,958
+completed games). Beyond scores it carries, per team and game: field-goal / three-point /
+free-throw attempts and makes, rebounds, assists, the AP `curatedRank` carried into the game,
+plus neutral-site and conference-game flags. Coverage 99.96% of the history file. No
+offensive rebounds or turnovers, so possessions cannot be reconstructed; `FGA + 0.44·FTA`
+is the tempo proxy (correlation 0.65 with the game total). New module
+`features/ncaab_scoreboard_stats.py` serves these keyed by ESPN event id; callers pass the
+history they are allowed to see, so a stats row is never newer than the history it rides on.
+
+### Features (all constructor parameters, default off; artifacts turn them on)
+
+| feature | model | what it does | selected on |
+|---|---|---|---|
+| `non_d1_prior_from_history` | spread | the non-D1 Elo prior is read off the venue-adjusted margins D1 teams posted against non-D1 opponents in the history (≥ 20 games, else the constant) — ~450 Elo at present vs the old 1180 | train window (Dec–Feb; nothing else is fitted there), validation must not degrade |
+| `rank_prior_per_slot` = 8 | spread | a team's last AP rank in the history lifts its Elo prior by `8 × (26 − rank)`; feeds the Elo start/regression target and the tiered trend priors | same |
+| `tempo_source="attempts"`, `pace_sensitivity` = 1.5 | total | pace factors from each team's shot-attempt tempo (EWM, shrunk toward the league mean) instead of points | validation (grid 0.55–2.5; 1.5 is the interior optimum on residual SD, coverage and over-Brier, within 0.04 MAE of 2.0) |
+
+Early-season features cannot be selected on the Feb–Mar validation split because it contains
+no season openers; the train window is the only non-holdout window that does. The Elo ramp and
+retention remain off/unchanged for the same reason as round 1.
+
+### Results (round-1 shipped → round-2 shipped)
+
+| spread | train (n=3,601) | validation (n=1,043) | holdout (n=743) |
+|---|---|---|---|
+| moneyline Brier | 0.1844 → **0.1803** | 0.2020 → 0.2020 | 0.1219 → **0.1096** (control 0.1116) |
+| margin MAE | 10.73 → **9.83** | 8.844 → 8.850 | 16.51 → **12.71** (control 17.76) |
+| margin MAE, D1-only | 9.36 → **9.25** | — | 11.86 → **11.46** |
+| cover Brier (pseudo-lines) | 0.2185 → **0.2170** | 0.2111 → 0.2110 | 0.2346 → **0.2281** |
+| PIT coverage 80% | 0.766 → 0.789 | 0.812 → 0.810 | 0.681 → **0.791** |
+
+| total | train | validation | holdout |
+|---|---|---|---|
+| MAE | 14.34 → **14.08** | 13.78 → **13.38** | 14.49 → **14.30** |
+| residual SD | 17.92 → 17.67 | 16.93 → **16.56** | 18.44 → 18.23 |
+| PIT 50/80/90 | 0.504/0.801/0.909 → 0.517/0.811/0.913 | 0.489/0.816/0.919 → **0.507/0.821/0.921** | 0.579/0.864/0.949 → 0.572/0.869/0.950 |
+| over Brier | 0.2351 → 0.2347 | 0.2363 → **0.2345** | 0.2344 → **0.2335** |
+
+The spread holdout moneyline Brier is now better than the pre-fix control's (0.1096 vs
+0.1116) — the round-1 regression there was the under-priced buy games, and the two priors
+address exactly those. Rank slots 12 and 16 improve train marginally but start to cost
+validation, so 8 was kept. Non-D1 constants 1000/850/700 all lose to the history-derived
+prior on train and holdout.
+
+Deployment check: the live daily at 2026-11-12T19:05Z (after round 1 landed) wrote 68 Flat
+rows; the deployed artifact model reproduces all 68 with zero feature or probability deltas
+(harness gate, `matched_by: deployed_artifact`).
+
 ## Not changed / open
 
 - Early-season dispersion (both markets) and the Elo ramp: need a second cross-season window

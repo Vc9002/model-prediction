@@ -43,13 +43,26 @@ from scipy import stats
 from model_prediction.domain import EASTERN
 from model_prediction.features.base import FeatureStore, GameRecord
 from model_prediction.models.basketball import UpcomingGame
-from model_prediction.models.ncaab_spread_v6 import NCAABSpreadModelV6
-from model_prediction.models.ncaab_total_v6 import NCAABTotalModelV6
+from model_prediction.models.ncaab_spread_v6 import NCAABSpreadModelV6, ncaab_spread_v6_model
+from model_prediction.models.ncaab_total_v6 import NCAABTotalModelV6, ncaab_total_v6_model
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = ROOT / "outputs" / "ncaab"
 GRADE_FROM = "2025-12-01"  # four weeks of warm-up history before the first graded day
 RUNTIME_LEDGER = Path(r"E:\model-prediction-runtime\ledgers\ledgers.db")
+
+SHIPPED_SPREAD_BASE: dict[str, Any] = {
+    "coherent_moneyline": True,
+    "tiered_trend_priors": True,
+    "additive_matchup": True,
+    "home_court_points": 5.0,
+    "elo_home_advantage": 45.0,
+}
+SHIPPED_TOTAL_BASE: dict[str, Any] = {
+    "conference_trend_priors": True,
+    "pace_baseline": "league",
+    "total_sd": 16.5,
+}
 
 SPREAD_VARIANTS: dict[str, dict[str, Any]] = {
     "control": {},
@@ -105,6 +118,37 @@ SPREAD_VARIANTS: dict[str, dict[str, Any]] = {
         "home_court_points": 5.0,
         "elo_home_advantage": 45.0,
     },
+    # round 2 (features, 2026-11-12): non-D1 prior and AP-rank prior. These act in the
+    # season-opener regime, which the validation split (Feb-Mar) does not contain; they are
+    # selected on the TRAIN window (Dec-Feb, nothing else is fitted there) and the holdout is
+    # still reported once.
+    "shipped_nond1_1000": {**SHIPPED_SPREAD_BASE, "non_d1_prior": 1000.0},
+    "shipped_nond1_850": {**SHIPPED_SPREAD_BASE, "non_d1_prior": 850.0},
+    "shipped_nond1_700": {**SHIPPED_SPREAD_BASE, "non_d1_prior": 700.0},
+    "shipped_nond1_hist": {**SHIPPED_SPREAD_BASE, "non_d1_prior_from_history": True},
+    "shipped_rank_4": {**SHIPPED_SPREAD_BASE, "rank_prior_per_slot": 4.0},
+    "shipped_rank_8": {**SHIPPED_SPREAD_BASE, "rank_prior_per_slot": 8.0},
+    "shipped_nond1_hist_rank_4": {
+        **SHIPPED_SPREAD_BASE,
+        "non_d1_prior_from_history": True,
+        "rank_prior_per_slot": 4.0,
+    },
+    # SHIPPED 2026-11-12 round 2 (spread): history-derived non-D1 prior + 8 Elo per AP slot.
+    "shipped_nond1_hist_rank_8": {
+        **SHIPPED_SPREAD_BASE,
+        "non_d1_prior_from_history": True,
+        "rank_prior_per_slot": 8.0,
+    },
+    "shipped_nond1_hist_rank_12": {
+        **SHIPPED_SPREAD_BASE,
+        "non_d1_prior_from_history": True,
+        "rank_prior_per_slot": 12.0,
+    },
+    "shipped_nond1_hist_rank_16": {
+        **SHIPPED_SPREAD_BASE,
+        "non_d1_prior_from_history": True,
+        "rank_prior_per_slot": 16.0,
+    },
     "final_ret_0.20": {
         "coherent_moneyline": True,
         "elo_weight_ramp_games": 8.0,
@@ -148,6 +192,17 @@ TOTAL_VARIANTS: dict[str, dict[str, Any]] = {
     },
     # SHIPPED 2026-11-12: validation-selected (total_sd 16.5 gives 0.489/0.816/0.919 PIT coverage).
     "shipped": {"conference_trend_priors": True, "pace_baseline": "league", "total_sd": 16.5},
+    # round 2 (features): attempts-based tempo (FGA + 0.44 FTA) from the archived scoreboards,
+    # selected on validation like every full-sample parameter.
+    "shipped_attempts_0.55": {**SHIPPED_TOTAL_BASE, "tempo_source": "attempts", "pace_sensitivity": 0.55},
+    "shipped_attempts_0.8": {**SHIPPED_TOTAL_BASE, "tempo_source": "attempts", "pace_sensitivity": 0.8},
+    "shipped_attempts_1.0": {**SHIPPED_TOTAL_BASE, "tempo_source": "attempts", "pace_sensitivity": 1.0},
+    "shipped_points_0.8": {**SHIPPED_TOTAL_BASE, "pace_sensitivity": 0.8},
+    "shipped_attempts_1.25": {**SHIPPED_TOTAL_BASE, "tempo_source": "attempts", "pace_sensitivity": 1.25},
+    # SHIPPED 2026-11-12 round 2 (total): attempts-based tempo, sensitivity 1.5.
+    "shipped_attempts_1.5": {**SHIPPED_TOTAL_BASE, "tempo_source": "attempts", "pace_sensitivity": 1.5},
+    "shipped_attempts_2.0": {**SHIPPED_TOTAL_BASE, "tempo_source": "attempts", "pace_sensitivity": 2.0},
+    "shipped_attempts_2.5": {**SHIPPED_TOTAL_BASE, "tempo_source": "attempts", "pace_sensitivity": 2.5},
 }
 
 
@@ -208,7 +263,8 @@ def _slope_intercept(probs: list[float], outcomes: list[int]) -> tuple[float, fl
     for _ in range(25):
         g_a = g_b = h_aa = h_ab = h_bb = 0.0
         for x, y in zip(xs, outcomes, strict=True):
-            p = 1 / (1 + math.exp(-(a * x + b)))
+            z = max(-50.0, min(50.0, a * x + b))  # separable subsets (near-certain games) overflow otherwise
+            p = 1 / (1 + math.exp(-z))
             w = p * (1 - p)
             g_a += (y - p) * x
             g_b += y - p
@@ -221,6 +277,8 @@ def _slope_intercept(probs: list[float], outcomes: list[int]) -> tuple[float, fl
         da = (g_a * h_bb - g_b * h_ab) / det
         db = (g_b * h_aa - g_a * h_ab) / det
         a, b = a + da, b + db
+        if abs(a) > 50.0 or abs(b) > 50.0:
+            return float("nan"), float("nan")  # diverged: the subset is separable, no finite slope
         if abs(da) < 1e-9 and abs(db) < 1e-9:
             break
     return a, b
@@ -330,9 +388,11 @@ def _run_variant(args: tuple[str, str, dict[str, Any]]) -> tuple[str, str, list[
         ]
         preds = model.predict_games(history, upcoming)
         actual = {g.event_id: g for g in todays}
+        d1_teams = getattr(model, "team_priors", None) or getattr(model, "team_conferences", {})
         for p in preds:
             g = actual[p.event_id]
             fb = p.feature_basis
+            non_d1 = g.home_team not in d1_teams or g.away_team not in d1_teams
             if market == "spread":
                 if p.market_type != "moneyline":
                     continue
@@ -340,6 +400,7 @@ def _run_variant(args: tuple[str, str, dict[str, Any]]) -> tuple[str, str, list[
                     {
                         "day": day,
                         "split": splits[day],
+                        "non_d1": non_d1,
                         "sample": fb.get("current_season_sample"),
                         "mean": float(p.inference_inputs["mean"]),
                         "scale": float(p.inference_inputs.get("scale", p.inference_inputs["sd"])),
@@ -355,6 +416,7 @@ def _run_variant(args: tuple[str, str, dict[str, Any]]) -> tuple[str, str, list[
                     {
                         "day": day,
                         "split": splits[day],
+                        "non_d1": non_d1,
                         "sample": fb.get("current_season_sample"),
                         "mean": float(p.inference_inputs["mean"]),
                         "sd": float(p.inference_inputs["sd"]),
@@ -378,6 +440,14 @@ def evaluate(market: str, name: str, rows: list[dict[str, Any]]) -> dict[str, An
         sd_fit,
     )
     out["cross_season_2026-11"] = summarise([r for r in rows if r["day"] >= "2026-11-01"], sd_fit)
+    for split in ("train", "holdout"):
+        out[f"{split}_non_d1"] = summarise([r for r in rows if r["split"] == split and r["non_d1"]], sd_fit)
+        out[f"{split}_d1_only"] = summarise(
+            [r for r in rows if r["split"] == split and not r["non_d1"]], sd_fit
+        )
+    out["cross_season_d1_only"] = summarise(
+        [r for r in rows if r["day"] >= "2026-11-01" and not r["non_d1"]], sd_fit
+    )
     return out
 
 
@@ -402,10 +472,13 @@ def reproduction_gate() -> dict[str, Any]:
     ).fetchall()
     con.close()
     store = FeatureStore(ROOT / "data")
-    spread = NCAABSpreadModelV6()
-    total = NCAABTotalModelV6()
+    candidates = {
+        "pre_fix_defaults": (NCAABSpreadModelV6(), NCAABTotalModelV6()),
+        "deployed_artifact": (ncaab_spread_v6_model(), ncaab_total_v6_model()),
+    }
     table: list[dict[str, Any]] = []
     mismatches = 0
+    matched_by: dict[str, int] = defaultdict(int)
     parsed = []
     for model_id, market, selection, line, prob, start, payload_json in rows:
         payload = json.loads(payload_json or "{}")
@@ -441,32 +514,38 @@ def reproduction_gate() -> dict[str, Any]:
             neutral_site=neutral,
             league="NCAAB",
         )
-        if market == "total":
-            pred = total.predict_games(history, [game])[0]
-            compared = {
-                k: feats.get(k)
-                for k in ("expected_total", "raw_model_total", "expected_pace", "effective_total_sd")
+        keys = (
+            ("expected_total", "raw_model_total", "expected_pace", "effective_total_sd")
+            if market == "total"
+            else (
+                "expected_margin",
+                "elo_margin",
+                "trend_margin",
+                "rest_diff",
+                "effective_margin_sd",
+                "elo_home",
+                "elo_away",
+            )
+        )
+        compared = {k: feats.get(k) for k in keys}
+        ok = False
+        priced_by = None
+        for label, (spread, total) in candidates.items():
+            if market == "total":
+                pred = total.predict_games(history, [game])[0]
+            else:
+                pred = next(p for p in spread.predict_games(history, [game]) if p.market_type == market)
+            deltas = {
+                k: round(float(pred.feature_basis[k]) - float(v), 4)
+                for k, v in compared.items()
+                if v is not None
             }
-        else:
-            preds = spread.predict_games(history, [game])
-            pred = next(p for p in preds if p.market_type == market)
-            compared = {
-                k: feats.get(k)
-                for k in (
-                    "expected_margin",
-                    "elo_margin",
-                    "trend_margin",
-                    "rest_diff",
-                    "effective_margin_sd",
-                    "elo_home",
-                    "elo_away",
-                )
-            }
-        deltas = {
-            k: round(float(pred.feature_basis[k]) - float(v), 4) for k, v in compared.items() if v is not None
-        }
-        p_delta = round(float(pred.probabilities[selection]) - float(prob), 6)
-        ok = digest_ok and all(abs(d) < 1e-6 for d in deltas.values()) and abs(p_delta) < 1e-6
+            p_delta = round(float(pred.probabilities[selection]) - float(prob), 6)
+            ok = digest_ok and all(abs(d) < 1e-6 for d in deltas.values()) and abs(p_delta) < 1e-6
+            if ok:
+                priced_by = label
+                matched_by[label] += 1
+                break
         mismatches += 0 if ok else 1
         table.append(
             {
@@ -478,12 +557,14 @@ def reproduction_gate() -> dict[str, Any]:
                 "feature_deltas": deltas,
                 "probability_delta": p_delta,
                 "match": ok,
+                "priced_by": priced_by,
             }
         )
     return {
         "status": "pass" if table and not mismatches else "FAIL",
         "rows": len(table),
         "mismatches": mismatches,
+        "matched_by": dict(matched_by),
         "created_at_utc": latest,
         "table": table,
     }
@@ -496,7 +577,7 @@ def _fmt_table(results: list[dict[str, Any]], split: str, keys: list[str]) -> st
     head = "| variant | " + " | ".join(keys) + " |\n|---|" + "---|" * len(keys) + "\n"
     body = ""
     for r in results:
-        s = r[split]
+        s = r.get(split) or {}
         body += f"| {r['variant']} | " + " | ".join(str(s.get(k, "")) for k in keys) + " |\n"
     return head + body
 
@@ -565,7 +646,18 @@ def write_report(
             + ", ".join(f"{r['variant']}={r['train_resid_sd']}" for r in res)
             + "\n"
         )
-        for split in ("validation", "holdout", "holdout_thin_sample_lt8", "cross_season_2026-11"):
+        for split in (
+            "validation",
+            "train",
+            "train_non_d1",
+            "train_d1_only",
+            "holdout",
+            "holdout_non_d1",
+            "holdout_d1_only",
+            "holdout_thin_sample_lt8",
+            "cross_season_2026-11",
+            "cross_season_d1_only",
+        ):
             md.append(f"### {split}\n")
             md.append(_fmt_table(res, split, keys))
     (OUT_DIR / "ncaab_v6_review_ablation.md").write_text("\n".join(md), encoding="utf-8")

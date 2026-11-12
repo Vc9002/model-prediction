@@ -39,7 +39,8 @@ from typing import Any
 
 from ..domain import parse_utc
 from ..features.base import GameRecord
-from ..features.trends import TrendEngine
+from ..features.ncaab_scoreboard_stats import NCAABScoreboardStats
+from ..features.trends import TrendEngine, ewm_level
 from .base import GamePrediction, GamePredictionBase
 from .basketball import UpcomingGame
 from .ncaab_spread_v6 import load_verified_artifact
@@ -148,16 +149,22 @@ class NCAABTotalModelV6:
         credibility_constant: float = 4.0,
         conference_trend_priors: bool = False,
         pace_baseline: str = "conference",
+        tempo_source: str = "points",
+        pace_sensitivity: float = 0.55,
+        tempo_prior_games: float = 12.0,
         max_edge: float = 0.08,
         base_units: float = 1.0,
         max_units: float = 2.0,
         dynamic_sizing_enabled: bool = True,
         conference_file: Path | str | None = None,
         conference_baselines: dict[str, float] | None = None,
+        stats_root: Path | str | None = None,
         version: str = NCAAB_TOTAL_V6_VERSION,
     ) -> None:
         if pace_baseline not in {"conference", "league"}:
             raise ValueError(f"pace_baseline must be 'conference' or 'league', got {pace_baseline!r}")
+        if tempo_source not in {"points", "attempts"}:
+            raise ValueError(f"tempo_source must be 'points' or 'attempts', got {tempo_source!r}")
         self.total_sd = total_sd
         self.baseline_points_per_team = baseline_points_per_team
         self.league_pace = league_pace
@@ -176,6 +183,10 @@ class NCAABTotalModelV6:
         self.credibility_constant = credibility_constant
         self.conference_trend_priors = conference_trend_priors
         self.pace_baseline = pace_baseline
+        self.tempo_source = tempo_source
+        self.pace_sensitivity = pace_sensitivity
+        self.tempo_prior_games = tempo_prior_games
+        self._stats = NCAABScoreboardStats(stats_root) if tempo_source == "attempts" else None
         self.max_edge = max_edge
         self.base_units = base_units
         self.max_units = max_units
@@ -214,6 +225,9 @@ class NCAABTotalModelV6:
             "credibility_constant": float(artifact.get("credibility_constant", 4.0)),
             "conference_trend_priors": bool(artifact.get("conference_trend_priors", False)),
             "pace_baseline": str(artifact.get("pace_baseline", "conference")),
+            "tempo_source": str(artifact.get("tempo_source", "points")),
+            "pace_sensitivity": float(artifact.get("pace_sensitivity", 0.55)),
+            "tempo_prior_games": float(artifact.get("tempo_prior_games", 12.0)),
             "max_edge": float(artifact.get("max_edge", 0.08)),
             "base_units": float(sizing.get("base_units", 1.0)),
             "max_units": float(sizing.get("max_units", 2.0)),
@@ -236,12 +250,50 @@ class NCAABTotalModelV6:
                 out[team] = float(prior)
         return out
 
+    def _attempt_tempo(self, history: Sequence[GameRecord]) -> tuple[dict[str, float], float]:
+        """Per-team tempo from shot attempts (FGA + 0.44 FTA, both teams averaged per game).
+
+        Points are a poor pace proxy -- a slow, efficient team and a fast, poor one score alike.
+        Each team's level is the exponentially weighted mean of the game tempos it played, shrunk
+        toward the league mean over ``tempo_prior_games``; the league mean is the history's own.
+        """
+        if self._stats is None:
+            return {}, self.league_pace
+        values: dict[str, list[float]] = {}
+        dates: dict[str, list[Any]] = {}
+        all_tempos: list[float] = []
+        for game, stats in self._stats.for_history(history):
+            tempo = stats.game_attempts
+            all_tempos.append(tempo)
+            for team in (game.home_team, game.away_team):
+                values.setdefault(team, []).append(tempo)
+                dates.setdefault(team, []).append(game.start)
+        if not all_tempos:
+            return {}, self.league_pace
+        league_tempo = sum(all_tempos) / len(all_tempos)
+        out = {
+            team: ewm_level(
+                vals,
+                10.0,
+                league_tempo,
+                self.tempo_prior_games,
+                dates=dates[team],
+                offseason_gap_days=self.offseason_gap_days,
+                offseason_retention=self.offseason_retention,
+            )
+            for team, vals in values.items()
+        }
+        return out, league_tempo
+
     def predict_totals(
         self,
         history: Sequence[GameRecord],
         upcoming: Sequence[UpcomingGame],
     ) -> list[GamePrediction]:
         team_baselines = self._trend_baselines(history)
+        team_tempo, league_tempo = (
+            self._attempt_tempo(history) if self.tempo_source == "attempts" else ({}, 0.0)
+        )
         trend = TrendEngine(
             history,
             offseason_gap_days=self.offseason_gap_days,
@@ -334,12 +386,29 @@ class NCAABTotalModelV6:
             # information looks fast/slow purely because of its conference label (#7).
             pace_ref_away = away_base if self.pace_baseline == "conference" else league_baseline
             pace_ref_home = home_base if self.pace_baseline == "conference" else league_baseline
-            if self.dynamic_matchup_pace and baseline > 0.0:
-                pf_away = 1.0 + 0.55 * (
+            tempo_home = tempo_away = None
+            if self.dynamic_matchup_pace and self.tempo_source == "attempts" and league_tempo > 0.0:
+                tempo_away = team_tempo.get(game.away_team, league_tempo)
+                tempo_home = team_tempo.get(game.home_team, league_tempo)
+                pf_away = 1.0 + self.pace_sensitivity * (tempo_away - league_tempo) / league_tempo
+                pf_home = 1.0 + self.pace_sensitivity * (tempo_home - league_tempo) / league_tempo
+                home_w = 0.50 if is_neutral else self.home_tempo_control
+                away_w = 0.50 if is_neutral else (1.0 - self.home_tempo_control)
+                expected_pace = max(
+                    56.0,
+                    min(
+                        78.0,
+                        self.league_pace * (1.0 + (away_w * (pf_away - 1.0) + home_w * (pf_home - 1.0)))
+                        + pace_adj,
+                    ),
+                )
+                raw_trend_total = raw_trend_total * (expected_pace / self.league_pace)
+            elif self.dynamic_matchup_pace and baseline > 0.0:
+                pf_away = 1.0 + self.pace_sensitivity * (
                     ((away_trend.offense["hl10"] + away_trend.defense["hl10"]) / 2.0 - pace_ref_away)
                     / pace_ref_away
                 )
-                pf_home = 1.0 + 0.55 * (
+                pf_home = 1.0 + self.pace_sensitivity * (
                     ((home_trend.offense["hl10"] + home_trend.defense["hl10"]) / 2.0 - pace_ref_home)
                     / pace_ref_home
                 )
@@ -431,6 +500,10 @@ class NCAABTotalModelV6:
                     "away_conference": away_conf,
                     "home_conference": home_conf,
                     "expected_pace": round(expected_pace, 1),
+                    "tempo_source": self.tempo_source,
+                    "tempo_home": round(tempo_home, 2) if tempo_home is not None else None,
+                    "tempo_away": round(tempo_away, 2) if tempo_away is not None else None,
+                    "league_tempo": round(league_tempo, 2) if league_tempo else None,
                     "neutral_site": is_neutral,
                     "league_pace": self.league_pace,
                     "pace_baseline": self.pace_baseline,

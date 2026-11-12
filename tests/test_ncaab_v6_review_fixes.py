@@ -262,6 +262,9 @@ def test_serving_entry_point_parameters_equal_the_artifact():
         "tiered_trend_priors",
         "additive_matchup",
         "elo_weight_ramp_games",
+        "non_d1_prior_from_history",
+        "non_d1_min_games",
+        "rank_prior_per_slot",
         "max_edge",
     ):
         assert getattr(spread, key) == spread_art[key], key
@@ -273,6 +276,9 @@ def test_serving_entry_point_parameters_equal_the_artifact():
         "league_total_weight",
         "pace_baseline",
         "conference_trend_priors",
+        "tempo_source",
+        "pace_sensitivity",
+        "tempo_prior_games",
         "max_edge",
     ):
         assert getattr(total, key) == total_art[key], key

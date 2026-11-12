@@ -1,6 +1,6 @@
 {
   "additive_matchup": true,
-  "artifact_hash": "7704c5800b883441b1d1749932328ffde409a7a4c4a6eb934c724a86409a8e45",
+  "artifact_hash": "7c6d6d1c551fc4a8768a98ae4f448260b3b95fc2db4bd622094571d35c5423a7",
   "coherent_moneyline": true,
   "dynamic_sizing": {
     "enabled": true,
@@ -12,35 +12,46 @@
   "elo_weight": 0.5,
   "elo_weight_ramp_games": null,
   "evidence": {
-    "source": "outputs/ncaab/ncaab_v6_review_ablation.md (variant shipped vs control)",
-    "method": "point-in-time day-by-day walk-forward over data/historical/ncaab_games_all.jsonl, graded days 2025-12-01..2026-11-11 split 60/20/20 by complete ET dates; parameters selected on validation only; reproduction gate 68/68 live Flat rows",
-    "validation": {
+    "source": "outputs/ncaab/ncaab_v6_review_ablation.md",
+    "method": "point-in-time day-by-day walk-forward over data/historical/ncaab_games_all.jsonl, graded days 2025-12-01..2026-11-11 split 60/20/20 by complete ET dates. Round 1 (2026-11-12, variant shipped vs control): selected on validation. Round 2 (features; variant shipped_nond1_hist_rank_8 vs shipped): non-D1 prior and AP-rank prior act in the season-opener regime that validation (Feb-Mar) does not contain, so they were selected on the train window (Dec-Feb, nothing fitted there) with validation required not to degrade; holdout reported once. Reproduction gate: control reproduced 68/68 pre-fix live rows; deployed artifact reproduced 68/68 post-fix live rows (2026-11-12T19:05Z).",
+    "round1_validation": {
       "n": 1043,
       "moneyline_brier": 0.202,
       "control_moneyline_brier": 0.2058,
-      "moneyline_logloss": 0.5877,
-      "control_moneyline_logloss": 0.5964,
       "margin_mae": 8.844,
       "control_margin_mae": 9.046,
-      "margin_bias": -0.867,
-      "control_margin_bias": -1.918,
       "cover_brier_pseudo_lines": 0.2111,
-      "control_cover_brier_pseudo_lines": 0.2133,
-      "pit_coverage_50_80_90": [
-        0.517,
-        0.812,
-        0.915
-      ]
+      "control_cover_brier_pseudo_lines": 0.2133
     },
-    "holdout": {
-      "n": 742,
-      "moneyline_brier": 0.1217,
-      "control_moneyline_brier": 0.1112,
-      "margin_mae": 16.515,
-      "control_margin_mae": 17.76,
-      "cover_brier_pseudo_lines": 0.2346,
-      "control_cover_brier_pseudo_lines": 0.2365,
-      "note": "holdout is 2026-03-19..2026-11-11; 657 of 742 games are the 2026-11 early-season window where home teams won 84.6% and all variants under-disperse (served scale ~15 vs realised 22-24)"
+    "round2_train": {
+      "n": 3601,
+      "moneyline_brier": 0.1803,
+      "round1_moneyline_brier": 0.1844,
+      "margin_mae": 9.825,
+      "round1_margin_mae": 10.73,
+      "cover_brier_pseudo_lines": 0.217,
+      "round1_cover_brier_pseudo_lines": 0.2185,
+      "d1_only_margin_mae": 9.253,
+      "round1_d1_only_margin_mae": 9.361
+    },
+    "round2_validation": {
+      "n": 1043,
+      "moneyline_brier": 0.202,
+      "margin_mae": 8.85,
+      "cover_brier_pseudo_lines": 0.211
+    },
+    "round2_holdout": {
+      "n": 743,
+      "moneyline_brier": 0.1096,
+      "round1_moneyline_brier": 0.1219,
+      "control_moneyline_brier": 0.1116,
+      "margin_mae": 12.709,
+      "round1_margin_mae": 16.513,
+      "control_margin_mae": 17.758,
+      "cover_brier_pseudo_lines": 0.2281,
+      "round1_cover_brier_pseudo_lines": 0.2346,
+      "pit_coverage_80": 0.791,
+      "note": "holdout is 2026-03-19..2026-11-11; 658 of 743 games are the 2026-11 early-season window"
     },
     "not_market_relative": true
   },
@@ -56,10 +67,13 @@
   "max_edge": 0.08,
   "model_id": "ncaab-spread-v6",
   "model_version": "ncaab-spread-v6",
+  "non_d1_min_games": 20,
   "non_d1_prior": 1180.0,
+  "non_d1_prior_from_history": true,
   "offseason_gap_days": 150,
   "offseason_retention": 0.35,
   "qualified_for_betting": true,
+  "rank_prior_per_slot": 8.0,
   "rest_penalty_away": 2.0,
   "rest_penalty_home": 1.6,
   "rest_weight": 0.15,

@@ -46,6 +46,7 @@ from scipy import stats
 from ..domain import parse_utc
 from ..features.base import GameRecord
 from ..features.elo_ratings import build_elo
+from ..features.ncaab_scoreboard_stats import NCAABScoreboardStats
 from ..features.trends import TrendEngine
 from .base import GamePrediction, GamePredictionBase
 from .basketball import UpcomingGame
@@ -211,12 +212,16 @@ class NCAABSpreadModelV6:
         elo_weight_ramp_games: float | None = None,
         tiered_trend_priors: bool = False,
         additive_matchup: bool = False,
+        non_d1_prior_from_history: bool = False,
+        non_d1_min_games: int = 20,
+        rank_prior_per_slot: float = 0.0,
         max_edge: float = 0.08,
         base_units: float = 1.0,
         max_units: float = 2.0,
         dynamic_sizing_enabled: bool = True,
         conference_file: Path | str | None = None,
         high_altitude_hca: dict[str, float] | None = None,
+        stats_root: Path | str | None = None,
         version: str = NCAAB_SPREAD_V6_VERSION,
     ) -> None:
         self.margin_sd = margin_sd
@@ -242,6 +247,10 @@ class NCAABSpreadModelV6:
         self.elo_weight_ramp_games = elo_weight_ramp_games
         self.tiered_trend_priors = tiered_trend_priors
         self.additive_matchup = additive_matchup
+        self.non_d1_prior_from_history = non_d1_prior_from_history
+        self.non_d1_min_games = non_d1_min_games
+        self.rank_prior_per_slot = rank_prior_per_slot
+        self._stats = NCAABScoreboardStats(stats_root) if rank_prior_per_slot > 0.0 else None
         self.max_edge = max_edge
         self.base_units = base_units
         self.max_units = max_units
@@ -289,6 +298,9 @@ class NCAABSpreadModelV6:
             "elo_weight_ramp_games": float(ramp) if ramp is not None else None,
             "tiered_trend_priors": bool(artifact.get("tiered_trend_priors", False)),
             "additive_matchup": bool(artifact.get("additive_matchup", False)),
+            "non_d1_prior_from_history": bool(artifact.get("non_d1_prior_from_history", False)),
+            "non_d1_min_games": int(artifact.get("non_d1_min_games", 20)),
+            "rank_prior_per_slot": float(artifact.get("rank_prior_per_slot", 0.0)),
             "max_edge": float(artifact.get("max_edge", 0.08)),
             "base_units": float(sizing.get("base_units", 1.0)),
             "max_units": float(sizing.get("max_units", 2.0)),
@@ -325,8 +337,48 @@ class NCAABSpreadModelV6:
             return _student_t_cdf(x, mean, scale, df=self.student_t_df)
         return _normal_cdf(x, mean, scale)
 
-    def _trend_baselines(
+    def _effective_priors(
         self, history: Sequence[GameRecord]
+    ) -> tuple[dict[str, float], float, dict[str, int]]:
+        """Team Elo priors and the non-D1 prior actually used for this history.
+
+        - ``rank_prior_per_slot``: a team's last AP rank in ``history`` lifts its prior by
+          ``slot * (26 - rank)`` -- the poll is the only pre-season strength signal the data has,
+          and conference tiers alone understate the top of the sport (holdout: Tier-1 hosts beat
+          Tier-3/4 visitors by 15-18, the tier gap says 7-11).
+        - ``non_d1_prior_from_history``: the non-D1 prior is read off the margins D1 teams actually
+          posted against non-D1 opponents in ``history`` (venue-adjusted), instead of a constant.
+          A fixed 1180 implied a 13-point gap; the observed one is ~40.
+        """
+        priors = dict(self.team_priors)
+        ranks: dict[str, int] = {}
+        if self.rank_prior_per_slot > 0.0 and self._stats is not None:
+            ranks = self._stats.last_known_ranks(history)
+            for team, rank in ranks.items():
+                priors[team] = priors.get(team, self.non_d1_prior) + self.rank_prior_per_slot * (26 - rank)
+        non_d1 = self.non_d1_prior
+        if self.non_d1_prior_from_history:
+            adjusted: list[float] = []
+            d1_priors: list[float] = []
+            for game in history:
+                home_d1 = game.home_team in self.team_priors
+                away_d1 = game.away_team in self.team_priors
+                if home_d1 == away_d1:
+                    continue
+                if home_d1:
+                    adjusted.append(float(game.margin) - self.home_court_points)
+                    d1_priors.append(priors[game.home_team])
+                else:
+                    adjusted.append(-float(game.margin) + self.home_court_points)
+                    d1_priors.append(priors[game.away_team])
+            if len(adjusted) >= self.non_d1_min_games:
+                mean_margin = sum(adjusted) / len(adjusted)
+                mean_d1_prior = sum(d1_priors) / len(d1_priors)
+                non_d1 = max(300.0, min(1400.0, mean_d1_prior - ELO_POINTS_PER_MARGIN_POINT * mean_margin))
+        return priors, non_d1, ranks
+
+    def _trend_baselines(
+        self, history: Sequence[GameRecord], priors: dict[str, float], non_d1: float
     ) -> tuple[dict[str, float], dict[str, float]] | None:
         """Per-team offense/defense shrinkage targets from the conference-tier Elo priors.
 
@@ -345,10 +397,8 @@ class NCAABSpreadModelV6:
         offense: dict[str, float] = {}
         defense: dict[str, float] = {}
         teams = {name for game in history for name in (game.home_team, game.away_team)}
-        for team in teams | set(self.team_priors):
-            strength = (self.team_priors.get(team, self.non_d1_prior) - 1500.0) / (
-                2.0 * ELO_POINTS_PER_MARGIN_POINT
-            )
+        for team in teams | set(priors):
+            strength = (priors.get(team, non_d1) - 1500.0) / (2.0 * ELO_POINTS_PER_MARGIN_POINT)
             offense[team] = league_mean + strength
             defense[team] = league_mean - strength
         return offense, defense
@@ -359,16 +409,17 @@ class NCAABSpreadModelV6:
         upcoming: Sequence[UpcomingGame],
     ) -> list[GamePrediction]:
         gap_days = int(self.offseason_gap_days) if self.offseason_gap_days is not None else 150
+        priors, non_d1, ranks = self._effective_priors(history)
         elo = build_elo(
             history,
             "ncaab",
             offseason_regression=1.0 - self.offseason_retention,
             offseason_gap_days=gap_days,
             home_advantage=self.elo_home_advantage,
-            team_priors=self.team_priors,
-            default_prior=self.non_d1_prior,
+            team_priors=priors,
+            default_prior=non_d1,
         )
-        baselines = self._trend_baselines(history)
+        baselines = self._trend_baselines(history, priors, non_d1)
         trend = TrendEngine(
             history,
             offseason_gap_days=self.offseason_gap_days,
@@ -490,6 +541,9 @@ class NCAABSpreadModelV6:
                 "model_version": self.version,
                 "feature_basis": {
                     "elo_home": round(elo.rating(game.home_team), 1),
+                    "non_d1_prior_effective": round(non_d1, 1),
+                    "rank_home": ranks.get(game.home_team),
+                    "rank_away": ranks.get(game.away_team),
                     "elo_away": round(elo.rating(game.away_team), 1),
                     "away_points_hl10": round(away_points, 2),
                     "home_points_hl10": round(home_points, 2),

@@ -1,5 +1,35 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
+## 2026-11-12 — NCAAB feature round: history-derived non-D1 prior, AP-rank prior, attempts-based tempo (quick-261112-nc6, round 2)
+
+Operator directive "improve the model, add more features" after the review fixes. Full
+write-up and tables: `docs/NCAAB_V6_REVIEW_FIXES_2026-11-12.md` (Feature round section);
+report `outputs/ncaab/ncaab_v6_review_ablation.md`.
+
+- **Diagnosis first**: on the 658 November-2026 games the round-1 model under-predicted
+  home margins by 12.4 points on average; 187 of those games had a non-Division-1 visitor
+  (bias +29, actual +42 vs modelled +13 — the 1180 non-D1 prior implied a 13-point gap)
+  and Tier-1/2 hosts in buy games were under-priced by a further ~13.
+- **Data already on disk**: the archived ESPN scoreboards (`data/raw/ncaab/<date>/
+  scores_ncaab.json`, 182 days) carry per-team FGA/3PA/FTA/makes, rebounds, assists, the
+  AP `curatedRank` carried into each game, neutral-site and conference flags for 99.96%
+  of history games. New `features/ncaab_scoreboard_stats.py` serves them by ESPN event id;
+  callers pass only the history they may see, so it cannot leak.
+- **Spread** (`non_d1_prior_from_history`, `rank_prior_per_slot` 8): both act only in the
+  season-opener regime, which the Feb–Mar validation split does not contain, so they were
+  selected on the train window (Dec–Feb; nothing else is fitted there) with validation
+  required not to degrade. Train: moneyline Brier 0.1844 → 0.1803, margin MAE 10.73 →
+  9.83; validation unchanged (0.2020 / 8.85); holdout (reported once) MAE 16.51 → 12.71,
+  moneyline Brier 0.1219 → 0.1096 (now better than the pre-fix control's 0.1116). Rank
+  slots 12/16 and non-D1 constants 1000/850/700 were tested and not taken.
+- **Total** (`tempo_source="attempts"`, `pace_sensitivity` 1.5): validation MAE 13.78 →
+  13.38, residual SD 16.93 → 16.56, PIT 0.507/0.821/0.921, over-Brier 0.2363 → 0.2345;
+  holdout MAE 14.49 → 14.30. Grid 0.55–2.5; 1.5 is the interior optimum.
+- **Deployment check**: the daily at 19:05Z (after round 1) wrote 68 Flat rows; the deployed
+  artifact model reproduces all 68 exactly (harness gate `matched_by: deployed_artifact`).
+  Artifacts rewritten with the new keys and evidence; consumed-keys / parity tests cover them.
+- Rollback: revert the round-2 commit; the round-1 artifacts are in git (`e32335c7`).
+
 ## 2026-11-12 — NFL loss investigation: no CLV existed, placeholder rungs priced as main lines, consensus/opener capture added
 
 Follow-up to the 2026-11-11 NFL review. Full evidence in

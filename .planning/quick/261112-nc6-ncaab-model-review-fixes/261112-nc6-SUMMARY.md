@@ -44,6 +44,20 @@ Holdout (n = 742, mostly the 2026-11 early-season window): margin MAE 17.76 -> 1
 - Red-without-fix: artifact tests failed on the pre-fix artifacts; the old integer-line total
   assertion failed on the push fix (rewritten to symmetry + push).
 
+## Round 2 — features (same quick task, operator request)
+
+- Diagnosed the early-season bias by matchup type: non-D1 visitors (+29 bias, 187 of 658
+  November games) and Tier-1/2 buy games were the sources.
+- Found the archived ESPN scoreboards carry attempts/makes, rebounds, assists and AP rank for
+  99.96% of history games; new `features/ncaab_scoreboard_stats.py` serves them PIT-safely.
+- Spread: `non_d1_prior_from_history` + `rank_prior_per_slot` 8 (train-window selected,
+  validation unchanged; holdout MAE 16.5 -> 12.7, moneyline Brier 0.122 -> 0.110).
+- Total: `tempo_source="attempts"`, `pace_sensitivity` 1.5 (validation MAE 13.78 -> 13.38).
+- Artifacts rewritten with the new keys and evidence; 6 new tests
+  (`tests/test_ncaab_scoreboard_features.py`); 57 tests across the affected files pass.
+- Deployment check: the 19:05Z daily's 68 Flat rows are reproduced exactly by the deployed
+  round-1 artifact model.
+
 ## Open (recorded in HANDOFF §1)
 
 Early-season under-dispersion (both markets), Elo ramp, retention 0.2 vs 0.35 — need a second
