@@ -32,8 +32,13 @@ The College Football prediction system implements a joint game-level scoring fra
 
 ### Dual-Ledger Invariants
 1. **Flat Ledger (`data/flat/ncaaf.xlsx` & SQLite mirror)**: Unconditionally receives **100% of all eligible CFB predictions** across Moneyline, Spread, and Total without applying pick-edge or unit gating.
-2. **Main Ledger (`data/main/ncaaf.xlsx`)**: Gated strictly by market qualification:
-   - Gating rule (applies to any champion): Main ledger writes need Edge >= 3.5%, Uncertainty <= 0.18, non-FCS, and sizing criteria passing. Which model is the champion per market is an open decision (see §7 and `docs/handoffs/HANDOFF.md`, item 3).
+2. **Main Ledger (`data/main/ncaaf.xlsx`)**: Gated by the champion artifact's own `gates` block, read by `models/cfb_structural_v4.py::main_gates_from_artifact` and enforced in `cli/forecast.py::_forecast_cfb_sport` (since 2026-11-12; before that only `max_edge` was read):
+   - Edge band `min_edge` 2% <= edge <= `max_edge` 8% (`config/model.yaml` may raise `min_edge`).
+   - `block_fcs`: any FBS-vs-FCS matchup is rejected (`fcs_blocked`).
+   - `max_spread_line` 21.5: spreads beyond it are rejected (`spread_line_above_max`).
+   - `max_moneyline_dog_odds` +200, applied as an executable-ask floor of 33.3% (`moneyline_ask_below_floor`).
+   - Totals additionally need verified pregame weather (`pregame_weather_unverified`) and pass the **unvalidated** `models.NCAAF.main_total_gates` block in `config/model.yaml` (model probability <= 62%, no under at a line >= 56.5, projection at least 1.5 from the line). Those three came from hardcoded clauses with no walk-forward evidence; they are config so they can be deleted or validated.
+   - Every row records `feature_basis.quote_provenance` (`polymarket_executable_ask` or `espn_consensus_indicative`). Whether consensus-priced rows should reach Main at all is an open operator decision.
 
 ---
 
@@ -152,6 +157,10 @@ What this means:
 | `cfb-structural-v4` | Moneyline, Spread, Total | 2 | `config/models/cfb-structural-v4.json` | `21a9390c663a5131...` | **Current champion**, `config/production.yaml` `champions.NCAAF` |
 
 ---
+
+## 10. Serving fixes from the 2026-11-11 model review (2026-11-12)
+
+See `docs/DEBUG.md` (2026-11-12 NCAAF entry) for the full record. In short: `build_cfb_slate` now serves `CFBStructuralV4Model` built from the artifact (`cfb_model()`), so the 14.5 margin SD, conference scaling and total-SD widening described in §1 to §4 are what production prices; Polymarket quotes use the newest capture per market and require both asks; the artifact's gates are enforced on Main (§1); neutral-site weather resolves from ESPN's venue and bowls use a fully decayed prior week; the QB starter channel is populated from the daily ESPN injuries snapshot joined to the scoreboard passing leader (sparse feed, fail-closed to "no evidence"); simulations run at 200k draws; `code_revision` hashes the serving source. Regression tests: `tests/test_cfb_serving_parity.py`.
 
 ## 9. First Real Market-Relative Backtest (2026-11-05)
 

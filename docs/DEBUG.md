@@ -1,5 +1,187 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
+## 2026-11-12 — NCAAF review fixes: serving the v4 class, ask integrity, artifact gates, venue weather, QB channel
+
+Closes every NCAAF item in `docs/MODEL_REVIEW_2026-11-11.md` (#1, #8a/b/c, #9 CFB,
+#12, #13, LOW: MC noise, `code_revision`). Quick task `261112-0xd`. Verified
+against the live ESPN scoreboard for 2026-11-14 (56 games, 167 contracts) and
+the runtime ledger read-only. Every fix carries a regression test in
+`tests/test_cfb_serving_parity.py`; the two headline tests were shown red under
+mutation (legacy 16.2 model injected; newest-capture matcher flipped to oldest).
+
+**Defect window (#1): 2026-10-26 (v4 promoted) → this fix.** `build_cfb_slate`
+instantiated `CollegeFootballModel()` — a second implementation with
+`margin_sd=16.2`, no conference scaling and no total-SD widening — and stamped
+every pick `cfb-structural-v4` with the v4 artifact hash. `CFBStructuralV4Model`
+(14.5 from the 11-05 walk-forward retune) was only ever imported by
+`sports/ncaaf/`, which nothing in `cli/` calls. The runtime ledger holds 243
+Main rows labelled `cfb-structural-v4` priced on the 16.2 arithmetic (176+3
+superseded, 56+6 settled, 2 open; 229 of them against ESPN consensus). They are
+left in place and are identifiable: their snapshot `parameters.margin_sd`
+divided by the recorded widening is 16.2, not 14.5. Superseding them is an
+operator decision, as with the NFL defaulted-input rows.
+
+Fixes:
+
+- **One implementation.** `CollegeFootballModel` is now a subclass of
+  `CFBStructuralV4Model` carrying only the legacy constructor (per-market
+  version labels). `cfb_model()` builds it with
+  `CFBStructuralV4Model.from_artifact(load_cfb_structural_v4_artifact())`,
+  which refuses a wrong `model_version`, a bad `artifact_hash`, a declared
+  feature the extractor does not produce, or a non-metadata key nothing reads.
+  `build_cfb_slate(..., model=None)` defaults to it. The v4 engine now records
+  `inference_inputs` (exact pre-draw RNG state, from one advancing stream shared
+  across the slate) so settlement replay (`cfb_replay`) keeps working; its
+  probabilities are kept at six decimals (four would have failed the 2e-6
+  replay tolerance on every row). `cfb_distribution.py` is untouched: its
+  source hash is pinned by every open snapshot's replay identity.
+- **Feature names.** `CFBMatchupFeatures.to_dict` now emits the eight
+  artifact-declared names it omitted (`*_offense_ppp`, `*_defense_ppp`,
+  `*_preseason_prior_weight`, `*_qb_value_adjustment`) plus `sample_games`.
+- **Ask integrity (#8a/b).** Snapshot rows are reduced to the newest capture
+  per `market_slug` before matching; `_match_cfb_moneyline` returns the newest
+  matching capture instead of the first file row; spread/total/moneyline
+  matchers require both side asks, and the `1 - ask` completion is gone.
+- **Provenance (#8c).** `feature_basis.quote_provenance` is
+  `polymarket_executable_ask` or `espn_consensus_indicative`, and the rationale
+  says so, mirroring NFL `5ffc2b40`. Main eligibility of consensus rows is
+  unchanged — open operator decision.
+- **Artifact gates enforced (#9).** `main_gates_from_artifact` reads every key
+  of the artifact's `gates` block; `_forecast_cfb_sport` rejects from Main with
+  `fcs_blocked`, `spread_line_above_max` (|line| > 21.5) and
+  `moneyline_ask_below_floor` (ask below 33.3%, the +200 dog limit expressed
+  as a probability). `min_edge` defaults to the artifact's 2% (was a hardcoded
+  3%). The live 11-14 slate has 3 FCS contracts the gate now blocks.
+- **Total gates to config (#12).** The hardcoded p > 62% / under ≥ 56.5 /
+  |proj − line| < 1.5 clauses moved to `config/model.yaml`
+  `models.NCAAF.main_total_gates` with the same values (documented as
+  unvalidated; delete the block to disable); the dead `edge > 0.10` clause and
+  the unread `spread_sd: 16.2`, `max_moneyline_american_odds`,
+  `blowout_spread_edge_cap` keys are removed.
+- **Neutral sites and postseason (#13).** `resolve_cfb_game_weather` takes
+  `is_neutral_site` / `venue_name` / `venue_indoor` from ESPN's `competition.venue`
+  and never falls back to the home stadium for a neutral game; the daily
+  `capture_cfb_pregame_weather` now captures neutral venues by ESPN name
+  (NFL venue table + CFB stadium catalog; unknown venue ⇒ unverified). Verified
+  on the live 2025-12-31 payload: bowls carry `season.type=3`, `week.number=1`,
+  `venue.fullName`, `venue.indoor`. Postseason maps to model week 15 (prior
+  weight 1%) instead of week 1 (90%).
+- **QB channel (#13).** New `features/cfb_qb_availability.py` joins the daily
+  ESPN CFB injuries snapshot (newest with `observed_at_utc <= decision`, ≤ 48 h
+  old) to the scoreboard passing leader (ESPN has no college depth chart) and
+  sets `qb_starter_prob_*` (Out/IR 0, Doubtful 44.4%, Questionable 77.8%). No
+  evidence ⇒ 1.0 with the reason recorded in `feature_basis.qb_availability`.
+  Limitation found on live data: ESPN's college injuries feed carried 3 entries
+  on 11-12 (one dated 2020), so the channel is wired and point-in-time correct
+  but will rarely fire until a denser report source exists.
+- **LOW.** Simulation count 15k → 200k on the served engine (±0.8 pp → ±0.22 pp
+  95% CI; recorded in `inference_inputs`, replayable, 5.9 s for a 56-game
+  slate). `code_revision` is a digest of the five serving source files, not of
+  the version string.
+
+Reproduction:
+
+```
+.venv/Scripts/python -m pytest tests/test_cfb_serving_parity.py tests/test_cfb_structural_v4.py tests/test_college_football.py tests/test_cfb_replay.py tests/test_cfb_quote_integrity.py -o addopts='' -q
+PYTHONPATH=src .venv/Scripts/python -c "from model_prediction.models.college_football import cfb_model; m=cfb_model(); print(m.margin_sd, m.total_sd, m.n_simulations)"   # 14.5 16.0 200000
+```
+
+Pre-existing, unrelated failures in the same tree (also red at committed HEAD):
+`tests/test_cli.py` tennis/soccer/MLB/WNBA/NFL ledger tests,
+`test_model_naming.py::test_catalog_covers_production_registry`,
+`test_ci_contracts.py::test_ci_imports_of_checked_in_config_resolve`.
+
+## 2026-11-12 — NBA review follow-up: serving transforms, Main relabel, lr-v4 skew, totals selector, neutral floors
+
+Re-verification of `docs/MODEL_REVIEW_2026-11-11.md` (NBA items) against the live
+tree and `E:\model-prediction-runtime\ledgers\ledgers.db` (read-only). The doc's
+NBA findings (#3 moneyline path, #6, #8d, #14) all reproduced; three further
+defects surfaced that the review could not see from model code alone, because
+they live in data files, in a nightly pipeline, or in uncommitted working-tree
+code the scheduler ran live. Every fix below carries a regression test shown
+red without the fix. Quick task `261112-11j`.
+
+**Defect window (totals): 2026-11-11T01:32Z → 2026-11-12T05:32Z.** Every NBA
+total priced in that window was pushed through a Beta calibrator
+(`a=1.2827, b=1.2591, c=-0.6334`, `data/calibration/models/nba-total-margin-v9.total_calibrator.json`
+at HEAD) that had been fitted on 2026-11-08 from 125 settled picks made by
+`nba-total-margin-v2..v7`, labelled v9. The loader in `_forecast_nba_total_slate`
+went live from the working tree before it was committed (`0af19ecd`). Served
+probabilities on the model's own selected side fell to 35–46% (ledger rows carry
+`calibration_method=beta`, hash `7f804465…`), so every total had negative edge
+and Main totals went dark from 11-09. At 05:32Z on 11-12 the nightly calibration
+pipeline refit on v9's 28 own rows, chose identity, and overwrote the file. No
+Main row was priced on the transform (that is the point: it blocked them all);
+13 Flat rows were. Flat beta-era rows went 3-10 on the model's raw selections,
+which the transform did not change.
+
+Fixes, one commit each:
+
+- **lr-v4 serves on its fit construction** (`HASH_A`). `learned_forward.py`
+  injected NBA-only Elo/Trend knobs (HCA 38, offseason gap 60, retention 0.40,
+  `isolate_postseason`) added in `a9315de4` and borrowed from the v9
+  structural config; `validation.py` fit `nba-elo-trend-lr-v4` on bare
+  `build_elo(history, sport)` / `TrendEngine(history)`. Even-team
+  `elo_probability` moved 59.9% → 55.5% against a 3.56 coefficient, so the
+  artifact's Brier 0.185 described a model that was not being served. Serving
+  now passes only what the artifact declares and otherwise uses the library
+  defaults training used. Test: `test_nba_learned_slate_rebuilds_elo_and_trends_exactly_as_training_did`.
+- **Serving calibrators require own-model fit provenance** (`HASH_D`). One
+  shared guard, `calibration_pipeline.serving_guard_reason`, now backs the
+  auto-buyer (`calibrate_for_serving`), the NFL slates
+  (`_nfl_serving_calibrator`) and the NBA total slate
+  (`load_serving_calibrator`). Besides the existing non-identity /
+  filename-match / `MIN_SERVING_SAMPLE` / OOF-improvement checks, an artifact
+  must declare `fit_model_versions == [model_version]` and
+  `fit_source` in {`settled_live_rows`, `point_in_time_replay`}. The pipeline
+  writer stamps both; `scripts/calibrate_nba_v9.py` stamps
+  `fit_source: retrospective_replay` (v9 replayed on games earlier models
+  picked), which the guard refuses. The NBA total slate records the decision
+  in its forecast output (`calibration`). The live NFL v7 artifacts are identity
+  at HEAD and on disk, so nothing served changes for NFL. Tests:
+  `test_calibrate_for_serving_leaves_untrusted_calibrators_unapplied`
+  (provenance cases), `test_load_serving_calibrator_applies_the_same_guard_for_slates`,
+  `test_pipeline_artifacts_declare_own_model_fit_provenance`.
+- **`nba-moneyline-v9` artifact is an unqualified placeholder** (`HASH_C`).
+  Rolled back from serving 2026-11-10 (`4d5624ed`, "placeholder coefficients")
+  but its artifact still claimed `qualified: true`, `locked_holdout: true`,
+  Brier 0.1945. Flat ledger 11-08..11-10: 8 of 11 settled rows priced the model
+  below the market ask (54% vs 87%). The qualification block now says
+  unqualified/unverified with the rollback note; `artifact_hash` recomputed;
+  the auto-buyer `DEFAULT_WHITELIST_MODELS` drops it (`nba-elo-trend-lr-v4` is
+  deliberately NOT added — operator decision, HANDOFF item 3). Registry test:
+  an `unverified` entry may not carry a qualified artifact claim.
+- **NBA forecast path** (`HASH_B`). (a) MODEL_REVIEW #3, moneyline path: the
+  Main lr-v4 row created 2026-11-11T05:51Z carries `reason_code QUALIFIED`,
+  `record_type QUALIFIED_SHADOW_CALL` although the champion had been
+  `historical_only` since 11-10 17:42Z and `_downgrade_unserved` had marked it
+  `PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED`; `ledger.py`'s Main branch relabels
+  every row it receives as QUALIFIED. The learned path now keeps any
+  `PAPER_CALL_*`-downgraded CALL off Main (Flat still logs it) and reports them
+  as `paper_calls_kept_off_main`. (b) #8d: `_select_nba_total_market` shares
+  the spread selector's freshness window + latest-per-slug dedupe
+  (`_fresh_latest_per_slug`); the slate passes `as_of=observed_at`. (c) #14:
+  `UpcomingGame.neutral_site` is set from ESPN `neutralSite` + the
+  international-venue heuristic for NBA spread/total slates, and both
+  basketball engines drop Elo HCA and trend home-court on neutral floors.
+  Tests: `test_nba_learned_main_never_receives_a_downgraded_paper_call`,
+  `test_select_nba_total_market_ignores_old_balanced_quote`,
+  `test_nba_v9_neutral_site_removes_home_court_from_both_halves`.
+
+Still open from the review (NBA): #10 (v9 logistic s=11.8 vs normal sd 14 — the
+v9 moneyline engine is not served, needs one ablation before it becomes the
+challenger), LOW items (integer-line push mass, `BasketballModel` constructed
+then discarded in the total slate, availability wiring hardcoded to v7/v9).
+Operator decisions: whether the nightly calibration pipeline may change a
+serving transform without a promotion record (it now can only do so with its
+own-model provenance, but it still does so unattended), and whether
+`nba-elo-trend-lr-v4` belongs on the buyer whitelist.
+
+Operational note found on the way: supervisor log files under
+`E:\model-prediction-runtime\logs\supervisor\` are zero bytes for every recent
+daily run on this Windows host, completed or failed (two of the last eight
+exited 1 with nothing to explain why). Not fixed here.
+
 ## 2026-11-12 — NCAAB model review: total baseline mismatch, artifact drift, moneyline coherence, early-season compression (quick-261112-nc6)
 
 Closes the NCAAB findings of `docs/MODEL_REVIEW_2026-11-11.md` (#7, #9, #10, #11,

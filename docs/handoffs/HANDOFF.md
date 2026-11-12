@@ -362,6 +362,17 @@ real, committed changes to the live champion `cfb-structural-v4`:
   `cfb_v4_constant_calibration.py` pattern (train/val/holdout + date-
   clustered bootstrap) rather than that script.
 
+## 8. NCAAF review fixes (2026-11-12, `quick-261112-0xd`)
+
+- 2026-11-12 (`quick-261112-0xd`): every NCAAF finding in `docs/MODEL_REVIEW_2026-11-11.md` is fixed —
+  production now serves the v4 class from the artifact (was a 16.2-SD duplicate under the v4 label),
+  newest-capture/both-asks quote matching, artifact gates (FCS, 21.5 spread cap, 33.3% dog floor) on
+  Main, total gates moved to `config/model.yaml`, venue-based neutral-site weather, postseason week,
+  QB channel from the injuries snapshot, 200k sims, source-hash `code_revision`. `DEBUG.md` entry.
+- Open decisions: supersede or keep the 243 Main `cfb-structural-v4` rows priced on the 16.2
+  arithmetic (identifiable from snapshot `parameters.margin_sd`); whether ESPN-consensus rows
+  (229 of 238 Main NCAAF) may reach Main at all — they are now labelled `espn_consensus_indicative`.
+
 ## Done when
 
 Items 1 through 6 are each either resolved or explicitly dropped, and this file has been deleted.

@@ -94,6 +94,7 @@ None yet.
 | 261112-118 | Add process-local threading.Lock to ledger.py for intra-process mutation contention; document deferred XLSX-rebuild-split decision | 2026-11-12 | 222584ed | [261112-118-in-ledger-py-1-every-ledger-mutation-tak](./quick/261112-118-in-ledger-py-1-every-ledger-mutation-tak/) |
 | 261112-112 | Add AuditLog.reversed_events() bounded backward reader; fix dashboard audit-tail and polymarket_execute single_order gate to stop fully materializing events.jsonl (428MB) | 2026-11-12 | d06d8db5 | [261112-112-the-events-jsonl-bug-audit-py-fixed-2026](./quick/261112-112-the-events-jsonl-bug-audit-py-fixed-2026/) |
 | 261112-111 | Make audit_ledger_pnl.py fail its exit code on unresolved model-ledger drift it already computed; remove corrupt stray xlsx; document generated-on-demand rejection rationale | 2026-11-12 | cafbe94c | [261112-111-evaluate-whether-the-per-model-xlsx-mirr](./quick/261112-111-evaluate-whether-the-per-model-xlsx-mirr/) |
+| 261112-0xd | NCAAF: close every open CFB finding of the 2026-11-11 model review (serve v4 from artifact, ask integrity, artifact Main gates, venue weather, postseason week, QB channel, 200k sims, source code_revision) | 2026-11-12 | f6fa91d1 | [261112-0xd-ncaaf-fix-all-open-cfb-findings-from-the](./quick/261112-0xd-ncaaf-fix-all-open-cfb-findings-from-the/) |
 
 ## Milestone History
 

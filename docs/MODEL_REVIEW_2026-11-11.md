@@ -42,7 +42,7 @@ NCAAF = `cfb-structural-v4` all three.
 
 ### HIGH
 
-**1. NCAAF production never runs `cfb-structural-v4`'s validated code. (OPEN)**
+**1. NCAAF production never runs `cfb-structural-v4`'s validated code. (FIXED `quick-261112-0xd` — `CollegeFootballModel` is now the v4 class built from the artifact; serving-entry-point parity test added)**
 `models/college_football.py:690` serves `CollegeFootballModel()` (`margin_sd=16.2`,
 `:87`) under the label `"cfb-structural-v4"` (`:36`) and stamps the v4 artifact
 hash on every pick. `CFBStructuralV4Model` (14.5 — the 11-05 walk-forward retune —
@@ -106,14 +106,14 @@ conference baseline (team priors for `TrendEngine`, mirroring
 
 ### MEDIUM
 
-**8. Executable-ask integrity in CFB/NFL.** (a) OPEN: `college_football.py:426-473`
+**8. Executable-ask integrity in CFB/NFL.** (a) CFB FIXED `quick-261112-0xd` (newest capture per slug, both asks required): `college_football.py:426-473`
 `_match_cfb_moneyline` returns the *first* (oldest) capture of the day; spread/total
 pick the ask closest to 50% across all captures *and* alt lines — the 18:00 ET run
-then trips `STALE_DATA` (>12 h) and can never emit Main ML. (b) OPEN: missing-side
+then trips `STALE_DATA` (>12 h) and can never emit Main ML. (b) CFB FIXED `quick-261112-0xd`: missing-side
 asks fabricated as `1 − ask` (`:740-741`), overstating edge by the full spread.
 (c) OPEN DECISION: **229 of 238 Main NCAAF rows and 31 of 52 Main NFL v7 rows are
 `espn_consensus`**, not Polymarket. NFL rows are now labelled (`5ffc2b40`) and stay
-Main-eligible by operator decision 2026-11-11; NCAAF unchanged. (d) NFL total
+Main-eligible by operator decision 2026-11-11; NCAAF rows are now labelled the same way (`quick-261112-0xd`), eligibility unchanged pending decision. (d) NFL total
 selector FIXED (`e44b7117`); NBA total selector OPEN (spread selectors were fixed
 in `6c078b08`). Fix pattern: `PolymarketSnapshotStore.latest()`, require both asks,
 tag non-Polymarket rows.
@@ -123,7 +123,7 @@ stripped, recording-dict test). NCAAB FIXED (`quick-261112-nc6`: hash-verified
 `from_artifact` factories, consumed-keys + serving-parity tests): `ncaab-spread-v6.json` said
 `offseason_retention: 0.2`, served default is 0.35 (`ncaab_spread_v6.py:159`) and
 the factory ignores the artifact; CFB `gates.block_fcs/max_spread_line/
-max_moneyline_dog_odds` are read nowhere — FCS is not blocked anywhere in serving.
+max_moneyline_dog_odds` FIXED `quick-261112-0xd` (enforced on Main via `main_gates_from_artifact`; consumed-keys test covers the v4 artifact).
 **Fix**: generalise the consumed-keys test to every champion in `production.yaml`.
 
 **10. "Coherent" moneylines aren't coherent with their own margin distributions.
@@ -142,12 +142,12 @@ team beating mid-majors by 20 hosting one losing to them by 20 (true ≈ +40) ge
 sample-dependent `elo_weight` (lean on tiered Elo until `current_season_sample` ≥ ~8)
 or conference priors for the trend engine.
 
-**12. CFB hardcoded total gates with no evidence. (OPEN)** `forecast.py` CFB total
+**12. CFB hardcoded total gates with no evidence. (FIXED `quick-261112-0xd` — moved to `config/model.yaml` `main_total_gates`, same values, documented unvalidated; dead `edge>0.10` removed)** `forecast.py` CFB total
 gates: p>62%, under ≥56.5, |proj−line|<1.5; `edge>0.10` is dead given `max_edge`
 0.08. Added in a "refactor" and an NBA commit; absent from
 `CFB_PREDICTION_SYSTEM.md`.
 
-**13. CFB neutral-site/postseason inputs. (OPEN)** Weather resolves on the home
+**13. CFB neutral-site/postseason inputs. (FIXED `quick-261112-0xd` — venue-based weather, postseason week 15 verified on the live 2025-12-31 payload, QB channel wired to the injuries snapshot + scoreboard passing leader; the feed is sparse)** Weather resolves on the home
 stadium even for neutral sites; a dome-home team playing an outdoor bowl gets
 "verified" 70 °F/0 mph. ESPN postseason `week.number` likely → `week=1` → 90%
 preseason-prior weight for bowl games (verify against a live payload).
@@ -159,7 +159,7 @@ Vegas games, Paris, Mexico City get full HCA; the ML path does use it.
 **15. NFL `input_qualified` keyed on calendar-date equality. (FIXED `e44b7117`)**
 Now ordering/age (`_nfl_inputs_fresh`).
 
-### LOW (quick wins, all OPEN except NFL rationale strings)
+### LOW (quick wins, all OPEN except NFL rationale strings and the CFB items — MC count 200k and source-hash `code_revision` FIXED `quick-261112-0xd`)
 
 Integer-line push mass credited to one side in NBA/NFL (NCAAB FIXED `quick-261112-nc6`;
 `home+away=1`; CFB
@@ -196,7 +196,7 @@ by this evidence; operator decision.
 - **NFL**: the structural inputs add nothing measurable over the market anchor at the
   close; the levers are early Polymarket prices vs the close (CLV) and the moneyline
   model, which was not re-priced. Explicit push handling or half-point-only lines.
-- **NCAAF**: ship the v4 class to production (#1), then replay v4's PIT predictions
+- **NCAAF**: ~~ship the v4 class to production (#1)~~ done `quick-261112-0xd`; then replay v4's PIT predictions
   against the 363-game no-vig closing dataset (HANDOFF §7) — the first real
   market-relative number for the champion. Add FCS blocking (declared in the
   artifact, enforced nowhere). Pass `season.type`/week and `is_neutral_site` into
@@ -206,10 +206,10 @@ by this evidence; operator decision.
 
 1. Serving-entry-point parity: for each champion in `production.yaml`, import the
    object production actually calls and assert its parameters equal the artifact's
-   (would have caught #1, #9).
+   (would have caught #1, #9). Done for NCAAF (`tests/test_cfb_serving_parity.py`).
 2. `record_type` Main gate test for every sport path (#3) — done for NFL.
 3. Train/serve parity for NBA/NFL/WNBA learned models, not just MLB v9 (#6).
-4. Generalised consumed-keys artifact test (#9) — done for NFL v7.
+4. Generalised consumed-keys artifact test (#9) — done for NFL v7 and NCAAF v4.
 
 ## Open operator decisions
 
