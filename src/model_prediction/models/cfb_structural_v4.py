@@ -11,8 +11,9 @@ Overhauled score distribution engine for NCAAF:
 3. Addresses historical CFB model failure modes:
    - Full Board Edge Optimization: Markets select sides based on maximum predictive edge
      against the executable ask, eliminating negative-edge chalk selection.
-   - Restored Collegiate Margin SD: Calibrated margin SD to empirical collegiate variance
-     (16.2 pts), preventing artificial cover overconfidence on mid-range spreads.
+   - Calibrated Collegiate Margin SD: 14.5 pts baseline (walk-forward retune 2026-11-05,
+     see CFB_V4_BASELINE_MARGIN_SD), widened per game by uncertainty, blowout lines and
+     conference familiarity instead of one constant for every matchup.
    - Calibrated Modern Clock Pace: Accommodates NCAA running first-down clock rules.
    - Blowout Disparity Tail Expansion: Expands effective margin SD on spreads > 21.5 pts
      to account for fourth-quarter starter benching, garbage-time volatility, and depth disparity.
@@ -21,15 +22,21 @@ Overhauled score distribution engine for NCAAF:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from collections.abc import Mapping
+from dataclasses import dataclass, fields
+from pathlib import Path
 from typing import Any
 
+from ..config import PROJECT_ROOT
 from ..domain import parse_utc
 from ..features.cfb_features import (
+    CFB_UNCERTAINTY_FLOOR,
     CFBFeatureExtractor,
     CFBMatchupFeatures,
 )
 from ..pricing import implied_probability
+from ..production_registry import compute_artifact_hash
 from .base import GamePrediction
 from .cfb_distribution import (
     CFBDistributionType,
@@ -37,6 +44,7 @@ from .cfb_distribution import (
 )
 
 CFB_V4_MODEL_VERSION = "cfb-structural-v4"
+CFB_V4_ARTIFACT_PATH = PROJECT_ROOT / "config" / "models" / f"{CFB_V4_MODEL_VERSION}.json"
 CFB_V4_DEFAULT_HOME_ADVANTAGE = 2.5
 # Walk-forward grid search on data/historical/ncaaf_games_all.jsonl (7,896 games,
 # train 2016-2021 / val 2022 / holdout 2023-2024 -- see docs/handoffs/HANDOFF.md):
@@ -51,7 +59,85 @@ CFB_BLOWOUT_SPREAD_THRESHOLD = 21.5
 CFB_BLOWOUT_MARGIN_SCALE = 0.025
 CFB_TOTAL_DEVIATION_THRESHOLD = 8.0
 CFB_TOTAL_DEVIATION_SCALE = 0.025
+# Per unit of feat.uncertainty above its floor, widen margin_sd by this factor. Walk-forward
+# residual check (2,434 games, 2023-2024): FBS-vs-FCS / thin-sample residual SD ~19.2 vs
+# ~16.7 for established matchups, i.e. ~15% wider at the uncertainty ceiling -- not 1:1.
+CFB_UNCERTAINTY_MARGIN_SD_SCALE = 2.0
+# 15,000 draws gave a +/-0.8 pp 95% CI on a near-50% cover probability against a 2 pp
+# min_edge gate -- simulation noise alone could create or erase a Main pick. 200,000 draws
+# is +/-0.22 pp. The count is recorded in inference_inputs so replay reproduces it exactly.
+CFB_V4_N_SIMULATIONS = 200_000
 STANDARD_LAY_ASK = round(implied_probability(-110), 6)
+_ARTIFACT_METADATA_KEYS = frozenset(
+    {
+        "artifact_hash",
+        "model_version",
+        "method",
+        "note",
+        "league",
+        "sport",
+        "schema_version",
+        "positive_class",
+        "qualification",
+        "calibration",
+    }
+)
+_ARTIFACT_PARAMETER_KEYS = frozenset(
+    {"distribution", "home_advantage_points", "margin_sd", "total_sd", "features", "gates"}
+)
+
+
+def load_cfb_structural_v4_artifact(path: str | Path | None = None) -> dict[str, Any]:
+    """Read the frozen v4 artifact, refusing a file whose identity or hash does not match.
+
+    The serving model takes its parameters from here so that "cfb-structural-v4" on a
+    ledger row always means the artifact's numbers. Review 2026-11-11 #1 found production
+    serving a 16.2 margin_sd under the v4 label while the artifact (and the class every
+    test exercised) said 14.5.
+    """
+    artifact_path = Path(path) if path is not None else CFB_V4_ARTIFACT_PATH
+    payload = json.loads(artifact_path.read_text(encoding="utf-8"))
+    if payload.get("model_version") != CFB_V4_MODEL_VERSION:
+        raise ValueError(f"cfb artifact model_version mismatch: {payload.get('model_version')!r}")
+    if payload.get("artifact_hash") != compute_artifact_hash(payload):
+        raise ValueError(f"cfb artifact_hash mismatch for {artifact_path}")
+    return payload
+
+
+@dataclass(frozen=True)
+class CFBMainGates:
+    """The artifact's ``gates`` block as the Main ledger consumes it.
+
+    ``max_moneyline_dog_odds`` is stored in the artifact as American odds; it is exposed
+    here as the equivalent minimum executable ask (+200 -> 33.3%) because every decision
+    path in this codebase prices in probabilities.
+    """
+
+    min_edge: float
+    max_edge: float
+    min_moneyline_ask: float
+    max_spread_line: float
+    block_fcs: bool
+    sizing: str
+
+
+def main_gates_from_artifact(artifact: Mapping[str, Any]) -> CFBMainGates:
+    gates = artifact["gates"]
+    min_edge = float(gates["min_edge"])
+    max_edge = float(gates["max_edge"])
+    if not 0.0 <= min_edge < max_edge < 1.0:
+        raise ValueError(f"cfb artifact gates have an invalid edge band: {min_edge}..{max_edge}")
+    dog_odds = float(gates["max_moneyline_dog_odds"])
+    if dog_odds < 100.0:
+        raise ValueError("cfb artifact max_moneyline_dog_odds must be a positive American price")
+    return CFBMainGates(
+        min_edge=min_edge,
+        max_edge=max_edge,
+        min_moneyline_ask=round(implied_probability(int(dog_odds)), 6),
+        max_spread_line=float(gates["max_spread_line"]),
+        block_fcs=bool(gates["block_fcs"]),
+        sizing=str(gates["sizing"]),
+    )
 
 
 @dataclass(frozen=True)
@@ -78,6 +164,7 @@ class CFBStructuralForecastV4:
     weather_points_adj: float
     effective_margin_sd: float
     effective_total_sd: float
+    inference_inputs: dict[str, Any] | None = None
 
 
 class CFBStructuralV4Model:
@@ -91,21 +178,58 @@ class CFBStructuralV4Model:
         margin_sd: float = CFB_V4_BASELINE_MARGIN_SD,
         total_sd: float = CFB_V4_BASELINE_TOTAL_SD,
         distribution_type: CFBDistributionType = CFBDistributionType.NEGATIVE_BINOMIAL,
+        n_simulations: int = CFB_V4_N_SIMULATIONS,
+        random_seed: int = 42,
     ) -> None:
         self.home_advantage_points = home_advantage_points
         self.margin_sd = margin_sd
         self.total_sd = total_sd
         self.distribution_type = distribution_type
+        self.n_simulations = int(n_simulations)
+        self.spread_version = self.version
+        self.total_version = self.version
         self.extractor = CFBFeatureExtractor(
             home_advantage_points=home_advantage_points,
             margin_sd=margin_sd,
             total_sd=total_sd,
         )
+        # Holds the one RNG stream every game in a slate draws from (see forecast_game).
         self.distribution_engine = CFBJointDistributionEngine(
             distribution_type=distribution_type,
             margin_sd=margin_sd,
             total_sd=total_sd,
+            n_simulations=self.n_simulations,
+            random_seed=random_seed,
         )
+
+    @classmethod
+    def from_artifact(cls, artifact: Mapping[str, Any], **overrides: Any) -> CFBStructuralV4Model:
+        """Build the served model from the frozen artifact's own parameters.
+
+        Every declared feature must be a field the extractor produces, and every
+        non-metadata key must be something the serving path reads: an artifact that
+        advertises a feature or parameter the code never touches is a false claim to
+        anyone auditing it, so it fails closed here instead of being ignored.
+        """
+        declared = tuple(str(name) for name in artifact["features"])
+        produced = {field.name for field in fields(CFBMatchupFeatures)}
+        unknown = sorted(set(declared) - produced)
+        if unknown:
+            raise ValueError(f"cfb artifact declares features the extractor never produces: {unknown}")
+        unread = set(artifact) - _ARTIFACT_METADATA_KEYS - _ARTIFACT_PARAMETER_KEYS
+        if unread:
+            raise ValueError(
+                f"cfb artifact carries parameters the served model never reads: {sorted(unread)}"
+            )
+        main_gates_from_artifact(artifact)
+        params: dict[str, Any] = {
+            "home_advantage_points": float(artifact["home_advantage_points"]),
+            "margin_sd": float(artifact["margin_sd"]),
+            "total_sd": float(artifact["total_sd"]),
+            "distribution_type": CFBDistributionType(str(artifact["distribution"])),
+        }
+        params.update(overrides)
+        return cls(**params)
 
     def compute_effective_margin_sd(
         self,
@@ -115,7 +239,7 @@ class CFBStructuralV4Model:
     ) -> float:
         """Compute effective margin standard deviation with conference, blowout and uncertainty scaling."""
         base_sd = self.margin_sd * (0.9135 if is_conference_matchup else 1.0)
-        sd = base_sd * (1.0 + 2.0 * max(0.0, uncertainty - 0.04))
+        sd = base_sd * (1.0 + CFB_UNCERTAINTY_MARGIN_SD_SCALE * max(0.0, uncertainty - CFB_UNCERTAINTY_FLOOR))
         abs_spread = abs(spread_home_line)
         if abs_spread > CFB_BLOWOUT_SPREAD_THRESHOLD:
             excess = min(15.0, abs_spread - CFB_BLOWOUT_SPREAD_THRESHOLD)
@@ -138,7 +262,9 @@ class CFBStructuralV4Model:
         lot; widening total_sd here lets the simulated distribution express that
         disagreement instead of clamping the resulting probability after the fact.
         """
-        sd = self.total_sd * (1.0 + 2.0 * max(0.0, uncertainty - 0.04))
+        sd = self.total_sd * (
+            1.0 + CFB_UNCERTAINTY_MARGIN_SD_SCALE * max(0.0, uncertainty - CFB_UNCERTAINTY_FLOOR)
+        )
         deviation = abs(projected_total - total_line)
         if deviation > CFB_TOTAL_DEVIATION_THRESHOLD:
             excess = min(20.0, deviation - CFB_TOTAL_DEVIATION_THRESHOLD)
@@ -167,10 +293,25 @@ class CFBStructuralV4Model:
             uncertainty=matchup_features.uncertainty,
         )
 
+        # A per-game engine carries this game's widened SDs, but it draws from the model's
+        # single advancing RNG stream: a seed-only restart would hand every game in a slate
+        # the same noise, and the replay contract (cfb_replay.capture_inputs) records the
+        # exact pre-draw state so the second and later games reproduce too.
+        from ..cfb_replay import capture_inputs
+
         engine = type(self.distribution_engine)(
             distribution_type=self.distribution_type,
             margin_sd=effective_margin_sd,
             total_sd=effective_total_sd,
+            n_simulations=self.n_simulations,
+        )
+        engine.rng = self.distribution_engine.rng
+        inference_inputs = capture_inputs(
+            engine,
+            mu_home=mu_home,
+            mu_away=mu_away,
+            spread_home_line=spread_home_line,
+            total_line=total_line,
         )
         joint_probs = engine.compute_market_probabilities(
             mu_away=mu_away,
@@ -184,16 +325,16 @@ class CFBStructuralV4Model:
             away_expected_points=round(mu_away, 2),
             projected_margin_home=round(mu_home - mu_away, 2),
             projected_total=round(mu_home + mu_away, 2),
-            prob_home_win=round(joint_probs.p_home_win, 4),
-            prob_away_win=round(joint_probs.p_away_win, 4),
+            prob_home_win=round(joint_probs.p_home_win, 6),
+            prob_away_win=round(joint_probs.p_away_win, 6),
             spread_home_line=spread_home_line,
-            prob_home_cover=round(joint_probs.p_home_cover, 4),
-            prob_away_cover=round(joint_probs.p_away_cover, 4),
-            prob_push_spread=round(joint_probs.p_push_spread, 4),
+            prob_home_cover=round(joint_probs.p_home_cover, 6),
+            prob_away_cover=round(joint_probs.p_away_cover, 6),
+            prob_push_spread=round(joint_probs.p_push_spread, 6),
             total_line=total_line,
-            prob_over=round(joint_probs.p_over, 4),
-            prob_under=round(joint_probs.p_under, 4),
-            prob_push_total=round(joint_probs.p_push_total, 4),
+            prob_over=round(joint_probs.p_over, 6),
+            prob_under=round(joint_probs.p_under, 6),
+            prob_push_total=round(joint_probs.p_push_total, 6),
             home_qb_uncertainty=round(matchup_features.home_qb_value_adjustment, 3),
             away_qb_uncertainty=round(matchup_features.away_qb_value_adjustment, 3),
             altitude_travel_adj=round(
@@ -204,14 +345,24 @@ class CFBStructuralV4Model:
             weather_points_adj=round(matchup_features.weather_total_adjustment, 2),
             effective_margin_sd=effective_margin_sd,
             effective_total_sd=effective_total_sd,
+            inference_inputs=inference_inputs,
         )
 
     def predict_matchup(
         self,
         history: list[Any],
         game: Any,
+        *,
+        project_missing_lines: bool = False,
     ) -> list[GamePrediction]:
-        """Generate standardized GamePrediction objects for Moneyline, Spread, and Total."""
+        """Generate standardized GamePrediction objects for Moneyline, Spread, and Total.
+
+        Without market lines there is nothing to price, so the default refuses. The slate
+        builder opts into ``project_missing_lines`` so a game with a Polymarket moneyline
+        but no spread anywhere is still priced (the spread line only enters the moneyline
+        through blowout SD widening); the candidate-evidence pass re-prices every listed
+        line from the captured inputs regardless.
+        """
         game_year = None
         if getattr(game, "event_start_utc", None):
             try:
@@ -237,9 +388,16 @@ class CFBStructuralV4Model:
             qb_starter_prob_home=getattr(game, "qb_starter_prob_home", 1.0),
         )
         supplied_spread = getattr(game, "spread_home_line", None)
+        if supplied_spread is None and getattr(game, "spread_away_line", None) is not None:
+            supplied_spread = -float(game.spread_away_line)
         tot_line = getattr(game, "total_line", None)
         if supplied_spread is None or tot_line is None:
-            return []
+            if not project_missing_lines:
+                return []
+            if supplied_spread is None:
+                supplied_spread = round(-feat.projected_margin_home * 2.0) / 2.0
+            if tot_line is None:
+                tot_line = feat.projected_total
         spread_home_line = float(supplied_spread)
         sp_away_line = -spread_home_line
         tot_line = float(tot_line)
@@ -265,6 +423,7 @@ class CFBStructuralV4Model:
                 uncertainty=feat.uncertainty,
                 model_version=self.version,
                 feature_basis=feat.to_dict(),
+                inference_inputs=fc.inference_inputs,
                 rationale=(
                     f"CFB Structural v4: proj {game.away_team} {fc.away_expected_points:.1f} @ "
                     f"{game.home_team} {fc.home_expected_points:.1f} (Margin {fc.projected_margin_home:+.1f}). "
@@ -290,8 +449,9 @@ class CFBStructuralV4Model:
                     "push": round(fc.prob_push_spread, 6),
                 },
                 uncertainty=feat.uncertainty,
-                model_version=self.version,
+                model_version=self.spread_version,
                 feature_basis=feat.to_dict(),
+                inference_inputs=fc.inference_inputs,
                 rationale=(
                     f"CFB Structural v4 Spread: Home {spread_home_line:+.1f} / Away {sp_away_line:+.1f} "
                     f"(P(Home cover)={fc.prob_home_cover:.4f}, P(Away cover)={fc.prob_away_cover:.4f}, "
@@ -317,8 +477,9 @@ class CFBStructuralV4Model:
                     "push": round(fc.prob_push_total, 6),
                 },
                 uncertainty=feat.uncertainty,
-                model_version=self.version,
+                model_version=self.total_version,
                 feature_basis=feat.to_dict(),
+                inference_inputs=fc.inference_inputs,
                 rationale=(
                     f"CFB Structural v4 Total: line {tot_line:.1f} "
                     f"(P(Over)={fc.prob_over:.4f}, P(Under)={fc.prob_under:.4f}, "

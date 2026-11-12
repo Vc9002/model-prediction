@@ -1,5 +1,52 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
+## 2026-11-12 — NCAAB model review: total baseline mismatch, artifact drift, moneyline coherence, early-season compression (quick-261112-nc6)
+
+Closes the NCAAB findings of `docs/MODEL_REVIEW_2026-11-11.md` (#7, #9, #10, #11,
+LOW push mass, cross-cutting test gaps #1/#4). Full write-up with the validation /
+holdout tables: `docs/NCAAB_V6_REVIEW_FIXES_2026-11-12.md`; harness
+`scripts/ncaab_v6_review_ablation.py`; report `outputs/ncaab/ncaab_v6_review_ablation.md`.
+Both champions are fixed in place under the same version string (NFL v7 precedent);
+every fix is a constructor parameter whose default reproduces the old model, and the
+control variant reproduced all 68 live Flat rows of the 05:40Z daily (0 deltas)
+before any candidate number was read.
+
+- **#7 total**: `hl10` was shrunk toward the league mean and then divided by the
+  *conference* baseline, so identical teams projected ~14 points apart by label; the
+  advertised `w_league` was `1 - 0.85 - 0.15 = 0`. `TrendEngine` gained per-team
+  `offense_baselines`/`defense_baselines` (None = byte-identical); the total model
+  shrinks toward the conference baseline and measures pace against the league mean;
+  `league_total_weight` is explicit (0.0 — 0.15 was worse on validation).
+  Validation MAE 14.30 → 13.78, holdout 15.11 → 14.48. `total_sd` 13.5 → 16.5
+  (PIT coverage 0.40/0.68/0.81 → 0.49/0.82/0.92 on validation).
+- **#9 artifacts**: `ncaab_spread_v6_model()` / `ncaab_total_v6_model()` now build
+  from the hash-verified `config/models/ncaab-*-v6.json` via `from_artifact`; the
+  artifacts list every served parameter (retention 0.35 as served, not the 0.2 the
+  file claimed) and drop `confidence_threshold`/`min_edge`/`min_sample_games`
+  (operator policy lives in `config/model.yaml`; nothing read them). `max_edge` and
+  `dynamic_sizing` are consumed by `compute_dynamic_units`; the forward path no
+  longer hard-codes 0.08. Consumed-keys and serving-entry-point parity tests added.
+- **#10 moneyline**: P(home) is read off the Student-t margin distribution
+  (`coherent_moneyline`). Validation Brier 0.2058 → 0.2020, log loss 0.5964 →
+  0.5877, intercept −0.28 → +0.04. The review's second suggestion (match the t scale
+  to the SD) was tested and **rejected**: scale 10.5 already covers 0.51/0.81/0.91;
+  matched gives 0.44/0.74/0.87.
+- **#11 compression**: `tiered_trend_priors` (trend half shrinks toward the
+  conference-tier strength) and `additive_matchup` (`offense + opp defense − league
+  mean`; the old average halved every strength gap even at full sample). Margin MAE
+  9.046 → 8.844 with HCA re-selected on validation (home_court_points 7.2 → 5.0,
+  Elo HCA 55 → 45; bias −1.92 → −0.87). The sample-scheduled Elo weight is
+  implemented but off: inert on validation, and on the holdout it gives back part
+  of the priors' gain.
+- **Push mass**: integer spread/total lines exclude the (line ± 0.5) band from both
+  sides and report `push`; half-point lines are unchanged.
+- **Holdout caveat**: 657 of 742 holdout games are the 2026-11 early-season window
+  (home win rate 84.6%, realised margin SD 22–24 vs served ~15). All variants
+  under-disperse there; the coherent moneyline is worse than the legacy logistic in
+  that regime (Brier 0.1217 vs 0.1112) and better everywhere selectable. Main does
+  not trade that regime (sample gate ≥ 8); Flat does. Not selectable on validation
+  — left open in HANDOFF §1 with the early-season volatility cap and retention.
+- Rollback: revert the `quick-261112-nc6` commits; the pre-fix artifacts are in git.
 ## 2026-11-11 — NFL model review: efficiency inputs silently defaulted since 10-27, forecast-path integrity, weather, calibration replay
 
 Full review of the NFL spread/total champions (`nfl-spread-structural-v7`,

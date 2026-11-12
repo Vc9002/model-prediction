@@ -438,10 +438,16 @@ def test_cfb_uncertainty_widens_margin_sd_and_restores_baseline(sample_cfb_histo
     parameters = inference_inputs["parameters"]
     assert isinstance(parameters, dict)
     used_margin_sd = parameters["margin_sd"]
-    expected = baseline_margin_sd * (
-        1.0 + CFB_UNCERTAINTY_MARGIN_SD_SCALE * (CFB_UNCERTAINTY_CEILING - CFB_UNCERTAINTY_FLOOR)
+    # The served formula is the v4 class's own (uncertainty widening on top of the
+    # conference-familiarity scale); the replay inputs must carry exactly that value.
+    expected = model.compute_effective_margin_sd(
+        spread_home_line=-3.5,
+        uncertainty=CFB_UNCERTAINTY_CEILING,
+        is_conference_matchup=real_feat.is_conference_matchup,
     )
     assert used_margin_sd == pytest.approx(expected)
+    widening = 1.0 + CFB_UNCERTAINTY_MARGIN_SD_SCALE * (CFB_UNCERTAINTY_CEILING - CFB_UNCERTAINTY_FLOOR)
+    assert used_margin_sd == pytest.approx(baseline_margin_sd * widening * 0.9135, abs=1e-3)
     assert used_margin_sd > baseline_margin_sd
     # Restored again after this call too.
     assert model.distribution_engine.margin_sd == pytest.approx(baseline_margin_sd)

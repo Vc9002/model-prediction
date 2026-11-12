@@ -478,23 +478,46 @@ def capture_cfb_pregame_weather(
     now = datetime.now(UTC)
     targets = []
     skipped = 0
+    neutral_unresolved = 0
     seen = set()
     for event in events:
         try:
             start = parse_utc(str(event["date"]))
+            competition = event["competitions"][0]
             home_name = next(
                 item["team"]["displayName"]
-                for item in event["competitions"][0]["competitors"]
+                for item in competition["competitors"]
                 if item["homeAway"] == "home"
             )
         except (KeyError, IndexError, StopIteration, TypeError, ValueError):
             skipped += 1
             continue
-        team = resolve_team(home_name)
-        if start <= now or team is None or team.is_dome or team.latitude is None or team.longitude is None:
+        if start <= now:
             skipped += 1
             continue
-        identity = (team.canonical_name, start.isoformat())
+        if bool(competition.get("neutralSite", False)):
+            # A bowl or kickoff classic is not played at the home team's stadium; the
+            # row is keyed on ESPN's venue name so the resolver can find it by venue.
+            venue = competition.get("venue") or {}
+            venue_name = str(venue.get("fullName") or "").strip()
+            if not venue_name or venue.get("indoor") is True:
+                skipped += 1
+                continue
+            profile = neutral_venue_profile(venue_name)
+            if profile is None or profile.is_indoor:
+                neutral_unresolved += 1
+                continue
+            identity = (home_name, venue_name, start.isoformat())
+            if identity in seen:
+                continue
+            seen.add(identity)
+            targets.append((home_name, start, profile))
+            continue
+        team = resolve_team(home_name)
+        if team is None or team.is_dome or team.latitude is None or team.longitude is None:
+            skipped += 1
+            continue
+        identity = (team.canonical_name, team.stadium_name, start.isoformat())
         if identity in seen:
             continue
         seen.add(identity)
@@ -524,7 +547,50 @@ def capture_cfb_pregame_weather(
         "captured": len(observations),
         "appended": appended,
         "skipped": skipped,
+        "neutral_venue_unresolved": neutral_unresolved,
     }
+
+
+def neutral_venue_profile(venue_name: str) -> VenueProfile | None:
+    """Coordinates for a neutral-site venue named by ESPN, or None when unknown.
+
+    Bowls are mostly played in NFL stadiums or on another school's campus, so the NFL
+    venue table and the CFB team catalog cover nearly all of them without a third list.
+    Unknown venues return None: the total then stays weather-unverified and cannot reach
+    Main, which is the correct answer for a forecast nobody captured.
+    """
+    from ..data_sources.cfb_data import CFB_TEAMS
+
+    wanted = venue_name.casefold().strip()
+    if not wanted:
+        return None
+    for profile in list(NFL_TEAM_VENUES.values()) + list(VENUE_CATALOG.values()):
+        if profile.venue_name.casefold().strip() == wanted:
+            return VenueProfile(
+                venue_name,
+                "ncaaf",
+                profile.city,
+                profile.state_or_country,
+                profile.latitude,
+                profile.longitude,
+                profile.elevation_m,
+                profile.field_orientation_deg,
+                profile.is_indoor,
+            )
+    for team in CFB_TEAMS.values():
+        if team.stadium_name.casefold().strip() == wanted and team.latitude is not None:
+            return VenueProfile(
+                venue_name,
+                "ncaaf",
+                team.city,
+                team.state,
+                team.latitude,
+                team.longitude,
+                team.elevation_ft / 3.28084,
+                0.0,
+                team.is_dome,
+            )
+    return None
 
 
 def _pregame_forecast_row(
@@ -674,9 +740,37 @@ def resolve_cfb_game_weather(
     event_start_utc: str | None = None,
     observed_at_utc: str | None = None,
     provenance_out: dict[str, Any] | None = None,
+    *,
+    is_neutral_site: bool = False,
+    venue_name: str | None = None,
+    venue_indoor: bool | None = None,
 ) -> tuple[float | None, float | None, float | None, bool]:
-    """Resolves (temperature_f, wind_mph, precipitation_in, is_dome) for a CFB matchup."""
+    """Resolves (temperature_f, wind_mph, precipitation_in, is_dome) for a CFB matchup.
+
+    A neutral-site game is resolved from ESPN's venue, never the home team's stadium: a
+    dome team playing an outdoor bowl used to come back "verified" 70F/0 mph (review
+    2026-11-11 #13). With no venue name the weather is simply unknown.
+    """
     from ..data_sources.cfb_data import resolve_team
+
+    if is_neutral_site:
+        if venue_indoor is True:
+            if provenance_out is not None:
+                provenance_out.update({"source": "espn_venue:indoor", "venue_name": venue_name})
+            return (70.0, 0.0, 0.0, True)
+        if not venue_name:
+            if provenance_out is not None:
+                provenance_out.update({"source": "neutral_site_venue_unknown"})
+            return (None, None, None, False)
+        return _resolve_weather_from_file(
+            Path(data_root) / "weather" / "ncaaf_historical.jsonl",
+            venue_name,
+            home_team,
+            game_date,
+            event_start_utc,
+            observed_at_utc,
+            provenance_out,
+        )
 
     team_info = resolve_team(home_team)
     if team_info is not None and team_info.is_dome:

@@ -252,6 +252,17 @@ class CFBMatchupFeatures:
             "projected_margin_home": round(self.projected_margin_home, 1),
             "projected_total": round(self.projected_total, 1),
             "efficiency_gap": round(self.efficiency_gap, 3),
+            # The v4 artifact declares these by name; a serving dict that omits them makes
+            # the artifact's feature list unverifiable against what production recorded.
+            "away_offense_ppp": round(self.away_offense_ppp, 4),
+            "home_offense_ppp": round(self.home_offense_ppp, 4),
+            "away_defense_ppp": round(self.away_defense_ppp, 4),
+            "home_defense_ppp": round(self.home_defense_ppp, 4),
+            "away_preseason_prior_weight": round(self.away_preseason_prior_weight, 3),
+            "home_preseason_prior_weight": round(self.home_preseason_prior_weight, 3),
+            "away_qb_value_adjustment": round(self.away_qb_value_adjustment, 3),
+            "home_qb_value_adjustment": round(self.home_qb_value_adjustment, 3),
+            "sample_games": self.sample_games,
             "travel_distance_miles": round(self.travel_distance_miles, 0),
             "stadium_elevation_ft": round(self.stadium_elevation_ft, 0),
             "altitude_fatigue_penalty": round(self.altitude_fatigue_penalty, 2),

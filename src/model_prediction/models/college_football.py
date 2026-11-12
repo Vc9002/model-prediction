@@ -1,4 +1,11 @@
-"""College Football (NCAAF) Unified Production Model.
+"""College Football (NCAAF) production slate builder and legacy model alias.
+
+The arithmetic lives in ``cfb_structural_v4.CFBStructuralV4Model``; ``CollegeFootballModel``
+is that class with the legacy constructor (per-market version labels) kept for the
+registry, replay tests and the ``models.cfb`` alias. Review 2026-11-11 #1: this module
+used to carry a second, divergent implementation (margin_sd 16.2, no conference scaling,
+no total-SD widening) that production served under the v4 label while every v4 test
+exercised the other class. There is now exactly one implementation.
 
 Generates coherent point-in-time predictions for:
 1. Moneyline: Calibrated win probabilities derived from the joint scoring distribution.
@@ -18,42 +25,46 @@ from typing import Any
 
 from ..domain import parse_utc, utc_now
 from ..features.base import GameRecord
-from ..features.cfb_features import (
-    CFB_DEFAULT_HOME_ADVANTAGE_POINTS,
-    CFB_UNCERTAINTY_FLOOR,
-    CFBFeatureExtractor,
-    CFBGameRecord,
-    CFBMatchupFeatures,
-)
+from ..features.cfb_features import CFB_UNCERTAINTY_FLOOR, CFBGameRecord
 from ..pricing import implied_probability
 from .base import GamePrediction
-from .cfb_distribution import (
-    CFBDistributionType,
-    CFBJointDistributionEngine,
-    CFBJointMarketProbabilities,
+from .cfb_distribution import CFBDistributionType
+from .cfb_structural_v4 import (
+    CFB_BLOWOUT_MARGIN_SCALE,
+    CFB_BLOWOUT_SPREAD_THRESHOLD,
+    CFB_UNCERTAINTY_MARGIN_SD_SCALE,
+    CFB_V4_BASELINE_MARGIN_SD,
+    CFB_V4_BASELINE_TOTAL_SD,
+    CFB_V4_DEFAULT_HOME_ADVANTAGE,
+    CFB_V4_N_SIMULATIONS,
+    CFBStructuralV4Model,
+    load_cfb_structural_v4_artifact,
 )
 
 MODEL_VERSION = "cfb-structural-v4"
 CFB_SPREAD_MODEL_VERSION = "cfb-structural-v4"
 CFB_TOTAL_MODEL_VERSION = "cfb-structural-v4"
-CFB_BLOWOUT_SPREAD_THRESHOLD = 21.5
-CFB_BLOWOUT_MARGIN_SCALE = 0.025
+# ESPN reports every bowl / CFP game as week 1 of season type 3 (postseason). Fed to the
+# preseason-prior decay table that would be a 90% prior weight for a December game; the
+# table is fully decayed from week 14 on, so postseason maps past it.
+CFB_POSTSEASON_WEEK = 15
+ESPN_SEASON_TYPE_POSTSEASON = 3
 
-# feat.uncertainty (0.04 floor -- established teams, no FBS/FCS mismatch,
-# confirmed starters) previously reached the ledger only as sizing metadata;
-# the margin distribution itself always used the same constant margin_sd
-# regardless. Live Main/Flat NCAAF spread picks were losing at 41-43%
-# (worse than a coin flip) while averaging ~68-79% claimed model probability
-# and ~16-26% claimed edge -- most concentrated in FBS-vs-FCS mismatches and
-# thin-sample-size teams. A chronological walk-forward residual check against
-# 2,434 real 2023-2024 games (uncertainty.py::extract_features's own
-# is_fbs_vs_fcs/sample_games signals) confirms this empirically: realized
-# margin residual SD is ~16.7 for established matchups vs ~19.2 for
-# FBS-vs-FCS/thin-sample ones -- about 15% wider, not the ~55% the raw
-# uncertainty range would suggest if scaled 1:1. Total-points residual SD
-# showed no comparable pattern by the same buckets (14.8-16.9 across all),
-# so this scale intentionally widens margin_sd only, not total_sd.
-CFB_UNCERTAINTY_MARGIN_SD_SCALE = 2.0
+__all__ = [
+    "CFB_BLOWOUT_MARGIN_SCALE",
+    "CFB_BLOWOUT_SPREAD_THRESHOLD",
+    "CFB_POSTSEASON_WEEK",
+    "CFB_SPREAD_MODEL_VERSION",
+    "CFB_TOTAL_MODEL_VERSION",
+    "CFB_UNCERTAINTY_MARGIN_SD_SCALE",
+    "MODEL_VERSION",
+    "CollegeFootballModel",
+    "UpcomingCFBGame",
+    "build_cfb_slate",
+    "cfb_model",
+    "cfb_serving_code_hash",
+    "model_week_from_espn_event",
+]
 
 
 @dataclass(frozen=True)
@@ -75,199 +86,32 @@ class UpcomingCFBGame:
     qb_starter_prob_home: float = 1.0
 
 
-class CollegeFootballModel:
-    """Unified College Football model predicting Moneyline, Spread, and Total."""
+class CollegeFootballModel(CFBStructuralV4Model):
+    """The served NCAAF model: v4 arithmetic with the legacy per-market version labels."""
 
     def __init__(
         self,
         version: str = MODEL_VERSION,
         spread_version: str | None = None,
         total_version: str | None = None,
-        home_advantage_points: float = CFB_DEFAULT_HOME_ADVANTAGE_POINTS,
-        margin_sd: float = 16.2,
-        total_sd: float = 16.0,
+        home_advantage_points: float = CFB_V4_DEFAULT_HOME_ADVANTAGE,
+        margin_sd: float = CFB_V4_BASELINE_MARGIN_SD,
+        total_sd: float = CFB_V4_BASELINE_TOTAL_SD,
         distribution_type: CFBDistributionType = CFBDistributionType.NEGATIVE_BINOMIAL,
+        n_simulations: int = CFB_V4_N_SIMULATIONS,
+        random_seed: int = 42,
     ) -> None:
-        self.version = version
-        self.spread_version = spread_version or CFB_SPREAD_MODEL_VERSION
-        self.total_version = total_version or CFB_TOTAL_MODEL_VERSION
-        self.home_advantage_points = home_advantage_points
-        self.margin_sd = margin_sd
-        self.total_sd = total_sd
-        self.distribution_type = distribution_type
-        self.extractor = CFBFeatureExtractor(
+        super().__init__(
             home_advantage_points=home_advantage_points,
             margin_sd=margin_sd,
             total_sd=total_sd,
-        )
-        self.distribution_engine = CFBJointDistributionEngine(
             distribution_type=distribution_type,
-            margin_sd=margin_sd,
-            total_sd=total_sd,
+            n_simulations=n_simulations,
+            random_seed=random_seed,
         )
-
-    def predict_matchup(
-        self,
-        history: Sequence[Any],
-        game: UpcomingCFBGame,
-        elo_book: Any | None = None,
-        trend_engine: Any | None = None,
-    ) -> list[GamePrediction]:
-        """Generate calibrated predictions for moneyline, spread, and total."""
-        # 1. Extract PIT Matchup Features
-        feat: CFBMatchupFeatures = self.extractor.extract_features(
-            history=history,
-            away_team=game.away_team,
-            home_team=game.home_team,
-            event_id=game.event_id,
-            game_start_utc=game.event_start_utc,
-            season_year=game.season_year,
-            week=game.week,
-            wind_mph=game.wind_mph,
-            temperature_f=game.temperature_f,
-            precipitation_in=game.precipitation_in,
-            is_neutral_site=game.is_neutral_site,
-            qb_starter_prob_away=game.qb_starter_prob_away,
-            qb_starter_prob_home=game.qb_starter_prob_home,
-        )
-
-        # 2. Resolve Market Lines
-        if game.spread_home_line is not None:
-            sp_home_line = float(game.spread_home_line)
-            sp_away_line = -sp_home_line
-        elif game.spread_away_line is not None:
-            sp_away_line = float(game.spread_away_line)
-            sp_home_line = -sp_away_line
-        else:
-            sp_home_line = round(-feat.projected_margin_home * 2.0) / 2.0
-            sp_away_line = -sp_home_line
-
-        tot_line = float(game.total_line) if game.total_line is not None else feat.projected_total
-
-        # Preserve state before the engine advances it. A seed alone cannot
-        # reproduce the second and later games in a slate.
-        from ..cfb_replay import capture_inputs
-
-        # Widen the margin distribution for exactly the games feat.uncertainty
-        # flags as least reliable (FBS-vs-FCS mismatches, thin sample size) --
-        # see CFB_UNCERTAINTY_MARGIN_SD_SCALE's docstring for the empirical
-        # residual-SD evidence. Mutate-then-restore on the shared engine
-        # (rather than a fresh per-call engine) so the RNG stream stays a
-        # single advancing sequence across a slate, matching the seed pin
-        # test in test_mlb_distribution_methods.py's stated invariant for
-        # the analogous MLB engine. Captured BEFORE compute so the replay
-        # record reflects the margin_sd actually used, not the baseline.
-        effective_margin_sd = self.margin_sd * (
-            1.0 + CFB_UNCERTAINTY_MARGIN_SD_SCALE * (feat.uncertainty - CFB_UNCERTAINTY_FLOOR)
-        )
-        if abs(sp_home_line) > CFB_BLOWOUT_SPREAD_THRESHOLD:
-            excess = min(15.0, abs(sp_home_line) - CFB_BLOWOUT_SPREAD_THRESHOLD)
-            effective_margin_sd *= 1.0 + CFB_BLOWOUT_MARGIN_SCALE * excess
-        self.distribution_engine.margin_sd = effective_margin_sd
-        try:
-            inference_inputs = capture_inputs(
-                self.distribution_engine,
-                mu_home=feat.projected_home_points,
-                mu_away=feat.projected_away_points,
-                spread_home_line=sp_home_line,
-                total_line=tot_line,
-            )
-            # 3. Derive Coherent Joint Probabilities
-            joint_probs: CFBJointMarketProbabilities = self.distribution_engine.compute_market_probabilities(
-                mu_home=feat.projected_home_points,
-                mu_away=feat.projected_away_points,
-                spread_home_line=sp_home_line,
-                total_line=tot_line,
-            )
-        finally:
-            self.distribution_engine.margin_sd = self.margin_sd
-
-        predictions: list[GamePrediction] = []
-
-        # 1. Moneyline Prediction
-        p_home_win = joint_probs.p_home_win
-        p_away_win = joint_probs.p_away_win
-        predictions.append(
-            GamePrediction(
-                event_id=game.event_id,
-                event_start_utc=game.event_start_utc,
-                league="NCAAF",
-                away_team=game.away_team,
-                home_team=game.home_team,
-                market_type="moneyline",
-                line=None,
-                probabilities={
-                    "home": round(p_home_win, 6),
-                    "away": round(p_away_win, 6),
-                },
-                uncertainty=feat.uncertainty,
-                model_version=self.version,
-                feature_basis=feat.to_dict(),
-                inference_inputs=inference_inputs,
-                rationale=(
-                    f"CFB Joint Model ({self.distribution_type.value}): "
-                    f"proj score {game.away_team} {feat.projected_away_points:.1f} @ "
-                    f"{game.home_team} {feat.projected_home_points:.1f} (Margin {feat.projected_margin_home:+.1f}). "
-                    f"Possessions: {feat.projected_possessions:.1f}, HFA: +{feat.home_field_advantage_points:.1f} pts."
-                ),
-            )
-        )
-
-        # 2. Spread Prediction
-        predictions.append(
-            GamePrediction(
-                event_id=game.event_id,
-                event_start_utc=game.event_start_utc,
-                league="NCAAF",
-                away_team=game.away_team,
-                home_team=game.home_team,
-                market_type="spread",
-                line=sp_away_line,
-                probabilities={
-                    "away": round(joint_probs.p_away_cover, 6),
-                    "home": round(joint_probs.p_home_cover, 6),
-                    "push": round(joint_probs.p_push_spread, 6),
-                },
-                uncertainty=feat.uncertainty,
-                model_version=self.spread_version,
-                feature_basis=feat.to_dict(),
-                inference_inputs=inference_inputs,
-                rationale=(
-                    f"Projected home margin {feat.projected_margin_home:+.1f} pts. "
-                    f"Spread: Home {sp_home_line:+.1f} / Away {sp_away_line:+.1f} -> "
-                    f"P(Away cover)={joint_probs.p_away_cover:.3f}, P(Home cover)={joint_probs.p_home_cover:.3f}, P(Push)={joint_probs.p_push_spread:.3f}."
-                ),
-            )
-        )
-
-        # 3. Total Prediction
-        predictions.append(
-            GamePrediction(
-                event_id=game.event_id,
-                event_start_utc=game.event_start_utc,
-                league="NCAAF",
-                away_team=game.away_team,
-                home_team=game.home_team,
-                market_type="total",
-                line=tot_line,
-                probabilities={
-                    "over": round(joint_probs.p_over, 6),
-                    "under": round(joint_probs.p_under, 6),
-                    "push": round(joint_probs.p_push_total, 6),
-                },
-                uncertainty=feat.uncertainty,
-                model_version=self.total_version,
-                feature_basis=feat.to_dict(),
-                inference_inputs=inference_inputs,
-                rationale=(
-                    f"Projected total {feat.projected_total:.1f} pts (Weather adj: {feat.weather_total_adjustment:+.1f} pts). "
-                    f"Total line {tot_line:.1f} -> "
-                    f"P(Over)={joint_probs.p_over:.3f}, P(Under)={joint_probs.p_under:.3f}, P(Push)={joint_probs.p_push_total:.3f}."
-                ),
-            )
-        )
-
-        return predictions
+        self.version = version
+        self.spread_version = spread_version or CFB_SPREAD_MODEL_VERSION
+        self.total_version = total_version or CFB_TOTAL_MODEL_VERSION
 
     def predict_games(
         self,
@@ -277,13 +121,46 @@ class CollegeFootballModel:
         """Predict a slate of upcoming CFB games."""
         all_preds: list[GamePrediction] = []
         for g in upcoming:
-            all_preds.extend(self.predict_matchup(history, g))
+            all_preds.extend(self.predict_matchup(list(history), g))
         return all_preds
 
 
 def cfb_model() -> CollegeFootballModel:
-    """Factory function for production model registry."""
-    return CollegeFootballModel()
+    """The production model, parameterised from the frozen v4 artifact (fail-closed)."""
+    return CollegeFootballModel.from_artifact(load_cfb_structural_v4_artifact())
+
+
+_SERVING_SOURCE_FILES = (
+    "college_football.py",
+    "cfb_structural_v4.py",
+    "cfb_distribution.py",
+)
+
+
+def cfb_serving_code_hash() -> str:
+    """Short digest of the NCAAF serving source, for ledger ``code_revision``.
+
+    The previous value hashed the version *string*, so it never changed when the code
+    did and could not tell two code revisions apart.
+    """
+    digest = hashlib.sha256()
+    here = Path(__file__).resolve().parent
+    for name in _SERVING_SOURCE_FILES:
+        digest.update(name.encode("utf-8"))
+        digest.update((here / name).read_bytes())
+    digest.update((here.parent / "features" / "cfb_features.py").read_bytes())
+    digest.update((here.parent / "features" / "cfb_qb_availability.py").read_bytes())
+    return digest.hexdigest()[:16]
+
+
+def model_week_from_espn_event(event: dict[str, Any], iso_date: str) -> tuple[int, int, int]:
+    """(season_year, model_week, espn_season_type) for the preseason-prior decay schedule."""
+    season = event.get("season") or {}
+    season_year = int(season.get("year") or iso_date[:4])
+    season_type = int(season.get("type") or 2)
+    espn_week = int((event.get("week") or {}).get("number") or 1)
+    model_week = CFB_POSTSEASON_WEEK if season_type == ESPN_SEASON_TYPE_POSTSEASON else espn_week
+    return season_year, model_week, season_type
 
 
 def _load_cfb_history(data_root: Path, cutoff_dt: datetime | None = None) -> list[GameRecord]:
@@ -411,9 +288,12 @@ def _match_cfb_moneyline(
     home_team: str,
     rows: list[dict[str, Any]],
 ) -> tuple[dict[str, Any] | None, str | None]:
-    """Match pregame Polymarket moneyline quote for an ESPN matchup.
+    """Match the newest pregame Polymarket moneyline quote for an ESPN matchup.
 
-    Returns (quote_row, long_side) where long_side is 'home' or 'away'.
+    Returns (quote_row, long_side) where long_side is 'home' or 'away'. The day's file
+    holds one row per capture, so the match must be the latest observation, not the
+    first row in file order (review 2026-11-11 #8a: returning the oldest capture made
+    the 18:00 ET run trip STALE_DATA and Main moneylines could never be emitted).
     """
     from ..data_sources.cfb_data import resolve_team
     from ..learned_forward import _team_matches
@@ -422,6 +302,7 @@ def _match_cfb_moneyline(
     home_res = resolve_team(_clean_cfb_school(home_team))
     away_canon = away_res.canonical_name if away_res else away_team
     home_canon = home_res.canonical_name if home_res else home_team
+    matched: list[tuple[str, dict[str, Any], str]] = []
 
     for r in rows:
         if r.get("market_type") != "moneyline":
@@ -458,7 +339,8 @@ def _match_cfb_moneyline(
                 or _team_matches(home_team, team)
                 or _team_matches(home_team, long_desc)
             )
-            return r, ("home" if is_home_long else "away")
+            matched.append((str(r.get("observed_at_utc") or ""), r, "home" if is_home_long else "away"))
+            continue
 
         a1 = (p1_c == away_canon) or _team_matches(away_team, p1)
         h2 = (p2_c == home_canon) or _team_matches(home_team, p2)
@@ -470,9 +352,12 @@ def _match_cfb_moneyline(
                 or _team_matches(away_team, team)
                 or _team_matches(away_team, long_desc)
             )
-            return r, ("away" if is_away_long else "home")
+            matched.append((str(r.get("observed_at_utc") or ""), r, "away" if is_away_long else "home"))
 
-    return None, None
+    if not matched:
+        return None, None
+    _, row, side = max(matched, key=lambda item: item[0])
+    return row, side
 
 
 def _match_cfb_spread(
@@ -499,9 +384,11 @@ def _match_cfb_spread(
             continue
         if r.get("line") is None:
             continue
+        # Both sides must be quoted: a one-sided book used to be completed as 1 - ask,
+        # which overstated the edge by the full spread (review 2026-11-11 #8b).
         l_ask = (r.get("long") or {}).get("ask")
         s_ask = (r.get("short") or {}).get("ask")
-        if l_ask is None and s_ask is None:
+        if l_ask is None or s_ask is None:
             continue
 
         title = str(r.get("event_title") or "")
@@ -534,13 +421,7 @@ def _match_cfb_spread(
         return None, None
 
     def _spread_ask_balance(row: dict[str, Any]) -> float:
-        l = (row.get("long") or {}).get("ask")
-        s = (row.get("short") or {}).get("ask")
-        if l is not None:
-            return abs(float(l) - 0.5)
-        if s is not None:
-            return abs(float(s) - 0.5)
-        return 1.0
+        return abs(float(row["long"]["ask"]) - 0.5)
 
     best = min(cands, key=_spread_ask_balance)
     anchor_team = str(best.get("team") or "")
@@ -581,9 +462,11 @@ def _match_cfb_total(
             continue
         if r.get("line") is None:
             continue
+        # Both sides must be quoted: a one-sided book used to be completed as 1 - ask,
+        # which overstated the edge by the full spread (review 2026-11-11 #8b).
         l_ask = (r.get("long") or {}).get("ask")
         s_ask = (r.get("short") or {}).get("ask")
-        if l_ask is None and s_ask is None:
+        if l_ask is None or s_ask is None:
             continue
 
         title = str(r.get("event_title") or "")
@@ -616,15 +499,31 @@ def _match_cfb_total(
         return None
 
     def _total_ask_balance(row: dict[str, Any]) -> float:
-        l = (row.get("long") or {}).get("ask")
-        s = (row.get("short") or {}).get("ask")
-        if l is not None:
-            return abs(float(l) - 0.5)
-        if s is not None:
-            return abs(float(s) - 0.5)
-        return 1.0
+        return abs(float(row["long"]["ask"]) - 0.5)
 
     return min(cands, key=_total_ask_balance)
+
+
+def _latest_capture_per_market(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep only the newest observation of each market_slug.
+
+    The spread/total selectors choose the most balanced quote; run over raw rows they
+    compared stale captures against fresh ones and could pick a line that no longer
+    existed. Rows without a slug are kept as-is.
+    """
+    latest: dict[str, dict[str, Any]] = {}
+    unslugged: list[dict[str, Any]] = []
+    for row in rows:
+        slug = str(row.get("market_slug") or "")
+        if not slug:
+            unslugged.append(row)
+            continue
+        current = latest.get(slug)
+        if current is None or str(row.get("observed_at_utc") or "") >= str(
+            current.get("observed_at_utc") or ""
+        ):
+            latest[slug] = row
+    return list(latest.values()) + unslugged
 
 
 def build_cfb_slate(
@@ -632,9 +531,19 @@ def build_cfb_slate(
     game_date: str,
     client: Any | None = None,
     observed_at: datetime | None = None,
+    model: CFBStructuralV4Model | None = None,
 ) -> dict[str, Any]:
-    """Build prospective slate for College Football (Moneyline, Spread, Total)."""
+    """Build prospective slate for College Football (Moneyline, Spread, Total).
+
+    ``model`` defaults to the artifact-parameterised production model; tests inject a
+    variant. ``observed_at`` is the decision time every point-in-time filter uses.
+    """
     from ..data_sources.espn import ESPNClient
+    from ..features.cfb_qb_availability import (
+        load_latest_injury_snapshot,
+        passing_leader_from_competitor,
+        resolve_cfb_qb_availability,
+    )
 
     root = Path(data_root)
     obs = observed_at or utc_now()
@@ -686,8 +595,10 @@ def build_cfb_slate(
                         continue
         except OSError:
             snapshot_rows = []
+    snapshot_rows = _latest_capture_per_market(snapshot_rows)
 
-    model = CollegeFootballModel()
+    model = model if model is not None else cfb_model()
+    injury_snapshot = load_latest_injury_snapshot(root, obs)
     priced_contracts: list[dict[str, Any]] = []
     unmatched: list[dict[str, Any]] = []
     candidate_bases: list[dict[str, Any]] = []
@@ -708,6 +619,9 @@ def build_cfb_slate(
         event_id = str(ev.get("id"))
         event_start_utc = str(ev.get("date"))
         is_neutral = bool(competition.get("neutralSite", False))
+        venue = competition.get("venue") or {}
+        venue_name = str(venue.get("fullName") or "").strip() or None
+        venue_indoor = venue.get("indoor") if isinstance(venue.get("indoor"), bool) else None
 
         # 3a. Match Polymarket prospective quotes
         pm_ml, ml_long_side = _match_cfb_moneyline(away_team, home_team, snapshot_rows)
@@ -735,10 +649,8 @@ def build_cfb_slate(
             sp_line = float(pm_sp["line"])
             pm_spread_away_line = sp_line if sp_anchor_side == "away" else -sp_line
             pm_spread_home_line = -sp_line if sp_anchor_side == "away" else sp_line
-            l_a = (pm_sp.get("long") or {}).get("ask")
-            s_a = (pm_sp.get("short") or {}).get("ask")
-            long_ask = float(l_a) if l_a is not None else (1.0 - float(s_a) if s_a is not None else None)
-            short_ask = float(s_a) if s_a is not None else (1.0 - float(l_a) if l_a is not None else None)
+            long_ask = float(pm_sp["long"]["ask"])
+            short_ask = float(pm_sp["short"]["ask"])
             pm_spread_away_prob = long_ask if sp_anchor_side == "away" else short_ask
             pm_spread_home_prob = short_ask if sp_anchor_side == "away" else long_ask
             pm_spread_lineage = _canonical_market_snapshot_lineage(pm_sp, snapshot_path)
@@ -749,14 +661,8 @@ def build_cfb_slate(
         pm_total_lineage = None
         if pm_tot is not None:
             pm_total_line = float(pm_tot["line"])
-            l_a = (pm_tot.get("long") or {}).get("ask")
-            s_a = (pm_tot.get("short") or {}).get("ask")
-            pm_total_over_prob = (
-                float(l_a) if l_a is not None else (1.0 - float(s_a) if s_a is not None else None)
-            )
-            pm_total_under_prob = (
-                float(s_a) if s_a is not None else (1.0 - float(l_a) if l_a is not None else None)
-            )
+            pm_total_over_prob = float(pm_tot["long"]["ask"])
+            pm_total_under_prob = float(pm_tot["short"]["ask"])
             pm_total_lineage = _canonical_market_snapshot_lineage(pm_tot, snapshot_path)
 
         # 3b. Extract fallback sportsbook odds if available from ESPN
@@ -851,8 +757,7 @@ def build_cfb_slate(
         effective_spread_home = pm_spread_home_line if pm_sp is not None else spread_home_line
         effective_total = pm_total_line if pm_tot is not None else total_line
 
-        ev_season = int((ev.get("season") or {}).get("year") or iso_date[:4])
-        ev_week = int((ev.get("week") or {}).get("number") or 1)
+        ev_season, ev_week, ev_season_type = model_week_from_espn_event(ev, iso_date)
 
         from ..features.multi_sport_weather import resolve_cfb_game_weather
 
@@ -864,8 +769,28 @@ def build_cfb_slate(
             event_start_utc=event_start_utc,
             observed_at_utc=obs.isoformat(),
             provenance_out=weather_evidence,
+            is_neutral_site=is_neutral,
+            venue_name=venue_name,
+            venue_indoor=venue_indoor,
         )
         weather_inputs_verified = is_dome or None not in (w_temp, w_wind, w_precip)
+
+        away_qb_id, away_qb_name = passing_leader_from_competitor(away)
+        home_qb_id, home_qb_name = passing_leader_from_competitor(home)
+        away_qb = resolve_cfb_qb_availability(
+            injury_snapshot,
+            team=away_team,
+            starter_athlete_id=away_qb_id,
+            starter_name=away_qb_name,
+            observed_at=obs,
+        )
+        home_qb = resolve_cfb_qb_availability(
+            injury_snapshot,
+            team=home_team,
+            starter_athlete_id=home_qb_id,
+            starter_name=home_qb_name,
+            observed_at=obs,
+        )
 
         upcoming = UpcomingCFBGame(
             event_id=event_id,
@@ -881,9 +806,19 @@ def build_cfb_slate(
             is_neutral_site=is_neutral,
             season_year=ev_season,
             week=ev_week,
+            qb_starter_prob_away=away_qb.starter_prob,
+            qb_starter_prob_home=home_qb.starter_prob,
         )
 
-        preds = model.predict_matchup(history, upcoming)
+        preds = model.predict_matchup(history, upcoming, project_missing_lines=True)
+        schedule_context = {
+            "espn_season_type": ev_season_type,
+            "espn_week": int((ev.get("week") or {}).get("number") or 1),
+            "model_week": ev_week,
+            "venue_name": venue_name,
+            "venue_indoor": venue_indoor,
+        }
+        qb_context = {"away": away_qb.to_dict(), "home": home_qb.to_dict()}
         if preds and preds[0].inference_inputs is not None:
             candidate_bases.append(
                 {
@@ -1048,6 +983,19 @@ def build_cfb_slate(
             if ask is None:
                 continue
 
+            # Operator decision 2026-11-11 (NFL, `5ffc2b40`), applied to NCAAF: a de-vigged
+            # sportsbook consensus number is not an executable ask. The row must say which
+            # it was priced against so CLV/PnL readers can separate the two populations.
+            quote_provenance = (
+                "polymarket_executable_ask" if sportsbook == "polymarket_us" else "espn_consensus_indicative"
+            )
+            rationale_text = p.rationale
+            if sportsbook != "polymarket_us":
+                rationale_text = (
+                    f"{rationale_text} Priced off ESPN sportsbook consensus "
+                    "(no Polymarket market matched); not an executable CLOB ask."
+                )
+
             edge = round(prob - float(ask), 6)
             priced_contracts.append(
                 {
@@ -1066,9 +1014,12 @@ def build_cfb_slate(
                         **p.feature_basis,
                         "weather_inputs_verified": weather_inputs_verified,
                         "weather_evidence": weather_evidence,
+                        "quote_provenance": quote_provenance,
+                        "schedule_context": schedule_context,
+                        "qb_availability": qb_context,
                     },
                     "inference_inputs": p.inference_inputs,
-                    "rationale": p.rationale,
+                    "rationale": rationale_text,
                     "market_slug": slug,
                     "executable_ask": float(ask),
                     "observed_at_utc": (
@@ -1083,7 +1034,7 @@ def build_cfb_slate(
                 }
             )
 
-    code_hash = hashlib.sha256(MODEL_VERSION.encode("utf-8")).hexdigest()[:16]
+    code_hash = cfb_serving_code_hash()
 
     candidate_capture: dict[str, Any] = {"status": "not_requested"}
     if client is None:
@@ -1123,6 +1074,11 @@ def build_cfb_slate(
                     if kind not in ("moneyline", "spread", "total") or not slug:
                         continue
                     inputs = json.loads(json.dumps(base["inference_inputs"]))
+                    features = base["features"] or {}
+                    uncertainty = float(features.get("uncertainty", CFB_UNCERTAINTY_FLOOR))
+                    # Re-derive both effective SDs with the model's own functions for the
+                    # listed line, so a candidate is priced exactly as a pick at that
+                    # line would have been (the slate's SDs belong to the slate's line).
                     if kind == "spread":
                         sides = listed_market.get("sides", [])
                         home_side = next((s for s in sides if s.get("selection") == "home"), None)
@@ -1130,21 +1086,21 @@ def build_cfb_slate(
                             continue
                         home_line = float(home_side["line"])
                         inputs["spread_home_line"] = home_line
-                        uncertainty = float(
-                            (base["features"] or {}).get("uncertainty", CFB_UNCERTAINTY_FLOOR)
+                        inputs["parameters"]["margin_sd"] = model.compute_effective_margin_sd(
+                            spread_home_line=home_line,
+                            uncertainty=uncertainty,
+                            is_conference_matchup=bool(features.get("is_conference_matchup", False)),
                         )
-                        effective_sd = model.margin_sd * (
-                            1.0 + CFB_UNCERTAINTY_MARGIN_SD_SCALE * (uncertainty - CFB_UNCERTAINTY_FLOOR)
-                        )
-                        if abs(home_line) > CFB_BLOWOUT_SPREAD_THRESHOLD:
-                            effective_sd *= 1.0 + CFB_BLOWOUT_MARGIN_SCALE * min(
-                                15.0, abs(home_line) - CFB_BLOWOUT_SPREAD_THRESHOLD
-                            )
-                        inputs["parameters"]["margin_sd"] = effective_sd
                     elif kind == "total":
                         if listed_market.get("line") is None:
                             continue
-                        inputs["total_line"] = float(listed_market["line"])
+                        total_line = float(listed_market["line"])
+                        inputs["total_line"] = total_line
+                        inputs["parameters"]["total_sd"] = model.compute_effective_total_sd(
+                            projected_total=float(inputs["mu_home"]) + float(inputs["mu_away"]),
+                            total_line=total_line,
+                            uncertainty=uncertainty,
+                        )
                     try:
                         probability = replay_inputs(inputs, kind)
                     except (KeyError, TypeError, ValueError):

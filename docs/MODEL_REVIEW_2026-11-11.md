@@ -11,6 +11,11 @@ verified against the live tree before being listed; ledger numbers come from
 **open**. Open items belong in `docs/ROADMAP.md` when picked up; this file is the
 evidence record.
 
+**NCAAB status (2026-11-12):** #7, #9 (NCAAB part), #10 (NCAAB part), #11 and the
+NCAAB push-mass item are **fixed** in `quick-261112-nc6` — `docs/DEBUG.md` 2026-11-12
+NCAAB entry, `docs/NCAAB_V6_REVIEW_FIXES_2026-11-12.md`,
+`outputs/ncaab/ncaab_v6_review_ablation.md` (validation-selected; control reproduced
+68/68 live rows). The t-scale half of #10 was tested and rejected (coverage got worse).
 Champions per `config/production.yaml`: NBA = `nba-elo-trend-lr-v4` ML /
 `nba-spread-margin-v9` / `nba-total-margin-v9`; NCAAB = `ncaab-spread-v6` (ML+spread)
 / `ncaab-total-v6`; NFL = `nfl-elo-trend-lr-v4` ML / `nfl-*-structural-v7`;
@@ -87,7 +92,7 @@ v4 with the new construction (and put those keys in the artifact) or drop the
 overrides; extend `test_train_serve_parity` beyond MLB.
 
 **7. NCAAB total v6 compares a league-shrunk level against a *conference*
-baseline. (OPEN)** `ncaab_total_v6.py:270-275`: `hl10` is shrunk toward
+baseline. (FIXED `quick-261112-nc6`)** `ncaab_total_v6.py:270-275`: `hl10` was shrunk toward
 `TrendEngine.league_baseline` (prior 12 games) but `pf_*` divides by the conference
 baseline (SEC 83.4, Northeast 69.0), so high-scoring conferences look "slow" and
 low-scoring ones "fast". Repro with the real class: identical 85-ppg teams project
@@ -114,19 +119,23 @@ in `6c078b08`). Fix pattern: `PolymarketSnapshotStore.latest()`, require both as
 tag non-Polymarket rows.
 
 **9. Artifact ↔ code drift on code-backed models.** NFL FIXED (`4dd3034e`: dead keys
-stripped, recording-dict test). OPEN: `ncaab-spread-v6.json` says
+stripped, recording-dict test). NCAAB FIXED (`quick-261112-nc6`: hash-verified
+`from_artifact` factories, consumed-keys + serving-parity tests): `ncaab-spread-v6.json` said
 `offseason_retention: 0.2`, served default is 0.35 (`ncaab_spread_v6.py:159`) and
 the factory ignores the artifact; CFB `gates.block_fcs/max_spread_line/
 max_moneyline_dog_odds` are read nowhere — FCS is not blocked anywhere in serving.
 **Fix**: generalise the consumed-keys test to every champion in `production.yaml`.
 
 **10. "Coherent" moneylines aren't coherent with their own margin distributions.
-(OPEN)** NCAAB logistic s=9.5 vs its sd-10.5 margin: at +8 → 87.4% vs 77.7%; NBA v9
+(NCAAB FIXED `quick-261112-nc6`: moneyline read off the t margin distribution; the
+scale change was tested and rejected. NBA OPEN)** NCAAB logistic s=9.5 vs its sd-10.5
+margin: at +8 → 87.4% vs 77.7%; NBA v9
 s=11.8 vs sd 14: +8 → 82.7% vs 71.6%. NCAAB's Student-t(df=8) with *scale* 10.5 has
 true SD 12.1, so spread cover probabilities are ~15% flatter than v5's. Needs one
 ablation, not three constants.
 
-**11. Early-season margin compression in NCAAB spread v6's trend half. (OPEN)** A
+**11. Early-season margin compression in NCAAB spread v6's trend half. (FIXED
+`quick-261112-nc6`: tiered trend priors + additive matchup; Elo ramp implemented but off)** A
 team beating mid-majors by 20 hosting one losing to them by 20 (true ≈ +40) gets
 `trend_margin` 11.7 vs `elo_margin` 21.5 → `expected_margin` 16.6, 17% to cover
 −28.5. Same mechanism as the −64.7u road-dog bleed under tempo-v3. **Fix**:
@@ -152,7 +161,8 @@ Now ordering/age (`_nfl_inputs_fresh`).
 
 ### LOW (quick wins, all OPEN except NFL rationale strings)
 
-Integer-line push mass credited to one side in NBA/NFL/NCAAB (`home+away=1`; CFB
+Integer-line push mass credited to one side in NBA/NFL (NCAAB FIXED `quick-261112-nc6`;
+`home+away=1`; CFB
 handles it). Monte-Carlo noise: 15k sims → ±0.8 pp 95% CI on CFB spread
 probabilities vs a 2 pp `min_edge`. NFL `_qb_adjustment` + injury penalty applied on
 the listed starter's tier, not the backup's. `code_revision` for CFB is a hash of

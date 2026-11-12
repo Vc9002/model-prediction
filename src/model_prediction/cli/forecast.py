@@ -5324,6 +5324,7 @@ def _forecast_cfb_sport(
     main_ledger: logs qualified calls meeting min_edge and uncertainty thresholds with edge-scaled sizing.
     """
     from ..data_sources.polymarket_us import probability_to_american
+    from ..models.cfb_structural_v4 import main_gates_from_artifact
     from ..models.college_football import build_cfb_slate
 
     model_config = config.get("models", {}).get("NCAAF", {})
@@ -5331,10 +5332,15 @@ def _forecast_cfb_sport(
     serving_artifact, artifact_error = _load_exact_artifact_contract(serving_version)
     if artifact_error or serving_artifact is None:
         raise ValueError(artifact_error or f"NCAAF serving artifact unavailable for {serving_version}")
-    max_edge = float(serving_artifact["gates"]["max_edge"])
-    if not 0 < max_edge < 1:
-        raise ValueError(f"NCAAF serving artifact has invalid max_edge for {serving_version}")
+    # The artifact's gates block is the Main contract. Review 2026-11-11 #9: block_fcs,
+    # max_spread_line and max_moneyline_dog_odds were declared there and read nowhere.
+    artifact_gates = main_gates_from_artifact(serving_artifact)
+    max_edge = artifact_gates.max_edge
     serving_artifact_hash = str(serving_artifact["artifact_hash"])
+    # Main-only total gates live in config/model.yaml (models.NCAAF.main_total_gates) so the
+    # thresholds are visible and removable; they were hardcoded here with no walk-forward
+    # evidence (review #12). Absent block => no extra total gate.
+    total_gates = model_config.get("main_total_gates") or {}
     forecast = build_cfb_slate(
         data_root=data_root,
         game_date=args_date,
@@ -5345,7 +5351,7 @@ def _forecast_cfb_sport(
         forecast["logged"] = 0
         return forecast
 
-    min_edge = float(model_config.get("min_edge", 0.03))
+    min_edge = float(model_config.get("min_edge", artifact_gates.min_edge))
     configured_state = str(model_config.get("status", "research"))
     forecast["status"] = configured_state
     observed_now = utc_now()
@@ -5449,58 +5455,50 @@ def _forecast_cfb_sport(
                     main_rejections.append(
                         {"event_id": contract["event_id"], "market": mtype.value, "reason": "excessive_edge"}
                     )
+                feature_basis = contract.get("feature_basis") or {}
+
+                def _reject(
+                    reason: str, *, _event_id: str = str(contract["event_id"]), _market: str = mtype.value
+                ) -> None:
+                    nonlocal genuinely_eligible
+                    genuinely_eligible = False
+                    main_rejections.append({"event_id": _event_id, "market": _market, "reason": reason})
+
                 if mtype == MarketType.TOTAL and contract.get("weather_inputs_verified") is not True:
-                    genuinely_eligible = False
-                    main_rejections.append(
-                        {
-                            "event_id": contract["event_id"],
-                            "market": mtype.value,
-                            "reason": "pregame_weather_unverified",
-                        }
-                    )
+                    _reject("pregame_weather_unverified")
+                if artifact_gates.block_fcs and bool(feature_basis.get("is_fbs_vs_fcs", False)):
+                    _reject("fcs_blocked")
                 if (
-                    genuinely_eligible
-                    and mtype == MarketType.TOTAL
-                    and (
-                        contract_edge > 0.10
-                        or float(contract.get("model_probability", 0.0)) > 0.62
-                        or (
-                            str(contract.get("selection", "")).lower() == "under"
-                            and contract.get("line") is not None
-                            and float(contract["line"]) >= 56.5
-                        )
-                        or (
-                            contract.get("line") is not None
-                            and (contract.get("feature_basis") or {}).get("projected_total") is not None
-                            and abs(
-                                float(contract["feature_basis"]["projected_total"]) - float(contract["line"])
-                            )
-                            < 1.5
-                        )
-                    )
-                ):
-                    genuinely_eligible = False
-                # Optional, off-by-default gates: each needs a config value, which in turn needs
-                # walk-forward evidence (ARCHITECTURE.md validation contract) before being set.
-                _ml_max_odds = model_config.get("max_moneyline_american_odds")
-                if (
-                    genuinely_eligible
-                    and _ml_max_odds is not None
-                    and mtype == MarketType.MONEYLINE
-                    and request.american_odds is not None
-                    and request.american_odds > float(_ml_max_odds)
-                ):
-                    genuinely_eligible = False
-                _blowout_cap = model_config.get("blowout_spread_edge_cap")
-                if (
-                    genuinely_eligible
-                    and _blowout_cap is not None
-                    and mtype == MarketType.SPREAD
+                    mtype == MarketType.SPREAD
                     and contract.get("line") is not None
-                    and abs(float(contract["line"])) > 21.5
-                    and contract_edge > float(_blowout_cap)
+                    and abs(float(contract["line"])) > artifact_gates.max_spread_line
                 ):
-                    genuinely_eligible = False
+                    _reject("spread_line_above_max")
+                if mtype == MarketType.MONEYLINE and ask < artifact_gates.min_moneyline_ask:
+                    _reject("moneyline_ask_below_floor")
+                if mtype == MarketType.TOTAL and total_gates:
+                    max_probability = total_gates.get("max_model_probability")
+                    if max_probability is not None and float(contract.get("model_probability", 0.0)) > float(
+                        max_probability
+                    ):
+                        _reject("total_probability_above_config_max")
+                    under_min_line = total_gates.get("under_min_line")
+                    if (
+                        under_min_line is not None
+                        and str(contract.get("selection", "")).lower() == "under"
+                        and contract.get("line") is not None
+                        and float(contract["line"]) >= float(under_min_line)
+                    ):
+                        _reject("total_under_line_above_config_min")
+                    min_gap = total_gates.get("min_projection_gap")
+                    if (
+                        min_gap is not None
+                        and contract.get("line") is not None
+                        and feature_basis.get("projected_total") is not None
+                        and abs(float(feature_basis["projected_total"]) - float(contract["line"]))
+                        < float(min_gap)
+                    ):
+                        _reject("total_projection_within_config_gap")
                 # CFB spread (cfb-spread-v1) and total (cfb-total-v1) artifacts explicitly declare
                 # "status": "FLAT_LEDGER_ONLY" and "qualified": false. Unified cfb-structural-v3
                 # produces calibrated joint probabilities and is qualified across moneyline,
