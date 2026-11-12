@@ -8,10 +8,29 @@ def test_nfl_spread_imports():
 
 
 def test_select_nfl_spread_market_ignores_quarter_and_half():
+    observed = "2026-10-04T15:00:00Z"
     candidates = [
-        {"market_slug": "asc-nfl-mia-min-2026-10-04-1h-neg-1pt5", "line": -1.5, "long": {"ask": 0.50}},
-        {"market_slug": "asc-nfl-mia-min-2026-10-04-3q-pos-2pt5", "line": 2.5, "long": {"ask": 0.50}},
-        {"market_slug": "asc-nfl-mia-min-2026-10-04-neg-3pt5", "line": -3.5, "long": {"ask": 0.53}},
+        {
+            "market_slug": "asc-nfl-mia-min-2026-10-04-1h-neg-1pt5",
+            "line": -1.5,
+            "long": {"ask": 0.50},
+            "short": {"ask": 0.52},
+            "observed_at_utc": observed,
+        },
+        {
+            "market_slug": "asc-nfl-mia-min-2026-10-04-3q-pos-2pt5",
+            "line": 2.5,
+            "long": {"ask": 0.50},
+            "short": {"ask": 0.52},
+            "observed_at_utc": observed,
+        },
+        {
+            "market_slug": "asc-nfl-mia-min-2026-10-04-neg-3pt5",
+            "line": -3.5,
+            "long": {"ask": 0.53},
+            "short": {"ask": 0.49},
+            "observed_at_utc": observed,
+        },
     ]
     selected = _select_nfl_spread_market(candidates)
     assert selected is not None

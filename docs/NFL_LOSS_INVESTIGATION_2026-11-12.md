@@ -134,12 +134,31 @@ and 62% of all games; its over side hits 49.6%, its under side 53.3%.
 - **No closing line for any NFL row, so CLV is unmeasurable.** Of 113
   Polymarket-priced spread/total rows, `closing_line` is populated in 0,
   `decision_consensus_probability` in 0, and `probability_clv` is "0.000000"
-  where present. Settlement's `market_store.closing_quote` is the MLB odds
-  store (`data_sources/mlb_market_odds.py`), which has no NFL rows. For a
-  market-anchored engine CLV is the only fast diagnostic; it is missing.
+  where present. The Polymarket closing lookup works but returns the same
+  game-day capture the decision used (markets were only snapshotted on game
+  day), and no sportsbook consensus was stored at all.
+  **Fixed 2026-11-12 (same day):** `data_sources/espn_nfl_odds.py` captures
+  ESPN's DraftKings opener and current two-sided prices for every NFL game in
+  the next 7 days on each daily run (`odds/nfl/<date>/espn_odds.jsonl`,
+  hash-verified, PIT reads); `commands.capture_nfl_polymarket_week_ahead`
+  snapshots Polymarket books for the same window; both run as
+  `step1l_nfl_week_ahead_quotes`. Every NFL row now stores
+  `decision_consensus_probability/line` and the opener in `feature_basis`;
+  settlement writes `closing_consensus_probability/line` from the last
+  pre-kickoff consensus record (`cli/settle.py`). First capture: 14 games,
+  2026-11-12T06:52Z.
+- **Placeholder rungs could be priced as the main line.** Before the main
+  line is listed, Polymarket carries only alternates (WAS at NYG: +17.5 to
+  +30.5 spreads at 91-99% asks, totals 17.5-23.5). The "most balanced" rule
+  picked +17.5 at a 91% ask as the spread and the 23.5 total at an 8% ask.
+  **Fixed 2026-11-12:** the selectors reject long asks outside 20-80% and,
+  when the consensus line is known, take the nearest rung within 6 (spread)
+  / 7 (total) points or decline to the consensus price
+  (`forecast_nfl_support._select_latest_balanced_market`,
+  `tests/test_nfl_market_selection.py`).
 - **v7 rationale strings still say "NFL Structural v6"**
-  (`cli/forecast.py:2876`, `:2978`, `:3498`, `:3594`). Cosmetic, but it is
-  what the dashboard shows.
+  (`cli/forecast.py:2876`, `:2978`, `:3498`, `:3594`). **Fixed 2026-11-12:**
+  rationale, model name and risk text now carry the served `model_version`.
 
 ## 4. Moneyline champion `nfl-elo-trend-lr-v4`
 
@@ -181,9 +200,10 @@ Ordered by evidence, not effort. Each is an operator decision.
    signal where inefficiency can exist, against opening or early-week lines,
    which requires a line-history source nflverse does not provide.
 2. **Build the NFL closing-line capture and CLV** before any further model
-   work. Store the consensus line and Polymarket ask at kickoff per event and
-   market, populate `closing_line` / `probability_clv` at settlement. Without
-   it there is no way to tell variance from a bad price.
+   work. **Done 2026-11-12** (see §3): consensus + Polymarket captured for the
+   week ahead on every run, consensus close written at settlement. CLV
+   against the consensus becomes readable as rows settle from Week 11 on; the
+   opener-vs-close history accumulates one week per week.
 3. **Re-fit the total engine around weather and drop the dead terms.** Weather
    is the only term with information and it is under-weighted roughly 2–3×.
    Validate on the Open-Meteo *forecast* captures (live since 11-11), not
@@ -197,7 +217,7 @@ Ordered by evidence, not effort. Each is an operator decision.
    inverted edge. Its `evidence_status` in `config/production.yaml` is
    unsupported. If it stays, the 50 placeholder-priced rows should be
    excluded from any performance view.
-6. **Cosmetic:** rename the "v6" rationale strings.
+6. **Cosmetic:** rename the "v6" rationale strings. **Done 2026-11-12.**
 
 ## 6. Reproduction
 

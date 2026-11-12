@@ -1,5 +1,52 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
+## 2026-11-12 — NFL loss investigation: no CLV existed, placeholder rungs priced as main lines, consensus/opener capture added
+
+Follow-up to the 2026-11-11 NFL review. Full evidence in
+`docs/NFL_LOSS_INVESTIGATION_2026-11-12.md` (loss attribution, 1,489-game
+component regressions, outside research). Code changes, all NFL-only:
+
+- **CLV was zero by construction, not measured.** Every NFL row had an empty
+  `closing_line`; `probability_clv` was 0.000 where present because the
+  Polymarket "closing" snapshot was the same game-day capture the decision
+  used (NFL markets were only snapshotted on game day, 1-2 captures), and no
+  sportsbook consensus was stored. New `data_sources/espn_nfl_odds.py`
+  captures ESPN's DraftKings opener + current two-sided spread/total/moneyline
+  prices for every NFL game in the next 7 days on each run
+  (`odds/nfl/<game_date_et>/espn_odds.jsonl`, append-only, sha256 per record,
+  readers filter on `observed_at_utc` and drop tampered lines);
+  `commands.capture_nfl_polymarket_week_ahead` snapshots Polymarket books for
+  the same window (`horizon_hours=None`, filed under each game's own date).
+  Both run in the daily capture pool as `step1l_nfl_week_ahead_quotes`.
+  NFL rows now carry `decision_consensus_probability/line` (de-vigged side
+  price at the book's own line) and the opener in `feature_basis`;
+  `cli/settle.py` writes `closing_consensus_probability/line` from the last
+  pre-kickoff record when its line equals the pick's line. First live
+  capture: 14 games, 2026-11-12T06:52Z (WAS@NYG opener -1.5/47.5, current
+  -2.5/40.5).
+- **Placeholder rungs were selectable as the main line.** Reproduced on the
+  2026-11-12 WAS@NYG snapshot: before the main line was listed, Polymarket
+  carried only +17.5..+30.5 spreads (long asks 91-99%) and 17.5-23.5 totals;
+  `_select_latest_balanced_market` priced +17.5 at a 91% ask as the spread
+  and the 23.5 total at an 8% ask. Fix: long ask must sit in 20-80%, and with
+  a consensus reference the nearest rung within 6 (spread) / 7 (total)
+  points wins, else the builder declines to the consensus price. The
+  reference is the parsed ESPN consensus for the event, home-anchored.
+  `tests/test_nfl_market_selection.py` pins the real ladder.
+- **Total fallback asks were vig-inclusive one-sided prices** while the
+  spread fallback de-vigged; both now use the de-vigged consensus side.
+- **"NFL Structural v6" labels on v7 rows** (rationale, model_name, risks)
+  now carry the served `model_version`; the risk text states the replay
+  finding (structural signal carries no information beyond the close).
+- Stale fixture `tests/sports/nfl/spread/test_nfl_spread.py` (one-sided asks,
+  no `observed_at_utc`) updated to the selector's contract; its two
+  end-to-end tests still assert the retired v5 version (pre-existing).
+
+Not changed (operator decisions, see the investigation doc §5): spread sd
+12.8 / heavy-line inflation, `predictively_qualified` on the three NFL
+champions, retiring `nfl-elo-trend-lr-v4` (−10u at real quotes; its
+qualification and 50 of its settled rows are priced at the 52.38% placeholder).
+
 ## 2026-11-12 — NCAAF review fixes: serving the v4 class, ask integrity, artifact gates, venue weather, QB channel
 
 Closes every NCAAF item in `docs/MODEL_REVIEW_2026-11-11.md` (#1, #8a/b/c, #9 CFB,

@@ -89,6 +89,72 @@ from .state import ESPN_SPORTS, SPORTS
 logger = logging.getLogger("model_prediction.cli")
 
 
+def capture_nfl_polymarket_week_ahead(
+    config: dict,
+    start_date: str,
+    *,
+    days: int = 7,
+    client: Any | None = None,
+    capture_fn: Any | None = None,
+    snapshot_root: Path | None = None,
+) -> dict[str, Any]:
+    """Snapshot Polymarket NFL books for every game in the next `days` dates.
+
+    The main slate capture prices only today's games, so until 2026-11-12 every NFL
+    quote in the archive was a game-day quote: no opener, no intra-week history, and a
+    "closing" snapshot identical to the decision quote (CLV was zero by construction).
+    Dates are filed under each game's own Eastern date, the same layout the forecast
+    and settlement readers already use. Fail-soft per date.
+    """
+    from datetime import timedelta
+
+    poly = client or PolymarketUSClient(max_attempts=2)
+    capture = capture_fn or capture_slate_snapshots
+    root = snapshot_root
+    if root is None:
+        root = Path(ledger_path(config)).parent
+        runtime = RuntimePaths.resolve()
+        if root.resolve() == (runtime.repo_root / "data").resolve():
+            root = runtime.runtime_root
+    first = date.fromisoformat(start_date)
+    per_date: dict[str, Any] = {}
+    errors: dict[str, str] = {}
+    # Offset 0 is the main slate capture's job; start at tomorrow.
+    for offset in range(1, max(2, days + 1)):
+        game_date = (first + timedelta(days=offset)).isoformat()
+        try:
+            events = poly.slate("NFL", date.fromisoformat(game_date), "America/New_York")
+        except httpx.HTTPError as exc:
+            errors[game_date] = str(exc)[:200]
+            continue
+        if not events:
+            continue
+        try:
+            result = capture(
+                poly,
+                {"NFL": events},
+                root,
+                game_date,
+                horizon_hours=None,
+                ladder_keep=2,
+                ladder_leagues=frozenset({"NFL"}),
+            )
+        except Exception as exc:  # noqa: BLE001 -- one date must not stop the rest of the week
+            errors[game_date] = f"{type(exc).__name__}: {exc}"[:200]
+            continue
+        per_date[game_date] = {
+            "events": len(events),
+            "captured": result.get("captured") if isinstance(result, dict) else None,
+        }
+    return {
+        "status": "ok" if not errors else ("partial" if per_date else "error"),
+        "start_date": start_date,
+        "days": days,
+        "dates": per_date,
+        "errors": errors,
+    }
+
+
 def _capture_horizon_hours() -> float | None:
     """Hours ahead to price books for (env POLYMARKET_CAPTURE_HORIZON_HOURS, default 24).
 

@@ -29,6 +29,7 @@ from ..config import (
 )
 from ..cross_market_consistency import validate_cross_market_pick_coherence
 from ..data_sources.espn import ESPNClient, ESPNMLBClient
+from ..data_sources.espn_nfl_odds import consensus_for_selection, parse_espn_consensus
 from ..data_sources.mlb_market_odds import (
     MarketOddsSnapshotStore,
     MLBMarketOddsFeed,
@@ -2602,12 +2603,25 @@ def _forecast_nfl_spread_slate(
             )
             and str(row.get("event_start_utc") or "")[:16] == str(event["date"])[:16]
         ]
-        market = _select_nfl_spread_market(candidates)
-        first_odds: dict[str, Any] = {}
+        comp = (event.get("competitions") or [{}])[0]
+        odds_list = comp.get("odds") or []
+        first_odds: dict[str, Any] = odds_list[0] if odds_list else {}
+        # Sportsbook consensus (opener + current two-sided prices) is recorded on every
+        # row, Polymarket-priced or not: it is the reference price CLV is measured
+        # against, the opener is the only line public models have beaten (see
+        # docs/NFL_LOSS_INVESTIGATION_2026-11-12.md §7), and it anchors which
+        # Polymarket rung counts as the main line.
+        consensus_record = parse_espn_consensus(event)
+        market = _select_nfl_spread_market(
+            candidates,
+            reference_line=(consensus_record or {}).get("spread_home_line"),
+            row_line=lambda row, _away=away_team: (
+                -float(row["line"])
+                if _team_matches(_away, str(row.get("team") or ""))
+                else float(row["line"])
+            ),
+        )
         if market is None:
-            comp = (event.get("competitions") or [{}])[0]
-            odds_list = comp.get("odds") or []
-            first_odds = odds_list[0] if odds_list else {}
             espn_spread = first_odds.get("spread")
             if espn_spread is None:
                 unmatched.append({"event_id": event_id, "reason": "no matched spread market"})
@@ -2810,6 +2824,7 @@ def _forecast_nfl_spread_slate(
         if ask is None or not 0 < float(ask) < 1:
             continue
 
+        consensus_probability, consensus_line = consensus_for_selection(consensus_record, "spread", selection)
         inference_inputs = {
             "mean": fc.projected_margin_home,
             # The v7 engine widens margin_sd 1.25x on |line| >= 8. The replay recomputes
@@ -2833,6 +2848,9 @@ def _forecast_nfl_spread_slate(
             "injury_source": injury_source,
             "input_qualified": input_qualified,
             "quote_provenance": quote_provenance,
+            "consensus_provider": (consensus_record or {}).get("provider"),
+            "consensus_spread_home_line_open": (consensus_record or {}).get("spread_home_line_open"),
+            "consensus_spread_home_line": (consensus_record or {}).get("spread_home_line"),
         }
         model_snapshot = build_scalar_snapshot(
             artifact,
@@ -2862,6 +2880,8 @@ def _forecast_nfl_spread_slate(
                 "selection": selection,
                 "line": line,
                 "executable_ask": float(ask),
+                "decision_consensus_probability": consensus_probability,
+                "decision_consensus_line": consensus_line,
                 "sportsbook": sportsbook,
                 "model_probability": round(served_probability, 6),
                 "model_probability_raw": round(model_probability, 6),
@@ -2873,7 +2893,7 @@ def _forecast_nfl_spread_slate(
                 "model_artifact_hash": model_artifact_hash,
                 "model_qualified": model_qualified and input_qualified,
                 "rationale": (
-                    f"NFL Structural v6 Spread projection. Projected margin {fc.projected_margin_home:+.1f} "
+                    f"NFL spread projection ({model_version}). Projected margin {fc.projected_margin_home:+.1f} "
                     f"(Rest: {home_rest_days}v{away_rest_days}d, Dome: {is_dome}).{quote_note}"
                 ),
                 "joint_packet_quote": (
@@ -2900,7 +2920,7 @@ def _forecast_nfl_spread_slate(
 
     return {
         "sport": "nfl_spread",
-        "model_name": "NFL Spread (Structural v6 research)",
+        "model_name": f"NFL Spread ({model_version})",
         "model_version": model_version,
         "model_qualified": model_qualified
         and bool(priced_contracts)
@@ -2975,7 +2995,10 @@ def _forecast_nfl_spread_sport(
             model_uncertainty=contract["model_uncertainty"],
             model_version=contract["model_version"],
             rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
-            risks="NFL Structural v6 projected-QB research model; prospective validation pending.",
+            risks=(
+                f"NFL structural engine {contract['model_version']}: in the 2021-2026 replay its structural "
+                "signal carried no information beyond the closing line; treat edge as price edge only."
+            ),
             model_origin=ModelOrigin.STATISTICAL_MODEL,
             model_enabled=True,
             observed_at_utc=contract["observed_at_utc"],
@@ -2987,6 +3010,8 @@ def _forecast_nfl_spread_sport(
             ),
             feature_schema_version="2",
             code_revision=contract["model_artifact_hash"],
+            decision_consensus_probability=contract.get("decision_consensus_probability"),
+            decision_consensus_line=contract.get("decision_consensus_line"),
             model_input_snapshot_json=json.dumps(
                 contract["model_input_snapshot"], sort_keys=True, allow_nan=False
             )
@@ -3176,12 +3201,14 @@ def _forecast_nfl_total_slate(
             )
             and str(row.get("event_start_utc") or "")[:16] == str(event["date"])[:16]
         ]
-        market = _select_nfl_total_market(candidates)
-        first_odds: dict[str, Any] = {}
+        comp = (event.get("competitions") or [{}])[0]
+        odds_list = comp.get("odds") or []
+        first_odds: dict[str, Any] = odds_list[0] if odds_list else {}
+        consensus_record = parse_espn_consensus(event)
+        market = _select_nfl_total_market(
+            candidates, reference_line=(consensus_record or {}).get("total_line")
+        )
         if market is None:
-            comp = (event.get("competitions") or [{}])[0]
-            odds_list = comp.get("odds") or []
-            first_odds = odds_list[0] if odds_list else {}
             espn_total = first_odds.get("overUnder")
             if espn_total is None:
                 unmatched.append({"event_id": event_id, "reason": "no matched total market"})
@@ -3386,16 +3413,7 @@ def _forecast_nfl_total_slate(
             if market is not None:
                 ask = market["long"]["ask"]
             else:
-                tot_obj = first_odds.get("total") or {}
-                close_odds = (tot_obj.get("over") or {}).get("close", {}).get("odds")
-                try:
-                    ask = (
-                        round(implied_probability(int(close_odds)), 6)
-                        if close_odds and str(close_odds).lstrip("-+").isdigit()
-                        else STANDARD_LAY_ASK
-                    )
-                except (ValueError, TypeError):
-                    ask = STANDARD_LAY_ASK
+                ask = consensus_for_selection(consensus_record, "total", "over")[0] or STANDARD_LAY_ASK
             line = t_line
         else:
             selection = "under"
@@ -3403,21 +3421,13 @@ def _forecast_nfl_total_slate(
             if market is not None:
                 ask = market["short"]["ask"]
             else:
-                tot_obj = first_odds.get("total") or {}
-                close_odds = (tot_obj.get("under") or {}).get("close", {}).get("odds")
-                try:
-                    ask = (
-                        round(implied_probability(int(close_odds)), 6)
-                        if close_odds and str(close_odds).lstrip("-+").isdigit()
-                        else STANDARD_LAY_ASK
-                    )
-                except (ValueError, TypeError):
-                    ask = STANDARD_LAY_ASK
+                ask = consensus_for_selection(consensus_record, "total", "under")[0] or STANDARD_LAY_ASK
             line = t_line
 
         if ask is None or not 0 < float(ask) < 1:
             continue
 
+        consensus_probability, consensus_line = consensus_for_selection(consensus_record, "total", selection)
         inference_inputs = {
             "mean": fc.projected_total,
             "sd": total_sd,
@@ -3444,6 +3454,9 @@ def _forecast_nfl_total_slate(
             "injury_source": injury_source,
             "input_qualified": input_qualified,
             "quote_provenance": quote_provenance,
+            "consensus_provider": (consensus_record or {}).get("provider"),
+            "consensus_total_line_open": (consensus_record or {}).get("total_line_open"),
+            "consensus_total_line": (consensus_record or {}).get("total_line"),
         }
         model_snapshot = build_scalar_snapshot(
             artifact,
@@ -3484,6 +3497,8 @@ def _forecast_nfl_total_slate(
                 "selection": selection,
                 "line": line,
                 "executable_ask": float(ask),
+                "decision_consensus_probability": consensus_probability,
+                "decision_consensus_line": consensus_line,
                 "sportsbook": sportsbook,
                 "model_probability": round(served_probability, 6),
                 "model_probability_raw": round(model_probability, 6),
@@ -3495,7 +3510,7 @@ def _forecast_nfl_total_slate(
                 "model_artifact_hash": model_artifact_hash,
                 "model_qualified": model_qualified and input_qualified,
                 "rationale": (
-                    f"NFL Structural v6 Total projection. Projected total {fc.projected_total:.1f} "
+                    f"NFL total projection ({model_version}). Projected total {fc.projected_total:.1f} "
                     f"(Dome: {is_dome}, Weather: {weather_note}).{tnf_note}{quote_note}"
                 ),
                 "joint_packet_quote": (
@@ -3521,7 +3536,7 @@ def _forecast_nfl_total_slate(
 
     return {
         "sport": "nfl_total",
-        "model_name": "NFL Total (Structural v6 research)",
+        "model_name": f"NFL Total ({model_version})",
         "model_version": model_version,
         "model_qualified": model_qualified
         and bool(priced_contracts)
@@ -3591,7 +3606,10 @@ def _forecast_nfl_total_sport(
             model_uncertainty=contract["model_uncertainty"],
             model_version=contract["model_version"],
             rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
-            risks="NFL Structural v6 projected-QB research model; prospective validation pending.",
+            risks=(
+                f"NFL structural engine {contract['model_version']}: in the 2021-2026 replay its structural "
+                "signal carried no information beyond the closing line; treat edge as price edge only."
+            ),
             model_origin=ModelOrigin.STATISTICAL_MODEL,
             model_enabled=True,
             observed_at_utc=contract["observed_at_utc"],
@@ -3603,6 +3621,8 @@ def _forecast_nfl_total_sport(
             ),
             feature_schema_version="2",
             code_revision=contract["model_artifact_hash"],
+            decision_consensus_probability=contract.get("decision_consensus_probability"),
+            decision_consensus_line=contract.get("decision_consensus_line"),
             model_input_snapshot_json=json.dumps(
                 contract["model_input_snapshot"], sort_keys=True, allow_nan=False
             )
