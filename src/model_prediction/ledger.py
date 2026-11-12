@@ -193,6 +193,30 @@ def _acquire_exclusive_lock(fileno: int, path: Path, timeout: float = LOCK_TIMEO
             time.sleep(LOCK_POLL_INTERVAL_SECONDS)
 
 
+# Same-process threads (the daily job's ThreadPoolExecutor fan-out) used to
+# discover contention only via _acquire_exclusive_lock's 100ms poll loop,
+# which is correct but built for cross-process safety and far slower than an
+# in-memory primitive for the common same-process case. Serializing
+# same-process callers through this lock first means at most one thread per
+# process ever attempts the fcntl acquire at a time, so that acquire is
+# normally uncontended, while the poll loop stays reserved for genuine
+# cross-process contention (a second process -- CLI re-run, dashboard,
+# supervisor -- holding the fcntl lock), which is exactly what
+# LOCK_TIMEOUT_SECONDS/LedgerLockTimeout exist to diagnose.
+_PROCESS_LOCAL_LOCKS_GUARD = threading.Lock()
+_PROCESS_LOCAL_LOCKS: dict[Path, threading.Lock] = {}
+
+
+def _process_local_lock(path: Path) -> threading.Lock:
+    resolved = path.resolve()
+    with _PROCESS_LOCAL_LOCKS_GUARD:
+        lock = _PROCESS_LOCAL_LOCKS.get(resolved)
+        if lock is None:
+            lock = threading.Lock()
+            _PROCESS_LOCAL_LOCKS[resolved] = lock
+        return lock
+
+
 LEDGER_SCHEMA_VERSION = "4"
 LEGACY_FIELDNAMES = [
     "pick_id",
@@ -589,12 +613,22 @@ class PickLedger:
             yield
             return
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.lock_path.open("a+") as lock:
-            _acquire_exclusive_lock(lock.fileno(), self.lock_path)
-            try:
-                yield
-            finally:
-                unlock(lock.fileno())
+        process_lock = _process_local_lock(self.lock_path)
+        if not process_lock.acquire(timeout=LOCK_TIMEOUT_SECONDS):
+            raise LedgerLockTimeout(
+                f"could not acquire in-process lock on {self.lock_path} within "
+                f"{LOCK_TIMEOUT_SECONDS}s -- another thread in this process may be "
+                "hung while holding it"
+            )
+        try:
+            with self.lock_path.open("a+") as lock:
+                _acquire_exclusive_lock(lock.fileno(), self.lock_path)
+                try:
+                    yield
+                finally:
+                    unlock(lock.fileno())
+        finally:
+            process_lock.release()
 
     def initialize(self) -> None:
         # Known residual gap in the audit-first ordering this module
