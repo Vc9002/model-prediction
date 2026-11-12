@@ -3285,6 +3285,23 @@ def test_research_models_dir_prefers_rolling_over_frozen(monkeypatch, tmp_path) 
     assert cli._research_models_dir() != cli.PROJECT_ROOT / "config" / "models"
 
 
+def test_rolling_models_write_dir_bootstraps_the_rolling_root(monkeypatch, tmp_path) -> None:
+    """Writes must never take the frozen fallback: until 2026-11-12 the daily
+    cycle retrained through _research_models_dir(), which fell back to
+    config/models because nothing had ever created the rolling directory, so
+    every run rewrote the git-tracked frozen artifacts."""
+    monkeypatch.setenv("MODEL_PREDICTION_RUNTIME_ROOT", str(tmp_path / "runtime"))
+    rolling = cli.rolling_models_root(cli.PROJECT_ROOT)
+    assert not rolling.exists()
+
+    assert cli._rolling_models_write_dir() == rolling
+    assert rolling.is_dir()
+    assert cli._rolling_models_write_dir() != cli.PROJECT_ROOT / "config" / "models"
+    # The first write bootstraps the read side as well.
+    (rolling / "cs2-tiered-elo-v6.json").write_text("{}", encoding="utf-8")
+    assert cli._research_models_dir() == rolling
+
+
 def test_qualified_wnba_spread_uses_valid_shadow_state(monkeypatch, registry, ban_list):
     forecast = _wnba_spread_forecast(selection="home", line=10.5)
     forecast["priced_contracts"][0]["model_qualified"] = True

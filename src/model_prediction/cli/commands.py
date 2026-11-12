@@ -322,6 +322,21 @@ def _research_models_dir() -> Path:
     return PROJECT_ROOT / "config" / "models"
 
 
+def _rolling_models_write_dir() -> Path:
+    """Where retraining WRITES rating artifacts: always the rolling root.
+
+    Using _research_models_dir() as the write target made its frozen
+    fallback permanent -- nothing ever created the rolling directory, so
+    every daily run rewrote the git-tracked config/models/ artifacts
+    (found 2026-11-12: cs2/dota2/lol/rainbow_six/valorant tiered-elo-v6 and
+    kbo/npb tie-aware-elo-v2 modified on every cycle). Writes bootstrap the
+    rolling directory; reads stay rolling-first via _research_models_dir().
+    """
+    rolling = rolling_models_root(PROJECT_ROOT)
+    rolling.mkdir(parents=True, exist_ok=True)
+    return rolling
+
+
 def _clear_today_open(
     ledger, date_str: str, by_event_date: bool = False, leagues: set[str] | None = None
 ) -> list[str]:
@@ -831,7 +846,7 @@ def cmd_validate_esports(args, config, registry, bans, ledger, audit, data_root)
     output = validate_all_esports_baselines(
         data_root,
         args.titles,
-        _research_models_dir() if args.write_artifacts else None,
+        _rolling_models_write_dir() if args.write_artifacts else None,
     )
     destination = PROJECT_ROOT / args.output
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -891,7 +906,7 @@ def cmd_validate_international_baseball(args, config, registry, bans, ledger, au
     output = validate_all_international_baseball_baselines(
         data_root,
         args.leagues,
-        _research_models_dir() if args.write_artifacts else None,
+        _rolling_models_write_dir() if args.write_artifacts else None,
     )
     destination = PROJECT_ROOT / args.output
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -972,7 +987,7 @@ def cmd_validate_totals(args, config, registry, bans, ledger, audit, data_root) 
     output = validate_all_total_score_models(
         FeatureStore(data_root),
         args.sports,
-        _research_models_dir() if args.write_artifacts else None,
+        _rolling_models_write_dir() if args.write_artifacts else None,
     )
     destination = PROJECT_ROOT / args.output
     destination.parent.mkdir(parents=True, exist_ok=True)

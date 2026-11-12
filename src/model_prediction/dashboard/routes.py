@@ -118,6 +118,7 @@ from model_prediction.portfolio.manual_bet_ledger import (
     sync_manual_bets_from_polymarket,
 )
 from model_prediction.portfolio.polymarket_scanner import PolymarketSlateScanner
+from model_prediction.runtime_paths import rerouted_data_root
 
 
 def _edge_feature_enabled(component: str) -> bool:
@@ -403,7 +404,9 @@ class Handler(BaseHTTPRequestHandler):
                             except Exception:  # noqa: BLE001, S110
                                 pass
                         if all_events:
-                            capture_slate_snapshots(client, all_events, ROOT / "data", today_utc)
+                            capture_slate_snapshots(
+                                client, all_events, rerouted_data_root(ROOT / "data"), today_utc
+                            )
                     except Exception:  # noqa: BLE001, S110
                         pass
 

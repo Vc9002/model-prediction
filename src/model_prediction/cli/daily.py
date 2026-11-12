@@ -41,7 +41,7 @@ from ..main_ledgers import MultiSportPickLedger
 from ..mlb_baseline_refresh import refresh_if_due
 from ..nbl_forward import forecast_nbl_sport
 from ..research_ledgers import existing_research_ledgers
-from ..runtime_paths import RuntimePaths
+from ..runtime_paths import RuntimePaths, rerouted_data_root
 from .commands import (
     _clear_today_open,
     _polymarket_slate,
@@ -1340,7 +1340,11 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     for sport in (*LEARNED_PRODUCTION_SPORTS, "tennis", "kbo", "npb"):
         odds_sport = "esports" if sport in ESPORTS_TITLES else sport
         snap_path = (
-            Path(ledger_path(config)).parent / "odds" / odds_sport / args.date / "polymarket_snapshots.jsonl"
+            rerouted_data_root(Path(ledger_path(config)).parent)
+            / "odds"
+            / odds_sport
+            / args.date
+            / "polymarket_snapshots.jsonl"
         )
         if snap_path.exists():
             snaps = [
@@ -1462,7 +1466,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
 
             scanner = PolymarketSlateScanner(min_edge=0.025, bankroll=1000.0)
             scan_res = scanner.scan_directory(
-                base_dir=data_directory / "odds",
+                base_dir=rerouted_data_root(data_directory) / "odds",
                 require_model=True,
                 pregame_only=True,
             )

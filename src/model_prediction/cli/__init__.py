@@ -17,6 +17,7 @@ from .commands import (  # noqa: F401 -- re-export for compat
     _polymarket_slate,
     _research_models_dir,
     _rollback_pre_clear,
+    _rolling_models_write_dir,
     _row_artifact_qualified,
     _summary,
     _verify_chain,

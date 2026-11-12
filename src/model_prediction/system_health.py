@@ -332,10 +332,16 @@ def _source_capture(repo_root: Path) -> dict[str, Any]:
     return capture
 
 
-def _market_capture(repo_root: Path) -> dict[str, Any]:
-    """Latest Polymarket snapshot date per sport from data/odds/."""
+def _market_capture(runtime_root: Path) -> dict[str, Any]:
+    """Latest Polymarket snapshot date per sport from the runtime root's odds/.
+
+    Capture writes under the runtime root (cli.commands reroutes the legacy
+    repo-local data/ there); reading the checkout's data/odds flagged every
+    sport stale for 8 days after the 2026-11-04 move with nothing actually
+    wrong.
+    """
     markets: dict[str, Any] = {}
-    odds_root = repo_root / "data" / "odds"
+    odds_root = Path(runtime_root) / "odds"
     if not odds_root.is_dir():
         return markets
     for sport_dir in sorted(p for p in odds_root.iterdir() if p.is_dir()):
@@ -522,7 +528,7 @@ def system_health(
         degrade(flag)
     report["checks"]["game_capture"] = capture
 
-    markets = _market_capture(root)
+    markets = _market_capture(paths.runtime_root)
     market_flags = _flag_market_staleness(markets)
     for flag in market_flags:
         degrade(flag)

@@ -77,7 +77,7 @@ from ..production_registry import ProductionModelRegistry, compute_artifact_hash
 from ..runtime_paths import RuntimePaths
 from ..soccer_forward import build_soccer_total_slate
 from ..tennis_forward import build_tennis_slate
-from .commands import _clear_today_open, _research_models_dir
+from .commands import _clear_today_open, _research_models_dir, _rolling_models_write_dir
 from .forecast_market_select import (
     _load_market_residual_model,
     _nba_volatility_features,
@@ -416,7 +416,7 @@ def _refresh_esports_ratings(data_root) -> dict:
     """
     titles = tuple(TITLE_SPECS)
     backfill_results = {title: refresh_recent_matches(data_root, title) for title in titles}
-    validation = validate_all_esports_baselines(data_root, titles, _research_models_dir())
+    validation = validate_all_esports_baselines(data_root, titles, _rolling_models_write_dir())
     # Keep the dashboard's evidence-consistency report in sync with the
     # artifacts it describes -- otherwise it goes stale again the moment new
     # matches merge in, since it's read as a pinned snapshot elsewhere
@@ -438,7 +438,9 @@ def _refresh_international_baseball_ratings(data_root) -> dict:
     backfill_results = {
         league: refresh_recent_international_baseball_matches(data_root, league) for league in leagues
     }
-    validation = validate_all_international_baseball_baselines(data_root, leagues, _research_models_dir())
+    validation = validate_all_international_baseball_baselines(
+        data_root, leagues, _rolling_models_write_dir()
+    )
     report_path = PROJECT_ROOT / "outputs/latest/international-baseball-baseline-validation.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(
