@@ -1,6 +1,8 @@
 import json
 from types import SimpleNamespace
 
+import pytest
+
 from model_prediction.portfolio import ncaab_paper_trial as trial
 from model_prediction.portfolio.auto_executor import (
     AutoExecutionConfig,
@@ -67,6 +69,9 @@ def test_trial_runner_passes_only_exact_cohort_to_paper_buyer(tmp_path, monkeypa
     monkeypatch.setattr(trial, "read_flat_picks", list)
     monkeypatch.setattr(trial, "settle_auto_buyer_ledger", lambda **_: None)
     monkeypatch.setattr(trial, "load_auto_buyer_state", lambda: {"max_event_lookahead_hours": 1.0})
+    # Stop this test from reading/creating the operator's real runtime paper ledger.
+    monkeypatch.setattr(trial, "PAPER_AUTO_BUYER_DATA_ROOT", tmp_path / "paper_auto_buyer")
+    monkeypatch.setattr(trial, "capture_unmapped_cohort_markets", lambda picks, root: 0)
     captured = {}
 
     class PaperBuyer:
@@ -223,6 +228,35 @@ def test_held_game_blocks_moved_line_opposite_side_and_missing_event_id(tmp_path
 
     assert result["candidates"] == 0
     assert captured["picks"] == []
+
+
+def test_same_game_passes_once_per_cycle(tmp_path, monkeypatch):
+    """main and flat ledgers can both carry an open pick for the same game
+    under different pick_ids; only the first occurrence should reach the buyer."""
+    first = _vmi_pick("first")
+    second = _vmi_pick("second")
+    _paper_root, captured = _install_cohort(tmp_path, monkeypatch, picks=[first], flat_picks=[second])
+
+    result = trial.run_ncaab_spread_paper_trial()
+
+    assert result["candidates"] == 1
+    assert [p["pick_id"] for p in captured["picks"]] == ["first"]
+
+
+def test_unreadable_paper_ledger_fails_closed(tmp_path, monkeypatch):
+    """An existing-but-unreadable shared paper ledger must block this cycle's
+    buys entirely (fail closed), never silently treat every game as unbought."""
+    paper_root, captured = _install_cohort(tmp_path, monkeypatch, picks=[_vmi_pick("x")])
+    # A directory at the ledger path raises PermissionError on Windows and
+    # IsADirectoryError on Linux CI when opened for reading -- both are OSError
+    # subclasses, so no monkeypatch of the reader itself is needed.
+    (paper_root / "auto_buyer_ledger.jsonl").mkdir()
+
+    with pytest.raises(OSError):
+        trial.run_ncaab_spread_paper_trial()
+
+    assert "config" not in captured
+    assert "picks" not in captured
 
 
 def test_unmapped_cohort_pick_captures_only_its_own_contract(tmp_path):

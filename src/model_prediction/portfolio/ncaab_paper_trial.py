@@ -189,14 +189,18 @@ def _paper_position_keys(row: dict[str, Any]) -> set[tuple[str, ...]]:
 
 
 def _recorded_paper_dedup_keys(paper_root: Any) -> set[tuple[str, ...]]:
-    """Game-market identity of every fill already recorded in the shared paper ledger."""
+    """Game-market identity of every fill already recorded in the shared paper ledger.
+
+    A ledger that does not exist yet legitimately means nothing has been
+    recorded. But once the file exists, a read failure must propagate instead
+    of being swallowed into an empty index -- an empty index makes every
+    recorded game look unbought, which re-opens the duplicate buy this module
+    just closed.
+    """
     path = paper_root / "auto_buyer_ledger.jsonl"
     if not path.exists():
         return set()
-    try:
-        rows = read_auto_buyer_ledger(path)
-    except (OSError, ValueError, KeyError, TypeError):
-        return set()
+    rows = read_auto_buyer_ledger(path)
     keys: set[tuple[str, ...]] = set()
     for row in rows:
         if not isinstance(row, dict):
@@ -237,7 +241,7 @@ def run_ncaab_spread_paper_trial() -> dict[str, Any]:
     # way on 2026-11-11. Seed the exclusion set from the shared paper
     # ledger's own game-market identity instead.
     already_recorded = _recorded_paper_dedup_keys(paper_root)
-    seen: set[str] = set()
+    seen: set[tuple[str, ...]] = set()
     picks: list[dict[str, Any]] = []
     for row in read_picks() + read_flat_picks():
         if row.get("status") != "open":
@@ -245,11 +249,12 @@ def run_ncaab_spread_paper_trial() -> dict[str, Any]:
         if not eligible_trial_pick(row, min_edge=min_edge, max_edge=max_edge):
             continue
         pick_id = str(row.get("pick_id") or "")
-        if not pick_id or pick_id in seen:
+        if not pick_id:
             continue
-        if _paper_position_keys(row) & already_recorded:
+        keys = _paper_position_keys(row)
+        if keys & already_recorded or keys & seen:
             continue
-        seen.add(pick_id)
+        seen |= keys
         picks.append(row)
 
     captured_markets = capture_unmapped_cohort_markets(picks, runtime)
