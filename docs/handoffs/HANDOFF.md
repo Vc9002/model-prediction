@@ -378,6 +378,10 @@ real, committed changes to the live champion `cfb-structural-v4`:
   ask beats both old and fixed model, fixed-model fires 98 Flat (51.0%, −6.14u), totals 40.9%.
   Decisions owed: pause Main NCAAF totals; v5 margin_sd/HFA retune as a walk-forward challenger;
   re-evidence the `predictively_qualified` label.
+- v5 challenger built 2026-11-12 (`d86876e7`, `models/cfb_structural_v5.py`, `config/models/cfb-structural-v5.json`,
+  research status): fitted margin/total mean calibration + residual SD table; holdout Brier 0.18933 vs 0.19056
+  (CI includes zero), margin/total log scores significantly better, slope 0.98 vs 1.19. Owed: register it as the
+  NCAAF challenger in `config/production.yaml` so it produces shadow rows; promotion only via the ROADMAP rule.
 
 ## Done when
 

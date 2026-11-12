@@ -162,6 +162,16 @@ What this means:
 
 See `docs/DEBUG.md` (2026-11-12 NCAAF entry) for the full record. In short: `build_cfb_slate` now serves `CFBStructuralV4Model` built from the artifact (`cfb_model()`), so the 14.5 margin SD, conference scaling and total-SD widening described in §1 to §4 are what production prices; Polymarket quotes use the newest capture per market and require both asks; the artifact's gates are enforced on Main (§1); neutral-site weather resolves from ESPN's venue and bowls use a fully decayed prior week; the QB starter channel is populated from the daily ESPN injuries snapshot joined to the scoreboard passing leader (sparse feed, fail-closed to "no evidence"); simulations run at 200k draws; `code_revision` hashes the serving source. Regression tests: `tests/test_cfb_serving_parity.py`.
 
+## 11. cfb-structural-v5 challenger (2026-11-12, research, not registered)
+
+Built from the replay evidence in §10 by `scripts/cfb_v5_research.py` (walk-forward 60/20/20 on complete kickoff dates: train 4,842 games 2016-08-27→2022-11-11, validation 1,591 →2024-11-14, locked holdout 1,527 →2026-11-12; fitted on train only, variant selected on validation, holdout scored once with the real engine). Class `models/cfb_structural_v5.py`, artifact `config/models/cfb-structural-v5.json` (status research).
+
+Three fitted layers on top of v4's point-in-time projection: margin mean `m' = -0.4143 + 1.3189·m` and total mean `t' = -5.6336 + 1.1017·t` (v4's margins were compressed: reliability slope 1.19); margin SD from realized residuals per slice (established ≥ 6 games 17.499, thin 17.125, FBS-vs-FCS 19.731, conference scale 0.9641) replacing the 14.5 × uncertainty widening; total SD 17.288 with no uncertainty widening. Blowout-line and total-deviation widening carried over unevaluated (no historical lines).
+
+Locked holdout (1,527 games), v5 vs v4: moneyline Brier 0.18933 vs 0.19056 (date-clustered 95% CI on the delta [-0.00262, +0.00024], not excluding zero); reliability slope 0.981 vs 1.189; margin Gaussian log score +0.0184 [+0.0043, +0.0330] and total log score +0.0129 [+0.0063, +0.0196] (both exclude zero); 80% margin interval coverage 0.817 vs 0.774; home margin bias 1.25 vs 1.92 points. On the 1,610 settled ledger rows re-priced at recorded asks, v5's gated fires: Flat moneyline 32 at 68.8% (+1.11u), spread 29 at 58.6% (+3.79u), total 48 at 43.8% (−7.99u); Main total 108 at 45.4% (−13.91u). Totals still lose at consensus asks under both models.
+
+What this does and does not show: the distribution is better calibrated (variance and mean), so spread probabilities are no longer overconfident; the moneyline gain is small and not significant; totals remain unprofitable against the recorded asks, which no SD change fixes. Next steps are governance: register v5 as the NCAAF challenger in `config/production.yaml` so it produces shadow rows, keep Main totals paused, and promote only via the ROADMAP promotion rule after shadow evidence. Report: `outputs/ncaaf/cfb_v5_research.md`.
+
 ## 9. First Real Market-Relative Backtest (2026-11-05)
 
 Every prior backtest in this document (§5, and the `college-football-v1` /
