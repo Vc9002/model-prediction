@@ -4,10 +4,10 @@ current_phase: 1
 current_phase_name: Portfolio Circuit Breaker
 status: planning
 stopped_at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated to 4-phase structure
-last_updated: "2026-11-12T04:34:24.260Z"
-last_activity: 2026-09-22
+last_updated: "2026-11-12T05:01:41.297Z"
+last_activity: 2026-11-11
 last_activity_desc: ROADMAP.md and STATE.md created from REQUIREMENTS.md and research/SUMMARY.md
-state_head: 3ca0a4c5b0d1a17b0719c298e3a86be7fc09c807
+state_head: b2ad1781cd0f9d4767a94edb3750314c80d4a11d
 progress:
   total_phases: 4
   completed_phases: 0
@@ -45,7 +45,7 @@ See: .planning/PROJECT.md (updated 2026-09-20 after initialization)
 Phase: 1 of 4 (Portfolio Circuit Breaker)
 Plan: None yet in current phase
 Status: Ready to plan
-Last activity: 2026-11-11 - Completed quick task 261111-w1m: Fix scripts/audit_best_picks.py: audit_candidate hardcodes CONFIRMED_BEST for NBA spread >=8% edge dogs, NCAAB overs 8-12%, and NCAAB moneyline without checking the ledger. Replace the hardcoded overrides with a live recompute of bucket win/loss stats from ledgers.db, and require market_quote_provenance == decision_time_executable_quote for a verdict to count. Reconcile docs/BEST_PICKS_AUDIT_FRAMEWORK.md's existing uncommitted edits first, then update it to match the new logic.
+Last activity: 2026-11-12 - Completed quick task 261111-wv9: Exclude MANUAL-* buyer-ledger rows from auto-buyer performance summary, model quarantine ROI, and dashboard KPIs.
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -88,6 +88,7 @@ None yet.
 | 261111-o7p | Fix auto-buyer rejection telemetry miscategorization and add state-file conflict detection | 2026-11-11 | d349715b | [261111-o7p-fix-auto-buyer-rejection-telemetry-misca](./quick/261111-o7p-fix-auto-buyer-rejection-telemetry-misca/) |
 | 261111-tx4 | Fix NCAAB paper-trial duplicate-buy bug: dedup keyed only on pick_id misses re-forecast churn of the same game/selection/line | 2026-11-11 | 69856d6b | [261111-tx4-fix-ncaab-paper-trial-duplicate-buy-bug-](./quick/261111-tx4-fix-ncaab-paper-trial-duplicate-buy-bug-/) |
 | 261111-w1m | Fix scripts/audit_best_picks.py hardcoded CONFIRMED_BEST overrides; recompute verdicts live from ledgers.db with verified-quote gate | 2026-11-11 | 3ca0a4c5 | [261111-w1m-fix-scripts-audit-best-picks-py-audit-ca](./quick/261111-w1m-fix-scripts-audit-best-picks-py-audit-ca/) |
+| 261111-wv9 | Exclude MANUAL-* buyer-ledger rows from auto-buyer performance summary, model quarantine ROI, and dashboard KPIs | 2026-11-12 | b2ad1781 | [261111-wv9-audit-every-script-that-computes-model-e](./quick/261111-wv9-audit-every-script-that-computes-model-e/) |
 
 ## Milestone History
 
