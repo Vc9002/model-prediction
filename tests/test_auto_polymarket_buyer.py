@@ -831,6 +831,35 @@ def test_underperforming_quarantine_is_scoped_to_ledger_and_latest_settlements(t
     assert model_id in _get_quarantined_underperforming_models(paper_root)
 
 
+def test_underperforming_quarantine_ignores_manual_rows(tmp_path: Path):
+    now = utc_now()
+    model_id = "test-model-v1"
+
+    def settled_row(settled_at, pnl, *, manual=False):
+        row = {
+            "model_id": "manual" if manual else model_id,
+            "status": "settled",
+            "settled_at_utc": iso_utc(settled_at),
+            "cost_usd": 1.0,
+            "pnl_usd": pnl,
+        }
+        if manual:
+            row["manual"] = True
+            row["pick_id"] = f"MANUAL-slug-{settled_at.timestamp()}"
+            row["order_id"] = f"MANUAL-slug-{settled_at.timestamp()}"
+        return row
+
+    ledger = tmp_path / "auto_buyer_ledger.jsonl"
+    rows = [settled_row(now - timedelta(hours=hour), -1.0, manual=True) for hour in range(15)] + [
+        settled_row(now - timedelta(hours=hour), -1.0) for hour in range(15)
+    ]
+    ledger.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+
+    quarantined = _get_quarantined_underperforming_models(tmp_path)
+    assert model_id in quarantined
+    assert "manual" not in quarantined
+
+
 def test_buyer_sizes_fractional_units(tmp_path: Path):
     now = utc_now()
     today_start = iso_utc(now + timedelta(hours=2))

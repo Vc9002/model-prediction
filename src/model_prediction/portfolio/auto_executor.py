@@ -1128,6 +1128,7 @@ def _get_quarantined_underperforming_models(
     """
     from model_prediction.portfolio.auto_buyer_ledger import (
         _is_settled_auto_buyer_record,
+        is_manual_auto_buyer_record,
         read_auto_buyer_ledger,
     )
 
@@ -1140,6 +1141,10 @@ def _get_quarantined_underperforming_models(
 
     by_model: dict[str, list[dict[str, Any]]] = {}
     for r in all_rows:
+        # MANUAL rows are hand-placed and carry no model edge; grouping them made a
+        # fake "manual" model that could show up in quarantined_models.
+        if is_manual_auto_buyer_record(r):
+            continue
         if _is_settled_auto_buyer_record(r):
             m = str(r.get("model_id") or r.get("model_version") or "")
             if m:
