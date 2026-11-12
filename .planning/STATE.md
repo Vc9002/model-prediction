@@ -4,10 +4,10 @@ current_phase: 1
 current_phase_name: Portfolio Circuit Breaker
 status: planning
 stopped_at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated to 4-phase structure
-last_updated: "2026-11-12T19:33:58.830Z"
+last_updated: "2026-11-12T19:54:54.262Z"
 last_activity: 2026-11-12
 last_activity_desc: ROADMAP.md and STATE.md created from REQUIREMENTS.md and research/SUMMARY.md
-state_head: 9c0223117efa8537fd3f85c47d43dc346a5df139
+state_head: 9bf925e4cd1df3cb7a2ca3b3db373f4ff57bea99
 progress:
   total_phases: 4
   completed_phases: 0
@@ -45,7 +45,7 @@ See: .planning/PROJECT.md (updated 2026-09-20 after initialization)
 Phase: 1 of 4 (Portfolio Circuit Breaker)
 Plan: None yet in current phase
 Status: Ready to plan
-Last activity: 2026-11-12 - Completed quick task 261112-2s6: Edge scanner's _lookup_model_prob now requires exact same-UTC-date match instead of an unbounded cross-date fallback (live data: 1,070/6,037 matches, ~17.7%, were genuinely different events). All four operator-approved follow-up items from the ledger-improvement plan are now resolved.
+Last activity: 2026-11-12 - Completed quick task 261112-kj3: refit NBA moneyline as nba-elo-trend-lr-v5 through validate-models, registered as challenger (shadow, historical_only); indistinguishable from v4 on identical holdout rows, promotion left to operator.
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -100,6 +100,7 @@ None yet.
 | 261112-2s7 | Widen xlsx_ledger.py except clause to BaseException; add crash-safe orphan temp-file sweep to both xlsx_ledger.py and model_ledger.py; document real leak root cause (hard worker-timeout kill, not just the except asymmetry) | 2026-11-12 | 0a934d6e | [261112-2s7-an-except-exception-src-model-prediction](./quick/261112-2s7-an-except-exception-src-model-prediction/) |
 | 261112-2s5 | Make auto-buyer bought-index fail closed on any unreadable dedup source, aggregating all failures, instead of silently treating a read error as an empty index | 2026-11-12 | 5298dd33 | [261112-2s5-build-bought-index-in-src-model-predicti](./quick/261112-2s5-build-bought-index-in-src-model-predicti/) |
 | 261112-2s6 | Require exact same-UTC-date match in edge scanner's _lookup_model_prob instead of an unbounded cross-date fallback; live data showed 1,070/6,037 matches (17.7%) were genuinely different events | 2026-11-12 | 9c022311 | [261112-2s6-src-model-prediction-portfolio-polymarke](./quick/261112-2s6-src-model-prediction-portfolio-polymarke/) |
+| 261112-kj3 | Refit NBA moneyline as nba-elo-trend-lr-v5 (walk-forward, restored fit construction); registered as challenger, not promoted; same-holdout Brier 0.1889 vs v4 0.1892 | 2026-11-12 | 9bf925e4 | [261112-kj3-refit-nba-moneyline-nba-elo-trend-lr-v5-](./quick/261112-kj3-refit-nba-moneyline-nba-elo-trend-lr-v5-/) |
 
 ## Milestone History
 
