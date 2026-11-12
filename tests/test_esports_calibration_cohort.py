@@ -70,10 +70,25 @@ def test_extract_preserves_zero_probability_and_separate_tiers(monkeypatch, tmp_
     monkeypatch.setattr(
         pipeline, "MultiSportPickLedger", lambda *a, **k: SimpleNamespace(_ledgers={"cs2": ledger})
     )
-    monkeypatch.setattr(pipeline, "existing_research_ledgers", lambda *_: [])
     groups = pipeline.extract_settled_model_predictions(tmp_path)
     assert groups[("cs2", "moneyline", "cs2-tiered-elo-v6", "flat")] == ([0.0], [1])
     assert groups[("cs2", "moneyline", "cs2-tiered-elo-v6", "main")] == ([0.0], [1])
+
+
+def test_legacy_research_ledger_is_not_calibration_evidence(monkeypatch, tmp_path):
+    live_rows = [row()]
+    live_ledger = SimpleNamespace(rows=lambda: live_rows)
+    monkeypatch.setattr(
+        pipeline, "MultiSportPickLedger", lambda *a, **k: SimpleNamespace(_ledgers={"cs2": live_ledger})
+    )
+    # Frozen research tier (merged into Flat/Main 2026-10-22) must never re-enter
+    # extraction as its own group, even if the enumerator still exists and returns rows.
+    frozen_ledger = SimpleNamespace(path=tmp_path / "research" / "cs2.xlsx", rows=lambda: [row("e9")])
+    monkeypatch.setattr(pipeline, "existing_research_ledgers", lambda *_: [frozen_ledger], raising=False)
+    groups = pipeline.extract_settled_model_predictions(tmp_path)
+    assert all(tier not in ("research", "gated") for (*_, tier) in groups)
+    assert ("cs2", "moneyline", "cs2-tiered-elo-v6", "flat") in groups
+    assert ("cs2", "moneyline", "cs2-tiered-elo-v6", "main") in groups
 
 
 def test_canonical_flat_artifact_beats_larger_retired_esports_tier(monkeypatch, tmp_path):
@@ -135,7 +150,6 @@ def test_empty_eligible_flat_retains_authority(monkeypatch, tmp_path):
     monkeypatch.setattr(
         pipeline, "MultiSportPickLedger", lambda *a, **k: SimpleNamespace(_ledgers={"cs2": ledger})
     )
-    monkeypatch.setattr(pipeline, "existing_research_ledgers", lambda *_: [])
     groups = pipeline.extract_settled_model_predictions(tmp_path)
     assert groups[("cs2", "moneyline", "cs2-tiered-elo-v6", "flat")] == ([], [])
     pipeline.run_full_calibration_pipeline(

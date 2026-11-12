@@ -33,7 +33,6 @@ from .calibration import (
 )
 from .config import PROJECT_ROOT
 from .main_ledgers import MultiSportPickLedger
-from .research_ledgers import existing_research_ledgers
 
 logger = logging.getLogger("model_prediction.calibration")
 
@@ -213,13 +212,9 @@ def extract_settled_model_predictions(
     except (OSError, ValueError, TypeError) as exc:
         logger.warning("Error reading flat ledgers: %s", exc)
 
-    # 3. Research Ledgers
-    try:
-        for r_ledger in existing_research_ledgers(root):
-            tier = "gated" if "gated" in str(r_ledger.path).lower() else "research"
-            _ingest_rows(r_ledger.rows(), tier)
-    except (OSError, ValueError, TypeError) as exc:
-        logger.warning("Error reading research ledgers: %s", exc)
+    # research/gated_research have been frozen since 2026-10-22; their settled
+    # history already lives in Flat/Main (merge dry-run 2026-11-12: to copy 0).
+    # Ingesting them here let a frozen cohort drive live drift status.
 
     return results
 
@@ -491,7 +486,7 @@ def run_full_calibration_pipeline(
     if update_artifacts:
         models_dir = cal_data_dir / "models"
         models_dir.mkdir(parents=True, exist_ok=True)
-        # The same settled picks sit in several ledger tiers (main/flat/research),
+        # The same settled picks sit in both ledger tiers ingested here (main/flat),
         # so a model has several records per market. One artifact per
         # (model_version, market): canonical Flat wins for esports, otherwise
         # the largest sample wins. Identity also replaces stale fitted files.
