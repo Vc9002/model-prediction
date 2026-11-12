@@ -1208,6 +1208,15 @@ def _auto_buyer_start_order(row: dict[str, Any]) -> tuple[float, str]:
     return timestamp, str(row.get("pick_id") or "")
 
 
+class BoughtIndexUnavailableError(RuntimeError):
+    """Raised when one or more of ``_build_bought_index``'s dedup sources
+    could not be read this cycle. A partial index would make an already-
+    bought position look unbought to ``_is_already_bought``, so the caller
+    must treat the whole cycle as blocked (fail-closed, across every sport)
+    rather than trust an incomplete result.
+    """
+
+
 class AutoPolymarketBuyer:
     """Automated buyer executing qualified model picks with risk gates."""
 
@@ -1255,6 +1264,8 @@ class AutoPolymarketBuyer:
         partially_filled_matchup_markets: set[tuple[str, str, str, str]] = set()
         partially_filled_slugs: set[str] = set()
 
+        failures: list[tuple[str, str]] = []
+
         # 1. Audit logs (self.audit, data_root / audit.jsonl, data_root / audit_log.jsonl)
         audit_paths = [self.audit.path, self.data_root / "audit.jsonl", self.data_root / "audit_log.jsonl"]
         seen_paths: set[Path] = set()
@@ -1291,8 +1302,9 @@ class AutoPolymarketBuyer:
                                 sel = str(payload.get("selection") or "").lower()
                                 if ev_id and sel:
                                     bought_event_selections.add((ev_id, sel))
-            except OSError:
-                pass
+            except OSError as exc:
+                logger.warning("Failed to read audit log %s for bought-index build: %s", log_path, exc)
+                failures.append((f"audit_log:{log_path}", str(exc)))
 
         # 2. Dashboard orders file (dashboard/orders.json)
         dashboard_orders_file = _paths.repo_root / "dashboard" / "orders.json"
@@ -1318,8 +1330,13 @@ class AutoPolymarketBuyer:
                         sel = str(ord_entry.get("selection") or "").lower()
                         if ev_id and sel:
                             bought_event_selections.add((ev_id, sel))
-            except (json.JSONDecodeError, OSError):
-                pass
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.warning(
+                    "Failed to read dashboard orders file %s for bought-index build: %s",
+                    dashboard_orders_file,
+                    exc,
+                )
+                failures.append(("dashboard_orders_file", str(exc)))
 
         # 3. Polymarket edge ledger (data/polymarket_picks.xlsx)
         poly_ledger_file = self.data_root / "polymarket_picks.xlsx"
@@ -1336,17 +1353,22 @@ class AutoPolymarketBuyer:
                     sel = str(r.get("selection") or "").lower()
                     if ev_id and sel:
                         bought_event_selections.add((ev_id, sel))
-            except (OSError, ValueError, KeyError, TypeError, RuntimeError):
-                pass
+            except (OSError, ValueError, KeyError, TypeError, RuntimeError) as exc:
+                logger.warning(
+                    "Failed to read polymarket_picks.xlsx %s for bought-index build: %s",
+                    poly_ledger_file,
+                    exc,
+                )
+                failures.append(("polymarket_picks_xlsx", str(exc)))
 
         # 3b. Dedicated Auto-Buyer Ledger, live and paper (both must be indexed
         # so paper mode never re-buys a pick it already recorded a paper fill
         # for, and switching modes mid-day can't double-buy the same pick).
         auto_ledger_files = [
-            self.data_root / "auto_buyer_ledger.jsonl",
-            self.paper_data_root / "auto_buyer_ledger.jsonl",
+            (self.data_root / "auto_buyer_ledger.jsonl", "live_auto_buyer_ledger"),
+            (self.paper_data_root / "auto_buyer_ledger.jsonl", "paper_auto_buyer_ledger"),
         ]
-        for auto_ledger_file in auto_ledger_files:
+        for auto_ledger_file, source_label in auto_ledger_files:
             if not auto_ledger_file.exists():
                 continue
             try:
@@ -1453,8 +1475,14 @@ class AutoPolymarketBuyer:
                         bought_matchup_markets.add(m_key)
                         if sel:
                             bought_matchup_selections.add((*m_key, sel.strip().lower()))
-            except (OSError, ValueError, KeyError, TypeError, RuntimeError):
-                pass
+            except (OSError, ValueError, KeyError, TypeError, RuntimeError) as exc:
+                logger.warning(
+                    "Failed to read auto-buyer ledger %s (%s) for bought-index build: %s",
+                    auto_ledger_file,
+                    source_label,
+                    exc,
+                )
+                failures.append((source_label, str(exc)))
 
         # 4. Live Polymarket US account positions
         if self.config.execute_live and os.environ.get("POLYMARKET_KEY_ID") and self._live_quote_fn is None:
@@ -1468,8 +1496,11 @@ class AutoPolymarketBuyer:
                             held_events.add(event_key_from_slug(str(pos_slug)))
                         if qty > 0:
                             held_slugs.add(str(pos_slug))
-            except (OSError, ValueError, KeyError, TypeError, ExecutionGateError, RuntimeError):
-                pass
+            except (OSError, ValueError, KeyError, TypeError, ExecutionGateError, RuntimeError) as exc:
+                logger.warning(
+                    "Failed to read live Polymarket account positions for bought-index build: %s", exc
+                )
+                failures.append(("live_polymarket_positions", str(exc)))
 
         # Exclude partially filled positions from hard lockouts so they remain eligible for remainder top-up
         bought_pick_ids.difference_update(partially_filled_pick_ids)
@@ -1478,6 +1509,14 @@ class AutoPolymarketBuyer:
         bought_event_markets.difference_update(partially_filled_event_markets)
         bought_matchup_markets.difference_update(partially_filled_matchup_markets)
         held_slugs.difference_update(partially_filled_slugs)
+
+        if failures:
+            detail = "; ".join(f"{name}: {msg}" for name, msg in failures)
+            raise BoughtIndexUnavailableError(
+                f"Bought-index build failed-closed for {len(failures)} dedup source(s): {detail} -- "
+                "blocking every buy for this cycle, across every sport, because a partial index risks "
+                "re-buying an already-held position."
+            )
 
         return {
             "pick_ids": bought_pick_ids,
