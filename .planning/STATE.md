@@ -4,10 +4,10 @@ current_phase: 1
 current_phase_name: Portfolio Circuit Breaker
 status: planning
 stopped_at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated to 4-phase structure
-last_updated: "2026-11-12T05:51:07.352Z"
+last_updated: "2026-11-12T06:35:19.065Z"
 last_activity: 2026-11-12
 last_activity_desc: ROADMAP.md and STATE.md created from REQUIREMENTS.md and research/SUMMARY.md
-state_head: b2ff76a1a229c9b11e3089aa7ea6c888607b5db6
+state_head: 222584ed5831b24469476b537195d0ca88bb210d
 progress:
   total_phases: 4
   completed_phases: 0
@@ -91,6 +91,7 @@ None yet.
 | 261111-wv9 | Exclude MANUAL-* buyer-ledger rows from auto-buyer performance summary, model quarantine ROI, and dashboard KPIs | 2026-11-12 | b2ad1781 | [261111-wv9-audit-every-script-that-computes-model-e](./quick/261111-wv9-audit-every-script-that-computes-model-e/) |
 | 261112-01r | Audit legacy research/gated_research tier readers; fix calibration pipeline and edge scanner treating frozen rows as live evidence | 2026-11-12 | 8a544cbb | [261112-01r-audit-every-remaining-reader-of-the-lega](./quick/261112-01r-audit-every-remaining-reader-of-the-lega/) |
 | 261112-0li | Generalize NCAAB dedup fix audit: confirmed no other sport has the bug; added mutation-proven regression tests pinning main-buyer identity dedup | 2026-11-12 | b2ff76a1 | [261112-0li-commits-b7a25ddf-69856d6b-5e2212ef-fixed](./quick/261112-0li-commits-b7a25ddf-69856d6b-5e2212ef-fixed/) |
+| 261112-118 | Add process-local threading.Lock to ledger.py for intra-process mutation contention; document deferred XLSX-rebuild-split decision | 2026-11-12 | 222584ed | [261112-118-in-ledger-py-1-every-ledger-mutation-tak](./quick/261112-118-in-ledger-py-1-every-ledger-mutation-tak/) |
 
 ## Milestone History
 
