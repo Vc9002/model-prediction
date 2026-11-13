@@ -105,7 +105,7 @@ None yet.
 | 261112-mpz | Full pipeline verification: reroute health/daily/dashboard odds readers to the runtime root, stop the schedule rewriting frozen config/models artifacts, single-thread BLAS in ingestion | 2026-11-12 | c96f28cf | [261112-mpz-fix-odds-root-split-brain-and-frozen-art](./quick/261112-mpz-fix-odds-root-split-brain-and-frozen-art/) |
 | 261113-r2d | Disable NBA totals in the auto-buyer: nba:total categorical gate + nba-total-margin-v9 off the whitelist; live state updated (v173->v174); 11 settled NBA total paper rows left in place | 2026-11-13 | c3522f2a | [261113-r2d-disable-nba-totals-in-the-paper-auto-buyer](./quick/261113-r2d-disable-nba-totals-in-the-paper-auto-buyer/) |
 | 261113-j3m | Promote nba-elo-trend-lr-v5 to NBA moneyline champion (promo-20261113T184744Z-6b0b74); v4 rollback; model.yaml serving pointer moved with it | 2026-11-13 | ec3210a2 | [261113-j3m-promote-nba-elo-trend-lr-v5-to-nba-money](./quick/261113-j3m-promote-nba-elo-trend-lr-v5-to-nba-money/) |
-| 261113-jb1 | Harden RuntimeLedgerStore against transient sqlite disk I/O error under memory pressure | 2026-11-13 | 8b57f961 | [261113-jb1-harden-runtimeledgerstore-against-transi](./quick/261113-jb1-harden-runtimeledgerstore-against-transi/) |
+| 261113-jb1 | Harden RuntimeLedgerStore against transient sqlite disk I/O error under memory pressure | 2026-11-13 | de9c71c3 | [261113-jb1-harden-runtimeledgerstore-against-transi](./quick/261113-jb1-harden-runtimeledgerstore-against-transi/) |
 
 ## Milestone History
 
