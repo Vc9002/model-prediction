@@ -4,10 +4,10 @@ current_phase: 1
 current_phase_name: Portfolio Circuit Breaker
 status: planning
 stopped_at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated to 4-phase structure
-last_updated: "2026-11-13T19:16:11.416Z"
+last_updated: "2026-11-13T19:18:00.237Z"
 last_activity: 2026-11-13
 last_activity_desc: ROADMAP.md and STATE.md created from REQUIREMENTS.md and research/SUMMARY.md
-state_head: df4b3d681a6a9d6f1c7323df33f3277844d4b85a
+state_head: 31f092a95844c9d5178ebfec3f403890c99466cd
 progress:
   total_phases: 4
   completed_phases: 0
@@ -45,7 +45,7 @@ See: .planning/PROJECT.md (updated 2026-09-20 after initialization)
 Phase: 1 of 4 (Portfolio Circuit Breaker)
 Plan: None yet in current phase
 Status: Ready to plan
-Last activity: 2026-11-13 - Completed quick task 261113-jqw: whitelisted nba-elo-trend-lr-v5 in the auto-buyer (code + live state v180); buyer still rejects its PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED rows until evidence_status changes.
+Last activity: 2026-11-13 - Completed quick task 261113-jrq: Fix NBA availability feature matching foreign teams injuries via abbreviation substrings
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -110,6 +110,7 @@ None yet.
 | 261113-j4w | Promote cfb-structural-v5 to NCAAF champion (Main + Flat) via model_promotion; cfb_model() follows the champion map; replay/forecast/naming/whitelist wiring | 2026-11-13 | 02f45736 | [261113-j4w-promote-cfb-structural-v5-to-ncaaf-champ](./quick/261113-j4w-promote-cfb-structural-v5-to-ncaaf-champ/) |
 | 261113-jpw | System-usage pass: bound the dashboard parsed-snapshot cache (LRU by on-disk bytes); measured memory/disk drivers and recorded recommendations | 2026-11-13 | 4fb785cd | [261113-jpw-bound-the-dashboard-parsed-snapshot-cache](./quick/261113-jpw-bound-the-dashboard-parsed-snapshot-cache/) |
 | 261113-jqw | Whitelist nba-elo-trend-lr-v5 in the auto-buyer (code constant via 4fb785cd + live auto_buyer_state.json v179->180); inert until evidence_status leaves historical_only | 2026-11-13 | df4b3d68 | [261113-jqw-whitelist-the-serving-nba-moneyline-cham](./quick/261113-jqw-whitelist-the-serving-nba-moneyline-cham/) |
+| 261113-jrq | Fix NBA availability feature matching foreign teams injuries via abbreviation substrings | 2026-11-13 | 31f092a9 | [261113-jrq-fix-nba-availability-feature-matching-fo](./quick/261113-jrq-fix-nba-availability-feature-matching-fo/) |
 
 ## Milestone History
 
