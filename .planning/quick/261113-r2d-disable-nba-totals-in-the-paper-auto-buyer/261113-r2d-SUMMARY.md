@@ -37,3 +37,20 @@ commit: c3522f2a
   `ncaaf:*` in `disabled_sport_markets` that the code constant does not. The persisted copy
   wins at runtime; any future "remove model X from the whitelist" code change must also
   edit the state file or it is a no-op in production.
+
+## Follow-up 2026-11-13 (commit a67061dc)
+
+Operator directives after the state-drift investigation: "ncaaf can be whitelisted" and
+"keep nba spread".
+
+- Live state version 176 -> 177 (backup `auto_buyer_state.json.pre-ncaaf-enable-nba-spread-keep-*`):
+  `ncaaf:moneyline/spread/total` removed from `disabled_sport_markets`; `cfb-structural-v5`
+  (NCAAF champion on all three markets since 02f45736) and `nba-spread-margin-v9` added to
+  `whitelist_models`. `nba:total` stays disabled.
+- Code: `nba-spread-margin-v9` restored in `DEFAULT_WHITELIST_MODELS`, reversing the
+  same-day pull in c648e048 (quick-261113-jf1); its two test pins flipped.
+- Effective executable set now: cfb-structural-v5, nba-spread-margin-v9, NFL v7 spread/total,
+  plus the dormant WNBA and MLB entries.
+- Investigation record: state lists are seeded from code once (2026-11-09) and never resynced;
+  the `ncaaf:*` disable was a 2026-11-10 22:29 hand edit with no commit or doc; lr-v4,
+  nfl-elo-trend-lr-v4 and mlb-structural-v10-frozen sit in both state lists (blacklist wins).
