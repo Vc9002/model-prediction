@@ -58,6 +58,15 @@ Holdout (n = 742, mostly the 2026-11 early-season window): margin MAE 17.76 -> 1
 - Deployment check: the 19:05Z daily's 68 Flat rows are reproduced exactly by the deployed
   round-1 artifact model.
 
+## Round 3 — Main totals + box-score pipeline (2026-11-13, operator request)
+
+- Main totals restored (`df37969f`) under the spread/moneyline conditions plus the sample gate;
+  `models.NCAAB.main_totals_enabled` added as the pause lever; 5 tests in
+  `tests/test_ncaab_main_totals.py`.
+- Box-score capture was already live daily; backfilled 2025-26 + 2026-11-02 (6,483/6,484 games).
+- `features/ncaab_possessions.py` + `tempo_source="possessions"`: validation-indistinguishable
+  from the attempts proxy; artifacts unchanged. 8 new tests pass.
+
 ## Open (recorded in HANDOFF §1)
 
 Early-season under-dispersion (both markets), Elo ramp, retention 0.2 vs 0.35 — need a second

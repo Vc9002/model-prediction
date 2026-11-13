@@ -1,20 +1,20 @@
 {
-  "generated_at_utc": "2026-11-12T19:52:59.854979+00:00",
+  "generated_at_utc": "2026-11-13T18:57:21.307959+00:00",
   "gate": {
     "status": "pass",
-    "rows": 68,
+    "rows": 132,
     "mismatches": 0,
     "matched_by": {
-      "deployed_artifact": 68
+      "deployed_artifact": 132
     },
-    "created_at_utc": "2026-11-12T19:05:06.584772Z",
+    "created_at_utc": "2026-11-13T17:05:34.093977Z",
     "table": [
       {
         "model": "ncaab-spread-v6",
-        "market": "spread",
-        "teams": "Southern Utah Thunderbirds @ High Point Panthers",
+        "market": "moneyline",
+        "teams": "Virginia Cavaliers @ Maryland Terrapins",
         "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_margin": 0.0,
           "elo_margin": 0.0,
@@ -31,41 +31,9 @@
       {
         "model": "ncaab-total-v6",
         "market": "total",
-        "teams": "Niagara Purple Eagles @ Bowling Green Falcons",
+        "teams": "Cal Poly Mustangs @ Idaho Vandals",
         "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_total": 0.0,
-          "raw_model_total": 0.0,
-          "expected_pace": 0.0,
-          "effective_total_sd": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-total-v6",
-        "market": "total",
-        "teams": "Southern Jaguars @ Minnesota Golden Gophers",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_total": 0.0,
-          "raw_model_total": 0.0,
-          "expected_pace": 0.0,
-          "effective_total_sd": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-total-v6",
-        "market": "total",
-        "teams": "UC Riverside Highlanders @ San Jos\u00e9 State Spartans",
-        "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_total": 0.0,
           "raw_model_total": 0.0,
@@ -79,66 +47,9 @@
       {
         "model": "ncaab-spread-v6",
         "market": "moneyline",
-        "teams": "Central Connecticut Blue Devils @ Sacred Heart Pioneers",
+        "teams": "College of Biblical Studies Ambassadors @ Houston Christian Huskies",
         "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "moneyline",
-        "teams": "Coppin State Eagles @ Bradley Braves",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "moneyline",
-        "teams": "Virginia Lynchburg Dragons @ Coastal Carolina Chanticleers",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "moneyline",
-        "teams": "Richmond Spiders @ Southern Illinois Salukis",
-        "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_margin": 0.0,
           "elo_margin": 0.0,
@@ -155,9 +66,9 @@
       {
         "model": "ncaab-total-v6",
         "market": "total",
-        "teams": "Western Michigan Broncos @ Purdue Fort Wayne Mastodons",
+        "teams": "Prairie View A&M Panthers @ Vanderbilt Commodores",
         "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_total": 0.0,
           "raw_model_total": 0.0,
@@ -170,67 +81,10 @@
       },
       {
         "model": "ncaab-spread-v6",
-        "market": "moneyline",
-        "teams": "Western Michigan Broncos @ Purdue Fort Wayne Mastodons",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
         "market": "spread",
-        "teams": "Monmouth Hawks @ Quinnipiac Bobcats",
+        "teams": "Fairleigh Dickinson Knights @ Oklahoma Sooners",
         "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "spread",
-        "teams": "Tennessee Tech Golden Eagles @ Indiana Hoosiers",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "spread",
-        "teams": "Oklahoma State Cowboys @ Texas A&M Aggies",
-        "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_margin": 0.0,
           "elo_margin": 0.0,
@@ -247,9 +101,9 @@
       {
         "model": "ncaab-total-v6",
         "market": "total",
-        "teams": "Maryland Eastern Shore Hawks @ Rhode Island Rams",
+        "teams": "Mount St. Mary's Mountaineers @ Virginia Tech Hokies",
         "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_total": 0.0,
           "raw_model_total": 0.0,
@@ -263,9 +117,25 @@
       {
         "model": "ncaab-total-v6",
         "market": "total",
-        "teams": "Richmond Spiders @ Southern Illinois Salukis",
+        "teams": "Arizona Wildcats @ Auburn Tigers",
         "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Georgetown Hoyas @ Clemson Tigers",
+        "history_digest_match": true,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_total": 0.0,
           "raw_model_total": 0.0,
@@ -279,44 +149,9 @@
       {
         "model": "ncaab-spread-v6",
         "market": "spread",
-        "teams": "UC Riverside Highlanders @ San Jos\u00e9 State Spartans",
+        "teams": "Merrimack Warriors @ Florida Gators",
         "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-total-v6",
-        "market": "total",
-        "teams": "Cal State Bakersfield Roadrunners @ Western Illinois Leathernecks",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_total": 0.0,
-          "raw_model_total": 0.0,
-          "expected_pace": 0.0,
-          "effective_total_sd": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "moneyline",
-        "teams": "Kansas City Roos @ George Mason Patriots",
-        "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_margin": 0.0,
           "elo_margin": 0.0,
@@ -333,9 +168,9 @@
       {
         "model": "ncaab-spread-v6",
         "market": "moneyline",
-        "teams": "Morgan State Bears @ UMBC Retrievers",
+        "teams": "Iona Gaels @ Hofstra Pride",
         "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_margin": 0.0,
           "elo_margin": 0.0,
@@ -344,22 +179,6 @@
           "effective_margin_sd": 0.0,
           "elo_home": 0.0,
           "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-total-v6",
-        "market": "total",
-        "teams": "Loyola Marymount Lions @ South Alabama Jaguars",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_total": 0.0,
-          "raw_model_total": 0.0,
-          "expected_pace": 0.0,
-          "effective_total_sd": 0.0
         },
         "probability_delta": 0.0,
         "match": true,
@@ -368,28 +187,9 @@
       {
         "model": "ncaab-spread-v6",
         "market": "moneyline",
-        "teams": "Oklahoma State Cowboys @ Texas A&M Aggies",
+        "teams": "Milwaukee Panthers @ TCU Horned Frogs",
         "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "spread",
-        "teams": "Mercyhurst Lakers @ Penn State Nittany Lions",
-        "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_margin": 0.0,
           "elo_margin": 0.0,
@@ -406,9 +206,9 @@
       {
         "model": "ncaab-total-v6",
         "market": "total",
-        "teams": "Monmouth Hawks @ Quinnipiac Bobcats",
+        "teams": "Milwaukee Panthers @ TCU Horned Frogs",
         "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_total": 0.0,
           "raw_model_total": 0.0,
@@ -422,9 +222,66 @@
       {
         "model": "ncaab-spread-v6",
         "market": "moneyline",
-        "teams": "Lincoln (CA) Oaklanders @ Cal State Fullerton Titans",
+        "teams": "North Carolina Central Eagles @ Liberty Flames",
         "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Ball State Cardinals @ SMU Mustangs",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Fairleigh Dickinson Knights @ Oklahoma Sooners",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Chattanooga Mocs @ Elon Phoenix",
+        "history_digest_match": true,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_margin": 0.0,
           "elo_margin": 0.0,
@@ -441,9 +298,9 @@
       {
         "model": "ncaab-total-v6",
         "market": "total",
-        "teams": "Montana State Bobcats @ BYU Cougars",
+        "teams": "Yale Bulldogs @ Northeastern Huskies",
         "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_total": 0.0,
           "raw_model_total": 0.0,
@@ -457,9 +314,9 @@
       {
         "model": "ncaab-total-v6",
         "market": "total",
-        "teams": "Morgan State Bears @ UMBC Retrievers",
+        "teams": "Alcorn State Braves @ Tarleton State Texans",
         "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_total": 0.0,
           "raw_model_total": 0.0,
@@ -473,9 +330,9 @@
       {
         "model": "ncaab-spread-v6",
         "market": "spread",
-        "teams": "Canisius Golden Griffins @ Brown Bears",
+        "teams": "Troy Trojans @ NC State Wolfpack",
         "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_margin": 0.0,
           "elo_margin": 0.0,
@@ -492,123 +349,9 @@
       {
         "model": "ncaab-spread-v6",
         "market": "moneyline",
-        "teams": "Niagara Purple Eagles @ Bowling Green Falcons",
+        "teams": "Georgia Southern Eagles @ UCF Knights",
         "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "spread",
-        "teams": "Loyola Maryland Greyhounds @ Towson Tigers",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "spread",
-        "teams": "Cal State Bakersfield Roadrunners @ Western Illinois Leathernecks",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "moneyline",
-        "teams": "UC Riverside Highlanders @ San Jos\u00e9 State Spartans",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "spread",
-        "teams": "Morgan State Bears @ UMBC Retrievers",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "spread",
-        "teams": "Western Michigan Broncos @ Purdue Fort Wayne Mastodons",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "moneyline",
-        "teams": "Monmouth Hawks @ Quinnipiac Bobcats",
-        "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_margin": 0.0,
           "elo_margin": 0.0,
@@ -625,41 +368,9 @@
       {
         "model": "ncaab-total-v6",
         "market": "total",
-        "teams": "Mercer Bears @ West Virginia Mountaineers",
+        "teams": "Pittsburgh Panthers @ Butler Bulldogs",
         "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_total": 0.0,
-          "raw_model_total": 0.0,
-          "expected_pace": 0.0,
-          "effective_total_sd": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-total-v6",
-        "market": "total",
-        "teams": "Southern Utah Thunderbirds @ High Point Panthers",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_total": 0.0,
-          "raw_model_total": 0.0,
-          "expected_pace": 0.0,
-          "effective_total_sd": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-total-v6",
-        "market": "total",
-        "teams": "Oklahoma State Cowboys @ Texas A&M Aggies",
-        "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_total": 0.0,
           "raw_model_total": 0.0,
@@ -672,29 +383,10 @@
       },
       {
         "model": "ncaab-spread-v6",
-        "market": "spread",
-        "teams": "Loyola Marymount Lions @ South Alabama Jaguars",
+        "market": "moneyline",
+        "teams": "Chattanooga Mocs @ Elon Phoenix",
         "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "spread",
-        "teams": "Southern Jaguars @ Minnesota Golden Gophers",
-        "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_margin": 0.0,
           "elo_margin": 0.0,
@@ -711,66 +403,9 @@
       {
         "model": "ncaab-spread-v6",
         "market": "moneyline",
-        "teams": "Montana State Bobcats @ BYU Cougars",
+        "teams": "UIC Flames @ Saint Mary's Gaels",
         "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "spread",
-        "teams": "Central Connecticut Blue Devils @ Sacred Heart Pioneers",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "spread",
-        "teams": "Montana State Bobcats @ BYU Cougars",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "spread",
-        "teams": "Richmond Spiders @ Southern Illinois Salukis",
-        "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_margin": 0.0,
           "elo_margin": 0.0,
@@ -787,9 +422,9 @@
       {
         "model": "ncaab-total-v6",
         "market": "total",
-        "teams": "Mercyhurst Lakers @ Penn State Nittany Lions",
+        "teams": "Chattanooga Mocs @ Elon Phoenix",
         "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_total": 0.0,
           "raw_model_total": 0.0,
@@ -803,330 +438,9 @@
       {
         "model": "ncaab-spread-v6",
         "market": "spread",
-        "teams": "Mercer Bears @ West Virginia Mountaineers",
+        "teams": "UIC Flames @ Saint Mary's Gaels",
         "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "moneyline",
-        "teams": "Mercer Bears @ West Virginia Mountaineers",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-total-v6",
-        "market": "total",
-        "teams": "Central Connecticut Blue Devils @ Sacred Heart Pioneers",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_total": 0.0,
-          "raw_model_total": 0.0,
-          "expected_pace": 0.0,
-          "effective_total_sd": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "spread",
-        "teams": "Stetson Hatters @ Howard Bison",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "moneyline",
-        "teams": "Cal State Bakersfield Roadrunners @ Western Illinois Leathernecks",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-total-v6",
-        "market": "total",
-        "teams": "Canisius Golden Griffins @ Brown Bears",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_total": 0.0,
-          "raw_model_total": 0.0,
-          "expected_pace": 0.0,
-          "effective_total_sd": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-total-v6",
-        "market": "total",
-        "teams": "Stetson Hatters @ Howard Bison",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_total": 0.0,
-          "raw_model_total": 0.0,
-          "expected_pace": 0.0,
-          "effective_total_sd": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "spread",
-        "teams": "Kansas City Roos @ George Mason Patriots",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "moneyline",
-        "teams": "Loyola Marymount Lions @ South Alabama Jaguars",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "moneyline",
-        "teams": "Stetson Hatters @ Howard Bison",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-total-v6",
-        "market": "total",
-        "teams": "Loyola Maryland Greyhounds @ Towson Tigers",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_total": 0.0,
-          "raw_model_total": 0.0,
-          "expected_pace": 0.0,
-          "effective_total_sd": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-total-v6",
-        "market": "total",
-        "teams": "Coppin State Eagles @ Bradley Braves",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_total": 0.0,
-          "raw_model_total": 0.0,
-          "expected_pace": 0.0,
-          "effective_total_sd": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-total-v6",
-        "market": "total",
-        "teams": "Kansas City Roos @ George Mason Patriots",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_total": 0.0,
-          "raw_model_total": 0.0,
-          "expected_pace": 0.0,
-          "effective_total_sd": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-total-v6",
-        "market": "total",
-        "teams": "Tennessee Tech Golden Eagles @ Indiana Hoosiers",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_total": 0.0,
-          "raw_model_total": 0.0,
-          "expected_pace": 0.0,
-          "effective_total_sd": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "moneyline",
-        "teams": "Canisius Golden Griffins @ Brown Bears",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "moneyline",
-        "teams": "Southern Utah Thunderbirds @ High Point Panthers",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "moneyline",
-        "teams": "Loyola Maryland Greyhounds @ Towson Tigers",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "moneyline",
-        "teams": "Tennessee Tech Golden Eagles @ Indiana Hoosiers",
-        "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "moneyline",
-        "teams": "Mercyhurst Lakers @ Penn State Nittany Lions",
-        "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_margin": 0.0,
           "elo_margin": 0.0,
@@ -1143,28 +457,9 @@
       {
         "model": "ncaab-spread-v6",
         "market": "spread",
-        "teams": "Maryland Eastern Shore Hawks @ Rhode Island Rams",
+        "teams": "Prairie View A&M Panthers @ Vanderbilt Commodores",
         "history_digest_match": true,
-        "history_games": 6958,
-        "feature_deltas": {
-          "expected_margin": 0.0,
-          "elo_margin": 0.0,
-          "trend_margin": 0.0,
-          "rest_diff": 0.0,
-          "effective_margin_sd": 0.0,
-          "elo_home": 0.0,
-          "elo_away": 0.0
-        },
-        "probability_delta": 0.0,
-        "match": true,
-        "priced_by": "deployed_artifact"
-      },
-      {
-        "model": "ncaab-spread-v6",
-        "market": "moneyline",
-        "teams": "Maryland Eastern Shore Hawks @ Rhode Island Rams",
-        "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_margin": 0.0,
           "elo_margin": 0.0,
@@ -1181,9 +476,79 @@
       {
         "model": "ncaab-spread-v6",
         "market": "spread",
-        "teams": "Niagara Purple Eagles @ Bowling Green Falcons",
+        "teams": "DePaul Blue Demons @ Northwestern Wildcats",
         "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Virginia Cavaliers @ Maryland Terrapins",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Texas Southern Tigers @ Murray State Racers",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Southern Miss Golden Eagles @ Texas State Bobcats",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Arizona Wildcats @ Auburn Tigers",
+        "history_digest_match": true,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_margin": 0.0,
           "elo_margin": 0.0,
@@ -1200,9 +565,9 @@
       {
         "model": "ncaab-spread-v6",
         "market": "spread",
-        "teams": "Coppin State Eagles @ Bradley Braves",
+        "teams": "Milwaukee Panthers @ TCU Horned Frogs",
         "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_margin": 0.0,
           "elo_margin": 0.0,
@@ -1219,9 +584,1788 @@
       {
         "model": "ncaab-spread-v6",
         "market": "moneyline",
-        "teams": "Southern Jaguars @ Minnesota Golden Gophers",
+        "teams": "Southeast Missouri State Redhawks @ Middle Tennessee Blue Raiders",
         "history_digest_match": true,
-        "history_games": 6958,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Ohio State Buckeyes @ Central Connecticut Blue Devils",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Stanford Cardinal @ UNLV Rebels",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Harvard Crimson @ George Washington Revolutionaries",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Cal Poly Mustangs @ Idaho Vandals",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Ohio State Buckeyes @ Central Connecticut Blue Devils",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Ohio Bobcats @ Purdue Boilermakers",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Stanford Cardinal @ UNLV Rebels",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Alcorn State Braves @ Tarleton State Texans",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Columbia Lions @ Bucknell Bison",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Wright State Raiders @ Samford Bulldogs",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Georgia Southern Eagles @ UCF Knights",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Virginia Cavaliers @ Maryland Terrapins",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Lindenwood Lions @ Omaha Mavericks",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Northern Iowa Panthers @ Michigan State Spartans",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Ohio State Buckeyes @ Central Connecticut Blue Devils",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Georgetown Hoyas @ Clemson Tigers",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Stanford Cardinal @ UNLV Rebels",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Harvard Crimson @ George Washington Revolutionaries",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Georgia Bulldogs @ North Carolina Tar Heels",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Marist Red Foxes @ Lehigh Mountain Hawks",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Pittsburgh Panthers @ Butler Bulldogs",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Chicago State Cougars @ San Diego Toreros",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Southern Miss Golden Eagles @ Texas State Bobcats",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Columbia Lions @ Bucknell Bison",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Pittsburgh Panthers @ Butler Bulldogs",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Mount St. Mary's Mountaineers @ Virginia Tech Hokies",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Columbia Lions @ Bucknell Bison",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Iona Gaels @ Hofstra Pride",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Southern Miss Golden Eagles @ Texas State Bobcats",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Florida International Panthers @ Florida Gulf Coast Eagles",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Wright State Raiders @ Samford Bulldogs",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "South Dakota Coyotes @ Drake Bulldogs",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "SIU Edwardsville Cougars @ Duke Blue Devils",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "UC San Diego Tritons @ Utah State Aggies",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Chicago State Cougars @ San Diego Toreros",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Georgia Bulldogs @ North Carolina Tar Heels",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Marist Red Foxes @ Lehigh Mountain Hawks",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Northern Iowa Panthers @ Michigan State Spartans",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Troy Trojans @ NC State Wolfpack",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "North Alabama Lions @ Miami Hurricanes",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Ball State Cardinals @ SMU Mustangs",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Sam Houston Bearkats @ Illinois Fighting Illini",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Ball State Cardinals @ SMU Mustangs",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "UL Monroe Warhawks @ Arizona State Sun Devils",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "East Texas A&M Lions @ Portland Pilots",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Georgia Southern Eagles @ UCF Knights",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Xavier Musketeers @ Mississippi State Bulldogs",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "DePaul Blue Demons @ Northwestern Wildcats",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Texas Southern Tigers @ Murray State Racers",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "UC San Diego Tritons @ Utah State Aggies",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Ohio Bobcats @ Purdue Boilermakers",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Wright State Raiders @ Samford Bulldogs",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Arkansas-Pine Bluff Golden Lions @ California Baptist Lancers",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "North Carolina Central Eagles @ Liberty Flames",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Long Island University Sharks @ Fordham Rams",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Northern Iowa Panthers @ Michigan State Spartans",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Merrimack Warriors @ Florida Gators",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Long Island University Sharks @ Fordham Rams",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Alcorn State Braves @ Tarleton State Texans",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Illinois State Redbirds @ North Dakota State Bison",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Yale Bulldogs @ Northeastern Huskies",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Illinois State Redbirds @ North Dakota State Bison",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Iona Gaels @ Hofstra Pride",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "UC San Diego Tritons @ Utah State Aggies",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Long Island University Sharks @ Fordham Rams",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Yale Bulldogs @ Northeastern Huskies",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Florida International Panthers @ Florida Gulf Coast Eagles",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Xavier Musketeers @ Mississippi State Bulldogs",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "UIC Flames @ Saint Mary's Gaels",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Fairleigh Dickinson Knights @ Oklahoma Sooners",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Lindenwood Lions @ Omaha Mavericks",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Lindenwood Lions @ Omaha Mavericks",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Troy Trojans @ NC State Wolfpack",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "North Alabama Lions @ Miami Hurricanes",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Arkansas-Pine Bluff Golden Lions @ California Baptist Lancers",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Arkansas-Pine Bluff Golden Lions @ California Baptist Lancers",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Harvard Crimson @ George Washington Revolutionaries",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "DePaul Blue Demons @ Northwestern Wildcats",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Sam Houston Bearkats @ Illinois Fighting Illini",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Texas Southern Tigers @ Murray State Racers",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Ohio Bobcats @ Purdue Boilermakers",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "South Dakota Coyotes @ Drake Bulldogs",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "SIU Edwardsville Cougars @ Duke Blue Devils",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Florida International Panthers @ Florida Gulf Coast Eagles",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "South Dakota Coyotes @ Drake Bulldogs",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Chicago State Cougars @ San Diego Toreros",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Georgetown Hoyas @ Clemson Tigers",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "East Texas A&M Lions @ Portland Pilots",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Illinois State Redbirds @ North Dakota State Bison",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Cal Poly Mustangs @ Idaho Vandals",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Marist Red Foxes @ Lehigh Mountain Hawks",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Southeast Missouri State Redhawks @ Middle Tennessee Blue Raiders",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "North Carolina Central Eagles @ Liberty Flames",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Arizona Wildcats @ Auburn Tigers",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "Southeast Missouri State Redhawks @ Middle Tennessee Blue Raiders",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-total-v6",
+        "market": "total",
+        "teams": "Xavier Musketeers @ Mississippi State Bulldogs",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_total": 0.0,
+          "raw_model_total": 0.0,
+          "expected_pace": 0.0,
+          "effective_total_sd": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Georgia Bulldogs @ North Carolina Tar Heels",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "moneyline",
+        "teams": "Mount St. Mary's Mountaineers @ Virginia Tech Hokies",
+        "history_digest_match": true,
+        "history_games": 6987,
+        "feature_deltas": {
+          "expected_margin": 0.0,
+          "elo_margin": 0.0,
+          "trend_margin": 0.0,
+          "rest_diff": 0.0,
+          "effective_margin_sd": 0.0,
+          "elo_home": 0.0,
+          "elo_away": 0.0
+        },
+        "probability_delta": 0.0,
+        "match": true,
+        "priced_by": "deployed_artifact"
+      },
+      {
+        "model": "ncaab-spread-v6",
+        "market": "spread",
+        "teams": "UL Monroe Warhawks @ Arizona State Sun Devils",
+        "history_digest_match": true,
+        "history_games": 6987,
         "feature_deltas": {
           "expected_margin": 0.0,
           "elo_margin": 0.0,
@@ -7353,6 +8497,438 @@
         "pit_cov80_sdfit": 0.912,
         "pit_cov90_sdfit": 0.972
       }
+    },
+    {
+      "variant": "shipped_possessions_1.0",
+      "train_resid_sd": 17.793,
+      "train": {
+        "n": 3601,
+        "total_mae": 14.195,
+        "total_bias": -1.692,
+        "resid_sd": 17.793,
+        "mean_served_sd": 18.09,
+        "pit_cov50": 0.515,
+        "pit_cov80": 0.806,
+        "pit_cov90": 0.913,
+        "over_brier": 0.2352,
+        "pit_cov50_sdfit": 0.548,
+        "pit_cov80_sdfit": 0.839,
+        "pit_cov90_sdfit": 0.934
+      },
+      "validation": {
+        "n": 1043,
+        "total_mae": 13.556,
+        "total_bias": -1.286,
+        "resid_sd": 16.756,
+        "mean_served_sd": 17.203,
+        "pit_cov50": 0.492,
+        "pit_cov80": 0.824,
+        "pit_cov90": 0.918,
+        "over_brier": 0.2348,
+        "pit_cov50_sdfit": 0.524,
+        "pit_cov80_sdfit": 0.85,
+        "pit_cov90_sdfit": 0.937
+      },
+      "holdout": {
+        "n": 772,
+        "total_mae": 14.272,
+        "total_bias": 0.943,
+        "resid_sd": 18.175,
+        "mean_served_sd": 21.57,
+        "pit_cov50": 0.58,
+        "pit_cov80": 0.873,
+        "pit_cov90": 0.949,
+        "over_brier": 0.234,
+        "pit_cov50_sdfit": 0.622,
+        "pit_cov80_sdfit": 0.89,
+        "pit_cov90_sdfit": 0.969
+      },
+      "holdout_thin_sample_lt8": {
+        "n": 687,
+        "total_mae": 14.516,
+        "total_bias": 1.042,
+        "resid_sd": 18.531,
+        "mean_served_sd": 22.123,
+        "pit_cov50": 0.582,
+        "pit_cov80": 0.873,
+        "pit_cov90": 0.953,
+        "over_brier": 0.234,
+        "pit_cov50_sdfit": 0.624,
+        "pit_cov80_sdfit": 0.891,
+        "pit_cov90_sdfit": 0.971
+      },
+      "cross_season_2026-11": {
+        "n": 687,
+        "total_mae": 14.516,
+        "total_bias": 1.042,
+        "resid_sd": 18.531,
+        "mean_served_sd": 22.123,
+        "pit_cov50": 0.582,
+        "pit_cov80": 0.873,
+        "pit_cov90": 0.953,
+        "over_brier": 0.234,
+        "pit_cov50_sdfit": 0.624,
+        "pit_cov80_sdfit": 0.891,
+        "pit_cov90_sdfit": 0.971
+      },
+      "train_non_d1": {
+        "n": 241,
+        "total_mae": 15.446,
+        "total_bias": 3.57,
+        "resid_sd": 19.463,
+        "mean_served_sd": 21.733,
+        "pit_cov50": 0.552,
+        "pit_cov80": 0.846,
+        "pit_cov90": 0.95,
+        "over_brier": 0.2373,
+        "pit_cov50_sdfit": 0.593,
+        "pit_cov80_sdfit": 0.884,
+        "pit_cov90_sdfit": 0.959
+      },
+      "train_d1_only": {
+        "n": 3360,
+        "total_mae": 14.105,
+        "total_bias": -2.069,
+        "resid_sd": 17.667,
+        "mean_served_sd": 17.829,
+        "pit_cov50": 0.512,
+        "pit_cov80": 0.803,
+        "pit_cov90": 0.911,
+        "over_brier": 0.235,
+        "pit_cov50_sdfit": 0.545,
+        "pit_cov80_sdfit": 0.836,
+        "pit_cov90_sdfit": 0.932
+      },
+      "holdout_non_d1": {
+        "n": 196,
+        "total_mae": 16.175,
+        "total_bias": 4.595,
+        "resid_sd": 21.309,
+        "mean_served_sd": 22.869,
+        "pit_cov50": 0.536,
+        "pit_cov80": 0.842,
+        "pit_cov90": 0.923,
+        "over_brier": 0.2322,
+        "pit_cov50_sdfit": 0.561,
+        "pit_cov80_sdfit": 0.857,
+        "pit_cov90_sdfit": 0.944
+      },
+      "holdout_d1_only": {
+        "n": 576,
+        "total_mae": 13.625,
+        "total_bias": -0.299,
+        "resid_sd": 16.977,
+        "mean_served_sd": 21.128,
+        "pit_cov50": 0.595,
+        "pit_cov80": 0.884,
+        "pit_cov90": 0.958,
+        "over_brier": 0.2346,
+        "pit_cov50_sdfit": 0.642,
+        "pit_cov80_sdfit": 0.901,
+        "pit_cov90_sdfit": 0.977
+      },
+      "cross_season_d1_only": {
+        "n": 491,
+        "total_mae": 13.853,
+        "total_bias": -0.376,
+        "resid_sd": 17.298,
+        "mean_served_sd": 21.825,
+        "pit_cov50": 0.601,
+        "pit_cov80": 0.886,
+        "pit_cov90": 0.965,
+        "over_brier": 0.2348,
+        "pit_cov50_sdfit": 0.65,
+        "pit_cov80_sdfit": 0.904,
+        "pit_cov90_sdfit": 0.982
+      }
+    },
+    {
+      "variant": "shipped_possessions_1.5",
+      "train_resid_sd": 17.679,
+      "train": {
+        "n": 3601,
+        "total_mae": 14.093,
+        "total_bias": -1.325,
+        "resid_sd": 17.679,
+        "mean_served_sd": 18.062,
+        "pit_cov50": 0.519,
+        "pit_cov80": 0.808,
+        "pit_cov90": 0.912,
+        "over_brier": 0.2346,
+        "pit_cov50_sdfit": 0.548,
+        "pit_cov80_sdfit": 0.842,
+        "pit_cov90_sdfit": 0.934
+      },
+      "validation": {
+        "n": 1043,
+        "total_mae": 13.399,
+        "total_bias": -0.708,
+        "resid_sd": 16.631,
+        "mean_served_sd": 17.161,
+        "pit_cov50": 0.501,
+        "pit_cov80": 0.824,
+        "pit_cov90": 0.918,
+        "over_brier": 0.2342,
+        "pit_cov50_sdfit": 0.528,
+        "pit_cov80_sdfit": 0.851,
+        "pit_cov90_sdfit": 0.936
+      },
+      "holdout": {
+        "n": 772,
+        "total_mae": 14.153,
+        "total_bias": 1.031,
+        "resid_sd": 18.062,
+        "mean_served_sd": 21.561,
+        "pit_cov50": 0.574,
+        "pit_cov80": 0.87,
+        "pit_cov90": 0.955,
+        "over_brier": 0.2333,
+        "pit_cov50_sdfit": 0.617,
+        "pit_cov80_sdfit": 0.892,
+        "pit_cov90_sdfit": 0.97
+      },
+      "holdout_thin_sample_lt8": {
+        "n": 687,
+        "total_mae": 14.423,
+        "total_bias": 1.042,
+        "resid_sd": 18.433,
+        "mean_served_sd": 22.12,
+        "pit_cov50": 0.576,
+        "pit_cov80": 0.873,
+        "pit_cov90": 0.958,
+        "over_brier": 0.2335,
+        "pit_cov50_sdfit": 0.62,
+        "pit_cov80_sdfit": 0.895,
+        "pit_cov90_sdfit": 0.974
+      },
+      "cross_season_2026-11": {
+        "n": 687,
+        "total_mae": 14.423,
+        "total_bias": 1.042,
+        "resid_sd": 18.433,
+        "mean_served_sd": 22.12,
+        "pit_cov50": 0.576,
+        "pit_cov80": 0.873,
+        "pit_cov90": 0.958,
+        "over_brier": 0.2335,
+        "pit_cov50_sdfit": 0.62,
+        "pit_cov80_sdfit": 0.895,
+        "pit_cov90_sdfit": 0.974
+      },
+      "train_non_d1": {
+        "n": 241,
+        "total_mae": 15.404,
+        "total_bias": 3.543,
+        "resid_sd": 19.359,
+        "mean_served_sd": 21.732,
+        "pit_cov50": 0.56,
+        "pit_cov80": 0.851,
+        "pit_cov90": 0.942,
+        "over_brier": 0.2388,
+        "pit_cov50_sdfit": 0.581,
+        "pit_cov80_sdfit": 0.888,
+        "pit_cov90_sdfit": 0.959
+      },
+      "train_d1_only": {
+        "n": 3360,
+        "total_mae": 13.999,
+        "total_bias": -1.674,
+        "resid_sd": 17.552,
+        "mean_served_sd": 17.799,
+        "pit_cov50": 0.516,
+        "pit_cov80": 0.805,
+        "pit_cov90": 0.91,
+        "over_brier": 0.2343,
+        "pit_cov50_sdfit": 0.546,
+        "pit_cov80_sdfit": 0.839,
+        "pit_cov90_sdfit": 0.933
+      },
+      "holdout_non_d1": {
+        "n": 196,
+        "total_mae": 16.037,
+        "total_bias": 4.29,
+        "resid_sd": 21.134,
+        "mean_served_sd": 22.894,
+        "pit_cov50": 0.541,
+        "pit_cov80": 0.837,
+        "pit_cov90": 0.929,
+        "over_brier": 0.2328,
+        "pit_cov50_sdfit": 0.571,
+        "pit_cov80_sdfit": 0.872,
+        "pit_cov90_sdfit": 0.949
+      },
+      "holdout_d1_only": {
+        "n": 576,
+        "total_mae": 13.512,
+        "total_bias": -0.079,
+        "resid_sd": 16.89,
+        "mean_served_sd": 21.108,
+        "pit_cov50": 0.585,
+        "pit_cov80": 0.882,
+        "pit_cov90": 0.964,
+        "over_brier": 0.2335,
+        "pit_cov50_sdfit": 0.632,
+        "pit_cov80_sdfit": 0.899,
+        "pit_cov90_sdfit": 0.977
+      },
+      "cross_season_d1_only": {
+        "n": 491,
+        "total_mae": 13.779,
+        "total_bias": -0.254,
+        "resid_sd": 17.237,
+        "mean_served_sd": 21.811,
+        "pit_cov50": 0.591,
+        "pit_cov80": 0.888,
+        "pit_cov90": 0.969,
+        "over_brier": 0.2337,
+        "pit_cov50_sdfit": 0.64,
+        "pit_cov80_sdfit": 0.904,
+        "pit_cov90_sdfit": 0.984
+      }
+    },
+    {
+      "variant": "shipped_possessions_2.0",
+      "train_resid_sd": 17.642,
+      "train": {
+        "n": 3601,
+        "total_mae": 14.043,
+        "total_bias": -0.959,
+        "resid_sd": 17.642,
+        "mean_served_sd": 18.034,
+        "pit_cov50": 0.516,
+        "pit_cov80": 0.812,
+        "pit_cov90": 0.909,
+        "over_brier": 0.2345,
+        "pit_cov50_sdfit": 0.544,
+        "pit_cov80_sdfit": 0.844,
+        "pit_cov90_sdfit": 0.931
+      },
+      "validation": {
+        "n": 1043,
+        "total_mae": 13.34,
+        "total_bias": -0.13,
+        "resid_sd": 16.623,
+        "mean_served_sd": 17.118,
+        "pit_cov50": 0.506,
+        "pit_cov80": 0.825,
+        "pit_cov90": 0.92,
+        "over_brier": 0.234,
+        "pit_cov50_sdfit": 0.538,
+        "pit_cov80_sdfit": 0.853,
+        "pit_cov90_sdfit": 0.933
+      },
+      "holdout": {
+        "n": 772,
+        "total_mae": 14.108,
+        "total_bias": 1.118,
+        "resid_sd": 18.016,
+        "mean_served_sd": 21.552,
+        "pit_cov50": 0.576,
+        "pit_cov80": 0.872,
+        "pit_cov90": 0.953,
+        "over_brier": 0.2328,
+        "pit_cov50_sdfit": 0.617,
+        "pit_cov80_sdfit": 0.894,
+        "pit_cov90_sdfit": 0.969
+      },
+      "holdout_thin_sample_lt8": {
+        "n": 687,
+        "total_mae": 14.401,
+        "total_bias": 1.042,
+        "resid_sd": 18.393,
+        "mean_served_sd": 22.116,
+        "pit_cov50": 0.578,
+        "pit_cov80": 0.873,
+        "pit_cov90": 0.956,
+        "over_brier": 0.2332,
+        "pit_cov50_sdfit": 0.619,
+        "pit_cov80_sdfit": 0.895,
+        "pit_cov90_sdfit": 0.972
+      },
+      "cross_season_2026-11": {
+        "n": 687,
+        "total_mae": 14.401,
+        "total_bias": 1.042,
+        "resid_sd": 18.393,
+        "mean_served_sd": 22.116,
+        "pit_cov50": 0.578,
+        "pit_cov80": 0.873,
+        "pit_cov90": 0.956,
+        "over_brier": 0.2332,
+        "pit_cov50_sdfit": 0.619,
+        "pit_cov80_sdfit": 0.895,
+        "pit_cov90_sdfit": 0.972
+      },
+      "train_non_d1": {
+        "n": 241,
+        "total_mae": 15.399,
+        "total_bias": 3.516,
+        "resid_sd": 19.298,
+        "mean_served_sd": 21.732,
+        "pit_cov50": 0.548,
+        "pit_cov80": 0.851,
+        "pit_cov90": 0.942,
+        "over_brier": 0.2397,
+        "pit_cov50_sdfit": 0.581,
+        "pit_cov80_sdfit": 0.888,
+        "pit_cov90_sdfit": 0.954
+      },
+      "train_d1_only": {
+        "n": 3360,
+        "total_mae": 13.946,
+        "total_bias": -1.28,
+        "resid_sd": 17.517,
+        "mean_served_sd": 17.769,
+        "pit_cov50": 0.514,
+        "pit_cov80": 0.809,
+        "pit_cov90": 0.907,
+        "over_brier": 0.2341,
+        "pit_cov50_sdfit": 0.541,
+        "pit_cov80_sdfit": 0.841,
+        "pit_cov90_sdfit": 0.929
+      },
+      "holdout_non_d1": {
+        "n": 196,
+        "total_mae": 15.98,
+        "total_bias": 3.986,
+        "resid_sd": 21.006,
+        "mean_served_sd": 22.918,
+        "pit_cov50": 0.541,
+        "pit_cov80": 0.852,
+        "pit_cov90": 0.929,
+        "over_brier": 0.2326,
+        "pit_cov50_sdfit": 0.577,
+        "pit_cov80_sdfit": 0.867,
+        "pit_cov90_sdfit": 0.949
+      },
+      "holdout_d1_only": {
+        "n": 576,
+        "total_mae": 13.471,
+        "total_bias": 0.142,
+        "resid_sd": 16.878,
+        "mean_served_sd": 21.087,
+        "pit_cov50": 0.589,
+        "pit_cov80": 0.878,
+        "pit_cov90": 0.962,
+        "over_brier": 0.2329,
+        "pit_cov50_sdfit": 0.63,
+        "pit_cov80_sdfit": 0.903,
+        "pit_cov90_sdfit": 0.976
+      },
+      "cross_season_d1_only": {
+        "n": 491,
+        "total_mae": 13.771,
+        "total_bias": -0.132,
+        "resid_sd": 17.24,
+        "mean_served_sd": 21.797,
+        "pit_cov50": 0.593,
+        "pit_cov80": 0.882,
+        "pit_cov90": 0.967,
+        "over_brier": 0.2334,
+        "pit_cov50_sdfit": 0.635,
+        "pit_cov80_sdfit": 0.906,
+        "pit_cov90_sdfit": 0.982
+      }
     }
   ],
   "splits": {
@@ -7366,7 +8942,7 @@
     ],
     "holdout": [
       "2026-03-19",
-      "2026-11-11"
+      "2026-11-12"
     ]
   }
 }

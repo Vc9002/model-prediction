@@ -1,5 +1,28 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
+## 2026-11-13 — NCAAB: Main totals restored behind the sample gate; box-score backfill; possessions tested (quick-261112-nc6, round 3)
+
+- **Main totals restored** (`df37969f`). The 93aa093c pause was a hard `kind != "total"` in
+  the Main destination. A total now reaches Main under the spread/moneyline conditions plus
+  the current-season sample gate (min_team_games 8) that the pause predated; new policy key
+  `models.NCAAB.main_totals_enabled` (default true) is the operator pause lever and a disabled
+  total is recorded as `main_totals_disabled_by_policy`. Every one of the 454 settled total
+  rows had a sample of 0–3 and would still be excluded. Tests: `tests/test_ncaab_main_totals.py`.
+- **Box-score pipeline**: the daily capture (`cli/daily.py` → `capture_completed_boxscores`)
+  has been live since 2026-11-03 and complete (file counts match completed games); the gap was
+  history. `scripts/backfill_ncaab_boxscores.py` captured the 2025-26 season and 2026-11-02
+  (6,483 of 6,484 games in 314 s; one 2025-11-10 game lacks components upstream). Coverage of
+  the history file: 99.97%. Backfilled records carry `observed_at_utc` = capture time; they
+  are terminal box scores, usable as history only.
+- **Possessions feature** (`features/ncaab_possessions.py`, `tempo_source="possessions"` on
+  the total model: FGA − OREB + TOV + 0.44 FTA). Walk-forward validation vs the shipped
+  attempts proxy at the same sensitivity: MAE 13.399 vs 13.376, over-Brier 0.2342 vs 0.2345,
+  PIT 0.501/0.824/0.918 vs 0.507/0.821/0.921 — indistinguishable. **Not shipped**; attempts
+  stay. The option remains available and tested for an efficiency-based (points per
+  possession) spread feature, which is the natural next step now that the data exists.
+- Reproduction gate: the 21:0xZ daily's 132 Flat rows are reproduced exactly by the deployed
+  artifact model.
+
 ## 2026-11-13 — 05:30Z daily failure: sqlite "disk I/O error" in the ledger store under host memory pressure (quick-261113-jb1)
 
 `daily-20261113T053001Z-8f176c` exited 1. The NCAAB forecast raised

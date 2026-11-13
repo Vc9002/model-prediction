@@ -242,6 +242,33 @@ What this does not claim: that Main totals are profitable. Validation evidence f
 model is distributional (MAE 13.38, PIT 0.507/0.821/0.921); the first market-relative read
 comes from the forward check once gated totals settle.
 
+## Box-score pipeline and exact possessions (2026-11-13)
+
+The capture (`data_sources/ncaab_boxscores.py`, wired into the daily since 2026-11-03) was
+already complete day by day; what was missing was history. `scripts/backfill_ncaab_boxscores.py`
+walked every ET date with completed games from 2025-11-03 to 2026-11-02 with the same first-seen
+capture: 6,483 of 6,484 games in 314 seconds, one game (2025-11-10, event 401823003) lacks
+possession components upstream. Coverage of the history file is now 99.97%. The records carry
+`observed_at_utc` equal to the capture time: they are terminal box scores, valid as history for
+a later decision, never as a live snapshot.
+
+`features/ncaab_possessions.py` applies the standard estimate (FGA − OREB + TOV + 0.44·FTA) and
+the total model gained `tempo_source="possessions"`. Against the shipped attempts proxy at the
+same sensitivity (validation, n = 1,043):
+
+| tempo source, sensitivity | MAE | residual SD | PIT 50/80/90 | over Brier |
+|---|---|---|---|---|
+| attempts, 1.5 (shipped) | **13.376** | **16.564** | 0.507/0.821/0.921 | 0.2345 |
+| possessions, 1.5 | 13.399 | 16.631 | 0.501/0.824/0.918 | 0.2342 |
+| attempts, 2.0 | 13.334 | 16.582 | 0.503/0.823/0.914 | 0.2345 |
+| possessions, 2.0 | 13.340 | 16.623 | 0.506/0.825/0.920 | 0.2340 |
+
+Indistinguishable at this sample (differences of 0.02 points MAE and 0.0005 Brier). The exact
+possession count does not improve the tempo signal over shot attempts for totals, so the
+artifact keeps `attempts`. The data now exists for the feature that should matter more:
+offensive and defensive efficiency per 100 possessions as the spread model's trend half, in
+place of raw points. That is the next model step, not done here.
+
 ## Not changed / open
 
 - Early-season dispersion (both markets) and the Elo ramp: need a second cross-season window
