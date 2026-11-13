@@ -75,4 +75,4 @@ def test_cfb_structural_v3_artifact_and_registry_wiring():
     for market in ["moneyline", "spread", "total"]:
         champ = reg.champion("NCAAF", market)
         assert champ is not None
-        assert champ.model_id in (CFB_V3_MODEL_VERSION, "cfb-structural-v4")
+        assert champ.model_id in (CFB_V3_MODEL_VERSION, "cfb-structural-v4", "cfb-structural-v5")

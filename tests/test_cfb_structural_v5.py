@@ -135,7 +135,7 @@ class _Recording(dict):
 @pytest.mark.skipif(
     not CFB_V5_ARTIFACT_PATH.exists(), reason="v5 artifact not yet produced by scripts/cfb_v5_research.py"
 )
-def test_artifact_loads_fail_closed_consumes_every_parameter_and_is_not_a_champion() -> None:
+def test_artifact_loads_fail_closed_consumes_every_parameter_and_is_the_champion() -> None:
     artifact = load_cfb_structural_v5_artifact()
     recorder = _Recording(artifact)
     model = CFBStructuralV5Model.from_artifact(recorder)
@@ -159,15 +159,16 @@ def test_artifact_loads_fail_closed_consumes_every_parameter_and_is_not_a_champi
     )
     assert not unread, sorted(unread)
     assert model.margin_sd_table["established"] == artifact["margin_sd_table"]["established"]
-    assert (
-        artifact["qualification"]["status"] == "research" and artifact["qualification"]["qualified"] is False
-    )
+    # Promoted by operator directive; the evidence block stays honest (moneyline gain not significant).
+    assert artifact["qualification"]["status"] == "PRODUCTION_ACTIVE"
+    assert artifact["qualification"]["qualified"] is False
     assert artifact["training"]["fitted_on"].startswith("train only")
     with pytest.raises(ValueError, match="never reads"):
         CFBStructuralV5Model.from_artifact({**artifact, "surprise": 1})
     reg = ProductionModelRegistry.load(PROJECT_ROOT)
     for market in ("moneyline", "spread", "total"):
-        assert reg.champion("NCAAF", market).model_id == "cfb-structural-v4"
+        assert reg.champion("NCAAF", market).model_id == CFB_V5_MODEL_VERSION
+        assert reg.lifecycle_contract("NCAAF", market).rollback_model_id == "cfb-structural-v4"
     tampered = dict(artifact)
     tampered["total_sd"] = 99.0
     tmp = PROJECT_ROOT / "outputs" / "_tampered_cfb_v5.json"

@@ -5358,10 +5358,10 @@ def _forecast_cfb_sport(
     """
     from ..data_sources.polymarket_us import probability_to_american
     from ..models.cfb_structural_v4 import main_gates_from_artifact
-    from ..models.college_football import build_cfb_slate
+    from ..models.college_football import build_cfb_slate, cfb_model_for_artifact
 
     model_config = config.get("models", {}).get("NCAAF", {})
-    serving_version = str(model_config.get("active_production_version") or "cfb-structural-v4")
+    serving_version = str(model_config.get("active_production_version") or "cfb-structural-v5")
     serving_artifact, artifact_error = _load_exact_artifact_contract(serving_version)
     if artifact_error or serving_artifact is None:
         raise ValueError(artifact_error or f"NCAAF serving artifact unavailable for {serving_version}")
@@ -5374,10 +5374,12 @@ def _forecast_cfb_sport(
     # thresholds are visible and removable; they were hardcoded here with no walk-forward
     # evidence (review #12). Absent block => no extra total gate.
     total_gates = model_config.get("main_total_gates") or {}
+    # The slate is priced by the exact artifact whose hash every row will carry.
     forecast = build_cfb_slate(
         data_root=data_root,
         game_date=args_date,
         observed_at=utc_now(),
+        model=cfb_model_for_artifact(serving_artifact),
     )
     exposure_source = flat_ledger or research_ledger or main_ledger
     if exposure_source is None:
@@ -5404,7 +5406,7 @@ def _forecast_cfb_sport(
         mtype = MarketType(str(contract["market_type"]))
         m_version = str(
             contract.get("model_version")
-            or model_config.get("active_production_version", "cfb-structural-v4")
+            or model_config.get("active_production_version", "cfb-structural-v5")
         )
 
         try:
@@ -5539,7 +5541,8 @@ def _forecast_cfb_sport(
                 is_qualified_call = (
                     genuinely_eligible
                     and not eligibility.reason_code.startswith("PAPER_CALL_")
-                    and m_version in ("cfb-structural-v4", "cfb-structural-v3", "cfb-structural-v2")
+                    and m_version
+                    in ("cfb-structural-v5", "cfb-structural-v4", "cfb-structural-v3", "cfb-structural-v2")
                 )
                 if (
                     research_ledger is not None

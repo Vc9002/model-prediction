@@ -73,8 +73,9 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     # active whitelisted champion -- nfl-elo-trend-lr-v4 is blacklisted below)
     "nfl-spread-structural-v7",
     "nfl-total-structural-v7",
-    # NCAAF (Latest Generation v4 Champion)
-    "cfb-structural-v4",
+    # NCAAF: cfb-structural-v5 promoted 2026-11-13 (operator directive, Direct Model
+    # Wiring policy). v4 no longer produces rows; it is not blacklisted.
+    "cfb-structural-v5",
     # WNBA (Dormant off-season)
     "wnba-elo-trend-lr-v4",
     "wnba-total-margin-v2",

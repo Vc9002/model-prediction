@@ -424,11 +424,11 @@
     }
   },
   "qualification": {
-    "status": "research",
+    "status": "PRODUCTION_ACTIVE",
     "qualified": false,
     "locked_holdout": true,
     "framework": "cfb_structural_v5_calibrated_bivariate_engine",
-    "note": "Challenger. Not registered in production.yaml; promotion requires the ROADMAP promotion rule."
+    "note": "Promoted to NCAAF champion 2026-11-13 by operator directive under the Direct Model Wiring policy (ROADMAP 2C). Evidence: holdout margin and total log scores significantly better than v4; moneyline Brier gain not significant; totals unprofitable at recorded asks under both models. See outputs/ncaaf/cfb_v5_research.md."
   },
-  "artifact_hash": "82daddd417b1847e6d977bac270cdd88f3151ba2f9319b3dccd9a3f6343fc41b"
+  "artifact_hash": "449bf27c80d62f7ff690b5800cb1474a2244f716f40b684cb8275d5e04a8a06d"
 }

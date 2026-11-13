@@ -152,6 +152,14 @@ MODEL_CATALOG: dict[str, ModelDescriptor] = {
         description="WNBA Total baseline rollback model.",
     ),
     # ── NCAAF ──
+    "cfb-structural-v5": ModelDescriptor(
+        model_id="cfb-structural-v5",
+        sport="NCAAF",
+        market="multi",
+        standard_name="cfb-multi-structural-v5",
+        display_name="NCAAF Unified (CFB Structural v5)",
+        description="College Football v4 joint scoring projection with fitted margin/total mean calibration, residual-based margin SD table and residual total SD (walk-forward fit 2026-11-12).",
+    ),
     "cfb-structural-v4": ModelDescriptor(
         model_id="cfb-structural-v4",
         sport="NCAAF",
@@ -1328,6 +1336,11 @@ MODEL_ALIASES: dict[str, str] = {
     "cfb-spread-structural-v2": "cfb-structural-v2",
     "cfb-total-structural-v2": "cfb-structural-v2",
     "cfb-multi-structural-v2": "cfb-structural-v2",
+    "cfb-moneyline-structural-v5": "cfb-structural-v5",
+    "cfb-spread-structural-v5": "cfb-structural-v5",
+    "cfb-total-structural-v5": "cfb-structural-v5",
+    "cfb-multi-structural-v5": "cfb-structural-v5",
+    "cfb-v5": "cfb-structural-v5",
     "cfb-moneyline-structural-v4": "cfb-structural-v4",
     "cfb-spread-structural-v4": "cfb-structural-v4",
     "cfb-total-structural-v4": "cfb-structural-v4",

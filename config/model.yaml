@@ -428,11 +428,11 @@ models:
     - nfl-spread-structural-v7
     - nfl-total-structural-v7
   NCAAF:
-    family: cfb_structural_v4_bivariate_engine
+    family: cfb_structural_v5_calibrated_bivariate_engine
     enabled: true
     origin: statistical_model
-    active_production_version: cfb-structural-v4
-    production_artifact: config/models/cfb-structural-v4.json
+    active_production_version: cfb-structural-v5
+    production_artifact: config/models/cfb-structural-v5.json
     markets:
     - moneyline
     - spread
@@ -450,7 +450,8 @@ models:
     - cfb-structural-v2
     - cfb-structural-v3
     - cfb-structural-v4
-    note: Overhauled bivariate Negative Binomial score engine with blowout tail expansion (>21.5), key-number preservation, and dynamic unit sizing.
+    - cfb-structural-v5
+    note: v5 (promoted 2026-11-13) = v4 bivariate Negative Binomial projection with walk-forward-fitted margin/total mean calibration, residual-based margin SD table and residual total SD; blowout tail expansion and key-number handling retained.
   TENNIS:
     family: surface_blended_elo
     enabled: true
