@@ -1337,7 +1337,9 @@ def test_nba_total_margin_v2_model_and_forecast():
     assert round(total_p.probabilities["over"] + total_p.probabilities["under"], 5) == 1.0
 
     # 4. Auto-buyer Whitelist/Blacklist
-    assert champ.model_id in DEFAULT_WHITELIST_MODELS or "nba-total-margin-v2" in DEFAULT_WHITELIST_MODELS
+    # NBA totals were pulled from the auto-buyer on 2026-11-13: the champion
+    # forecasts but must not be buyable.
+    assert champ.model_id not in DEFAULT_WHITELIST_MODELS
     assert "nba-total-margin-v1" in EXPLICIT_BLACKLIST_MODELS
 
 
@@ -1413,7 +1415,9 @@ def test_nba_spread_margin_v2_model_and_forecast():
     assert round(spread_p.probabilities["away"] + spread_p.probabilities["home"], 5) == 1.0
 
     # 4. Auto-buyer Whitelist/Blacklist
-    assert champ.model_id in DEFAULT_WHITELIST_MODELS or "nba-spread-margin-v2" in DEFAULT_WHITELIST_MODELS
+    # NBA spread was pulled from the auto-buyer on 2026-11-13 (loss review):
+    # the champion forecasts but must not be buyable.
+    assert champ.model_id not in DEFAULT_WHITELIST_MODELS
     assert "nba-spread-margin-v1" in EXPLICIT_BLACKLIST_MODELS
 
 
