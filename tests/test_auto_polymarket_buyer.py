@@ -308,6 +308,13 @@ def test_buyer_categorically_rejects_nba_total_even_when_model_is_whitelisted():
     assert quote_calls == ["slug-nba-spread-allowed"]
     assert [order["pick_id"] for order in result.dry_run_orders] == ["nba-spread-allowed"]
     assert "nba-total-margin-v9" not in DEFAULT_WHITELIST_MODELS
+    # 2026-11-13 operator directives: NBA spread stays buyable; totals do not; the
+    # serving moneyline champion (nba-elo-trend-lr-v5) "can stay in auto buyer".
+    assert "nba-spread-margin-v9" in DEFAULT_WHITELIST_MODELS
+    assert [m for m in DEFAULT_WHITELIST_MODELS if m.startswith("nba-")] == [
+        "nba-spread-margin-v9",
+        "nba-elo-trend-lr-v5",
+    ]
 
 
 def test_buyer_categorically_rejects_mlb_moneyline_even_when_model_is_whitelisted():

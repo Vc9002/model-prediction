@@ -62,7 +62,8 @@ def test_cfb_missing_side_price_blocks_that_market(tmp_path, monkeypatch, missin
             )
         ]
 
-    monkeypatch.setattr(college_football.CollegeFootballModel, "predict_matchup", predict)
+    # Patch the shared base so whichever champion class cfb_model() returns is stubbed.
+    monkeypatch.setattr(college_football.CFBStructuralV4Model, "predict_matchup", predict)
     slate = college_football.build_cfb_slate(
         tmp_path, "2030-09-07", client=client, observed_at=datetime(2030, 9, 7, 18, tzinfo=UTC)
     )

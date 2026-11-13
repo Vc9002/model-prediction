@@ -17,16 +17,18 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from ..config import PROJECT_ROOT
 from ..domain import parse_utc, utc_now
 from ..features.base import GameRecord
-from ..features.cfb_features import CFB_UNCERTAINTY_FLOOR, CFBGameRecord
+from ..features.cfb_features import CFBGameRecord
 from ..pricing import implied_probability
+from ..production_registry import ProductionModelRegistry, compute_artifact_hash
 from .base import GamePrediction
 from .cfb_distribution import CFBDistributionType
 from .cfb_structural_v4 import (
@@ -38,8 +40,8 @@ from .cfb_structural_v4 import (
     CFB_V4_DEFAULT_HOME_ADVANTAGE,
     CFB_V4_N_SIMULATIONS,
     CFBStructuralV4Model,
-    load_cfb_structural_v4_artifact,
 )
+from .cfb_structural_v5 import CFB_V5_MODEL_VERSION, CFBStructuralV5Model
 
 MODEL_VERSION = "cfb-structural-v4"
 CFB_SPREAD_MODEL_VERSION = "cfb-structural-v4"
@@ -62,6 +64,7 @@ __all__ = [
     "UpcomingCFBGame",
     "build_cfb_slate",
     "cfb_model",
+    "cfb_model_for_artifact",
     "cfb_serving_code_hash",
     "model_week_from_espn_event",
 ]
@@ -125,14 +128,50 @@ class CollegeFootballModel(CFBStructuralV4Model):
         return all_preds
 
 
-def cfb_model() -> CollegeFootballModel:
-    """The production model, parameterised from the frozen v4 artifact (fail-closed)."""
-    return CollegeFootballModel.from_artifact(load_cfb_structural_v4_artifact())
+_SERVING_CLASSES: dict[str, type[CFBStructuralV4Model]] = {
+    MODEL_VERSION: CollegeFootballModel,
+    CFB_V5_MODEL_VERSION: CFBStructuralV5Model,
+}
+
+
+def cfb_model_for_artifact(artifact: Mapping[str, Any]) -> CFBStructuralV4Model:
+    """The serving class for an NCAAF artifact, parameterised from that artifact (fail-closed)."""
+    version = str(artifact.get("model_version") or "")
+    cls = _SERVING_CLASSES.get(version)
+    if cls is None:
+        raise ValueError(f"no NCAAF serving class for artifact model_version {version!r}")
+    return cls.from_artifact(artifact)
+
+
+def cfb_model() -> CFBStructuralV4Model:
+    """The NCAAF champion named by config/production.yaml, built from its own artifact.
+
+    Serving follows the champion map rather than a class default so a promotion cannot
+    leave production pricing with one model while labelling rows with another (the
+    2026-11-11 review's finding #1). All three NCAAF markets must name the same artifact.
+    """
+    registry = ProductionModelRegistry.load(PROJECT_ROOT)
+    champions = {market: registry.champion("NCAAF", market) for market in ("moneyline", "spread", "total")}
+    missing = [m for m, c in champions.items() if c is None or not c.available]
+    if missing:
+        raise ValueError(f"NCAAF champion unavailable for {missing}")
+    ids = {c.model_id for c in champions.values() if c is not None}
+    if len(ids) != 1:
+        raise ValueError(f"NCAAF markets name different champions: {sorted(ids)}")
+    champion = champions["moneyline"]
+    assert champion is not None and champion.artifact
+    payload = json.loads((PROJECT_ROOT / champion.artifact).read_text(encoding="utf-8"))
+    if payload.get("model_version") != champion.model_id:
+        raise ValueError(f"NCAAF champion artifact model_version mismatch for {champion.model_id}")
+    if payload.get("artifact_hash") != compute_artifact_hash(payload):
+        raise ValueError(f"NCAAF champion artifact_hash mismatch for {champion.model_id}")
+    return cfb_model_for_artifact(payload)
 
 
 _SERVING_SOURCE_FILES = (
     "college_football.py",
     "cfb_structural_v4.py",
+    "cfb_structural_v5.py",
     "cfb_distribution.py",
 )
 
@@ -1075,7 +1114,6 @@ def build_cfb_slate(
                         continue
                     inputs = json.loads(json.dumps(base["inference_inputs"]))
                     features = base["features"] or {}
-                    uncertainty = float(features.get("uncertainty", CFB_UNCERTAINTY_FLOOR))
                     # Re-derive both effective SDs with the model's own functions for the
                     # listed line, so a candidate is priced exactly as a pick at that
                     # line would have been (the slate's SDs belong to the slate's line).
@@ -1086,20 +1124,14 @@ def build_cfb_slate(
                             continue
                         home_line = float(home_side["line"])
                         inputs["spread_home_line"] = home_line
-                        inputs["parameters"]["margin_sd"] = model.compute_effective_margin_sd(
-                            spread_home_line=home_line,
-                            uncertainty=uncertainty,
-                            is_conference_matchup=bool(features.get("is_conference_matchup", False)),
-                        )
+                        inputs["parameters"]["margin_sd"] = model.margin_sd_for_features(features, home_line)
                     elif kind == "total":
                         if listed_market.get("line") is None:
                             continue
                         total_line = float(listed_market["line"])
                         inputs["total_line"] = total_line
-                        inputs["parameters"]["total_sd"] = model.compute_effective_total_sd(
-                            projected_total=float(inputs["mu_home"]) + float(inputs["mu_away"]),
-                            total_line=total_line,
-                            uncertainty=uncertainty,
+                        inputs["parameters"]["total_sd"] = model.total_sd_for_features(
+                            features, float(inputs["mu_home"]) + float(inputs["mu_away"]), total_line
                         )
                     try:
                         probability = replay_inputs(inputs, kind)

@@ -113,52 +113,56 @@ def _slate(tmp_path: Path, event: dict, **kwargs):
 
 
 # --------------------------------------------------------------------------- #1 serving parity
-def test_production_factory_is_the_v4_class_parameterised_from_the_artifact() -> None:
-    artifact = json.loads(ARTIFACT_PATH.read_text(encoding="utf-8"))
+def _champion_artifact() -> dict:
+    import yaml
+
+    prod = yaml.safe_load((PROJECT_ROOT / "config" / "production.yaml").read_text(encoding="utf-8"))
+    ids = {prod["prediction_service"]["champions"]["NCAAF"][m] for m in ("moneyline", "spread", "total")}
+    assert len(ids) == 1, ids
+    return json.loads((PROJECT_ROOT / "config" / "models" / f"{ids.pop()}.json").read_text(encoding="utf-8"))
+
+
+def test_production_factory_follows_the_champion_map_and_its_artifact() -> None:
+    """cfb_model() must be the class and parameters of whatever production.yaml names as the
+    NCAAF champion -- never a class default. Today that is cfb-structural-v5."""
+    champion = _champion_artifact()
     model = cfb_model()
     assert isinstance(model, CFBStructuralV4Model)
-    assert model.version == artifact["model_version"] == MODEL_VERSION
-    assert model.margin_sd == artifact["margin_sd"]
-    assert model.total_sd == artifact["total_sd"]
-    assert model.home_advantage_points == artifact["home_advantage_points"]
-    assert model.distribution_type.value == artifact["distribution"]
+    assert model.version == champion["model_version"]
+    base_margin_sd = champion.get("margin_sd") or champion["margin_sd_table"]["established"]
+    assert model.margin_sd == base_margin_sd
+    assert model.total_sd == champion["total_sd"]
+    assert model.home_advantage_points == champion["home_advantage_points"]
+    assert model.distribution_type.value == champion["distribution"]
     assert model.n_simulations == CFB_V4_N_SIMULATIONS == 200_000
+    # The v4 artifact still builds the v4 class (rollback path), with its own numbers.
+    v4 = json.loads(ARTIFACT_PATH.read_text(encoding="utf-8"))
+    rollback = college_football.cfb_model_for_artifact(v4)
+    assert type(rollback) is CollegeFootballModel and rollback.margin_sd == v4["margin_sd"] == 14.5
+    with pytest.raises(ValueError, match="no NCAAF serving class"):
+        college_football.cfb_model_for_artifact({**v4, "model_version": "cfb-structural-v9"})
 
 
 def test_serving_entry_point_records_the_artifact_margin_sd_not_the_legacy_constant(tmp_path) -> None:
     """The slate builder's replay inputs must carry the v4 class's effective SDs for the
     priced line, derived from the artifact's 14.5 base. The retired implementation
     recorded 16.2 x widening under the same model label."""
-    artifact = json.loads(ARTIFACT_PATH.read_text(encoding="utf-8"))
+    champion = _champion_artifact()
     slate = _slate(tmp_path, _event())
     spread = next(c for c in slate["priced_contracts"] if c["market_type"] == "spread")
     features = spread["feature_basis"]
     served = cfb_model()
-    expected_margin_sd = served.compute_effective_margin_sd(
-        spread_home_line=-3.5,
-        uncertainty=float(features["uncertainty"]),
-        is_conference_matchup=bool(features["is_conference_matchup"]),
-    )
+    expected_margin_sd = served.margin_sd_for_features(features, -3.5)
     params = spread["inference_inputs"]["parameters"]
     assert params["margin_sd"] == pytest.approx(expected_margin_sd)
-    assert params["total_sd"] == pytest.approx(
-        served.compute_effective_total_sd(
-            projected_total=float(features["projected_total"]),
-            total_line=50.5,
-            uncertainty=float(features["uncertainty"]),
-        )
+    projected_total = float(spread["inference_inputs"]["mu_home"]) + float(
+        spread["inference_inputs"]["mu_away"]
     )
+    assert params["total_sd"] == pytest.approx(served.total_sd_for_features(features, projected_total, 50.5))
     assert params["n_simulations"] == CFB_V4_N_SIMULATIONS
-    legacy = CollegeFootballModel(margin_sd=16.2).compute_effective_margin_sd(
-        spread_home_line=-3.5,
-        uncertainty=float(features["uncertainty"]),
-        is_conference_matchup=bool(features["is_conference_matchup"]),
-    )
+    legacy = CollegeFootballModel(margin_sd=16.2).margin_sd_for_features(features, -3.5)
     assert params["margin_sd"] != pytest.approx(legacy)
-    assert expected_margin_sd / (1.0 + 2.0 * (float(features["uncertainty"]) - 0.04)) / (
-        0.9135 if features["is_conference_matchup"] else 1.0
-    ) == pytest.approx(artifact["margin_sd"], abs=1e-3)
-    assert spread["model_version"] == artifact["model_version"]
+    assert spread["model_version"] == champion["model_version"]
     # And the recorded inputs replay to the recorded probabilities (settlement contract).
     assert replay_inputs(spread["inference_inputs"], "spread")["home"] == pytest.approx(
         spread["model_probability"] if spread["selection"] == "home" else 1.0 - spread["model_probability"],
@@ -169,16 +173,12 @@ def test_serving_entry_point_records_the_artifact_margin_sd_not_the_legacy_const
 def test_parity_test_detects_a_mis_parameterised_serving_model(tmp_path) -> None:
     """Mutation check: hand the slate builder the legacy 16.2 model and the recorded
     margin_sd no longer matches the artifact-derived value."""
-    artifact = json.loads(ARTIFACT_PATH.read_text(encoding="utf-8"))
     slate = _slate(tmp_path, _event(), model=CollegeFootballModel(margin_sd=16.2))
     spread = next(c for c in slate["priced_contracts"] if c["market_type"] == "spread")
     features = spread["feature_basis"]
-    base = (
-        spread["inference_inputs"]["parameters"]["margin_sd"]
-        / (1.0 + 2.0 * (float(features["uncertainty"]) - 0.04))
-        / (0.9135 if features["is_conference_matchup"] else 1.0)
+    assert spread["inference_inputs"]["parameters"]["margin_sd"] != pytest.approx(
+        cfb_model().margin_sd_for_features(features, -3.5)
     )
-    assert base != pytest.approx(artifact["margin_sd"], abs=1e-3)
 
 
 class _RecordingArtifact(dict):

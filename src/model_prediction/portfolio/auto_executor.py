@@ -58,22 +58,28 @@ if _env_file.exists():
         pass
 
 DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
-    # NBA (v9 spread champion only). nba-moneyline-v9 was removed 2026-11-12:
-    # it ran on placeholder coefficients and was rolled back from serving on
-    # 2026-11-10 (4d5624ed). The serving moneyline champion
-    # (nba-elo-trend-lr-v4, historical_only evidence) is deliberately NOT
-    # listed -- adding it is a trading-eligibility decision for the operator.
-    # nba-total-margin-v9 was removed 2026-11-13 (operator directive: NBA totals
-    # must not reach the paper ledger); ("nba", "total") is also categorically
-    # blocked in DISABLED_AUTO_BUYER_SPORT_MARKETS so a persisted whitelist
-    # cannot restore it.
+    # NBA: spread + moneyline. nba-moneyline-v9 was removed 2026-11-12 (placeholder
+    # coefficients, rolled back from serving 2026-11-10, 4d5624ed). The serving
+    # moneyline champion nba-elo-trend-lr-v5 (promoted 2026-11-13) is listed by
+    # operator directive 2026-11-13 ("nba ml can stay in auto buyer"). Note: while
+    # its registry evidence_status is historical_only, every NBA moneyline Main row
+    # is a PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED paper call, which the decision gate
+    # below rejects -- so this entry buys nothing until that flag changes.
+    # nba-total-margin-v9 was removed 2026-11-13 (NBA totals must not reach the
+    # paper ledger; ("nba", "total") is also blocked in DISABLED_AUTO_BUYER_SPORT_MARKETS).
+    # nba-spread-margin-v9 stays by operator directive 2026-11-13 ("keep nba
+    # spread"), overriding the same-day loss-review pull (2W-7L in its 8-12% edge
+    # bucket, calibration slope 0.19, under-dispersed vs the market line). That
+    # evidence is still open; a market-relative replay is the next step.
     "nba-spread-margin-v9",
+    "nba-elo-trend-lr-v5",
     # NFL (Latest Generation v7 Champions; NFL moneyline currently has no
     # active whitelisted champion -- nfl-elo-trend-lr-v4 is blacklisted below)
     "nfl-spread-structural-v7",
     "nfl-total-structural-v7",
-    # NCAAF (Latest Generation v4 Champion)
-    "cfb-structural-v4",
+    # NCAAF: cfb-structural-v5 promoted 2026-11-13 (operator directive, Direct Model
+    # Wiring policy). v4 no longer produces rows; it is not blacklisted.
+    "cfb-structural-v5",
     # WNBA (Dormant off-season)
     "wnba-elo-trend-lr-v4",
     "wnba-total-margin-v2",

@@ -283,3 +283,74 @@ def test_resolve_cfb_game_weather(tmp_path: Path) -> None:
     assert temp == 50.0
     assert wind == 12.4
     assert precip == 0.10
+
+
+def _injury(name: str, team: str, abbr: str, status: str = "Out", position: str = "SF") -> dict:
+    return {
+        "player_name": name,
+        "team": team,
+        "team_abbreviation": abbr,
+        "status": status,
+        "position": position,
+    }
+
+
+def test_nba_availability_never_matches_other_teams_by_abbreviation_substring() -> None:
+    # quick-261113-jrq: "orl" is inside "new orleans pelicans", "phi" inside "memphis grizzlies",
+    # "gs"/"sa" inside "sacramento kings", "den" inside "golden state warriors". On 2026-11-13 the
+    # live feature charged seven Magic and four 76ers injuries to a Grizzlies/Pelicans game.
+    snapshot = {
+        "timestamp": "2026-11-13T19:00:00Z",
+        "entries": [
+            _injury("Paolo Banchero", "Orlando Magic", "ORL"),
+            _injury("Jalen Suggs", "Orlando Magic", "ORL"),
+            _injury("Joel Embiid", "Philadelphia 76ers", "PHI"),
+            _injury("Stephen Curry", "Golden State Warriors", "GS"),
+            _injury("Nikola Jokic", "Denver Nuggets", "DEN"),
+            _injury("Trey Murphy III", "New Orleans Pelicans", "NO"),
+            _injury("Zach Edey", "Memphis Grizzlies", "MEM", position="C"),
+        ],
+    }
+    result = compute_nba_matchup_availability(
+        data_root="dummy",
+        home_team="New Orleans Pelicans",
+        away_team="Memphis Grizzlies",
+        snapshot=snapshot,
+    )
+    assert [e["team"] for e in result["home_injuries"]] == ["New Orleans Pelicans"]
+    assert [e["team"] for e in result["away_injuries"]] == ["Memphis Grizzlies"]
+
+    kings = compute_nba_matchup_availability(
+        data_root="dummy",
+        home_team="Sacramento Kings",
+        away_team="Portland Trail Blazers",
+        snapshot=snapshot,
+    )
+    assert kings["home_injuries"] == []
+    assert kings["away_injuries"] == []
+    assert kings["availability_total_loss"] == 0.0
+
+
+def test_nba_availability_matches_nickname_variants_and_exact_abbreviations() -> None:
+    snapshot = {
+        "entries": [
+            _injury("Kawhi Leonard", "LA Clippers", "LAC"),
+            _injury("LeBron James", "Los Angeles Lakers", "LAL"),
+            _injury("Jayson Tatum", "Boston Celtics", "BOS"),
+        ],
+    }
+    # ESPN scoreboard spells it "Los Angeles Clippers"; the injury feed says "LA Clippers".
+    clippers = compute_nba_matchup_availability(
+        data_root="dummy",
+        home_team="Los Angeles Clippers",
+        away_team="Oklahoma City Thunder",
+        snapshot=snapshot,
+    )
+    assert [e["player_name"] for e in clippers["home_injuries"]] == ["Kawhi Leonard"]
+    assert clippers["away_injuries"] == []
+    # An abbreviation matches only when the matchup string IS the abbreviation.
+    bos = compute_nba_matchup_availability(
+        data_root="dummy", home_team="BOS", away_team="LAL", snapshot=snapshot
+    )
+    assert [e["player_name"] for e in bos["home_injuries"]] == ["Jayson Tatum"]
+    assert [e["player_name"] for e in bos["away_injuries"]] == ["LeBron James"]

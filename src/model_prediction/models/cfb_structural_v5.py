@@ -226,6 +226,19 @@ class CFBStructuralV5Model(CFBStructuralV4Model):
     ) -> float:
         return self.compute_total_sd(projected_total=projected_total, total_line=total_line)
 
+    def margin_sd_for_features(self, features: Mapping[str, Any], spread_home_line: float) -> float:
+        return self.compute_margin_sd(
+            spread_home_line=spread_home_line,
+            is_fbs_vs_fcs=bool(features.get("is_fbs_vs_fcs", False)),
+            sample_games=int(features.get("sample_games", self.established_min_sample)),
+            is_conference_matchup=bool(features.get("is_conference_matchup", False)),
+        )
+
+    def total_sd_for_features(
+        self, features: Mapping[str, Any], projected_total: float, total_line: float
+    ) -> float:
+        return self.compute_total_sd(projected_total=projected_total, total_line=total_line)
+
     def forecast_game(
         self,
         matchup_features: CFBMatchupFeatures,

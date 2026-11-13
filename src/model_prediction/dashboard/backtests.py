@@ -421,9 +421,35 @@ def _total_side_for_row(row: dict, snapshot: dict) -> str | None:
 
 
 import threading
+from collections import OrderedDict
 
-_SNAPSHOT_FILE_CACHE: dict[Path, tuple[float, list[dict]]] = {}
+# Parsed polymarket_snapshots.jsonl files, newest-used last. The cache was
+# unbounded until 2026-11-13: 774 files / 543 MB on disk parse to ~4.4x that
+# in Python objects, and decorating picks across the season's dates pinned
+# ~2.5 GB in the dashboard process (Windows low-virtual-memory events named
+# it the top consumer at 3.4-3.6 GB). Bounded by on-disk bytes so one 43 MB
+# NCAAF Saturday cannot evict everything else at once but the whole tree can
+# never be resident; evicted files simply re-parse on the next touch.
+_SNAPSHOT_FILE_CACHE: OrderedDict[Path, tuple[float, int, list[dict]]] = OrderedDict()
 _SNAPSHOT_FILE_CACHE_LOCK = threading.Lock()
+_SNAPSHOT_CACHE_MAX_BYTES = 96 * 1024 * 1024  # on-disk bytes; ~400 MB parsed
+_SNAPSHOT_CACHE_BYTES = 0
+
+
+def _snapshot_cache_put(path: Path, mtime: float, size: int, records: list[dict]) -> None:
+    """Insert under the byte cap, evicting least-recently-used files first."""
+    global _SNAPSHOT_CACHE_BYTES
+    with _SNAPSHOT_FILE_CACHE_LOCK:
+        old = _SNAPSHOT_FILE_CACHE.pop(path, None)
+        if old is not None:
+            _SNAPSHOT_CACHE_BYTES -= old[1]
+        _SNAPSHOT_FILE_CACHE[path] = (mtime, size, records)
+        _SNAPSHOT_CACHE_BYTES += size
+        while _SNAPSHOT_CACHE_BYTES > _SNAPSHOT_CACHE_MAX_BYTES and len(_SNAPSHOT_FILE_CACHE) > 1:
+            _, (_, evicted_size, _) = _SNAPSHOT_FILE_CACHE.popitem(last=False)
+            _SNAPSHOT_CACHE_BYTES -= evicted_size
+
+
 # Negative-existence cache: paths confirmed absent on first check are stored here
 # so bulk decoration (4000+ picks) avoids repeated expensive Windows stat() calls.
 _MISSING_PATHS: set[Path] = set()
@@ -441,14 +467,16 @@ def _load_snapshot_file(path: Path) -> list[dict]:
         _MISSING_PATHS.add(path)
         return []
     try:
-        mtime = path.stat().st_mtime
+        stat = path.stat()
+        mtime, size = stat.st_mtime, stat.st_size
     except OSError:
         return []
 
     with _SNAPSHOT_FILE_CACHE_LOCK:
         cached = _SNAPSHOT_FILE_CACHE.get(path)
         if cached is not None and cached[0] == mtime:
-            return cached[1]
+            _SNAPSHOT_FILE_CACHE.move_to_end(path)
+            return cached[2]
 
     records: list[dict] = []
     try:
@@ -472,8 +500,7 @@ def _load_snapshot_file(path: Path) -> list[dict]:
     except OSError:
         return []
 
-    with _SNAPSHOT_FILE_CACHE_LOCK:
-        _SNAPSHOT_FILE_CACHE[path] = (mtime, records)
+    _snapshot_cache_put(path, mtime, size, records)
     return records
 
 

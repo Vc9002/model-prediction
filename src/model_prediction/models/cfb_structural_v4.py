@@ -271,6 +271,28 @@ class CFBStructuralV4Model:
             sd *= 1.0 + CFB_TOTAL_DEVIATION_SCALE * excess
         return round(sd, 3)
 
+    def margin_sd_for_features(self, features: Mapping[str, Any], spread_home_line: float) -> float:
+        """Effective margin SD for a priced line from a recorded feature dict.
+
+        The candidate-evidence pass re-prices every listed line from captured features; this
+        is the one entry point it uses, so a subclass with a different SD model (v5's slice
+        table) overrides it and the slate builder never reaches into version-specific knobs.
+        """
+        return self.compute_effective_margin_sd(
+            spread_home_line=spread_home_line,
+            uncertainty=float(features.get("uncertainty", CFB_UNCERTAINTY_FLOOR)),
+            is_conference_matchup=bool(features.get("is_conference_matchup", False)),
+        )
+
+    def total_sd_for_features(
+        self, features: Mapping[str, Any], projected_total: float, total_line: float
+    ) -> float:
+        return self.compute_effective_total_sd(
+            projected_total=projected_total,
+            total_line=total_line,
+            uncertainty=float(features.get("uncertainty", CFB_UNCERTAINTY_FLOOR)),
+        )
+
     def forecast_game(
         self,
         matchup_features: CFBMatchupFeatures,

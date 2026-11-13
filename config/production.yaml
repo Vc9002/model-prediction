@@ -974,9 +974,9 @@ prediction_service:
       spread: nfl-spread-structural-v7
       total: nfl-total-structural-v7
     NCAAF:
-      moneyline: cfb-structural-v4
-      spread: cfb-structural-v4
-      total: cfb-structural-v4
+      moneyline: cfb-structural-v5
+      spread: cfb-structural-v5
+      total: cfb-structural-v5
     SOCCER:
       moneyline: soccer-poisson-dc-v3
       spread: soccer-poisson-dc-v3
