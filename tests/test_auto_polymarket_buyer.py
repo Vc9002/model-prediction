@@ -308,10 +308,9 @@ def test_buyer_categorically_rejects_nba_total_even_when_model_is_whitelisted():
     assert quote_calls == ["slug-nba-spread-allowed"]
     assert [order["pick_id"] for order in result.dry_run_orders] == ["nba-spread-allowed"]
     assert "nba-total-margin-v9" not in DEFAULT_WHITELIST_MODELS
-    # 2026-11-13: the spread champion is withheld from execution too (loss review);
-    # the explicit per-config whitelist above is what lets this test's order through.
-    assert "nba-spread-margin-v9" not in DEFAULT_WHITELIST_MODELS
-    assert not any(model.startswith("nba-") for model in DEFAULT_WHITELIST_MODELS)
+    # 2026-11-13 operator directive: NBA spread stays buyable; totals do not.
+    assert "nba-spread-margin-v9" in DEFAULT_WHITELIST_MODELS
+    assert [m for m in DEFAULT_WHITELIST_MODELS if m.startswith("nba-")] == ["nba-spread-margin-v9"]
 
 
 def test_buyer_categorically_rejects_mlb_moneyline_even_when_model_is_whitelisted():

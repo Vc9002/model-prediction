@@ -58,17 +58,17 @@ if _env_file.exists():
         pass
 
 DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
-    # NBA: no model is buyable. nba-moneyline-v9 was removed 2026-11-12 (placeholder
+    # NBA: spread only. nba-moneyline-v9 was removed 2026-11-12 (placeholder
     # coefficients, rolled back from serving 2026-11-10, 4d5624ed); the serving
     # moneyline champion is deliberately NOT listed -- adding it is a
     # trading-eligibility decision for the operator. nba-total-margin-v9 was
     # removed 2026-11-13 (NBA totals must not reach the paper ledger; ("nba",
     # "total") is also blocked in DISABLED_AUTO_BUYER_SPORT_MARKETS).
-    # nba-spread-margin-v9 was removed 2026-11-13 (operator directive after the
-    # 11-12 loss review): 2W-7L in its 8-12% edge bucket, calibration slope 0.19,
-    # and its projections are under-dispersed against the market line (0W-3L when
-    # it disagrees by 4-6 points). It keeps forecasting for the ledgers; only
-    # execution is withheld until a market-relative replay shows it beats the line.
+    # nba-spread-margin-v9 stays by operator directive 2026-11-13 ("keep nba
+    # spread"), overriding the same-day loss-review pull (2W-7L in its 8-12% edge
+    # bucket, calibration slope 0.19, under-dispersed vs the market line). That
+    # evidence is still open; a market-relative replay is the next step.
+    "nba-spread-margin-v9",
     # NFL (Latest Generation v7 Champions; NFL moneyline currently has no
     # active whitelisted champion -- nfl-elo-trend-lr-v4 is blacklisted below)
     "nfl-spread-structural-v7",

@@ -1415,9 +1415,9 @@ def test_nba_spread_margin_v2_model_and_forecast():
     assert round(spread_p.probabilities["away"] + spread_p.probabilities["home"], 5) == 1.0
 
     # 4. Auto-buyer Whitelist/Blacklist
-    # NBA spread was pulled from the auto-buyer on 2026-11-13 (loss review):
-    # the champion forecasts but must not be buyable.
-    assert champ.model_id not in DEFAULT_WHITELIST_MODELS
+    # 2026-11-13 operator directive ("keep nba spread"): the spread champion
+    # stays buyable; the loss-review pull of the same day was overridden.
+    assert champ.model_id in DEFAULT_WHITELIST_MODELS
     assert "nba-spread-margin-v1" in EXPLICIT_BLACKLIST_MODELS
 
 
