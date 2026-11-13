@@ -1181,7 +1181,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 len(_priced_esports),
             )
 
-    def _esports_block() -> None:
+    def _esports_block(titles: tuple[str, ...] = ESPORTS_TITLES) -> None:
         try:
             forecast_result["_esports_ratings_refresh"] = _refresh_esports_ratings(data_directory)
         except Exception:
@@ -1189,7 +1189,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         # Titles are independent of each other once ratings are
         # refreshed above -- fan them out too instead of one at a time.
         with ThreadPoolExecutor(max_workers=1) as title_pool:
-            title_futures = {title_pool.submit(_esports_title_task, title): title for title in ESPORTS_TITLES}
+            title_futures = {title_pool.submit(_esports_title_task, title): title for title in titles}
             for future in as_completed(title_futures):
                 title = title_futures[future]
                 try:
@@ -1222,7 +1222,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 len(_priced_intl),
             )
 
-    def _intl_baseball_block() -> None:
+    def _intl_baseball_block(leagues: tuple[str, ...] = DAILY_INTERNATIONAL_BASEBALL_SPORTS) -> None:
         try:
             forecast_result["_international_baseball_ratings_refresh"] = (
                 _refresh_international_baseball_ratings(data_directory)
@@ -1230,10 +1230,9 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         except Exception:
             logger.warning("International baseball ratings refresh failed", exc_info=True)
         # International baseball — logged to research/gated/flat ledgers
-        with ThreadPoolExecutor(max_workers=len(DAILY_INTERNATIONAL_BASEBALL_SPORTS)) as league_pool:
+        with ThreadPoolExecutor(max_workers=len(leagues)) as league_pool:
             league_futures = {
-                league_pool.submit(_intl_baseball_league_task, league): league
-                for league in DAILY_INTERNATIONAL_BASEBALL_SPORTS
+                league_pool.submit(_intl_baseball_league_task, league): league for league in leagues
             }
             for future in as_completed(league_futures):
                 league = league_futures[future]
@@ -1277,12 +1276,33 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             logger.warning("%s forecast failed", sport, exc_info=True)
             forecast_result[sport] = {"status": "error", "reason": str(exc), "logged": 0}
 
+    def _daily_sport_disabled(sport_key: str) -> bool:
+        # Operator directive 2026-11-13: production is narrowed to NBA, NCAAF, NFL,
+        # MLB, WNBA and NCAAB. The other sports are switched off through their
+        # config/model.yaml flags, and these tasks honour the same gate the learned
+        # pool above already uses -- so a sport is disabled in exactly one place,
+        # instead of these blocks running unconditionally as they did before.
+        if is_sport_daily_enabled(config, sport_key):
+            return False
+        logger.info("Sport %s is disabled in config/model.yaml; skipping daily forecast.", sport_key.upper())
+        forecast_result[sport_key] = {
+            "sport": sport_key,
+            "status": "off_season",
+            "logged": 0,
+            "candidates": [],
+            "reason": "disabled_in_config",
+        }
+        return True
+
+    enabled_esports_titles = tuple(t for t in ESPORTS_TITLES if not _daily_sport_disabled(t))
+    enabled_intl_leagues = tuple(
+        lg for lg in DAILY_INTERNATIONAL_BASEBALL_SPORTS if not _daily_sport_disabled(lg)
+    )
+
     with ThreadPoolExecutor(max_workers=16) as research_pool:
         research_futures_map = {
             research_pool.submit(_mlb_totals_task): "mlb_totals",
             research_pool.submit(_mlb_nrfi_task): "mlb_nrfi",
-            research_pool.submit(_soccer_task): "soccer",
-            research_pool.submit(_tennis_task): "tennis",
             research_pool.submit(_cfb_task): "cfb",
             research_pool.submit(_wnba_spread_task): "wnba_spread",
             research_pool.submit(_wnba_total_task): "wnba_total",
@@ -1290,8 +1310,6 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             research_pool.submit(_nba_total_task): "nba_total",
             research_pool.submit(_nfl_spread_task): "nfl_spread",
             research_pool.submit(_nfl_total_task): "nfl_total",
-            research_pool.submit(_esports_block): "esports",
-            research_pool.submit(_intl_baseball_block): "intl_baseball",
             **{
                 research_pool.submit(_additional_sport_task, sport, forecast_function): sport
                 for sport, forecast_function in zip(
@@ -1305,8 +1323,19 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                     ),
                     strict=True,
                 )
+                if not _daily_sport_disabled(sport)
             },
         }
+        if not _daily_sport_disabled("soccer"):
+            research_futures_map[research_pool.submit(_soccer_task)] = "soccer"
+        if not _daily_sport_disabled("tennis"):
+            research_futures_map[research_pool.submit(_tennis_task)] = "tennis"
+        if enabled_esports_titles:
+            research_futures_map[research_pool.submit(_esports_block, enabled_esports_titles)] = "esports"
+        if enabled_intl_leagues:
+            research_futures_map[research_pool.submit(_intl_baseball_block, enabled_intl_leagues)] = (
+                "intl_baseball"
+            )
 
         _research_pool_started = time.monotonic()
         for rf in as_completed(research_futures_map):

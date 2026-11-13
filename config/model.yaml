@@ -304,6 +304,8 @@ models:
   SOCCER:
     family: poisson_dixon_coles
     enabled: true
+    # Out of scope since 2026-11-13 (CLAUDE.md 'Scope'): code kept, daily forecast off.
+    daily_forecast_enabled: false
     origin: statistical_model
     qualification_override: true
     qualification_override_reason: 'Operator directive, 2026-08-02: promote soccer
@@ -455,6 +457,8 @@ models:
   TENNIS:
     family: surface_blended_elo
     enabled: true
+    # Out of scope since 2026-11-13 (CLAUDE.md 'Scope'): code kept, daily forecast off.
+    daily_forecast_enabled: false
     origin: statistical_model
     qualification_override: true
     qualification_override_reason: 'Overhaul 2026-11-02: Promoted tennis-surface-elo-v6 and tennis-games-markov-v4
@@ -479,6 +483,8 @@ models:
   LOL:
     family: neutral_series_elo
     enabled: true
+    # Out of scope since 2026-11-13 (CLAUDE.md 'Scope'): code kept, daily forecast off.
+    daily_forecast_enabled: false
     origin: statistical_model
     qualification_override: true
     qualification_override_reason: Esports v6 artifacts use Platt-scaled Elo; qualification
@@ -518,6 +524,8 @@ models:
   CS2:
     family: neutral_series_elo
     enabled: true
+    # Out of scope since 2026-11-13 (CLAUDE.md 'Scope'): code kept, daily forecast off.
+    daily_forecast_enabled: false
     origin: statistical_model
     qualification_override: true
     qualification_override_reason: Esports v6 artifacts use Platt-scaled Elo; qualification
@@ -539,6 +547,8 @@ models:
   DOTA2:
     family: neutral_series_elo
     enabled: true
+    # Out of scope since 2026-11-13 (CLAUDE.md 'Scope'): code kept, daily forecast off.
+    daily_forecast_enabled: false
     origin: statistical_model
     qualification_override: true
     qualification_override_reason: Esports v6 artifacts use Platt-scaled Elo; qualification
@@ -562,6 +572,8 @@ models:
   VALORANT:
     family: neutral_series_elo
     enabled: true
+    # Out of scope since 2026-11-13 (CLAUDE.md 'Scope'): code kept, daily forecast off.
+    daily_forecast_enabled: false
     origin: statistical_model
     qualification_override: true
     qualification_override_reason: Esports v6 artifacts use Platt-scaled Elo; qualification
@@ -582,6 +594,8 @@ models:
   RAINBOW_SIX:
     family: neutral_series_elo
     enabled: true
+    # Out of scope since 2026-11-13 (CLAUDE.md 'Scope'): code kept, daily forecast off.
+    daily_forecast_enabled: false
     origin: statistical_model
     active_production_version: rainbow_six-tiered-elo-v6
     active_research_version: r6-contextual-v7
@@ -596,6 +610,8 @@ models:
   KBO:
     family: tie_aware_home_elo
     enabled: true
+    # Out of scope since 2026-11-13 (CLAUDE.md 'Scope'): code kept, daily forecast off.
+    daily_forecast_enabled: false
     origin: statistical_model
     qualification_override: true
     qualification_override_reason: Tie-aware Elo model; standard moneyline qualification
@@ -615,6 +631,8 @@ models:
   NPB:
     family: tie_aware_home_elo
     enabled: true
+    # Out of scope since 2026-11-13 (CLAUDE.md 'Scope'): code kept, daily forecast off.
+    daily_forecast_enabled: false
     origin: statistical_model
     qualification_override: true
     qualification_override_reason: Tie-aware Elo model; standard moneyline qualification
@@ -640,6 +658,8 @@ models:
   HOCKEY:
     family: poisson_dixon_coles
     enabled: true
+    # Out of scope since 2026-11-13 (CLAUDE.md 'Scope'): code kept, daily forecast off.
+    daily_forecast_enabled: false
     origin: statistical_model
     model_type: hockey_bivariate_poisson
     active_production_version: hockey-poisson-dc-v2
@@ -663,6 +683,8 @@ models:
   DARTS:
     family: exact_markov_leg_progression
     enabled: true
+    # Out of scope since 2026-11-13 (CLAUDE.md 'Scope'): code kept, daily forecast off.
+    daily_forecast_enabled: false
     origin: statistical_model
     model_type: darts_markov
     active_production_version: darts-markov-v2
@@ -703,6 +725,8 @@ models:
   EUROLEAGUE:
     family: elo_trend_normal_approximation
     enabled: true
+    # Out of scope since 2026-11-13 (CLAUDE.md 'Scope'): code kept, daily forecast off.
+    daily_forecast_enabled: false
     origin: statistical_model
     active_production_version: eurolg-tempo-v2
     active_research_version: eurolg-tempo-v1
@@ -722,6 +746,8 @@ models:
   NBL:
     family: elo_trend_normal_approximation
     enabled: true
+    # Out of scope since 2026-11-13 (CLAUDE.md 'Scope'): code kept, daily forecast off.
+    daily_forecast_enabled: false
     origin: statistical_model
     active_production_version: nbl-tempo-v2
     active_research_version: nbl-tempo-v1
