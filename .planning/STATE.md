@@ -4,10 +4,10 @@ current_phase: 1
 current_phase_name: Portfolio Circuit Breaker
 status: planning
 stopped_at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated to 4-phase structure
-last_updated: "2026-11-13T18:50:54.743Z"
-last_activity: 2026-11-12
+last_updated: "2026-11-13T18:59:23.231Z"
+last_activity: 2026-11-13
 last_activity_desc: ROADMAP.md and STATE.md created from REQUIREMENTS.md and research/SUMMARY.md
-state_head: ec3210a21955451c905d516a48ee607f7f17be1a
+state_head: 8b57f9612da6623b32685da0022db4b693575228
 progress:
   total_phases: 4
   completed_phases: 0
@@ -45,7 +45,7 @@ See: .planning/PROJECT.md (updated 2026-09-20 after initialization)
 Phase: 1 of 4 (Portfolio Circuit Breaker)
 Plan: None yet in current phase
 Status: Ready to plan
-Last activity: 2026-11-13 - Completed quick task 261113-j3m: promoted nba-elo-trend-lr-v5 to NBA moneyline champion (promo-20261113T184744Z-6b0b74), v4 rollback, serving pointer and statuses moved together.
+Last activity: 2026-11-13 - Completed quick task 261113-jb1: Harden RuntimeLedgerStore against transient sqlite disk I/O error under memory pressure
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -105,6 +105,7 @@ None yet.
 | 261112-mpz | Full pipeline verification: reroute health/daily/dashboard odds readers to the runtime root, stop the schedule rewriting frozen config/models artifacts, single-thread BLAS in ingestion | 2026-11-12 | c96f28cf | [261112-mpz-fix-odds-root-split-brain-and-frozen-art](./quick/261112-mpz-fix-odds-root-split-brain-and-frozen-art/) |
 | 261113-r2d | Disable NBA totals in the auto-buyer: nba:total categorical gate + nba-total-margin-v9 off the whitelist; live state updated (v173->v174); 11 settled NBA total paper rows left in place | 2026-11-13 | c3522f2a | [261113-r2d-disable-nba-totals-in-the-paper-auto-buyer](./quick/261113-r2d-disable-nba-totals-in-the-paper-auto-buyer/) |
 | 261113-j3m | Promote nba-elo-trend-lr-v5 to NBA moneyline champion (promo-20261113T184744Z-6b0b74); v4 rollback; model.yaml serving pointer moved with it | 2026-11-13 | ec3210a2 | [261113-j3m-promote-nba-elo-trend-lr-v5-to-nba-money](./quick/261113-j3m-promote-nba-elo-trend-lr-v5-to-nba-money/) |
+| 261113-jb1 | Harden RuntimeLedgerStore against transient sqlite disk I/O error under memory pressure | 2026-11-13 | 8b57f961 | [261113-jb1-harden-runtimeledgerstore-against-transi](./quick/261113-jb1-harden-runtimeledgerstore-against-transi/) |
 
 ## Milestone History
 
