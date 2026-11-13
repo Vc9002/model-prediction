@@ -684,3 +684,112 @@ def test_store_usable_from_multiple_threads(tmp_path) -> None:
     assert all(results)
     assert store.records(tier="research", sport="wnba")
     store.close()
+
+
+# ---------------------------------------------------------------------------
+# quick-261113-jb1: transient "disk I/O error" under host memory pressure.
+# The 2026-11-13 05:30Z daily run died in records() with SQLITE_IOERR while
+# Windows logged Resource-Exhaustion (2004) events; the per-thread connections
+# each mapped 256MB of the 1.1GB ledger, and a memory-mapped read that cannot be
+# committed surfaces as an I/O error, not out-of-memory.
+
+
+def test_connection_pragmas_avoid_mmap_and_cap_the_page_cache(tmp_path) -> None:
+    paths = RuntimePaths.for_test(tmp_path)
+    with RuntimeLedgerStore(paths) as store:
+        conn = store._conn
+        assert conn.execute("PRAGMA mmap_size").fetchone()[0] == 0
+        assert conn.execute("PRAGMA cache_size").fetchone()[0] == -32000
+
+
+def _poisoned_connect(monkeypatch, state: dict):
+    """Patch sqlite3.connect so the next ``state['poison']`` connections raise
+    'disk I/O error' on every execute, then hand out healthy ones."""
+    import sqlite3
+
+    real_connect = sqlite3.connect
+
+    class _Flaky(sqlite3.Connection):
+        poisoned = False
+
+        def execute(self, *args, **kwargs):  # type: ignore[override]
+            if self.poisoned:
+                raise sqlite3.OperationalError("disk I/O error")
+            return super().execute(*args, **kwargs)
+
+    def fake_connect(*args, **kwargs):
+        kwargs.setdefault("factory", _Flaky)
+        conn = real_connect(*args, **kwargs)
+        state["created"] = state.get("created", 0) + 1
+        if state.get("poison", 0) > 0:
+            state["poison"] -= 1
+            conn.poisoned = True
+        return conn
+
+    monkeypatch.setattr(sqlite3, "connect", fake_connect)
+
+
+def test_records_survives_transient_disk_io_errors_by_reconnecting(tmp_path, monkeypatch) -> None:
+    from model_prediction import runtime_ledger_store as module
+
+    monkeypatch.setattr(module, "_RETRY_DELAYS", (0.0, 0.0, 0.0))
+    state: dict = {"poison": 0}
+    _poisoned_connect(monkeypatch, state)
+    paths = RuntimePaths.for_test(tmp_path)
+    with RuntimeLedgerStore(paths) as store:
+        store.apply(_mutation())
+        # Drop the healthy connection, then make the next two fail like the
+        # 05:30Z run: SQLITE_IOERR on the first statement of a fresh connection.
+        store._reset_connection()
+        state["poison"] = 2
+        created_before = state["created"]
+        rows = store.records(tier="main")
+        assert len(rows) == 1
+        # Two poisoned connections were opened and discarded, one healthy one succeeded.
+        assert state["created"] - created_before == 3
+
+
+def test_records_gives_up_after_the_bounded_retries(tmp_path, monkeypatch) -> None:
+    import sqlite3
+
+    from model_prediction import runtime_ledger_store as module
+
+    monkeypatch.setattr(module, "_RETRY_DELAYS", (0.0, 0.0, 0.0))
+    state: dict = {"poison": 0}
+    _poisoned_connect(monkeypatch, state)
+    paths = RuntimePaths.for_test(tmp_path)
+    with RuntimeLedgerStore(paths) as store:
+        store.apply(_mutation())
+        store._reset_connection()
+        state["poison"] = 10**6  # every further connection fails
+        created_before = state["created"]
+        with pytest.raises(sqlite3.OperationalError, match="disk I/O error"):
+            store.records(tier="main")
+        # First attempt plus one per retry delay, then re-raise: no unbounded loop.
+        assert state["created"] - created_before == len(module._RETRY_DELAYS) + 1
+
+
+def test_records_does_not_retry_non_transient_operational_errors(tmp_path, monkeypatch) -> None:
+    import sqlite3
+
+    from model_prediction import runtime_ledger_store as module
+
+    monkeypatch.setattr(module, "_RETRY_DELAYS", (0.0, 0.0, 0.0))
+    paths = RuntimePaths.for_test(tmp_path)
+    with RuntimeLedgerStore(paths) as store:
+        calls = {"n": 0}
+        real_conn = store._conn
+
+        class _Broken:
+            def execute(self, *args, **kwargs):
+                calls["n"] += 1
+                raise sqlite3.OperationalError("no such table: ledger_records")
+
+            def __getattr__(self, name):
+                return getattr(real_conn, name)
+
+        store._local.conn = _Broken()
+        with pytest.raises(sqlite3.OperationalError, match="no such table"):
+            store.records(tier="main")
+        assert calls["n"] == 1
+        store._local.conn = real_conn

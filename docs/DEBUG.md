@@ -1,5 +1,37 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
+## 2026-11-13 — 05:30Z daily failure: sqlite "disk I/O error" in the ledger store under host memory pressure (quick-261113-jb1)
+
+`daily-20261113T053001Z-8f176c` exited 1. The NCAAB forecast raised
+`sqlite3.OperationalError: disk I/O error` inside `RuntimeLedgerStore.records()` while
+`PickLedger._append_record` re-read the Flat mirror; the run then failed `ledger_coverage`. The
+11:00Z, 14:00Z and 17:00Z runs were green and `PRAGMA quick_check` on `ledgers.db` returns ok.
+
+- **Root cause (host, not disk)**: Windows System log Resource-Exhaustion-Detector Id 2004
+  ("low virtual memory condition") at 00:41:49 and 00:42:24 local, inside that run's Step 2
+  window (05:33Z-05:49Z); top consumers Overwatch.exe 3.6-4.9 GB and the daily python.exe
+  3.4 GB; DWM crashed at 00:41:53. The 2026-11-12 05:30Z failure window carries the same 2004
+  events (rust-analyzer + python), the same hour the 11-11/11-12 ingestion `MemoryError`s above
+  hit. Ruled out: drive E (healthy NVMe, no disk/NTFS events, 189 GB free), Defender (no scan
+  in the window), the 08:00Z offsite backup, and `log_maintenance` (VACUUMs top-level `*.db`
+  only, never `ledgers/ledgers.db`).
+- **Why it surfaces as I/O**: the store opened one connection per forecast thread (16 workers)
+  with `PRAGMA mmap_size=268435456` and a 64 MB page cache each: 4 GB of address space mapped
+  over a 1.1 GB file. A memory-mapped page that cannot be committed fails as `SQLITE_IOERR`,
+  not `SQLITE_NOMEM`.
+- **Fix** (`runtime_ledger_store.py`): `mmap_size=0`, `cache_size=-32000`, and a bounded
+  reopen-and-retry in `records()` for `OperationalError` messages containing "disk I/O error"
+  or "database is locked" (`_RETRY_DELAYS = (0.5, 1.5, 3.0)`, so four attempts), re-raising
+  anything else on the first attempt. New `_reset_connection()` closes and drops the thread's
+  handle so the retry does not reuse a poisoned page cache.
+- **Tests** (`tests/test_runtime_ledger_store.py`, all four fail on the pre-fix code):
+  pragma values; two poisoned connections then success; persistent failure raises after
+  `len(_RETRY_DELAYS) + 1` connections; a `no such table` error is not retried.
+- **Follow-ups, not done here**: `PickLedger._append_record` re-reads the entire tier/sport
+  mirror on every append (that is why the daily process holds so many large result sets at
+  once); and the host itself runs at about 1 GB free of 31.7 GB while games or rust-analyzer are
+  up, which no code change removes.
+
 ## 2026-11-12 — Full pipeline verification: odds-root split-brain in health/daily/dashboard, frozen artifacts rewritten by the schedule (quick-261112-mpz)
 
 Operator directive "verify and run through ALL pipeline and workflows". Commit `c96f28cf`.
