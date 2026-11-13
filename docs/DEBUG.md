@@ -71,6 +71,33 @@ champions map change. Harmless functionally; recorded for the audit trail.
 - Reproduction gate: the 21:0xZ daily's 132 Flat rows are reproduced exactly by the deployed
   artifact model.
 
+## 2026-11-13 — NBA availability feature charged other teams' injuries to a matchup via abbreviation substrings (quick-261113-jrq)
+
+Found while re-pricing the 2026-11-13 slate after the ledger-store fix. `compute_nba_matchup_availability`
+assigned an injury row to a side when the row's team name was a substring of the matchup name (or the
+reverse) OR when the row's two/three-letter abbreviation appeared anywhere inside the matchup name.
+
+- **Blast radius tonight**: Grizzlies at Pelicans counted seven Orlando Magic ("orl" in "new orleans")
+  and four Philadelphia 76ers ("phi" in "memphis") injuries: home_lost 12.0 / away_lost 10.1 instead of
+  5.5 / 4.4, so the Main under 233.5 was priced on 22 phantom points of absence. Blazers at Kings counted
+  six Warriors ("gs" in "kings") and four Spurs ("sa" in "sacramento"); Warriors at Spurs counted a
+  Nugget ("den" in "golden"). The same code also MISSED real injuries when the feed and scoreboard spell a
+  city differently ("LA Clippers" vs "Los Angeles Clippers"): Clippers home_lost 0.0 -> 5.8 after the fix.
+- **Scope**: the feature is wired into `nba-spread-margin-v9` / `nba-total-margin-v9` (and v7 before
+  them) as `expected_margin += availability_points_gap` and `total -= 0.15 * availability_total_loss`,
+  so every settled v7/v9 row for a matchup whose name contains another team's abbreviation carries the
+  contamination. The replay snapshot does not persist the availability inputs, so the affected history
+  cannot be re-priced from the ledger alone.
+- **Fix**: `_team_matches()` with exact normalized-name equality, else nickname (last token) equality
+  (NBA nicknames are unique), else abbreviation equality only when the matchup string itself is the
+  abbreviation. No substring tests remain.
+- **Tests** (`tests/test_nba_nhl_cfb_injuries.py`): decoy Magic/76ers/Warriors/Nuggets rows against a
+  Pelicans/Grizzlies and a Kings/Blazers matchup; "LA Clippers" nickname match; abbreviation-only
+  matchup strings. Both new tests fail on the old matcher. The two failures in
+  `tests/test_five_blind_spot_guards.py` on this tree (`no NCAAF serving class ... 'cfb-structural-v3'`,
+  `unit_policy` mock lacking `.rows`) predate this change and come from the NCAAF v5 promotion and
+  `forecast.py` edits landing in parallel.
+
 ## 2026-11-13 — 05:30Z daily failure: sqlite "disk I/O error" in the ledger store under host memory pressure (quick-261113-jb1)
 
 `daily-20261113T053001Z-8f176c` exited 1. The NCAAB forecast raised

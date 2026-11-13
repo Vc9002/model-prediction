@@ -230,6 +230,36 @@ def load_latest_nba_injury_snapshot(
     return None
 
 
+def _normalize_team(value: str) -> str:
+    return " ".join(value.casefold().split())
+
+
+def _team_matches(entry_team: str, entry_abbr: str, matchup_team: str) -> bool:
+    """Decide whether an injury-feed row belongs to ``matchup_team``.
+
+    Exact matches only. The previous substring test (``abbr in team_name``)
+    charged other teams' injuries to a matchup whenever a two- or three-letter
+    abbreviation happened to appear inside a name: "orl" sits inside
+    "new orleans pelicans", "phi" inside "memphis grizzlies", "gs" and "sa"
+    inside "sacramento kings", "den" inside "golden state warriors". On
+    2026-11-13 that priced a Grizzlies/Pelicans total on seven Magic and four
+    76ers injuries (quick-261113-jrq). Nickname equality is kept because the
+    scoreboard and the injury feed spell some cities differently ("Los Angeles
+    Clippers" vs "LA Clippers") and NBA nicknames are unique; an abbreviation
+    counts only when the matchup string itself is that abbreviation.
+    """
+    target = _normalize_team(matchup_team)
+    name = _normalize_team(entry_team)
+    abbr = _normalize_team(entry_abbr)
+    if not target:
+        return False
+    if name and name == target:
+        return True
+    if name and target.split()[-1] == name.split()[-1] and " " in name and " " in target:
+        return True
+    return bool(abbr) and abbr == target
+
+
 def compute_nba_matchup_availability(
     data_root: str | Path,
     home_team: str,
@@ -276,21 +306,16 @@ def compute_nba_matchup_availability(
         }
 
     entries = snap.get("entries", [])
-    home_norm = home_team.casefold().strip()
-    away_norm = away_team.casefold().strip()
 
     home_injuries: list[dict[str, Any]] = []
     away_injuries: list[dict[str, Any]] = []
 
     for entry in entries:
-        t_name = str(entry.get("team", "")).casefold().strip()
-        t_abbr = str(entry.get("team_abbreviation", "")).casefold().strip()
-        is_home = (t_name in home_norm or home_norm in t_name) or (t_abbr and t_abbr in home_norm)
-        is_away = (t_name in away_norm or away_norm in t_name) or (t_abbr and t_abbr in away_norm)
-
-        if is_home:
+        t_name = str(entry.get("team", ""))
+        t_abbr = str(entry.get("team_abbreviation", ""))
+        if _team_matches(t_name, t_abbr, home_team):
             home_injuries.append(entry)
-        elif is_away:
+        elif _team_matches(t_name, t_abbr, away_team):
             away_injuries.append(entry)
 
     def _team_loss(injury_list: list[dict[str, Any]], team_off_rating: float | None) -> float:
