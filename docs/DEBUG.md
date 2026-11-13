@@ -55,6 +55,43 @@
   once); and the host itself runs at about 1 GB free of 31.7 GB while games or rust-analyzer are
   up, which no code change removes.
 
+## 2026-11-13 — Loss review of the 1W-7L paper day; NBA v9 spread/total pulled from the auto-buyer (quick-261113-jf1)
+
+Operator directive "investigate this performance loss, and check pipeline logs". Commit `c648e048`.
+
+- **The loss**: paper auto-buyer ledger, event date 2026-11-12, 8 settled orders, -$41.08. Five
+  NCAAB spread paper-trial orders at $0.50 units (1W-4L, -$1.56) and three NBA v9 orders at $10
+  units (0W-3L, -$39.53): `nba-spread-margin-v9` Raptors +7.5 (model 61.1% vs ask 51.9%), and
+  `nba-total-margin-v9` under 223.5 PHI/TOR (58.9% vs 49.0%; actual 235) and over 214.5 CHA/PHX
+  (61.8% vs 51.0%; actual 197). Decision packets intact: executable Polymarket quotes, valid
+  timestamps, identity calibrator. Classification: **model_error**.
+- **Evidence** (canonical `ledgers.db`, Flat tier, settled rows): `nba-total-margin-v9` 13W-20L
+  (-8.8u), 2W-5L at 8-12% edge; its projections are under-dispersed against the market line
+  (sd 4.6 vs 6.6 points) and worse than the line at predicting totals (MAE 14.0 vs 12.7); record
+  by |model - line|: <2 pts 6W-8L, 2-4 3W-4L, 4-6 2W-7L. `nba-spread-margin-v9` 17W-17L, 2W-7L at
+  8-12% edge, MAE 12.0 vs the line's 11.3, 0W-3L at 4-6 points of disagreement. The v7 totals
+  model shows the same 0W-5L at 8-12% edge, so this is structural (no market anchoring), not a
+  v9 regression. The nightly calibration audit rates both SEVERE_DRIFT (spread slope 0.19,
+  ECE 15%; total ECE 12%) but with 33-34 outcomes the >=100-outcome guard keeps the serving
+  calibrator at identity, so the buyer sees raw probabilities; edge-scaled sizing then put
+  1.25-1.4u on the worst bucket. Both v9 models became champions on 2026-11-08 (`84258909`)
+  with no promotions-table record and no evidence doc.
+- **Action**: `nba-spread-margin-v9` removed from `DEFAULT_WHITELIST_MODELS` and from the
+  persisted whitelist (versioned save 175 -> 176, backup kept); totals were already out
+  (quick-261113-r2d). Forecasting unchanged. Owed: a market-relative replay before either is
+  made buyable again; a promotion record for the 11-08 activation.
+- **Pipeline logs**: 00:30 ET on 11-13 failed again, this time `sqlite3.OperationalError: disk I/O
+  error` reading `ledgers.db` (1.17 GB, `quick_check` ok, SSDs healthy). Windows System event
+  2004 (low virtual memory) fired at 00:41 naming Overwatch 4.9 GB, the dashboard python 3.4 GB and
+  rust-analyzer 2.9 GB; the same event fired at 00:31-00:45 on 11-12 (the MemoryError run) and
+  00:36 on 11-11. The three nights' different errors share one host cause. The BLAS fix held
+  (ingestion exit 0 at 00:30); every later run on 11-13 was clean. Event 2004 also fired at 16:10
+  and 20:18 on 11-12 with the dashboard process as top consumer (3.6 GB); the dashboard was
+  restarted at 13:37 today (1 GB now). The calibrate worker's SEVERE_DRIFT flag names about 130
+  lanes and is not discriminating.
+- **NCAAB forward check** (pinned in the handoff): 1W-4L in the 5-8% bucket with 6 open since
+  the 11-12 fix; nothing to conclude yet.
+
 ## 2026-11-12 — Full pipeline verification: odds-root split-brain in health/daily/dashboard, frozen artifacts rewritten by the schedule (quick-261112-mpz)
 
 Operator directive "verify and run through ALL pipeline and workflows". Commit `c96f28cf`.

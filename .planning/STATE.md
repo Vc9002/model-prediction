@@ -106,6 +106,7 @@ None yet.
 | 261113-r2d | Disable NBA totals in the auto-buyer: nba:total categorical gate + nba-total-margin-v9 off the whitelist; live state updated (v173->v174); 11 settled NBA total paper rows left in place | 2026-11-13 | c3522f2a | [261113-r2d-disable-nba-totals-in-the-paper-auto-buyer](./quick/261113-r2d-disable-nba-totals-in-the-paper-auto-buyer/) |
 | 261113-j3m | Promote nba-elo-trend-lr-v5 to NBA moneyline champion (promo-20261113T184744Z-6b0b74); v4 rollback; model.yaml serving pointer moved with it | 2026-11-13 | ec3210a2 | [261113-j3m-promote-nba-elo-trend-lr-v5-to-nba-money](./quick/261113-j3m-promote-nba-elo-trend-lr-v5-to-nba-money/) |
 | 261113-jb1 | Harden RuntimeLedgerStore against transient sqlite disk I/O error under memory pressure | 2026-11-13 | de9c71c3 | [261113-jb1-harden-runtimeledgerstore-against-transi](./quick/261113-jb1-harden-runtimeledgerstore-against-transi/) |
+| 261113-jf1 | Pull nba-spread-margin-v9 (and total v9) from the paper auto-buyer whitelist after the 2026-11-12 loss review; persisted state updated via versioned save | 2026-11-13 | c648e048 | [261113-jf1-pull-nba-v9-spread-and-total-from-the-paper-wh](./quick/261113-jf1-pull-nba-v9-spread-and-total-from-the-paper-wh/) |
 
 ## Milestone History
 
