@@ -203,6 +203,11 @@ TOTAL_VARIANTS: dict[str, dict[str, Any]] = {
     "shipped_attempts_1.5": {**SHIPPED_TOTAL_BASE, "tempo_source": "attempts", "pace_sensitivity": 1.5},
     "shipped_attempts_2.0": {**SHIPPED_TOTAL_BASE, "tempo_source": "attempts", "pace_sensitivity": 2.0},
     "shipped_attempts_2.5": {**SHIPPED_TOTAL_BASE, "tempo_source": "attempts", "pace_sensitivity": 2.5},
+    # round 3 (2026-11-13): exact possessions (FGA - OREB + TOV + 0.44 FTA) from the backfilled
+    # box scores, against the shipped attempts proxy at the same sensitivity.
+    "shipped_possessions_1.0": {**SHIPPED_TOTAL_BASE, "tempo_source": "possessions", "pace_sensitivity": 1.0},
+    "shipped_possessions_1.5": {**SHIPPED_TOTAL_BASE, "tempo_source": "possessions", "pace_sensitivity": 1.5},
+    "shipped_possessions_2.0": {**SHIPPED_TOTAL_BASE, "tempo_source": "possessions", "pace_sensitivity": 2.0},
 }
 
 

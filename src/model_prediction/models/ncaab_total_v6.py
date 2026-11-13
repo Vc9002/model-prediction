@@ -39,6 +39,7 @@ from typing import Any
 
 from ..domain import parse_utc
 from ..features.base import GameRecord
+from ..features.ncaab_possessions import NCAABPossessionStore
 from ..features.ncaab_scoreboard_stats import NCAABScoreboardStats
 from ..features.trends import TrendEngine, ewm_level
 from .base import GamePrediction, GamePredictionBase
@@ -159,12 +160,15 @@ class NCAABTotalModelV6:
         conference_file: Path | str | None = None,
         conference_baselines: dict[str, float] | None = None,
         stats_root: Path | str | None = None,
+        boxscore_root: Path | str | None = None,
         version: str = NCAAB_TOTAL_V6_VERSION,
     ) -> None:
         if pace_baseline not in {"conference", "league"}:
             raise ValueError(f"pace_baseline must be 'conference' or 'league', got {pace_baseline!r}")
-        if tempo_source not in {"points", "attempts"}:
-            raise ValueError(f"tempo_source must be 'points' or 'attempts', got {tempo_source!r}")
+        if tempo_source not in {"points", "attempts", "possessions"}:
+            raise ValueError(
+                f"tempo_source must be 'points', 'attempts' or 'possessions', got {tempo_source!r}"
+            )
         self.total_sd = total_sd
         self.baseline_points_per_team = baseline_points_per_team
         self.league_pace = league_pace
@@ -187,6 +191,7 @@ class NCAABTotalModelV6:
         self.pace_sensitivity = pace_sensitivity
         self.tempo_prior_games = tempo_prior_games
         self._stats = NCAABScoreboardStats(stats_root) if tempo_source == "attempts" else None
+        self._possessions = NCAABPossessionStore(boxscore_root) if tempo_source == "possessions" else None
         self.max_edge = max_edge
         self.base_units = base_units
         self.max_units = max_units
@@ -250,27 +255,31 @@ class NCAABTotalModelV6:
                 out[team] = float(prior)
         return out
 
-    def _attempt_tempo(self, history: Sequence[GameRecord]) -> tuple[dict[str, float], float]:
-        """Per-team tempo from shot attempts (FGA + 0.44 FTA, both teams averaged per game).
+    def _tempo_table(self, history: Sequence[GameRecord]) -> tuple[dict[str, float], float]:
+        """Per-team tempo from shot attempts (FGA + 0.44 FTA) or exact possessions
+        (FGA - OREB + TOV + 0.44 FTA), both teams averaged per game.
 
         Points are a poor pace proxy -- a slow, efficient team and a fast, poor one score alike.
         Each team's level is the exponentially weighted mean of the game tempos it played, shrunk
         toward the league mean over ``tempo_prior_games``; the league mean is the history's own.
+        Games without a stats record simply do not contribute.
         """
-        if self._stats is None:
-            return {}, self.league_pace
+        pairs: list[tuple[GameRecord, float]]
+        if self.tempo_source == "attempts" and self._stats is not None:
+            pairs = [(game, stats.game_attempts) for game, stats in self._stats.for_history(history)]
+        elif self.tempo_source == "possessions" and self._possessions is not None:
+            pairs = [(game, rec.game_possessions) for game, rec in self._possessions.for_history(history)]
+        else:
+            return {}, 0.0
+        if not pairs:
+            return {}, 0.0
         values: dict[str, list[float]] = {}
         dates: dict[str, list[Any]] = {}
-        all_tempos: list[float] = []
-        for game, stats in self._stats.for_history(history):
-            tempo = stats.game_attempts
-            all_tempos.append(tempo)
+        for game, tempo in pairs:
             for team in (game.home_team, game.away_team):
                 values.setdefault(team, []).append(tempo)
                 dates.setdefault(team, []).append(game.start)
-        if not all_tempos:
-            return {}, self.league_pace
-        league_tempo = sum(all_tempos) / len(all_tempos)
+        league_tempo = sum(t for _g, t in pairs) / len(pairs)
         out = {
             team: ewm_level(
                 vals,
@@ -291,9 +300,7 @@ class NCAABTotalModelV6:
         upcoming: Sequence[UpcomingGame],
     ) -> list[GamePrediction]:
         team_baselines = self._trend_baselines(history)
-        team_tempo, league_tempo = (
-            self._attempt_tempo(history) if self.tempo_source == "attempts" else ({}, 0.0)
-        )
+        team_tempo, league_tempo = self._tempo_table(history)
         trend = TrendEngine(
             history,
             offseason_gap_days=self.offseason_gap_days,
@@ -387,7 +394,7 @@ class NCAABTotalModelV6:
             pace_ref_away = away_base if self.pace_baseline == "conference" else league_baseline
             pace_ref_home = home_base if self.pace_baseline == "conference" else league_baseline
             tempo_home = tempo_away = None
-            if self.dynamic_matchup_pace and self.tempo_source == "attempts" and league_tempo > 0.0:
+            if self.dynamic_matchup_pace and self.tempo_source != "points" and league_tempo > 0.0:
                 tempo_away = team_tempo.get(game.away_team, league_tempo)
                 tempo_home = team_tempo.get(game.home_team, league_tempo)
                 pf_away = 1.0 + self.pace_sensitivity * (tempo_away - league_tempo) / league_tempo

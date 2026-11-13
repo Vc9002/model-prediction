@@ -205,7 +205,7 @@ def test_attempts_tempo_drives_pace_and_defaults_off(tmp_path):
     )
     assert pp["g1"].feature_basis["tempo_source"] == "points" and pp["g1"].feature_basis["tempo_home"] is None
     with pytest.raises(ValueError):
-        NCAABTotalModelV6(tempo_source="possessions")
+        NCAABTotalModelV6(tempo_source="shots")
 
 
 def test_new_feature_parameters_default_off_in_from_artifact():
@@ -213,3 +213,88 @@ def test_new_feature_parameters_default_off_in_from_artifact():
     total = NCAABTotalModelV6.from_artifact({})
     assert spread.non_d1_prior_from_history is False and spread.rank_prior_per_slot == 0.0
     assert total.tempo_source == "points" and total.pace_sensitivity == 0.55
+
+
+# --------------------------------------------------------------------------- possessions (box scores)
+
+from model_prediction.features.ncaab_possessions import NCAABPossessionStore
+
+
+def _boxscore(
+    root: Path, day: str, event_id: str, home: str, away: str, fga: int, oreb: int, tov: int, fta: int
+) -> None:
+    (root / day).mkdir(parents=True, exist_ok=True)
+    rec = {
+        "schema": "ncaab-boxscore-components-v1",
+        "status": "completed",
+        "event_id": event_id,
+        "event_start_utc": f"{day}T23:00Z",
+        "observed_at_utc": "2026-11-13T00:00:00+00:00",
+        "source": "espn:NCAAB:summary",
+        "home": {
+            "team_name": home,
+            "team_id": "1",
+            "points": 75,
+            "field_goal_attempts": fga,
+            "free_throw_attempts": fta,
+            "offensive_rebounds": oreb,
+            "turnovers": tov,
+        },
+        "away": {
+            "team_name": away,
+            "team_id": "2",
+            "points": 75,
+            "field_goal_attempts": fga,
+            "free_throw_attempts": fta,
+            "offensive_rebounds": oreb,
+            "turnovers": tov,
+        },
+    }
+    (root / day / f"{event_id}.json").write_text(json.dumps(rec), encoding="utf-8")
+
+
+def test_possession_store_applies_the_standard_formula_and_keys_by_history(tmp_path):
+    _boxscore(
+        tmp_path, "2026-11-08", "e1", "Duke Blue Devils", "Rider Broncs", fga=60, oreb=10, tov=12, fta=20
+    )
+    store = NCAABPossessionStore(tmp_path)
+    rec = store.get("e1")
+    assert rec is not None
+    assert rec.home.possessions == pytest.approx(60 - 10 + 12 + 0.44 * 20)
+    assert rec.game_possessions == pytest.approx(rec.home.possessions)
+    assert rec.efficiency("home") == pytest.approx(100 * 75 / rec.game_possessions)
+    g1 = GameRecord("e1", "2026-11-08T23:00:00Z", "NCAAB", "Rider Broncs", "Duke Blue Devils", 75, 75)
+    g2 = GameRecord("e2", "2026-11-09T23:00:00Z", "NCAAB", "Rider Broncs", "Duke Blue Devils", 70, 80)
+    assert [r.event_id for _g, r in store.for_history([g1, g2])] == ["e1"]  # e2 has no box score
+    assert store.coverage([g1, g2]) == 0.5
+    assert NCAABPossessionStore(tmp_path / "nowhere").get("e1") is None
+
+
+def test_possessions_tempo_source_drives_pace_like_attempts_and_falls_back_when_absent(tmp_path):
+    history = []
+    for i in range(8):
+        day = (NOW - timedelta(days=i + 2)).date().isoformat()
+        _boxscore(
+            tmp_path, day, f"f{i}", "Fast Home", "Fast Away", fga=70, oreb=10, tov=16, fta=20
+        )  # ~84.8 poss
+        _boxscore(
+            tmp_path, day, f"s{i}", "Slow Home", "Slow Away", fga=50, oreb=10, tov=8, fta=10
+        )  # ~52.4 poss
+        history.append(GameRecord(f"f{i}", f"{day}T23:00:00Z", "NCAAB", "Fast Away", "Fast Home", 75, 75))
+        history.append(GameRecord(f"s{i}", f"{day}T23:00:00Z", "NCAAB", "Slow Away", "Slow Home", 75, 75))
+    model = NCAABTotalModelV6(tempo_source="possessions", pace_sensitivity=1.0, boxscore_root=tmp_path)
+    fast = UpcomingGame("g1", NOW.isoformat(), "Fast Away", "Fast Home", total_line=150.5)
+    slow = UpcomingGame("g2", NOW.isoformat(), "Slow Away", "Slow Home", total_line=150.5)
+    preds = {p.event_id: p for p in model.predict_totals(history, [fast, slow])}
+    assert preds["g1"].feature_basis["tempo_source"] == "possessions"
+    assert (
+        preds["g1"].feature_basis["tempo_home"]
+        > preds["g1"].feature_basis["league_tempo"]
+        > preds["g2"].feature_basis["tempo_home"]
+    )
+    assert preds["g1"].feature_basis["expected_pace"] > preds["g2"].feature_basis["expected_pace"]
+    # No box scores at all -> no tempo table -> falls back to the points-based pace, no crash.
+    empty = NCAABTotalModelV6(tempo_source="possessions", boxscore_root=tmp_path / "empty")
+    p = empty.predict_totals(history, [fast])[0]
+    points_pace = NCAABTotalModelV6().predict_totals(history, [fast])[0].feature_basis["expected_pace"]
+    assert p.feature_basis["tempo_home"] is None and p.feature_basis["expected_pace"] == points_pace

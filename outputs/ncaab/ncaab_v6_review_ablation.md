@@ -1,85 +1,149 @@
 # NCAAB v6 review ablation -- point-in-time walk-forward
 
-Generated 2026-11-12T19:52:59.853453+00:00.
+Generated 2026-11-13T18:57:21.305958+00:00.
 
 ## Reproduction gate (control vs live Flat rows)
 
-Status: **pass** -- 68 rows from 2026-11-12T19:05:06.584772Z, 0 mismatches.
+Status: **pass** -- 132 rows from 2026-11-13T17:05:34.093977Z, 0 mismatches.
 
-- ncaab-spread-v6 spread Southern Utah Thunderbirds @ High Point Panthers: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-total-v6 total Niagara Purple Eagles @ Bowling Green Falcons: digest True, history 6958, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
-- ncaab-total-v6 total Southern Jaguars @ Minnesota Golden Gophers: digest True, history 6958, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
-- ncaab-total-v6 total UC Riverside Highlanders @ San José State Spartans: digest True, history 6958, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Central Connecticut Blue Devils @ Sacred Heart Pioneers: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Coppin State Eagles @ Bradley Braves: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Virginia Lynchburg Dragons @ Coastal Carolina Chanticleers: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Richmond Spiders @ Southern Illinois Salukis: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-total-v6 total Western Michigan Broncos @ Purdue Fort Wayne Mastodons: digest True, history 6958, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Western Michigan Broncos @ Purdue Fort Wayne Mastodons: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 spread Monmouth Hawks @ Quinnipiac Bobcats: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 spread Tennessee Tech Golden Eagles @ Indiana Hoosiers: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 spread Oklahoma State Cowboys @ Texas A&M Aggies: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-total-v6 total Maryland Eastern Shore Hawks @ Rhode Island Rams: digest True, history 6958, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
-- ncaab-total-v6 total Richmond Spiders @ Southern Illinois Salukis: digest True, history 6958, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 spread UC Riverside Highlanders @ San José State Spartans: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-total-v6 total Cal State Bakersfield Roadrunners @ Western Illinois Leathernecks: digest True, history 6958, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Kansas City Roos @ George Mason Patriots: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Morgan State Bears @ UMBC Retrievers: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-total-v6 total Loyola Marymount Lions @ South Alabama Jaguars: digest True, history 6958, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Oklahoma State Cowboys @ Texas A&M Aggies: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 spread Mercyhurst Lakers @ Penn State Nittany Lions: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-total-v6 total Monmouth Hawks @ Quinnipiac Bobcats: digest True, history 6958, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Lincoln (CA) Oaklanders @ Cal State Fullerton Titans: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-total-v6 total Montana State Bobcats @ BYU Cougars: digest True, history 6958, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
-- ncaab-total-v6 total Morgan State Bears @ UMBC Retrievers: digest True, history 6958, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 spread Canisius Golden Griffins @ Brown Bears: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Niagara Purple Eagles @ Bowling Green Falcons: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 spread Loyola Maryland Greyhounds @ Towson Tigers: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 spread Cal State Bakersfield Roadrunners @ Western Illinois Leathernecks: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline UC Riverside Highlanders @ San José State Spartans: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 spread Morgan State Bears @ UMBC Retrievers: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 spread Western Michigan Broncos @ Purdue Fort Wayne Mastodons: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Monmouth Hawks @ Quinnipiac Bobcats: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-total-v6 total Mercer Bears @ West Virginia Mountaineers: digest True, history 6958, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
-- ncaab-total-v6 total Southern Utah Thunderbirds @ High Point Panthers: digest True, history 6958, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
-- ncaab-total-v6 total Oklahoma State Cowboys @ Texas A&M Aggies: digest True, history 6958, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 spread Loyola Marymount Lions @ South Alabama Jaguars: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 spread Southern Jaguars @ Minnesota Golden Gophers: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Montana State Bobcats @ BYU Cougars: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 spread Central Connecticut Blue Devils @ Sacred Heart Pioneers: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 spread Montana State Bobcats @ BYU Cougars: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 spread Richmond Spiders @ Southern Illinois Salukis: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-total-v6 total Mercyhurst Lakers @ Penn State Nittany Lions: digest True, history 6958, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 spread Mercer Bears @ West Virginia Mountaineers: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Mercer Bears @ West Virginia Mountaineers: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-total-v6 total Central Connecticut Blue Devils @ Sacred Heart Pioneers: digest True, history 6958, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 spread Stetson Hatters @ Howard Bison: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Cal State Bakersfield Roadrunners @ Western Illinois Leathernecks: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-total-v6 total Canisius Golden Griffins @ Brown Bears: digest True, history 6958, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
-- ncaab-total-v6 total Stetson Hatters @ Howard Bison: digest True, history 6958, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 spread Kansas City Roos @ George Mason Patriots: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Loyola Marymount Lions @ South Alabama Jaguars: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Stetson Hatters @ Howard Bison: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-total-v6 total Loyola Maryland Greyhounds @ Towson Tigers: digest True, history 6958, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
-- ncaab-total-v6 total Coppin State Eagles @ Bradley Braves: digest True, history 6958, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
-- ncaab-total-v6 total Kansas City Roos @ George Mason Patriots: digest True, history 6958, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
-- ncaab-total-v6 total Tennessee Tech Golden Eagles @ Indiana Hoosiers: digest True, history 6958, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Canisius Golden Griffins @ Brown Bears: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Southern Utah Thunderbirds @ High Point Panthers: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Loyola Maryland Greyhounds @ Towson Tigers: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Tennessee Tech Golden Eagles @ Indiana Hoosiers: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Mercyhurst Lakers @ Penn State Nittany Lions: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 spread Maryland Eastern Shore Hawks @ Rhode Island Rams: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Maryland Eastern Shore Hawks @ Rhode Island Rams: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 spread Niagara Purple Eagles @ Bowling Green Falcons: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 spread Coppin State Eagles @ Bradley Braves: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
-- ncaab-spread-v6 moneyline Southern Jaguars @ Minnesota Golden Gophers: digest True, history 6958, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Virginia Cavaliers @ Maryland Terrapins: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Cal Poly Mustangs @ Idaho Vandals: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline College of Biblical Studies Ambassadors @ Houston Christian Huskies: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Prairie View A&M Panthers @ Vanderbilt Commodores: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Fairleigh Dickinson Knights @ Oklahoma Sooners: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Mount St. Mary's Mountaineers @ Virginia Tech Hokies: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Arizona Wildcats @ Auburn Tigers: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Georgetown Hoyas @ Clemson Tigers: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Merrimack Warriors @ Florida Gators: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Iona Gaels @ Hofstra Pride: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Milwaukee Panthers @ TCU Horned Frogs: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Milwaukee Panthers @ TCU Horned Frogs: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline North Carolina Central Eagles @ Liberty Flames: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Ball State Cardinals @ SMU Mustangs: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Fairleigh Dickinson Knights @ Oklahoma Sooners: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Chattanooga Mocs @ Elon Phoenix: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Yale Bulldogs @ Northeastern Huskies: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Alcorn State Braves @ Tarleton State Texans: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Troy Trojans @ NC State Wolfpack: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Georgia Southern Eagles @ UCF Knights: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Pittsburgh Panthers @ Butler Bulldogs: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Chattanooga Mocs @ Elon Phoenix: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline UIC Flames @ Saint Mary's Gaels: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Chattanooga Mocs @ Elon Phoenix: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread UIC Flames @ Saint Mary's Gaels: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Prairie View A&M Panthers @ Vanderbilt Commodores: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread DePaul Blue Demons @ Northwestern Wildcats: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Virginia Cavaliers @ Maryland Terrapins: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Texas Southern Tigers @ Murray State Racers: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Southern Miss Golden Eagles @ Texas State Bobcats: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Arizona Wildcats @ Auburn Tigers: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Milwaukee Panthers @ TCU Horned Frogs: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Southeast Missouri State Redhawks @ Middle Tennessee Blue Raiders: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Ohio State Buckeyes @ Central Connecticut Blue Devils: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Stanford Cardinal @ UNLV Rebels: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Harvard Crimson @ George Washington Revolutionaries: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Cal Poly Mustangs @ Idaho Vandals: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Ohio State Buckeyes @ Central Connecticut Blue Devils: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Ohio Bobcats @ Purdue Boilermakers: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Stanford Cardinal @ UNLV Rebels: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Alcorn State Braves @ Tarleton State Texans: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Columbia Lions @ Bucknell Bison: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Wright State Raiders @ Samford Bulldogs: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Georgia Southern Eagles @ UCF Knights: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Virginia Cavaliers @ Maryland Terrapins: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Lindenwood Lions @ Omaha Mavericks: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Northern Iowa Panthers @ Michigan State Spartans: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Ohio State Buckeyes @ Central Connecticut Blue Devils: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Georgetown Hoyas @ Clemson Tigers: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Stanford Cardinal @ UNLV Rebels: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Harvard Crimson @ George Washington Revolutionaries: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Georgia Bulldogs @ North Carolina Tar Heels: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Marist Red Foxes @ Lehigh Mountain Hawks: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Pittsburgh Panthers @ Butler Bulldogs: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Chicago State Cougars @ San Diego Toreros: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Southern Miss Golden Eagles @ Texas State Bobcats: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Columbia Lions @ Bucknell Bison: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Pittsburgh Panthers @ Butler Bulldogs: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Mount St. Mary's Mountaineers @ Virginia Tech Hokies: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Columbia Lions @ Bucknell Bison: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Iona Gaels @ Hofstra Pride: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Southern Miss Golden Eagles @ Texas State Bobcats: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Florida International Panthers @ Florida Gulf Coast Eagles: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Wright State Raiders @ Samford Bulldogs: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline South Dakota Coyotes @ Drake Bulldogs: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread SIU Edwardsville Cougars @ Duke Blue Devils: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total UC San Diego Tritons @ Utah State Aggies: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Chicago State Cougars @ San Diego Toreros: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Georgia Bulldogs @ North Carolina Tar Heels: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Marist Red Foxes @ Lehigh Mountain Hawks: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Northern Iowa Panthers @ Michigan State Spartans: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Troy Trojans @ NC State Wolfpack: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total North Alabama Lions @ Miami Hurricanes: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Ball State Cardinals @ SMU Mustangs: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Sam Houston Bearkats @ Illinois Fighting Illini: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Ball State Cardinals @ SMU Mustangs: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total UL Monroe Warhawks @ Arizona State Sun Devils: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total East Texas A&M Lions @ Portland Pilots: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Georgia Southern Eagles @ UCF Knights: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Xavier Musketeers @ Mississippi State Bulldogs: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline DePaul Blue Demons @ Northwestern Wildcats: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Texas Southern Tigers @ Murray State Racers: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread UC San Diego Tritons @ Utah State Aggies: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Ohio Bobcats @ Purdue Boilermakers: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Wright State Raiders @ Samford Bulldogs: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Arkansas-Pine Bluff Golden Lions @ California Baptist Lancers: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total North Carolina Central Eagles @ Liberty Flames: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Long Island University Sharks @ Fordham Rams: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Northern Iowa Panthers @ Michigan State Spartans: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Merrimack Warriors @ Florida Gators: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Long Island University Sharks @ Fordham Rams: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Alcorn State Braves @ Tarleton State Texans: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Illinois State Redbirds @ North Dakota State Bison: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Yale Bulldogs @ Northeastern Huskies: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Illinois State Redbirds @ North Dakota State Bison: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Iona Gaels @ Hofstra Pride: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline UC San Diego Tritons @ Utah State Aggies: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Long Island University Sharks @ Fordham Rams: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Yale Bulldogs @ Northeastern Huskies: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Florida International Panthers @ Florida Gulf Coast Eagles: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Xavier Musketeers @ Mississippi State Bulldogs: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total UIC Flames @ Saint Mary's Gaels: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Fairleigh Dickinson Knights @ Oklahoma Sooners: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Lindenwood Lions @ Omaha Mavericks: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Lindenwood Lions @ Omaha Mavericks: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Troy Trojans @ NC State Wolfpack: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread North Alabama Lions @ Miami Hurricanes: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Arkansas-Pine Bluff Golden Lions @ California Baptist Lancers: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Arkansas-Pine Bluff Golden Lions @ California Baptist Lancers: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Harvard Crimson @ George Washington Revolutionaries: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total DePaul Blue Demons @ Northwestern Wildcats: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Sam Houston Bearkats @ Illinois Fighting Illini: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Texas Southern Tigers @ Murray State Racers: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Ohio Bobcats @ Purdue Boilermakers: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread South Dakota Coyotes @ Drake Bulldogs: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total SIU Edwardsville Cougars @ Duke Blue Devils: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Florida International Panthers @ Florida Gulf Coast Eagles: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total South Dakota Coyotes @ Drake Bulldogs: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Chicago State Cougars @ San Diego Toreros: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Georgetown Hoyas @ Clemson Tigers: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline East Texas A&M Lions @ Portland Pilots: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Illinois State Redbirds @ North Dakota State Bison: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Cal Poly Mustangs @ Idaho Vandals: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Marist Red Foxes @ Lehigh Mountain Hawks: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Southeast Missouri State Redhawks @ Middle Tennessee Blue Raiders: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread North Carolina Central Eagles @ Liberty Flames: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Arizona Wildcats @ Auburn Tigers: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread Southeast Missouri State Redhawks @ Middle Tennessee Blue Raiders: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-total-v6 total Xavier Musketeers @ Mississippi State Bulldogs: digest True, history 6987, feature deltas {'expected_total': 0.0, 'raw_model_total': 0.0, 'expected_pace': 0.0, 'effective_total_sd': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Georgia Bulldogs @ North Carolina Tar Heels: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 moneyline Mount St. Mary's Mountaineers @ Virginia Tech Hokies: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
+- ncaab-spread-v6 spread UL Monroe Warhawks @ Arizona State Sun Devils: digest True, history 6987, feature deltas {'expected_margin': 0.0, 'elo_margin': 0.0, 'trend_margin': 0.0, 'rest_diff': 0.0, 'effective_margin_sd': 0.0, 'elo_home': 0.0, 'elo_away': 0.0}, probability delta 0.0 -> ok
 
 ## Splits (complete ET dates, graded from 2025-12-01)
 
 - train: 2025-12-01 -> 2026-02-19
 - validation: 2026-02-20 -> 2026-03-18
-- holdout: 2026-03-19 -> 2026-11-11
+- holdout: 2026-03-19 -> 2026-11-12
 
 PIT coverage = share of actual outcomes inside the served distribution's central 50/80/90% interval (ideal 0.50/0.80/0.90). `cover_brier` / `over_brier`: Brier of the served cover/over probability at pseudo-lines floor(mean)+0.5 + {-8,-4,0,4,8}.
 
@@ -409,7 +473,7 @@ Train residual SD per variant: control=15.203, artifact_retention_0.20=15.203, c
 
 ## Total (ncaab-total-v6)
 
-Train residual SD per variant: control=18.654, pace_vs_league=18.063, conference_trend_priors=18.088, conf_priors_wleague_0.15=18.131, conf_priors_ret_0.35=18.088, final=17.919, final_sd_15.5=17.919, final_sd_16.5=17.919, final_sd_17.5=17.919, final_wleague_0.15=18.03, shipped=17.919, shipped_attempts_0.55=17.939, shipped_attempts_0.8=17.836, shipped_attempts_1.0=17.769, shipped_points_0.8=17.85, shipped_attempts_1.25=17.706, shipped_attempts_1.5=17.665, shipped_attempts_2.0=17.653, shipped_attempts_2.5=17.732
+Train residual SD per variant: control=18.654, pace_vs_league=18.063, conference_trend_priors=18.088, conf_priors_wleague_0.15=18.131, conf_priors_ret_0.35=18.088, final=17.919, final_sd_15.5=17.919, final_sd_16.5=17.919, final_sd_17.5=17.919, final_wleague_0.15=18.03, shipped=17.919, shipped_attempts_0.55=17.939, shipped_attempts_0.8=17.836, shipped_attempts_1.0=17.769, shipped_points_0.8=17.85, shipped_attempts_1.25=17.706, shipped_attempts_1.5=17.665, shipped_attempts_2.0=17.653, shipped_attempts_2.5=17.732, shipped_possessions_1.0=17.793, shipped_possessions_1.5=17.679, shipped_possessions_2.0=17.642
 
 ### validation
 
@@ -434,6 +498,9 @@ Train residual SD per variant: control=18.654, pace_vs_league=18.063, conference
 | shipped_attempts_1.5 | 1043 | 13.376 | -1.168 | 16.564 | 17.19 | 0.507 | 0.821 | 0.921 | 0.2345 |
 | shipped_attempts_2.0 | 1043 | 13.334 | -0.741 | 16.582 | 17.157 | 0.503 | 0.823 | 0.914 | 0.2345 |
 | shipped_attempts_2.5 | 1043 | 13.4 | -0.302 | 16.734 | 17.122 | 0.51 | 0.812 | 0.907 | 0.2343 |
+| shipped_possessions_1.0 | 1043 | 13.556 | -1.286 | 16.756 | 17.203 | 0.492 | 0.824 | 0.918 | 0.2348 |
+| shipped_possessions_1.5 | 1043 | 13.399 | -0.708 | 16.631 | 17.161 | 0.501 | 0.824 | 0.918 | 0.2342 |
+| shipped_possessions_2.0 | 1043 | 13.34 | -0.13 | 16.623 | 17.118 | 0.506 | 0.825 | 0.92 | 0.234 |
 
 ### train
 
@@ -458,6 +525,9 @@ Train residual SD per variant: control=18.654, pace_vs_league=18.063, conference
 | shipped_attempts_1.5 | 3601 | 14.08 | -1.607 | 17.665 | 18.08 | 0.517 | 0.811 | 0.913 | 0.2347 |
 | shipped_attempts_2.0 | 3601 | 14.052 | -1.334 | 17.653 | 18.058 | 0.517 | 0.812 | 0.909 | 0.2346 |
 | shipped_attempts_2.5 | 3601 | 14.091 | -1.055 | 17.732 | 18.035 | 0.513 | 0.808 | 0.905 | 0.2348 |
+| shipped_possessions_1.0 | 3601 | 14.195 | -1.692 | 17.793 | 18.09 | 0.515 | 0.806 | 0.913 | 0.2352 |
+| shipped_possessions_1.5 | 3601 | 14.093 | -1.325 | 17.679 | 18.062 | 0.519 | 0.808 | 0.912 | 0.2346 |
+| shipped_possessions_2.0 | 3601 | 14.043 | -0.959 | 17.642 | 18.034 | 0.516 | 0.812 | 0.909 | 0.2345 |
 
 ### train_non_d1
 
@@ -482,6 +552,9 @@ Train residual SD per variant: control=18.654, pace_vs_league=18.063, conference
 | shipped_attempts_1.5 | 241 | 15.47 | 3.789 | 19.453 | 21.712 | 0.564 | 0.867 | 0.942 | 0.2379 |
 | shipped_attempts_2.0 | 241 | 15.488 | 3.845 | 19.438 | 21.704 | 0.552 | 0.859 | 0.942 | 0.2394 |
 | shipped_attempts_2.5 | 241 | 15.547 | 3.9 | 19.473 | 21.696 | 0.544 | 0.867 | 0.934 | 0.2389 |
+| shipped_possessions_1.0 | 241 | 15.446 | 3.57 | 19.463 | 21.733 | 0.552 | 0.846 | 0.95 | 0.2373 |
+| shipped_possessions_1.5 | 241 | 15.404 | 3.543 | 19.359 | 21.732 | 0.56 | 0.851 | 0.942 | 0.2388 |
+| shipped_possessions_2.0 | 241 | 15.399 | 3.516 | 19.298 | 21.732 | 0.548 | 0.851 | 0.942 | 0.2397 |
 
 ### train_d1_only
 
@@ -506,6 +579,9 @@ Train residual SD per variant: control=18.654, pace_vs_league=18.063, conference
 | shipped_attempts_1.5 | 3360 | 13.981 | -1.994 | 17.53 | 17.82 | 0.513 | 0.807 | 0.911 | 0.2345 |
 | shipped_attempts_2.0 | 3360 | 13.949 | -1.706 | 17.518 | 17.796 | 0.515 | 0.808 | 0.907 | 0.2343 |
 | shipped_attempts_2.5 | 3360 | 13.987 | -1.41 | 17.601 | 17.772 | 0.51 | 0.804 | 0.903 | 0.2346 |
+| shipped_possessions_1.0 | 3360 | 14.105 | -2.069 | 17.667 | 17.829 | 0.512 | 0.803 | 0.911 | 0.235 |
+| shipped_possessions_1.5 | 3360 | 13.999 | -1.674 | 17.552 | 17.799 | 0.516 | 0.805 | 0.91 | 0.2343 |
+| shipped_possessions_2.0 | 3360 | 13.946 | -1.28 | 17.517 | 17.769 | 0.514 | 0.809 | 0.907 | 0.2341 |
 
 ### holdout
 
@@ -530,6 +606,9 @@ Train residual SD per variant: control=18.654, pace_vs_league=18.063, conference
 | shipped_attempts_1.5 | 743 | 14.303 | 0.756 | 18.228 | 21.614 | 0.572 | 0.869 | 0.95 | 0.2335 |
 | shipped_attempts_2.0 | 743 | 14.31 | 0.742 | 18.231 | 21.612 | 0.571 | 0.871 | 0.954 | 0.2334 |
 | shipped_attempts_2.5 | 743 | 14.387 | 0.738 | 18.306 | 21.608 | 0.576 | 0.878 | 0.952 | 0.2338 |
+| shipped_possessions_1.0 | 772 | 14.272 | 0.943 | 18.175 | 21.57 | 0.58 | 0.873 | 0.949 | 0.234 |
+| shipped_possessions_1.5 | 772 | 14.153 | 1.031 | 18.062 | 21.561 | 0.574 | 0.87 | 0.955 | 0.2333 |
+| shipped_possessions_2.0 | 772 | 14.108 | 1.118 | 18.016 | 21.552 | 0.576 | 0.872 | 0.953 | 0.2328 |
 
 ### holdout_non_d1
 
@@ -554,6 +633,9 @@ Train residual SD per variant: control=18.654, pace_vs_league=18.063, conference
 | shipped_attempts_1.5 | 191 | 16.121 | 4.36 | 21.31 | 22.891 | 0.55 | 0.832 | 0.921 | 0.2315 |
 | shipped_attempts_2.0 | 191 | 16.078 | 4.17 | 21.207 | 22.905 | 0.55 | 0.838 | 0.932 | 0.2317 |
 | shipped_attempts_2.5 | 191 | 16.068 | 3.979 | 21.154 | 22.919 | 0.555 | 0.843 | 0.937 | 0.2322 |
+| shipped_possessions_1.0 | 196 | 16.175 | 4.595 | 21.309 | 22.869 | 0.536 | 0.842 | 0.923 | 0.2322 |
+| shipped_possessions_1.5 | 196 | 16.037 | 4.29 | 21.134 | 22.894 | 0.541 | 0.837 | 0.929 | 0.2328 |
+| shipped_possessions_2.0 | 196 | 15.98 | 3.986 | 21.006 | 22.918 | 0.541 | 0.852 | 0.929 | 0.2326 |
 
 ### holdout_d1_only
 
@@ -578,6 +660,9 @@ Train residual SD per variant: control=18.654, pace_vs_league=18.063, conference
 | shipped_attempts_1.5 | 552 | 13.674 | -0.491 | 17.032 | 21.173 | 0.58 | 0.882 | 0.96 | 0.2342 |
 | shipped_attempts_2.0 | 552 | 13.698 | -0.444 | 17.081 | 21.165 | 0.578 | 0.882 | 0.962 | 0.234 |
 | shipped_attempts_2.5 | 552 | 13.805 | -0.383 | 17.212 | 21.155 | 0.583 | 0.889 | 0.957 | 0.2343 |
+| shipped_possessions_1.0 | 576 | 13.625 | -0.299 | 16.977 | 21.128 | 0.595 | 0.884 | 0.958 | 0.2346 |
+| shipped_possessions_1.5 | 576 | 13.512 | -0.079 | 16.89 | 21.108 | 0.585 | 0.882 | 0.964 | 0.2335 |
+| shipped_possessions_2.0 | 576 | 13.471 | 0.142 | 16.878 | 21.087 | 0.589 | 0.878 | 0.962 | 0.2329 |
 
 ### holdout_thin_sample_lt8
 
@@ -602,6 +687,9 @@ Train residual SD per variant: control=18.654, pace_vs_league=18.063, conference
 | shipped_attempts_1.5 | 658 | 14.592 | 1.04 | 18.611 | 22.184 | 0.578 | 0.869 | 0.951 | 0.2339 |
 | shipped_attempts_2.0 | 658 | 14.618 | 1.025 | 18.612 | 22.182 | 0.573 | 0.871 | 0.956 | 0.2341 |
 | shipped_attempts_2.5 | 658 | 14.694 | 1.021 | 18.674 | 22.178 | 0.578 | 0.877 | 0.956 | 0.2344 |
+| shipped_possessions_1.0 | 687 | 14.516 | 1.042 | 18.531 | 22.123 | 0.582 | 0.873 | 0.953 | 0.234 |
+| shipped_possessions_1.5 | 687 | 14.423 | 1.042 | 18.433 | 22.12 | 0.576 | 0.873 | 0.958 | 0.2335 |
+| shipped_possessions_2.0 | 687 | 14.401 | 1.042 | 18.393 | 22.116 | 0.578 | 0.873 | 0.956 | 0.2332 |
 
 ### cross_season_2026-11
 
@@ -626,6 +714,9 @@ Train residual SD per variant: control=18.654, pace_vs_league=18.063, conference
 | shipped_attempts_1.5 | 658 | 14.592 | 1.04 | 18.611 | 22.184 | 0.578 | 0.869 | 0.951 | 0.2339 |
 | shipped_attempts_2.0 | 658 | 14.618 | 1.025 | 18.612 | 22.182 | 0.573 | 0.871 | 0.956 | 0.2341 |
 | shipped_attempts_2.5 | 658 | 14.694 | 1.021 | 18.674 | 22.178 | 0.578 | 0.877 | 0.956 | 0.2344 |
+| shipped_possessions_1.0 | 687 | 14.516 | 1.042 | 18.531 | 22.123 | 0.582 | 0.873 | 0.953 | 0.234 |
+| shipped_possessions_1.5 | 687 | 14.423 | 1.042 | 18.433 | 22.12 | 0.576 | 0.873 | 0.958 | 0.2335 |
+| shipped_possessions_2.0 | 687 | 14.401 | 1.042 | 18.393 | 22.116 | 0.578 | 0.873 | 0.956 | 0.2332 |
 
 ### cross_season_d1_only
 
@@ -650,3 +741,6 @@ Train residual SD per variant: control=18.654, pace_vs_league=18.063, conference
 | shipped_attempts_1.5 | 467 | 13.967 | -0.318 | 17.387 | 21.895 | 0.589 | 0.884 | 0.964 | 0.2349 |
 | shipped_attempts_2.0 | 467 | 14.021 | -0.262 | 17.44 | 21.886 | 0.582 | 0.884 | 0.966 | 0.235 |
 | shipped_attempts_2.5 | 467 | 14.132 | -0.189 | 17.559 | 21.875 | 0.587 | 0.891 | 0.964 | 0.2353 |
+| shipped_possessions_1.0 | 491 | 13.853 | -0.376 | 17.298 | 21.825 | 0.601 | 0.886 | 0.965 | 0.2348 |
+| shipped_possessions_1.5 | 491 | 13.779 | -0.254 | 17.237 | 21.811 | 0.591 | 0.888 | 0.969 | 0.2337 |
+| shipped_possessions_2.0 | 491 | 13.771 | -0.132 | 17.24 | 21.797 | 0.593 | 0.882 | 0.967 | 0.2334 |
