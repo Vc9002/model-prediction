@@ -103,6 +103,23 @@ champions map change. Harmless functionally; recorded for the audit trail.
   once); and the host itself runs at about 1 GB free of 31.7 GB while games or rust-analyzer are
   up, which no code change removes.
 
+## 2026-11-13 — System-usage pass: dashboard snapshot cache unbounded; memory, ledger and backup footprint measured (quick-261113-jpw)
+
+Operator directive "optimize project system usage". Commit `4fb785cd`.
+
+- **Dashboard memory (fixed)**: `dashboard/backtests._SNAPSHOT_FILE_CACHE` kept every parsed
+  `polymarket_snapshots.jsonl` for the life of the process: 774 files / 543 MB on disk, x4.4 expansion
+  measured (43 MB -> 192 MB resident), ~2.5 GB ceiling. That is the 3.4-3.6 GB python process named in
+  the 11-12 16:10 and 20:18 low-virtual-memory events. Now an LRU bounded at 96 MB on-disk bytes.
+  Restart the dashboard to apply.
+- **Host**: 32 GB RAM / 20 GB pagefile; commit 27 of 52 GB at rest. The 00:30 ET daily run fails on
+  nights a game is running (Overwatch/HOI4 15 GB); the daily forecast itself peaks ~3.2 GB.
+- **Ledger**: `ledgers.db` 1.12 GB = 660 MB hash-chained `ledger_events` payloads (evidence, keep) +
+  340 MB records, 51% of them `superseded` from the 8x/day re-forecast cadence; +16-49 MB/day.
+- **Disk**: `backups/` 20.6 GB (14 copies of the 1.1 GB ledger) mirrored 1:1 into OneDrive;
+  `market_quotes.db` 685 MB; repo `data/raw` 2.9 GB, `data/availability` 2.1 GB.
+- **Not changed** (operator decisions): backup `--keep`, the 00:30 trigger, the forecast cadence.
+
 ## 2026-11-13 — Loss review of the 1W-7L paper day; NBA v9 spread/total pulled from the auto-buyer (quick-261113-jf1)
 
 Operator directive "investigate this performance loss, and check pipeline logs". Commit `c648e048`.

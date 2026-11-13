@@ -108,6 +108,7 @@ None yet.
 | 261113-jb1 | Harden RuntimeLedgerStore against transient sqlite disk I/O error under memory pressure | 2026-11-13 | de9c71c3 | [261113-jb1-harden-runtimeledgerstore-against-transi](./quick/261113-jb1-harden-runtimeledgerstore-against-transi/) |
 | 261113-jf1 | Pull nba-spread-margin-v9 (and total v9) from the paper auto-buyer whitelist after the 2026-11-12 loss review; persisted state updated via versioned save | 2026-11-13 | c648e048 | [261113-jf1-pull-nba-v9-spread-and-total-from-the-paper-wh](./quick/261113-jf1-pull-nba-v9-spread-and-total-from-the-paper-wh/) |
 | 261113-j4w | Promote cfb-structural-v5 to NCAAF champion (Main + Flat) via model_promotion; cfb_model() follows the champion map; replay/forecast/naming/whitelist wiring | 2026-11-13 | 02f45736 | [261113-j4w-promote-cfb-structural-v5-to-ncaaf-champ](./quick/261113-j4w-promote-cfb-structural-v5-to-ncaaf-champ/) |
+| 261113-jpw | System-usage pass: bound the dashboard parsed-snapshot cache (LRU by on-disk bytes); measured memory/disk drivers and recorded recommendations | 2026-11-13 | 4fb785cd | [261113-jpw-bound-the-dashboard-parsed-snapshot-cache](./quick/261113-jpw-bound-the-dashboard-parsed-snapshot-cache/) |
 
 ## Milestone History
 
