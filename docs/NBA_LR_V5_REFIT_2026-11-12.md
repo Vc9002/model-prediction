@@ -46,20 +46,25 @@ Brier delta v5 − v4 = −0.00026. **The refit is a confirmation, not an improv
 coefficients were never the defect; the serving overrides were. Current season only
 (2026-10-01 → 2026-11-11, 170 games): v4 Brier 0.2047 / 67.6% accuracy, v5 0.2045 / 68.8%.
 
-## Registration
+## Registration and promotion
 
-`config/production.yaml`: new entry `nba-elo-trend-lr-v5` (`serving_status: shadow`,
-`evidence_status: historical_only`, rollback v4); `challengers.NBA.moneyline` now points at it
-(the previous value `nba-structural-v5` had no registry entry). Champion stays
-`nba-elo-trend-lr-v4`. Promotion, if wanted, is the explicit command:
+2026-11-12 (quick-261112-kj3): registered as the NBA moneyline challenger (`serving_status:
+shadow`, `evidence_status: historical_only`, rollback v4); the previous challenger value
+`nba-structural-v5` had no registry entry.
 
-```
-python -m model_prediction.model_promotion promote --new nba-elo-trend-lr-v5 --sport NBA \
-  --market moneyline --approved-by <operator> --evidence docs/NBA_LR_V5_REFIT_2026-11-12.md
-```
-
-What promotion would buy: an evidence window that includes 2026-27 games, and ~5% more calls
-from the lower threshold. What it would not buy: better probabilities.
+2026-11-13 (quick-261113-j3m, operator directive "promote"): promoted through
+`model_promotion.promote` — promotion id `promo-20261113T184744Z-6b0b74`, recorded in the
+runtime `promotions` table with `evidence_id` = this document and an explicit
+`market_evidence_unavailable_reason` (no market-relative replay exists for v5 or v4; the
+promotion changes the evidence window and the threshold, not the served probabilities).
+Record copy: `outputs/nba/nba_lr_v5_promotion.json`. Wiring completed by hand where the
+command does not reach: `serving_status` v5 → production, v4 → rollback; `config/model.yaml`
+`models.NBA.active_production_version` / `production_artifact` → v5 (the learned slate serves
+from model.yaml and `_is_registered_serving_model` compares that artifact's version to the
+champion, so both had to move together). `evidence_status` stays `historical_only` for v5
+as it was for v4, so NBA moneyline still reaches Main only as a paper call
+(`PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED`); changing that is a separate decision, as is the
+auto-buyer whitelist (neither v4 nor v5 is listed).
 
 ## Caveats
 

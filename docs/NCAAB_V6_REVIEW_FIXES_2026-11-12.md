@@ -220,6 +220,28 @@ Deployment check: the live daily at 2026-11-12T19:05Z (after round 1 landed) wro
 rows; the deployed artifact model reproduces all 68 with zero feature or probability deltas
 (harness gate, `matched_by: deployed_artifact`).
 
+## Main totals restored (2026-11-13)
+
+The pause (`93aa093c`, 2026-11-10) was a hard `kind != "total"` in the Main destination of
+`college_basketball_forward.py`, added after the v6 totals lost 25.8u in Main on
+season-opener samples (mean current-season sample 1.7 games, mean absolute total error 16).
+Restored by operator directive, but **not unconditionally**: a total now reaches Main under
+exactly the spread/moneyline conditions — matched fresh executable two-sided quote, edge ≥
+`min_edge`, divergence gate, and the current-season sample gate (`min_team_games` = 8) that
+the pause predated. The settled-ledger replay above shows why the gate matters: every one of
+the 454 settled total rows had a sample of 0–3, and the fixed model still lost 9.4 paper
+units on them under the live rule. None of those rows would reach Main today.
+
+A new policy switch, `models.NCAAB.main_totals_enabled` in `config/model.yaml` (default true,
+read via the policy dict so no yaml edit was needed), is the operator's pause lever from now
+on; a disabled total is recorded as `main_totals_disabled_by_policy` in the run's skipped
+list. Tests: `tests/test_ncaab_main_totals.py` (reaches Main with sample 9 and an executable
+quote; blocked at sample 3; blocked by the switch).
+
+What this does not claim: that Main totals are profitable. Validation evidence for the total
+model is distributional (MAE 13.38, PIT 0.507/0.821/0.921); the first market-relative read
+comes from the forward check once gated totals settle.
+
 ## Not changed / open
 
 - Early-season dispersion (both markets) and the Elo ramp: need a second cross-season window

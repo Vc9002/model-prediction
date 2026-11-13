@@ -180,7 +180,7 @@ prediction_service:
     implementation: json_artifact
     artifact: config/models/nba-elo-trend-lr-v4.json
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: historical_only
     replacement_priority: medium
     rollback_model: nba-elo-trend-lr-v3
@@ -190,18 +190,18 @@ prediction_service:
     implementation: json_artifact
     artifact: config/models/nba-elo-trend-lr-v5.json
     enabled: true
-    serving_status: shadow
+    serving_status: production
     evidence_status: historical_only
     replacement_priority: low
     rollback_model: nba-elo-trend-lr-v4
     promotion_basis: null
-    note: >-
-      2026-11-12 walk-forward refit of the elo_trend_defense LR on the restored fit construction
-      (quick-261112-kj3); same features as v4, coefficients within 1%, threshold 0.5254 vs 0.5444.
-      Locked holdout 2026-02-23..2026-11-11 (636 rows) qualified: 598 calls, 73.1% hit, Brier
-      0.1849 on calls. On identical holdout rows v4-as-fit scores Brier 0.1892 vs v5 0.1889 --
-      not a measurable improvement; evidence window is simply current. Challenger only;
-      promotion is an explicit operator command.
+    note: '2026-11-12 walk-forward refit of the elo_trend_defense LR on the restored
+      fit construction (quick-261112-kj3); same features as v4, coefficients within
+      1%, threshold 0.5254 vs 0.5444. Locked holdout 2026-02-23..2026-11-11 (636 rows)
+      qualified: 598 calls, 73.1% hit, Brier 0.1849 on calls. On identical holdout
+      rows v4-as-fit scores Brier 0.1892 vs v5 0.1889 -- not a measurable improvement;
+      evidence window is simply current. Challenger only; promotion is an explicit
+      operator command.'
   - model_id: nba-spread-margin-v9
     sport: NBA
     market: spread
@@ -531,13 +531,23 @@ prediction_service:
     evidence_status: historical_only
     replacement_priority: low
     rollback_model: null
+  - model_id: cfb-structural-v5
+    sport: NCAAF
+    market: multi
+    implementation: json_artifact
+    artifact: config/models/cfb-structural-v5.json
+    enabled: true
+    serving_status: production
+    evidence_status: historical_only
+    replacement_priority: low
+    rollback_model: cfb-structural-v4
   - model_id: cfb-structural-v4
     sport: NCAAF
     market: multi
     implementation: json_artifact
     artifact: config/models/cfb-structural-v4.json
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: cfb-structural-v3
@@ -956,7 +966,7 @@ prediction_service:
       total: mlb-structural-v10-frozen
       nrfi: mlb-nrfi-v4
     NBA:
-      moneyline: nba-elo-trend-lr-v4
+      moneyline: nba-elo-trend-lr-v5
       spread: nba-spread-margin-v9
       total: nba-total-margin-v9
     NFL:
@@ -1020,9 +1030,7 @@ prediction_service:
       moneyline: null
       spread: null
       total: null
-    NBA:
-      # nba-structural-v5 (previous value) has no registry entry; replaced 2026-11-12.
-      moneyline: nba-elo-trend-lr-v5
+    NBA: {}
     NFL:
       moneyline: null
       spread: null
@@ -1050,19 +1058,19 @@ prediction_service:
   research_queue:
   - sport: NCAAF
     market: moneyline
-    incumbent: cfb-structural-v3
+    incumbent: cfb-structural-v5
     replacement_priority: low
     challenger: null
     evidence_status: predictively_qualified
   - sport: NCAAF
     market: spread
-    incumbent: cfb-structural-v3
+    incumbent: cfb-structural-v5
     replacement_priority: low
     challenger: null
     evidence_status: predictively_qualified
   - sport: NCAAF
     market: total
-    incumbent: cfb-structural-v3
+    incumbent: cfb-structural-v5
     replacement_priority: low
     challenger: null
     evidence_status: predictively_qualified
@@ -1211,6 +1219,7 @@ prediction_service:
   - tennis-games-markov-v1
   - tennis-learned-v3
   - tennis-surface-elo-v1
+  - cfb-structural-v5
   - cfb-structural-v4
   - cfb-structural-v3
   - cfb-structural-v2
@@ -1286,6 +1295,7 @@ prediction_service:
     nfl-total-structural-v7: config/models/nfl-total-structural-v7.json
     nfl-total-structural-v6: config/models/nfl-total-structural-v6.json
     nfl-total-structural-v5: config/models/nfl-total-structural-v5.json
+    cfb-structural-v5: config/models/cfb-structural-v5.json
     cfb-structural-v4: config/models/cfb-structural-v4.json
     cfb-structural-v3: config/models/cfb-structural-v3.json
     cfb-structural-v2: config/models/cfb-structural-v2.json

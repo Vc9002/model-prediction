@@ -24,6 +24,7 @@ from typing import Any
 
 from ..domain import EASTERN, parse_utc
 from ..pricing import implied_probability
+from ..runtime_paths import rerouted_data_root
 
 _logger = logging.getLogger(__name__)
 
@@ -171,7 +172,15 @@ def _record_hash(record: dict[str, Any]) -> str:
 
 
 def espn_odds_path(data_root: str | Path, game_date_et: str) -> Path:
-    return Path(data_root) / "odds" / "nfl" / game_date_et / ESPN_ODDS_FILENAME
+    """File for one Eastern game date, next to that date's Polymarket snapshots.
+
+    The checkout's legacy ``data/`` root is rerouted to the runtime root here, at
+    the one choke point every writer and reader of this file goes through: the
+    daily capture is handed the repo-local root while Polymarket capture and
+    settlement already resolve to the runtime root, and the first eleven runs
+    (2026-11-12/13) wrote 153 consensus records where no reader looked.
+    """
+    return rerouted_data_root(data_root) / "odds" / "nfl" / game_date_et / ESPN_ODDS_FILENAME
 
 
 def capture_nfl_espn_odds(

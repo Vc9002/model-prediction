@@ -175,3 +175,20 @@ def test_unusable_odds_strings_yield_no_price(bad):
     rec = parse_espn_consensus(ev)
     assert rec["spread_home_odds"] is None
     assert consensus_for_selection(rec, "spread", "home") == (None, -2.5)
+
+
+def test_repo_local_data_root_is_rerouted_to_the_runtime_root(tmp_path, monkeypatch):
+    from model_prediction.config import PROJECT_ROOT
+
+    runtime = tmp_path / "runtime"
+    monkeypatch.setenv("MODEL_PREDICTION_RUNTIME_ROOT", str(runtime))
+    # The daily job hands capture the checkout's data/ root; readers (settlement,
+    # Polymarket snapshots) live under the runtime root. Both must meet in one file.
+    assert espn_odds_path(PROJECT_ROOT / "data", "2026-11-15") == (
+        runtime / "odds" / "nfl" / "2026-11-15" / "espn_odds.jsonl"
+    )
+    # An explicit isolated root (tests, replays) is never rerouted.
+    assert (
+        espn_odds_path(tmp_path / "iso", "2026-11-15")
+        == tmp_path / "iso" / "odds" / "nfl" / "2026-11-15" / "espn_odds.jsonl"
+    )

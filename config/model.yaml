@@ -260,8 +260,8 @@ models:
     origin: statistical_model
     min_edge: 0.05
     minimum_team_history_games: 8
-    active_production_version: nba-elo-trend-lr-v4
-    production_artifact: config/models/nba-elo-trend-lr-v4.json
+    active_production_version: nba-elo-trend-lr-v5
+    production_artifact: config/models/nba-elo-trend-lr-v5.json
     spread_production_artifact: config/models/nba-spread-margin-v9.json
     total_production_artifact: config/models/nba-total-margin-v9.json
     spread_rollback_artifact: config/models/nba-spread-margin-v7.json

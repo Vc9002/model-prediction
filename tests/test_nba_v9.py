@@ -136,9 +136,12 @@ def test_nba_v9_production_registry():
 
     champ_ml = reg.champion("NBA", "moneyline")
     assert champ_ml is not None
-    assert champ_ml.model_id == "nba-elo-trend-lr-v4"
+    # v5 promoted 2026-11-13 (quick-261113-j3m); v4 is its rollback. Evidence stays
+    # historical_only: a walk-forward backtest is not live evidence.
+    assert champ_ml.model_id == "nba-elo-trend-lr-v5"
     assert champ_ml.serving_status == "production"
     assert champ_ml.evidence_status == "historical_only"
+    assert champ_ml.rollback_model == "nba-elo-trend-lr-v4"
 
 
 def test_nba_moneyline_rollback_prices_open_underdog_examples():

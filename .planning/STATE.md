@@ -4,10 +4,10 @@ current_phase: 1
 current_phase_name: Portfolio Circuit Breaker
 status: planning
 stopped_at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated to 4-phase structure
-last_updated: "2026-11-12T19:54:54.262Z"
+last_updated: "2026-11-13T18:50:54.743Z"
 last_activity: 2026-11-12
 last_activity_desc: ROADMAP.md and STATE.md created from REQUIREMENTS.md and research/SUMMARY.md
-state_head: 9bf925e4cd1df3cb7a2ca3b3db373f4ff57bea99
+state_head: ec3210a21955451c905d516a48ee607f7f17be1a
 progress:
   total_phases: 4
   completed_phases: 0
@@ -45,7 +45,7 @@ See: .planning/PROJECT.md (updated 2026-09-20 after initialization)
 Phase: 1 of 4 (Portfolio Circuit Breaker)
 Plan: None yet in current phase
 Status: Ready to plan
-Last activity: 2026-11-12 - Completed quick task 261112-kj3: refit NBA moneyline as nba-elo-trend-lr-v5 through validate-models, registered as challenger (shadow, historical_only); indistinguishable from v4 on identical holdout rows, promotion left to operator.
+Last activity: 2026-11-13 - Completed quick task 261113-j3m: promoted nba-elo-trend-lr-v5 to NBA moneyline champion (promo-20261113T184744Z-6b0b74), v4 rollback, serving pointer and statuses moved together.
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -103,6 +103,8 @@ None yet.
 | 261112-kj3 | Refit NBA moneyline as nba-elo-trend-lr-v5 (walk-forward, restored fit construction); registered as challenger, not promoted; same-holdout Brier 0.1889 vs v4 0.1892 | 2026-11-12 | 9bf925e4 | [261112-kj3-refit-nba-moneyline-nba-elo-trend-lr-v5-](./quick/261112-kj3-refit-nba-moneyline-nba-elo-trend-lr-v5-/) |
 | 261112-m31 | NCAAF cfb-structural-v5 challenger: fitted margin/total mean calibration, slice SD table, residual total SD on walk-forward splits; artifact + class + harness, research status | 2026-11-12 | d86876e7 | [261112-m31-ncaaf-v5-challenger-fit-margin-calibrati](./quick/261112-m31-ncaaf-v5-challenger-fit-margin-calibrati/) |
 | 261112-mpz | Full pipeline verification: reroute health/daily/dashboard odds readers to the runtime root, stop the schedule rewriting frozen config/models artifacts, single-thread BLAS in ingestion | 2026-11-12 | c96f28cf | [261112-mpz-fix-odds-root-split-brain-and-frozen-art](./quick/261112-mpz-fix-odds-root-split-brain-and-frozen-art/) |
+| 261113-r2d | Disable NBA totals in the auto-buyer: nba:total categorical gate + nba-total-margin-v9 off the whitelist; live state updated (v173->v174); 11 settled NBA total paper rows left in place | 2026-11-13 | c3522f2a | [261113-r2d-disable-nba-totals-in-the-paper-auto-buyer](./quick/261113-r2d-disable-nba-totals-in-the-paper-auto-buyer/) |
+| 261113-j3m | Promote nba-elo-trend-lr-v5 to NBA moneyline champion (promo-20261113T184744Z-6b0b74); v4 rollback; model.yaml serving pointer moved with it | 2026-11-13 | ec3210a2 | [261113-j3m-promote-nba-elo-trend-lr-v5-to-nba-money](./quick/261113-j3m-promote-nba-elo-trend-lr-v5-to-nba-money/) |
 
 ## Milestone History
 

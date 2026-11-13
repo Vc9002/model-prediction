@@ -1,0 +1,17 @@
+{
+  "approved_by": "Vincent Chen (operator directive 2026-11-13; executed by Claude)",
+  "evidence_id": "docs/NBA_LR_V5_REFIT_2026-11-12.md",
+  "git_sha": "b38d6be3b8cc268a6b7cd643d57c38380c04a5f0",
+  "market": "moneyline",
+  "market_evidence_id": null,
+  "market_evidence_unavailable_reason": "No market-relative evaluation (market_eval / CLV replay) exists for nba-elo-trend-lr-v5, nor for the serving nba-elo-trend-lr-v4 it replaces. Promotion rests on the 2026-11-12 walk-forward refit (docs/NBA_LR_V5_REFIT_2026-11-12.md): on identical locked-holdout rows v5 is statistically indistinguishable from v4-as-fit (Brier 0.1889 vs 0.1892), so this promotion changes the evidence window (through 2026-11-11) and the confidence threshold (0.5254 vs 0.5444), not the served probabilities. Operator directive 'promote' 2026-11-13 under docs/PROMOTION_POLICY.md direct wiring.",
+  "new_artifact_hash": "4f4ad2d7dce2b4413a6956432457139a0c9ee122e361d45badb0549ab2723340",
+  "new_model_id": "nba-elo-trend-lr-v5",
+  "note": null,
+  "old_artifact_hash": "79618accee5a07fd472001ea010870f3cd86bf77869ddceb10d1d633eb834c0c",
+  "old_model_id": "nba-elo-trend-lr-v4",
+  "promoted_at_utc": "2026-11-13T18:47:44.208223+00:00",
+  "promotion_id": "promo-20261113T184744Z-6b0b74",
+  "sport": "NBA",
+  "status": "active"
+}

@@ -28,11 +28,24 @@ import hashlib
 import json
 import sqlite3
 import threading
+import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Self
 
 from .runtime_paths import RuntimePaths
+
+# Read failures worth reopening the connection for. SQLite reports host
+# commit-limit exhaustion on a memory-mapped page as SQLITE_IOERR ("disk I/O
+# error"), not SQLITE_NOMEM: the 2026-11-13 05:30Z daily run died this way in
+# records() while Windows logged Resource-Exhaustion (2004) events for the
+# same minute (quick-261113-jb1). "database is locked" is a busy_timeout
+# overrun under the auto-buyer's concurrent full-table reads. Anything else
+# (corruption, schema drift) re-raises on the first attempt.
+_TRANSIENT_READ_ERRORS = ("disk i/o error", "database is locked")
+# Seconds to wait before each retry; one more attempt than delays. Tests
+# monkeypatch this to zeros.
+_RETRY_DELAYS = (0.5, 1.5, 3.0)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS ledger_records (
@@ -251,12 +264,42 @@ class RuntimeLedgerStore:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA synchronous=NORMAL")
             conn.execute("PRAGMA temp_store=MEMORY")
-            conn.execute("PRAGMA mmap_size=268435456")
-            conn.execute("PRAGMA cache_size=-64000")
+            # No memory-mapped I/O: the daily forecast fans out over 16 worker
+            # threads, each with its own connection, so a 256MB map per
+            # connection was 4GB of address space against a 1.1GB file on a
+            # host that games and rust-analyzer regularly push to the commit
+            # limit. mmap reads that cannot be committed fail as SQLITE_IOERR
+            # (quick-261113-jb1). Plain read() goes through the page cache and
+            # degrades to SQLITE_NOMEM or a retryable error instead.
+            conn.execute("PRAGMA mmap_size=0")
+            # 32MB page cache per connection (was 64MB): 16 threads x 64MB was
+            # another 1GB of the daily process's footprint during the same
+            # exhaustion window.
+            conn.execute("PRAGMA cache_size=-32000")
             conn.execute("PRAGMA busy_timeout=5000")
             self._local.conn = conn
             self._connections.append(conn)
         return conn
+
+    def _reset_connection(self) -> None:
+        """Drop this thread's connection so the next access reopens it.
+
+        A connection that has hit SQLITE_IOERR may hold a poisoned page cache
+        or a stale WAL-index view; retrying on the same handle just repeats
+        the failure, so the retry path in records() reopens instead.
+        """
+        conn = getattr(self._local, "conn", None)
+        self._local.conn = None
+        if conn is None:
+            return
+        try:
+            self._connections.remove(conn)
+        except ValueError:
+            pass
+        try:
+            conn.close()
+        except sqlite3.Error:
+            pass
 
     def close(self) -> None:
         # Close every thread's connection; sqlite3 forbids closing a
@@ -417,7 +460,22 @@ class RuntimeLedgerStore:
         if clauses:
             query += " WHERE " + " AND ".join(clauses)
         query += " ORDER BY created_at_utc"
-        return [dict(r) for r in self._conn.execute(query, params).fetchall()]
+        attempt = 0
+        while True:
+            try:
+                return [dict(r) for r in self._conn.execute(query, params).fetchall()]
+            except sqlite3.OperationalError as exc:
+                message = str(exc).lower()
+                transient = any(marker in message for marker in _TRANSIENT_READ_ERRORS)
+                if not transient or attempt >= len(_RETRY_DELAYS):
+                    raise
+                # Bounded: len(_RETRY_DELAYS) reopen-and-retry cycles, then the
+                # caller sees the real error. PickLedger._append_record calls
+                # this on every append, so one transient read failure no longer
+                # fails a whole sport's forecast and the daily integrity check.
+                self._reset_connection()
+                time.sleep(_RETRY_DELAYS[attempt])
+                attempt += 1
 
     def pick_rows(self, *, tier: str | None = None, sport: str | None = None) -> list[dict[str, Any]]:
         """Project canonical records back into the rich PickLedger row shape.

@@ -21,6 +21,7 @@ from model_prediction.portfolio.auto_buyer_ledger import (
     record_auto_buy_execution,
 )
 from model_prediction.portfolio.auto_executor import (
+    DEFAULT_WHITELIST_MODELS,
     PAPER_AUTO_BUYER_DATA_ROOT,
     AutoExecutionConfig,
     AutoExecutionResult,
@@ -255,6 +256,58 @@ def test_buyer_filters_blacklist_models():
     res = buyer.evaluate_and_execute(picks)
     assert res.rejected_blacklist == 1
     assert len(res.dry_run_orders) == 0
+
+
+def test_buyer_categorically_rejects_nba_total_even_when_model_is_whitelisted():
+    """Operator directive 2026-11-13: NBA totals must never reach the paper ledger.
+
+    The gate is the sport/market constant, not the whitelist -- the persisted
+    runtime state carries its own whitelist_models, so a model-id removal alone
+    would not survive a stale state file.
+    """
+    quote_calls = []
+
+    def quote_lookup(slug):
+        quote_calls.append(slug)
+        return {"ask": 0.50, "market_slug": slug, "side": "long"}
+
+    buyer = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(
+            whitelisted_models=("nba-total-margin-v9", "nba-spread-margin-v9"),
+            blacklisted_models=(),
+        ),
+        live_quote_fn=quote_lookup,
+    )
+    event_start = iso_utc(utc_now() + timedelta(hours=2))
+    result = buyer.evaluate_and_execute(
+        [
+            {
+                "pick_id": "nba-total-disabled",
+                "model_id": "nba-total-margin-v9",
+                "status": "open",
+                "league": "NBA",
+                "market_type": "total",
+                "event_start_utc": event_start,
+                "model_probability": 0.58,
+                "market_probability": 0.50,
+            },
+            {
+                "pick_id": "nba-spread-allowed",
+                "model_id": "nba-spread-margin-v9",
+                "status": "open",
+                "league": "NBA",
+                "market_type": "spread",
+                "event_start_utc": event_start,
+                "model_probability": 0.58,
+                "market_probability": 0.50,
+            },
+        ]
+    )
+
+    assert result.rejected_disabled_sport_market == 1
+    assert quote_calls == ["slug-nba-spread-allowed"]
+    assert [order["pick_id"] for order in result.dry_run_orders] == ["nba-spread-allowed"]
+    assert "nba-total-margin-v9" not in DEFAULT_WHITELIST_MODELS
 
 
 def test_buyer_categorically_rejects_mlb_moneyline_even_when_model_is_whitelisted():
