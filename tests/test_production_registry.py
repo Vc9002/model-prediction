@@ -104,7 +104,7 @@ def test_real_production_yaml_resolves_every_model() -> None:
     # across supported markets are available contracts (champions + rollbacks).
     # Weak evidence models have evidence_status=degraded and
     # replacement_priority=critical rather than being disabled.
-    assert len(registry.available_entries()) == 88
+    assert len(registry.available_entries()) == 89
     assert len(registry.problem_entries()) == 0
     assert registry.primary.model_id == "wnba-elo-trend-lr-v4"
     assert registry.primary.artifact_hash
