@@ -58,13 +58,16 @@ if _env_file.exists():
         pass
 
 DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
-    # NBA (v9 spread/total champions). nba-moneyline-v9 was removed 2026-11-12:
+    # NBA (v9 spread champion only). nba-moneyline-v9 was removed 2026-11-12:
     # it ran on placeholder coefficients and was rolled back from serving on
     # 2026-11-10 (4d5624ed). The serving moneyline champion
     # (nba-elo-trend-lr-v4, historical_only evidence) is deliberately NOT
     # listed -- adding it is a trading-eligibility decision for the operator.
+    # nba-total-margin-v9 was removed 2026-11-13 (operator directive: NBA totals
+    # must not reach the paper ledger); ("nba", "total") is also categorically
+    # blocked in DISABLED_AUTO_BUYER_SPORT_MARKETS so a persisted whitelist
+    # cannot restore it.
     "nba-spread-margin-v9",
-    "nba-total-margin-v9",
     # NFL (Latest Generation v7 Champions; NFL moneyline currently has no
     # active whitelisted champion -- nfl-elo-trend-lr-v4 is blacklisted below)
     "nfl-spread-structural-v7",
@@ -195,6 +198,10 @@ ESPORTS_LEAGUES = frozenset({"cs2", "lol", "dota2", "valorant", "r6", "rainbow_s
 DISABLED_AUTO_BUYER_SPORT_MARKETS = frozenset(
     {
         ("mlb", "moneyline"),
+        # NBA totals pulled from the auto-buyer 2026-11-13 (operator directive).
+        # The serving champion (nba-total-margin-v9) keeps forecasting for the
+        # Main ledger; only execution is blocked.
+        ("nba", "total"),
         ("soccer", "moneyline"),
         ("soccer", "total"),
         ("soccer", "spread"),
