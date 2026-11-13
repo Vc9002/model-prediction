@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from collections.abc import Callable
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -36,6 +37,13 @@ def _main_call_eligible(eligibility: Any, *, edge: float, min_edge: float, max_e
 
 
 _NFL_PARTIAL_MARKET_TOKENS = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")
+# A main line's long ask sits near 50% by construction; outside this band the row is
+# an alternate rung or a placeholder, never the game's spread/total.
+NFL_MAIN_LINE_ASK_BAND = (0.20, 0.80)
+# Largest tolerated distance between a Polymarket line and the sportsbook consensus
+# before the contract is treated as an alternate rather than the main line.
+NFL_SPREAD_MAX_LINE_GAP = 6.0
+NFL_TOTAL_MAX_LINE_GAP = 7.0
 
 
 def _nfl_serving_calibrator(model_version: str, market: str, data_root: str | Path) -> Any | None:
@@ -46,27 +54,12 @@ def _nfl_serving_calibrator(model_version: str, market: str, data_root: str | Pa
     and the raw engine probability is served. Returns the load_calibrator_artifact object so
     the row carries the artifact's file hash, which validate_decision_snapshot re-checks at
     request time and at settlement."""
-    from ..calibration import load_calibrator_artifact
-    from ..calibration_pipeline import MIN_SERVING_BRIER_IMPROVEMENT, MIN_SERVING_SAMPLE
+    from ..calibration_pipeline import load_serving_calibrator
 
-    path = Path(data_root) / "calibration" / "models" / f"{model_version}.{market}_calibrator.json"
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    try:
-        if str(payload.get("champion_method") or "identity").lower() == "identity":
-            return None
-        if str(payload.get("market")) != market or str(payload.get("model_version")) != model_version:
-            return None
-        if int(payload.get("sample_size") or 0) < MIN_SERVING_SAMPLE:
-            return None
-        baseline, oof = payload.get("baseline_brier"), payload.get("calibrated_oof_brier")
-        if baseline is None or oof is None or float(baseline) - float(oof) < MIN_SERVING_BRIER_IMPROVEMENT:
-            return None
-        return load_calibrator_artifact(path)
-    except (TypeError, ValueError, KeyError, FileNotFoundError):
-        return None
+    calibrator, _decision = load_serving_calibrator(
+        model_version, market, roots=(Path(data_root) / "calibration",)
+    )
+    return calibrator
 
 
 def _apply_serving_calibrator(
@@ -94,25 +87,55 @@ def _apply_serving_calibrator(
     )
 
 
-def _select_nfl_spread_market(candidates: list[dict]) -> dict | None:
-    """Select the most balanced spread market line for an NFL game."""
-    return _select_latest_balanced_market(candidates)
+def _select_nfl_spread_market(
+    candidates: list[dict],
+    *,
+    reference_line: float | None = None,
+    row_line: Callable[[dict], float] | None = None,
+    max_line_gap: float = NFL_SPREAD_MAX_LINE_GAP,
+) -> dict | None:
+    """Pick the NFL spread quote to price. See _select_latest_balanced_market."""
+    return _select_latest_balanced_market(
+        candidates, reference_line=reference_line, row_line=row_line, max_line_gap=max_line_gap
+    )
 
 
-def _select_nfl_total_market(candidates: list[dict]) -> dict | None:
-    """Select the most balanced full-game total line for an NFL game.
+def _select_nfl_total_market(
+    candidates: list[dict],
+    *,
+    reference_line: float | None = None,
+    max_line_gap: float = NFL_TOTAL_MAX_LINE_GAP,
+) -> dict | None:
+    """Pick the NFL total quote to price. See _select_latest_balanced_market.
 
-    Shares the spread selector's rules. Until 2026-11-11 this picked the
-    ask nearest 50% over every observation of the day (the daily job captures
-    4x/day into an append-only archive), so a stale morning quote could beat
-    the current one and be stamped as the decision-time ask; it also accepted
-    one-sided rows, which the under branch then dropped silently.
+    Rejects quarter/half/team-total slugs; totals keep their line as-is, so no
+    row_line transform is needed.
     """
-    return _select_latest_balanced_market(candidates)
+    return _select_latest_balanced_market(
+        candidates, reference_line=reference_line, max_line_gap=max_line_gap
+    )
 
 
-def _select_latest_balanced_market(candidates: list[dict]) -> dict | None:
-    """Latest two-sided quote per contract, then the line whose long ask is nearest 50%."""
+def _select_latest_balanced_market(
+    candidates: list[dict],
+    *,
+    reference_line: float | None = None,
+    row_line: Callable[[dict], float] | None = None,
+    max_line_gap: float | None = None,
+    ask_band: tuple[float, float] = NFL_MAIN_LINE_ASK_BAND,
+) -> dict | None:
+    """Latest two-sided quote per contract, then the main line.
+
+    "Main line" means: within `ask_band` on the long side (a placeholder rung at a
+    91% ask is not a market, whatever its line), and when a sportsbook
+    `reference_line` is known, within `max_line_gap` of it and nearest to it; ties
+    and the no-reference case fall back to the long ask nearest 50%.
+
+    Why (2026-11-12): before the main line was listed, Polymarket carried only +17.5
+    to +30.5 alternates for WAS at NYG and the "most balanced" rule priced the +17.5
+    at a 91% ask as the game's spread, and a 23.5 total at an 8% ask. The consensus
+    line (-2.5 / 40.5) was on the same scoreboard event the whole time.
+    """
     partial_tokens = _NFL_PARTIAL_MARKET_TOKENS
     latest_by_contract: dict[str, dict] = {}
     for row in candidates:
@@ -140,7 +163,29 @@ def _select_latest_balanced_market(candidates: list[dict]) -> dict | None:
             latest_by_contract[slug] = row
     if not latest_by_contract:
         return None
-    return min(latest_by_contract.values(), key=lambda row: abs(float(row["long"]["ask"]) - 0.5))
+    low, high = ask_band
+    plausible = [row for row in latest_by_contract.values() if low <= float(row["long"]["ask"]) <= high]
+    if not plausible:
+        return None
+
+    def _balance(row: dict) -> float:
+        return abs(float(row["long"]["ask"]) - 0.5)
+
+    if reference_line is None:
+        return min(plausible, key=_balance)
+    line_of = row_line or (lambda row: float(row["line"]))
+    scored: list[tuple[float, float, dict]] = []
+    for row in plausible:
+        try:
+            gap = abs(line_of(row) - float(reference_line))
+        except (TypeError, ValueError):
+            continue
+        if max_line_gap is not None and gap > max_line_gap:
+            continue
+        scored.append((gap, _balance(row), row))
+    if not scored:
+        return None
+    return min(scored, key=lambda item: (item[0], item[1]))[2]
 
 
 def _nfl_is_neutral_site(event: dict) -> bool:

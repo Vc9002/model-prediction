@@ -674,3 +674,25 @@ def test_a_varying_price_and_a_demoted_sport_are_both_left_alone(tmp_path: Path)
     assert check["degenerate"] == []
     assert check["by_sport"]["ncaaf"] == 1
     assert check["by_sport"]["mlb"] == 12
+
+
+def test_market_capture_reads_the_runtime_root_not_the_checkout(tmp_path: Path) -> None:
+    """Capture writes Polymarket snapshots under the runtime root's odds/. From
+    2026-11-04 to 2026-11-12 health read the checkout's data/odds instead and
+    reported every sport stale while capture was healthy."""
+    repo = _make_repo(tmp_path)
+    runtime = tmp_path / "runtime"
+    for worker in WORKERS:
+        _seed_successful_run(repo, worker)
+    # Fresh snapshot only where capture actually writes; a stale one in the
+    # checkout's legacy tree must not be consulted.
+    fresh = (datetime.now(UTC) - timedelta(days=1)).date().isoformat()
+    stale = (datetime.now(UTC) - timedelta(days=9)).date().isoformat()
+    (runtime / "odds" / "nba" / fresh).mkdir(parents=True)
+    (repo / "data" / "odds" / "nba" / stale).mkdir(parents=True)
+
+    report = system_health(repo_root=repo, runtime_root=runtime)
+
+    assert report["checks"]["market_capture"]["nba"]["latest_snapshot_date"] == fresh
+    assert report["checks"]["market_capture"]["nba"]["stale"] is False
+    assert not [r for r in report["reasons"] if "market snapshots stale" in r]

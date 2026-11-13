@@ -10,6 +10,7 @@ import pytest
 
 import dashboard_server
 import model_prediction.dashboard.orders as dashboard_orders
+from model_prediction.audit import AuditLog
 
 
 def _configure_archive(monkeypatch, tmp_path: Path, rows: list[dict], patch_dash) -> Path:
@@ -339,6 +340,24 @@ def test_data_inventory_uses_each_sports_real_storage_layout(monkeypatch, tmp_pa
         "cs2": "data/esports/cs2/matches.jsonl",
         "kbo": "data/international_baseball/kbo/games.jsonl",
     }
+
+
+def test_audit_tail_streams_the_newest_events_without_reading_the_whole_file_into_memory(
+    tmp_path: Path, patch_dash
+) -> None:
+    data = tmp_path / "data"
+    data.mkdir()
+    patch_dash("DATA", data)
+    log = AuditLog(data / "events.jsonl")
+    for index in range(30):
+        log.append("order_executed", f"pick-{index}", {"action": "buy"})
+
+    result = dashboard_orders._audit_tail()
+
+    assert result["total_events"] == 30
+    assert len(result["tail"]) == 25
+    assert result["tail"][0]["subject"] == "pick-29"
+    assert result["tail"][-1]["subject"] == "pick-5"
 
 
 def test_metricless_qualified_artifact_is_not_rendered_as_qualified() -> None:

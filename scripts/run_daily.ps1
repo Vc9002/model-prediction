@@ -102,6 +102,13 @@ $IngestJobs = foreach ($sport in $Sports) {
     Start-Job -ArgumentList $Py, $RepoRoot, $sport, $Yesterday, $RunDate -ScriptBlock {
         param($Py, $RepoRoot, $sport, $d1, $d2)
         Set-Location $RepoRoot
+        # Seven interpreters import numpy/scipy at once; OpenBLAS reserves a
+        # per-thread buffer pool per process (12 cores here), and the 00:30 ET
+        # runs on 2026-11-11 and 2026-11-12 died with "OpenBLAS error: Memory
+        # allocation still failed after 10 retries" / MemoryError. Ingestion
+        # does no linear algebra, so one BLAS thread costs nothing.
+        $env:OPENBLAS_NUM_THREADS = '1'
+        $env:OMP_NUM_THREADS = '1'
         $worst = 0
         foreach ($d in @($d1, $d2)) {
             & $Py -m model_prediction.cli ingest --sport $sport --date $d 2>&1

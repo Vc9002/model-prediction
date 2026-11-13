@@ -1,5 +1,365 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
+## 2026-11-12 — Full pipeline verification: odds-root split-brain in health/daily/dashboard, frozen artifacts rewritten by the schedule (quick-261112-mpz)
+
+Operator directive "verify and run through ALL pipeline and workflows". Commit `c96f28cf`.
+
+- **Health false alarm (real bug)**: `system_health._market_capture` read the checkout's `data/odds`
+  while `cli.commands` has written Polymarket snapshots under the runtime root since 2026-11-04.
+  Result: "market snapshots stale (8 days)" for every sport while capture was healthy (the data gap
+  monitor, which reads the runtime root, said FRESH). Fixed to read `runtime_root/odds`;
+  `tests/test_system_health.py::test_market_capture_reads_the_runtime_root_not_the_checkout`
+  fails on the old code, passes on the fix.
+- **Frozen artifacts rewritten every run (contract violation)**: `_research_models_dir()` returns the
+  rolling `runtime_root/models` only once it exists and is non-empty, else `config/models`. It was
+  also used as the WRITE target by `_refresh_esports_ratings`, `_refresh_international_baseball_ratings`
+  and the `--write-artifacts` commands, so nothing ever created the rolling dir and every daily run
+  rewrote `cs2/dota2/lol/rainbow_six/valorant-tiered-elo-v6.json`, `kbo/npb-tie-aware-elo-v2.json`
+  and their `.previous.json` in git (mtimes 16:08-16:10 during the 16:00 run). New
+  `_rolling_models_write_dir()` always targets and creates the rolling dir; reads unchanged.
+  Runtime `models/` seeded from the 16:08 copies, frozen files `git checkout`ed. Registry still
+  validates every model on the frozen copies.
+- **Same split-brain elsewhere**: `daily.py` step10 Polymarket edge scanner (`scan_directory(base_dir=
+  data_directory/"odds")`) and the `odds_by_sport` summary read the repo tree (scanner saw nothing since
+  11-04); `dashboard/routes.py` live capture wrote to `ROOT/"data"`. All rerouted through the new
+  `runtime_paths.rerouted_data_root()` (legacy repo `data/` -> runtime root, explicit roots untouched).
+  `settle.py`'s closing-snapshot lookup also passes the repo root, but settled rows since 11-04 still
+  carry closing prices that differ from decision prices, so it is fed by another path; left as is.
+- **00:30 ET daily failures**: 11-11 and 11-12 00:30 runs failed in ingestion with `MemoryError` /
+  `OpenBLAS error: Memory allocation still failed after 10 retries` (seven parallel interpreters on a
+  12-core box). `run_daily.ps1` ingest jobs now set `OPENBLAS_NUM_THREADS=1` / `OMP_NUM_THREADS=1`.
+  The 11-10 all-day `ledger_coverage` integrity exits and the 11-11 16:00 `0xC0000005` crash are the
+  earlier, already-documented failures. All five later runs on 11-12 exited 0 on every step.
+- **Test suite status (not fixed, triaged)**: full suite 2927 passed / 57 failed; 54 persist with the
+  `MODEL_PREDICTION_*` env cleared; 39 fail at clean HEAD, 36 at checkpoint `0af19ecd`. Regressed on the
+  branch: `test_auto_polymarket_buyer::test_buyer_rejects_below_win_probability`,
+  `::test_buyer_rejects_unrealistic_edge_outliers`,
+  `test_qualification_integrity::test_names_cannot_claim_prospective_capture[wnba-moneyline-v5]`.
+  Dirty-tree-only (18): `test_dashboard_polymarket` x2 pin `scanner_enabled: false` but the uncommitted
+  `config/model.yaml` enables it (operator directive 2026-11-10); `test_dashboard_server::test_pick_quote_*`
+  x6, `test_main_ledgers` x4, `test_research_ledger*` x4, `test_auto_polymarket_buyer::..._network_error`,
+  `test_research_pair_capture` read local runtime state. The remaining failures pin superseded versions
+  (`nfl-*-structural-v5` vs v7, `eurolg-tempo-v1` vs v2, NBA v9 sets, model catalog, CI import count
+  78 vs 88, `cfb_structural_v2` dispersion 19.2 vs 16.0) or stub drift (`Ledger.settle()` kwargs,
+  `_DuplicateLedger.rows`, `sqlite ledger authority requires a RuntimeLedgerStore`). Two look like
+  real code paths worth a look: `research_scoring.outcome_label` does `float(prediction["line"])` on a
+  `None` line for moneyline rows, and `settle._settle_by_resolution` indexes `row["event_start_utc"]`
+  on rows without it.
+- **Also observed, unchanged**: `data/calibration/**` (97 files) is git-tracked yet rewritten by the
+  calibrate step every run; health flags off-season kbo/mlb/npb/wnba snapshots as stale (2-day rule,
+  no season model); production canary primary is WNBA so `production.db` has no prediction since 10-31
+  (NO_EVENTS); auto-buyer had two `0xC0000005` crashes on 11-12 (known python312.dll fault);
+  `/api/bets` ~100 s and `/api/export/picks` ~19 s on a threaded server.
+
+## 2026-11-12 — NCAAB feature round: history-derived non-D1 prior, AP-rank prior, attempts-based tempo (quick-261112-nc6, round 2)
+
+Operator directive "improve the model, add more features" after the review fixes. Full
+write-up and tables: `docs/NCAAB_V6_REVIEW_FIXES_2026-11-12.md` (Feature round section);
+report `outputs/ncaab/ncaab_v6_review_ablation.md`.
+
+- **Diagnosis first**: on the 658 November-2026 games the round-1 model under-predicted
+  home margins by 12.4 points on average; 187 of those games had a non-Division-1 visitor
+  (bias +29, actual +42 vs modelled +13 — the 1180 non-D1 prior implied a 13-point gap)
+  and Tier-1/2 hosts in buy games were under-priced by a further ~13.
+- **Data already on disk**: the archived ESPN scoreboards (`data/raw/ncaab/<date>/
+  scores_ncaab.json`, 182 days) carry per-team FGA/3PA/FTA/makes, rebounds, assists, the
+  AP `curatedRank` carried into each game, neutral-site and conference flags for 99.96%
+  of history games. New `features/ncaab_scoreboard_stats.py` serves them by ESPN event id;
+  callers pass only the history they may see, so it cannot leak.
+- **Spread** (`non_d1_prior_from_history`, `rank_prior_per_slot` 8): both act only in the
+  season-opener regime, which the Feb–Mar validation split does not contain, so they were
+  selected on the train window (Dec–Feb; nothing else is fitted there) with validation
+  required not to degrade. Train: moneyline Brier 0.1844 → 0.1803, margin MAE 10.73 →
+  9.83; validation unchanged (0.2020 / 8.85); holdout (reported once) MAE 16.51 → 12.71,
+  moneyline Brier 0.1219 → 0.1096 (now better than the pre-fix control's 0.1116). Rank
+  slots 12/16 and non-D1 constants 1000/850/700 were tested and not taken.
+- **Total** (`tempo_source="attempts"`, `pace_sensitivity` 1.5): validation MAE 13.78 →
+  13.38, residual SD 16.93 → 16.56, PIT 0.507/0.821/0.921, over-Brier 0.2363 → 0.2345;
+  holdout MAE 14.49 → 14.30. Grid 0.55–2.5; 1.5 is the interior optimum.
+- **Deployment check**: the daily at 19:05Z (after round 1) wrote 68 Flat rows; the deployed
+  artifact model reproduces all 68 exactly (harness gate `matched_by: deployed_artifact`).
+  Artifacts rewritten with the new keys and evidence; consumed-keys / parity tests cover them.
+- Rollback: revert the round-2 commit; the round-1 artifacts are in git (`e32335c7`).
+
+## 2026-11-12 — NFL loss investigation: no CLV existed, placeholder rungs priced as main lines, consensus/opener capture added
+
+Follow-up to the 2026-11-11 NFL review. Full evidence in
+`docs/NFL_LOSS_INVESTIGATION_2026-11-12.md` (loss attribution, 1,489-game
+component regressions, outside research). Code changes, all NFL-only:
+
+- **CLV was zero by construction, not measured.** Every NFL row had an empty
+  `closing_line`; `probability_clv` was 0.000 where present because the
+  Polymarket "closing" snapshot was the same game-day capture the decision
+  used (NFL markets were only snapshotted on game day, 1-2 captures), and no
+  sportsbook consensus was stored. New `data_sources/espn_nfl_odds.py`
+  captures ESPN's DraftKings opener + current two-sided spread/total/moneyline
+  prices for every NFL game in the next 7 days on each run
+  (`odds/nfl/<game_date_et>/espn_odds.jsonl`, append-only, sha256 per record,
+  readers filter on `observed_at_utc` and drop tampered lines);
+  `commands.capture_nfl_polymarket_week_ahead` snapshots Polymarket books for
+  the same window (`horizon_hours=None`, filed under each game's own date).
+  Both run in the daily capture pool as `step1l_nfl_week_ahead_quotes`.
+  NFL rows now carry `decision_consensus_probability/line` (de-vigged side
+  price at the book's own line) and the opener in `feature_basis`;
+  `cli/settle.py` writes `closing_consensus_probability/line` from the last
+  pre-kickoff record when its line equals the pick's line. First live
+  capture: 14 games, 2026-11-12T06:52Z (WAS@NYG opener -1.5/47.5, current
+  -2.5/40.5).
+- **Placeholder rungs were selectable as the main line.** Reproduced on the
+  2026-11-12 WAS@NYG snapshot: before the main line was listed, Polymarket
+  carried only +17.5..+30.5 spreads (long asks 91-99%) and 17.5-23.5 totals;
+  `_select_latest_balanced_market` priced +17.5 at a 91% ask as the spread
+  and the 23.5 total at an 8% ask. Fix: long ask must sit in 20-80%, and with
+  a consensus reference the nearest rung within 6 (spread) / 7 (total)
+  points wins, else the builder declines to the consensus price. The
+  reference is the parsed ESPN consensus for the event, home-anchored.
+  `tests/test_nfl_market_selection.py` pins the real ladder.
+- **Total fallback asks were vig-inclusive one-sided prices** while the
+  spread fallback de-vigged; both now use the de-vigged consensus side.
+- **"NFL Structural v6" labels on v7 rows** (rationale, model_name, risks)
+  now carry the served `model_version`; the risk text states the replay
+  finding (structural signal carries no information beyond the close).
+- Stale fixture `tests/sports/nfl/spread/test_nfl_spread.py` (one-sided asks,
+  no `observed_at_utc`) updated to the selector's contract; its two
+  end-to-end tests still assert the retired v5 version (pre-existing).
+
+Not changed (operator decisions, see the investigation doc §5): spread sd
+12.8 / heavy-line inflation, `predictively_qualified` on the three NFL
+champions, retiring `nfl-elo-trend-lr-v4` (−10u at real quotes; its
+qualification and 50 of its settled rows are priced at the 52.38% placeholder).
+
+## 2026-11-12 — NCAAF review fixes: serving the v4 class, ask integrity, artifact gates, venue weather, QB channel
+
+Closes every NCAAF item in `docs/MODEL_REVIEW_2026-11-11.md` (#1, #8a/b/c, #9 CFB,
+#12, #13, LOW: MC noise, `code_revision`). Quick task `261112-0xd`. Verified
+against the live ESPN scoreboard for 2026-11-14 (56 games, 167 contracts) and
+the runtime ledger read-only. Every fix carries a regression test in
+`tests/test_cfb_serving_parity.py`; the two headline tests were shown red under
+mutation (legacy 16.2 model injected; newest-capture matcher flipped to oldest).
+
+**Defect window (#1): 2026-10-26 (v4 promoted) → this fix.** `build_cfb_slate`
+instantiated `CollegeFootballModel()` — a second implementation with
+`margin_sd=16.2`, no conference scaling and no total-SD widening — and stamped
+every pick `cfb-structural-v4` with the v4 artifact hash. `CFBStructuralV4Model`
+(14.5 from the 11-05 walk-forward retune) was only ever imported by
+`sports/ncaaf/`, which nothing in `cli/` calls. The runtime ledger holds 243
+Main rows labelled `cfb-structural-v4` priced on the 16.2 arithmetic (176+3
+superseded, 56+6 settled, 2 open; 229 of them against ESPN consensus). They are
+left in place and are identifiable: their snapshot `parameters.margin_sd`
+divided by the recorded widening is 16.2, not 14.5. Superseding them is an
+operator decision, as with the NFL defaulted-input rows.
+
+Fixes:
+
+- **One implementation.** `CollegeFootballModel` is now a subclass of
+  `CFBStructuralV4Model` carrying only the legacy constructor (per-market
+  version labels). `cfb_model()` builds it with
+  `CFBStructuralV4Model.from_artifact(load_cfb_structural_v4_artifact())`,
+  which refuses a wrong `model_version`, a bad `artifact_hash`, a declared
+  feature the extractor does not produce, or a non-metadata key nothing reads.
+  `build_cfb_slate(..., model=None)` defaults to it. The v4 engine now records
+  `inference_inputs` (exact pre-draw RNG state, from one advancing stream shared
+  across the slate) so settlement replay (`cfb_replay`) keeps working; its
+  probabilities are kept at six decimals (four would have failed the 2e-6
+  replay tolerance on every row). `cfb_distribution.py` is untouched: its
+  source hash is pinned by every open snapshot's replay identity.
+- **Feature names.** `CFBMatchupFeatures.to_dict` now emits the eight
+  artifact-declared names it omitted (`*_offense_ppp`, `*_defense_ppp`,
+  `*_preseason_prior_weight`, `*_qb_value_adjustment`) plus `sample_games`.
+- **Ask integrity (#8a/b).** Snapshot rows are reduced to the newest capture
+  per `market_slug` before matching; `_match_cfb_moneyline` returns the newest
+  matching capture instead of the first file row; spread/total/moneyline
+  matchers require both side asks, and the `1 - ask` completion is gone.
+- **Provenance (#8c).** `feature_basis.quote_provenance` is
+  `polymarket_executable_ask` or `espn_consensus_indicative`, and the rationale
+  says so, mirroring NFL `5ffc2b40`. Main eligibility of consensus rows is
+  unchanged — open operator decision.
+- **Artifact gates enforced (#9).** `main_gates_from_artifact` reads every key
+  of the artifact's `gates` block; `_forecast_cfb_sport` rejects from Main with
+  `fcs_blocked`, `spread_line_above_max` (|line| > 21.5) and
+  `moneyline_ask_below_floor` (ask below 33.3%, the +200 dog limit expressed
+  as a probability). `min_edge` defaults to the artifact's 2% (was a hardcoded
+  3%). The live 11-14 slate has 3 FCS contracts the gate now blocks.
+- **Total gates to config (#12).** The hardcoded p > 62% / under ≥ 56.5 /
+  |proj − line| < 1.5 clauses moved to `config/model.yaml`
+  `models.NCAAF.main_total_gates` with the same values (documented as
+  unvalidated; delete the block to disable); the dead `edge > 0.10` clause and
+  the unread `spread_sd: 16.2`, `max_moneyline_american_odds`,
+  `blowout_spread_edge_cap` keys are removed.
+- **Neutral sites and postseason (#13).** `resolve_cfb_game_weather` takes
+  `is_neutral_site` / `venue_name` / `venue_indoor` from ESPN's `competition.venue`
+  and never falls back to the home stadium for a neutral game; the daily
+  `capture_cfb_pregame_weather` now captures neutral venues by ESPN name
+  (NFL venue table + CFB stadium catalog; unknown venue ⇒ unverified). Verified
+  on the live 2025-12-31 payload: bowls carry `season.type=3`, `week.number=1`,
+  `venue.fullName`, `venue.indoor`. Postseason maps to model week 15 (prior
+  weight 1%) instead of week 1 (90%).
+- **QB channel (#13).** New `features/cfb_qb_availability.py` joins the daily
+  ESPN CFB injuries snapshot (newest with `observed_at_utc <= decision`, ≤ 48 h
+  old) to the scoreboard passing leader (ESPN has no college depth chart) and
+  sets `qb_starter_prob_*` (Out/IR 0, Doubtful 44.4%, Questionable 77.8%). No
+  evidence ⇒ 1.0 with the reason recorded in `feature_basis.qb_availability`.
+  Limitation found on live data: ESPN's college injuries feed carried 3 entries
+  on 11-12 (one dated 2020), so the channel is wired and point-in-time correct
+  but will rarely fire until a denser report source exists.
+- **LOW.** Simulation count 15k → 200k on the served engine (±0.8 pp → ±0.22 pp
+  95% CI; recorded in `inference_inputs`, replayable, 5.9 s for a 56-game
+  slate). `code_revision` is a digest of the five serving source files, not of
+  the version string.
+
+Reproduction:
+
+```
+.venv/Scripts/python -m pytest tests/test_cfb_serving_parity.py tests/test_cfb_structural_v4.py tests/test_college_football.py tests/test_cfb_replay.py tests/test_cfb_quote_integrity.py -o addopts='' -q
+PYTHONPATH=src .venv/Scripts/python -c "from model_prediction.models.college_football import cfb_model; m=cfb_model(); print(m.margin_sd, m.total_sd, m.n_simulations)"   # 14.5 16.0 200000
+```
+
+Pre-existing, unrelated failures in the same tree (also red at committed HEAD):
+`tests/test_cli.py` tennis/soccer/MLB/WNBA/NFL ledger tests,
+`test_model_naming.py::test_catalog_covers_production_registry`,
+`test_ci_contracts.py::test_ci_imports_of_checked_in_config_resolve`.
+
+## 2026-11-12 — NBA review follow-up: serving transforms, Main relabel, lr-v4 skew, totals selector, neutral floors
+
+Re-verification of `docs/MODEL_REVIEW_2026-11-11.md` (NBA items) against the live
+tree and `E:\model-prediction-runtime\ledgers\ledgers.db` (read-only). The doc's
+NBA findings (#3 moneyline path, #6, #8d, #14) all reproduced; three further
+defects surfaced that the review could not see from model code alone, because
+they live in data files, in a nightly pipeline, or in uncommitted working-tree
+code the scheduler ran live. Every fix below carries a regression test shown
+red without the fix. Quick task `261112-11j`.
+
+**Defect window (totals): 2026-11-11T01:32Z → 2026-11-12T05:32Z.** Every NBA
+total priced in that window was pushed through a Beta calibrator
+(`a=1.2827, b=1.2591, c=-0.6334`, `data/calibration/models/nba-total-margin-v9.total_calibrator.json`
+at HEAD) that had been fitted on 2026-11-08 from 125 settled picks made by
+`nba-total-margin-v2..v7`, labelled v9. The loader in `_forecast_nba_total_slate`
+went live from the working tree before it was committed (`0af19ecd`). Served
+probabilities on the model's own selected side fell to 35–46% (ledger rows carry
+`calibration_method=beta`, hash `7f804465…`), so every total had negative edge
+and Main totals went dark from 11-09. At 05:32Z on 11-12 the nightly calibration
+pipeline refit on v9's 28 own rows, chose identity, and overwrote the file. No
+Main row was priced on the transform (that is the point: it blocked them all);
+13 Flat rows were. Flat beta-era rows went 3-10 on the model's raw selections,
+which the transform did not change.
+
+Fixes, one commit each:
+
+- **lr-v4 serves on its fit construction** (`62e0118c`). `learned_forward.py`
+  injected NBA-only Elo/Trend knobs (HCA 38, offseason gap 60, retention 0.40,
+  `isolate_postseason`) added in `a9315de4` and borrowed from the v9
+  structural config; `validation.py` fit `nba-elo-trend-lr-v4` on bare
+  `build_elo(history, sport)` / `TrendEngine(history)`. Even-team
+  `elo_probability` moved 59.9% → 55.5% against a 3.56 coefficient, so the
+  artifact's Brier 0.185 described a model that was not being served. Serving
+  now passes only what the artifact declares and otherwise uses the library
+  defaults training used. Test: `test_nba_learned_slate_rebuilds_elo_and_trends_exactly_as_training_did`.
+- **Serving calibrators require own-model fit provenance** (`c5a6a5e9`). One
+  shared guard, `calibration_pipeline.serving_guard_reason`, now backs the
+  auto-buyer (`calibrate_for_serving`), the NFL slates
+  (`_nfl_serving_calibrator`) and the NBA total slate
+  (`load_serving_calibrator`). Besides the existing non-identity /
+  filename-match / `MIN_SERVING_SAMPLE` / OOF-improvement checks, an artifact
+  must declare `fit_model_versions == [model_version]` and
+  `fit_source` in {`settled_live_rows`, `point_in_time_replay`}. The pipeline
+  writer stamps both; `scripts/calibrate_nba_v9.py` stamps
+  `fit_source: retrospective_replay` (v9 replayed on games earlier models
+  picked), which the guard refuses. The NBA total slate records the decision
+  in its forecast output (`calibration`). The live NFL v7 artifacts are identity
+  at HEAD and on disk, so nothing served changes for NFL. Tests:
+  `test_calibrate_for_serving_leaves_untrusted_calibrators_unapplied`
+  (provenance cases), `test_load_serving_calibrator_applies_the_same_guard_for_slates`,
+  `test_pipeline_artifacts_declare_own_model_fit_provenance`.
+- **`nba-moneyline-v9` artifact is an unqualified placeholder** (`df48e07d`).
+  Rolled back from serving 2026-11-10 (`4d5624ed`, "placeholder coefficients")
+  but its artifact still claimed `qualified: true`, `locked_holdout: true`,
+  Brier 0.1945. Flat ledger 11-08..11-10: 8 of 11 settled rows priced the model
+  below the market ask (54% vs 87%). The qualification block now says
+  unqualified/unverified with the rollback note; `artifact_hash` recomputed;
+  the auto-buyer `DEFAULT_WHITELIST_MODELS` drops it (`nba-elo-trend-lr-v4` is
+  deliberately NOT added — operator decision, HANDOFF item 3). Registry test:
+  an `unverified` entry may not carry a qualified artifact claim.
+- **NBA forecast path** (`83b76fc7`). (a) MODEL_REVIEW #3, moneyline path: the
+  Main lr-v4 row created 2026-11-11T05:51Z carries `reason_code QUALIFIED`,
+  `record_type QUALIFIED_SHADOW_CALL` although the champion had been
+  `historical_only` since 11-10 17:42Z and `_downgrade_unserved` had marked it
+  `PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED`; `ledger.py`'s Main branch
+  (`ccc842b6`, 2026-10-23) relabelled every row it received as QUALIFIED. Every
+  candidate is still a CALL pick on Main (operator directive 2026-10-11), but a
+  non-qualified eligibility now goes through `enforce_universal_paper_call`
+  and keeps its reason code and research `record_type`; only a qualified one
+  is promoted. (b) #8d: `_select_nba_total_market` shares
+  the spread selector's freshness window + latest-per-slug dedupe
+  (`_fresh_latest_per_slug`); the slate passes `as_of=observed_at`. (c) #14:
+  `UpcomingGame.neutral_site` is set from ESPN `neutralSite` + the
+  international-venue heuristic for NBA spread/total slates, and both
+  basketball engines drop Elo HCA and trend home-court on neutral floors.
+  Tests: `test_main_ledger_keeps_a_downgraded_paper_call_unqualified`,
+  `test_nba_learned_downgraded_call_reaches_main_as_a_paper_call_not_qualified`,
+  `test_select_nba_total_market_ignores_old_balanced_quote`,
+  `test_nba_v9_neutral_site_removes_home_court_from_both_halves`.
+
+Still open from the review (NBA): #10 (v9 logistic s=11.8 vs normal sd 14 — the
+v9 moneyline engine is not served, needs one ablation before it becomes the
+challenger), LOW items (integer-line push mass, `BasketballModel` constructed
+then discarded in the total slate, availability wiring hardcoded to v7/v9).
+Operator decisions: whether the nightly calibration pipeline may change a
+serving transform without a promotion record (it now can only do so with its
+own-model provenance, but it still does so unattended), and whether
+`nba-elo-trend-lr-v4` belongs on the buyer whitelist.
+
+Operational note found on the way: supervisor log files under
+`E:\model-prediction-runtime\logs\supervisor\` are zero bytes for every recent
+daily run on this Windows host, completed or failed (two of the last eight
+exited 1 with nothing to explain why). Not fixed here.
+
+## 2026-11-12 — NCAAB model review: total baseline mismatch, artifact drift, moneyline coherence, early-season compression (quick-261112-nc6)
+
+Closes the NCAAB findings of `docs/MODEL_REVIEW_2026-11-11.md` (#7, #9, #10, #11,
+LOW push mass, cross-cutting test gaps #1/#4). Full write-up with the validation /
+holdout tables: `docs/NCAAB_V6_REVIEW_FIXES_2026-11-12.md`; harness
+`scripts/ncaab_v6_review_ablation.py`; report `outputs/ncaab/ncaab_v6_review_ablation.md`.
+Both champions are fixed in place under the same version string (NFL v7 precedent);
+every fix is a constructor parameter whose default reproduces the old model, and the
+control variant reproduced all 68 live Flat rows of the 05:40Z daily (0 deltas)
+before any candidate number was read.
+
+- **#7 total**: `hl10` was shrunk toward the league mean and then divided by the
+  *conference* baseline, so identical teams projected ~14 points apart by label; the
+  advertised `w_league` was `1 - 0.85 - 0.15 = 0`. `TrendEngine` gained per-team
+  `offense_baselines`/`defense_baselines` (None = byte-identical); the total model
+  shrinks toward the conference baseline and measures pace against the league mean;
+  `league_total_weight` is explicit (0.0 — 0.15 was worse on validation).
+  Validation MAE 14.30 → 13.78, holdout 15.11 → 14.48. `total_sd` 13.5 → 16.5
+  (PIT coverage 0.40/0.68/0.81 → 0.49/0.82/0.92 on validation).
+- **#9 artifacts**: `ncaab_spread_v6_model()` / `ncaab_total_v6_model()` now build
+  from the hash-verified `config/models/ncaab-*-v6.json` via `from_artifact`; the
+  artifacts list every served parameter (retention 0.35 as served, not the 0.2 the
+  file claimed) and drop `confidence_threshold`/`min_edge`/`min_sample_games`
+  (operator policy lives in `config/model.yaml`; nothing read them). `max_edge` and
+  `dynamic_sizing` are consumed by `compute_dynamic_units`; the forward path no
+  longer hard-codes 0.08. Consumed-keys and serving-entry-point parity tests added.
+- **#10 moneyline**: P(home) is read off the Student-t margin distribution
+  (`coherent_moneyline`). Validation Brier 0.2058 → 0.2020, log loss 0.5964 →
+  0.5877, intercept −0.28 → +0.04. The review's second suggestion (match the t scale
+  to the SD) was tested and **rejected**: scale 10.5 already covers 0.51/0.81/0.91;
+  matched gives 0.44/0.74/0.87.
+- **#11 compression**: `tiered_trend_priors` (trend half shrinks toward the
+  conference-tier strength) and `additive_matchup` (`offense + opp defense − league
+  mean`; the old average halved every strength gap even at full sample). Margin MAE
+  9.046 → 8.844 with HCA re-selected on validation (home_court_points 7.2 → 5.0,
+  Elo HCA 55 → 45; bias −1.92 → −0.87). The sample-scheduled Elo weight is
+  implemented but off: inert on validation, and on the holdout it gives back part
+  of the priors' gain.
+- **Push mass**: integer spread/total lines exclude the (line ± 0.5) band from both
+  sides and report `push`; half-point lines are unchanged.
+- **Holdout caveat**: 657 of 742 holdout games are the 2026-11 early-season window
+  (home win rate 84.6%, realised margin SD 22–24 vs served ~15). All variants
+  under-disperse there; the coherent moneyline is worse than the legacy logistic in
+  that regime (Brier 0.1217 vs 0.1112) and better everywhere selectable. Main does
+  not trade that regime (sample gate ≥ 8); Flat does. Not selectable on validation
+  — left open in HANDOFF §1 with the early-season volatility cap and retention.
+- Rollback: revert the `quick-261112-nc6` commits; the pre-fix artifacts are in git.
 ## 2026-11-11 — NFL model review: efficiency inputs silently defaulted since 10-27, forecast-path integrity, weather, calibration replay
 
 Full review of the NFL spread/total champions (`nfl-spread-structural-v7`,

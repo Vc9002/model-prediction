@@ -1,34 +1,78 @@
 {
-  "artifact_hash": "f05c4d6ce109ac0a6b6b1392d0d58cbb409d0f0044a79fd8ac8b5ac17c262cd0",
+  "artifact_hash": "fe0155c5db84600a42cfc1077e2c7d3377d3888a637c80a02e3350a57b2cca61",
   "baseline_points_per_team": 76.06,
-  "confidence_threshold": 0.035,
+  "conference_trend_priors": true,
   "credibility_constant": 4.0,
+  "dynamic_matchup_pace": true,
   "dynamic_sizing": {
-    "base_units": 1.0,
-    "edge_slope": 16.67,
     "enabled": true,
+    "base_units": 1.0,
     "max_units": 2.0
+  },
+  "evidence": {
+    "source": "outputs/ncaab/ncaab_v6_review_ablation.md",
+    "method": "same walk-forward; total_line=None so the raw projection is scored. Round 2 (variant shipped_attempts_1.5 vs shipped): attempts-based tempo selected on validation (grid 0.55..2.5; 1.5 is the interior optimum on residual SD, PIT coverage and over Brier, within 0.04 MAE of 2.0).",
+    "round1_validation": {
+      "n": 1043,
+      "total_mae": 13.784,
+      "control_total_mae": 14.302,
+      "pit_coverage_50_80_90": [
+        0.489,
+        0.816,
+        0.919
+      ]
+    },
+    "round2_validation": {
+      "n": 1043,
+      "total_mae": 13.376,
+      "round1_total_mae": 13.784,
+      "resid_sd": 16.564,
+      "pit_coverage_50_80_90": [
+        0.507,
+        0.821,
+        0.921
+      ],
+      "over_brier_pseudo_lines": 0.2345,
+      "round1_over_brier_pseudo_lines": 0.2363
+    },
+    "round2_holdout": {
+      "n": 743,
+      "total_mae": 14.303,
+      "round1_total_mae": 14.487,
+      "control_total_mae": 15.108,
+      "over_brier_pseudo_lines": 0.2335,
+      "round1_over_brier_pseudo_lines": 0.2344
+    },
+    "not_market_relative": true
   },
   "home_tempo_control": 0.6,
   "implementation_type": "code_backed_model",
+  "isolate_postseason": true,
   "league_pace": 68.1,
+  "league_total_weight": 0.0,
   "markets": [
     "total"
   ],
   "max_edge": 0.08,
-  "min_edge": 0.035,
-  "min_sample_games": 8,
   "model_id": "ncaab-total-v6",
   "model_version": "ncaab-total-v6",
   "offseason_gap_days": 150,
   "offseason_retention": 0.2,
+  "overtime_risk_adjustment": true,
+  "pace_baseline": "league",
+  "pace_drag": 0.5,
+  "pace_sensitivity": 1.5,
   "qualified_for_betting": true,
+  "schedule_density_drag": true,
   "schema_version": "basketball-total-v6",
   "sport": "ncaab",
   "status": "production",
   "target": "NCAAB Men's College Basketball conference-tiered dynamic total model with Bayesian credibility shrinkage",
-  "total_sd": 13.5,
-  "trained_through_date": "2026-11-09",
+  "team_total_weight": 0.15,
+  "tempo_prior_games": 12.0,
+  "tempo_source": "attempts",
+  "total_sd": 16.5,
+  "trained_through_date": "2026-11-12",
   "trend_total_weight": 0.85,
   "use_bayesian_credibility": true
 }

@@ -44,7 +44,7 @@ def test_cfb_missing_side_price_blocks_that_market(tmp_path, monkeypatch, missin
         lambda *_args, **_kwargs: (70.0, 0.0, 0.0, True),
     )
 
-    def predict(_self, _history, _game):
+    def predict(_self, _history, _game, **_kwargs):
         return [
             SimpleNamespace(
                 market_type=market,

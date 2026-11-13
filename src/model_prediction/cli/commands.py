@@ -89,6 +89,72 @@ from .state import ESPN_SPORTS, SPORTS
 logger = logging.getLogger("model_prediction.cli")
 
 
+def capture_nfl_polymarket_week_ahead(
+    config: dict,
+    start_date: str,
+    *,
+    days: int = 7,
+    client: Any | None = None,
+    capture_fn: Any | None = None,
+    snapshot_root: Path | None = None,
+) -> dict[str, Any]:
+    """Snapshot Polymarket NFL books for every game in the next `days` dates.
+
+    The main slate capture prices only today's games, so until 2026-11-12 every NFL
+    quote in the archive was a game-day quote: no opener, no intra-week history, and a
+    "closing" snapshot identical to the decision quote (CLV was zero by construction).
+    Dates are filed under each game's own Eastern date, the same layout the forecast
+    and settlement readers already use. Fail-soft per date.
+    """
+    from datetime import timedelta
+
+    poly = client or PolymarketUSClient(max_attempts=2)
+    capture = capture_fn or capture_slate_snapshots
+    root = snapshot_root
+    if root is None:
+        root = Path(ledger_path(config)).parent
+        runtime = RuntimePaths.resolve()
+        if root.resolve() == (runtime.repo_root / "data").resolve():
+            root = runtime.runtime_root
+    first = date.fromisoformat(start_date)
+    per_date: dict[str, Any] = {}
+    errors: dict[str, str] = {}
+    # Offset 0 is the main slate capture's job; start at tomorrow.
+    for offset in range(1, max(2, days + 1)):
+        game_date = (first + timedelta(days=offset)).isoformat()
+        try:
+            events = poly.slate("NFL", date.fromisoformat(game_date), "America/New_York")
+        except httpx.HTTPError as exc:
+            errors[game_date] = str(exc)[:200]
+            continue
+        if not events:
+            continue
+        try:
+            result = capture(
+                poly,
+                {"NFL": events},
+                root,
+                game_date,
+                horizon_hours=None,
+                ladder_keep=2,
+                ladder_leagues=frozenset({"NFL"}),
+            )
+        except Exception as exc:  # noqa: BLE001 -- one date must not stop the rest of the week
+            errors[game_date] = f"{type(exc).__name__}: {exc}"[:200]
+            continue
+        per_date[game_date] = {
+            "events": len(events),
+            "captured": result.get("captured") if isinstance(result, dict) else None,
+        }
+    return {
+        "status": "ok" if not errors else ("partial" if per_date else "error"),
+        "start_date": start_date,
+        "days": days,
+        "dates": per_date,
+        "errors": errors,
+    }
+
+
 def _capture_horizon_hours() -> float | None:
     """Hours ahead to price books for (env POLYMARKET_CAPTURE_HORIZON_HOURS, default 24).
 
@@ -254,6 +320,21 @@ def _research_models_dir() -> Path:
     if rolling.is_dir() and any(rolling.iterdir()):
         return rolling
     return PROJECT_ROOT / "config" / "models"
+
+
+def _rolling_models_write_dir() -> Path:
+    """Where retraining WRITES rating artifacts: always the rolling root.
+
+    Using _research_models_dir() as the write target made its frozen
+    fallback permanent -- nothing ever created the rolling directory, so
+    every daily run rewrote the git-tracked config/models/ artifacts
+    (found 2026-11-12: cs2/dota2/lol/rainbow_six/valorant tiered-elo-v6 and
+    kbo/npb tie-aware-elo-v2 modified on every cycle). Writes bootstrap the
+    rolling directory; reads stay rolling-first via _research_models_dir().
+    """
+    rolling = rolling_models_root(PROJECT_ROOT)
+    rolling.mkdir(parents=True, exist_ok=True)
+    return rolling
 
 
 def _clear_today_open(
@@ -765,7 +846,7 @@ def cmd_validate_esports(args, config, registry, bans, ledger, audit, data_root)
     output = validate_all_esports_baselines(
         data_root,
         args.titles,
-        _research_models_dir() if args.write_artifacts else None,
+        _rolling_models_write_dir() if args.write_artifacts else None,
     )
     destination = PROJECT_ROOT / args.output
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -825,7 +906,7 @@ def cmd_validate_international_baseball(args, config, registry, bans, ledger, au
     output = validate_all_international_baseball_baselines(
         data_root,
         args.leagues,
-        _research_models_dir() if args.write_artifacts else None,
+        _rolling_models_write_dir() if args.write_artifacts else None,
     )
     destination = PROJECT_ROOT / args.output
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -906,7 +987,7 @@ def cmd_validate_totals(args, config, registry, bans, ledger, audit, data_root) 
     output = validate_all_total_score_models(
         FeatureStore(data_root),
         args.sports,
-        _research_models_dir() if args.write_artifacts else None,
+        _rolling_models_write_dir() if args.write_artifacts else None,
     )
     destination = PROJECT_ROOT / args.output
     destination.parent.mkdir(parents=True, exist_ok=True)

@@ -125,3 +125,34 @@ def test_append_chains_correctly_with_large_events_exceeding_tail_buffer(tmp_pat
     # Event 4: should successfully chain from Event 3
     fourth = log.append("pick_settled", "pick-3", {"result": "win"})
     assert fourth["previous_hash"] == third["event_hash"]
+
+
+def test_reversed_events_yields_newest_first(tmp_path) -> None:
+    log = AuditLog(tmp_path / "events.jsonl")
+    log.append("pick_created", "a", {})
+    log.append("pick_created", "b", {})
+    log.append("pick_created", "c", {})
+    subjects = [event["subject_id"] for event in log.reversed_events()]
+    assert subjects == ["c", "b", "a"]
+
+
+def test_reversed_events_on_a_missing_file_yields_nothing(tmp_path) -> None:
+    log = AuditLog(tmp_path / "does_not_exist.jsonl")
+    assert list(log.reversed_events()) == []
+
+
+def test_reversed_events_is_a_generator_not_a_materialized_list(tmp_path) -> None:
+    import inspect
+
+    log = AuditLog(tmp_path / "events.jsonl")
+    log.append("pick_created", "a", {})
+    assert inspect.isgenerator(log.reversed_events())
+
+
+def test_reversed_events_matches_events_reversed_across_chunk_boundaries(tmp_path) -> None:
+    log = AuditLog(tmp_path / "events.jsonl")
+    log.append("pick_created", "pick-1", {"data": "x" * 10000})
+    log.append("pick_created", "pick-2", {"units": 1.0})
+    log.append("pick_created", "pick-3", {"data": "y" * 70000})
+    log.append("pick_settled", "pick-3", {"result": "win"})
+    assert list(log.reversed_events()) == list(reversed(log.events()))

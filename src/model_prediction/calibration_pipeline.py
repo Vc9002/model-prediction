@@ -24,11 +24,13 @@ from typing import Any, cast
 from .calibration import (
     BetaCalibrator,
     CalibrationMetadata,
+    Calibrator,
     IdentityCalibrator,
     IsotonicCalibrator,
     TemperatureCalibrator,
     TrainablePlattCalibrator,
     calibration_metrics,
+    load_calibrator_artifact,
     run_calibration_tournament,
 )
 from .config import PROJECT_ROOT
@@ -525,6 +527,11 @@ def run_full_calibration_pipeline(
                     "oof_brier_score"
                 ),
                 "calibrated_at_utc": now_iso,
+                # Groups are keyed by the row's own model_version, so by
+                # construction this transform was fitted on the model's own
+                # settled live rows -- the provenance the serving guard requires.
+                "fit_model_versions": [r.model_version],
+                "fit_source": FIT_SOURCE_SETTLED_LIVE_ROWS,
             }
             _calibrator_artifact_path(cal_data_dir, r.model_version, r.market).write_text(
                 json.dumps(artifact_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -545,6 +552,8 @@ def run_full_calibration_pipeline(
                 "calibrated_oof_brier": None,
                 "calibrated_at_utc": now_iso,
                 "reason": "canonical_flat_insufficient_evidence",
+                "fit_model_versions": [model],
+                "fit_source": FIT_SOURCE_SETTLED_LIVE_ROWS,
             }
             _calibrator_artifact_path(cal_data_dir, model, market).write_text(
                 json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -622,6 +631,102 @@ def load_model_calibrator(
 MIN_SERVING_SAMPLE = 100
 MIN_SERVING_BRIER_IMPROVEMENT = 0.001
 SERVING_PROBABILITY_BOUNDS = (0.01, 0.99)
+# Fit provenance a serving transform must declare. "settled_live_rows" is what
+# run_full_calibration_pipeline writes (grouped by the row's own model_version);
+# "point_in_time_replay" is a walk-forward replay of the SAME engine over every
+# completed game (e.g. scripts/replay_nfl_v7_all_settled.py). A transform fitted
+# on games that earlier models happened to pick, or that does not say what it
+# was fitted on, is refused: the 2026-11-08 nba-total-margin-v9 Beta artifact
+# was fitted on 125 v2-v7 picks, labelled v9, and pushed every served total to
+# 35-46% for two slates (MODEL_REVIEW_2026-11-11, NBA addendum).
+FIT_SOURCE_SETTLED_LIVE_ROWS = "settled_live_rows"
+FIT_SOURCE_POINT_IN_TIME_REPLAY = "point_in_time_replay"
+ALLOWED_SERVING_FIT_SOURCES = frozenset({FIT_SOURCE_SETTLED_LIVE_ROWS, FIT_SOURCE_POINT_IN_TIME_REPLAY})
+
+
+def serving_guard_reason(payload: dict[str, Any], model_version: str, market: str) -> str | None:
+    """Why ``payload`` may NOT be served for (model_version, market), or None when it may.
+
+    One guard for every serving path (auto-buyer, NFL slates, NBA total slate):
+    non-identity champion, filename/payload agreement, declared own-model fit
+    provenance, MIN_SERVING_SAMPLE outcomes, and an out-of-fold Brier that beats
+    the raw model by MIN_SERVING_BRIER_IMPROVEMENT.
+    """
+    method = str(payload.get("champion_method") or "identity").lower()
+    if method == "identity":
+        return "identity_champion"
+    try:
+        if str(payload.get("market")) != market or str(payload.get("model_version")) != model_version:
+            return "artifact_mismatch"
+        fit_versions = payload.get("fit_model_versions")
+        fit_source = payload.get("fit_source")
+        if not isinstance(fit_versions, list) or not fit_versions or fit_source is None:
+            return "unknown_fit_provenance"
+        if {str(v) for v in fit_versions} != {model_version}:
+            return "foreign_fit_provenance"
+        if str(fit_source) not in ALLOWED_SERVING_FIT_SOURCES:
+            return "foreign_fit_provenance"
+        if int(payload.get("sample_size") or 0) < MIN_SERVING_SAMPLE:
+            return "sample_too_small"
+        baseline, oof = payload.get("baseline_brier"), payload.get("calibrated_oof_brier")
+        if baseline is None or oof is None or float(baseline) - float(oof) < MIN_SERVING_BRIER_IMPROVEMENT:
+            return "no_oof_improvement"
+    except (TypeError, ValueError):
+        return "unreadable_artifact"
+    return None
+
+
+def load_serving_calibrator(
+    model_version: str,
+    market: str,
+    *,
+    roots: Sequence[Path],
+) -> tuple[Calibrator | None, dict[str, Any]]:
+    """Slate-level serving transform for (model_version, market): (calibrator, decision).
+
+    The first root holding an artifact decides; the artifact must pass
+    ``serving_guard_reason``. Anything else yields (None, decision) so the slate
+    serves the engine's raw probability under its own identity labels. The
+    decision dict is meant to be written into the forecast output so a transform
+    change is visible per run, not only per ledger row. Never raises.
+    """
+    decision: dict[str, Any] = {
+        "model_version": model_version,
+        "market": market,
+        "applied": False,
+        "reason": "no_artifact",
+        "path": None,
+    }
+    for root in roots:
+        path = _calibrator_artifact_path(Path(root), model_version, market)
+        if not path.exists():
+            continue
+        decision["path"] = str(path)
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            decision["reason"] = "unreadable_artifact"
+            return None, decision
+        if not isinstance(payload, dict):
+            decision["reason"] = "unreadable_artifact"
+            return None, decision
+        decision["champion_method"] = str(payload.get("champion_method") or "identity").lower()
+        decision["sample_size"] = payload.get("sample_size")
+        decision["fit_model_versions"] = payload.get("fit_model_versions")
+        decision["fit_source"] = payload.get("fit_source")
+        reason = serving_guard_reason(payload, model_version, market)
+        if reason is not None:
+            decision["reason"] = reason
+            return None, decision
+        try:
+            calibrator = load_calibrator_artifact(path)
+        except (OSError, ValueError, KeyError, TypeError):
+            decision["reason"] = "unreadable_artifact"
+            return None, decision
+        decision["applied"] = True
+        decision["reason"] = "applied"
+        return calibrator, decision
+    return None, decision
 
 
 @dataclass(frozen=True)
@@ -655,19 +760,12 @@ def calibrate_for_serving(
         return raw("no_artifact")
     except (OSError, ValueError):
         return raw("unreadable_artifact")
-    method = str(payload.get("champion_method") or "identity").lower()
-    if method == "identity":
-        return raw("identity_champion")
-    try:
-        if str(payload.get("market")) != market or str(payload.get("model_version")) != model_version:
-            return raw("artifact_mismatch")
-        if int(payload.get("sample_size") or 0) < MIN_SERVING_SAMPLE:
-            return raw("sample_too_small")
-        baseline, oof = payload.get("baseline_brier"), payload.get("calibrated_oof_brier")
-        if baseline is None or oof is None or float(baseline) - float(oof) < MIN_SERVING_BRIER_IMPROVEMENT:
-            return raw("no_oof_improvement")
-    except (TypeError, ValueError):
+    if not isinstance(payload, dict):
         return raw("unreadable_artifact")
+    method = str(payload.get("champion_method") or "identity").lower()
+    guard_reason = serving_guard_reason(payload, model_version, market)
+    if guard_reason is not None:
+        return raw(guard_reason)
     calibrator = load_model_calibrator(model_version, data_root=data_path, market=market)
     if calibrator is None:
         return raw("unreadable_artifact")

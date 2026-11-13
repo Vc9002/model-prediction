@@ -97,7 +97,7 @@ def test_production_artifact_pins_audited_coefficients_threshold_and_qualificati
 
     artifact = build_production_artifact(report)
 
-    assert artifact["model_version"] == "nba-elo-trend-lr-v4"
+    assert artifact["model_version"] == "nba-elo-trend-lr-v5"
     assert artifact["market_models"]["moneyline"]["coefficients"] == [2.5, 0.1]
     assert artifact["market_models"]["moneyline"]["confidence_threshold"] == 0.62
     assert artifact["qualification"]["qualified"] is True
@@ -116,8 +116,8 @@ def test_write_production_artifacts_refuses_to_overwrite_existing_version(tmp_pa
     report = {"sports": {"nba": _fake_validation_report("nba")}}
 
     first = write_production_artifacts(report, tmp_path)
-    assert (tmp_path / "nba-elo-trend-lr-v4.json").exists()
-    assert first["nba"] == str(tmp_path / "nba-elo-trend-lr-v4.json")
+    assert (tmp_path / "nba-elo-trend-lr-v5.json").exists()
+    assert first["nba"] == str(tmp_path / "nba-elo-trend-lr-v5.json")
 
     with pytest.raises(FileExistsError, match="refusing to overwrite"):
         write_production_artifacts(report, tmp_path)

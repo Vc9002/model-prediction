@@ -389,6 +389,41 @@ def test_audit_append_happens_while_the_ledger_lock_is_still_held(
     assert all(audit_calls_while_locked), "every audit.append must fire while the ledger lock is still held"
 
 
+def test_same_process_concurrent_appends_land_every_write_exactly_once(registry, ban_list, tmp_path) -> None:
+    """The process-local lock added to PickLedger._lock() must serialize
+    same-process threads correctly, not just faster -- 16 concurrent
+    append_evaluated calls on one ledger path must still produce 16 distinct
+    rows, with none lost or duplicated."""
+    import concurrent.futures
+
+    ledger = PickLedger(tmp_path / "picks.xlsx", tmp_path / "events.jsonl")
+
+    def do_append(index: int):
+        req = request(f"concurrent-{index}")
+        eligibility = evaluate_eligibility(req, registry, ban_list, Exposure(), UnitPolicy(), NOW)
+        return ledger.append_evaluated(req, eligibility, NOW)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        rows = list(executor.map(do_append, range(16)))
+
+    pick_ids = {row["pick_id"] for row in rows}
+    assert len(pick_ids) == 16, "expected 16 distinct pick_ids, no DuplicatePickError, no lost write"
+    assert len(ledger.rows()) == 16
+
+
+def test_process_local_lock_is_keyed_by_resolved_path_not_ledger_instance(tmp_path) -> None:
+    """The fast path must protect cross-thread access to the same underlying
+    file, not silently grant two independent locks to two PickLedger
+    instances that happen to point at the same file via different paths."""
+    from model_prediction.ledger import _process_local_lock
+
+    shared_path = tmp_path / "picks.xlsx"
+    ledger_a = PickLedger(shared_path, tmp_path / "events_a.jsonl")
+    ledger_b = PickLedger(tmp_path / "." / "picks.xlsx", tmp_path / "events_b.jsonl")
+
+    assert _process_local_lock(ledger_a.lock_path) is _process_local_lock(ledger_b.lock_path)
+
+
 def test_ledger_write_crash_leaves_a_recoverable_audit_event_not_a_silent_gap(
     monkeypatch, registry, ban_list, tmp_path
 ) -> None:

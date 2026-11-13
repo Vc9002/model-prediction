@@ -41,7 +41,7 @@ from ..main_ledgers import MultiSportPickLedger
 from ..mlb_baseline_refresh import refresh_if_due
 from ..nbl_forward import forecast_nbl_sport
 from ..research_ledgers import existing_research_ledgers
-from ..runtime_paths import RuntimePaths
+from ..runtime_paths import RuntimePaths, rerouted_data_root
 from .commands import (
     _clear_today_open,
     _polymarket_slate,
@@ -475,6 +475,31 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             logger.warning("NFL pregame weather capture failed for %s", args.date, exc_info=True)
             nfl_weather_result = {"status": "error"}
 
+    nfl_week_ahead_result: dict[str, Any] = {"status": "skipped"}
+
+    def _capture_nfl_week_ahead():
+        """ESPN consensus (opener + current) and Polymarket books for the next 7 NFL dates.
+
+        Both are the inputs CLV and early-line analysis need and neither existed before
+        2026-11-12 (docs/NFL_LOSS_INVESTIGATION_2026-11-12.md §3, §7)."""
+        nonlocal nfl_week_ahead_result
+        out: dict[str, Any] = {}
+        try:
+            from ..data_sources.espn_nfl_odds import capture_nfl_espn_odds
+
+            out["espn_consensus"] = capture_nfl_espn_odds(data_root, args.date, days=7)
+        except Exception:
+            logger.warning("NFL ESPN consensus week-ahead capture failed for %s", args.date, exc_info=True)
+            out["espn_consensus"] = {"status": "error"}
+        try:
+            from .commands import capture_nfl_polymarket_week_ahead
+
+            out["polymarket"] = capture_nfl_polymarket_week_ahead(config, args.date, days=7)
+        except Exception:
+            logger.warning("NFL Polymarket week-ahead capture failed for %s", args.date, exc_info=True)
+            out["polymarket"] = {"status": "error"}
+        nfl_week_ahead_result = out
+
     def _capture_mlb_probables():
         nonlocal mlb_probables_result
         if not is_sport_daily_enabled(config, "MLB"):
@@ -635,7 +660,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         f14 = io_pool.submit(_timed, "nfl_efficiency", _capture_nfl_efficiency)
         f15 = io_pool.submit(_timed, "ncaab_boxscores", _capture_ncaab_boxscores)
         f16 = io_pool.submit(_timed, "nfl_weather", _capture_nfl_weather)
-        for f in (f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16):
+        f17 = io_pool.submit(_timed, "nfl_week_ahead_quotes", _capture_nfl_week_ahead)
+        for f in (f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17):
             f.result()  # Wait for all, surface exceptions
         try:
             slate = f0.result()
@@ -1314,7 +1340,11 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     for sport in (*LEARNED_PRODUCTION_SPORTS, "tennis", "kbo", "npb"):
         odds_sport = "esports" if sport in ESPORTS_TITLES else sport
         snap_path = (
-            Path(ledger_path(config)).parent / "odds" / odds_sport / args.date / "polymarket_snapshots.jsonl"
+            rerouted_data_root(Path(ledger_path(config)).parent)
+            / "odds"
+            / odds_sport
+            / args.date
+            / "polymarket_snapshots.jsonl"
         )
         if snap_path.exists():
             snaps = [
@@ -1436,7 +1466,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
 
             scanner = PolymarketSlateScanner(min_edge=0.025, bankroll=1000.0)
             scan_res = scanner.scan_directory(
-                base_dir=data_directory / "odds",
+                base_dir=rerouted_data_root(data_directory) / "odds",
                 require_model=True,
                 pregame_only=True,
             )
@@ -1625,6 +1655,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         "step1i_cfb_injuries": cfb_injuries_result,
         "step1j_cfb_weather": cfb_weather_result,
         "step1k_nfl_weather": nfl_weather_result,
+        "step1l_nfl_week_ahead_quotes": nfl_week_ahead_result,
         "step1c_mlb_probable_starters": {
             "captured_events": len(mlb_probables_result),
             "archive": "data/point_in_time/mlb_probable_starters.jsonl",

@@ -438,11 +438,13 @@ models:
     - spread
     - total
     min_edge: 0.02
-    spread_sd: 16.2
-    total_sd: 16.0
-    home_field_advantage_points: 2.5
-    max_moneyline_american_odds: 200
-    blowout_spread_edge_cap: 0.08
+    # Main-only total gates. Carried over from hardcoded forecast.py clauses (model review
+    # 2026-11-11 #12) so the thresholds are visible and removable; no walk-forward evidence
+    # supports them yet. Probabilities, not odds. Delete the block to disable.
+    main_total_gates:
+      max_model_probability: 0.62
+      under_min_line: 56.5
+      min_projection_gap: 1.5
     protected_versions:
     - college-football-v1
     - cfb-structural-v2

@@ -125,6 +125,8 @@ class TrendEngine:
         offseason_gap_days: float | None = None,
         offseason_retention: float = 0.50,
         isolate_postseason: bool = False,
+        offense_baselines: dict[str, float] | None = None,
+        defense_baselines: dict[str, float] | None = None,
     ) -> None:
         self.games = sorted(games, key=lambda game: game.start)
         self.half_lives = tuple(half_lives)
@@ -132,6 +134,13 @@ class TrendEngine:
         self.offseason_gap_days = offseason_gap_days
         self.offseason_retention = offseason_retention
         self.isolate_postseason = isolate_postseason
+        # Per-team shrinkage targets. Without them every team's level is shrunk toward the
+        # league mean, which (a) compresses early-season margins toward zero and (b) is the
+        # wrong reference when a caller then divides by a conference baseline (NCAAB total v6,
+        # review finding #7). Opponent adjustment still uses the league mean: a ratio to the
+        # league-average defense is what "league-neutral points" means.
+        self.offense_baselines = offense_baselines
+        self.defense_baselines = defense_baselines
         self._by_team: dict[str, list[_TeamGameRow]] = {}
         self._league_points: list[float] = []
         self._defense_cache: dict[str, float] = {}
@@ -180,13 +189,27 @@ class TrendEngine:
             return 0.0
         return sum(self._league_points) / len(self._league_points)
 
+    def _offense_baseline(self, team: str) -> float:
+        if self.offense_baselines is not None:
+            prior = self.offense_baselines.get(team)
+            if prior is not None:
+                return float(prior)
+        return self.league_baseline
+
+    def _defense_baseline(self, team: str) -> float:
+        if self.defense_baselines is not None:
+            prior = self.defense_baselines.get(team)
+            if prior is not None:
+                return float(prior)
+        return self.league_baseline
+
     def _defense_simple(self, team: str) -> float:
         """Unadjusted points allowed per game — used for opponent adjustment."""
         if team in self._defense_cache:
             return self._defense_cache[team]
         rows = self._by_team.get(team, [])
         if not rows:
-            val = self.league_baseline
+            val = self._defense_baseline(team)
         elif self.offseason_gap_days is not None and len(rows) > 1:
             dates = [r["start"] for r in rows if "start" in r and isinstance(r["start"], datetime)]
             if len(dates) == len(rows):
@@ -194,7 +217,7 @@ class TrendEngine:
                 val = ewm_level(
                     [r["allowed"] for r in rows],
                     half_life=hl,
-                    baseline=self.league_baseline,
+                    baseline=self._defense_baseline(team),
                     prior=self.prior_strength,
                     dates=dates,
                     offseason_gap_days=self.offseason_gap_days,
@@ -212,7 +235,7 @@ class TrendEngine:
             return self._offense_cache[team]
         rows = self._by_team.get(team, [])
         if not rows:
-            val = self.league_baseline
+            val = self._offense_baseline(team)
         elif self.offseason_gap_days is not None and len(rows) > 1:
             dates = [r["start"] for r in rows if "start" in r and isinstance(r["start"], datetime)]
             if len(dates) == len(rows):
@@ -220,7 +243,7 @@ class TrendEngine:
                 val = ewm_level(
                     [r["scored"] for r in rows],
                     half_life=hl,
-                    baseline=self.league_baseline,
+                    baseline=self._offense_baseline(team),
                     prior=self.prior_strength,
                     dates=dates,
                     offseason_gap_days=self.offseason_gap_days,
@@ -257,7 +280,7 @@ class TrendEngine:
                 ewm_level(
                     adjusted_scored,
                     hl,
-                    baseline,
+                    self._offense_baseline(team),
                     self.prior_strength,
                     dates=dates_seq,
                     offseason_gap_days=self.offseason_gap_days,
@@ -272,7 +295,7 @@ class TrendEngine:
                 ewm_level(
                     adjusted_allowed,
                     hl,
-                    baseline,
+                    self._defense_baseline(team),
                     self.prior_strength,
                     dates=dates_seq,
                     offseason_gap_days=self.offseason_gap_days,

@@ -174,10 +174,15 @@ class NBAStructuralV9Engine:
             away_points = (away_off + home_def) / 2.0
             home_points = (home_off + away_def) / 2.0
 
-            r_home = elo.rating(game.home_team) + elo.home_advantage
+            # Neutral floors carry no home-court edge in either half (#14).
+            r_home = elo.rating(game.home_team) + (0.0 if game.neutral_site else elo.home_advantage)
             r_away = elo.rating(game.away_team)
             elo_margin = (r_home - r_away) / 28.0
-            home_win = elo.expected_home_win(game.home_team, game.away_team)
+            home_win = (
+                elo.expected_neutral_win(game.home_team, game.away_team)
+                if game.neutral_site
+                else elo.expected_home_win(game.home_team, game.away_team)
+            )
 
             # Rest disparity calculation
             game_start_dt = parse_utc(game.event_start_utc)
@@ -250,7 +255,9 @@ class NBAStructuralV9Engine:
             if game.availability_total_loss > 0:
                 expected_total -= 0.15 * game.availability_total_loss
 
-            trend_margin = (home_points - away_points) + self.home_court_points
+            trend_margin = (home_points - away_points) + (
+                0.0 if game.neutral_site else self.home_court_points
+            )
             expected_margin = (
                 self.elo_weight * elo_margin + self.trend_weight * trend_margin + self.rest_weight * rest_diff
             )

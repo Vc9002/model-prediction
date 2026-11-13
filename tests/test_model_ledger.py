@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import time
+
 import pytest
 
 from model_prediction.domain import League, MarketType, ModelOrigin, PickRequest
@@ -83,6 +86,22 @@ def test_append_prediction_writes_every_field_and_defaults_to_open(tmp_path) -> 
     assert row["model_id"] == "mlb-moneyline-elo-trend-lr"
     assert row["model_probability"] == "0.62"
     assert set(row.keys()) == set(FIELDNAMES)
+
+
+def test_append_prediction_sweeps_a_stale_orphaned_temp_file(tmp_path) -> None:
+    """A hard process kill or crash leaves an orphaned .{name}.* temp file
+    with no Python exception handler ever running. The next normal
+    append_prediction call to the same path must clean it up first."""
+    path = tmp_path / "mlb-moneyline-elo-trend-lr.xlsx"
+    stray = tmp_path / f".{path.name}.deadbeef"
+    stray.write_bytes(b"not a real workbook")
+    stray_time = time.time() - 10000
+    os.utime(stray, (stray_time, stray_time))
+
+    ModelLedger(path).append_prediction(_prediction())
+
+    assert not stray.exists()
+    assert path.exists()
 
 
 def test_predictions_persist_across_ledger_instances(tmp_path) -> None:

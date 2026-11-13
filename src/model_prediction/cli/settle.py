@@ -27,6 +27,7 @@ from ..config import (
     polymarket_edge_enabled,
 )
 from ..data_sources.espn import ESPNClient
+from ..data_sources.espn_nfl_odds import closing_espn_consensus, consensus_for_selection
 from ..data_sources.mlb_market_odds import MarketOddsSnapshotStore
 from ..data_sources.polymarket_execute import _team_name_matches
 from ..data_sources.polymarket_us import (
@@ -362,6 +363,26 @@ def _settle_all_unsettled(
                     logger.warning(
                         "%s closing-snapshot lookup failed for slug %s", sport_dir, slug, exc_info=True
                     )
+        closing_consensus_probability = closing_consensus_line = None
+        if str(row.get("league", "")).upper() == "NFL" and data_root is not None:
+            # Sportsbook consensus at kickoff, from the week-ahead ESPN capture
+            # (espn_nfl_odds). Only the pick's own line counts as a closing price for it.
+            try:
+                consensus = closing_espn_consensus(data_root, str(row["event_id"]), row["event_start_utc"])
+                cons_p, cons_line = consensus_for_selection(
+                    consensus, str(row.get("market_type", "")), str(row.get("selection", ""))
+                )
+                row_line = row.get("line")
+                same_line = (
+                    cons_line is None
+                    or row_line in (None, "")
+                    or abs(float(cons_line) - float(row_line)) < 1e-9
+                )
+                if cons_p is not None and same_line:
+                    closing_consensus_probability = cons_p
+                    closing_consensus_line = cons_line
+            except (OSError, TypeError, ValueError):
+                logger.warning("NFL closing consensus lookup failed for %s", row["pick_id"], exc_info=True)
         try:
             if row.get("market_type") in ("nrfi", "yrfi") and "away_1st" in match and "home_1st" in match:
                 settle_away = int(match["away_1st"])
@@ -377,6 +398,8 @@ def _settle_all_unsettled(
                 closing_line,
                 closing_odds,
                 closing_raw_probability=closing_probability,
+                closing_consensus_probability=closing_consensus_probability,
+                closing_consensus_line=closing_consensus_line,
             )
             settled.append({"pick_id": row["pick_id"], "result": result["result"]})
 

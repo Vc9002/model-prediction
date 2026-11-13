@@ -34,7 +34,10 @@ def _fixture() -> tuple[dict, dict, dict]:
         },
     }
     final = {
-        "event_id": "game-1", "status": "completed", "home_score": 28, "away_score": 21,
+        "event_id": "game-1",
+        "status": "completed",
+        "home_score": 28,
+        "away_score": 21,
         "raw_hash": "official-scoreboard-digest",
     }
     return forecast, packet, final
@@ -44,7 +47,9 @@ def test_scores_all_markets_on_explicit_final() -> None:
     forecast, packet, final = _fixture()
     scored = score_forecast(forecast, packet, final)
     assert {market: row["outcome"] for market, row in scored.items()} == {
-        "moneyline": 1, "spread": 1, "total": 1
+        "moneyline": 1,
+        "spread": 1,
+        "total": 1,
     }
     assert scored["spread"]["incumbent_brier"] == pytest.approx((0.62 - 1) ** 2)
     assert scored["spread"]["market_no_vig_probability"] == pytest.approx(0.52 / 1.01)

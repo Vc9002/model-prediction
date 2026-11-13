@@ -35,7 +35,7 @@ from openpyxl.utils import get_column_letter
 from model_prediction.filelock import lock_exclusive, unlock
 
 from .domain import iso_utc, utc_now
-from .xlsx_ledger import _replace_with_retry
+from .xlsx_ledger import _replace_with_retry, _sweep_orphaned_temp_files
 
 MODEL_LEDGER_SCHEMA_VERSION = "1"
 SHEET_NAME = "Predictions"
@@ -713,6 +713,11 @@ def _write_predictions_atomic(path: Path, rows: list[dict[str, str]]) -> None:
     (record_type, pick_id, research_score_units, ...) into a formula-driven
     summary sheet and cannot be reused for a differently-shaped schema."""
     path.parent.mkdir(parents=True, exist_ok=True)
+    # 261112-2s7: same crash-safe sweep as xlsx_ledger.py::write_xlsx_rows_atomic
+    # -- a hard process kill or crash never reaches this function's own
+    # except BaseException below, so the next normal write cleans up what a
+    # prior one left behind.
+    _sweep_orphaned_temp_files(path.parent, f".{path.name}.*")
     workbook = Workbook()
     sheet = workbook.active
     assert sheet is not None

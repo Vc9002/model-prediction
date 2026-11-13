@@ -25,6 +25,7 @@ from model_prediction.portfolio.auto_executor import (
     AutoExecutionConfig,
     AutoExecutionResult,
     AutoPolymarketBuyer,
+    BoughtIndexUnavailableError,
     _capture_missing_active_snapshot_slates,
     _get_quarantined_underperforming_models,
     _is_live_ncaab_spread_v6_bucket,
@@ -2885,6 +2886,42 @@ def test_holding_one_line_of_a_spread_blocks_the_other_line(tmp_path: Path):
     assert not buyer._is_already_bought(
         "new", market_slug="asc-cbb-other-game-2026-11-11-pos-1pt5", token_side="short", bought_index=index
     )
+
+
+def test_build_bought_index_fails_closed_when_a_source_ledger_is_unreadable(tmp_path: Path):
+    # Same technique as test_ncaab_auto_buyer_paper_trial.py::test_unreadable_paper_ledger_fails_closed:
+    # making the ledger path a directory raises PermissionError/IsADirectoryError when opened for
+    # reading, both OSError subclasses -- no monkeypatch of the reader needed.
+    (tmp_path / "auto_buyer_ledger.jsonl").mkdir()
+    buyer = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(), audit=AuditLog(tmp_path / "audit.jsonl"), data_root=tmp_path
+    )
+    with pytest.raises(BoughtIndexUnavailableError, match="live_auto_buyer_ledger"):
+        buyer._build_bought_index()
+
+
+def test_evaluate_and_execute_fails_closed_when_a_dedup_source_is_unreadable(tmp_path: Path):
+    (tmp_path / "auto_buyer_ledger.jsonl").mkdir()
+    buyer = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(), audit=AuditLog(tmp_path / "audit.jsonl"), data_root=tmp_path
+    )
+    # Explicit empty list: proves the cycle is blocked unconditionally, before any pick
+    # is ever considered, not only when a qualifying pick exists.
+    with pytest.raises(BoughtIndexUnavailableError, match="live_auto_buyer_ledger"):
+        buyer.evaluate_and_execute([])
+
+
+def test_build_bought_index_fails_closed_and_aggregates_every_unreadable_source(tmp_path: Path):
+    (tmp_path / "audit.jsonl").mkdir()
+    (tmp_path / "auto_buyer_ledger.jsonl").mkdir()
+    buyer = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(), audit=AuditLog(tmp_path / "audit.jsonl"), data_root=tmp_path
+    )
+    with pytest.raises(BoughtIndexUnavailableError) as exc_info:
+        buyer._build_bought_index()
+    message = str(exc_info.value)
+    assert "audit_log" in message
+    assert "live_auto_buyer_ledger" in message
 
 
 def test_main_buyer_dedup_index_reads_the_shared_paper_ledger_root(tmp_path: Path):

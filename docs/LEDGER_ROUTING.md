@@ -169,6 +169,221 @@ Mutation proof (CLAUDE.md "verify the regression test actually catches it", adap
 - **241 settled identity-duplicate historical rows** in `ledgers.db` (see snapshot above). Cleanup is a governed ledger mutation, only through `archive_settled_rows`/`remove_open_rows` (never raw deletion, per CLAUDE.md), and needs an operator decision on scope. The read side is already mitigated by `a9aac3cb`.
 - **`event_key_from_slug` is spread-only** (`auto_buyer_ledger.py`:997-1004) — for a totals market with no `event_id`, `matchup_markets` is the sole guard, as the real ORL@GSW duplicate shows. This is now pinned by `test_reforecast_total_on_moved_line_is_blocked_on_both_ledger_roots`; widening `event_key_from_slug` itself (if ever desired) is a separate decision, not needed for the audit's verdict to hold.
 
+## Per-model XLSX mirror audit (2026-11-12)
+
+Phase 2 item 2 of the ledger-improvement plan (quick task 261112-111). The
+question: should `data/model_ledgers/*.xlsx` (one workbook per model
+identity, written by `model_ledger.py`'s `ModelLedger`) become a
+generated-on-demand report instead of an independently-written projection
+that can drift? **Verdict: no, not in this task.** Full conversion was
+investigated and rejected as unsafe for a quick task; a minimal, safe fix
+shipped instead (see "The fix shipped" below).
+
+### Why conversion was rejected
+
+`ModelLedger` is not a disposable export like the per-sport Main/Flat xlsx
+(`rebuild_xlsx_projection`, which fully regenerates from canonical SQLite on
+every write). It is an independently mutable evidentiary store, and its own
+module docstring quotes the 2026-08-02 operator directive verbatim: "every
+model writes a prediction... the operator's own decision about what to act
+on is tracked separately, in the same row, never mutating the model's own
+output." Several of its field blocks have no corresponding column in
+canonical `ledger_records` (`runtime_ledger_store.py`'s `_SCHEMA`):
+
+| Field block | Where (`model_ledger.py`) | Column in canonical `ledger_records`? |
+|---|---|---|
+| `OPERATOR_FIELDS` (:111-118): `operator_decision`, `operator_selected_model`, `operator_selected_market`, `operator_units`, `operator_timestamp`, `operator_note` | Written only by `record_operator_decision()` (:656-682) | **None.** `decision`/`reason_code` exist but are the MODEL's own eligibility decision, not a separate post-hoc operator annotation |
+| `code_revision`, `model_uncertainty`, `input_availability`, `missing_inputs`, `source_lineage` (`MODEL_FIELDS`, :71-95) | Written by `append_prediction`/`record_from_pick_request` | **None.** `model_artifact_hash`, `feature_schema_version`, `decision_payload_json`/`feature_payload_json` exist but do not carry these fields verbatim |
+
+A pure "generate from SQLite on demand" conversion would silently drop
+exactly the data that 2026-08-02 directive asked to keep separate and
+durable. `audit_ledger_pnl.py`'s own docstring independently calls these
+workbooks "evidence views, not bankroll ledgers" and treats SQLite as the
+sole production authority -- the project's tooling already treats this the
+way "generate on demand" wants to, just not by discarding the write path
+itself.
+
+A path-resolution split-brain between `audit_ledger_pnl.py`'s hardcoded
+`DATA = ROOT / "data"` and `RuntimePaths`/`MODEL_PREDICTION_RUNTIME_ROOT` was
+checked and ruled out: `$MODEL_PREDICTION_RUNTIME_ROOT`
+(`E:\model-prediction-runtime` on this machine) has **zero** files under
+`model_ledgers/` -- the XLSX model ledgers genuinely live in repo-local
+`data/`, matching CLAUDE.md's "data/ trees are untracked operational
+output" note. Not the cause of the observed drift.
+
+### Root cause of the observed drift
+
+Three fail-soft hook call sites in `ledger.py` each wrap their
+`model_ledger` write in `try: ... except Exception: logging.getLogger(__name__).warning(...)`,
+with no retry and no alerting beyond a log line:
+
+- `_append_record` (:1007-1014, calling `record_from_pick_request`)
+- `settle` (:1405-1412, calling `settle_from_pick_row`)
+- `update_closing_data` (:1923-1930, calling `settle_from_pick_row`)
+
+A failed write (e.g. a lock timeout under the daily job's per-sport
+`ThreadPoolExecutor` fan-out, or any other exception) silently strands or
+skips a model-ledger row while the real, canonical write to `ledgers.db`
+already succeeded -- no error surfaces anywhere beyond a warning log line
+that nothing reads automatically.
+
+### Live open-row snapshot
+
+`audit_ledger_pnl.py` could not be run end-to-end at planning time -- it
+crashed with `zipfile.BadZipFile` scanning `data/main/*.xlsx` because of the
+stray `data/main/picks-js40dfcf.xlsx` temp file (now removed, see "The fix
+shipped" below), before it ever reached the model-ledger comparison. The
+snapshot below comes from a direct, read-only `ModelLedger(path).rows()`
+scan instead, re-measured at execution time: counts match the planning-time
+numbers exactly (the planning-time snapshot was already current).
+
+**4,133 stranded-open-candidate rows total** across the 31 live
+(non-`.bak-`) `data/model_ledgers/*.xlsx` workbooks. Highest counts / oldest
+open rows: `cs2-tiered-elo.xlsx` (total 6390, open 1111, oldest
+`observed_at_utc` 2026-08-30T03:35:12Z); `ncaaf-total-baseline.xlsx` (total
+1712, open 589, oldest 2026-09-04T22:03:40Z); `ncaaf-spread-baseline.xlsx`
+(total 1710, open 580, oldest 2026-09-04T22:03:40Z);
+`mlb-total-measured-edge.xlsx` (total 2541, open 261, oldest
+2026-08-29T12:42:15Z); `ncaab-total-v6.xlsx` (total 391, open 156, oldest
+2026-11-09). Several models have only 1-2 open rows, consistent with
+genuinely-pending recent predictions rather than drift -- the signal is
+specifically the months-old stranded-open rows, not open rows in general.
+
+Running the now-fixed `audit_ledger_pnl.py` dry run against the live
+runtime root (see "The fix shipped") found a narrower, cross-tier-verified
+slice of this: 27 unresolved stranded-open rows with an unambiguous
+canonical-backed settlement available, plus 8 settlement conflicts
+(disagreeing economics, never auto-resolved) -- smaller than the raw
+4,133-row scan because the script requires an exact event/market/line/
+model/selection match against a *settled* row in an active tier workbook,
+which most of the raw stranded-open candidates above don't have.
+
+### The fix shipped
+
+`audit_ledger_pnl.py`'s dry run already computed this exact drift signal
+into its JSON report (`model_repairs_planned_total`,
+`model_repairs_applied`, `model_settlement_conflicts`) but its exit code
+ignored both fields, so a dry run could report real drift and still exit
+0. Task 1 added `_report_exit_code(report)`, a pure helper returning 1 when
+sqlite integrity fails, sqlite repairs are rejected, unresolved stranded-
+open model rows remain (`model_repairs_planned_total > model_repairs_applied`),
+or settlement conflicts are non-empty -- and a one-line stderr drift
+summary whenever the exit code is non-zero. Zero changes to the write path,
+the apply/repair logic, or any ledger.
+
+The live verify run observed at execution time: exit code **1**, with
+stderr `model-ledger drift: 27 unresolved stranded-open row(s), 8
+unresolved settlement conflict(s) -- see
+model_repairs_planned_total/model_repairs_applied/model_settlement_conflicts
+in the JSON report above for detail`. The JSON report confirms
+`sqlite_integrity.ok: true`, `sqlite_repairs_rejected`: 12 entries,
+`model_repairs_planned_total: 27`, `model_repairs_applied: 0`,
+`model_settlement_conflicts`: 8 entries -- real, previously-invisible drift
+that this task's exit-code fix now surfaces automatically on every dry run.
+
+### Open follow-ups (not fixed by this task)
+
+- **`model_ledger.py`'s own lock has no in-process fast path.**
+  `_acquire_exclusive_lock`/`_lock()` (:55-67, :443-451) go straight to the
+  OS-level `fcntl`/`msvcrt` lock with a 0.1s poll and a 30s timeout -- the
+  same contention shape sibling quick task 261112-118 is adding a
+  `threading.Lock` fast path for in `ledger.py`'s own lock. `model_ledger.py`
+  is not touched by that sibling task and is not touched here either; same
+  contention risk, not yet fixed.
+- **`write_xlsx_rows_atomic`'s exception handling is narrower than
+  `model_ledger.py`'s own writer**, and is the likely cause of the leaked
+  temp file this task removed. `xlsx_ledger.py` (:133) catches `except
+  Exception`, so a forced process kill (a supervisor lease timeout, a
+  `KeyboardInterrupt`/`SystemExit`, which are `BaseException` but not
+  `Exception`) between `workbook.save` and `_replace_with_retry` would skip
+  the `os.unlink(temporary)` cleanup and leak a `picks-*.xlsx` temp file --
+  exactly the shape of `data/main/picks-js40dfcf.xlsx`.
+  `model_ledger.py::_write_predictions_atomic` (:741) already catches
+  `except BaseException` for the equivalent cleanup. Worth widening
+  `xlsx_ledger.py` to match, but that file sits in the same export call
+  graph sibling task 261112-118 is actively hardening -- left as a
+  follow-up rather than risking a collision.
+- **A real generated-on-demand conversion remains possible later**, but
+  requires an explicit operator decision on where `OPERATOR_FIELDS` and the
+  model-only evidentiary fields (`code_revision`, `model_uncertainty`,
+  `input_availability`, `missing_inputs`, `source_lineage`) would live if
+  the independent `ModelLedger` write path were removed. Not a quick-task
+  default.
+
+## Atomic-write temp-file leak: exception asymmetry + crash-safe sweep (2026-11-12)
+
+Investigation of the "## Per-model XLSX mirror audit (2026-11-12)" section's
+own "Open follow-ups" item 2 above: the `except Exception` vs `except
+BaseException` asymmetry it flagged as the likely leak cause. **Verdict,
+confirmed against live code: the asymmetry is real, but it only explains the
+in-process-catchable slice of the leak -- it does not explain the dominant
+production failure mode.**
+
+### What the code actually showed
+
+Direct code read confirmed the flagged asymmetry exactly: `xlsx_ledger.py`
+(:133) caught `except Exception:` around its cleanup-and-reraise block (`if
+os.path.exists(temporary): os.unlink(temporary)` then `raise`);
+`model_ledger.py`'s `_write_predictions_atomic` (:741) caught `except
+BaseException:` around the equivalent block. `KeyboardInterrupt` and
+`SystemExit` are `BaseException` subclasses that are **not** `Exception`
+subclasses -- if either was raised between `workbook.save(temporary)` and
+`_replace_with_retry` inside `write_xlsx_rows_atomic`, the narrower clause
+really did skip the `os.unlink` and leak the temp file.
+
+### Why it is not the whole explanation
+
+This project's scheduled jobs (`run_supervisor.py`) kill a worker that
+exceeds its timeout with `taskkill /F /T /PID` on Windows (:341-345) or
+`proc.kill()`/SIGKILL on Unix (:347) -- both a hard, uncatchable process
+termination. A hard kill runs no Python code at all: no `except Exception`,
+no `except BaseException`, no `finally`. If the kill lands mid-`workbook.save`
+in either writer, both leak today, and no `except`-clause change, however
+wide, could ever fix that. The scheduled daily/production/rebuild-shadow jobs
+that most expose these two writers to this window run headless (non-
+interactive, via `subprocess.Popen` with `CREATE_NO_WINDOW` on Windows) --
+they have essentially no path to an interactive `KeyboardInterrupt` or an
+explicit `sys.exit()` at all, making a hard kill or crash the more likely
+real-world cause of this project's confirmed leaks than the except-clause
+asymmetry alone.
+
+### Live evidence
+
+A second orphaned temp file was found live during this investigation's own
+code read: `data/sports/cs2/picks-39cd77nx.xlsx` (3772 bytes, dated
+2026-11-08, confirmed `zipfile.BadZipFile`, gitignored/untracked, removed by
+this task). Its size is nearly identical to the previously-removed
+`data/main/picks-js40dfcf.xlsx` (3770 bytes) -- both tiny fragments of what a
+real workbook save produces (real sibling workbooks in the same directories
+run 300KB-1.5MB), consistent with both being interrupted at essentially the
+same early point inside `workbook.save`, which a hard kill explains at least
+as well as a `KeyboardInterrupt` would.
+
+### The fix shipped
+
+1. `xlsx_ledger.py`'s `except Exception` widened to `except BaseException`,
+   matching `model_ledger.py`'s already-correct clause -- closes the
+   confirmed in-process-catchable gap (e.g. a manual Ctrl-C during an ad hoc
+   interactive run).
+2. A new shared, age-gated `_sweep_orphaned_temp_files(directory, pattern,
+   min_age_seconds=7200.0)` helper in `xlsx_ledger.py`, called at the start of
+   both `write_xlsx_rows_atomic` (own `picks-*.xlsx` pattern) and
+   `_write_predictions_atomic` (own `.{name}.*` pattern) before either
+   creates its own temp file. The 7200s age gate is deliberately double
+   `run_supervisor.py`'s largest configured `DEFAULT_WORKER_TIMEOUTS` entry
+   (3600s for `daily`/`rebuild-shadow`), so a write genuinely still in flight
+   right now is never swept. This is what actually makes the dominant
+   hard-kill case self-healing -- the crash itself can never be caught, but
+   the next normal write to that same destination now cleans up what the
+   crash left behind, rather than letting it accumulate indefinitely (which
+   is exactly what let `data/main/picks-js40dfcf.xlsx` sit for ten days and
+   crash `audit_ledger_pnl.py`'s tier scan).
+3. The second live orphan, `data/sports/cs2/picks-39cd77nx.xlsx`, removed.
+
+This closes the "## Per-model XLSX mirror audit (2026-11-12)" section's
+"Open follow-ups" item on the `write_xlsx_rows_atomic`/`model_ledger.py`
+exception-handling asymmetry above -- resolved, not just narrowed.
+
 ## The four ledgers (2026-08-03 layout, historical)
 
 | Ledger | File(s) | Rule |

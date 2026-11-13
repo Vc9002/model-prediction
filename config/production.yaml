@@ -184,6 +184,24 @@ prediction_service:
     evidence_status: historical_only
     replacement_priority: medium
     rollback_model: nba-elo-trend-lr-v3
+  - model_id: nba-elo-trend-lr-v5
+    sport: NBA
+    market: moneyline
+    implementation: json_artifact
+    artifact: config/models/nba-elo-trend-lr-v5.json
+    enabled: true
+    serving_status: shadow
+    evidence_status: historical_only
+    replacement_priority: low
+    rollback_model: nba-elo-trend-lr-v4
+    promotion_basis: null
+    note: >-
+      2026-11-12 walk-forward refit of the elo_trend_defense LR on the restored fit construction
+      (quick-261112-kj3); same features as v4, coefficients within 1%, threshold 0.5254 vs 0.5444.
+      Locked holdout 2026-02-23..2026-11-11 (636 rows) qualified: 598 calls, 73.1% hit, Brier
+      0.1849 on calls. On identical holdout rows v4-as-fit scores Brier 0.1892 vs v5 0.1889 --
+      not a measurable improvement; evidence window is simply current. Challenger only;
+      promotion is an explicit operator command.
   - model_id: nba-spread-margin-v9
     sport: NBA
     market: spread
@@ -1003,7 +1021,8 @@ prediction_service:
       spread: null
       total: null
     NBA:
-      moneyline: nba-structural-v5
+      # nba-structural-v5 (previous value) has no registry entry; replaced 2026-11-12.
+      moneyline: nba-elo-trend-lr-v5
     NFL:
       moneyline: null
       spread: null
@@ -1158,6 +1177,7 @@ prediction_service:
   - nba-moneyline-v9
   - nba-moneyline-v7
   - nba-elo-trend-lr-v4
+  - nba-elo-trend-lr-v5
   - nba-spread-margin-v9
   - nba-spread-margin-v7
   - nba-spread-margin-v6
@@ -1244,6 +1264,7 @@ prediction_service:
     nba-moneyline-v9: config/models/nba-moneyline-v9.json
     nba-moneyline-v7: config/models/nba-moneyline-v7.json
     nba-elo-trend-lr-v4: config/models/nba-elo-trend-lr-v4.json
+    nba-elo-trend-lr-v5: config/models/nba-elo-trend-lr-v5.json
     nba-spread-margin-v9: config/models/nba-spread-margin-v9.json
     nba-spread-margin-v7: config/models/nba-spread-margin-v7.json
     nba-spread-margin-v6: config/models/nba-spread-margin-v6.json

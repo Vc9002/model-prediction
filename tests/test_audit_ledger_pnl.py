@@ -74,3 +74,52 @@ def test_economic_signature_handles_missing_units_safely() -> None:
         0.61,
         0.0001,
     )
+
+
+def _report(
+    *,
+    sqlite_ok: bool = True,
+    sqlite_rejected: list | None = None,
+    model_repairs_planned_total: int = 0,
+    model_repairs_applied: int = 0,
+    model_settlement_conflicts: list | None = None,
+) -> dict:
+    return {
+        "sqlite_integrity": {"ok": sqlite_ok, "problems": []},
+        "sqlite_repairs_rejected": sqlite_rejected or [],
+        "model_repairs_planned_total": model_repairs_planned_total,
+        "model_repairs_applied": model_repairs_applied,
+        "model_settlement_conflicts": model_settlement_conflicts or [],
+    }
+
+
+def test_report_exit_code_clean_run_is_zero() -> None:
+    assert audit_ledger_pnl._report_exit_code(_report()) == 0
+
+
+def test_report_exit_code_unresolved_stranded_open_rows_is_one() -> None:
+    report = _report(model_repairs_planned_total=22, model_repairs_applied=0)
+
+    assert audit_ledger_pnl._report_exit_code(report) == 1
+
+
+def test_report_exit_code_all_planned_repairs_applied_is_zero() -> None:
+    report = _report(model_repairs_planned_total=22, model_repairs_applied=22)
+
+    assert audit_ledger_pnl._report_exit_code(report) == 0
+
+
+def test_report_exit_code_conflicts_fail_even_when_repairs_fully_applied() -> None:
+    report = _report(
+        model_repairs_planned_total=22,
+        model_repairs_applied=22,
+        model_settlement_conflicts=[{"key": ["x"], "signatures": []}],
+    )
+
+    assert audit_ledger_pnl._report_exit_code(report) == 1
+
+
+def test_report_exit_code_sqlite_integrity_failure_is_one() -> None:
+    report = _report(sqlite_ok=False)
+
+    assert audit_ledger_pnl._report_exit_code(report) == 1

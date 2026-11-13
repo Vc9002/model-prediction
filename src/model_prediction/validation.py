@@ -61,7 +61,7 @@ MINIMUM_MONTHLY_CALLS = 10
 # this can't happen silently again regardless of whether this dict drifts.
 LEARNED_ARTIFACT_VERSIONS = {
     "mlb": "mlb-elo-trend-lr-v8",
-    "nba": "nba-elo-trend-lr-v4",
+    "nba": "nba-elo-trend-lr-v5",
     "wnba": "wnba-elo-trend-lr-v4",
     "nfl": "nfl-elo-trend-lr-v4",
     "soccer": "soccer-elo-trend-lr-v2",

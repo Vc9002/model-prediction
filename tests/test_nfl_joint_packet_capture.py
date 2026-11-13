@@ -35,9 +35,7 @@ def test_packet_capture_records_no_calls_and_missing_contracts(tmp_path) -> None
 
 def test_packet_capture_never_backfills_after_start(tmp_path) -> None:
     event = {"event_id": "game-1", "event_start_utc": "2026-11-01T18:00:00Z"}
-    result = capture_packets(
-        tmp_path, "2026-11-01", "2026-11-01T18:00:00Z", {"game-1": {"moneyline": event}}
-    )
+    result = capture_packets(tmp_path, "2026-11-01", "2026-11-01T18:00:00Z", {"game-1": {"moneyline": event}})
     assert result["packets"] == 0
     assert not (tmp_path / "research").exists()
 
@@ -50,8 +48,13 @@ def test_complete_verified_packet_is_replay_ready(tmp_path) -> None:
     features = {"elo_probability": 0.6, "trend_gap": 1.0}
     home = artifact.probability("moneyline", features)
     moneyline = build_learned_snapshot(
-        artifact, features, event_id="game-1", observed_at_utc=observed,
-        event_start_utc=start, base_home_probability=home, served_home_probability=home,
+        artifact,
+        features,
+        event_id="game-1",
+        observed_at_utc=observed,
+        event_start_utc=start,
+        base_home_probability=home,
+        served_home_probability=home,
         adjustment={"method": "identity", "applied": False, "reason": "not_applicable"},
     )
     record = {"observed_at_utc": observed, "long": {"ask": 0.52}, "short": {"ask": 0.49}, "line": 44.5}
@@ -70,8 +73,12 @@ def test_complete_verified_packet_is_replay_ready(tmp_path) -> None:
     quote = {"long_ask": 0.52, "short_ask": 0.49, "lineage": lineage}
     markets = {
         "moneyline": {
-            "event_start_utc": start, "selection": "home", "model_probability": home,
-            "model_input_snapshot": moneyline, "quote": quote, "call": False,
+            "event_start_utc": start,
+            "selection": "home",
+            "model_probability": home,
+            "model_input_snapshot": moneyline,
+            "quote": quote,
+            "call": False,
         }
     }
     for market, model, inputs, selection in (
@@ -80,14 +87,22 @@ def test_complete_verified_packet_is_replay_ready(tmp_path) -> None:
     ):
         spec = json.loads((ROOT / "config/models" / f"{model}.json").read_text())
         snapshot = build_scalar_snapshot(
-            spec, {}, inputs, event_id="game-1", event_start_utc=start, observed_at_utc=observed,
+            spec,
+            {},
+            inputs,
+            event_id="game-1",
+            event_start_utc=start,
+            observed_at_utc=observed,
         )
         from model_prediction.scalar_artifact_replay import replay_snapshot
 
         markets[market] = {
-            "event_start_utc": start, "selection": selection,
+            "event_start_utc": start,
+            "selection": selection,
             "model_probability": replay_snapshot(snapshot)[selection],
-            "model_input_snapshot": snapshot, "quote": quote, "call": False,
+            "model_input_snapshot": snapshot,
+            "quote": quote,
+            "call": False,
         }
     result = capture_packets(tmp_path, "2026-11-01", captured, {"game-1": markets})
     packet = json.loads(Path(result["paths"][0]).read_text())

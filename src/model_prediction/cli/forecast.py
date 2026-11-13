@@ -16,6 +16,7 @@ import json
 import logging
 from dataclasses import asdict, replace
 from datetime import UTC, datetime, timedelta
+from functools import partial
 from pathlib import Path
 from typing import Any, cast
 
@@ -29,6 +30,7 @@ from ..config import (
 )
 from ..cross_market_consistency import validate_cross_market_pick_coherence
 from ..data_sources.espn import ESPNClient, ESPNMLBClient
+from ..data_sources.espn_nfl_odds import consensus_for_selection, parse_espn_consensus
 from ..data_sources.mlb_market_odds import (
     MarketOddsSnapshotStore,
     MLBMarketOddsFeed,
@@ -75,7 +77,7 @@ from ..production_registry import ProductionModelRegistry, compute_artifact_hash
 from ..runtime_paths import RuntimePaths
 from ..soccer_forward import build_soccer_total_slate
 from ..tennis_forward import build_tennis_slate
-from .commands import _clear_today_open, _research_models_dir
+from .commands import _clear_today_open, _research_models_dir, _rolling_models_write_dir
 from .forecast_market_select import (
     _load_market_residual_model,
     _nba_volatility_features,
@@ -414,7 +416,7 @@ def _refresh_esports_ratings(data_root) -> dict:
     """
     titles = tuple(TITLE_SPECS)
     backfill_results = {title: refresh_recent_matches(data_root, title) for title in titles}
-    validation = validate_all_esports_baselines(data_root, titles, _research_models_dir())
+    validation = validate_all_esports_baselines(data_root, titles, _rolling_models_write_dir())
     # Keep the dashboard's evidence-consistency report in sync with the
     # artifacts it describes -- otherwise it goes stale again the moment new
     # matches merge in, since it's read as a pinned snapshot elsewhere
@@ -436,7 +438,9 @@ def _refresh_international_baseball_ratings(data_root) -> dict:
     backfill_results = {
         league: refresh_recent_international_baseball_matches(data_root, league) for league in leagues
     }
-    validation = validate_all_international_baseball_baselines(data_root, leagues, _research_models_dir())
+    validation = validate_all_international_baseball_baselines(
+        data_root, leagues, _rolling_models_write_dir()
+    )
     report_path = PROJECT_ROOT / "outputs/latest/international-baseball-baseline-validation.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(
@@ -1695,7 +1699,10 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
     logistic_scale = float(artifact.get("logistic_scale", 11.2))
     pace_sd_scaling = bool(artifact.get("pace_sd_scaling", False))
 
-    model = BasketballModel(
+    # Only the pre-v6 fallback below runs this engine; v6-v9 slates used to build
+    # and discard it on every run (MODEL_REVIEW_2026-11-11, LOW). partial keeps it lazy.
+    legacy_model = partial(
+        BasketballModel,
         sport="nba",
         version=model_version,
         margin_sd=margin_sd,
@@ -1786,6 +1793,9 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
                     else 0.0
                 ),
                 league="NBA",
+                # ESPN neutralSite + international-venue heuristic; the helper is
+                # league-agnostic despite its NFL name (MODEL_REVIEW #14).
+                neutral_site=_nfl_is_neutral_site(event),
             )
         )
         market_by_event_id[event_id] = market
@@ -1812,7 +1822,9 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
             p for p in spread_v6_model.predict_spreads(history, upcoming) if p.market_type == "spread"
         ]
     else:
-        predictions = [p for p in model.predict_games(history, upcoming) if p.market_type == "spread"]
+        predictions = [
+            p for p in legacy_model().predict_games(history, upcoming) if p.market_type == "spread"
+        ]
 
     priced_contracts = []
     for prediction in predictions:
@@ -2102,7 +2114,9 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
     schedule_density_drag = bool(artifact.get("schedule_density_drag", False))
     overtime_risk_adjustment = bool(artifact.get("overtime_risk_adjustment", False))
 
-    model = BasketballModel(
+    # Lazy for the same reason as the spread slate: only the pre-v6 fallback uses it.
+    legacy_model = partial(
+        BasketballModel,
         sport="nba",
         version=model_version,
         margin_sd=float(artifact.get("margin_sd", 12.0)),
@@ -2173,7 +2187,7 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
             )
             and str(row.get("event_start_utc") or "")[:16] == str(event["date"])[:16]
         ]
-        market = _select_nba_total_market(candidates)
+        market = _select_nba_total_market(candidates, as_of=observed_at)
         if market is None:
             unmatched.append({"event_id": event_id, "reason": "no matched total market"})
             continue
@@ -2199,6 +2213,7 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
                 away_team=away_team,
                 home_team=home_team,
                 total_line=t_line,
+                neutral_site=_nfl_is_neutral_site(event),
                 availability_points_gap=(
                     float(avail.get("availability_points_gap", 0.0))
                     if model_version in ("nba-total-margin-v7", "nba-total-margin-v9")
@@ -2236,23 +2251,21 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
             p for p in total_v6_model.predict_totals(history, upcoming) if p.market_type == "total"
         ]
     else:
-        predictions = [p for p in model.predict_games(history, upcoming) if p.market_type == "total"]
+        predictions = [p for p in legacy_model().predict_games(history, upcoming) if p.market_type == "total"]
 
-    calibrator = None
-    cal_paths = [
-        Path(data_root) / "calibration" / "models" / f"{model_version}.total_calibrator.json",
-        PROJECT_ROOT / "data" / "calibration" / "models" / f"{model_version}.total_calibrator.json",
-    ]
-    for cp in cal_paths:
-        if cp.exists():
-            try:
-                from ..calibration import load_calibrator_artifact
+    from ..calibration_pipeline import load_serving_calibrator
 
-                calibrator = load_calibrator_artifact(cp)
-                break
-            except (OSError, json.JSONDecodeError, ValueError, KeyError, TypeError):
-                # A malformed artifact must degrade to the raw probability, not abort the slate.
-                calibrator = None
+    # Serving transforms go through the same guard every other serving path
+    # uses (own-model fit provenance, MIN_SERVING_SAMPLE, OOF improvement).
+    # The bare loader this replaced applied a Beta artifact fitted on 125
+    # v2-v7 picks but labelled v9 from 2026-11-11T01:32Z, pushing every served
+    # total to 35-46% and blacking out Main totals until the nightly pipeline
+    # happened to overwrite the file (MODEL_REVIEW_2026-11-11, NBA addendum).
+    calibrator, calibration_decision = load_serving_calibrator(
+        model_version,
+        "total",
+        roots=(Path(data_root) / "calibration", PROJECT_ROOT / "data" / "calibration"),
+    )
 
     priced_contracts = []
     for prediction in predictions:
@@ -2340,6 +2353,7 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
         "market_candidates": len(priced_contracts),
         "priced_contracts": priced_contracts,
         "unmatched": unmatched,
+        "calibration": calibration_decision,
         "observed_at_utc": observed_at.isoformat(),
     }
 
@@ -2602,12 +2616,25 @@ def _forecast_nfl_spread_slate(
             )
             and str(row.get("event_start_utc") or "")[:16] == str(event["date"])[:16]
         ]
-        market = _select_nfl_spread_market(candidates)
-        first_odds: dict[str, Any] = {}
+        comp = (event.get("competitions") or [{}])[0]
+        odds_list = comp.get("odds") or []
+        first_odds: dict[str, Any] = odds_list[0] if odds_list else {}
+        # Sportsbook consensus (opener + current two-sided prices) is recorded on every
+        # row, Polymarket-priced or not: it is the reference price CLV is measured
+        # against, the opener is the only line public models have beaten (see
+        # docs/NFL_LOSS_INVESTIGATION_2026-11-12.md §7), and it anchors which
+        # Polymarket rung counts as the main line.
+        consensus_record = parse_espn_consensus(event)
+        market = _select_nfl_spread_market(
+            candidates,
+            reference_line=(consensus_record or {}).get("spread_home_line"),
+            row_line=lambda row, _away=away_team: (
+                -float(row["line"])
+                if _team_matches(_away, str(row.get("team") or ""))
+                else float(row["line"])
+            ),
+        )
         if market is None:
-            comp = (event.get("competitions") or [{}])[0]
-            odds_list = comp.get("odds") or []
-            first_odds = odds_list[0] if odds_list else {}
             espn_spread = first_odds.get("spread")
             if espn_spread is None:
                 unmatched.append({"event_id": event_id, "reason": "no matched spread market"})
@@ -2810,6 +2837,7 @@ def _forecast_nfl_spread_slate(
         if ask is None or not 0 < float(ask) < 1:
             continue
 
+        consensus_probability, consensus_line = consensus_for_selection(consensus_record, "spread", selection)
         inference_inputs = {
             "mean": fc.projected_margin_home,
             # The v7 engine widens margin_sd 1.25x on |line| >= 8. The replay recomputes
@@ -2833,6 +2861,9 @@ def _forecast_nfl_spread_slate(
             "injury_source": injury_source,
             "input_qualified": input_qualified,
             "quote_provenance": quote_provenance,
+            "consensus_provider": (consensus_record or {}).get("provider"),
+            "consensus_spread_home_line_open": (consensus_record or {}).get("spread_home_line_open"),
+            "consensus_spread_home_line": (consensus_record or {}).get("spread_home_line"),
         }
         model_snapshot = build_scalar_snapshot(
             artifact,
@@ -2862,6 +2893,8 @@ def _forecast_nfl_spread_slate(
                 "selection": selection,
                 "line": line,
                 "executable_ask": float(ask),
+                "decision_consensus_probability": consensus_probability,
+                "decision_consensus_line": consensus_line,
                 "sportsbook": sportsbook,
                 "model_probability": round(served_probability, 6),
                 "model_probability_raw": round(model_probability, 6),
@@ -2873,7 +2906,7 @@ def _forecast_nfl_spread_slate(
                 "model_artifact_hash": model_artifact_hash,
                 "model_qualified": model_qualified and input_qualified,
                 "rationale": (
-                    f"NFL Structural v6 Spread projection. Projected margin {fc.projected_margin_home:+.1f} "
+                    f"NFL spread projection ({model_version}). Projected margin {fc.projected_margin_home:+.1f} "
                     f"(Rest: {home_rest_days}v{away_rest_days}d, Dome: {is_dome}).{quote_note}"
                 ),
                 "joint_packet_quote": (
@@ -2900,7 +2933,7 @@ def _forecast_nfl_spread_slate(
 
     return {
         "sport": "nfl_spread",
-        "model_name": "NFL Spread (Structural v6 research)",
+        "model_name": f"NFL Spread ({model_version})",
         "model_version": model_version,
         "model_qualified": model_qualified
         and bool(priced_contracts)
@@ -2975,7 +3008,10 @@ def _forecast_nfl_spread_sport(
             model_uncertainty=contract["model_uncertainty"],
             model_version=contract["model_version"],
             rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
-            risks="NFL Structural v6 projected-QB research model; prospective validation pending.",
+            risks=(
+                f"NFL structural engine {contract['model_version']}: in the 2021-2026 replay its structural "
+                "signal carried no information beyond the closing line; treat edge as price edge only."
+            ),
             model_origin=ModelOrigin.STATISTICAL_MODEL,
             model_enabled=True,
             observed_at_utc=contract["observed_at_utc"],
@@ -2987,6 +3023,8 @@ def _forecast_nfl_spread_sport(
             ),
             feature_schema_version="2",
             code_revision=contract["model_artifact_hash"],
+            decision_consensus_probability=contract.get("decision_consensus_probability"),
+            decision_consensus_line=contract.get("decision_consensus_line"),
             model_input_snapshot_json=json.dumps(
                 contract["model_input_snapshot"], sort_keys=True, allow_nan=False
             )
@@ -3176,12 +3214,14 @@ def _forecast_nfl_total_slate(
             )
             and str(row.get("event_start_utc") or "")[:16] == str(event["date"])[:16]
         ]
-        market = _select_nfl_total_market(candidates)
-        first_odds: dict[str, Any] = {}
+        comp = (event.get("competitions") or [{}])[0]
+        odds_list = comp.get("odds") or []
+        first_odds: dict[str, Any] = odds_list[0] if odds_list else {}
+        consensus_record = parse_espn_consensus(event)
+        market = _select_nfl_total_market(
+            candidates, reference_line=(consensus_record or {}).get("total_line")
+        )
         if market is None:
-            comp = (event.get("competitions") or [{}])[0]
-            odds_list = comp.get("odds") or []
-            first_odds = odds_list[0] if odds_list else {}
             espn_total = first_odds.get("overUnder")
             if espn_total is None:
                 unmatched.append({"event_id": event_id, "reason": "no matched total market"})
@@ -3386,16 +3426,7 @@ def _forecast_nfl_total_slate(
             if market is not None:
                 ask = market["long"]["ask"]
             else:
-                tot_obj = first_odds.get("total") or {}
-                close_odds = (tot_obj.get("over") or {}).get("close", {}).get("odds")
-                try:
-                    ask = (
-                        round(implied_probability(int(close_odds)), 6)
-                        if close_odds and str(close_odds).lstrip("-+").isdigit()
-                        else STANDARD_LAY_ASK
-                    )
-                except (ValueError, TypeError):
-                    ask = STANDARD_LAY_ASK
+                ask = consensus_for_selection(consensus_record, "total", "over")[0] or STANDARD_LAY_ASK
             line = t_line
         else:
             selection = "under"
@@ -3403,21 +3434,13 @@ def _forecast_nfl_total_slate(
             if market is not None:
                 ask = market["short"]["ask"]
             else:
-                tot_obj = first_odds.get("total") or {}
-                close_odds = (tot_obj.get("under") or {}).get("close", {}).get("odds")
-                try:
-                    ask = (
-                        round(implied_probability(int(close_odds)), 6)
-                        if close_odds and str(close_odds).lstrip("-+").isdigit()
-                        else STANDARD_LAY_ASK
-                    )
-                except (ValueError, TypeError):
-                    ask = STANDARD_LAY_ASK
+                ask = consensus_for_selection(consensus_record, "total", "under")[0] or STANDARD_LAY_ASK
             line = t_line
 
         if ask is None or not 0 < float(ask) < 1:
             continue
 
+        consensus_probability, consensus_line = consensus_for_selection(consensus_record, "total", selection)
         inference_inputs = {
             "mean": fc.projected_total,
             "sd": total_sd,
@@ -3444,6 +3467,9 @@ def _forecast_nfl_total_slate(
             "injury_source": injury_source,
             "input_qualified": input_qualified,
             "quote_provenance": quote_provenance,
+            "consensus_provider": (consensus_record or {}).get("provider"),
+            "consensus_total_line_open": (consensus_record or {}).get("total_line_open"),
+            "consensus_total_line": (consensus_record or {}).get("total_line"),
         }
         model_snapshot = build_scalar_snapshot(
             artifact,
@@ -3484,6 +3510,8 @@ def _forecast_nfl_total_slate(
                 "selection": selection,
                 "line": line,
                 "executable_ask": float(ask),
+                "decision_consensus_probability": consensus_probability,
+                "decision_consensus_line": consensus_line,
                 "sportsbook": sportsbook,
                 "model_probability": round(served_probability, 6),
                 "model_probability_raw": round(model_probability, 6),
@@ -3495,7 +3523,7 @@ def _forecast_nfl_total_slate(
                 "model_artifact_hash": model_artifact_hash,
                 "model_qualified": model_qualified and input_qualified,
                 "rationale": (
-                    f"NFL Structural v6 Total projection. Projected total {fc.projected_total:.1f} "
+                    f"NFL total projection ({model_version}). Projected total {fc.projected_total:.1f} "
                     f"(Dome: {is_dome}, Weather: {weather_note}).{tnf_note}{quote_note}"
                 ),
                 "joint_packet_quote": (
@@ -3521,7 +3549,7 @@ def _forecast_nfl_total_slate(
 
     return {
         "sport": "nfl_total",
-        "model_name": "NFL Total (Structural v6 research)",
+        "model_name": f"NFL Total ({model_version})",
         "model_version": model_version,
         "model_qualified": model_qualified
         and bool(priced_contracts)
@@ -3591,7 +3619,10 @@ def _forecast_nfl_total_sport(
             model_uncertainty=contract["model_uncertainty"],
             model_version=contract["model_version"],
             rationale=(f"{contract['rationale']} Executable ask {ask:.4f} ({contract['market_slug']})."),
-            risks="NFL Structural v6 projected-QB research model; prospective validation pending.",
+            risks=(
+                f"NFL structural engine {contract['model_version']}: in the 2021-2026 replay its structural "
+                "signal carried no information beyond the closing line; treat edge as price edge only."
+            ),
             model_origin=ModelOrigin.STATISTICAL_MODEL,
             model_enabled=True,
             observed_at_utc=contract["observed_at_utc"],
@@ -3603,6 +3634,8 @@ def _forecast_nfl_total_sport(
             ),
             feature_schema_version="2",
             code_revision=contract["model_artifact_hash"],
+            decision_consensus_probability=contract.get("decision_consensus_probability"),
+            decision_consensus_line=contract.get("decision_consensus_line"),
             model_input_snapshot_json=json.dumps(
                 contract["model_input_snapshot"], sort_keys=True, allow_nan=False
             )
@@ -5324,6 +5357,7 @@ def _forecast_cfb_sport(
     main_ledger: logs qualified calls meeting min_edge and uncertainty thresholds with edge-scaled sizing.
     """
     from ..data_sources.polymarket_us import probability_to_american
+    from ..models.cfb_structural_v4 import main_gates_from_artifact
     from ..models.college_football import build_cfb_slate
 
     model_config = config.get("models", {}).get("NCAAF", {})
@@ -5331,10 +5365,15 @@ def _forecast_cfb_sport(
     serving_artifact, artifact_error = _load_exact_artifact_contract(serving_version)
     if artifact_error or serving_artifact is None:
         raise ValueError(artifact_error or f"NCAAF serving artifact unavailable for {serving_version}")
-    max_edge = float(serving_artifact["gates"]["max_edge"])
-    if not 0 < max_edge < 1:
-        raise ValueError(f"NCAAF serving artifact has invalid max_edge for {serving_version}")
+    # The artifact's gates block is the Main contract. Review 2026-11-11 #9: block_fcs,
+    # max_spread_line and max_moneyline_dog_odds were declared there and read nowhere.
+    artifact_gates = main_gates_from_artifact(serving_artifact)
+    max_edge = artifact_gates.max_edge
     serving_artifact_hash = str(serving_artifact["artifact_hash"])
+    # Main-only total gates live in config/model.yaml (models.NCAAF.main_total_gates) so the
+    # thresholds are visible and removable; they were hardcoded here with no walk-forward
+    # evidence (review #12). Absent block => no extra total gate.
+    total_gates = model_config.get("main_total_gates") or {}
     forecast = build_cfb_slate(
         data_root=data_root,
         game_date=args_date,
@@ -5345,7 +5384,7 @@ def _forecast_cfb_sport(
         forecast["logged"] = 0
         return forecast
 
-    min_edge = float(model_config.get("min_edge", 0.03))
+    min_edge = float(model_config.get("min_edge", artifact_gates.min_edge))
     configured_state = str(model_config.get("status", "research"))
     forecast["status"] = configured_state
     observed_now = utc_now()
@@ -5449,58 +5488,50 @@ def _forecast_cfb_sport(
                     main_rejections.append(
                         {"event_id": contract["event_id"], "market": mtype.value, "reason": "excessive_edge"}
                     )
+                feature_basis = contract.get("feature_basis") or {}
+
+                def _reject(
+                    reason: str, *, _event_id: str = str(contract["event_id"]), _market: str = mtype.value
+                ) -> None:
+                    nonlocal genuinely_eligible
+                    genuinely_eligible = False
+                    main_rejections.append({"event_id": _event_id, "market": _market, "reason": reason})
+
                 if mtype == MarketType.TOTAL and contract.get("weather_inputs_verified") is not True:
-                    genuinely_eligible = False
-                    main_rejections.append(
-                        {
-                            "event_id": contract["event_id"],
-                            "market": mtype.value,
-                            "reason": "pregame_weather_unverified",
-                        }
-                    )
+                    _reject("pregame_weather_unverified")
+                if artifact_gates.block_fcs and bool(feature_basis.get("is_fbs_vs_fcs", False)):
+                    _reject("fcs_blocked")
                 if (
-                    genuinely_eligible
-                    and mtype == MarketType.TOTAL
-                    and (
-                        contract_edge > 0.10
-                        or float(contract.get("model_probability", 0.0)) > 0.62
-                        or (
-                            str(contract.get("selection", "")).lower() == "under"
-                            and contract.get("line") is not None
-                            and float(contract["line"]) >= 56.5
-                        )
-                        or (
-                            contract.get("line") is not None
-                            and (contract.get("feature_basis") or {}).get("projected_total") is not None
-                            and abs(
-                                float(contract["feature_basis"]["projected_total"]) - float(contract["line"])
-                            )
-                            < 1.5
-                        )
-                    )
-                ):
-                    genuinely_eligible = False
-                # Optional, off-by-default gates: each needs a config value, which in turn needs
-                # walk-forward evidence (ARCHITECTURE.md validation contract) before being set.
-                _ml_max_odds = model_config.get("max_moneyline_american_odds")
-                if (
-                    genuinely_eligible
-                    and _ml_max_odds is not None
-                    and mtype == MarketType.MONEYLINE
-                    and request.american_odds is not None
-                    and request.american_odds > float(_ml_max_odds)
-                ):
-                    genuinely_eligible = False
-                _blowout_cap = model_config.get("blowout_spread_edge_cap")
-                if (
-                    genuinely_eligible
-                    and _blowout_cap is not None
-                    and mtype == MarketType.SPREAD
+                    mtype == MarketType.SPREAD
                     and contract.get("line") is not None
-                    and abs(float(contract["line"])) > 21.5
-                    and contract_edge > float(_blowout_cap)
+                    and abs(float(contract["line"])) > artifact_gates.max_spread_line
                 ):
-                    genuinely_eligible = False
+                    _reject("spread_line_above_max")
+                if mtype == MarketType.MONEYLINE and ask < artifact_gates.min_moneyline_ask:
+                    _reject("moneyline_ask_below_floor")
+                if mtype == MarketType.TOTAL and total_gates:
+                    max_probability = total_gates.get("max_model_probability")
+                    if max_probability is not None and float(contract.get("model_probability", 0.0)) > float(
+                        max_probability
+                    ):
+                        _reject("total_probability_above_config_max")
+                    under_min_line = total_gates.get("under_min_line")
+                    if (
+                        under_min_line is not None
+                        and str(contract.get("selection", "")).lower() == "under"
+                        and contract.get("line") is not None
+                        and float(contract["line"]) >= float(under_min_line)
+                    ):
+                        _reject("total_under_line_above_config_min")
+                    min_gap = total_gates.get("min_projection_gap")
+                    if (
+                        min_gap is not None
+                        and contract.get("line") is not None
+                        and feature_basis.get("projected_total") is not None
+                        and abs(float(feature_basis["projected_total"]) - float(contract["line"]))
+                        < float(min_gap)
+                    ):
+                        _reject("total_projection_within_config_gap")
                 # CFB spread (cfb-spread-v1) and total (cfb-total-v1) artifacts explicitly declare
                 # "status": "FLAT_LEDGER_ONLY" and "qualified": false. Unified cfb-structural-v3
                 # produces calibrated joint probabilities and is qualified across moneyline,

@@ -362,6 +362,27 @@ real, committed changes to the live champion `cfb-structural-v4`:
   `cfb_v4_constant_calibration.py` pattern (train/val/holdout + date-
   clustered bootstrap) rather than that script.
 
+## 8. NCAAF review fixes (2026-11-12, `quick-261112-0xd`)
+
+- 2026-11-12 (`quick-261112-0xd`): every NCAAF finding in `docs/MODEL_REVIEW_2026-11-11.md` is fixed —
+  production now serves the v4 class from the artifact (was a 16.2-SD duplicate under the v4 label),
+  newest-capture/both-asks quote matching, artifact gates (FCS, 21.5 spread cap, 33.3% dog floor) on
+  Main, total gates moved to `config/model.yaml`, venue-based neutral-site weather, postseason week,
+  QB channel from the injuries snapshot, 200k sims, source-hash `code_revision`. `DEBUG.md` entry.
+- Open decisions: supersede or keep the 243 Main `cfb-structural-v4` rows priced on the 16.2
+  arithmetic (identifiable from snapshot `parameters.margin_sd`); whether ESPN-consensus rows
+  (229 of 238 Main NCAAF) may reach Main at all — they are now labelled `espn_consensus_indicative`.
+- Replay 2026-11-12 (`scripts/replay_cfb_v4_all_settled.py`, `outputs/ncaaf/cfb_v4_replay.md`): on all
+  7,960 completed games the fixed model's moneyline Brier (0.1893) equals its own Elo channel (0.1894);
+  realized margin SD 16.8 vs served 14.8 on established FBS matchups; on 1,610 settled rows the recorded
+  ask beats both old and fixed model, fixed-model fires 98 Flat (51.0%, −6.14u), totals 40.9%.
+  Decisions owed: pause Main NCAAF totals; v5 margin_sd/HFA retune as a walk-forward challenger;
+  re-evidence the `predictively_qualified` label.
+- v5 challenger built 2026-11-12 (`d86876e7`, `models/cfb_structural_v5.py`, `config/models/cfb-structural-v5.json`,
+  research status): fitted margin/total mean calibration + residual SD table; holdout Brier 0.18933 vs 0.19056
+  (CI includes zero), margin/total log scores significantly better, slope 0.98 vs 1.19. Owed: register it as the
+  NCAAF challenger in `config/production.yaml` so it produces shadow rows; promotion only via the ROADMAP rule.
+
 ## Done when
 
 Items 1 through 6 are each either resolved or explicitly dropped, and this file has been deleted.

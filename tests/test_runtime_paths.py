@@ -107,3 +107,22 @@ def test_default_resolve_keeps_repo_fallback_for_dev(tmp_path):
     repo = tmp_path / "repo"
     paths = RuntimePaths.resolve(repo_root=repo)
     assert paths.runtime_root == (repo / "data").resolve()
+
+
+def test_rerouted_data_root_maps_only_the_legacy_repo_data_root(monkeypatch, tmp_path):
+    """Every odds reader must look where capture writes. The checkout's legacy
+    data/ root reroutes to the configured runtime root; an explicit isolated
+    root (a test fixture, a research sandbox) is left alone so it can never
+    borrow production market data."""
+    from model_prediction.runtime_paths import rerouted_data_root
+
+    repo = tmp_path / "repo"
+    runtime = tmp_path / "runtime"
+    (repo / "data").mkdir(parents=True)
+    monkeypatch.setenv("MODEL_PREDICTION_RUNTIME_ROOT", str(runtime))
+
+    assert rerouted_data_root(repo / "data", repo_root=repo) == runtime
+    assert rerouted_data_root(tmp_path / "isolated", repo_root=repo) == tmp_path / "isolated"
+
+    monkeypatch.delenv("MODEL_PREDICTION_RUNTIME_ROOT")
+    assert rerouted_data_root(repo / "data", repo_root=repo) == repo / "data"

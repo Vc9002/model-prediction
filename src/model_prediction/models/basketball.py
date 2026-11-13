@@ -169,7 +169,13 @@ class BasketballModel:
         baseline = trend.league_baseline or default_baseline
         predictions: list[GamePrediction] = []
         for game in upcoming:
-            home_win = elo.expected_home_win(game.home_team, game.away_team)
+            # Neutral floors (NBA Cup knockout rounds, Paris/Mexico City games)
+            # carry no home-court edge in either the Elo or the trend half.
+            home_win = (
+                elo.expected_neutral_win(game.home_team, game.away_team)
+                if game.neutral_site
+                else elo.expected_home_win(game.home_team, game.away_team)
+            )
             away_trend = trend.team_trend(game.away_team)
             home_trend = trend.team_trend(game.home_team)
 
@@ -229,15 +235,15 @@ class BasketballModel:
             home_points = (home_trend.offense["hl10"] + away_trend.defense["hl10"]) / 2 or baseline
 
             # Altitude HCA adjustment
-            effective_hca = self.home_court_points
-            if self.altitude_hca and str(self._sport).lower() == "nba":
+            effective_hca = 0.0 if game.neutral_site else self.home_court_points
+            if self.altitude_hca and not game.neutral_site and str(self._sport).lower() == "nba":
                 if game.home_team == "Denver Nuggets":
                     effective_hca += 1.40
                 elif game.home_team == "Utah Jazz":
                     effective_hca += 0.80
 
             # Elo margin (home rating with HCA minus away rating)
-            r_home = elo.rating(game.home_team) + elo.home_advantage
+            r_home = elo.rating(game.home_team) + (0.0 if game.neutral_site else elo.home_advantage)
             r_away = elo.rating(game.away_team)
             elo_margin = (r_home - r_away) / 28.0
 

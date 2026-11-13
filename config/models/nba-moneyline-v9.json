@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "34b4118c61044b2c74684101fc893c4c44f06296dc616e67b4b4e278b4dba551",
+  "artifact_hash": "591633e1e1fcdf773a137fdf3c9f49e3b36112b424b7dbbf4966a0f3dac24230",
   "feature_schema_version": "1",
   "market_models": {
     "moneyline": {
@@ -21,16 +21,12 @@
   "method": "logistic_regression",
   "model_version": "nba-moneyline-v9",
   "qualification": {
-    "brier_score": 0.1945,
     "framework": "nba_structural_v9_joint_engine",
-    "holdout_brier_score": 0.1945,
-    "holdout_log_loss": 0.548,
-    "locked_holdout": true,
-    "model_version": "nba-moneyline-v9",
-    "note": "Point-in-time walk-forward validated on locked holdout and live 2026-27 games (66.7% win rate).",
-    "qualified": true,
-    "sample_size": 664,
-    "status": "qualified"
+    "locked_holdout": false,
+    "qualified": false,
+    "status": "unverified_placeholder",
+    "sample_size": 0,
+    "note": "Rolled back from serving 2026-11-10 (4d5624ed): the coefficients are placeholders that were never fit. The previous holdout_brier_score 0.1945 / 66.7% claims were not produced by these coefficients and are void. Flat ledger 2026-11-08..10: 8 of 11 settled rows priced the model below the market ask (e.g. 54% vs 87%). Keep as a rollback-chain placeholder only; refit before any qualification claim (MODEL_REVIEW_2026-11-11 NBA addendum)."
   },
   "sport": "nba"
 }

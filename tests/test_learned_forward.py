@@ -503,3 +503,104 @@ def test_extract_espn_moneyline_odds_missing_or_empty():
     assert learned_forward.extract_espn_moneyline_odds({"competitions": [{}]}) is None
     assert learned_forward.extract_espn_moneyline_odds({"competitions": [{"odds": []}]}) is None
     assert learned_forward.extract_espn_moneyline_odds({"competitions": [{"odds": [{}]}]}) is None
+
+
+class _FakeNBAESPN:
+    def scoreboard(self, league: str, game_date: str) -> dict:
+        assert league == "NBA"
+        return {
+            "events": [
+                {
+                    "id": "nba-future-1",
+                    "date": f"{game_date}T23:00:00Z",
+                    "competitions": [
+                        {
+                            "competitors": [
+                                {"homeAway": "away", "team": {"displayName": "Miami Heat"}},
+                                {"homeAway": "home", "team": {"displayName": "Boston Celtics"}},
+                            ]
+                        }
+                    ],
+                }
+            ]
+        }
+
+
+def test_nba_learned_slate_rebuilds_elo_and_trends_exactly_as_training_did(tmp_path, monkeypatch) -> None:
+    """MODEL_REVIEW_2026-11-11 #6: learned_forward injected NBA-only Elo/Trend
+    overrides (HCA 38, offseason gap 60, retention 0.40, isolate_postseason) that
+    validation.py never used when it fit nba-elo-trend-lr-v4, so the served
+    elo_probability differed from the trained one by ~4.5 pp for even teams. The
+    slate must now pass only what the artifact declares and otherwise let
+    build_elo / TrendEngine fall back to the defaults training used."""
+    path = tmp_path / "processed/nba/games.jsonl"
+    path.parent.mkdir(parents=True)
+    rows = [
+        {
+            "event_id": f"nba-history-{index}",
+            "event_start_utc": f"2026-05-{index % 28 + 1:02d}T23:00:00Z",
+            "league": "NBA",
+            "away_team": "Miami Heat" if index % 2 else "Boston Celtics",
+            "home_team": "Boston Celtics" if index % 2 else "Miami Heat",
+            "away_score": 100 + index % 5,
+            "home_score": 104,
+        }
+        for index in range(60)
+    ]
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+    artifact_path = tmp_path / "nba-artifact.json"
+    artifact_path.write_text(
+        json.dumps(
+            build_artifact(
+                sport="nba",
+                model_version="nba-elo-trend-lr-test",
+                market_models={
+                    "moneyline": {
+                        "feature_names": ["elo_probability", "trend_gap", "defensive_trend_gap"],
+                        "coefficients": [3.56, 0.0, 0.0],
+                        "intercept": -1.9,
+                        "confidence_threshold": 0.54,
+                        "positive_class": "home",
+                    }
+                },
+                training={"market_inputs_used": False},
+                qualification={"qualified": True},
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    elo_kwargs: dict = {}
+    trend_kwargs: dict = {}
+    real_build_elo = learned_forward.build_elo
+    real_trend_engine = learned_forward.TrendEngine
+
+    def spy_build_elo(history, sport, **kwargs):
+        elo_kwargs.update(kwargs)
+        return real_build_elo(history, sport, **kwargs)
+
+    def spy_trend_engine(history, **kwargs):
+        trend_kwargs.update(kwargs)
+        return real_trend_engine(history, **kwargs)
+
+    monkeypatch.setattr(learned_forward, "build_elo", spy_build_elo)
+    monkeypatch.setattr(learned_forward, "TrendEngine", spy_trend_engine)
+
+    candidates, skipped, scheduled = build_learned_moneyline_slate(
+        sport="nba",
+        game_date="2026-07-17",
+        store=FeatureStore(tmp_path),
+        client=_FakeNBAESPN(),
+        artifact_path=artifact_path,
+        observed_at=datetime(2026, 7, 17, 12, tzinfo=UTC),
+    )
+
+    assert scheduled == 1 and skipped == [] and len(candidates) == 1
+    # Training: build_elo(history, sport) -> sport-config HCA, default regression, gap 90.
+    assert elo_kwargs == {"offseason_regression": None, "offseason_gap_days": 90, "home_advantage": None}
+    # Training: TrendEngine(history) -> no gap, retention 0.50, no postseason isolation.
+    assert trend_kwargs == {
+        "offseason_gap_days": None,
+        "offseason_retention": 0.50,
+        "isolate_postseason": False,
+    }

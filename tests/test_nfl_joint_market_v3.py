@@ -20,36 +20,50 @@ def _packet() -> dict:
         "replay_ready": True,
         "markets": {
             "moneyline": {
-                "status": "verified", "selection": "home", "model_probability": 0.55,
+                "status": "verified",
+                "selection": "home",
+                "model_probability": 0.55,
                 "model_snapshot": {"artifact_hash": "moneyline", "model_version": "nfl-elo-trend-lr-v4"},
                 "quote": {
-                    "no_vig_selected": 0.60, "selected_ask": 0.60,
-                    "long_ask": 0.60, "short_ask": 0.40,
+                    "no_vig_selected": 0.60,
+                    "selected_ask": 0.60,
+                    "long_ask": 0.60,
+                    "short_ask": 0.40,
                     "lineage": {"market_snapshot_record_id": "ml-quote"},
                 },
             },
             "spread": {
-                "status": "verified", "selection": "home", "line": -3.5,
+                "status": "verified",
+                "selection": "home",
+                "line": -3.5,
                 "model_snapshot": {
-                    "artifact_hash": "spread-v6", "model_version": "nfl-spread-structural-v6",
+                    "artifact_hash": "spread-v6",
+                    "model_version": "nfl-spread-structural-v6",
                     "features": {"input_qualified": True},
                     "inference_inputs": {"mean": 2.0, "sd": 14.5},
                 },
                 "quote": {
-                    "line": -3.5, "long_ask": 0.52, "short_ask": 0.49,
+                    "line": -3.5,
+                    "long_ask": 0.52,
+                    "short_ask": 0.49,
                     "lineage": {"market_snapshot_record_id": "spread-quote"},
                 },
             },
             "total": {
-                "status": "verified", "selection": "over", "line": 44.5,
+                "status": "verified",
+                "selection": "over",
+                "line": 44.5,
                 "model_snapshot": {
-                    "artifact_hash": "total-v6", "model_version": "nfl-total-structural-v6",
+                    "artifact_hash": "total-v6",
+                    "model_version": "nfl-total-structural-v6",
                     "features": {"input_qualified": True},
                     "inference_inputs": {"mean": 45.0, "sd": 14.2},
                     "artifact": {"league_avg_total": 45.5},
                 },
                 "quote": {
-                    "line": 44.5, "long_ask": 0.51, "short_ask": 0.50,
+                    "line": 44.5,
+                    "long_ask": 0.51,
+                    "short_ask": 0.50,
                     "lineage": {"market_snapshot_record_id": "total-quote"},
                 },
             },
@@ -69,9 +83,7 @@ ARTIFACT["artifact_hash"] = compute_artifact_hash(ARTIFACT)
 
 
 def test_v3_forecast_is_joint_and_uses_prior_settled_weight() -> None:
-    history = [
-        SettledQuote(date(2026, 10, 25), 0.50, 0.60, 1, datetime(2026, 10, 26, tzinfo=UTC))
-    ]
+    history = [SettledQuote(date(2026, 10, 25), 0.50, 0.60, 1, datetime(2026, 10, 26, tzinfo=UTC))]
     result = forecast_packet(_packet(), ARTIFACT, history)
     assert result["market_weight"] == 1.0
     assert result["home_win_probability"] == pytest.approx(0.60)
@@ -79,14 +91,15 @@ def test_v3_forecast_is_joint_and_uses_prior_settled_weight() -> None:
     assert result["selected_probabilities"]["spread"] <= result["home_win_probability"]
     assert all(0 < value < 1 for value in result["selected_probabilities"].values())
     assert result["contracts"]["spread"] == {
-        "selection": "home", "line": -3.5, "ask": 0.52, "quote_record_id": "spread-quote"
+        "selection": "home",
+        "line": -3.5,
+        "ask": 0.52,
+        "quote_record_id": "spread-quote",
     }
 
 
 def test_v3_rejects_wrong_parent_or_unqualified_source() -> None:
-    history = [
-        SettledQuote(date(2026, 10, 25), 0.50, 0.60, 1, datetime(2026, 10, 26, tzinfo=UTC))
-    ]
+    history = [SettledQuote(date(2026, 10, 25), 0.50, 0.60, 1, datetime(2026, 10, 26, tzinfo=UTC))]
     packet = _packet()
     packet["markets"]["spread"]["model_snapshot"]["artifact_hash"] = "wrong"
     with pytest.raises(ValueError, match="parent_artifact_hash_mismatch"):

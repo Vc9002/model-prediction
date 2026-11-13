@@ -79,6 +79,24 @@ def migrate_legacy_state(paths: RuntimePaths) -> list[str]:
     return moved
 
 
+def rerouted_data_root(data_root: Path | str, repo_root: Path | str | None = None) -> Path:
+    """Map the checkout's legacy ``data/`` root onto the runtime root.
+
+    Capture (`cli.commands`) and the forecast read side already reroute the
+    repo-local ``data/`` to the runtime root once one is configured; every
+    reader that kept using ``Path(ledger_path(config)).parent`` silently went
+    stale on 2026-11-04 when snapshots moved (health reported every sport
+    stale for 8 days, the daily edge scanner scanned an empty tree). Only the
+    legacy repo-local root is rerouted: explicit isolated roots, including
+    test fixtures, must never borrow production market data.
+    """
+    paths = RuntimePaths.resolve(repo_root=repo_root)
+    root = Path(data_root)
+    if root.resolve() == (paths.repo_root / "data").resolve():
+        return paths.runtime_root
+    return root
+
+
 def rolling_models_root(repo_root: Path | str | None = None) -> Path:
     """Where scheduled retraining writes its rolling rating artifacts.
 

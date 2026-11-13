@@ -358,6 +358,28 @@ def _public_sqlite_repair(repair: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in repair.items() if key not in {"current", "source_row"}}
 
 
+def _report_exit_code(report: dict[str, Any]) -> int:
+    """Fail the exit code on drift the dry run already computed but used to ignore.
+
+    Before this, a dry run always returned ``0 if integrity_ok and not
+    sqlite_rejected else 1``, so stranded-open model-ledger rows
+    (``model_repairs_planned_total`` exceeding ``model_repairs_applied``) and
+    unresolved ``model_settlement_conflicts`` were already in the JSON report
+    but never affected the exit code -- exactly how the cs2-tiered-elo
+    22-row backlog and 6 identity conflicts went unnoticed between manual
+    audits instead of being surfaced by the tool itself.
+    """
+    if not report["sqlite_integrity"]["ok"]:
+        return 1
+    if report["sqlite_repairs_rejected"]:
+        return 1
+    if report["model_repairs_planned_total"] - report["model_repairs_applied"] > 0:
+        return 1
+    if report["model_settlement_conflicts"]:
+        return 1
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--apply-sqlite", action="store_true")
@@ -408,7 +430,18 @@ def main() -> int:
         args.report.parent.mkdir(parents=True, exist_ok=True)
         args.report.write_text(rendered + "\n", encoding="utf-8")
     print(rendered)
-    return 0 if integrity_ok and not sqlite_rejected else 1
+    exit_code = _report_exit_code(report)
+    if exit_code != 0:
+        unresolved_model_repairs = report["model_repairs_planned_total"] - report["model_repairs_applied"]
+        unresolved_conflicts = len(report["model_settlement_conflicts"])
+        print(
+            f"model-ledger drift: {unresolved_model_repairs} unresolved stranded-open row(s), "
+            f"{unresolved_conflicts} unresolved settlement conflict(s) "
+            "-- see model_repairs_planned_total/model_repairs_applied/model_settlement_conflicts "
+            "in the JSON report above for detail",
+            file=sys.stderr,
+        )
+    return exit_code
 
 
 if __name__ == "__main__":
