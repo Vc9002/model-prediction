@@ -39,8 +39,11 @@ Register-WorkerTask 'ModelPrediction-Calibrate' 'calibrate' $calibrateTriggers '
 # Production canary and rebuild shadow: every 3 hours, per their launcher headers.
 $threeHourly = New-ScheduledTaskTrigger -Once -At (Get-Date).Date.AddMinutes(5) -RepetitionInterval (New-TimeSpan -Hours 3) -RepetitionDuration (New-TimeSpan -Days 3650)
 Register-WorkerTask 'ModelPrediction-Production' 'production' $threeHourly 'model-prediction production canary (predict)'
-$threeHourly2 = New-ScheduledTaskTrigger -Once -At (Get-Date).Date.AddMinutes(35) -RepetitionInterval (New-TimeSpan -Hours 3) -RepetitionDuration (New-TimeSpan -Days 3650)
-Register-WorkerTask 'ModelPrediction-RebuildShadow' 'rebuild-shadow' $threeHourly2 'model-prediction rebuild shadow (isolated, no production writes)'
+# Rebuild shadow: frozen 2026-11-13 (operator directive, scope narrowed; see CLAUDE.md
+# 'Scope'). The live task was disabled in place, not deleted; re-registering must not
+# re-enable it. Uncomment both lines to thaw.
+# $threeHourly2 = New-ScheduledTaskTrigger -Once -At (Get-Date).Date.AddMinutes(35) -RepetitionInterval (New-TimeSpan -Hours 3) -RepetitionDuration (New-TimeSpan -Days 3650)
+# Register-WorkerTask 'ModelPrediction-RebuildShadow' 'rebuild-shadow' $threeHourly2 'model-prediction rebuild shadow (isolated, no production writes)'
 
 # Offsite backup: 03:00 daily, matching com.vc.model-backup-offsite.plist.
 $vbs = Join-Path $RepoRoot 'scripts\run_silent.vbs'

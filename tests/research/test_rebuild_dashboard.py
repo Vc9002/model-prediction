@@ -156,7 +156,7 @@ def test_rebuild_namespace_rejects_all_mutating_http_methods() -> None:
 
 
 def test_rebuild_ui_is_labeled_and_has_no_execution_controls() -> None:
-    html = (Path(__file__).resolve().parents[1] / "dashboard.html").read_text(encoding="utf-8")
+    html = (Path(__file__).resolve().parents[2] / "dashboard.html").read_text(encoding="utf-8")
     rebuild = html.split('<section id="tab-rebuild"', 1)[1].split('<section id="tab-evidence"', 1)[0]
 
     assert "CLEAN-SLATE REBUILD — SHADOW ONLY" in rebuild

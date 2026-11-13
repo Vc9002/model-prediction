@@ -7,7 +7,7 @@ from pathlib import Path
 from model_prediction.runtime_ledger_store import LedgerMutation, RuntimeLedgerStore
 from model_prediction.runtime_paths import RuntimePaths
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "merge_research_ledgers.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "merge_research_ledgers.py"
 spec = importlib.util.spec_from_file_location("merge_research_ledgers", SCRIPT)
 merge = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(merge)

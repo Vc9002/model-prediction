@@ -14,8 +14,8 @@ from scripts import (
     evaluate_archived_research_pairs,
     score_research_forward,
 )
+from tests.research.test_research_pair_capture import prepared  # noqa: F401
 from tests.test_research_forward import fixture, history, models  # noqa: F401
-from tests.test_research_pair_capture import prepared  # noqa: F401
 
 
 def test_removed_ledger_decision_scores_from_original_pregame_archive(prepared, tmp_path, monkeypatch):  # noqa: F811
@@ -29,7 +29,7 @@ def test_removed_ledger_decision_scores_from_original_pregame_archive(prepared, 
             return datetime.fromisoformat("2025-05-10T12:02:00+00:00")
 
     monkeypatch.setattr(audit_research_pair_quotes, "datetime", Clock)
-    root = Path(__file__).parents[1]
+    root = Path(__file__).parents[2]
     audit = tmp_path / "audit"
     audit_research_pair_quotes.run(root, captures, database, audit)
     outcome = tmp_path / "outcome.jsonl"

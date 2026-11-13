@@ -19,7 +19,7 @@ from tests.test_research_forward import fixture, history, models  # noqa: F401
 def prepared(models, tmp_path, monkeypatch):  # noqa: F811
     generation = tmp_path / "generation"
     shutil.copytree(models / "moneyline", generation / "models/nba-moneyline")
-    root = Path(__file__).parents[1]
+    root = Path(__file__).parents[2]
     registered = next(
         m
         for m in yaml.safe_load((root / "config/production.yaml").read_text())["prediction_service"]["models"]
@@ -258,7 +258,7 @@ def test_pregame_audit_reproduces_and_retains_null_economics(prepared, tmp_path,
             "INSERT INTO ledger_records VALUES (" + ",".join("?" for _ in record) + ")", list(record.values())
         )
     before = file_hash(database)
-    root = Path(__file__).parents[1]
+    root = Path(__file__).parents[2]
     result = audit.run(root, output, database, tmp_path / "audit")
     assert result["counts"] == {"REPRODUCED_NO_VERIFIED_QUOTE": 1}
     assert result["pnl_usd"] is None and result["roi"] is None
