@@ -302,7 +302,8 @@ CALL (operator directive 2026-10-11) but a non-qualified eligibility keeps its
 Still open for NBA: #10 (latent until the v9 moneyline engine is a challenger) and
 the two operator decisions above. The #6 "refit or revert" question is closed both ways:
 overrides reverted (`quick-261112-11j`) and a walk-forward refit `nba-elo-trend-lr-v5`
-registered as challenger (`quick-261112-kj3`, `docs/NBA_LR_V5_REFIT_2026-11-12.md`); on
+registered as challenger (`quick-261112-kj3`, `docs/NBA_LR_V5_REFIT_2026-11-12.md`) and
+promoted to champion 2026-11-13 (`quick-261113-j3m`, `promo-20261113T184744Z-6b0b74`); on
 identical holdout rows the refit matches v4-as-fit (Brier 0.1889 vs 0.1892). LOW items, checked 2026-11-12: integer-line push
 mass is moot for NBA -- all 341 settled/open NBA spread and total rows in the runtime
 ledger sit on half-point lines, so no change was made to the pricing/replay contract;
