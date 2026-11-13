@@ -111,6 +111,7 @@ None yet.
 | 261113-jpw | System-usage pass: bound the dashboard parsed-snapshot cache (LRU by on-disk bytes); measured memory/disk drivers and recorded recommendations | 2026-11-13 | 4fb785cd | [261113-jpw-bound-the-dashboard-parsed-snapshot-cache](./quick/261113-jpw-bound-the-dashboard-parsed-snapshot-cache/) |
 | 261113-jqw | Whitelist nba-elo-trend-lr-v5 in the auto-buyer (code constant via 4fb785cd + live auto_buyer_state.json v179->180); inert until evidence_status leaves historical_only | 2026-11-13 | df4b3d68 | [261113-jqw-whitelist-the-serving-nba-moneyline-cham](./quick/261113-jqw-whitelist-the-serving-nba-moneyline-cham/) |
 | 261113-jrq | Fix NBA availability feature matching foreign teams injuries via abbreviation substrings | 2026-11-13 | 31f092a9 | [261113-jrq-fix-nba-availability-feature-matching-fo](./quick/261113-jrq-fix-nba-availability-feature-matching-fo/) |
+| 261113-smp | Narrow production to NBA/NCAAF/NFL/MLB/WNBA/NCAAB via model.yaml flag + daily.py gate; research tests to tests/research (off default pytest); rebuild shadow task frozen; CLAUDE.md trimmed, paper+gated-real-money stated once | 2026-11-13 | 166bb2ce | [261113-smp-simplify-project-scope-six-sports](./quick/261113-smp-simplify-project-scope-six-sports/) |
 
 ## Milestone History
 
