@@ -249,6 +249,11 @@ def forecast_ncaab_sport(
     max_margin_divergence = float(policy.get("max_margin_divergence", 12.0))
     max_total_divergence = float(policy.get("max_total_divergence", 14.0))
     max_quote_age_seconds = float(policy.get("max_quote_age_seconds", 300.0))
+    # Main totals were paused by code in 93aa093c (2026-11-10) after the v6 totals lost 25.8u in
+    # Main on season-opener samples. Restored 2026-11-13 behind the same current-season sample
+    # gate as spread/moneyline; this switch (config/model.yaml models.NCAAB.main_totals_enabled)
+    # is the operator's pause lever from now on.
+    main_totals_enabled = bool(policy.get("main_totals_enabled", True))
     games_by_team: dict[str, int] = {}
     for game in history:
         for name in (game.home_team, game.away_team):
@@ -711,7 +716,7 @@ def forecast_ncaab_sport(
                     "current_season_sample"
                 )
                 main_sample_eligible = _main_sample_eligible(current_season_sample, min_team_games)
-                if kind != "total" and qualified and not main_sample_eligible:
+                if qualified and not main_sample_eligible:
                     result["skipped"].append(
                         {
                             "event_id": identity,
@@ -721,13 +726,22 @@ def forecast_ncaab_sport(
                             "required_games": min_team_games,
                         }
                     )
+                market_main_enabled = main_totals_enabled or kind != "total"
+                if qualified and main_sample_eligible and not market_main_enabled:
+                    result["skipped"].append(
+                        {
+                            "event_id": identity,
+                            "market_type": kind,
+                            "reason": "main_totals_disabled_by_policy",
+                        }
+                    )
                 destinations = (
                     ("research_ledger_logged", research_ledger, qualified),
                     ("gated_ledger_logged", gated_ledger, qualified),
                     (
                         "main_logged",
                         main_ledger,
-                        qualified and kind != "total" and main_sample_eligible,
+                        qualified and main_sample_eligible and market_main_enabled,
                     ),
                 )
                 for counter, destination, eligible in destinations:
