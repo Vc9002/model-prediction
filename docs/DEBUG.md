@@ -119,6 +119,16 @@ component regressions, outside research). Code changes, all NFL-only:
 - **"NFL Structural v6" labels on v7 rows** (rationale, model_name, risks)
   now carry the served `model_version`; the risk text states the replay
   finding (structural signal carries no information beyond the close).
+- **Addendum 2026-11-13: the consensus capture wrote to the wrong root.** The
+  daily job hands capture the checkout's `data/` root while Polymarket capture
+  and settlement resolve to the runtime root; eleven runs (2026-11-12T11:01Z
+  to 2026-11-13T17:02Z) wrote 153 records under `E:\MP\data\odds
+fl` where
+  no reader looked. `espn_odds_path` now applies `rerouted_data_root` (one
+  choke point for every writer/reader); the 153 records were merged into the
+  runtime root by `record_hash` and the misplaced copies removed. Regression:
+  `test_repo_local_data_root_is_rerouted_to_the_runtime_root`. Same bug class
+  as the 2026-08 capture split-brain and `c96f28cf`.
 - Stale fixture `tests/sports/nfl/spread/test_nfl_spread.py` (one-sided asks,
   no `observed_at_utc`) updated to the selector's contract; its two
   end-to-end tests still assert the retired v5 version (pre-existing).
