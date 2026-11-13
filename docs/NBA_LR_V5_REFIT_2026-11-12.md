@@ -63,8 +63,9 @@ command does not reach: `serving_status` v5 → production, v4 → rollback; `co
 from model.yaml and `_is_registered_serving_model` compares that artifact's version to the
 champion, so both had to move together). `evidence_status` stays `historical_only` for v5
 as it was for v4, so NBA moneyline still reaches Main only as a paper call
-(`PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED`); changing that is a separate decision, as is the
-auto-buyer whitelist (neither v4 nor v5 is listed).
+(`PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED`); changing that is a separate decision. The auto-buyer
+whitelist lists v5 since 2026-11-13 (operator directive), but the buyer rejects `PAPER_CALL_*` rows,
+so the entry is inert until `evidence_status` changes.
 
 ## Caveats
 
