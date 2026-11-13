@@ -107,6 +107,7 @@ None yet.
 | 261113-j3m | Promote nba-elo-trend-lr-v5 to NBA moneyline champion (promo-20261113T184744Z-6b0b74); v4 rollback; model.yaml serving pointer moved with it | 2026-11-13 | ec3210a2 | [261113-j3m-promote-nba-elo-trend-lr-v5-to-nba-money](./quick/261113-j3m-promote-nba-elo-trend-lr-v5-to-nba-money/) |
 | 261113-jb1 | Harden RuntimeLedgerStore against transient sqlite disk I/O error under memory pressure | 2026-11-13 | de9c71c3 | [261113-jb1-harden-runtimeledgerstore-against-transi](./quick/261113-jb1-harden-runtimeledgerstore-against-transi/) |
 | 261113-jf1 | Pull nba-spread-margin-v9 (and total v9) from the paper auto-buyer whitelist after the 2026-11-12 loss review; persisted state updated via versioned save | 2026-11-13 | c648e048 | [261113-jf1-pull-nba-v9-spread-and-total-from-the-paper-wh](./quick/261113-jf1-pull-nba-v9-spread-and-total-from-the-paper-wh/) |
+| 261113-j4w | Promote cfb-structural-v5 to NCAAF champion (Main + Flat) via model_promotion; cfb_model() follows the champion map; replay/forecast/naming/whitelist wiring | 2026-11-13 | 02f45736 | [261113-j4w-promote-cfb-structural-v5-to-ncaaf-champ](./quick/261113-j4w-promote-cfb-structural-v5-to-ncaaf-champ/) |
 
 ## Milestone History
 

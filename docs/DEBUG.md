@@ -1,5 +1,53 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
+## 2026-11-13 — NCAAF: cfb-structural-v5 promoted to champion (operator directive); serving now follows the champion map
+
+Operator directive 2026-11-13 ("promote v5 fully into main and flat ledger"), executed under the
+Direct Model Wiring policy (`docs/ROADMAP.md` 2C) via the sanctioned command, one record per
+market in the runtime `promotions` table (`model_promotion history`): NCAAF moneyline, spread,
+total `cfb-structural-v4 -> cfb-structural-v5` at 18:51Z, approved_by Vincent Chen, evidence
+`outputs/ncaaf/cfb_v5_research.md` (market-relative block: settled rows re-priced at recorded
+asks). Quick task `261113-j4w`.
+
+**Evidence stated plainly.** The v5 artifact's `qualification` block says `PRODUCTION_ACTIVE,
+qualified: false`: holdout margin and total log scores are significantly better than v4, the
+moneyline Brier gain (0.18933 vs 0.19056) is not significant, and totals lose at recorded asks
+under both models. The artifact hash is `449bf27c80d6…` (recomputed by code after the status
+change; never hand-edited).
+
+**Wiring (every consumer that keyed on the champion id):**
+
+- `college_football.cfb_model()` now resolves the NCAAF champion from `config/production.yaml`
+  (all three markets must agree), loads that entry's artifact, verifies `model_version` and
+  `artifact_hash`, and dispatches to the serving class (`cfb_model_for_artifact`: v4 →
+  `CollegeFootballModel`, v5 → `CFBStructuralV5Model`). `_forecast_cfb_sport` passes the exact
+  serving artifact's model into `build_cfb_slate`, so rows are priced by the artifact whose hash
+  they carry — the mechanism that would have prevented the 2026-11-11 finding #1.
+- Candidate-evidence re-pricing calls `margin_sd_for_features` / `total_sd_for_features`
+  (v4: uncertainty widening; v5: slice table), no version-specific knobs in the slate builder.
+- `cfb_replay.VERSIONS` accepts v5 (without it every v5 ledger append would have raised
+  `cfb_replay_decision_identity_mismatch`); `_forecast_cfb_sport`'s Main version list accepts v5;
+  `sports/naming.py` has the v5 descriptor and aliases; the auto-buyer whitelist swaps v4 → v5.
+- `config/production.yaml`: v5 entry (`serving_status: production`, `evidence_status:
+  historical_only`, `rollback_model: cfb-structural-v4`), v4 → `rollback`, allowed_models and
+  artifact_map carry v5, NCAAF challenger incumbents → v5. `config/model.yaml` NCAAF:
+  `active_production_version: cfb-structural-v5`, artifact path, protected_versions.
+
+**Live verification.** `cfb_model()` returns `CFBStructuralV5Model`; the 2026-11-14 ESPN slate
+(56 games) priced 167 contracts all labelled v5, margin SDs 16.9–20.6 (slice table × blowout
+widening). A real `_forecast_cfb_sport` run against live ESPN data into isolated Flat and Main
+ledgers wrote 167 Flat rows and 19 Main rows, every snapshot replaying
+(`validate_decision_snapshot` passes on append); Main rejections `excessive_edge 56, pregame_weather_unverified 54, total_projection_within_config_gap 14, total_probability_above_config_max 11, total_under_line_above_config_min 10, fcs_blocked 3, spread_line_above_max 1, moneyline_ask_below_floor 1`. The scheduled
+daily job will write the production rows at its next run.
+
+**Rollback:** `python -m model_prediction.model_promotion rollback --sport NCAAF --market <m>`
+(three markets) restores `cfb-structural-v4`; the serving factory follows the map automatically.
+
+**Shared-tree note.** Another session's commit `ec3210a2` (NBA promotion, 18:47Z) committed
+`config/production.yaml` by path four minutes after I had edited the v5 registry entry in the
+working tree, so that entry entered history under the NBA commit; this commit carries only the
+champions map change. Harmless functionally; recorded for the audit trail.
+
 ## 2026-11-13 — NCAAB: Main totals restored behind the sample gate; box-score backfill; possessions tested (quick-261112-nc6, round 3)
 
 - **Main totals restored** (`df37969f`). The 93aa093c pause was a hard `kind != "total"` in

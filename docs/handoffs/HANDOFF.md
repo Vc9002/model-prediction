@@ -382,6 +382,10 @@ real, committed changes to the live champion `cfb-structural-v4`:
   research status): fitted margin/total mean calibration + residual SD table; holdout Brier 0.18933 vs 0.19056
   (CI includes zero), margin/total log scores significantly better, slope 0.98 vs 1.19. Owed: register it as the
   NCAAF challenger in `config/production.yaml` so it produces shadow rows; promotion only via the ROADMAP rule.
+- **Promoted 2026-11-13** (operator directive, `model_promotion` records for moneyline/spread/total; code `02f45736`):
+  `champions.NCAAF` = `cfb-structural-v5`, v4 = rollback; `cfb_model()` follows the champion map. Owed now: watch
+  the first v5 Main/Flat rows and their settlement replay; decide Main NCAAF totals (both models lose at consensus
+  asks); the buyer whitelist carries v5 (edge band 2%-12%).
 
 ## Done when
 
