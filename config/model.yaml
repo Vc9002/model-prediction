@@ -120,9 +120,9 @@ execution:
   - unit engine caps still apply
   - audit chain entry for every order
 polymarket_edge:
-  # Disabled by explicit operator directive. These flags gate the unattended
-  # daily scanner, edge-ledger settlement, and dashboard mutation endpoints.
-  scanner_enabled: false
+  # Re-enabled by explicit operator directive 2026-11-10. These flags gate the
+  # unattended daily scanner, edge-ledger settlement, and dashboard mutation endpoints.
+  scanner_enabled: true
   ledger_enabled: false
 model_iteration_policy:
   status: continuous
@@ -715,6 +715,7 @@ models:
     min_moneyline_ask: 0.20
     max_spread_line: 16.0
     max_margin_divergence: 12.0
+    max_total_divergence: 14.0
     max_moneyline_margin: 10.0
     markets:
     - moneyline

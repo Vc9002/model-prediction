@@ -45,6 +45,8 @@ Welcome to the unified documentation directory for the `model-prediction` platfo
 | [`V8_REPRODUCTION.md`](V8_REPRODUCTION.md) | Forensic reproduction report and holdout cohort definitions for MLB v8. |
 | [`FEATURE_MODEL_AUDIT.md`](FEATURE_MODEL_AUDIT.md) | Comprehensive model and feature audit across all active sport models. |
 | [`PRODUCTION_MODEL_AUDIT.md`](PRODUCTION_MODEL_AUDIT.md) | Multi-sport production artifact and calibration verification audit. |
+| [`NCAAB_LOSS_AUDIT_2026-11-10.md`](NCAAB_LOSS_AUDIT_2026-11-10.md) | Read-only audit of NCAAB Main losses (v2/v3/v6) and the quote/sample gates added after it. |
+| [`BEST_PICKS_AUDIT_FRAMEWORK.md`](BEST_PICKS_AUDIT_FRAMEWORK.md) | 5-pillar audit protocol for operator "best picks" requests. Script labels need ledger re-verification (see ROADMAP 2026-11-11). |
 | [`V8_PARITY_BASELINE_2026-08-17.md`](V8_PARITY_BASELINE_2026-08-17.md) | MLB v8 parity baseline and feature parity verification sample. |
 | [`DISTRIBUTION_MIGRATION_PLAN.md`](DISTRIBUTION_MIGRATION_PLAN.md) | Migration from decoupled GLMs to unified joint score distributions (Poisson / Negative Binomial). |
 

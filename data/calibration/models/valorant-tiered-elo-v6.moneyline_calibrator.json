@@ -1,11 +1,15 @@
 {
-  "baseline_brier": 0.261183,
-  "calibrated_at_utc": "2026-11-09T01:31:23.309763+00:00",
-  "calibrated_oof_brier": 0.2611826831250653,
+  "baseline_brier": 0.261059,
+  "calibrated_at_utc": "2026-11-14T19:00:47.253431+00:00",
+  "calibrated_oof_brier": 0.2610587790498557,
   "champion_method": "identity",
+  "fit_model_versions": [
+    "valorant-tiered-elo-v6"
+  ],
+  "fit_source": "settled_live_rows",
   "market": "moneyline",
   "model_version": "valorant-tiered-elo-v6",
   "parameters": {},
-  "sample_size": 199,
+  "sample_size": 201,
   "sport": "valorant"
 }

@@ -56,10 +56,18 @@ Official KBO/NPB schedule requests now use a five-second connection timeout
 and a 12-second read timeout. A source outage remains a reported refresh
 warning and does not block forecasts from using the last verified artifact.
 
-The all-sport prospective BBO capture uses four concurrent book requests and
-two request attempts. A confirmed HTTP 429 stops queued book requests for that
-capture; each skipped contract is counted in `failure_details`, and the capture
-reports `partial` with `source_rate_limited` and `skipped_after_rate_limit`.
+The all-sport prospective BBO capture uses four workers and two request
+attempts, paced by one shared spacing (0.5 s between book requests). Since
+2026-11-14 a 429 no longer ends the capture: every worker pauses (5 s, doubling
+per consecutive episode), the spacing doubles, and the throttled contract is
+retried; the queue is abandoned only after five consecutive 429 episodes.
+Contracts are fetched in tiers: open picks' contracts first, then the
+daily-enabled sports' upcoming games round-robin by league, then out-of-scope
+leagues and started games on a 120 s budget; the whole capture is capped at
+600 s (the daily worker's own timeout is 60 minutes). Each skipped contract
+is counted in `failure_details`, and the capture reports `partial` with
+`source_rate_limited`, `skipped_after_rate_limit`, `skipped_after_time_budget`,
+`rate_limit_pauses` and per-league counts.
 Already captured quotes remain in their original archives. The daily pipeline
 can proceed to per-sport forecasts, whose own source failures still fail daily
 integrity rather than silently implying complete coverage.

@@ -5,12 +5,14 @@ import logging
 import math
 import random
 import time
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from itertools import zip_longest
 from pathlib import Path
-from threading import Event
+from threading import Event, Lock
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -934,6 +936,171 @@ def _is_preseason_event(event: dict[str, Any], league: str) -> bool:
     return start_month in (7, 8)
 
 
+# Shared pacing for prospective BBO capture. The gateway's /book limit is IP-wide
+# and well under one request a second sustained: an unpaced 4-worker burst drew
+# a 429 within about a minute on every daily run of 2026-11-14, and the old
+# abandon-on-first-429 rule then skipped 1,750-2,050 queued contracts per run
+# (every NCAAF contract among them). Requests are spaced instead, and a 429
+# pauses every worker and doubles the spacing rather than ending the capture.
+CAPTURE_MIN_REQUEST_INTERVAL_SECONDS = 0.5
+CAPTURE_MAX_REQUEST_INTERVAL_SECONDS = 4.0
+CAPTURE_RATE_LIMIT_BASE_PAUSE_SECONDS = 5.0
+CAPTURE_RATE_LIMIT_MAX_PAUSE_SECONDS = 60.0
+# Consecutive 429 episodes (no unthrottled response in between) before the
+# capture gives up on the rest of its queue.
+CAPTURE_RATE_LIMIT_BUDGET = 5
+# Attempts per contract when its own request is throttled.
+CAPTURE_CONTRACT_429_ATTEMPTS = 3
+# Unthrottled responses needed before a widened spacing eases back by 20%.
+_CAPTURE_INTERVAL_RECOVERY_SUCCESSES = 20
+
+_SKIP_RATE_LIMITED = "source_rate_limited_after_http_429"
+_SKIP_TIME_BUDGET = "capture_time_budget_exhausted"
+
+_CaptureEntry = tuple[str, str, dict[str, Any], dict[str, Any]]
+
+
+class _CapturePacer:
+    """Spaces capture requests across workers and backs off together on a 429.
+
+    ``acquire`` hands each request a start slot ``interval`` after the previous
+    one. A 429 that survives the client's own retry opens a pause episode: every
+    worker waits it out and the spacing doubles. Requests already dispatched when
+    the episode opened carry the old generation, so their 429s join that episode
+    instead of each counting toward the abandon budget.
+    """
+
+    def __init__(self, min_interval: float, rate_limit_budget: int) -> None:
+        self._lock = Lock()
+        self.min_interval = max(0.0, float(min_interval))
+        self.interval = self.min_interval
+        self.max_interval = max(CAPTURE_MAX_REQUEST_INTERVAL_SECONDS, self.min_interval)
+        self.rate_limit_budget = max(1, int(rate_limit_budget))
+        self.consecutive_rate_limits = 0
+        self.pauses = 0
+        self._generation = 0
+        self._next_slot = 0.0
+        self._resume_at = 0.0
+        self._successes = 0
+
+    def acquire(self) -> int:
+        """Block until this request's slot; return the pause generation it was issued under."""
+        while True:
+            with self._lock:
+                slot = max(time.monotonic(), self._next_slot, self._resume_at)
+                self._next_slot = slot + self.interval
+                generation = self._generation
+            delay = slot - time.monotonic()
+            if delay > 0:
+                time.sleep(delay)
+            with self._lock:
+                if generation == self._generation:
+                    return generation
+            # A pause episode opened while this worker waited: take a slot after it.
+
+    def record_response(self) -> None:
+        """The gateway answered without throttling."""
+        with self._lock:
+            self.consecutive_rate_limits = 0
+            self._successes += 1
+            if self.interval > self.min_interval and self._successes >= _CAPTURE_INTERVAL_RECOVERY_SUCCESSES:
+                self.interval = max(self.min_interval, self.interval * 0.8)
+                self._successes = 0
+
+    def record_rate_limit(self, generation: int, retry_after: float | None) -> bool:
+        """Open (or join) a pause episode; True once the consecutive-429 budget is spent."""
+        with self._lock:
+            if generation != self._generation:
+                return self.consecutive_rate_limits >= self.rate_limit_budget
+            self._generation += 1
+            self.consecutive_rate_limits += 1
+            self.pauses += 1
+            self._successes = 0
+            self.interval = min(
+                self.max_interval, max(2 * self.interval, CAPTURE_MIN_REQUEST_INTERVAL_SECONDS)
+            )
+            pause = (
+                retry_after
+                if retry_after is not None
+                else CAPTURE_RATE_LIMIT_BASE_PAUSE_SECONDS * 2 ** (self.consecutive_rate_limits - 1)
+            )
+            self._resume_at = max(
+                self._resume_at, time.monotonic() + min(pause, CAPTURE_RATE_LIMIT_MAX_PAUSE_SECONDS)
+            )
+            return self.consecutive_rate_limits >= self.rate_limit_budget
+
+
+def _retry_after_seconds(response: httpx.Response) -> float | None:
+    retry_after = response.headers.get("Retry-After", "").strip()
+    return float(retry_after) if retry_after.isdigit() else None
+
+
+def _has_started(event: dict[str, Any], now: datetime) -> bool:
+    """True when the event has a parseable start at or before ``now``."""
+    try:
+        return parse_utc(str(event["event_start_utc"])) <= now
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def _round_robin_by_kickoff(entries: list[_CaptureEntry], now: datetime) -> list[_CaptureEntry]:
+    """Interleave leagues one contract at a time, each league in kickoff order.
+
+    One kickoff-ordered queue across leagues let early soccer, tennis and esports
+    games use up the budget before a later-kicking sport got anything (NCAAF on
+    2026-11-14). Upcoming games go before started ones within a league; the sort
+    is stable, so an event's markets keep their slate order.
+    """
+    by_league: dict[str, list[_CaptureEntry]] = {}
+    for entry in entries:
+        by_league.setdefault(entry[0].upper(), []).append(entry)
+    queues = [
+        sorted(
+            by_league[league],
+            key=lambda entry: (
+                _has_started(entry[2], now),
+                str(entry[2].get("event_start_utc") or ""),
+                str(entry[2].get("event_id") or ""),
+            ),
+        )
+        for league in sorted(by_league)
+    ]
+    return [entry for group in zip_longest(*queues) for entry in group if entry is not None]
+
+
+def _capture_tiers(
+    entries: list[_CaptureEntry],
+    *,
+    priority_leagues: frozenset[str] | None,
+    keep_slugs: frozenset[str],
+    now: datetime,
+) -> tuple[list[_CaptureEntry], list[_CaptureEntry]]:
+    """Split the capture queue into (primary, secondary), each round-robin by league.
+
+    Primary: upcoming open-pick contracts (their CLV history) first, then
+    upcoming contracts of ``priority_leagues`` (every league when None).
+    Secondary: out-of-scope leagues and games already under way, whose quotes
+    can no longer serve a pregame decision or a closing line.
+    """
+    keep_first: list[_CaptureEntry] = []
+    primary: list[_CaptureEntry] = []
+    secondary: list[_CaptureEntry] = []
+    for entry in entries:
+        league, _sport, event, market = entry
+        if _has_started(event, now):
+            secondary.append(entry)
+        elif market.get("market_slug") in keep_slugs:
+            keep_first.append(entry)
+        elif priority_leagues is None or league.upper() in priority_leagues:
+            primary.append(entry)
+        else:
+            secondary.append(entry)
+    return (
+        _round_robin_by_kickoff(keep_first, now) + _round_robin_by_kickoff(primary, now),
+        _round_robin_by_kickoff(secondary, now),
+    )
+
+
 def _starts_after(event: dict[str, Any], cutoff: datetime) -> bool:
     """True when the event has a parseable start later than ``cutoff``."""
     try:
@@ -988,23 +1155,44 @@ def capture_slate_snapshots(
     *,
     horizon_hours: float | None = None,
     now: datetime | None = None,
-    ladder_keep: int | None = None,
+    ladder_keep: int | Mapping[str, int] | None = None,
     ladder_leagues: frozenset[str] = frozenset({"NCAAF"}),
     ladder_keep_slugs: frozenset[str] = frozenset(),
+    priority_leagues: frozenset[str] | None = None,
     max_workers: int = 4,
+    min_request_interval: float | None = None,
+    rate_limit_budget: int | None = None,
+    max_capture_seconds: float | None = None,
+    secondary_max_seconds: float | None = None,
 ) -> dict[str, Any]:
     """Persist a prospective executable BBO for every discovered contract.
 
     With ``horizon_hours`` set, contracts whose event starts later than that
     many hours from now are skipped (each run only prices games about to start;
-    games already started are still captured). ``None`` keeps every contract.
+    games already started are still captured, after everything else).
+    ``None`` keeps every contract.
 
     With ``ladder_keep`` set, leagues in ``ladder_leagues`` only fetch books for
     that many spread/total alternates per event (see ``_prune_line_ladders``);
-    ``ladder_keep_slugs`` are fetched regardless.
+    a mapping gives each league its own count. ``ladder_keep_slugs`` are
+    fetched regardless, and first.
+
+    Requests are paced ``min_request_interval`` seconds apart across all
+    workers. A 429 pauses every worker and widens the spacing; the rest of the
+    queue is abandoned only after ``rate_limit_budget`` consecutive 429
+    episodes. ``priority_leagues`` (default: every league) are fetched before
+    the secondary tier (other leagues, started games), which stops after
+    ``secondary_max_seconds``; ``max_capture_seconds`` caps the whole capture.
     """
     if max_workers < 1:
         raise ValueError("max_workers must be positive")
+    started_at = time.monotonic()
+    pacer = _CapturePacer(
+        CAPTURE_MIN_REQUEST_INTERVAL_SECONDS if min_request_interval is None else min_request_interval,
+        CAPTURE_RATE_LIMIT_BUDGET if rate_limit_budget is None else rate_limit_budget,
+    )
+    capture_now = now or utc_now()
+    priority = None if priority_leagues is None else frozenset(league.upper() for league in priority_leagues)
     league_to_sport = {
         league: sport for sport, leagues in POLYMARKET_SPORT_LEAGUES.items() for league in leagues
     }
@@ -1020,7 +1208,7 @@ def capture_slate_snapshots(
     qualification_sports = BBO_CAPTURE_SPORTS
     captured = missing_bbo = failures = skipped_nonqualification_contracts = 0
     skipped_summer_league = timestamp_invalid = skipped_beyond_horizon = skipped_ladder = 0
-    horizon_cutoff = None if horizon_hours is None else (now or utc_now()) + timedelta(hours=horizon_hours)
+    horizon_cutoff = None if horizon_hours is None else capture_now + timedelta(hours=horizon_hours)
     failure_details: list[dict[str, str]] = []
     source_rate_limited = Event()
 
@@ -1070,75 +1258,109 @@ def capture_slate_snapshots(
             within = [entry for entry in kept if not _starts_after(entry[2], horizon_cutoff)]
             skipped_beyond_horizon += len(kept) - len(within)
             kept = within
-        if ladder_keep and league.upper() in ladder_leagues:
-            pruned = _prune_line_ladders(kept, ladder_keep, ladder_keep_slugs)
+        # One integer used to apply to every ladder league, and the CLI picked
+        # it first-match (NBA present => 3), so NCAAB and NCAAF priced 3 rungs
+        # each instead of 1 and 2 and the queue grew past the rate limit.
+        league_keep = ladder_keep.get(league.upper()) if isinstance(ladder_keep, Mapping) else ladder_keep
+        if league_keep and league.upper() in ladder_leagues:
+            pruned = _prune_line_ladders(kept, league_keep, ladder_keep_slugs)
             skipped_ladder += len(kept) - len(pruned)
             kept = pruned
         all_contracts.extend(kept)
 
-    # Shared gateway throttling can stop the queue after a 429. Give each NBA
-    # event its shortlist before spending that budget on other sports.
-    all_contracts.sort(
-        key=lambda entry: (
-            entry[0].upper() != "NBA",
-            str(entry[2].get("event_start_utc") or ""),
-            str(entry[2].get("event_id") or ""),
-        )
+    primary_contracts, secondary_contracts = _capture_tiers(
+        all_contracts, priority_leagues=priority, keep_slugs=ladder_keep_slugs, now=capture_now
     )
 
-    def _fetch(entry):
+    def _fetch(entry, deadline):
         league, sport, event, market = entry
         slug = str(market.get("market_slug") or "")
-        if source_rate_limited.is_set():
-            return league, sport, slug, None, "source_rate_limited_after_http_429"
-        try:
-            if hasattr(client, "snapshot_from_slate") and market.get("sides") and market.get("market_id"):
-                snapshot = client.snapshot_from_slate(event, market)
-            else:
-                snapshot = client.snapshot(slug)
-            observed = parse_utc(snapshot["observed_at_utc"])
-            event_start = parse_utc(snapshot["event_start_utc"])
-            snapshot.update(
-                {
-                    "league": league.upper(),
-                    "event_id": str(event.get("event_id", "")),
-                    "event_slug": str(event.get("event_slug", "")),
-                    "event_title": str(event.get("title", "")),
-                    "market_type": market.get("market_type"),
-                    "line": market.get("line"),
-                    # Which team this specific market concerns, e.g. for
-                    # team_win markets (soccer's "Will X win?" Yes/No,
-                    # one market per team, unlike moneyline's single
-                    # combined market) -- None where not team-specific.
-                    "team": next(
-                        (side.get("team") for side in market.get("sides", []) if side.get("team")),
-                        None,
-                    ),
-                    "timestamp_valid": observed <= event_start,
-                    "reconstructed": snapshot.get("reconstructed"),
-                    "reconstruction_status_source": snapshot.get("reconstruction_status_source"),
-                    "usage": "prospective_executable_bbo",
-                }
-            )
-            return league, sport, slug, snapshot, None
-        except (httpx.HTTPError, KeyError, StopIteration, TypeError, ValueError) as exc:
-            if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 429:
-                source_rate_limited.set()
-            return league, sport, slug, None, str(exc)[:200]
+        rate_limited_attempts = 0
+        while True:
+            if source_rate_limited.is_set():
+                return league, sport, slug, None, _SKIP_RATE_LIMITED
+            if deadline is not None and time.monotonic() >= deadline:
+                return league, sport, slug, None, _SKIP_TIME_BUDGET
+            generation = pacer.acquire()
+            # The slot may have come after a long pause; re-check before spending it.
+            if source_rate_limited.is_set():
+                return league, sport, slug, None, _SKIP_RATE_LIMITED
+            if deadline is not None and time.monotonic() >= deadline:
+                return league, sport, slug, None, _SKIP_TIME_BUDGET
+            try:
+                return _fetch_once(league, sport, event, market, slug)
+            except (httpx.HTTPError, KeyError, StopIteration, TypeError, ValueError) as exc:
+                if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 429:
+                    rate_limited_attempts += 1
+                    if pacer.record_rate_limit(generation, _retry_after_seconds(exc.response)):
+                        source_rate_limited.set()
+                        return league, sport, slug, None, str(exc)[:200]
+                    if rate_limited_attempts < CAPTURE_CONTRACT_429_ATTEMPTS:
+                        continue
+                else:
+                    pacer.record_response()
+                return league, sport, slug, None, str(exc)[:200]
 
-    # Keep requests below the gateway's observed burst limit. Once a 429 is
-    # confirmed, do not spend the rest of the daily run retrying every queued
-    # contract; each omitted quote is recorded as a source failure below.
+    def _fetch_once(league, sport, event, market, slug):
+        if hasattr(client, "snapshot_from_slate") and market.get("sides") and market.get("market_id"):
+            snapshot = client.snapshot_from_slate(event, market)
+        else:
+            snapshot = client.snapshot(slug)
+        pacer.record_response()
+        observed = parse_utc(snapshot["observed_at_utc"])
+        event_start = parse_utc(snapshot["event_start_utc"])
+        snapshot.update(
+            {
+                "league": league.upper(),
+                "event_id": str(event.get("event_id", "")),
+                "event_slug": str(event.get("event_slug", "")),
+                "event_title": str(event.get("title", "")),
+                "market_type": market.get("market_type"),
+                "line": market.get("line"),
+                # Which team this specific market concerns, e.g. for
+                # team_win markets (soccer's "Will X win?" Yes/No,
+                # one market per team, unlike moneyline's single
+                # combined market) -- None where not team-specific.
+                "team": next(
+                    (side.get("team") for side in market.get("sides", []) if side.get("team")),
+                    None,
+                ),
+                "timestamp_valid": observed <= event_start,
+                "reconstructed": snapshot.get("reconstructed"),
+                "reconstruction_status_source": snapshot.get("reconstruction_status_source"),
+                "usage": "prospective_executable_bbo",
+            }
+        )
+        return league, sport, slug, snapshot, None
+
+    # The secondary tier (out-of-scope leagues, started games) runs only after
+    # the primary tier and on its own short clock, so research capture never
+    # holds the daily run hostage; max_capture_seconds bounds both.
+    overall_deadline = None if max_capture_seconds is None else started_at + max_capture_seconds
     results: list[tuple[str, str, str, dict[str, Any] | None, str | None]] = []
-    if all_contracts:
-        with ThreadPoolExecutor(max_workers=min(max_workers, len(all_contracts))) as pool:
-            results = list(pool.map(_fetch, all_contracts))
+    for tier_contracts, tier_seconds in (
+        (primary_contracts, None),
+        (secondary_contracts, secondary_max_seconds),
+    ):
+        if not tier_contracts:
+            continue
+        deadline = overall_deadline
+        if tier_seconds is not None:
+            tier_deadline = time.monotonic() + tier_seconds
+            deadline = tier_deadline if deadline is None else min(deadline, tier_deadline)
+        with ThreadPoolExecutor(max_workers=min(max_workers, len(tier_contracts))) as pool:
+            results.extend(
+                pool.map(lambda entry, _deadline=deadline: _fetch(entry, _deadline), tier_contracts)
+            )
 
     stores: dict[str, PolymarketSnapshotStore] = {}
     nba_captured: dict[str, set[str]] = {}
+    captured_by_league: dict[str, int] = {}
+    failures_by_league: dict[str, int] = {}
     for league, sport, slug, snapshot, fetch_error in results:
         if snapshot is None:
             failures += 1
+            failures_by_league[league.upper()] = failures_by_league.get(league.upper(), 0) + 1
             failure_details.append(
                 {
                     "league": league,
@@ -1162,6 +1384,7 @@ def capture_slate_snapshots(
                 str(snapshot.get("market_type"))
             )
         captured += 1
+        captured_by_league[league.upper()] = captured_by_league.get(league.upper(), 0) + 1
         if snapshot["long"].get("ask") is None or snapshot["short"].get("ask") is None:
             missing_bbo += 1
         if not snapshot.get("timestamp_valid", True):
@@ -1181,15 +1404,23 @@ def capture_slate_snapshots(
         "missing_executable_ask": missing_bbo,
         "failures": failures,
         "source_rate_limited": source_rate_limited.is_set(),
-        "skipped_after_rate_limit": sum(
-            detail["reason"] == "source_rate_limited_after_http_429" for detail in failure_details
-        ),
+        "skipped_after_rate_limit": sum(detail["reason"] == _SKIP_RATE_LIMITED for detail in failure_details),
+        "skipped_after_time_budget": sum(detail["reason"] == _SKIP_TIME_BUDGET for detail in failure_details),
+        "rate_limit_pauses": pacer.pauses,
+        "min_request_interval": pacer.min_interval,
+        "final_request_interval": round(pacer.interval, 3),
+        "elapsed_seconds": round(time.monotonic() - started_at, 1),
+        "priority_leagues": None if priority is None else sorted(priority),
+        "primary_contracts": len(primary_contracts),
+        "secondary_contracts": len(secondary_contracts),
+        "captured_by_league": dict(sorted(captured_by_league.items())),
+        "failures_by_league": dict(sorted(failures_by_league.items())),
         "skipped_nonqualification_contracts": skipped_nonqualification_contracts,
         "skipped_summer_league": skipped_summer_league,
         "skipped_beyond_horizon": skipped_beyond_horizon,
         "horizon_hours": horizon_hours,
         "skipped_ladder_alternates": skipped_ladder,
-        "ladder_keep": ladder_keep,
+        "ladder_keep": dict(ladder_keep) if isinstance(ladder_keep, Mapping) else ladder_keep,
         "failure_details": failure_details,
         "nba_missing_quote_event_ids": nba_missing_by_market,
         "timestamp_valid": timestamp_invalid == 0,

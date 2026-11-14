@@ -5433,6 +5433,8 @@ def _forecast_cfb_sport(
             rationale_text = str(contract.get("rationale") or "")
             if contract_sportsbook == "polymarket_us" and contract_slug:
                 rationale_text = f"{rationale_text} Executable ask {ask:.4f} ({contract_slug})."
+            elif contract_sportsbook == "polymarket_us_indicative" and contract_slug:
+                rationale_text = f"{rationale_text} Indicative ask {ask:.4f} ({contract_slug})."
 
             request = PickRequest(
                 event_start_utc=str(contract["event_start_utc"]),

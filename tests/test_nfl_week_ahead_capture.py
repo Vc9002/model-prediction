@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 import httpx
+import pytest
 
 from model_prediction.cli.commands import capture_nfl_polymarket_week_ahead
 
@@ -54,3 +55,30 @@ def test_week_ahead_isolates_a_failing_date(tmp_path):
     )
     assert out["status"] == "partial"
     assert "2026-11-12" in out["errors"] and list(out["dates"]) == ["2026-11-15"]
+
+
+def test_daily_runs_week_ahead_books_only_after_the_slate_capture():
+    """Both captures share one IP-wide gateway limit; run side by side (2026-11-14) each
+    one's 429s ended the other's queue. The week-ahead must also run when the slate
+    capture raises, and the slate's outcome must still reach the caller."""
+    from model_prediction.cli.daily import _serialized_polymarket_captures
+
+    order: list[str] = []
+
+    def slate_capture():
+        order.append("slate")
+        return {"captured": 7}
+
+    def week_ahead_capture():
+        order.append("week_ahead")
+
+    assert _serialized_polymarket_captures(slate_capture, week_ahead_capture) == {"captured": 7}
+    assert order == ["slate", "week_ahead"]
+
+    def failing_slate_capture():
+        order.append("slate_failed")
+        raise httpx.ConnectError("gateway down")
+
+    with pytest.raises(httpx.ConnectError):
+        _serialized_polymarket_captures(failing_slate_capture, week_ahead_capture)
+    assert order[-2:] == ["slate_failed", "week_ahead"]

@@ -1,13 +1,15 @@
 {
-  "baseline_brier": 0.21311961020781808,
-  "calibrated_at_utc": "2026-11-08T06:31:18.924697+00:00",
-  "calibrated_oof_brier": 0.21399385614418046,
-  "champion_method": "temperature",
+  "baseline_brier": 0.261982,
+  "calibrated_at_utc": "2026-11-14T19:00:47.253431+00:00",
+  "calibrated_oof_brier": 0.26198199207188766,
+  "champion_method": "identity",
+  "fit_model_versions": [
+    "ncaab-total-v6"
+  ],
+  "fit_source": "settled_live_rows",
   "market": "total",
   "model_version": "ncaab-total-v6",
-  "parameters": {
-    "temperature": 0.8
-  },
-  "sample_size": 630,
+  "parameters": {},
+  "sample_size": 178,
   "sport": "ncaab"
 }

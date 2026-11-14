@@ -1,9 +1,11 @@
 import json
 from datetime import UTC, date, datetime, timedelta
+from itertools import pairwise
 
 import httpx
 import pytest
 
+from model_prediction.data_sources import polymarket_us
 from model_prediction.data_sources.polymarket_us import (
     POLYMARKET_SPORT_LEAGUES,
     PolymarketSnapshotStore,
@@ -12,6 +14,68 @@ from model_prediction.data_sources.polymarket_us import (
     probability_to_american,
     refresh_contract_snapshots,
 )
+
+
+@pytest.fixture(autouse=True)
+def _unpaced_capture(monkeypatch) -> None:
+    """Stub clients answer instantly; the production 0.5 s spacing would only slow these tests.
+
+    Pacing itself is pinned by the tests that set the interval explicitly.
+    """
+    monkeypatch.setattr(polymarket_us, "CAPTURE_MIN_REQUEST_INTERVAL_SECONDS", 0.0, raising=False)
+
+
+class _FakeClock:
+    """Deterministic stand-in for time.monotonic/time.sleep: sleeping advances the clock."""
+
+    def __init__(self, monkeypatch) -> None:
+        self.now = 1000.0
+        self.sleeps: list[float] = []
+        monkeypatch.setattr("model_prediction.data_sources.polymarket_us.time.monotonic", lambda: self.now)
+        monkeypatch.setattr("model_prediction.data_sources.polymarket_us.time.sleep", self.sleep)
+
+    def sleep(self, seconds: float) -> None:
+        self.sleeps.append(seconds)
+        self.now += max(0.0, seconds)
+
+
+class _Recorder:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def snapshot(self, slug: str) -> dict:
+        self.calls.append(slug)
+        return _stub_snapshot(slug)
+
+
+def _rate_limit_error(slug: str) -> httpx.HTTPStatusError:
+    request = httpx.Request("GET", f"https://example.test/{slug}")
+    return httpx.HTTPStatusError(
+        "rate limited", request=request, response=httpx.Response(429, request=request)
+    )
+
+
+def _stub_snapshot(slug: str) -> dict:
+    return {
+        "market_slug": slug,
+        "event_start_utc": "2026-07-18T23:00:00Z",
+        "observed_at_utc": "2026-07-17T12:00:00Z",
+        "long": {"ask": 0.55},
+        "short": {"ask": 0.47},
+    }
+
+
+def _moneyline_events(count: int) -> dict:
+    return {
+        "MLB": [
+            {
+                "event_id": "event-1",
+                "markets": [
+                    {"market_slug": f"market-{index}", "market_type": "moneyline"} for index in range(count)
+                ],
+            }
+        ]
+    }
 
 
 def test_events_paginates_across_multiple_pages() -> None:
@@ -364,39 +428,202 @@ def test_slate_capture_stores_prospective_bbo_by_sport_and_date(tmp_path) -> Non
     assert stored["usage"] == "prospective_executable_bbo"
 
 
-def test_slate_capture_stops_queued_book_requests_after_rate_limit(tmp_path) -> None:
+def test_slate_capture_abandons_queue_only_after_consecutive_rate_limit_budget(tmp_path, monkeypatch) -> None:
+    # Contract changed 2026-11-14: the first post-retry 429 used to end the queue
+    # (1,750-2,050 contracts skipped per daily run). Now each 429 opens a shared
+    # pause and the queue is abandoned only after the consecutive-429 budget.
+    clock = _FakeClock(monkeypatch)
+
     class RateLimitedClient:
         calls = 0
 
         def snapshot(self, slug: str) -> dict:
             self.calls += 1
-            request = httpx.Request("GET", f"https://example.test/{slug}")
-            response = httpx.Response(429, request=request)
-            raise httpx.HTTPStatusError("rate limited", request=request, response=response)
+            raise _rate_limit_error(slug)
 
     source = RateLimitedClient()
     result = capture_slate_snapshots(
-        source,
-        {
-            "MLB": [
-                {
-                    "event_id": "event-1",
-                    "markets": [
-                        {"market_slug": f"market-{index}", "market_type": "moneyline"} for index in range(3)
-                    ],
-                }
-            ]
-        },
-        tmp_path,
-        "2026-07-18",
-        max_workers=1,
+        source, _moneyline_events(3), tmp_path, "2026-07-18", max_workers=1, rate_limit_budget=2
     )
-    assert source.calls == 1
+    assert source.calls == 2
     assert result["captured"] == 0
     assert result["failures"] == 3
     assert result["source_rate_limited"] is True
     assert result["skipped_after_rate_limit"] == 2
+    assert result["rate_limit_pauses"] == 2
     assert result["status"] == "partial"
+    # The first episode was waited out (5 s) before the contract was retried.
+    assert sum(clock.sleeps) >= 5.0
+
+
+def test_slate_capture_resumes_after_a_single_rate_limit(tmp_path, monkeypatch) -> None:
+    clock = _FakeClock(monkeypatch)
+
+    class OnceThrottledClient:
+        def __init__(self) -> None:
+            self.calls: list[str] = []
+
+        def snapshot(self, slug: str) -> dict:
+            self.calls.append(slug)
+            if len(self.calls) == 1:
+                raise _rate_limit_error(slug)
+            return _stub_snapshot(slug)
+
+    source = OnceThrottledClient()
+    result = capture_slate_snapshots(source, _moneyline_events(3), tmp_path, "2026-07-18", max_workers=1)
+
+    assert result["captured"] == 3
+    assert result["failures"] == 0
+    assert result["source_rate_limited"] is False
+    assert result["skipped_after_rate_limit"] == 0
+    # The throttled contract is retried after the pause, not dropped.
+    assert source.calls == ["market-0", "market-0", "market-1", "market-2"]
+    assert result["rate_limit_pauses"] == 1
+    assert sum(clock.sleeps) >= 5.0
+
+
+def test_slate_capture_spaces_requests_by_the_minimum_interval(tmp_path, monkeypatch) -> None:
+    clock = _FakeClock(monkeypatch)
+    monkeypatch.setattr(polymarket_us, "CAPTURE_MIN_REQUEST_INTERVAL_SECONDS", 0.5, raising=False)
+    seen: list[float] = []
+
+    class TimedClient:
+        def snapshot(self, slug: str) -> dict:
+            seen.append(clock.now)
+            return _stub_snapshot(slug)
+
+    result = capture_slate_snapshots(
+        TimedClient(), _moneyline_events(4), tmp_path, "2026-07-18", max_workers=1
+    )
+
+    assert result["captured"] == 4
+    assert [round(later - earlier, 6) for earlier, later in pairwise(seen)] == [0.5] * 3
+
+
+def test_slate_capture_pacing_is_shared_across_workers(tmp_path, monkeypatch) -> None:
+    import threading
+    import time
+
+    monkeypatch.setattr(polymarket_us, "CAPTURE_MIN_REQUEST_INTERVAL_SECONDS", 0.1, raising=False)
+    seen: list[float] = []
+    lock = threading.Lock()
+
+    class TimedClient:
+        def snapshot(self, slug: str) -> dict:
+            with lock:
+                seen.append(time.perf_counter())
+            return _stub_snapshot(slug)
+
+    result = capture_slate_snapshots(
+        TimedClient(), _moneyline_events(5), tmp_path, "2026-07-18", max_workers=4
+    )
+
+    assert result["captured"] == 5
+    ordered = sorted(seen)
+    # time.monotonic ticks at 15.6 ms on Windows, so allow that much slack per gap.
+    assert min(later - earlier for earlier, later in pairwise(ordered)) >= 0.08
+
+
+def _scheduled_event(event_id: str, league_now: datetime, hours: float, slugs: list[str]) -> dict:
+    start = (league_now + timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return {
+        "event_id": event_id,
+        "event_start_utc": start,
+        "markets": [{"market_slug": slug, "market_type": "moneyline"} for slug in slugs],
+    }
+
+
+def _scope_slate(now: datetime) -> dict:
+    # Out-of-scope soccer kicks off first and has the most contracts; an NCAAF game
+    # is already under way. Before 2026-11-14 this order (NBA, then kickoff time
+    # across every league) spent the budget on EPL before any NCAAF game.
+    return {
+        "EPL": [_scheduled_event("epl-1", now, 1, ["epl-a", "epl-b", "epl-c"])],
+        "NCAAF": [
+            _scheduled_event("cfb-live", now, -1, ["cfb-live"]),
+            _scheduled_event("cfb-2", now, 6, ["cfb-2"]),
+            _scheduled_event("cfb-1", now, 5, ["cfb-1"]),
+        ],
+        "NBA": [_scheduled_event("nba-1", now, 3, ["nba-1"]), _scheduled_event("nba-2", now, 4, ["nba-2"])],
+    }
+
+
+def test_capture_fetches_scope_leagues_round_robin_before_out_of_scope_and_started(tmp_path) -> None:
+    now = datetime(2026, 11, 14, 15, tzinfo=UTC)
+
+    source = _Recorder()
+    result = capture_slate_snapshots(
+        source,
+        _scope_slate(now),
+        tmp_path,
+        "2026-11-14",
+        now=now,
+        priority_leagues=frozenset({"NBA", "NCAAF"}),
+        ladder_keep_slugs=frozenset({"epl-c"}),
+        max_workers=1,
+    )
+
+    assert source.calls == [
+        # An open pick's contract first (its CLV history), whatever its league.
+        "epl-c",
+        # Scope leagues interleaved, each in kickoff order.
+        "nba-1",
+        "cfb-1",
+        "nba-2",
+        "cfb-2",
+        # Then out-of-scope leagues and started games, interleaved.
+        "epl-a",
+        "cfb-live",
+        "epl-b",
+    ]
+    assert result["primary_contracts"] == 5 and result["secondary_contracts"] == 3
+
+
+def test_capture_time_budget_reaches_every_scope_league_before_any_out_of_scope_one(
+    tmp_path, monkeypatch
+) -> None:
+    clock = _FakeClock(monkeypatch)
+    monkeypatch.setattr(polymarket_us, "CAPTURE_MIN_REQUEST_INTERVAL_SECONDS", 1.0, raising=False)
+    now = datetime(2026, 11, 14, 15, tzinfo=UTC)
+
+    source = _Recorder()
+    # Room for three requests at one per second.
+    result = capture_slate_snapshots(
+        source,
+        _scope_slate(now),
+        tmp_path,
+        "2026-11-14",
+        now=now,
+        priority_leagues=frozenset({"NBA", "NCAAF"}),
+        max_workers=1,
+        max_capture_seconds=2.5,
+    )
+
+    assert source.calls == ["nba-1", "cfb-1", "nba-2"]
+    assert result["captured"] == 3
+    assert result["skipped_after_time_budget"] == 5
+    assert result["source_rate_limited"] is False
+    assert clock.now <= 1003.0
+
+
+def test_capture_secondary_tier_has_its_own_short_budget(tmp_path) -> None:
+    now = datetime(2026, 11, 14, 15, tzinfo=UTC)
+
+    source = _Recorder()
+    result = capture_slate_snapshots(
+        source,
+        _scope_slate(now),
+        tmp_path,
+        "2026-11-14",
+        now=now,
+        priority_leagues=frozenset({"NBA", "NCAAF"}),
+        max_workers=1,
+        secondary_max_seconds=0,
+    )
+
+    assert source.calls == ["nba-1", "cfb-1", "nba-2", "cfb-2"]
+    assert result["skipped_after_time_budget"] == 4
+    assert result["captured_by_league"] == {"NBA": 2, "NCAAF": 2}
 
 
 def test_sport_slate_surfaces_a_failed_league_distinctly_from_an_empty_one() -> None:
@@ -974,7 +1201,7 @@ def test_ladder_keep_fetches_only_the_most_balanced_alternates_for_listed_league
     assert result["skipped_ladder_alternates"] == 2
 
 
-def test_nba_capture_shortlists_each_game_before_other_sports(tmp_path) -> None:
+def test_priority_league_shortlists_each_game_before_other_sports(tmp_path) -> None:
     first = _ladder_event({"far": 0.95, "near": 0.52, "close": 0.49})
     first["event_id"] = "nba-1"
     second = _ladder_event({"far2": 0.90, "near2": 0.51, "close2": 0.48})
@@ -985,8 +1212,10 @@ def test_nba_capture_shortlists_each_game_before_other_sports(tmp_path) -> None:
         {"MLB": [_ladder_event({"mlb": 0.5})], "NBA": [first, second]},
         tmp_path,
         "2026-10-22",
+        now=datetime(2026, 10, 22, 10, tzinfo=UTC),
         ladder_keep=2,
         ladder_leagues=frozenset({"NBA"}),
+        priority_leagues=frozenset({"NBA"}),
         max_workers=1,
     )
     assert client.slate_calls[:4] == ["near", "close", "near2", "close2"]
@@ -994,6 +1223,83 @@ def test_nba_capture_shortlists_each_game_before_other_sports(tmp_path) -> None:
     assert result["skipped_ladder_alternates"] == 2
     assert result["nba_missing_quote_event_ids"]["spread"] == []
     assert result["nba_missing_quote_event_ids"]["total"] == ["nba-1", "nba-2"]
+
+
+def test_ladder_keep_mapping_prices_each_league_its_own_rung_count(tmp_path) -> None:
+    # 2026-11-14: one integer chosen first-match (NBA on the slate => 3) gave
+    # NCAAB 3 rungs instead of 1 and NCAAF 3 instead of 2.
+    prices = {"far": 0.95, "near": 0.52, "mid": 0.70, "close": 0.49}
+    client = _SlateClient()
+    result = capture_slate_snapshots(
+        client,
+        {"NBA": [_ladder_event(prices)], "NCAAB": [_ladder_event(prices)], "NCAAF": [_ladder_event(prices)]},
+        tmp_path,
+        "2026-10-22",
+        ladder_keep={"NBA": 3, "NCAAF": 2, "NCAAB": 1},
+        ladder_leagues=frozenset({"NBA", "NCAAF", "NCAAB"}),
+    )
+    calls = sorted(client.slate_calls)
+    assert calls.count("close") == 3  # every league keeps its most balanced line
+    assert calls.count("near") == 2  # NBA and NCAAF
+    assert calls.count("mid") == 1  # NBA only
+    assert calls.count("far") == 0
+    assert result["skipped_ladder_alternates"] == 1 + 2 + 3
+    assert result["ladder_keep"] == {"NBA": 3, "NCAAF": 2, "NCAAB": 1}
+
+
+def test_cli_capture_passes_per_league_ladders_and_scope_priority(monkeypatch, tmp_path) -> None:
+    from argparse import Namespace
+    from types import SimpleNamespace
+
+    from model_prediction.cli import commands
+
+    events = {"NBA": [{"event_id": "n"}], "NCAAB": [{"event_id": "b"}], "EPL": [{"event_id": "e"}]}
+
+    class FakeClient:
+        base_url = "https://example.test"
+        client = None
+
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def sport_slate(self, sport, game_date, timezone_name):
+            return SimpleNamespace(events=events, errors={})
+
+    seen: dict = {}
+
+    def fake_capture(client, events_by_league, root, game_date, **kwargs):
+        seen.update(kwargs)
+        return {"status": "ok"}
+
+    monkeypatch.setattr(commands, "PolymarketUSClient", FakeClient)
+    monkeypatch.setattr(commands, "capture_slate_snapshots", fake_capture)
+    monkeypatch.setattr(commands, "_open_pick_slugs", lambda root, sport=None: frozenset({"open-pick"}))
+    monkeypatch.delenv("POLYMARKET_CAPTURE_LADDER_KEEP", raising=False)
+    config = {
+        "project": {"ledger_path": str(tmp_path / "ledger.xlsx")},
+        "models": {"NBA": {"enabled": True}, "NCAAB": {"enabled": True}, "SOCCER": {"enabled": True}},
+    }
+    args = Namespace(
+        provider="polymarket",
+        league=None,
+        all=False,
+        sport="basketball",
+        date="2026-11-14",
+        timezone="America/New_York",
+        no_snapshot_bbo=False,
+    )
+
+    commands._polymarket_slate(args, config)
+
+    # NBA on the slate must not raise NCAAB's rung count above 1.
+    assert seen["ladder_keep"]["NCAAB"] == 1 and seen["ladder_keep"]["NBA"] == 3
+    assert {"NBA", "NCAAB", "NCAAF", "NFL"} <= seen["ladder_leagues"]
+    assert seen["priority_leagues"] == frozenset({"NBA", "NCAAB"})
+    assert seen["ladder_keep_slugs"] == frozenset({"open-pick"})
+
+    monkeypatch.setenv("POLYMARKET_CAPTURE_LADDER_KEEP", "4")
+    commands._polymarket_slate(args, config)
+    assert set(seen["ladder_keep"].values()) == {4}
 
 
 def test_ladder_keep_slugs_survive_pruning_without_using_up_the_quota(tmp_path) -> None:
