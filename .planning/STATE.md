@@ -112,6 +112,7 @@ None yet.
 | 261113-jqw | Whitelist nba-elo-trend-lr-v5 in the auto-buyer (code constant via 4fb785cd + live auto_buyer_state.json v179->180); inert until evidence_status leaves historical_only | 2026-11-13 | df4b3d68 | [261113-jqw-whitelist-the-serving-nba-moneyline-cham](./quick/261113-jqw-whitelist-the-serving-nba-moneyline-cham/) |
 | 261113-jrq | Fix NBA availability feature matching foreign teams injuries via abbreviation substrings | 2026-11-13 | 31f092a9 | [261113-jrq-fix-nba-availability-feature-matching-fo](./quick/261113-jrq-fix-nba-availability-feature-matching-fo/) |
 | 261113-smp | Narrow production to NBA/NCAAF/NFL/MLB/WNBA/NCAAB via model.yaml flag + daily.py gate; research tests to tests/research (off default pytest); rebuild shadow task frozen; CLAUDE.md trimmed, paper+gated-real-money stated once | 2026-11-13 | 166bb2ce | [261113-smp-simplify-project-scope-six-sports](./quick/261113-smp-simplify-project-scope-six-sports/) |
+| 261114-tfx | Clear 13 stale core-suite failures (1 real: NBA replay thin-sample widening); apply PR 36 review (gate fixed NCAAF/NBA/NFL tasks, scope test pins flag, CI runs tests/research) | 2026-11-14 | d5c331e9 | [261114-tfx-clear-core-suite-failures-and-pr36-review](./quick/261114-tfx-clear-core-suite-failures-and-pr36-review/) |
 
 ## Milestone History
 
