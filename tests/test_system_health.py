@@ -333,6 +333,70 @@ def test_latest_event_is_a_max_scan_not_the_last_line(tmp_path: Path) -> None:
     assert report["checks"]["game_capture"]["mlb"]["stale"] is False
 
 
+def _mark_sport_off(repo: Path, sport: str, *, off_season: bool) -> None:
+    """config/model.yaml entry that switches a sport off (scope) or marks it off-season."""
+    path = repo / "config" / "model.yaml"
+    config = yaml.safe_load(path.read_text(encoding="utf-8")) if path.exists() else {}
+    models = config.setdefault("models", {})
+    entry = {"enabled": True}
+    if off_season:
+        entry["season_active"] = False
+    else:
+        entry["daily_forecast_enabled"] = False
+    models[sport.upper()] = entry
+    _write_yaml(path, config)
+
+
+def test_switched_off_and_off_season_sports_do_not_degrade_health(tmp_path: Path) -> None:
+    """Scope (2026-11-13) and the off-season both make a sport's capture go quiet on
+    purpose. That silence is information, not a DEGRADED reason; a sport that is still
+    on and goes quiet is still flagged."""
+    repo = _make_repo(tmp_path)
+    for worker in WORKERS:
+        _seed_successful_run(repo, worker)
+    _seed_prediction_state(repo, minutes_ago=5)
+    _seed_game(repo, "mlb", days_ago=10)  # off-season: quiet on purpose
+    _seed_game(repo, "soccer", days_ago=10)  # switched off: quiet on purpose
+    _seed_game(repo, "nba", days_ago=1)
+    _seed_market(repo, "kbo", days_ago=9)  # switched off
+    _seed_market(repo, "nba", days_ago=1)
+    _mark_sport_off(repo, "mlb", off_season=True)
+    _mark_sport_off(repo, "soccer", off_season=False)
+    _mark_sport_off(repo, "kbo", off_season=False)
+
+    report = system_health(repo_root=repo, runtime_root=repo / "data")
+
+    assert report["status"] == "HEALTHY", report["reasons"]
+    assert set(report["checks"]["inactive_sports"]) == {"kbo", "mlb", "soccer"}
+    assert report["checks"]["game_capture"]["mlb"]["inactive"] is True
+    assert report["checks"]["game_capture"]["mlb"]["stale"] is False
+    assert report["checks"]["market_capture"]["kbo"]["inactive"] is True
+
+    # The same quiet gap on a sport that is still on is a real finding.
+    _seed_game(repo, "nfl", days_ago=10)
+    report = system_health(repo_root=repo, runtime_root=repo / "data")
+    assert report["status"] == "DEGRADED"
+    assert any("nfl game capture stale" in r for r in report["reasons"])
+
+
+def test_primary_sport_off_season_makes_prediction_age_informational(tmp_path: Path) -> None:
+    """The production canary predicts the primary's sport (WNBA). In the off-season it has
+    nothing to predict, so a two-week-old last prediction is expected, not DEGRADED."""
+    repo = _make_repo(tmp_path)
+    for worker in WORKERS:
+        _seed_successful_run(repo, worker)
+    _seed_prediction_state(repo, minutes_ago=20000)
+    _seed_game(repo, "nba", days_ago=1)
+    _seed_market(repo, "nba", days_ago=1)
+    _mark_sport_off(repo, "wnba", off_season=True)
+
+    report = system_health(repo_root=repo, runtime_root=repo / "data")
+
+    assert report["status"] == "HEALTHY", report["reasons"]
+    assert report["checks"]["predictions"]["primary_sport_inactive"] is True
+    assert "informational" in report["checks"]["predictions"]["note"]
+
+
 def test_stale_market_snapshots_flagged(tmp_path: Path) -> None:
     repo = _make_repo(tmp_path)
     _seed_market(repo, "wnba", days_ago=5)

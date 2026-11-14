@@ -22,7 +22,9 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from model_prediction.config import PROJECT_ROOT
+import yaml
+
+from model_prediction.config import PROJECT_ROOT, is_sport_daily_enabled
 from model_prediction.production_canary import load_production_config
 from model_prediction.production_registry import compute_artifact_hash
 from model_prediction.runtime_paths import RuntimePaths, migrate_legacy_state
@@ -70,6 +72,42 @@ OFF_SEASON_CALENDARS: dict[str, dict[str, Any]] = {
 }
 
 
+# Odds directories / quote labels that aggregate several configured sports. A label is
+# switched off only when every sport behind it is.
+LABEL_SPORTS: dict[str, tuple[str, ...]] = {
+    "basketball": ("euroleague", "nbl"),
+    "esports": ("lol", "cs2", "dota2", "valorant", "rainbow_six"),
+}
+
+
+def switched_off_labels(config: dict[str, Any] | None = None) -> set[str]:
+    """Odds/quote labels whose sports config/model.yaml has switched off or marked off-season.
+
+    Uses the daily run's own gate (``is_sport_daily_enabled``) so the monitor and the
+    forecast agree on what is expected to go quiet. Before 2026-11-14 the monitor warned
+    "basketball odds stale" the day after Euroleague/NBL were switched off (CLAUDE.md
+    "Scope") -- a scope decision read as a feed outage. No model.yaml means nothing is off.
+    """
+    if config is None:
+        path = PROJECT_ROOT / "config" / "model.yaml"
+        if not path.exists():
+            return set()
+        try:
+            config = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        except (OSError, yaml.YAMLError):
+            return set()
+    models = config.get("models") or {}
+    if not isinstance(models, dict):
+        return set()
+    configured = {str(s).lower() for s, cfg in models.items() if isinstance(cfg, dict)}
+    inactive = {s for s in configured if not is_sport_daily_enabled(config, s)}
+    labels = set(inactive)
+    for label, sports in LABEL_SPORTS.items():
+        if all(s in inactive for s in sports):
+            labels.add(label)
+    return labels
+
+
 def is_sport_off_season(sport: str, reference_date: datetime.date) -> tuple[bool, str]:
     """Determine if a sport is in natural off-season dormancy."""
     cal = OFF_SEASON_CALENDARS.get(sport)
@@ -93,6 +131,7 @@ def audit_odds_freshness(runtime_paths: RuntimePaths) -> dict[str, Any]:
 
     sports_status = {}
     total_snapshots = 0
+    switched_off = switched_off_labels()
 
     if odds_root.exists():
         for sport_dir in sorted(odds_root.iterdir()):
@@ -113,6 +152,9 @@ def audit_odds_freshness(runtime_paths: RuntimePaths) -> dict[str, Any]:
                 sp_status = "FRESH"
             elif is_off:
                 sp_status = "OFF_SEASON"
+            elif sport in switched_off:
+                sp_status = "SWITCHED_OFF"
+                reason = "Switched off in config/model.yaml (CLAUDE.md Scope)"
             else:
                 sp_status = "STALE"
 
@@ -158,16 +200,25 @@ def audit_market_quotes_warehouse(runtime_paths: RuntimePaths) -> dict[str, Any]
     today = datetime.now(ZoneInfo("America/New_York")).date()
     yesterday_iso = (today - timedelta(days=1)).isoformat()
     stale_active_sports = []
+    switched_off = switched_off_labels()
     for r in cur.fetchall():
         sport, count, latest = r
         off_season, _ = is_sport_off_season(sport, today)
-        stale = not off_season and (not latest or str(latest)[:10] < yesterday_iso)
+        quiet = not latest or str(latest)[:10] < yesterday_iso
+        is_switched_off = quiet and not off_season and sport in switched_off
+        stale = quiet and not off_season and not is_switched_off
         if stale:
             stale_active_sports.append(sport)
+        if off_season:
+            status = "OFF_SEASON"
+        elif is_switched_off:
+            status = "SWITCHED_OFF"
+        else:
+            status = "STALE" if stale else "FRESH"
         sports_breakdown[sport] = {
             "count": count,
             "latest_observed": latest,
-            "status": "OFF_SEASON" if off_season else ("STALE" if stale else "FRESH"),
+            "status": status,
         }
     conn.close()
 

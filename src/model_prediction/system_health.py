@@ -35,7 +35,9 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from .config import PROJECT_ROOT
+import yaml
+
+from .config import PROJECT_ROOT, is_sport_daily_enabled
 from .production_registry import ProductionModelRegistry
 from .production_store import (
     read_latest_prediction_utc,
@@ -356,18 +358,49 @@ def _market_capture(runtime_root: Path) -> dict[str, Any]:
     return markets
 
 
-def _flag_capture_staleness(capture: dict[str, Any]) -> list[str]:
+def _inactive_sports(repo_root: Path) -> set[str]:
+    """Sports config/model.yaml has switched off (scope) or marked off-season.
+
+    Their capture and market snapshots are *expected* to go quiet, so staleness
+    on them is information, never a DEGRADED reason. Before 2026-11-14 the
+    health check alarmed on MLB/WNBA every off-season and on every sport the
+    scope cut switched off, which made DEGRADED the permanent resting state and
+    hid real findings. No model.yaml (test repos) means nothing is inactive.
+    """
+    path = repo_root / "config" / "model.yaml"
+    if not path.exists():
+        return set()
+    try:
+        config = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return set()
+    models = config.get("models") or {}
+    if not isinstance(models, dict):
+        return set()
+    return {
+        str(sport).lower()
+        for sport, sport_cfg in models.items()
+        if isinstance(sport_cfg, dict) and not is_sport_daily_enabled(config, str(sport))
+    }
+
+
+def _flag_capture_staleness(capture: dict[str, Any], inactive: set[str] | None = None) -> list[str]:
     """Flag sports whose capture stopped 7-28 days ago.
 
     Nothing within the last 7 days but something within the last 28 days
     means the sport was recently active and has gone quiet — a real
     staleness signal. Older than that is presumed offseason (NBA/NFL in
-    summer) and stays informational.
+    summer) and stays informational, as does any sport config has switched
+    off or marked off-season (``inactive``).
     """
     flags: list[str] = []
     for sport, info in capture.items():
         latest = info.get("latest_event_utc")
         if not latest:
+            continue
+        if inactive and sport.lower() in inactive:
+            info["stale"] = False
+            info["inactive"] = True
             continue
         age_hours = info.get("age_hours") or 0.0
         quiet = age_hours > _CAPTURE_STALE_DAYS * 24
@@ -378,11 +411,15 @@ def _flag_capture_staleness(capture: dict[str, Any]) -> list[str]:
     return flags
 
 
-def _flag_market_staleness(markets: dict[str, Any]) -> list[str]:
+def _flag_market_staleness(markets: dict[str, Any], inactive: set[str] | None = None) -> list[str]:
     flags: list[str] = []
     for sport, info in markets.items():
         latest = info.get("latest_snapshot_date")
         if not latest:
+            continue
+        if inactive and sport.lower() in inactive:
+            info["stale"] = False
+            info["inactive"] = True
             continue
         try:
             dt = datetime.fromisoformat(latest)
@@ -507,7 +544,19 @@ def system_health(
         "age_minutes": (round(_age_minutes(last_prediction), 1) if last_prediction else None),
     }
     max_age_minutes = float(registry.health.get("max_data_age_minutes", 120))
-    if last_prediction is None:
+    inactive = _inactive_sports(root)
+    primary_sport = str(getattr(registry.primary, "sport", "") or "").lower()
+    primary_inactive = bool(primary_sport) and primary_sport in inactive
+    report["checks"]["predictions"]["primary_sport_inactive"] = primary_inactive
+    report["checks"]["inactive_sports"] = sorted(inactive)
+    if primary_inactive:
+        # The canary predicts the primary's sport; with that sport off-season or
+        # switched off it has nothing to predict, so its silence is expected.
+        report["checks"]["predictions"]["note"] = (
+            f"primary sport {primary_sport} is off-season/disabled in config/model.yaml; "
+            "prediction age is informational"
+        )
+    elif last_prediction is None:
         degrade("no production prediction runs recorded in production.db")
     elif _age_minutes(last_prediction) > max_age_minutes:
         degrade(
@@ -523,13 +572,13 @@ def system_health(
 
     # 4. Source capture: historical games + Polymarket snapshots.
     capture = _source_capture(root)
-    flags = _flag_capture_staleness(capture)
+    flags = _flag_capture_staleness(capture, inactive)
     for flag in flags:
         degrade(flag)
     report["checks"]["game_capture"] = capture
 
     markets = _market_capture(paths.runtime_root)
-    market_flags = _flag_market_staleness(markets)
+    market_flags = _flag_market_staleness(markets, inactive)
     for flag in market_flags:
         degrade(flag)
     report["checks"]["market_capture"] = markets
