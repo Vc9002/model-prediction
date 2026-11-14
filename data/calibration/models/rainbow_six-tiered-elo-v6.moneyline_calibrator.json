@@ -1,15 +1,19 @@
 {
-  "baseline_brier": 0.252135,
-  "calibrated_at_utc": "2026-11-09T01:31:23.309763+00:00",
-  "calibrated_oof_brier": 0.25190956678599075,
+  "baseline_brier": 0.251383,
+  "calibrated_at_utc": "2026-11-14T19:00:47.253431+00:00",
+  "calibrated_oof_brier": 0.2511473568190261,
   "champion_method": "beta",
+  "fit_model_versions": [
+    "rainbow_six-tiered-elo-v6"
+  ],
+  "fit_source": "settled_live_rows",
   "market": "moneyline",
   "model_version": "rainbow_six-tiered-elo-v6",
   "parameters": {
-    "a": 1.2143,
-    "b": 1.2996,
-    "c": -0.4701
+    "a": 0.8883,
+    "b": 1.3123,
+    "c": -0.6156
   },
-  "sample_size": 69,
+  "sample_size": 80,
   "sport": "rainbow_six"
 }

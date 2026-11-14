@@ -1,0 +1,15 @@
+{
+  "baseline_brier": 0.27529,
+  "calibrated_at_utc": "2026-11-14T19:00:47.253431+00:00",
+  "calibrated_oof_brier": 0.25,
+  "champion_method": "identity",
+  "fit_model_versions": [
+    "eurolg-tempo-v2"
+  ],
+  "fit_source": "settled_live_rows",
+  "market": "total",
+  "model_version": "eurolg-tempo-v2",
+  "parameters": {},
+  "sample_size": 28,
+  "sport": "euroleague"
+}

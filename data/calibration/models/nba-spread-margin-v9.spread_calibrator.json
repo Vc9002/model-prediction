@@ -1,11 +1,15 @@
 {
-  "sport": "nba",
+  "baseline_brier": 0.262521,
+  "calibrated_at_utc": "2026-11-14T19:00:47.253431+00:00",
+  "calibrated_oof_brier": 0.262521136992814,
+  "champion_method": "identity",
+  "fit_model_versions": [
+    "nba-spread-margin-v9"
+  ],
+  "fit_source": "settled_live_rows",
   "market": "spread",
   "model_version": "nba-spread-margin-v9",
-  "champion_method": "identity",
   "parameters": {},
-  "sample_size": 133,
-  "baseline_brier": 0.267847,
-  "calibrated_oof_brier": 0.267847,
-  "calibrated_at_utc": "2026-11-08T19:01:52.091110+00:00"
+  "sample_size": 43,
+  "sport": "nba"
 }

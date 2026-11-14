@@ -1,5 +1,46 @@
 # Project status and source of truth
 
+## 2026-11-12 — NBA review fixes (`quick-261112-11j`)
+
+Still 100% paper; champions unchanged. The open NBA items of `MODEL_REVIEW_2026-11-11.md`
+are fixed and three new ones were found and fixed (NBA addendum there; `DEBUG.md`
+2026-11-12): a totals serving calibrator fitted on predecessor models' picks had been
+reshaping every served NBA total since 2026-11-11T01:32Z (Main totals dark); the
+`nba-moneyline-v9` artifact falsely claimed qualification; Main was relabelling downgraded
+learned calls as QUALIFIED. `nba-elo-trend-lr-v4` now serves on its fit
+construction. Open operator decisions: pipeline-driven serving transforms, lr-v4 whitelist /
+refit (HANDOFF items 3, 3b). The 2026-11-12T05:30Z daily run failed on an ingestion
+MemoryError and a `ledger_coverage` integrity error (unrelated to these fixes); supervisor log
+files on this host are empty.
+
+## 2026-11-11 — NCAAB guardrails, NBA moneyline rollback, buyer settlement fixes, refactor pass
+
+Everything remains 100% paper. Champions are unchanged except NBA moneyline,
+which serves `nba-elo-trend-lr-v4` again (`nba-moneyline-v9` ran on placeholder
+coefficients; `4d5624ed`). Detail and commit ids: `ROADMAP.md`, last section.
+
+- **NCAAB v6 has no prospective edge yet.** `NCAAB_LOSS_AUDIT_2026-11-10.md`:
+  Main spread 20 wins in 40 calls (+0.95 units), total 11 in 36 (-25.78 units),
+  most quote joins `not_archived`. The earlier +104.69 unit v6 figure is a
+  retrospective replay and must not be cited. Main now requires a fresh matched
+  executable quote and a current-season sample of at least 8 games; totals are
+  paused in Main. No settled post-gate NCAAB calls existed at the time of the audit.
+- **Pinned forward check:** `ncaab-spread-v6` spread, edge 5%-8%, picks created
+  from 2026-11-12. Baseline 11W-3L is post-hoc and not evidence.
+- **Auto-buyer:** decommissioned for tennis, soccer, hockey, darts, EuroLeague/NBL
+  and NCAAB (2026-11-09), with one guarded NCAAB spread live bucket and an isolated
+  paper trial. Settlement now needs exact identity, manual exits are recognised,
+  and hand-placed positions import as `MANUAL-*` rows (exclude them from model audits).
+- **Best-picks audit labels are unreliable** (hardcoded overrides in
+  `scripts/audit_best_picks.py`); recompute from `ledgers.db` first.
+- **Refactor branch** `refactor/cleanup-2026-11-11`: dead-code removal and
+  wrapper merges, behavior-preserving by intent. Failing before and after the
+  refactor start: 9 in `tests/test_cli.py`, 1 each in `test_five_blind_spot_guards.py`,
+  `test_forecast_runtime_regressions.py`, `test_tennis_markov.py`. Not re-run since the later merges.
+- Working tree carries uncommitted rolling artifacts (`config/models/*`,
+  `data/calibration/*`, `outputs/*`), `dash.ps1`, `dashboard.html`, `.claude/CLAUDE.md`
+  and a few scripts/tests; none were part of this doc update.
+
 ## 2026-11-08 — routine rolling artifact sync
 
 Daily-cycle retrain output for esports/KBO/NPB ratings (`config/models/*.json`)

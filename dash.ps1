@@ -5,8 +5,19 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = $PSScriptRoot
 Set-Location $RepoRoot
+
+if (Test-Path (Join-Path $RepoRoot '.env')) {
+    foreach ($line in Get-Content (Join-Path $RepoRoot '.env')) {
+        if ($line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$') {
+            $value = $Matches[2].Trim('"').Trim("'")
+            [Environment]::SetEnvironmentVariable($Matches[1], $value, 'Process')
+        }
+    }
+}
+
 $RuntimeRoot = if ($env:MODEL_PREDICTION_RUNTIME_ROOT) { $env:MODEL_PREDICTION_RUNTIME_ROOT } else { Join-Path $RepoRoot 'data' }
 $env:MODEL_PREDICTION_RUNTIME_ROOT = $RuntimeRoot
+$env:MODEL_PREDICTION_LEDGER_AUTHORITY = if ($env:MODEL_PREDICTION_LEDGER_AUTHORITY) { $env:MODEL_PREDICTION_LEDGER_AUTHORITY } else { 'sqlite' }
 $env:PYTHONPATH = 'src'
 
 $PidFile = Join-Path $RepoRoot '.dashboard.pid'
