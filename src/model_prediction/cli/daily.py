@@ -159,6 +159,20 @@ def _finalize_daily_report(report: dict[str, Any]) -> dict[str, Any]:
     return report
 
 
+def _serialized_polymarket_captures(slate_capture: Any, week_ahead_capture: Any) -> Any:
+    """Run the slate BBO capture, then the NFL week-ahead book capture, in one thread.
+
+    Both draw on one IP-wide gateway rate limit. Run side by side in the daily
+    pool (2026-11-14: 34-73 s each, fully overlapping), each one's burst drew
+    429s that ended the other's queue. The week-ahead still runs when the
+    slate capture raises; the slate capture's result or exception is returned.
+    """
+    try:
+        return slate_capture()
+    finally:
+        week_ahead_capture()
+
+
 def _skipped_sport_result(sport: str, status: str, reason: str) -> dict[str, Any]:
     """The result dict a daily task records when a sport is not forecast at all."""
     return {"sport": sport, "status": status, "logged": 0, "candidates": [], "reason": reason}
@@ -480,30 +494,29 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             logger.warning("NFL pregame weather capture failed for %s", args.date, exc_info=True)
             nfl_weather_result = {"status": "error"}
 
-    nfl_week_ahead_result: dict[str, Any] = {"status": "skipped"}
+    # ESPN consensus (opener + current) and Polymarket books for the next 7 NFL
+    # dates: the inputs CLV and early-line analysis need, neither of which
+    # existed before 2026-11-12 (docs/NFL_LOSS_INVESTIGATION_2026-11-12.md §3, §7).
+    # The two halves run separately; each writes only its own key.
+    nfl_week_ahead_result: dict[str, Any] = {}
 
-    def _capture_nfl_week_ahead():
-        """ESPN consensus (opener + current) and Polymarket books for the next 7 NFL dates.
-
-        Both are the inputs CLV and early-line analysis need and neither existed before
-        2026-11-12 (docs/NFL_LOSS_INVESTIGATION_2026-11-12.md §3, §7)."""
-        nonlocal nfl_week_ahead_result
-        out: dict[str, Any] = {}
+    def _capture_nfl_week_ahead_consensus():
         try:
             from ..data_sources.espn_nfl_odds import capture_nfl_espn_odds
 
-            out["espn_consensus"] = capture_nfl_espn_odds(data_root, args.date, days=7)
+            nfl_week_ahead_result["espn_consensus"] = capture_nfl_espn_odds(data_root, args.date, days=7)
         except Exception:
             logger.warning("NFL ESPN consensus week-ahead capture failed for %s", args.date, exc_info=True)
-            out["espn_consensus"] = {"status": "error"}
+            nfl_week_ahead_result["espn_consensus"] = {"status": "error"}
+
+    def _capture_nfl_week_ahead_polymarket():
         try:
             from .commands import capture_nfl_polymarket_week_ahead
 
-            out["polymarket"] = capture_nfl_polymarket_week_ahead(config, args.date, days=7)
+            nfl_week_ahead_result["polymarket"] = capture_nfl_polymarket_week_ahead(config, args.date, days=7)
         except Exception:
             logger.warning("NFL Polymarket week-ahead capture failed for %s", args.date, exc_info=True)
-            out["polymarket"] = {"status": "error"}
-        nfl_week_ahead_result = out
+            nfl_week_ahead_result["polymarket"] = {"status": "error"}
 
     def _capture_mlb_probables():
         nonlocal mlb_probables_result
@@ -648,7 +661,11 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             capture_task_seconds[name] = round(time.monotonic() - started, 1)
 
     with ThreadPoolExecutor(max_workers=16) as io_pool:
-        f0 = io_pool.submit(_timed, "polymarket_slate", _polymarket_slate, slate_args, config)
+        f0 = io_pool.submit(
+            _serialized_polymarket_captures,
+            lambda: _timed("polymarket_slate", _polymarket_slate, slate_args, config),
+            lambda: _timed("nfl_week_ahead_polymarket", _capture_nfl_week_ahead_polymarket),
+        )
         f1 = io_pool.submit(_timed, "wnba", _capture_wnba)
         f2 = io_pool.submit(_timed, "priors", _build_priors)
         f3 = io_pool.submit(_timed, "soccer", _collect_soccer)
@@ -665,7 +682,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         f14 = io_pool.submit(_timed, "nfl_efficiency", _capture_nfl_efficiency)
         f15 = io_pool.submit(_timed, "ncaab_boxscores", _capture_ncaab_boxscores)
         f16 = io_pool.submit(_timed, "nfl_weather", _capture_nfl_weather)
-        f17 = io_pool.submit(_timed, "nfl_week_ahead_quotes", _capture_nfl_week_ahead)
+        f17 = io_pool.submit(_timed, "nfl_week_ahead_consensus", _capture_nfl_week_ahead_consensus)
         for f in (f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17):
             f.result()  # Wait for all, surface exceptions
         try:

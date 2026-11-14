@@ -33,6 +33,7 @@ from ..config import (
     PROJECT_ROOT,
     audit_path,
     entity_registry_path,
+    is_sport_daily_enabled,
     ledger_path,
     polymarket_snapshot_path,
     unit_policy,
@@ -170,17 +171,53 @@ def _capture_horizon_hours() -> float | None:
 
 
 def _capture_ladder_keep() -> int | None:
-    """Spread/total alternates to price per NCAAF event (env POLYMARKET_CAPTURE_LADDER_KEEP).
+    """Operator override for every ladder league's rung count (env POLYMARKET_CAPTURE_LADDER_KEEP).
 
-    Off by default (None): every alternate gets a /book request, which at the
-    gateway's rate limit made one capture take 2.8 hours. Zero, negative or
-    invalid leaves it off.
+    Unset by default (None), which leaves CAPTURE_LADDER_KEEP's per-league
+    counts in force. Zero, negative or invalid is treated as unset.
     """
     try:
         keep = int(os.environ.get("POLYMARKET_CAPTURE_LADDER_KEEP", "0"))
     except ValueError:
         return None
     return keep if keep > 0 else None
+
+
+# Spread/total alternates priced per event, per league. Pricing every alternate
+# made one capture take 2.8 hours at the gateway's rate limit. Until 2026-11-14
+# one integer was chosen first-match (NBA on the slate => 3 for every league),
+# so NCAAB and NCAAF each priced 3 rungs and the queue outgrew the limit.
+CAPTURE_LADDER_KEEP: dict[str, int] = {"NBA": 3, "NCAAF": 2, "NCAAB": 1, "NFL": 2}
+
+
+def _capture_ladder_keep_by_league() -> dict[str, int]:
+    override = _capture_ladder_keep()
+    return {league: override or keep for league, keep in CAPTURE_LADDER_KEEP.items()}
+
+
+def _capture_seconds(name: str, default: float) -> float | None:
+    """A capture time budget in seconds from env ``name``; zero, negative or invalid disables it."""
+    try:
+        seconds = float(os.environ.get(name, str(default)))
+    except ValueError:
+        return None
+    return seconds if seconds > 0 else None
+
+
+def _capture_priority_leagues(config: dict, leagues: Sequence[str]) -> frozenset[str]:
+    """Leagues whose sport is in daily production scope, so their contracts are captured first.
+
+    Read from config rather than hardcoded: a sport flipped back on with
+    ``daily_forecast_enabled`` regains capture priority with no code change.
+    A league without its own ``models`` entry (EPL, WNCAAB, ITF ...) is never
+    in scope.
+    """
+    models = config.get("models") or {}
+    return frozenset(
+        league.upper()
+        for league in leagues
+        if isinstance(models.get(league.upper()), dict) and is_sport_daily_enabled(config, league)
+    )
 
 
 def _open_pick_slugs(data_root: Path, sport: str | None = None) -> frozenset[str]:
@@ -252,18 +289,9 @@ def _polymarket_slate(args, config) -> dict:
         league_errors = result.errors
     else:
         raise ValueError("provide --sport, --league, or --all")
-    ladder_keep = _capture_ladder_keep()
-    # NBA alternate ladders can exhaust the shared book budget before the
-    # forecast sees a main spread/total for each game. Keep a small balanced
-    # shortlist per event while preserving every moneyline contract.
-    if ladder_keep is None and "NBA" in events:
-        ladder_keep = 3
-    if ladder_keep is None and "NCAAB" in events:
-        ladder_keep = 1
-    if ladder_keep is None and "NCAAF" in events:
-        ladder_keep = 2
-    if ladder_keep is None and "NFL" in events:
-        ladder_keep = 2
+    # Keep a small balanced shortlist of spread/total alternates per event
+    # while preserving every moneyline contract.
+    ladder_keep = _capture_ladder_keep_by_league()
     snapshot_root = Path(ledger_path(config)).parent
     # Mirror snapshot_archives.snapshot_paths's read-side reroute: forecast.py
     # looks for captured quotes under the external runtime root once one is
@@ -276,7 +304,7 @@ def _polymarket_slate(args, config) -> dict:
     _runtime_paths = RuntimePaths.resolve()
     if snapshot_root.resolve() == (_runtime_paths.repo_root / "data").resolve():
         snapshot_root = _runtime_paths.runtime_root
-    bbo_capture = (
+    bbo_capture: dict[str, Any] = (
         {"status": "disabled"}
         if getattr(args, "no_snapshot_bbo", False)
         else capture_slate_snapshots(
@@ -286,8 +314,11 @@ def _polymarket_slate(args, config) -> dict:
             args.date,
             horizon_hours=_capture_horizon_hours(),
             ladder_keep=ladder_keep,
-            ladder_leagues=frozenset({"NBA", "NCAAF", "NCAAB", "NFL"}),
-            ladder_keep_slugs=(_open_pick_slugs(snapshot_root, None) if ladder_keep else frozenset()),
+            ladder_leagues=frozenset(ladder_keep),
+            ladder_keep_slugs=_open_pick_slugs(snapshot_root, None),
+            priority_leagues=_capture_priority_leagues(config, list(events)),
+            max_capture_seconds=_capture_seconds("POLYMARKET_CAPTURE_MAX_SECONDS", 600.0),
+            secondary_max_seconds=_capture_seconds("POLYMARKET_CAPTURE_SECONDARY_SECONDS", 120.0),
         )
     )
     missing_nba = bbo_capture.get("nba_missing_quote_event_ids", {})

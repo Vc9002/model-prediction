@@ -206,6 +206,113 @@ change how you should work here:
   expected. Soccer's Odds API credential remains a known-DEGRADED external
   dependency. The two launchd research agents are loaded and producing.
 
+## 2026-11-14 — Prospective BBO capture abandoned on the first 429 and starved NCAAF; NCAAF priced off ESPN consensus (debug bbo-capture-429-starves-ncaaf)
+
+**Symptom.** Every NCAAF Main row written on 2026-11-14 carried `sportsbook=espn_consensus` and a
+blank `market_quote_provenance`. Every daily capture of the day died about a minute in: captured
+17 / 2 / 22 / 13 / 7 contracts, `skipped_after_rate_limit` 1754 / 1921 / 1863 / 2052 / 2017,
+`source_rate_limited: true` (runs at 05:30Z, 11:00Z, 14:00Z, 17:00Z, 19:00Z). The runtime
+archive `odds/ncaaf/2026-11-14` held 143 rows, all from standalone CLI runs, none from a daily.
+
+**Root cause (five defects, compounding).**
+
+1. `capture_slate_snapshots` set a shared `source_rate_limited` flag on the first 429 that survived
+   the client's two attempts and skipped the rest of the queue. Four unpaced workers drew that 429
+   within about a minute. The 2026-08/10 mitigation (stop the queue) traded 1,700 throttled
+   fetches for 2,000 never-attempted ones.
+2. The queue was sorted NBA first, then by kickoff across all 15 capture sports, nine of them out
+   of production scope since 2026-11-13. Early soccer, tennis and esports games sat ahead of
+   every NCAAF game, so the budget was gone before NCAAF was reached.
+3. `ladder_keep` was one integer picked first-match in `_polymarket_slate` (`NBA` on the slate
+   => 3), so NCAAB (meant 1) and NCAAF (meant 2) priced 3 rungs per event.
+4. `daily.py` ran the NFL week-ahead book capture in the same pool as the slate capture (34-73 s
+   each, fully overlapping), on the same IP-wide gateway limit.
+5. `build_cfb_slate` had no Polymarket fallback between captured books and ESPN consensus, and
+   consensus rows carried no quote lineage, so the ledger provenance column was blank.
+
+**Fix.**
+
+- `data_sources/polymarket_us.py`: a shared `_CapturePacer` spaces book requests 0.5 s apart
+  across workers. A 429 opens a pause episode (5 s, doubling, Retry-After honored, cap 60 s) that
+  every worker waits out, doubles the spacing (cap 4 s, eases back after 20 clean responses) and
+  retries the contract (3 attempts). The queue is abandoned only after 5 consecutive episodes.
+  Contracts are split into tiers by `_capture_tiers`: upcoming open-pick contracts, then upcoming
+  `priority_leagues` contracts, both round-robin across leagues in kickoff order; then a
+  secondary tier (out-of-scope leagues and games already under way) on its own
+  `secondary_max_seconds`. `max_capture_seconds` caps the whole capture. `ladder_keep` accepts a
+  per-league mapping. New result keys: `rate_limit_pauses`, `skipped_after_time_budget`,
+  `elapsed_seconds`, `priority_leagues`, `primary_contracts`, `secondary_contracts`,
+  `captured_by_league`, `failures_by_league`; existing keys unchanged.
+- `cli/commands.py`: `CAPTURE_LADDER_KEEP = {NBA: 3, NCAAF: 2, NCAAB: 1, NFL: 2}` (env
+  `POLYMARKET_CAPTURE_LADDER_KEEP` still overrides all). Priority leagues come from config: a
+  league with its own `models` entry that `is_sport_daily_enabled` (today NBA, NCAAB, NCAAF, NFL;
+  MLB and WNBA rejoin when their season flag flips). Caps: 600 s overall, 120 s secondary (env
+  `POLYMARKET_CAPTURE_MAX_SECONDS`, `POLYMARKET_CAPTURE_SECONDARY_SECONDS`).
+- `cli/daily.py`: `_serialized_polymarket_captures` runs the NFL week-ahead book capture after
+  the slate capture in the same pool slot (also when the slate capture raises); the ESPN
+  consensus half stays in the pool.
+- `models/college_football.py`: the NCAAF event list is fetched once per slate build (it was
+  already fetched for candidate evidence; now hoisted and reused). A market with no captured book
+  is matched against the event list with the same `_match_cfb_*` selectors and priced at the
+  matched side's `price_probability`: `sportsbook=polymarket_us_indicative`,
+  `market_quote_provenance=indicative_slate`, `market_quote_timestamp_valid=False`,
+  `market_quote_source=polymarket_us`. A live list fetched more than 10 minutes after the
+  decision time is not used (point-in-time). ESPN consensus rows now carry
+  `market_quote_provenance=espn_consensus_indicative`, `market_quote_source=espn_consensus`.
+- `cli/forecast.py`: indicative NCAAF rows get `Indicative ask 0.xxxx (slug).` in the rationale,
+  as executable rows get `Executable ask`.
+
+**Not changed:** artifact gates (`max_edge`), model code, the auto-buyer, `BBO_CAPTURE_SPORTS`
+(out-of-scope capture still runs, last and time-boxed).
+
+**Tests (each shown failing on the old code, then passing).** `tests/test_polymarket_us.py`:
+`test_slate_capture_resumes_after_a_single_rate_limit` (old: captured 0 of 3),
+`test_slate_capture_spaces_requests_by_the_minimum_interval` (old: gaps 0.0 s),
+`test_slate_capture_pacing_is_shared_across_workers` (old: gap 0.00001 s),
+`test_capture_fetches_scope_leagues_round_robin_before_out_of_scope_and_started`,
+`test_capture_time_budget_reaches_every_scope_league_before_any_out_of_scope_one`,
+`test_capture_secondary_tier_has_its_own_short_budget`,
+`test_ladder_keep_mapping_prices_each_league_its_own_rung_count`,
+`test_cli_capture_passes_per_league_ladders_and_scope_priority`; the pinned abandon test became
+`test_slate_capture_abandons_queue_only_after_consecutive_rate_limit_budget` and the NBA-first
+test became `test_priority_league_shortlists_each_game_before_other_sports`. Mutations (no
+round-robin; abandon on the first 429; started games kept in the primary tier) each fail a test.
+`tests/test_nfl_week_ahead_capture.py::test_daily_runs_week_ahead_books_only_after_the_slate_capture`.
+`tests/test_cfb_indicative_quote.py` (5 tests: indicative pricing, captured book wins,
+consensus provenance, the 10-minute point-in-time guard, provenance reaching the Flat ledger row).
+
+**Live proof (read-only GET traffic).** `python -m model_prediction.cli polymarket-slate --league NCAAF --date 2026-11-14`,
+19:55:03-20:10:14Z (this process loaded the 900 s cap; the committed default is 600 s). Before
+(17:34Z, old code): captured 23, skipped 551 after the first 429. After: 117 events, 539
+contracts after ladders (298 upcoming in the primary tier, 241 started in the secondary);
+captured 311, `skipped_after_rate_limit` 0, `source_rate_limited` false, 6 rate-limit pauses,
+spacing settled at 1.34 s. Every one of the 298 upcoming contracts was captured with a valid
+pregame timestamp; 59 of 60 upcoming games have moneyline, spread and total quotes (the 60th,
+Nicholls vs. Incarnate Word, lists no spread market). The 225 time-budget skips and 3 invalid
+BBOs are all games already under way. Sustained throughput was about 20 contracts a minute
+(31 contracts fell back to /bbo after a throttled /book), so the gateway tolerates roughly one
+book request every 3 s.
+
+`polymarket-slate --league NCAAB --date 2026-11-14`, 20:13:51-20:21:21Z (600 s cap). Before:
+two of the five daily runs wrote NCAAB rows at all (6 and 8); a standalone run at 17:59Z wrote 68.
+After: 62 events, 162 contracts after the one-rung ladder (126 upcoming, 36 started); captured
+161, `skipped_after_rate_limit` 0, 2 rate-limit pauses, 432 s; all 46 upcoming games have every
+listed moneyline/spread/total quoted. The one failure is an invalid BBO on a game under way.
+
+**Cost and limits.** The daily's slate-capture step used to quit after about a minute; it now
+runs until the in-scope queue is done or the 600 s cap, plus the NFL week-ahead books after it.
+At the measured gateway rate (about 20 contracts a minute) one daily run captures roughly 200
+in-scope contracts, earliest kickoffs first, round-robin across NBA/NCAAB/NCAAF/NFL. A full
+Saturday queue (NCAAF alone had 298 upcoming contracts at 19:55Z) therefore spans several daily
+runs; an NCAAF market not yet captured is priced from the event list (indicative) whenever
+Polymarket lists it, and ESPN consensus is only the last fallback. The daily worker's timeout is 60 minutes; today's runs took
+17-38 minutes. Open operator decision, not changed here: raise `POLYMARKET_CAPTURE_MAX_SECONDS`,
+or move the capture off the daily's critical path into its own scheduled worker.
+
+**Pre-existing, not touched:** `tests/test_polymarket_us.py::test_open_pick_slugs_reads_main_and_flat_and_survives_a_ledger_error`
+fails at HEAD (`_open_pick_slugs(root, None)` reads `existing_main_ledgers`, the test patches
+`main_ledger`; since 32528f57).
+
 ## 2026-11-13 — NCAAF: cfb-structural-v5 promoted to champion (operator directive); serving now follows the champion map
 
 Operator directive 2026-11-13 ("promote v5 fully into main and flat ledger"), executed under the

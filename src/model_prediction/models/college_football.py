@@ -19,7 +19,7 @@ import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -543,6 +543,75 @@ def _match_cfb_total(
     return min(cands, key=_total_ask_balance)
 
 
+# A live event list fetched this long after the decision time postdates it and
+# must not price that decision (point-in-time rule).
+_INDICATIVE_LIST_MAX_LAG = timedelta(minutes=10)
+
+
+def _indicative_quote_rows(events: list[dict[str, Any]], observed_at_utc: str) -> list[dict[str, Any]]:
+    """Polymarket event-list markets in the snapshot-row shape the ``_match_cfb_*`` selectors read.
+
+    Built exactly as ``capture_slate_snapshots`` lays out a captured row (same
+    ``line``, same ``team`` anchor, long/short by ``is_long``), but each side's
+    ask is the event list's indicative ``price_probability``, not a live book.
+    """
+    rows: list[dict[str, Any]] = []
+    for event in events:
+        for market in event.get("markets") or []:
+            sides = market.get("sides") or []
+            long_side = next((side for side in sides if side.get("is_long")), None)
+            short_side = next((side for side in sides if not side.get("is_long")), None)
+            if long_side is None or short_side is None:
+                continue
+            rows.append(
+                {
+                    "market_slug": market.get("market_slug"),
+                    "market_type": market.get("market_type"),
+                    "line": market.get("line"),
+                    "team": next((side.get("team") for side in sides if side.get("team")), None),
+                    "event_id": str(event.get("event_id") or ""),
+                    "event_title": str(event.get("title") or ""),
+                    "event_start_utc": event.get("event_start_utc"),
+                    "observed_at_utc": observed_at_utc,
+                    "long": {
+                        "ask": long_side.get("price_probability"),
+                        "description": long_side.get("description"),
+                    },
+                    "short": {
+                        "ask": short_side.get("price_probability"),
+                        "description": short_side.get("description"),
+                    },
+                }
+            )
+    return rows
+
+
+def _indicative_quote_lineage(observed_at_utc: str) -> dict[str, Any]:
+    """Ledger quote fields for a row priced off the event list (no archived book to bind)."""
+    return {
+        "market_quote_observed_at_utc": observed_at_utc,
+        "market_quote_timestamp_valid": False,
+        "market_quote_source": "polymarket_us",
+        "market_quote_provenance": "indicative_slate",
+        "market_quote_reconstructed": False,
+    }
+
+
+def _espn_consensus_quote_lineage() -> dict[str, Any]:
+    """Ledger quote fields for a row priced off ESPN's de-vigged consensus.
+
+    Until 2026-11-14 these rows carried no lineage at all, so the ledger's
+    ``market_quote_provenance`` was blank and consensus rows could not be told
+    apart from executable ones without parsing the rationale.
+    """
+    return {
+        "market_quote_timestamp_valid": False,
+        "market_quote_source": "espn_consensus",
+        "market_quote_provenance": "espn_consensus_indicative",
+        "market_quote_reconstructed": False,
+    }
+
+
 def _latest_capture_per_market(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Keep only the newest observation of each market_slug.
 
@@ -571,11 +640,17 @@ def build_cfb_slate(
     client: Any | None = None,
     observed_at: datetime | None = None,
     model: CFBStructuralV4Model | None = None,
+    polymarket_events: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Build prospective slate for College Football (Moneyline, Spread, Total).
 
     ``model`` defaults to the artifact-parameterised production model; tests inject a
     variant. ``observed_at`` is the decision time every point-in-time filter uses.
+
+    Each market is priced off, in order: a captured executable Polymarket book, the
+    Polymarket event list's indicative price, ESPN's sportsbook consensus. The event
+    list is fetched live when ``client`` is None (production); ``polymarket_events``
+    supplies one already observed no later than ``observed_at``.
     """
     from ..data_sources.espn import ESPNClient
     from ..features.cfb_qb_availability import (
@@ -636,6 +711,27 @@ def build_cfb_slate(
             snapshot_rows = []
     snapshot_rows = _latest_capture_per_market(snapshot_rows)
 
+    # Polymarket event list, fetched once: the indicative fallback for a market
+    # with no captured book, and the inventory for candidate evidence below. Without
+    # it, every NCAAF market the throttled BBO capture missed fell straight through to
+    # ESPN consensus (2026-11-14: every Main row of the day).
+    listed_events: list[dict[str, Any]] | None = polymarket_events
+    listed_events_error: str | None = None
+    listed_observed = obs
+    if listed_events is None and client is None:
+        from ..data_sources.polymarket_us import PolymarketUSClient
+
+        try:
+            listed_events = PolymarketUSClient().slate("NCAAF", datetime.fromisoformat(iso_date).date())
+            listed_observed = utc_now()
+        except Exception as exc:  # noqa: BLE001 -- fail soft to ESPN consensus
+            listed_events_error = f"{type(exc).__name__}: {exc}"
+    indicative_rows = (
+        _indicative_quote_rows(listed_events, listed_observed.isoformat())
+        if listed_events and listed_observed - obs <= _INDICATIVE_LIST_MAX_LAG
+        else []
+    )
+
     model = model if model is not None else cfb_model()
     injury_snapshot = load_latest_injury_snapshot(root, obs)
     priced_contracts: list[dict[str, Any]] = []
@@ -662,10 +758,23 @@ def build_cfb_slate(
         venue_name = str(venue.get("fullName") or "").strip() or None
         venue_indoor = venue.get("indoor") if isinstance(venue.get("indoor"), bool) else None
 
-        # 3a. Match Polymarket prospective quotes
+        # 3a. Match Polymarket prospective quotes: a captured book first, else the
+        # event list's indicative price for that market.
         pm_ml, ml_long_side = _match_cfb_moneyline(away_team, home_team, snapshot_rows)
+        ml_sportsbook = "polymarket_us"
+        if pm_ml is None and indicative_rows:
+            pm_ml, ml_long_side = _match_cfb_moneyline(away_team, home_team, indicative_rows)
+            ml_sportsbook = "polymarket_us_indicative"
         pm_sp, sp_anchor_side = _match_cfb_spread(away_team, home_team, snapshot_rows)
+        sp_sportsbook = "polymarket_us"
+        if pm_sp is None and indicative_rows:
+            pm_sp, sp_anchor_side = _match_cfb_spread(away_team, home_team, indicative_rows)
+            sp_sportsbook = "polymarket_us_indicative"
         pm_tot = _match_cfb_total(away_team, home_team, snapshot_rows)
+        tot_sportsbook = "polymarket_us"
+        if pm_tot is None and indicative_rows:
+            pm_tot = _match_cfb_total(away_team, home_team, indicative_rows)
+            tot_sportsbook = "polymarket_us_indicative"
 
         pm_ml_home_prob = None
         pm_ml_away_prob = None
@@ -677,7 +786,11 @@ def build_cfb_slate(
             pm_ml_away_prob = (
                 float(pm_ml["short"]["ask"]) if ml_long_side == "home" else float(pm_ml["long"]["ask"])
             )
-            pm_ml_lineage = _canonical_market_snapshot_lineage(pm_ml, snapshot_path)
+            pm_ml_lineage = (
+                _canonical_market_snapshot_lineage(pm_ml, snapshot_path)
+                if ml_sportsbook == "polymarket_us"
+                else _indicative_quote_lineage(listed_observed.isoformat())
+            )
 
         pm_spread_away_line = None
         pm_spread_home_line = None
@@ -692,7 +805,11 @@ def build_cfb_slate(
             short_ask = float(pm_sp["short"]["ask"])
             pm_spread_away_prob = long_ask if sp_anchor_side == "away" else short_ask
             pm_spread_home_prob = short_ask if sp_anchor_side == "away" else long_ask
-            pm_spread_lineage = _canonical_market_snapshot_lineage(pm_sp, snapshot_path)
+            pm_spread_lineage = (
+                _canonical_market_snapshot_lineage(pm_sp, snapshot_path)
+                if sp_sportsbook == "polymarket_us"
+                else _indicative_quote_lineage(listed_observed.isoformat())
+            )
 
         pm_total_line = None
         pm_total_over_prob = None
@@ -702,7 +819,11 @@ def build_cfb_slate(
             pm_total_line = float(pm_tot["line"])
             pm_total_over_prob = float(pm_tot["long"]["ask"])
             pm_total_under_prob = float(pm_tot["short"]["ask"])
-            pm_total_lineage = _canonical_market_snapshot_lineage(pm_tot, snapshot_path)
+            pm_total_lineage = (
+                _canonical_market_snapshot_lineage(pm_tot, snapshot_path)
+                if tot_sportsbook == "polymarket_us"
+                else _indicative_quote_lineage(listed_observed.isoformat())
+            )
 
         # 3b. Extract fallback sportsbook odds if available from ESPN
         odds_list = competition.get("odds", [])
@@ -882,7 +1003,7 @@ def build_cfb_slate(
                     h_ask = float(pm_ml_home_prob)
                     a_ask = float(pm_ml_away_prob)
                     slug_base = str(pm_ml.get("market_slug"))
-                    sportsbook = "polymarket_us"
+                    sportsbook = ml_sportsbook
                     market_lineage = pm_ml_lineage
                     m_ver = p.model_version
                 elif market_ml_home_prob is not None and market_ml_away_prob is not None:
@@ -890,7 +1011,7 @@ def build_cfb_slate(
                     a_ask = float(market_ml_away_prob)
                     slug_base = f"ncaaf-ml-{event_id}"
                     sportsbook = "espn_consensus"
-                    market_lineage = None
+                    market_lineage = _espn_consensus_quote_lineage()
                     m_ver = p.model_version
                 else:
                     continue
@@ -935,7 +1056,7 @@ def build_cfb_slate(
                         selection, prob, ask = "home", p_cov_h, float(pm_spread_home_prob)
                         line_val = pm_spread_home_line
                     slug = str(pm_sp.get("market_slug"))
-                    sportsbook = "polymarket_us"
+                    sportsbook = sp_sportsbook
                     market_lineage = pm_spread_lineage
                     m_ver = p.model_version
                 elif (
@@ -974,7 +1095,7 @@ def build_cfb_slate(
                         line_val = spread_home_line
                     slug = f"ncaaf-spread-{event_id}-{selection}"
                     sportsbook = "espn_consensus"
-                    market_lineage = None
+                    market_lineage = _espn_consensus_quote_lineage()
                     m_ver = p.model_version
                 else:
                     continue
@@ -992,7 +1113,7 @@ def build_cfb_slate(
                         selection, prob, ask = "under", p_un, float(pm_total_under_prob)
                     line_val = pm_total_line
                     slug = str(pm_tot.get("market_slug"))
-                    sportsbook = "polymarket_us"
+                    sportsbook = tot_sportsbook
                     market_lineage = pm_total_lineage
                     m_ver = p.model_version
                 elif (
@@ -1013,7 +1134,7 @@ def build_cfb_slate(
                     line_val = total_line
                     slug = f"ncaaf-total-{event_id}-{selection}"
                     sportsbook = "espn_consensus"
-                    market_lineage = None
+                    market_lineage = _espn_consensus_quote_lineage()
                     m_ver = p.model_version
                 else:
                     continue
@@ -1025,11 +1146,17 @@ def build_cfb_slate(
             # Operator decision 2026-11-11 (NFL, `5ffc2b40`), applied to NCAAF: a de-vigged
             # sportsbook consensus number is not an executable ask. The row must say which
             # it was priced against so CLV/PnL readers can separate the two populations.
-            quote_provenance = (
-                "polymarket_executable_ask" if sportsbook == "polymarket_us" else "espn_consensus_indicative"
-            )
+            quote_provenance = {
+                "polymarket_us": "polymarket_executable_ask",
+                "polymarket_us_indicative": "polymarket_indicative_slate",
+            }.get(sportsbook, "espn_consensus_indicative")
             rationale_text = p.rationale
-            if sportsbook != "polymarket_us":
+            if sportsbook == "polymarket_us_indicative":
+                rationale_text = (
+                    f"{rationale_text} Priced off the Polymarket event-list price "
+                    "(no captured book matched); indicative, not an executable CLOB ask."
+                )
+            elif sportsbook != "polymarket_us":
                 rationale_text = (
                     f"{rationale_text} Priced off ESPN sportsbook consensus "
                     "(no Polymarket market matched); not an executable CLOB ask."
@@ -1080,10 +1207,10 @@ def build_cfb_slate(
         try:
             from ..cfb_replay import replay_inputs
             from ..college_contract_evidence import build_candidate_evidence, save_candidate_evidence
-            from ..data_sources.polymarket_us import PolymarketUSClient
             from ..learned_forward import _team_matches
 
-            listed_events = PolymarketUSClient().slate("NCAAF", datetime.fromisoformat(iso_date).date())
+            if listed_events is None:
+                raise RuntimeError(listed_events_error or "NCAAF event list unavailable")
             candidate_probabilities: dict[str, dict[str, Any]] = {}
             for listed_event in listed_events:
                 title = str(listed_event.get("title") or "")
