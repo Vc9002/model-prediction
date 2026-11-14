@@ -130,7 +130,7 @@ def test_cfb_main_requires_artifact_edge_and_pregame_weather(monkeypatch, tmp_pa
                 "line": 51.5 if market == "total" else 3.5,
                 "model_probability": 0.6,
                 "model_uncertainty": 0.1,
-                "model_version": "cfb-structural-v3",
+                "model_version": "cfb-structural-v4",
                 "rationale": "Test",
                 "market_slug": event_id,
                 "executable_ask": 0.6 - edge,
@@ -160,10 +160,12 @@ def test_cfb_main_requires_artifact_edge_and_pregame_weather(monkeypatch, tmp_pa
     )
     flat = SimpleNamespace(exposure=lambda *args, **kwargs: object())
     main = object()
+    # v3 has no serving class any more (cfb_model_for_artifact fails closed); v4 is the
+    # oldest artifact that still serves.
     result = forecast_cli._forecast_cfb_sport(
         data_root=tmp_path,
         args_date="2026-10-31",
-        config={"models": {"NCAAF": {"active_production_version": "cfb-structural-v3", "min_edge": 0.02}}},
+        config={"models": {"NCAAF": {"active_production_version": "cfb-structural-v4", "min_edge": 0.02}}},
         flat_ledger=flat,
         main_ledger=main,
     )
@@ -374,7 +376,8 @@ def test_nba_spread_extreme_disagreement_stays_in_flat(monkeypatch, tmp_path):
     )
     writes = []
     flat = SimpleNamespace(exposure=lambda *args, **kwargs: object(), rows=lambda **kwargs: [])
-    main = object()
+    # Main is read too: the structural spread path supersedes incoherent moneyline CALLs.
+    main = SimpleNamespace(rows=lambda **kwargs: [])
     registry = SimpleNamespace(resolve=lambda *args: SimpleNamespace(canonical_team_id="test"))
     result = forecast_cli._forecast_nba_spread_sport(
         data_root=tmp_path,

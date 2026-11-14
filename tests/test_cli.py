@@ -126,6 +126,9 @@ class _DuplicateLedger:
     def exposure(self, request, now=None, **kwargs):
         return Exposure()
 
+    def rows(self, filters=None):
+        return []
+
     def append_evaluated(self, request, eligibility, now=None):
         raise DuplicatePickError(self.existing_pick_id)
 
@@ -885,10 +888,13 @@ def test_soccer_low_edge_is_a_research_only_call_in_every_ledger(monkeypatch) ->
         main_ledger=main,
     )
 
-    assert result["gated_logged"] == 1
-    assert result["main_logged"] == 1
-    assert len(gated.appended) == 1
-    assert len(main.appended) == 1
+    # Research keeps the opinion; gated (= Main since 2026-10-22) and Main only take
+    # genuinely eligible calls, and 0.20 edge is below the 0.90 min_edge.
+    assert result["logged"] == 1
+    assert result["gated_logged"] == 0
+    assert result["main_logged"] == 0
+    assert len(gated.appended) == 0
+    assert len(main.appended) == 0
     assert len(research.appended) == 1
 
 
@@ -992,6 +998,13 @@ def test_daily_forecast_roster_includes_soccer_and_both_international_baseball_l
         "ncaab",
         "euroleague",
         "nbl",
+        "lol",
+        "cs2",
+        "dota2",
+        "valorant",
+        "rainbow_six",
+        "kbo",
+        "npb",
     }
     assert set(cli.DAILY_ADDITIONAL_SPORTS) == {"hockey", "darts", "ncaab", "euroleague", "nbl"}
     assert set(cli.RESEARCH_ONLY_DAILY_SPORTS) == {
@@ -1005,7 +1018,8 @@ def test_daily_forecast_roster_includes_soccer_and_both_international_baseball_l
         "kbo",
         "npb",
     }
-    assert set(cli.FLAT_LEDGER_SPORTS) & set(cli.RESEARCH_ONLY_DAILY_SPORTS) == {"soccer", "tennis"}
+    # Every research-only sport also writes Flat since the 2026-10-22 ledger merge.
+    assert set(cli.RESEARCH_ONLY_DAILY_SPORTS) <= set(cli.FLAT_LEDGER_SPORTS)
 
 
 class _FakeTennisESPN:
@@ -1104,6 +1118,7 @@ def _tennis_forecast() -> dict:
                 "line": None,
                 "executable_ask": 0.45,
                 "model_probability": 0.55,
+                "edge_vs_executable_ask": 0.05,
                 "model_uncertainty": 0.05,
                 "model_version": "tennis-surface-elo-v1",
                 "rationale": "fixture",
@@ -1318,10 +1333,11 @@ def test_tennis_thin_history_is_a_research_only_call_in_every_ledger(monkeypatch
         main_ledger=main,
     )
 
-    assert result["gated_logged"] == 1
-    assert result["main_logged"] == 1
-    assert len(gated.appended) == 1
-    assert len(main.appended) == 1
+    assert result["logged"] == 1
+    assert result["gated_logged"] == 0
+    assert result["main_logged"] == 0
+    assert len(gated.appended) == 0
+    assert len(main.appended) == 0
     assert len(research.appended) == 1
 
 
@@ -1480,9 +1496,19 @@ def test_invalid_quote_timestamp_keeps_mlb_model_opinion_off_main(
         ledger,
     )
 
-    assert result["logged"] == 1
-    assert len(ledger.appended) == 1
-    assert not ledger.appended[0][1].qualified
+    # The model opinion stays visible in candidates, but an invalid quote timestamp
+    # blocks every ledger write -- nothing reaches Main or Flat.
+    assert result["logged"] == 0
+    assert ledger.appended == []
+    assert result["candidates"][0]["call"] is True
+    assert result["unmatched_quotes"] == [
+        {
+            "event_id": "mlb-1",
+            "reason": (
+                "model call retained for Today visibility; execution blocked because quote timestamp is invalid"
+            ),
+        }
+    ]
     assert any("timestamp is invalid" in row["reason"] for row in result["unmatched_quotes"])
 
 
@@ -3510,6 +3536,9 @@ def test_nfl_total_flat_ledger_logs_contract(monkeypatch, registry, ban_list) ->
 
 
 def test_nfl_spread_and_total_main_ledger_hard_edge_gate(monkeypatch, registry, ban_list) -> None:
+    # The fixture models (structural-v5) are no longer the NFL champions; this test
+    # pins the edge band, so treat them as served and leave the registry gate to its own tests.
+    monkeypatch.setattr(cli_forecast, "_is_registered_serving_model", lambda *args, **kwargs: True)
     # 1. Spread: Test edge bounds [0.02, 0.08]
     # Out of bounds (< 0.02): ask 0.55, prob 0.56 -> edge 0.01 -> main_ledger NOT appended
     low_edge_spread = _nfl_spread_forecast(selection="away", line=-3.5)
@@ -3568,10 +3597,12 @@ def test_nfl_spread_and_total_main_ledger_hard_edge_gate(monkeypatch, registry, 
     )
     assert len(main_total_ext.appended) == 0
 
-    # In bounds: ask 0.51, prob 0.56 -> edge 0.05 -> main_ledger appended
+    # In bounds: ask 0.49, prob 0.56 -> edge 0.07 -> main_ledger appended. An OVER at a
+    # 47+ total carries a +0.02 min_edge surcharge (is_high_total_over), so 0.05 would
+    # now be rejected; 0.07 clears it and stays under the 0.08 cap.
     good_edge_total = _nfl_total_forecast(selection="over", line=48.5)
-    good_edge_total["priced_contracts"][0]["executable_ask"] = 0.51
-    good_edge_total["priced_contracts"][0]["model_probability"] = 0.56  # edge 0.05
+    good_edge_total["priced_contracts"][0]["executable_ask"] = 0.49
+    good_edge_total["priced_contracts"][0]["model_probability"] = 0.56  # edge 0.07
     monkeypatch.setattr(cli_forecast, "_forecast_nfl_total_slate", lambda *a, **k: good_edge_total)
 
     main_total_good = _CaptureLedger()
