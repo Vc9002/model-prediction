@@ -275,6 +275,87 @@ NCAAB 702 s (`timing.forecast_sport_done_seconds`). Separately, the live
 live file: identify them by `mode == "LIVE_EXECUTION"` and `forecast_date == "2026-08-30"`. The
 per-model workbook is still rewritten once per appended pick.
 
+## 2026-11-14 — Event-detail quote pass ahead of the paced /book capture (quick-261114-mzz)
+
+**Symptom.** The 21:00Z daily (`daily-20261114T210002Z-126544`, commit 87d41d45) captured 203
+contracts and left 955 `skipped_after_time_budget` at its 600 s cap (NCAAF 322, NCAAB 56). The
+paced `/book` pass that fixed the abandon-on-429 defect (entry below) is correct but slow: it
+sustains about 20 contracts a minute on the IP-wide limit, so a full college slate (about 1,500
+NCAAB and 1,900 NCAAF contracts) cannot fit in 600 s.
+
+**Evidence.** `GET /v1/events/slug/{slug}` returned both top-of-book quotes on 525 of 530 slate
+markets, matched live `/bbo` exactly on 26 of 27 spot checks, and served 40 requests in 1.1 s with
+no 429. Observed while planning (read-only GETs, 21:36Z): the detail market `status` is
+`MARKET_STATUS_OPEN` (the readers gate on `MARKET_STATE_OPEN`), with `active true`, `closed false`,
+`ep3Status "OPEN"`; the response is CDN-cached (`max-age=30`, an `Age` header); `/bbo` has no
+`transactTime` either and is CDN-cached the same way, so a `/bbo` row already has
+`transact_time_utc None` and no sizes; the detail `updatedAt` was 07:25Z on a 21:36Z read, so it is
+market-metadata time and is never used as a quote time.
+
+**Design** (`data_sources/polymarket_us.py`, `capture_slate_snapshots`).
+
+- Pass 1 (event detail): one request per upcoming in-scope event (priority leagues first, then
+  other leagues' events that hold an open-pick slug), spaced 0.25 s
+  (`EVENT_DETAIL_MIN_REQUEST_INTERVAL_SECONDS`), inside `max_capture_seconds`. For every slate
+  market of the event it writes a row with `reconstruction_status_source`
+  `live_gateway_event_detail_quote`, `usage` `prospective_executable_bbo`, `market_state`
+  `MARKET_STATE_OPEN`, `bid_size`/`ask_size`/`transact_time_utc` None, `observed_at_utc` stamped
+  after the response arrives, and `quote_cache_age_seconds` from the `Age` header. Rows pass through
+  the same `_annotate_capture` as `/book` rows, so they carry the identical field set.
+- Fail closed per market (`_event_detail_quote_book`): status open, active, not closed,
+  `ep3Status` absent or `OPEN`, finite `0 < bid < ask < 1`, and the line equal to the slate's when
+  both exist; anything else writes no row and is fetched by pass 2. `market_state` is mapped to
+  `MARKET_STATE_OPEN` only from the verified open status, so an event-detail row is exactly as
+  executable as a `/bbo` row, never looser.
+- Fail soft per event: an HTTP, parse or type error counts in `event_detail_failures` and the pass
+  continues; a 429 ends the pass (the limit is IP-wide and pass 2 needs the budget). Ladder pruning
+  does not apply to pass 1 (every rung is in the same response); it still applies to pass 2.
+- Pass 2 (`/book`) keeps its contract set, pacer and budget. Each tier is now a stable partition,
+  contracts with no event-detail quote first, then the quoted ones, so the paced budget reaches
+  unquoted markets before it refreshes the ladder shortlist for depth. A later `/book` row wins
+  over an earlier event-detail row in `_latest_capture_per_market`, `_fresh_latest_per_slug` and
+  `PolymarketSnapshotStore.latest` (pinned by a test).
+
+**Decisions.**
+
+- `captured`, `captured_by_league`, `missing_executable_ask`, `timestamp_invalid_count` and
+  `nba_missing_quote_event_ids` count rows written by both passes, because consumers read
+  `captured` as snapshots persisted (`ncaab_paper_trial` sums it); `captured_by_source` gives the
+  split. New keys only: `event_detail_events`, `event_detail_captured`, `event_detail_failures`,
+  `captured_by_source`, `covered_book_failures`; none removed or renamed.
+- A `/book` failure or skip on a market pass 1 already quoted is `covered_book_failures`, not
+  `failures`: `failures`, `skipped_after_time_budget` and `skipped_after_rate_limit` keep meaning
+  "contracts left with no snapshot from this run". `event_detail_failures` is never added to
+  `failures`, since those markets fall through to pass 2.
+- A client without `event_detail` (test stubs, legacy) captures exactly as before.
+
+**Reader audit.** The only code naming a `reconstruction_status_source` outside this module is
+`research_quote_contracts.py:68`, which requires `live_gateway_market_and_book_response` and so
+already rejects `/bbo` rows; there is no `/bbo` allow-list to extend and it was not touched. The
+executable-quote gates read `market_state == "MARKET_STATE_OPEN"`, `provider`, `reconstructed`,
+`timestamp_valid` and `usage`, all of which event-detail rows satisfy. `college_contract_evidence`
+also needs a parseable `transact_time_utc`, so it rejects `/bbo` and event-detail rows alike; the
+`/book` rows from pass 2 (ladder shortlist) keep serving it. No reader or gate was edited.
+
+**Live proof** (read-only GETs; `cli polymarket-slate --date 2026-11-14`, 21:49Z to 22:04Z, runtime
+root unchanged; nothing posted to any order endpoint).
+
+| | events asked | `event_detail_captured` | `captured` | by source (detail / bbo / book) | `elapsed_seconds` | `failures` | rate-limit pauses |
+|---|---|---|---|---|---|---|---|
+| NCAAB | 34 | 1491 | 1619 | 1491 / 18 / 110 | 367.2 | 0 | 3 |
+| NCAAF | 30 | 1910 | 2107 | 1910 / 34 / 163 | 531.6 | 162 | 3 |
+
+`event_detail_failures` 0 and `source_rate_limited` false on both; pass 1 took about 7 s for 34
+events. NCAAF `failures` 162 are 160 `capture_time_budget_exhausted` and two `invalid_executable_bbo`;
+all 162 are contracts of games already under way (checked against the slate's start times), in
+the secondary tier on its 120 s cap, which pass 1 does not cover. Every upcoming-game contract
+got a snapshot. Spot checks of
+three stored event-detail rows per slate against a live `/bbo` GET: NCAAB 41.0%/42.0%,
+79.0%/81.0%, 57.0%/58.0% (bid/ask) equal the live 41.0/42.0, 79.0/81.0, 57.0/58.0; NCAAF
+61.0/62.0, 58.0/59.0, 21.0/22.0 equal the live 61.0/62.0, 58.0/59.0, 21.0/22.0. No event-detail
+row has `timestamp_valid` false or a missing ask. Compare the 21:00Z daily: 203 captured.
+Code: commit e8e2ed47 (8 `test_event_detail_*` tests in `tests/test_polymarket_us.py`).
+
 ## 2026-11-14 — Prospective BBO capture abandoned on the first 429 and starved NCAAF; NCAAF priced off ESPN consensus (debug bbo-capture-429-starves-ncaaf)
 
 **Symptom.** Every NCAAF Main row written on 2026-11-14 carried `sportsbook=espn_consensus` and a
