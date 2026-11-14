@@ -117,6 +117,7 @@ None yet.
 | 261114-dsh | Drop the Rebuild Shadow dashboard tab (5023->4830 lines), default ledger sport filter to the six production sports, archive eight dated reports to docs/archive/reports | 2026-11-14 | b29e3c14 | [261114-dsh-drop-rebuild-dashboard-tab-archive-dated-reports](./quick/261114-dsh-drop-rebuild-dashboard-tab-archive-dated-reports/) |
 | 261114-hlt | system_health treats switched-off and off-season sports as informational (live verdict DEGRADED -> HEALTHY, 0 reasons) | 2026-11-14 | 311b4812 | [261114-hlt-scope-aware-system-health](./quick/261114-hlt-scope-aware-system-health/) |
 | 261114-prf | Daily write path: event-scoped duplicate read (1.9-2.5 s -> ms per append), model-ledger read cache, memoized NCAAF replay simulation; pytest no longer binds to the live runtime root; 3 stale pins | 2026-11-14 | 41a27c73 | [261114-prf-daily-write-path-perf-and-test-isolation](./quick/261114-prf-daily-write-path-perf-and-test-isolation/) |
+| 261114-mzz | Event-detail quote pass (one GET per game) ahead of the paced /book capture: NCAAB 1619 and NCAAF 2107 contracts captured per run vs 203 in the 21:00Z daily; /book pass serves unquoted markets first | 2026-11-14 | e8e2ed47 | [261114-mzz-add-event-detail-quote-pass-to-polymarke](./quick/261114-mzz-add-event-detail-quote-pass-to-polymarke/) |
 
 ## Milestone History
 
