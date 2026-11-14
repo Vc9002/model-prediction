@@ -88,30 +88,29 @@ def test_evidence_status_does_not_control_serving_status() -> None:
     assert mlb_champ.evidence_status == "historical_only"
     assert mlb_champ.replacement_priority == ReplacementPriority.HIGH.value
 
-    # The corrective v3 serves paper predictions with unverified performance evidence.
-    soccer_champ = registry.champion("SOCCER", "moneyline")
-    assert soccer_champ is not None
-    assert soccer_champ.available is True
-    assert soccer_champ.serving_status in {"production", "active"}
-    assert soccer_champ.evidence_status == EvidenceStatus.UNVERIFIED.value
-    assert soccer_champ.replacement_priority == ReplacementPriority.HIGH.value
+    # Soccer is out of production scope (2026-11-13): its entries are disabled and it has
+    # no champion route or lifecycle contract, independent of its evidence status.
+    assert registry.champion("SOCCER", "moneyline") is None
+    assert registry.lifecycle_contract("SOCCER", "moneyline") is None
+    assert registry.entries["soccer-poisson-dc-v3"].enabled is False
+    assert registry.entries["soccer-poisson-dc-v3"].evidence_status == EvidenceStatus.UNVERIFIED.value
 
-    contract = registry.lifecycle_contract("SOCCER", "moneyline")
-    assert contract is not None
-    assert contract.serving_status in {"production", "active"}
-    assert contract.evidence_status == EvidenceStatus.UNVERIFIED.value
-    assert contract.replacement_priority == ReplacementPriority.HIGH.value
-
-    # NCAAF was unified under cfb-structural-v2 (predictively_qualified with medium replacement priority)
+    # NCAAF serves one structural model across all three markets. cfb-structural-v5 was
+    # promoted 2026-11-13 with evidence_status historical_only (qualified: false) -- the
+    # point of this test: evidence status does not decide whether the champion serves.
     for market in ("moneyline", "spread", "total"):
         champion = registry.champion("NCAAF", market)
         assert champion is not None
         assert champion.available is True
         assert champion.serving_status in {"production", "active"}
-        assert champion.evidence_status == EvidenceStatus.PREDICTIVELY_QUALIFIED.value
+        assert champion.evidence_status in {
+            EvidenceStatus.PREDICTIVELY_QUALIFIED.value,
+            EvidenceStatus.HISTORICAL_ONLY.value,
+        }
         assert champion.replacement_priority in {
             ReplacementPriority.MEDIUM.value,
             ReplacementPriority.LOW.value,
+            ReplacementPriority.HIGH.value,
         }
 
 

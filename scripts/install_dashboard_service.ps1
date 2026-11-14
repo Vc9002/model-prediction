@@ -8,6 +8,16 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $TaskName = 'ModelPredictionDashboard'
 $Py = Join-Path $RepoRoot '.venv\Scripts\python.exe'
+
+if (Test-Path (Join-Path $RepoRoot '.env')) {
+    foreach ($line in Get-Content (Join-Path $RepoRoot '.env')) {
+        if ($line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$') {
+            $value = $Matches[2].Trim('"').Trim("'")
+            [Environment]::SetEnvironmentVariable($Matches[1], $value, 'Process')
+        }
+    }
+}
+
 $RuntimeRoot = if ($env:MODEL_PREDICTION_RUNTIME_ROOT) { $env:MODEL_PREDICTION_RUNTIME_ROOT.Trim() } else { Join-Path $RepoRoot 'data' }
 $LogDir = Join-Path $RepoRoot 'dashboard'
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null

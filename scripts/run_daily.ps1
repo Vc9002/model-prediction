@@ -38,6 +38,11 @@ function Write-Log([string]$Message) {
 # Returns the command's exit code.
 function Invoke-Step([string[]]$PyArgs, [string]$PythonPath = 'src') {
     $env:PYTHONPATH = $PythonPath
+    # A hard crash inside python312.dll (0xC0000005 on 2026-11-10 18:09 and
+    # 2026-11-11 16:10, same fault offset) prints nothing, so the log carried only
+    # an exit code. faulthandler writes the Python stack of every thread on a fatal
+    # error, which is the only evidence of what was running when it died.
+    $env:PYTHONFAULTHANDLER = '1'
     & $Py @PyArgs 2>&1 | Out-File -FilePath $Log -Append -Encoding utf8
     return $LASTEXITCODE
 }
@@ -139,6 +144,17 @@ Write-Log '--- Step 2: Unified slate + main/flat/research forecasts ---'
 $Stopwatch.Restart()
 $DailyExit = Invoke-Step @('-m', 'model_prediction.cli', 'daily', '--date', $RunDate, '--skip-settlement')
 Write-Log "Unified daily exit code: $DailyExit"
+# The unified step supersedes today's open pre-game picks BEFORE it recomputes them,
+# so a hard crash (negative NTSTATUS exit, e.g. -1073741819) leaves those games with
+# no open picks until the next scheduled run: the 2026-11-11 16:10 crash left tonight's
+# slate at 4 NBA / 18 NCAAB rows against 20 / 93 from the prior run, hours before tip-off.
+# Retry once, only for a native crash. An ordinary exit 1 (integrity alarm after a
+# fail-soft completion) already wrote its picks and would just repeat identically.
+if ($DailyExit -lt 0) {
+    Write-Log "Unified daily crashed natively (exit $DailyExit); retrying once to restore the cleared picks."
+    $DailyExit = Invoke-Step @('-m', 'model_prediction.cli', 'daily', '--date', $RunDate, '--skip-settlement')
+    Write-Log "Unified daily retry exit code: $DailyExit"
+}
 Write-Log ("Unified daily took: {0}s" -f [int]$Stopwatch.Elapsed.TotalSeconds)
 
 # -- Step 2b: MLB v9 Challenger flat forecast --------------------------------

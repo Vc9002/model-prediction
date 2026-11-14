@@ -41,6 +41,11 @@ are switched off, not deleted:
 - Their code, artifacts, and calibrators stay in place. Settlement of
   already-open picks and score ingestion continue so history stays
   continuous. `cli forecast --sport <x>` still works for a manual run.
+- In `config/production.yaml` their 40 registry entries carry
+  `enabled: false` and their `champions:` / `challengers:` routes are
+  removed; `model_lifecycle.SUPPORTED_MARKETS` lists only the six sports.
+  `tests/test_production_registry.py` pins 89 entries, 49 available, 40
+  disabled-by-scope with a contract that still resolves.
 - **Re-enabling esports, KBO, or NPB needs a backfill first.** Their Elo
   ratings refresh only inside the daily forecast block (14-day incremental
   merge), so while they are off the ratings and match history go stale. Run
