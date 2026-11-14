@@ -132,6 +132,12 @@ def defer_sqlite_xlsx_exports() -> Iterator[None]:
                     _parity_alarm(ledger.mirror, f"deferred export write {ledger.path}")
 
 
+def _sqlite_xlsx_export_deferred() -> bool:
+    """Whether a deferral context is active, without registering a ledger as dirty."""
+    with _DEFERRED_XLSX_EXPORTS_LOCK:
+        return _DEFERRED_XLSX_EXPORTS_DEPTH > 0
+
+
 def _defer_sqlite_xlsx_export(ledger: PickLedger) -> bool:
     with _DEFERRED_XLSX_EXPORTS_LOCK:
         if _DEFERRED_XLSX_EXPORTS_DEPTH <= 0:
@@ -896,7 +902,14 @@ class PickLedger:
         )
         with self._lock():
             self._migrate_if_needed()
-            existing = self._read_unlocked()
+            # The duplicate check only needs this event's rows. Reading the whole
+            # tier/sport slice here cost 1.9 s (flat/ncaaf, 4,216 rows) to 2.5 s
+            # (flat/ncaab, 8,442 rows) per append on 2026-11-14 and grew daily;
+            # the indexed event lookup is under a millisecond. The full list is
+            # only ever needed to rebuild the XLSX export, so it is read only
+            # when that export is not deferred.
+            event_scoped = self.authority == "sqlite" and _sqlite_xlsx_export_deferred()
+            existing = self._read_unlocked(event_id=request.event_id if event_scoped else None)
             for item in existing:
                 item_key = _market_duplicate_key(
                     item["event_id"],
@@ -999,7 +1012,13 @@ class PickLedger:
                 # Canonical store commits first — its failure aborts the
                 # mutation (the export write below becomes best-effort).
                 self._mirror_row(row, "append", operation_id)
-            self._write_rows(existing)
+            if event_scoped and not _defer_sqlite_xlsx_export(self):
+                # The deferral ended between the check and here (another
+                # thread's context exited): the export needs every row, and
+                # the canonical store already holds the new one.
+                self._write_rows(self._read_unlocked())
+            elif not event_scoped:
+                self._write_rows(existing)
         # Operator directive, 2026-08-02: every model also writes to its own
         # per-model ledger going forward (data/model_ledgers/<model-id>.xlsx,
         # see model_ledger.py) -- additive, alongside this real, working
@@ -2199,12 +2218,17 @@ class PickLedger:
             raise ValueError(f"cannot write picks.xlsx with unknown fields: {unknown}")
         write_xlsx_rows_atomic(self.path, FIELDNAMES, rows)
 
-    def _read_unlocked(self) -> list[dict[str, str]]:
+    def _read_unlocked(self, *, event_id: str | None = None) -> list[dict[str, str]]:
+        """Every live row of this ledger, or only one event's when ``event_id`` is given.
+
+        ``event_id`` narrows the read under sqlite authority only; the XLSX
+        path has no index to use and always returns every row.
+        """
         if self.authority == "sqlite":
             if self.mirror is None or not self.tier:
                 raise RuntimeError("sqlite ledger authority requires a RuntimeLedgerStore and ledger tier")
             canonical_rows: list[dict[str, str]] = []
-            for projected in self.mirror.pick_rows(tier=self.tier, sport=self.sport):
+            for projected in self.mirror.pick_rows(tier=self.tier, sport=self.sport, event_id=event_id):
                 if projected.get("status") in RETIRED_STATUSES:
                     continue
                 row = dict.fromkeys(FIELDNAMES, "")

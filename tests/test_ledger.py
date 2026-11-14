@@ -464,3 +464,63 @@ def test_main_ledger_keeps_a_downgraded_paper_call_unqualified(tmp_path) -> None
     row = ledger.append_evaluated(second, qualified)
     assert row["reason_code"] == "QUALIFIED"
     assert is_qualified_row(row)
+
+
+def _sqlite_ledger(tmp_path):
+    from model_prediction.runtime_ledger_store import RuntimeLedgerStore
+    from model_prediction.runtime_paths import RuntimePaths
+
+    store = RuntimeLedgerStore(RuntimePaths.for_test(tmp_path))
+    ledger = PickLedger(
+        tmp_path / "picks.xlsx",
+        tmp_path / "events.jsonl",
+        tier="main",
+        mirror=store,
+        authority="sqlite",
+        sport="mlb",
+    )
+    return ledger, store
+
+
+def test_deferred_append_reads_only_the_events_own_rows(tmp_path, monkeypatch) -> None:
+    """The duplicate check must not re-read the whole ledger on every append."""
+    from model_prediction.ledger import DuplicatePickError, defer_sqlite_xlsx_exports
+    from model_prediction.xlsx_ledger import read_xlsx_rows
+
+    ledger, store = _sqlite_ledger(tmp_path)
+    for index in range(5):
+        ledger.append_call(replace(request(), event_id=f"other-{index}"), 1.0, 70)
+
+    reads: list[tuple[str | None, int]] = []
+    real_pick_rows = store.pick_rows
+
+    def counting_pick_rows(**filters):
+        rows = real_pick_rows(**filters)
+        reads.append((filters.get("event_id"), len(rows)))
+        return rows
+
+    with defer_sqlite_xlsx_exports():
+        monkeypatch.setattr(store, "pick_rows", counting_pick_rows)
+        logged = ledger.append_call(request(), 1.0, 70)
+        assert reads == [("event-1", 0)]
+        # Same market, other side: still a duplicate under the narrowed read.
+        with pytest.raises(DuplicatePickError) as duplicate:
+            ledger.append_call(replace(request(), selection="under"), 1.0, 70)
+        assert duplicate.value.pick_id == logged["pick_id"]
+        assert reads[-1] == ("event-1", 1)
+        monkeypatch.undo()
+
+    # The export rebuilt on exit holds every row, not just the last event's.
+    assert len(ledger.rows()) == 6
+    assert len(read_xlsx_rows(tmp_path / "picks.xlsx")[1]) == 6
+    store.close()
+
+
+def test_undeferred_append_still_exports_every_row(tmp_path) -> None:
+    from model_prediction.xlsx_ledger import read_xlsx_rows
+
+    ledger, store = _sqlite_ledger(tmp_path)
+    ledger.append_call(replace(request(), event_id="other"), 1.0, 70)
+    ledger.append_call(request(), 1.0, 70)
+    assert len(read_xlsx_rows(tmp_path / "picks.xlsx")[1]) == 2
+    store.close()
