@@ -2,20 +2,20 @@
 quick_id: 261114-prf
 status: complete
 date: 2026-11-14
-commit: d865002b
+commit: 41a27c73
 ---
 
 # Summary: the daily write path no longer re-reads the ledger or re-runs simulations
 
 ## What changed
 
-- `ae6f8f17` `cfb_replay.py`: `_MemoizedReplayEngine` caches simulated score arrays on engine
+- `dd6fa737` `cfb_replay.py`: `_MemoizedReplayEngine` caches simulated score arrays on engine
   parameters, RNG state and score means (16 entries). `models/cfb_distribution.py` untouched.
-- `ae6f8f17` `model_ledger.py`: `_ROWS_CACHE`, a stat-validated read cache; writes drop the entry.
-- `ae6f8f17` `runtime_ledger_store.py`: `records` / `pick_rows` accept `event_id`.
-- `ae6f8f17` `tests/conftest.py`: drops `MODEL_PREDICTION_RUNTIME_ROOT` at import;
+- `dd6fa737` `model_ledger.py`: `_ROWS_CACHE`, a stat-validated read cache; writes drop the entry.
+- `dd6fa737` `runtime_ledger_store.py`: `records` / `pick_rows` accept `event_id`.
+- `dd6fa737` `tests/conftest.py`: drops `MODEL_PREDICTION_RUNTIME_ROOT` at import;
   `test_auto_buyer_cycle_tracking` patches `AUTO_BUYER_CYCLE_HISTORY_PATH`; three stale pins fixed.
-- `d865002b` `ledger.py`: `_append_record` reads only the event's rows while the XLSX export is
+- `41a27c73` `ledger.py`: `_append_record` reads only the event's rows while the XLSX export is
   deferred; `_read_unlocked(event_id=)`; `_sqlite_xlsx_export_deferred()`.
 
 ## Verification
