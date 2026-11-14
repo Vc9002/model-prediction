@@ -114,6 +114,7 @@ None yet.
 | 261113-smp | Narrow production to NBA/NCAAF/NFL/MLB/WNBA/NCAAB via model.yaml flag + daily.py gate; research tests to tests/research (off default pytest); rebuild shadow task frozen; CLAUDE.md trimmed, paper+gated-real-money stated once | 2026-11-13 | 166bb2ce | [261113-smp-simplify-project-scope-six-sports](./quick/261113-smp-simplify-project-scope-six-sports/) |
 | 261114-tfx | Clear 13 stale core-suite failures (1 real: NBA replay thin-sample widening); apply PR 36 review (gate fixed NCAAF/NBA/NFL tasks, scope test pins flag, CI runs tests/research) | 2026-11-14 | d5c331e9 | [261114-tfx-clear-core-suite-failures-and-pr36-review](./quick/261114-tfx-clear-core-suite-failures-and-pr36-review/) |
 | 261114-reg | Disable 40 out-of-scope registry entries and drop their routes; SUPPORTED_MARKETS to six sports; delete 53 orphaned research scripts; fix stale pins and a network-dependent settlement test | 2026-11-14 | 0face48b | [261114-reg-disable-out-of-scope-registry-entries-prune-scripts](./quick/261114-reg-disable-out-of-scope-registry-entries-prune-scripts/) |
+| 261114-dsh | Drop the Rebuild Shadow dashboard tab (5023->4830 lines), default ledger sport filter to the six production sports, archive eight dated reports to docs/archive/reports | 2026-11-14 | b29e3c14 | [261114-dsh-drop-rebuild-dashboard-tab-archive-dated-reports](./quick/261114-dsh-drop-rebuild-dashboard-tab-archive-dated-reports/) |
 
 ## Milestone History
 
