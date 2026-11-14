@@ -42,6 +42,10 @@ jobs:
         env:
           PYTHONPATH: src:.
         run: python -m pytest -q --junitxml=full-compat.xml
+      - name: Research-tooling tests (excluded from the default run)
+        env:
+          PYTHONPATH: src:.
+        run: python -m pytest -q tests/research --junitxml=research-compat.xml
       - name: Upload compatibility test evidence
         if: always()
         uses: actions/upload-artifact@v4

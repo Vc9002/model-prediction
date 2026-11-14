@@ -774,47 +774,6 @@ def test_dashboard_ledger_filter_system_node_execution() -> None:
     assert result.stdout == "OK"
 
 
-def test_auto_buyer_consolidated_tab_markup_and_routing() -> None:
-    html = (ROOT / "dashboard.html").read_text(encoding="utf-8")
-    assert 'data-tab="auto-buyer-ledger"' in html
-    assert '<section id="tab-auto-buyer-ledger"' in html
-    assert 'id="autoBuyerKpis"' in html
-    assert 'id="btnAbsSettled"' in html
-    assert 'id="btnAbsPending"' in html
-    assert 'id="btnAbsAll"' in html
-    assert 'id="absPendingTable"' in html
-    assert 'id="absSettledTable"' in html
-    assert 'id="btnAutoBuyerPerformanceView"' in html
-    assert 'id="autoBuyerPerformancePanel"' in html
-    assert 'id="autoBuyerDailyPerformanceTable"' in html
-    assert 'id="autoBuyerUnitValueInput"' in html
-    assert 'id="autoBuyerUnitBadge"' in html
-    assert '"/api/auto-buyer/unit-value"' in html
-    assert "saveAutoBuyerUnitValue" in html
-    assert "historical rows retain their execution-time unit value" in html
-    assert "Future automated sizing and unit-based risk caps will become" in html
-    assert "max_game_stake_units" in html
-    assert "max_daily_spend_units" in html
-    assert "setAutoBuyerView('performance')" in html
-    assert 'id="autoBuyerCumulativePnl"' in html
-    assert 'id="autoBuyerSportPnl"' in html
-    assert 'id="autoBuyerSportTable"' in html
-    assert 'timeZone: "America/New_York"' in html
-    assert "Pending positions excluded" in html
-    assert "renderAutoBuyer" in html
-    assert "renderAutoBuyerSettle" in html
-    assert "renderAutoBuyerLedger" in html
-    assert "settleAutoBuyerTrades" in html
-    assert "runAutoBuyerNow" in html
-    assert '"No positions changed."' in html
-    assert "Moved from pending: ${newlySettled}" in html
-    assert "if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);" in html
-    assert "const remainingPending = Number(data.remaining_pending);" in html
-    assert "Still pending: ${remainingPending}" in html
-    assert "Still pending: ${Number(data.pending || 0)}" not in html
-    assert "Settled: ${data.settled}" not in html
-
-
 def test_auto_buyer_performance_cohorts_and_et_day_grouping() -> None:
     node = shutil.which("node")
     if node is None:

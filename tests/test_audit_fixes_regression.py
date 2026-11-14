@@ -566,10 +566,18 @@ def test_neutral_resolution_side_settles_via_winning_outcome_team_name(tmp_path:
         ]
     }
 
+    class _UnresolvedMarketClient:
+        # Without a stub the settle path builds a real PolymarketUSClient and the live
+        # market for this slug resolved to a fair-value price, which grades "push" before
+        # the NEUTRAL fallback under test is ever reached (network-dependent failure).
+        def market(self, slug):
+            return {"status": "MARKET_STATUS_OPEN"}
+
     result = settle_auto_buyer_ledger(
         data_root=tmp_path,
         espn=MagicMock(),
         polymarket_executor=executor,
+        polymarket_client=_UnresolvedMarketClient(),
     )
 
     settled = read_auto_buyer_ledger(j_path)[0]
@@ -1296,6 +1304,8 @@ def test_nba_total_margin_v2_model_and_forecast():
         "nba-total-margin-v5",
         "nba-total-margin-v6",
         "nba-total-margin-v7",
+        "nba-total-margin-v8",
+        "nba-total-margin-v9",
     }
     assert champ.available is True
     assert "nba-total-margin-v2" not in registry.blocked_workflows
@@ -1308,6 +1318,8 @@ def test_nba_total_margin_v2_model_and_forecast():
         "nba-total-margin-v4",
         "nba-total-margin-v5",
         "nba-total-margin-v6",
+        "nba-total-margin-v7",
+        "nba-total-margin-v8",
     }
 
     # 3. BasketballModel Composite Total Forecast
@@ -1372,6 +1384,8 @@ def test_nba_spread_margin_v2_model_and_forecast():
         "nba-spread-margin-v5",
         "nba-spread-margin-v6",
         "nba-spread-margin-v7",
+        "nba-spread-margin-v8",
+        "nba-spread-margin-v9",
     }
     assert champ.available is True
     assert "nba-spread-margin-v2" not in registry.blocked_workflows
@@ -1384,6 +1398,8 @@ def test_nba_spread_margin_v2_model_and_forecast():
         "nba-spread-margin-v4",
         "nba-spread-margin-v5",
         "nba-spread-margin-v6",
+        "nba-spread-margin-v7",
+        "nba-spread-margin-v8",
     }
 
     # 3. Model Execution

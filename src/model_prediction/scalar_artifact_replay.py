@@ -251,7 +251,17 @@ def replay_snapshot(payload: dict[str, Any]) -> dict[str, float]:
         if not all(math.isfinite(value) and 0 <= value <= 1 for value in consistency):
             raise ValueError("invalid_scalar_replay_volatility_features")
         avg_c = sum(value or 0.05 for value in consistency) / 2.0
+        base_sd = expected_sd
         expected_sd = max(12.0, min(17.5, expected_sd * (1.0 + 0.25 * (1.0 - avg_c / 0.055))))
+        # Thin-sample widening, replayed from the captured current-season sample
+        # (BasketballModel: sample < 8 => sd >= margin_sd * (1 + 0.5 * (1 - sample / 8))).
+        # Snapshots captured before the sample was recorded carry no key and replay as before.
+        sample = payload["features"].get("volatility_sample")
+        if sample is not None:
+            sample = int(sample)
+            if sample < 8:
+                sample_factor = max(0.0, min(1.0, 1.0 - sample / 8.0))
+                expected_sd = max(expected_sd, base_sd * (1.0 + 0.5 * sample_factor))
     if sd != expected_sd:
         raise ValueError("scalar_replay_artifact_parameter_mismatch")
     below = _normal_cdf(line, mean, sd)

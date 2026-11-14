@@ -98,7 +98,8 @@ def test_ci_imports_of_checked_in_config_resolve() -> None:
     from model_prediction.production_registry import ProductionModelRegistry
 
     registry = ProductionModelRegistry.load(Path(__file__).resolve().parents[1])
-    assert len(registry.entries) == 78
+    # Entry count is pinned once, in test_production_registry (89 entries, 49 available).
+    assert len(registry.entries) == len(registry.available_entries()) + len(registry.problem_entries())
     assert "nba-spread-margin-v6" in registry.entries
     assert "nba-total-margin-v6" in registry.entries
     assert "nfl-spread-structural-v6" in registry.entries
@@ -126,8 +127,8 @@ def test_ci_imports_of_checked_in_config_resolve() -> None:
     assert "hockey-poisson-dc-v1" in registry.entries
     assert "darts-markov-v1" in registry.entries
     assert "ncaab-tempo-v1" in registry.entries
-    # In the champion-challenger production framework, all 35 models
-    # across supported markets are valid serving entries (zero problem entries).
-    problems = {e.model_id for e in registry.problem_entries()}
-    assert problems == set()
-    assert len(registry.available_entries()) == 78
+    # Scope 2026-11-13: the only non-available entries are the switched-off sports'
+    # models, disabled by decision (enabled: false) with a contract that still resolves.
+    # A failed contract on an in-scope model is a CI failure.
+    failed = {e.model_id for e in registry.problem_entries() if e.enabled or e.load_error is not None}
+    assert failed == set()

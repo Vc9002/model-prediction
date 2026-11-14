@@ -30,9 +30,44 @@ def _nba_volatility_features(artifact: dict, history, prediction) -> dict:
             offseason_retention=float(artifact.get("offseason_retention", 0.50)),
             isolate_postseason=bool(artifact.get("isolate_postseason", False)),
         )
-        features["volatility_away_consistency"] = trend.team_trend(prediction.away_team).consistency
-        features["volatility_home_consistency"] = trend.team_trend(prediction.home_team).consistency
+        away_trend = trend.team_trend(prediction.away_team)
+        home_trend = trend.team_trend(prediction.home_team)
+        features["volatility_away_consistency"] = away_trend.consistency
+        features["volatility_home_consistency"] = home_trend.consistency
+        # The engine widens sd again when either side has under 8 current-season games
+        # (BasketballModel.predict_games, sample_factor). Replay must see the same sample
+        # or every early-season snapshot fails parameter_mismatch -- this mirrors the
+        # engine's season-opener override (last game further back than offseason_gap_days
+        # => 0) without touching the protected NBA model file.
+        features["volatility_sample"] = _nba_volatility_sample(
+            artifact, history, prediction, away_trend, home_trend
+        )
     return features
+
+
+def _nba_volatility_sample(artifact: dict, history, prediction, away_trend, home_trend) -> int:
+    from ..domain import parse_utc
+
+    try:
+        start = parse_utc(prediction.event_start_utc)
+    except (ValueError, TypeError):
+        start = None
+    gap_days = artifact.get("offseason_gap_days")
+
+    def _sample(team: str, trend_sample: int) -> int:
+        prev = [g for g in history if g.home_team == team or g.away_team == team]
+        if start is not None:
+            prev = [g for g in prev if g.start < start]
+        if gap_days is not None and start is not None and prev:
+            last = max(g.start for g in prev)
+            if (start - last).total_seconds() / 86400.0 > float(gap_days):
+                return 0
+        return int(trend_sample)
+
+    return min(
+        _sample(prediction.away_team, away_trend.current_season_games_played),
+        _sample(prediction.home_team, home_trend.current_season_games_played),
+    )
 
 
 def _select_mlb_nrfi_market(rows: list[dict]) -> dict | None:

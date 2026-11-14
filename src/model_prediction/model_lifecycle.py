@@ -31,25 +31,15 @@ logger = logging.getLogger(__name__)
 # ── Central Definition of Supported Markets ───────────────────────────────────
 
 SUPPORTED_MARKETS: dict[str, set[str]] = {
+    # Production scope since 2026-11-13 (CLAUDE.md "Scope"): the six sports that forecast
+    # daily. Soccer, tennis, esports, KBO/NPB, hockey, darts, Euroleague and NBL keep their
+    # code and artifacts but are no longer markets a champion must serve.
     "MLB": {"moneyline", "spread", "total", "nrfi"},
     "WNBA": {"moneyline", "spread", "total"},
     "NCAAF": {"moneyline", "spread", "total"},
     "NBA": {"moneyline"},
     "NFL": {"moneyline", "spread", "total"},
-    "SOCCER": {"moneyline", "spread", "total"},
-    "TENNIS": {"moneyline", "spread", "total"},
-    "CS2": {"moneyline", "spread", "total"},
-    "DOTA2": {"moneyline", "spread", "total"},
-    "LOL": {"moneyline", "spread", "total"},
-    "VALORANT": {"moneyline", "spread", "total"},
-    "RAINBOW_SIX": {"moneyline", "spread", "total"},
-    "KBO": {"moneyline"},
-    "NPB": {"moneyline"},
-    "HOCKEY": {"moneyline", "spread", "total"},
-    "DARTS": {"moneyline"},
     "NCAAB": {"moneyline", "spread", "total"},
-    "EUROLEAGUE": {"moneyline", "spread", "total"},
-    "NBL": {"moneyline", "spread", "total"},
 }
 
 # Every market with a priced lane now has a registered champion; markets without a model

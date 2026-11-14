@@ -100,12 +100,28 @@ def test_real_production_yaml_resolves_every_model() -> None:
 
     assert registry.schema_version == "3"
     assert len(registry.entries) == 89
-    # Under the permanent champion-challenger framework, all models
-    # across supported markets are available contracts (champions + rollbacks).
-    # Weak evidence models have evidence_status=degraded and
-    # replacement_priority=critical rather than being disabled.
-    assert len(registry.available_entries()) == 89
-    assert len(registry.problem_entries()) == 0
+    # Scope 2026-11-13: the 40 entries for switched-off sports are enabled: false and
+    # therefore unavailable by decision, not by a failed contract. Every in-scope entry
+    # must still resolve, so a healthy registry has zero *failed* entries.
+    assert len(registry.available_entries()) == 49
+    problems = registry.problem_entries()
+    assert len(problems) == 40
+    assert all(not e.enabled and e.load_error is None for e in problems)
+    assert {e.sport for e in problems} == {
+        "SOCCER",
+        "TENNIS",
+        "LOL",
+        "CS2",
+        "DOTA2",
+        "VALORANT",
+        "RAINBOW_SIX",
+        "KBO",
+        "NPB",
+        "HOCKEY",
+        "DARTS",
+        "EUROLEAGUE",
+        "NBL",
+    }
     assert registry.primary.model_id == "wnba-elo-trend-lr-v4"
     assert registry.primary.artifact_hash
     assert registry.champion("NBA", "moneyline").model_id == "nba-elo-trend-lr-v5"
@@ -154,8 +170,9 @@ def test_real_production_yaml_resolves_every_model() -> None:
     soccer_v2 = registry.entries["soccer-poisson-dc-v2"]
     assert soccer_v2.implementation == IMPLEMENTATION_CODE_BACKED
     assert soccer_v2.entry == "model_prediction.models.soccer:soccer_model_v2"
-    assert registry.champion("SOCCER", "moneyline").model_id == "soccer-poisson-dc-v3"
-    assert registry.champion("SOCCER", "moneyline").rollback_model == "soccer-poisson-dc-v2"
+    # Soccer is out of scope (2026-11-13): entries stay, disabled, with no champion route.
+    assert soccer_v2.enabled is False
+    assert registry.champion("SOCCER", "moneyline") is None
     tennis = registry.entries["tennis-surface-elo-v1"]
     assert tennis.implementation == IMPLEMENTATION_CODE_BACKED
     assert tennis.entry == "model_prediction.models.tennis:tennis_model"
@@ -171,25 +188,27 @@ def test_real_production_yaml_resolves_every_model() -> None:
     tennis_v6 = registry.entries["tennis-surface-elo-v6"]
     assert tennis_v6.implementation == IMPLEMENTATION_CODE_BACKED
     assert tennis_v6.entry == "model_prediction.models.tennis:tennis_model"
-    assert registry.champion("TENNIS", "moneyline").model_id == "tennis-surface-elo-v6"
-    assert registry.champion("TENNIS", "moneyline").rollback_model == "tennis-surface-elo-v5"
-    assert registry.champion("TENNIS", "spread").model_id == "tennis-games-markov-v4"
-    assert registry.champion("TENNIS", "spread").rollback_model == "tennis-games-markov-v3"
-    assert registry.champion("TENNIS", "total").model_id == "tennis-games-markov-v4"
-    assert registry.champion("TENNIS", "total").rollback_model == "tennis-games-markov-v3"
+    # Tennis is out of scope (2026-11-13): entries stay, disabled, with no champion route.
+    assert tennis_v6.enabled is False
+    assert registry.champion("TENNIS", "moneyline") is None
+    assert registry.champion("TENNIS", "spread") is None
+    assert registry.champion("TENNIS", "total") is None
 
+    # The other switched-off sports: entries kept and still contract-valid, but
+    # disabled with no champion or challenger route.
     hockey = registry.entries["hockey-poisson-dc-v2"]
     assert hockey.implementation == IMPLEMENTATION_CODE_BACKED
     assert hockey.entry == "model_prediction.models.hockey:hockey_v2_model"
-    assert registry.champion("HOCKEY", "moneyline").model_id == "hockey-poisson-dc-v2"
-    assert registry.champion("NPB", "moneyline").model_id == "npb-baseball-v3"
-    assert registry.champion("RAINBOW_SIX", "moneyline").model_id == "rainbow_six-tiered-elo-v6"
-    assert registry.challengers["RAINBOW_SIX"]["moneyline"] == "r6-contextual-v7"
     darts = registry.entries["darts-markov-v2"]
     assert darts.implementation == IMPLEMENTATION_CODE_BACKED
     assert darts.entry == "model_prediction.models.darts:darts_v2_model"
-    assert registry.champion("DARTS", "moneyline").model_id == "darts-markov-v2"
-    assert registry.champion("KBO", "moneyline").model_id == "kbo-baseball-v3"
+    for sport in ("HOCKEY", "NPB", "KBO", "RAINBOW_SIX", "DARTS", "EUROLEAGUE", "NBL"):
+        assert registry.champion(sport, "moneyline") is None, sport
+        assert sport not in registry.champions
+        assert sport not in registry.challengers
+    for model_id in ("hockey-poisson-dc-v2", "npb-baseball-v3", "kbo-baseball-v3", "darts-markov-v2"):
+        assert registry.entries[model_id].enabled is False
+        assert registry.entries[model_id].load_error is None
     ncaab = registry.entries["ncaab-tempo-v1"]
     assert ncaab.implementation == IMPLEMENTATION_CODE_BACKED
     assert ncaab.entry == "model_prediction.models.basketball_leagues:ncaab_model"

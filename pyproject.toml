@@ -56,7 +56,11 @@ packages = ["src/model_prediction"]
 testpaths = ["tests"]
 pythonpath = [".", "src"]
 addopts = ["-q", "--disable-warnings", "-m", "not slow"]
+# "research" and "rebuild" hold the research-tooling and shadow-rebuild suites;
+# they never gate the daily run, so the default `pytest` skips them. Run them
+# explicitly: `pytest tests/research` / `pytest tests/rebuild`.
 norecursedirs = [
+  "research",
   "rebuild",
   "archive",
   "data",

@@ -492,7 +492,9 @@ def test_current_configured_artifacts_are_valid_after_rename_and_config_fix(
         }
         if model_version.endswith("tiered-elo-v6"):
             esports_titles[model_version.split("-")[0]] = entry
-        elif model_version.endswith("tie-aware-elo-v2"):
+        elif model_version.startswith(("kbo-", "npb-")):
+            # KBO/NPB serve kbo-baseball-v3 / npb-baseball-v3 now; the report is keyed by
+            # league, whatever the serving version string is.
             leagues[model_version.split("-")[0]] = entry
     (tmp_path / "outputs" / "esports-baseline-validation.json").write_text(
         json.dumps({"titles": esports_titles}), encoding="utf-8"
@@ -682,7 +684,8 @@ def test_http_payload_renders_nba_verified_with_missing_ledger_dashes(monkeypatc
 
         assert response.status == 200
         assert rendered == {
-            "backfill": "654 obs · 577 calls · 73.7% · Brier 0.185 · QUALIFIED",
+            # Tracks the serving NBA moneyline artifact (nba-elo-trend-lr-v5, refit 2026-11-12).
+            "backfill": "636 obs · 598 calls · 73.1% · Brier 0.185 · QUALIFIED",
             "artifact": "VERIFIED",
             "main_ledger": "—",
             "flat_ledger": "—",

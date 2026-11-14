@@ -24,7 +24,7 @@
   --green:#1f9a5c; --red:#e0384b; --red-text:#e0384b; --row-line:rgba(0,0,0,.07); --tip-bg:#171a24; --tip-fg:#fff; --yellow:#c07c10; --violet:#7458d6;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-table.data,table.ledger,table.matrix,.kpis,.perf-kpis,.health-kpis,.rebuild-kpis,.pick-metrics,.mono{font-variant-numeric:tabular-nums}
+table.data,table.ledger,table.matrix,.kpis,.perf-kpis,.health-kpis,.pick-metrics,.mono{font-variant-numeric:tabular-nums}
 h2,h3,h4,.perf-heading{text-wrap:balance}p,.small,.order-note,.menu-note,.perf-market-note{text-wrap:pretty}
 html,body{overflow-x:hidden;max-width:100%}
 body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px}
@@ -337,21 +337,6 @@ pre{font-family:var(--mono);font-size:12px;white-space:pre-wrap;word-break:break
 @media(max-width:1000px){.evidence-grid{grid-template-columns:1fr}}
 @media(max-width:600px){.evidence-head{display:block}.evidence-status{display:inline-block;margin-top:8px}.evidence-card{padding:11px}.evidence-table{min-width:540px}}
 
-/* isolated clean-slate rebuild monitoring */
-.rebuild-banner{border:1px solid var(--yellow);background:rgba(242,169,60,.09);border-radius:10px;padding:14px;margin-bottom:14px}
-.rebuild-banner h2{color:var(--yellow);font-size:15px;margin-bottom:5px}
-.rebuild-kpis,.rebuild-sports{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
-.rebuild-kpi,.rebuild-sport{border:1px solid var(--border);background:var(--surface-2);border-radius:8px;padding:11px;min-width:0}
-.rebuild-kpi b{display:block;font:700 18px var(--mono);overflow-wrap:anywhere}
-.rebuild-kpi span{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
-.rebuild-sport h3{font:700 14px var(--mono);margin-bottom:8px}
-.rebuild-detail{display:grid;grid-template-columns:1fr auto;gap:5px 9px;font-size:11px}
-.rebuild-detail dt{color:var(--dim)}.rebuild-detail dd{text-align:right;overflow-wrap:anywhere}
-.rebuild-state{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:2px 7px;font-size:11px;text-transform:uppercase}
-.rebuild-state.rejected{color:var(--yellow);border-color:rgba(242,169,60,.55)}
-.rebuild-state.failed{color:var(--red);border-color:rgba(255,92,92,.55)}
-.rebuild-state.available{color:var(--green);border-color:rgba(51,209,126,.55)}
-
 /* utilities replacing repeated inline styles */
 .mb-16{margin-bottom:16px}.mb-12{margin-bottom:12px}.mb-8{margin-bottom:8px}.mt-12{margin-top:12px}.mt-9{margin-top:9px}
 .m-0{margin:0}.flex-1{flex:1}.ox-auto{overflow-x:auto}.fw-7{font-weight:700}.fw-6{font-weight:600}
@@ -490,7 +475,6 @@ body.hide-col-order .c-order,body.hide-col-matchup .c-matchup{display:none}
     </div>
     <div class="rail-group">
       <div class="rail-label">System</div>
-      <button data-tab="rebuild">Rebuild Shadow</button>
       <button data-tab="evidence">Evidence</button>
       <button data-tab="settings">Settings</button>
     </div>
@@ -560,41 +544,6 @@ body.hide-col-order .c-order,body.hide-col-matchup .c-matchup{display:none}
     </div>
   </section>
 
-  <section id="tab-rebuild" style="display:none">
-    <div class="rebuild-banner" role="status">
-      <h2>CLEAN-SLATE REBUILD — SHADOW ONLY</h2>
-      <div>No rebuild output can submit a live order. <b>NO LIVE EXECUTION</b></div>
-    </div>
-    <div class="card">
-      <h2>Shadow Picks</h2>
-      <div class="small dim">Real predictions/decisions from the shadow ledger. Research only &mdash; no order execution is wired to this table.</div>
-      <div class="mt-12" id="shadowPicks"></div>
-    </div>
-    <div class="card">
-      <h2>Rebuild Overview</h2>
-      <div class="small dim" id="rebuildMeta">Read-only evidence has not been loaded.</div>
-      <div class="rebuild-kpis mt-12" id="rebuildKpis"></div>
-    </div>
-    <div class="card">
-      <h2>Sport Status</h2>
-      <div class="small dim">A rejected challenger is a research outcome, not a system failure.</div>
-      <div class="rebuild-sports mt-12" id="rebuildSports"></div>
-    </div>
-    <div class="card">
-      <h2>MLB Authoritative Challenger</h2>
-      <div id="rebuildBenchmark" class="small dim">Unavailable until loaded.</div>
-    </div>
-    <div class="card">
-      <h2>Prospective Test Protection</h2>
-      <div class="small dim">Unconsumed final-test performance is redacted by the server.</div>
-      <div class="mt-9" id="rebuildSealed"></div>
-    </div>
-    <div class="health-grid">
-      <div class="card"><h2>Economics</h2><div id="rebuildEconomics"></div></div>
-      <div class="card"><h2>Run Health</h2><div id="rebuildHealth"></div></div>
-    </div>
-  </section>
-
   <section id="tab-evidence" style="display:none">
     <div class="card">
       <h2>Production Model Evidence</h2>
@@ -616,7 +565,7 @@ body.hide-col-order .c-order,body.hide-col-matchup .c-matchup{display:none}
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
         <h2 class="section-head">Model Picks Ledger</h2>
         <span class="flex-1"></span>
-        <button class="primary" onclick="confirmAction('main_forecast','Run the main forecast for today? MLB/WNBA qualified calls go to this ledger; esports/soccer/nba/nfl route to Research and Gated Research in the same pass.')">Run Main Forecast</button>
+        <button class="primary" onclick="confirmAction('main_forecast','Run the main forecast for today? Qualified calls for the six production sports (NBA, NCAAF, NFL, MLB, WNBA, NCAAB) go to this ledger; every priced candidate goes to Flat in the same pass.')">Run Main Forecast</button>
       </div>
       <div class="small dim mb-8">Paper model forecasts: Size and P&amp;L are hypothetical units. Order shows exchange status only; live positions and dollar P&amp;L appear in Portfolio.</div>
       <div class="filters mb-12" id="filters_L"></div>
@@ -1035,20 +984,21 @@ body.hide-col-order .c-order,body.hide-col-matchup .c-matchup{display:none}
             <label><input type="checkbox" class="sSport" value="wnba" checked>WNBA</label>
             <label><input type="checkbox" class="sSport" value="nfl" checked>NFL</label>
             <label><input type="checkbox" class="sSport" value="ncaaf" checked>NCAAF</label>
-            <label><input type="checkbox" class="sSport" value="soccer" checked>Soccer</label>
-            <label><input type="checkbox" class="sSport" value="tennis" checked>Tennis</label>
-            <label><input type="checkbox" class="sSport" value="lol" checked>LOL</label>
-            <label><input type="checkbox" class="sSport" value="cs2" checked>CS2</label>
-            <label><input type="checkbox" class="sSport" value="dota2" checked>DOTA2</label>
-            <label><input type="checkbox" class="sSport" value="valorant" checked>Valorant</label>
-            <label><input type="checkbox" class="sSport" value="rainbow_six" checked>Rainbow Six</label>
-            <label><input type="checkbox" class="sSport" value="kbo" checked>KBO</label>
-            <label><input type="checkbox" class="sSport" value="npb" checked>NPB</label>
-            <label><input type="checkbox" class="sSport" value="hockey" checked>Hockey</label>
-            <label><input type="checkbox" class="sSport" value="darts" checked>Darts</label>
             <label><input type="checkbox" class="sSport" value="ncaab" checked>NCAAB</label>
-            <label><input type="checkbox" class="sSport" value="euroleague" checked>Euroleague</label>
-            <label><input type="checkbox" class="sSport" value="nbl" checked>NBL</label>
+            <span class="small dim" style="grid-column:1/-1;margin-top:6px">Switched off 2026-11-13 (history only)</span>
+            <label><input type="checkbox" class="sSport" value="soccer">Soccer</label>
+            <label><input type="checkbox" class="sSport" value="tennis">Tennis</label>
+            <label><input type="checkbox" class="sSport" value="lol">LOL</label>
+            <label><input type="checkbox" class="sSport" value="cs2">CS2</label>
+            <label><input type="checkbox" class="sSport" value="dota2">DOTA2</label>
+            <label><input type="checkbox" class="sSport" value="valorant">Valorant</label>
+            <label><input type="checkbox" class="sSport" value="rainbow_six">Rainbow Six</label>
+            <label><input type="checkbox" class="sSport" value="kbo">KBO</label>
+            <label><input type="checkbox" class="sSport" value="npb">NPB</label>
+            <label><input type="checkbox" class="sSport" value="hockey">Hockey</label>
+            <label><input type="checkbox" class="sSport" value="darts">Darts</label>
+            <label><input type="checkbox" class="sSport" value="euroleague">Euroleague</label>
+            <label><input type="checkbox" class="sSport" value="nbl">NBL</label>
           </span>
         </label>
       </div>
@@ -1225,7 +1175,6 @@ $$("#tabs button").forEach(b=>b.onclick=()=>{
   if(b.dataset.tab==="folio"&&state.livePortfolio)renderFolioHistory();
   if(b.dataset.tab==="production")loadProduction();
   if(b.dataset.tab==="models")renderModelLedgers();
-  if(b.dataset.tab==="rebuild")loadRebuild();
   if(b.dataset.tab==="polymarket")loadPolymarketScanner();
   if(b.dataset.tab==="poly-ledger")renderPolyLedger(true);
   if(b.dataset.tab==="auto-buyer-live-ledger")renderAutoBuyerLiveLedger(true);
@@ -1284,148 +1233,6 @@ function dataWarming(on){
   }else if(bar){bar.remove();}
 }
 async function api(path){const r=await fetch(path);if(!r.ok)throw new Error(path+" -> "+r.status);if(r.headers.get("X-Data-Warming")==="1")dataWarming(true);return r.json();}
-let rebuildLoaded=false,rebuildLoading=null;
-const rebuildValue=value=>value===null||value===undefined||value===""?"—":String(value);
-const rebuildPercent=value=>value===null||value===undefined?"unavailable":`${(Number(value)*100).toFixed(1)}%`;
-function rebuildStateClass(value){
-  const state=String(value||"").toUpperCase();
-  if(state.includes("REJECT"))return "rejected";
-  if(state.includes("FAIL")||state.includes("ERROR")||state.includes("DOWN"))return "failed";
-  if(state.includes("QUALIFIED")&&!state.includes("NOT_"))return "available";
-  return "";
-}
-function renderShadowPicks(shadowPicks){
-  const picks=shadowPicks.picks||[];
-  if(!picks.length){
-    $("#shadowPicks").innerHTML=`<div class="dim small">${esc(shadowPicks.reason||"No shadow picks recorded yet.")}</div>`;
-    return;
-  }
-  $("#shadowPicks").innerHTML=`<div style="overflow-x:auto"><table class="data">
-    <tr><th>Decision time</th><th>League</th><th>Market</th><th>Matchup</th><th>Selection</th>
-    <th>Model prob.</th><th>Edge</th><th>Decision</th><th>Reason</th><th>Units</th><th>State</th><th>P&amp;L</th></tr>
-    ${picks.map(pick=>`<tr>
-      <td>${esc(rebuildValue(pick.decision_time_utc))}</td>
-      <td>${esc(rebuildValue(pick.league))}</td>
-      <td>${esc(rebuildValue(pick.market_type))}</td>
-      <td>${esc((pick.away_team||"")+" @ "+(pick.home_team||""))}</td>
-      <td>${esc(rebuildValue(pick.selection))}</td>
-      <td>${pick.model_probability==null?"—":`${(Number(pick.model_probability)*100).toFixed(1)}%`}</td>
-      <td>${pick.edge==null?"—":`${(Number(pick.edge)*100).toFixed(1)}pp`}</td>
-      <td><span class="rebuild-state ${pick.decision==="BET"?"available":""}">${esc(rebuildValue(pick.decision))}</span></td>
-      <td class="small dim">${esc(rebuildValue(pick.reason_code))}</td>
-      <td>${esc(rebuildValue(pick.units))}</td>
-      <td><span class="rebuild-state ${pick.status==="settled"?"available":""}">${esc(rebuildValue(pick.status))}</span></td>
-      <td>${pick.pnl_units==null?"—":Number(pick.pnl_units).toFixed(2)}</td>
-    </tr>`).join("")}
-  </table></div>`;
-}
-async function loadProduction(){
-  const panel=$("#productionPanel");
-  try{
-    const d=await api("/api/production-canary");
-    renderProduction(d);
-  }catch(e){
-    if(panel)panel.innerHTML=`<div class="card"><h2 class="red">Production status unavailable</h2><pre>${esc(e.message||"load failed")}</pre></div>`;
-  }
-}
-function renderProduction(d){
-  const panel=$("#productionPanel");
-  if(!panel)return;
-  const status=String(d.status||"unknown").toUpperCase();
-  const statusClass=status==="HEALTHY"||status==="OK"?"green":status==="DEGRADED"?"yellow":"red";
-  const ageHours=d.last_prediction_utc?(Date.now()-Date.parse(d.last_prediction_utc))/3600000:null;
-  const stale=ageHours!==null&&ageHours>36;
-  const when=v=>v?new Date(v).toLocaleString():"never";
-  const fact=(label,value)=>`<div class="card" style="margin:0;padding:12px 14px"><div class="small dim">${esc(label)}</div><div class="mono" style="margin-top:4px;overflow-wrap:anywhere">${value}</div></div>`;
-  panel.innerHTML=`<div class="card">
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-      <h2 class="section-head">Production Canary</h2>
-      <span class="rebuild-state ${statusClass}">${esc(status)}</span>
-      <span class="mono small dim">${esc(d.model_id||"no model")}</span>
-    </div>
-    <div class="grid3">
-      ${fact("Last prediction",`${esc(when(d.last_prediction_utc))}${stale?` <span class="yellow">· ${Math.round(ageHours)}h old</span>`:""}`)}
-      ${fact("Last scheduler run",esc(when(d.last_scheduler_run_utc)))}
-      ${fact("Checked",esc(when(d.checked_at_utc)))}
-      ${fact("Today's events",esc(String(d.today_events??"—")))}
-      ${fact("Today's predictions",esc(String(d.today_predictions??"—")))}
-      ${fact("Automated orders",d.automated_orders?'<span class="green">ON</span>':'<span class="dim">OFF</span>')}
-    </div>
-    <div class="small dim mono" style="margin-top:12px;overflow-wrap:anywhere">artifact ${esc(d.artifact_hash||"—")}</div>
-  </div>`;
-}
-function renderRebuild(status,sports,benchmark,economics,runs,health){
-  const reason=[status.reason,sports.reason,benchmark.reason,economics.reason,runs.reason,health.reason].filter(Boolean).join(" · ");
-  $("#rebuildMeta").textContent=`Revision ${status.code_revision||"unavailable"} · ${status.status||"unavailable"}${reason?` · ${reason}`:""}`;
-  const tests=status.tests||{},k=status.kpis||{};
-  const testText=tests.passed==null?(tests.status||"unavailable"):`${tests.passed} passed${tests.failed?`, ${tests.failed} failed`:""}`;
-  const kpis=[
-    [status.code_revision?String(status.code_revision).slice(0,10):"—","Code revision"],
-    [testText,"Tests"],[k.sports_with_data??"—","Sports with data"],
-    [k.sports_with_models??"—","Sports with models"],[k.prospective_tests??"—","Prospective tests"],
-    [k.predictively_qualified_sports??"—","Predictively qualified"],
-    [k.economically_qualified_sports??"—","Economically qualified"],
-    [rebuildPercent(k.closing_price_coverage),"Closing-price coverage"]
-  ];
-  $("#rebuildKpis").innerHTML=kpis.map(([value,label])=>`<div class="rebuild-kpi"><b>${esc(value)}</b><span>${esc(label)}</span></div>`).join("");
-
-  const cards=sports.sports||[];
-  $("#rebuildSports").innerHTML=cards.length?cards.map(card=>`<article class="rebuild-sport">
-    <h3>${esc(String(card.sport||"unknown").toUpperCase())} <span class="rebuild-state ${rebuildStateClass(card.system_state)}">${esc(card.system_state||"unavailable")}</span></h3>
-    <dl class="rebuild-detail">
-      <dt>Current model</dt><dd>${esc(rebuildValue(card.current_model))}</dd>
-      <dt>Dataset size</dt><dd>${esc(rebuildValue(card.dataset_size))}</dd>
-      <dt>OOF sample</dt><dd>${esc(rebuildValue(card.oof_sample))}</dd>
-      <dt>Prospective sample</dt><dd>${esc(rebuildValue(card.prospective_sample))}</dd>
-      <dt>Last run</dt><dd>${esc(rebuildValue(card.last_run))}</dd>
-      <dt>Predictive</dt><dd><span class="rebuild-state ${rebuildStateClass(card.predictive_qualification)}">${esc(card.predictive_qualification||"NOT_ESTABLISHED")}</span></dd>
-      <dt>Economic</dt><dd><span class="rebuild-state ${rebuildStateClass(card.economic_qualification)}">${esc(card.economic_qualification||"NOT_ESTABLISHED")}</span></dd>
-      <dt>Main blocker</dt><dd>${esc(rebuildValue(card.main_blocker))}</dd>
-    </dl></article>`).join(""):'<div class="dim">Sport status is unavailable.</div>';
-
-  const b=benchmark.authoritative;
-  $("#rebuildBenchmark").innerHTML=b?`<div class="rebuild-kpis">
-    <div class="rebuild-kpi"><b>${esc(rebuildValue(b.head_family))}</b><span>Head family</span></div>
-    <div class="rebuild-kpi"><b>${esc(rebuildValue(b.distribution))}</b><span>Distribution</span></div>
-    <div class="rebuild-kpi"><b>${esc(rebuildValue(b.calibration))}</b><span>Calibration</span></div>
-    <div class="rebuild-kpi"><b>${esc(rebuildValue(b.ensemble))}</b><span>Ensemble</span></div>
-    <div class="rebuild-kpi"><b>${b.candidate_log_loss==null?"—":Number(b.candidate_log_loss).toFixed(4)}</b><span>Candidate OOF log loss</span></div>
-    <div class="rebuild-kpi"><b>${b.constant_0_5_log_loss==null?"—":Number(b.constant_0_5_log_loss).toFixed(4)}</b><span>Constant 0.5 log loss</span></div>
-    <div class="rebuild-kpi"><b>NOT ESTABLISHED</b><span>Predictive qualification</span></div>
-    <div class="rebuild-kpi"><b>NOT ESTABLISHED</b><span>Economic qualification</span></div>
-  </div><p class="small dim" style="margin-top:9px">Winning among challengers does not establish meaningful edge.</p>`:
-  '<div class="dim">Authoritative corrected benchmark is unavailable.</div>';
-
-  const sealed=(status.sealed_tests||[]).filter(test=>test.consumed===false);
-  $("#rebuildSealed").innerHTML=sealed.length?`<div style="overflow-x:auto"><table class="data"><tr><th>Test</th><th>Start</th><th>End</th><th>Model hash</th><th>Calibrator hash</th><th>Predictions</th><th>Coverage</th></tr>${sealed.map(test=>`<tr><td>${esc(test.test_id)}</td><td>${esc(rebuildValue(test.test_start))}</td><td>${esc(rebuildValue(test.test_end))}</td><td class="mono">${esc(rebuildValue(test.model_hash))}</td><td class="mono">${esc(rebuildValue(test.calibrator_hash))}</td><td>${esc(rebuildValue(test.prediction_count))}</td><td>${esc(rebuildPercent(test.coverage))}</td></tr>`).join("")}</table></div>`:
-  '<div class="dim small">No unconsumed tests are registered.</div>';
-
-  const money=value=>value==null?"unavailable":Number(value).toFixed(3);
-  $("#rebuildEconomics").innerHTML=`<dl class="rebuild-detail">
-    <dt>Market evaluations</dt><dd>${esc(rebuildValue(economics.market_evaluations))}</dd>
-    <dt>BET</dt><dd>${esc(rebuildValue(economics.bet))}</dd><dt>NO_BET</dt><dd>${esc(rebuildValue(economics.no_bet))}</dd>
-    <dt>Paper orders</dt><dd>${esc(rebuildValue(economics.paper_orders))}</dd><dt>Settlements</dt><dd>${esc(rebuildValue(economics.settlements))}</dd>
-    <dt>Closing prices</dt><dd>${esc(rebuildValue(economics.closing_prices))}</dd><dt>CLV coverage</dt><dd>${esc(rebuildPercent(economics.clv_coverage))}</dd>
-    <dt>P&amp;L</dt><dd>${money(economics.pnl)}</dd><dt>ROI</dt><dd>${economics.roi==null?"unavailable":rebuildPercent(economics.roi)}</dd><dt>CLV</dt><dd>${money(economics.clv)}</dd>
-  </dl><div class="small dim" style="margin-top:9px">${esc((economics.reason_codes||[]).map(row=>`${row.reason}: ${row.count}`).join(" · ")||economics.reason||"")}</div>`;
-
-  const stages=health.stages||[];
-  $("#rebuildHealth").innerHTML=stages.length?stages.map(stage=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;gap:9px"><span>${esc(stage.stage)}</span><span class="rebuild-state ${rebuildStateClass(stage.status)}">${esc(stage.status||"unavailable")}</span><span class="dim">${esc(rebuildValue(stage.last_run))}</span></div><div class="small dim" style="margin-top:3px">duration ${esc(rebuildValue(stage.duration_seconds))}s · rows ${esc(rebuildValue(stage.rows))} · mode ${esc(rebuildValue(stage.mode))}${stage.error?` · error ${esc(stage.error)}`:""}</div></div>`).join(""):
-  `<div class="dim small">${esc(health.reason||runs.reason||"Run health is unavailable.")}</div>`;
-}
-async function loadRebuild(force=false){
-  if(rebuildLoaded&&!force)return;
-  if(rebuildLoading)return rebuildLoading;
-  $("#rebuildMeta").textContent="Loading read-only rebuild evidence…";
-  rebuildLoading=Promise.all([
-    api("/api/rebuild/status"),api("/api/rebuild/sports"),api("/api/rebuild/benchmark"),
-    api("/api/rebuild/economics"),api("/api/rebuild/runs"),api("/api/rebuild/health"),
-    api("/api/rebuild/shadow-picks")
-  ]).then(payloads=>{renderRebuild(...payloads.slice(0,6));renderShadowPicks(payloads[6]);rebuildLoaded=true;}).catch(error=>{
-    $("#rebuildMeta").textContent=`Rebuild evidence unavailable: ${error.message}`;
-  }).finally(()=>{rebuildLoading=null;});
-  return rebuildLoading;
-}
 async function saveUnitValue(){
   const input=$("#unitValueInput"),value=Number(input.value);
   if(!Number.isFinite(value)||value<0.01||value>100000){
@@ -3586,7 +3393,7 @@ Crash details, if any, are in dashboard/server.log</pre>`);
   tick();
 }
 function bootstrapDialog(){
-  const sport=prompt("Bootstrap which sport? (mlb / nba / wnba / nfl / soccer / tennis / lol / cs2)","mlb");
+  const sport=prompt("Bootstrap which sport? (mlb / nba / wnba / nfl / ncaaf / ncaab)","mlb");
   if(!sport)return;
   const from=prompt("From date (YYYY-MM-DD)?","2026-06-01"); if(!from)return;
   const to=prompt("To date (blank = today)?","")||null;
@@ -3765,7 +3572,7 @@ document.addEventListener("visibilitychange",()=>{
 });
 function currentActiveTab(){
   const onBtn = $("#tabs button.on");
-  return onBtn ? onBtn.dataset.tab : "rebuild";
+  return onBtn ? onBtn.dataset.tab : "today";
 }
 
 /* ---------- production overview strip + stale banner ---------- */

@@ -78,14 +78,18 @@ def test_serving_config_registry_and_factory_agree():
 
     root = Path(__file__).resolve().parents[1]
     registry = ProductionModelRegistry.load(root)
-    champion = registry.champion("SOCCER", "moneyline")
+    # Soccer is out of production scope (2026-11-13): no champion route, entry disabled,
+    # but config/model.yaml, the registry entry and the factory must still agree on v3
+    # so a re-enable is a flag flip, not a re-wiring.
+    assert registry.champion("SOCCER", "moneyline") is None
     config = yaml.safe_load((root / "config/model.yaml").read_text(encoding="utf-8"))
     version = config["models"]["SOCCER"]["active_production_version"]
-    assert version == champion.model_id == "soccer-poisson-dc-v3"
-    assert champion.rollback_model == "soccer-poisson-dc-v2"
-    assert champion.evidence_status == "unverified"
+    entry = registry.entries[version]
+    assert version == entry.model_id == "soccer-poisson-dc-v3"
+    assert entry.rollback_model == "soccer-poisson-dc-v2"
+    assert entry.evidence_status == "unverified"
+    assert entry.enabled is False and entry.load_error is None
     assert soccer_model_for_version(version).version == version
-    assert registry.entries[version].available
     with pytest.raises(ValueError, match="unsupported_soccer_model_version"):
         soccer_model_for_version("soccer-poisson-dc-v30")
 

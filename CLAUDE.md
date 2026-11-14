@@ -1,390 +1,246 @@
 # CLAUDE.md — Working Guidelines for This Project
 
-This file is auto-loaded into every session. Keep it short and durable —
-volatile status belongs in `docs/PROJECT_STATUS.md`, full audit history in
-`docs/DEBUG.md`, and the unified documentation index in `docs/INDEX.md`.
-This file is about *how to work here*, not *what's currently true*.
-
-## Fast Iteration & Workflow Speed (Operator Directive 2026-10-18)
-
-- **Zero Test Overhead for Minor Changes**: NEVER run pytest suites for refactors, dead code cleanup, variable renames, formatting, comments, or documentation. Rely strictly on `ruff check` (runs in < 0.2s).
-- **No Monolithic Test Runs**: NEVER run `pytest tests/` (all 3,200 tests) unless explicitly commanded by Vincent. It takes ~6 minutes and grinds the iteration loop to a halt.
-- **Micro-Targeted Testing Only**: When core mathematical or pricing algorithms change, run ONLY the single directly affected test file with `-o addopts='' -q` (e.g. `pytest tests/test_nba_nfl_v5.py -o addopts='' -q` in < 0.5s).
-- **Batch Before Verifying**: Complete all planned code modifications across all files before running any verification.
-
-## Pricing & Odds Format (Operator Directive 2026-11-07)
-- **Percentages Only, No American Odds**: NEVER use, display, or communicate prices using American odds (e.g. -110, +120, -310). ALWAYS express market prices, quotes, contract lines, and break-even levels as percentages / implied probabilities (e.g. 52.4%, 45.5%, 75.6%) or probability cents (e.g. 52¢). All user-facing tables, pick summaries, forecasts, and reports must use percentages exclusively.
-
-## 2026-08-15 — consolidation K (runtime singularity)
-
-- **Rolling vs frozen model artifacts.** `config/models/*.json` are frozen
-  promoted artifacts (git, never rewritten by the schedule). The daily
-  cycle retrains esports/KBO/NPB ratings into the runtime root's
-  `models/` (`RuntimePaths.models_root`); research forecasts read
-  rolling-first with frozen fallback (`cli._research_models_dir()`).
-  If you add a new retrainable artifact, route its writes through that
-  contract — do not add new checked-in files the schedule rewrites.
-- **The data/ trees are untracked operational output** (`git rm --cached`
-  2026-08-15, files remain on disk): availability, player_priors,
-  production, esports, international_baseball, historical, odds,
-  point_in_time, main/flat/research/gated_research xlsx, model_ledgers
-  xlsx, logs, features, dashboard scratch. The SQLite ledger (runtime
-  root) is the canonical evidence store; `data/archive/` and `snapshots/`
-  remain tracked evidence. Do not re-add files under the ignored trees;
-  if a genuinely new evidence file needs tracking, put it outside them
-  or adjust the ignore list deliberately.
-- **The daily worker's lock lives at the runtime root**
-  (`${MODEL_PREDICTION_RUNTIME_ROOT:-data}/locks/daily.lock`), not in the
-  repo checkout.
-
-## Handoffs
-
-- Open work lives in one file: `docs/handoffs/HANDOFF.md`. Read it at the start of a session if it exists.
-- There is only ever one handoff file. Overwrite it for new open work; do not create a second one.
-- When every item in it is done, delete the file. Do not archive it.
-- Keep it short: next action first, then facts with evidence (paths, PIDs, row counts). No secrets.
-
-## Knowledge graph
-
-A graphify knowledge graph of this repo lives at `graphify-out/` (graph.json,
-GRAPH_REPORT.md, graph.html — built 2026-08-13, entire repo). For codebase
-questions (architecture, cross-file relations, "what calls X"), use `/graphify`
-first — the `graphify` MCP server (query_graph, get_node, get_neighbors,
-shortest_path) is also registered in Claude Code. Refresh with
-`/graphify . --update` (code changes, no LLM) or a full `/graphify .`
-(includes the expensive docs/papers semantic pass).
+This file is auto-loaded into every session. It holds only durable working
+rules. Volatile status lives in `docs/PROJECT_STATUS.md`, the audit and
+session history in `docs/DEBUG.md`, open items in `docs/ROADMAP.md`, and the
+documentation index in `docs/INDEX.md`. When a dated note stops being a rule,
+move it to `docs/DEBUG.md` instead of leaving it here.
 
 ## What this project is
 
-A **100% paper trading ("fugazi")** multi-sport quantitative prediction, research,
-ledger, and local dashboard system with Polymarket US CLOB integration.
+A multi-sport quantitative prediction, research, ledger, and local-dashboard
+system with Polymarket US CLOB integration. It is **both** of these, by
+operator decision (2026-11-13), and this paragraph is the single place that
+decision is recorded:
 
-- **Zero Real Capital**: The entire platform operates in simulated paper mode — no real
-  money can actually be used, and live automated order execution is barred.
-- **Realistic Financial Mechanics**: Despite being paper/fugazi, it functions with full
-  market fidelity as if real capital were at stake: real Polymarket CLOB executable asks,
-  realistic Kelly/edge-scaled unit sizing (1.0U–2.0U), daily bankroll loss caps,
-  mark-to-market settlement, and closing-line-value (CLV) PnL accounting.
-- **Direct Model Wiring**: All models are directly wired up to the most updated model
-  across all sports, leagues, and market types (Moneyline, Spread, Total, NRFI).
-  Bureaucratic "shadow-qualified" hurdles and quarantine holdouts are removed.
+- **Paper trading is the operating mode.** Every scheduled run writes to
+  simulated ledgers with full market fidelity: real Polymarket executable asks,
+  Kelly/edge-scaled unit sizing (1.0U–2.0U), daily bankroll loss caps,
+  mark-to-market settlement, and closing-line-value PnL accounting. The paper
+  auto-buyer is the only thing that ever buys unattended.
+- **A real-money execution path exists and stays gated.** Order submission to
+  Polymarket (`portfolio/`, `polymarket_execute.py`, the dashboard BUY/SELL
+  endpoint) runs only on an explicit per-request operator instruction with
+  confirmation, never from the scheduler, and is held to real-money care:
+  quote freshness, market state, game-not-started, idempotent audit.
+
+All models are wired directly to the current champion per sport and market
+(moneyline, spread, total, NRFI). There are no shadow-qualification hurdles
+or quarantine holdouts in front of serving.
+
+## Scope (operator directive 2026-11-13)
+
+Production forecasts **NBA, NCAAF, NFL, MLB, WNBA, and NCAAB** only. Soccer,
+tennis, the five esports titles, KBO, NPB, hockey, darts, Euroleague, and NBL
+are switched off, not deleted:
+
+- The switch is `daily_forecast_enabled: false` on the sport's entry in
+  `config/model.yaml`. `config.is_sport_daily_enabled` is the one gate every
+  daily forecast task consults (`cli/daily.py`), so re-enabling a sport is a
+  one-line config change. `tests/test_focus_sports_config.py` pins the list.
+- Their code, artifacts, and calibrators stay in place. Settlement of
+  already-open picks and score ingestion continue so history stays
+  continuous. `cli forecast --sport <x>` still works for a manual run.
+- In `config/production.yaml` their 40 registry entries carry
+  `enabled: false` and their `champions:` / `challengers:` routes are
+  removed; `model_lifecycle.SUPPORTED_MARKETS` lists only the six sports.
+  `tests/test_production_registry.py` pins 89 entries, 49 available, 40
+  disabled-by-scope with a contract that still resolves.
+- **Re-enabling esports, KBO, or NPB needs a backfill first.** Their Elo
+  ratings refresh only inside the daily forecast block (14-day incremental
+  merge), so while they are off the ratings and match history go stale. Run
+  `cli esports-backfill` / `cli international-baseball-backfill` over the gap
+  and re-validate before flipping the flag back on.
+- Research tooling (ablations, champion/challenger harness, experiment
+  registries, replay research, the rebuild dashboard panel) is tested under
+  `tests/research/`, which the default `pytest` skips (`norecursedirs`). The
+  shadow-rebuild tree (`src/model_prediction/rebuild/`, `tests/rebuild/`) is
+  frozen: its Windows scheduled task `ModelPrediction-RebuildShadow` is
+  disabled in place and its registration in
+  `scripts/register_windows_tasks.ps1` is commented out. Research must never
+  block or slow the daily run. Run those suites on demand:
+  `pytest tests/research -o addopts='' -q`, `pytest tests/rebuild -o addopts='' -q`.
+
+Widening scope again is an explicit operator decision, not a side effect of
+fixing something in a disabled sport.
+
+## Fast iteration (operator directive 2026-10-18)
+
+- **No pytest for minor changes.** Refactors, dead-code cleanup, renames,
+  formatting, comments, documentation: rely on `ruff check` only.
+- **Never run the whole suite** (`pytest tests/`) unless Vincent explicitly
+  asks. It takes minutes and stalls the loop.
+- **Micro-targeted tests only.** When a pricing or model algorithm changes,
+  run the single affected file with `-o addopts='' -q`.
+- **Batch before verifying.** Finish all planned edits across files, then
+  verify once.
+
+## Pricing and odds format (operator directive 2026-11-07)
+
+Never use American odds anywhere (not -110, not +120). Express every price,
+quote, line, and break-even as a percentage / implied probability (52.4%) or
+probability cents (52¢), in all user-facing tables, summaries, and reports.
+
+## Handoffs
+
+- Open work lives in one file: `docs/handoffs/HANDOFF.md`. Read it at session
+  start if it exists. Overwrite it for new open work; never create a second.
+- Delete it when every item is done. Keep it short: next action first, then
+  facts with evidence (paths, PIDs, row counts). No secrets.
+
+## Knowledge graph
+
+A graphify graph of the repo lives at `graphify-out/` (graph.json,
+GRAPH_REPORT.md, graph.html). For codebase questions (architecture, what calls
+X), use `/graphify` first; the `graphify` MCP server (query_graph, get_node,
+get_neighbors, shortest_path) is registered. Refresh with
+`/graphify . --update` (code only) or a full `/graphify .`.
 
 ## Read these first, in this order
 
 1. `docs/PROJECT_STATUS.md` — current operational status and release verdict.
-2. `DEBUG.md` — full audit history, every real bug found/fixed with its trace,
-   and a "Reproduction commands" checklist. This is the most-current, most-
-   trustworthy record of what actually works right now — trust it over
-   older docs when they disagree.
-3. `docs/ROADMAP.md` — the consolidated engineering, dashboard, portfolio,
-   and research roadmap (promotion rules, verdict taxonomy, and what's
-   actually still open, not just a wishlist). Merged 2026-08-22 from seven
-   overlapping planning docs (`TODO.md`, `ENGINEERING_ROADMAP.md`,
-   `RESEARCH_BACKLOG.md`, `V9_RESEARCH_PLAN.md`,
-   `RESEARCH_DECISION_2026-08-18.md`, `POST_MLB_RESEARCH_PLANS.md`,
-   `MODEL_IMPROVEMENTS.md`), all now deleted — don't re-create them; add
-   new open items to `ROADMAP.md` instead.
-4. `docs/AGENTS.md` — short, durable execution rules (walk-forward only,
-   never hardcode thresholds, protected files, etc.). Still binding.
-5. `docs/ARCHITECTURE.md` — the durable architecture contract (data flow,
-   validation contract, invariants). Doesn't change often; check it before
-   assuming something about the pipeline shape.
-6. `docs/rebuild/*` — the separate clean-slate rebuild contract. Read these
-   before rebuild work; its shadow-only and no-production-write boundaries
-   are hard invariants, not configurable operating modes.
+2. `docs/DEBUG.md` — the audit history, every real bug with its trace, and the
+   reproduction checklist. The most trustworthy record of what works now;
+   trust it over older docs when they disagree.
+3. `docs/ROADMAP.md` — the consolidated roadmap, promotion rules, verdict
+   taxonomy, and what is still open. Add new open items here; do not
+   re-create the planning docs it replaced.
+4. `docs/AGENTS.md` — short execution rules (walk-forward only, never
+   hardcode thresholds, protected files). Binding.
+5. `docs/ARCHITECTURE.md` — the architecture contract (data flow, validation
+   contract, invariants).
+6. `docs/rebuild/*` — the clean-slate rebuild contract. Shadow-only and
+   no-production-write are hard invariants. The tree is frozen (see Scope).
 
 ## The one invariant that matters most
 
 **Point-in-time correctness.** A decision made at time `T` may only use
-information with `observed_at_utc <= T`. This is, by a wide margin, the
-single most common source of real bugs found across every session on this
-project — weather timing, KBO/NPB home/away labels, MLB starter selection,
-soccer team-name collisions, and (this session) an MLB transaction-date
-same-day ambiguity and a KBO/NPB timestamp-ordering bug that silently zeroed
-every real pick for as long as it existed. When building or reviewing
-anything that touches a live decision:
+information with `observed_at_utc <= T`. This is by far the most common source
+of real bugs here (weather timing, KBO/NPB home/away labels, MLB starter
+selection, soccer team-name collisions, an MLB transaction-date ambiguity, a
+KBO/NPB timestamp-ordering bug that silently zeroed every real pick for
+months). When touching a live decision:
 
-- Check every timestamp comparison's actual granularity. A `date`-only field
-  (no time-of-day) being compared against a full timestamp is a common
-  leak — same-day is not the same as "before."
-- Check the *order* two `utc_now()`/timestamp captures happen in, when one
-  feeds a slow live-data-building call and the other feeds a `validate(now=)`
-  check. Capturing "now" before a slow call that does its own internal
-  timestamping is a real, easy-to-miss bug class (see DEBUG.md's KBO/NPB
-  entry — it silently zeroed every real pick, for months, with no error
-  surfaced anywhere).
-- A live-only signal (e.g. a current roster snapshot) can never be used for
-  a decision time in the past. A retroactively-queryable signal (e.g. a
-  transaction log with real report dates) can — but only by filtering on
-  the record's own report timestamp, never on when your system happened to
-  fetch it.
+- Check every timestamp comparison's granularity. A date-only field compared
+  against a full timestamp leaks: same-day is not "before".
+- Check the order two `utc_now()` captures happen in when one feeds a slow
+  live-data call and the other feeds `validate(now=)`. Capturing "now" before
+  a slow call that timestamps internally is a real, easy-to-miss bug.
+- A live-only signal (a current roster snapshot) can never serve a past
+  decision time. A retroactively queryable signal (a transaction log with
+  report dates) can, filtered on the record's own report timestamp, never on
+  fetch time.
 
 ## The shadow-feature pattern
 
-New predictive signals in this codebase follow a consistent shape (see
-`features/mlb_player_availability.py` and `features/player_availability.py`
-for two live examples):
+New predictive signals follow one shape (`features/mlb_player_availability.py`,
+`features/player_availability.py`):
 
-1. Build a data-source module that captures/normalizes raw provider data
-   with explicit `observed_at_utc` provenance.
-2. Build a feature module with fail-closed error handling (`NO_CALL_*`
-   reason codes) — missing/stale/ambiguous data means the feature declines
-   to answer, never guesses.
-3. Wire it into `learned_forward.py`'s generic `_compute_features` as its
-   own dispatch branch, gated by its own feature-name constant. It stays
-   **inert in live production** until some future artifact's own
-   `feature_names` config explicitly lists those names — this is
-   deliberate, not a placeholder to "finish later." Promoting a feature
-   into an active model is a separate, explicit decision requiring real
-   walk-forward validation, not a side effect of building it.
-4. Test against real, live data before calling it done — synthetic
-   fixtures alone have repeatedly missed real bugs this session (a wrong
-   field name, a status enum that doesn't match what the real API
-   actually returns, a schema assumption that was true in fixtures but
-   false in production).
+1. A data-source module that captures raw provider data with explicit
+   `observed_at_utc` provenance.
+2. A feature module that fails closed (`NO_CALL_*` reason codes): missing,
+   stale, or ambiguous data means decline, never guess.
+3. A dispatch branch in `learned_forward.py::_compute_features`, gated by its
+   own feature-name constant. It stays inert until an artifact's
+   `feature_names` lists it. Promotion into a model is a separate, explicit
+   decision with real walk-forward validation.
+4. Test against real live data before calling it done. Synthetic fixtures have
+   repeatedly missed real bugs (wrong field names, status enums the API never
+   returns).
 
 ## Before promoting anything into a live model
 
 Match `docs/ARCHITECTURE.md`'s validation contract: 60/20/20 chronological
-split, fit on train only, select thresholds on validation only, locked
-holdout untouched until the final check. Reuse the existing tooling —
-`validation.py::build_walk_forward_rows`/`chronological_split`,
-`production_feature_ablation.py`, `roadmap_challenger.py` — rather than
-reimplementing chronological splitting or feature replay from scratch; it's
-easy to accidentally leak future information into a hand-rolled backtest.
-Report the delta with real numbers (Brier, calibration, locked-holdout
-accuracy), not just "it correlates" — a promising standalone correlation
-(see this session's `starter_era_gap` finding) is a reason to run the real
-ablation, not a promotion decision by itself.
+split, fit on train only, thresholds on validation only, locked holdout
+untouched until the final check. Reuse `validation.py::build_walk_forward_rows`
+/ `chronological_split`, `production_feature_ablation.py`, and
+`roadmap_challenger.py` rather than hand-rolling splits. Report the delta with
+real numbers (Brier, calibration, locked-holdout accuracy). A standalone
+correlation is a reason to run the ablation, not a promotion decision.
+
+Promotion is one command, never a hand-edited yaml:
+`python -m model_prediction.model_promotion promote --new … --sport … --market
+… --approved-by … [--evidence …]`; rollback likewise. Records land in the
+`promotions` table of the runtime `runs.db`. Champion (what serves, the
+`champions:` map) is not the same as primary (what the canary runs).
+
+## Durable contracts
+
+These came out of the 2026-08 consolidation; the dated narrative is in
+`docs/DEBUG.md` (2026-11-13 entry). The rules still bind:
+
+- **All mutable control-plane state resolves through `RuntimePaths`**
+  (`runtime_paths.py`): `MODEL_PREDICTION_RUNTIME_ROOT` when set, repo
+  `data/` otherwise. Operational entry points (supervisor, canary, promotion,
+  system_health, dashboard, cli_production) use
+  `resolve(require_external_runtime=True)` and fail closed on a missing root.
+  Never hand-build a path to runs.db, production.db, or the supervisor logs.
+- **`config/production.yaml` is schema v3**; `production_registry.py` is the
+  single source of truth and fails each broken model closed. Keep
+  `production_canary.py`'s public API (tests pin its messages).
+- **Every scheduled run goes through `run_supervisor`** (workers: daily,
+  production, rebuild-shadow). Exit 75 is a coalesced lock skip, never a
+  failure. The daily job runs several times a day on purpose; that is safe
+  because the forecast step replaces today's picks and settlement, ingestion,
+  and the auto-buyer's bought-index are idempotent.
+- **`ProductionPredictionStore` is the only writer to `production.db`.**
+  Schema changes for legacy DBs go in `_migrate_columns`, not only `_SCHEMA`.
+- **SQLite is the ledger authority** (`MODEL_PREDICTION_LEDGER_AUTHORITY=
+  sqlite`; `ledgers/ledgers.db`). The xlsx workbooks are a best-effort export
+  whose failure only warns. Do not flip authority back without a decision.
+- **Rolling vs frozen artifacts.** `config/models/*.json` are frozen promoted
+  artifacts; retrained ratings go to the runtime root's `models/`
+  (`RuntimePaths.models_root`). Route new retrainable artifacts through that.
+- **The `data/` trees are untracked operational output**; the SQLite ledger is
+  the evidence store, `data/archive/` and `snapshots/` stay tracked. Do not
+  re-add files under the ignored trees.
+- **Historical JSONL is ingest-ordered, not event-ordered**: "newest event" is
+  a max-scan, never the last line.
+- **Train/serve parity is a tested invariant**
+  (`tests/test_validation.py::test_train_serve_parity_for_v9_features`). Any
+  new feature must hold `validation.py` and `learned_forward.py` in literal
+  sync.
+- **Stable seeds are load-bearing**: `simulate_game`'s default gamma-Poisson
+  stream must stay bit-for-bit; the seed pin test pins history and is never
+  updated to match new output.
+- **MLB Main-ledger philosophy is "no gates, show everything, human
+  decides."** Other sports are deliberately curated. Don't homogenize without
+  asking.
+- **v8's park-factor static-table leak is documented and v8 is never
+  modified** (`docs/V8_REPRODUCTION.md`); v9 uses `park_factor_pit`.
 
 ## Testing conventions
 
-- `env PYTHONPATH=src:. .venv/bin/python -m pytest tests/ -q` and
-  `.venv/bin/ruff check src/ tests/` should both stay clean. (The old
-  ~117-118 pre-existing ruff baseline was cleared by later sessions --
-  verified clean 2026-08-26; keep it clean, don't re-introduce findings.)
-- When you fix a bug, verify the regression test actually catches it:
-  temporarily revert the fix, confirm the new test fails, then restore the
-  fix. This has caught real "the test doesn't actually test anything"
-  mistakes this session.
-- Mocking `utc_now()` to one fixed value everywhere hides timestamp-
-  ordering bugs (see the KBO/NPB incident) — when testing something whose
-  correctness depends on *when* two timestamps are captured relative to
-  each other, use a mock clock that actually advances between calls.
+- `ruff check src/ tests/` is clean and stays clean.
+- `pytest` runs **without** the `MODEL_PREDICTION_*` env vars; several tests
+  pin the no-env repo-colocated default.
+- The default `pytest` is the core suite; `tests/research/` and
+  `tests/rebuild/` run only when asked (see Scope).
+- When you fix a bug, prove the regression test catches it: revert the fix,
+  watch the test fail, restore the fix.
+- Don't mock `utc_now()` to one fixed value when correctness depends on the
+  order two timestamps are captured; use a clock that advances.
 
 ## Real-money and destructive actions
 
-- Ledger mutation only through `archive_settled_rows`/`remove_open_rows` —
-  never raw deletion. `allow_staked_removal=True` is reserved for ledgers
-  that can never hold real money (research/gated/flat), not Main.
-- MLB Main-ledger philosophy is "no gates, show everything, human decides."
-  Esports/soccer/tennis Gated Research is deliberately curated/tightened.
-  These are sport-specific and intentional — don't homogenize them without
-  asking first.
-- Dashboard order execution (BUY/SELL) requires the same care as any
-  real-money code path: check quote freshness, market state, and
-  game-not-started before touching it.
-- Config/model promotion (`status: research` -> `shadow_qualified`, or a
-  new artifact version becoming the active one) is a real decision with
-  real governance requirements (see the Promotion rule in
-  `docs/ROADMAP.md`). Don't do it as a side effect of
-  something else; confirm scope first if it's not explicitly requested.
+- Ledger mutation only through `archive_settled_rows` / `remove_open_rows`,
+  never raw deletion. `allow_staked_removal=True` is for ledgers that can
+  never hold real money (research/gated/flat), not Main.
+- Dashboard order execution (BUY/SELL) gets the same care as any real-money
+  path: quote freshness, market state, game-not-started.
+- Config or model promotion is a governed decision. Never do it as a side
+  effect of something else; confirm scope first if it was not asked for.
+- The live `auto_buyer_state.json` overrides the code constants (whitelists,
+  disabled sport-markets). Update both layers when changing buyer behaviour.
 
-## Working with subagents on this codebase
+## Working with subagents
 
-If you delegate a review or research task to a subagent running in an
-isolated worktree (`isolation: "worktree"`), remember it can only see
-**committed** git history — not your own session's uncommitted working-
-directory changes. If there's substantial uncommitted work, either commit
-first or explicitly instruct the agent to read the shared checkout path
-directly instead of its own worktree. This session had two review agents
-run stale by several commits' worth of real, tested, verified work; one
-caught it and adjusted, one didn't and reported several already-fixed
-things as broken. Verify surprising or contradictory subagent findings
-against the actual current code yourself before acting on them — this is
-generally good practice, but especially so here given the fast commit
-cadence.
+An agent in an isolated worktree sees only committed history, not this
+session's uncommitted work. Commit first or point it at the shared checkout.
+Verify surprising subagent findings against the current code before acting;
+review agents here have reported already-fixed things as broken.
 
 ## Style
 
-Comments explain *why*, not *what* — a hidden constraint, a workaround for
-a specific real bug, a non-obvious invariant. Don't write comments that
-just restate the code. This project's own code is written this way
-throughout; match it.
-
-## 2026-08-14 — Infrastructure consolidation, Phase A (control plane)
-
-The operator's 20-item consolidation directive (registry / supervisor /
-health / data plane / dashboard) is being executed in phases; **Phase A
-is done and pushed** (`cleanup/final-debug-2026-08-14`). These are the
-new working contracts — don't regress them:
-
-- **`config/production.yaml` is schema v3** with explicit `models:`
-  (13 entries: 11 json_artifact + 2 code_backed soccer/tennis) and a
-  `champions:` map. `src/model_prediction/production_registry.py` is the
-  single source of truth: loading validates EVERY enabled entry and fails
-  that model closed (`load_error`, `resolve()`/`champion()` refuse it);
-  the primary's failure is a hard ValueError. Legacy v1/v2 configs still
-  load (entries derived from allowed_models + artifact_map, identity from
-  each artifact's own fields). Keep `production_canary.py`'s public API
-  (it delegates to the registry; tests pin its messages).
-- **Champion ≠ primary.** The champion is what SERVES a sport/market
-  (`champions:` map); the primary is what the canary predict cycle runs.
-  Promotion is one command, never hand-edited yaml:
-  `python -m model_prediction.model_promotion promote --new … --sport …
-  --market … --approved-by … [--evidence …]`, rollback likewise. Records
-  live in the `promotions` table of `data/runs.db`.
-- **Scheduled runs go through the supervisor**:
-  `python -m model_prediction.run_supervisor run <worker>` (workers:
-  daily/production/rebuild-shadow, command map in `WORKERS`). Run rows
-  (run_id, lease, heartbeat, exit, log) land in `data/runs.db` (SQLite
-  WAL, gitignored). Health reads them — `python -m model_prediction.system_health`
-  reports evidence-based status with reasons (DOWN/DEGRADED/HEALTHY).
-- Historical JSONL files are **ingest-ordered, not event-ordered** —
-  "newest event" is a max-scan over the file, never the last line
-  (system_health learned this the hard way).
-- All three launchd plists (daily / production / rebuild-shadow) are
-  rewired to the supervisor and loaded; the dashboard's "daily" action
-  routes through the supervisor too (2026-08-15).
-
-## 2026-08-14 (noon) — data-plane contracts (consolidation B)
-
-- **All canary/control-plane mutable state resolves through
-  `RuntimePaths`** (`runtime_paths.py`) — `MODEL_PREDICTION_RUNTIME_ROOT`
-  when set (launchd jobs), repo `data/` otherwise.
-  `migrate_legacy_state()` carries legacy repo-local files into the
-  runtime root once (copy-tmp+rename, never deletes). New code that
-  touches runs.db / production.db / production_state.json / supervisor
-  logs must go through RuntimePaths, not hand-built paths — the
-  2026-08-13 split-brain was exactly this disagreement.
-- **Operational entry points FAIL CLOSED on a missing runtime root**
-  (2026-08-15): `RuntimePaths.resolve(require_external_runtime=True)` —
-  supervisor, canary, promotion, system_health, dashboard,
-  cli_production all raise instead of falling back to repo `data/`,
-  because the fallback silently created a second runtime next to the
-  canonical one. Local dev uses the default `resolve()`; tests use
-  `for_test()` or inject pre-resolved `paths`. Don't add a new
-  operational entry point without the flag.
-- **Exactly one daily scheduler** (2026-08-15): every launchd job
-  (daily/production/rebuild-shadow) and the dashboard's "daily" action
-  route through `run_supervisor`; the dashboard never executes
-  `scripts/run_daily.sh` itself. A busy lease returns exit 75
-  (`daily_lock` convention) and is recorded as skipped — lock refusal is
-  a coalesced skip, never a failed job. The dashboard service
-  (`com.vc.model-dashboard`) is the only owner of port 8765 and carries
-  `MODEL_PREDICTION_LEDGER_AUTHORITY=sqlite` like the other jobs.
-  "One scheduler" means no competing schedulers, not run-once-per-day:
-  **`com.modelprediction.daily` runs 4x/day since 2026-09-04** (00:30,
-  06:00, 12:00, 18:00 — operator directive, to catch markets/games that
-  don't open until later in the day). This is safe because
-  `run_daily.sh`'s forecast step explicitly clears and replaces today's
-  picks on every run, settlement/ingestion are idempotent, and the
-  auto-buyer's bought-index cross-references the audit log to refuse a
-  double-buy on an already-bought pick_id/market_side. Checked-in copy:
-  `ops/launchd/com.modelprediction.daily.plist` — keep it byte-synced
-  with the live `~/Library/LaunchAgents` copy when changing the schedule
-  again.
-- **ProductionPredictionStore** (`production_store.py`) is the ONLY
-  writer to `production/production.db` (narrow API, identity key
-  event_id+model_id+market_type+horizon+decision_time_utc, decisions +
-  market_snapshots tables, keyset pagination, `cli_production export`
-  for xlsx). `cli_production` no longer uses `ProductionLedger` (kept
-  for legacy compat + tests). Schema migrations for legacy DBs happen in
-  `_migrate_columns` — new columns/indexes must be added there, NOT
-  only in `_SCHEMA` (CREATE IF NOT EXISTS won't touch a migrated table).
-- **Superseded 2026-08-16 (verified live)**: the SQLite cutover this
-  note warned against has already happened and is the current state —
-  all four scheduled jobs (daily/production/rebuild-shadow/dashboard)
-  run with `MODEL_PREDICTION_LEDGER_AUTHORITY=sqlite`; `PickLedger`
-  (`ledger.py`) treats the runtime-root SQLite store
-  (`ledgers/ledgers.db`) as canonical, and the main/flat/research xlsx
-  are now a best-effort EXPORT whose failure only logs a warning
-  (`ledger.py::_write_rows`, ~line 1641) — never blocks the commit.
-  Verified 2026-08-16: sqlite `ledger_records` has real rows across all
-  four tiers (main/flat/research/gated_research); `data/main/mlb.xlsx`'s
-  **Picks** sheet (not the Summary tab) row count matches sqlite's
-  open+settled count exactly (97 = 31+66); archived/removed rows live
-  under `data/archive/`, not deleted. Don't re-flip authority back to
-  `xlsx` without an explicit decision — that's the real remaining
-  governance question, not whether the cutover happened.
-
-## 2026-08-13 — Champion/challenger + settled-picks + cleanup (this session)
-
-**New module `src/model_prediction/champion_challenger.py`** — production
-freeze + paired comparison harness. CLI: `freeze-production`,
-`compare-champion`. Docs: `docs/CHAMPION_CHALLENGER.md`.
-
-**MLB v9 Phase 1 features wired** — `starter_kbb_gap`, `residual_trend_gap`,
-`bullpen_fatigue_gap` added to `validation.py` / `learned_forward.py` /
-`features/starter_history.py`. Runner: `scripts/mlb_v9_ablation.py`.
-Ablation result: residual-trend variant wins (+56.4u vs +43.1u raw trend).
-
-**MLB v9 Phase 2** — `park_factor_at()` PIT-correct park factors added
-(`features/park_factors.py`), wired into `validation.py` walk-forward.
-
-**WNBA spread fix** — `wnba-spread-baseline-v1` was predicting moneyline not
-spread (never used the line). Replaced with `wnba-spread-margin-v1`
-(margin_normal, `P(away_cover)=Φ(line; margin, 10.5)`). Broken artifact
-archived. `config/model.yaml` spread/total refs corrected.
-
-**Cleanup** — 38 files removed (12 `*.previous.json`, 22 obsolete configs, 4
-dead rebuild models). Config root 63 → 27 files.
-
-**Known gap** — canonical `data/model_ledgers/` froze 2026-08-03 (retired main
-ledger was its only writer). Dashboard + settled-picks loader read stale data.
-See `docs/archive/SETTLEMENT_GAP.md` (fixed 08-13; sqlite canonical since J).
-Do NOT silently re-route production data paths
-without an explicit decision.
-
-**Settlement routing fix** — model-ledger mirror now writes to canonical
-`data/model_ledgers/` (threaded `model_ledgers_dir` through `PickLedger`,
-`main_ledgers.py`, `research_ledgers.py`). Previously each tier mirrored to
-its own subdir (`data/flat/model_ledgers/`, …) while the dashboard + loader
-read only canonical — that froze on 2026-08-03. See `docs/archive/SETTLEMENT_GAP.md`.
-
-**MLB distribution methods** — `simulate_game` now takes a `method` argument
-(`gamma_poisson` default / `negative_binomial` / `independent_poisson`);
-`compare_distribution_methods()` prices moneyline/spread/total from one
-coherent joint draw per method. Wired through `MeasuredEdgeMarginModel` /
-`MeasuredEdgeTotalsModel.predict(..., method=...)`. NB is the first serious
-challenger to the incumbent gamma-Poisson; it is runnable but not yet
-promoted. Tests: `tests/test_mlb_distribution_methods.py`.
-
-## 2026-08-13 (later) — deep-audit fix pass (F-72 → F-84)
-
-Full audit run against this tree; every finding fixed with regression tests.
-Details in `MASTER.md`'s 2026-08-13 session entry and
-`docs/PROJECT_STATUS.md`'s "2026-08-13 deep-audit fix pass". Things that
-change how you should work here:
-
-- **Main ledger is un-retired** (operator directive): `main_ledger_enabled:
-  true`, workbooks restored to `data/main/`. Phase B's `retired` mechanism
-  still exists; don't re-flip without a directive.
-- **Train/serve parity is now a testable invariant** —
-  `tests/test_validation.py::test_train_serve_parity_for_v9_features` proves
-  `validation.py` (training) and `learned_forward.py` (serving) compute
-  identical values per feature. Any new feature must hold both sides in
-  literal sync — the 2026-08-13 audit found three v9 features where they
-  silently diverged (F-79). v9 variants use the new `park_factor_pit`
-  feature name; `park_factor` stays the static table for v8's trained
-  contract. **Prior v9 ablation numbers are void — re-run
-  `scripts/mlb_v9_ablation.py` before trusting them.**
-- **Stable seeds are load-bearing**: `simulate_game`'s default
-  `gamma_poisson` stream must stay bit-for-bit across refactors; the seed
-  pin test in `test_mlb_distribution_methods.py` must never be updated to
-  "match new output" — it pins history (F-80).
-- **ProductionLedger is live**: every `cli_production predict` writes
-  `data/production/predictions.db` fail-soft; lifecycle transitions are
-  guarded open→terminal only (settle/void/supersede/error). Operator
-  commands are fail-LOUD, scheduler path fail-soft.
-- **`pytest` runs WITHOUT the MODEL_PREDICTION_* env vars** (documented safe
-  form) — several tests pin the no-env repo-colocated default; setting the
-  launchd env vars makes ~12 of them red by retargeting them at the live
-  runtime root.
-- **Standing open items (2026-08-15)**: the v8 park-factor static-table
-  leak is verified and documented (`docs/V8_REPRODUCTION.md`) — v8 is never
-  modified; v9 uses `park_factor_pit`. `outputs/rebuild/verification.json`
-  is CI-generated evidence (CONSOLIDATION.md policy) — a local 404 is
-  expected. Soccer's Odds API credential remains a known-DEGRADED external
-  dependency. The two launchd research agents are loaded and producing.
-
+Comments explain *why*, not *what*: a hidden constraint, a workaround for a
+specific real bug, a non-obvious invariant. Match the existing code.
