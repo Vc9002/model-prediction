@@ -566,10 +566,18 @@ def test_neutral_resolution_side_settles_via_winning_outcome_team_name(tmp_path:
         ]
     }
 
+    class _UnresolvedMarketClient:
+        # Without a stub the settle path builds a real PolymarketUSClient and the live
+        # market for this slug resolved to a fair-value price, which grades "push" before
+        # the NEUTRAL fallback under test is ever reached (network-dependent failure).
+        def market(self, slug):
+            return {"status": "MARKET_STATUS_OPEN"}
+
     result = settle_auto_buyer_ledger(
         data_root=tmp_path,
         espn=MagicMock(),
         polymarket_executor=executor,
+        polymarket_client=_UnresolvedMarketClient(),
     )
 
     settled = read_auto_buyer_ledger(j_path)[0]
