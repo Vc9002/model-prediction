@@ -111,3 +111,55 @@ def test_simulator_state_survives_canonical_ledger_settlement(tmp_path):
     [settled] = store.records(tier="flat", sport="ncaaf")
     assert replay(settled, None)["status"] == "PASS"
     store.close()
+
+
+def test_memoized_replay_equals_a_cold_simulation():
+    from model_prediction import cfb_replay
+    from model_prediction.models.cfb_distribution import CFBJointDistributionEngine
+
+    first, _ = predictions()
+    inputs = first[1].inference_inputs
+    simulations: list[int] = []
+    real_simulate = CFBJointDistributionEngine.simulate_joint_scores
+
+    def counting_simulate(self, mu_home, mu_away):
+        simulations.append(1)
+        return real_simulate(self, mu_home, mu_away)
+
+    cfb_replay._SCORES_CACHE.clear()
+    with pytest.MonkeyPatch.context() as patcher:
+        patcher.setattr(CFBJointDistributionEngine, "simulate_joint_scores", counting_simulate)
+        cold = {market: replay_inputs(inputs, market) for market in ("moneyline", "spread", "total")}
+        # One game's three markets share one simulation.
+        assert len(simulations) == 1
+        warm = {market: replay_inputs(inputs, market) for market in ("moneyline", "spread", "total")}
+        assert len(simulations) == 1
+        assert warm == cold
+
+        # A moved line re-thresholds the same draws; changed draws are a new key.
+        moved = copy.deepcopy(inputs)
+        moved["spread_home_line"] = inputs["spread_home_line"] - 7.0
+        assert replay_inputs(moved, "spread") != cold["spread"]
+        assert len(simulations) == 1
+        wider = copy.deepcopy(inputs)
+        wider["parameters"]["margin_sd"] = inputs["parameters"]["margin_sd"] + 3.0
+        replay_inputs(wider, "spread")
+        assert len(simulations) == 2
+
+    # The engine itself, with no memo, gives the same numbers.
+    parameters = dict(inputs["parameters"])
+    parameters["distribution_type"] = cfb_replay.CFBDistributionType(parameters["distribution_type"])
+    engine = CFBJointDistributionEngine(**parameters)
+    engine.rng.bit_generator.state = inputs["rng_state_before"]
+    direct = engine.compute_market_probabilities(
+        mu_home=inputs["mu_home"],
+        mu_away=inputs["mu_away"],
+        spread_home_line=inputs["spread_home_line"],
+        total_line=inputs["total_line"],
+    )
+    assert cold["spread"] == {
+        "home": round(direct.p_home_cover, 6),
+        "away": round(direct.p_away_cover, 6),
+        "push": round(direct.p_push_spread, 6),
+    }
+    assert cold["moneyline"] == {"home": round(direct.p_home_win, 6), "away": round(direct.p_away_win, 6)}

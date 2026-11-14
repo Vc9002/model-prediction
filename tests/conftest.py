@@ -1,7 +1,16 @@
+import os
 from pathlib import Path
 
 import pytest
 import yaml
+
+# Dropped here, before any model_prediction import, and not only in the autouse
+# fixture below: auto_executor, auto_buyer_ledger and polymarket_execute resolve
+# RuntimePaths at import, so with the variable set in the shell their path
+# constants bound to the live runtime root during collection. A test that
+# missed one patch then wrote there (52 fake LIVE_EXECUTION rows in the live
+# auto_buyer_cycle_history.jsonl, 2026-11-07 to 11-13).
+os.environ.pop("MODEL_PREDICTION_RUNTIME_ROOT", None)
 
 from model_prediction.audit import AuditLog
 from model_prediction.bans import TeamBanList

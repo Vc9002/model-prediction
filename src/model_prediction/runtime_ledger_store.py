@@ -447,7 +447,9 @@ class RuntimeLedgerStore:
 
     # ------------------------------------------------------------- reading
 
-    def records(self, *, tier: str | None = None, sport: str | None = None) -> list[dict[str, Any]]:
+    def records(
+        self, *, tier: str | None = None, sport: str | None = None, event_id: str | None = None
+    ) -> list[dict[str, Any]]:
         query = "SELECT * FROM ledger_records"
         clauses: list[str] = []
         params: list[Any] = []
@@ -457,6 +459,10 @@ class RuntimeLedgerStore:
         if sport is not None:
             clauses.append("sport = ?")
             params.append(sport)
+        if event_id is not None:
+            # Served by idx_ledger_records_event (event_id, ledger_tier).
+            clauses.append("event_id = ?")
+            params.append(event_id)
         if clauses:
             query += " WHERE " + " AND ".join(clauses)
         query += " ORDER BY created_at_utc"
@@ -477,7 +483,9 @@ class RuntimeLedgerStore:
                 time.sleep(_RETRY_DELAYS[attempt])
                 attempt += 1
 
-    def pick_rows(self, *, tier: str | None = None, sport: str | None = None) -> list[dict[str, Any]]:
+    def pick_rows(
+        self, *, tier: str | None = None, sport: str | None = None, event_id: str | None = None
+    ) -> list[dict[str, Any]]:
         """Project canonical records back into the rich PickLedger row shape.
 
         ``decision_payload_json`` contains the complete versioned ledger row
@@ -487,7 +495,7 @@ class RuntimeLedgerStore:
         dashboard consumers after the SQLite authority cutover.
         """
         projected: list[dict[str, Any]] = []
-        for record in self.records(tier=tier, sport=sport):
+        for record in self.records(tier=tier, sport=sport, event_id=event_id):
             payload: dict[str, Any] = {}
             raw_payload = record.get("decision_payload_json")
             if isinstance(raw_payload, str) and raw_payload:

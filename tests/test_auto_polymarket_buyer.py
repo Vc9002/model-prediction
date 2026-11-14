@@ -456,7 +456,13 @@ def test_buyer_filters_low_edge_and_past_games():
 
 def test_buyer_rejects_unrealistic_edge_outliers():
     today_start = iso_utc(utc_now() + timedelta(hours=2))
-    config = AutoExecutionConfig(min_edge=0.035, max_edge=0.20, min_model_probability=0.20)
+    # Whitelisted explicitly: the default whitelist dropped this model 2026-11-12.
+    config = AutoExecutionConfig(
+        min_edge=0.035,
+        max_edge=0.20,
+        min_model_probability=0.20,
+        whitelisted_models=("nba-moneyline-v9",),
+    )
     buyer = AutoPolymarketBuyer(
         config=config,
         live_quote_fn=lambda _slug: {"ask": 0.16, "market_slug": "test-slug", "side": "long"},
@@ -489,7 +495,10 @@ def test_buyer_rejects_unrealistic_edge_outliers():
 def test_buyer_rejects_below_win_probability():
     """Verify that an underdog (< 50% model probability) is rejected even with high positive edge."""
     today_start = iso_utc(utc_now() + timedelta(hours=2))
-    config = AutoExecutionConfig(min_edge=0.035, min_model_probability=0.50)
+    # Whitelisted explicitly: the default whitelist dropped this model 2026-11-12.
+    config = AutoExecutionConfig(
+        min_edge=0.035, min_model_probability=0.50, whitelisted_models=("nba-moneyline-v9",)
+    )
     buyer = AutoPolymarketBuyer(
         config=config,
         live_quote_fn=lambda _slug: {"ask": 0.24, "market_slug": "test-slug", "side": "long"},
@@ -1851,9 +1860,13 @@ def test_auto_buyer_cycle_tracking(tmp_path: Path):
     )
 
     test_state_file = tmp_path / "auto_buyer_state.json"
+    history_file = tmp_path / "logs" / "auto_buyer_cycle_history.jsonl"
     with (
         patch("model_prediction.portfolio.auto_executor.AUTO_BUYER_STATE_FILE", test_state_file),
         patch("model_prediction.portfolio.auto_executor.DATA", tmp_path),
+        # Bound at import, so patching DATA alone left live-mode cycles appending
+        # to the real history file.
+        patch("model_prediction.portfolio.auto_executor.AUTO_BUYER_CYCLE_HISTORY_PATH", history_file),
     ):
         toggle_auto_buyer(True)
         from model_prediction.portfolio.auto_executor import set_auto_buyer_mode
