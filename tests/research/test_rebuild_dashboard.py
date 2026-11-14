@@ -155,15 +155,15 @@ def test_rebuild_namespace_rejects_all_mutating_http_methods() -> None:
         assert sent == [({"error": "method not allowed", "allowed_methods": ["GET", "HEAD"]}, 405)]
 
 
-def test_rebuild_ui_is_labeled_and_has_no_execution_controls() -> None:
+def test_rebuild_ui_is_gone_and_dashboard_has_no_rebuild_execution_controls() -> None:
+    """The rebuild tree is frozen (CLAUDE.md "Scope", 2026-11-13): the dashboard no longer
+    renders a Rebuild Shadow tab. The read-only /api/rebuild/* routes stay for research
+    tooling, and nothing in the page may ever call a mutating rebuild endpoint."""
     html = (Path(__file__).resolve().parents[2] / "dashboard.html").read_text(encoding="utf-8")
-    rebuild = html.split('<section id="tab-rebuild"', 1)[1].split('<section id="tab-evidence"', 1)[0]
 
-    assert "CLEAN-SLATE REBUILD — SHADOW ONLY" in rebuild
-    assert "NO LIVE EXECUTION" in rebuild
-    assert "A rejected challenger is a research outcome, not a system failure." in rebuild
-    assert "<button" not in rebuild
+    assert '<section id="tab-rebuild"' not in html
+    assert 'data-tab="rebuild"' not in html
+    assert "loadRebuild" not in html
     assert "/api/rebuild/order" not in html
     assert "/api/rebuild/execute" not in html
     assert "/api/rebuild/promote" not in html
-    assert 'if(b.dataset.tab==="rebuild")loadRebuild();' in html
