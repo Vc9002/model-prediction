@@ -28,6 +28,40 @@ def test_odds_audit_reads_runtime_root_and_eastern_date(monkeypatch, tmp_path):
     assert result["sports"]["esports"]["latest_date"] == "2020-01-01"
 
 
+def test_switched_off_sports_are_not_stale_odds(monkeypatch, tmp_path):
+    """The 'basketball' odds directory is the Euroleague/NBL capture. Both were switched
+    off 2026-11-13, so its silence is scope, not a feed gap; an in-scope quiet sport is."""
+    import yaml
+
+    repo = tmp_path / "repo"
+    runtime = tmp_path / "runtime"
+    (repo / "config").mkdir(parents=True)
+    (repo / "config" / "model.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "models": {
+                    "NBA": {"enabled": True},
+                    "EUROLEAGUE": {"enabled": True, "daily_forecast_enabled": False},
+                    "NBL": {"enabled": True, "daily_forecast_enabled": False},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    for sport in ("basketball", "nba"):
+        f = runtime / "odds" / sport / "2020-01-01" / "polymarket_snapshots.jsonl"
+        f.parent.mkdir(parents=True)
+        f.write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(monitor, "PROJECT_ROOT", repo)
+
+    assert monitor.switched_off_labels() == {"euroleague", "nbl", "basketball"}
+    result = monitor.audit_odds_freshness(RuntimePaths(repo, runtime))
+
+    assert result["sports"]["basketball"]["status"] == "SWITCHED_OFF"
+    assert result["sports"]["nba"]["status"] == "STALE"
+    assert result["stale_active_sports"] == ["nba"]
+
+
 def test_auto_heal_uses_sport_slate_and_capture_signature(monkeypatch, tmp_path):
     repo = tmp_path / "repo"
     runtime = tmp_path / "runtime"

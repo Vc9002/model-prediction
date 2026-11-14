@@ -16,6 +16,12 @@ commit: 311b4812
   `checks.inactive_sports` and `checks.predictions.primary_sport_inactive`.
 - `tests/test_system_health.py`: `_mark_sport_off` helper plus two tests.
 
+- `scripts/health_and_data_gap_monitor.py`: `switched_off_labels()` (same model.yaml gate,
+  plus a label map: `basketball` = Euroleague+NBL capture, `esports` = the five titles).
+  Quiet switched-off labels report `SWITCHED_OFF` in both the odds-freshness and
+  market-quotes audits instead of `STALE`. The monitor had warned "basketball odds stale"
+  since 11-12, which was the Euroleague/NBL switch-off read as a feed outage.
+
 ## Evidence
 
 - `tests/test_system_health.py`: 22 passed.
@@ -25,3 +31,5 @@ commit: 311b4812
   sports plus MLB and WNBA.
 - The 14:00 ET daily run (first after the registry cut, commit 13:40) exited 0 on every step
   and wrote NBA 15, NCAAB 119, NCAAF 139 rows; zero out-of-scope rows today.
+- `tests/test_health_monitor_repair.py`: 5 passed (one new). Live audit-only run of the monitor:
+  overall WARNING -> HEALTHY; odds OK, warehouse HEALTHY, `basketball` = SWITCHED_OFF.
