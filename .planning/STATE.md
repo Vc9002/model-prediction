@@ -116,6 +116,7 @@ None yet.
 | 261114-reg | Disable 40 out-of-scope registry entries and drop their routes; SUPPORTED_MARKETS to six sports; delete 53 orphaned research scripts; fix stale pins and a network-dependent settlement test | 2026-11-14 | 0face48b | [261114-reg-disable-out-of-scope-registry-entries-prune-scripts](./quick/261114-reg-disable-out-of-scope-registry-entries-prune-scripts/) |
 | 261114-dsh | Drop the Rebuild Shadow dashboard tab (5023->4830 lines), default ledger sport filter to the six production sports, archive eight dated reports to docs/archive/reports | 2026-11-14 | b29e3c14 | [261114-dsh-drop-rebuild-dashboard-tab-archive-dated-reports](./quick/261114-dsh-drop-rebuild-dashboard-tab-archive-dated-reports/) |
 | 261114-hlt | system_health treats switched-off and off-season sports as informational (live verdict DEGRADED -> HEALTHY, 0 reasons) | 2026-11-14 | 311b4812 | [261114-hlt-scope-aware-system-health](./quick/261114-hlt-scope-aware-system-health/) |
+| 261114-prf | Daily write path: event-scoped duplicate read (1.9-2.5 s -> ms per append), model-ledger read cache, memoized NCAAF replay simulation; pytest no longer binds to the live runtime root; 3 stale pins | 2026-11-14 | d865002b | [261114-prf-daily-write-path-perf-and-test-isolation](./quick/261114-prf-daily-write-path-perf-and-test-isolation/) |
 
 ## Milestone History
 

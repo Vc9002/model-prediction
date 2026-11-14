@@ -206,6 +206,75 @@ change how you should work here:
   expected. Soccer's Odds API credential remains a known-DEGRADED external
   dependency. The two launchd research agents are loaded and producing.
 
+## 2026-11-14 — Project audit: the forecast step's time was ledger re-reads and replayed simulations, not pricing; pytest wrote into the live runtime root (quick-261114-prf)
+
+**Symptom.** The 14:00 daily spent 1,589 s of 1,886 s in the forecast step: NCAAF 1,567 s,
+NCAAB 702 s (`timing.forecast_sport_done_seconds`). Separately, the live
+`logs/auto_buyer_cycle_history.jsonl` held 52 rows marked `LIVE_EXECUTION` with
+`forecast_date` 2026-08-30, the last six written 2026-11-13 while the buyer state was `paper`.
+
+**Root causes.**
+
+1. `PickLedger._append_record` read the ledger's whole tier/sport slice for one duplicate check,
+   on every append. Timed read-only against the live `ledgers.db` (1.25 GB, 50,949 records):
+   flat/ncaaf 4,216 rows 1.9 s, flat/ncaab 8,442 rows 2.5 s, main/ncaab 4,624 rows 1.4 s. A
+   contract is appended to two tiers, a slate is hundreds of contracts, and the slice grows every
+   day (82% of flat/ncaaf is retired rows that are read, parsed and then dropped). The XLSX
+   rebuild was already deferred (`defer_sqlite_xlsx_exports`); the read that fed it was not.
+2. `record_from_pick_request` read the model's whole workbook twice (dedupe, then append) and
+   rewrote it once per appended pick, and read it again when the same pick arrived from the
+   second tier: 0.4 s per read at 1,000 rows.
+3. `cfb_replay.replay_inputs` restores the recorded RNG state, so its simulation is a pure
+   function of its inputs, but it was re-run every time: once per listed ladder rung in the
+   slate build (about 3,600 replays, 93% of a 128 s slate build by stack sample), twice in
+   `build_snapshot` (build, then validate), once in `PickRequest.validate`, once per ledger
+   write. One simulation is 0.033 s; nothing was slow, it was only repeated.
+4. `auto_executor`, `auto_buyer_ledger` and `polymarket_execute` call `RuntimePaths.resolve()` at
+   import. `MODEL_PREDICTION_RUNTIME_ROOT` is set machine-wide, and `tests/conftest.py` cleared
+   it only in an autouse fixture, after collection had imported those modules. Their path
+   constants therefore pointed at the live runtime root for the whole session, and
+   `test_auto_buyer_cycle_tracking` (live mode, mocked executor) patched `DATA` and the state
+   file but not `AUTO_BUYER_CYCLE_HISTORY_PATH`. The live buyer ledger, audit log and state file
+   were checked and hold no test rows; the pollution is the cycle history only.
+
+**Fix.**
+
+- `RuntimeLedgerStore.records/pick_rows` take `event_id` (served by `idx_ledger_records_event`);
+  `_append_record` reads only the event's rows while the export is deferred and falls back to
+  the full read otherwise, including when the deferral ends between the check and the write.
+- `ModelLedger._read_unlocked` serves a copy from a cache keyed on (mtime, size, inode); a write
+  drops the entry. Rows are cached from real reads only: the workbook round trip is not an
+  identity.
+- `cfb_replay._MemoizedReplayEngine` caches the simulated score arrays on (engine parameters, RNG
+  state, score means); the lines only threshold them. It subclasses the engine in `cfb_replay.py`
+  because `models/cfb_distribution.py` must not change: its sha256 is `engine_source_sha256` in
+  every stored snapshot, and editing it would fail replay validation for every open NCAAF pick.
+- `tests/conftest.py` drops the env var at import, before any `model_prediction` import; the
+  cycle-tracking test patches the history path.
+- Three stale pins the 2026-11-14 triage missed, failing at HEAD: two buyer tests relied on
+  `nba-moneyline-v9` being in the default whitelist (removed 2026-11-12); one model-ledger test
+  asserted tennis spread is unmapped (it maps to `tennis-games-markov-v4`) and that an unmapped
+  market is a no-op (it falls back to the model version).
+
+**Evidence.**
+
+- Targeted read vs full read on a `backup()` copy of the live ledger, through `PickLedger`:
+  2,651 events, 7,147 rows, nine tier/sport slices, 0 row-set mismatches, 0 duplicate-verdict
+  differences; 0.6-5.6 ms per event against 0.14-1.84 s per slice.
+- Replay memo on a 35-rung ladder at 200,000 draws: 1.08 s cold, 0.16 s first pass, 0.04 s
+  repeat, probabilities identical.
+- Each new test fails with its fix reverted and passes with it restored
+  (`test_deferred_append_reads_only_the_events_own_rows`,
+  `test_rows_cache_sees_external_writes_and_is_not_mutable_by_callers`,
+  `test_memoized_replay_equals_a_cold_simulation`, `tests/test_runtime_root_test_isolation.py`).
+- The profiling run of `build_cfb_slate` (no ledgers passed) wrote one candidate-evidence packet,
+  `research/college_contract_candidates/ncaaf/2026-11-14/c1669b1e...json` at 15:38 ET. It is a
+  real observation by production code, outside the scheduled runs.
+
+**Not done here (see ROADMAP Horizon 3 item 6).** The 52 polluted history rows are still in the
+live file: identify them by `mode == "LIVE_EXECUTION"` and `forecast_date == "2026-08-30"`. The
+per-model workbook is still rewritten once per appended pick.
+
 ## 2026-11-14 — Prospective BBO capture abandoned on the first 429 and starved NCAAF; NCAAF priced off ESPN consensus (debug bbo-capture-429-starves-ncaaf)
 
 **Symptom.** Every NCAAF Main row written on 2026-11-14 carried `sportsbook=espn_consensus` and a

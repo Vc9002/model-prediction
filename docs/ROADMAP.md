@@ -152,8 +152,8 @@ flowchart TD
 
 ### Horizon 3: Quality Engineering & Platform Hardening
 
-#### 1. Mypy Static Type Hardening (Zero-Error Initiative) — COMPLETED
-- **Status**: Completed / Enforced (0 errors across 470 source files).
+#### 1. Mypy Static Type Hardening (Zero-Error Initiative) — REGRESSED
+- **Status**: Reached 0 errors across 470 source files, then drifted: 52 errors across 548 files on 2026-11-14, because no CI or pre-commit gate runs mypy on the package (item 6).
 - **Milestones Delivered**:
   - Enforced strict static type safety across all 470 source files in `src/model_prediction`.
   - Resolved all 89 type errors across 17 files, eliminating dictionary-to-primitive coercions, polars sum Decimal union operands, eligibility call signatures, and Protocol client definitions.
@@ -183,6 +183,48 @@ flowchart TD
 - `_lookup_model_prob` in `portfolio/polymarket_scanner.py` gives a same-date match only a +10 score bonus, so a stale earlier-date Main/Flat pick for the same team pair can supply `p_model` for a different, current event.
 - Found during quick task 261112-01r and not fixed there, because changing it alters which markets the daily edge scanner records.
 - Fail closed when no same-date pick exists.
+
+#### 6. Open items from the 2026-11-14 project audit (OPEN)
+Fixed in `quick-261114-prf` (see `docs/DEBUG.md`): per-append full ledger reads, per-append
+workbook re-reads, repeated NCAAF replay simulations, pytest binding to the live runtime root.
+Found and left for a decision:
+- **Dead adapter layer.** `src/model_prediction/sports/*/adapter.py`, `sports/base.py`
+  (`SportRegistry`), `sports/esports_base.py` and `cli/dispatcher.py` (about 4,200 lines, 18
+  sports) are imported only by tests. Nothing in `cli/`, `scripts/` or the dashboard calls
+  `SportDispatcher`. The MLB, tennis and soccer adapters cannot run (21 mypy errors: wrong
+  constructor arguments, attributes the models do not have), and the MLB one fills in guessed
+  starters and lines (`"SP_H"`, -1.5, 8.5), which the fail-closed rule forbids. Only
+  `sports/naming.py` is live. Delete the layer and its `tests/unit/*sport_adapter*` files, or
+  wire it in; do not leave it looking like the architecture.
+- **Mypy is not enforced on the package.** 52 errors in 14 files on 2026-11-14: 21 in the dead
+  adapters, 31 in live modules. The live ones inspected (ledger, auto-executor, buyer ledger,
+  NCAAB forward, dashboard) are type-narrowing gaps behind runtime guards, not bugs. CI gates
+  only `rebuild/` by fingerprint. After the adapter decision, add `mypy src/model_prediction` to CI.
+- **Polluted live history.** 52 test rows in the runtime root's
+  `logs/auto_buyer_cycle_history.jsonl` (`mode == "LIVE_EXECUTION"`, `forecast_date ==
+  "2026-08-30"`). Remove by that exact identity, with a named backup.
+- **Ledger size.** `ledgers.db` is 1.25 GB for 50,949 records: `ledger_events.payload_json` is
+  737 MB and `decision_payload_json` 278 MB, because every event stores the full row. Most rows
+  in the big slices are retired. Decide on archiving retired rows out of the hot database.
+- **Same full read in settlement.** `PickLedger.settle`, `void` and `update_closing` still read
+  the whole tier/sport slice once per pick to find one row. The fix is the same narrowing by
+  `pick_id`; not done in `quick-261114-prf` because these are P&L mutation paths and no recent
+  run shows them dominating (NCAAB settlement was 73 s on 2026-11-11). Time one first.
+- **Per-model workbook write.** `ModelLedger.append_prediction` still rewrites the whole workbook
+  per appended pick. Batching it under the existing deferral context changes its crash
+  durability, so it needs a decision.
+- **Daily log location.** `scripts/run_daily.ps1` writes `data\logs\daily_<date>.log` in the repo
+  (77 MB, 34 files), not under the runtime root, and the supervisor's own log for the daily
+  worker is always empty. `httpx` INFO request lines are most of the 233,000 lines a day.
+- **Tracked calibration artifacts.** 103 files under `data/calibration/` are tracked and
+  rewritten by every calibrate run, so the tree is permanently dirty (80 modified files). Ties
+  into HANDOFF 3b (pin a hash, or stop tracking them).
+- **Runtime root clutter.** A zero-byte `ledgers.db` beside `ledgers/ledgers.db`; two October
+  ledger snapshots (537 MB) in `ledgers/`; 16 `auto_buyer_state.json` backups, two `.patch`
+  files, staged dashboard copies and a one-off migration script at the root.
+- **Auto-buyer lock wait.** `FORECAST_LOCK_WAIT_SECONDS = 1200` was sized for a 30-minute
+  trigger; the task now fires every 15 minutes, so a waiting cycle swallows the next trigger.
+  Harmless today (the result is the same skip), but the comment and the bound are stale.
 
 ---
 
