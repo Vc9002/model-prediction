@@ -8,5 +8,6 @@ block the production loop. Run them on demand:
 
     pytest tests/research -o addopts='' -q
 
-The shadow-rebuild suite lives in `tests/rebuild/` and is run the same way; CI
-still runs it as its own job.
+CI runs this directory as its own step (`.github/workflows/ci.yml`), so a break
+here is still caught on main; it just never blocks a local core run. The
+shadow-rebuild suite lives in `tests/rebuild/` and is run the same way.

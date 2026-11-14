@@ -159,6 +159,11 @@ def _finalize_daily_report(report: dict[str, Any]) -> dict[str, Any]:
     return report
 
 
+def _skipped_sport_result(sport: str, status: str, reason: str) -> dict[str, Any]:
+    """The result dict a daily task records when a sport is not forecast at all."""
+    return {"sport": sport, "status": status, "logged": 0, "candidates": [], "reason": reason}
+
+
 def _skip_auto_buyer_for_verification() -> bool:
     """Return whether this invocation explicitly suppresses live purchases.
 
@@ -736,13 +741,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         for sport in DAILY_LEARNED_SPORTS:
             if not is_sport_daily_enabled(config, sport):
                 logger.info("Sport %s is off-season; skipping daily forecast.", sport.upper())
-                forecast_result[sport] = {
-                    "sport": sport,
-                    "status": "off_season",
-                    "logged": 0,
-                    "candidates": [],
-                    "reason": "season_concluded",
-                }
+                forecast_result[sport] = _skipped_sport_result(sport, "off_season", "season_concluded")
                 continue
             futures[
                 pool.submit(
@@ -779,13 +778,9 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         flat_futures = {}
         for sport in DAILY_LEARNED_SPORTS:
             if not is_sport_daily_enabled(config, sport):
-                forecast_result[f"_flat_{sport}"] = {
-                    "sport": sport,
-                    "status": "off_season",
-                    "logged": 0,
-                    "candidates": [],
-                    "reason": "season_concluded",
-                }
+                forecast_result[f"_flat_{sport}"] = _skipped_sport_result(
+                    sport, "off_season", "season_concluded"
+                )
                 continue
             result = forecast_result.get(sport, {})
             candidates = result.get("candidates", [])
@@ -1181,7 +1176,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 len(_priced_esports),
             )
 
-    def _esports_block(titles: tuple[str, ...] = ESPORTS_TITLES) -> None:
+    def _esports_block(titles: tuple[str, ...]) -> None:
         try:
             forecast_result["_esports_ratings_refresh"] = _refresh_esports_ratings(data_directory)
         except Exception:
@@ -1222,7 +1217,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 len(_priced_intl),
             )
 
-    def _intl_baseball_block(leagues: tuple[str, ...] = DAILY_INTERNATIONAL_BASEBALL_SPORTS) -> None:
+    def _intl_baseball_block(leagues: tuple[str, ...]) -> None:
         try:
             forecast_result["_international_baseball_ratings_refresh"] = (
                 _refresh_international_baseball_ratings(data_directory)
@@ -1276,40 +1271,47 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             logger.warning("%s forecast failed", sport, exc_info=True)
             forecast_result[sport] = {"status": "error", "reason": str(exc), "logged": 0}
 
-    def _daily_sport_disabled(sport_key: str) -> bool:
+    def _daily_sport_disabled(sport_key: str, result_key: str | None = None) -> bool:
         # Operator directive 2026-11-13: production is narrowed to NBA, NCAAF, NFL,
         # MLB, WNBA and NCAAB. The other sports are switched off through their
-        # config/model.yaml flags, and these tasks honour the same gate the learned
-        # pool above already uses -- so a sport is disabled in exactly one place,
-        # instead of these blocks running unconditionally as they did before.
+        # config/model.yaml flags, and every task below honours the same gate the
+        # learned pool above already uses -- so a sport is disabled in exactly one
+        # place, instead of these blocks running unconditionally as they did before.
+        # Status "disabled" (not "off_season") so ledger_coverage and the dashboard can
+        # tell a scope decision from a season gap.
         if is_sport_daily_enabled(config, sport_key):
             return False
         logger.info("Sport %s is disabled in config/model.yaml; skipping daily forecast.", sport_key.upper())
-        forecast_result[sport_key] = {
-            "sport": sport_key,
-            "status": "off_season",
-            "logged": 0,
-            "candidates": [],
-            "reason": "disabled_in_config",
-        }
+        forecast_result[result_key or sport_key] = _skipped_sport_result(
+            sport_key, "disabled", "disabled_in_config"
+        )
         return True
 
     enabled_esports_titles = tuple(t for t in ESPORTS_TITLES if not _daily_sport_disabled(t))
     enabled_intl_leagues = tuple(
         lg for lg in DAILY_INTERNATIONAL_BASEBALL_SPORTS if not _daily_sport_disabled(lg)
     )
+    # (task, result name, gating sport). MLB/WNBA tasks gate themselves internally and
+    # write their own off-season result, so they are always submitted.
+    fixed_market_tasks = (
+        (_mlb_totals_task, "mlb_totals", None),
+        (_mlb_nrfi_task, "mlb_nrfi", None),
+        (_cfb_task, "cfb", ("ncaaf", "ncaaf")),
+        (_wnba_spread_task, "wnba_spread", None),
+        (_wnba_total_task, "wnba_total", None),
+        (_nba_spread_task, "nba_spread", ("nba", "nba_spread")),
+        (_nba_total_task, "nba_total", ("nba", "nba_total")),
+        (_nfl_spread_task, "nfl_spread", ("nfl", "nfl_spread")),
+        (_nfl_total_task, "nfl_total", ("nfl", "nfl_total")),
+    )
 
     with ThreadPoolExecutor(max_workers=16) as research_pool:
         research_futures_map = {
-            research_pool.submit(_mlb_totals_task): "mlb_totals",
-            research_pool.submit(_mlb_nrfi_task): "mlb_nrfi",
-            research_pool.submit(_cfb_task): "cfb",
-            research_pool.submit(_wnba_spread_task): "wnba_spread",
-            research_pool.submit(_wnba_total_task): "wnba_total",
-            research_pool.submit(_nba_spread_task): "nba_spread",
-            research_pool.submit(_nba_total_task): "nba_total",
-            research_pool.submit(_nfl_spread_task): "nfl_spread",
-            research_pool.submit(_nfl_total_task): "nfl_total",
+            **{
+                research_pool.submit(task): name
+                for task, name, gate in fixed_market_tasks
+                if gate is None or not _daily_sport_disabled(gate[0], gate[1])
+            },
             **{
                 research_pool.submit(_additional_sport_task, sport, forecast_function): sport
                 for sport, forecast_function in zip(

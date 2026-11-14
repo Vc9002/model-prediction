@@ -41,6 +41,11 @@ are switched off, not deleted:
 - Their code, artifacts, and calibrators stay in place. Settlement of
   already-open picks and score ingestion continue so history stays
   continuous. `cli forecast --sport <x>` still works for a manual run.
+- **Re-enabling esports, KBO, or NPB needs a backfill first.** Their Elo
+  ratings refresh only inside the daily forecast block (14-day incremental
+  merge), so while they are off the ratings and match history go stale. Run
+  `cli esports-backfill` / `cli international-baseball-backfill` over the gap
+  and re-validate before flipping the flag back on.
 - Research tooling (ablations, champion/challenger harness, experiment
   registries, replay research, the rebuild dashboard panel) is tested under
   `tests/research/`, which the default `pytest` skips (`norecursedirs`). The

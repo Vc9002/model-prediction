@@ -1,14 +1,14 @@
 """Pin the production scope decided 2026-11-13: six sports forecast daily, the rest are off.
 
-The flag lives in config/model.yaml (``daily_forecast_enabled``) and every daily
-forecast task, learned or not, consults ``is_sport_daily_enabled`` before running.
-MLB and WNBA are in scope but currently off-season, so they are asserted separately.
+The switch is ``daily_forecast_enabled`` in config/model.yaml and every daily forecast
+task consults ``is_sport_daily_enabled`` before running. Season state (``season_active``)
+is deliberately not asserted here: it flips at every season boundary and has nothing to
+do with scope.
 """
 
 from model_prediction.config import is_sport_daily_enabled, load_config
 
-IN_SCOPE_IN_SEASON = ("NBA", "NCAAF", "NFL", "NCAAB")
-IN_SCOPE_OFF_SEASON = ("MLB", "WNBA")
+IN_SCOPE = ("NBA", "NCAAF", "NFL", "MLB", "WNBA", "NCAAB")
 OUT_OF_SCOPE = (
     "SOCCER",
     "TENNIS",
@@ -26,18 +26,16 @@ OUT_OF_SCOPE = (
 )
 
 
-def test_in_scope_sports_are_daily_enabled():
+def test_in_scope_sports_are_not_switched_off():
     config = load_config()
-    for sport in IN_SCOPE_IN_SEASON:
-        assert is_sport_daily_enabled(config, sport), sport
-
-
-def test_in_scope_off_season_sports_are_only_gated_by_season():
-    config = load_config()
-    for sport in IN_SCOPE_OFF_SEASON:
+    for sport in IN_SCOPE:
         sport_cfg = config["models"][sport]
         assert sport_cfg.get("enabled") is True, sport
-        assert sport_cfg.get("season_active") is False, sport
+        # An in-scope sport may be off only for season reasons (MLB/WNBA carry
+        # daily_forecast_enabled: false together with season_active: false). Off while
+        # in season is a scope regression; the season rollover itself never trips this.
+        if sport_cfg.get("daily_forecast_enabled") is False:
+            assert sport_cfg.get("season_active") is False, f"{sport} switched off while in season"
 
 
 def test_out_of_scope_sports_are_daily_disabled():
