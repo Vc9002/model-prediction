@@ -440,6 +440,25 @@ class SportSlateResult:
     errors: dict[str, str]
 
 
+@dataclass(frozen=True)
+class EventDetail:
+    """One ``/v1/events/slug/{slug}`` response: the event plus how stale the CDN says it is.
+
+    ``cache_age_seconds`` is the ``Age`` header (None when absent or unparseable). The
+    endpoint is served from a CDN cache (``max-age=30``), so a quote read from it can be
+    up to that old; the age is stored on each row that uses it.
+    """
+
+    event: dict[str, Any]
+    cache_age_seconds: float | None
+
+
+def _cache_age_seconds(response: httpx.Response) -> float | None:
+    """``Age`` header as seconds; None unless it is plain non-negative integer digits."""
+    age = response.headers.get("Age", "").strip()
+    return float(age) if age.isascii() and age.isdigit() else None
+
+
 def _retry_delay_seconds(response: httpx.Response, attempt: int) -> float:
     """Seconds to wait before retrying a 429: Retry-After when numeric, else jittered exponential backoff."""
     retry_after = response.headers.get("Retry-After", "")
@@ -453,6 +472,13 @@ def _connect_retry_delay_seconds(attempt: int) -> float:
     """Jittered exponential backoff for DNS/connect failures (no response to inspect)."""
     base = min(8.0, 0.5 * (2**attempt))
     return base + random.uniform(0.0, base / 4)
+
+
+# `_response_source` marks which endpoint a book-shaped dict came from; absent means /book.
+_RECONSTRUCTION_SOURCE_BY_RESPONSE = {
+    "bbo": "live_gateway_market_and_bbo_response",
+    "event_detail": "live_gateway_event_detail_quote",
+}
 
 
 class PolymarketUSClient:
@@ -474,6 +500,9 @@ class PolymarketUSClient:
         self._last_bbo_request = 0.0
 
     def _get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        return self._get_response(path, params).json()
+
+    def _get_response(self, path: str, params: dict[str, Any] | None = None) -> httpx.Response:
         # The gateway throttles bursts from the 16-worker snapshot pool with
         # plain 429s (no Retry-After header observed in practice); a short
         # bounded backoff recovers most of these in place instead of losing
@@ -500,7 +529,7 @@ class PolymarketUSClient:
                 time.sleep(_retry_delay_seconds(response, attempt))
                 continue
             response.raise_for_status()
-            return response.json()
+            return response
         raise AssertionError("unreachable")  # pragma: no cover
 
     def events(self, league: str, limit: int = 500) -> list[dict[str, Any]]:
@@ -627,6 +656,14 @@ class PolymarketUSClient:
         """Fetch the complete market inventory used by the game-detail page."""
         return self._get(f"/v1/events/slug/{slug}")["event"]
 
+    def event_detail(self, slug: str) -> EventDetail:
+        """Like ``event`` but keeps the CDN ``Age`` so a quote read from it can state its staleness."""
+        response = self._get_response(f"/v1/events/slug/{slug}")
+        event = response.json()["event"]
+        if not isinstance(event, dict):
+            raise TypeError(f"event_detail_payload_not_an_object_for_{slug}")
+        return EventDetail(event=event, cache_age_seconds=_cache_age_seconds(response))
+
     def book(self, slug: str) -> dict[str, Any]:
         return self._get(f"/v1/markets/{slug}/book")["marketData"]
 
@@ -676,6 +713,12 @@ class PolymarketUSClient:
         slate market already holds. The book is still fetched live.
         """
         slug = market["market_slug"]
+        market_like = self._slate_market_like(event, market)
+        return self._build_snapshot(market_like, self._book_with_bbo_fallback(slug), slug, observed_at)
+
+    @staticmethod
+    def _slate_market_like(event: dict[str, Any], market: dict[str, Any]) -> dict[str, Any]:
+        """The market-endpoint fields ``_build_snapshot`` needs, rebuilt from a normalized slate market."""
         sides = [
             {
                 "description": side["description"],
@@ -684,13 +727,12 @@ class PolymarketUSClient:
             }
             for side in market["sides"]
         ]
-        market_like = {
+        return {
             "id": market["market_id"],
             "gameStartTime": event.get("event_start_utc"),
             "line": market.get("line"),
             "marketSides": sides,
         }
-        return self._build_snapshot(market_like, self._book_with_bbo_fallback(slug), slug, observed_at)
 
     @staticmethod
     def _build_snapshot(
@@ -727,10 +769,8 @@ class PolymarketUSClient:
             # market/book responses in this call; it is not reconstructed
             # from historical prices or postgame data.
             "reconstructed": False,
-            "reconstruction_status_source": (
-                "live_gateway_market_and_bbo_response"
-                if book.get("_response_source") == "bbo"
-                else "live_gateway_market_and_book_response"
+            "reconstruction_status_source": _RECONSTRUCTION_SOURCE_BY_RESPONSE.get(
+                book.get("_response_source"), "live_gateway_market_and_book_response"
             ),
             "market_id": str(market["id"]),
             "market_slug": slug,
@@ -951,6 +991,11 @@ CAPTURE_RATE_LIMIT_MAX_PAUSE_SECONDS = 60.0
 CAPTURE_RATE_LIMIT_BUDGET = 5
 # Attempts per contract when its own request is throttled.
 CAPTURE_CONTRACT_429_ATTEMPTS = 3
+# Spacing between event-detail requests (pass 1). 2026-11-14: 40 consecutive
+# event-detail requests took 1.1 s with no 429, and the responses are CDN-cached
+# (max-age 30), so they are far cheaper for the gateway than /book. The spacing
+# is a courtesy, not a rate fit: pass 2's /book budget is what the IP limit binds.
+EVENT_DETAIL_MIN_REQUEST_INTERVAL_SECONDS = 0.25
 # Unthrottled responses needed before a widened spacing eases back by 20%.
 _CAPTURE_INTERVAL_RECOVERY_SUCCESSES = 20
 
@@ -1147,6 +1192,186 @@ def _prune_line_ladders(
     return [entry for index, entry in enumerate(entries) if index not in dropped]
 
 
+def _annotate_capture(
+    snapshot: dict[str, Any], league: str, event: dict[str, Any], market: dict[str, Any]
+) -> dict[str, Any]:
+    """Stamp a freshly built snapshot with the slate metadata every capture row carries.
+
+    Shared by the event-detail pass and the /book pass so both write exactly the same field set.
+    """
+    observed = parse_utc(snapshot["observed_at_utc"])
+    event_start = parse_utc(snapshot["event_start_utc"])
+    snapshot.update(
+        {
+            "league": league.upper(),
+            "event_id": str(event.get("event_id", "")),
+            "event_slug": str(event.get("event_slug", "")),
+            "event_title": str(event.get("title", "")),
+            "market_type": market.get("market_type"),
+            "line": market.get("line"),
+            # Which team this specific market concerns, e.g. for
+            # team_win markets (soccer's "Will X win?" Yes/No,
+            # one market per team, unlike moneyline's single
+            # combined market) -- None where not team-specific.
+            "team": next(
+                (side.get("team") for side in market.get("sides", []) if side.get("team")),
+                None,
+            ),
+            "timestamp_valid": observed <= event_start,
+            "reconstructed": snapshot.get("reconstructed"),
+            "reconstruction_status_source": snapshot.get("reconstruction_status_source"),
+            "usage": "prospective_executable_bbo",
+        }
+    )
+    return snapshot
+
+
+def _event_detail_quote_book(detail_market: dict[str, Any], slate_line: Any) -> dict[str, Any] | None:
+    """A book-shaped dict from an event-detail market's top-of-book quote, or None (fail closed).
+
+    None unless the market is open, active and not closed, its two quotes are
+    finite with 0 < bid < ask < 1, and (when both sides state one) its line
+    matches the slate's. A market that fails is left to the /book pass.
+
+    ``state`` is mapped to ``MARKET_STATE_OPEN`` only from the verified open
+    status: the detail endpoint reports ``MARKET_STATUS_OPEN`` while every
+    executable-quote reader gates on ``MARKET_STATE_OPEN``, so an event-detail
+    row is exactly as executable as a /bbo row, never looser. ``transactTime`` is
+    left out on purpose: neither this endpoint nor /bbo carries one (observed
+    2026-11-14), and ``updatedAt`` is market-metadata time, not a quote time.
+    """
+    if (
+        detail_market.get("status") != "MARKET_STATUS_OPEN"
+        or detail_market.get("active") is not True
+        or detail_market.get("closed") is not False
+        or detail_market.get("ep3Status", "OPEN") != "OPEN"
+    ):
+        return None
+    detail_line = detail_market.get("line")
+    if detail_line is not None and slate_line is not None:
+        try:
+            if float(detail_line) != float(slate_line):
+                return None
+        except (TypeError, ValueError):
+            return None
+    bid = _amount(detail_market.get("bestBidQuote"))
+    ask = _amount(detail_market.get("bestAskQuote"))
+    if bid is None or ask is None or not (math.isfinite(bid) and math.isfinite(ask) and 0 < bid < ask < 1):
+        return None
+    return {
+        "bestBid": detail_market["bestBidQuote"],
+        "bestAsk": detail_market["bestAskQuote"],
+        "state": "MARKET_STATE_OPEN",
+        "_response_source": "event_detail",
+    }
+
+
+@dataclass
+class _EventDetailPass:
+    results: list[tuple[str, str, str, dict[str, Any] | None, str | None]]
+    events_requested: int = 0
+    failures: int = 0
+
+
+def _capture_event_detail_quotes(
+    client: Any,
+    candidates: list[_CaptureEntry],
+    *,
+    priority_leagues: frozenset[str] | None,
+    keep_slugs: frozenset[str],
+    now: datetime,
+    deadline: float | None,
+) -> _EventDetailPass:
+    """Pass 1: one event-detail GET per upcoming event quotes all of its slate markets.
+
+    ``candidates`` are the contracts BEFORE ladder pruning, because every rung
+    is quoted from the same response. Events of priority leagues go first, then
+    events of other leagues holding an open-pick slug (their CLV history);
+    other events are not requested. Each event is fail-soft (an error leaves its
+    markets to the /book pass); a 429 ends the pass because the gateway limit is
+    IP-wide and the /book pass needs what is left of it.
+    """
+    outcome = _EventDetailPass(results=[])
+    fetch = getattr(client, "event_detail", None)
+    if not callable(fetch):
+        return outcome
+    groups: dict[tuple[str, str], list[_CaptureEntry]] = {}
+    for entry in candidates:
+        event_slug = str(entry[2].get("event_slug") or "")
+        if event_slug and not _has_started(entry[2], now):
+            groups.setdefault((entry[0].upper(), event_slug), []).append(entry)
+
+    def _key(entry: _CaptureEntry) -> tuple[str, str]:
+        return entry[0].upper(), str(entry[2]["event_slug"])
+
+    in_priority = [
+        group[0] for key, group in groups.items() if priority_leagues is None or key[0] in priority_leagues
+    ]
+    with_open_picks = [
+        group[0]
+        for key, group in groups.items()
+        if not (priority_leagues is None or key[0] in priority_leagues)
+        and any(entry[3].get("market_slug") in keep_slugs for entry in group)
+    ]
+    ordered = _round_robin_by_kickoff(in_priority, now) + _round_robin_by_kickoff(with_open_picks, now)
+    covered: set[str] = set()
+    last_request: float | None = None
+    for representative in ordered:
+        if deadline is not None and time.monotonic() >= deadline:
+            break
+        if last_request is not None:
+            wait = EVENT_DETAIL_MIN_REQUEST_INTERVAL_SECONDS - (time.monotonic() - last_request)
+            if wait > 0:
+                time.sleep(wait)
+        last_request = time.monotonic()
+        outcome.events_requested += 1
+        try:
+            detail = fetch(str(representative[2]["event_slug"]))
+        except httpx.HTTPStatusError as exc:
+            outcome.failures += 1
+            if exc.response.status_code == 429:
+                break
+            continue
+        except (httpx.HTTPError, KeyError, TypeError, ValueError):
+            outcome.failures += 1
+            continue
+        # Stamped only after the response is in hand: a stamp taken before the
+        # call would predate the data it labels.
+        observed_at = utc_now()
+        by_slug = {
+            str(market["slug"]): market
+            for market in detail.event.get("markets") or []
+            if isinstance(market, dict) and market.get("slug")
+        }
+        for league, sport, event, market in groups[_key(representative)]:
+            slug = str(market.get("market_slug") or "")
+            if slug in covered or not (market.get("sides") and market.get("market_id")):
+                continue
+            detail_market = by_slug.get(slug)
+            book = (
+                None if detail_market is None else _event_detail_quote_book(detail_market, market.get("line"))
+            )
+            if book is None:
+                continue
+            try:
+                snapshot = PolymarketUSClient._build_snapshot(
+                    PolymarketUSClient._slate_market_like(event, market), book, slug, observed_at
+                )
+                _annotate_capture(snapshot, league, event, market)
+            except (KeyError, StopIteration, TypeError, ValueError):
+                continue
+            snapshot["quote_cache_age_seconds"] = detail.cache_age_seconds
+            covered.add(slug)
+            outcome.results.append((league, sport, slug, snapshot, None))
+    return outcome
+
+
+def _uncovered_first(entries: list[_CaptureEntry], covered: set[str]) -> list[_CaptureEntry]:
+    """Stable partition: contracts with no event-detail quote first, the rest after, each in order."""
+    uncovered = [entry for entry in entries if entry[3].get("market_slug") not in covered]
+    return uncovered + [entry for entry in entries if entry[3].get("market_slug") in covered]
+
+
 def capture_slate_snapshots(
     client: PolymarketUSClient,
     events_by_league: dict[str, list[dict[str, Any]]],
@@ -1183,6 +1408,24 @@ def capture_slate_snapshots(
     episodes. ``priority_leagues`` (default: every league) are fetched before
     the secondary tier (other leagues, started games), which stops after
     ``secondary_max_seconds``; ``max_capture_seconds`` caps the whole capture.
+
+    Two passes. Pass 1 (event detail) makes one ``GET /v1/events/slug/{slug}``
+    per upcoming in-scope event and writes a top-of-book row, source
+    ``live_gateway_event_detail_quote``, for every slate market whose detail
+    quote is open and uncrossed; a client without ``event_detail`` skips it.
+    Pass 2 is the paced /book (or /bbo) capture above with an unchanged contract
+    set and budget, but each tier now fetches contracts pass 1 could not quote
+    first, then refreshes the rest for depth. A later /book row wins over an
+    earlier event-detail row in the latest-per-market readers.
+
+    ``captured``, ``captured_by_league``, ``missing_executable_ask``,
+    ``timestamp_invalid_count`` and ``nba_missing_quote_event_ids`` count rows
+    written by BOTH passes (consumers read ``captured`` as snapshots persisted);
+    ``captured_by_source`` gives the split. ``failures`` keeps meaning
+    "contracts left with no snapshot from this run": a /book failure on a market
+    pass 1 already quoted is counted in ``covered_book_failures`` instead, and
+    ``event_detail_failures`` (events whose detail request failed) is never
+    added to ``failures`` because those markets fall through to pass 2.
     """
     if max_workers < 1:
         raise ValueError("max_workers must be positive")
@@ -1211,6 +1454,8 @@ def capture_slate_snapshots(
     horizon_cutoff = None if horizon_hours is None else capture_now + timedelta(hours=horizon_hours)
     failure_details: list[dict[str, str]] = []
     source_rate_limited = Event()
+    overall_deadline = None if max_capture_seconds is None else started_at + max_capture_seconds
+    detail_candidates: list[_CaptureEntry] = []
 
     # Skip summer league / preseason events — they offer only moneyline
     # markets and pollute the spread/total readiness counts.
@@ -1261,6 +1506,8 @@ def capture_slate_snapshots(
         # One integer used to apply to every ladder league, and the CLI picked
         # it first-match (NBA present => 3), so NCAAB and NCAAF priced 3 rungs
         # each instead of 1 and 2 and the queue grew past the rate limit.
+        # Pass 1 quotes every rung from one response, so it sees the unpruned list.
+        detail_candidates.extend(kept)
         league_keep = ladder_keep.get(league.upper()) if isinstance(ladder_keep, Mapping) else ladder_keep
         if league_keep and league.upper() in ladder_leagues:
             pruned = _prune_line_ladders(kept, league_keep, ladder_keep_slugs)
@@ -1268,9 +1515,20 @@ def capture_slate_snapshots(
             kept = pruned
         all_contracts.extend(kept)
 
+    detail_pass = _capture_event_detail_quotes(
+        client,
+        detail_candidates,
+        priority_leagues=priority,
+        keep_slugs=ladder_keep_slugs,
+        now=capture_now,
+        deadline=overall_deadline,
+    )
+    covered_slugs = {slug for _league, _sport, slug, _snapshot, _error in detail_pass.results}
     primary_contracts, secondary_contracts = _capture_tiers(
         all_contracts, priority_leagues=priority, keep_slugs=ladder_keep_slugs, now=capture_now
     )
+    primary_contracts = _uncovered_first(primary_contracts, covered_slugs)
+    secondary_contracts = _uncovered_first(secondary_contracts, covered_slugs)
 
     def _fetch(entry, deadline):
         league, sport, event, market = entry
@@ -1307,37 +1565,13 @@ def capture_slate_snapshots(
         else:
             snapshot = client.snapshot(slug)
         pacer.record_response()
-        observed = parse_utc(snapshot["observed_at_utc"])
-        event_start = parse_utc(snapshot["event_start_utc"])
-        snapshot.update(
-            {
-                "league": league.upper(),
-                "event_id": str(event.get("event_id", "")),
-                "event_slug": str(event.get("event_slug", "")),
-                "event_title": str(event.get("title", "")),
-                "market_type": market.get("market_type"),
-                "line": market.get("line"),
-                # Which team this specific market concerns, e.g. for
-                # team_win markets (soccer's "Will X win?" Yes/No,
-                # one market per team, unlike moneyline's single
-                # combined market) -- None where not team-specific.
-                "team": next(
-                    (side.get("team") for side in market.get("sides", []) if side.get("team")),
-                    None,
-                ),
-                "timestamp_valid": observed <= event_start,
-                "reconstructed": snapshot.get("reconstructed"),
-                "reconstruction_status_source": snapshot.get("reconstruction_status_source"),
-                "usage": "prospective_executable_bbo",
-            }
-        )
+        _annotate_capture(snapshot, league, event, market)
         return league, sport, slug, snapshot, None
 
     # The secondary tier (out-of-scope leagues, started games) runs only after
     # the primary tier and on its own short clock, so research capture never
     # holds the daily run hostage; max_capture_seconds bounds both.
-    overall_deadline = None if max_capture_seconds is None else started_at + max_capture_seconds
-    results: list[tuple[str, str, str, dict[str, Any] | None, str | None]] = []
+    results: list[tuple[str, str, str, dict[str, Any] | None, str | None]] = list(detail_pass.results)
     for tier_contracts, tier_seconds in (
         (primary_contracts, None),
         (secondary_contracts, secondary_max_seconds),
@@ -1357,7 +1591,14 @@ def capture_slate_snapshots(
     nba_captured: dict[str, set[str]] = {}
     captured_by_league: dict[str, int] = {}
     failures_by_league: dict[str, int] = {}
+    captured_by_source: dict[str, int] = {}
+    covered_book_failures = 0
     for league, sport, slug, snapshot, fetch_error in results:
+        if snapshot is None and slug in covered_slugs:
+            # Pass 1 already quoted this market this run; a failed depth refresh
+            # leaves it with a snapshot, so it is not a contract left without one.
+            covered_book_failures += 1
+            continue
         if snapshot is None:
             failures += 1
             failures_by_league[league.upper()] = failures_by_league.get(league.upper(), 0) + 1
@@ -1384,6 +1625,8 @@ def capture_slate_snapshots(
                 str(snapshot.get("market_type"))
             )
         captured += 1
+        source = str(snapshot.get("reconstruction_status_source") or "unknown")
+        captured_by_source[source] = captured_by_source.get(source, 0) + 1
         captured_by_league[league.upper()] = captured_by_league.get(league.upper(), 0) + 1
         if snapshot["long"].get("ask") is None or snapshot["short"].get("ask") is None:
             missing_bbo += 1
@@ -1414,6 +1657,11 @@ def capture_slate_snapshots(
         "primary_contracts": len(primary_contracts),
         "secondary_contracts": len(secondary_contracts),
         "captured_by_league": dict(sorted(captured_by_league.items())),
+        "captured_by_source": dict(sorted(captured_by_source.items())),
+        "event_detail_events": detail_pass.events_requested,
+        "event_detail_captured": len(detail_pass.results),
+        "event_detail_failures": detail_pass.failures,
+        "covered_book_failures": covered_book_failures,
         "failures_by_league": dict(sorted(failures_by_league.items())),
         "skipped_nonqualification_contracts": skipped_nonqualification_contracts,
         "skipped_summer_league": skipped_summer_league,
