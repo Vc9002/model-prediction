@@ -433,7 +433,9 @@ def espn_open_close(rec: dict[str, Any]) -> dict[str, Any]:
     """
     import statistics
 
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    scripts_dir = str(Path(__file__).resolve().parent)
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
     import cfb_v6_espn_lines as espn
 
     season = int(rec.get("season_year") or 0)

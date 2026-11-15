@@ -103,6 +103,10 @@ def verify(path: Path = PREREG_PATH) -> list[str]:
 
 
 # --------------------------------------------------------------------------- scoreboard parsing
+class EvaluationAbort(RuntimeError):
+    """A fetch failed: the evaluation stops (non-zero exit) rather than testing a silently different sample."""
+
+
 def season_of(start: datetime) -> int:
     return start.year - 1 if start.month in (1, 2) else start.year
 
@@ -210,15 +214,17 @@ def collect_events(
     outcomes are parsed only for events with kickoff strictly after ``registered``."""
     index: dict[str, dict[str, Any]] = {}
     outcomes: dict[str, dict[str, Any]] = {}
-    failed = 0
+    failed = 0  # always 0 on return: a failed request raises EvaluationAbort
     for season in seasons:
         for season_type, weeks in ((2, REGULAR_WEEKS), (3, POST_WEEKS)):
             for week in weeks:
                 for group in GROUPS:
                     status, payload = fetcher.get(_scoreboard_url(season, season_type, week, group))
                     if status != 200 or not isinstance(payload, dict):
-                        failed += 1
-                        continue
+                        raise EvaluationAbort(
+                            f"scoreboard fetch failed (status {status}) for season {season} type {season_type} "
+                            f"week {week} groups={group}: a missing feed would misclassify FBS teams"
+                        )
                     for raw in payload.get("events") or []:
                         ids = parse_event_ids_only(raw, group)
                         if ids is None:
@@ -254,14 +260,13 @@ def run_evaluation(fetcher: Any, prereg: dict[str, Any], *, now: datetime | None
         key=lambda e: (e["start"], e["event_id"]),
     )
     games: list[dict[str, Any]] = []
-    skipped = {"no_closing_total": 0, "fetch_failed": 0, "not_in_tilt": 0}
+    skipped = {"no_closing_total": 0, "not_in_tilt": 0}
     for ev in ready:
         if len(games) >= minimum_n:
             break
         rec = fetcher.fetch_event({"event_id": ev["event_id"], "season_year": season_of(ev["start"])})
         if rec["no_line_reason"] == "fetch_failed":
-            skipped["fetch_failed"] += 1
-            continue
+            raise EvaluationAbort(f"odds fetch failed for event {ev['event_id']}: the sample would shift")
         selected = rec["selected"]
         close_total = selected.get("total_line")
         if close_total is None:
@@ -316,7 +321,11 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
     from cfb_v6_espn_lines import Fetcher
 
     prereg = load_prereg()
-    result = run_evaluation(Fetcher(0.4), prereg)
+    try:
+        result = run_evaluation(Fetcher(0.4), prereg)
+    except EvaluationAbort as exc:
+        print("EVALUATION ABORTED:", exc)
+        return 2
     summary = result["summary"]
     n = summary["n"]
     print(f"registration {prereg['sha256']} registered_at_utc {prereg['registered_at_utc']}")
