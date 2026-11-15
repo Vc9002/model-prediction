@@ -45,10 +45,11 @@ from ..runtime_paths import RuntimePaths, rerouted_data_root
 from .commands import (
     _clear_today_open,
     _declined_slots,
-    _open_ncaab_rows,
+    _evaluated_slots,
     _polymarket_slate,
     _research_models_dir,
-    _restore_unreplaced_ncaab,
+    _restorable_open_rows,
+    _restore_unreplaced,
     _summary,
 )
 from .forecast import (
@@ -733,11 +734,14 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         statcast_aggregates_result = {"status": "off_season", "reason": "season_concluded"}
 
     cleared_ledgers: list[Any] = [ledger]
-    # Captured BEFORE the clear so NCAAB picks the refresh does not replace can be
-    # reopened afterwards (see _restore_unreplaced_ncaab). Without this the daily
-    # path silently dropped them; only run_forecast used to restore.
+    # Captured BEFORE the clear so picks the refresh does not replace can be reopened
+    # afterwards (see _restore_unreplaced). The clear below spans every league in Main and
+    # Flat; the daily path used to restore nothing and only run_forecast restored NCAAB.
     flat_ledger = MultiSportPickLedger(data_root, flat=True)
-    ncaab_prior = {"main": _open_ncaab_rows(ledger), "flat": _open_ncaab_rows(flat_ledger)}
+    restore_prior = {
+        "main": _restorable_open_rows(ledger, config),
+        "flat": _restorable_open_rows(flat_ledger, config),
+    }
     _clear_today_open(ledger, args.date, by_event_date=True)
     # Also clear and forecast for flat ledger
     cleared_ledgers.append(flat_ledger)
@@ -1379,13 +1383,18 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 for cl in cleared_ledgers:
                     _rollback_pre_clear(cl)
                 raise
-    ncaab_declined = _declined_slots(forecast_result.get("ncaab"))
-    ncaab_restored = _restore_unreplaced_ncaab(
-        {"main": ledger, "flat": flat_ledger}, ncaab_prior, ncaab_declined
+    # Slots a gate declined (NCAAB reports them) plus every slot a result shows was evaluated
+    # this run stay retired; only unevaluated slots are reopened. Must run before the
+    # `candidates` pop below.
+    restore_excluded = [
+        slot for result in forecast_result.values() for slot in _declined_slots(result)
+    ] + _evaluated_slots(forecast_result, restore_prior)
+    unreplaced_restored = _restore_unreplaced(
+        {"main": ledger, "flat": flat_ledger}, restore_prior, restore_excluded
     )
-    if "ncaab" in forecast_result:
-        forecast_result["ncaab"].pop("declined_slots", None)
-        forecast_result["ncaab"]["unreplaced_restored"] = ncaab_restored
+    for result in forecast_result.values():
+        if isinstance(result, dict):
+            result.pop("declined_slots", None)
     flat_result = {
         sport: forecast_result.get(f"_flat_{sport}", forecast_result.get(sport, {}))
         for sport in DAILY_LEARNED_SPORTS
@@ -1705,6 +1714,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             "bbo_capture": slate.get("prospective_bbo_capture", {}),
         },
         "step2_3_forecast_and_log": forecast_result,
+        "step2_3_unreplaced_restored": unreplaced_restored,
         "step3b_polymarket_odds_snapshots": odds_by_sport,
         "step4_settlement": settlement,
         "step4b_calibration": calibration_result,

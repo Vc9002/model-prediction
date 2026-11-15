@@ -12,7 +12,7 @@ import argparse
 import json
 import logging
 import os
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import asdict
@@ -445,13 +445,36 @@ def _clear_today_open(
     )
 
 
-def _open_ncaab_rows(ledger: Any) -> list[dict[str, str]]:
-    """Open NCAAB rows, captured BEFORE a refresh retires them (see restore below)."""
+def _open_rows(ledger: Any, leagues: Collection[str] | None = None) -> list[dict[str, str]]:
+    """Open rows (optionally one league set), captured BEFORE a refresh retires them."""
+    wanted = {str(name).casefold() for name in leagues} if leagues is not None else None
     return [
         row
         for row in ledger.rows()
-        if row.get("status") == "open" and str(row.get("league", "")).casefold() == "ncaab"
+        if row.get("status") == "open" and (wanted is None or str(row.get("league", "")).casefold() in wanted)
     ]
+
+
+def _open_ncaab_rows(ledger: Any) -> list[dict[str, str]]:
+    """Open NCAAB rows, captured BEFORE a refresh retires them (see restore below)."""
+    return _open_rows(ledger, {"ncaab"})
+
+
+def _restorable_open_rows(ledger: Any, config: dict[str, Any]) -> list[dict[str, str]]:
+    """Open rows of every league the daily job still forecasts, plus NCAAB (always).
+
+    "Enabled" means the league's own ``models.<LEAGUE>`` entry exists and
+    ``is_sport_daily_enabled`` accepts it. A league with no entry of its own (sub-leagues such as
+    NHL or DARTS_PDC) is not treated as enabled, and a switched-off sport's rows are left to the
+    daily clear exactly as before. NCAAB stays unconditional: it was restored before this widened.
+    """
+    models = config.get("models") or {}
+    enabled = {
+        str(key).casefold()
+        for key, value in models.items()
+        if isinstance(value, dict) and is_sport_daily_enabled(config, str(key))
+    }
+    return _open_rows(ledger, enabled | {"ncaab"})
 
 
 def _declined_slots(result: dict[str, Any] | None) -> list[tuple[str, str, str]]:
@@ -459,12 +482,40 @@ def _declined_slots(result: dict[str, Any] | None) -> list[tuple[str, str, str]]
     return [tuple(item) for item in (result or {}).get("declined_slots", ())]  # type: ignore[misc]
 
 
-def _restore_unreplaced_ncaab(
+def _evaluated_slots(
+    results: dict[str, Any], prior: dict[str, list[dict[str, str]]]
+) -> list[tuple[str, str, str]]:
+    """Prior-row slots this run's forecast results show it evaluated, whatever it decided.
+
+    Learned moneyline results carry ``candidates`` and the spread/total tasks carry
+    ``priced_contracts``; each entry names an (event_id, market_type) the run looked at. A pick
+    that was evaluated and not re-emitted was dropped by a gate, ban or no-call, and restoring
+    the previous run's version would resurrect exactly what that decision removed. Only slots
+    the run never evaluated (an errored task, a failed slate fetch, a vanished market) are left
+    for restore. The league comes from the prior row, so no result-key-to-league table is needed.
+    """
+    evaluated: set[tuple[str, str]] = set()
+    for result in results.values():
+        if not isinstance(result, dict):
+            continue
+        for key in ("candidates", "priced_contracts"):
+            for item in result.get(key) or ():
+                if isinstance(item, dict) and item.get("event_id") and item.get("market_type"):
+                    evaluated.add((str(item["event_id"]), str(item["market_type"])))
+    return [
+        (row["league"], row["event_id"], row["market_type"])
+        for rows in prior.values()
+        for row in rows
+        if (str(row["event_id"]), str(row["market_type"])) in evaluated
+    ]
+
+
+def _restore_unreplaced(
     ledgers: dict[str, Any],
     prior: dict[str, list[dict[str, str]]],
     declined: list[tuple[str, str, str]],
 ) -> dict[str, int]:
-    """Reopen NCAAB picks the refresh retired and did not replace, except declined slots.
+    """Reopen picks the refresh retired and did not replace, except declined/evaluated slots.
 
     Both the daily job and ``run_forecast`` clear every not-yet-started open row
     before re-forecasting. A pick whose market produced no new call (the model no
@@ -476,6 +527,9 @@ def _restore_unreplaced_ncaab(
         tier: len(ledger.restore_unreplaced_picks(prior.get(tier, []), exclude_slots=declined))
         for tier, ledger in ledgers.items()
     }
+
+
+_restore_unreplaced_ncaab = _restore_unreplaced  # name kept for run_forecast and its tests
 
 
 def _rollback_pre_clear(ledger: Any) -> bool:

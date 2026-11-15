@@ -17,16 +17,18 @@ from model_prediction.entities import CanonicalTeam
 from model_prediction.main_ledgers import MultiSportPickLedger
 
 
-def _ncaab_request(event_id="g1", selection="home") -> tuple[PickRequest, EligibilityResult]:
+def _ncaab_request(
+    event_id="g1", selection="home", league=League.NCAAB, market=MarketType.MONEYLINE
+) -> tuple[PickRequest, EligibilityResult]:
     request = PickRequest(
         event_start_utc="2099-01-01T00:00:00Z",
         event_id=event_id,
-        league=League.NCAAB,
+        league=league,
         away_team="Away",
         home_team="Home",
-        market_type=MarketType.MONEYLINE,
-        selection=selection,
-        line=None,
+        market_type=market,
+        selection="over" if market is MarketType.TOTAL else selection,
+        line={MarketType.SPREAD: -3.5, MarketType.TOTAL: 145.5}.get(market),
         sportsbook="polymarket_us_indicative",
         american_odds=-110,
         model_probability=0.6,
@@ -90,9 +92,89 @@ def test_scheduled_daily_path_captures_before_clearing_and_restores_after_foreca
     from model_prediction.cli import daily
 
     source = inspect.getsource(daily.run_daily)
-    capture = source.index("_open_ncaab_rows(ledger)")
+    capture = source.index("_restorable_open_rows(ledger, config)")
     clear = source.index("_clear_today_open(ledger, args.date")
     forecasts = source.index("research_futures_map = {")
-    restore = source.index("_restore_unreplaced_ncaab(")
+    evaluated = source.index("_evaluated_slots(forecast_result, restore_prior)")
+    restore = source.index("_restore_unreplaced(")
+    candidates_pop = source.index('result.pop("candidates", None)')
     settlement = source.index("if args.skip_settlement:")
-    assert capture < clear < forecasts < restore < settlement
+    assert capture < clear < forecasts < evaluated < restore < candidates_pop < settlement
+    # The clear spans every league, so the capture must not be NCAAB-only any more.
+    assert "_open_ncaab_rows" not in source
+
+
+# ---------------------------------------------------------------- every enabled league (261115-g9j)
+
+NBA_CONFIG = {"models": {"NBA": {}, "NCAAB": {}, "MLB": {"daily_forecast_enabled": False}}}
+
+
+def _log_league(ledger, league, event_id="n1", market=MarketType.MONEYLINE):
+    request, eligibility = _ncaab_request(event_id=event_id, league=league, market=market)
+    return ledger.append_evaluated(request, eligibility, now=datetime(2026, 11, 14, 10, tzinfo=UTC))
+
+
+def test_capture_spans_enabled_leagues_and_skips_switched_off_ones(flat_ledger):
+    from model_prediction.cli.commands import _restorable_open_rows
+
+    _log_league(flat_ledger, League.NBA, "nba1")
+    _log_league(flat_ledger, League.NCAAB, "cb1")
+    _log_league(flat_ledger, League.MLB, "mlb1")  # daily_forecast_enabled: false in the config
+    _log_league(flat_ledger, League.WNBA, "w1")  # no models.WNBA entry in the config
+    captured = {row["league"] for row in _restorable_open_rows(flat_ledger, NBA_CONFIG)}
+    assert captured == {"NBA", "NCAAB"}
+
+
+def test_unreplaced_nba_pick_comes_back_after_the_daily_clear(flat_ledger):
+    from model_prediction.cli.commands import (
+        _clear_today_open,
+        _evaluated_slots,
+        _restorable_open_rows,
+        _restore_unreplaced,
+    )
+
+    row = _log_league(flat_ledger, League.NBA, "nba1")
+    prior = {"flat": _restorable_open_rows(flat_ledger, NBA_CONFIG)}
+    _clear_today_open(flat_ledger, "2026-11-14", by_event_date=True)
+    assert flat_ledger.rows() == []
+    # The task errored: its result evaluated nothing, so the slot is reopened.
+    excluded = _evaluated_slots({"nba": {"status": "error", "candidates": []}}, prior)
+    assert _restore_unreplaced({"flat": flat_ledger}, prior, excluded) == {"flat": 1}
+    assert [r["pick_id"] for r in flat_ledger.rows()] == [row["pick_id"]]
+
+
+def test_slot_a_run_evaluated_but_did_not_emit_is_not_resurrected(flat_ledger):
+    from model_prediction.cli.commands import (
+        _clear_today_open,
+        _evaluated_slots,
+        _restorable_open_rows,
+        _restore_unreplaced,
+    )
+
+    _log_league(flat_ledger, League.NBA, "nba1", MarketType.MONEYLINE)
+    _log_league(flat_ledger, League.NBA, "nba2", MarketType.SPREAD)
+    _log_league(flat_ledger, League.NBA, "nba3", MarketType.TOTAL)
+    prior = {"flat": _restorable_open_rows(flat_ledger, NBA_CONFIG)}
+    _clear_today_open(flat_ledger, "2026-11-14", by_event_date=True)
+    results = {
+        # Moneyline evaluated (candidates); spread priced (priced_contracts); total never seen.
+        "nba": {"candidates": [{"event_id": "nba1", "market_type": "moneyline"}]},
+        "nba_spread": {"priced_contracts": [{"event_id": "nba2", "market_type": "spread"}]},
+        "nba_total": {"status": "error"},
+    }
+    excluded = _evaluated_slots(results, prior)
+    assert {slot[1:] for slot in excluded} == {("nba1", "moneyline"), ("nba2", "spread")}
+    assert _restore_unreplaced({"flat": flat_ledger}, prior, excluded) == {"flat": 1}
+    assert [r["event_id"] for r in flat_ledger.rows()] == ["nba3"]
+
+
+def test_gate_declined_ncaab_slot_stays_retired_next_to_a_restored_nba_pick(flat_ledger):
+    from model_prediction.cli.commands import _clear_today_open, _restorable_open_rows, _restore_unreplaced
+
+    _log_league(flat_ledger, League.NBA, "nba1")
+    _log_league(flat_ledger, League.NCAAB, "cb1")
+    prior = {"flat": _restorable_open_rows(flat_ledger, NBA_CONFIG)}
+    _clear_today_open(flat_ledger, "2026-11-14", by_event_date=True)
+    declined = [("NCAAB", "cb1", "moneyline")]
+    assert _restore_unreplaced({"flat": flat_ledger}, prior, declined) == {"flat": 1}
+    assert [r["league"] for r in flat_ledger.rows()] == ["NBA"]
