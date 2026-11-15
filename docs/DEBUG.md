@@ -206,6 +206,159 @@ change how you should work here:
   expected. Soccer's Odds API credential remains a known-DEGRADED external
   dependency. The two launchd research agents are loaded and producing.
 
+## 2026-11-15 — NCAAF totals: information-source tests, cfb-structural-v6.1 and the 11-14 retrospective replay (quick-261115-183)
+
+**Bottom line.** The operator asked for information the NCAAF closing total cannot price quickly (level drift, line
+movement, weather, QB status), a better totals model, and a forward-only test of the lopsided / FBS-vs-FCS tilt. Under a
+rule written down before any validation or holdout number existed, **no source beyond the level tracker passed**. v6.1 is
+therefore frozen v6 plus the walk-forward level tracker and nothing else (the tracker entered by operator instruction, not
+by a passing test). It removes part of v6's over lean, adds no error gain, and **does not beat the closing line**. The
+tilt is pre-registered for a forward test that needs 704 games. No promotion decision. v6.1 is not routed.
+
+**Rule and pre-registration.** The pinned rule (`outputs/ncaaf/cfb_totals_sources_rule.json`, canonical-JSON sha256
+`1481273f1fbd860a5e35ecc25a864818e74818f564aa0f6d5710ea42f524145f`) and the lopsided pre-registration were committed in
+`8ebdc514`, before any workstream output; `57520a29` made the evaluator fail closed on any failed fetch. Every output
+carries the same rule hash and each workstream read the holdout exactly once (`holdout_reads` 1). Windows by kickoff date
+on lined games: select to 2022-11-11, validation 2022-11-12 to 2024-11-14, holdout 2024-11-15 to 2026-11-13 (already seen
+in earlier v6 checks, so any read is a one-time look). Primary statistic per source: dMSE = MSE(close-only OLS) minus
+MSE(close plus source OLS) on validation, coefficients fit on select; PASS needs the validation date-clustered 95% CI
+lower bound above 0 and a positive holdout point estimate. Bootstrap B 1,000, seed 20261115.
+
+| source | market | n select / validation / holdout | validation dMSE [95% CI] | holdout dMSE (point) | verdict |
+|---|---|---|---|---|---|
+| W1 level tracker (days 90, chosen on select only) | total | 4,590 / 1,790 / 1,861 (MAE and bias, not dMSE) | MAE v6.1 minus v6 +0.004 [-0.049, +0.057] | +0.048 [-0.045, +0.151] (MAE diff) | enters by operator instruction; no taxonomy verdict |
+| W2 ESPN open-to-close movement | total | 4 / 1,064 / 1,861 | not interpretable (select n 4) | not interpretable | INSUFFICIENT_DATA |
+| W2 ESPN open-to-close movement | spread | 4 / 1,063 / 1,853 | not interpretable (select n 4) | not interpretable | INSUFFICIENT_DATA |
+| W2 intraday Polymarket ladders (2026) | total, spread | no select or validation data | none | none | DESCRIPTIVE_ONLY |
+| W3 observed weather (wind, precipitation, cold) | total | 4,135 / 1,617 / 1,677 | +0.142 [-0.351, +0.587] | +0.057 | NOT_WORTH_BUILDING |
+| W3 observed weather (wind times expected margin) | spread | 4,232 / 1,616 / 1,668 | +0.022 [-0.051, +0.100] | +0.030 | NOT_WORTH_BUILDING |
+| W4 QB (backup start, QB changed; post hoc) | total | 542 / 1,566 / 1,607 | +0.703 [-0.449, +1.900] | -0.789 | NOT_WORTH_BUILDING |
+| W4 QB (home-minus-away flag differences; post hoc) | spread | 542 / 1,565 / 1,608 | +1.986 [-0.229, +4.082] | +2.569 | NOT_WORTH_BUILDING |
+
+Caveats that matter for reading the table. **W2:** ESPN carries open values only for 4 games in 2017 and from 2023-10-17
+(select window 4 rows, validation 59.4%, holdout 100%), so the pinned test cannot run; the labelled exploratory refit
+(coefficients fit on validation rows with open values) gives totals dMSE +0.140 [-0.140, +0.439] and spreads -0.647
+[-1.499, +0.320] on the holdout, and neither is a verdict input. ESPN open and close are untimestamped, so even a pass could
+only have been an upper bound. The intraday part uses Polymarket-lineage ladder quotes, not ESPN lines; "main line" is the
+ladder rung whose over (or home-side) midpoint is nearest 50% at each snapshot, and the last pre-kickoff rung failed its
+line-only agreement gate against the ESPN close on 7 of the 8 definitions (totals correlation 0.853, median absolute
+difference 1.0 point; one spread sensitivity cut passed at correlation 0.976), so its exploratory outcome numbers (for
+example totals: outcome beyond the close in the movement direction by +2.03 points [+0.22, +4.07] on 376 holdout games)
+are not usable evidence. **W3:** Open-Meteo archive weather, 131 venues, 1,266 of 1,266 venue-seasons cached; observed
+weather is already an upper bound (the line knows the forecast), and it still failed, so the forecast stage did not run
+and weather is not worth building. **W4:** starters derived from box-score pass attempts (post hoc, leaky), 2022 onward,
+so the select window is only 2022 up to 11-11; the spread holdout point is positive but the validation interval includes
+zero, so no PASS. No weather or QB source reached UPPER_BOUND_PASS, so no point-in-time retest is owed.
+
+**Level tracker.** Residual = actual total minus the v6 calibrated total, mean over a trailing window of games that finished
+(start plus 5 h, inclusive) before kickoff; grid 14, 30, 60, 90 days then 150, 300, 600 games, day windows under 50 games
+fall back to the last 150. Chosen on select only: days 90 (select RMSE 17.021 against 16.981 untracked, so the tracker does
+not even improve the select fit).
+
+| window (lined games) | v6 bias | v6.1 bias | v6 over lean | v6.1 over lean | corr(model - line, actual - line), v6 to v6.1 |
+|---|---|---|---|---|---|
+| select, n 4,590 | -0.41 | -0.09 | 47.5% | 50.6% | -0.003 to -0.004 |
+| validation, n 1,790 | +0.38 | -0.37 | 66.0% | 58.7% | 0.059 to 0.055 |
+| holdout, n 1,861 | +0.50 | -0.36 | 63.9% | 57.7% | -0.030 to -0.026 |
+
+Expected result partly confirmed: the tracker removes the over lean on select (47.5% to 50.6%) but only part of it on
+validation (66.0% to 58.7%) and holdout (63.9% to 57.7%). It adds
+no edge (correlation with the closing-line residual unchanged and not distinguishable from zero in holdout) and no MAE gain.
+
+**v6.1 contents and comparison.** `outputs/ncaaf/cfb_v61_spec.json` (spec_sha256
+`8a3e5c6612aa72d0d9fc40b94d1ade4e40acb2ea649201750cbd74747db4573c`): frozen v6 calibrated total plus the days-90 tracker;
+components empty; spreads v6 unchanged; frozen v6 params sha256 `6e38b14ca486acfd836c1259e5c4fd4fb8e9b5894a06f367322b1eb0c7b13e70`
+unchanged. Nothing was tuned after the freeze.
+
+| holdout, 1,861 lined games (2024-11-15 to 2026-11-13) | MAE | bias | over lean |
+|---|---|---|---|
+| closing line | 12.39 | -0.79 | n/a |
+| v6 | 12.99 | +0.50 | 63.9% |
+| v6.1 | 13.04 | -0.36 | 57.7% |
+
+On the common-v5 holdout cohort (1,511 games) v5 is 13.13, v6 13.02, v6.1 13.00 against a line of 12.52. Paired MAE
+differences on the 1,861 holdout games (date-clustered 95% CI): v6.1 minus v6 +0.048 [-0.045, +0.151]; v6.1 minus line
++0.647 [+0.442, +0.854]. **v6.1 does not beat the closing line, and the closing line is significantly better.** Select
+(v6.1 minus line +0.535 [+0.383, +0.689]) and validation (+0.280 [+0.105, +0.474]) say the same. Full tables:
+`outputs/ncaaf/cfb_v61_comparison.md`.
+
+**11-14 RETROSPECTIVE REPLAY** (`outputs/ncaaf/cfb_v61_replay_1114.md`; 11-14 is inside the data the tilt was found on, so
+none of this tests the tilt). Settled at run time (2026-11-15 about 07:38Z): 117 games listed in the window (kickoff
+2026-11-14T10:00Z to 2026-11-15T10:00Z, groups 80 and 81), all 117 completed, 0 forfeits, 0 unfinished, 0 v6 no-calls, 116
+with an ESPN closing total (1 game has no line and is excluded from the line comparison). Closing lines fetched into the new
+file `data/research/ncaaf_v6/espn_lines_20261114.jsonl` (the pinned `espn_lines.jsonl` untouched); the last kickoffs
+(03:30Z to 04:00Z on 11-15) were fetched 3.65 to 4.15 hours after kickoff, shortly after those games ended, which is earlier
+than the 6-hour rule the forward evaluator uses. Fresh v6 projections matched the frozen research rows on the 92 overlapping
+games with max absolute difference 0.0. Tracker offsets applied: mean -0.84 points (range -1.10 to -0.77, 1,270 to 1,363
+games averaged).
+
+| cohort A, lined games (n 116) | MAE | bias | over lean |
+|---|---|---|---|
+| v6 | 13.32 | +5.69 | 69.0% |
+| v6.1 | 13.02 | +4.85 | 60.3% |
+| closing line | 12.53 | +3.97 | n/a |
+
+The day was high-scoring: the closing line itself was 3.97 points low on average. v6.1 minus v6 -0.31 [-0.46, -0.16],
+v6.1 minus line +0.49 [-0.19, +1.18], v6 minus line +0.80 [+0.07, +1.52] (game-level bootstrap, one date). On the 55
+FBS-involved games that also carry a v5 ledger projection: v5 12.62 (bias +5.13, over lean 56.4%), v6 13.10 (+6.39, 76.4%),
+v6.1 12.65 (+5.51, 63.6%), line 11.39 (+4.45). **Lopsided / FBS-vs-FCS subset: n = 1** (Boston College at Notre Dame,
+closing home spread -29.5; v6 MAE 5.01, v6.1 4.24, line 3.50) and **FBS-vs-FCS n = 0**, so the subset says nothing.
+
+Cohort B (52 events with a settled flat-tier `cfb-structural-v5` total row; 3 more flat total rows for completed games were
+still open in the ledger at run time and are not in cohort B; prices are the ledger's ESPN-consensus price on the ledger side
+and 1.0476 minus it on the other side, a 4.76% vig, flat 1 unit, percentages only):
+
+| cohort B | picks | W-L-P | PnL | ROI |
+|---|---|---|---|---|
+| v5 (ledger rows' own results) | 52 | 18-34-0 | -16.77 U | -32.2% |
+| v6 | 52 | 19-33-0 | -15.27 U | -29.4% |
+| v6.1 | 52 | 20-32-0 | -13.43 U | -25.8% |
+| v5, 2-8% edge view | 20 | 5-15-0 | -10.11 U | -50.5% |
+| v6, 2-8% edge view | 20 | 8-12-0 | -4.66 U | -23.3% |
+| v6.1, 2-8% edge view | 19 | 7-12-0 | -5.44 U | -28.7% |
+
+v6 and v6.1 chose different sides on 1 of the 52 rows. Cohort B MAE on its rows: v5 12.29, v6 12.82, v6.1 12.32, line 11.21;
+v6.1 minus line +1.11 [+0.10, +2.21]. Every variant lost money on 11-14 at these prices; one Saturday validates nothing.
+The seam check passed: a fresh v6.1 instance with offset 0 and a fresh v6 instance gave exactly equal over, under and push
+probabilities on all 52 cohort-B rows and all 117 cohort-A rows.
+
+**Lopsided / FBS-vs-FCS pre-registration.** `outputs/ncaaf/cfb_lopsided_prereg.json`, sha256
+`45dbd546543e345559d39422ef77d17b7d8721302c5bc314882f89f2deff4d22`, registered_at_utc 2026-11-15T06:28:59Z, committed in
+`8ebdc514`. Tilt = closing home spread of 28 points or more, or exactly one side FBS; predicted direction actual minus
+closing total above 0, expected size +1.5 points; primary metric mean(actual - closing total) with a one-sided date-clustered
+bootstrap lower bound above 0; minimum n 704 qualifying games with kickoff strictly after the registration time (alpha
+0.05, power 0.8, residual SD 16.0). About 100 to 180 qualifying lined games a season, so the decision is no earlier than
+about 2030 and more likely later. Evaluate with `python scripts/cfb_lopsided_prereg.py evaluate` (prints INSUFFICIENT N
+below 704 and never reads a game at or before the registration time); `verify` re-checks the hash. The evaluator was not
+run. The 55.2% over on 972 games before registration is cited only as the origin of the hypothesis.
+
+**Task 2 (src port and forward capture), gate OPEN.** The runs.db gate (no daily row in status `started`; the newest daily
+row is not the gate) was open before each edit batch and before the commit. `src/model_prediction/models/cfb_structural_v61.py`
+subclasses the v6 model overriding `calibrate_means` only; the tracker window, buffer and fallback come from the hash-verified
+`config/models/cfb-structural-v6.1.json` (built from the frozen spec; `base_artifact_hash` ties it to the v6 artifact). It is
+bit-exact: 200 of 200 fixture rows and all 14,639 research rows match the research tracker with maximum absolute difference
+0.0 (offsets, games averaged, and the floored served total). It is inert (no reference from `learned_forward.py`,
+`config/production.yaml` or `config/model.yaml`; a clean-subprocess probe confirms serving never loads it). Three mutations
+each made tests fail (buffer 5 h to 0, window 90 to 89 days, fallback minimum 50 to 40); the fallback mutation also failed the
+fixture parity test, and a synthetic 49/50 boundary test pins it independently.
+`src/model_prediction/data_sources/espn_cfb_pregame_capture.py` is the fail-soft forward capture (append-only JSONL under the
+runtime root via `RuntimePaths`, `observed_at_utc` read after each response, records at or after kickoff dropped, prices
+stored only as implied probabilities, hard request, time and event budgets). The depth-chart probe found no QB slot (core
+`depthcharts` answers 400 "not supported for football|college-football", site `depthchart` returns `{}`), so the record says
+`qb_depth: endpoint_unavailable`; the league injury feed holds 3 stale entries. A live run into a scratch root wrote one real
+record. `tests/test_cfb_structural_v6.py`'s v6-inertness scan lists the v6.1 module as the one allowed v6 subclass (a one-hunk
+edit). **The capture is not wired into the daily run:** the call-site rule required the sibling's `espn.py` commit, and its
+actual commits (`403df5f3`, `fbe7cb6c`, `3b9728fc`) did not touch `espn.py` or `daily.py`, so `daily.py` was left alone (it
+has no uncommitted hunks) and the call site is a documented follow-up in `docs/ROADMAP.md`.
+
+**What remains.** (1) Wire `capture_cfb_pregame_snapshots` into the daily run behind the NCAAF switch (try/except, a new
+step key) and let it accumulate a season of timestamped pregame lines, injuries and, once a source exists, QB depth; only then
+can W2, QB and injury sources be retested point in time. (2) The ESPN open feed starts 2023-10-17, so the pinned W2 test is
+untestable on the select window; a different window split is a new decision, not made here. (3) The lopsided tilt waits for 704
+forward games. (4) The four pre-existing non-verifying artifacts in `tests/test_artifact_hash_verification.py`
+(`nba-moneyline-v8`, `nba-spread-margin-v8`, `nba-total-margin-v8`, `tennis-games-markov-v3`) are untouched and still fail that
+test. No promotion decision. v6.1 is not routed.
+
 ## 2026-11-15 — NFL: the paper buyer bought from Flat what Main had declined; placeholder prices inflated the record (quick-261115-21e)
 
 - **Symptom.** Pre-kickoff review of the 2026-11-15 slate: three NFL rows were buy candidates although
