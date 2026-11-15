@@ -1,6 +1,9 @@
 """PINNED windows, grids, selection and acceptance rules for the NCAAB v7 multi-season replay (quick 261115-m5r).
 
-This file is committed BEFORE any outcome is joined to a multi-season component row. ``PIN_SHA256`` (the
+Pin 1 of this file was committed BEFORE any outcome was joined to a multi-season component row (commit b4a61cf0).
+Pin 2 (this version, commit 7127ad86) extends the ridge grid and was committed AFTER the fit seasons' outcomes were
+read (pin 1's selection hit the grid corner) and BEFORE any 2024-25 outcome was read; see ``amendment_from_pin_1``.
+``PIN_SHA256`` (the
 canonical-JSON hash of ``PIN``) is printed by every stage of ``scripts/ncaab_v7_multiseason.py`` and recorded in
 the frozen config; the final stage refuses to run when the frozen config carries a different hash.
 

@@ -1006,16 +1006,20 @@ def render_md(rep: dict[str, Any]) -> str:
     out.append("# NCAAB v7 multi-season re-fit and evaluation (quick 261115-m5r)\n")
     out.append(
         "SHADOW and INERT: nothing is registered, no artifact, no champion route, v6 untouched, no ledger write. "
-        f"Pin `{rep['pin_id']}` sha256 `{rep['pin_sha256']}` was committed before any outcome was joined to the "
-        "multi-season components; the windows below follow it. Pin 1 (commit b4a61cf0) was amended once, to "
-        "extend the ridge grid, after its fit-window selection landed on the grid corner and before any 2024-25 "
-        "outcome was read (see the pin file).\n"
+        "Pin 1 (commit b4a61cf0, sha256 747121964170d1c32d75149d3a50000158a323a9095af1895c52bc4a588530cf) was "
+        "committed before any outcome was joined to the multi-season components. Its fit-window selection landed "
+        "on the corner of all three grid axes, so the ridge grid was extended and re-pinned as "
+        f"`{rep['pin_id']}` sha256 `{rep['pin_sha256']}` (commit 7127ad86) AFTER fit-season (2022-23, 2023-24) "
+        "outcomes had been read and BEFORE any 2024-25 outcome was read; nothing else changed and the pin-1 fit "
+        "result is kept in `ncaab_v7_multiseason_fit_pin1.json`. The windows below follow pin 2.\n"
     )
     out.append(
         "- **Fit** 2022-23 and 2023-24 (hyperparameters, coefficients, scales; leave-one-season-out selection). "
         "**Decision** 2024-25 only. **2025-26** shaped v7's design in 1m7 and **2026-27** (partial) was its "
-        "holdout there: both are CONTAMINATED and reported line-free only; no line x outcome x model number is "
-        "read on them, so the 1m8 locked windows stay unspent.\n"
+        "holdout there: both are CONTAMINATED and reported line-free only; no ESPN-closing-line x outcome x model "
+        "number is read on them, so the 1m8 locked windows stay unspent. The one exception is the 357-row "
+        "settled-ledger replay below, which joins the ledger's own quoted lines to 2026-27 outcomes and is "
+        "labelled contaminated.\n"
         "- 2024-25 was read for nine models per market in 1m8; the multiplicity in scorecard B counts that.\n"
         "- Conference map: AS-OF-SEASON, from the ESPN conference id on every scoreboard game. Realigned teams carry "
         "their own season's tier. The tier table is today's, so the old Pac-12 (id 21 through 2023-24) carries an "
@@ -1164,6 +1168,32 @@ def render_md(rep: dict[str, Any]) -> str:
         out.append(
             f"v7 minus v6 as-of D1 RMSE {c['v7_minus_v6_asof_d1_rmse']}; v7 minus v6 as served {c['v7_minus_v6_served_d1_rmse']}\n"
         )
+    bt = a["bootstrap"]
+    out.append("## Plain reading and caveats\n")
+    out.append(
+        "- **v7 is the ridge.** v7 minus ridge-only D1 RMSE is "
+        f"{bt['v7_minus_ridge_d1_rmse']['delta_rmse']:+.3f} {bt['v7_minus_ridge_d1_rmse']['ci90']}: the v6 tail term "
+        "adds nothing. The selected carry is 0.1 per season of age (1m7 declared 0.5 on one prior season); the "
+        "fit-window table shows RMSE falling monotonically with less carry, less shrinkage and a larger tier prior.\n"
+        "- **No edge over the closing line.** v7 is closer than v6 but the line is closer still "
+        f"({b['spread']['descriptive_val_rmse']['v7']:.2f} vs {b['spread']['descriptive_val_rmse']['market_line']:.2f} "
+        "on 2024-25 lined D1 games), and no model is accepted by the pinned market rule.\n"
+        "- **Mismatch fix: not claimed.** Bias in the cohort falls and RMSE shrinks, and v7 stops making most of the "
+        "p >= 0.8 cover calls (see the cohort table), but the few it still makes did not beat v6 as-of on hit rate, "
+        "and the settled-row replay's p >= 0.8 hit rate is no better. Both samples are tiny.\n"
+        "- **Inputs v7 leans on harder than v6:** the conference tier table scaled by kappa 1.4 and the archived AP "
+        "ranks. The tier table was authored on 2026-11-08 (commit a840e4f7) and its estimation window is not "
+        "recorded, so it may overlap the replay seasons (shared with v6, leaned on harder by v7); the Pac-12 era "
+        "override is hand-set; archived ranks are 'as served at fetch time', not verified as pre-game.\n"
+        "- **v6 as served win Brier is not like-for-like:** it uses the t formula on the PIT mean and sd (the projection "
+        "file carries no win probability), while v6 as-of uses v6's served logistic blend.\n"
+        "- **Conference membership** of a season is read from any of the team's games in that season (public before "
+        "tip-off; no result is used).\n"
+        "- **Process deviations:** pin 2 amended pin 1 after fit-season outcomes were read (grid corner); the `final` "
+        "stage was run three times (the first two before the first-610 ledger block and report wording were added, "
+        "outputs identical outside the ledger block, compared programmatically); this markdown is re-rendered from "
+        "the stored JSON.\n"
+    )
     out.append("## Fit-window reference (v7 leave-one-season-out)\n")
     for s, d in rep["fit_window_reference"]["by_season_d1_margin"].items():
         out.append(f"- season year {s}: " + ", ".join(f"{m} {_cell(d[m])}" for m in MODELS_SPREAD))
@@ -1181,7 +1211,7 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--out", default="")
     g = sub.add_parser("gate")
     g.add_argument("--components", required=True)
-    for name in ("fit", "final"):
+    for name in ("fit", "final", "render"):
         sub.add_parser(name)
     args = ap.parse_args(argv)
     print(f"pin {PIN['id']} sha256 {PIN_SHA256}", flush=True)
@@ -1193,6 +1223,11 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_fit(args)
     if args.cmd == "final":
         return cmd_final(args)
+    if args.cmd == "render":
+        rep = json.loads((OUT / "ncaab_v7_multiseason.json").read_text(encoding="utf-8"))
+        (OUT / "ncaab_v7_multiseason.md").write_text(render_md(rep), encoding="utf-8")
+        print("rendered from the stored JSON; no outcome was read")
+        return 0
     raise SystemExit(f"stage {args.cmd} is added in a later commit")
 
 
