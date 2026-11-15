@@ -50,6 +50,7 @@ CACHE = OUT / "cfb_v6_base_rows.jsonl"
 FIT_SELECTION = WORK / "fit_selection.json"
 FROZEN = OUT / "cfb_v6_frozen_fit.json"
 LIB_PATH = REPO / "scripts" / "cfb_v6_lib.py"
+ARTIFACT = ARTIFACT_PATH = REPO / "config" / "models" / "cfb-structural-v6.json"
 LIVE = (REPO / "data" / "processed" / "ncaaf" / "games.jsonl", REPO / "data" / "historical" / "ncaaf_games_all.jsonl")
 
 # Grids. First pass (lam 2-30, w_prev 0.3-1.0, k 3-6) was fixed before any metric was looked at; a labelled
@@ -852,6 +853,218 @@ def render_holdout_md(rep: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _engine_vs_analytic(v6src: Any, extractor: Any, by_id: dict[str, Any], rows: list[dict[str, Any]], frozen: dict[str, Any]) -> dict[str, Any]:
+    """Informational: the src model's simulated moneyline probability vs the analytic Normal one on 50 holdout rows."""
+    from model_prediction.models.cfb_structural_v6 import (
+        CFBStructuralV6Model,
+        load_cfb_structural_v6_artifact,
+    )
+
+    if not ARTIFACT_PATH.exists():
+        return {"skipped": "artifact not written yet"}
+    model = CFBStructuralV6Model.from_artifact(load_cfb_structural_v6_artifact(ARTIFACT_PATH))
+    holdout = [r for r in rows if r["date"] > VALIDATION_END and "grid" in r][:50]
+    diffs = []
+    for r in holdout:
+        g = by_id[r["event_id"]]
+        f = extractor.extract_features(
+            event_id=g.event_id, game_start_utc=g.start, home_team=g.home, away_team=g.away, is_neutral_site=g.neutral
+        )
+        margin, _ = model.calibrate_means(f.projected_margin_home, f.projected_total)
+        sd = model.margin_sd_for(is_fbs_vs_fcs=f.is_fbs_vs_fcs, sample_games=f.sample_games)
+        fc = model.forecast_game(f, spread_home_line=round(-margin * 2) / 2, total_line=50.5)
+        diffs.append(abs(fc.prob_home_win - _p_home(margin, sd)))
+    return {"rows": len(diffs), "max_abs_diff": max(diffs) if diffs else None, "mean_abs_diff": sum(diffs) / len(diffs) if diffs else None}
+
+
+# ------------------------------------------------------------------ parity (src module vs the Task 1 research cache)
+def cmd_parity(args: argparse.Namespace) -> int:
+    """Recompute every (or a stratified sample of) cached row's raw projection through the src extractor.
+
+    Exact float equality is required: the frozen parameters are never adjusted to make this pass.
+    """
+    from model_prediction.features import cfb_features_v6 as v6src
+
+    frozen = json.loads(FROZEN.read_text(encoding="utf-8"))
+    verify_frozen(quiet=True)
+    if sha256_file(SNAPSHOT) != frozen["history_snapshot"]["sha256"]:
+        raise SystemExit("history snapshot sha256 != the frozen fit's")
+    sel = frozen["selected"]
+    gk = gkey(sel["lambda"], sel["w_prev"])
+    games = v6src.load_snapshot(SNAPSHOT)
+    extractor = v6src.CFBV6FeatureExtractor(
+        games,
+        lam=sel["lambda"],
+        w_prev=sel["w_prev"],
+        buffer_hours=frozen["result_buffer_hours"],
+        backfill_sha256=frozen["backfill"]["sha256"],
+    )
+    by_id = {g.event_id: g for g in games}
+    rows = _load_cache(CACHE)
+    if args.sample:
+        step = max(1, len(rows) // args.sample)
+        rows = rows[::step]
+    checked = max_abs = 0
+    mismatches: list[str] = []
+    no_call_ok = no_call_checked = 0
+    per_season: dict[int, int] = {}
+    for r in rows:  # cache order is kickoff order: the book's cutoff never decreases
+        g = by_id[r["event_id"]]
+        try:
+            f = extractor.extract_features(
+                event_id=g.event_id, game_start_utc=g.start, home_team=g.home, away_team=g.away, is_neutral_site=g.neutral
+            )
+        except v6src.V6NoCall as exc:
+            no_call_checked += 1
+            if "no_call" in r:
+                no_call_ok += 1
+            else:
+                mismatches.append(f"{r['event_id']}: src raised {exc.reason}, cache has a projection")
+            continue
+        if "grid" not in r:
+            mismatches.append(f"{r['event_id']}: cache no_call {r.get('no_call')} but src projected")
+            continue
+        want_m, want_t, want_mu, want_h = r["grid"][gk]
+        got = (f.projected_margin_home, f.projected_total, f.mu, f.h_home)
+        diffs = [abs(a - b) for a, b in zip(got, (want_m, want_t, want_mu, want_h), strict=True)]
+        max_abs = max(max_abs, *diffs)
+        meta_ok = (
+            f.sample_games == r["sample_games"]
+            and f.home_games_window == r["home_games_window"]
+            and f.away_games_window == r["away_games_window"]
+            and f.home_games_current == r["home_games_current"]
+            and f.away_games_current == r["away_games_current"]
+            and f.is_fbs_vs_fcs == r["is_fcs"]
+            and f.eligible_games == r["eligible_games"]
+        )
+        if any(d != 0.0 for d in diffs) or not meta_ok:
+            mismatches.append(f"{r['event_id']}: diffs {diffs} meta_ok {meta_ok}")
+        checked += 1
+        per_season[r["season"]] = per_season.get(r["season"], 0) + 1
+    report = {
+        "rows_considered": len(rows),
+        "projections_checked": checked,
+        "per_season": dict(sorted(per_season.items())),
+        "max_abs_diff": max_abs,
+        "no_call_rows_checked": no_call_checked,
+        "no_call_rows_matching_cache": no_call_ok,
+        "mismatches": len(mismatches),
+        "frozen_params_sha256": frozen["params_sha256"],
+        "snapshot_sha256": frozen["history_snapshot"]["sha256"],
+    }
+    report["engine_vs_analytic_moneyline"] = _engine_vs_analytic(v6src, extractor, by_id, rows, frozen)
+    print(json.dumps(report, indent=2))
+    for m in mismatches[:20]:
+        print("MISMATCH", m)
+    return 0 if not mismatches and max_abs == 0.0 and checked > 0 else 1
+
+
+# ------------------------------------------------------------------ artifact (research challenger, inert)
+MARKET_JSON = OUT / "cfb_v6_market_check.json"
+ESPN_MARKET_JSON = OUT / "cfb_v6_espn_market_check.json"
+
+
+def _corr_summary(markets: dict[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for name, block in markets.items():
+        out[name] = {
+            "v6_corr_verdict": block["verdict_v6"]["text"],
+            "v6_covered_n": block["v6_covered_n"],
+        }
+    return out
+
+
+def cmd_write_artifact(args: argparse.Namespace) -> int:
+    """Build config/models/cfb-structural-v6.json from the frozen fit (parameters are read, never typed in)."""
+    from model_prediction.models.cfb_structural_v6 import (
+        CFBStructuralV6Model,
+        load_cfb_structural_v6_artifact,
+    )
+    from model_prediction.production_registry import compute_artifact_hash
+
+    frozen = json.loads(FROZEN.read_text(encoding="utf-8"))
+    verify_frozen(quiet=True)
+    if ARTIFACT.exists() and not args.overwrite:
+        raise SystemExit(f"{ARTIFACT} exists; pass --overwrite to rebuild it from the frozen fit")
+    research = json.loads(RESEARCH_JSON.read_text(encoding="utf-8"))
+    market = json.loads(MARKET_JSON.read_text(encoding="utf-8"))
+    espn = json.loads(ESPN_MARKET_JSON.read_text(encoding="utf-8"))
+    if research["frozen_params_sha256"] != frozen["params_sha256"] or market["frozen_params_sha256"] != frozen["params_sha256"]:
+        raise SystemExit("a report does not carry the frozen fit hash")
+    params = frozen["params"]
+    sel = frozen["selected"]
+    cohort = research["common_cohort"]
+    artifact: dict[str, Any] = {
+        "method": "cfb_structural_v6_additive_joint_ridge_bivariate_engine",
+        "model_version": "cfb-structural-v6",
+        "schema_version": "1",
+        "sport": "ncaaf",
+        "league": "NCAAF",
+        "positive_class": "home_win",
+        "distribution": "negative_binomial",
+        "margin_calibration": params["margin_calibration"],
+        "total_calibration": params["total_calibration"],
+        "margin_sd_table": params["margin_sd_table"],
+        "total_sd_table": params["total_sd_table"],
+        "established_min_sample": params["established_min_sample"],
+        "solver": {
+            "lambda": sel["lambda"],
+            "w_prev": sel["w_prev"],
+            "result_buffer_hours": frozen["result_buffer_hours"],
+        },
+        "features": ["projected_margin_home", "projected_total", "is_fbs_vs_fcs", "sample_games"],
+        "note": (
+            "Research challenger only. Not routed, not registered as a champion, not in config/production.yaml "
+            "or config/model.yaml. v6 is a better-calibrated probability model than v5 on the locked holdout, "
+            "but its market-relative check shows no evidence of edge. Promotion is a separate governed decision."
+        ),
+        "qualification": {
+            "status": "research",
+            "qualified": False,
+            "locked_holdout": True,
+            "framework": "cfb_structural_v6_additive_joint_ridge_bivariate_engine",
+            "note": "RESEARCH_ONLY: shadow challenger, never qualified, never promoted, never routed.",
+        },
+        "training": {
+            "frozen_fit_sha256": frozen["params_sha256"],
+            "frozen_fit_path": "outputs/ncaaf/cfb_v6_frozen_fit.json",
+            "as_of_utc": frozen["as_of_utc"],
+            "split": frozen["split"],
+            "counts": frozen["counts"],
+            "burn_in_season": frozen["burn_in_season"],
+            "grid": frozen["grid"],
+            "selection_rule": frozen["selection_rule"],
+            "history_snapshot": frozen["history_snapshot"],
+            "backfill": {
+                "sha256": frozen["backfill"]["sha256"],
+                "rows": frozen["backfill"]["rows"],
+                "path": frozen["backfill"]["path"],
+            },
+            "pool_key": frozen["pool_key"],
+        },
+        "calibration": {
+            "holdout_v6_vs_v5_common_cohort": {
+                "n": cohort["n"],
+                "v6": {k: cohort["v6"][k] for k in ("brier", "log_loss", "ece", "calibration_slope", "margin_log_score", "total_log_score")},
+                "v5": {k: cohort["v5"][k] for k in ("brier", "log_loss", "ece", "calibration_slope", "margin_log_score", "total_log_score")},
+                "delta_v6_minus_v5": cohort["delta_v6_minus_v5"],
+            },
+            "market_check_575_first_look": _corr_summary(market["markets"]),
+            "espn_closing_line_first_look": {
+                "espn_lines_sha256": espn["espn_lines_sha256"],
+                "lined_events_in_file": espn["lined_events_in_file"],
+                "note": "closing-line benchmark, no decision-time quotes; see outputs/ncaaf/cfb_v6_espn_market_check.md",
+            },
+        },
+    }
+    artifact["artifact_hash"] = compute_artifact_hash(artifact)
+    ARTIFACT.write_text(json.dumps(artifact, indent=2) + chr(10), encoding="utf-8", newline=chr(10))
+    reloaded = load_cfb_structural_v6_artifact(ARTIFACT)  # model_version and hash check
+    CFBStructuralV6Model.from_artifact(reloaded)
+    print("wrote", ARTIFACT, reloaded["artifact_hash"])
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -874,6 +1087,10 @@ def main() -> int:
     pz = sub.add_parser("freeze")
     pz.add_argument("--allow-no-backfill", action="store_true")
     sub.add_parser("verify-frozen")
+    pw = sub.add_parser("write-artifact")
+    pw.add_argument("--overwrite", action="store_true")
+    pp = sub.add_parser("parity")
+    pp.add_argument("--sample", type=int, default=0, help="stratified sample size (0 = every cached row)")
     args = ap.parse_args()
     if args.cmd == "selfcheck":
         return selfcheck()
@@ -887,6 +1104,10 @@ def main() -> int:
         return cmd_freeze(args)
     if args.cmd == "holdout":
         return cmd_holdout(args)
+    if args.cmd == "write-artifact":
+        return cmd_write_artifact(args)
+    if args.cmd == "parity":
+        return cmd_parity(args)
     if args.cmd == "verify-frozen":
         verify_frozen()
         return 0
