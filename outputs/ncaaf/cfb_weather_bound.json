@@ -1,0 +1,304 @@
+{
+  "rule_sha256": "1481273f1fbd860a5e35ecc25a864818e74818f564aa0f6d5710ea42f524145f",
+  "rule_version": "totals-sources-rule-1",
+  "script": "cfb_weather_bound.py",
+  "script_sha256": "b53eb169dd5819f48a15d4b38cb98dd888b9044a422f3aecf0a07776955a32fa",
+  "generated_at_utc": "2026-11-15T07:32:25Z",
+  "final": true,
+  "frozen_inputs_sha256": {
+    "cfb_v6_base_rows.jsonl": "30c3383c4de3824e5a3ee7cb76053facd18b0fe105097fec066bb9fc2980f4be",
+    "cfb_v5_base_rows.jsonl": "39c1cbd61e63b7dc1c029ad39b7c5b759aa1921296957d9070cb977bab2d187e",
+    "history_snapshot.jsonl": "1fe90e1a11b8e5248003bff92ae62eec5bb17c4bd421a275b2f64ed36f1ced0c",
+    "espn_lines.jsonl": "2b19a2545fb2e5f9df4c55a1b57ee9f88b11eab371828a4a7ed88e8bdfb7fa54"
+  },
+  "v6_frozen_params_sha256": "6e38b14ca486acfd836c1259e5c4fd4fb8e9b5894a06f367322b1eb0c7b13e70",
+  "holdout_reads": 1,
+  "holdout_note": null,
+  "workstream": "W3",
+  "label": "OBSERVED WEATHER UPPER BOUND (the line already knows the forecast)",
+  "source": "Open-Meteo archive (observed/reanalysis) hourly temperature_2m, wind_speed_10m, precipitation",
+  "coverage": {
+    "venues_required": 131,
+    "venue_seasons_required": 1266,
+    "venue_seasons_cached": 1266,
+    "forecast_venue_seasons_required": 643,
+    "forecast_venue_seasons_cached": 0,
+    "by_season": {
+      "2017": {
+        "games_fbs_involved": 873,
+        "excluded_neutral": 61,
+        "excluded_dome_home": 19,
+        "excluded_unresolved_or_no_coords": 22,
+        "wx_eligible": 771,
+        "with_observed_weather": 771,
+        "lined_total_with_observed_weather": 691,
+        "lined_spread_with_observed_weather": 771,
+        "with_forecast_weather": 0
+      },
+      "2018": {
+        "games_fbs_involved": 884,
+        "excluded_neutral": 61,
+        "excluded_dome_home": 18,
+        "excluded_unresolved_or_no_coords": 14,
+        "wx_eligible": 791,
+        "with_observed_weather": 791,
+        "lined_total_with_observed_weather": 761,
+        "lined_spread_with_observed_weather": 778,
+        "with_forecast_weather": 0
+      },
+      "2019": {
+        "games_fbs_involved": 888,
+        "excluded_neutral": 58,
+        "excluded_dome_home": 18,
+        "excluded_unresolved_or_no_coords": 18,
+        "wx_eligible": 794,
+        "with_observed_weather": 794,
+        "lined_total_with_observed_weather": 790,
+        "lined_spread_with_observed_weather": 790,
+        "with_forecast_weather": 0
+      },
+      "2020": {
+        "games_fbs_involved": 568,
+        "excluded_neutral": 38,
+        "excluded_dome_home": 15,
+        "excluded_unresolved_or_no_coords": 10,
+        "wx_eligible": 505,
+        "with_observed_weather": 505,
+        "lined_total_with_observed_weather": 504,
+        "lined_spread_with_observed_weather": 504,
+        "with_forecast_weather": 0
+      },
+      "2021": {
+        "games_fbs_involved": 852,
+        "excluded_neutral": 61,
+        "excluded_dome_home": 18,
+        "excluded_unresolved_or_no_coords": 5,
+        "wx_eligible": 768,
+        "with_observed_weather": 768,
+        "lined_total_with_observed_weather": 764,
+        "lined_spread_with_observed_weather": 764,
+        "with_forecast_weather": 0
+      },
+      "2022": {
+        "games_fbs_involved": 896,
+        "excluded_neutral": 61,
+        "excluded_dome_home": 20,
+        "excluded_unresolved_or_no_coords": 6,
+        "wx_eligible": 809,
+        "with_observed_weather": 809,
+        "lined_total_with_observed_weather": 807,
+        "lined_spread_with_observed_weather": 807,
+        "with_forecast_weather": 0
+      },
+      "2023": {
+        "games_fbs_involved": 910,
+        "excluded_neutral": 62,
+        "excluded_dome_home": 19,
+        "excluded_unresolved_or_no_coords": 6,
+        "wx_eligible": 823,
+        "with_observed_weather": 823,
+        "lined_total_with_observed_weather": 823,
+        "lined_spread_with_observed_weather": 823,
+        "with_forecast_weather": 0
+      },
+      "2024": {
+        "games_fbs_involved": 919,
+        "excluded_neutral": 61,
+        "excluded_dome_home": 19,
+        "excluded_unresolved_or_no_coords": 6,
+        "wx_eligible": 833,
+        "with_observed_weather": 833,
+        "lined_total_with_observed_weather": 793,
+        "lined_spread_with_observed_weather": 791,
+        "with_forecast_weather": 0
+      },
+      "2025": {
+        "games_fbs_involved": 934,
+        "excluded_neutral": 55,
+        "excluded_dome_home": 18,
+        "excluded_unresolved_or_no_coords": 12,
+        "wx_eligible": 849,
+        "with_observed_weather": 849,
+        "lined_total_with_observed_weather": 847,
+        "lined_spread_with_observed_weather": 839,
+        "with_forecast_weather": 0
+      },
+      "2026": {
+        "games_fbs_involved": 731,
+        "excluded_neutral": 10,
+        "excluded_dome_home": 19,
+        "excluded_unresolved_or_no_coords": 16,
+        "wx_eligible": 686,
+        "with_observed_weather": 682,
+        "lined_total_with_observed_weather": 682,
+        "lined_spread_with_observed_weather": 682,
+        "with_forecast_weather": 0
+      }
+    },
+    "cohort_counts": {
+      "total": {
+        "select": 4590,
+        "validation": 1790,
+        "holdout": 1861,
+        "post_holdout": 38
+      },
+      "spread": {
+        "select": 4696,
+        "validation": 1789,
+        "holdout": 1853,
+        "post_holdout": 38
+      }
+    },
+    "note": "counts only; the cohort for each test is the lined rows carrying every pinned feature"
+  },
+  "results": {
+    "total": {
+      "source": "W3",
+      "market": "total",
+      "stage": "observed",
+      "tier": "leaky",
+      "result": {
+        "market": "total",
+        "features": [
+          "wind_mph",
+          "precip_in",
+          "cold_f"
+        ],
+        "eval_features": null,
+        "close_col": "line",
+        "y_col": "actual",
+        "n_select": 4135,
+        "n_validation": 1617,
+        "n_holdout": 1677,
+        "flag_counts": {},
+        "final": true,
+        "validation": {
+          "mse_baseline": 257.0896801255104,
+          "mse_with_source": 256.9477674681362,
+          "dmse": 0.1419126573742363,
+          "ci_lo": -0.3512011518909444,
+          "ci_hi": 0.5866476807260823,
+          "B": 1000,
+          "seed": 20261115
+        },
+        "holdout": {
+          "mse_baseline": 234.7308183636385,
+          "mse_with_source": 234.67399304144402,
+          "dmse": 0.05682532219446272,
+          "point_estimate_only": true
+        },
+        "baseline_coef": [
+          3.006148048235192,
+          0.9490435133167621
+        ],
+        "source_coef": [
+          3.7379342312575177,
+          0.9460074740600384,
+          -0.07591809927910217,
+          -5.953132454307305,
+          0.043904247282212885
+        ],
+        "select_feature_means": {
+          "wind_mph": 7.262152357920193,
+          "precip_in": 0.004282627972591697,
+          "cold_f": 0.3464328899637243
+        },
+        "exploratory": {
+          "label": "exploratory, not a verdict input",
+          "select_in_sample_dmse": 0.1107608635845251,
+          "validation_dmae": 0.0055584113840128615
+        }
+      },
+      "verdict": {
+        "verdict": "NOT_WORTH_BUILDING",
+        "validation_pass": false,
+        "holdout_pass": true,
+        "reason": "fails the pass rule (validation CI lower bound > 0 AND holdout point estimate > 0)"
+      }
+    },
+    "spread": {
+      "source": "W3",
+      "market": "spread",
+      "stage": "observed",
+      "tier": "leaky",
+      "result": {
+        "market": "spread",
+        "features": [
+          "wind_x_margin"
+        ],
+        "eval_features": null,
+        "close_col": "close_margin",
+        "y_col": "margin",
+        "n_select": 4232,
+        "n_validation": 1616,
+        "n_holdout": 1668,
+        "flag_counts": {},
+        "final": true,
+        "validation": {
+          "mse_baseline": 232.14507895114954,
+          "mse_with_source": 232.12303967881016,
+          "dmse": 0.022039272339391052,
+          "ci_lo": -0.05115807901167217,
+          "ci_hi": 0.0999804561936723,
+          "B": 1000,
+          "seed": 20261115
+        },
+        "holdout": {
+          "mse_baseline": 227.0837012244991,
+          "mse_with_source": 227.0533674169536,
+          "dmse": 0.030333807545498963,
+          "point_estimate_only": true
+        },
+        "baseline_coef": [
+          -0.20906644356508003,
+          0.9960557060082642
+        ],
+        "source_coef": [
+          -0.2109424127013162,
+          1.001840756792348,
+          -0.00842437664452178
+        ],
+        "select_feature_means": {
+          "wind_x_margin": 4.939480348141148
+        },
+        "exploratory": {
+          "label": "exploratory, not a verdict input",
+          "select_in_sample_dmse": 0.0029686162319206054,
+          "validation_dmae": 0.0004633913502850319
+        }
+      },
+      "verdict": {
+        "verdict": "NOT_WORTH_BUILDING",
+        "validation_pass": false,
+        "holdout_pass": true,
+        "reason": "fails the pass rule (validation CI lower bound > 0 AND holdout point estimate > 0)"
+      }
+    }
+  },
+  "forecast_stage": {
+    "total": {
+      "ran": false,
+      "reason": "observed test did not pass; the rule only runs the retest on a pass"
+    },
+    "spread": {
+      "ran": false,
+      "reason": "observed test did not pass; the rule only runs the retest on a pass"
+    }
+  },
+  "verdicts": {
+    "total": {
+      "verdict": "NOT_WORTH_BUILDING",
+      "validation_pass": false,
+      "holdout_pass": true,
+      "reason": "fails the pass rule (validation CI lower bound > 0 AND holdout point estimate > 0)",
+      "stage": "observed"
+    },
+    "spread": {
+      "verdict": "NOT_WORTH_BUILDING",
+      "validation_pass": false,
+      "holdout_pass": true,
+      "reason": "fails the pass rule (validation CI lower bound > 0 AND holdout point estimate > 0)",
+      "stage": "observed"
+    }
+  }
+}
