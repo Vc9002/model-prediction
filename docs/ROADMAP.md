@@ -305,3 +305,11 @@ Serving/replay consistency, exact derivative contract logging, canonical esports
 - **Auto-buyer**: settlement requires exact identity and terminal rows are immutable (`233871bb`, `1c335152`); stale source quotes rejected (`814e668d`); six-hour quote fallback (`69593602`); manual exits settled, hand-placed positions imported as `MANUAL-*` rows, sold games locked out (`12c7f2e7`). Buyer "losses" can be early exits (`settlement_source: manual_sell`), so use `ledgers.db`, not the buyer ledger, for model quality.
 - **Best-picks audit**: `scripts/audit_best_picks.py` CONFIRMED_BEST labels for NBA spreads, NCAAB overs and NCAAB moneyline are hardcoded overrides that do not replicate from the ledger (for example NBA spread >=8% edge on double-digit dogs recomputes to 4W-6L, n=10). Recompute the bucket from the ledger and check quote provenance before presenting any pick as best. Fixing the script is open work (see HANDOFF).
 - **Refactor pass on `refactor/cleanup-2026-11-11`**: 75 + 25 unreferenced definitions removed, safe lint simplifications, NBA/WNBA spread and total wrappers merged, leaf helpers split out of `cli/forecast.py`. No behavior change intended. Pre-existing failures at the checkpoint: 9 in `tests/test_cli.py`, 1 each in `test_five_blind_spot_guards.py`, `test_forecast_runtime_regressions.py`, `test_tennis_markov.py`.
+
+
+## 2026-11-15 NCAAF history backfill, capture wiring, hash-test documentation (quick 261115-w7k)
+
+- Operator waived the pinned history-impact REJECT (holdout Brier delta +0.001065 vs +0.001 limit, CI spans zero). Applied the 1,478-game FBS-involved backfill to data/processed/ncaaf/games.jsonl (append set sha256 7d0f9caf..., loaded history 9,498 rows) and shipped the groups=80/81 NCAAF ingest. No refit, no promotion.
+- Forward capture is wired into the daily run as a fail-soft step (step1m_cfb_pregame_capture).
+- The four non-verifying artifacts are documented evidence, not drift: three NBA v8 files embed a label, tennis-games-markov-v3 a stale hash. Listed in KNOWN_NON_VERIFIERS.
+- Still open: ~6,900 FCS-vs-FCS events not appended; v5 refit on the complete history not done; line-movement retest needs a season of capture.
