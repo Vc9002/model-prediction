@@ -177,6 +177,24 @@ def _serialized_polymarket_captures(slate_capture: Any, week_ahead_capture: Any)
         week_ahead_capture()
 
 
+def _run_cfb_pregame_capture(config, data_root, game_date: str) -> dict[str, Any]:
+    """Forward capture of timestamped NCAAF pregame lines and injuries (quick 261115-w7k).
+
+    Optional by construction: a disabled NCAAF daily forecast skips it, and any failure is returned as a
+    status dict. ``step1m_cfb_pregame_capture`` is deliberately not in ``_material_daily_errors``, so this can
+    never turn the daily run red.
+    """
+    try:
+        if not is_sport_daily_enabled(config, "NCAAF"):
+            return {"status": "skipped", "reason": "ncaaf_daily_forecast_disabled"}
+        from ..data_sources.espn_cfb_pregame_capture import capture_cfb_pregame_snapshots
+
+        return capture_cfb_pregame_snapshots(data_root, game_date)
+    except Exception:
+        logger.warning("NCAAF pregame capture failed for %s", game_date, exc_info=True)
+        return {"status": "error"}
+
+
 def _skipped_sport_result(sport: str, status: str, reason: str) -> dict[str, Any]:
     """The result dict a daily task records when a sport is not forecast at all."""
     return {"sport": sport, "status": status, "logged": 0, "candidates": [], "reason": reason}
@@ -474,6 +492,12 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             logger.warning("CFB injury report capture failed for %s", args.date, exc_info=True)
             cfb_injuries_result = {"status": "error"}
 
+    cfb_pregame_result: dict[str, Any] = {"status": "skipped"}
+
+    def _capture_cfb_pregame():
+        nonlocal cfb_pregame_result
+        cfb_pregame_result = _run_cfb_pregame_capture(config, data_root, args.date)
+
     cfb_weather_result: dict[str, Any] = {"status": "skipped"}
 
     def _capture_cfb_weather():
@@ -687,7 +711,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         f15 = io_pool.submit(_timed, "ncaab_boxscores", _capture_ncaab_boxscores)
         f16 = io_pool.submit(_timed, "nfl_weather", _capture_nfl_weather)
         f17 = io_pool.submit(_timed, "nfl_week_ahead_consensus", _capture_nfl_week_ahead_consensus)
-        for f in (f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17):
+        f18 = io_pool.submit(_timed, "cfb_pregame_capture", _capture_cfb_pregame)
+        for f in (f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18):
             f.result()  # Wait for all, surface exceptions
         try:
             slate = f0.result()
@@ -1728,6 +1753,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         "step1j_cfb_weather": cfb_weather_result,
         "step1k_nfl_weather": nfl_weather_result,
         "step1l_nfl_week_ahead_quotes": nfl_week_ahead_result,
+        "step1m_cfb_pregame_capture": cfb_pregame_result,
         "step1c_mlb_probable_starters": {
             "captured_events": len(mlb_probables_result),
             "archive": "data/point_in_time/mlb_probable_starters.jsonl",

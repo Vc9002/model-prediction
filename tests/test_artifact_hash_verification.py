@@ -1,6 +1,6 @@
 """Pin the artifact-hash verification convention and the documented non-verifiers.
 
-The two config/models artifacts that do not self-verify against their
+The six config/models artifacts that do not self-verify against their
 embedded ``artifact_hash`` are DOCUMENTED evidence artifacts, not defects:
 
 - ``archive/wnba-spread-baseline-v1.json`` — ``_retired*`` fields were
@@ -9,6 +9,14 @@ embedded ``artifact_hash`` are DOCUMENTED evidence artifacts, not defects:
 - ``research/mlb-v9-candidate-1.json`` — quarantine fields (``status`` /
   ``invalidation_reason`` / ``replacement``) were appended by the
   quarantine commit; preserved for audit, never promoted (docs/ROADMAP.md).
+- ``nba-moneyline-v8.json``, ``nba-spread-margin-v8.json``,
+  ``nba-total-margin-v8.json`` — the embedded ``artifact_hash`` is a label
+  string (``research-nba-<market>-v8-20261102``), never a sha256, and the files
+  are unchanged since their adding commit a107a3e8. Unrouted research
+  evidence; nothing in config/production.yaml serves them.
+- ``tennis-games-markov-v3.json`` — a stale real hash, unchanged since its
+  single commit 9a568a99 (never re-signed). It is a disabled rollback entry
+  (``enabled: false``) in a sport outside the production scope.
 
 Everything else under config/models/ with an ``artifact_hash`` must
 self-verify under the registry's canonical convention
@@ -31,6 +39,10 @@ KNOWN_NON_VERIFIERS = frozenset(
     {
         "config/models/archive/wnba-spread-baseline-v1.json",
         "config/models/research/mlb-v9-candidate-1.json",
+        "config/models/nba-moneyline-v8.json",
+        "config/models/nba-spread-margin-v8.json",
+        "config/models/nba-total-margin-v8.json",
+        "config/models/tennis-games-markov-v3.json",
     }
 )
 
@@ -60,7 +72,7 @@ def test_canonical_hash_convention_is_pinned_on_a_live_artifact() -> None:
 
 
 def test_only_documented_evidence_artifacts_fail_self_verification() -> None:
-    """No artifact may mismatch its embedded hash except the two documented ones."""
+    """No artifact may mismatch its embedded hash except the documented ones."""
     non_verifiers = {
         rel for rel, payload in _artifacts() if compute_artifact_hash(payload) != payload["artifact_hash"]
     }
