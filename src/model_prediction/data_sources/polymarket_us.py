@@ -1230,6 +1230,12 @@ def _annotate_capture(
     return snapshot
 
 
+# Leagues whose quotes must come from the paced /book pass. The event-detail
+# response has no transactTime, and the NCAAF evidence check fails closed on a
+# quote without one (invalid_time), so event-detail quotes there never matched.
+EVENT_DETAIL_EXCLUDED_LEAGUES = frozenset({"NCAAF"})
+
+
 def _event_detail_quote_book(detail_market: dict[str, Any], slate_line: Any) -> dict[str, Any] | None:
     """A book-shaped dict from an event-detail market's top-of-book quote, or None (fail closed).
 
@@ -1302,6 +1308,8 @@ def _capture_event_detail_quotes(
     groups: dict[tuple[str, str], list[_CaptureEntry]] = {}
     for entry in candidates:
         event_slug = str(entry[2].get("event_slug") or "")
+        if entry[0].upper() in EVENT_DETAIL_EXCLUDED_LEAGUES:
+            continue
         if event_slug and not _has_started(entry[2], now):
             groups.setdefault((entry[0].upper(), event_slug), []).append(entry)
 

@@ -1687,3 +1687,35 @@ def test_open_pick_in_switched_off_league_does_not_take_primary_budget() -> None
     )
     assert [entry[3]["market_slug"] for entry in primary] == ["nba-open-market"]
     assert [entry[3]["market_slug"] for entry in secondary] == ["atp-open-pick"]
+
+
+def test_event_detail_pass_skips_ncaaf_because_its_quotes_carry_no_transact_time() -> None:
+    """NCAAF quotes need a transactTime for the evidence check, which event-detail never carries."""
+    now = datetime(2026, 11, 15, 12, tzinfo=UTC)
+    future = (now + timedelta(hours=5)).isoformat()
+
+    class _Detail:
+        event: dict = {"markets": []}  # noqa: RUF012 - fixture, never mutated
+        cache_age_seconds = 0.0
+
+    class _Client:
+        def __init__(self) -> None:
+            self.requested: list[str] = []
+
+        def event_detail(self, slug: str) -> _Detail:
+            self.requested.append(slug)
+            return _Detail()
+
+    event = {"event_slug": "cfb-miss-okl", "event_start_utc": future, "event_id": "1"}
+    market = {"market_slug": "tsc-cfb-miss-okl-total", "market_id": "9", "sides": [{}]}
+    client = _Client()
+    outcome = polymarket_us._capture_event_detail_quotes(
+        client,
+        [("NCAAF", "football", event, market)],
+        priority_leagues=None,
+        keep_slugs=frozenset(),
+        now=now,
+        deadline=None,
+    )
+    assert client.requested == []
+    assert outcome.results == []
