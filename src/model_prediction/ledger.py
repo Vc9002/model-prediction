@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 import threading
 import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager, suppress
 from datetime import datetime
 from pathlib import Path
@@ -1572,8 +1572,19 @@ class PickLedger:
         """
         return self._retire_open_rows(pick_ids, reason, allow_staked_removal, superseded=True)
 
-    def restore_unreplaced_picks(self, prior_rows: list[dict[str, str]]) -> list[str]:
-        """Reopen pre-refresh calls only where no new event/market call landed."""
+    def restore_unreplaced_picks(
+        self,
+        prior_rows: list[dict[str, str]],
+        exclude_slots: Iterable[tuple[str, str, str]] = (),
+    ) -> list[str]:
+        """Reopen pre-refresh calls only where no new event/market call landed.
+
+        ``exclude_slots`` are (league, event_id, market_type) slots the refresh
+        deliberately declined (a serving gate said no). Those must stay retired:
+        reopening the previous run's version would resurrect exactly the pick the
+        gate exists to stop.
+        """
+        declined = {(str(a).casefold(), str(b), str(c)) for a, b, c in exclude_slots}
         restored: list[str] = []
         with self._lock():
             current = self._read_unlocked()
@@ -1593,7 +1604,7 @@ class PickLedger:
             }
             for row in prior_rows:
                 slot = (row["league"].casefold(), row["event_id"], row["market_type"])
-                if slot in active_slots:
+                if slot in active_slots or slot in declined:
                     continue
                 # Only the rows this refresh actually retired are eligible.
                 if retired_ids is not None and row["pick_id"] not in retired_ids:

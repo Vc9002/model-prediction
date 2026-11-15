@@ -44,8 +44,11 @@ from ..research_ledgers import existing_research_ledgers
 from ..runtime_paths import RuntimePaths, rerouted_data_root
 from .commands import (
     _clear_today_open,
+    _declined_slots,
+    _open_ncaab_rows,
     _polymarket_slate,
     _research_models_dir,
+    _restore_unreplaced_ncaab,
     _summary,
 )
 from .forecast import (
@@ -730,9 +733,13 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         statcast_aggregates_result = {"status": "off_season", "reason": "season_concluded"}
 
     cleared_ledgers: list[Any] = [ledger]
+    # Captured BEFORE the clear so NCAAB picks the refresh does not replace can be
+    # reopened afterwards (see _restore_unreplaced_ncaab). Without this the daily
+    # path silently dropped them; only run_forecast used to restore.
+    flat_ledger = MultiSportPickLedger(data_root, flat=True)
+    ncaab_prior = {"main": _open_ncaab_rows(ledger), "flat": _open_ncaab_rows(flat_ledger)}
     _clear_today_open(ledger, args.date, by_event_date=True)
     # Also clear and forecast for flat ledger
-    flat_ledger = MultiSportPickLedger(data_root, flat=True)
     cleared_ledgers.append(flat_ledger)
     _clear_today_open(flat_ledger, args.date, by_event_date=True)
     max_data_age = float(config["project"].get("maximum_data_age_hours", 12))
@@ -1372,6 +1379,13 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 for cl in cleared_ledgers:
                     _rollback_pre_clear(cl)
                 raise
+    ncaab_declined = _declined_slots(forecast_result.get("ncaab"))
+    ncaab_restored = _restore_unreplaced_ncaab(
+        {"main": ledger, "flat": flat_ledger}, ncaab_prior, ncaab_declined
+    )
+    if "ncaab" in forecast_result:
+        forecast_result["ncaab"].pop("declined_slots", None)
+        forecast_result["ncaab"]["unreplaced_restored"] = ncaab_restored
     flat_result = {
         sport: forecast_result.get(f"_flat_{sport}", forecast_result.get(sport, {}))
         for sport in DAILY_LEARNED_SPORTS

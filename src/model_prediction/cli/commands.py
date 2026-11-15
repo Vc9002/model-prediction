@@ -445,6 +445,39 @@ def _clear_today_open(
     )
 
 
+def _open_ncaab_rows(ledger: Any) -> list[dict[str, str]]:
+    """Open NCAAB rows, captured BEFORE a refresh retires them (see restore below)."""
+    return [
+        row
+        for row in ledger.rows()
+        if row.get("status") == "open" and str(row.get("league", "")).casefold() == "ncaab"
+    ]
+
+
+def _declined_slots(result: dict[str, Any] | None) -> list[tuple[str, str, str]]:
+    """(league, event_id, market_type) slots a forecast result says a gate declined."""
+    return [tuple(item) for item in (result or {}).get("declined_slots", ())]  # type: ignore[misc]
+
+
+def _restore_unreplaced_ncaab(
+    ledgers: dict[str, Any],
+    prior: dict[str, list[dict[str, str]]],
+    declined: list[tuple[str, str, str]],
+) -> dict[str, int]:
+    """Reopen NCAAB picks the refresh retired and did not replace, except declined slots.
+
+    Both the daily job and ``run_forecast`` clear every not-yet-started open row
+    before re-forecasting. A pick whose market produced no new call (the model no
+    longer favours it, the slate fetch failed, the sport task errored) would
+    otherwise vanish: 24 flat NCAAB event-markets were lost this way because only
+    ``run_forecast`` called restore and the scheduled daily path never did.
+    """
+    return {
+        tier: len(ledger.restore_unreplaced_picks(prior.get(tier, []), exclude_slots=declined))
+        for tier, ledger in ledgers.items()
+    }
+
+
 def _rollback_pre_clear(ledger: Any) -> bool:
     """Restore ledger file(s) from .pre_clear.bak snapshot(s)."""
     if not hasattr(ledger, "path") or not ledger.path:

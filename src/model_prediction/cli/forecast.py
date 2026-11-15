@@ -77,7 +77,14 @@ from ..production_registry import ProductionModelRegistry, compute_artifact_hash
 from ..runtime_paths import RuntimePaths
 from ..soccer_forward import build_soccer_total_slate
 from ..tennis_forward import build_tennis_slate
-from .commands import _clear_today_open, _research_models_dir, _rolling_models_write_dir
+from .commands import (
+    _clear_today_open,
+    _declined_slots,
+    _open_ncaab_rows,
+    _research_models_dir,
+    _restore_unreplaced_ncaab,
+    _rolling_models_write_dir,
+)
 from .forecast_market_select import (
     _load_market_residual_model,
     _nba_volatility_features,
@@ -6141,11 +6148,7 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
     ncaab_prior = {}
     if log and replace_today and "ncaab" in main_ledger_sport_scope:
         for tier_name, source in (("main", ledger), ("flat", flat_ledger)):
-            ncaab_prior[tier_name] = [
-                row
-                for row in source.rows()
-                if row.get("status") == "open" and str(row.get("league", "")).casefold() == "ncaab"
-            ]
+            ncaab_prior[tier_name] = _open_ncaab_rows(source)
     if is_flat:
         if replace_today and log:
             _clear_today_open(flat_ledger, args.date, by_event_date=True, leagues=main_ledger_sport_scope)
@@ -6438,9 +6441,13 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
     for sport in sports:
         if sport in results:
             if sport == "ncaab" and ncaab_prior:
-                for tier_name, source in (("main", ledger), ("flat", flat_ledger)):
-                    restored = source.restore_unreplaced_picks(ncaab_prior[tier_name])
-                    results[sport][f"{tier_name}_unreplaced_restored"] = len(restored)
+                restored_counts = _restore_unreplaced_ncaab(
+                    {"main": ledger, "flat": flat_ledger},
+                    ncaab_prior,
+                    _declined_slots(results[sport]),
+                )
+                for tier_name, count in restored_counts.items():
+                    results[sport][f"{tier_name}_unreplaced_restored"] = count
             results[sport]["existing_started_picks"] = [
                 row for row in saved if str(row.get("league", "")).casefold() == sport.casefold()
             ]
