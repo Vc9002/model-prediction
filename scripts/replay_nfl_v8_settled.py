@@ -14,7 +14,7 @@ from pathlib import Path
 from statistics import mean as average
 
 from model_prediction.domain import parse_utc
-from model_prediction.features.nfl_efficiency import NFLEfficiencyStore
+from model_prediction.features.nfl_efficiency import NFLEfficiencyInputError, NFLEfficiencyStore
 from model_prediction.models.nfl_scoring_simulation import solve_bivariate_scoring
 from model_prediction.models.nfl_spread_v7 import NFLSpreadModelV7
 from model_prediction.models.nfl_spread_v8 import NFLSpreadModelV8, _historical_symmetric_margin_pmf
@@ -51,6 +51,7 @@ def replay() -> dict:
     efficiency_cache = {}
     rows = []
     missing = []
+    legacy_snapshot_rows = 0
     for record in ledger:
         payload = json.loads(record["decision_payload_json"])
         event = history.get(str(record["event_id"]))
@@ -79,13 +80,23 @@ def replay() -> dict:
             and efficiency.source_manifest
             and efficiency.source_manifest.get("manifest_sha256") == source.get("manifest_sha256")
         )
-        eff = efficiency.get_matchup_efficiency(
-            home_team=event["home_team"],
-            away_team=event["away_team"],
-            as_of_date=start[:10],
-            home_qb=features.get("home_qb"),
-            away_qb=features.get("away_qb"),
-        )
+        matchup_kwargs = {
+            "home_team": event["home_team"],
+            "away_team": event["away_team"],
+            "as_of_date": start[:10],
+            "home_qb": features.get("home_qb"),
+            "away_qb": features.get("away_qb"),
+        }
+        try:
+            eff = efficiency.get_matchup_efficiency(**matchup_kwargs)
+        except NFLEfficiencyInputError:
+            # Snapshots taken before 2026-11-11 hold four team columns and now fail
+            # closed. Those rows were served on league-average defaults, so there is
+            # no stored input to reproduce: re-price them from the current snapshot
+            # filtered to the game date and report them as unverified.
+            eff = current_efficiency.get_matchup_efficiency(**matchup_kwargs)
+            source_verified = False
+            legacy_snapshot_rows += 1
         kwargs = {
             "spread_home_line": home_line,
             "home_rest_days": int(features.get("home_rest_days") or 7),
@@ -215,6 +226,7 @@ def replay() -> dict:
         "recorded_clv_rows": sum(row["recorded_clv"] is not None for row in rows),
         "qb_snapshot_rows": sum(row["qb_from_pregame_snapshot"] for row in rows),
         "efficiency_snapshot_verified_rows": sum(row["efficiency_snapshot_verified"] for row in rows),
+        "legacy_snapshot_rows_repriced_from_current_store": legacy_snapshot_rows,
         "promotion_blocked": not parity or max(parity) > 0.01,
         "limitations": [
             "Current efficiency store is filtered by game date but its source snapshot may postdate older games.",
@@ -223,7 +235,7 @@ def replay() -> dict:
         ],
         "rows": rows,
     }
-    output = ROOT / "outputs/research/nfl_v8_settled_replay_20261110.json"
+    output = ROOT / "outputs/research/nfl_v8_settled_replay.json"
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return report
