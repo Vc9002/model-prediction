@@ -118,8 +118,12 @@ def test_ncaab_records_real_model_output_and_rerun_deduplicates(tmp_path, monkey
     worse = forecast_ncaab_sport(
         **{**args, "flat_ledger": MultiSportPickLedger(tmp_path / "worse", flat=True), "main_ledger": None}
     )
-    assert worse["flat_logged"] == 1
-    assert float(MultiSportPickLedger(tmp_path / "worse", flat=True).rows()[0]["edge"]) < 0
+    # Tier-1 guardrail (2026-11-15): a negative-edge moneyline is declined on every tier,
+    # where it used to be written to Flat (110 of 166 settled flat v6 moneylines).
+    assert worse["flat_logged"] == 0
+    assert MultiSportPickLedger(tmp_path / "worse", flat=True).rows() == []
+    assert any(s["reason"] == "moneyline_nonpositive_edge" for s in worse["skipped"])
+    assert worse["declined_slots"] == [["NCAAB", "fixture", "moneyline"]]
     assert worse["candidate_quote_coverage"]["serving_decisions"] == 1
     archive.unlink()
     missing = forecast_ncaab_sport(

@@ -69,6 +69,16 @@ def eligible_trial_pick(row: dict[str, Any], *, min_edge: float, max_edge: float
         return False
     if str(row.get("market_type") or "").lower() != "spread":
         return False
+    # A zero-stake row is a shadow row (e.g. the forecast's unquoted 50%-placeholder price,
+    # whose edge is manufactured). The buyer would still lift it to min_shares, so the
+    # cohort must exclude it here rather than rely on units.
+    units = row.get("units")
+    if units not in (None, ""):
+        try:
+            if float(units) <= 0:
+                return False
+        except (TypeError, ValueError):
+            return False
     try:
         edge = float(row["edge"])
     except (KeyError, TypeError, ValueError):

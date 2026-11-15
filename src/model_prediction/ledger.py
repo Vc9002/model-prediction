@@ -788,6 +788,8 @@ class PickLedger:
                 )
                 if dyn_units <= 1.0 and calc_edge > 0.01:
                     dyn_units = round(1.0 + min(1.0, calc_edge / 0.08), 2)
+            if eligibility.units_cap is not None:
+                dyn_units = min(dyn_units, max(0.0, float(eligibility.units_cap)))
             eligibility = replace(
                 eligibility,
                 qualified=True,
@@ -831,6 +833,8 @@ class PickLedger:
                 )
                 if dyn_units <= 1.0 and calc_edge > 0.01:
                     dyn_units = round(1.0 + min(1.0, calc_edge / 0.08), 2)
+            if eligibility.units_cap is not None:
+                dyn_units = min(dyn_units, max(0.0, float(eligibility.units_cap)))
             eligibility = replace(
                 eligibility,
                 qualified=True,

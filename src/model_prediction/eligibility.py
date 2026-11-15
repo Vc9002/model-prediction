@@ -23,6 +23,11 @@ class EligibilityResult:
     away_team: CanonicalTeam
     home_team: CanonicalTeam
     banned_team: CanonicalTeam | None = None
+    # Hard ceiling on the persisted stake, honoured by the Flat and Main tiers of
+    # PickLedger.append_evaluated (which otherwise recompute units from edge and can
+    # raise a passed 1.0 to 2.0). None leaves sizing untouched, so only callers that
+    # opt in change behaviour. 0.0 persists a visible zero-stake shadow row.
+    units_cap: float | None = None
 
 
 def evaluate_eligibility(
