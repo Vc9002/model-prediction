@@ -173,6 +173,14 @@ class TeamResolver:
     def is_resolved(self, key: str) -> bool:
         return key in self._resolved
 
+    def is_known(self, name: str) -> bool:
+        """True when ``name`` is a history name or ``resolve_team`` can alias it.
+
+        An unknown name would otherwise fall through ``base_key`` to a ``NAME:`` key and pool into the
+        season's shared lower-division identity, projecting a made-up team as an average pooled one.
+        """
+        return name in self._name_key or self._fallback(name) is not None
+
     def is_fcs(self, key: str, season: int) -> bool:
         return is_pool(key) or (key, season) not in self._fbs
 
@@ -622,6 +630,11 @@ def project(
 ) -> V6Projection:
     """Raw (uncalibrated) additive projection. Fails closed with NO_CALL_CFB_V6_UNRATED_TEAM."""
     season = season_of(sol.cutoff)
+    for name in (home_name, away_name):
+        # Before identity(): a name the history never saw and resolve_team cannot alias must decline,
+        # not pool. Real pooled lower-division teams are history names, so they still project.
+        if not book.resolver.is_known(name):
+            raise V6NoCall(NO_CALL_UNRATED, f"{name} is not a team in the rating history")
     hi = book.identity(home_name, season)
     ai = book.identity(away_name, season)
     for ident, name in ((hi, home_name), (ai, away_name)):

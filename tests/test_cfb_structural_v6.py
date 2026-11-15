@@ -244,6 +244,56 @@ def test_team_with_no_game_in_the_window_declines() -> None:
         assert exc.value.reason == "NO_CALL_CFB_V6_UNRATED_TEAM"
 
 
+# ----------------------------------------------------------------------------- known-team gate
+def _strict_resolve(name: str) -> SimpleNamespace | None:
+    """Knows the league teams and one alias only; every other name is unresolvable, as in production."""
+    if name == "Alias Team A":
+        return SimpleNamespace(canonical_name="Team A", tier="P4")
+    return _fake_resolve(name) if name in TEAMS else None
+
+
+def _pooled_league() -> list[v6.V6Game]:
+    """The league plus a lower-division singleton that plays one in-season game, so the season has a pool."""
+    games = _league()
+    games.append(_game(900, "2024-09-14T18:00Z", "Team A", "Tiny College", 38, 10))
+    return games
+
+
+def _strict_features(games: list[v6.V6Game], home: str, away: str) -> v6.CFBV6MatchupFeatures:
+    ordered = sorted(games, key=lambda g: (g.start, g.event_id))
+    resolver = v6.TeamResolver.from_games(ordered, resolve=_strict_resolve)
+    extractor = v6.CFBV6FeatureExtractor(ordered, lam=LAM, w_prev=W_PREV, resolver=resolver)
+    return extractor.extract_features(
+        event_id="target", game_start_utc=TARGET_START, home_team=home, away_team=away
+    )
+
+
+def test_invented_team_declines_instead_of_pooling() -> None:
+    games = _pooled_league()
+    for home, away in (("Team A", "Invented Tech"), ("Invented Tech", "Team B")):
+        with pytest.raises(v6.V6NoCall) as exc:
+            _strict_features(games, home, away)
+        assert exc.value.reason == "NO_CALL_CFB_V6_UNRATED_TEAM"
+        assert "Invented Tech" in str(exc.value)
+
+
+def test_real_pooled_team_from_history_still_projects() -> None:
+    games = _pooled_league()
+    ordered = sorted(games, key=lambda g: (g.start, g.event_id))
+    book = v6.RatingBook(ordered, v6.TeamResolver.from_games(ordered, resolve=_strict_resolve))
+    ident = book.identity("Tiny College", 2024)
+    assert ident.pooled and not ident.resolved  # a pooled history team, not a rated one
+    features = _strict_features(games, "Team A", "Tiny College")
+    assert features.sample_games >= 1
+    assert np.isfinite(features.projected_margin_home) and np.isfinite(features.projected_total)
+
+
+def test_unseen_name_that_resolve_team_aliases_still_projects() -> None:
+    features = _strict_features(_pooled_league(), "Alias Team A", "Team B")
+    reference = _strict_features(_pooled_league(), "Team A", "Team B")
+    assert features.projected_margin_home == reference.projected_margin_home
+
+
 # ----------------------------------------------------------------------------- loader
 def _jline(**kw) -> str:
     return json.dumps(kw)
