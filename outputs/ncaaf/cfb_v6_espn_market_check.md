@@ -1,8 +1,8 @@
 # cfb-structural-v6 vs v5 on ESPN archived closing lines (FIRST LOOK), as of 2026-11-15T02:10:00Z
 
-Frozen fit sha256 `6e38b14ca486acfd836c1259e5c4fd4fb8e9b5894a06f367322b1eb0c7b13e70`. ESPN lines file sha256 `2b19a2545fb2e5f9df4c55a1b57ee9f88b11eab371828a4a7ed88e8bdfb7fa54`; audit sha256 `37b1fec6fb01d1fb471f125444c1167490bc9f3318a925f1fad7850e981fa2d5`; rule sha256 ['ee23e34e91544b797a1feaa9c6ab604fa79597671f6bec110dd34df4b806ee97']. Lined events in file: 9364. Skipped: {"no_v6_row": 0, "no_call": 36, "no_line": 255}.
+Frozen fit sha256 `6e38b14ca486acfd836c1259e5c4fd4fb8e9b5894a06f367322b1eb0c7b13e70`. ESPN lines file sha256 `2b19a2545fb2e5f9df4c55a1b57ee9f88b11eab371828a4a7ed88e8bdfb7fa54`; audit sha256 `00672fa6fb47b7687b1ba35724d88a70ea2e49dd0f53279a20e1b19a5e654110`; rule sha256 ['ee23e34e91544b797a1feaa9c6ab604fa79597671f6bec110dd34df4b806ee97']. Lined events in file: 9364. Skipped: {"no_call": 36, "no_call_reasons": {"NO_CALL_CFB_V6_UNRATED_TEAM": 36}, "no_line": 255, "lined_events_not_in_v6_cache_by_reason": {"burn_in_season_2016": 873}}.
 
-> ESPN's odds feed gives archived closing/final pregame lines with no per-quote observed_at: a closing-line benchmark, not decision-time quotes. The line is E's pinned rule (median across non-live providers, fixed before any outcome was joined; sha256 in the header); nothing was fitted on any line. Fit-window games (on or before the frozen validation end) were used to fit v6's calibration and v5's, so the holdout-window seasons are the clean test. The 575/576 check is a design-informed subset of the 2026 holdout-window season and is not independent of it. Spread of projections, over% by line bucket and dog takes are diagnostics, not evidence. No promotion decision.
+> ESPN's odds feed gives archived closing/final pregame lines with no per-quote observed_at: a closing-line benchmark, not decision-time quotes. The line is E's pinned rule (median across non-live providers, fixed before any outcome was joined; sha256 in the header); nothing was fitted on any line. Fit-window games (on or before the frozen validation end) were used to fit v6's calibration and v5's, so the holdout-window seasons are the clean test, and from 2024 on each event carries a single book (ESPN BET 2024-25, DraftKings 2025-26), so the median is that book's close. Against the 575 reference the pinned spreads had 13 sign flips of 576 (inferred to be reference-side line-pair repeats, not verified). The 575/576 check is a design-informed subset of the 2026 holdout-window season and is not independent of it. Spread of projections, over% by line bucket and dog takes are diagnostics, not evidence. No promotion decision.
 
 ## Totals: lined v6-covered events 8279, common with v5 7078
 
@@ -86,7 +86,20 @@ Buckets, window:fit, v5 common:
 | 52-60 | 1977 | 49.6 | 763 / 713 | 49.5 |
 | 60 and over | 1474 | 44.7 | 147 / 1148 | 53.0 |
 
-Sensitivity (holdout window, line excluding Opening and consensus providers), v6: n 1899, corr -0.034 [-0.078, 0.008].
+### Robustness: book-only median (Opening, accuscore, teamrankings, numberfire, consensus dropped), total
+
+| group | model | n | pinned corr [95% CI] | book-only corr [95% CI] |
+|---|---|---|---|---|
+| window:fit | v6 all | 6265 | 0.020 [-0.009, 0.048] | 0.018 [-0.012, 0.049] |
+| window:fit | v5 common | 5476 | 0.023 [-0.006, 0.051] | 0.022 [-0.007, 0.051] |
+| window:holdout | v6 all | 1899 | -0.034 [-0.078, 0.008] | -0.034 [-0.078, 0.008] |
+| window:holdout | v5 common | 1511 | -0.040 [-0.097, 0.016] | -0.040 [-0.097, 0.016] |
+| all | v6 all | 8164 | 0.010 [-0.015, 0.034] | 0.008 [-0.017, 0.033] |
+| all | v5 common | 6987 | 0.013 [-0.013, 0.039] | 0.012 [-0.014, 0.038] |
+
+Groups where the book-only conclusion differs (sign of corr or CI excluding zero): 2.
+- season:2018 / v6_all_covered: pinned: positive correlation: no (point -0.072); 95% CI [-0.138, +0.004] includes zero; book-only: positive correlation: no (point -0.086); 95% CI [-0.159, -0.005] excludes zero
+- season:2020 / v6_common: pinned: positive correlation: yes (point +0.077); 95% CI [-0.011, +0.167] includes zero; book-only: positive correlation: yes (point +0.086); 95% CI [+0.000, +0.175] excludes zero
 
 ## Spreads: lined v6-covered events 8376, common with v5 7086
 
@@ -178,5 +191,18 @@ Buckets, window:fit, v5 common:
 
 Lines of 21+: n 875, mean favourite margin model 22.58 vs line 28.11 vs actual 27.36; dog takes 671.
 
-Sensitivity (holdout window, line excluding Opening and consensus providers), v6: n 1891, corr -0.016 [-0.060, 0.027].
+### Robustness: book-only median (Opening, accuscore, teamrankings, numberfire, consensus dropped), spread
+
+| group | model | n | pinned corr [95% CI] | book-only corr [95% CI] |
+|---|---|---|---|---|
+| window:fit | v6 all | 6403 | -0.006 [-0.034, 0.024] | -0.007 [-0.035, 0.021] |
+| window:fit | v5 common | 5492 | 0.004 [-0.024, 0.033] | 0.005 [-0.023, 0.032] |
+| window:holdout | v6 all | 1891 | -0.016 [-0.060, 0.027] | -0.016 [-0.060, 0.027] |
+| window:holdout | v5 common | 1512 | 0.019 [-0.032, 0.068] | 0.019 [-0.032, 0.068] |
+| all | v6 all | 8294 | -0.007 [-0.032, 0.018] | -0.008 [-0.032, 0.015] |
+| all | v5 common | 7004 | 0.007 [-0.018, 0.031] | 0.007 [-0.017, 0.031] |
+
+Groups where the book-only conclusion differs (sign of corr or CI excluding zero): 2.
+- season:2018 / v6_all_covered: pinned: positive correlation: yes (point +0.001); 95% CI [-0.057, +0.070] includes zero; book-only: positive correlation: no (point -0.008); 95% CI [-0.059, +0.053] includes zero
+- season:2018 / v6_common: pinned: positive correlation: yes (point +0.012); 95% CI [-0.066, +0.094] includes zero; book-only: positive correlation: no (point -0.000); 95% CI [-0.073, +0.080] includes zero
 

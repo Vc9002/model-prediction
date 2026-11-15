@@ -846,11 +846,13 @@ ESPN_NOTE = (
     "benchmark, not decision-time quotes. The line is E's pinned rule (median across non-live providers, fixed "
     "before any outcome was joined; sha256 in the header); nothing was fitted on any line. Fit-window games "
     "(on or before the frozen validation end) were used to fit v6's calibration and v5's, so the holdout-window "
-    "seasons are the clean test. The 575/576 check is a design-informed subset of the 2026 holdout-window season "
+    "seasons are the clean test, and from 2024 on each event carries a single book (ESPN BET 2024-25, DraftKings "
+    "2025-26), so the median is that book's close. Against the 575 reference the pinned spreads had 13 sign flips "
+    "of 576 (inferred to be reference-side line-pair repeats, not verified). The 575/576 check is a design-informed subset of the 2026 holdout-window season "
     "and is not independent of it. Spread of projections, over% by line bucket and dog takes are diagnostics, not "
     "evidence. No promotion decision."
 )
-SENSITIVITY_EXCLUDE = ("Opening", "consensus")
+SENSITIVITY_EXCLUDE = ("Opening", "accuscore", "teamrankings", "numberfire", "consensus")  # non-sportsbook entries
 
 
 def _load_espn_lines() -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
@@ -896,6 +898,7 @@ def _group_stats(rows: list[dict[str, Any]], market: str, key: str) -> dict[str,
 
 
 def run_v6_espn(args: argparse.Namespace) -> int:
+    import cfb_v6_lib as lib
     import cfb_v6_research as r6
 
     frozen_hash = r6.verify_frozen(quiet=True)
@@ -916,16 +919,20 @@ def run_v6_espn(args: argparse.Namespace) -> int:
             v5_by_id[r["event_id"]] = r
     rows_by_market: dict[str, list[dict[str, Any]]] = {"total": [], "spread": []}
     sens_by_market: dict[str, list[dict[str, Any]]] = {"total": [], "spread": []}
-    skipped = {"no_v6_row": 0, "no_call": 0, "no_line": 0}
+    skipped: dict[str, Any] = {"no_call": 0, "no_call_reasons": {}, "no_line": 0}
+    cache_ids: set[str] = set()
     for ln in V6_CACHE.read_text(encoding="utf-8").splitlines():
         if not ln.strip():
             continue
         r = json.loads(ln)
         eid = r["event_id"]
+        cache_ids.add(eid)
         if eid not in lines:
             continue
         if "grid" not in r:
             skipped["no_call"] += 1
+            why = r.get("no_call", "unknown")
+            skipped["no_call_reasons"][why] = skipped["no_call_reasons"].get(why, 0) + 1
             continue
         ent = lines[eid]
         pm, pt = r["grid"][gk][:2]
@@ -965,6 +972,25 @@ def run_v6_espn(args: argparse.Namespace) -> int:
                 sens_by_market[market].append(
                     {**row, "line": float(sraw) if market == "total" else -float(sraw)}
                 )
+    snap = {
+        g.event_id: g for g in lib.load_snapshot(REPO / "data" / "research" / "ncaaf_v6" / "history_snapshot.jsonl")
+    }
+    not_in_cache: dict[str, int] = {}
+    for eid in lines:
+        if eid in cache_ids:
+            continue
+        g = snap.get(eid)
+        why = (
+            "not_in_history_snapshot"
+            if g is None
+            else "forfeit"
+            if g.is_forfeit
+            else "burn_in_season_2016"
+            if g.season <= r6.BURN_IN_SEASON
+            else "other"
+        )
+        not_in_cache[why] = not_in_cache.get(why, 0) + 1
+    skipped["lined_events_not_in_v6_cache_by_reason"] = not_in_cache
     report: dict[str, Any] = {
         "as_of_utc": AS_OF_UTC,
         "first_look": True,
@@ -983,13 +1009,11 @@ def run_v6_espn(args: argparse.Namespace) -> int:
         common = [r for r in rows if r["v5"] is not None]
         block: dict[str, Any] = {"n_lined_v6": len(rows), "n_common_v5_v6": len(common), "groups": {}}
 
-        def add_group(name: str, sub: list[dict[str, Any]], market: str = market, block: dict[str, Any] = block) -> None:
+        def make_group(sub: list[dict[str, Any]], market: str = market) -> dict[str, Any]:
             com = [r for r in sub if r["v5"] is not None]
             entry: dict[str, Any] = {
                 "n_lined_v6": len(sub),
-                "v6_all_covered": _group_stats(
-                    [{**r, "model": r["v6"]} for r in sub], market, "model"
-                ),
+                "v6_all_covered": _group_stats([{**r, "model": r["v6"]} for r in sub], market, "model"),
                 "v6_common": _group_stats([{**r, "model": r["v6"]} for r in com], market, "model"),
                 "v5_common": _group_stats([{**r, "model": r["v5"]} for r in com], market, "model"),
             }
@@ -997,20 +1021,34 @@ def run_v6_espn(args: argparse.Namespace) -> int:
                 st = entry[tag]
                 if st and "corr" in st:
                     entry[f"verdict_{tag}"] = verdict(st)
-            block["groups"][name] = entry
+            return entry
 
-        for window in ("fit", "holdout"):
-            add_group(f"window:{window}", [r for r in rows if r["window"] == window])
-        for season in sorted({r["season"] for r in rows}):
-            add_group(f"season:{season}", [r for r in rows if r["season"] == season])
-        add_group("all", rows)
-        sens = sens_by_market[market]
-        sens_h = [r for r in sens if r["window"] == "holdout"]
-        block["sensitivity_ex_opening_consensus_holdout"] = {
-            "note": "same rows, line = median excluding providers named Opening and consensus (diagnostic only)",
-            "n": len(sens_h),
-            "v6_all_covered": _group_stats([{**r, "model": r["v6"]} for r in sens_h], market, "model"),
-        }
+        def group_names(src: list[dict[str, Any]]) -> list[tuple[str, list[dict[str, Any]]]]:
+            out = [(f"window:{w}", [r for r in src if r["window"] == w]) for w in ("fit", "holdout")]
+            out += [(f"season:{se}", [r for r in src if r["season"] == se]) for se in sorted({r["season"] for r in src})]
+            out.append(("all", src))
+            return out
+
+        for name, sub in group_names(rows):
+            block["groups"][name] = make_group(sub)
+        block["book_only_median_groups"] = {name: make_group(sub) for name, sub in group_names(sens_by_market[market])}
+        differs = []
+        for name, g in block["groups"].items():
+            alt = block["book_only_median_groups"].get(name)
+            if not alt:
+                continue
+            for tag in ("v6_all_covered", "v6_common", "v5_common"):
+                v0, v1 = g.get(f"verdict_{tag}"), alt.get(f"verdict_{tag}")
+                if (
+                    v0
+                    and v1
+                    and (
+                        v0["positive_out_of_sample_correlation"] != v1["positive_out_of_sample_correlation"]
+                        or v0["ci_excludes_zero"] != v1["ci_excludes_zero"]
+                    )
+                ):
+                    differs.append({"group": name, "model": tag, "pinned": v0["text"], "book_only": v1["text"]})
+        block["book_only_conclusion_differs"] = differs
         # orientation sanity on the pinned line (diagnostic, uses outcomes only to confirm sign convention)
         if market == "spread":
             lm = [r["line"] for r in rows]
@@ -1117,14 +1155,31 @@ def render_espn_md(rep: dict[str, Any]) -> str:
                         ),
                     ]
                 lines.append("")
-        sens = b["sensitivity_ex_opening_consensus_holdout"]
-        ss = sens["v6_all_covered"]
-        if ss and "corr" in ss:
-            lines.append(
-                f"Sensitivity (holdout window, line excluding Opening and consensus providers), v6: n {ss['n']}, "
-                f"corr {_fmt(ss['corr'])} [{_fmt(ss['corr_ci']['ci_95_low'])}, {_fmt(ss['corr_ci']['ci_95_high'])}]."
-            )
-            lines.append("")
+        lines += [
+            f"### Robustness: book-only median ({', '.join(SENSITIVITY_EXCLUDE)} dropped), {market}",
+            "",
+            "| group | model | n | pinned corr [95% CI] | book-only corr [95% CI] |",
+            "|---|---|---|---|---|",
+        ]
+        for gname in ("window:fit", "window:holdout", "all"):
+            g0, g1 = b["groups"].get(gname), b["book_only_median_groups"].get(gname)
+            for tag, label in (("v6_all_covered", "v6 all"), ("v5_common", "v5 common")):
+                s0, s1 = (g0 or {}).get(tag), (g1 or {}).get(tag)
+                if not s0 or not s1 or "corr" not in s0 or "corr" not in s1:
+                    continue
+                lines.append(
+                    f"| {gname} | {label} | {s1['n']} | {_fmt(s0['corr'])} "
+                    f"[{_fmt(s0['corr_ci']['ci_95_low'])}, {_fmt(s0['corr_ci']['ci_95_high'])}] | {_fmt(s1['corr'])} "
+                    f"[{_fmt(s1['corr_ci']['ci_95_low'])}, {_fmt(s1['corr_ci']['ci_95_high'])}] |"
+                )
+        diff = b["book_only_conclusion_differs"]
+        lines += [
+            "",
+            f"Groups where the book-only conclusion differs (sign of corr or CI excluding zero): {len(diff)}.",
+        ]
+        for d in diff:
+            lines.append(f"- {d['group']} / {d['model']}: pinned: {d['pinned']}; book-only: {d['book_only']}")
+        lines.append("")
     return "\n".join(lines) + "\n"
 
 
