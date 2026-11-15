@@ -38,6 +38,7 @@ from ..domain import EASTERN, parse_utc, utc_now
 from ..ledger import defer_sqlite_xlsx_exports
 from ..main_ledgers import MultiSportPickLedger
 from ..research_ledgers import existing_research_ledgers
+from ..runtime_paths import rerouted_data_root
 from ..tennis_forward import TENNIS_TOURS, _is_tennis_subperiod_slug
 from .state import _LEDGER_LEAGUE_TO_ESPN, _TERMINAL_MARKET_STATES
 
@@ -618,6 +619,11 @@ def _closing_probability_for_moneyline_pick(
 
     from ..learned_forward import _team_matches
 
+    # Settlement derives data_root from the ledger path, i.e. the checkout's legacy data/.
+    # Snapshots moved to the runtime root on 2026-11-04, so every lookup against the legacy
+    # root found nothing and no NCAAB row has ever had closing_* / probability_clv filled.
+    # Only the legacy repo root is rerouted; explicit isolated roots (tests) are untouched.
+    data_root = rerouted_data_root(data_root)
     start = parse_utc(event_start_utc)
     dates_to_try = [
         start.astimezone(EASTERN).date().isoformat(),
