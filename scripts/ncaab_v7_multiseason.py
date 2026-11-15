@@ -869,7 +869,7 @@ def ledger_block(df: pd.DataFrame) -> dict[str, Any]:
     uri = "file:E:/model-prediction-runtime/ledgers/ledgers.db?mode=ro"
     with sqlite3.connect(uri, uri=True) as conn:
         led = pd.read_sql(
-            "select pick_id, market_type, model_id, event_start_utc, model_probability, result, pnl_units, "
+            "select pick_id, market_type, model_id, event_start_utc, model_probability, result, pnl_units, settled_at_utc, "
             "decision_payload_json from ledger_records where sport='ncaab' and ledger_tier='flat' "
             "and status='settled' and model_id in ('ncaab-spread-v6','ncaab-total-v6')",
             conn,
@@ -897,6 +897,20 @@ def ledger_block(df: pd.DataFrame) -> dict[str, Any]:
         "p_ge_0.8_losing_rows": int((hi & lost).sum()),
         "p_ge_0.8_losing_rows_declined": int((hi & lost & led["declined"]).sum()),
         "p_ge_0.8_won_rows_declined": int((hi & won & led["declined"]).sum()),
+    }
+    first = led.sort_values("settled_at_utc").head(610)
+    res["first_610_settled_rows"] = {
+        "note": "the plan's 610 was the settled count at about 2026-11-15T05:34Z; rows settled since are excluded here",
+        "rows": len(first),
+        "declined": int(first["declined"].sum()),
+        "declined_markets": {
+            k: int(v) for k, v in first[first["declined"]]["market_type"].value_counts().items()
+        },
+        "losing_rows_declined": int(((first["pnl_units"] < 0) & first["declined"]).sum()),
+        "p_ge_0.8_losing_rows": int(((first["model_probability"] >= 0.8) & (first["pnl_units"] < 0)).sum()),
+        "p_ge_0.8_losing_rows_declined": int(
+            ((first["model_probability"] >= 0.8) & (first["pnl_units"] < 0) & first["declined"]).sum()
+        ),
     }
     # mismatch replay on the settled-row replay file (spread rows), v6 as served vs v6 as-of vs v7
     rp = pd.DataFrame(json.loads((OUT / "ncaab_v6_settled_replay.json").read_text(encoding="utf-8"))["rows"])
@@ -1138,6 +1152,7 @@ def render_md(rep: dict[str, Any]) -> str:
     out.append(
         f"Non-D1 no-pick rule (fc7ff8b8 predicate: either team absent from v6 team_priors) on settled Flat v6 rows: {led['rows']} rows ({led['rows_by_market']}; the plan said 610, the ledger holds this many now), declined {led['rows_declined_by_non_d1_rule']} ({led['declined_by_market']}), P&L of declined rows {led['declined_pnl_units']}u of {led['all_rows_pnl_units']}u; losing rows {led['losing_rows']} of which declined {led['losing_rows_declined']}; rows with model p >= 0.8: {led['p_ge_0.8_rows']}, losing {led['p_ge_0.8_losing_rows']}, of which declined {led['p_ge_0.8_losing_rows_declined']}.\n"
     )
+    out.append(f"First 610 settled rows (the plan's snapshot): {led['first_610_settled_rows']}\n")
     out.append(
         f"Replay of the settled spread rows (contaminated, ledger lines): {led['replay_spread_rows']}\n"
     )
