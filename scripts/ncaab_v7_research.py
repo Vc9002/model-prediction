@@ -994,6 +994,40 @@ def run_dev_calibration(components: pd.DataFrame, config: V7Config) -> dict[str,
     return out
 
 
+def descriptive_holdout(hold: pd.DataFrame) -> dict[str, Any]:
+    """Diagnostics of the single holdout look (nothing is selected from these)."""
+    d1 = hold[hold.d1]
+    out: dict[str, Any] = {"slope_of_actual_on_predicted_d1": {}, "d1_rmse_by_sample": {}}
+    for label, col in (("v6", "v6_mean"), ("ridge_c0", "ridge_c0"), ("v7", "v7_mean")):
+        beta, se = ols_hc1(d1[col].to_numpy(float).reshape(-1, 1), d1.margin.to_numpy(float))
+        out["slope_of_actual_on_predicted_d1"][label] = {
+            "intercept": [round(float(beta[0]), 3), round(float(se[0]), 3)],
+            "slope": [round(float(beta[1]), 3), round(float(se[1]), 3)],
+        }
+    for lo, hi, label in ((0, 0, "0"), (1, 2, "1-2"), (3, 7, "3-7"), (8, 999, "8+")):
+        g = d1[(d1["sample"] >= lo) & (d1["sample"] <= hi)]
+        if len(g):
+            out["d1_rmse_by_sample"][label] = {
+                "n": len(g),
+                "v6": err_stats(g.margin.to_numpy(float), g.v6_mean.to_numpy(float)),
+                "v7": err_stats(g.margin.to_numpy(float), g.v7_mean.to_numpy(float)),
+            }
+    nonneutral = d1[~d1.neutral]
+    out["d1_non_neutral"] = {
+        "v6": err_stats(nonneutral.margin.to_numpy(float), nonneutral.v6_mean.to_numpy(float)),
+        "v7": err_stats(nonneutral.margin.to_numpy(float), nonneutral.v7_mean.to_numpy(float)),
+    }
+    out["d1_away_favourite_bias"] = {
+        label: {
+            "home_fav": round(float((nonneutral.margin - nonneutral[col])[nonneutral[col] > 0].mean()), 3),
+            "away_fav": round(float((nonneutral.margin - nonneutral[col])[nonneutral[col] < 0].mean()), 3),
+            "n_away_fav": int((nonneutral[col] < 0).sum()),
+        }
+        for label, col in (("v6", "v6_mean"), ("v7", "v7_mean"))
+    }
+    return out
+
+
 def run_final(components: pd.DataFrame) -> dict[str, Any]:
     """ONE read of the locked holdout with the frozen config."""
     config = load_frozen()
@@ -1011,8 +1045,164 @@ def run_final(components: pd.DataFrame) -> dict[str, Any]:
         "carryover": carryover_sensitivity(hold, config),
         "non_d1_decisions": decision_variants(hold, config),
         "replay": replay_check(hold, config),
+        "descriptive": descriptive_holdout(hold),
     }
     return out
+
+
+# ----------------------------------------------------------------------------- report
+
+# Verdicts are written against the numbers in the stage JSONs (ideas / isolated / parity /
+# dev_calibration / final); "dev" = warm+train fit with validation as the non-degradation check,
+# "holdout" = the single look. Wording is deliberately conservative.
+VERDICTS: list[dict[str, str]] = [
+    {
+        "item": "1",
+        "idea": "mismatch rescale / heavier tail",
+        "verdict": "SUPPORTED for early season and large gaps; NOT a mature-season gain",
+        "evidence": (
+            "v6 slope of actual on predicted D1 margin: 1.62 (Nov-2025), 1.43 (Dec-Feb), 1.17 (Mar), 1.61 on the "
+            "holdout. A single slope fitted on warm+train (1.35) makes validation worse (RMSE 11.192 vs 11.109, "
+            "+0.084 [-0.016,+0.186]); scheduling it by sample and adding a tail term beyond 12 points ties v6 on "
+            "validation (11.107) and cuts the fit window 12.369 -> 11.983. Kept in v7 as the v6 tail term "
+            "(coef 0.93). Holdout slope: v6 1.61, v7 1.07."
+        ),
+    },
+    {
+        "item": "2",
+        "idea": "ridge (Massey) with conference-tier prior",
+        "verdict": "SUPPORTED (core of v7)",
+        "evidence": (
+            "Ridge alone, coefficient 0.995 (no fitted parameter): D1 RMSE 12.026 vs v6 12.369 on warm+train, "
+            "validation 11.090 vs 11.109 (-0.018 [-0.113,+0.058], a tie), Nov-2025 13.38 vs 13.93. Against its own "
+            "refit control it is -0.25 [-0.42,-0.11]. Replacing v6's trend half through a refit (elo+ridge+rest) "
+            "is worse than v6 on validation (+0.141 [+0.019,+0.268]) because early-season refit weights do not "
+            "transfer to March, so v7 uses the ridge as the strength model instead. Holdout ridge-only D1 RMSE "
+            "13.82 vs v6 14.20; v7 vs ridge-only -0.54 [-1.17,+0.03] (not separable). lam=5 not re-tuned."
+        ),
+    },
+    {
+        "item": "3",
+        "idea": "last-season carryover (weight 0.5-1)",
+        "verdict": "WEAKLY SUPPORTED, selectable only on the holdout (untestable in dev)",
+        "evidence": (
+            "Data starts 2025-11-03, so no dev game has a prior season; 0.5 was declared ex ante. Holdout D1 "
+            "(n=688, 85 of them 2025-26 games unaffected): v7 form RMSE carry 0 = 13.425 (bias -0.06), 0.5 = "
+            "13.283 (bias +1.94), 1.0 = 13.355; raw ridge 13.824 / 13.472 / 13.523. An earlier read-only agent "
+            "saw the same direction on this data, so this is not a blind confirmation. v6 already carries Elo "
+            "and trend ratings over at retention 0.35."
+        ),
+    },
+    {
+        "item": "4",
+        "idea": "non-D1 handling (rule or exclusion)",
+        "verdict": "SUPPORTED as a policy: decline non-D1 picks; the fitted rule fixes bias but not accuracy",
+        "evidence": (
+            "v6 on non-D1 games: RMSE 24.2 / 22.2, bias +14.2 / +12.4 (Nov-2025 / Dec-Feb; n=270 / 241; "
+            "validation has 4). Linear rule fit on Nov-2025 only (0.608*v6 + 23.5) scores 17.9, bias -0.4 on "
+            "Dec-Feb (offset-only 20.4, slope-only 20.5). Holdout non-D1 (n=213): v6 20.15, bias +8.2; rule "
+            "18.97, bias -3.0 (bias is not stationary across Novembers). Declining them removes 23.6% of "
+            "holdout games and takes v6 D1 RMSE from 15.8 to 14.2; declining also < 3 current-season games "
+            "keeps 21.8%. No decline rule is wired in; it is a Main/Flat selection decision."
+        ),
+    },
+    {
+        "item": "5",
+        "idea": "per-team / per-venue HCA (shrunk), neutral-site handling",
+        "verdict": "NOT SUPPORTED",
+        "evidence": (
+            "Shrunk team home residual (k=10/20) gets coefficient 0.58/0.87 and moves validation RMSE by "
+            "-0.032/-0.031 vs a single slope ([-0.059,+0.003]): immaterial. A listed-home edge on neutral "
+            "games (coef +0.70) is worse on validation (+0.038 [+0.018,+0.065]); v6 neutral-game bias is +1.0 "
+            "(n=74), -0.7 (n=273), +0.7 (n=268) by split, i.e. none. Flag-aware home court is fine: D1 non-neutral "
+            "validation bias +0.22 (v6), fitted ridge HCA 3.2-4.2 mature (7.6 in Nov-2025, confounded by buy games)."
+        ),
+    },
+    {
+        "item": "6",
+        "idea": "rest / schedule-density terms",
+        "verdict": "NOT SUPPORTED (untestable at current back-to-back frequency)",
+        "evidence": (
+            "Residual of the ridge margin on v6's rest_diff (v6 weight 0.15): 0.17+-0.75 (Dec-Feb), 0.35+-1.31 "
+            "(Mar), 2.07+-1.07 (Nov-2025), indistinguishable from 0, 0.15 or 1. Back-to-backs are rare "
+            "(home/away team on a b2b: 14/29 games in Nov-2025, 13/16 in Dec-Feb, 6/7 in Mar); the b2b "
+            "coefficient is +8.5+-2.0, +1.5+-1.5, +6.2+-4.0 (Dec-Feb, Mar, Nov-2025): unstable. Adding fitted rest terms worsens validation (+0.115 [+0.044,+0.202] vs none)."
+        ),
+    },
+    {
+        "item": "7",
+        "idea": "possessions efficiency x pace decomposition for totals",
+        "verdict": "NOT SUPPORTED out of sample (dev gain did not replicate)",
+        "evidence": (
+            "Ridge pace/efficiency total alone: validation RMSE 16.60 vs v6 16.57 (+0.04 [-0.16,+0.26]). "
+            "Blend 0.55*v6 + 0.44*effpace: validation 16.42 (-0.152 [-0.247,-0.056]), warm+train 17.65 vs 17.89; "
+            "holdout 18.11 vs 18.13 (-0.021 [-0.285,+0.233]), bias +1.02 vs -0.18, and the frozen total sd "
+            "(17.65, no early-season widening) gives 0.498/0.790/0.890 coverage vs v6's 0.569/0.869/0.952. "
+            "Matches the 2026-11-13 finding that exact possessions do not improve tempo."
+        ),
+    },
+    {
+        "item": "8",
+        "idea": "home-vs-away favourite asymmetry",
+        "verdict": "A v6 symptom, not a separate effect: NOT SUPPORTED as a term",
+        "evidence": (
+            "v6 bias, away-fav vs home-fav: -2.9 vs +0.8 (Dec-Feb), -0.5 vs +0.5 (Mar), -1.8 vs +3.8 (Nov-2025), "
+            "-1.1 (n=54) vs +5.1 on the holdout. The ridge margin has no asymmetry (extra away-fav slope 0.06+-0.08, "
+            "0.00+-0.16) and an explicit term adds nothing over a single slope (+0.015 [-0.019,+0.045]). v7 "
+            "holdout: home-fav +2.4, away-fav -0.1."
+        ),
+    },
+    {
+        "item": "9",
+        "idea": "v6 retune train/serve parity (HCA 5.0, Elo 45)",
+        "verdict": "Code and parameters match exactly; one INPUT differs (neutral flag); retune survives it",
+        "evidence": (
+            "Ablation kwargs vs artifact factory: 0 parameter diffs; same inputs -> max |margin diff| 0.0 on "
+            "1,069 games. The ablation never passes neutral_site while serving does; validation is 273/1,043 "
+            "neutral games (ESPN flag; the TRNMNT proxy disagrees on 266 of 6,947). With the real flag the "
+            "HCA grid 7.2/70, 6.0/55, 5.0/45 on validation has bias -1.22, -0.57, -0.06 (home-only inputs: "
+            "-2.50, -1.62, -0.93): 5.0/45 is still selected (also best cover Brier 0.2104 and D1 RMSE 11.109). "
+            "The post-retune positive live bias is early-season compression (slope 1.62 in Nov-2025, 1.61 on the "
+            "holdout, intercept -2.0+-0.8 / -0.9+-0.7), not HCA."
+        ),
+    },
+    {
+        "item": "10",
+        "idea": "v7 combined candidate on the locked holdout",
+        "verdict": "Better calibrated early-season margin than v6; no market-relative claim possible",
+        "evidence": (
+            "Holdout (n=901, 688 D1; 816 are 2026-27 early season): D1 RMSE 13.28 vs v6 14.20 (-0.91 "
+            "[-1.33,-0.60]), all-games 14.83 vs 15.81, bias +1.94 vs +4.14, slope 1.07 vs 1.61. Moneyline "
+            "Brier 0.1159 vs 0.1156 (tie), cover Brier 0.2266 vs 0.2279, PIT 50/80/90 = 0.482/0.800/0.906. "
+            "Validation (non-degradation guard): D1 RMSE 11.093 vs 11.109. Replay on 357 of 408 settled "
+            "spread rows: v7 does not fix p>=0.8 (54 rows, hit 42.6% vs v6 60 rows, 50.0%) and recorded-side "
+            "Brier is worse (0.3117 vs 0.2939). Market-relative content is thin and selected (see md)."
+        ),
+    },
+]
+
+
+def run_report() -> dict[str, Any]:
+    stage = {
+        name: json.loads((OUT / f"ncaab_v7_{name}.json").read_text(encoding="utf-8"))
+        for name in ("parity", "ideas", "isolated", "dev_calibration", "final")
+    }
+    frozen = json.loads(FROZEN_PATH.read_text(encoding="utf-8"))
+    report = {
+        "task": "261115-1m7",
+        "status": "SHADOW_RESEARCH_INERT: nothing registered, promoted or served",
+        "split": {
+            "warm": "2025-11-03..2025-11-30",
+            "train": f"{TRAIN_START}..{TRAIN_END}",
+            "validation": f"{TRAIN_END}+1d..{VAL_END}",
+            "holdout": f"{VAL_END}+1d..2026-11-14",
+        },
+        "verdicts": VERDICTS,
+        "frozen_config": frozen,
+        **stage,
+    }
+    (OUT / "ncaab_v7_research.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
+    return report
 
 
 if __name__ == "__main__":
@@ -1020,6 +1210,8 @@ if __name__ == "__main__":
     if "components" in stages:
         df = build_components()
         print(len(df), df.split.value_counts().to_dict())
+    if "report" in stages:
+        run_report()
     if "isolated" in stages:
         res = run_isolated_effects(load_components())
         (OUT / "ncaab_v7_isolated.json").write_text(json.dumps(res, indent=2, default=str), encoding="utf-8")
