@@ -1134,10 +1134,14 @@ def _capture_tiers(
         league, _sport, event, market = entry
         if _has_started(event, now):
             secondary.append(entry)
-        elif market.get("market_slug") in keep_slugs:
-            keep_first.append(entry)
         elif priority_leagues is None or league.upper() in priority_leagues:
-            primary.append(entry)
+            # An open pick in a switched-off league still gets its closing line,
+            # but from the secondary tier: otherwise its contract took primary
+            # budget ahead of in-scope games and the 600 s cap cut those off.
+            if market.get("market_slug") in keep_slugs:
+                keep_first.append(entry)
+            else:
+                primary.append(entry)
         else:
             secondary.append(entry)
     return (

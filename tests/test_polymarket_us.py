@@ -565,19 +565,20 @@ def test_capture_fetches_scope_leagues_round_robin_before_out_of_scope_and_start
     )
 
     assert source.calls == [
-        # An open pick's contract first (its CLV history), whatever its league.
-        "epl-c",
         # Scope leagues interleaved, each in kickoff order.
         "nba-1",
         "cfb-1",
         "nba-2",
         "cfb-2",
-        # Then out-of-scope leagues and started games, interleaved.
+        # Then out-of-scope leagues and started games, interleaved. The open pick
+        # in EPL (epl-c) waits here: its league is switched off, so it must not
+        # take primary budget ahead of in-scope games.
         "epl-a",
         "cfb-live",
         "epl-b",
+        "epl-c",
     ]
-    assert result["primary_contracts"] == 5 and result["secondary_contracts"] == 3
+    assert result["primary_contracts"] == 4 and result["secondary_contracts"] == 4
 
 
 def test_capture_time_budget_reaches_every_scope_league_before_any_out_of_scope_one(
@@ -1664,3 +1665,25 @@ def test_event_detail_row_loses_to_a_later_book_row_in_latest_capture_readers(tm
         assert [row["reconstruction_status_source"] for row in pick] == [
             "live_gateway_market_and_book_response"
         ]
+
+
+def test_open_pick_in_switched_off_league_does_not_take_primary_budget() -> None:
+    """An open pick in an out-of-scope league must not ahead-of-queue in-scope games."""
+    now = datetime(2026, 11, 15, 12, 0, tzinfo=UTC)
+    future = (now + timedelta(hours=3)).isoformat()
+    nba_event = {"event_start_utc": future}
+    atp_event = {"event_start_utc": future}
+    nba_market = {"market_slug": "nba-open-market"}
+    atp_open_market = {"market_slug": "atp-open-pick"}
+    entries = [
+        ("ATP", "tennis", atp_event, atp_open_market),
+        ("NBA", "basketball", nba_event, nba_market),
+    ]
+    primary, secondary = polymarket_us._capture_tiers(
+        entries,
+        priority_leagues=frozenset({"NBA"}),
+        keep_slugs=frozenset({"atp-open-pick"}),
+        now=now,
+    )
+    assert [entry[3]["market_slug"] for entry in primary] == ["nba-open-market"]
+    assert [entry[3]["market_slug"] for entry in secondary] == ["atp-open-pick"]
