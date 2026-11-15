@@ -6,6 +6,9 @@ from model_prediction.college_basketball_forward import _main_sample_eligible, f
 from model_prediction.features.base import GameRecord
 from model_prediction.main_ledgers import MultiSportPickLedger
 
+# The served v6 model defines D1 as membership in its conference map (team_priors).
+_D1_TEAMS = {name: 1500.0 for name in ("Away", "Home", "MajorAway", "MajorHome", "SmallCollege")}
+
 
 def test_main_sample_gate_uses_current_season_and_fails_closed():
     assert not _main_sample_eligible(None, 8)
@@ -81,7 +84,8 @@ def test_ncaab_records_real_model_output_and_rerun_deduplicates(tmp_path, monkey
     args = {
         "data_root": tmp_path,
         "args_date": now.date().isoformat(),
-        "config": {"models": {"NCAAB": {}}},
+        # Fixture teams are not in the real conference map; this test is about model output.
+        "config": {"models": {"NCAAB": {"decline_non_d1": False}}},
         "flat_ledger": flat_ledger,
         "main_ledger": main_ledger,
     }
@@ -205,6 +209,7 @@ def test_ncaab_picks_projected_winner_not_underdog_on_edge(tmp_path, monkeypatch
 
     class Model:
         version = "ncaab-spread-v6"
+        team_priors = _D1_TEAMS
 
         def predict_games(self, history, upcoming):
             return [
@@ -330,6 +335,7 @@ def test_ncaab_gates_non_d1_and_extreme_lines(tmp_path, monkeypatch):
 
     class Model:
         version = "ncaab-spread-v6"
+        team_priors = _D1_TEAMS
 
         def predict_games(self, history, upcoming):
             return [
@@ -410,6 +416,7 @@ def test_ncaab_gates_total_divergence(tmp_path, monkeypatch):
 
     class SpreadModel:
         version = "ncaab-spread-v6"
+        team_priors = _D1_TEAMS
 
         def predict_spreads(self, history, upcoming):
             return []

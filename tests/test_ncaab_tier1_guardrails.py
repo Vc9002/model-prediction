@@ -27,6 +27,10 @@ NOW = datetime.now(UTC)
 START = (NOW + timedelta(days=1)).isoformat()
 
 
+# The served v6 model defines D1 as membership in its conference map (team_priors).
+_D1_TEAMS = {name: 1500.0 for name in ("Away", "Home", "MajorAway", "MajorHome", "SmallCollege")}
+
+
 def _side(selection, price, line=None, is_long=True):
     return {
         "selection": selection,
@@ -76,6 +80,7 @@ def run(
     policy: dict[str, Any] | None = None,
     sample: int = 9,
     main: bool = False,
+    d1_teams: dict[str, float] | None = None,
 ):
     """Run forecast_ncaab_sport against a fixture slate.
 
@@ -105,6 +110,7 @@ def run(
 
     class SpreadModel:
         version = "ncaab-spread-v6"
+        team_priors = _D1_TEAMS if d1_teams is None else d1_teams
 
         def predict_games(self, history, upcoming):
             out = []
@@ -441,3 +447,111 @@ def test_paper_trial_cohort_excludes_zero_stake_shadow_rows():
     assert eligible_trial_pick({**base, "units": "1.40"}, min_edge=0.05, max_edge=0.08)
     assert eligible_trial_pick(base, min_edge=0.05, max_edge=0.08)  # legacy rows carry no units
     assert not eligible_trial_pick({**base, "units": "0.00"}, min_edge=0.05, max_edge=0.08)
+
+
+# ---------------------------------------------------------------- non-D1 no-pick rule (261115-g9j)
+
+
+def _full_event(event_id="n1"):
+    """One event listing a spread, a total and a moneyline (each with its own slot)."""
+    return _event(
+        event_id,
+        [
+            _market(
+                "spread",
+                f"{event_id}-sp",
+                5.5,
+                [_side("away", 0.52, 5.5, is_long=True), _side("home", 0.48, -5.5, is_long=False)],
+            ),
+            _market(
+                "total",
+                f"{event_id}-tot",
+                145.5,
+                [_side("over", 0.52, 145.5, is_long=True), _side("under", 0.48, 145.5, is_long=False)],
+            ),
+            _market(
+                "moneyline",
+                f"{event_id}-ml",
+                None,
+                [_side("away", 0.30, is_long=False), _side("home", 0.55, is_long=True)],
+            ),
+        ],
+    )
+
+
+def _all_markets_predict(game):
+    if game.total_line is not None:
+        return {"over": 0.60, "under": 0.40}, {"mean": 146.0, "sd": 14.0, "line": 145.5}
+    if game.spread_away_line is not None:
+        return "spread", {"away": 0.60, "home": 0.40}, {"mean": 4.0, "sd": 10.5, "line": 5.5}
+    return "moneyline", {"home": 0.62, "away": 0.38}, {"mean": 4.0, "sd": 10.5}
+
+
+def _run_full(tmp_path, monkeypatch, **kwargs):
+    def total(game):
+        return _all_markets_predict(game)
+
+    return run(
+        tmp_path,
+        monkeypatch,
+        [_full_event()],
+        spread_predict=_all_markets_predict,
+        total_predict=total,
+        **kwargs,
+    )
+
+
+def test_d1_event_is_picked_so_the_non_d1_rule_is_the_only_difference(tmp_path, monkeypatch):
+    report = _run_full(tmp_path, monkeypatch)
+    assert {row["market_type"] for row in report["_flat_rows"]} == {"spread", "total", "moneyline"}
+    assert report["declined_slots"] == []
+
+
+@pytest.mark.parametrize("d1_teams", [{"Away": 1500.0}, {"Home": 1500.0}])
+def test_event_with_a_non_d1_team_declines_every_slot_and_writes_nothing(tmp_path, monkeypatch, d1_teams):
+    report = _run_full(tmp_path, monkeypatch, d1_teams=d1_teams)
+    assert report["_flat_rows"] == [] and report["_main_rows"] == []
+    assert sorted(report["declined_slots"]) == [
+        ["NCAAB", "n1", "moneyline"],
+        ["NCAAB", "n1", "spread"],
+        ["NCAAB", "n1", "total"],
+    ]
+    reasons = {(s["market_type"], s["reason"]) for s in report["skipped"]}
+    assert reasons == {
+        ("spread", "NO_CALL_NON_D1"),
+        ("total", "NO_CALL_NON_D1"),
+        ("moneyline", "NO_CALL_NON_D1"),
+    }
+
+
+def test_missing_conference_map_declines_everything(tmp_path, monkeypatch):
+    # No D1 membership can be shown, so fail closed rather than serve unvetted teams.
+    report = _run_full(tmp_path, monkeypatch, d1_teams={})
+    assert report["_flat_rows"] == []
+    assert len(report["declined_slots"]) == 3
+
+
+def test_non_d1_rule_has_a_named_default_and_a_config_switch(tmp_path, monkeypatch):
+    from model_prediction.college_basketball_forward import DECLINE_NON_D1
+
+    assert DECLINE_NON_D1 is True
+    off = _run_full(tmp_path, monkeypatch, d1_teams={"Away": 1500.0}, policy={"decline_non_d1": False})
+    assert off["declined_slots"] == []
+    assert len(off["_flat_rows"]) == 3
+
+
+def test_declined_non_d1_slot_is_not_resurrected_by_restore(tmp_path, monkeypatch):
+    """The declined slots the forecast reports are what keep a restore from reopening old rows."""
+    from model_prediction.cli.commands import _restore_unreplaced_ncaab
+
+    monkeypatch.setenv("MODEL_PREDICTION_LEDGER_MIRROR", "0")
+    kept = _run_full(tmp_path / "before", monkeypatch)
+    prior = {"flat": kept["_flat_rows"]}
+    assert prior["flat"]
+    report = _run_full(tmp_path / "after", monkeypatch, d1_teams={"Away": 1500.0})
+    ledger = MultiSportPickLedger(tmp_path / "after", flat=True)
+    declined = [tuple(item) for item in report["declined_slots"]]
+    assert _restore_unreplaced_ncaab({"flat": ledger}, prior, declined) == {"flat": 0}
+    assert ledger.rows() == []
+    # Control: without the reported slots the same restore reopens all three old rows.
+    assert _restore_unreplaced_ncaab({"flat": ledger}, prior, []) == {"flat": 3}

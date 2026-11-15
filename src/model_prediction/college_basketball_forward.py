@@ -202,6 +202,11 @@ PLACEHOLDER_INDICATIVE_PRICE = 0.5
 # A quoted line only replaces the slate's choice when its BBO mid is within this distance
 # of 50%; otherwise the genuinely balanced line was not among the freshly quoted ones.
 QUOTE_BALANCE_MAX_DEVIATION = 0.10
+# models.NCAAB.decline_non_d1. v6 on games with a team outside the D1 conference map had RMSE
+# 20-24 and +8..+14 bias (non-D1 v7 research, quick 261115-1m7); the rule was written after
+# seeing those cohorts (post-hoc), so judge it forward only. Reason code matches the v7 shadow.
+DECLINE_NON_D1 = True
+NON_D1_REASON = "NO_CALL_NON_D1"
 
 
 def _model_line_divergence(
@@ -383,6 +388,10 @@ def forecast_ncaab_sport(
     max_same_direction_totals = int(
         policy.get("max_same_direction_totals", MAX_SAME_DIRECTION_TOTALS_PER_SLATE)
     )
+    decline_non_d1 = bool(policy.get("decline_non_d1", DECLINE_NON_D1))
+    # The served v6 definition of "D1" is membership in its conference map (team_priors). A
+    # missing or empty map means no team can be shown to be D1, so everything declines (fail closed).
+    d1_teams = getattr(spread_model, "team_priors", None) or {}
     # Main totals were paused by code in 93aa093c (2026-11-10) after the v6 totals lost 25.8u in
     # Main on season-opener samples. Restored 2026-11-13 behind the same current-season sample
     # gate as spread/moneyline; this switch (config/model.yaml models.NCAAB.main_totals_enabled)
@@ -493,8 +502,24 @@ def forecast_ncaab_sport(
             or frozenset({away, home}) in espn_neutral_pairs
         )
 
-        if min_team_games > 0 and (
-            games_by_team.get(away, 0) < min_team_games or games_by_team.get(home, 0) < min_team_games
+        non_d1 = decline_non_d1 and (away not in d1_teams or home not in d1_teams)
+        if non_d1:
+            # Recorded here, before any later per-market `continue`, so every slot of the event
+            # lands in declined_slots and a restore cannot reopen an earlier run's row for it.
+            # The markets still go through prediction so candidate evidence keeps their
+            # probabilities for judging this rule forward; they are just never planned.
+            for kind in dict.fromkeys(
+                m.get("market_type")
+                for m in event.get("markets", [])
+                if m.get("market_type") in {"moneyline", "spread", "total"}
+            ):
+                result["skipped"].append({"event_id": identity, "market_type": kind, "reason": NON_D1_REASON})
+                result["declined_slots"].append(["NCAAB", str(identity), kind])
+
+        if (
+            not non_d1
+            and min_team_games > 0
+            and (games_by_team.get(away, 0) < min_team_games or games_by_team.get(home, 0) < min_team_games)
         ):
             result["skipped"].append({"event_id": identity, "reason": "insufficient_history_non_d1"})
             continue
@@ -528,7 +553,7 @@ def forecast_ncaab_sport(
                 market_game_keys[slug] = (game_key, kind)
                 if kind == "total" and len(sides) == 2:
                     alternate_totals.setdefault(str(identity), []).append((market_def, line, sides, game_key))
-            if id(market_def) in main_market_ids:
+            if id(market_def) in main_market_ids and not non_d1:
                 planned.append(
                     (event, market_def, kind, line, sides, away, home, str(start), str(identity), game_key)
                 )
