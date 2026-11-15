@@ -118,6 +118,7 @@ None yet.
 | 261114-hlt | system_health treats switched-off and off-season sports as informational (live verdict DEGRADED -> HEALTHY, 0 reasons) | 2026-11-14 | 311b4812 | [261114-hlt-scope-aware-system-health](./quick/261114-hlt-scope-aware-system-health/) |
 | 261114-prf | Daily write path: event-scoped duplicate read (1.9-2.5 s -> ms per append), model-ledger read cache, memoized NCAAF replay simulation; pytest no longer binds to the live runtime root; 3 stale pins | 2026-11-14 | 41a27c73 | [261114-prf-daily-write-path-perf-and-test-isolation](./quick/261114-prf-daily-write-path-perf-and-test-isolation/) |
 | 261114-mzz | Event-detail quote pass (one GET per game) ahead of the paced /book capture: NCAAB 1619 and NCAAF 2107 contracts captured per run vs 203 in the 21:00Z daily; /book pass serves unquoted markets first | 2026-11-14 | e8e2ed47 | [261114-mzz-add-event-detail-quote-pass-to-polymarke](./quick/261114-mzz-add-event-detail-quote-pass-to-polymarke/) |
+| 261114-srb | cfb-structural-v6 NCAAF shadow challenger (additive joint-ridge ratings, frozen fit, inert, not routed): holdout Brier 0.17975 vs v5 0.19003 (CI [-0.01524, -0.00553]) but no market-relative edge (all line-correlation CIs include zero); history gap audit (existing history misses 90-100% of lower-division games), 16,378-event backfill, 9,364 ESPN closing lines; src port bit-exact (14,639 rows) | 2026-11-15 | de3208dc | [261114-srb-build-cfb-structural-v6-shadow-only-ncaa](./quick/261114-srb-build-cfb-structural-v6-shadow-only-ncaa/) |
 
 ## Milestone History
 

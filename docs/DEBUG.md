@@ -206,6 +206,175 @@ change how you should work here:
   expected. Soccer's Odds API credential remains a known-DEGRADED external
   dependency. The two launchd research agents are loaded and producing.
 
+## 2026-11-15 — NCAAF: cfb-structural-v6 shadow challenger and market-relative check (quick-261114-srb)
+
+**Bottom line.** v6 is a better-calibrated probability model than v5 on the locked holdout, and it shows **no
+market-relative edge**. Nothing was promoted, routed or wired: v5 stays the NCAAF champion, v6 is a research
+artifact that no serving module imports. The decision for the operator is at the end of this entry.
+
+### Why (the 2026-11-14 loss review of v5)
+
+Over the 575 lined 2026 games the v5 projections carry no skill against the market line, and are compressed:
+
+- **Totals:** corr(model - line, actual - line) -0.033 (95% CI [-0.119, +0.041]); model side record 218-257
+  (it takes the wrong side more often than not); model total SD 4.13 against a line SD 5.71 and an actual SD 16.76.
+- **Spreads:** corr +0.009 (CI [-0.090, +0.105]); side 264-233; MAE 14.64 against 11.65 for the line;
+  margin SD 11.78 (model) / 16.35 (line) / 22.37 (actual); on 117 lines of 21+ the model's mean favourite margin
+  is 16.64 against a line of 34.22 and an actual of 33.84, and it takes the underdog 107 times.
+- The v6 harness regenerates these from the ledger DB and the v5 artifact and refuses to continue if it cannot
+  reproduce them (gate passed).
+
+### Five projection defects, and what v6 does instead
+
+1. Matchup was an averaged half-sum of an offence number and a defence number; v6 is additive: league average
+   + offence deviation + opponent defence deviation + home term (offence +10 vs defence +8 over 28 projects 46,
+   not the half-sum 37; pinned by a test shown to fail when the half-sum is substituted).
+2. Opponent strength entered through conference-tier offsets and a hand-built Elo; v6 solves every rated team
+   jointly (weighted ridge, one solve per distinct eligible-game set), so each opponent enters through its own
+   rating. No conference table or team list exists in v6. Pooled pseudo-team per season for lower-division
+   singletons.
+3. Pace: no drive or play data exists (see audit below); v6 carries tempo through the offence and defence
+   points ratings instead of a constant.
+4. Fixed total baselines (49.5 / 54.0) are replaced by the rolling league scoring average `mu` solved with the
+   ratings.
+5. Hand-set dispersion and calibration are replaced by a walk-forward refit: mean calibration and per-slice
+   outcome-residual SDs for BOTH margin and total (established / thin sample / FBS-vs-FCS), fitted on train only,
+   chosen on validation, no line-dependent widening.
+
+A game feeds the ratings only if kickoff + 5 hours is at or before the decision time (stricter than v5's
+`start < observed`, which admits a game in progress). v4/v5's hand-set altitude, travel, bye, weather and QB
+adjustments are not carried into v6; their raw inputs (wind, temperature, precipitation, QB starter probability)
+are recorded verbatim in the v6 feature payload (None stays None) so the audit is possible going forward.
+
+### The history gap (item 6)
+
+The existing history (7,965 events, sha256 `659e33b21de95e02633251c5614df3b63f9fea62898a140bd7efaa83e525ecb7`)
+misses almost every game that involves a lower-division team. ESPN scoreboard with groups=80 and groups=81
+(read-only, 440 requests, 0 failures, all 11 seasons 2016-2026) lists 16,378 completed events; all 7,965
+existing events are in it with **0 score disagreements**.
+
+- **FBS-vs-FCS:** the history holds 6-12 games a season against 98-126 on ESPN, so it misses 90-95% in every
+  season (2016: 10 of 113; 2025: 6 of 126).
+- **FCS-vs-FCS:** 0-16 a season against 653-752 (2020: 0 of 24), so it misses 98-100%.
+  (`ESPNClient.scoreboard` sends no `groups` parameter for NCAAF, the likely cause.)
+- **2026:** 878 of 1,384 completed games are missing (226 of 731 FBS-involved). FBS teams are missing a mean
+  2.46 games each (median 2, max 7), which confirms "about 2 per team". Week 6 is missing entirely
+  (108 of 108 games, 58 FBS-involved). Week 11 is mostly ingest lag (93 of 104, 35 of 46 FBS-involved).
+  The "16 of 65 on 2026-09-26" claim is confirmed by the US-Eastern date (65 FBS-involved games, 16 missing).
+- **Backfill:** 16,378 rows, sha256 `cc704059e4684edb9e580dff5033433424ee34e6a5fe96995c7c272ae82d8bf4`, parser
+  `cfb-v6-backfill-1`, under `data/research/ncaaf_v6/` (gitignored). The live history files were only read.
+  v6 uses the backfill as rating input; scored games are the existing-history events (D-FIT-COHORT), the
+  backfill-only FBS-involved games are scored separately.
+- Consequence for v5: its live ratings are built from this gap-ridden history. Fixing ingest is an open item
+  below, not done here.
+
+### Input audit (weather, QB, pace)
+
+- **Weather is plumbed with real forecasts but fires on 0.4% of rows at most 1.8 points and was never fitted.**
+  Across 6,129 NCAAF ledger rows (607 events) the adjustment is non-zero on 25 rows (0.4%; 0.9% of the 2,829 rows
+  that carried a real forecast), on 6 events, largest 1.8 total points. Forecast capture began 2026-10-23.
+  Training history carries constant placeholders (5 mph / 65 F on 7,542 rows, 0 / 72 on 182), so the wind,
+  precipitation and cold coefficients are hand-set literals that were never fitted or validated.
+- **QB adjustment is dead:** the -4.5 point backup discount fired on 0 of 2,430 recorded side cells; the
+  injury feed holds 387 entries over 129 snapshots with no QB entries; the "starter" is the season passing leader
+  (not a point-in-time starter) and a starter missing from the report is scored as available (1.0).
+- **No pace data:** no possession or drive fields exist; `possessions` is the constant 12.5 on all 7,724 legacy rows
+  (absent on the 241 newest), success rate the constant 0.42, `home_epa_per_play` has no recorded provenance
+  (339 distinct values, absent on the 241 newest).
+
+### ESPN historical closing-line dataset
+
+9,364 lined events (FBS-FBS and FBS-FCS completed games 2016-2026, forfeits excluded), sha256
+`2b19a2545fb2e5f9df4c55a1b57ee9f88b11eab371828a4a7ed88e8bdfb7fa54`, selection rule `espn-lines-rule-1`
+(median across non-live providers, fixed before any outcome was joined; rule sha256
+`ee23e34e91544b797a1feaa9c6ab604fa79597671f6bec110dd34df4b806ee97`). These are **closing/final pregame lines
+with no per-quote `observed_at`: a closing-line benchmark, not decision-time quotes.** From 2024 each event carries
+one book (ESPN BET 2024-25, DraftKings 2025-26).
+
+### v6 frozen fit and holdout
+
+Frozen before the holdout or any market check ran: params sha256
+`6e38b14ca486acfd836c1259e5c4fd4fb8e9b5894a06f367322b1eb0c7b13e70` (`outputs/ncaaf/cfb_v6_frozen_fit.json`).
+Selected ridge 0.1, previous-season weight 0.2, established threshold 2 current-season games, result buffer 5 h.
+Margin calibration 0.4044 + 0.8716 x raw margin; total calibration 21.3898 + 0.6097 x raw total. Margin SD
+16.35 established / 16.89 thin sample / 16.76 FBS-vs-FCS; total SD 16.86 / 16.72 / 17.43. Split: train 4,102 events
+to 2022-11-11, validation 1,591 to 2024-11-14, holdout after that; 2016 is burn-in (734 existing games excluded).
+Caveat: the grid was extended downward twice on validation before freezing and the chosen ridge 0.1 is the
+smallest value in the final grid (an edge selection).
+
+Locked holdout, common cohort n 1,527 (2024-11-15 to 2026-11-12), scored once; v5 incumbent check: analytic Brier
+0.19003 against the recorded engine 0.18933 (n 1,527):
+
+| metric | v6 | v5 | v6 minus v5 (date-clustered 95% CI) |
+|---|---|---|---|
+| moneyline Brier | 0.17975 | 0.19003 | -0.01029 [-0.01524, -0.00553] |
+| log loss | 0.5333 | 0.5589 | |
+| ECE | 0.0225 | 0.0448 | |
+| calibration slope | 1.121 | 1.034 | |
+| margin log score | -4.1630 | -4.2109 | +0.0479 [+0.0306, +0.0640] |
+| total log score | -4.1966 | -4.2115 | +0.0150 [+0.0062, +0.0240] |
+| margin MAE | 12.286 | 12.885 | -0.599 [-0.847, -0.332] |
+
+v6's Brier is lower in each of 2024 (n 233), 2025 (n 793) and 2026 (n 501) and in every SD slice (established, thin sample, FBS-vs-FCS). Backfill-only FBS-involved
+games (n 384, scored separately): Brier 0.1046, ECE 0.0629, margin MAE 14.54.
+
+### Market-relative checks (FIRST LOOK, frozen fit `6e38b14c...`)
+
+Correlation of (model - line) with (actual - line); a positive value is the evidence of edge, and about zero means none.
+
+| set | totals v6 | totals v5 | spreads v6 | spreads v5 |
+|---|---|---|---|---|
+| 575-game reference (design-informed, inside the holdout window) | -0.011 [-0.091, +0.054] | -0.033 [-0.119, +0.041] | +0.042 [-0.023, +0.110] | +0.009 [-0.090, +0.105] |
+| ESPN lines, holdout window, common set | -0.008 [-0.057, +0.041] (n 1,511) | -0.040 [-0.097, +0.016] | +0.019 [-0.027, +0.066] (n 1,512) | +0.019 [-0.032, +0.068] |
+| ESPN lines, fit window, common set | +0.028 [-0.001, +0.058] (n 5,567) | +0.023 [-0.006, +0.051] | -0.009 [-0.041, +0.022] (n 5,574) | +0.004 [-0.024, +0.033] |
+
+Every interval includes zero. Over all 8,279 lined totals v6 is +0.010 [-0.015, +0.034]; over all 8,376 lined spreads
+-0.007 [-0.032, +0.018]. On the 575 reference v6 fixes much of the spread compression (margin SD 14.82 against v5's
+11.78 and a line of 16.35; MAE 12.56 against 14.64; the 21+ favourite margin 28.74 against 16.64) and does not fix
+the total (model SD 5.04 against a line of 5.71), yet side records are 232-256 on totals and 237-246 on spreads.
+Fixing compression was necessary, not sufficient, and it did not buy edge.
+
+Caveats, all binding: (1) the ESPN lines are closing lines, so a model with no edge against the close can still
+differ from a decision-time quote; (2) single book from 2024 (the fit window mixes providers); (3) fit-window games
+fitted both models' calibration, so the holdout window is the clean test; (4) the 575 reference and its 2026 season
+sit inside the holdout window and were used to motivate v6, so they are not independent evidence; (5) against the
+575 reference the pinned ESPN spreads show 13 sign flips of 576 (inferred to be reference-side line-pair repeats,
+not verified); (6) per-season cuts (totals 2024 +0.095 [+0.005, +0.176], 2026 -0.089 [-0.170, -0.013]) are looks
+among many and not findings; (7) the moneyline Brier gain is against v5's own calibration, not against market
+prices, and no moneyline market comparison was made.
+
+### Item 7 (market-anchored residual): not done, now feasible
+
+It was blocked locally (the only lined games were the 575). The ESPN lines now make it feasible (9,364 events, 8,279
+totals and 8,376 spreads covered by v6). Recorded as a follow-up; nothing was fitted on any line.
+
+### Port into src, parity and inertness
+
+`features/cfb_features_v6.py` and `models/cfb_structural_v6.py` carry the frozen math (copied from the research
+copy `scripts/cfb_v6_lib.py`, kept as the historical copy that the frozen-fit pin covers). `cfb_v6_research.py
+parity` recomputes the cache through the src extractor: **14,639 projections, max abs difference 0.0**, 183 no-call
+rows matching (the simulated moneyline probability differs from the analytic Normal one by at most 0.035 on 50
+holdout rows, mean 0.017; informational). `config/models/cfb-structural-v6.json` (qualification `research`, not
+qualified, no gates block) verifies its own artifact hash. `tests/test_cfb_structural_v6.py` pins the additive form,
+point-in-time, opponent rating, rolling baseline, raw weather/QB, fail-closed, loader, artifact and, in a clean
+subprocess, that learned_forward, college_football and cli.daily never load either v6 module and that
+production.yaml and model.yaml do not name it. Design call and RISK to know before anyone routes v6: a team name never seen in the history resolves to the season's
+pooled lower-division pseudo-team and is projected, not declined (checked on the real snapshot: an invented home team
+against Ohio State projects a raw margin of -90.9 with 9 sample games, no NO_CALL). `NO_CALL_CFB_V6_UNRATED_TEAM`
+fires for a rated name with no game in the window and for any name when no pooled team exists. The frozen math is
+unchanged (parity is bit-exact); any serving use would need a known-team gate first.
+
+### Decision for the operator
+
+No promotion decision was made and v6 is not routed. Options: (a) leave v6 shadow-only (nothing here shows edge,
+so there is no case to route it); (b) run item 7 on the ESPN lines (a market-anchored residual, with the closing-line
+caveat), the only route left to a market-relative signal from these inputs; (c) if better-calibrated probabilities
+are wanted on their own, a separate governed promotion with a market-relative test on decision-time quotes.
+
+Open items: the daily ingest still lacks `groups=80/81` (v5's live ratings stay on the gap-ridden history); the
+ESPN lines and backfill live under `data/research/ncaaf_v6/` (untracked); QB point-in-time starter data does not
+exist; there is no drive or play data for pace.
+
 ## 2026-11-14 — Project audit: the forecast step's time was ledger re-reads and replayed simulations, not pricing; pytest wrote into the live runtime root (quick-261114-prf)
 
 **Symptom.** The 14:00 daily spent 1,589 s of 1,886 s in the forecast step: NCAAF 1,567 s,
