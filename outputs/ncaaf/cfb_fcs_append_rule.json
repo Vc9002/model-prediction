@@ -1,0 +1,42 @@
+{
+  "rule": {
+    "accept_if": {
+      "brier_delta_at_most": 0.001,
+      "margin_log_score_delta_at_least": -0.005,
+      "note": "positive Brier delta is worse; log score is the mean Gaussian log density, higher is better",
+      "total_log_score_delta_at_least": -0.005
+    },
+    "arm_i_reproduction": "recorded, not gated (history changed since the 0.18933 measurement); n must equal 1527",
+    "arms": {
+      "i": "current live history copy (includes the 1,478 FBS-involved backfill rows)",
+      "ii": "arm i plus completed non-forfeit backfill rows whose feed_groups == [81], absent from arm i"
+    },
+    "bootstrap": {
+      "brier_seed": 11,
+      "cluster": "date",
+      "decision_statistic": "point_estimate",
+      "helpers": [
+        "model_prediction.roadmap_challenger._cluster_bootstrap_brier_delta",
+        "cfb_v5_research.clustered_bootstrap_mean_delta"
+      ],
+      "log_score_seed": 7,
+      "resamples": 2000
+    },
+    "cohort": {
+      "expected_events": 1527,
+      "same_as": "cfb-v5-history-impact-rule-1"
+    },
+    "delta_definition": "arm_ii_minus_arm_i",
+    "id": "cfb-fcs-append-rule-1",
+    "informational_only": [
+      "log_loss",
+      "arm_i_vs_recorded_0.18933"
+    ],
+    "refit_note": "no refit is performed; the report only states whether the evidence warrants one",
+    "verdicts": [
+      "ACCEPT",
+      "REJECT"
+    ]
+  },
+  "rule_sha256": "f4668a71388eb177eefa92b72aa452504b70ca220d1f3d0e71117cd17075eba2"
+}
