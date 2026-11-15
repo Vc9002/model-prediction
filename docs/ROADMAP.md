@@ -313,3 +313,7 @@ Serving/replay consistency, exact derivative contract logging, canonical esports
 - Forward capture is wired into the daily run as a fail-soft step (step1m_cfb_pregame_capture).
 - The four non-verifying artifacts are documented evidence, not drift: three NBA v8 files embed a label, tennis-games-markov-v3 a stale hash. Listed in KNOWN_NON_VERIFIERS.
 - Still open: ~6,900 FCS-vs-FCS events not appended; v5 refit on the complete history not done; line-movement retest needs a season of capture.
+
+## 2026-11-15 FCS-vs-FCS append (quick 261115-x4q)
+
+- Pinned cfb-fcs-append-rule-1 ACCEPT: holdout Brier 0.19036 to 0.18974 (delta -0.00062, CI [-0.00231, +0.00076]); neutral within noise. Applied 6,894 groups=[81] rows to the processed history only (16,392 rows loaded). One-time snapshot, not maintained by the daily ingest. No refit, no promotion.
