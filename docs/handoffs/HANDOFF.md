@@ -227,5 +227,5 @@ Loss review: at executable quotes moneyline is 29-22 -9.91u (edge >= 8%: 0-8), s
 - **Evaluated 2026-11-15:** `nfl_market_anchor_v1` walk-forward on live quote-backed calls: moneyline
   0.2330 -> 0.2138 (41 rows) and spread 0.2653 -> 0.2408 (26) at weight 1.0, i.e. the market; total
   gets worse, 0.2328 -> 0.2482 (25). Loss mechanism: moneyline picks 5%+ above the ask are 1-11.
-- **Not evaluated:** `nfl_market_anchor_v1`, `nfl_joint_market_v3`, `nfl_joint_score_v1`. The anchor
+- **Not evaluated:** `nfl_joint_market_v3`, `nfl_joint_score_v1`. The anchor
   needs timestamp-valid two-sided quotes per settled game; 121 executable-quote picks exist.
