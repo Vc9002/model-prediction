@@ -37,25 +37,14 @@ from model_prediction.data_sources.polymarket_execute import (
 )
 from model_prediction.domain import iso_utc, parse_utc, utc_now
 from model_prediction.portfolio.auto_buyer_ledger import event_key_from_slug
-from model_prediction.runtime_paths import RuntimePaths
+from model_prediction.runtime_paths import RuntimePaths, load_dotenv_into_environ
 
 _paths = RuntimePaths.resolve()
 DATA = _paths.runtime_root
 EASTERN = ZoneInfo("America/New_York")
 
 # Auto-load .env credentials if present
-_env_file = _paths.repo_root / ".env"
-if _env_file.exists():
-    try:
-        with _env_file.open(encoding="utf-8") as _f:
-            for _line in _f:
-                _line = _line.strip()
-                if _line and not _line.startswith("#") and "=" in _line:
-                    _key, _val = _line.split("=", 1)
-                    if _key.strip() and _key.strip() not in os.environ:
-                        os.environ[_key.strip()] = _val.strip()
-    except OSError:
-        pass
+load_dotenv_into_environ(_paths.repo_root / ".env")
 
 DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     # NBA: spread + moneyline. nba-moneyline-v9 was removed 2026-11-12 (placeholder

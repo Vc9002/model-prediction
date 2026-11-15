@@ -210,8 +210,10 @@ change how you should work here:
 
 **Symptom.** The 14:00 daily spent 1,589 s of 1,886 s in the forecast step: NCAAF 1,567 s,
 NCAAB 702 s (`timing.forecast_sport_done_seconds`). Separately, the live
-`logs/auto_buyer_cycle_history.jsonl` held 52 rows marked `LIVE_EXECUTION` with
-`forecast_date` 2026-08-30, the last six written 2026-11-13 while the buyer state was `paper`.
+`logs/auto_buyer_cycle_history.jsonl` held 64 rows marked `LIVE_EXECUTION` with
+`forecast_date` 2026-08-30 (every one evaluated 5 picks and placed no order), written 2026-10-24
+to 2026-11-13. Other `LIVE_EXECUTION` rows with no forecast date are real runs (12,593 picks
+evaluated, 147.78 USD placed on 2026-11-10 and 11-11) and are not test output.
 
 **Root causes.**
 
@@ -230,12 +232,19 @@ NCAAB 702 s (`timing.forecast_sport_done_seconds`). Separately, the live
    `build_snapshot` (build, then validate), once in `PickRequest.validate`, once per ledger
    write. One simulation is 0.033 s; nothing was slow, it was only repeated.
 4. `auto_executor`, `auto_buyer_ledger` and `polymarket_execute` call `RuntimePaths.resolve()` at
-   import. `MODEL_PREDICTION_RUNTIME_ROOT` is set machine-wide, and `tests/conftest.py` cleared
-   it only in an autouse fixture, after collection had imported those modules. Their path
-   constants therefore pointed at the live runtime root for the whole session, and
-   `test_auto_buyer_cycle_tracking` (live mode, mocked executor) patched `DATA` and the state
-   file but not `AUTO_BUYER_CYCLE_HISTORY_PATH`. The live buyer ledger, audit log and state file
-   were checked and hold no test rows; the pollution is the cycle history only.
+   import. Under pytest that reached the live runtime root by three routes: the variable is set
+   machine-wide and `tests/conftest.py` cleared it only in an autouse fixture, after collection
+   had imported those modules; `RuntimePaths.resolve()` falls back to the repo `.env`, which
+   names the live root; and `polymarket_execute`, `auto_executor` and `dashboard/common.py` each
+   carried a copy of a loader that puts every `.env` line, live Polymarket credentials
+   included, into `os.environ` at import. Their path constants therefore pointed at the live
+   runtime root for the whole session, and `test_auto_buyer_cycle_tracking` (live mode, mocked
+   executor) patched `DATA` and the state file but not `AUTO_BUYER_CYCLE_HISTORY_PATH`.
+   `test_buyer_fails_closed_when_stale_quote_refresh_has_network_error` exposed the second
+   route: it builds a default buyer, which read the live state file's one-hour lookahead and
+   failed or passed depending on the checkout it ran in. The live buyer ledger, audit log, state file and the
+   paper root (`paper_auto_buyer/`: ledger, history, state) were scanned read-only for test
+   identities and hold none; the pollution is the main cycle history only.
 
 **Fix.**
 
@@ -249,8 +258,15 @@ NCAAB 702 s (`timing.forecast_sport_done_seconds`). Separately, the live
   state, score means); the lines only threshold them. It subclasses the engine in `cfb_replay.py`
   because `models/cfb_distribution.py` must not change: its sha256 is `engine_source_sha256` in
   every stored snapshot, and editing it would fail replay validation for every open NCAAF pick.
-- `tests/conftest.py` drops the env var at import, before any `model_prediction` import; the
-  cycle-tracking test patches the history path.
+- `tests/conftest.py` drops the env var and sets `MODEL_PREDICTION_SKIP_DOTENV=1` at import,
+  before any `model_prediction` import. `runtime_paths.dotenv_disabled()` reads the flag:
+  `RuntimePaths.resolve()` skips its `.env` fallback, and the three duplicated loaders are
+  replaced by one `runtime_paths.load_dotenv_into_environ()` that honours it. Nothing in
+  production sets the flag; with it unset the modules still load the runtime root and the
+  credentials from `.env` (checked). The cycle-tracking test patches the history path. A first
+  version that only popped the variable passed in a worktree with no `.env` and did nothing in
+  the real checkout; the isolation test now asserts the paths are the repo default, not merely
+  different from the shell's value.
 - Three stale pins the 2026-11-14 triage missed, failing at HEAD: two buyer tests relied on
   `nba-moneyline-v9` being in the default whitelist (removed 2026-11-12); one model-ledger test
   asserted tennis spread is unmapped (it maps to `tennis-games-markov-v4`) and that an unmapped

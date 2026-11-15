@@ -20,7 +20,7 @@ reads of the live ledger (read-only) put the cost in three places, none of them 
   128 s slate build, and again at snapshot build, snapshot validation and every ledger write.
 
 Separately, `tests/test_auto_polymarket_buyer.py::test_auto_buyer_cycle_tracking` has written
-52 fake `LIVE_EXECUTION` rows (forecast date 2026-08-30) into the live runtime root's
+64 fake `LIVE_EXECUTION` rows (forecast date 2026-08-30) into the live runtime root's
 `logs/auto_buyer_cycle_history.jsonl`: three modules resolve `RuntimePaths` at import, before
 the autouse fixture clears `MODEL_PREDICTION_RUNTIME_ROOT`.
 

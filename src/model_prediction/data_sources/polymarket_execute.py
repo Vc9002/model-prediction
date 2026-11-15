@@ -45,21 +45,10 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from ..audit import AuditLog
 from ..domain import iso_utc, parse_utc, utc_now
-from ..runtime_paths import RuntimePaths
+from ..runtime_paths import RuntimePaths, load_dotenv_into_environ
 
 _paths = RuntimePaths.resolve()
-_env_file = _paths.repo_root / ".env"
-if _env_file.exists():
-    try:
-        with _env_file.open(encoding="utf-8") as _f:
-            for _line in _f:
-                _line = _line.strip()
-                if _line and not _line.startswith("#") and "=" in _line:
-                    _key, _val = _line.split("=", 1)
-                    if _key.strip() and _key.strip() not in os.environ:
-                        os.environ[_key.strip()] = _val.strip()
-    except OSError:
-        pass
+load_dotenv_into_environ(_paths.repo_root / ".env")
 
 _MARKET_SLUG_RE = re.compile(r"market_slug=([a-z0-9_\-]+)")
 _MARKET_SLUG_LEGACY_RE = re.compile(r"\(([a-z0-9_\-]+)\)\.?\s*$")

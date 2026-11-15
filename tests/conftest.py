@@ -10,6 +10,11 @@ import yaml
 # constants bound to the live runtime root during collection. A test that
 # missed one patch then wrote there (52 fake LIVE_EXECUTION rows in the live
 # auto_buyer_cycle_history.jsonl, 2026-11-07 to 11-13).
+# Popping it is not enough on its own: RuntimePaths.resolve() falls back to the
+# repo .env, and polymarket_execute loads that file (runtime root and live
+# credentials) into os.environ at import. The skip flag turns both off for the
+# whole test process.
+os.environ["MODEL_PREDICTION_SKIP_DOTENV"] = "1"
 os.environ.pop("MODEL_PREDICTION_RUNTIME_ROOT", None)
 
 from model_prediction.audit import AuditLog

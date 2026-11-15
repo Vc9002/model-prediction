@@ -200,9 +200,10 @@ Found and left for a decision:
   adapters, 31 in live modules. The live ones inspected (ledger, auto-executor, buyer ledger,
   NCAAB forward, dashboard) are type-narrowing gaps behind runtime guards, not bugs. CI gates
   only `rebuild/` by fingerprint. After the adapter decision, add `mypy src/model_prediction` to CI.
-- **Polluted live history.** 52 test rows in the runtime root's
-  `logs/auto_buyer_cycle_history.jsonl` (`mode == "LIVE_EXECUTION"`, `forecast_date ==
-  "2026-08-30"`). Remove by that exact identity, with a named backup.
+- **Polluted live history.** 64 test rows in the runtime root's `logs/auto_buyer_cycle_history.jsonl`:
+  `mode == "LIVE_EXECUTION"`, `forecast_date == "2026-08-30"`, `total_evaluated == 5`,
+  `orders_count == 0`. Remove by that exact signature, with a named backup. Do not remove
+  `LIVE_EXECUTION` rows with no forecast date: those are real runs that placed orders.
 - **Ledger size.** `ledgers.db` is 1.25 GB for 50,949 records: `ledger_events.payload_json` is
   737 MB and `decision_payload_json` 278 MB, because every event stores the full row. Most rows
   in the big slices are retired. Decide on archiving retired rows out of the hot database.

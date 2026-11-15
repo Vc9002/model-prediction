@@ -23,6 +23,8 @@ from zoneinfo import ZoneInfo
 
 import yaml
 
+from model_prediction.runtime_paths import load_dotenv_into_environ
+
 try:
     from openpyxl import load_workbook
 except ImportError:  # pragma: no cover
@@ -35,14 +37,7 @@ DASHBOARD_PORT = 8765
 
 # Load .env file so subprocess CLI commands inherit Polymarket keys
 _ENV_PATH = ROOT / ".env"
-if _ENV_PATH.exists():
-    with _ENV_PATH.open(encoding="utf-8") as _fh:
-        for _line in _fh:
-            _line = _line.strip()
-            if _line and not _line.startswith("#") and "=" in _line:
-                _key, _, _val = _line.partition("=")
-                if _key.strip() and _key.strip() not in os.environ:
-                    os.environ[_key.strip()] = _val.strip()
+load_dotenv_into_environ(_ENV_PATH)
 
 DATA = ROOT / "data"
 OUTPUTS = ROOT / "outputs" / "latest"

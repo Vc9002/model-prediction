@@ -27,10 +27,23 @@ commit: 41a27c73
 - Real data: 2,651 events / 7,147 rows on a backup copy of the live ledger, 0 differences.
 - `ruff check src/ tests/` clean. The full suite was not run (project rule).
 
+## Timing
+
+NCAAF forecast seconds, from `timing.forecast_sport_done_seconds`:
+
+| Run (ET) | cfb s | ncaab s | Before the fixes |
+|---|---|---|---|
+| 14:00 | 1,567 | 702 | yes |
+| 16:00 | 472 | 195 | yes (started before the cherry-pick landed) |
+| 18:30 | 206 | not compared | no, first run on the fixed tree |
+
+The drop from 14:00 to 16:00 came from changes other than these fixes (the BBO pacing commit
+and fewer contracts), so the 18:30 run is the only one that tests these fixes. Contract counts were
+not normalised; compare per contract logged before crediting the fix.
+
 ## Not verified
 
-- The effect on a scheduled daily run's `timing.forecast_sport_done_seconds`. Compare the first
-  run after this lands against 2026-11-14 14:00 (cfb 1,567 s, ncaab 702 s).
+- A per-contract comparison. Contract counts per run are not yet extracted.
 
 ## Left open
 

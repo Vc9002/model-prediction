@@ -26,6 +26,8 @@ def isolated_roots(tmp_path, monkeypatch):
     paths = RuntimePaths.for_test(tmp_path)
     monkeypatch.setattr(runtime_paths, "_default_repo_root", lambda: paths.repo_root)
     monkeypatch.delenv("MODEL_PREDICTION_RUNTIME_ROOT", raising=False)
+    # conftest disables the .env fallback for the suite; this helper tests that fallback.
+    monkeypatch.delenv("MODEL_PREDICTION_SKIP_DOTENV", raising=False)
     (paths.repo_root / ".env").write_text(
         f'MODEL_PREDICTION_RUNTIME_ROOT="{paths.runtime_root}"\n', encoding="utf-8"
     )

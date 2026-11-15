@@ -107,6 +107,40 @@ def rolling_models_root(repo_root: Path | str | None = None) -> Path:
     return RuntimePaths.resolve(repo_root=repo_root).models_root
 
 
+def dotenv_disabled() -> bool:
+    """True when the repo ``.env`` must not be read (``MODEL_PREDICTION_SKIP_DOTENV=1``).
+
+    ``tests/conftest.py`` sets the flag. The operator's ``.env`` names the live
+    runtime root and holds live Polymarket credentials, so without it pytest on
+    the operator's machine resolved every un-patched path to the live root; a
+    test wrote 52 fake live-mode rows into the live cycle history that way
+    (2026-11-14). Nothing in production sets the flag.
+    """
+    return os.environ.get("MODEL_PREDICTION_SKIP_DOTENV") == "1"
+
+
+def load_dotenv_into_environ(env_file: Path) -> None:
+    """Copy ``KEY=VALUE`` lines of ``env_file`` into ``os.environ`` without overriding.
+
+    The one loader behind the executor, the auto-buyer and the dashboard, which
+    each carried their own copy. Variables already set win; a missing or
+    unreadable file is ignored.
+    """
+    if dotenv_disabled():
+        return
+    try:
+        with env_file.open(encoding="utf-8") as handle:
+            for raw_line in handle:
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, value = line.partition("=")
+                if key.strip() and key.strip() not in os.environ:
+                    os.environ[key.strip()] = value.strip()
+    except OSError:
+        pass
+
+
 def _default_repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
@@ -279,7 +313,7 @@ class RuntimePaths:
         """
         resolved_repo_root = Path(repo_root) if repo_root is not None else _default_repo_root()
         runtime_root_env = os.environ.get("MODEL_PREDICTION_RUNTIME_ROOT")
-        if not runtime_root_env:
+        if not runtime_root_env and not dotenv_disabled():
             local_env = resolved_repo_root / ".env"
             if local_env.is_file():
                 for line in local_env.read_text(encoding="utf-8-sig").splitlines():
