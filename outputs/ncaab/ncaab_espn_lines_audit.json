@@ -1,0 +1,521 @@
+{
+  "as_of_utc": "2026-11-15T03:00:00Z",
+  "coverage": {
+    "per_season": {
+      "2023": {
+        "attempted": 6228,
+        "events_in_scope": 6228,
+        "median_nonlive_providers": 14.0,
+        "no_line_reasons": {
+          "empty_items": 385,
+          "no_spread_resolved": 56
+        },
+        "spread_disagree_gt2_pct": 10.85,
+        "spread_multi_provider_events": 5734,
+        "total_disagree_gt2_pct": 21.66,
+        "total_multi_provider_events": 5733,
+        "with_nonlive_spread": 5787,
+        "with_nonlive_spread_pct": 92.92,
+        "with_open_spread": 0,
+        "with_open_total": 0,
+        "with_total": 5841,
+        "with_total_pct": 93.79
+      },
+      "2024": {
+        "attempted": 6243,
+        "events_in_scope": 6243,
+        "median_nonlive_providers": 11.0,
+        "no_line_reasons": {
+          "empty_items": 410,
+          "no_spread_resolved": 2,
+          "only_live_items": 13
+        },
+        "spread_disagree_gt2_pct": 6.11,
+        "spread_multi_provider_events": 5732,
+        "total_disagree_gt2_pct": 23.01,
+        "total_multi_provider_events": 5733,
+        "with_nonlive_spread": 5818,
+        "with_nonlive_spread_pct": 93.19,
+        "with_open_spread": 5818,
+        "with_open_total": 5819,
+        "with_total": 5819,
+        "with_total_pct": 93.21
+      },
+      "2025": {
+        "attempted": 6292,
+        "events_in_scope": 6292,
+        "median_nonlive_providers": 1.0,
+        "no_line_reasons": {
+          "empty_items": 528,
+          "only_live_items": 1
+        },
+        "spread_disagree_gt2_pct": null,
+        "spread_multi_provider_events": 0,
+        "total_disagree_gt2_pct": null,
+        "total_multi_provider_events": 0,
+        "with_nonlive_spread": 5763,
+        "with_nonlive_spread_pct": 91.59,
+        "with_open_spread": 5763,
+        "with_open_total": 5762,
+        "with_total": 5762,
+        "with_total_pct": 91.58
+      },
+      "2026": {
+        "attempted": 6300,
+        "events_in_scope": 6300,
+        "median_nonlive_providers": 1.0,
+        "no_line_reasons": {
+          "empty_items": 551,
+          "no_spread_resolved": 5
+        },
+        "spread_disagree_gt2_pct": 2.51,
+        "spread_multi_provider_events": 279,
+        "total_disagree_gt2_pct": 2.98,
+        "total_multi_provider_events": 302,
+        "with_nonlive_spread": 5744,
+        "with_nonlive_spread_pct": 91.17,
+        "with_open_spread": 5744,
+        "with_open_total": 5749,
+        "with_total": 5749,
+        "with_total_pct": 91.25
+      },
+      "2027": {
+        "attempted": 817,
+        "events_in_scope": 817,
+        "median_nonlive_providers": 1.0,
+        "no_line_reasons": {
+          "empty_items": 214
+        },
+        "spread_disagree_gt2_pct": null,
+        "spread_multi_provider_events": 0,
+        "total_disagree_gt2_pct": null,
+        "total_multi_provider_events": 0,
+        "with_nonlive_spread": 603,
+        "with_nonlive_spread_pct": 73.81,
+        "with_open_spread": 603,
+        "with_open_total": 603,
+        "with_total": 603,
+        "with_total_pct": 73.81
+      }
+    }
+  },
+  "generated_at_utc": "2026-11-15T09:18:00Z",
+  "lines_file": {
+    "bytes": 91430886,
+    "events_in_scope": 25880,
+    "events_not_fetched": 0,
+    "path": "data/research/ncaab_market/espn_lines.jsonl (untracked)",
+    "records_unique_events": 25880,
+    "selected_recompute_mismatches": 0,
+    "sha256": "3386b8d1f1f8d50fa59bbfb9af0f2c015afff3866ec1a668611147d839e8a4f4"
+  },
+  "pinned_rule": {
+    "also_emitted": "ESPN BET (provider name exactly 'ESPN BET') close value where present; eligible provider count; min/max/range across providers as a dispersion diagnostic",
+    "excluded_items": "any provider item whose name contains 'live' (case-insensitive) or that is flagged live; these are in-play lines",
+    "home_spread_line_orientation": "negative = home favoured by that many points. Magnitude from the last number in the item's `details` text; side from homeTeamOdds.favorite / awayTeamOdds.favorite (exactly one true). 'EVEN'/'PK'/'PICK' details = 0. If details or flags are unusable, the home team's own point-spread block string is used (direct home-signed value). The raw `spread` field's sign is NEVER assumed and a provider with neither resolution is excluded from the median.",
+    "line_semantics": "archived closing/final pregame lines; no per-quote observed_at; a closing-line benchmark, not a decision-time quote. The opening line is the provider's open block where present",
+    "no_line_reasons": "http_404, empty_items, only_live_items, no_spread_resolved, fetch_failed",
+    "outcomes": "never joined in this script",
+    "per_provider_value": "spread: homeTeamOdds.close point spread when the item carries a close block, else the details/flags-derived current line. total: close.total when present, else overUnder, else current.total. open spread: homeTeamOdds.open point spread; open total: open.total.",
+    "plausibility_drops": "a spread-field value with |x| > 70 or a total-field value outside [90, 250] is treated as missing (a price or garbage leaking into a line field; ESPN BET 2022-2023 close blocks carry prices) and is dropped BEFORE storage, so no price enters the records, and counted; a close spread is rejected (the details/flags current line is used instead) when it differs from that line by more than 3.0 points; disagreement between the home point-spread block and the details/flags line is counted, never silently resolved",
+    "population": "completed ESPN men's college basketball Division I scoreboard events (groups=50) with season year 2023..2027 (2022-23 through 2026-27 to date); every such event is fetched, events with no odds are kept as no-line records",
+    "primary_line": "per event and market, spread and total separately: the median (statistics.median, unrounded) across eligible non-live providers of their per-provider value; the opening line is the same median over providers' open values",
+    "version": "ncaab-espn-lines-rule-1"
+  },
+  "providers": {
+    "close_block_differs_from_current": 828,
+    "close_block_present": 69505,
+    "flag_counts_by_season": {
+      "2023": {
+        "nonlive_items": 77885,
+        "ps_close_dropped": 5577,
+        "ps_current_dropped": 1072,
+        "total_close_dropped": 5639
+      },
+      "2024": {
+        "close_rejected_vs_current": 54,
+        "nonlive_items": 60340,
+        "ps_current_dropped": 554,
+        "total_open_dropped": 15
+      },
+      "2025": {
+        "nonlive_items": 5763
+      },
+      "2026": {
+        "nonlive_items": 6067
+      },
+      "2027": {
+        "nonlive_items": 603
+      }
+    },
+    "live_items_excluded": 9398,
+    "nonlive_orientation_sources": {
+      "details_flags": 149494,
+      "details_pick": 813,
+      "unresolved": 351
+    },
+    "providers": {
+      "1001|accuscore": {
+        "items": 11211,
+        "seasons": "2023-2024"
+      },
+      "1002|teamrankings": {
+        "items": 5708,
+        "seasons": "2023-2023"
+      },
+      "1004|consensus": {
+        "items": 5598,
+        "seasons": "2023-2023"
+      },
+      "1005|betegy": {
+        "items": 42,
+        "seasons": "2023-2023"
+      },
+      "100|DraftKings": {
+        "items": 5408,
+        "seasons": "2026-2027"
+      },
+      "200|DraftKings - Live Odds": {
+        "items": 95,
+        "seasons": "2026-2027"
+      },
+      "31|Caesars Sportsbook": {
+        "items": 5200,
+        "seasons": "2023-2023"
+      },
+      "36|Unibet": {
+        "items": 11353,
+        "seasons": "2023-2024"
+      },
+      "40|DraftKings": {
+        "items": 10746,
+        "seasons": "2023-2024"
+      },
+      "41|SugarHouse": {
+        "items": 10339,
+        "seasons": "2023-2024"
+      },
+      "45|Caesars Sportsbook (New Jersey)": {
+        "items": 10831,
+        "seasons": "2023-2024"
+      },
+      "47|MGM": {
+        "items": 10360,
+        "seasons": "2023-2024"
+      },
+      "48|PointsBet": {
+        "items": 6554,
+        "seasons": "2023-2024"
+      },
+      "50|BetfairSportsbook": {
+        "items": 9509,
+        "seasons": "2023-2024"
+      },
+      "52|Caesars Sportsbook (Colorado)": {
+        "items": 11315,
+        "seasons": "2023-2024"
+      },
+      "53|Titanbets": {
+        "items": 11067,
+        "seasons": "2023-2024"
+      },
+      "57|Caesars Sportsbook (Tennessee)": {
+        "items": 7259,
+        "seasons": "2023-2024"
+      },
+      "58|ESPN BET": {
+        "items": 18158,
+        "seasons": "2023-2026"
+      },
+      "59|ESPN Bet - Live Odds": {
+        "items": 9303,
+        "seasons": "2024-2026"
+      }
+    }
+  },
+  "rule_pin": {
+    "first_fetch_started_at_utc": "2026-11-15T06:23:27Z",
+    "rule_sha256": "e0f6811dc13c08a0cdcdb30656e46737607333a2de20b9715efe84043cf5bc35"
+  },
+  "scoreboard_file": {
+    "dates_archived": 820,
+    "dates_at_500_event_cap": 0,
+    "dates_failed": 0,
+    "path": "data/research/ncaab_market/scoreboard.jsonl (untracked)",
+    "per_season_year": {
+      "2022": {
+        "a_side_without_conference_id": 524,
+        "completed": 5976,
+        "events": 6387,
+        "neutral": 703
+      },
+      "2023": {
+        "a_side_without_conference_id": 512,
+        "completed": 6228,
+        "events": 6261,
+        "neutral": 768
+      },
+      "2024": {
+        "a_side_without_conference_id": 518,
+        "completed": 6243,
+        "events": 6249,
+        "neutral": 746
+      },
+      "2025": {
+        "a_side_without_conference_id": 530,
+        "completed": 6292,
+        "events": 6299,
+        "neutral": 747
+      },
+      "2026": {
+        "a_side_without_conference_id": 551,
+        "completed": 6300,
+        "events": 6318,
+        "neutral": 709
+      },
+      "2027": {
+        "a_side_without_conference_id": 214,
+        "completed": 817,
+        "events": 820,
+        "neutral": 46
+      }
+    },
+    "sha256": "ee5394da02380ae9ca4780813ba9cfa851f450d87d94206031c7be81a5d8d1a7"
+  },
+  "script": "scripts/ncaab_espn_lines.py",
+  "verification_sample": {
+    "matched": 25,
+    "matched_with_lines": 24,
+    "results": [
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401596895",
+        "match": true,
+        "providers_fresh": 12,
+        "providers_stored": 12,
+        "season_year": 2024
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401470368",
+        "match": true,
+        "providers_fresh": 15,
+        "providers_stored": 15,
+        "season_year": 2023
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401721071",
+        "match": true,
+        "providers_fresh": 2,
+        "providers_stored": 2,
+        "season_year": 2025
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401826817",
+        "match": true,
+        "providers_fresh": 1,
+        "providers_stored": 1,
+        "season_year": 2026
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401909533",
+        "match": true,
+        "providers_fresh": 1,
+        "providers_stored": 1,
+        "season_year": 2027
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401827679",
+        "match": true,
+        "providers_fresh": 1,
+        "providers_stored": 1,
+        "season_year": 2026
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401822342",
+        "match": true,
+        "providers_fresh": 2,
+        "providers_stored": 2,
+        "season_year": 2026
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401809358",
+        "match": true,
+        "providers_fresh": 1,
+        "providers_stored": 1,
+        "season_year": 2026
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401493441",
+        "match": true,
+        "providers_fresh": 15,
+        "providers_stored": 15,
+        "season_year": 2023
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401603523",
+        "match": true,
+        "providers_fresh": 11,
+        "providers_stored": 11,
+        "season_year": 2024
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401514216",
+        "match": true,
+        "providers_fresh": 15,
+        "providers_stored": 15,
+        "season_year": 2023
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401825574",
+        "match": true,
+        "providers_fresh": 1,
+        "providers_stored": 1,
+        "season_year": 2026
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401826782",
+        "match": true,
+        "providers_fresh": 1,
+        "providers_stored": 1,
+        "season_year": 2026
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401921682",
+        "match": true,
+        "providers_fresh": 1,
+        "providers_stored": 1,
+        "season_year": 2027
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401718143",
+        "match": true,
+        "providers_fresh": 2,
+        "providers_stored": 2,
+        "season_year": 2025
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401814557",
+        "match": true,
+        "providers_fresh": 1,
+        "providers_stored": 1,
+        "season_year": 2026
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401573454",
+        "match": true,
+        "providers_fresh": 12,
+        "providers_stored": 12,
+        "season_year": 2024
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401829463",
+        "match": true,
+        "providers_fresh": 3,
+        "providers_stored": 3,
+        "season_year": 2026
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401487049",
+        "match": true,
+        "providers_fresh": 11,
+        "providers_stored": 11,
+        "season_year": 2023
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401482855",
+        "match": true,
+        "providers_fresh": 15,
+        "providers_stored": 15,
+        "season_year": 2023
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401581763",
+        "match": true,
+        "providers_fresh": 13,
+        "providers_stored": 13,
+        "season_year": 2024
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401723743",
+        "match": true,
+        "providers_fresh": 2,
+        "providers_stored": 2,
+        "season_year": 2025
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401823827",
+        "match": true,
+        "providers_fresh": 1,
+        "providers_stored": 1,
+        "season_year": 2026
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401522157",
+        "match": true,
+        "providers_fresh": 13,
+        "providers_stored": 13,
+        "season_year": 2023
+      },
+      {
+        "carried_line": false,
+        "diffs": [],
+        "event_id": "401491895",
+        "match": true,
+        "providers_fresh": 0,
+        "providers_stored": 0,
+        "season_year": 2023
+      }
+    ],
+    "sampled": 25,
+    "sampled_with_lines": 24,
+    "seed": 20261115,
+    "verified_at_utc": "2026-11-15T09:17:58Z"
+  }
+}

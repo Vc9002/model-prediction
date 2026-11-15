@@ -699,6 +699,13 @@ def run_market(market: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
         }
     accepted = [n for n in family if result["models"][n]["accepted_on_validation"]]
     result["accepted_models"] = accepted
+    xv, yv, dv = design(by_win["validation"], ["x"])
+    plain = window_stats(xv[:, 0], yv, dv, fits["m0_v6"]["ymean"], 1)
+    result["v6_gap_plain_slope_validation"] = {
+        "slope": plain["slope"],
+        "ci_95": plain["slope_ci_95"],
+        "n": plain["n"],
+    }
     result["raw_v6_side_record_fit_and_validation"] = {
         w: raw_v6_side(by_win[w]) for w in ("fit", "validation")
     }
@@ -877,7 +884,7 @@ def build_report(shuffle_seed: int | None) -> dict[str, Any]:
         "power": power_statement(),
         "pipeline_gate": pipeline_gate(),
         "local_history_overlap": local_history_overlap(),
-        "orientation_favourite_wins": {m: favourite_check(rows[m]) for m in MARKETS},
+        "orientation_favourite_wins": {"spread": favourite_check(rows["spread"])},
         "residual_by_season": {m: descriptive_raw(rows[m]) for m in MARKETS},
         "markets": {m: run_market(m, rows[m]) for m in MARKETS},
     }
@@ -958,7 +965,7 @@ def render_md(rep: dict[str, Any]) -> str:
     add("")
     add("| Market cohort | Season year | n | Favourite won | Underdog won | Tie | Favourite win % |")
     add("|---|---|---|---|---|---|---|")
-    for m in MARKETS:
+    for m in rep["orientation_favourite_wins"]:
         for y, s in sorted(rep["orientation_favourite_wins"][m].items()):
             add(
                 f"| {m} | {y} | {s['n']} | {s['fav_won']} | {s['dog_won']} | {s['tie']} | {s['fav_win_pct']} |"
@@ -1013,6 +1020,12 @@ def render_md(rep: dict[str, Any]) -> str:
         add("")
         for name in r["family"]:
             add(f"- {name}: {_side_text(r['models'][name]['validation']['side_record'])}")
+        add("")
+        v = r["v6_gap_plain_slope_validation"]
+        add(
+            f"Descriptive (NCAAF-style): validation-window OLS slope of (actual - line) on the raw v6-minus-line gap "
+            f"{v['slope']:+.4f}, date-clustered 95% CI {_ci(v['ci_95'], 4)}, n {v['n']}."
+        )
         add("")
         add("Descriptive: following the RAW v6-minus-line gap (|gap| >= 1) on the non-locked windows:")
         add("")
