@@ -1,0 +1,51 @@
+{
+  "model": "ncaab-v7-shadow",
+  "status": "SHADOW_RESEARCH_INERT",
+  "frozen_before_holdout_read": true,
+  "fit_windows": "warm 2025-11-03..2025-11-30 + train 2025-12-01..2026-02-19; validation 2026-02-20..2026-03-18 selected",
+  "carryover_weight_declared_ex_ante": 0.5,
+  "config": {
+    "margin_names": [
+      "ridge_c05",
+      "v6_tail"
+    ],
+    "margin_coef": [
+      0.8853,
+      0.9336
+    ],
+    "nond1_rule": "linear",
+    "nond1_names": [
+      "v6",
+      "const"
+    ],
+    "nond1_coef": [
+      0.6079,
+      23.531
+    ],
+    "min_games_decline": 0,
+    "scale_edges": [
+      0,
+      1,
+      3,
+      8
+    ],
+    "scale_values": [
+      13.313,
+      12.168,
+      11.371,
+      10.171
+    ],
+    "nond1_scale": 16.817,
+    "df": 8.0,
+    "total_names": [
+      "v6_total",
+      "effpace_total"
+    ],
+    "total_coef": [
+      0.5511,
+      0.4393
+    ],
+    "total_sd": 17.652,
+    "notes": "fit on warm+train (2025-11-03..2026-02-19); non-D1 linear rule fit on 2025-11 only; scale = MLE t(8)"
+  }
+}
