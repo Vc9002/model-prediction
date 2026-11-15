@@ -540,7 +540,13 @@ def test_the_inertness_probe_detects_a_loaded_module() -> None:
 
 def test_no_module_under_src_imports_or_names_v6_and_no_config_routes_to_it() -> None:
     src = PROJECT_ROOT / "src" / "model_prediction"
-    own = {src / "models" / "cfb_structural_v6.py", src / "features" / "cfb_features_v6.py"}
+    # cfb_structural_v61.py is the inert v6.1 subclass (quick-261115-183): it must name v6 to wrap it, and its own
+    # inertness is pinned in tests/test_cfb_structural_v61.py
+    own = {
+        src / "models" / "cfb_structural_v6.py",
+        src / "features" / "cfb_features_v6.py",
+        src / "models" / "cfb_structural_v61.py",
+    }
     offenders = [
         str(p.relative_to(PROJECT_ROOT))
         for p in src.rglob("*.py")
