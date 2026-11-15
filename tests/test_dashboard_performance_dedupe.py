@@ -43,3 +43,20 @@ def test_late_refresh_never_displaces_verified_pregame_observation() -> None:
     late = _row("late", line=22.5, observed="2026-08-23T19:01:00Z", pnl=1.0)
 
     assert [row["pick_id"] for row in _dedupe_contract_observations([valid, late])] == ["valid"]
+
+
+def test_performance_excludes_placeholder_priced_rows_but_reports_them() -> None:
+    """A row priced at the 52.38% lay with no executable quote pays a favourite as a
+    coin flip; its pnl must not reach the record (NFL moneyline 2026-11: 17-7, +11.3u
+    at placeholder prices against 29-22, -9.9u at real quotes)."""
+    real = _row("real", line=22.5, observed="2026-08-23T12:00:00Z", pnl=-1.0)
+    placeholder = _row("placeholder", line=17.5, observed="2026-08-23T12:00:00Z", pnl=0.91)
+    placeholder["sportsbook"] = "model_opinion_no_executable_quote"
+
+    payload = performance([real, placeholder])
+
+    assert payload["settled"] == 1
+    assert payload["wins"] == 0
+    assert payload["total_pnl"] == -1.0
+    assert payload["total_picks"] == 2
+    assert payload["placeholder_priced_excluded"] == {"calls": 1, "wins": 1, "pnl": 0.91}
