@@ -1613,7 +1613,9 @@ def test_event_detail_quotes_every_ladder_rung_while_book_pass_keeps_the_shortli
         ladder_keep=1,
         max_workers=1,
     )
-    assert result["event_detail_captured"] == 4
+    # NCAAF is excluded from event-detail (no transactTime), so the kept rung is
+    # priced by /book alone and the alternates are still pruned.
+    assert result["event_detail_captured"] == 0
     assert client.slate_calls == ["close"]
     assert result["skipped_ladder_alternates"] == 3
 
