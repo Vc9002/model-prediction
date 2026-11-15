@@ -1,0 +1,1474 @@
+{
+  "as_of_utc": "2026-11-15T03:00:00Z",
+  "coverage": {
+    "overall": {
+      "attempted": 9364,
+      "events_in_scope": 9364,
+      "spread_disagree_gt2_pct": 22.41,
+      "spread_multi_provider_events": 6806,
+      "spread_range_median": 1.0,
+      "total_disagree_gt2_pct": 27.22,
+      "total_multi_provider_events": 6672,
+      "total_range_median": 1.5,
+      "with_nonlive_spread": 9278,
+      "with_total": 9177
+    },
+    "per_season": {
+      "2016": {
+        "attempted": 873,
+        "espn_bet_close_present": 0,
+        "events_in_scope": 873,
+        "http_404": 0,
+        "median_nonlive_providers": 13.0,
+        "no_line_reasons": {
+          "empty_items": 6
+        },
+        "spread_disagree_gt2_pct": 51.74,
+        "spread_multi_provider_events": 864,
+        "total_disagree_gt2_pct": 53.0,
+        "total_multi_provider_events": 851,
+        "with_nonlive_spread": 867,
+        "with_nonlive_spread_pct": 99.31,
+        "with_total": 864,
+        "with_total_pct": 98.97
+      },
+      "2017": {
+        "attempted": 874,
+        "espn_bet_close_present": 0,
+        "events_in_scope": 874,
+        "http_404": 0,
+        "median_nonlive_providers": 10.0,
+        "no_line_reasons": {},
+        "spread_disagree_gt2_pct": 24.83,
+        "spread_multi_provider_events": 874,
+        "total_disagree_gt2_pct": 32.87,
+        "total_multi_provider_events": 785,
+        "with_nonlive_spread": 874,
+        "with_nonlive_spread_pct": 100.0,
+        "with_total": 785,
+        "with_total_pct": 89.82
+      },
+      "2018": {
+        "attempted": 884,
+        "espn_bet_close_present": 0,
+        "events_in_scope": 884,
+        "http_404": 0,
+        "median_nonlive_providers": 10.0,
+        "no_line_reasons": {
+          "empty_items": 14
+        },
+        "spread_disagree_gt2_pct": 26.01,
+        "spread_multi_provider_events": 869,
+        "total_disagree_gt2_pct": 24.47,
+        "total_multi_provider_events": 842,
+        "with_nonlive_spread": 870,
+        "with_nonlive_spread_pct": 98.42,
+        "with_total": 852,
+        "with_total_pct": 96.38
+      },
+      "2019": {
+        "attempted": 888,
+        "espn_bet_close_present": 0,
+        "events_in_scope": 888,
+        "http_404": 0,
+        "median_nonlive_providers": 11.0,
+        "no_line_reasons": {
+          "empty_items": 4
+        },
+        "spread_disagree_gt2_pct": 15.72,
+        "spread_multi_provider_events": 884,
+        "total_disagree_gt2_pct": 41.52,
+        "total_multi_provider_events": 884,
+        "with_nonlive_spread": 884,
+        "with_nonlive_spread_pct": 99.55,
+        "with_total": 884,
+        "with_total_pct": 99.55
+      },
+      "2020": {
+        "attempted": 568,
+        "espn_bet_close_present": 0,
+        "events_in_scope": 568,
+        "http_404": 0,
+        "median_nonlive_providers": 11.0,
+        "no_line_reasons": {
+          "empty_items": 1
+        },
+        "spread_disagree_gt2_pct": 25.75,
+        "spread_multi_provider_events": 567,
+        "total_disagree_gt2_pct": 22.93,
+        "total_multi_provider_events": 567,
+        "with_nonlive_spread": 567,
+        "with_nonlive_spread_pct": 99.82,
+        "with_total": 567,
+        "with_total_pct": 99.82
+      },
+      "2021": {
+        "attempted": 887,
+        "espn_bet_close_present": 0,
+        "events_in_scope": 887,
+        "http_404": 0,
+        "median_nonlive_providers": 13.0,
+        "no_line_reasons": {
+          "empty_items": 5
+        },
+        "spread_disagree_gt2_pct": 10.54,
+        "spread_multi_provider_events": 882,
+        "total_disagree_gt2_pct": 10.54,
+        "total_multi_provider_events": 882,
+        "with_nonlive_spread": 882,
+        "with_nonlive_spread_pct": 99.44,
+        "with_total": 882,
+        "with_total_pct": 99.44
+      },
+      "2022": {
+        "attempted": 896,
+        "espn_bet_close_present": 849,
+        "events_in_scope": 896,
+        "http_404": 0,
+        "median_nonlive_providers": 13.0,
+        "no_line_reasons": {
+          "empty_items": 2
+        },
+        "spread_disagree_gt2_pct": 12.99,
+        "spread_multi_provider_events": 893,
+        "total_disagree_gt2_pct": 19.26,
+        "total_multi_provider_events": 893,
+        "with_nonlive_spread": 894,
+        "with_nonlive_spread_pct": 99.78,
+        "with_total": 894,
+        "with_total_pct": 99.78
+      },
+      "2023": {
+        "attempted": 910,
+        "espn_bet_close_present": 895,
+        "events_in_scope": 910,
+        "http_404": 0,
+        "median_nonlive_providers": 11.0,
+        "no_line_reasons": {},
+        "spread_disagree_gt2_pct": 14.0,
+        "spread_multi_provider_events": 907,
+        "total_disagree_gt2_pct": 14.66,
+        "total_multi_provider_events": 907,
+        "with_nonlive_spread": 910,
+        "with_nonlive_spread_pct": 100.0,
+        "with_total": 910,
+        "with_total_pct": 100.0
+      },
+      "2024": {
+        "attempted": 919,
+        "espn_bet_close_present": 875,
+        "events_in_scope": 919,
+        "http_404": 0,
+        "median_nonlive_providers": 1.0,
+        "no_line_reasons": {
+          "empty_items": 7,
+          "no_spread_resolved": 2,
+          "only_live_items": 35
+        },
+        "spread_disagree_gt2_pct": 83.33,
+        "spread_multi_provider_events": 12,
+        "total_disagree_gt2_pct": 40.0,
+        "total_multi_provider_events": 10,
+        "with_nonlive_spread": 875,
+        "with_nonlive_spread_pct": 95.21,
+        "with_total": 877,
+        "with_total_pct": 95.43
+      },
+      "2025": {
+        "attempted": 934,
+        "espn_bet_close_present": 877,
+        "events_in_scope": 934,
+        "http_404": 0,
+        "median_nonlive_providers": 1.0,
+        "no_line_reasons": {
+          "empty_items": 1,
+          "no_spread_resolved": 9
+        },
+        "spread_disagree_gt2_pct": 7.41,
+        "spread_multi_provider_events": 54,
+        "total_disagree_gt2_pct": 3.92,
+        "total_multi_provider_events": 51,
+        "with_nonlive_spread": 924,
+        "with_nonlive_spread_pct": 98.93,
+        "with_total": 931,
+        "with_total_pct": 99.68
+      },
+      "2026": {
+        "attempted": 731,
+        "espn_bet_close_present": 0,
+        "events_in_scope": 731,
+        "http_404": 0,
+        "median_nonlive_providers": 1.0,
+        "no_line_reasons": {},
+        "spread_disagree_gt2_pct": null,
+        "spread_multi_provider_events": 0,
+        "total_disagree_gt2_pct": null,
+        "total_multi_provider_events": 0,
+        "with_nonlive_spread": 731,
+        "with_nonlive_spread_pct": 100.0,
+        "with_total": 731,
+        "with_total_pct": 100.0
+      }
+    }
+  },
+  "data_quality": {
+    "flag_counts_by_season": {
+      "2016": {
+        "nonlive_items": 10595,
+        "ps_current_dropped": 148
+      },
+      "2017": {
+        "nonlive_items": 8055,
+        "ps_current_dropped": 22,
+        "raw_over_under_dropped": 6,
+        "total_current_dropped": 6
+      },
+      "2018": {
+        "nonlive_items": 7763,
+        "ps_current_dropped": 76,
+        "raw_over_under_dropped": 36,
+        "total_current_dropped": 36
+      },
+      "2019": {
+        "nonlive_items": 9429,
+        "ps_current_dropped": 38,
+        "raw_over_under_dropped": 26,
+        "total_current_dropped": 26
+      },
+      "2020": {
+        "nonlive_items": 5918,
+        "ps_current_dropped": 36
+      },
+      "2021": {
+        "nonlive_items": 11273,
+        "ps_current_dropped": 60,
+        "raw_over_under_dropped": 2,
+        "total_current_dropped": 2
+      },
+      "2022": {
+        "block_vs_details_conflict": 1,
+        "nonlive_items": 11273,
+        "ps_close_dropped": 812,
+        "ps_current_dropped": 64,
+        "total_close_dropped": 812
+      },
+      "2023": {
+        "close_rejected_vs_current": 22,
+        "nonlive_items": 10172,
+        "ps_close_dropped": 311,
+        "ps_current_dropped": 82,
+        "total_close_dropped": 313,
+        "total_open_dropped": 1
+      },
+      "2024": {
+        "nonlive_items": 909
+      },
+      "2025": {
+        "close_rejected_vs_current": 1,
+        "nonlive_items": 989
+      },
+      "2026": {
+        "nonlive_items": 731
+      }
+    },
+    "nonbook_exclusion_diagnostic": {
+      "by_season": {
+        "2016": {
+          "differs_pct": 12.99,
+          "events": 862,
+          "gap_gt_0.5_pct": 1.39,
+          "gap_gt_1.0_pct": 0.7,
+          "mean_abs_gap": 0.081
+        },
+        "2017": {
+          "differs_pct": 33.26,
+          "events": 863,
+          "gap_gt_0.5_pct": 1.85,
+          "gap_gt_1.0_pct": 0.58,
+          "mean_abs_gap": 0.18
+        },
+        "2018": {
+          "differs_pct": 25.62,
+          "events": 804,
+          "gap_gt_0.5_pct": 3.11,
+          "gap_gt_1.0_pct": 1.0,
+          "mean_abs_gap": 0.114
+        },
+        "2019": {
+          "differs_pct": 20.48,
+          "events": 884,
+          "gap_gt_0.5_pct": 1.7,
+          "gap_gt_1.0_pct": 0.45,
+          "mean_abs_gap": 0.091
+        },
+        "2020": {
+          "differs_pct": 19.93,
+          "events": 562,
+          "gap_gt_0.5_pct": 3.74,
+          "gap_gt_1.0_pct": 1.6,
+          "mean_abs_gap": 0.109
+        },
+        "2021": {
+          "differs_pct": 7.48,
+          "events": 882,
+          "gap_gt_0.5_pct": 0.11,
+          "gap_gt_1.0_pct": 0.0,
+          "mean_abs_gap": 0.025
+        },
+        "2022": {
+          "differs_pct": 9.62,
+          "events": 894,
+          "gap_gt_0.5_pct": 0.22,
+          "gap_gt_1.0_pct": 0.0,
+          "mean_abs_gap": 0.035
+        },
+        "2023": {
+          "differs_pct": 9.45,
+          "events": 910,
+          "gap_gt_0.5_pct": 0.0,
+          "gap_gt_1.0_pct": 0.0,
+          "mean_abs_gap": 0.024
+        },
+        "2024": {
+          "differs_pct": 0.0,
+          "events": 875,
+          "gap_gt_0.5_pct": 0.0,
+          "gap_gt_1.0_pct": 0.0,
+          "mean_abs_gap": 0.0
+        },
+        "2025": {
+          "differs_pct": 0.0,
+          "events": 924,
+          "gap_gt_0.5_pct": 0.0,
+          "gap_gt_1.0_pct": 0.0,
+          "mean_abs_gap": 0.0
+        },
+        "2026": {
+          "differs_pct": 0.0,
+          "events": 731,
+          "gap_gt_0.5_pct": 0.0,
+          "gap_gt_1.0_pct": 0.0,
+          "mean_abs_gap": 0.0
+        }
+      },
+      "events_where_book_only_median_differs": 1136,
+      "events_with_book_only_median": 9191,
+      "excluded_provider_names": [
+        "Opening",
+        "accuscore",
+        "consensus",
+        "numberfire",
+        "teamrankings"
+      ]
+    },
+    "provider_seasons_with_5pct_plus_gt2pt_deviation": [
+      {
+        "items": 862,
+        "provider": "Caesars Sportsbook",
+        "season": 2017,
+        "share_gt2_pts_pct": 15.78
+      },
+      {
+        "items": 794,
+        "provider": "Caesars Sportsbook",
+        "season": 2018,
+        "share_gt2_pts_pct": 15.99
+      },
+      {
+        "items": 584,
+        "provider": "Caesars Sportsbook",
+        "season": 2019,
+        "share_gt2_pts_pct": 5.99
+      },
+      {
+        "items": 504,
+        "provider": "Caesars Sportsbook",
+        "season": 2020,
+        "share_gt2_pts_pct": 9.13
+      },
+      {
+        "items": 800,
+        "provider": "Caesars Sportsbook",
+        "season": 2021,
+        "share_gt2_pts_pct": 5.12
+      },
+      {
+        "items": 692,
+        "provider": "Caesars Sportsbook",
+        "season": 2022,
+        "share_gt2_pts_pct": 6.94
+      },
+      {
+        "items": 84,
+        "provider": "Caesars Sportsbook",
+        "season": 2023,
+        "share_gt2_pts_pct": 22.62
+      },
+      {
+        "items": 32,
+        "provider": "FanDuel",
+        "season": 2022,
+        "share_gt2_pts_pct": 25.0
+      },
+      {
+        "items": 76,
+        "provider": "FanDuel",
+        "season": 2023,
+        "share_gt2_pts_pct": 32.89
+      },
+      {
+        "items": 862,
+        "provider": "Opening",
+        "season": 2016,
+        "share_gt2_pts_pct": 37.82
+      },
+      {
+        "items": 393,
+        "provider": "Westgate",
+        "season": 2020,
+        "share_gt2_pts_pct": 15.27
+      },
+      {
+        "items": 858,
+        "provider": "consensus",
+        "season": 2016,
+        "share_gt2_pts_pct": 38.11
+      },
+      {
+        "items": 52,
+        "provider": "teamrankings",
+        "season": 2023,
+        "share_gt2_pts_pct": 19.23
+      }
+    ],
+    "provider_spread_deviation_events_with_3plus_providers": {
+      "5Dimes.eu": {
+        "items": 849,
+        "mean_abs_dev_from_event_median": 0.159,
+        "mean_signed_dev": -0.007,
+        "share_gt2_pts_pct": 0.24
+      },
+      "BETNOW.eu": {
+        "items": 845,
+        "mean_abs_dev_from_event_median": 0.156,
+        "mean_signed_dev": -0.009,
+        "share_gt2_pts_pct": 0.24
+      },
+      "BETONLINE.ag": {
+        "items": 853,
+        "mean_abs_dev_from_event_median": 0.17,
+        "mean_signed_dev": 0.04,
+        "share_gt2_pts_pct": 0.12
+      },
+      "BOVADA.lv": {
+        "items": 819,
+        "mean_abs_dev_from_event_median": 0.342,
+        "mean_signed_dev": -0.013,
+        "share_gt2_pts_pct": 0.49
+      },
+      "BetUS.COM": {
+        "items": 698,
+        "mean_abs_dev_from_event_median": 0.155,
+        "mean_signed_dev": -0.016,
+        "share_gt2_pts_pct": 0.14
+      },
+      "Betradar": {
+        "items": 553,
+        "mean_abs_dev_from_event_median": 0.405,
+        "mean_signed_dev": -0.014,
+        "share_gt2_pts_pct": 0.9
+      },
+      "CG Technology": {
+        "items": 1264,
+        "mean_abs_dev_from_event_median": 0.281,
+        "mean_signed_dev": -0.033,
+        "share_gt2_pts_pct": 0.55
+      },
+      "Caesar's": {
+        "items": 1472,
+        "mean_abs_dev_from_event_median": 0.208,
+        "mean_signed_dev": -0.011,
+        "share_gt2_pts_pct": 0.48
+      },
+      "Caesars": {
+        "items": 1986,
+        "mean_abs_dev_from_event_median": 0.191,
+        "mean_signed_dev": -0.003,
+        "share_gt2_pts_pct": 0.3
+      },
+      "Caesars Sportsbook": {
+        "items": 4320,
+        "mean_abs_dev_from_event_median": 1.31,
+        "mean_signed_dev": -0.108,
+        "share_gt2_pts_pct": 10.46
+      },
+      "Caesars Sportsbook (Colorado)": {
+        "items": 2548,
+        "mean_abs_dev_from_event_median": 0.12,
+        "mean_signed_dev": -0.002,
+        "share_gt2_pts_pct": 0.27
+      },
+      "Caesars Sportsbook (New Jersey)": {
+        "items": 3050,
+        "mean_abs_dev_from_event_median": 0.103,
+        "mean_signed_dev": -0.001,
+        "share_gt2_pts_pct": 0.2
+      },
+      "Caesars Sportsbook (Pennsylvania)": {
+        "items": 885,
+        "mean_abs_dev_from_event_median": 0.158,
+        "mean_signed_dev": 0.001,
+        "share_gt2_pts_pct": 0.23
+      },
+      "Caesars Sportsbook (Tennessee)": {
+        "items": 906,
+        "mean_abs_dev_from_event_median": 0.099,
+        "mean_signed_dev": 0.004,
+        "share_gt2_pts_pct": 0.11
+      },
+      "DraftKings": {
+        "items": 3896,
+        "mean_abs_dev_from_event_median": 0.195,
+        "mean_signed_dev": 0.008,
+        "share_gt2_pts_pct": 0.41
+      },
+      "ESPN BET": {
+        "items": 1750,
+        "mean_abs_dev_from_event_median": 0.464,
+        "mean_signed_dev": 0.003,
+        "share_gt2_pts_pct": 1.6
+      },
+      "FanDuel": {
+        "items": 108,
+        "mean_abs_dev_from_event_median": 2.308,
+        "mean_signed_dev": 0.067,
+        "share_gt2_pts_pct": 30.56
+      },
+      "MGM": {
+        "items": 2579,
+        "mean_abs_dev_from_event_median": 0.2,
+        "mean_signed_dev": -0.027,
+        "share_gt2_pts_pct": 0.12
+      },
+      "Opening": {
+        "items": 866,
+        "mean_abs_dev_from_event_median": 2.216,
+        "mean_signed_dev": 0.119,
+        "share_gt2_pts_pct": 37.88
+      },
+      "PointsBet": {
+        "items": 2461,
+        "mean_abs_dev_from_event_median": 0.142,
+        "mean_signed_dev": 0.016,
+        "share_gt2_pts_pct": 0.98
+      },
+      "SportsBetting.ag": {
+        "items": 853,
+        "mean_abs_dev_from_event_median": 0.17,
+        "mean_signed_dev": 0.04,
+        "share_gt2_pts_pct": 0.12
+      },
+      "SportsInteraction.com": {
+        "items": 847,
+        "mean_abs_dev_from_event_median": 0.308,
+        "mean_signed_dev": -0.043,
+        "share_gt2_pts_pct": 0.83
+      },
+      "Sportsbook.com": {
+        "items": 742,
+        "mean_abs_dev_from_event_median": 0.277,
+        "mean_signed_dev": 0.004,
+        "share_gt2_pts_pct": 0.27
+      },
+      "SugarHouse": {
+        "items": 3496,
+        "mean_abs_dev_from_event_median": 0.325,
+        "mean_signed_dev": 0.003,
+        "share_gt2_pts_pct": 0.83
+      },
+      "Titanbets": {
+        "items": 2628,
+        "mean_abs_dev_from_event_median": 0.076,
+        "mean_signed_dev": 0.01,
+        "share_gt2_pts_pct": 0.0
+      },
+      "Unibet": {
+        "items": 5604,
+        "mean_abs_dev_from_event_median": 0.423,
+        "mean_signed_dev": 0.05,
+        "share_gt2_pts_pct": 2.39
+      },
+      "Westgate": {
+        "items": 4336,
+        "mean_abs_dev_from_event_median": 0.563,
+        "mean_signed_dev": 0.024,
+        "share_gt2_pts_pct": 2.81
+      },
+      "Wynn": {
+        "items": 1932,
+        "mean_abs_dev_from_event_median": 0.273,
+        "mean_signed_dev": -0.003,
+        "share_gt2_pts_pct": 0.57
+      },
+      "accuscore": {
+        "items": 5747,
+        "mean_abs_dev_from_event_median": 0.153,
+        "mean_signed_dev": -0.005,
+        "share_gt2_pts_pct": 0.17
+      },
+      "consensus": {
+        "items": 5758,
+        "mean_abs_dev_from_event_median": 0.478,
+        "mean_signed_dev": -0.046,
+        "share_gt2_pts_pct": 6.2
+      },
+      "numberfire": {
+        "items": 3655,
+        "mean_abs_dev_from_event_median": 0.325,
+        "mean_signed_dev": 0.028,
+        "share_gt2_pts_pct": 1.42
+      },
+      "teamrankings": {
+        "items": 5103,
+        "mean_abs_dev_from_event_median": 0.275,
+        "mean_signed_dev": 0.012,
+        "share_gt2_pts_pct": 1.29
+      }
+    }
+  },
+  "generated_at_utc": "2026-11-15T04:04:55Z",
+  "lines_file": {
+    "bytes": 41496203,
+    "events_in_scope": 9364,
+    "events_not_fetched": 0,
+    "path": "data/research/ncaaf_v6/espn_lines.jsonl (untracked)",
+    "records_unique_events": 9364,
+    "selected_recompute_mismatches": 0,
+    "sha256": "2b19a2545fb2e5f9df4c55a1b57ee9f88b11eab371828a4a7ed88e8bdfb7fa54"
+  },
+  "orientation_favourite_outcome_check": {
+    "all": {
+      "dog_won": 2210,
+      "fav_win_pct": 76.13,
+      "fav_won": 7050,
+      "n": 9260,
+      "tie": 0
+    },
+    "per_season": {
+      "2016": {
+        "dog_won": 212,
+        "fav_win_pct": 75.46,
+        "fav_won": 652,
+        "n": 864,
+        "tie": 0
+      },
+      "2017": {
+        "dog_won": 200,
+        "fav_win_pct": 77.06,
+        "fav_won": 672,
+        "n": 872,
+        "tie": 0
+      },
+      "2018": {
+        "dog_won": 205,
+        "fav_win_pct": 76.38,
+        "fav_won": 663,
+        "n": 868,
+        "tie": 0
+      },
+      "2019": {
+        "dog_won": 198,
+        "fav_win_pct": 77.58,
+        "fav_won": 685,
+        "n": 883,
+        "tie": 0
+      },
+      "2020": {
+        "dog_won": 139,
+        "fav_win_pct": 75.49,
+        "fav_won": 428,
+        "n": 567,
+        "tie": 0
+      },
+      "2021": {
+        "dog_won": 219,
+        "fav_win_pct": 75.06,
+        "fav_won": 659,
+        "n": 878,
+        "tie": 0
+      },
+      "2022": {
+        "dog_won": 221,
+        "fav_win_pct": 75.2,
+        "fav_won": 670,
+        "n": 891,
+        "tie": 0
+      },
+      "2023": {
+        "dog_won": 212,
+        "fav_win_pct": 76.63,
+        "fav_won": 695,
+        "n": 907,
+        "tie": 0
+      },
+      "2024": {
+        "dog_won": 232,
+        "fav_win_pct": 73.49,
+        "fav_won": 643,
+        "n": 875,
+        "tie": 0
+      },
+      "2025": {
+        "dog_won": 217,
+        "fav_win_pct": 76.52,
+        "fav_won": 707,
+        "n": 924,
+        "tie": 0
+      },
+      "2026": {
+        "dog_won": 155,
+        "fav_win_pct": 78.8,
+        "fav_won": 576,
+        "n": 731,
+        "tie": 0
+      }
+    },
+    "pk_lines_excluded": 18,
+    "summary": "favourite by pinned median line won straight up 7050 of 9260 decided games (76.13%), 0 ties, 18 pick'em lines excluded"
+  },
+  "orientation_vs_v5_reference": {
+    "comparable": 577,
+    "home_away_swapped_vs_reference": 0,
+    "matched": 577,
+    "matched_exact_start": 565,
+    "matched_fuzzy_start_within_36h": 12,
+    "reference_rows": 577,
+    "spread_vs_reference": {
+      "abs_diff_gt_3_count": 14,
+      "exact_within_0.01_pct": 56.94,
+      "mean_abs_diff": 0.691,
+      "median_abs_diff": 0.0,
+      "n_pairs": 576,
+      "sign_flip_rows": [
+        {
+          "abs_gap": 6.5,
+          "derived": 3.0,
+          "event_id": "401871070",
+          "n_nonlive_providers": 1,
+          "ref": -3.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": true
+        },
+        {
+          "abs_gap": 3.0,
+          "derived": 1.5,
+          "event_id": "401862808",
+          "n_nonlive_providers": 1,
+          "ref": -1.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": false
+        },
+        {
+          "abs_gap": 3.0,
+          "derived": -1.5,
+          "event_id": "401856834",
+          "n_nonlive_providers": 1,
+          "ref": 1.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": true
+        },
+        {
+          "abs_gap": 17.0,
+          "derived": -14.5,
+          "event_id": "401866447",
+          "n_nonlive_providers": 1,
+          "ref": 2.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": true
+        },
+        {
+          "abs_gap": 19.0,
+          "derived": -11.5,
+          "event_id": "401856838",
+          "n_nonlive_providers": 1,
+          "ref": 7.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": true
+        },
+        {
+          "abs_gap": 17.0,
+          "derived": -14.5,
+          "event_id": "401860906",
+          "n_nonlive_providers": 1,
+          "ref": 2.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": true
+        },
+        {
+          "abs_gap": 4.0,
+          "derived": -2.5,
+          "event_id": "401871071",
+          "n_nonlive_providers": 1,
+          "ref": 1.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": true
+        },
+        {
+          "abs_gap": 18.0,
+          "derived": -9.5,
+          "event_id": "401860910",
+          "n_nonlive_providers": 1,
+          "ref": 8.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": true
+        },
+        {
+          "abs_gap": 11.5,
+          "derived": -10.0,
+          "event_id": "401858506",
+          "n_nonlive_providers": 1,
+          "ref": 1.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": true
+        },
+        {
+          "abs_gap": 11.0,
+          "derived": -2.5,
+          "event_id": "401860909",
+          "n_nonlive_providers": 1,
+          "ref": 8.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": true
+        },
+        {
+          "abs_gap": 18.5,
+          "derived": -10.0,
+          "event_id": "401860908",
+          "n_nonlive_providers": 1,
+          "ref": 8.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": true
+        },
+        {
+          "abs_gap": 18.0,
+          "derived": 15.5,
+          "event_id": "401860911",
+          "n_nonlive_providers": 1,
+          "ref": -2.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": true
+        },
+        {
+          "abs_gap": 3.0,
+          "derived": 1.5,
+          "event_id": "401869937",
+          "n_nonlive_providers": 1,
+          "ref": -1.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": false
+        }
+      ],
+      "sign_flips": 13,
+      "within_0.5_pct": 73.44,
+      "within_1.0_pct": 92.01
+    },
+    "spread_vs_reference_ref_pair_repeated": {
+      "abs_diff_gt_3_count": 13,
+      "exact_within_0.01_pct": 56.47,
+      "mean_abs_diff": 1.0431,
+      "median_abs_diff": 0.0,
+      "n_pairs": 232,
+      "sign_flip_rows": [
+        {
+          "abs_gap": 6.5,
+          "derived": 3.0,
+          "event_id": "401871070",
+          "n_nonlive_providers": 1,
+          "ref": -3.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": true
+        },
+        {
+          "abs_gap": 3.0,
+          "derived": -1.5,
+          "event_id": "401856834",
+          "n_nonlive_providers": 1,
+          "ref": 1.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": true
+        },
+        {
+          "abs_gap": 17.0,
+          "derived": -14.5,
+          "event_id": "401866447",
+          "n_nonlive_providers": 1,
+          "ref": 2.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": true
+        },
+        {
+          "abs_gap": 19.0,
+          "derived": -11.5,
+          "event_id": "401856838",
+          "n_nonlive_providers": 1,
+          "ref": 7.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": true
+        },
+        {
+          "abs_gap": 17.0,
+          "derived": -14.5,
+          "event_id": "401860906",
+          "n_nonlive_providers": 1,
+          "ref": 2.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": true
+        },
+        {
+          "abs_gap": 4.0,
+          "derived": -2.5,
+          "event_id": "401871071",
+          "n_nonlive_providers": 1,
+          "ref": 1.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": true
+        },
+        {
+          "abs_gap": 18.0,
+          "derived": -9.5,
+          "event_id": "401860910",
+          "n_nonlive_providers": 1,
+          "ref": 8.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": true
+        },
+        {
+          "abs_gap": 11.5,
+          "derived": -10.0,
+          "event_id": "401858506",
+          "n_nonlive_providers": 1,
+          "ref": 1.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": true
+        },
+        {
+          "abs_gap": 11.0,
+          "derived": -2.5,
+          "event_id": "401860909",
+          "n_nonlive_providers": 1,
+          "ref": 8.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": true
+        },
+        {
+          "abs_gap": 18.5,
+          "derived": -10.0,
+          "event_id": "401860908",
+          "n_nonlive_providers": 1,
+          "ref": 8.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": true
+        },
+        {
+          "abs_gap": 18.0,
+          "derived": 15.5,
+          "event_id": "401860911",
+          "n_nonlive_providers": 1,
+          "ref": -2.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": true
+        }
+      ],
+      "sign_flips": 11,
+      "within_0.5_pct": 72.84,
+      "within_1.0_pct": 89.66
+    },
+    "spread_vs_reference_ref_pair_unique": {
+      "abs_diff_gt_3_count": 1,
+      "exact_within_0.01_pct": 57.27,
+      "mean_abs_diff": 0.4535,
+      "median_abs_diff": 0.0,
+      "n_pairs": 344,
+      "sign_flip_rows": [
+        {
+          "abs_gap": 3.0,
+          "derived": 1.5,
+          "event_id": "401862808",
+          "n_nonlive_providers": 1,
+          "ref": -1.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": false
+        },
+        {
+          "abs_gap": 3.0,
+          "derived": 1.5,
+          "event_id": "401869937",
+          "n_nonlive_providers": 1,
+          "ref": -1.5,
+          "ref_hl_tl_pair_repeats_on_other_rows": false
+        }
+      ],
+      "sign_flips": 2,
+      "within_0.5_pct": 73.84,
+      "within_1.0_pct": 93.6
+    },
+    "total_vs_reference": {
+      "abs_diff_gt_3_count": 11,
+      "exact_within_0.01_pct": 59.13,
+      "mean_abs_diff": 0.6104,
+      "median_abs_diff": 0.0,
+      "n_pairs": 575,
+      "within_0.5_pct": 59.13,
+      "within_1.0_pct": 93.74
+    },
+    "total_vs_reference_ref_pair_repeated": {
+      "abs_diff_gt_3_count": 8,
+      "exact_within_0.01_pct": 56.9,
+      "mean_abs_diff": 0.7586,
+      "median_abs_diff": 0.0,
+      "n_pairs": 232,
+      "within_0.5_pct": 56.9,
+      "within_1.0_pct": 91.38
+    },
+    "total_vs_reference_ref_pair_unique": {
+      "abs_diff_gt_3_count": 3,
+      "exact_within_0.01_pct": 60.64,
+      "mean_abs_diff": 0.5102,
+      "median_abs_diff": 0.0,
+      "n_pairs": 343,
+      "within_0.5_pct": 60.64,
+      "within_1.0_pct": 95.34
+    },
+    "unmatched": 0
+  },
+  "pinned_rule": {
+    "also_emitted": "ESPN BET (provider name exactly 'ESPN BET') close value where present; eligible provider count; min/max/range across providers as a dispersion diagnostic",
+    "excluded_items": "any provider item whose name contains 'live' (case-insensitive) or that is flagged live; these are in-play lines",
+    "home_spread_line_orientation": "negative = home favoured by that many points. Magnitude from the last number in the item's `details` text; side from homeTeamOdds.favorite / awayTeamOdds.favorite (exactly one true). 'EVEN'/'PK'/'PICK' details = 0. If details or flags are unusable, the home team's own point-spread block string is used (direct home-signed value). The raw `spread` field's sign is NEVER assumed and a provider with neither resolution is excluded from the median.",
+    "line_semantics": "archived closing/final pregame lines; no per-quote observed_at; a closing-line benchmark, not a decision-time quote",
+    "no_line_reasons": "http_404, empty_items, only_live_items, no_spread_resolved, fetch_failed",
+    "outcomes": "never joined in this script",
+    "per_provider_value": "spread: homeTeamOdds.close point spread when the item carries a close block, else the details/flags-derived current line. total: close.total when present, else overUnder, else current.total.",
+    "plausibility_drops": "a spread-field value with |x| > 70 or a total-field value outside [15, 120] is treated as missing (a price or garbage leaking into a line field; ESPN BET 2022-2023 close blocks carry prices) and is dropped BEFORE storage, so no price enters the records, and counted; a close spread is rejected (the details/flags current line is used instead) when it differs from that line by more than 3.0 points; disagreement between the home point-spread block and the details/flags line is counted, never silently resolved",
+    "population": "FBS-FBS and FBS-FCS completed games 2016-2026, forfeits excluded",
+    "primary_line": "per event and market, spread and total separately: the median (statistics.median, unrounded) across eligible non-live providers of their per-provider value",
+    "version": "espn-lines-rule-1"
+  },
+  "providers": {
+    "close_block_differs_from_current": 235,
+    "close_block_present": 7824,
+    "live_items_excluded": 2067,
+    "nonlive_orientation_sources": {
+      "details_flags": 75884,
+      "details_pick": 263,
+      "unresolved": 960
+    },
+    "providers": {
+      "1001|accuscore": {
+        "items": 5761,
+        "seasons": "2017-2023"
+      },
+      "1002|teamrankings": {
+        "items": 5346,
+        "seasons": "2016-2023"
+      },
+      "1003|numberfire": {
+        "items": 3728,
+        "seasons": "2016-2021"
+      },
+      "1004|consensus": {
+        "items": 5765,
+        "seasons": "2016-2023"
+      },
+      "1005|FanDuel": {
+        "items": 108,
+        "seasons": "2022-2023"
+      },
+      "1007|SportsInsights": {
+        "items": 56,
+        "seasons": "2016-2019"
+      },
+      "100|DraftKings": {
+        "items": 834,
+        "seasons": "2025-2026"
+      },
+      "15|SportsBetting.ag": {
+        "items": 853,
+        "seasons": "2016-2016"
+      },
+      "18|5Dimes.eu": {
+        "items": 849,
+        "seasons": "2016-2017"
+      },
+      "19|BETONLINE.ag": {
+        "items": 853,
+        "seasons": "2016-2016"
+      },
+      "1|SportsInteraction.com": {
+        "items": 847,
+        "seasons": "2016-2017"
+      },
+      "200|DraftKings - Live Odds": {
+        "items": 7,
+        "seasons": "2025-2026"
+      },
+      "20|BOVADA.lv": {
+        "items": 819,
+        "seasons": "2016-2017"
+      },
+      "23|Opening": {
+        "items": 868,
+        "seasons": "2016-2017"
+      },
+      "25|Westgate": {
+        "items": 4340,
+        "seasons": "2016-2022"
+      },
+      "26|BETNOW.eu": {
+        "items": 845,
+        "seasons": "2016-2016"
+      },
+      "28|Caesar's": {
+        "items": 1472,
+        "seasons": "2017-2018"
+      },
+      "31|Caesars Sportsbook": {
+        "items": 4416,
+        "seasons": "2017-2023"
+      },
+      "32|Wynn": {
+        "items": 1933,
+        "seasons": "2017-2019"
+      },
+      "35|CG Technology": {
+        "items": 1264,
+        "seasons": "2017-2019"
+      },
+      "36|Unibet": {
+        "items": 5605,
+        "seasons": "2017-2024"
+      },
+      "37|Betradar": {
+        "items": 553,
+        "seasons": "2019-2019"
+      },
+      "38|Caesars": {
+        "items": 1986,
+        "seasons": "2018-2020"
+      },
+      "3|Sportsbook.com": {
+        "items": 742,
+        "seasons": "2016-2017"
+      },
+      "40|DraftKings": {
+        "items": 3897,
+        "seasons": "2019-2023"
+      },
+      "41|SugarHouse": {
+        "items": 3581,
+        "seasons": "2019-2024"
+      },
+      "43|Caesars Sportsbook (Pennsylvania)": {
+        "items": 1329,
+        "seasons": "2020-2022"
+      },
+      "45|Caesars Sportsbook (New Jersey)": {
+        "items": 3092,
+        "seasons": "2020-2024"
+      },
+      "47|MGM": {
+        "items": 2616,
+        "seasons": "2020-2023"
+      },
+      "48|PointsBet": {
+        "items": 2461,
+        "seasons": "2020-2023"
+      },
+      "4|BetUS.COM": {
+        "items": 698,
+        "seasons": "2016-2017"
+      },
+      "52|Caesars Sportsbook (Colorado)": {
+        "items": 2549,
+        "seasons": "2021-2024"
+      },
+      "53|Titanbets": {
+        "items": 2628,
+        "seasons": "2021-2023"
+      },
+      "57|Caesars Sportsbook (Tennessee)": {
+        "items": 906,
+        "seasons": "2023-2024"
+      },
+      "58|ESPN BET": {
+        "items": 3507,
+        "seasons": "2022-2025"
+      },
+      "59|ESPN Bet - Live Odds": {
+        "items": 2060,
+        "seasons": "2023-2025"
+      }
+    }
+  },
+  "raw_spread_vs_derived_by_season": {
+    "2016": {
+      "n": 10501,
+      "raw_equals_home_signed": 10501
+    },
+    "2017": {
+      "n": 8028,
+      "raw_equals_home_signed": 8028
+    },
+    "2018": {
+      "n": 7710,
+      "raw_equals_home_signed": 7710
+    },
+    "2019": {
+      "n": 9223,
+      "raw_equals_home_signed": 9223
+    },
+    "2020": {
+      "n": 5412,
+      "raw_equals_home_signed": 5412
+    },
+    "2021": {
+      "n": 11202,
+      "raw_equals_home_signed": 11202
+    },
+    "2022": {
+      "n": 11239,
+      "raw_equals_home_signed": 11239
+    },
+    "2023": {
+      "n": 9953,
+      "raw_equals_home_signed": 9953
+    },
+    "2024": {
+      "n": 907,
+      "raw_equals_home_signed": 907
+    },
+    "2025": {
+      "n": 978,
+      "raw_equals_home_signed": 978
+    },
+    "2026": {
+      "n": 731,
+      "raw_equals_home_signed": 731
+    }
+  },
+  "rule_pin": {
+    "first_fetch_started_at_utc": "2026-11-15T02:59:33Z",
+    "rule_sha256": "ee23e34e91544b797a1feaa9c6ab604fa79597671f6bec110dd34df4b806ee97"
+  },
+  "script": "scripts/cfb_v6_espn_lines.py",
+  "verification_sample": {
+    "matched": 25,
+    "matched_with_lines": 24,
+    "results": [
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401328545",
+        "match": true,
+        "providers_fresh": 11,
+        "providers_stored": 11,
+        "season_year": 2021
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "400869341",
+        "match": true,
+        "providers_fresh": 11,
+        "providers_stored": 11,
+        "season_year": 2016
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401752759",
+        "match": true,
+        "providers_fresh": 2,
+        "providers_stored": 2,
+        "season_year": 2025
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401110774",
+        "match": true,
+        "providers_fresh": 11,
+        "providers_stored": 11,
+        "season_year": 2019
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401426564",
+        "match": true,
+        "providers_fresh": 14,
+        "providers_stored": 14,
+        "season_year": 2022
+      },
+      {
+        "carried_line": false,
+        "diffs": [],
+        "event_id": "401112257",
+        "match": true,
+        "providers_fresh": 0,
+        "providers_stored": 0,
+        "season_year": 2019
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401643746",
+        "match": true,
+        "providers_fresh": 2,
+        "providers_stored": 2,
+        "season_year": 2024
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401114293",
+        "match": true,
+        "providers_fresh": 13,
+        "providers_stored": 13,
+        "season_year": 2019
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "400944883",
+        "match": true,
+        "providers_fresh": 10,
+        "providers_stored": 10,
+        "season_year": 2017
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "400869703",
+        "match": true,
+        "providers_fresh": 13,
+        "providers_stored": 13,
+        "season_year": 2016
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401249008",
+        "match": true,
+        "providers_fresh": 12,
+        "providers_stored": 12,
+        "season_year": 2020
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401762470",
+        "match": true,
+        "providers_fresh": 2,
+        "providers_stored": 2,
+        "season_year": 2025
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401114198",
+        "match": true,
+        "providers_fresh": 11,
+        "providers_stored": 11,
+        "season_year": 2019
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401020790",
+        "match": true,
+        "providers_fresh": 10,
+        "providers_stored": 10,
+        "season_year": 2018
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "400937484",
+        "match": true,
+        "providers_fresh": 4,
+        "providers_stored": 4,
+        "season_year": 2017
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401858290",
+        "match": true,
+        "providers_fresh": 1,
+        "providers_stored": 1,
+        "season_year": 2026
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401756878",
+        "match": true,
+        "providers_fresh": 2,
+        "providers_stored": 2,
+        "season_year": 2025
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401032085",
+        "match": true,
+        "providers_fresh": 10,
+        "providers_stored": 10,
+        "season_year": 2018
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401761647",
+        "match": true,
+        "providers_fresh": 2,
+        "providers_stored": 2,
+        "season_year": 2025
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401415254",
+        "match": true,
+        "providers_fresh": 13,
+        "providers_stored": 13,
+        "season_year": 2022
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401415652",
+        "match": true,
+        "providers_fresh": 13,
+        "providers_stored": 13,
+        "season_year": 2022
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401015003",
+        "match": true,
+        "providers_fresh": 9,
+        "providers_stored": 9,
+        "season_year": 2018
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401520254",
+        "match": true,
+        "providers_fresh": 12,
+        "providers_stored": 12,
+        "season_year": 2023
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401644758",
+        "match": true,
+        "providers_fresh": 2,
+        "providers_stored": 2,
+        "season_year": 2024
+      },
+      {
+        "carried_line": true,
+        "diffs": [],
+        "event_id": "401520281",
+        "match": true,
+        "providers_fresh": 12,
+        "providers_stored": 12,
+        "season_year": 2023
+      }
+    ],
+    "sampled": 25,
+    "sampled_with_lines": 24,
+    "seed": 20261115,
+    "verified_at_utc": "2026-11-15T04:03:05Z"
+  }
+}

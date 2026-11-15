@@ -1,0 +1,4717 @@
+{
+  "as_of_utc": "2026-11-15T02:10:00Z",
+  "espn_lines_audit_sha256": "37b1fec6fb01d1fb471f125444c1167490bc9f3318a925f1fad7850e981fa2d5",
+  "espn_lines_sha256": "2b19a2545fb2e5f9df4c55a1b57ee9f88b11eab371828a4a7ed88e8bdfb7fa54",
+  "espn_rule_sha256_values": [
+    "ee23e34e91544b797a1feaa9c6ab604fa79597671f6bec110dd34df4b806ee97"
+  ],
+  "first_look": true,
+  "frozen_params_sha256": "6e38b14ca486acfd836c1259e5c4fd4fb8e9b5894a06f367322b1eb0c7b13e70",
+  "lined_events_in_file": 9364,
+  "markets": {
+    "spread": {
+      "groups": {
+        "all": {
+          "n_lined_v6": 8376,
+          "v5_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 50.164203612479476,
+                "n": 2910,
+                "side_takes": 2436
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 48.988350705088905,
+                "n": 1936,
+                "side_takes": 1631
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 47.94383149448345,
+                "n": 1170,
+                "side_takes": 997
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 50.311850311850314,
+                "n": 1070,
+                "side_takes": 962
+              }
+            ],
+            "corr": 0.006517499636330385,
+            "corr_ci": {
+              "ci_95_high": 0.03096657673194518,
+              "ci_95_low": -0.017984729615426322,
+              "dates": 756,
+              "point": 0.006517499636330385
+            },
+            "line_21_plus": {
+              "dog_takes": 826,
+              "mean_actual_favourite_margin": 27.92429906542056,
+              "mean_line_favourite_margin": 28.364485981308412,
+              "mean_model_favourite_margin": 22.601083635514016,
+              "n": 1070
+            },
+            "mae_line": 12.174499012136607,
+            "mae_model": 13.26310855489698,
+            "n": 7086,
+            "ols_slope": 0.015650477107762597,
+            "sd_actual": 20.815749169688193,
+            "sd_line": 13.843476392245213,
+            "sd_model": 12.55433806007031,
+            "side_losses": 3043,
+            "side_pushes": 103,
+            "side_wins": 2983
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 49.20049200492005,
+                "n": 3102,
+                "side_takes": 2439
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 49.572649572649574,
+                "n": 2127,
+                "side_takes": 1638
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 49.486461251167135,
+                "n": 1309,
+                "side_takes": 1071
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 49.96873045653533,
+                "n": 1838,
+                "side_takes": 1599
+              }
+            ],
+            "corr": -0.007112157585642361,
+            "corr_ci": {
+              "ci_95_high": 0.017664808548693865,
+              "ci_95_low": -0.031914323907876435,
+              "dates": 784,
+              "point": -0.007112157585642361
+            },
+            "line_21_plus": {
+              "dog_takes": 1376,
+              "mean_actual_favourite_margin": 31.088683351468987,
+              "mean_line_favourite_margin": 31.291485310119697,
+              "mean_model_favourite_margin": 26.286692328368428,
+              "n": 1838
+            },
+            "mae_line": 12.173680754536772,
+            "mae_model": 13.00135382317308,
+            "n": 8376,
+            "ols_slope": -0.019810584483236013,
+            "sd_actual": 22.29919552630752,
+            "sd_line": 15.993831750509136,
+            "sd_model": 14.38338033076722,
+            "side_losses": 3406,
+            "side_pushes": 91,
+            "side_wins": 3341
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 48.88500218627022,
+                "n": 2910,
+                "side_takes": 2287
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 48.95340985820392,
+                "n": 1936,
+                "side_takes": 1481
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 49.94697773064687,
+                "n": 1170,
+                "side_takes": 943
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 49.16943521594684,
+                "n": 1070,
+                "side_takes": 903
+              }
+            ],
+            "corr": -0.001992146887383456,
+            "corr_ci": {
+              "ci_95_high": 0.02350496794421007,
+              "ci_95_low": -0.028670805729663098,
+              "dates": 756,
+              "point": -0.001992146887383456
+            },
+            "line_21_plus": {
+              "dog_takes": 737,
+              "mean_actual_favourite_margin": 27.92429906542056,
+              "mean_line_favourite_margin": 28.364485981308412,
+              "mean_model_favourite_margin": 25.020661923003267,
+              "n": 1070
+            },
+            "mae_line": 12.174499012136607,
+            "mae_model": 12.801341237335103,
+            "n": 7086,
+            "ols_slope": -0.006438594365039552,
+            "sd_actual": 20.815749169688193,
+            "sd_line": 13.843476392245213,
+            "sd_model": 12.995949669562101,
+            "side_losses": 2856,
+            "side_pushes": 79,
+            "side_wins": 2758
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.007); 95% CI [-0.018, +0.031] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.007); 95% CI [-0.032, +0.018] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.002); 95% CI [-0.029, +0.024] includes zero"
+          }
+        },
+        "season:2017": {
+          "n_lined_v6": 873,
+          "v5_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 50.224215246636774,
+                "n": 269,
+                "side_takes": 223
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 46.78362573099415,
+                "n": 212,
+                "side_takes": 171
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 40.54054054054054,
+                "n": 137,
+                "side_takes": 111
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 56.60377358490566,
+                "n": 119,
+                "side_takes": 106
+              }
+            ],
+            "corr": -0.014991146111846458,
+            "corr_ci": {
+              "ci_95_high": 0.08991093059577394,
+              "ci_95_low": -0.10886348808011913,
+              "dates": 73,
+              "point": -0.014991146111846458
+            },
+            "line_21_plus": {
+              "dog_takes": 95,
+              "mean_actual_favourite_margin": 28.428571428571427,
+              "mean_line_favourite_margin": 28.067226890756302,
+              "mean_model_favourite_margin": 23.0373243697479,
+              "n": 119
+            },
+            "mae_line": 12.148236092265943,
+            "mae_model": 13.44627499321574,
+            "n": 737,
+            "ols_slope": -0.037930498839454485,
+            "sd_actual": 21.639443350626443,
+            "sd_line": 14.152704310318951,
+            "sd_model": 12.650278844276196,
+            "side_losses": 314,
+            "side_pushes": 20,
+            "side_wins": 297
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 51.111111111111114,
+                "n": 291,
+                "side_takes": 225
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 55.26315789473684,
+                "n": 239,
+                "side_takes": 190
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 48.031496062992126,
+                "n": 153,
+                "side_takes": 127
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 59.06432748538012,
+                "n": 190,
+                "side_takes": 171
+              }
+            ],
+            "corr": 0.03432489367310282,
+            "corr_ci": {
+              "ci_95_high": 0.12094517249925968,
+              "ci_95_low": -0.05766436387642408,
+              "dates": 74,
+              "point": 0.03432489367310282
+            },
+            "line_21_plus": {
+              "dog_takes": 161,
+              "mean_actual_favourite_margin": 29.44736842105263,
+              "mean_line_favourite_margin": 30.78684210526316,
+              "mean_model_favourite_margin": 25.025875730856317,
+              "n": 190
+            },
+            "mae_line": 12.352233676975946,
+            "mae_model": 13.11464491669785,
+            "n": 873,
+            "ols_slope": 0.09251776967575868,
+            "sd_actual": 22.531094964818013,
+            "sd_line": 15.955882956988363,
+            "sd_model": 14.284263575638331,
+            "side_losses": 331,
+            "side_pushes": 17,
+            "side_wins": 382
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 50.0,
+                "n": 269,
+                "side_takes": 208
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 53.89221556886228,
+                "n": 212,
+                "side_takes": 167
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 47.78761061946903,
+                "n": 137,
+                "side_takes": 113
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 52.88461538461539,
+                "n": 119,
+                "side_takes": 104
+              }
+            ],
+            "corr": -0.02138425208230248,
+            "corr_ci": {
+              "ci_95_high": 0.06932246630203788,
+              "ci_95_low": -0.11712435756762712,
+              "dates": 73,
+              "point": -0.02138425208230248
+            },
+            "line_21_plus": {
+              "dog_takes": 94,
+              "mean_actual_favourite_margin": 28.428571428571427,
+              "mean_line_favourite_margin": 28.067226890756302,
+              "mean_model_favourite_margin": 24.57098247485546,
+              "n": 119
+            },
+            "mae_line": 12.148236092265943,
+            "mae_model": 12.926354207833185,
+            "n": 737,
+            "ols_slope": -0.07100850315810998,
+            "sd_actual": 21.639443350626443,
+            "sd_line": 14.152704310318951,
+            "sd_model": 13.182011834004161,
+            "side_losses": 289,
+            "side_pushes": 15,
+            "side_wins": 303
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.015); 95% CI [-0.109, +0.090] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.034); 95% CI [-0.058, +0.121] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.021); 95% CI [-0.117, +0.069] includes zero"
+          }
+        },
+        "season:2018": {
+          "n_lined_v6": 870,
+          "v5_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 48.01587301587302,
+                "n": 288,
+                "side_takes": 252
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 51.829268292682926,
+                "n": 200,
+                "side_takes": 164
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 50.847457627118644,
+                "n": 132,
+                "side_takes": 118
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 48.62385321100918,
+                "n": 129,
+                "side_takes": 109
+              }
+            ],
+            "corr": -0.00623506401938776,
+            "corr_ci": {
+              "ci_95_high": 0.05133594037437842,
+              "ci_95_low": -0.07061009843583194,
+              "dates": 77,
+              "point": -0.00623506401938776
+            },
+            "line_21_plus": {
+              "dog_takes": 99,
+              "mean_actual_favourite_margin": 27.24031007751938,
+              "mean_line_favourite_margin": 28.100775193798448,
+              "mean_model_favourite_margin": 22.727147674418603,
+              "n": 129
+            },
+            "mae_line": 12.691255006675567,
+            "mae_model": 13.76588162883845,
+            "n": 749,
+            "ols_slope": -0.016231520703949894,
+            "sd_actual": 21.534764260466908,
+            "sd_line": 14.174463349525398,
+            "sd_model": 12.827876102141644,
+            "side_losses": 324,
+            "side_pushes": 15,
+            "side_wins": 319
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 50.0,
+                "n": 301,
+                "side_takes": 234
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 50.617283950617285,
+                "n": 221,
+                "side_takes": 162
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 49.13793103448276,
+                "n": 143,
+                "side_takes": 116
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 52.54237288135593,
+                "n": 205,
+                "side_takes": 177
+              }
+            ],
+            "corr": 0.0012003059447994895,
+            "corr_ci": {
+              "ci_95_high": 0.06996018132411051,
+              "ci_95_low": -0.057396755084856255,
+              "dates": 78,
+              "point": 0.0012003059447994895
+            },
+            "line_21_plus": {
+              "dog_takes": 147,
+              "mean_actual_favourite_margin": 29.902439024390244,
+              "mean_line_favourite_margin": 31.228048780487804,
+              "mean_model_favourite_margin": 26.59230880935532,
+              "n": 205
+            },
+            "mae_line": 12.497413793103448,
+            "mae_model": 13.128515773939284,
+            "n": 870,
+            "ols_slope": 0.003620840008234717,
+            "sd_actual": 22.751788246435098,
+            "sd_line": 16.353673536723363,
+            "sd_model": 14.74892660295335,
+            "side_losses": 340,
+            "side_pushes": 12,
+            "side_wins": 349
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 48.888888888888886,
+                "n": 288,
+                "side_takes": 225
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 48.275862068965516,
+                "n": 200,
+                "side_takes": 145
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 51.42857142857143,
+                "n": 132,
+                "side_takes": 105
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 50.0,
+                "n": 129,
+                "side_takes": 108
+              }
+            ],
+            "corr": 0.01204481957079943,
+            "corr_ci": {
+              "ci_95_high": 0.0937690399076588,
+              "ci_95_low": -0.0663624889186405,
+              "dates": 77,
+              "point": 0.01204481957079943
+            },
+            "line_21_plus": {
+              "dog_takes": 80,
+              "mean_actual_favourite_margin": 27.24031007751938,
+              "mean_line_favourite_margin": 28.100775193798448,
+              "mean_model_favourite_margin": 25.918450363449068,
+              "n": 129
+            },
+            "mae_line": 12.691255006675567,
+            "mae_model": 13.116591291577423,
+            "n": 749,
+            "ols_slope": 0.046485126135760814,
+            "sd_actual": 21.534764260466908,
+            "sd_line": 14.174463349525398,
+            "sd_model": 13.55761209370814,
+            "side_losses": 295,
+            "side_pushes": 12,
+            "side_wins": 288
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.006); 95% CI [-0.071, +0.051] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.001); 95% CI [-0.057, +0.070] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.012); 95% CI [-0.066, +0.094] includes zero"
+          }
+        },
+        "season:2019": {
+          "n_lined_v6": 884,
+          "v5_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 50.43859649122807,
+                "n": 274,
+                "side_takes": 228
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 42.01183431952663,
+                "n": 199,
+                "side_takes": 169
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 44.54545454545455,
+                "n": 126,
+                "side_takes": 110
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 39.682539682539684,
+                "n": 140,
+                "side_takes": 126
+              }
+            ],
+            "corr": -0.030648960355458135,
+            "corr_ci": {
+              "ci_95_high": 0.030824170400535884,
+              "ci_95_low": -0.09611174306581755,
+              "dates": 75,
+              "point": -0.030648960355458135
+            },
+            "line_21_plus": {
+              "dog_takes": 112,
+              "mean_actual_favourite_margin": 28.735714285714284,
+              "mean_line_favourite_margin": 28.198214285714286,
+              "mean_model_favourite_margin": 21.7362325,
+              "n": 140
+            },
+            "mae_line": 12.162381596752368,
+            "mae_model": 13.433161637347766,
+            "n": 739,
+            "ols_slope": -0.07415133777517413,
+            "sd_actual": 22.095224150790912,
+            "sd_line": 14.999872547544637,
+            "sd_model": 13.156268404783047,
+            "side_losses": 348,
+            "side_pushes": 11,
+            "side_wins": 285
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 49.78902953586498,
+                "n": 295,
+                "side_takes": 237
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 45.562130177514796,
+                "n": 221,
+                "side_takes": 169
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 52.136752136752136,
+                "n": 144,
+                "side_takes": 117
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 48.958333333333336,
+                "n": 224,
+                "side_takes": 192
+              }
+            ],
+            "corr": -0.017696787090621825,
+            "corr_ci": {
+              "ci_95_high": 0.04606388947378991,
+              "ci_95_low": -0.080527389202069,
+              "dates": 76,
+              "point": -0.017696787090621825
+            },
+            "line_21_plus": {
+              "dog_takes": 165,
+              "mean_actual_favourite_margin": 30.790178571428573,
+              "mean_line_favourite_margin": 30.363839285714285,
+              "mean_model_favourite_margin": 25.82464983950337,
+              "n": 224
+            },
+            "mae_line": 11.967760180995475,
+            "mae_model": 12.823194747271039,
+            "n": 884,
+            "ols_slope": -0.05164064220163501,
+            "sd_actual": 22.940974406055414,
+            "sd_line": 16.702224516883096,
+            "sd_model": 14.991284976675368,
+            "side_losses": 365,
+            "side_pushes": 12,
+            "side_wins": 350
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 50.0,
+                "n": 274,
+                "side_takes": 220
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 46.666666666666664,
+                "n": 199,
+                "side_takes": 150
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 50.505050505050505,
+                "n": 126,
+                "side_takes": 99
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 45.76271186440678,
+                "n": 140,
+                "side_takes": 118
+              }
+            ],
+            "corr": -0.02450181540084065,
+            "corr_ci": {
+              "ci_95_high": 0.03851777321351823,
+              "ci_95_low": -0.08142467333986914,
+              "dates": 75,
+              "point": -0.02450181540084065
+            },
+            "line_21_plus": {
+              "dog_takes": 97,
+              "mean_actual_favourite_margin": 28.735714285714284,
+              "mean_line_favourite_margin": 28.198214285714286,
+              "mean_model_favourite_margin": 24.725112870917826,
+              "n": 140
+            },
+            "mae_line": 12.162381596752368,
+            "mae_model": 12.858438431397111,
+            "n": 739,
+            "ols_slope": -0.07999715055847437,
+            "sd_actual": 22.095224150790912,
+            "sd_line": 14.999872547544637,
+            "sd_model": 13.873159886936442,
+            "side_losses": 303,
+            "side_pushes": 9,
+            "side_wins": 284
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.031); 95% CI [-0.096, +0.031] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.018); 95% CI [-0.081, +0.046] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.025); 95% CI [-0.081, +0.039] includes zero"
+          }
+        },
+        "season:2020": {
+          "n_lined_v6": 567,
+          "v5_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 48.85057471264368,
+                "n": 196,
+                "side_takes": 174
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 51.63934426229508,
+                "n": 148,
+                "side_takes": 122
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 44.705882352941174,
+                "n": 98,
+                "side_takes": 85
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 57.971014492753625,
+                "n": 76,
+                "side_takes": 69
+              }
+            ],
+            "corr": 0.0740173454216543,
+            "corr_ci": {
+              "ci_95_high": 0.15944449776680125,
+              "ci_95_low": -0.018554498797201405,
+              "dates": 71,
+              "point": 0.0740173454216543
+            },
+            "line_21_plus": {
+              "dog_takes": 63,
+              "mean_actual_favourite_margin": 25.36842105263158,
+              "mean_line_favourite_margin": 27.148026315789473,
+              "mean_model_favourite_margin": 20.16883552631579,
+              "n": 76
+            },
+            "mae_line": 12.836389961389962,
+            "mae_model": 13.60419027027027,
+            "n": 518,
+            "ols_slope": 0.1724323613479661,
+            "sd_actual": 20.86976306359979,
+            "sd_line": 13.90358926855776,
+            "sd_model": 12.20154830060316,
+            "side_losses": 224,
+            "side_pushes": 6,
+            "side_wins": 226
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 47.30538922155689,
+                "n": 205,
+                "side_takes": 167
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 51.8796992481203,
+                "n": 159,
+                "side_takes": 133
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 49.45054945054945,
+                "n": 103,
+                "side_takes": 91
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 52.27272727272727,
+                "n": 100,
+                "side_takes": 88
+              }
+            ],
+            "corr": 0.028088714684527883,
+            "corr_ci": {
+              "ci_95_high": 0.11837644666174882,
+              "ci_95_low": -0.0668866028872219,
+              "dates": 76,
+              "point": 0.028088714684527883
+            },
+            "line_21_plus": {
+              "dog_takes": 73,
+              "mean_actual_favourite_margin": 27.13,
+              "mean_line_favourite_margin": 29.0225,
+              "mean_model_favourite_margin": 24.471221587247747,
+              "n": 100
+            },
+            "mae_line": 12.701940035273369,
+            "mae_model": 13.273741543356245,
+            "n": 567,
+            "ols_slope": 0.07839006734052403,
+            "sd_actual": 21.452411383560243,
+            "sd_line": 14.977200841448548,
+            "sd_model": 13.620904720795778,
+            "side_losses": 240,
+            "side_pushes": 6,
+            "side_wins": 239
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 46.875,
+                "n": 196,
+                "side_takes": 160
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 51.2,
+                "n": 148,
+                "side_takes": 125
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 50.0,
+                "n": 98,
+                "side_takes": 86
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 54.54545454545455,
+                "n": 76,
+                "side_takes": 66
+              }
+            ],
+            "corr": 0.03684060741771834,
+            "corr_ci": {
+              "ci_95_high": 0.12822555869843436,
+              "ci_95_low": -0.06095243280384893,
+              "dates": 71,
+              "point": 0.03684060741771834
+            },
+            "line_21_plus": {
+              "dog_takes": 51,
+              "mean_actual_favourite_margin": 25.36842105263158,
+              "mean_line_favourite_margin": 27.148026315789473,
+              "mean_model_favourite_margin": 23.521451750725742,
+              "n": 76
+            },
+            "mae_line": 12.836389961389962,
+            "mae_model": 13.304016310597945,
+            "n": 518,
+            "ols_slope": 0.10707587067755689,
+            "sd_actual": 20.86976306359979,
+            "sd_line": 13.90358926855776,
+            "sd_model": 12.984767460833186,
+            "side_losses": 219,
+            "side_pushes": 5,
+            "side_wins": 218
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.074); 95% CI [-0.019, +0.159] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.028); 95% CI [-0.067, +0.118] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.037); 95% CI [-0.061, +0.128] includes zero"
+          }
+        },
+        "season:2021": {
+          "n_lined_v6": 848,
+          "v5_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 50.588235294117645,
+                "n": 310,
+                "side_takes": 255
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 45.76271186440678,
+                "n": 200,
+                "side_takes": 177
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 49.51456310679612,
+                "n": 126,
+                "side_takes": 103
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 47.61904761904762,
+                "n": 115,
+                "side_takes": 105
+              }
+            ],
+            "corr": 0.0443740742035371,
+            "corr_ci": {
+              "ci_95_high": 0.11729386307631437,
+              "ci_95_low": -0.0311019141240478,
+              "dates": 81,
+              "point": 0.0443740742035371
+            },
+            "line_21_plus": {
+              "dog_takes": 89,
+              "mean_actual_favourite_margin": 25.94782608695652,
+              "mean_line_favourite_margin": 28.25,
+              "mean_model_favourite_margin": 22.485640521739132,
+              "n": 115
+            },
+            "mae_line": 12.557256990679095,
+            "mae_model": 13.463320798934754,
+            "n": 751,
+            "ols_slope": 0.1054082632921501,
+            "sd_actual": 20.759109384694348,
+            "sd_line": 14.068652630283529,
+            "sd_model": 12.611227866110138,
+            "side_losses": 329,
+            "side_pushes": 10,
+            "side_wins": 311
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 48.275862068965516,
+                "n": 324,
+                "side_takes": 261
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 46.3855421686747,
+                "n": 214,
+                "side_takes": 166
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 40.74074074074074,
+                "n": 132,
+                "side_takes": 108
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 49.00662251655629,
+                "n": 178,
+                "side_takes": 151
+              }
+            ],
+            "corr": -0.039266471587342415,
+            "corr_ci": {
+              "ci_95_high": 0.04377804479943514,
+              "ci_95_low": -0.11992401365134665,
+              "dates": 81,
+              "point": -0.039266471587342415
+            },
+            "line_21_plus": {
+              "dog_takes": 119,
+              "mean_actual_favourite_margin": 28.792134831460675,
+              "mean_line_favourite_margin": 30.67556179775281,
+              "mean_model_favourite_margin": 25.911800764581017,
+              "n": 178
+            },
+            "mae_line": 12.540978773584905,
+            "mae_model": 13.749228037830376,
+            "n": 848,
+            "ols_slope": -0.09431202290981375,
+            "sd_actual": 22.133592328265706,
+            "sd_line": 15.901468859098,
+            "sd_model": 14.855735378432833,
+            "side_losses": 365,
+            "side_pushes": 9,
+            "side_wins": 321
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 48.38709677419355,
+                "n": 310,
+                "side_takes": 248
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 44.8051948051948,
+                "n": 200,
+                "side_takes": 154
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 42.15686274509804,
+                "n": 126,
+                "side_takes": 102
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 45.65217391304348,
+                "n": 115,
+                "side_takes": 92
+              }
+            ],
+            "corr": -0.017395367494810198,
+            "corr_ci": {
+              "ci_95_high": 0.06281360762297614,
+              "ci_95_low": -0.11031386767718813,
+              "dates": 81,
+              "point": -0.017395367494810198
+            },
+            "line_21_plus": {
+              "dog_takes": 73,
+              "mean_actual_favourite_margin": 25.94782608695652,
+              "mean_line_favourite_margin": 28.25,
+              "mean_model_favourite_margin": 25.394057622781233,
+              "n": 115
+            },
+            "mae_line": 12.557256990679095,
+            "mae_model": 13.366104939088228,
+            "n": 751,
+            "ols_slope": -0.05168712734957919,
+            "sd_actual": 20.759109384694348,
+            "sd_line": 14.068652630283529,
+            "sd_model": 13.559004118036233,
+            "side_losses": 322,
+            "side_pushes": 8,
+            "side_wins": 274
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.044); 95% CI [-0.031, +0.117] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.039); 95% CI [-0.120, +0.044] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.017); 95% CI [-0.110, +0.063] includes zero"
+          }
+        },
+        "season:2022": {
+          "n_lined_v6": 894,
+          "v5_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 45.09803921568628,
+                "n": 311,
+                "side_takes": 255
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 50.54347826086956,
+                "n": 217,
+                "side_takes": 184
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 55.23809523809524,
+                "n": 127,
+                "side_takes": 105
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 42.708333333333336,
+                "n": 112,
+                "side_takes": 96
+              }
+            ],
+            "corr": -0.003964837679199191,
+            "corr_ci": {
+              "ci_95_high": 0.06337321460536335,
+              "ci_95_low": -0.07424103968232065,
+              "dates": 79,
+              "point": -0.003964837679199191
+            },
+            "line_21_plus": {
+              "dog_takes": 81,
+              "mean_actual_favourite_margin": 26.348214285714285,
+              "mean_line_favourite_margin": 28.404017857142858,
+              "mean_model_favourite_margin": 22.937216250000002,
+              "n": 112
+            },
+            "mae_line": 11.878748370273794,
+            "mae_model": 12.807743468057366,
+            "n": 767,
+            "ols_slope": -0.009702941919156844,
+            "sd_actual": 19.796358066930523,
+            "sd_line": 13.561916497848992,
+            "sd_model": 12.302656909090386,
+            "side_losses": 333,
+            "side_pushes": 13,
+            "side_wins": 307
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 45.173745173745175,
+                "n": 325,
+                "side_takes": 259
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 54.91329479768786,
+                "n": 230,
+                "side_takes": 173
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 54.285714285714285,
+                "n": 142,
+                "side_takes": 105
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 43.67816091954023,
+                "n": 197,
+                "side_takes": 174
+              }
+            ],
+            "corr": -0.028283636450920004,
+            "corr_ci": {
+              "ci_95_high": 0.03713678879914933,
+              "ci_95_low": -0.0915405600680702,
+              "dates": 81,
+              "point": -0.028283636450920004
+            },
+            "line_21_plus": {
+              "dog_takes": 159,
+              "mean_actual_favourite_margin": 30.705583756345177,
+              "mean_line_favourite_margin": 31.550761421319798,
+              "mean_model_favourite_margin": 25.76319168042916,
+              "n": 197
+            },
+            "mae_line": 12.178691275167786,
+            "mae_model": 12.949142604706935,
+            "n": 894,
+            "ols_slope": -0.0841518294197036,
+            "sd_actual": 21.866057002776024,
+            "sd_line": 15.882766473737993,
+            "sd_model": 14.01171791761852,
+            "side_losses": 366,
+            "side_pushes": 11,
+            "side_wins": 345
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 44.93927125506073,
+                "n": 311,
+                "side_takes": 247
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 54.93827160493827,
+                "n": 217,
+                "side_takes": 162
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 54.34782608695652,
+                "n": 127,
+                "side_takes": 92
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 41.83673469387755,
+                "n": 112,
+                "side_takes": 98
+              }
+            ],
+            "corr": -0.014105944225520698,
+            "corr_ci": {
+              "ci_95_high": 0.08328207652195618,
+              "ci_95_low": -0.11035523427712339,
+              "dates": 79,
+              "point": -0.014105944225520698
+            },
+            "line_21_plus": {
+              "dog_takes": 85,
+              "mean_actual_favourite_margin": 26.348214285714285,
+              "mean_line_favourite_margin": 28.404017857142858,
+              "mean_model_favourite_margin": 23.9535801020209,
+              "n": 112
+            },
+            "mae_line": 11.878748370273794,
+            "mae_model": 12.416646138848686,
+            "n": 767,
+            "ols_slope": -0.0468740336550531,
+            "sd_actual": 19.796358066930523,
+            "sd_line": 13.561916497848992,
+            "sd_model": 12.420792392556463,
+            "side_losses": 308,
+            "side_pushes": 10,
+            "side_wins": 291
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.004); 95% CI [-0.074, +0.063] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.028); 95% CI [-0.092, +0.037] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.014); 95% CI [-0.110, +0.083] includes zero"
+          }
+        },
+        "season:2023": {
+          "n_lined_v6": 910,
+          "v5_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 51.985559566787,
+                "n": 344,
+                "side_takes": 277
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 48.10126582278481,
+                "n": 199,
+                "side_takes": 158
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 44.54545454545455,
+                "n": 127,
+                "side_takes": 110
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 51.578947368421055,
+                "n": 106,
+                "side_takes": 95
+              }
+            ],
+            "corr": -0.023891311885198902,
+            "corr_ci": {
+              "ci_95_high": 0.054507140262906394,
+              "ci_95_low": -0.10404351527975943,
+              "dates": 79,
+              "point": -0.023891311885198902
+            },
+            "line_21_plus": {
+              "dog_takes": 78,
+              "mean_actual_favourite_margin": 27.92452830188679,
+              "mean_line_favourite_margin": 28.193396226415093,
+              "mean_model_favourite_margin": 22.919461320754717,
+              "n": 106
+            },
+            "mae_line": 12.12951030927835,
+            "mae_model": 13.224535425257733,
+            "n": 776,
+            "ols_slope": -0.060183010913930836,
+            "sd_actual": 20.40930936112613,
+            "sd_line": 13.279650242345964,
+            "sd_model": 12.500757271831452,
+            "side_losses": 322,
+            "side_pushes": 20,
+            "side_wins": 318
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 51.11940298507463,
+                "n": 353,
+                "side_takes": 268
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 45.45454545454545,
+                "n": 219,
+                "side_takes": 165
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 52.67857142857143,
+                "n": 141,
+                "side_takes": 112
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 52.60115606936416,
+                "n": 197,
+                "side_takes": 173
+              }
+            ],
+            "corr": -0.0205042875394628,
+            "corr_ci": {
+              "ci_95_high": 0.06724586599424487,
+              "ci_95_low": -0.10755177975680333,
+              "dates": 83,
+              "point": -0.0205042875394628
+            },
+            "line_21_plus": {
+              "dog_takes": 161,
+              "mean_actual_favourite_margin": 30.3248730964467,
+              "mean_line_favourite_margin": 31.16497461928934,
+              "mean_model_favourite_margin": 25.79575860888392,
+              "n": 197
+            },
+            "mae_line": 12.061813186813186,
+            "mae_model": 12.731786762395686,
+            "n": 910,
+            "ols_slope": -0.05964233746067642,
+            "sd_actual": 21.774275394442522,
+            "sd_line": 15.714791327933614,
+            "sd_model": 13.827060959612508,
+            "side_losses": 356,
+            "side_pushes": 14,
+            "side_wins": 362
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 50.38461538461539,
+                "n": 344,
+                "side_takes": 260
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 42.95302013422819,
+                "n": 199,
+                "side_takes": 149
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 54.08163265306123,
+                "n": 127,
+                "side_takes": 98
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 48.35164835164835,
+                "n": 106,
+                "side_takes": 91
+              }
+            ],
+            "corr": -0.055601179748001855,
+            "corr_ci": {
+              "ci_95_high": 0.020026868776316025,
+              "ci_95_low": -0.1335576395715352,
+              "dates": 79,
+              "point": -0.055601179748001855
+            },
+            "line_21_plus": {
+              "dog_takes": 81,
+              "mean_actual_favourite_margin": 27.92452830188679,
+              "mean_line_favourite_margin": 28.193396226415093,
+              "mean_model_favourite_margin": 24.1579465385584,
+              "n": 106
+            },
+            "mae_line": 12.12951030927835,
+            "mae_model": 12.821879587074827,
+            "n": 776,
+            "ols_slope": -0.18482405571090538,
+            "sd_actual": 20.40930936112613,
+            "sd_line": 13.279650242345964,
+            "sd_model": 12.254744757725728,
+            "side_losses": 306,
+            "side_pushes": 12,
+            "side_wins": 292
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.024); 95% CI [-0.104, +0.055] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.021); 95% CI [-0.108, +0.067] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.056); 95% CI [-0.134, +0.020] includes zero"
+          }
+        },
+        "season:2024": {
+          "n_lined_v6": 875,
+          "v5_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 50.865051903114185,
+                "n": 347,
+                "side_takes": 289
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 55.43478260869565,
+                "n": 209,
+                "side_takes": 184
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 52.577319587628864,
+                "n": 113,
+                "side_takes": 97
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 51.724137931034484,
+                "n": 94,
+                "side_takes": 87
+              }
+            ],
+            "corr": 0.029938767510880517,
+            "corr_ci": {
+              "ci_95_high": 0.09161359614778994,
+              "ci_95_low": -0.02968069441408271,
+              "dates": 89,
+              "point": 0.029938767510880517
+            },
+            "line_21_plus": {
+              "dog_takes": 63,
+              "mean_actual_favourite_margin": 28.25531914893617,
+              "mean_line_favourite_margin": 28.085106382978722,
+              "mean_model_favourite_margin": 24.665172978723405,
+              "n": 94
+            },
+            "mae_line": 12.046854521625164,
+            "mae_model": 13.111725570117956,
+            "n": 763,
+            "ols_slope": 0.07402820512384763,
+            "sd_actual": 20.06980795108968,
+            "sd_line": 12.94099774124144,
+            "sd_model": 12.622794161897138,
+            "side_losses": 312,
+            "side_pushes": 0,
+            "side_wins": 345
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 50.36231884057971,
+                "n": 359,
+                "side_takes": 276
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 49.375,
+                "n": 219,
+                "side_takes": 160
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 51.401869158878505,
+                "n": 125,
+                "side_takes": 107
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 43.66197183098591,
+                "n": 172,
+                "side_takes": 142
+              }
+            ],
+            "corr": 0.010707838625008416,
+            "corr_ci": {
+              "ci_95_high": 0.07786209506124872,
+              "ci_95_low": -0.05111036049264977,
+              "dates": 92,
+              "point": 0.010707838625008416
+            },
+            "line_21_plus": {
+              "dog_takes": 114,
+              "mean_actual_favourite_margin": 32.68604651162791,
+              "mean_line_favourite_margin": 31.38081395348837,
+              "mean_model_favourite_margin": 26.97666449237209,
+              "n": 172
+            },
+            "mae_line": 11.911714285714286,
+            "mae_model": 12.724649815681397,
+            "n": 875,
+            "ols_slope": 0.031332373617500756,
+            "sd_actual": 21.72171884806278,
+            "sd_line": 15.300481849155162,
+            "sd_model": 13.768258614573533,
+            "side_losses": 350,
+            "side_pushes": 0,
+            "side_wins": 335
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 49.438202247191015,
+                "n": 347,
+                "side_takes": 267
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 49.35064935064935,
+                "n": 209,
+                "side_takes": 154
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 51.02040816326531,
+                "n": 113,
+                "side_takes": 98
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 41.666666666666664,
+                "n": 94,
+                "side_takes": 72
+              }
+            ],
+            "corr": 0.028854090053131384,
+            "corr_ci": {
+              "ci_95_high": 0.09651480275978472,
+              "ci_95_low": -0.040050152028664104,
+              "dates": 89,
+              "point": 0.028854090053131384
+            },
+            "line_21_plus": {
+              "dog_takes": 54,
+              "mean_actual_favourite_margin": 28.25531914893617,
+              "mean_line_favourite_margin": 28.085106382978722,
+              "mean_model_favourite_margin": 25.612629998420307,
+              "n": 94
+            },
+            "mae_line": 12.046854521625164,
+            "mae_model": 12.649328580293243,
+            "n": 763,
+            "ols_slope": 0.09823393307772729,
+            "sd_actual": 20.06980795108968,
+            "sd_line": 12.94099774124144,
+            "sd_model": 12.307934234586975,
+            "side_losses": 303,
+            "side_pushes": 0,
+            "side_wins": 288
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.030); 95% CI [-0.030, +0.092] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.011); 95% CI [-0.051, +0.078] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.029); 95% CI [-0.040, +0.097] includes zero"
+          }
+        },
+        "season:2025": {
+          "n_lined_v6": 924,
+          "v5_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 54.54545454545455,
+                "n": 360,
+                "side_takes": 308
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 45.55555555555556,
+                "n": 212,
+                "side_takes": 180
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 43.18181818181818,
+                "n": 108,
+                "side_takes": 88
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 56.43564356435643,
+                "n": 106,
+                "side_takes": 101
+              }
+            ],
+            "corr": 0.03206599196990108,
+            "corr_ci": {
+              "ci_95_high": 0.09981568113749523,
+              "ci_95_low": -0.039478878957200765,
+              "dates": 90,
+              "point": 0.03206599196990108
+            },
+            "line_21_plus": {
+              "dog_takes": 85,
+              "mean_actual_favourite_margin": 30.87735849056604,
+              "mean_line_favourite_margin": 29.25,
+              "mean_model_favourite_margin": 22.876833396226417,
+              "n": 106
+            },
+            "mae_line": 11.748091603053435,
+            "mae_model": 12.6382575826972,
+            "n": 786,
+            "ols_slope": 0.07363333964153153,
+            "sd_actual": 20.201513314160305,
+            "sd_line": 13.346039181858991,
+            "sd_model": 12.075982509033338,
+            "side_losses": 332,
+            "side_pushes": 0,
+            "side_wins": 345
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 50.98039215686274,
+                "n": 381,
+                "side_takes": 306
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 50.0,
+                "n": 227,
+                "side_takes": 172
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 53.68421052631579,
+                "n": 122,
+                "side_takes": 95
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 53.84615384615385,
+                "n": 194,
+                "side_takes": 169
+              }
+            ],
+            "corr": 0.024175402251078837,
+            "corr_ci": {
+              "ci_95_high": 0.08691025710814806,
+              "ci_95_low": -0.03674337780834275,
+              "dates": 91,
+              "point": 0.024175402251078837
+            },
+            "line_21_plus": {
+              "dog_takes": 141,
+              "mean_actual_favourite_margin": 33.61340206185567,
+              "mean_line_favourite_margin": 31.809278350515463,
+              "mean_model_favourite_margin": 27.51087458877948,
+              "n": 194
+            },
+            "mae_line": 11.897727272727273,
+            "mae_model": 12.504026502093938,
+            "n": 924,
+            "ols_slope": 0.07149429492448939,
+            "sd_actual": 21.8668711989949,
+            "sd_line": 15.569474588094689,
+            "sd_model": 14.038845747521055,
+            "side_losses": 358,
+            "side_pushes": 0,
+            "side_wins": 384
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 51.21107266435986,
+                "n": 360,
+                "side_takes": 289
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 51.25,
+                "n": 212,
+                "side_takes": 160
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 54.8780487804878,
+                "n": 108,
+                "side_takes": 82
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 58.69565217391305,
+                "n": 106,
+                "side_takes": 92
+              }
+            ],
+            "corr": 0.05791977850510526,
+            "corr_ci": {
+              "ci_95_high": 0.11759198491397661,
+              "ci_95_low": -0.004011160055865178,
+              "dates": 90,
+              "point": 0.05791977850510526
+            },
+            "line_21_plus": {
+              "dog_takes": 73,
+              "mean_actual_favourite_margin": 30.87735849056604,
+              "mean_line_favourite_margin": 29.25,
+              "mean_model_favourite_margin": 26.13418259227112,
+              "n": 106
+            },
+            "mae_line": 11.748091603053435,
+            "mae_model": 12.091810145126576,
+            "n": 786,
+            "ols_slope": 0.18819657308570803,
+            "sd_actual": 20.201513314160305,
+            "sd_line": 13.346039181858991,
+            "sd_model": 12.487554031581547,
+            "side_losses": 294,
+            "side_pushes": 0,
+            "side_wins": 329
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.032); 95% CI [-0.039, +0.100] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.024); 95% CI [-0.037, +0.087] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.058); 95% CI [-0.004, +0.118] includes zero"
+          }
+        },
+        "season:2026": {
+          "n_lined_v6": 731,
+          "v5_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 49.142857142857146,
+                "n": 211,
+                "side_takes": 175
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 54.09836065573771,
+                "n": 140,
+                "side_takes": 122
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 55.714285714285715,
+                "n": 76,
+                "side_takes": 70
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 57.35294117647059,
+                "n": 73,
+                "side_takes": 68
+              }
+            ],
+            "corr": -0.025565642111973423,
+            "corr_ci": {
+              "ci_95_high": 0.06119215893569223,
+              "ci_95_low": -0.10619683569464358,
+              "dates": 42,
+              "point": -0.025565642111973423
+            },
+            "line_21_plus": {
+              "dog_takes": 61,
+              "mean_actual_favourite_margin": 30.232876712328768,
+              "mean_line_favourite_margin": 30.34246575342466,
+              "mean_model_favourite_margin": 22.003580958904106,
+              "n": 73
+            },
+            "mae_line": 11.585,
+            "mae_model": 13.306220960000001,
+            "n": 500,
+            "ols_slope": -0.0508961121363068,
+            "sd_actual": 20.498245388325312,
+            "sd_line": 13.873441209735962,
+            "sd_model": 12.336628442848575,
+            "side_losses": 205,
+            "side_pushes": 8,
+            "side_wins": 230
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 46.601941747572816,
+                "n": 268,
+                "side_takes": 206
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 45.270270270270274,
+                "n": 178,
+                "side_takes": 148
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 43.01075268817204,
+                "n": 104,
+                "side_takes": 93
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 43.82716049382716,
+                "n": 181,
+                "side_takes": 162
+              }
+            ],
+            "corr": -0.07807465153895671,
+            "corr_ci": {
+              "ci_95_high": -0.01319939657231188,
+              "ci_95_low": -0.14526834169421338,
+              "dates": 52,
+              "point": -0.07807465153895671
+            },
+            "line_21_plus": {
+              "dog_takes": 136,
+              "mean_actual_favourite_margin": 35.994475138121544,
+              "mean_line_favourite_margin": 34.11602209944751,
+              "mean_model_favourite_margin": 28.34390815461758,
+              "n": 181
+            },
+            "mae_line": 11.783857729138166,
+            "mae_model": 13.210583283855641,
+            "n": 731,
+            "ols_slope": -0.19500656108713485,
+            "sd_actual": 23.274041782270785,
+            "sd_line": 16.907985770652946,
+            "sd_model": 15.104034853764949,
+            "side_losses": 335,
+            "side_pushes": 10,
+            "side_wins": 274
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 47.239263803680984,
+                "n": 211,
+                "side_takes": 163
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 44.34782608695652,
+                "n": 140,
+                "side_takes": 115
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 42.64705882352941,
+                "n": 76,
+                "side_takes": 68
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 54.83870967741935,
+                "n": 73,
+                "side_takes": 62
+              }
+            ],
+            "corr": -0.047423119172196715,
+            "corr_ci": {
+              "ci_95_high": 0.02246549755405455,
+              "ci_95_low": -0.12392096851498804,
+              "dates": 42,
+              "point": -0.047423119172196715
+            },
+            "line_21_plus": {
+              "dog_takes": 49,
+              "mean_actual_favourite_margin": 30.232876712328768,
+              "mean_line_favourite_margin": 30.34246575342466,
+              "mean_model_favourite_margin": 26.217323362623183,
+              "n": 73
+            },
+            "mae_line": 11.585,
+            "mae_model": 12.596992382688557,
+            "n": 500,
+            "ols_slope": -0.13424854357553778,
+            "sd_actual": 20.498245388325312,
+            "sd_line": 13.873441209735962,
+            "sd_model": 13.192313972883085,
+            "side_losses": 217,
+            "side_pushes": 8,
+            "side_wins": 191
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.026); 95% CI [-0.106, +0.061] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": true,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.078); 95% CI [-0.145, -0.013] excludes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.047); 95% CI [-0.124, +0.022] includes zero"
+          }
+        },
+        "window:fit": {
+          "n_lined_v6": 6485,
+          "v5_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 49.30032292787944,
+                "n": 2222,
+                "side_takes": 1858
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 48.42271293375394,
+                "n": 1519,
+                "side_takes": 1268
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 47.36196319018405,
+                "n": 958,
+                "side_takes": 815
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 48.648648648648646,
+                "n": 875,
+                "side_takes": 777
+              }
+            ],
+            "corr": 0.004051511099507201,
+            "corr_ci": {
+              "ci_95_high": 0.032530443729388916,
+              "ci_95_low": -0.024492290451817448,
+              "dates": 588,
+              "point": 0.004051511099507201
+            },
+            "line_21_plus": {
+              "dog_takes": 671,
+              "mean_actual_favourite_margin": 27.355428571428572,
+              "mean_line_favourite_margin": 28.108,
+              "mean_model_favourite_margin": 22.578328125714286,
+              "n": 875
+            },
+            "mae_line": 12.294851094366702,
+            "mae_model": 13.370080548977397,
+            "n": 5574,
+            "ols_slope": 0.009953258936256551,
+            "sd_actual": 21.001289362518325,
+            "sd_line": 13.993545256191231,
+            "sd_model": 12.673262383944293,
+            "side_losses": 2424,
+            "side_pushes": 95,
+            "side_wins": 2294
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 48.940793047256925,
+                "n": 2336,
+                "side_takes": 1841
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 50.19669551534225,
+                "n": 1654,
+                "side_takes": 1271
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 49.24506387921022,
+                "n": 1054,
+                "side_takes": 861
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 50.19984012789768,
+                "n": 1441,
+                "side_takes": 1251
+              }
+            ],
+            "corr": -0.0060034468182754075,
+            "corr_ci": {
+              "ci_95_high": 0.024386496941957655,
+              "ci_95_low": -0.0342875349922939,
+              "dates": 605,
+              "point": -0.0060034468182754075
+            },
+            "line_21_plus": {
+              "dog_takes": 1087,
+              "mean_actual_favourite_margin": 30.106870229007633,
+              "mean_line_favourite_margin": 30.86589174184594,
+              "mean_model_favourite_margin": 25.81740725956607,
+              "n": 1441
+            },
+            "mae_line": 12.271819583654587,
+            "mae_model": 13.081306392003933,
+            "n": 6485,
+            "ols_slope": -0.016688165495238355,
+            "sd_actual": 22.30627382861305,
+            "sd_line": 16.010264680089307,
+            "sd_model": 14.392090644492859,
+            "side_losses": 2633,
+            "side_pushes": 81,
+            "side_wins": 2591
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 48.3704974271012,
+                "n": 2222,
+                "side_takes": 1749
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 49.26787252368648,
+                "n": 1519,
+                "side_takes": 1161
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 49.54604409857328,
+                "n": 958,
+                "side_takes": 771
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 47.62550881953867,
+                "n": 875,
+                "side_takes": 737
+              }
+            ],
+            "corr": -0.008603498136454493,
+            "corr_ci": {
+              "ci_95_high": 0.02243048925218845,
+              "ci_95_low": -0.041017802505068986,
+              "dates": 588,
+              "point": -0.008603498136454493
+            },
+            "line_21_plus": {
+              "dog_takes": 605,
+              "mean_actual_favourite_margin": 27.355428571428572,
+              "mean_line_favourite_margin": 28.108,
+              "mean_model_favourite_margin": 24.7904180780719,
+              "n": 875
+            },
+            "mae_line": 12.294851094366702,
+            "mae_model": 12.937331388364615,
+            "n": 5574,
+            "ols_slope": -0.02796005602362355,
+            "sd_actual": 21.001289362518325,
+            "sd_line": 13.993545256191231,
+            "sd_model": 13.128127590727408,
+            "side_losses": 2267,
+            "side_pushes": 71,
+            "side_wins": 2151
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.004); 95% CI [-0.024, +0.033] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.006); 95% CI [-0.034, +0.024] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.009); 95% CI [-0.041, +0.022] includes zero"
+          }
+        },
+        "window:holdout": {
+          "n_lined_v6": 1891,
+          "v5_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 52.94117647058823,
+                "n": 688,
+                "side_takes": 578
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 50.964187327823694,
+                "n": 417,
+                "side_takes": 363
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 50.54945054945055,
+                "n": 212,
+                "side_takes": 182
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 57.2972972972973,
+                "n": 195,
+                "side_takes": 185
+              }
+            ],
+            "corr": 0.019464737296533453,
+            "corr_ci": {
+              "ci_95_high": 0.06778126536358464,
+              "ci_95_low": -0.03238337896474201,
+              "dates": 168,
+              "point": 0.019464737296533453
+            },
+            "line_21_plus": {
+              "dog_takes": 155,
+              "mean_actual_favourite_margin": 30.476923076923075,
+              "mean_line_favourite_margin": 29.515384615384615,
+              "mean_model_favourite_margin": 22.70319169230769,
+              "n": 195
+            },
+            "mae_line": 11.730820105820106,
+            "mae_model": 12.868755449735449,
+            "n": 1512,
+            "ols_slope": 0.04311041933508375,
+            "sd_actual": 20.083339693132533,
+            "sd_line": 13.270033048937801,
+            "sd_model": 12.105215020158388,
+            "side_losses": 619,
+            "side_pushes": 8,
+            "side_wins": 689
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 50.0,
+                "n": 766,
+                "side_takes": 598
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 47.41144414168937,
+                "n": 473,
+                "side_takes": 367
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 50.476190476190474,
+                "n": 255,
+                "side_takes": 210
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 49.13793103448276,
+                "n": 397,
+                "side_takes": 348
+              }
+            ],
+            "corr": -0.016206322518046365,
+            "corr_ci": {
+              "ci_95_high": 0.027476070564540735,
+              "ci_95_low": -0.06007259865042868,
+              "dates": 179,
+              "point": -0.016206322518046365
+            },
+            "line_21_plus": {
+              "dog_takes": 289,
+              "mean_actual_favourite_margin": 34.65239294710327,
+              "mean_line_favourite_margin": 32.83627204030227,
+              "mean_model_favourite_margin": 27.990067099512498,
+              "n": 397
+            },
+            "mae_line": 11.837123215230037,
+            "mae_model": 12.727164289133903,
+            "n": 1891,
+            "ols_slope": -0.045562464818649714,
+            "sd_actual": 22.205303294542908,
+            "sd_line": 15.913419008994527,
+            "sd_model": 14.293258473898424,
+            "side_losses": 773,
+            "side_pushes": 10,
+            "side_wins": 750
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "bucket": "|line| under 7",
+                "model_side_win_pct": 50.55762081784387,
+                "n": 688,
+                "side_takes": 538
+              },
+              {
+                "bucket": "7-14",
+                "model_side_win_pct": 47.8125,
+                "n": 417,
+                "side_takes": 320
+              },
+              {
+                "bucket": "14-21",
+                "model_side_win_pct": 51.74418604651163,
+                "n": 212,
+                "side_takes": 172
+              },
+              {
+                "bucket": "21 and over",
+                "model_side_win_pct": 56.024096385542165,
+                "n": 195,
+                "side_takes": 166
+              }
+            ],
+            "corr": 0.01879737854122353,
+            "corr_ci": {
+              "ci_95_high": 0.0661269984284384,
+              "ci_95_low": -0.02662205591419503,
+              "dates": 168,
+              "point": 0.01879737854122353
+            },
+            "line_21_plus": {
+              "dog_takes": 132,
+              "mean_actual_favourite_margin": 30.476923076923075,
+              "mean_line_favourite_margin": 29.515384615384615,
+              "mean_model_favourite_margin": 26.053807381028612,
+              "n": 195
+            },
+            "mae_line": 11.730820105820106,
+            "mae_model": 12.300012466277886,
+            "n": 1512,
+            "ols_slope": 0.0596702664391413,
+            "sd_actual": 20.083339693132533,
+            "sd_line": 13.270033048937801,
+            "sd_model": 12.467609343828745,
+            "side_losses": 589,
+            "side_pushes": 8,
+            "side_wins": 607
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.019); 95% CI [-0.032, +0.068] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.016); 95% CI [-0.060, +0.027] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.019); 95% CI [-0.027, +0.066] includes zero"
+          }
+        }
+      },
+      "n_common_v5_v6": 7086,
+      "n_lined_v6": 8376,
+      "orientation_check": {
+        "corr_implied_home_margin_vs_actual": 0.7229396245014452,
+        "favourite_wins_straight_up_pct": 76.16313838057648,
+        "n": 8361
+      },
+      "sensitivity_ex_opening_consensus_holdout": {
+        "n": 1891,
+        "note": "same rows, line = median excluding providers named Opening and consensus (diagnostic only)",
+        "v6_all_covered": {
+          "buckets": [
+            {
+              "bucket": "|line| under 7",
+              "model_side_win_pct": 50.0,
+              "n": 766,
+              "side_takes": 598
+            },
+            {
+              "bucket": "7-14",
+              "model_side_win_pct": 47.41144414168937,
+              "n": 473,
+              "side_takes": 367
+            },
+            {
+              "bucket": "14-21",
+              "model_side_win_pct": 50.476190476190474,
+              "n": 255,
+              "side_takes": 210
+            },
+            {
+              "bucket": "21 and over",
+              "model_side_win_pct": 49.13793103448276,
+              "n": 397,
+              "side_takes": 348
+            }
+          ],
+          "corr": -0.016206322518046365,
+          "corr_ci": {
+            "ci_95_high": 0.027476070564540735,
+            "ci_95_low": -0.06007259865042868,
+            "dates": 179,
+            "point": -0.016206322518046365
+          },
+          "line_21_plus": {
+            "dog_takes": 289,
+            "mean_actual_favourite_margin": 34.65239294710327,
+            "mean_line_favourite_margin": 32.83627204030227,
+            "mean_model_favourite_margin": 27.990067099512498,
+            "n": 397
+          },
+          "mae_line": 11.837123215230037,
+          "mae_model": 12.727164289133903,
+          "n": 1891,
+          "ols_slope": -0.045562464818649714,
+          "sd_actual": 22.205303294542908,
+          "sd_line": 15.913419008994527,
+          "sd_model": 14.293258473898424,
+          "side_losses": 773,
+          "side_pushes": 10,
+          "side_wins": 750
+        }
+      }
+    },
+    "total": {
+      "groups": {
+        "all": {
+          "n_lined_v6": 8279,
+          "v5_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 48.36065573770492,
+                "bucket": "under 45",
+                "model_over_takes": 611,
+                "model_side_win_pct": 48.710166919575116,
+                "model_under_takes": 48,
+                "n": 732
+              },
+              {
+                "actual_over_pct": 50.96774193548387,
+                "bucket": "45-52",
+                "model_over_takes": 1634,
+                "model_side_win_pct": 49.973333333333336,
+                "model_under_takes": 241,
+                "n": 2170
+              },
+              {
+                "actual_over_pct": 49.529780564263326,
+                "bucket": "52-60",
+                "model_over_takes": 961,
+                "model_side_win_pct": 49.20802534318902,
+                "model_under_takes": 933,
+                "n": 2552
+              },
+              {
+                "actual_over_pct": 45.320197044334975,
+                "bucket": "60 and over",
+                "model_over_takes": 164,
+                "model_side_win_pct": 52.75423728813559,
+                "model_under_takes": 1252,
+                "n": 1624
+              }
+            ],
+            "corr": 0.013069695806688044,
+            "corr_ci": {
+              "ci_95_high": 0.03882545040030051,
+              "ci_95_low": -0.012875199422000942,
+              "dates": 756,
+              "point": 0.013069695806688044
+            },
+            "mae_line": 12.779068946029952,
+            "mae_model": 13.397998335688047,
+            "n": 7078,
+            "ols_slope": 0.04098092432767693,
+            "sd_actual": 17.597966138606047,
+            "sd_line": 7.850337914892332,
+            "sd_model": 5.659618815701707,
+            "side_losses": 2907,
+            "side_pushes": 53,
+            "side_wins": 2937
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "actual_over_pct": 48.81398252184769,
+                "bucket": "under 45",
+                "model_over_takes": 675,
+                "model_side_win_pct": 48.324022346368714,
+                "model_under_takes": 41,
+                "n": 801
+              },
+              {
+                "actual_over_pct": 50.82895268904165,
+                "bucket": "45-52",
+                "model_over_takes": 1666,
+                "model_side_win_pct": 50.84661354581673,
+                "model_under_takes": 342,
+                "n": 2473
+              },
+              {
+                "actual_over_pct": 49.91901522513768,
+                "bucket": "52-60",
+                "model_over_takes": 1209,
+                "model_side_win_pct": 49.748533109807205,
+                "model_under_takes": 1177,
+                "n": 3087
+              },
+              {
+                "actual_over_pct": 46.45464025026069,
+                "bucket": "60 and over",
+                "model_over_takes": 231,
+                "model_side_win_pct": 51.15842204132749,
+                "model_under_takes": 1366,
+                "n": 1918
+              }
+            ],
+            "corr": 0.00990284024952966,
+            "corr_ci": {
+              "ci_95_high": 0.03398588446075997,
+              "ci_95_low": -0.014916398787239235,
+              "dates": 783,
+              "point": 0.00990284024952966
+            },
+            "mae_line": 12.7398236501993,
+            "mae_model": 13.215892749838227,
+            "n": 8279,
+            "ols_slope": 0.0356561758879022,
+            "sd_actual": 17.536415682120825,
+            "sd_line": 7.752129138826757,
+            "sd_model": 6.200690154135334,
+            "side_losses": 3336,
+            "side_pushes": 55,
+            "side_wins": 3371
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 48.36065573770492,
+                "bucket": "under 45",
+                "model_over_takes": 627,
+                "model_side_win_pct": 48.24961948249619,
+                "model_under_takes": 30,
+                "n": 732
+              },
+              {
+                "actual_over_pct": 50.96774193548387,
+                "bucket": "45-52",
+                "model_over_takes": 1491,
+                "model_side_win_pct": 51.27334465195246,
+                "model_under_takes": 276,
+                "n": 2170
+              },
+              {
+                "actual_over_pct": 49.529780564263326,
+                "bucket": "52-60",
+                "model_over_takes": 1060,
+                "model_side_win_pct": 51.35688684075781,
+                "model_under_takes": 893,
+                "n": 2552
+              },
+              {
+                "actual_over_pct": 45.320197044334975,
+                "bucket": "60 and over",
+                "model_over_takes": 195,
+                "model_side_win_pct": 51.7524235645041,
+                "model_under_takes": 1146,
+                "n": 1624
+              }
+            ],
+            "corr": 0.02296656176237056,
+            "corr_ci": {
+              "ci_95_high": 0.0490753374788289,
+              "ci_95_low": -0.0027700286334655048,
+              "dates": 756,
+              "point": 0.02296656176237056
+            },
+            "mae_line": 12.779068946029952,
+            "mae_model": 13.179838460333114,
+            "n": 7078,
+            "ols_slope": 0.08505874059135743,
+            "sd_actual": 17.597966138606047,
+            "sd_line": 7.850337914892332,
+            "sd_model": 6.158453851250791,
+            "side_losses": 2798,
+            "side_pushes": 52,
+            "side_wins": 2920
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.013); 95% CI [-0.013, +0.039] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.010); 95% CI [-0.015, +0.034] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.023); 95% CI [-0.003, +0.049] includes zero"
+          }
+        },
+        "season:2017": {
+          "n_lined_v6": 785,
+          "v5_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 53.84615384615385,
+                "bucket": "under 45",
+                "model_over_takes": 36,
+                "model_side_win_pct": 48.648648648648646,
+                "model_under_takes": 1,
+                "n": 39
+              },
+              {
+                "actual_over_pct": 46.902654867256636,
+                "bucket": "45-52",
+                "model_over_takes": 164,
+                "model_side_win_pct": 49.746192893401016,
+                "model_under_takes": 33,
+                "n": 226
+              },
+              {
+                "actual_over_pct": 44.62809917355372,
+                "bucket": "52-60",
+                "model_over_takes": 102,
+                "model_side_win_pct": 47.752808988764045,
+                "model_under_takes": 76,
+                "n": 242
+              },
+              {
+                "actual_over_pct": 44.5945945945946,
+                "bucket": "60 and over",
+                "model_over_takes": 28,
+                "model_side_win_pct": 53.807106598984774,
+                "model_under_takes": 169,
+                "n": 222
+              }
+            ],
+            "corr": -0.009625176823408464,
+            "corr_ci": {
+              "ci_95_high": 0.05617030896562219,
+              "ci_95_low": -0.0836024846874263,
+              "dates": 73,
+              "point": -0.009625176823408464
+            },
+            "mae_line": 13.335048010973937,
+            "mae_model": 14.069231001371742,
+            "n": 729,
+            "ols_slope": -0.028638111683266597,
+            "sd_actual": 18.434224960475095,
+            "sd_line": 8.1865069061366,
+            "sd_model": 5.95336759694565,
+            "side_losses": 302,
+            "side_pushes": 8,
+            "side_wins": 307
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "actual_over_pct": 53.84615384615385,
+                "bucket": "under 45",
+                "model_over_takes": 33,
+                "model_side_win_pct": 51.515151515151516,
+                "model_under_takes": 0,
+                "n": 39
+              },
+              {
+                "actual_over_pct": 47.325102880658434,
+                "bucket": "45-52",
+                "model_over_takes": 152,
+                "model_side_win_pct": 53.36787564766839,
+                "model_under_takes": 41,
+                "n": 243
+              },
+              {
+                "actual_over_pct": 45.247148288973385,
+                "bucket": "52-60",
+                "model_over_takes": 108,
+                "model_side_win_pct": 45.36585365853659,
+                "model_under_takes": 97,
+                "n": 263
+              },
+              {
+                "actual_over_pct": 45.416666666666664,
+                "bucket": "60 and over",
+                "model_over_takes": 38,
+                "model_side_win_pct": 51.832460732984295,
+                "model_under_takes": 153,
+                "n": 240
+              }
+            ],
+            "corr": 0.00490588653061307,
+            "corr_ci": {
+              "ci_95_high": 0.09109364918756582,
+              "ci_95_low": -0.0840320171642613,
+              "dates": 73,
+              "point": 0.00490588653061307
+            },
+            "mae_line": 13.70891719745223,
+            "mae_model": 14.146631334364251,
+            "n": 785,
+            "ols_slope": 0.018357187752536863,
+            "sd_actual": 18.970323394782305,
+            "sd_line": 8.099483935780386,
+            "sd_model": 6.7364163897736855,
+            "side_losses": 310,
+            "side_pushes": 7,
+            "side_wins": 312
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 53.84615384615385,
+                "bucket": "under 45",
+                "model_over_takes": 33,
+                "model_side_win_pct": 51.515151515151516,
+                "model_under_takes": 0,
+                "n": 39
+              },
+              {
+                "actual_over_pct": 46.902654867256636,
+                "bucket": "45-52",
+                "model_over_takes": 140,
+                "model_side_win_pct": 53.333333333333336,
+                "model_under_takes": 40,
+                "n": 226
+              },
+              {
+                "actual_over_pct": 44.62809917355372,
+                "bucket": "52-60",
+                "model_over_takes": 98,
+                "model_side_win_pct": 46.07329842931937,
+                "model_under_takes": 93,
+                "n": 242
+              },
+              {
+                "actual_over_pct": 44.5945945945946,
+                "bucket": "60 and over",
+                "model_over_takes": 32,
+                "model_side_win_pct": 52.57142857142857,
+                "model_under_takes": 143,
+                "n": 222
+              }
+            ],
+            "corr": 0.006940189461101021,
+            "corr_ci": {
+              "ci_95_high": 0.09542704527990097,
+              "ci_95_low": -0.0870263331309296,
+              "dates": 73,
+              "point": 0.006940189461101021
+            },
+            "mae_line": 13.335048010973937,
+            "mae_model": 13.762689441636633,
+            "n": 729,
+            "ols_slope": 0.02482636431586938,
+            "sd_actual": 18.434224960475095,
+            "sd_line": 8.1865069061366,
+            "sd_model": 6.774414277097577,
+            "side_losses": 286,
+            "side_pushes": 7,
+            "side_wins": 293
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.010); 95% CI [-0.084, +0.056] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.005); 95% CI [-0.084, +0.091] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.007); 95% CI [-0.087, +0.095] includes zero"
+          }
+        },
+        "season:2018": {
+          "n_lined_v6": 852,
+          "v5_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 52.27272727272727,
+                "bucket": "under 45",
+                "model_over_takes": 42,
+                "model_side_win_pct": 50.0,
+                "model_under_takes": 0,
+                "n": 44
+              },
+              {
+                "actual_over_pct": 41.6243654822335,
+                "bucket": "45-52",
+                "model_over_takes": 165,
+                "model_side_win_pct": 39.548022598870055,
+                "model_under_takes": 12,
+                "n": 197
+              },
+              {
+                "actual_over_pct": 53.48837209302326,
+                "bucket": "52-60",
+                "model_over_takes": 112,
+                "model_side_win_pct": 53.8860103626943,
+                "model_under_takes": 81,
+                "n": 258
+              },
+              {
+                "actual_over_pct": 46.4,
+                "bucket": "60 and over",
+                "model_over_takes": 25,
+                "model_side_win_pct": 51.196172248803826,
+                "model_under_takes": 184,
+                "n": 250
+              }
+            ],
+            "corr": -0.05687894375228012,
+            "corr_ci": {
+              "ci_95_high": 0.029239643948075548,
+              "ci_95_low": -0.14342688342281634,
+              "dates": 77,
+              "point": -0.05687894375228012
+            },
+            "mae_line": 13.068090787716956,
+            "mae_model": 13.983216688918558,
+            "n": 749,
+            "ols_slope": -0.17125424270032366,
+            "sd_actual": 19.010662951956597,
+            "sd_line": 8.36111150188217,
+            "sd_model": 5.7392191473360725,
+            "side_losses": 319,
+            "side_pushes": 6,
+            "side_wins": 302
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "actual_over_pct": 52.0,
+                "bucket": "under 45",
+                "model_over_takes": 41,
+                "model_side_win_pct": 53.333333333333336,
+                "model_under_takes": 4,
+                "n": 50
+              },
+              {
+                "actual_over_pct": 43.45794392523364,
+                "bucket": "45-52",
+                "model_over_takes": 134,
+                "model_side_win_pct": 38.55421686746988,
+                "model_under_takes": 32,
+                "n": 214
+              },
+              {
+                "actual_over_pct": 53.61842105263158,
+                "bucket": "52-60",
+                "model_over_takes": 96,
+                "model_side_win_pct": 47.57709251101321,
+                "model_under_takes": 131,
+                "n": 304
+              },
+              {
+                "actual_over_pct": 48.59154929577465,
+                "bucket": "60 and over",
+                "model_over_takes": 28,
+                "model_side_win_pct": 48.497854077253216,
+                "model_under_takes": 205,
+                "n": 284
+              }
+            ],
+            "corr": -0.07226686918552716,
+            "corr_ci": {
+              "ci_95_high": 0.004432187416808153,
+              "ci_95_low": -0.13844813683656307,
+              "dates": 78,
+              "point": -0.07226686918552716
+            },
+            "mae_line": 12.804577464788732,
+            "mae_model": 13.395746154115795,
+            "n": 852,
+            "ols_slope": -0.2895850236847031,
+            "sd_actual": 18.7505264166737,
+            "sd_line": 8.369238570775545,
+            "sd_model": 6.768249844370452,
+            "side_losses": 362,
+            "side_pushes": 8,
+            "side_wins": 309
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 52.27272727272727,
+                "bucket": "under 45",
+                "model_over_takes": 37,
+                "model_side_win_pct": 50.0,
+                "model_under_takes": 3,
+                "n": 44
+              },
+              {
+                "actual_over_pct": 41.6243654822335,
+                "bucket": "45-52",
+                "model_over_takes": 127,
+                "model_side_win_pct": 38.56209150326797,
+                "model_under_takes": 26,
+                "n": 197
+              },
+              {
+                "actual_over_pct": 53.48837209302326,
+                "bucket": "52-60",
+                "model_over_takes": 89,
+                "model_side_win_pct": 50.261780104712045,
+                "model_under_takes": 102,
+                "n": 258
+              },
+              {
+                "actual_over_pct": 46.4,
+                "bucket": "60 and over",
+                "model_over_takes": 27,
+                "model_side_win_pct": 50.0,
+                "model_under_takes": 175,
+                "n": 250
+              }
+            ],
+            "corr": -0.06167002844975757,
+            "corr_ci": {
+              "ci_95_high": 0.01911834078538629,
+              "ci_95_low": -0.1369294336787317,
+              "dates": 77,
+              "point": -0.06167002844975757
+            },
+            "mae_line": 13.068090787716956,
+            "mae_model": 13.537870522600336,
+            "n": 749,
+            "ols_slope": -0.261076954316794,
+            "sd_actual": 19.010662951956597,
+            "sd_line": 8.36111150188217,
+            "sd_model": 6.699426993141492,
+            "side_losses": 310,
+            "side_pushes": 8,
+            "side_wins": 276
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.057); 95% CI [-0.143, +0.029] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.072); 95% CI [-0.138, +0.004] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.062); 95% CI [-0.137, +0.019] includes zero"
+          }
+        },
+        "season:2019": {
+          "n_lined_v6": 884,
+          "v5_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 42.42424242424242,
+                "bucket": "under 45",
+                "model_over_takes": 60,
+                "model_side_win_pct": 40.98360655737705,
+                "model_under_takes": 1,
+                "n": 66
+              },
+              {
+                "actual_over_pct": 52.70935960591133,
+                "bucket": "45-52",
+                "model_over_takes": 164,
+                "model_side_win_pct": 52.747252747252745,
+                "model_under_takes": 18,
+                "n": 203
+              },
+              {
+                "actual_over_pct": 46.93877551020408,
+                "bucket": "52-60",
+                "model_over_takes": 92,
+                "model_side_win_pct": 48.108108108108105,
+                "model_under_takes": 93,
+                "n": 245
+              },
+              {
+                "actual_over_pct": 47.55555555555556,
+                "bucket": "60 and over",
+                "model_over_takes": 22,
+                "model_side_win_pct": 49.51456310679612,
+                "model_under_takes": 184,
+                "n": 225
+              }
+            ],
+            "corr": 0.050647672019145364,
+            "corr_ci": {
+              "ci_95_high": 0.1316147465899858,
+              "ci_95_low": -0.027817641916670414,
+              "dates": 75,
+              "point": 0.050647672019145364
+            },
+            "mae_line": 12.8819350473613,
+            "mae_model": 13.588048416779431,
+            "n": 739,
+            "ols_slope": 0.14580039252342739,
+            "sd_actual": 17.69701019405601,
+            "sd_line": 8.126444829916291,
+            "sd_model": 5.261338669262928,
+            "side_losses": 322,
+            "side_pushes": 10,
+            "side_wins": 312
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "actual_over_pct": 45.333333333333336,
+                "bucket": "under 45",
+                "model_over_takes": 61,
+                "model_side_win_pct": 46.96969696969697,
+                "model_under_takes": 5,
+                "n": 75
+              },
+              {
+                "actual_over_pct": 51.94805194805195,
+                "bucket": "45-52",
+                "model_over_takes": 151,
+                "model_side_win_pct": 54.83870967741935,
+                "model_under_takes": 35,
+                "n": 231
+              },
+              {
+                "actual_over_pct": 47.491638795986624,
+                "bucket": "52-60",
+                "model_over_takes": 99,
+                "model_side_win_pct": 43.111111111111114,
+                "model_under_takes": 126,
+                "n": 299
+              },
+              {
+                "actual_over_pct": 46.59498207885304,
+                "bucket": "60 and over",
+                "model_over_takes": 28,
+                "model_side_win_pct": 51.04602510460251,
+                "model_under_takes": 211,
+                "n": 279
+              }
+            ],
+            "corr": 0.04768482247050892,
+            "corr_ci": {
+              "ci_95_high": 0.12151621417236634,
+              "ci_95_low": -0.025781029896615237,
+              "dates": 76,
+              "point": 0.04768482247050892
+            },
+            "mae_line": 12.940893665158372,
+            "mae_model": 13.307964416630227,
+            "n": 884,
+            "ols_slope": 0.18180483725148452,
+            "sd_actual": 17.489305736508314,
+            "sd_line": 8.191524897550321,
+            "sd_model": 6.286317042622355,
+            "side_losses": 364,
+            "side_pushes": 8,
+            "side_wins": 352
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 42.42424242424242,
+                "bucket": "under 45",
+                "model_over_takes": 53,
+                "model_side_win_pct": 44.827586206896555,
+                "model_under_takes": 5,
+                "n": 66
+              },
+              {
+                "actual_over_pct": 52.70935960591133,
+                "bucket": "45-52",
+                "model_over_takes": 141,
+                "model_side_win_pct": 56.21301775147929,
+                "model_under_takes": 28,
+                "n": 203
+              },
+              {
+                "actual_over_pct": 46.93877551020408,
+                "bucket": "52-60",
+                "model_over_takes": 93,
+                "model_side_win_pct": 43.646408839779006,
+                "model_under_takes": 88,
+                "n": 245
+              },
+              {
+                "actual_over_pct": 47.55555555555556,
+                "bucket": "60 and over",
+                "model_over_takes": 23,
+                "model_side_win_pct": 50.526315789473685,
+                "model_under_takes": 167,
+                "n": 225
+              }
+            ],
+            "corr": 0.037038750660062465,
+            "corr_ci": {
+              "ci_95_high": 0.10962333836813386,
+              "ci_95_low": -0.03474047769089758,
+              "dates": 75,
+              "point": 0.037038750660062465
+            },
+            "mae_line": 12.8819350473613,
+            "mae_model": 13.261028473690525,
+            "n": 739,
+            "ols_slope": 0.1403426938605739,
+            "sd_actual": 17.69701019405601,
+            "sd_line": 8.126444829916291,
+            "sd_model": 6.250206530223735,
+            "side_losses": 302,
+            "side_pushes": 7,
+            "side_wins": 296
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.051); 95% CI [-0.028, +0.132] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.048); 95% CI [-0.026, +0.122] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.037); 95% CI [-0.035, +0.110] includes zero"
+          }
+        },
+        "season:2020": {
+          "n_lined_v6": 567,
+          "v5_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 53.125,
+                "bucket": "under 45",
+                "model_over_takes": 29,
+                "model_side_win_pct": 50.0,
+                "model_under_takes": 1,
+                "n": 32
+              },
+              {
+                "actual_over_pct": 50.0,
+                "bucket": "45-52",
+                "model_over_takes": 88,
+                "model_side_win_pct": 53.608247422680414,
+                "model_under_takes": 9,
+                "n": 114
+              },
+              {
+                "actual_over_pct": 51.794871794871796,
+                "bucket": "52-60",
+                "model_over_takes": 65,
+                "model_side_win_pct": 55.921052631578945,
+                "model_under_takes": 87,
+                "n": 195
+              },
+              {
+                "actual_over_pct": 45.19774011299435,
+                "bucket": "60 and over",
+                "model_over_takes": 20,
+                "model_side_win_pct": 48.68421052631579,
+                "model_under_takes": 132,
+                "n": 177
+              }
+            ],
+            "corr": 0.03759907537567319,
+            "corr_ci": {
+              "ci_95_high": 0.11963109194555298,
+              "ci_95_low": -0.042642717752378975,
+              "dates": 71,
+              "point": 0.03759907537567319
+            },
+            "mae_line": 13.558397683397683,
+            "mae_model": 14.007832258687259,
+            "n": 518,
+            "ols_slope": 0.1135205901430295,
+            "sd_actual": 18.40262992243754,
+            "sd_line": 7.959029161399441,
+            "sd_model": 5.686881953577185,
+            "side_losses": 205,
+            "side_pushes": 4,
+            "side_wins": 226
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "actual_over_pct": 57.142857142857146,
+                "bucket": "under 45",
+                "model_over_takes": 29,
+                "model_side_win_pct": 51.61290322580645,
+                "model_under_takes": 2,
+                "n": 35
+              },
+              {
+                "actual_over_pct": 50.0,
+                "bucket": "45-52",
+                "model_over_takes": 72,
+                "model_side_win_pct": 54.63917525773196,
+                "model_under_takes": 25,
+                "n": 124
+              },
+              {
+                "actual_over_pct": 52.11267605633803,
+                "bucket": "52-60",
+                "model_over_takes": 73,
+                "model_side_win_pct": 55.357142857142854,
+                "model_under_takes": 95,
+                "n": 213
+              },
+              {
+                "actual_over_pct": 46.15384615384615,
+                "bucket": "60 and over",
+                "model_over_takes": 17,
+                "model_side_win_pct": 54.11764705882353,
+                "model_under_takes": 153,
+                "n": 195
+              }
+            ],
+            "corr": 0.06025955839273976,
+            "corr_ci": {
+              "ci_95_high": 0.14324664712656976,
+              "ci_95_low": -0.02939450802583724,
+              "dates": 76,
+              "point": 0.06025955839273976
+            },
+            "mae_line": 13.727954144620812,
+            "mae_model": 13.85765169759601,
+            "n": 567,
+            "ols_slope": 0.2244312570408952,
+            "sd_actual": 18.483858721320956,
+            "sd_line": 8.049366099524233,
+            "sd_model": 6.417766637707252,
+            "side_losses": 212,
+            "side_pushes": 4,
+            "side_wins": 254
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 53.125,
+                "bucket": "under 45",
+                "model_over_takes": 26,
+                "model_side_win_pct": 46.42857142857143,
+                "model_under_takes": 2,
+                "n": 32
+              },
+              {
+                "actual_over_pct": 50.0,
+                "bucket": "45-52",
+                "model_over_takes": 66,
+                "model_side_win_pct": 57.95454545454545,
+                "model_under_takes": 22,
+                "n": 114
+              },
+              {
+                "actual_over_pct": 51.794871794871796,
+                "bucket": "52-60",
+                "model_over_takes": 68,
+                "model_side_win_pct": 57.142857142857146,
+                "model_under_takes": 86,
+                "n": 195
+              },
+              {
+                "actual_over_pct": 45.19774011299435,
+                "bucket": "60 and over",
+                "model_over_takes": 16,
+                "model_side_win_pct": 54.90196078431372,
+                "model_under_takes": 137,
+                "n": 177
+              }
+            ],
+            "corr": 0.07727869637199146,
+            "corr_ci": {
+              "ci_95_high": 0.16674531811143045,
+              "ci_95_low": -0.011205978342436222,
+              "dates": 71,
+              "point": 0.07727869637199146
+            },
+            "mae_line": 13.558397683397683,
+            "mae_model": 13.599757847817429,
+            "n": 518,
+            "ols_slope": 0.2894346660892745,
+            "sd_actual": 18.40262992243754,
+            "sd_line": 7.959029161399441,
+            "sd_model": 6.3948814677334775,
+            "side_losses": 187,
+            "side_pushes": 4,
+            "side_wins": 236
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.038); 95% CI [-0.043, +0.120] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.060); 95% CI [-0.029, +0.143] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.077); 95% CI [-0.011, +0.167] includes zero"
+          }
+        },
+        "season:2021": {
+          "n_lined_v6": 848,
+          "v5_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 47.16981132075472,
+                "bucket": "under 45",
+                "model_over_takes": 37,
+                "model_side_win_pct": 47.72727272727273,
+                "model_under_takes": 7,
+                "n": 53
+              },
+              {
+                "actual_over_pct": 53.63128491620112,
+                "bucket": "45-52",
+                "model_over_takes": 124,
+                "model_side_win_pct": 51.006711409395976,
+                "model_under_takes": 25,
+                "n": 179
+              },
+              {
+                "actual_over_pct": 44.5141065830721,
+                "bucket": "52-60",
+                "model_over_takes": 103,
+                "model_side_win_pct": 47.916666666666664,
+                "model_under_takes": 137,
+                "n": 319
+              },
+              {
+                "actual_over_pct": 42.5,
+                "bucket": "60 and over",
+                "model_over_takes": 13,
+                "model_side_win_pct": 56.111111111111114,
+                "model_under_takes": 167,
+                "n": 200
+              }
+            ],
+            "corr": 0.03934828776965001,
+            "corr_ci": {
+              "ci_95_high": 0.10060270028966928,
+              "ci_95_low": -0.028068631831023948,
+              "dates": 81,
+              "point": 0.03934828776965001
+            },
+            "mae_line": 12.495339547270307,
+            "mae_model": 12.928231770972037,
+            "n": 751,
+            "ols_slope": 0.12215431817554012,
+            "sd_actual": 17.075038936595448,
+            "sd_line": 7.674591174184417,
+            "sd_model": 5.412790095456475,
+            "side_losses": 300,
+            "side_pushes": 7,
+            "side_wins": 313
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "actual_over_pct": 48.275862068965516,
+                "bucket": "under 45",
+                "model_over_takes": 47,
+                "model_side_win_pct": 37.254901960784316,
+                "model_under_takes": 4,
+                "n": 58
+              },
+              {
+                "actual_over_pct": 52.55102040816327,
+                "bucket": "45-52",
+                "model_over_takes": 116,
+                "model_side_win_pct": 44.87179487179487,
+                "model_under_takes": 40,
+                "n": 196
+              },
+              {
+                "actual_over_pct": 46.612466124661246,
+                "bucket": "52-60",
+                "model_over_takes": 137,
+                "model_side_win_pct": 49.16943521594684,
+                "model_under_takes": 164,
+                "n": 369
+              },
+              {
+                "actual_over_pct": 43.55555555555556,
+                "bucket": "60 and over",
+                "model_over_takes": 29,
+                "model_side_win_pct": 53.2994923857868,
+                "model_under_takes": 168,
+                "n": 225
+              }
+            ],
+            "corr": -0.009553613848144194,
+            "corr_ci": {
+              "ci_95_high": 0.059280184989433014,
+              "ci_95_low": -0.07561534055318758,
+              "dates": 81,
+              "point": -0.009553613848144194
+            },
+            "mae_line": 12.471698113207546,
+            "mae_model": 13.112151432792732,
+            "n": 848,
+            "ols_slope": -0.03305921746459914,
+            "sd_actual": 17.10658308654187,
+            "sd_line": 7.617374041825426,
+            "sd_model": 6.448173888312891,
+            "side_losses": 363,
+            "side_pushes": 7,
+            "side_wins": 342
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 47.16981132075472,
+                "bucket": "under 45",
+                "model_over_takes": 46,
+                "model_side_win_pct": 39.583333333333336,
+                "model_under_takes": 2,
+                "n": 53
+              },
+              {
+                "actual_over_pct": 53.63128491620112,
+                "bucket": "45-52",
+                "model_over_takes": 108,
+                "model_side_win_pct": 45.0,
+                "model_under_takes": 32,
+                "n": 179
+              },
+              {
+                "actual_over_pct": 44.5141065830721,
+                "bucket": "52-60",
+                "model_over_takes": 118,
+                "model_side_win_pct": 52.14007782101167,
+                "model_under_takes": 139,
+                "n": 319
+              },
+              {
+                "actual_over_pct": 42.5,
+                "bucket": "60 and over",
+                "model_over_takes": 24,
+                "model_side_win_pct": 53.63128491620112,
+                "model_under_takes": 155,
+                "n": 200
+              }
+            ],
+            "corr": 0.013624656663534282,
+            "corr_ci": {
+              "ci_95_high": 0.0773630703884806,
+              "ci_95_low": -0.04831585474166124,
+              "dates": 81,
+              "point": 0.013624656663534282
+            },
+            "mae_line": 12.495339547270307,
+            "mae_model": 12.95112266031677,
+            "n": 751,
+            "ols_slope": 0.04909005066008542,
+            "sd_actual": 17.075038936595448,
+            "sd_line": 7.674591174184417,
+            "sd_model": 6.097529885651198,
+            "side_losses": 312,
+            "side_pushes": 7,
+            "side_wins": 312
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.039); 95% CI [-0.028, +0.101] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.010); 95% CI [-0.076, +0.059] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.014); 95% CI [-0.048, +0.077] includes zero"
+          }
+        },
+        "season:2022": {
+          "n_lined_v6": 894,
+          "v5_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 45.26315789473684,
+                "bucket": "under 45",
+                "model_over_takes": 70,
+                "model_side_win_pct": 44.87179487179487,
+                "model_under_takes": 8,
+                "n": 95
+              },
+              {
+                "actual_over_pct": 46.948356807511736,
+                "bucket": "45-52",
+                "model_over_takes": 159,
+                "model_side_win_pct": 47.486033519553075,
+                "model_under_takes": 20,
+                "n": 213
+              },
+              {
+                "actual_over_pct": 52.94117647058823,
+                "bucket": "52-60",
+                "model_over_takes": 110,
+                "model_side_win_pct": 43.91534391534392,
+                "model_under_takes": 79,
+                "n": 255
+              },
+              {
+                "actual_over_pct": 47.05882352941177,
+                "bucket": "60 and over",
+                "model_over_takes": 21,
+                "model_side_win_pct": 51.666666666666664,
+                "model_under_takes": 159,
+                "n": 204
+              }
+            ],
+            "corr": -0.0162059919921019,
+            "corr_ci": {
+              "ci_95_high": 0.05849097350354601,
+              "ci_95_low": -0.09323117710421203,
+              "dates": 79,
+              "point": -0.0162059919921019
+            },
+            "mae_line": 12.13070404172099,
+            "mae_model": 13.102171499348108,
+            "n": 767,
+            "ols_slope": -0.049232160014895845,
+            "sd_actual": 17.532134946819685,
+            "sd_line": 8.315770435981005,
+            "sd_model": 6.16588105308343,
+            "side_losses": 330,
+            "side_pushes": 11,
+            "side_wins": 296
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "actual_over_pct": 44.554455445544555,
+                "bucket": "under 45",
+                "model_over_takes": 88,
+                "model_side_win_pct": 48.35164835164835,
+                "model_under_takes": 3,
+                "n": 101
+              },
+              {
+                "actual_over_pct": 47.43589743589744,
+                "bucket": "45-52",
+                "model_over_takes": 150,
+                "model_side_win_pct": 53.723404255319146,
+                "model_under_takes": 38,
+                "n": 234
+              },
+              {
+                "actual_over_pct": 53.52564102564103,
+                "bucket": "52-60",
+                "model_over_takes": 125,
+                "model_side_win_pct": 53.97489539748954,
+                "model_under_takes": 114,
+                "n": 312
+              },
+              {
+                "actual_over_pct": 47.77327935222672,
+                "bucket": "60 and over",
+                "model_over_takes": 24,
+                "model_side_win_pct": 47.03196347031963,
+                "model_under_takes": 195,
+                "n": 247
+              }
+            ],
+            "corr": -0.01066122389712293,
+            "corr_ci": {
+              "ci_95_high": 0.06880590218703855,
+              "ci_95_low": -0.09707336147874021,
+              "dates": 81,
+              "point": -0.01066122389712293
+            },
+            "mae_line": 12.161912751677852,
+            "mae_model": 12.861879160196093,
+            "n": 894,
+            "ols_slope": -0.035376102242255375,
+            "sd_actual": 17.537473525101888,
+            "sd_line": 8.189641587678889,
+            "sd_model": 6.126039696804719,
+            "side_losses": 360,
+            "side_pushes": 12,
+            "side_wins": 377
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 45.26315789473684,
+                "bucket": "under 45",
+                "model_over_takes": 83,
+                "model_side_win_pct": 48.83720930232558,
+                "model_under_takes": 3,
+                "n": 95
+              },
+              {
+                "actual_over_pct": 46.948356807511736,
+                "bucket": "45-52",
+                "model_over_takes": 142,
+                "model_side_win_pct": 53.44827586206897,
+                "model_under_takes": 32,
+                "n": 213
+              },
+              {
+                "actual_over_pct": 52.94117647058823,
+                "bucket": "52-60",
+                "model_over_takes": 113,
+                "model_side_win_pct": 55.32994923857868,
+                "model_under_takes": 84,
+                "n": 255
+              },
+              {
+                "actual_over_pct": 47.05882352941177,
+                "bucket": "60 and over",
+                "model_over_takes": 18,
+                "model_side_win_pct": 46.96132596685083,
+                "model_under_takes": 163,
+                "n": 204
+              }
+            ],
+            "corr": -0.011479016749151959,
+            "corr_ci": {
+              "ci_95_high": 0.07584481038731827,
+              "ci_95_low": -0.10955587179662374,
+              "dates": 79,
+              "point": -0.011479016749151959
+            },
+            "mae_line": 12.13070404172099,
+            "mae_model": 12.82894730406114,
+            "n": 767,
+            "ols_slope": -0.03771268900420193,
+            "sd_actual": 17.532134946819685,
+            "sd_line": 8.315770435981005,
+            "sd_model": 6.122662083440258,
+            "side_losses": 309,
+            "side_pushes": 11,
+            "side_wins": 329
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.016); 95% CI [-0.093, +0.058] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.011); 95% CI [-0.097, +0.069] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.011); 95% CI [-0.110, +0.076] includes zero"
+          }
+        },
+        "season:2023": {
+          "n_lined_v6": 910,
+          "v5_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 47.014925373134325,
+                "bucket": "under 45",
+                "model_over_takes": 119,
+                "model_side_win_pct": 48.36065573770492,
+                "model_under_takes": 3,
+                "n": 134
+              },
+              {
+                "actual_over_pct": 57.08661417322835,
+                "bucket": "45-52",
+                "model_over_takes": 201,
+                "model_side_win_pct": 54.824561403508774,
+                "model_under_takes": 27,
+                "n": 254
+              },
+              {
+                "actual_over_pct": 51.52671755725191,
+                "bucket": "52-60",
+                "model_over_takes": 106,
+                "model_side_win_pct": 52.06185567010309,
+                "model_under_takes": 88,
+                "n": 262
+              },
+              {
+                "actual_over_pct": 41.26984126984127,
+                "bucket": "60 and over",
+                "model_over_takes": 11,
+                "model_side_win_pct": 58.71559633027523,
+                "model_under_takes": 98,
+                "n": 126
+              }
+            ],
+            "corr": 0.04515591315545022,
+            "corr_ci": {
+              "ci_95_high": 0.13709744252710027,
+              "ci_95_low": -0.04660380891778353,
+              "dates": 79,
+              "point": 0.04515591315545022
+            },
+            "mae_line": 12.768685567010309,
+            "mae_model": 13.179188492268041,
+            "n": 776,
+            "ols_slope": 0.14284553905957548,
+            "sd_actual": 17.14652814914286,
+            "sd_line": 7.929294295138632,
+            "sd_model": 5.5996832966798,
+            "side_losses": 304,
+            "side_pushes": 7,
+            "side_wins": 349
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "actual_over_pct": 47.2972972972973,
+                "bucket": "under 45",
+                "model_over_takes": 131,
+                "model_side_win_pct": 45.65217391304348,
+                "model_under_takes": 7,
+                "n": 148
+              },
+              {
+                "actual_over_pct": 56.74740484429066,
+                "bucket": "45-52",
+                "model_over_takes": 222,
+                "model_side_win_pct": 56.50406504065041,
+                "model_under_takes": 24,
+                "n": 289
+              },
+              {
+                "actual_over_pct": 50.1577287066246,
+                "bucket": "52-60",
+                "model_over_takes": 141,
+                "model_side_win_pct": 54.95867768595041,
+                "model_under_takes": 101,
+                "n": 317
+              },
+              {
+                "actual_over_pct": 44.23076923076923,
+                "bucket": "60 and over",
+                "model_over_takes": 19,
+                "model_side_win_pct": 53.278688524590166,
+                "model_under_takes": 103,
+                "n": 156
+              }
+            ],
+            "corr": 0.020429635154594183,
+            "corr_ci": {
+              "ci_95_high": 0.08923789747293186,
+              "ci_95_low": -0.0469220998924496,
+              "dates": 83,
+              "point": 0.020429635154594183
+            },
+            "mae_line": 12.617032967032968,
+            "mae_model": 12.997668566293676,
+            "n": 910,
+            "ols_slope": 0.07132081233070649,
+            "sd_actual": 17.033225130976124,
+            "sd_line": 7.810127838147513,
+            "sd_model": 5.9980331532701685,
+            "side_losses": 348,
+            "side_pushes": 9,
+            "side_wins": 400
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 47.014925373134325,
+                "bucket": "under 45",
+                "model_over_takes": 122,
+                "model_side_win_pct": 48.031496062992126,
+                "model_under_takes": 5,
+                "n": 134
+              },
+              {
+                "actual_over_pct": 57.08661417322835,
+                "bucket": "45-52",
+                "model_over_takes": 198,
+                "model_side_win_pct": 56.48148148148148,
+                "model_under_takes": 18,
+                "n": 254
+              },
+              {
+                "actual_over_pct": 51.52671755725191,
+                "bucket": "52-60",
+                "model_over_takes": 119,
+                "model_side_win_pct": 54.87179487179487,
+                "model_under_takes": 76,
+                "n": 262
+              },
+              {
+                "actual_over_pct": 41.26984126984127,
+                "bucket": "60 and over",
+                "model_over_takes": 17,
+                "model_side_win_pct": 53.125,
+                "model_under_takes": 79,
+                "n": 126
+              }
+            ],
+            "corr": 0.03495241361558006,
+            "corr_ci": {
+              "ci_95_high": 0.1195962602260915,
+              "ci_95_low": -0.03936185170940449,
+              "dates": 79,
+              "point": 0.03495241361558006
+            },
+            "mae_line": 12.768685567010309,
+            "mae_model": 13.092794836059102,
+            "n": 776,
+            "ols_slope": 0.12680855650957792,
+            "sd_actual": 17.14652814914286,
+            "sd_line": 7.929294295138632,
+            "sd_model": 5.939215101345414,
+            "side_losses": 293,
+            "side_pushes": 8,
+            "side_wins": 341
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.045); 95% CI [-0.047, +0.137] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.020); 95% CI [-0.047, +0.089] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.035); 95% CI [-0.039, +0.120] includes zero"
+          }
+        },
+        "season:2024": {
+          "n_lined_v6": 877,
+          "v5_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 60.0,
+                "bucket": "under 45",
+                "model_over_takes": 106,
+                "model_side_win_pct": 61.81818181818182,
+                "model_under_takes": 4,
+                "n": 120
+              },
+              {
+                "actual_over_pct": 53.07692307692308,
+                "bucket": "45-52",
+                "model_over_takes": 196,
+                "model_side_win_pct": 49.775784753363226,
+                "model_under_takes": 27,
+                "n": 260
+              },
+              {
+                "actual_over_pct": 52.63157894736842,
+                "bucket": "52-60",
+                "model_over_takes": 109,
+                "model_side_win_pct": 44.54976303317535,
+                "model_under_takes": 102,
+                "n": 285
+              },
+              {
+                "actual_over_pct": 41.0,
+                "bucket": "60 and over",
+                "model_over_takes": 14,
+                "model_side_win_pct": 59.770114942528735,
+                "model_under_takes": 73,
+                "n": 100
+              }
+            ],
+            "corr": 0.05118067295273185,
+            "corr_ci": {
+              "ci_95_high": 0.13291324688014952,
+              "ci_95_low": -0.028293951091039694,
+              "dates": 89,
+              "point": 0.05118067295273185
+            },
+            "mae_line": 12.775490196078431,
+            "mae_model": 13.026132405228758,
+            "n": 765,
+            "ols_slope": 0.19371378847198104,
+            "sd_actual": 16.628657723300176,
+            "sd_line": 6.752268760218808,
+            "sd_model": 5.178153638800981,
+            "side_losses": 306,
+            "side_pushes": 0,
+            "side_wins": 325
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "actual_over_pct": 60.62992125984252,
+                "bucket": "under 45",
+                "model_over_takes": 109,
+                "model_side_win_pct": 63.716814159292035,
+                "model_under_takes": 4,
+                "n": 127
+              },
+              {
+                "actual_over_pct": 51.52542372881356,
+                "bucket": "45-52",
+                "model_over_takes": 213,
+                "model_side_win_pct": 53.36134453781513,
+                "model_under_takes": 25,
+                "n": 295
+              },
+              {
+                "actual_over_pct": 53.21637426900585,
+                "bucket": "52-60",
+                "model_over_takes": 149,
+                "model_side_win_pct": 49.797570850202426,
+                "model_under_takes": 98,
+                "n": 342
+              },
+              {
+                "actual_over_pct": 40.70796460176991,
+                "bucket": "60 and over",
+                "model_over_takes": 22,
+                "model_side_win_pct": 56.32183908045977,
+                "model_under_takes": 65,
+                "n": 113
+              }
+            ],
+            "corr": 0.09408806872900323,
+            "corr_ci": {
+              "ci_95_high": 0.16389896449339536,
+              "ci_95_low": 0.015124165924510186,
+              "dates": 92,
+              "point": 0.09408806872900323
+            },
+            "mae_line": 12.693557582668188,
+            "mae_model": 12.76464612846197,
+            "n": 877,
+            "ols_slope": 0.38721786558866816,
+            "sd_actual": 16.64941845755452,
+            "sd_line": 6.65044192624707,
+            "sd_model": 5.732704248904183,
+            "side_losses": 314,
+            "side_pushes": 0,
+            "side_wins": 371
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 60.0,
+                "bucket": "under 45",
+                "model_over_takes": 104,
+                "model_side_win_pct": 63.20754716981132,
+                "model_under_takes": 2,
+                "n": 120
+              },
+              {
+                "actual_over_pct": 53.07692307692308,
+                "bucket": "45-52",
+                "model_over_takes": 193,
+                "model_side_win_pct": 53.990610328638496,
+                "model_under_takes": 20,
+                "n": 260
+              },
+              {
+                "actual_over_pct": 52.63157894736842,
+                "bucket": "52-60",
+                "model_over_takes": 129,
+                "model_side_win_pct": 50.24630541871921,
+                "model_under_takes": 74,
+                "n": 285
+              },
+              {
+                "actual_over_pct": 41.0,
+                "bucket": "60 and over",
+                "model_over_takes": 20,
+                "model_side_win_pct": 56.41025641025641,
+                "model_under_takes": 58,
+                "n": 100
+              }
+            ],
+            "corr": 0.09489954735475721,
+            "corr_ci": {
+              "ci_95_high": 0.17626871904007918,
+              "ci_95_low": 0.004965627949675536,
+              "dates": 89,
+              "point": 0.09489954735475721
+            },
+            "mae_line": 12.775490196078431,
+            "mae_model": 12.829989509959955,
+            "n": 765,
+            "ols_slope": 0.4106753089339763,
+            "sd_actual": 16.628657723300176,
+            "sd_line": 6.752268760218808,
+            "sd_model": 5.699943034385261,
+            "side_losses": 272,
+            "side_pushes": 0,
+            "side_wins": 328
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.051); 95% CI [-0.028, +0.133] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": true,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.094); 95% CI [+0.015, +0.164] excludes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": true,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.095); 95% CI [+0.005, +0.176] excludes zero"
+          }
+        },
+        "season:2025": {
+          "n_lined_v6": 931,
+          "v5_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 43.47826086956522,
+                "bucket": "under 45",
+                "model_over_takes": 59,
+                "model_side_win_pct": 43.75,
+                "model_under_takes": 21,
+                "n": 92
+              },
+              {
+                "actual_over_pct": 53.37620578778135,
+                "bucket": "45-52",
+                "model_over_takes": 214,
+                "model_side_win_pct": 51.15384615384615,
+                "model_under_takes": 46,
+                "n": 311
+              },
+              {
+                "actual_over_pct": 45.833333333333336,
+                "bucket": "52-60",
+                "model_over_takes": 87,
+                "model_side_win_pct": 53.65853658536585,
+                "model_under_takes": 118,
+                "n": 288
+              },
+              {
+                "actual_over_pct": 45.16129032258065,
+                "bucket": "60 and over",
+                "model_over_takes": 10,
+                "model_side_win_pct": 56.33802816901409,
+                "model_under_takes": 61,
+                "n": 93
+              }
+            ],
+            "corr": -0.011391993150942945,
+            "corr_ci": {
+              "ci_95_high": 0.07063499490043677,
+              "ci_95_low": -0.1030883670394521,
+              "dates": 90,
+              "point": -0.011391993150942945
+            },
+            "mae_line": 12.466836734693878,
+            "mae_model": 12.978398341836735,
+            "n": 784,
+            "ols_slope": -0.04228553212108991,
+            "sd_actual": 16.41437261740615,
+            "sd_line": 6.222664999956755,
+            "sd_model": 5.47861510386425,
+            "side_losses": 298,
+            "side_pushes": 0,
+            "side_wins": 318
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "actual_over_pct": 43.61702127659574,
+                "bucket": "under 45",
+                "model_over_takes": 77,
+                "model_side_win_pct": 43.373493975903614,
+                "model_under_takes": 6,
+                "n": 94
+              },
+              {
+                "actual_over_pct": 54.21348314606742,
+                "bucket": "45-52",
+                "model_over_takes": 239,
+                "model_side_win_pct": 52.613240418118465,
+                "model_under_takes": 48,
+                "n": 356
+              },
+              {
+                "actual_over_pct": 46.81440443213297,
+                "bucket": "52-60",
+                "model_over_takes": 140,
+                "model_side_win_pct": 52.34657039711191,
+                "model_under_takes": 137,
+                "n": 361
+              },
+              {
+                "actual_over_pct": 46.666666666666664,
+                "bucket": "60 and over",
+                "model_over_takes": 19,
+                "model_side_win_pct": 53.40909090909091,
+                "model_under_takes": 69,
+                "n": 120
+              }
+            ],
+            "corr": 0.01491104806271147,
+            "corr_ci": {
+              "ci_95_high": 0.06770761645979984,
+              "ci_95_low": -0.0399268886020504,
+              "dates": 91,
+              "point": 0.01491104806271147
+            },
+            "mae_line": 12.440923737916219,
+            "mae_model": 12.855309436553686,
+            "n": 931,
+            "ols_slope": 0.05907578377040984,
+            "sd_actual": 16.294862370146888,
+            "sd_line": 6.135311925465202,
+            "sd_model": 5.456268368982303,
+            "side_losses": 356,
+            "side_pushes": 0,
+            "side_wins": 379
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 43.47826086956522,
+                "bucket": "under 45",
+                "model_over_takes": 77,
+                "model_side_win_pct": 43.20987654320987,
+                "model_under_takes": 4,
+                "n": 92
+              },
+              {
+                "actual_over_pct": 53.37620578778135,
+                "bucket": "45-52",
+                "model_over_takes": 220,
+                "model_side_win_pct": 52.17391304347826,
+                "model_under_takes": 33,
+                "n": 311
+              },
+              {
+                "actual_over_pct": 45.833333333333336,
+                "bucket": "52-60",
+                "model_over_takes": 124,
+                "model_side_win_pct": 54.337899543378995,
+                "model_under_takes": 95,
+                "n": 288
+              },
+              {
+                "actual_over_pct": 45.16129032258065,
+                "bucket": "60 and over",
+                "model_over_takes": 12,
+                "model_side_win_pct": 55.55555555555556,
+                "model_under_takes": 51,
+                "n": 93
+              }
+            ],
+            "corr": 0.031767229257732864,
+            "corr_ci": {
+              "ci_95_high": 0.09807737940721083,
+              "ci_95_low": -0.03802374856455598,
+              "dates": 90,
+              "point": 0.031767229257732864
+            },
+            "mae_line": 12.466836734693878,
+            "mae_model": 12.860516752322814,
+            "n": 784,
+            "ols_slope": 0.1353559011334079,
+            "sd_actual": 16.41437261740615,
+            "sd_line": 6.222664999956755,
+            "sd_model": 5.414860875106433,
+            "side_losses": 295,
+            "side_pushes": 0,
+            "side_wins": 321
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.011); 95% CI [-0.103, +0.071] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.015); 95% CI [-0.040, +0.068] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.032); 95% CI [-0.038, +0.098] includes zero"
+          }
+        },
+        "season:2026": {
+          "n_lined_v6": 731,
+          "v5_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 38.59649122807018,
+                "bucket": "under 45",
+                "model_over_takes": 53,
+                "model_side_win_pct": 43.63636363636363,
+                "model_under_takes": 2,
+                "n": 57
+              },
+              {
+                "actual_over_pct": 51.17370892018779,
+                "bucket": "45-52",
+                "model_over_takes": 159,
+                "model_side_win_pct": 49.72677595628415,
+                "model_under_takes": 24,
+                "n": 213
+              },
+              {
+                "actual_over_pct": 53.20197044334975,
+                "bucket": "52-60",
+                "model_over_takes": 75,
+                "model_side_win_pct": 44.89795918367347,
+                "model_under_takes": 72,
+                "n": 203
+              },
+              {
+                "actual_over_pct": 66.66666666666667,
+                "bucket": "60 and over",
+                "model_over_takes": 0,
+                "model_side_win_pct": 32.0,
+                "model_under_takes": 25,
+                "n": 27
+              }
+            ],
+            "corr": -0.09415562303850085,
+            "corr_ci": {
+              "ci_95_high": -0.003493451169354832,
+              "ci_95_low": -0.18158398893668548,
+              "dates": 42,
+              "point": -0.09415562303850085
+            },
+            "mae_line": 12.508,
+            "mae_model": 13.35587034,
+            "n": 500,
+            "ols_slope": -0.3487500674206981,
+            "sd_actual": 16.95525688392836,
+            "sd_line": 5.551119166438422,
+            "sd_model": 4.346399043292947,
+            "side_losses": 221,
+            "side_pushes": 0,
+            "side_wins": 189
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "actual_over_pct": 39.189189189189186,
+                "bucket": "under 45",
+                "model_over_takes": 59,
+                "model_side_win_pct": 36.92307692307692,
+                "model_under_takes": 6,
+                "n": 74
+              },
+              {
+                "actual_over_pct": 49.48453608247423,
+                "bucket": "45-52",
+                "model_over_takes": 217,
+                "model_side_win_pct": 44.223107569721115,
+                "model_under_takes": 34,
+                "n": 291
+              },
+              {
+                "actual_over_pct": 51.14006514657981,
+                "bucket": "52-60",
+                "model_over_takes": 141,
+                "model_side_win_pct": 46.27450980392157,
+                "model_under_takes": 114,
+                "n": 307
+              },
+              {
+                "actual_over_pct": 62.71186440677966,
+                "bucket": "60 and over",
+                "model_over_takes": 7,
+                "model_side_win_pct": 43.13725490196079,
+                "model_under_takes": 44,
+                "n": 59
+              }
+            ],
+            "corr": -0.10456032417160668,
+            "corr_ci": {
+              "ci_95_high": -0.03672557306311558,
+              "ci_95_low": -0.1932490195944169,
+              "dates": 52,
+              "point": -0.10456032417160668
+            },
+            "mae_line": 12.220930232558139,
+            "mae_model": 13.22322185861369,
+            "n": 731,
+            "ols_slope": -0.3507728621378614,
+            "sd_actual": 16.686677796214006,
+            "sd_line": 5.717136092275796,
+            "sd_model": 5.187456300193163,
+            "side_losses": 347,
+            "side_pushes": 0,
+            "side_wins": 275
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 38.59649122807018,
+                "bucket": "under 45",
+                "model_over_takes": 46,
+                "model_side_win_pct": 34.0,
+                "model_under_takes": 4,
+                "n": 57
+              },
+              {
+                "actual_over_pct": 51.17370892018779,
+                "bucket": "45-52",
+                "model_over_takes": 156,
+                "model_side_win_pct": 44.19889502762431,
+                "model_under_takes": 25,
+                "n": 213
+              },
+              {
+                "actual_over_pct": 53.20197044334975,
+                "bucket": "52-60",
+                "model_over_takes": 109,
+                "model_side_win_pct": 49.09090909090909,
+                "model_under_takes": 56,
+                "n": 203
+              },
+              {
+                "actual_over_pct": 66.66666666666667,
+                "bucket": "60 and over",
+                "model_over_takes": 6,
+                "model_side_win_pct": 41.666666666666664,
+                "model_under_takes": 18,
+                "n": 27
+              }
+            ],
+            "corr": -0.08925942926878638,
+            "corr_ci": {
+              "ci_95_high": -0.012615138634267727,
+              "ci_95_low": -0.17008631933267482,
+              "dates": 42,
+              "point": -0.08925942926878638
+            },
+            "mae_line": 12.508,
+            "mae_model": 13.291529577590381,
+            "n": 500,
+            "ols_slope": -0.37763041214927545,
+            "sd_actual": 16.95525688392836,
+            "sd_line": 5.551119166438422,
+            "sd_model": 5.149115085624732,
+            "side_losses": 232,
+            "side_pushes": 0,
+            "side_wins": 188
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": true,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.094); 95% CI [-0.182, -0.003] excludes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": true,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.105); 95% CI [-0.193, -0.037] excludes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": true,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.089); 95% CI [-0.170, -0.013] excludes zero"
+          }
+        },
+        "window:fit": {
+          "n_lined_v6": 6380,
+          "v5_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 49.81818181818182,
+                "bucket": "under 45",
+                "model_over_takes": 473,
+                "model_side_win_pct": 49.696969696969695,
+                "model_under_takes": 22,
+                "n": 550
+              },
+              {
+                "actual_over_pct": 50.31928480204342,
+                "bucket": "45-52",
+                "model_over_takes": 1211,
+                "model_side_win_pct": 49.70717423133236,
+                "model_under_takes": 155,
+                "n": 1566
+              },
+              {
+                "actual_over_pct": 49.6206373292868,
+                "bucket": "52-60",
+                "model_over_takes": 763,
+                "model_side_win_pct": 49.4579945799458,
+                "model_under_takes": 713,
+                "n": 1977
+              },
+              {
+                "actual_over_pct": 44.708276797829036,
+                "bucket": "60 and over",
+                "model_over_takes": 147,
+                "model_side_win_pct": 52.972972972972975,
+                "model_under_takes": 1148,
+                "n": 1474
+              }
+            ],
+            "corr": 0.022881601327268998,
+            "corr_ci": {
+              "ci_95_high": 0.05079190132226209,
+              "ci_95_low": -0.006323672530259089,
+              "dates": 588,
+              "point": 0.022881601327268998
+            },
+            "mae_line": 12.849739536554697,
+            "mae_model": 13.470673143524339,
+            "n": 5567,
+            "ols_slope": 0.06936208642285624,
+            "sd_actual": 17.816374276155823,
+            "sd_line": 8.160976021332337,
+            "sd_model": 5.700679656995972,
+            "side_losses": 2291,
+            "side_pushes": 53,
+            "side_wins": 2341
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "actual_over_pct": 50.33444816053512,
+                "bucket": "under 45",
+                "model_over_takes": 511,
+                "model_side_win_pct": 49.814126394052046,
+                "model_under_takes": 27,
+                "n": 598
+              },
+              {
+                "actual_over_pct": 50.14343086632243,
+                "bucket": "45-52",
+                "model_over_takes": 1151,
+                "model_side_win_pct": 51.59914712153518,
+                "model_under_takes": 256,
+                "n": 1743
+              },
+              {
+                "actual_over_pct": 50.128755364806864,
+                "bucket": "52-60",
+                "model_over_takes": 887,
+                "model_side_win_pct": 50.055679287305125,
+                "model_under_takes": 909,
+                "n": 2330
+              },
+              {
+                "actual_over_pct": 45.69923932124049,
+                "bucket": "60 and over",
+                "model_over_takes": 201,
+                "model_side_win_pct": 51.290997906489885,
+                "model_under_takes": 1232,
+                "n": 1709
+              }
+            ],
+            "corr": 0.020205404285016403,
+            "corr_ci": {
+              "ci_95_high": 0.04827525041449977,
+              "ci_95_low": -0.009437127065674818,
+              "dates": 604,
+              "point": 0.020205404285016403
+            },
+            "mae_line": 12.850822884012539,
+            "mae_model": 13.283284667614204,
+            "n": 6380,
+            "ols_slope": 0.07254003341320539,
+            "sd_actual": 17.810111868879126,
+            "sd_line": 8.094736272782358,
+            "sd_model": 6.389144636461506,
+            "side_losses": 2546,
+            "side_pushes": 55,
+            "side_wins": 2628
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 49.81818181818182,
+                "bucket": "under 45",
+                "model_over_takes": 477,
+                "model_side_win_pct": 49.799196787148595,
+                "model_under_takes": 21,
+                "n": 550
+              },
+              {
+                "actual_over_pct": 50.31928480204342,
+                "bucket": "45-52",
+                "model_over_takes": 1058,
+                "model_side_win_pct": 52.081696779261584,
+                "model_under_takes": 215,
+                "n": 1566
+              },
+              {
+                "actual_over_pct": 49.6206373292868,
+                "bucket": "52-60",
+                "model_over_takes": 787,
+                "model_side_win_pct": 51.353135313531354,
+                "model_under_takes": 728,
+                "n": 1977
+              },
+              {
+                "actual_over_pct": 44.708276797829036,
+                "bucket": "60 and over",
+                "model_over_takes": 173,
+                "model_side_win_pct": 51.74938974776241,
+                "model_under_takes": 1056,
+                "n": 1474
+              }
+            ],
+            "corr": 0.02821904378073017,
+            "corr_ci": {
+              "ci_95_high": 0.05797407335491698,
+              "ci_95_low": -0.0006212519656394768,
+              "dates": 588,
+              "point": 0.02821904378073017
+            },
+            "mae_line": 12.849739536554697,
+            "mae_model": 13.22455388871759,
+            "n": 5567,
+            "ols_slope": 0.10234427987125669,
+            "sd_actual": 17.816374276155823,
+            "sd_line": 8.160976021332337,
+            "sd_model": 6.331685946261556,
+            "side_losses": 2190,
+            "side_pushes": 52,
+            "side_wins": 2325
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.023); 95% CI [-0.006, +0.051] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.020); 95% CI [-0.009, +0.048] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": true,
+            "text": "positive correlation: yes (point +0.028); 95% CI [-0.001, +0.058] includes zero"
+          }
+        },
+        "window:holdout": {
+          "n_lined_v6": 1899,
+          "v5_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 43.956043956043956,
+                "bucket": "under 45",
+                "model_over_takes": 138,
+                "model_side_win_pct": 45.73170731707317,
+                "model_under_takes": 26,
+                "n": 182
+              },
+              {
+                "actual_over_pct": 52.64900662251656,
+                "bucket": "45-52",
+                "model_over_takes": 423,
+                "model_side_win_pct": 50.68762278978389,
+                "model_under_takes": 86,
+                "n": 604
+              },
+              {
+                "actual_over_pct": 49.21739130434783,
+                "bucket": "52-60",
+                "model_over_takes": 198,
+                "model_side_win_pct": 48.32535885167464,
+                "model_under_takes": 220,
+                "n": 575
+              },
+              {
+                "actual_over_pct": 51.333333333333336,
+                "bucket": "60 and over",
+                "model_over_takes": 17,
+                "model_side_win_pct": 50.413223140495866,
+                "model_under_takes": 104,
+                "n": 150
+              }
+            ],
+            "corr": -0.039682309000155236,
+            "corr_ci": {
+              "ci_95_high": 0.015873600149561806,
+              "ci_95_low": -0.09653718281097565,
+              "dates": 168,
+              "point": -0.039682309000155236
+            },
+            "mae_line": 12.5186962276638,
+            "mae_model": 13.130241449371276,
+            "n": 1511,
+            "ols_slope": -0.1495958684523797,
+            "sd_actual": 16.625459223358344,
+            "sd_line": 6.075908457378061,
+            "sd_model": 5.243220454599583,
+            "side_losses": 616,
+            "side_pushes": 0,
+            "side_wins": 596
+          },
+          "v6_all_covered": {
+            "buckets": [
+              {
+                "actual_over_pct": 44.33497536945813,
+                "bucket": "under 45",
+                "model_over_takes": 164,
+                "model_side_win_pct": 43.82022471910113,
+                "model_under_takes": 14,
+                "n": 203
+              },
+              {
+                "actual_over_pct": 52.465753424657535,
+                "bucket": "45-52",
+                "model_over_takes": 515,
+                "model_side_win_pct": 49.08485856905158,
+                "model_under_takes": 86,
+                "n": 730
+              },
+              {
+                "actual_over_pct": 49.27344782034346,
+                "bucket": "52-60",
+                "model_over_takes": 322,
+                "model_side_win_pct": 48.813559322033896,
+                "model_under_takes": 268,
+                "n": 757
+              },
+              {
+                "actual_over_pct": 52.63157894736842,
+                "bucket": "60 and over",
+                "model_over_takes": 30,
+                "model_side_win_pct": 50.0,
+                "model_under_takes": 134,
+                "n": 209
+              }
+            ],
+            "corr": -0.03381420496545343,
+            "corr_ci": {
+              "ci_95_high": 0.007886327245592574,
+              "ci_95_low": -0.07785652312386838,
+              "dates": 179,
+              "point": -0.03381420496545343
+            },
+            "mae_line": 12.366903633491312,
+            "mae_model": 12.989478618500291,
+            "n": 1899,
+            "ols_slope": -0.12637718480131319,
+            "sd_actual": 16.453143894448875,
+            "sd_line": 6.038476934967695,
+            "sd_model": 5.349144423675363,
+            "side_losses": 790,
+            "side_pushes": 0,
+            "side_wins": 743
+          },
+          "v6_common": {
+            "buckets": [
+              {
+                "actual_over_pct": 43.956043956043956,
+                "bucket": "under 45",
+                "model_over_takes": 150,
+                "model_side_win_pct": 43.39622641509434,
+                "model_under_takes": 9,
+                "n": 182
+              },
+              {
+                "actual_over_pct": 52.64900662251656,
+                "bucket": "45-52",
+                "model_over_takes": 433,
+                "model_side_win_pct": 49.19028340080972,
+                "model_under_takes": 61,
+                "n": 604
+              },
+              {
+                "actual_over_pct": 49.21739130434783,
+                "bucket": "52-60",
+                "model_over_takes": 273,
+                "model_side_win_pct": 51.36986301369863,
+                "model_under_takes": 165,
+                "n": 575
+              },
+              {
+                "actual_over_pct": 51.333333333333336,
+                "bucket": "60 and over",
+                "model_over_takes": 22,
+                "model_side_win_pct": 51.785714285714285,
+                "model_under_takes": 90,
+                "n": 150
+              }
+            ],
+            "corr": -0.007948526436687668,
+            "corr_ci": {
+              "ci_95_high": 0.04098760629808546,
+              "ci_95_low": -0.05673228225986558,
+              "dates": 168,
+              "point": -0.007948526436687668
+            },
+            "mae_line": 12.5186962276638,
+            "mae_model": 13.015092735768986,
+            "n": 1511,
+            "ols_slope": -0.03417291952826117,
+            "sd_actual": 16.625459223358344,
+            "sd_line": 6.075908457378061,
+            "sd_model": 5.320245918077015,
+            "side_losses": 608,
+            "side_pushes": 0,
+            "side_wins": 595
+          },
+          "verdict_v5_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.040); 95% CI [-0.097, +0.016] includes zero"
+          },
+          "verdict_v6_all_covered": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.034); 95% CI [-0.078, +0.008] includes zero"
+          },
+          "verdict_v6_common": {
+            "ci_excludes_zero": false,
+            "positive_out_of_sample_correlation": false,
+            "text": "positive correlation: no (point -0.008); 95% CI [-0.057, +0.041] includes zero"
+          }
+        }
+      },
+      "n_common_v5_v6": 7078,
+      "n_lined_v6": 8279,
+      "orientation_check": {
+        "corr_line_vs_actual_total": 0.402850281355854,
+        "n": 8279
+      },
+      "sensitivity_ex_opening_consensus_holdout": {
+        "n": 1899,
+        "note": "same rows, line = median excluding providers named Opening and consensus (diagnostic only)",
+        "v6_all_covered": {
+          "buckets": [
+            {
+              "actual_over_pct": 44.33497536945813,
+              "bucket": "under 45",
+              "model_over_takes": 164,
+              "model_side_win_pct": 43.82022471910113,
+              "model_under_takes": 14,
+              "n": 203
+            },
+            {
+              "actual_over_pct": 52.465753424657535,
+              "bucket": "45-52",
+              "model_over_takes": 515,
+              "model_side_win_pct": 49.08485856905158,
+              "model_under_takes": 86,
+              "n": 730
+            },
+            {
+              "actual_over_pct": 49.27344782034346,
+              "bucket": "52-60",
+              "model_over_takes": 322,
+              "model_side_win_pct": 48.813559322033896,
+              "model_under_takes": 268,
+              "n": 757
+            },
+            {
+              "actual_over_pct": 52.63157894736842,
+              "bucket": "60 and over",
+              "model_over_takes": 30,
+              "model_side_win_pct": 50.0,
+              "model_under_takes": 134,
+              "n": 209
+            }
+          ],
+          "corr": -0.03381420496545343,
+          "corr_ci": {
+            "ci_95_high": 0.007886327245592574,
+            "ci_95_low": -0.07785652312386838,
+            "dates": 179,
+            "point": -0.03381420496545343
+          },
+          "mae_line": 12.366903633491312,
+          "mae_model": 12.989478618500291,
+          "n": 1899,
+          "ols_slope": -0.12637718480131319,
+          "sd_actual": 16.453143894448875,
+          "sd_line": 6.038476934967695,
+          "sd_model": 5.349144423675363,
+          "side_losses": 790,
+          "side_pushes": 0,
+          "side_wins": 743
+        }
+      }
+    }
+  },
+  "note": "ESPN's odds feed gives archived closing/final pregame lines with no per-quote observed_at: a closing-line benchmark, not decision-time quotes. The line is E's pinned rule (median across non-live providers, fixed before any outcome was joined; sha256 in the header); nothing was fitted on any line. Fit-window games (on or before the frozen validation end) were used to fit v6's calibration and v5's, so the holdout-window seasons are the clean test. The 575/576 check is a design-informed subset of the 2026 holdout-window season and is not independent of it. Spread of projections, over% by line bucket and dog takes are diagnostics, not evidence. No promotion decision.",
+  "skipped": {
+    "no_call": 36,
+    "no_line": 255,
+    "no_v6_row": 0
+  },
+  "validation_end": "2024-11-14"
+}
