@@ -210,5 +210,22 @@ Loss review: at executable quotes moneyline is 29-22 -9.91u (edge >= 8%: 0-8), s
   36 more after 2026-11-16 settlement, readable from roughly 2026-12-07 with four slates); forecast
   weather validation (Open-Meteo captures began 2026-11-11); opener and line-movement tests (captures
   began 2026-11-12; four weeks by 2026-12-10).
+- **Reversed the same day (operator directive: nothing comes off production, paper needs picks).**
+  `(nfl, spread)` and `(nfl, total)` are live in the buyer again (code and state, `f451f802`,
+  `b6d3177a`) and `nfl-elo-trend-lr-v4` is back on the live whitelist. It is still on the blacklist
+  from before 2026-11-15, so the buyer buys no NFL moneyline. The input gate stays. Do not propose
+  disabling a market as a fix; the two open decisions above are closed as "leave serving".
+- **Moneyline challenger `nfl-moneyline-margin-v1` (`3c6c6aca`).** The home-win probability
+  `nfl-spread-structural-v7` already derives from its margin, logged to Flat under its own model id
+  from the spread slate (`cli/forecast_nfl_moneyline_shadow.py`). 594 out-of-sample games
+  (2024-09-22..2026-10-08): Brier 0.2071 vs 0.2198 for lr-v4, paired gain +0.0127 (95% +0.0038..
+  +0.0213), 67.3% vs 66.0% winners. The gain is the sportsbook line inside the margin (pure
+  structural margin 0.2277, line alone 0.2068), so it is accuracy, not edge. Not promoted; promotion
+  needs Vincent's yes and `model_promotion promote`. One row (`b112db1191754f20`, PIT at CIN) was
+  written to the live Flat ledger at 21:27Z by a dry run that resolved to the runtime root.
+  **Next:** confirm the 23:30Z run logged the row beside lr-v4's and compare the two on results.
+- **Evaluated 2026-11-15:** `nfl_market_anchor_v1` walk-forward on live quote-backed calls: moneyline
+  0.2330 -> 0.2138 (41 rows) and spread 0.2653 -> 0.2408 (26) at weight 1.0, i.e. the market; total
+  gets worse, 0.2328 -> 0.2482 (25). Loss mechanism: moneyline picks 5%+ above the ask are 1-11.
 - **Not evaluated:** `nfl_market_anchor_v1`, `nfl_joint_market_v3`, `nfl_joint_score_v1`. The anchor
   needs timestamp-valid two-sided quotes per settled game; 121 executable-quote picks exist.
