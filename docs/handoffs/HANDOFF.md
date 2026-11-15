@@ -97,11 +97,21 @@ slate / NFL slates / auto-buyer read them at serving time. Since `quick-261112-1
 own-model fit provenance and >= 100 outcomes, but the pipeline can still change a served transform with no
 promotion record. Decide whether that is acceptable or whether serving must pin a hash.
 
-## 4. NFL v8 challenger
+## 4. NFL v8 challenger (replayed 2026-11-15: not promotable; keep unqualified)
 
-`nfl-spread-structural-v8` (discrete-margin PMF) is an unqualified challenger. The replay over every
-settled spread ledger game is in `scripts/replay_nfl_v8_settled.py`; its result is not recorded in
-any doc. Run it, record Brier/ROI vs v7 with the 60/20/20 contract, and only then discuss promotion.
+`nfl-spread-structural-v8` projects the same margin as v7 in every game; only the distribution
+differs (discrete PMF with push mass), so it cannot repair a mean with no signal.
+
+- 1,489 completed games, flat 1u at a 52.4% ask: Brier 0.2494 vs v7 0.2496 (market 0.2500); favoured
+  side 51.4% vs 52.7%. At its own 3.5% gate: 75 bets 42-33 +5.18u, of which 2022 (inside the PMF fit
+  window) is +5.18u. Out of sample (2023+): 48 bets 26-22 +1.64u at 3.5%, 18 bets 9-9 -0.82u at 5%.
+  Fires cluster on 2.5/3.5/6.5/7.5 (46 bets 28-18), a post-hoc slice priced at an unshaded ask.
+- 60 settled Flat spread rows at their own line and ask (`scripts/replay_nfl_v8_settled.py`, repaired
+  2026-11-15 to re-price pre-11-11 four-column snapshots from the current store; output
+  `outputs/research/nfl_v8_settled_replay.json`): Brier ask 0.2447, fixed v7 0.2513, v8 0.2531.
+  `promotion_blocked: true` (v7 parity 7 of 24 rows within one point).
+- Possible use: valuing half points around 3 and 7 against real shaded two-sided asks, once a few weeks
+  of the week-ahead captures exist. Not a serving candidate.
 
 ## 5. Daily forecast speed and reliability
 
@@ -170,3 +180,35 @@ weather, guarded serving calibrator, and `scripts/replay_nfl_v7_all_settled.py`.
   the replay contradicts that. Either demote the evidence label (keeps them serving, blocks Main as
   qualified) or accept that the 5% Main hurdle will rarely fire (16 of 1,451 games, hit 37.5%).
 - **Open**: NFL moneyline (`nfl-elo-trend-lr-v4`) was not re-priced; 85 Flat picks 55W/29L +5.55u.
+
+## 8. NFL fix batch 2026-11-15 (`quick-261115-21e`; done, follow-ups open)
+
+Loss review: at executable quotes moneyline is 29-22 -9.91u (edge >= 8%: 0-8), spread edge >= 5% is
+6-14, totals 21-10 +15.82u. Model Brier loses to the ask in all three markets.
+
+- **Done.** Paper buyer rejects picks whose forecast flagged `input_qualified` false or (totals)
+  `weather_inputs_verified` false, read from the canonical ledger (`rejected_input_unqualified`;
+  first live cycle 06:40Z rejected the NE at DET and SEA at LV totals). `(nfl, spread)` is disabled in
+  the buyer, code constant and live state; `nfl-elo-trend-lr-v4` left the live whitelist (it was on
+  both lists; state backup `auto_buyer_state.json.pre-nfl-spread-off-lrv4-whitelist-20261115-063137.bak`).
+  Registry `evidence_status` is `historical_only` for v7 spread, v7 total and lr-v4. Dashboard
+  `performance()` no longer scores `model_opinion_no_executable_quote` rows and reports them under
+  `placeholder_priced_excluded`; this applies to every sport (210 settled Main rows, +47u: MLB 144,
+  WNBA 25, NFL 25, NBA 16).
+- **Open decision: NFL Main still follows the artifact, not the registry.** NFL spread/total gating
+  reads `qualification.qualified` in the v7 artifacts, so the evidence demotion is a label only. Wiring
+  NFL to the registry (as NBA is) would turn every NFL Main row into a paper call.
+- **Open decision: NFL totals in the buyer.** A weather-only total model selected on validation scores
+  0.2502 on the locked holdout (from 2025-09-28) against 0.2511 for served v7, whose edge >= 5% fires
+  are 13-17 -5.18u there. Recorded wind >= 12 mph went 105 unders / 60 overs through 2025-09 and
+  20 / 21 since. No total edge is validated; the +15.82u ledger record is 31 picks.
+- **Not changed, on evidence:** spread sd. Flat 12.8 vs 13.8 with the 1.25x heavy-line factor is
+  Brier-neutral on validation (0.24946 vs 0.24949) and slightly worse on holdout (0.25064 vs 0.25044).
+- **New shadow tool:** `scripts/nfl_price_edge_report.py [date]` lists Polymarket asks below the
+  no-vig DraftKings consensus for the same line. Unvalidated; one week of capture history.
+- **Blocked on data, with dates:** closing-line value (3 settled rows have a closing consensus; about
+  36 more after 2026-11-16 settlement, readable from roughly 2026-12-07 with four slates); forecast
+  weather validation (Open-Meteo captures began 2026-11-11); opener and line-movement tests (captures
+  began 2026-11-12; four weeks by 2026-12-10).
+- **Not evaluated:** `nfl_market_anchor_v1`, `nfl_joint_market_v3`, `nfl_joint_score_v1`. The anchor
+  needs timestamp-valid two-sided quotes per settled game; 121 executable-quote picks exist.

@@ -4,10 +4,10 @@ current_phase: 1
 current_phase_name: Portfolio Circuit Breaker
 status: planning
 stopped_at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated to 4-phase structure
-last_updated: "2026-11-13T19:18:00.237Z"
+last_updated: "2026-11-15T07:10:30.727Z"
 last_activity: 2026-11-13
 last_activity_desc: ROADMAP.md and STATE.md created from REQUIREMENTS.md and research/SUMMARY.md
-state_head: 31f092a95844c9d5178ebfec3f403890c99466cd
+state_head: b88de0e3f3a87d2088bcee96c12bfcdec14188dc
 progress:
   total_phases: 4
   completed_phases: 0
@@ -120,6 +120,7 @@ None yet.
 | 261114-mzz | Event-detail quote pass (one GET per game) ahead of the paced /book capture: NCAAB 1619 and NCAAF 2107 contracts captured per run vs 203 in the 21:00Z daily; /book pass serves unquoted markets first | 2026-11-14 | e8e2ed47 | [261114-mzz-add-event-detail-quote-pass-to-polymarke](./quick/261114-mzz-add-event-detail-quote-pass-to-polymarke/) |
 | 261114-srb | cfb-structural-v6 NCAAF shadow challenger (additive joint-ridge ratings, frozen fit, inert, not routed): holdout Brier 0.17975 vs v5 0.19003 (CI [-0.01524, -0.00553]) but no market-relative edge (all line-correlation CIs include zero); history gap audit (existing history misses 90-100% of lower-division games), 16,378-event backfill, 9,364 ESPN closing lines; src port bit-exact (14,639 rows) | 2026-11-15 | de3208dc | [261114-srb-build-cfb-structural-v6-shadow-only-ncaa](./quick/261114-srb-build-cfb-structural-v6-shadow-only-ncaa/) |
 | 261115-0pq | v6 open items: known-team gate (declines names absent from history; parity max abs 0.0, 0 newly declined) and checkout-proof lib pin (CRLF-normalised hash, frozen sha256 unchanged) shipped; v5 live-history backfill and NCAAF groups 80/81 ingest measured by a pre-pinned rule and REJECTED (holdout Brier delta +0.001065 vs +0.001 limit), live files untouched | 2026-11-15 | 3b9728fc | [261115-0pq-fix-v6-open-items-ncaaf-ingest-groups-80](./quick/261115-0pq-fix-v6-open-items-ncaaf-ingest-groups-80/) |
+| 261115-21e | NFL fix batch: buyer input gate, NFL spread off in buyer, evidence labels, placeholder rows out of performance, v8 replay repair | 2026-11-15 | b88de0e3 | [261115-21e-nfl-fix-batch-buyer-input-gate-nfl-sprea](./quick/261115-21e-nfl-fix-batch-buyer-input-gate-nfl-sprea/) |
 
 ## Milestone History
 

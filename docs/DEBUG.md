@@ -206,6 +206,26 @@ change how you should work here:
   expected. Soccer's Odds API credential remains a known-DEGRADED external
   dependency. The two launchd research agents are loaded and producing.
 
+## 2026-11-15 — NFL: the paper buyer bought from Flat what Main had declined; placeholder prices inflated the record (quick-261115-21e)
+
+- **Symptom.** Pre-kickoff review of the 2026-11-15 slate: three NFL rows were buy candidates although
+  Main had rejected them -- SEA at LV spread and total (`input_qualified` false) and NE at DET over
+  49.5 (neutral site, no pregame weather).
+- **Cause.** `AutoPolymarketBuyer.evaluate_and_execute` merges Main and Flat and, since the
+  2026-11-11 "tags name destinations" change, rejects only `decision != CALL` and `PAPER_CALL_*`.
+  The dashboard pick readers it consumes do not project `feature_payload_json`, so the input flags the
+  forecast writes never reached the buyer.
+- **Fix.** `_load_pick_input_flags` reads the flags from the canonical ledger by pick id (the stored
+  values are the strings "True"/"False"); `_has_unqualified_inputs` rejects explicit false, weather for
+  totals only, and fails closed for NFL spread/total when the ledger cannot be read. Regression test
+  `tests/test_auto_buyer_input_gate.py`, shown to fail with the gate removed.
+- **Second finding.** 210 settled Main rows carry sportsbook `model_opinion_no_executable_quote`: no
+  quote matched, the row was priced at the 52.38% lay, and favourites were paid as coin flips (+47u
+  in total). `dashboard.picks.performance` now excludes them from the record and reports the count.
+- **Reproduction.** Row-level NFL loss tables: ledger `ledger_records`, `sport='nfl'`,
+  `status='settled'`, de-duplicated on (event, market, selection, line, model) preferring Main, split
+  on `market_quote_provenance`. v8 and total-refit numbers: `docs/handoffs/HANDOFF.md` sections 4, 8.
+
 ## 2026-11-15 — NCAAF: v6 open items: ingest groups 80/81, measured v5 history backfill, known-team gate, checkout-proof pin (quick-261115-0pq)
 
 **Bottom line.** The operator approved fixing the four open items from the v6 entry below. Two shipped (the known-team
