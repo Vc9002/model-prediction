@@ -58,6 +58,7 @@ from model_prediction.models.ncaab_v7_shadow import (
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "outputs" / "ncaab"
 COMPONENTS_PATH = OUT / "ncaab_v7_components.jsonl"
+POSTFIX_COMPONENTS_PATH = OUT / "ncaab_v7_components_postfix.jsonl"
 
 TRAIN_START = "2025-12-01"
 TRAIN_END = "2026-02-19"
@@ -121,24 +122,24 @@ def _component_worker(days: list[str]) -> list[dict[str, Any]]:
     return rows
 
 
-def build_components(workers: int = 3) -> pd.DataFrame:
+def build_components(workers: int = 3, path: Path = COMPONENTS_PATH) -> pd.DataFrame:
     games = ab.load_games()
     days = sorted({g.start.astimezone(ab.EASTERN).date().isoformat() for g in games})
     chunks = [days[i::workers] for i in range(workers)]
     with ProcessPoolExecutor(workers) as ex:
         parts = list(ex.map(_component_worker, chunks))
     rows = sorted((r for p in parts for r in p), key=lambda r: (r["start"], r["event_id"]))
-    COMPONENTS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with COMPONENTS_PATH.open("w", encoding="utf-8") as fh:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as fh:
         for r in rows:
             fh.write(json.dumps(r, separators=(",", ":")) + "\n")
     return pd.DataFrame(rows)
 
 
-def load_components(rebuild: bool = False) -> pd.DataFrame:
-    if rebuild or not COMPONENTS_PATH.exists():
-        return build_components()
-    return pd.read_json(COMPONENTS_PATH, lines=True, dtype={"event_id": str})
+def load_components(rebuild: bool = False, path: Path = COMPONENTS_PATH) -> pd.DataFrame:
+    if rebuild or not path.exists():
+        return build_components(path=path)
+    return pd.read_json(path, lines=True, dtype={"event_id": str})
 
 
 # ----------------------------------------------------------------------------- item 9: parity
@@ -865,41 +866,77 @@ def decision_variants(frame: pd.DataFrame, config: V7Config) -> dict[str, Any]:
 
 
 def replay_check(frame: pd.DataFrame, config: V7Config) -> dict[str, Any]:
-    """Item 10 replay: the settled v6 replay rows re-priced by v7 at the same line.
+    """Item 10 replay: the settled v6 replay rows re-priced by v7 and by the CURRENT v6.
 
-    Market-relative content is deliberately thin: 1,167 settled rows, every one with a current-season
-    sample of 0-3 games, 1,157 of 1,167 asks are indicative slate prices, not executable quotes.
+    Line convention (verified against outcomes): ``line`` is the selected side's own spread, so the
+    market's home margin is ``line`` for an away pick and ``-line`` for a home pick. The replay's
+    ``p_fixed`` comes from an earlier v6 artifact (hash in ``artifact_hashes``), so the like-for-like
+    v6 column is recomputed here from the current v6 margin and scale.
+
+    Market-relative content is deliberately thin: every row has a current-season sample of 0-3 games,
+    1,157 of 1,167 asks are indicative slate prices, not executable quotes, and the rows are the
+    picks the old models chose to log.
     """
     from scipy import stats
 
-    path = OUT / "ncaab_v6_settled_replay.json"
-    rows = pd.DataFrame(json.loads(path.read_text(encoding="utf-8"))["rows"])
+    payload = json.loads((OUT / "ncaab_v6_settled_replay.json").read_text(encoding="utf-8"))
+    rows = pd.DataFrame(payload["rows"]).rename(columns={"cutoff": "day"})
     key = frame.set_index(["home", "away", "day"])
-    keep = ~key.index.duplicated(keep="first")
-    key = key[keep]
-    rows = rows.rename(columns={"cutoff": "day"})
-    joined = rows.join(
-        key[["v7_mean", "v7_scale", "v6_mean", "v6_scale", "margin", "total", "v7_total", "d1"]],
-        on=["home", "away", "day"],
-    )
+    key = key[~key.index.duplicated(keep="first")]
+    cols = ["v7_mean", "v7_scale", "v6_mean", "v6_scale", "margin", "total", "v7_total", "v6_total", "d1"]
+    joined = rows.join(key[cols], on=["home", "away", "day"])
+    swapped = rows[joined.v7_mean.isna()].copy()
+    swapped_key = frame.set_index(["away", "home", "day"])
+    swapped_key = swapped_key[~swapped_key.index.duplicated(keep="first")]
+    swapped = swapped.join(swapped_key[cols], on=["home", "away", "day"])
+    swapped = swapped[swapped.v7_mean.notna()]
+    out: dict[str, Any] = {
+        "rows_total": len(rows),
+        "rows_joined_same_orientation": int(joined.v7_mean.notna().sum()),
+        "rows_matching_only_with_home_away_swapped": len(swapped),
+        "rows_unmatched": int(len(rows) - joined.v7_mean.notna().sum() - len(swapped)),
+        "replay_artifact_hashes": {k: v[:12] for k, v in payload["artifact_hashes"].items()},
+        "note_p_fixed": "p_fixed is from the replay-time artifact (not the current v6); v6_current is recomputed",
+    }
     joined = joined[joined.v7_mean.notna()]
-    out: dict[str, Any] = {"rows_total": len(rows), "rows_joined": len(joined)}
     sp = joined[joined.market == "spread"].copy()
+    # market home margin and outcome-consistency check of the line convention
+    sp["mkt_home_margin"] = np.where(sp.selection == "away", sp.line, -sp.line)
+    covered = np.where(sp.selection == "away", sp.margin < sp.mkt_home_margin, sp.margin > sp.mkt_home_margin)
+    push = sp.margin == sp.mkt_home_margin
+    consistent = (covered.astype(int) == sp.outcome) | push
+    out["line_convention_outcome_consistency"] = {
+        "rows": len(sp),
+        "consistent_share": round(float(consistent.mean()), 4),
+        "inconsistent_rows": int((~consistent).sum()),
+        "pushes": int(push.sum()),
+    }
 
-    def side_prob(mean: float, scale: float, line: float, selection: str) -> float:
-        """P(selection covers) with the push mass excluded on integer lines (same rule as v6)."""
-        if float(line).is_integer():
-            away = float(stats.t.cdf((line - 0.5 - mean) / scale, df=8.0))
-            home = 1.0 - float(stats.t.cdf((line + 0.5 - mean) / scale, df=8.0))
+    def side_prob(mean: float, scale: float, home_line: float, selection: str) -> float:
+        """P(selection covers); ``home_line`` is the market home margin; push mass excluded on integers."""
+        if float(home_line).is_integer():
+            away = float(stats.t.cdf((home_line - 0.5 - mean) / scale, df=8.0))
+            home = 1.0 - float(stats.t.cdf((home_line + 0.5 - mean) / scale, df=8.0))
         else:
-            away = float(stats.t.cdf((line - mean) / scale, df=8.0))
+            away = float(stats.t.cdf((home_line - mean) / scale, df=8.0))
             home = 1.0 - away
         return away if selection == "away" else home
 
-    sp["p_v7"] = [side_prob(r.v7_mean, r.v7_scale, r.line, r.selection) for r in sp.itertuples()]
+    sp["p_v7"] = [side_prob(r.v7_mean, r.v7_scale, r.mkt_home_margin, r.selection) for r in sp.itertuples()]
+    sp["p_v6_current"] = [
+        side_prob(r.v6_mean, r.v6_scale, r.mkt_home_margin, r.selection) for r in sp.itertuples()
+    ]
     out["spread_rows"] = len(sp)
     out["spread_sample_0_3_share"] = round(float((sp.current_season_sample <= 3).mean()), 3)
-    for label, col in (("v6_fixed_as_replayed", "p_fixed"), ("v7", "p_v7")):
+    out["spread_selection_counts"] = {k: int(v) for k, v in sp.selection.value_counts().items()}
+    out["mean_abs_p_diff_replayed_vs_current_v6"] = round(
+        float((sp.p_fixed - sp.p_v6_current).abs().mean()), 4
+    )
+    for label, col in (
+        ("v6_as_replayed_older_artifact", "p_fixed"),
+        ("v6_current", "p_v6_current"),
+        ("v7", "p_v7"),
+    ):
         p = sp[col].to_numpy(float)
         o = sp.outcome.to_numpy(float)
         hi = p >= 0.8
@@ -913,41 +950,39 @@ def replay_check(frame: pd.DataFrame, config: V7Config) -> dict[str, Any]:
             "n_p_ge_0.7": int((p >= 0.7).sum()),
             "hit_rate_p_ge_0.7": round(float(o[p >= 0.7].mean()), 3) if (p >= 0.7).any() else None,
         }
-    # market-relative: the spread line is the market's home margin; who is closer to the result?
     y = sp.margin.to_numpy(float)
-    line = sp.line.to_numpy(float)
+    line = sp.mkt_home_margin.to_numpy(float)
     model = sp.v7_mean.to_numpy(float)
     v6 = sp.v6_mean.to_numpy(float)
+    big = line >= 25
     out["market_relative_thin"] = {
         "n": len(sp),
         "rmse_market_line": round(float(np.sqrt(np.mean((y - line) ** 2))), 3),
         "rmse_v7": round(float(np.sqrt(np.mean((y - model) ** 2))), 3),
-        "rmse_v6": round(float(np.sqrt(np.mean((y - v6) ** 2))), 3),
+        "rmse_v6_current": round(float(np.sqrt(np.mean((y - v6) ** 2))), 3),
         "corr_v7_minus_line_vs_result_minus_line": round(float(np.corrcoef(model - line, y - line)[0, 1]), 3),
         "corr_v6_minus_line_vs_result_minus_line": round(float(np.corrcoef(v6 - line, y - line)[0, 1]), 3),
         "mean_v7_minus_line": round(float(np.mean(model - line)), 3),
         "mean_v6_minus_line": round(float(np.mean(v6 - line)), 3),
         "mean_result_minus_line": round(float(np.mean(y - line)), 3),
-    }
-    big = sp.line.to_numpy(float) >= 25
-    out["market_relative_thin"]["line_ge_25"] = {
-        "n": int(big.sum()),
-        "mean_line": round(float(line[big].mean()), 2) if big.any() else None,
-        "mean_v6": round(float(v6[big].mean()), 2) if big.any() else None,
-        "mean_v7": round(float(model[big].mean()), 2) if big.any() else None,
-        "mean_result": round(float(y[big].mean()), 2) if big.any() else None,
+        "line_ge_25": {
+            "n": int(big.sum()),
+            "mean_line": round(float(line[big].mean()), 2) if big.any() else None,
+            "mean_v6": round(float(v6[big].mean()), 2) if big.any() else None,
+            "mean_v7": round(float(model[big].mean()), 2) if big.any() else None,
+            "mean_result": round(float(y[big].mean()), 2) if big.any() else None,
+        },
     }
     tot = joined[(joined.market == "total") & joined.v7_total.notna()]
     if len(tot):
         yt = tot.total.to_numpy(float)
-        tline = tot.line.to_numpy(float)
         out["total_rows_market_relative_thin"] = {
             "n": len(tot),
-            "rmse_market_line": round(float(np.sqrt(np.mean((yt - tline) ** 2))), 3),
+            "rmse_market_line": round(float(np.sqrt(np.mean((yt - tot.line.to_numpy(float)) ** 2))), 3),
             "rmse_v7_total": round(float(np.sqrt(np.mean((yt - tot.v7_total.to_numpy(float)) ** 2))), 3),
-            "rmse_v6_total": round(float(np.sqrt(np.mean((yt - tot.v6_total.to_numpy(float)) ** 2))), 3)
-            if "v6_total" in tot
-            else None,
+            "rmse_v6_total_current": round(
+                float(np.sqrt(np.mean((yt - tot.v6_total.to_numpy(float)) ** 2))), 3
+            ),
         }
     return out
 
@@ -1084,13 +1119,9 @@ VERDICTS: list[dict[str, str]] = [
     {
         "item": "3",
         "idea": "last-season carryover (weight 0.5-1)",
-        "verdict": "WEAKLY SUPPORTED, selectable only on the holdout (untestable in dev)",
+        "verdict": "SUPPORTED on the holdout only (untestable in dev); 0.5 declared ex ante",
         "evidence": (
-            "Data starts 2025-11-03, so no dev game has a prior season; 0.5 was declared ex ante. Holdout D1 "
-            "(n=688, 85 of them 2025-26 games unaffected): v7 form RMSE carry 0 = 13.425 (bias -0.06), 0.5 = "
-            "13.283 (bias +1.94), 1.0 = 13.355; raw ridge 13.824 / 13.472 / 13.523. An earlier read-only agent "
-            "saw the same direction on this data, so this is not a blind confirmation. v6 already carries Elo "
-            "and trend ratings over at retention 0.35."
+            "Data starts 2025-11-03, so no dev game has a prior season. Holdout D1 (n=688; 85 are 2025-26 games that carryover cannot touch). As frozen, a guard counted only current-season games, which switched carryover off on 2026-11-01/02 (121 of 603 early-season D1 rows, 121 of the 150 sample-0 games): v7 form RMSE carry 0 / 0.5 / 1.0 = 13.425 / 13.283 / 13.355. POST-FREEZE rerun with the guard fixed (dev rows and frozen coefficients verified unchanged): 13.425 / 12.988 / 13.023, bias -0.06 / +1.46 / +1.18; raw ridge 13.824 / 13.035 / 13.032. So carryover is worth about 0.4 RMSE on D1 early-season games and 0.5 vs 1.0 is not separable. An earlier read-only agent saw the same direction on this data, so this is not a blind confirmation. v6 already carries Elo and trend ratings over at retention 0.35."
         ),
     },
     {
@@ -1155,28 +1186,17 @@ VERDICTS: list[dict[str, str]] = [
     {
         "item": "9",
         "idea": "v6 retune train/serve parity (HCA 5.0, Elo 45)",
-        "verdict": "Code and parameters match exactly; one INPUT differs (neutral flag); retune survives it",
+        "verdict": "Code, parameters and serving all match; one harness INPUT differs (neutral flag); the retune survives it",
         "evidence": (
-            "Ablation kwargs vs artifact factory: 0 parameter diffs; same inputs -> max |margin diff| 0.0 on "
-            "1,069 games. The ablation never passes neutral_site while serving does; validation is 273/1,043 "
-            "neutral games (ESPN flag; the TRNMNT proxy disagrees on 266 of 6,947). With the real flag the "
-            "HCA grid 7.2/70, 6.0/55, 5.0/45 on validation has bias -1.22, -0.57, -0.06 (home-only inputs: "
-            "-2.50, -1.62, -0.93): 5.0/45 is still selected (also best cover Brier 0.2104 and D1 RMSE 11.109). "
-            "The post-retune positive live bias is early-season compression (slope 1.62 in Nov-2025, 1.61 on the "
-            "holdout, intercept -2.0+-0.8 / -0.9+-0.7), not HCA."
+            "Ablation kwargs vs artifact factory: 0 parameter diffs; same inputs give max |margin diff| 0.0 on 1,069 games. Serving leg: the ablation's reproduction gate reproduced 132 live rows with 0 deltas, and joining the runtime-ledger spread-v6 Flat rows to this walk-forward gives mean |live expected_margin - walk-forward v6_mean| of 0.01 / 0.00 / 0.00 on 2026-11-12 / 13 / 14 (23 / 46 / 53 games; earlier days differ because the artifact changed). The ablation never passes neutral_site while serving does; validation is 273/1,043 neutral games (ESPN flag; the TRNMNT proxy disagrees on 266 of 6,947). With the real flag the HCA grid 7.2/70, 6.0/55, 5.0/45 on validation has bias -1.22, -0.57, -0.06 (home-only inputs: -2.50, -1.62, -0.93): 5.0/45 is still selected (best cover Brier 0.2104, D1 RMSE 11.109). The post-retune positive bias is early-season compression (slope 1.62 in Nov-2025, 1.61 on the holdout; intercepts -2.0+-0.8 / -0.9+-0.7), not HCA. Live bias (actual - live expected_margin) by day: +1.29, +1.40, -0.99 for 11-12/13/14; I did not reproduce the quoted +4.3/+1.9/+0.2 (different cut)."
         ),
     },
     {
         "item": "10",
         "idea": "v7 combined candidate on the locked holdout",
-        "verdict": "Better calibrated early-season margin than v6; no market-relative claim possible",
+        "verdict": "D1 margin clearly better than v6; calibration roughly a tie; no market-relative claim possible",
         "evidence": (
-            "Holdout (n=901, 688 D1; 816 are 2026-27 early season): D1 RMSE 13.28 vs v6 14.20 (-0.91 "
-            "[-1.33,-0.60]), all-games 14.83 vs 15.81, bias +1.94 vs +4.14, slope 1.07 vs 1.61. Moneyline "
-            "Brier 0.1159 vs 0.1156 (tie), cover Brier 0.2266 vs 0.2279, PIT 50/80/90 = 0.482/0.800/0.906. "
-            "Validation (non-degradation guard): D1 RMSE 11.093 vs 11.109. Replay on 357 of 408 settled "
-            "spread rows: v7 does not fix p>=0.8 (54 rows, hit 42.6% vs v6 60 rows, 50.0%) and recorded-side "
-            "Brier is worse (0.3117 vs 0.2939). Market-relative content is thin and selected (see md)."
+            "Frozen run (holdout n=901, 688 D1; 816 are 2026-27 early season): D1 RMSE 13.28 vs v6 14.20 (-0.91 [-1.33,-0.60]), all games 14.83 vs 15.81, bias +1.94 vs +4.14, slope 1.07 vs 1.61, ML Brier 0.1159 vs 0.1156, cover Brier 0.2266 vs 0.2279. POST-FREEZE rerun with the carryover guard fixed: D1 RMSE 12.99 (-1.21 [-1.58,-0.79]), all games 14.62, bias +1.46, ML Brier 0.1141, cover Brier 0.2251, PIT 0.483/0.808/0.910. v7 vs ridge-only -0.54 [-1.17,+0.03] frozen, -0.84 [-1.47,-0.06] post-fix. Validation guard: D1 RMSE 11.093 vs 11.109. Replay on 357 settled spread rows (line convention verified: 100% consistent with outcomes): v7 recorded-side Brier 0.2971 vs 0.2913 for current v6 (0.2939 as replayed with an older artifact); p>=0.8: v7 34 rows hit 41.2%, current v6 42 rows hit 42.9%: not fixed. The market line beats both models on these rows (RMSE 12.06 vs v7 14.56, v6 15.49; correlation of model-minus-line with result-minus-line 0.02 / 0.05): no model-vs-market edge, thin and selected rows."
         ),
     },
 ]
@@ -1185,7 +1205,15 @@ VERDICTS: list[dict[str, str]] = [
 def run_report() -> dict[str, Any]:
     stage = {
         name: json.loads((OUT / f"ncaab_v7_{name}.json").read_text(encoding="utf-8"))
-        for name in ("parity", "ideas", "isolated", "dev_calibration", "final")
+        for name in (
+            "parity",
+            "serving_leg",
+            "ideas",
+            "isolated",
+            "dev_calibration",
+            "final",
+            "final_postfix",
+        )
     }
     frozen = json.loads(FROZEN_PATH.read_text(encoding="utf-8"))
     report = {
@@ -1205,11 +1233,110 @@ def run_report() -> dict[str, Any]:
     return report
 
 
+# ----------------------------------------------------------------------------- post-freeze rerun
+
+
+def run_postfix() -> dict[str, Any]:
+    """Rerun `final` after the carryover opening-day guard fix (labelled post-freeze).
+
+    The frozen config is NOT refitted: the check below asserts that the fixed model produces
+    identical dev rows (so the frozen coefficients are still what a refit would give) and that
+    only 2026-27 opening-day rows changed.
+    """
+    fixed = build_components(path=POSTFIX_COMPONENTS_PATH)
+    frozen_rows = load_components()
+    merged = frozen_rows.merge(fixed, on="event_id", suffixes=("_old", "_new"))
+    dev = merged[merged.split_old != "holdout"]
+    cols = ("ridge_c0", "ridge_c05", "ridge_c10", "v6_mean", "effpace_total")
+    integrity: dict[str, Any] = {
+        "dev_rows": len(dev),
+        "dev_max_abs_diff": {c: float((dev[f"{c}_old"] - dev[f"{c}_new"]).abs().max()) for c in cols},
+    }
+    changed = merged[(merged.ridge_c05_old - merged.ridge_c05_new).abs() > 1e-9]
+    integrity["rows_changed_in_ridge_c05"] = len(changed)
+    integrity["changed_days"] = sorted(changed.day_old.unique().tolist())
+    refit = fit_frozen_config(fixed)
+    frozen = load_frozen()
+    integrity["refit_coef_matches_frozen"] = (
+        refit.margin_coef == frozen.margin_coef and refit.nond1_coef == frozen.nond1_coef
+    )
+    res = run_final(fixed)
+    res["integrity"] = integrity
+    res["label"] = (
+        "POST-FREEZE rerun after the carryover opening-day guard fix; primary result is ncaab_v7_final.json"
+    )
+    # carryover on the rows the bug disabled
+    same_before = frozen_rows[
+        (frozen_rows.split == "holdout")
+        & (frozen_rows.d1_home & frozen_rows.d1_away)
+        & (frozen_rows.ridge_c0 == frozen_rows.ridge_c05)
+        & (frozen_rows.ridge_c05 == frozen_rows.ridge_c10)
+        & (frozen_rows.day >= "2026-10-01")
+    ]
+    res["rows_with_carryover_disabled_in_frozen_run"] = {
+        "n": len(same_before),
+        "days": same_before.groupby("day").size().to_dict(),
+    }
+    return res
+
+
+# ----------------------------------------------------------------------------- item 9: serving leg
+
+
+def run_serving_leg(components: pd.DataFrame) -> dict[str, Any]:
+    """Live ncaab-spread-v6 Flat rows (read-only runtime ledger) vs this walk-forward's v6 margin.
+
+    Rows from before the 2026-11-12 retune are expected to differ (different artifact); the
+    post-retune days are the serving-parity evidence.
+    """
+    import sqlite3
+
+    uri = f"file:{ab.RUNTIME_LEDGER.as_posix()}?mode=ro"
+    with sqlite3.connect(uri, uri=True) as conn:
+        live = pd.read_sql(
+            "select created_at_utc, event_start_utc, decision_payload_json, feature_payload_json "
+            "from ledger_records where sport='ncaab' and model_id='ncaab-spread-v6' and ledger_tier='flat'",
+            conn,
+        )
+    payload = live.decision_payload_json.map(json.loads)
+    feats = live.feature_payload_json.map(lambda s: json.loads(s).get("features", {}))
+    live["home"] = payload.map(lambda p: p.get("home_team"))
+    live["away"] = payload.map(lambda p: p.get("away_team"))
+    live["live_margin"] = pd.to_numeric(feats.map(lambda f: f.get("expected_margin")), errors="coerce")
+    start = pd.to_datetime(live.event_start_utc, utc=True)
+    live["day"] = start.dt.tz_convert("America/New_York").dt.date.astype(str)
+    live["created"] = pd.to_datetime(live.created_at_utc, utc=True)
+    key = components.drop_duplicates(["home", "away", "day"]).set_index(["home", "away", "day"])
+    joined = live.join(key[["v6_mean", "margin"]], on=["home", "away", "day"])
+    joined = joined[joined.v6_mean.notna() & joined.live_margin.notna()]
+    joined = joined.sort_values("created").drop_duplicates(["home", "away", "day"], keep="last")
+    joined["delta"] = joined.live_margin - joined.v6_mean
+    by_day = {
+        day: {
+            "games": len(g),
+            "mean_abs_live_minus_walkforward": round(float(g.delta.abs().mean()), 3),
+            "live_bias_actual_minus_live": round(float((g.margin - g.live_margin).mean()), 3),
+        }
+        for day, g in joined.groupby("day")
+    }
+    return {"games_joined": len(joined), "by_day": by_day}
+
+
 if __name__ == "__main__":
     stages: Sequence[str] = sys.argv[1:] or ["components"]
     if "components" in stages:
         df = build_components()
         print(len(df), df.split.value_counts().to_dict())
+    if "serving" in stages:
+        res = run_serving_leg(load_components())
+        (OUT / "ncaab_v7_serving_leg.json").write_text(
+            json.dumps(res, indent=2, default=str), encoding="utf-8"
+        )
+    if "postfix" in stages:
+        res = run_postfix()
+        (OUT / "ncaab_v7_final_postfix.json").write_text(
+            json.dumps(res, indent=2, default=str), encoding="utf-8"
+        )
     if "report" in stages:
         run_report()
     if "isolated" in stages:

@@ -254,3 +254,38 @@ def test_v7_is_inert_and_v6_is_untouched() -> None:
     assert not list((ROOT / "config" / "models").glob("ncaab-v7*"))
     # the v6 champion artifact still verifies against its embedded hash
     assert load_verified_artifact(ARTIFACT_PATH)["model_id"] == "ncaab-spread-v6"
+
+
+def test_carryover_is_active_on_the_season_opener() -> None:
+    """Regression: the fit guard once counted only current-season games, so ridge_c05/c10 silently
+    equalled the bare prior on opening day, when prior-season games are all there is."""
+    from datetime import UTC, datetime, timedelta
+
+    from model_prediction.features.base import GameRecord
+    from model_prediction.models.basketball import UpcomingGame
+    from model_prediction.models.ncaab_v7_shadow import NCAABV7ShadowModel
+
+    model = NCAABV7ShadowModel(with_totals=False)
+    teams = sorted(model._d1)[:2]
+    home, away = teams
+    start = datetime(2026, 1, 3, 20, tzinfo=UTC)
+    history = []
+    for i in range(40):  # 40 prior-season games, the "home" team always wins big
+        when = (start + timedelta(days=i)).strftime("%Y-%m-%dT%H:%MZ")
+        history.append(
+            GameRecord(
+                event_id=f"g{i}",
+                event_start_utc=when,
+                league="NCAAB",
+                away_team=away,
+                home_team=home,
+                away_score=60,
+                home_score=90,
+                season_year=2026,
+            )
+        )
+    opener = (start + timedelta(days=300)).strftime("%Y-%m-%dT%H:%MZ")
+    (comp,) = model.components(history, [UpcomingGame("opener", opener, away, home, league="NCAAB")])
+    assert comp.games_home == 0  # nothing from the new season yet
+    assert comp.ridge_c05 != pytest.approx(comp.ridge_c0)  # carryover moved the rating
+    assert comp.ridge_c10 > comp.ridge_c0  # the prior season said the home team is much better

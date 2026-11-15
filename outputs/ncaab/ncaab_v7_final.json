@@ -634,10 +634,28 @@
   },
   "replay": {
     "rows_total": 1167,
-    "rows_joined": 1016,
+    "rows_joined_same_orientation": 1016,
+    "rows_matching_only_with_home_away_swapped": 81,
+    "rows_unmatched": 70,
+    "replay_artifact_hashes": {
+      "ncaab-spread-v6": "7704c5800b88",
+      "ncaab-total-v6": "cbff479dbdb5"
+    },
+    "note_p_fixed": "p_fixed is from the replay-time artifact (not the current v6); v6_current is recomputed",
+    "line_convention_outcome_consistency": {
+      "rows": 357,
+      "consistent_share": 1.0,
+      "inconsistent_rows": 0,
+      "pushes": 0
+    },
     "spread_rows": 357,
     "spread_sample_0_3_share": 1.0,
-    "v6_fixed_as_replayed": {
+    "spread_selection_counts": {
+      "away": 265,
+      "home": 92
+    },
+    "mean_abs_p_diff_replayed_vs_current_v6": 0.0193,
+    "v6_as_replayed_older_artifact": {
       "brier_recorded_side": 0.2939,
       "mean_p": 0.639,
       "hit_rate": 0.482,
@@ -647,39 +665,49 @@
       "n_p_ge_0.7": 121,
       "hit_rate_p_ge_0.7": 0.488
     },
-    "v7": {
-      "brier_recorded_side": 0.3117,
-      "mean_p": 0.618,
+    "v6_current": {
+      "brier_recorded_side": 0.2913,
+      "mean_p": 0.626,
       "hit_rate": 0.482,
-      "n_p_ge_0.8": 54,
-      "hit_rate_p_ge_0.8": 0.426,
-      "mean_p_p_ge_0.8": 0.876,
-      "n_p_ge_0.7": 117,
-      "hit_rate_p_ge_0.7": 0.436
+      "n_p_ge_0.8": 42,
+      "hit_rate_p_ge_0.8": 0.429,
+      "mean_p_p_ge_0.8": 0.846,
+      "n_p_ge_0.7": 112,
+      "hit_rate_p_ge_0.7": 0.5
+    },
+    "v7": {
+      "brier_recorded_side": 0.2971,
+      "mean_p": 0.607,
+      "hit_rate": 0.482,
+      "n_p_ge_0.8": 34,
+      "hit_rate_p_ge_0.8": 0.412,
+      "mean_p_p_ge_0.8": 0.848,
+      "n_p_ge_0.7": 102,
+      "hit_rate_p_ge_0.7": 0.461
     },
     "market_relative_thin": {
       "n": 357,
-      "rmse_market_line": 15.337,
+      "rmse_market_line": 12.057,
       "rmse_v7": 14.555,
-      "rmse_v6": 15.486,
-      "corr_v7_minus_line_vs_result_minus_line": 0.458,
-      "corr_v6_minus_line_vs_result_minus_line": 0.44,
-      "mean_v7_minus_line": -2.581,
-      "mean_v6_minus_line": -4.316,
-      "mean_result_minus_line": 2.553,
+      "rmse_v6_current": 15.486,
+      "corr_v7_minus_line_vs_result_minus_line": 0.022,
+      "corr_v6_minus_line_vs_result_minus_line": 0.049,
+      "mean_v7_minus_line": -3.629,
+      "mean_v6_minus_line": -5.363,
+      "mean_result_minus_line": 1.506,
       "line_ge_25": {
-        "n": 76,
-        "mean_line": 31.54,
-        "mean_v6": 17.36,
-        "mean_v7": 23.64,
-        "mean_result": 32.63
+        "n": 81,
+        "mean_line": 31.69,
+        "mean_v6": 16.5,
+        "mean_v7": 22.54,
+        "mean_result": 32.26
       }
     },
     "total_rows_market_relative_thin": {
       "n": 395,
       "rmse_market_line": 17.149,
       "rmse_v7_total": 17.323,
-      "rmse_v6_total": null
+      "rmse_v6_total_current": 17.044
     }
   },
   "descriptive": {

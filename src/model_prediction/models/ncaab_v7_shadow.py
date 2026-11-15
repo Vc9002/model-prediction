@@ -322,7 +322,9 @@ class NCAABV7ShadowModel:
         for carry in (0.0, 0.5, 1.0):
             w = season_weights(seasons, season_now, carry)
             keep = w > 0
-            if int(np.sum(seasons == season_now)) < self.min_fit_games:
+            # kept = games this fit actually sees (current season, plus prior seasons when carry > 0);
+            # counting only current-season games switched carryover off on the opening day.
+            if int(np.sum(keep)) < self.min_fit_games:
                 fits[carry] = (prior.copy(), HCA_PRIOR_POINTS)
                 continue
             fits[carry] = ridge_team_strengths(
