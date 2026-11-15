@@ -99,6 +99,7 @@ def test_buyer_rejects_flat_row_with_unqualified_inputs(tmp_path, monkeypatch):
         },
     )
     real_loader = auto_executor._load_pick_input_flags
+    monkeypatch.setattr(auto_executor, "DISABLED_AUTO_BUYER_SPORT_MARKETS", frozenset())
     monkeypatch.setattr(auto_executor, "_load_pick_input_flags", lambda ids: real_loader(ids, db))
     buyer = AutoPolymarketBuyer(
         config=AutoExecutionConfig(
@@ -124,6 +125,6 @@ def test_buyer_rejects_flat_row_with_unqualified_inputs(tmp_path, monkeypatch):
     assert result.whitelisted_count == 1
 
 
-def test_nfl_spread_is_disabled_in_the_buyer():
+def test_nfl_spread_and_total_are_disabled_in_the_buyer():
     assert ("nfl", "spread") in DISABLED_AUTO_BUYER_SPORT_MARKETS
-    assert ("nfl", "total") not in DISABLED_AUTO_BUYER_SPORT_MARKETS
+    assert ("nfl", "total") in DISABLED_AUTO_BUYER_SPORT_MARKETS

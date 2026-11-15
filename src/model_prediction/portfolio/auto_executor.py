@@ -204,6 +204,11 @@ DISABLED_AUTO_BUYER_SPORT_MARKETS = frozenset(
         # and settled executable-quote spread picks at edge >= 5% are 6-14. No
         # edge threshold survives that, so the market is off, not re-tuned.
         ("nfl", "spread"),
+        # NFL totals pulled the same day (operator directive 2026-11-15). On the
+        # locked holdout from 2025-09-28 nfl-total-structural-v7's edge >= 5% fires
+        # are 13-17, and a weather-only refit only matches the market (Brier 0.2502
+        # vs 0.2500). The +15.8u ledger record is 31 picks.
+        ("nfl", "total"),
         ("soccer", "moneyline"),
         ("soccer", "total"),
         ("soccer", "spread"),
