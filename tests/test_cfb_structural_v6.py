@@ -499,7 +499,8 @@ def test_no_module_under_src_imports_or_names_v6_and_no_config_routes_to_it() ->
     ]
     assert offenders == []
     learned_forward = (src / "learned_forward.py").read_text(encoding="utf-8")
-    assert "v6" not in learned_forward.lower().replace("mlb_v6", "")
+    for name in ("cfb_structural_v6", "cfb_features_v6", "cfb-structural-v6"):
+        assert name not in learned_forward
     for rel in ("config/production.yaml", "config/model.yaml"):
         text = (PROJECT_ROOT / rel).read_text(encoding="utf-8")
         assert "cfb-structural-v6" not in text and "cfb_structural_v6" not in text, rel

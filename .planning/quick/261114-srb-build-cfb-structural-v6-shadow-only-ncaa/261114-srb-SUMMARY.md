@@ -42,7 +42,7 @@ metrics:
   completed: 2026-11-15
 status: complete
 actuals:
-  tokens: 240000
+  tokens: 370154
   tasks: 3
   commits: 3
 plan_head_before: d0cf17408aaa0a6f74a5fcb32272ccd7ea0b0c9d
@@ -53,7 +53,7 @@ plan_head_after: de3208dc516b77b2282a44dda489edd92c851756
 
 v6 (additive matchup over a joint ridge rating solve, rolling league baseline, walk-forward refit with per-slice margin and total SDs) is a better-calibrated probability model than v5 on the locked holdout (Brier 0.17975 vs 0.19003, delta -0.01029, 95% CI [-0.01524, -0.00553]) and shows no market-relative edge (every correlation interval against the line includes zero); nothing was promoted, routed or wired.
 
-`commits: 3` is measured at SUMMARY time (`git rev-list --count plan_head_before..HEAD`): `93b2d8b0` (Task 1), `8a5a7bcc` (ESPN closing-line robustness, same task), `de3208dc` (Task 2). The final planning-files docs commit (docs/DEBUG.md, this file, STATE.md, PLAN.md) follows it and is not counted. `actuals.tokens` is a chars/4 estimate over the changed files.
+`commits: 3` is measured at SUMMARY time (`git rev-list --count plan_head_before..HEAD`): `93b2d8b0` (Task 1), `8a5a7bcc` (ESPN closing-line robustness, same task), `de3208dc` (Task 2). The final planning-files docs commit (docs/DEBUG.md, this file, STATE.md, PLAN.md) follows it and is not counted. `actuals.tokens` is measured: chars/4 over `git diff d0cf1740..de3208dc` (1,480,618 chars; 472,396 chars = 118,099 tokens when the generated `outputs/` reports are excluded), against the plan's 215,000 estimate.
 
 ## Market-relative verdict
 
@@ -72,7 +72,7 @@ Caveats: ESPN lines are closing lines (no `observed_at`), single book from 2024 
 ## Task 1 (scripts, frozen fit, holdout, market checks) - commits 93b2d8b0, 8a5a7bcc
 
 - v5 reproduction gate passed before any v6 number: totals corr -0.033, side 218-257, model SD 4.13; spreads corr +0.009, side 264-233, MAE 14.64 vs 11.65, margin SD 11.78 / 16.35 / 22.37.
-- History gap (audit a): existing history 7,965 events (sha256 `659e33b2...`), ESPN groups=80/81 lists 16,378 over all 11 seasons (440 requests, 0 failed); 0 score disagreements on the 7,965 overlap. FBS-vs-FCS: history holds 6-12 per season vs 98-126 on ESPN (misses 90-95%); FCS-vs-FCS 0-16 vs 653-752 (98-100%). 2026: 878 of 1,384 missing (226 of 731 FBS-involved); FBS teams mean 2.46 missing (median 2); week 6 missing entirely (108 of 108); week 11 mostly ingest lag (93 of 104); "16 of 65 on 2026-09-26" confirmed by US-Eastern date. Backfill: 16,378 rows, sha256 `cc704059e4684edb9e580dff5033433424ee34e6a5fe96995c7c272ae82d8bf4`.
+- History gap (audit a): existing history 7,965 events (sha256 `659e33b2...`), ESPN groups=80/81 lists 16,378 over all 11 seasons (440 requests, 0 failed); 0 score disagreements on the 7,965 overlap. FBS-vs-FCS: history holds 6-12 per season vs 98-126 on ESPN (2020: 2 of 34), so it misses roughly 90-95%; FCS-vs-FCS 0-16 vs 653-752 (98-100%). 2026: 878 of 1,384 missing (226 of 731 FBS-involved); FBS teams mean 2.46 missing (median 2); week 6 missing entirely (108 of 108); week 11 mostly ingest lag (93 of 104); "16 of 65 on 2026-09-26" confirmed by US-Eastern date. Backfill: 16,378 rows, sha256 `cc704059e4684edb9e580dff5033433424ee34e6a5fe96995c7c272ae82d8bf4`.
 - Input audit (b): weather is plumbed with real forecasts but non-zero on 25 of 6,129 ledger rows (0.4%), 6 events, largest 1.8 points, never fitted (training history is placeholder 5 mph / 65 F on 7,542 rows, 0 / 72 on 182); QB adjustment dead (0 of 2,430 side cells, 387 injury entries over 129 snapshots with 0 QB entries, starter = season passing leader); no possession or drive data (`possessions` constant 12.5, success rate constant 0.42, EPA without provenance).
 - ESPN closing-line dataset: 9,364 events, sha256 `2b19a2545fb2e5f9df4c55a1b57ee9f88b11eab371828a4a7ed88e8bdfb7fa54`, rule `espn-lines-rule-1` (rule sha256 `ee23e34e...`).
 - Frozen fit `6e38b14ca486acfd836c1259e5c4fd4fb8e9b5894a06f367322b1eb0c7b13e70`: ridge 0.1, previous-season weight 0.2, k 2, buffer 5 h; margin calibration 0.4044 + 0.8716 m; total 21.3898 + 0.6097 t; margin SD 16.35 / 16.89 / 16.76 and total SD 16.86 / 16.72 / 17.43 (established / thin / FBS-vs-FCS); train 4,102, validation 1,591. The grid was extended downward twice on validation before the freeze and the chosen ridge 0.1 is the smallest value in the final grid (edge selection, recorded in the frozen fit).

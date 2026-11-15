@@ -229,7 +229,7 @@ Over the 575 lined 2026 games the v5 projections carry no skill against the mark
 1. Matchup was an averaged half-sum of an offence number and a defence number; v6 is additive: league average
    + offence deviation + opponent defence deviation + home term (offence +10 vs defence +8 over 28 projects 46,
    not the half-sum 37; pinned by a test shown to fail when the half-sum is substituted).
-2. Opponent strength entered through conference-tier offsets and a hand-built Elo; v6 solves every rated team
+2. Opponent strength entered through conference-tier offsets and an Elo channel; v6 solves every rated team
    jointly (weighted ridge, one solve per distinct eligible-game set), so each opponent enters through its own
    rating. No conference table or team list exists in v6. Pooled pseudo-team per season for lower-division
    singletons.
@@ -237,9 +237,10 @@ Over the 575 lined 2026 games the v5 projections carry no skill against the mark
    points ratings instead of a constant.
 4. Fixed total baselines (49.5 / 54.0) are replaced by the rolling league scoring average `mu` solved with the
    ratings.
-5. Hand-set dispersion and calibration are replaced by a walk-forward refit: mean calibration and per-slice
-   outcome-residual SDs for BOTH margin and total (established / thin sample / FBS-vs-FCS), fitted on train only,
-   chosen on validation, no line-dependent widening.
+5. v5 fitted its mean calibration and per-slice margin SDs, but on the v4 projection, with one total SD and
+   hand-set line-dependent widening and conference scale carried over. v6 refits the calibration on its own
+   projection, fits per-slice outcome-residual SDs for BOTH margin and total (established / thin sample /
+   FBS-vs-FCS) on train only, chooses on validation, and drops the line-dependent widening and the conference scale.
 
 A game feeds the ratings only if kickoff + 5 hours is at or before the decision time (stricter than v5's
 `start < observed`, which admits a game in progress). v4/v5's hand-set altitude, travel, bye, weather and QB
@@ -253,8 +254,8 @@ misses almost every game that involves a lower-division team. ESPN scoreboard wi
 (read-only, 440 requests, 0 failures, all 11 seasons 2016-2026) lists 16,378 completed events; all 7,965
 existing events are in it with **0 score disagreements**.
 
-- **FBS-vs-FCS:** the history holds 6-12 games a season against 98-126 on ESPN, so it misses 90-95% in every
-  season (2016: 10 of 113; 2025: 6 of 126).
+- **FBS-vs-FCS:** the history holds 6-12 games a season against 98-126 on ESPN (2020: 2 of 34), so it misses roughly
+  90-95% in every season (2016: 10 of 113; 2025: 6 of 126).
 - **FCS-vs-FCS:** 0-16 a season against 653-752 (2020: 0 of 24), so it misses 98-100%.
   (`ESPNClient.scoreboard` sends no `groups` parameter for NCAAF, the likely cause.)
 - **2026:** 878 of 1,384 completed games are missing (226 of 731 FBS-involved). FBS teams are missing a mean
