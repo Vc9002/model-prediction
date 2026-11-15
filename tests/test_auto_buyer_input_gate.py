@@ -125,6 +125,6 @@ def test_buyer_rejects_flat_row_with_unqualified_inputs(tmp_path, monkeypatch):
     assert result.whitelisted_count == 1
 
 
-def test_nfl_spread_is_disabled_and_total_is_live_in_the_buyer():
-    assert ("nfl", "spread") in DISABLED_AUTO_BUYER_SPORT_MARKETS
+def test_nfl_spread_and_total_are_live_in_the_buyer():
+    assert ("nfl", "spread") not in DISABLED_AUTO_BUYER_SPORT_MARKETS
     assert ("nfl", "total") not in DISABLED_AUTO_BUYER_SPORT_MARKETS

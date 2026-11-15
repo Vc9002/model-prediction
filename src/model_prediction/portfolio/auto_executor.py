@@ -198,17 +198,12 @@ DISABLED_AUTO_BUYER_SPORT_MARKETS = frozenset(
         # The serving champion (nba-total-margin-v9) keeps forecasting for the
         # Main ledger; only execution is blocked.
         ("nba", "total"),
-        # NFL spreads pulled from the auto-buyer 2026-11-15 (operator directive).
-        # In the 1,489-game point-in-time replay nfl-spread-structural-v7's
-        # disagreement with the line carries no information (edge >= 5%: 6-10),
-        # and settled executable-quote spread picks at edge >= 5% are 6-14. No
-        # edge threshold survives that, so the market is off, not re-tuned.
-        ("nfl", "spread"),
-        # NFL totals were pulled and then restored the same day (operator directive
-        # 2026-11-15, "buyer live on NFL today"). Open evidence against: on the
-        # holdout from 2025-09-28 nfl-total-structural-v7's edge >= 5% fires are
-        # 13-17, against a 21-10 settled ledger record. The input gate below still
-        # blocks totals priced without verified weather or qualified inputs.
+        # NFL spreads and totals were pulled and then restored the same day
+        # (operator directive 2026-11-15: nothing comes off production, the paper
+        # ledger needs picks to judge the model). Open evidence against both is in
+        # docs/DEBUG.md (2026-11-15): spread edge >= 5% is 6-14 on settled quotes,
+        # total edge >= 5% is 13-17 on the replay holdout. The input gate below
+        # still blocks rows priced without verified weather or qualified inputs.
         ("soccer", "moneyline"),
         ("soccer", "total"),
         ("soccer", "spread"),
