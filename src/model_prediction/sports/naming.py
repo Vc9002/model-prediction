@@ -443,6 +443,14 @@ MODEL_CATALOG: dict[str, ModelDescriptor] = {
         display_name="NFL Moneyline (Elo Trend LR v4)",
         description="NFL Moneyline logistic regression model with trend gap.",
     ),
+    "nfl-moneyline-margin-v1": ModelDescriptor(
+        model_id="nfl-moneyline-margin-v1",
+        sport="NFL",
+        market="moneyline",
+        standard_name="nfl-moneyline-margin-v1",
+        display_name="NFL Moneyline (Spread Margin v1, challenger)",
+        description="NFL Moneyline from the structural spread engine's projected margin; Flat-only challenger.",
+    ),
     "nfl-spread-structural-v5": ModelDescriptor(
         model_id="nfl-spread-structural-v5",
         sport="NFL",

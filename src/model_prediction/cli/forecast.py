@@ -95,6 +95,11 @@ from .forecast_market_select import (
     _select_wnba_spread_market,
     _select_wnba_total_market,
 )
+from .forecast_nfl_moneyline_shadow import (
+    log_nfl_margin_moneyline_shadow,
+    moneyline_shadow_input,
+    without_moneyline_shadow_rows,
+)
 from .forecast_nfl_support import (  # noqa: F401 -- re-exported: tests and callers import these from forecast
     NFL_DIVISIONS,
     STANDARD_LAY_ASK,
@@ -2602,6 +2607,7 @@ def _forecast_nfl_spread_slate(
     )
 
     priced_contracts = []
+    moneyline_shadow_inputs: list[dict[str, Any]] = []
     unmatched: list[dict[str, str]] = []
 
     for event in events:
@@ -2823,6 +2829,21 @@ def _forecast_nfl_spread_slate(
                 is_neutral_site=is_neutral_site,
             )
 
+        # Captured before the spread-ask check on purpose: a game with no spread ask
+        # still has a margin, and the moneyline challenger prices off that margin.
+        shadow_input = moneyline_shadow_input(
+            event_id=event_id,
+            event_start_utc=str(event["date"]),
+            home_team=home_team,
+            away_team=away_team,
+            forecast=fc,
+            spread_home_line=spread_home_line,
+            input_qualified=input_qualified,
+            parent_model_version=model_version,
+        )
+        if shadow_input is not None:
+            moneyline_shadow_inputs.append(shadow_input)
+
         cover_prob = fc.prob_away_cover if anchor_is_away else fc.prob_home_cover
         if cover_prob >= 0.5:
             selection = "away" if anchor_is_away else "home"
@@ -2955,6 +2976,7 @@ def _forecast_nfl_spread_slate(
         ],
         "market_candidates": len(priced_contracts),
         "priced_contracts": priced_contracts,
+        "moneyline_shadow_inputs": moneyline_shadow_inputs,
         "unmatched": unmatched,
         "observed_at_utc": observed_at.isoformat(),
     }
@@ -3068,7 +3090,9 @@ def _forecast_nfl_spread_sport(
                     eligibility = _downgrade_unserved(eligibility)
                 flat_eligibility = eligibility
                 if eligibility.decision == "CALL":
-                    existing_for_event = exposure_source.rows(filters={"event_id": str(contract["event_id"])})
+                    existing_for_event = without_moneyline_shadow_rows(
+                        exposure_source.rows(filters={"event_id": str(contract["event_id"])})
+                    )
                     coherent, _ = validate_cross_market_pick_coherence(
                         "spread", request.selection, request.line, existing_for_event
                     )
@@ -3124,6 +3148,23 @@ def _forecast_nfl_spread_sport(
         except (EntityResolutionError, ValueError) as error:
             skipped.append({"event_id": contract["event_id"], "reason": str(error)[:200]})
 
+    if flat_ledger is not None:
+        # Same slate, same decision timestamp as the spread rows above. A failure
+        # here must never cost the spread picks, so it is contained and reported.
+        try:
+            forecast["moneyline_shadow"] = log_nfl_margin_moneyline_shadow(
+                forecast=forecast,
+                data_root=data_root,
+                args_date=args_date,
+                config=config,
+                registry=registry,
+                bans=bans,
+                flat_ledger=flat_ledger,
+                observed_now=observed_now,
+            )
+        except Exception:  # shadow logging is best-effort by design
+            logger.warning("nfl moneyline margin challenger failed to log", exc_info=True)
+            forecast["moneyline_shadow"] = {"status": "error", "logged": 0, "skipped": []}
     forecast["logged"] = len(logged)
     forecast["logged_event_ids"] = logged
     forecast["duplicate_pick_ids"] = duplicates
@@ -4187,6 +4228,7 @@ def _forecast_learned_sport(
                         )
                         if flat_mode and exposure_ledger is not None and request.league == League.NFL:
                             existing_for_event += ledger.rows(filters={"event_id": str(request.event_id)})
+                        existing_for_event = without_moneyline_shadow_rows(existing_for_event)
                         is_coherent, _ = validate_cross_market_pick_coherence(
                             candidate_market_type="moneyline",
                             candidate_selection=request.selection,
