@@ -206,6 +206,90 @@ change how you should work here:
   expected. Soccer's Odds API credential remains a known-DEGRADED external
   dependency. The two launchd research agents are loaded and producing.
 
+## 2026-11-15 — NCAAF: v6 open items: ingest groups 80/81, measured v5 history backfill, known-team gate, checkout-proof pin (quick-261115-0pq)
+
+**Bottom line.** The operator approved fixing the four open items from the v6 entry below. Two shipped (the known-team
+gate and the checkout-proof lib pin). The live-history backfill and the NCAAF `groups=80/81` ingest were **measured first
+and rejected by a rule written down before the numbers existed**, so neither shipped and the live history files are
+byte-identical to their start state.
+
+### B: measured impact of completing the live history on v5 (verdict REJECT)
+`scripts/cfb_v5_history_impact.py` carries its acceptance rule as the constant `RULE` (id `cfb-v5-history-impact-rule-1`,
+sha256 `f780ad86a2b3ab378382d873cdbd02455b5b5900c4c46e721726d3c6c2f5a236`). The script was committed (`403df5f3`, blob
+`6010d8af8285`) before its first run and never changed afterwards; the report records the same blob sha. The rule: replay the
+v5 serving artifact point-in-time on the same 1,527 locked-holdout event ids (2024-11-15 to 2026-11-12) with arm (i) the live
+history and arm (ii) the live history plus the recorded append set; ACCEPT only if the Brier delta (ii minus i, date-clustered
+bootstrap point estimate, 2,000 resamples) is at most +0.001 and the margin and total Gaussian log-score deltas are each at
+least -0.005. Arm (i) must first reproduce the recorded v5 numbers.
+
+Arm (i) reproduces: n 1,527, Brier 0.18933, margin log score -4.21265, total log score -4.21155, and the 575/576
+reference-line gate passes on every row (corr -0.0328 / +0.0090, side records 218-257 and 264-233, SDs and MAEs within tolerance).
+
+| holdout (1,527 events) | arm (i) live | arm (ii) live + append | delta (ii - i) | 95% CI |
+|---|---|---|---|---|
+| Brier | 0.18933 | 0.19040 | **+0.001065** | [-0.000815, +0.002998] |
+| margin log score | -4.21265 | -4.20970 | +0.002951 | [-0.004547, +0.010515] |
+| total log score | -4.21155 | -4.20731 | +0.004240 | [-0.001014, +0.009189] |
+| log loss (informational) | 0.557265 | 0.559138 | +0.001873 | |
+| accuracy (informational) | 71.19% | 70.14% | -1.05 points | |
+
+The Brier delta is 0.000065 over the pinned limit, so the verdict is **REJECT**, from the rule as written. The log scores
+improve and the Brier interval includes zero, so this is a marginal call, not a finding that the extra games are bad: all
+1,527 holdout probabilities move (max 24.5 points of home-win probability) and accuracy drops 1.05 points. 575/576
+reference lines, informational only, 1,133 of 1,151 projection pairs change: totals corr -0.0328 [-0.119, +0.041] to +0.0005
+[-0.075, +0.071] (side 218-257 to 209-242), spreads +0.0090 [-0.090, +0.105] to +0.0113 [-0.081, +0.108] (side 264-233 to
+258-247); spread MAE 14.64 to 14.17 points. The champion's fitted calibration and SD table were fit on the gappy history, so
+feeding it a complete one moves its inputs away from its fit; shipping that would be an unvalidated change to the serving
+champion's inputs.
+
+Append set (recorded, not applied): 1,478 events, sha256 `7d0f9cafff801ed758b7f20d913db28176a1a63466be8aa1adf072583da80cbb`,
+FBS-FCS 1,101, FBS-FBS 376, FCS-FCS 1 (the one FCS-FCS event is listed in both feeds), by season 2016 154, 2017 137, 2018 134,
+2019 146, 2020 50, 2021 127, 2022 128, 2023 135, 2024 128, 2025 148, 2026 191. The plan expected about 1,513: the live files
+grew from 7,965 to 8,014 rows between planning and the run, and 35 of those 49 new rows are FBS-FBS events that were in the
+backfill.
+
+Live files: `data/processed/ncaaf/games.jsonl` and `data/historical/ncaaf_games_all.jsonl` are 8,014 rows and 5,510,866 bytes,
+sha256 `a934dd88dc035d800eb2d4fba8211e470d1fb92fa24310bf2b9fceb1f3cc230f`, identical at the measurement and at the final
+check. Nothing was appended, so no backup was needed and `scripts/cfb_backfill_live_history.py` was not written.
+
+### A: ingest groups 80/81 (not shipped)
+Not shipped, by the plan's own coupling rule: the go-forward ingest would shift v5's inputs the same way the rejected
+backfill does, leaving a history that is gappy before a date and complete after it. `ESPNClient.scoreboard`, `ingest.py`
+and `tests/test_ingest.py` are unchanged. The design is kept for a later decision: a new `scoreboard_ncaaf_divisions`
+client method (groups 80 then 81, limit 500, merged by event id) used only by the NCAAF ingest branch, appending only
+FBS-involved non-forfeit rows. Re-opening it needs either a v5 refit on the complete history (validation-split, not a
+decision on this holdout) or an operator waiver of the rule.
+
+### C: v6 known-team gate (shipped)
+`TeamResolver.is_known(name)` is true for a history name or one `resolve_team` can alias; `project()` raises
+`NO_CALL_CFB_V6_UNRATED_TEAM` for any other name before `book.identity`, instead of letting an unknown name pool into the
+season's shared lower-division identity. The frozen math, `RatingBook._key`, the solve and `scripts/cfb_v6_lib.py` are
+untouched. Against the real resolver on the frozen snapshot an invented name is not known and a real or aliased one is.
+Parity over every cached row: 14,822 rows, 14,639 projections, max abs difference 0.0, 183 of 183 cached no-calls matching,
+**0 newly declined**, frozen params sha256 unchanged. Tests (three, in `tests/test_cfb_structural_v6.py`): an invented name
+declines, a real pooled lower-division team from history still projects, an aliased unseen name still projects.
+
+### D: checkout-proof lib pin (shipped)
+Deviation from the brief's wording. `canonical_params` hashes every frozen-fit key except `params_sha256` and
+`generated_at_utc`, and `code.cfb_v6_lib_sha256` is one of those keys, so re-pinning the lib hash inside
+`outputs/ncaaf/cfb_v6_frozen_fit.json` would change the frozen params sha256 (forbidden) and break the test that pins it. The
+frozen-fit file stays byte-identical to HEAD; `verify_frozen` instead hashes the lib after normalising line endings to CRLF
+(`lib_sha256_crlf`), and CRLF-normalising either the CRLF working copy or the LF blob gives the existing pin `fe42c288...`.
+`cmd_parity` now reports rows the src extractor declines but the research cache projected as `newly_declined` and fails on
+any. Proof: verify-frozen passes on the CRLF working file and on the LF blob from `git show HEAD:scripts/cfb_v6_lib.py`; a
+one-byte edit of that blob fails (negative control); `cfb_v6_market_check.py v6 --check-only`, the residual and pool-audit
+callers all return `6e38b14ca486...`.
+
+### Prove-it-fails
+Each C test was proven by a mutation of `cfb_features_v6.py`, the file restored and its sha256 compared equal: the gate
+deleted (`if False`) fails the invented-name test; an over-broad gate that also declines pooled identities fails the real
+pooled team test; dropping the `resolve_team` fallback from `is_known` fails the aliased-name test. The impact script's
+arm (i) reproduction gate is its own control: it must match the recorded v5 numbers before any verdict other than STOP. The
+C tests were written after the gate rather than RED-first. `ruff check src/ tests/` clean; `tests/test_ingest.py` and
+`tests/test_cfb_structural_v6.py` give 32 passed in a detached worktree at `C:/wt0pq` on the C commit.
+
+No promotion. v6 is not routed; v5 parameters and gates unchanged.
+
 ## 2026-11-15 — NCAAF: cfb-structural-v6 shadow challenger and market-relative check (quick-261114-srb)
 
 **Bottom line.** v6 is a better-calibrated probability model than v5 on the locked holdout, and it shows **no
