@@ -79,6 +79,16 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def lib_sha256_crlf(path: Path) -> str:
+    """sha256 of the file with every line ending normalised to CRLF.
+
+    The lib pin lives inside the frozen params hash, so it cannot be re-pinned; core.autocrlf checkouts
+    are CRLF while the committed blob is LF, and normalising makes the one pin hold on either.
+    """
+    data = path.read_bytes().replace(bytes((13, 10)), bytes((10,))).replace(bytes((10,)), bytes((13, 10)))
+    return hashlib.sha256(data).hexdigest()
+
+
 def gkey(lam: float, w: float) -> str:
     return f"{lam:g}|{w:g}"
 
@@ -598,7 +608,8 @@ def verify_frozen(quiet: bool = False) -> str:
         problems.append("params sha256 mismatch")
     if SNAPSHOT.exists() and sha256_file(SNAPSHOT) != frozen["history_snapshot"]["sha256"]:
         problems.append("history snapshot sha256 mismatch")
-    if sha256_file(LIB_PATH) != frozen["code"]["cfb_v6_lib_sha256"]:
+    # Line-ending-normalised on purpose (see lib_sha256_crlf): the pin is part of the params hash.
+    if lib_sha256_crlf(LIB_PATH) != frozen["code"]["cfb_v6_lib_sha256"]:
         problems.append("cfb_v6_lib.py changed since freeze")
     if problems:
         raise SystemExit("verify-frozen FAILED: " + "; ".join(problems))
@@ -906,6 +917,7 @@ def cmd_parity(args: argparse.Namespace) -> int:
         rows = rows[::step]
     checked = max_abs = 0
     mismatches: list[str] = []
+    newly_declined: list[dict[str, Any]] = []
     no_call_ok = no_call_checked = 0
     per_season: dict[int, int] = {}
     for r in rows:  # cache order is kickoff order: the book's cutoff never decreases
@@ -919,7 +931,11 @@ def cmd_parity(args: argparse.Namespace) -> int:
             if "no_call" in r:
                 no_call_ok += 1
             else:
-                mismatches.append(f"{r['event_id']}: src raised {exc.reason}, cache has a projection")
+                # A row the research cache projected that the src extractor now declines (the known-team
+                # gate): reported on its own, never filed as a numeric mismatch, and it fails the run.
+                newly_declined.append(
+                    {"event_id": r["event_id"], "reason": exc.reason, "detail": str(exc)}
+                )
             continue
         if "grid" not in r:
             mismatches.append(f"{r['event_id']}: cache no_call {r.get('no_call')} but src projected")
@@ -949,6 +965,8 @@ def cmd_parity(args: argparse.Namespace) -> int:
         "no_call_rows_checked": no_call_checked,
         "no_call_rows_matching_cache": no_call_ok,
         "mismatches": len(mismatches),
+        "newly_declined_count": len(newly_declined),
+        "newly_declined": newly_declined[:50],
         "frozen_params_sha256": frozen["params_sha256"],
         "snapshot_sha256": frozen["history_snapshot"]["sha256"],
     }
@@ -956,7 +974,8 @@ def cmd_parity(args: argparse.Namespace) -> int:
     print(json.dumps(report, indent=2))
     for m in mismatches[:20]:
         print("MISMATCH", m)
-    return 0 if not mismatches and max_abs == 0.0 and checked > 0 else 1
+    ok = not mismatches and not newly_declined and max_abs == 0.0 and checked > 0
+    return 0 if ok else 1
 
 
 # ------------------------------------------------------------------ artifact (research challenger, inert)
