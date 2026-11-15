@@ -55,9 +55,13 @@ HCA_LAMBDA = 20.0
 NON_D1_PRIOR = 1180.0
 
 # Pre-declared ridge grid (pinned before any outcome is joined; see PIN in scripts/ncaab_v7_multiseason.py).
-CARRY_GRID = (0.25, 0.5, 0.75)
-LAMBDA_GRID = (3.0, 8.0, 20.0)
-KAPPA_GRID = (1.0, 1.4)  # scale on the conference-tier prior (the tier gap was compressed vs margins seen)
+CARRY_GRID = (0.0, 0.1, 0.25, 0.5)
+LAMBDA_GRID = (1.0, 2.0, 3.0, 8.0)
+KAPPA_GRID = (
+    1.0,
+    1.4,
+    2.0,
+)  # scale on the conference-tier prior (the tier gap was compressed vs margins seen)
 
 # ESPN scoreboard conference id -> conference name in DEFAULT_CONFERENCE_TIER_PRIORS. Derived from the
 # 2025-26 / 2026-27 scoreboards by plurality against ``data/entities/ncaab_conferences.json``; id 30 is the

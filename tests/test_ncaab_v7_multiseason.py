@@ -105,4 +105,4 @@ def test_every_conference_id_resolves_to_a_tier_table_name() -> None:
 
 def test_variant_grid_keys_are_unique() -> None:
     keys = [variant_key(*v) for v in variant_grid()]
-    assert len(keys) == len(set(keys)) == 18
+    assert len(keys) == len(set(keys)) == 48

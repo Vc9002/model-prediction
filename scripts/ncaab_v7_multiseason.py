@@ -28,6 +28,9 @@ from datetime import time as dtime
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+import pandas as pd
+
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
@@ -35,6 +38,8 @@ sys.path.insert(0, str(REPO / "scripts"))
 
 import ncaab_residual as nr
 from ncaab_v7_multiseason_pin import PIN, PIN_SHA256
+
+from model_prediction.models.ncaab_v7_shadow import student_t_scale_mle
 
 DATA = REPO / "data" / "research" / "ncaab_market"
 OUT = REPO / "outputs" / "ncaab"
@@ -146,6 +151,224 @@ def cmd_gate(args: argparse.Namespace) -> int:
     return 0 if diffs and max(diffs) < 0.011 and (not tdiffs or max(tdiffs) < 0.011) else 1
 
 
+# ----------------------------------------------------------------------------------------- model math
+BUCKET_CUTS = (1, 3, 8)  # sample buckets 0 | 1-2 | 3-7 | 8+
+N_BUCKETS = 4
+TAIL_KNOT = 12.0
+FORMS = ("F1", "F2", "F3")
+FORM_MARGIN = 0.01  # a more complex form must beat the simpler one by more than this RMSE
+TOTAL_MARGIN = 0.05
+DF_T = 8.0
+
+
+def sbucket(sample: np.ndarray) -> np.ndarray:
+    return np.searchsorted(np.array(BUCKET_CUTS), np.asarray(sample), side="right")
+
+
+def tail_term(v6: np.ndarray) -> np.ndarray:
+    return np.sign(v6) * np.maximum(np.abs(v6) - TAIL_KNOT, 0.0)
+
+
+def form_design(form: str, ridge: np.ndarray, v6: np.ndarray, sample: np.ndarray) -> np.ndarray:
+    onehot = np.eye(N_BUCKETS)[sbucket(sample)]
+    t = tail_term(v6)
+    if form == "F1":
+        return np.column_stack([ridge, t])
+    if form == "F2":
+        return np.column_stack([onehot * ridge[:, None], t])
+    if form == "F3":
+        return np.column_stack([onehot * ridge[:, None], t, onehot])
+    raise KeyError(form)
+
+
+def ols(x: np.ndarray, y: np.ndarray) -> np.ndarray:
+    return np.linalg.solve(x.T @ x + 1e-6 * np.eye(x.shape[1]), x.T @ y)
+
+
+def is_d1(df: pd.DataFrame) -> pd.Series:
+    return df["d1_home"].astype(bool) & df["d1_away"].astype(bool)
+
+
+def fit_config(train: pd.DataFrame, variant: str, form: str, total_mode: str) -> dict[str, Any]:
+    """Fit every v7 coefficient and scale on ``train`` rows (which carry margin / total)."""
+    d1 = train[is_d1(train) & train[variant].notna()]
+    x = form_design(form, d1[variant].to_numpy(float), d1["v6_mean"].to_numpy(float), d1["sample"].to_numpy())
+    coef = ols(x, d1["margin"].to_numpy(float))
+    resid = d1["margin"].to_numpy(float) - x @ coef
+    b = sbucket(d1["sample"].to_numpy())
+    scales = [student_t_scale_mle(resid[b == k], DF_T) for k in range(N_BUCKETS)]
+    nd = train[~is_d1(train)]
+    xn = np.column_stack([nd["v6_mean"].to_numpy(float), np.ones(len(nd))])
+    cn = ols(xn, nd["margin"].to_numpy(float))
+    rn = nd["margin"].to_numpy(float) - xn @ cn
+    cfg: dict[str, Any] = {
+        "variant": variant,
+        "form": form,
+        "coef": coef.tolist(),
+        "scales": scales,
+        "nond1": {
+            "alpha": float(cn[0]),
+            "beta": float(cn[1]),
+            "scale": student_t_scale_mle(rn, DF_T),
+            "n": len(nd),
+        },
+        "n_d1": len(d1),
+        "total": {"mode": total_mode},
+    }
+    tr = train[train["v6_total"].notna()]
+    bt = sbucket(tr["sample"].to_numpy())
+    alpha, beta, tscales = [], [], []
+    for k in range(N_BUCKETS):
+        sel = bt == k
+        v, y = tr["v6_total"].to_numpy(float)[sel], tr["total"].to_numpy(float)[sel]
+        if total_mode == "recal" and sel.sum() >= 30:
+            c = ols(np.column_stack([v, np.ones(sel.sum())]), y)
+        else:
+            c = np.array([1.0, 0.0])
+        alpha.append(float(c[1]))
+        beta.append(float(c[0]))
+        tscales.append(student_t_scale_mle(y - (c[0] * v + c[1]), DF_T))
+    cfg["total"].update({"alpha": alpha, "beta": beta, "scales": tscales})
+    return cfg
+
+
+def apply_config(df: pd.DataFrame, cfg: dict[str, Any]) -> pd.DataFrame:
+    """v7 mean, t-scale, total mean and total scale for every row (non-D1 rows use the linear rule)."""
+    mean = np.full(len(df), np.nan)
+    scale = np.full(len(df), np.nan)
+    d1 = is_d1(df).to_numpy() & df[cfg["variant"]].notna().to_numpy()
+    if d1.any():
+        sub = df[d1]
+        x = form_design(
+            cfg["form"],
+            sub[cfg["variant"]].to_numpy(float),
+            sub["v6_mean"].to_numpy(float),
+            sub["sample"].to_numpy(),
+        )
+        mean[d1] = x @ np.array(cfg["coef"])
+        scale[d1] = np.array(cfg["scales"])[sbucket(sub["sample"].to_numpy())]
+    nd = ~is_d1(df).to_numpy()
+    if nd.any():
+        mean[nd] = cfg["nond1"]["alpha"] * df["v6_mean"].to_numpy(float)[nd] + cfg["nond1"]["beta"]
+        scale[nd] = cfg["nond1"]["scale"]
+    tot = np.full(len(df), np.nan)
+    tscale = np.full(len(df), np.nan)
+    has = df["v6_total"].notna().to_numpy()
+    bt = sbucket(df["sample"].to_numpy())
+    a, b, ts = (np.array(cfg["total"][k]) for k in ("alpha", "beta", "scales"))
+    tot[has] = a[bt[has]] + b[bt[has]] * df["v6_total"].to_numpy(float)[has]
+    tscale[has] = ts[bt[has]]
+    return pd.DataFrame(
+        {"v7_mean": mean, "v7_scale": scale, "v7_total": tot, "v7_total_scale": tscale}, index=df.index
+    )
+
+
+def load_components(max_season_year: int) -> pd.DataFrame:
+    df = pd.read_json(COMPONENTS, lines=True, dtype={"event_id": str})
+    df["event_id"] = df["event_id"].astype(str)
+    return df[df["season_year"] <= max_season_year].copy()
+
+
+def ridge_keys(df: pd.DataFrame) -> list[str]:
+    return [c for c in df.columns if c.startswith("rg_c")]
+
+
+def rmse(a: np.ndarray) -> float:
+    return float(np.sqrt(np.mean(np.square(a)))) if len(a) else float("nan")
+
+
+# ----------------------------------------------------------------------------------------- fit stage
+def with_outcomes(df: pd.DataFrame, outcomes: dict[str, dict[str, Any]]) -> pd.DataFrame:
+    df = df[df["event_id"].isin(outcomes)].copy()
+    df["margin"] = df["event_id"].map(lambda e: outcomes[e]["margin"])
+    df["total"] = df["event_id"].map(lambda e: outcomes[e]["total"])
+    return df
+
+
+def cmd_fit(_args: argparse.Namespace) -> int:
+    """Select the ridge variant and combiner form by leave-one-season-out, then freeze everything."""
+    outcomes = load_outcomes("fit")
+    df = with_outcomes(load_components(max(FIT_SEASONS)), outcomes)
+    assert set(df["season_year"]) <= set(FIT_SEASONS), "fit stage read a non-fit season"
+    d1 = df[is_d1(df)]
+    # 1. ridge variant: raw ridge RMSE per fit season (no fitted parameter)
+    table: dict[str, Any] = {}
+    for key in ridge_keys(df):
+        sub = d1[d1[key].notna()]
+        per = {int(s): rmse((g["margin"] - g[key]).to_numpy(float)) for s, g in sub.groupby("season_year")}
+        table[key] = {"rmse_by_season": per, "score": float(np.mean(list(per.values())))}
+    variant = min(table, key=lambda k: (table[k]["score"], k))
+    # 2. combiner form by leave-one-season-out
+    form_scores: dict[str, float] = {}
+    for form in FORMS:
+        errs = []
+        for hold in FIT_SEASONS:
+            cfg = fit_config(df[df["season_year"] != hold], variant, form, "identity")
+            test = df[(df["season_year"] == hold) & is_d1(df)]
+            pred = apply_config(test, cfg)["v7_mean"].to_numpy(float)
+            errs.append(rmse(test["margin"].to_numpy(float) - pred))
+        form_scores[form] = float(np.mean(errs))
+    form = FORMS[0]
+    for cand in FORMS[1:]:
+        if form_scores[form] - form_scores[cand] > FORM_MARGIN:
+            form = cand
+    # 3. totals: recalibration only when it beats v6 as-of by more than TOTAL_MARGIN (leave-one-season-out)
+    base_err, recal_err = [], []
+    for hold in FIT_SEASONS:
+        test = df[(df["season_year"] == hold) & df["v6_total"].notna()]
+        cfg = fit_config(df[df["season_year"] != hold], variant, form, "recal")
+        base_err.append(rmse(test["total"].to_numpy(float) - test["v6_total"].to_numpy(float)))
+        recal_err.append(
+            rmse(test["total"].to_numpy(float) - apply_config(test, cfg)["v7_total"].to_numpy(float))
+        )
+    total_mode = "recal" if np.mean(base_err) - np.mean(recal_err) > TOTAL_MARGIN else "identity"
+    cfg_final = fit_config(df, variant, form, total_mode)
+    # leave-one-season-out predictions for the fit rows (the market rule's fit window)
+    loso_parts = []
+    for hold in FIT_SEASONS:
+        cfg_h = fit_config(df[df["season_year"] != hold], variant, form, total_mode)
+        test = df[df["season_year"] == hold]
+        pred = apply_config(test, cfg_h)
+        pred["event_id"] = test["event_id"].to_numpy()
+        loso_parts.append(pred)
+    pd.concat(loso_parts).to_json(DATA / "v7ms_loso_fit_preds.jsonl", orient="records", lines=True)
+    selection = {
+        "ridge_variant_table": table,
+        "ridge_variant_selected": variant,
+        "form_loso_rmse": form_scores,
+        "form_selected": form,
+        "total_loso_rmse_v6_asof": float(np.mean(base_err)),
+        "total_loso_rmse_recal": float(np.mean(recal_err)),
+        "total_mode": total_mode,
+    }
+    frozen = {
+        "pin_id": PIN["id"],
+        "pin_sha256": PIN_SHA256,
+        "components_sha256": nr.sha256_file(COMPONENTS),
+        "fit_seasons": list(FIT_SEASONS),
+        "fit_rows": len(df),
+        "config": cfg_final,
+        "selection": selection,
+    }
+    FROZEN.write_text(json.dumps(frozen, indent=2, sort_keys=True), encoding="utf-8")
+    best5 = sorted(table, key=lambda k: table[k]["score"])[:5]
+    print("top ridge variants", [(k, round(table[k]["score"], 4)) for k in best5])
+    print(
+        "selected", variant, "form", form, "form loso rmse", {k: round(v, 4) for k, v in form_scores.items()}
+    )
+    print(
+        "coef", [round(c, 4) for c in cfg_final["coef"]], "scales", [round(x, 3) for x in cfg_final["scales"]]
+    )
+    print(
+        "total loso rmse v6 as-of / recal",
+        round(float(np.mean(base_err)), 4),
+        round(float(np.mean(recal_err)), 4),
+        total_mode,
+    )
+    print("wrote", FROZEN)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -164,6 +387,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_components(args)
     if args.cmd == "gate":
         return cmd_gate(args)
+    if args.cmd == "fit":
+        return cmd_fit(args)
     raise SystemExit(f"stage {args.cmd} is added in a later commit")
 
 

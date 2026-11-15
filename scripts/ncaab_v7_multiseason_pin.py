@@ -17,7 +17,14 @@ import json
 from typing import Any
 
 PIN: dict[str, Any] = {
-    "id": "ncaab-v7-multiseason-pin-1",
+    "id": "ncaab-v7-multiseason-pin-2",
+    "amendment_from_pin_1": (
+        "pin 1 (sha256 747121964170d1c32d75149d3a50000158a323a9095af1895c52bc4a588530cf, commit b4a61cf0) used "
+        "carry (0.25, 0.5, 0.75), lambda (3, 8, 20), kappa (1.0, 1.4). Its fit-window selection (outputs/ncaab/"
+        "ncaab_v7_multiseason_fit_pin1.json) landed on the corner of all three axes (carry 0.25, lambda 3, kappa "
+        "1.4). Before ANY decision-window (2024-25) outcome was read, the grid was extended outward; nothing else "
+        "changed. Only fit-season outcomes were seen when this amendment was made."
+    ),
     "windows_by_espn_season_year": {
         "burn_in": [2022],  # 2021-22: rating history only, never scored
         "fit": [2023, 2024],  # 2022-23, 2023-24: hyperparameters, coefficients, scales
@@ -44,11 +51,11 @@ PIN: dict[str, Any] = {
         "v6_projections.jsonl); their 2024-25 difference is the quantified map risk",
     },
     "ridge_grid": {
-        "carry_geometric_per_season_age": [0.25, 0.5, 0.75],
+        "carry_geometric_per_season_age": [0.0, 0.1, 0.25, 0.5],
         "max_age_seasons": 3,
-        "lambda_toward_tier_prior": [3.0, 8.0, 20.0],
-        "tier_prior_scale_kappa": [1.0, 1.4],
-        "n_variants": 18,
+        "lambda_toward_tier_prior": [1.0, 2.0, 3.0, 8.0],
+        "tier_prior_scale_kappa": [1.0, 1.4, 2.0],
+        "n_variants": 48,
         "note": "carryover weight and offseason regression are one lever in a Massey ridge (weight of last "
         "season's games vs the pull toward the tier prior); both are varied. Venue HCA, rest and "
         "efficiency x pace are NOT re-tested (failed in 1m7).",
