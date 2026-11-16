@@ -72,6 +72,7 @@ from .forecast import (
     _refresh_esports_ratings,
     _refresh_international_baseball_ratings,
 )
+from .nfl_early_line_log import log_nfl_early_lines
 from .settle import _settle_all_unsettled
 from .state import (
     DAILY_ADDITIONAL_SPORTS,
@@ -1157,6 +1158,26 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 "logged": 0,
             }
 
+    def _nfl_early_task() -> None:
+        # Research only: first-seen prices for games still days away. Skipped under pytest
+        # because it reaches ESPN for seven future dates; it must never fail or slow the run.
+        if os.environ.get("PYTEST_CURRENT_TEST"):
+            return
+        try:
+            forecast_result["nfl_early"] = {
+                "sport": "nfl_early",
+                "logged": 0,
+                **log_nfl_early_lines(data_directory, now=utc_now()),
+            }
+        except Exception as exc:
+            logger.warning("NFL early-line log failed", exc_info=True)
+            forecast_result["nfl_early"] = {
+                "sport": "nfl_early",
+                "status": "error",
+                "reason": str(exc),
+                "logged": 0,
+            }
+
     def _tennis_task() -> None:
         try:
             forecast_result["tennis"] = _forecast_tennis_sport(
@@ -1356,6 +1377,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         (_nba_total_task, "nba_total", ("nba", "nba_total")),
         (_nfl_spread_task, "nfl_spread", ("nfl", "nfl_spread")),
         (_nfl_total_task, "nfl_total", ("nfl", "nfl_total")),
+        (_nfl_early_task, "nfl_early", ("nfl", "nfl_early")),
     )
 
     with ThreadPoolExecutor(max_workers=16) as research_pool:

@@ -278,6 +278,6 @@ Season-forward (fit on seasons < S, score S, 2023..2026), pooled, pushes dropped
   serving v7 engines days before kickoff and appends first-sight rows to
   `data/research/nfl_early/early_lines.jsonl`. It builds no ledger object and writes nothing else.
 - First run 2026-11-16 ~05:00Z: 13 games x 2 markets (11-16 MNF, 11-19 TNF, 11-22 Sunday), all with
-  Polymarket asks. Run it each Tuesday for the coming week's dates; not scheduled.
+  Polymarket asks. The daily job now runs it once a day for the next seven days (`_nfl_early_task`).
 - Purpose: clean prospective test of section 10 (model vs early line predicts the move). Score each row
   against the closing line and the result once the games settle.
