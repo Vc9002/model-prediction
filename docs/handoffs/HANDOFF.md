@@ -262,3 +262,12 @@ Season-forward (fit on seasons < S, score S, 2023..2026), pooled, pushes dropped
   the model may know a week of results (and, in the real-starter run, the starter) the opener did not.
   Next step is prospective: price each NFL game when its line opens, log to Flat under its own id, and
   measure CLV against the close. Not built.
+
+## 11. NFL replay extended to 2016 (2026-11-16)
+
+- nflverse weekly player stats 2015-2020 cached in `data/research/nfl_history/`; replay now 2,826 games
+  (was 1,489), real starters in 2,818. Dump is scratchpad-only (`dump_2016.py`, `big_test.py`).
+- v7 as served on 2016-2020, which it was never tuned on: spread 666-639 (51.0%), Brier 0.2503; total
+  664-663 (50.0%), Brier 0.2517. All 2,826: spread 52.0% +/-1.9%, total 50.8% +/-1.9%.
+- corr(model lean, result vs closing line): spread +0.013, total -0.0001. Season-forward refits
+  (2018-2026, 2,235 / 2,270 games) do not beat v7. The total model has no signal against the close.
