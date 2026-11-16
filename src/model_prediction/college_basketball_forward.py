@@ -378,6 +378,10 @@ def forecast_ncaab_sport(
                 f"NCAAB {market} champion {champion.model_id if champion else None} does not match executable model {expected_model.version}"
             )
     policy = config.get("models", {}).get("NCAAB", {})
+    # Off unless the operator sets models.NCAAB.margin_engine: v7 (multi-season margin engine); only the
+    # v6 spread model carries the switch, any other executable model ignores it.
+    if hasattr(spread_model, "margin_engine"):
+        spread_model.margin_engine = str(policy.get("margin_engine", "v6"))
     min_edge = float(policy.get("min_edge", 0.035))
     min_team_games = int(policy.get("min_team_games", 0))
     min_moneyline_ask = float(policy.get("min_moneyline_ask", 0.20))
