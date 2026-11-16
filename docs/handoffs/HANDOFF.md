@@ -271,3 +271,13 @@ Season-forward (fit on seasons < S, score S, 2023..2026), pooled, pushes dropped
   664-663 (50.0%), Brier 0.2517. All 2,826: spread 52.0% +/-1.9%, total 50.8% +/-1.9%.
 - corr(model lean, result vs closing line): spread +0.013, total -0.0001. Season-forward refits
   (2018-2026, 2,235 / 2,270 games) do not beat v7. The total model has no signal against the close.
+
+## 12. NFL early-line log (started 2026-11-16)
+
+- `scripts/nfl_early_line_log.py <date> [<date> ...]` prices upcoming NFL spread and total slates with the
+  serving v7 engines days before kickoff and appends first-sight rows to
+  `data/research/nfl_early/early_lines.jsonl`. It builds no ledger object and writes nothing else.
+- First run 2026-11-16 ~05:00Z: 13 games x 2 markets (11-16 MNF, 11-19 TNF, 11-22 Sunday), all with
+  Polymarket asks. Run it each Tuesday for the coming week's dates; not scheduled.
+- Purpose: clean prospective test of section 10 (model vs early line predicts the move). Score each row
+  against the closing line and the result once the games settle.
