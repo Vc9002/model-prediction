@@ -248,3 +248,17 @@ Season-forward (fit on seasons < S, score S, 2023..2026), pooled, pushes dropped
 - Not replayable on history: `nfl_joint_market_v3`, `nfl_joint_score_v1` (need frozen pregame packets).
 - Scripts are in the session scratchpad only (`st_search.py`, `dump_starters.py`, `qb_test.py`); nothing in
   the repo changed. Untested and still open: opener/line-movement inputs (data from 2026-11-11 only).
+
+## 10. NFL opener / line-movement data (fetched 2026-11-15 night)
+
+- `data/research/nfl_openers/espn_odds_raw.jsonl` (1,489 events, ESPN core odds endpoint, all providers,
+  raw items) and `openers_parsed.json` (median non-live open/close per event). Openers exist for 826 games:
+  2023-10 onward (2021-2022 and early 2023 have none). Parsed close vs replay line: corr 0.996.
+- No fit, 826 games. At the CLOSE nothing works: betting with the move 299-315 (spread), 317-338 (total).
+- v7 re-anchored on the opener (swap the 0.8 market term): its deviation matches the direction the spread
+  later moved 344-279 (55.2%), 202-143 (58.6%) when the deviation is >= 0.5 pt; side vs the opener covers
+  427-382 (52.8%, not separable from 50%). With real starters: 58.4% / 62.0% / 53.7%.
+- **Not clean yet:** opener timestamps are unknown and the replay inputs are as of 6h before kickoff, so
+  the model may know a week of results (and, in the real-starter run, the starter) the opener did not.
+  Next step is prospective: price each NFL game when its line opens, log to Flat under its own id, and
+  measure CLV against the close. Not built.
