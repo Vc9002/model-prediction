@@ -229,3 +229,22 @@ Loss review: at executable quotes moneyline is 29-22 -9.91u (edge >= 8%: 0-8), s
   gets worse, 0.2328 -> 0.2482 (25). Loss mechanism: moneyline picks 5%+ above the ask are 1-11.
 - **Not evaluated:** `nfl_joint_market_v3`, `nfl_joint_score_v1`. The anchor
   needs timestamp-valid two-sided quotes per settled game; 121 executable-quote picks exist.
+
+## 9. NFL spread/total improvement search (2026-11-15 evening: nothing beats the line)
+
+Season-forward (fit on seasons < S, score S, 2023..2026), pooled, pushes dropped; closing line = 0.2500 / 50.0%.
+
+- 10 fixed candidates on existing inputs (Elo/form vs line, engine terms refit, line/pace/EPA, boosted
+  trees): best spread 0.2500 vs v7 0.2504 (895 games), best total 0.2497 vs 0.2505 (912). All inside noise.
+- **The replay's quarterbacks were wrong.** `QBResolver` has depth charts for 65 of 1,469 games; the other
+  1,404 fell back to the team's all-time attempts leader. Re-dumped with each game's actual starter (most
+  attempts in that game): the starter differs in 598 home / 618 away team-games, `c_qb` changes in 859.
+- With real starters v7 is unchanged: spread 0.2501, 52.7% (896); total 0.2506, 51.7% (913). The QB term
+  alone has corr 0.027 with the spread residual (0.72 with the line itself) and its fitted sign flips by
+  fold. 6 more candidates, none beats v7. The line already prices the quarterback.
+- Only stable signal: the v7 total deviation refits to a slope of 0.13-0.23 in every fold (right direction,
+  roughly 4x overconfident); gain +0.0010 Brier, 95% -0.0012..+0.0033, same side picked.
+- Live path checked: anchor line and priced Polymarket rung are the same contract and snapshot.
+- Not replayable on history: `nfl_joint_market_v3`, `nfl_joint_score_v1` (need frozen pregame packets).
+- Scripts are in the session scratchpad only (`st_search.py`, `dump_starters.py`, `qb_test.py`); nothing in
+  the repo changed. Untested and still open: opener/line-movement inputs (data from 2026-11-11 only).
