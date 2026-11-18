@@ -2,12 +2,48 @@ import json
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
-from model_prediction.college_basketball_forward import _main_sample_eligible, forecast_ncaab_sport
+from model_prediction.college_basketball_forward import (
+    _main_sample_eligible,
+    _normalize_name,
+    _resolve_ncaab_team,
+    forecast_ncaab_sport,
+)
 from model_prediction.features.base import GameRecord
 from model_prediction.main_ledgers import MultiSportPickLedger
 
 # The served v6 model defines D1 as membership in its conference map (team_priors).
 _D1_TEAMS = {name: 1500.0 for name in ("Away", "Home", "MajorAway", "MajorHome", "SmallCollege")}
+
+
+def test_uconn_never_resolves_to_central_connecticut():
+    # History and ESPN name UConn "UConn Huskies". The alias target "connecticut" matches no name
+    # by prefix, and a substring test used to land on "Central Connecticut Blue Devils" instead:
+    # five 2026-11 ledger games (incl. UConn @ Arizona) were priced as the wrong team.
+    names = {
+        "Central Connecticut Blue Devils",  # listed first on purpose: dict order picked the wrong one
+        "Truett McConnell Bears",
+        "UConn Huskies",
+        "Arizona Wildcats",
+    }
+    normalized = {_normalize_name(n): n for n in names}
+
+    def resolve(school, mascot=""):
+        return _resolve_ncaab_team(school, mascot, names, normalized)
+
+    for school, mascot in (
+        ("UConn", "Huskies"),
+        ("UConn", ""),
+        ("Connecticut", "Huskies"),
+        ("Connecticut", ""),
+    ):
+        assert resolve(school, mascot) == "UConn Huskies", (school, mascot)
+    for school, mascot in (
+        ("Central Connecticut", "Blue Devils"),
+        ("Central Connecticut", ""),
+        ("Central Connecticut State", ""),
+    ):
+        assert resolve(school, mascot) == "Central Connecticut Blue Devils", (school, mascot)
+    assert resolve("Arizona", "Wildcats") == "Arizona Wildcats"
 
 
 def test_main_sample_gate_uses_current_season_and_fails_closed():

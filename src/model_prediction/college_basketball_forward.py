@@ -74,7 +74,11 @@ _NCAAB_ALIASES: dict[str, str] = {
     "st thomas (mn)": "st thomas tommies",
     "st thomas mn": "st thomas tommies",
     "saint thomas": "st thomas tommies",
-    "uconn": "connecticut",
+    # History and ESPN call UConn "UConn Huskies"; the old target "connecticut" matched nothing
+    # by name and fell onto "Central Connecticut Blue Devils" (2026-11-18, five ledger games).
+    "uconn": "uconn huskies",
+    "connecticut": "uconn huskies",
+    "connecticut huskies": "uconn huskies",
     "nc state": "nc state wolfpack",
     "penn": "pennsylvania quakers",
     "ole miss": "ole miss rebels",
@@ -107,8 +111,14 @@ def _resolve_ncaab_team(
 
     if norm_school in _NCAAB_ALIASES:
         target = _NCAAB_ALIASES[norm_school]
+        # Exact name, then whole-word prefix. Never `target in k`: a short alias target is a
+        # substring of other schools ("connecticut" in "central connecticut blue devils"), and the
+        # first such name in dict order won. A miss falls through to the general matching below.
         for k, v in normalized_names.items():
-            if k == target or k.startswith(target + " ") or target in k:
+            if k == target:
+                return v
+        for k, v in normalized_names.items():
+            if k.startswith(target + " "):
                 return v
 
     if norm_mascot:
