@@ -1,0 +1,27 @@
+{
+  "created_utc": "2026-11-18T22:23:29Z",
+  "status": "ARCHIVED 2026-11-18 (operator approved); rows now status=archived in ledgers.db, one archive event each",
+  "reason": "NCAAB settled picks priced on the wrong team: the resolver mapped UConn to Central Connecticut Blue Devils, UMass to UMass Boston Beacons and Rutgers to Rutgers-Camden (fixed in commits 0de74638 and 54e0028b).",
+  "source": "E:/model-prediction-runtime/ledgers/ledgers.db, table ledger_records, sport=ncaab, status=settled, event_id in listed events (read-only)",
+  "events": {
+    "202804": "ESPN: Gardner-Webb @ UConn (2026-11-03)",
+    "203058": "ESPN: UConn @ Michigan, neutral site (2026-11-07)",
+    "203282": "ESPN: Wagner @ UConn (2026-11-10)",
+    "209160": "ESPN: Ohio State @ UConn (2026-11-14)",
+    "202698": "UMass game (label carries UMass Boston)",
+    "202992": "UMass game (label carries UMass Boston)",
+    "203008": "Rutgers game (label carries Rutgers-Camden)"
+  },
+  "row_count": 30,
+  "main_rows": 12,
+  "flat_rows": 18,
+  "net_pnl_units": -20.06,
+  "staked_units": 45.73,
+  "rows_file": "settled_rows.jsonl",
+  "rows_file_sha256": "115d534a642f21526ee1e3709d52154e602c65bcc47fc5bdac5e6210e88e5588",
+  "not_included": "108 superseded rows and 1 open row (event 229051) on the same games stay in the ledger; archive_settled_rows only touches settled rows",
+  "archived_utc": "2026-11-18T22:25:58Z",
+  "method": "PickLedger.archive_settled_rows via main_ledger/flat_ledger, MODEL_PREDICTION_LEDGER_AUTHORITY=sqlite, daily writer lock held, exact reviewed pick_id set and totals asserted",
+  "sqlite_backup_before": "E:/model-prediction-runtime/ledgers/ledgers.db.pre-collision-archive-20261118T222558Z.bak",
+  "verification": "vs the backup only 12 main + 18 flat ncaab rows changed settled -> archived; 30 settled_pick_archived audit events in data/events.jsonl"
+}

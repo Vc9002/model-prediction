@@ -61,3 +61,12 @@ Ledger vs ESPN, all 772 distinct NCAAB game labels (2026-11-02..11-19): 715 matc
 - **Orientation:** of the 715 matched games, 694 have the same away/home order as ESPN, 20 are flipped at ESPN-neutral sites (arbitrary), 1 flipped at a home-court site (2026-11-08 Evansville @ Southern Indiana, event 203192).
 - **Real-money matcher (`data_sources/polymarket_execute.py::_team_name_matches`), not changed:** `UConn Huskies` vs side `Central Connecticut` / `Central Connecticut State` returns True (the final distinctive-token clause matches the alias target `connecticut`), and `UMass` vs `UMass Boston` returns True. Both need two near-identical teams in one event to bite, so the exposure is small, but it is the gated real-money path and was left for an explicit instruction. `Rutgers` vs `Rutgers-Camden`, `Oklahoma State` vs `Oklahoma Panhandle State`, `Arizona` vs `Arizona State`, `Michigan` vs `Michigan State` correctly return False.
 - **Paper auto-buyer:** no buy touched any mislabeled game (its only Central Connecticut rows are real Central Connecticut games).
+
+## Follow-up (2026-11-18, operator approved): 30 contaminated settled rows archived
+
+The operator said yes after the export was reviewed. `PickLedger.archive_settled_rows` ran under SQLite authority with the daily writer lock held, a SQLite backup first (`E:/model-prediction-runtime/ledgers/ledgers.db.pre-collision-archive-20261118T222558Z.bak`), and the exact reviewed pick_id set and totals asserted (30 rows: 12 Main, 18 Flat, net -20.06U on 45.73U staked; UConn 14 rows -6.90U, UMass/Rutgers 16 rows -13.16U).
+
+- Rows file and manifest: `data/archive/2026-11-18-ncaab-team-name-collision-rows/` (`settled_rows.jsonl`, `MANIFEST.json`).
+- Verified against the backup: only those 30 rows changed (flat settled 13,662 -> 13,644, main settled 9,910 -> 9,898; archived 0 -> 18 and 0 -> 12). They stay in `ledger_records` as `status=archived`, each with an `archive` event, and 30 `settled_pick_archived` audit events carry the full rows in `data/events.jsonl`.
+- Not archived: the 108 superseded rows and the one open row on the same games. The open Arizona row (event 229051) was repriced by the 17:00 ET daily run as `UConn Huskies @ Arizona Wildcats`, model 56.9% vs market 50% (was Central Connecticut at 97.7% vs 60%).
+- Gotcha: the code default for `MODEL_PREDICTION_LEDGER_AUTHORITY` is `xlsx`; an ad-hoc ledger mutation must set `sqlite` explicitly or it reads the wrong authority.
