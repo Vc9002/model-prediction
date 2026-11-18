@@ -95,7 +95,13 @@ _NCAAB_ALIASES: dict[str, str] = {
     "unlv": "unlv rebels",
     "utep": "utep miners",
     "utsa": "utsa roadrunners",
-    "umass": "umass minutemen",
+    # History calls the flagship "Massachusetts Minutemen"; the old target "umass minutemen" matched
+    # nothing, so school-only "UMass" fell to token-subset ranking and landed on "UMass Boston Beacons"
+    # (a non-D1 school, 2026-11-03/06). "Rutgers" alone lost the same ranking to Rutgers-Camden
+    # because that history name repeats its own token.
+    "umass": "massachusetts minutemen",
+    "umass minutemen": "massachusetts minutemen",
+    "rutgers": "rutgers scarlet knights",
     "liu": "long island university sharks",
 }
 

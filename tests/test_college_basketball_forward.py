@@ -46,6 +46,41 @@ def test_uconn_never_resolves_to_central_connecticut():
     assert resolve("Arizona", "Wildcats") == "Arizona Wildcats"
 
 
+def test_umass_and_rutgers_never_resolve_to_lookalike_schools():
+    # School-only "UMass" and "Rutgers" used to resolve to UMass Boston and Rutgers-Camden (non-D1
+    # schools that outrank the flagship in token-subset matching), mispricing three 2026-11 games.
+    names = {
+        "UMass Boston Beacons",
+        "UMass Lowell River Hawks",
+        "Rutgers-Camden RUTGERS-CAMDEN",  # repeats its own token, so it outranks the flagship
+        "Rutgers Scarlet Knights",
+        "Massachusetts Minutemen",
+    }
+    normalized = {_normalize_name(n): n for n in names}
+
+    def resolve(school, mascot=""):
+        return _resolve_ncaab_team(school, mascot, names, normalized)
+
+    for school, mascot in (
+        ("UMass", ""),
+        ("UMass", "Minutemen"),
+        ("UMass Minutemen", ""),
+        ("Massachusetts", "Minutemen"),
+    ):
+        assert resolve(school, mascot) == "Massachusetts Minutemen", (school, mascot)
+    for school, mascot in (
+        ("Rutgers", ""),
+        ("Rutgers", "Scarlet Knights"),
+        ("Rutgers Scarlet Knights", ""),
+    ):
+        assert resolve(school, mascot) == "Rutgers Scarlet Knights", (school, mascot)
+    # The lookalikes keep resolving to themselves.
+    assert resolve("UMass Boston", "") == "UMass Boston Beacons"
+    assert resolve("UMass Lowell", "River Hawks") == "UMass Lowell River Hawks"
+    assert resolve("Rutgers-Camden", "") == "Rutgers-Camden RUTGERS-CAMDEN"
+    assert resolve("Rutgers Camden", "") == "Rutgers-Camden RUTGERS-CAMDEN"
+
+
 def test_main_sample_gate_uses_current_season_and_fails_closed():
     assert not _main_sample_eligible(None, 8)
     assert not _main_sample_eligible(True, 8)
