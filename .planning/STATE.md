@@ -123,6 +123,7 @@ None yet.
 | 261115-21e | NFL fix batch: buyer input gate, NFL spread off in buyer, evidence labels, placeholder rows out of performance, v8 replay repair | 2026-11-15 | b88de0e3 | [261115-21e-nfl-fix-batch-buyer-input-gate-nfl-sprea](./quick/261115-21e-nfl-fix-batch-buyer-input-gate-nfl-sprea/) |
 | 261115-183 | NCAAF totals information-source tests under a pinned rule (level tracker; line movement INSUFFICIENT_DATA; weather and QB NOT_WORTH_BUILDING), cfb-structural-v6.1 = v6 + days-90 level tracker (inert, bit-exact port, does not beat the closing line: holdout MAE diff vs line +0.647 [+0.442, +0.854]), 11-14 retrospective replay (117 settled games), lopsided tilt pre-registered (n 704), forward pregame capture built but not wired into the daily run | 2026-11-15 | f9ef35b3 | [261115-183-test-information-sources-for-ncaaf-total](./quick/261115-183-test-information-sources-for-ncaaf-total/) |
 | 261118-ke0 | Fix NCAAB resolver mapping UConn to Central Connecticut Blue Devils (alias target plus substring match); regression test | 2026-11-18 | 0de74638 | [261118-ke0-ncaab-resolver-stop-uconn-resolving-to-c](./quick/261118-ke0-ncaab-resolver-stop-uconn-resolving-to-c/) |
+| 261118-umr | NCAAB resolver: school-only UMass and Rutgers resolve to the flagship instead of UMass Boston / Rutgers-Camden (alias target was not a history name); regression test | 2026-11-18 | 54e0028b | [261118-umr-ncaab-resolver-umass-and-rutgers-aliases](./quick/261118-umr-ncaab-resolver-umass-and-rutgers-aliases/) |
 
 ## Milestone History
 
