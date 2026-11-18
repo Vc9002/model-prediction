@@ -39,13 +39,25 @@ Found because the Best Pick Audit widget showed "1 UNMATCHED": the unmatched pic
 | Game date (UTC start) | ESPN game | Ledger label | Last row |
 | --- | --- | --- | --- |
 | 2026-11-03 | Gardner-Webb @ UConn | Gardner-Webb @ Central Connecticut | settled win, spread, +1.92U (model 99.9%) |
-| 2026-11-07 | UConn @ Michigan | Michigan @ Central Connecticut (home/away also reversed) | settled loss, moneyline, -1.00U |
+| 2026-11-07 | UConn @ Michigan (neutral site) | Michigan @ Central Connecticut | settled loss, moneyline, -1.00U |
 | 2026-11-10 | Wagner @ UConn | Wagner @ Central Connecticut | settled loss, total over, -1.56U |
 | 2026-11-14 | Ohio State @ UConn | Ohio State @ Central Connecticut | settled loss, moneyline, -1.00U |
 | 2026-11-19 | UConn @ Arizona | Central Connecticut @ Arizona | OPEN, moneyline home, model 97.7% vs 60% |
 
 About 84 ledger rows (incl. superseded duplicates). The ledger is the append-only evidence store; those rows were not edited. Operator decision pending: whether to archive/void them and exclude them from model evidence (ledger mutation only through `archive_settled_rows` / `remove_open_rows`). The open Arizona row is repriced by the next daily run now that the fix is on disk.
 
-## Open question (not fixed here)
+## Home/away on the 2026-11-07 row: not a bug
 
-The 2026-11-07 row has home and away reversed relative to ESPN (`UConn @ Michigan` logged as `Michigan @ Central Connecticut`). The resolver fix does not touch slate orientation; that comes from the Polymarket event title/side parsing in `forecast_ncaab_sport` and needs its own look.
+ESPN lists `UConn @ Michigan` for that game but the slate tagged Michigan away. The game was a neutral-site Hall of Fame Series game at TD Garden (ESPN `neutralSite=True`), where either label is arbitrary. Neutral detection compares resolved name pairs, and the slate and ESPN both resolved UConn the same wrong way, so the pair still matched and the game was treated as neutral. The other four UConn games have ESPN labels matching the ledger (non-neutral).
+
+## Are other teams affected? (audit, read-only)
+
+Ledger vs ESPN, all 772 distinct NCAAB game labels (2026-11-02..11-19): 715 match both teams exactly; 12 are the right teams with a different ESPN tip time or listing order; 45 label rows have exactly one team different from ESPN.
+
+- **Collision onto a real D1 team: UConn only** (5 games, fixed). No other D1-to-D1 collision exists in the ledger or in the 615-team simulation below.
+- **Collisions onto a non-D1 school, 3 games, all before 11-09:** UMass -> `UMass Boston Beacons` (11-03 vs Troy, 11-06 vs Boston College) and Rutgers -> `Rutgers-Camden RUTGERS-CAMDEN` (11-07, New Haven @ Rutgers). Those 3 games hold 16 settled rows (7 Main, 9 Flat), net -13.16U on 23.28U. With the UConn games the mislabeled settled rows are 30, net -20.06U.
+- **Unresolved names, 37 label rows, all dated 11-03..11-08:** D1 teams kept as a raw slate string (`Alabama`, `K-State`, `Mich. State`, `Notre Dame`, `Cornell`, `Delaware`, `California`, `NM State`, `UNCW`, ...) so the model had no rating history for them, plus spelling variants of non-D1 schools (`Concordia-Chicago`). None after 11-08, so the alias additions since then work.
+- **Simulation:** every D1 team on ESPN's 11-02..11-26 scoreboards (615 teams, 1,779 inputs). School + mascot form (the slate's normal form): 1 wrong before this fix (UConn), 0 now. Remaining wrong results come only from school-only or abbreviated inputs, and every collision lands on a non-D1 school (`Rutgers`, `UMass`, `Oklahoma St`, `St Mary's`, `Wilson`, `Florida Memorial`, `Pacific Union`); since 11-15 `decline_non_d1` turns those into no-picks, so the cost is lost coverage on real D1 games (Rutgers, UMass), not a mispriced pick. The `umass` alias has the same defect as `uconn` did: its target `umass minutemen` is not a history name (history says `Massachusetts Minutemen`). Not changed here.
+- **Orientation:** of the 715 matched games, 694 have the same away/home order as ESPN, 20 are flipped at ESPN-neutral sites (arbitrary), 1 flipped at a home-court site (2026-11-08 Evansville @ Southern Indiana, event 203192).
+- **Real-money matcher (`data_sources/polymarket_execute.py::_team_name_matches`), not changed:** `UConn Huskies` vs side `Central Connecticut` / `Central Connecticut State` returns True (the final distinctive-token clause matches the alias target `connecticut`), and `UMass` vs `UMass Boston` returns True. Both need two near-identical teams in one event to bite, so the exposure is small, but it is the gated real-money path and was left for an explicit instruction. `Rutgers` vs `Rutgers-Camden`, `Oklahoma State` vs `Oklahoma Panhandle State`, `Arizona` vs `Arizona State`, `Michigan` vs `Michigan State` correctly return False.
+- **Paper auto-buyer:** no buy touched any mislabeled game (its only Central Connecticut rows are real Central Connecticut games).
