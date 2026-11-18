@@ -1,5 +1,12 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
+## 2026-11-18 — health audit (`quick-261118-hlt`)
+
+- **Settlement name variance.** `_settle_by_resolution` matched sides by substring only, so clubs spelled differently by the ledger and Polymarket (Oerebro Hockey/HK, Anadolu Efes Istanbul/SK, Besiktas Istanbul/JK) never resolved and would have been voided by the 7-day rule although the markets had resolved as wins. Fixed with a fail-closed distinctive-token second pass (`16f92f3b`). Euroleague and hockey results histories only refresh inside their forecast block, so they stop while switched off; settlement must not depend on them.
+- **`system_health` economics check** now exempts the writer's `[UNQUOTED_SHADOW:]` marker (placeholder-priced NCAAB calls stake nothing by design, quick 261115-1m3); unmarked silent-zero rows (Flat MLB class) still report.
+- **`market_quotes.db` corruption.** Single-bit flips (bit 0x08) left 8 rows where the table and the two indexes disagree (`soccer`/`sgccer`, `mlb`/`elb`, event_id `mlb-`/`mdb-`); the health monitor reported them as stale sports. Repaired under the daily lock with a backup. `PRAGMA quick_check` does NOT compare indexes with the table; use `integrity_check`. Suspect memory or storage hardware (python.exe crashes, 00:30 memory exhaustion, bugcheck 0x139 on 11-07): run a RAM test.
+- **Dashboard** died 11-16 (python.exe crash) and its logon-only task never restarted it; restarted 11-18.
+
 ## 2026-11-13 — CLAUDE.md session history moved here (operator directive: trim CLAUDE.md to working rules)
 
 The dated sections below lived in the root `CLAUDE.md` from 2026-08-13 to 2026-11-13 and were moved
