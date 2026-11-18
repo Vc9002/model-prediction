@@ -214,6 +214,11 @@ def _ledger_economics(paths: RuntimePaths) -> dict[str, Any]:
               WHERE status = 'settled' AND result IN ('win', 'loss')
                 AND COALESCE(reason_code, json_extract(decision_payload_json, '$.reason_code'), '') != 'OPERATOR_REQUESTED_RETROSPECTIVE_UNPRICED'
                 AND COALESCE(json_extract(decision_payload_json, '$.call_type'), '') != 'retrospective_model_tracking'
+                -- Placeholder-priced NCAAB calls stake nothing by design (quick 261115-1m3): no
+                -- executable quote and a 50% slate price, so any P&L would be fictitious. The
+                -- marker is the writer's own signature; matching it (not just units=0) keeps the
+                -- Flat MLB silent-zero bug visible.
+                AND COALESCE(json_extract(decision_payload_json, '$.rationale'), '') NOT LIKE '%[UNQUOTED_SHADOW:%'
             ), effective AS (
               SELECT *,
                      CASE WHEN ledger_units > 0 THEN ledger_units ELSE research_units END AS effective_units,
@@ -253,6 +258,7 @@ def _ledger_economics(paths: RuntimePaths) -> dict[str, Any]:
                   WHERE status = 'settled' AND result IN ('win', 'loss')
                     AND COALESCE(reason_code, json_extract(decision_payload_json, '$.reason_code'), '') != 'OPERATOR_REQUESTED_RETROSPECTIVE_UNPRICED'
                     AND COALESCE(json_extract(decision_payload_json, '$.call_type'), '') != 'retrospective_model_tracking'
+                    AND COALESCE(json_extract(decision_payload_json, '$.rationale'), '') NOT LIKE '%[UNQUOTED_SHADOW:%'
                 )
                 SELECT ledger_tier, sport, pick_id, result, reason_code,
                        effective_units, effective_pnl

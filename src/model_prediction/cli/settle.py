@@ -852,6 +852,48 @@ def _scores_for_outcome(market_type: str, selection: str, line, won: bool) -> tu
     return (other, sel_score) if selection == "home" else (sel_score, other)
 
 
+_NAME_TOKEN_STOPWORDS = frozenset({"state", "university", "city", "club", "team", "united"})
+
+
+def _name_tokens(value: str) -> frozenset[str]:
+    """Distinctive word tokens (4+ letters, ASCII-folded) of a team name."""
+    decomposed = unicodedata.normalize("NFKD", value)
+    folded = "".join(
+        "" if unicodedata.combining(c) else (c.lower() if c.isalnum() else " ") for c in decomposed
+    )
+    return frozenset(t for t in folded.split() if len(t) >= 4 and t not in _NAME_TOKEN_STOPWORDS)
+
+
+def _resolve_side_by_name_tokens(team: str, prices: list, market_type: str, line) -> dict | None:
+    """Second-chance side match when the substring match found nothing.
+
+    The ledger and Polymarket spell some clubs differently ("Oerebro Hockey" vs "Oerebro HK",
+    "Anadolu Efes Istanbul" vs "Anadolu Efes SK", "Besiktas Istanbul" vs "Besiktas JK"), so every
+    pick on them returned "resolution side unresolved" and would have been voided by the 7-day
+    rule even though the market had resolved (4 winning picks, 2026-11-12/13). Pick the one side
+    sharing the most distinctive tokens; a tie or no overlap stays unresolved (fail closed).
+    """
+    wanted = _name_tokens(team)
+    if not wanted:
+        return None
+    scored: list[tuple[int, dict]] = []
+    for side, _ in prices:
+        if market_type == "spread":
+            try:
+                if abs(float(str(side.get("description")).replace("+", "")) - float(line)) > 1e-6:
+                    continue
+            except (TypeError, ValueError):
+                continue
+        name = str((side.get("team") or {}).get("name") or side.get("description") or "")
+        scored.append((len(wanted & _name_tokens(name)), side))
+    scored.sort(key=lambda item: -item[0])
+    if not scored or scored[0][0] == 0:
+        return None
+    if len(scored) > 1 and scored[1][0] == scored[0][0]:
+        return None
+    return scored[0][1]
+
+
 def _settle_by_resolution(row: dict, ledger, client=None, data_root=None) -> dict | None:
     """Settle any pick from its Polymarket contract's terminal resolution.
 
@@ -918,6 +960,8 @@ def _settle_by_resolution(row: dict, ledger, client=None, data_root=None) -> dic
                         continue
                 own = side
                 break
+        if own is None:
+            own = _resolve_side_by_name_tokens(team, prices, market_type, row.get("line"))
     if own is None:
         return {"pick_id": row["pick_id"], "reason": f"resolution side unresolved for {slug}"}
     won = next(price for side, price in prices if side is own) == 1.0

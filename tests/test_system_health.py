@@ -293,6 +293,46 @@ def test_ledger_economics_exempts_unpriced_retrospective_tracking(tmp_path: Path
     assert len(check["examples"]) == 0
 
 
+def test_ledger_economics_exempts_only_marked_unquoted_shadow_rows(tmp_path: Path) -> None:
+    # Placeholder-priced NCAAB calls are zero-stake by design and carry the writer's
+    # [UNQUOTED_SHADOW: ...] marker; an unmarked zero-stake graded row (the Flat MLB silent-zero
+    # bug) must still be reported.
+    repo = _make_repo(tmp_path)
+    paths = RuntimePaths(repo_root=repo, runtime_root=repo / "data")
+    paths.ledgers_db.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(paths.ledgers_db)
+    connection.execute(
+        """CREATE TABLE ledger_records (
+        ledger_tier TEXT, sport TEXT, pick_id TEXT, status TEXT, result TEXT,
+        units REAL, pnl_units REAL, decision_payload_json TEXT)"""
+    )
+    marked = "Projected total 159.3. [UNQUOTED_SHADOW: no executable quote and the indicative price is the 50% placeholder; zero stake]"
+    for pick_id, sport, rationale in (
+        ("marked-unquoted-shadow", "ncaab", marked),
+        ("silent-zero-stake", "mlb", "Projected 4.2 runs."),
+    ):
+        connection.execute(
+            "INSERT INTO ledger_records VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "flat",
+                sport,
+                pick_id,
+                "settled",
+                "win",
+                0.0,
+                0.0,
+                json.dumps({"reason_code": "FLAT_CALL", "rationale": rationale}),
+            ),
+        )
+    connection.commit()
+    connection.close()
+
+    check = _ledger_economics(paths)
+
+    assert check["semantic_errors"] == 1
+    assert [row["pick_id"] for row in check["examples"]] == ["silent-zero-stake"]
+
+
 def test_stale_prediction_degrades(tmp_path: Path) -> None:
     repo = _make_repo(tmp_path)
     _seed_prediction_state(repo, minutes_ago=300)  # max_data_age_minutes=120
