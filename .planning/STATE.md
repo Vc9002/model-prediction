@@ -4,10 +4,10 @@ current_phase: 1
 current_phase_name: Portfolio Circuit Breaker
 status: planning
 stopped_at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated to 4-phase structure
-last_updated: "2026-11-15T07:10:30.727Z"
+last_updated: "2026-11-18T19:44:33.153Z"
 last_activity: 2026-11-13
 last_activity_desc: ROADMAP.md and STATE.md created from REQUIREMENTS.md and research/SUMMARY.md
-state_head: b88de0e3f3a87d2088bcee96c12bfcdec14188dc
+state_head: 0de746381925862817da265252cc3732c506d303
 progress:
   total_phases: 4
   completed_phases: 0
@@ -122,6 +122,7 @@ None yet.
 | 261115-0pq | v6 open items: known-team gate (declines names absent from history; parity max abs 0.0, 0 newly declined) and checkout-proof lib pin (CRLF-normalised hash, frozen sha256 unchanged) shipped; v5 live-history backfill and NCAAF groups 80/81 ingest measured by a pre-pinned rule and REJECTED (holdout Brier delta +0.001065 vs +0.001 limit), live files untouched | 2026-11-15 | 3b9728fc | [261115-0pq-fix-v6-open-items-ncaaf-ingest-groups-80](./quick/261115-0pq-fix-v6-open-items-ncaaf-ingest-groups-80/) |
 | 261115-21e | NFL fix batch: buyer input gate, NFL spread off in buyer, evidence labels, placeholder rows out of performance, v8 replay repair | 2026-11-15 | b88de0e3 | [261115-21e-nfl-fix-batch-buyer-input-gate-nfl-sprea](./quick/261115-21e-nfl-fix-batch-buyer-input-gate-nfl-sprea/) |
 | 261115-183 | NCAAF totals information-source tests under a pinned rule (level tracker; line movement INSUFFICIENT_DATA; weather and QB NOT_WORTH_BUILDING), cfb-structural-v6.1 = v6 + days-90 level tracker (inert, bit-exact port, does not beat the closing line: holdout MAE diff vs line +0.647 [+0.442, +0.854]), 11-14 retrospective replay (117 settled games), lopsided tilt pre-registered (n 704), forward pregame capture built but not wired into the daily run | 2026-11-15 | f9ef35b3 | [261115-183-test-information-sources-for-ncaaf-total](./quick/261115-183-test-information-sources-for-ncaaf-total/) |
+| 261118-ke0 | Fix NCAAB resolver mapping UConn to Central Connecticut Blue Devils (alias target plus substring match); regression test | 2026-11-18 | 0de74638 | [261118-ke0-ncaab-resolver-stop-uconn-resolving-to-c](./quick/261118-ke0-ncaab-resolver-stop-uconn-resolving-to-c/) |
 
 ## Milestone History
 
