@@ -686,10 +686,73 @@ def _build_context(
     )
 
 
+def train_replacement_fit(
+    train_games: Sequence[GameRecord], rows_by_event: dict[str, dict[str, list[dict[str, Any]]]]
+) -> dict[str, Any]:
+    """Train-split-only distribution of rotation players' mean minutes-weighted impact.
+
+    Players with >= 10 played games and mean played minutes >= MEAN_MINUTES_FLOOR. The
+    quantiles, the percentile rank of each grid value, and the train p25 (rounded to 2 dp,
+    the extra replacement candidate) come from TRAIN games only; the validation split
+    then selects the final (arm, k, replacement_level).
+    """
+    impacts: dict[str, list[float]] = defaultdict(list)
+    minutes: dict[str, list[float]] = defaultdict(list)
+    for g in train_games:
+        for rows in rows_by_event.get(g.event_id, {}).values():
+            for row in rows:
+                if float(row["minutes"]) <= 0:
+                    continue
+                impacts[str(row["player_id"])].append(minutes_weighted_impact(row))
+                minutes[str(row["player_id"])].append(float(row["minutes"]))
+    means = np.array(
+        [
+            sum(vals) / len(vals)
+            for pid, vals in impacts.items()
+            if len(vals) >= 10 and sum(minutes[pid]) / len(minutes[pid]) >= MEAN_MINUTES_FLOOR
+        ]
+    )
+    if means.size == 0:
+        raise RuntimeError("no rotation players in the train boxscores")
+    quantiles = {f"p{q}": float(np.percentile(means, q)) for q in (10, 25, 50, 75, 90)}
+    return {
+        "players": int(means.size),
+        "quantiles": quantiles,
+        "grid_percentile_rank": {str(r): float(100.0 * np.mean(means <= r)) for r in REPLACEMENT_GRID},
+        "train_p25": round(float(np.percentile(means, 100 * TRAIN_REPLACEMENT_QUANTILE)), 2),
+    }
+
+
+def name_collision_report(
+    rows_by_event: dict[str, dict[str, list[dict[str, Any]]]],
+    event_start: dict[str, str],
+    before_utc: str,
+) -> dict[str, Any]:
+    """Names that map to more than one player_id: why the historical arms are id-keyed."""
+    triples = [
+        (event_start[eid], str(row["player_id"]), str(row["name"]))
+        for eid, teams in rows_by_event.items()
+        if eid in event_start
+        for rows in teams.values()
+        for row in rows
+    ]
+    name_map = build_name_to_ids(triples, before_utc)
+    multi = {name: sorted(ids) for name, ids in name_map.items() if len(ids) > 1}
+    return {
+        "names": len(name_map),
+        "multi_id_names": len(multi),
+        "examples": dict(sorted(multi.items())[:10]),
+    }
+
+
+def _result_row(result: ConfigResult) -> dict[str, Any]:
+    return _jsonable(result)
+
+
 def run(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     parser.add_argument("--out", required=True, help="JSON result path (must be outside the repo)")
-    parser.add_argument("--smoke", action="store_true", help="validation-only, first dates, no holdout")
+    parser.add_argument("--smoke", action="store_true", help="validation-only, a few dates, no holdout")
     args = parser.parse_args(argv)
 
     out_path = Path(args.out).resolve()
@@ -704,34 +767,130 @@ def run(argv: Sequence[str] | None = None) -> int:
     box = load_boxscores_with_dates(BOX_DIR)
     print(f"  loaded {len(box.rows_by_event)} boxscores in {time.time() - started:.0f}s", flush=True)
 
+    # A. data lag (counts files and schedule rows only; no holdout game is evaluated here)
     lag = data_lag_report(box, raw_games, datetime.now(UTC).date())
     _print_data_lag(lag)
+    # B. limitation banner
+    print("\n=== B. LIMITATION ===")
+    print(LIMITATION)
 
-    _train, val_games, _holdout, meta = split_complete_dates(all_games, 0.60, 0.20)
+    train_games, val_games, holdout_games, meta = split_complete_dates(all_games, 0.60, 0.20)
     print("\nsplit:", meta)
 
-    if not args.smoke:
-        raise SystemExit("full run is added in Task 2")
-    # Mid-validation dates, not the first ones: the first validation dates are the season opener,
-    # where every team's last game is a preseason game with no boxscore, so nothing would be
-    # exercised beyond the "uncovered" branch.
-    all_val_dates = sorted({g.event_start_utc[:10] for g in val_games})
-    start = len(all_val_dates) // 2
-    val_dates = all_val_dates[start : start + SMOKE_DATES]
-    smoke_games = [g for g in val_games if g.event_start_utc[:10] in set(val_dates)]
-    levels = (1.0,)
-    ctx = _build_context(all_games, box, levels)
-    configs = [
-        ConfigSpec("zero", "zero", 0.0),
-        ConfigSpec(f"static_k{STATIC_BASELINE_K}", "static", STATIC_BASELINE_K),
-        ConfigSpec("real_r1.0_k1.0", "real", 1.0, 1.0),
-    ]
-    output = evaluate(ctx, smoke_games, configs, verify_batch=True)
-    _print_results(f"SMOKE ({len(val_dates)} validation dates)", list(output.results.values()))
-    print("diagnostics:", output.diagnostics)
+    # C. train-only replacement-level fit
+    fit = train_replacement_fit(train_games, box.rows_by_event)
+    levels = tuple(sorted({*REPLACEMENT_GRID, fit["train_p25"]}))
+    print("\n=== C. TRAIN-ONLY ROTATION IMPACT DISTRIBUTION (points per game, minutes-weighted) ===")
+    print(f"rotation players (>=10 played games, mean minutes >= {MEAN_MINUTES_FLOOR:g}): {fit['players']}")
+    print("quantiles: " + ", ".join(f"{q}={v:.3f}" for q, v in fit["quantiles"].items()))
+    for r, rank in fit["grid_percentile_rank"].items():
+        print(f"  grid replacement level {r}: percentile rank {rank:.1f}")
+    print(f"train p25 candidate: {fit['train_p25']}; replacement levels evaluated: {list(levels)}")
 
-    payload = {"data_lag": lag, "limitation": LIMITATION, "split_meta": meta, "smoke": output.results,
-               "diagnostics": output.diagnostics}  # fmt: skip
+    ctx = _build_context(all_games, box, levels)
+
+    # G. name-collision diagnostic
+    newest = lag["newest_header_date"] or "9999"
+    collisions = name_collision_report(
+        box.rows_by_event, {g.event_id: g.event_start_utc for g in all_games}, newest
+    )
+    print("\n=== G. NAME COLLISIONS (why historical arms are player_id-keyed) ===")
+    print(f"{collisions['multi_id_names']} of {collisions['names']} normalized names map to >1 player_id")
+    for name, ids in collisions["examples"].items():
+        print(f"  {name}: {ids}")
+
+    # D. validation grid
+    val_dates = sorted({g.event_start_utc[:10] for g in val_games})
+    if args.smoke:
+        # Mid-validation dates, not the first ones: the first validation dates are the season
+        # opener, where every team's last game is a preseason game with no boxscore, so nothing
+        # would be exercised beyond the "uncovered" branch.
+        start = len(val_dates) // 2
+        keep = set(val_dates[start : start + SMOKE_DATES])
+        val_eval_games = [g for g in val_games if g.event_start_utc[:10] in keep]
+        scope = f"SMOKE, {len(keep)} mid-validation dates"
+    else:
+        val_eval_games = val_games
+        scope = f"{len(val_dates)} dates"
+    configs = build_configs(levels)
+    by_key = {c.key: c for c in configs}
+    print(f"\n=== D. VALIDATION GRID ({scope}; {len(configs)} configs, one batched pass) ===")
+    val_out = evaluate(ctx, val_eval_games, configs, verify_batch=True)
+    ranked = sorted(val_out.results.values(), key=lambda r: (r.mae_margin, r.brier))
+    _print_results("validation, sorted by margin MAE (e* = both-sides-covered subset)", ranked)
+    diag = val_out.diagnostics
+    print(f"\nvalidation diagnostics: side status {diag['side_status_counts']}")
+    print(f"  inferred-absent player-games: {diag['absent_player_games']}")
+    print(f"  static tier hits (4.8 / 2.5 / 1.1): {diag['static_tier_hits']}")
+    print(f"  real fallback to static tier (no played history): {diag['real_fallback']}")
+
+    # E. selection on validation only
+    winner = select_winner(val_out.results.values())
+    wspec = by_key[winner.key]
+    print(f"\n=== E. WINNER (validation only): {winner.key} ===")
+    print(f"  validation margin MAE {winner.mae_margin:.4f}, Brier {winner.brier:.5f}")
+    if winner.key == "zero":
+        print("no availability arm beat the zero gap on validation")
+    edge = wspec.k == max(K_GRID) or (
+        wspec.replacement is not None and wspec.replacement in (min(levels), max(levels))
+    )
+    if edge and winner.key != "zero":
+        print("winner sits at the edge of the grid; the optimum may lie outside it")
+
+    payload: dict[str, Any] = {
+        "smoke": bool(args.smoke),
+        "data_lag": lag,
+        "limitation": LIMITATION,
+        "split_meta": meta,
+        "train_quantiles": fit,
+        "replacement_levels": list(levels),
+        "validation": [_result_row(r) for r in ranked],
+        "validation_diagnostics": diag,
+        "winner": _result_row(winner),
+        "name_collisions": collisions,
+        "holdout": None,
+    }
+    json.dumps(_jsonable(payload))  # serialization check: fail here, not after the holdout touch
+
+    # F. locked holdout, touched exactly once, after selection
+    if not args.smoke:
+        static_key = f"static_k{STATIC_BASELINE_K}"
+        hold_keys = list(dict.fromkeys([winner.key, "zero", static_key]))
+        hold_out = evaluate(ctx, holdout_games, [by_key[k] for k in hold_keys])
+        hres = hold_out.results
+        print("\n=== F. FINAL CHECK, one-shot ===")
+        _print_results("LOCKED HOLDOUT", [hres[k] for k in hold_keys])
+        deltas: dict[str, dict[str, float]] = {}
+        for label, key in (("winner", winner.key), ("static_k1.0", static_key)):
+            r, z = hres[key], hres["zero"]
+            d = {
+                "mae_margin": r.mae_margin - z.mae_margin,
+                "brier": r.brier - z.brier,
+                "elig_mae_margin": r.elig_mae_margin - z.elig_mae_margin,
+                "elig_brier": r.elig_brier - z.elig_brier,
+            }
+            deltas[f"{label}_minus_zero"] = d
+            print(
+                f"delta {label} ({key}) minus zero: margin MAE {d['mae_margin']:+.4f}, "
+                f"Brier {d['brier']:+.5f}; eligible subset: MAE {d['elig_mae_margin']:+.4f}, "
+                f"Brier {d['elig_brier']:+.5f}"
+            )
+        zero_res = hres["zero"]
+        print(
+            f"Holdout is underpowered: only {zero_res.elig_n} of {zero_res.n} holdout games have "
+            "both sides covered by boxscores"
+        )
+        print(f"holdout diagnostics: {hold_out.diagnostics}")
+        payload["holdout"] = {
+            "configs": hold_keys,
+            "results": [_result_row(hres[k]) for k in hold_keys],
+            "deltas": deltas,
+            "diagnostics": hold_out.diagnostics,
+            "eligible_games": zero_res.elig_n,
+            "total_games": zero_res.n,
+        }
+
+    # H. write the result JSON
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(_jsonable(payload), indent=2), encoding="utf-8")
     print(f"\nwrote {out_path} in {time.time() - started:.0f}s")
