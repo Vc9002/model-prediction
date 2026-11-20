@@ -126,6 +126,7 @@ None yet.
 | 261118-umr | NCAAB resolver: school-only UMass and Rutgers resolve to the flagship instead of UMass Boston / Rutgers-Camden (alias target was not a history name); regression test | 2026-11-18 | 54e0028b | [261118-umr-ncaab-resolver-umass-and-rutgers-aliases](./quick/261118-umr-ncaab-resolver-umass-and-rutgers-aliases/) |
 | 261118-hlt | Health audit: resolution settlement matches spelling-variant team names (4 winning Euroleague/hockey picks would have voided), health check exempts zero-stake UNQUOTED_SHADOW rows, market_quotes.db bit-flip corruption repaired, dashboard restarted | 2026-11-18 | 16f92f3b | [261118-hlt-health-audit-fixes-settlement-name-match-](./quick/261118-hlt-health-audit-fixes-settlement-name-match-/) |
 | 261118-x3p | NBA real-player availability ablation v2 (research only): zero vs static vs replacement-relative minutes-aware player_id-keyed real values, scale grid selected on validation, holdout touched once; winner was zero (no availability arm beat it; static worse on validation and holdout); box scores stop at 2026-11-02 and the backfill is unscheduled | 2026-11-18 | c714f097 | [261118-x3p-nba-real-player-availability-ablation-v2](./quick/261118-x3p-nba-real-player-availability-ablation-v2/) |
+| 261120-gaq | Best-pick audit edge buckets keyed on first-sight edge, graded at that row's own line and price; last-run record kept as context | 2026-11-20 | 24091844 | [261120-gaq-re-key-best-pick-audit-edge-buckets-on-f](./quick/261120-gaq-re-key-best-pick-audit-edge-buckets-on-f/) |
 
 ## Milestone History
 
