@@ -76,6 +76,7 @@ def _add(
     raw_payload=None,
     home_team="Home Team",
     away_team="Away Team",
+    payload_extra=None,
 ):
     _counter["n"] += 1
     n = _counter["n"]
@@ -93,6 +94,7 @@ def _add(
                 "market_quote_provenance": provenance,
                 "away_team": away_team,
                 "home_team": home_team,
+                **(payload_extra or {}),
             }
         )
     if open_pick:
@@ -140,6 +142,68 @@ def _add(
 def _bucket_rows(db_path, n, *, result="win", provenance="", **kwargs):
     for _ in range(n):
         _add(db_path, result=result, provenance=provenance, **kwargs)
+
+
+def _superseded_then_settled(
+    db_path,
+    *,
+    event_id,
+    model_id,
+    sport,
+    market_type,
+    selection,
+    first_edge,
+    first_line,
+    last_edge,
+    last_line,
+    last_result,
+    scores=None,
+    provenance=abp.VERIFIED_QUOTE_PROVENANCE,
+):
+    # The forecast job reruns and supersedes earlier rows: the first sighting is the
+    # superseded row, the settled row is the last pre-game rerun with a moved line and edge.
+    common = {
+        "event_id": event_id,
+        "model_id": model_id,
+        "sport": sport,
+        "market_type": market_type,
+        "selection": selection,
+        "provenance": provenance,
+    }
+    _add(
+        db_path,
+        edge=first_edge,
+        line=first_line,
+        result=None,
+        status="superseded",
+        created_at="2026-01-01T14:00:00Z",
+        **common,
+    )
+    _add(
+        db_path,
+        edge=last_edge,
+        line=last_line,
+        result=last_result,
+        status="settled",
+        created_at="2026-01-01T22:00:00Z",
+        payload_extra=(
+            {"home_score": str(scores[0]), "away_score": str(scores[1])} if scores is not None else None
+        ),
+        **common,
+    )
+
+
+def _audit(engine, *, sport, market_type, selection, edge, model_id="m1"):
+    return engine.audit_candidate(
+        sport=sport,
+        market_type=market_type,
+        selection=selection,
+        edge=edge,
+        model_prob=0.5 + edge,
+        market_prob=0.5,
+        model_id=model_id,
+        quote_provenance=abp.VERIFIED_QUOTE_PROVENANCE,
+    )
 
 
 # --- Task 1: verified-quote gate -------------------------------------------------
@@ -465,3 +529,181 @@ def test_negative_edge_against_winning_bucket_is_still_a_trap(db):
         quote_provenance=abp.VERIFIED_QUOTE_PROVENANCE,
     )
     assert result["verdict"] == "DOWNGRADE_TRAP"
+
+
+# --- quick-261120-gaq: buckets keyed on first sighting, not the last pre-game rerun ------
+
+
+def test_first_sight_bucket_not_last_rerun(db):
+    # A pick offered at +6.5% whose last rerun shows +13% must stay in the 5-8% bucket and be
+    # graded at its own first-sight line: under 230.5 loses on a final total of 232, even
+    # though the settled row (under 233.5) won.
+    _superseded_then_settled(
+        db,
+        event_id="evt-a",
+        model_id="m1",
+        sport="nba",
+        market_type="total",
+        selection="under",
+        first_edge=0.065,
+        first_line=230.5,
+        last_edge=0.13,
+        last_line=233.5,
+        last_result="win",
+        scores=(120, 112),
+    )
+    engine = abp.HistoricalAuditEngine(db)
+    first = _audit(engine, sport="nba", market_type="total", selection="under", edge=0.065)
+    assert first["pooled"].verified.wins == 0
+    assert first["pooled"].verified.losses == 1
+    assert first["pooled"].verified.total_graded == 1
+    assert first["pooled"].verified.pnl == pytest.approx(-1.0)
+    assert first["evidence"].all_rows.losses == 1
+
+    last = _audit(engine, sport="nba", market_type="total", selection="under", edge=0.13)
+    assert last["pooled"].all_rows.total_graded == 0
+    assert last["pooled"].verified.total_graded == 0
+
+
+def test_first_sight_graded_by_same_line_settled_result_without_scores(db):
+    _superseded_then_settled(
+        db,
+        event_id="evt-b",
+        model_id="m1",
+        sport="nba",
+        market_type="total",
+        selection="under",
+        first_edge=0.065,
+        first_line=230.5,
+        last_edge=0.13,
+        last_line=230.5,
+        last_result="win",
+    )
+    # Different settled line and no scores: the first-sight row cannot be graded, and the
+    # later row is never substituted for it.
+    _superseded_then_settled(
+        db,
+        event_id="evt-b2",
+        model_id="m1",
+        sport="nba",
+        market_type="total",
+        selection="under",
+        first_edge=0.065,
+        first_line=230.5,
+        last_edge=0.13,
+        last_line=233.5,
+        last_result="win",
+    )
+    engine = abp.HistoricalAuditEngine(db)
+    res = _audit(engine, sport="nba", market_type="total", selection="under", edge=0.065)
+    v = res["pooled"].verified
+    assert (v.wins, v.losses) == (1, 0)
+    # Price-derived from the first-sight row's 50% price, not the settled row's own pnl (0.9).
+    assert v.pnl == pytest.approx(1.0)
+    assert res["pooled"].all_rows.total_graded == 1
+    assert engine.ungraded_first_sight_keys == 1
+
+
+def test_archived_and_removed_rows_never_counted(db):
+    common = {"sport": "mlb", "market_type": "moneyline", "selection": "home"}
+    _add(
+        db,
+        event_id="evt-c",
+        edge=0.065,
+        result="loss",
+        status="archived",
+        provenance=abp.VERIFIED_QUOTE_PROVENANCE,
+        created_at="2026-01-01T10:00:00Z",
+        **common,
+    )
+    _add(
+        db,
+        event_id="evt-c",
+        edge=0.09,
+        result="win",
+        status="settled",
+        provenance=abp.VERIFIED_QUOTE_PROVENANCE,
+        created_at="2026-01-01T12:00:00Z",
+        **common,
+    )
+    _add(
+        db,
+        event_id="evt-c-removed",
+        edge=0.065,
+        result="loss",
+        status="removed",
+        provenance=abp.VERIFIED_QUOTE_PROVENANCE,
+        created_at="2026-01-01T10:00:00Z",
+        **common,
+    )
+    engine = abp.HistoricalAuditEngine(db)
+    low = engine.stats_by_sport_mkt_bucket[("mlb", "moneyline", "5.0% - 7.9%")]
+    assert low.all_rows.total_graded == 0
+    assert low.verified.total_graded == 0
+    mid = engine.stats_by_sport_mkt_bucket[("mlb", "moneyline", "8.0% - 11.9%")]
+    assert (mid.verified.wins, mid.verified.losses) == (1, 0)
+
+
+def test_last_run_evidence_keeps_settled_row_basis(db):
+    for i in range(4):
+        _superseded_then_settled(
+            db,
+            event_id=f"evt-d{i}",
+            model_id="m1",
+            sport="nba",
+            market_type="total",
+            selection="under",
+            first_edge=0.065,
+            first_line=230.5,
+            last_edge=0.13,
+            last_line=233.5,
+            last_result="win",
+            scores=(120, 112),
+        )
+    _superseded_then_settled(
+        db,
+        event_id="evt-d-m2",
+        model_id="m2",
+        sport="nba",
+        market_type="total",
+        selection="under",
+        first_edge=0.065,
+        first_line=230.5,
+        last_edge=0.13,
+        last_line=233.5,
+        last_result="loss",
+        scores=(120, 115),
+    )
+    engine = abp.HistoricalAuditEngine(db)
+    res = _audit(engine, sport="nba", market_type="total", selection="under", edge=0.13)
+    assert res["basis"] == "all models pooled"
+    assert res["evidence"].verified.total_graded == 0
+    # The context basis follows the first-sight decision (pooled); the m1-only record would
+    # read 4W-0L if it chose the basis instead.
+    lr = res["last_run_evidence"].verified
+    assert (lr.wins, lr.losses) == (4, 1)
+    assert any("Context, last pre-game run (old basis): verified 4W-1L" in f for f in res["flags"])
+
+
+def test_first_sight_spread_graded_from_selected_side(db):
+    # Spread line is from the selected side's perspective: away +2.5 covers a 2-point away
+    # loss, the later +1.5 does not.
+    _superseded_then_settled(
+        db,
+        event_id="evt-e",
+        model_id="m1",
+        sport="nba",
+        market_type="spread",
+        selection="away",
+        first_edge=0.065,
+        first_line=2.5,
+        last_edge=0.13,
+        last_line=1.5,
+        last_result="loss",
+        scores=(122, 120),
+    )
+    engine = abp.HistoricalAuditEngine(db)
+    res = _audit(engine, sport="nba", market_type="spread", selection="away", edge=0.065)
+    v = res["pooled"].verified
+    assert (v.wins, v.losses) == (1, 0)
+    assert v.pnl == pytest.approx(1.0)

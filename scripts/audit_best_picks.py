@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Best Picks Empirical Audit Tool.
 
-Audits candidate or open picks against historical settled records in ledgers.db. Every
-verdict is recomputed live from that ledger at run time -- no sport or market is ever
-hard-labelled. Evaluates picks beyond nominal edge using:
-1. Historical Edge Tier Win Rate & ROI, counted only from rows whose own quote was a
-   verified decision-time executable quote (Pillar 1).
+Audits candidate or open picks against historical records in ledgers.db. Every verdict is
+recomputed live from that ledger at run time -- no sport or market is ever hard-labelled.
+Evaluates picks beyond nominal edge using:
+1. Historical Edge Tier Win Rate & ROI, bucketed on the edge each decision had when it was
+   FIRST offered (its earliest ledger row, graded at that row's own line and price), and
+   counted for verdicts only from first-sight rows whose own quote was a verified
+   decision-time executable quote (Pillar 1). The old last-pre-game-run (settled row) record
+   is shown as context only.
 2. Directional Asymmetry: a total candidate (over/under) is judged on its own direction's
    bucket, never the pooled over+under record (Pillar 2).
 
@@ -94,10 +97,11 @@ def get_edge_bucket(edge: float) -> str:
 
 @dataclass
 class BucketStats:
-    """All settled rows in a bucket, split by whether the row's own quote was verified.
+    """All first-sight decisions in a bucket, split by whether the row's own quote was verified.
 
     Only `.verified` counts toward any verdict; `.all_rows` is retained for context so a
-    report can show "0 verified of N graded" instead of silently dropping the bucket.
+    report can show "0 verified of N graded" instead of silently dropping the bucket. The two
+    take their own first row per decision, so `.verified` can exceed `.all_rows` in a bucket.
     """
 
     all_rows: EdgeTierStats = field(default_factory=EdgeTierStats)
@@ -113,9 +117,77 @@ def _connect_ro(db_path: Path) -> sqlite3.Connection:
     return conn
 
 
+_RESULTS = ("WIN", "LOSS", "PUSH")
+_UTC_MAX = datetime.max.replace(tzinfo=UTC)
+
+
+def _parse_created_at(value: Any) -> datetime:
+    # created_at_utc is stored in mixed shapes (`...42.589330Z`, `...42Z`, `+00:00`), so a
+    # string sort mis-orders same-second rows. A naive value is read as UTC so aware and
+    # naive stamps can never raise TypeError mid-sort; an unparseable stamp sorts last and
+    # can therefore never claim first sighting.
+    try:
+        dt = datetime.fromisoformat(str(value))
+    except (TypeError, ValueError):
+        return _UTC_MAX
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
+
+
+def _parse_score(value: Any) -> float | None:
+    # Scores are stored as TEXT and many superseded rows carry the key with an empty string,
+    # so "present" means parseable, not "not null".
+    if value is None or str(value).strip() == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _grade_from_scores(
+    market: str, selection: str, line: float | None, home: float, away: float
+) -> str | None:
+    """Grade a decision from final scores at the decision's own line.
+
+    `line` is from the selected side's perspective (a spread of +2.5 on the away side means
+    away plus 2.5). Returns None for markets the final score cannot grade (nrfi, draw).
+    """
+    if market == "moneyline" and selection in ("home", "away"):
+        margin = (home - away) if selection == "home" else (away - home)
+    elif market == "spread" and selection in ("home", "away") and line is not None:
+        margin = ((home - away) if selection == "home" else (away - home)) + line
+    elif market == "total" and selection in ("over", "under") and line is not None:
+        total = home + away
+        margin = (total - line) if selection == "over" else (line - total)
+    else:
+        return None
+    if margin > 0:
+        return "WIN"
+    if margin < 0:
+        return "LOSS"
+    return "PUSH"
+
+
+def _price_pnl(result: str, staked: float, price: float) -> float:
+    if result == "WIN":
+        return staked * (1.0 - price) / price
+    if result == "LOSS":
+        return -staked
+    return 0.0
+
+
+def _same_line(a: Any, b: Any) -> bool:
+    if a is None or b is None:
+        return a is None and b is None
+    return abs(float(a) - float(b)) < 1e-9
+
+
 class HistoricalAuditEngine:
     def __init__(self, db_path: Path = DB_PATH) -> None:
         self.db_path = db_path
+        # First-sight basis: each decision counts once, in the bucket of the edge it had when
+        # it was first offered, graded at that row's own line and price. These four maps feed
+        # every verdict.
         self.stats_by_sport_mkt_bucket: dict[tuple[str, str, str], BucketStats] = defaultdict(BucketStats)
         self.stats_by_sport_dir_bucket: dict[tuple[str, str, str], BucketStats] = defaultdict(BucketStats)
         # A pooled bucket mixes retired models with the serving one, so a bucket can look
@@ -126,72 +198,227 @@ class HistoricalAuditEngine:
         self.stats_by_model_dir_bucket: dict[tuple[str, str, str, str], BucketStats] = defaultdict(
             BucketStats
         )
+        # Last-run basis (the old behaviour): the settled row, i.e. the last pre-game rerun.
+        # Kept as context only; it never decides a verdict.
+        self.last_run_by_sport_mkt_bucket: dict[tuple[str, str, str], BucketStats] = defaultdict(BucketStats)
+        self.last_run_by_sport_dir_bucket: dict[tuple[str, str, str], BucketStats] = defaultdict(BucketStats)
+        self.last_run_by_model_mkt_bucket: dict[tuple[str, str, str, str], BucketStats] = defaultdict(
+            BucketStats
+        )
+        self.last_run_by_model_dir_bucket: dict[tuple[str, str, str, str], BucketStats] = defaultdict(
+            BucketStats
+        )
+        # First-sight keys whose row could not be graded at its own line (no result, no
+        # scores, no same-line settled sibling); skipped, never filled from a later row.
+        self.ungraded_first_sight_keys: int = 0
         self._load_historical_settlements()
+
+    @staticmethod
+    def _decision_key(r: sqlite3.Row) -> tuple[str, str, str, str, str]:
+        return (
+            str(r["sport"] or "").lower(),
+            str(r["event_id"] or ""),
+            str(r["market_type"] or "").lower(),
+            str(r["selection"] or "").lower(),
+            str(r["model_id"] or "").lower(),
+        )
+
+    @staticmethod
+    def _entries(
+        r: sqlite3.Row,
+        edge: float,
+        sport_mkt: dict[tuple[str, str, str], BucketStats],
+        sport_dir: dict[tuple[str, str, str], BucketStats],
+        model_mkt: dict[tuple[str, str, str, str], BucketStats],
+        model_dir: dict[tuple[str, str, str, str], BucketStats],
+    ) -> list[BucketStats]:
+        sport = str(r["sport"] or "").lower()
+        mkt = str(r["market_type"] or "").lower()
+        sel = str(r["selection"] or "").lower()
+        model_id = str(r["model_id"] or "").lower()
+        bucket = get_edge_bucket(edge)
+        entries = [sport_mkt[(sport, mkt, bucket)], model_mkt[(sport, mkt, bucket, model_id)]]
+        if mkt == "total" and sel in ("over", "under"):
+            entries.append(sport_dir[(sport, sel, bucket)])
+            entries.append(model_dir[(sport, sel, bucket, model_id)])
+        return entries
+
+    @staticmethod
+    def _add_result(entry: EdgeTierStats, res: str, pnl: float, staked: float) -> None:
+        if res == "WIN":
+            entry.wins += 1
+        elif res == "LOSS":
+            entry.losses += 1
+        elif res == "PUSH":
+            entry.pushes += 1
+        entry.pnl += pnl
+        entry.staked += staked
+
+    def _count_first_sight(
+        self, r: sqlite3.Row, res: str, pnl: float, staked: float, *, to_all: bool, to_verified: bool
+    ) -> None:
+        edge = float(r["model_probability"] or 0.0) - float(r["market_probability"] or 0.0)
+        for bs in self._entries(
+            r,
+            edge,
+            self.stats_by_sport_mkt_bucket,
+            self.stats_by_sport_dir_bucket,
+            self.stats_by_model_mkt_bucket,
+            self.stats_by_model_dir_bucket,
+        ):
+            if to_all:
+                self._add_result(bs.all_rows, res, pnl, staked)
+            if to_verified:
+                self._add_result(bs.verified, res, pnl, staked)
 
     def _load_historical_settlements(self) -> None:
         if not self.db_path.exists():
             return
         conn = _connect_ro(self.db_path)
+        # Archived and removed rows are operator-removed bad rows and are never read.
         rows = conn.execute(
             """
             SELECT sport, market_type, model_probability, market_probability,
                    selection, line, pnl_units, result, units, event_id, model_id,
+                   status, created_at_utc, ledger_tier,
                    CASE WHEN json_valid(decision_payload_json)
                         THEN json_extract(decision_payload_json, '$.market_quote_provenance')
-                   END AS quote_provenance
+                   END AS quote_provenance,
+                   CASE WHEN json_valid(decision_payload_json)
+                        THEN json_extract(decision_payload_json, '$.home_score')
+                   END AS home_score,
+                   CASE WHEN json_valid(decision_payload_json)
+                        THEN json_extract(decision_payload_json, '$.away_score')
+                   END AS away_score
             FROM ledger_records
-            WHERE status = 'settled'
-            ORDER BY CASE ledger_tier WHEN 'main' THEN 0 ELSE 1 END, created_at_utc
+            WHERE status IN ('open', 'superseded', 'settled')
             """
         ).fetchall()
         conn.close()
 
+        def tier_rank(r: sqlite3.Row) -> int:
+            return 0 if r["ledger_tier"] == "main" else 1
+
+        # Last-run pass: the old settled-row basis, reproduced exactly (same ordering, same
+        # dedup, same own pnl) so it stays comparable as context.
+        settled = sorted(
+            (r for r in rows if r["status"] == "settled"),
+            key=lambda r: (tier_rank(r), r["created_at_utc"] or ""),
+        )
         # The same call is logged once per ledger tier (Main and Flat); counting both rows
         # inflates n and double-weights those games. Main's row wins when both exist.
         seen: set[tuple[str, str, str, str, str]] = set()
-        for r in rows:
+        settled_by_key: dict[tuple[str, str, str, str, str], list[sqlite3.Row]] = defaultdict(list)
+        scores_by_event: dict[tuple[str, str], tuple[float, float]] = {}
+        for r in settled:
+            home = _parse_score(r["home_score"])
+            away = _parse_score(r["away_score"])
+            if home is not None and away is not None:
+                scores_by_event.setdefault(
+                    (str(r["sport"] or "").lower(), str(r["event_id"] or "")), (home, away)
+                )
             res = str(r["result"] or "").upper()
-            if res not in ("WIN", "LOSS", "PUSH"):
+            if res not in _RESULTS:
                 continue
-            sport = str(r["sport"] or "").lower()
-            mkt = str(r["market_type"] or "").lower()
-            model_id = str(r["model_id"] or "").lower()
-            event_id = str(r["event_id"] or "")
-            if event_id:
-                key = (sport, event_id, mkt, str(r["selection"] or "").lower(), model_id)
+            if r["event_id"]:
+                key = self._decision_key(r)
+                settled_by_key[key].append(r)
                 if key in seen:
                     continue
                 seen.add(key)
-            mod_p = float(r["model_probability"] or 0.0)
-            mkt_p = float(r["market_probability"] or 0.0)
-            edge = mod_p - mkt_p
-            bucket = get_edge_bucket(edge)
+            edge = float(r["model_probability"] or 0.0) - float(r["market_probability"] or 0.0)
             pnl = float(r["pnl_units"] or 0.0)
             staked = float(r["units"] or 1.0)
-            sel = str(r["selection"] or "").lower()
             is_verified = r["quote_provenance"] == VERIFIED_QUOTE_PROVENANCE
+            for bs in self._entries(
+                r,
+                edge,
+                self.last_run_by_sport_mkt_bucket,
+                self.last_run_by_sport_dir_bucket,
+                self.last_run_by_model_mkt_bucket,
+                self.last_run_by_model_dir_bucket,
+            ):
+                self._add_result(bs.all_rows, res, pnl, staked)
+                if is_verified:
+                    self._add_result(bs.verified, res, pnl, staked)
 
-            entries: list[BucketStats] = [
-                self.stats_by_sport_mkt_bucket[(sport, mkt, bucket)],
-                self.stats_by_model_mkt_bucket[(sport, mkt, bucket, model_id)],
-            ]
-            if mkt == "total" and sel in ("over", "under"):
-                entries.append(self.stats_by_sport_dir_bucket[(sport, sel, bucket)])
-                entries.append(self.stats_by_model_dir_bucket[(sport, sel, bucket, model_id)])
-            for bucket_stats in entries:
-                for entry in (
-                    (bucket_stats.all_rows,)
-                    if not is_verified
-                    else (bucket_stats.all_rows, bucket_stats.verified)
-                ):
-                    if res == "WIN":
-                        entry.wins += 1
-                    elif res == "LOSS":
-                        entry.losses += 1
-                    elif res == "PUSH":
-                        entry.pushes += 1
-                    entry.pnl += pnl
-                    entry.staked += staked
+        # First-sight pass. The settled row is the last pre-game rerun (the daily job reruns
+        # up to 4x a day and supersedes earlier rows), so keying a bucket on its edge
+        # conditions on line movement AFTER the pick was first offered: winners whose edge
+        # grew and losers whose edge shrank migrate between buckets and inflate the band.
+        first_any: dict[tuple[str, str, str, str, str], sqlite3.Row] = {}
+        first_verified: dict[tuple[str, str, str, str, str], sqlite3.Row] = {}
+        for r in sorted(rows, key=lambda r: (_parse_created_at(r["created_at_utc"]), tier_rank(r))):
+            if not r["event_id"]:
+                # No stable identity to dedup on: keep the old per-row behaviour for settled
+                # rows (own result, own pnl); an unsettled row has nothing to grade.
+                res = str(r["result"] or "").upper()
+                if r["status"] == "settled" and res in _RESULTS:
+                    self._count_first_sight(
+                        r,
+                        res,
+                        float(r["pnl_units"] or 0.0),
+                        float(r["units"] or 1.0),
+                        to_all=True,
+                        to_verified=r["quote_provenance"] == VERIFIED_QUOTE_PROVENANCE,
+                    )
+                continue
+            key = self._decision_key(r)
+            first_any.setdefault(key, r)
+            if r["quote_provenance"] == VERIFIED_QUOTE_PROVENANCE:
+                first_verified.setdefault(key, r)
+
+        # The two dicts are deliberately uncoupled: a key's verified evidence is its earliest
+        # verified row, which can sit in a different bucket than its earliest row overall.
+        graded_cache: dict[int, tuple[str, float, float] | None] = {}
+
+        def graded(r: sqlite3.Row, key: tuple[str, str, str, str, str]) -> tuple[str, float, float] | None:
+            if id(r) not in graded_cache:
+                graded_cache[id(r)] = self._grade_first_sight(r, key, scores_by_event, settled_by_key)
+            return graded_cache[id(r)]
+
+        for key, r in first_any.items():
+            g = graded(r, key)
+            if g is None:
+                self.ungraded_first_sight_keys += 1
+                continue
+            self._count_first_sight(r, *g, to_all=True, to_verified=False)
+        for key, r in first_verified.items():
+            g = graded(r, key)
+            if g is not None:
+                self._count_first_sight(r, *g, to_all=False, to_verified=True)
+
+    @staticmethod
+    def _grade_first_sight(
+        r: sqlite3.Row,
+        key: tuple[str, str, str, str, str],
+        scores_by_event: dict[tuple[str, str], tuple[float, float]],
+        settled_by_key: dict[tuple[str, str, str, str, str], list[sqlite3.Row]],
+    ) -> tuple[str, float, float] | None:
+        """Grade a first-sight row at its OWN line and price; never borrow a later row."""
+        price = float(r["market_probability"] or 0.0)
+        if price <= 0.0 or price >= 1.0:
+            # A missing price makes the edge, and so the bucket, meaningless.
+            return None
+        staked = float(r["units"] or 1.0)
+        own_res = str(r["result"] or "").upper()
+        if r["status"] == "settled" and own_res in _RESULTS:
+            return own_res, float(r["pnl_units"] or 0.0), staked
+        line = r["line"]
+        market = str(r["market_type"] or "").lower()
+        selection = str(r["selection"] or "").lower()
+        scores = scores_by_event.get((key[0], key[1]))
+        res: str | None = None
+        if scores is not None:
+            res = _grade_from_scores(market, selection, None if line is None else float(line), *scores)
+        if res is None:
+            for sib in settled_by_key.get(key, ()):
+                if _same_line(sib["line"], line):
+                    res = str(sib["result"]).upper()
+                    break
+        if res is None:
+            return None
+        return res, _price_pnl(res, staked, price), staked
 
     def audit_candidate(
         self,
@@ -221,13 +448,20 @@ class HistoricalAuditEngine:
         if is_directional_total:
             pooled = self.stats_by_sport_dir_bucket.get((sp, sel, bucket), BucketStats())
             model = self.stats_by_model_dir_bucket.get((sp, sel, bucket, mid), BucketStats())
+            last_run_pooled = self.last_run_by_sport_dir_bucket.get((sp, sel, bucket), BucketStats())
+            last_run_model = self.last_run_by_model_dir_bucket.get((sp, sel, bucket, mid), BucketStats())
         else:
             pooled = self.stats_by_sport_mkt_bucket.get((sp, mkt, bucket), BucketStats())
             model = self.stats_by_model_mkt_bucket.get((sp, mkt, bucket, mid), BucketStats())
+            last_run_pooled = self.last_run_by_sport_mkt_bucket.get((sp, mkt, bucket), BucketStats())
+            last_run_model = self.last_run_by_model_mkt_bucket.get((sp, mkt, bucket, mid), BucketStats())
         # Judge on the candidate's own model when it has enough VERIFIED graded history;
         # otherwise the pooled bucket is the only evidence there is, and a flag says so.
         use_model = bool(mid) and model.verified.total_graded >= MIN_GRADED
         evidence = model if use_model else pooled
+        # Context only: the old settled-row (last pre-game run) record, on the same basis the
+        # verdict used so the two lines are comparable. It never moves a verdict.
+        last_run_evidence = last_run_model if use_model else last_run_pooled
         basis = f"{model_id} only" if use_model else "all models pooled"
         bucket_label = f"{bucket} {sel}" if is_directional_total else bucket
 
@@ -270,6 +504,12 @@ class HistoricalAuditEngine:
                 f"Context, all models pooled: verified {pooled.verified.win_rate:.1f}% WR, {pooled.verified.roi:+.1f}% ROI ({pooled.verified.wins}W-{pooled.verified.losses}L)."
             )
 
+        lr = last_run_evidence.verified
+        if lr.total_graded > 0:
+            flags.append(
+                f"Context, last pre-game run (old basis): verified {lr.wins}W-{lr.losses}L, {lr.roi:+.1f}% ROI."
+            )
+
         bucket_verdict = verdict
         if bucket_verdict == "CONFIRMED_BEST" and not quote_verified:
             # The mechanical bucket evidence qualifies, but the candidate's own quote was
@@ -287,6 +527,7 @@ class HistoricalAuditEngine:
             "bucket": bucket,
             "basis": basis,
             "evidence": evidence,
+            "last_run_evidence": last_run_evidence,
             "pooled": pooled,
             "model": model,
             "quote_provenance": prov,
